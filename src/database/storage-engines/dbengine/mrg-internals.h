@@ -141,24 +141,24 @@ static inline void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const cha
     uuidmap_uuid(metric->uuid, uuid);
     char uuid_txt[UUID_STR_LEN];
     uuid_unparse_lower(uuid, uuid_txt);
-    nd_log(NDLS_DAEMON, NDLP_ERR,
-           "METRIC: %s on %s at tier %d, refcount %d, partition %u, "
-           "retention [%ld - %ld (hot), %ld (clean)], update every %"PRIu32
+    dbengine_log(ctx->engine, NDLP_ERR,
+                 "METRIC: %s on %s at tier %d, refcount %d, partition %u, "
+                 "retention [%ld - %ld (hot), %ld (clean)], update every %"PRIu32
 #ifdef NETDATA_INTERNAL_CHECKS
-           ", writer pid %d "
+                 ", writer pid %d "
 #endif
-           " --- PLEASE OPEN A GITHUB ISSUE TO REPORT THIS LOG LINE TO NETDATA --- ",
-           msg,
-           uuid_txt,
-           ctx->config.tier,
-           metric->refcount,
-           metric->partition,
-           metric->first_time_s,
-           metric->latest_time_s_hot,
-           metric->latest_time_s_clean,
-           metric->latest_update_every_s
+                 " --- PLEASE OPEN A GITHUB ISSUE TO REPORT THIS LOG LINE TO NETDATA --- ",
+                 msg,
+                 uuid_txt,
+                 ctx->config.tier,
+                 metric->refcount,
+                 metric->partition,
+                 metric->first_time_s,
+                 metric->latest_time_s_hot,
+                 metric->latest_time_s_clean,
+                 metric->latest_update_every_s
 #ifdef NETDATA_INTERNAL_CHECKS
-           , (int)metric->writer
+                 , (int)metric->writer
 #endif
     );
 }

@@ -1474,9 +1474,9 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         size_t entries = __atomic_load_n(&cache->clean.stats->entries, __ATOMIC_RELAXED);
         if(entries) {
             nd_log_limit_static_global_var(erl, 1, 0);
-            nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
-                         "DBENGINE CACHE: cannot free all clean pages, %zu are still in the clean queue",
-                         entries);
+            dbengine_log_limit(pgc_engine(cache), &erl, NDLP_NOTICE,
+                               "DBENGINE CACHE: cannot free all clean pages, %zu are still in the clean queue",
+                               entries);
         }
         pgc_queue_unlock(cache, &cache->clean);
     }
@@ -2280,7 +2280,9 @@ bool pgc_destroy(PGC *cache, bool flush) {
     nd_thread_join(cache->evictor.thread);
 
     if(PGC_REFERENCED_PAGES(cache)) {
-        netdata_log_error("DBENGINE CACHE: there are %zu referenced cache pages - leaving the cache allocated", PGC_REFERENCED_PAGES(cache));
+        dbengine_log_error(pgc_engine(cache),
+                           "DBENGINE CACHE: there are %zu referenced cache pages - leaving the cache allocated",
+                           PGC_REFERENCED_PAGES(cache));
         return false;
     }
     else {
@@ -2674,8 +2676,9 @@ void pgc_open_cache_to_journal_v2(
 
     struct section_pages *sp = *section_pages_pptr;
     if(!spinlock_trylock(&sp->migration_to_v2_spinlock)) {
-        netdata_log_info("DBENGINE: migration to journal v2 for datafile %u (section %" PRIu64 ") is postponed, another jv2 indexer is already running for this section",
-                         datafile_fileno, (uint64_t)section);
+        dbengine_log_info(pgc_engine(cache),
+                          "DBENGINE: migration to journal v2 for datafile %u (section %" PRIu64 ") is postponed, another jv2 indexer is already running for this section",
+                          datafile_fileno, (uint64_t)section);
         pgc_queue_unlock(cache, &cache->hot);
         return;
     }
@@ -2877,10 +2880,10 @@ void pgc_open_cache_to_journal_v2(
             jv2_reject_page(&JudyL_rejected_pages, rejected);
 
             nd_log_limit_static_thread_var(erl, 10, 0);
-            nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
-                         "DBENGINE: journal v2 indexing of datafile %u (section %" PRIu64 "): "
-                         "uuid id %" PRIu32 " has two pages starting at %ld; keeping the higher ranked one",
-                         datafile_fileno, (uint64_t)section, xio->uuid_id, (long)page->start_time_s);
+            dbengine_log_limit(pgc_engine(cache), &erl, NDLP_NOTICE,
+                               "DBENGINE: journal v2 indexing of datafile %u (section %" PRIu64 "): "
+                               "uuid id %" PRIu32 " has two pages starting at %ld; keeping the higher ranked one",
+                               datafile_fileno, (uint64_t)section, xio->uuid_id, (long)page->start_time_s);
         }
 
         // Every page that gets here is now owned by this migration: it is either

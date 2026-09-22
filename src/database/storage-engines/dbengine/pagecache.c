@@ -516,139 +516,189 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct dbengine_tier 
 
         char file_path[DBENGINE_PATH_MAX];
         journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
-        PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "read");
-        if(no_signal_received) {
-            time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
-            size_t journal_v2_file_size = datafile->journalfile->mmap.size;
+        // What the guarded read found, reported after it ends rather than inside it. The frame the
+        // PROTECTED_ACCESS_SETUP below installs is torn down by a cleanup attribute, so it stays armed until the
+        // end of the scope it sits in: anything emitted while it is armed runs under a signal handler that
+        // siglongjmps out of whatever it interrupts, skipping that code's own cleanup. A log sink is the
+        // embedder's code and may take a lock, so it is not run there - the braces below end the frame first.
+        enum {
+            JV2_NO_PROBLEM = 0,
+            JV2_METRIC_LIST_OVERFLOWS_FILE,
+            JV2_PAGE_LIST_HEADER_INVALID,
+            JV2_PAGE_LIST_OVERFLOWS_FILE,
+            JV2_EXTENT_INDEX_INVALID,
+            JV2_JOURNAL_FAULTED,
+        } problem = JV2_NO_PROBLEM;
+        size_t problem_metric_offset = 0, problem_list_size = 0, problem_file_size = 0;
+        {
+            PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "read");
+            if(no_signal_received) {
+                time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
+                size_t journal_v2_file_size = datafile->journalfile->mmap.size;
 
-            // the datafile possibly contains useful data for this query
+                // the datafile possibly contains useful data for this query
 
-            size_t journal_metric_count = (size_t)j2_header->metric_count;
-            struct journal_metric_list *uuid_list =
-                (struct journal_metric_list *)((uint8_t *)j2_header + j2_header->metric_offset);
-            size_t metric_offset = (uint8_t *)uuid_list - (uint8_t *)j2_header;
+                size_t journal_metric_count = (size_t)j2_header->metric_count;
+                struct journal_metric_list *uuid_list =
+                    (struct journal_metric_list *)((uint8_t *)j2_header + j2_header->metric_offset);
+                size_t metric_offset = (uint8_t *)uuid_list - (uint8_t *)j2_header;
 
-            size_t metric_list_size;
-            if (__builtin_mul_overflow(journal_metric_count, sizeof(*uuid_list), &metric_list_size) ||
-                metric_offset > journal_v2_file_size ||
-                metric_list_size > journal_v2_file_size - metric_offset) {
-                nd_log_limit_static_thread_var(erl, 60, 0);
-                nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                             "DBENGINE: Metric list exceeds journal file size in journalfile %u of tier %u (metric_offset=%zu, list_size=%zu, file_size=%zu)",
-                             datafile->fileno, datafile->tier, metric_offset, metric_list_size, journal_v2_file_size);
-                goto release_journal;
-            }
-
-            struct journal_metric_list *uuid_entry =
-                bsearch(uuid, uuid_list, journal_metric_count, sizeof(*uuid_list), journal_metric_uuid_compare);
-
-            if (unlikely(!uuid_entry)) {
-                // our UUID is not in this datafile
-                goto release_journal;
-            }
-
-            struct journal_page_header *page_list_header =
-                (struct journal_page_header *)((uint8_t *)j2_header + uuid_entry->page_offset);
-            size_t page_offset = (uint8_t *)page_list_header - (uint8_t *)j2_header;
-            if (page_offset > journal_v2_file_size - sizeof(*page_list_header)) {
-                nd_log_limit_static_thread_var(erl, 60, 0);
-                nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                             "DBENGINE: Invalid page list header in journalfile %u of tier %u",
-                             datafile->fileno, datafile->tier);
-                goto release_journal;
-            }
-
-            const volatile struct journal_page_list *page_list =
-                (const volatile struct journal_page_list *)((uint8_t *)page_list_header + sizeof(*page_list_header));
-            const volatile struct journal_extent_list *extent_list =
-                (const volatile struct journal_extent_list *)((uint8_t *)j2_header + j2_header->extent_offset);
-            uint32_t extent_entries = j2_header->extent_count;
-            uint32_t uuid_page_entries = page_list_header->entries;
-            size_t page_list_size;
-
-            if (__builtin_mul_overflow((size_t)uuid_page_entries, sizeof(*page_list), &page_list_size) ||
-                page_list_size > journal_v2_file_size - page_offset - sizeof(*page_list_header)) {
-                nd_log_limit_static_thread_var(erl, 60, 0);
-                nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                             "DBENGINE: Page list exceeds journal file size in journalfile %u of tier %u",
-                             datafile->fileno, datafile->tier);
-                goto release_journal;
-            }
-
-            for (uint32_t index = 0; index < uuid_page_entries; index++) {
-                const volatile struct journal_page_list *page_entry_in_journal = &page_list[index];
-
-                time_t page_first_time_s = page_entry_in_journal->delta_start_s + journal_start_time_s;
-                time_t page_last_time_s = page_entry_in_journal->delta_end_s + journal_start_time_s;
-
-                TIME_RANGE_COMPARE prc =
-                    is_page_in_time_range(page_first_time_s, page_last_time_s, wanted_start_time_s, wanted_end_time_s);
-
-                if (prc == PAGE_IS_IN_THE_PAST)
-                    continue;
-
-                if (prc == PAGE_IS_IN_THE_FUTURE)
-                    break;
-
-                // Make sure index is valid for this file
-                uint32_t extent_index = page_entry_in_journal->extent_index;
-                if (extent_index >= extent_entries) {
-                    nd_log_limit_static_thread_var(erl, 60, 0);
-                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                                 "DBENGINE: Invalid extent index in journalfile %u",
-                                 datafile->fileno);
-                    break;
+                size_t metric_list_size;
+                if (__builtin_mul_overflow(journal_metric_count, sizeof(*uuid_list), &metric_list_size) ||
+                    metric_offset > journal_v2_file_size ||
+                    metric_list_size > journal_v2_file_size - metric_offset) {
+                    problem = JV2_METRIC_LIST_OVERFLOWS_FILE;
+                    problem_metric_offset = metric_offset;
+                    problem_list_size = metric_list_size;
+                    problem_file_size = journal_v2_file_size;
+                    goto release_journal;
                 }
 
-                uint32_t page_update_every_s = page_entry_in_journal->update_every_s;
-                struct extent_io_data ei = {
-                    .block = OFFSET_TO_BLOCK(extent_list[extent_index].datafile_offset),
-                    .bytes = extent_list[extent_index].datafile_size,
-                    .fileno = datafile->fileno,
-                    // Every open-cache page must carry its metric's id, so that
-                    // journal-v2 indexing can resolve the metric without
-                    // dereferencing page->metric_id. Pages added here are clean
-                    // rather than hot, so the indexer does not walk them today -
-                    // but leaving the identity field zero would make that an
-                    // invisible dependency on queue placement.
-                    .uuid_id = mrg_metric_uuidmap_id(ctx->engine->main_mrg, metric),
-                };
+                struct journal_metric_list *uuid_entry =
+                    bsearch(uuid, uuid_list, journal_metric_count, sizeof(*uuid_list), journal_metric_uuid_compare);
 
-                if (datafile_acquire(datafile, DATAFILE_ACQUIRE_OPEN_CACHE)) {
-                    //for open cache item
-                    // add this page to open cache
-                    bool added = false;
+                if (unlikely(!uuid_entry)) {
+                    // our UUID is not in this datafile
+                    goto release_journal;
+                }
 
-                    PGC_ENTRY e = {0};
-                    e.hot = false;
-                    e.section = (Word_t)ctx;
-                    e.metric_id = metric_id;
-                    e.start_time_s = page_first_time_s;
-                    e.end_time_s = page_last_time_s;
-                    e.update_every_s = page_update_every_s;
-                    e.data = datafile;
-                    e.size = 0;
-                    e.custom_data = (uint8_t *)&ei;
-                    PGC_PAGE *page = pgc_page_add_and_acquire(ctx->engine->open_cache, e, &added);
+                struct journal_page_header *page_list_header =
+                    (struct journal_page_header *)((uint8_t *)j2_header + uuid_entry->page_offset);
+                size_t page_offset = (uint8_t *)page_list_header - (uint8_t *)j2_header;
+                if (page_offset > journal_v2_file_size - sizeof(*page_list_header)) {
+                    problem = JV2_PAGE_LIST_HEADER_INVALID;
+                    goto release_journal;
+                }
 
-                    if (!added)
-                        datafile_release(datafile, DATAFILE_ACQUIRE_OPEN_CACHE);
+                const volatile struct journal_page_list *page_list =
+                    (const volatile struct journal_page_list *)((uint8_t *)page_list_header + sizeof(*page_list_header));
+                const volatile struct journal_extent_list *extent_list =
+                    (const volatile struct journal_extent_list *)((uint8_t *)j2_header + j2_header->extent_offset);
+                uint32_t extent_entries = j2_header->extent_count;
+                uint32_t uuid_page_entries = page_list_header->entries;
+                size_t page_list_size;
 
-                    callback(page, callback_data);
+                if (__builtin_mul_overflow((size_t)uuid_page_entries, sizeof(*page_list), &page_list_size) ||
+                    page_list_size > journal_v2_file_size - page_offset - sizeof(*page_list_header)) {
+                    problem = JV2_PAGE_LIST_OVERFLOWS_FILE;
+                    goto release_journal;
+                }
 
-                    pgc_page_release(ctx->engine->open_cache, page);
+                for (uint32_t index = 0; index < uuid_page_entries; index++) {
+                    const volatile struct journal_page_list *page_entry_in_journal = &page_list[index];
 
-                    pages_found++;
+                    time_t page_first_time_s = page_entry_in_journal->delta_start_s + journal_start_time_s;
+                    time_t page_last_time_s = page_entry_in_journal->delta_end_s + journal_start_time_s;
+
+                    TIME_RANGE_COMPARE prc =
+                        is_page_in_time_range(page_first_time_s, page_last_time_s, wanted_start_time_s, wanted_end_time_s);
+
+                    if (prc == PAGE_IS_IN_THE_PAST)
+                        continue;
+
+                    if (prc == PAGE_IS_IN_THE_FUTURE)
+                        break;
+
+                    // Make sure index is valid for this file
+                    uint32_t extent_index = page_entry_in_journal->extent_index;
+                    if (extent_index >= extent_entries) {
+                        problem = JV2_EXTENT_INDEX_INVALID;
+                        break;
+                    }
+
+                    uint32_t page_update_every_s = page_entry_in_journal->update_every_s;
+                    struct extent_io_data ei = {
+                        .block = OFFSET_TO_BLOCK(extent_list[extent_index].datafile_offset),
+                        .bytes = extent_list[extent_index].datafile_size,
+                        .fileno = datafile->fileno,
+                        // Every open-cache page must carry its metric's id, so that
+                        // journal-v2 indexing can resolve the metric without
+                        // dereferencing page->metric_id. Pages added here are clean
+                        // rather than hot, so the indexer does not walk them today -
+                        // but leaving the identity field zero would make that an
+                        // invisible dependency on queue placement.
+                        .uuid_id = mrg_metric_uuidmap_id(ctx->engine->main_mrg, metric),
+                    };
+
+                    if (datafile_acquire(datafile, DATAFILE_ACQUIRE_OPEN_CACHE)) {
+                        //for open cache item
+                        // add this page to open cache
+                        bool added = false;
+
+                        PGC_ENTRY e = {0};
+                        e.hot = false;
+                        e.section = (Word_t)ctx;
+                        e.metric_id = metric_id;
+                        e.start_time_s = page_first_time_s;
+                        e.end_time_s = page_last_time_s;
+                        e.update_every_s = page_update_every_s;
+                        e.data = datafile;
+                        e.size = 0;
+                        e.custom_data = (uint8_t *)&ei;
+                        PGC_PAGE *page = pgc_page_add_and_acquire(ctx->engine->open_cache, e, &added);
+
+                        if (!added)
+                            datafile_release(datafile, DATAFILE_ACQUIRE_OPEN_CACHE);
+
+                        callback(page, callback_data);
+
+                        pgc_page_release(ctx->engine->open_cache, page);
+
+                        pages_found++;
+                    }
                 }
             }
+            else
+                problem = JV2_JOURNAL_FAULTED;
         }
-        else {
-            nd_log_limit_static_thread_var(erl, 10, 0);
-            nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: failed to access journal file %u of tier %d (SIGBUS)",
-                         datafile->fileno, datafile->ctx->config.tier);
-        }
-
 release_journal:
+
+        switch(problem) {
+            case JV2_METRIC_LIST_OVERFLOWS_FILE: {
+                nd_log_limit_static_thread_var(erl, 60, 0);
+                dbengine_log_limit(
+                    ctx->engine, &erl, NDLP_ERR,
+                    "DBENGINE: Metric list exceeds journal file size in journalfile %u of tier %u (metric_offset=%zu, list_size=%zu, file_size=%zu)",
+                    datafile->fileno, datafile->tier, problem_metric_offset, problem_list_size, problem_file_size);
+                break;
+            }
+
+            case JV2_PAGE_LIST_HEADER_INVALID: {
+                nd_log_limit_static_thread_var(erl, 60, 0);
+                dbengine_log_limit(ctx->engine, &erl, NDLP_ERR,
+                                   "DBENGINE: Invalid page list header in journalfile %u of tier %u",
+                                   datafile->fileno, datafile->tier);
+                break;
+            }
+
+            case JV2_PAGE_LIST_OVERFLOWS_FILE: {
+                nd_log_limit_static_thread_var(erl, 60, 0);
+                dbengine_log_limit(ctx->engine, &erl, NDLP_ERR,
+                                   "DBENGINE: Page list exceeds journal file size in journalfile %u of tier %u",
+                                   datafile->fileno, datafile->tier);
+                break;
+            }
+
+            case JV2_EXTENT_INDEX_INVALID: {
+                nd_log_limit_static_thread_var(erl, 60, 0);
+                dbengine_log_limit(ctx->engine, &erl, NDLP_ERR,
+                                   "DBENGINE: Invalid extent index in journalfile %u",
+                                   datafile->fileno);
+                break;
+            }
+
+            case JV2_JOURNAL_FAULTED: {
+                nd_log_limit_static_thread_var(erl, 10, 0);
+                dbengine_log_limit(ctx->engine, &erl, NDLP_ERR,
+                                   "DBENGINE: failed to access journal file %u of tier %d (SIGBUS)",
+                                   datafile->fileno, datafile->ctx->config.tier);
+                break;
+            }
+
+            case JV2_NO_PROBLEM:
+                break;
+        }
+
         journalfile_v2_data_release(datafile->journalfile);
         datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
     }
@@ -1089,18 +1139,18 @@ void pgc_open_add_hot_page(
 {
     if (unlikely(!dbengine_valid_extent_disk_size(extent_size))) {
         nd_log_limit_static_thread_var(erl, 10, 0);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                     "DBENGINE: skipped adding open-cache page for datafile %u of tier %u, "
-                     "extent at offset %" PRIu64 " has invalid size %u",
-                     datafile->fileno, datafile->tier, extent_offset, extent_size);
+        dbengine_log_limit(datafile_ctx(datafile)->engine, &erl, NDLP_ERR,
+                           "DBENGINE: skipped adding open-cache page for datafile %u of tier %u, "
+                           "extent at offset %" PRIu64 " has invalid size %u",
+                           datafile->fileno, datafile->tier, extent_offset, extent_size);
         return;
     }
 
     if(!datafile_acquire(datafile, DATAFILE_ACQUIRE_OPEN_CACHE)) { // for open cache item
         nd_log_limit_static_thread_var(erl, 10, 0);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
-                     "DBENGINE: skipped adding open-cache page for datafile %u of tier %u (deletion in progress)",
-                     datafile->fileno, datafile->tier);
+        dbengine_log_limit(datafile_ctx(datafile)->engine, &erl, NDLP_INFO,
+                           "DBENGINE: skipped adding open-cache page for datafile %u of tier %u (deletion in progress)",
+                           datafile->fileno, datafile->tier);
         return;
     }
 
