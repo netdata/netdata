@@ -372,3 +372,34 @@ async fn a_lost_file_outside_the_window_does_not_make_an_answer_partial() {
     let v = call(&h, body).await.unwrap();
     assert_eq!(v["status"], json!({"complete": true}));
 }
+
+#[tokio::test]
+async fn an_unreadable_catalog_in_the_completion_slack_spares_the_aggregate() {
+    // File 3 lies after the 100 s window but inside search's completion
+    // slack (one hour per side): the page needs its catalog, the window
+    // aggregate does not.
+    let registries = make_registries();
+    let remote = TestRemote::new(64 * MIB);
+    remote
+        .evicted(&registries, "default", test_identity(), 1, file_one())
+        .await;
+    remote
+        .evicted(&registries, "default", test_identity(), 2, file_two())
+        .await;
+    let three = remote
+        .evicted(
+            &registries,
+            "default",
+            test_identity(),
+            3,
+            vec![otlp_req_svc(0x0F, 1, base_ns(700), "svc-a")],
+        )
+        .await;
+    std::fs::write(&three.catalog, b"not a catalog").unwrap();
+    let h = handler(registries, &remote);
+
+    let v = call(&h, functions_body(20)).await.unwrap();
+    assert_eq!(v["data"]["status"], json!({"partial": ["remote_unavailable"]}));
+    assert_eq!(v["data"]["overview"]["status"], json!({"complete": true}));
+    assert_eq!(v["data"]["overview"]["totals"]["traces"], 4);
+}
