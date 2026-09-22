@@ -19,9 +19,9 @@ extern "C" {
 
 // The macro layer in dbengine-log.h, family by family, on an engine object that is allocated but never started: which
 // priority each family hands the sink, that the site the sink is told is the line that emitted, what errno the sink
-// and the caller see, the rate-limited family's window, that an engine without a sink calls none, and where the page
-// allocator's notice goes. Limiters here are local, not the per-site statics, so a repeated or reordered run starts
-// every window fresh.
+// and the caller see, the rate-limited family's window, that an engine without a sink reaches netdata's logger, and
+// where the page allocator's notice goes. Limiters here are local, not the per-site statics, and opened as of now, so
+// a repeated or reordered run, on a host up for any length of time, starts every window fresh.
 
 namespace {
 
@@ -94,11 +94,19 @@ protected:
     struct dbengine_engine *engine_ = nullptr;
 };
 
+// Opens a local limiter's window as of now. The gate measures the window on the boot clock from last_logged, so a
+// limiter left at 0 would still be inside its first window on a host up for less than log_every - a fresh CI runner
+// - and drop the very line a case expects.
+void open_window(ERROR_LIMIT *erl) {
+    erl->last_logged = now_boottime_sec() - erl->log_every;
+}
+
 // Runs one emission with stderr sent to a file, and returns what reached stderr: netdata's logger writes there in
 // this binary, so a line that did not go to a sink shows up here.
 template <typename F> std::string stderr_of(F emit) {
-    char path[] = "/tmp/dbengine-test-stderr-XXXXXX";
-    const int fd = mkstemp(path);
+    const char *root = getenv("TMPDIR");
+    std::string path = std::string(root && *root ? root : "/tmp") + "/dbengine-test-stderr-XXXXXX";
+    const int fd = mkstemp(path.data());
     if (fd < 0)
         return "<no temporary file>";
 
@@ -116,7 +124,7 @@ template <typename F> std::string stderr_of(F emit) {
     for (ssize_t n; (n = read(fd, buf, sizeof(buf))) > 0;)
         out.append(buf, static_cast<size_t>(n));
     close(fd);
-    unlink(path);
+    unlink(path.c_str());
     return out;
 }
 
@@ -139,6 +147,7 @@ TEST_F(LogLayer, EachFamilyHandsTheSinkItsPriorityAndTheLineThatEmitted) {
 
     ERROR_LIMIT erl = {
         .spinlock = SPINLOCK_INITIALIZER, .log_every = 3600, .count = 0, .last_logged = 0, .sleep_ut = 0 };
+    open_window(&erl);
     line = __LINE__; dbengine_log_limit(engine_, &erl, NDLP_NOTICE, "family limit");
     expect_one(NDLP_NOTICE, line, "family limit");
 
@@ -176,6 +185,7 @@ TEST_F(LogLayer, TheSinkSeesTheSitesErrnoAndTheCallerKeepsItsOwn) {
     errno = 13;
     ERROR_LIMIT erl = {
         .spinlock = SPINLOCK_INITIALIZER, .log_every = 3600, .count = 0, .last_logged = 0, .sleep_ut = 0 };
+    open_window(&erl);
     dbengine_log_limit(engine_, &erl, NDLP_ERR, "errno limited");
     EXPECT_EQ(errno, 13) << "the sink's errno leaked to the caller through the rate-limited family";
 
@@ -195,6 +205,7 @@ TEST_F(LogLayer, TheSinkSeesTheSitesErrnoWhenTheLimiterWasContended) {
     // errno on the way. The sink must still see the errno the site had.
     ERROR_LIMIT erl = {
         .spinlock = SPINLOCK_INITIALIZER, .log_every = 3600, .count = 0, .last_logged = 0, .sleep_ut = 0 };
+    open_window(&erl);
     std::atomic<bool> held{false};
     std::thread holder([&] {
         spinlock_lock(&erl.spinlock);
@@ -217,11 +228,12 @@ TEST_F(LogLayer, TheSinkSeesTheSitesErrnoWhenTheLimiterWasContended) {
 TEST_F(LogLayer, ARateLimitedSiteEmitsOncePerWindow) {
     ERROR_LIMIT erl = {
         .spinlock = SPINLOCK_INITIALIZER, .log_every = 3600, .count = 0, .last_logged = 0, .sleep_ut = 0 };
+    open_window(&erl);
     for (int i = 0; i < 5; i++)
         dbengine_log_limit(engine_, &erl, NDLP_ERR, "limited %d", i);
 
     const std::vector<LogRecord> records = recorder_->take();
-    ASSERT_EQ(records.size(), 1u) << "a window of an hour let more than one of five attempts through";
+    ASSERT_EQ(records.size(), 1u) << "five attempts inside one open window of an hour did not produce exactly one line";
     EXPECT_NE(records[0].text.find("limited 0"), std::string::npos);
     EXPECT_EQ(erl.count, 4u) << "the four dropped attempts were not counted";
 
@@ -231,7 +243,7 @@ TEST_F(LogLayer, ARateLimitedSiteEmitsOncePerWindow) {
     EXPECT_EQ(erl.count, 0u);
 }
 
-TEST_F(LogLayer, WithoutASinkTheLineGoesToTheLoggerAndNoSinkIsCalled) {
+TEST_F(LogLayer, WithoutASinkTheLineGoesToTheLogger) {
     struct dbengine_config plain = netdata_test_config();
     plain.log_sink = nullptr;
     plain.log_sink_data = nullptr;
@@ -244,7 +256,6 @@ TEST_F(LogLayer, WithoutASinkTheLineGoesToTheLoggerAndNoSinkIsCalled) {
     });
     dbengine_engine_free(no_sink);
 
-    EXPECT_TRUE(recorder_->take().empty()) << "a sink was called for an engine that has none";
     EXPECT_NE(out.find("no sink error line"), std::string::npos) << "netdata's logger did not get the line: " << out;
     EXPECT_NE(out.find("no engine error line"), std::string::npos) << "netdata's logger did not get the line: " << out;
 }

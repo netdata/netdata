@@ -77,8 +77,9 @@ struct dbengine_tier_config tier_config(const Scratch &scratch) {
     return tc;
 }
 
-// Brings an engine up with tier 0 on the scratch directory and returns it; the assertions end the calling case when
-// it does not come up.
+// Brings an engine up with tier 0 on the scratch directory and returns it, or NULL - with the failure recorded and
+// nothing left running - when either does not come up. The wait for readiness is only for a tier that did: a tier
+// whose init failed never arms it, and the wait would not return.
 DBENGINE_ENGINE *bring_up(const struct dbengine_config &cfg, const Scratch &scratch) {
     DBENGINE_ENGINE *engine = dbengine_create(&cfg);
     EXPECT_NE(engine, nullptr) << "the engine did not come up";
@@ -86,7 +87,12 @@ DBENGINE_ENGINE *bring_up(const struct dbengine_config &cfg, const Scratch &scra
         return nullptr;
 
     const struct dbengine_tier_config tc = tier_config(scratch);
-    EXPECT_EQ(dbengine_tier_init(engine, &tc), 0) << "the tier did not come up";
+    if (dbengine_tier_init(engine, &tc) != 0) {
+        ADD_FAILURE() << "the tier did not come up";
+        dbengine_shutdown(engine);
+        dbengine_destroy(engine);
+        return nullptr;
+    }
     dbengine_readiness_wait(dbengine_tier(engine, 0));
     return engine;
 }
@@ -146,7 +152,10 @@ TEST(EngineLogSink, EachEngineHearsOnlyItsOwnLines) {
     DBENGINE_ENGINE *a = bring_up(config_with(recorder_a), scratch_a);
     ASSERT_NE(a, nullptr);
     DBENGINE_ENGINE *b = bring_up(config_with(recorder_b), scratch_b);
-    ASSERT_NE(b, nullptr);
+    if (!b) {
+        take_down(a);
+        FAIL() << "engine B did not come up";
+    }
     EXPECT_EQ(take_down(a), 0u);
     EXPECT_EQ(take_down(b), 0u);
 
