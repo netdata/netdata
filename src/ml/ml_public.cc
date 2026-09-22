@@ -814,9 +814,9 @@ void ml_workers_free()
 
 bool ml_model_received_from_child(RRDHOST *host, const char *json)
 {
-    UNUSED(host);
-
-    bool ok = ml_dimension_deserialize_kmeans(json);
+    // host is the host this streaming connection is authenticated for; the deserializer requires
+    // the payload to name it.
+    bool ok = ml_dimension_deserialize_kmeans(host, json);
     if (!ok) {
         global_statistics_ml_models_deserialization_failures();
     }
