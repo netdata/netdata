@@ -94,8 +94,8 @@ extern "C" inline void netdata_test_log_sink(void *data, ND_LOG_FIELD_PRIORITY p
     if (len < 0)
         return;
 
-    // A truncated message would make the A/B comparison measure this buffer rather than the engine, so it says so
-    // instead of pretending. The longest line the suite produces today is 424 bytes.
+    // A truncated message says so, in the captured log and in the A/B echo alike, instead of pretending to be whole.
+    // The longest line the suite produces today is 424 bytes.
     const bool message_truncated = (size_t)len >= sizeof(message);
 
     NetdataTestLogCapture *capture = static_cast<NetdataTestLogCapture *>(data);
@@ -110,7 +110,9 @@ extern "C" inline void netdata_test_log_sink(void *data, ND_LOG_FIELD_PRIORITY p
                      message_truncated ? " <TRUNCATED>" : "");
     }
 
-    if (capture->text.size() + (size_t)len > NETDATA_TEST_LOG_CAPTURE_MAX) {
+    // once a line has been dropped at the ceiling, later ones are dropped too: a shorter line that still fitted would
+    // leave a hole in the middle of a log that reads as complete up to the "... and more" footer
+    if (capture->truncated || capture->text.size() + (size_t)len > NETDATA_TEST_LOG_CAPTURE_MAX) {
         capture->truncated = true;
         return;
     }
@@ -130,6 +132,8 @@ extern "C" inline void netdata_test_log_sink(void *data, ND_LOG_FIELD_PRIORITY p
     capture->text += function ? function : "?";
     capture->text += "(): ";
     capture->text += message;
+    if (message_truncated)
+        capture->text += " <TRUNCATED>";
     if (capture->text.empty() || capture->text.back() != '\n')
         capture->text += "\n";
 }

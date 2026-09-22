@@ -9,11 +9,13 @@ bool dbengine_log_has_sink(struct dbengine_engine *engine) {
     return engine && engine->cfg.log_sink;
 }
 
-// errno is saved and restored around the sink: dbengine-config.h promises an embedder that a caller reading errno
-// after an engine verb is unaffected by whatever its sink does
+// errno is set to the site's value before the sink and restored after it: the sink may read it (the limiter's sleep
+// and a contended spinlock both clear it on the way here), and a caller reading errno after an engine verb is
+// unaffected by whatever the sink does
 static void dbengine_log_to_sink(struct dbengine_engine *engine, ND_LOG_FIELD_PRIORITY priority,
                                  const char *file, const char *function, unsigned long line,
                                  const char *fmt, va_list ap, int saved_errno) {
+    errno = saved_errno;
     engine->cfg.log_sink(engine->cfg.log_sink_data, priority, file, function, line, fmt, ap);
     errno = saved_errno;
 }

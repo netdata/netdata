@@ -20,7 +20,7 @@ class EngineLogListener : public ::testing::EmptyTestEventListener {
     }
 
     void OnTestEnd(const ::testing::TestInfo &info) override {
-        if (info.result()->Passed())
+        if (!info.result()->Failed())
             return;
 
         // copied under the lock and printed outside it: an engine thread that logs while this runs should not
@@ -69,6 +69,8 @@ int main(int argc, char **argv) {
     nd_log_limits_unlimited();
 
     ::testing::InitGoogleTest(&argc, argv);
-    ::testing::UnitTest::GetInstance()->listeners().Append(new EngineLogListener);
+    // with DBENGINE_TEST_LOG=none there is no sink and nothing is captured: the engine's lines are already on stderr
+    if (netdata_test_log_mode() != NETDATA_TEST_LOG_NONE)
+        ::testing::UnitTest::GetInstance()->listeners().Append(new EngineLogListener);
     return RUN_ALL_TESTS();
 }

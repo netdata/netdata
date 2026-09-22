@@ -54,10 +54,11 @@ void dbengine_async_wakeup(struct dbengine_engine *engine)
     if (__atomic_load_n(&engine->async_ready, __ATOMIC_RELAXED)) {
         netdata_mutex_lock(&dbengine_async_mutex);
         int rc = uv_async_send(&engine->async);
+        netdata_mutex_unlock(&dbengine_async_mutex);
+
+        // said after the unlock: the mutex is shared by every engine in the process, and a sink must not run under it
         if (rc)
             dbengine_log(engine, NDLP_ERR,"DBENGINE: wakeup async error = %d", rc);
-
-        netdata_mutex_unlock(&dbengine_async_mutex);
     } else {
         dbengine_log(engine, NDLP_WARNING,"DBENGINE: wakeup async handler is being reset");
     }

@@ -295,6 +295,8 @@ TEST(EngineConfig, DefaultsFunctionMatchesTheInitialiser) {
     EXPECT_EQ(from_macro.reserved_libuv_worker_threads, from_function.reserved_libuv_worker_threads);
     EXPECT_EQ(from_macro.on_db_rotation, from_function.on_db_rotation);
     EXPECT_EQ(from_macro.preload_metrics, from_function.preload_metrics);
+    EXPECT_EQ(from_macro.log_sink, from_function.log_sink);
+    EXPECT_EQ(from_macro.log_sink_data, from_function.log_sink_data);
 }
 
 TEST(EngineConfig, AZeroFileDescriptorBudgetResolvesToAShareOfTheLimit) {
