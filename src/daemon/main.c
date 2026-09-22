@@ -585,6 +585,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "escapetest") == 0) {
                             return command_argument_sanitization_tests();
                         }
+                        else if(strcmp(optarg, "alertqueuetest") == 0) {
+                            unittest_running = true;
+                            return alert_queue_unittest();
+                        }
                         else if(strcmp(optarg, "dicttest") == 0) {
                             unittest_running = true;
                             return dictionary_unittest(10000);
