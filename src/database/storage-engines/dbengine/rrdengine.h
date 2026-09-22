@@ -29,6 +29,7 @@
 #include <Judy.h>
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-config.h"
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-workers.h"
+#include "database/storage-engines/dbengine/dbengine-log.h"
 
 // the 0-means-default fields of *cfg become concrete values, so the engine never has to re-check them
 void dbengine_config_resolve(struct dbengine_config *cfg);

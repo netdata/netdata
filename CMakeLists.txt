@@ -1981,6 +1981,8 @@ if(ENABLE_DBENGINE)
             src/database/storage-engines/dbengine/dbengine-compression.c
             src/database/storage-engines/dbengine/dbengine-compression.h
             src/database/storage-engines/dbengine/dbengine-config.c
+            src/database/storage-engines/dbengine/dbengine-log.c
+            src/database/storage-engines/dbengine/dbengine-log.h
     )
 endif()
 
