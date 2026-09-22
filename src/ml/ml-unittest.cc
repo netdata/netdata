@@ -1115,6 +1115,49 @@ static void test_reset_generation_cancels_model_publish()
                    "successful publication path should leave training_in_progress unchanged");
 }
 
+// Regression: DimensionLookupInfo's ctors used to copy a fixed
+// sizeof(MachineGuid) bytes from their source string, so a machine-guid shorter than GUID_LEN
+// (the streaming ML_MODEL payload supplies it) read past the end of the source allocation.
+// The sources here are sized exactly strlen + 1, the way libjson-c allocates a string value, so
+// an over-read is a heap-buffer-overflow under ASan and not merely a garbage GUID.
+//
+// The expected values are spelled out rather than computed with strncpyz(), so that the test
+// cannot agree with a broken copy by using the same helper to describe it.
+static void test_dimension_lookup_info_short_machine_guid()
+{
+    fprintf(stderr, "  test_dimension_lookup_info_short_machine_guid...\n");
+
+    struct {
+        const char *guid;
+        const char *expected;
+    } cases[] = {
+        // 1-byte source: the shortest possible input
+        { "", "" },
+        { "abc", "abc" },
+        // one character short of GUID_LEN
+        { "00000000-0000-0000-0000-00000000000", "00000000-0000-0000-0000-00000000000" },
+        // exactly GUID_LEN (control: must be copied whole)
+        { "00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000000" },
+        // longer than GUID_LEN: truncated, never overflowing the array
+        { "00000000-0000-0000-0000-000000000000-and-then-some", "00000000-0000-0000-0000-000000000000" },
+    };
+
+    for (const auto &c : cases) {
+        size_t len = strlen(c.guid);
+        char *src = (char *) mallocz(len + 1);
+        memcpy(src, c.guid, len + 1);
+
+        DimensionLookupInfo DLI(src, "chart", "dimension");
+
+        freez(src);
+
+        ML_TEST_ASSERT(strcmp(DLI.machineGuid(), c.expected) == 0,
+                       "machine guid must be the source truncated to GUID_LEN");
+        ML_TEST_ASSERT(strlen(DLI.machineGuid()) <= GUID_LEN,
+                       "machine guid must stay within GUID_LEN characters");
+    }
+}
+
 extern "C" int ml_unittest()
 {
     fprintf(stderr, "\nML unit tests:\n");
@@ -1147,6 +1190,7 @@ extern "C" int ml_unittest()
     test_kmeans_timestamp_rejection();
     test_downstream_model_short_circuit_and_requeue();
     test_reset_generation_cancels_model_publish();
+    test_dimension_lookup_info_short_machine_guid();
 
     fprintf(stderr, "\nML tests: %d run, %d failed\n", tests_run, tests_failed);
 
