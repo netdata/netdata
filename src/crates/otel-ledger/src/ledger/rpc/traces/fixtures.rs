@@ -32,6 +32,12 @@ pub(crate) fn summary(record_count: u32, min_s: u32, max_s: u32) -> sfst::Summar
     }
 }
 
+/// The identity every fixture file of sequence `seq` is installed under
+/// (one test identity, pipeline 1, part_key 7).
+pub(crate) fn test_file_id(seq: u64) -> FileId {
+    FileId::new(test_identity(), 1, seq, 7)
+}
+
 /// Track a sealed SFST under `tenant` and return its registry path.
 /// The file itself is never written: `capture` maps registry state
 /// (summaries come from `track`); the engine opens files later.
@@ -42,7 +48,7 @@ pub(crate) async fn install_sfst(
     min_s: u32,
     max_s: u32,
 ) -> std::path::PathBuf {
-    let id = FileId::new(test_identity(), 1, seq, 7);
+    let id = test_file_id(seq);
     let mut guard = registries.write().await;
     let reg = guard.get_or_create(&TenantId::from(tenant));
     let path = reg.sfst.file_path(id);
@@ -220,7 +226,7 @@ pub(crate) async fn install_wal(
     let written = write_traces_wal(staging.path(), reqs);
     let bytes = std::fs::read(&written).unwrap();
 
-    let id = FileId::new(test_identity(), 1, seq, 7);
+    let id = test_file_id(seq);
     let mut guard = registries.write().await;
     let reg = guard.get_or_create(&TenantId::from(tenant));
     let path = reg.wal.file_path(id);

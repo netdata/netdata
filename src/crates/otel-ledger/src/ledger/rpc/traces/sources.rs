@@ -15,11 +15,16 @@
 //! it is given, so a refused WAL is a logged gap, exactly as it is for
 //! logs.
 //!
-//! Source identity per `sfsq::traces::sources` docs: sealed files use
-//! their path (which encodes the full `FileId`); a WAL's chunks and
-//! tail derive `{path}#chunk{i}` / `{path}#tail{start}` with
-//! [`WalCoverage`] over the WAL path, so the engine's overlap
-//! validation sees every WAL-derived byte range.
+//! Source identity per `sfsq::traces::sources` docs, derived from the
+//! file's full `FileId` and never from its directory: a sealed file is
+//! `<stem>.sfst`; a WAL is `<stem>.wal`, its chunks
+//! `<stem>.wal#chunk<index:06>` and its tail `<stem>.wal#tail<start>`,
+//! with [`WalCoverage`] over the WAL's id so the engine's overlap
+//! validation sees every WAL-derived byte range. One file therefore has
+//! one name wherever its bytes are served from — the engine's duplicate
+//! check sees a double inclusion, and its id-ordered reading (ceiling
+//! truncation, fold tie-breaks) does not change with location. The
+//! zero-padded chunk index keeps that order numeric.
 //!
 //! The supplier takes its window verbatim: canonicalizing the wire
 //! request's window (the logs precedent defaults an unspecified
@@ -33,15 +38,21 @@ use std::sync::Arc;
 
 use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::registry::{TenantRegistries, WalDesc};
-use file_registry::TenantId;
+use file_registry::{FileId, TenantId};
 use sfsq::traces::{SourceId, TraceSfstCandidate, TraceSource, TraceWalTail, WalCoverage};
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use wal::prefix::{chunk_boundaries, tail_start};
 
+/// Filename extensions of the source-id derivation (the registries'
+/// own on-disk extensions, which those crates keep private).
+const SFST_EXT: &str = "sfst";
+const WAL_EXT: &str = "wal";
+
 /// One WAL resolved to buildable parts: everything needed to
 /// materialize its sources any number of times without re-scanning.
 struct ResolvedWal {
+    id: FileId,
     path: PathBuf,
     chunks: Vec<ResolvedChunk>,
     /// The trailing un-chunked byte range, when non-empty.
@@ -156,16 +167,16 @@ impl TracesSourceSupplier {
                 .collect()
         };
 
-        // Every WAL any range selected resolves ONCE, keyed by the path
-        // that encodes its full `FileId`; a refused one is absent for
-        // every copy alike (one snapshot, one verdict).
-        let mut resolved: HashMap<PathBuf, ResolvedWal> = HashMap::new();
+        // Every WAL any range selected resolves ONCE, keyed by its full
+        // `FileId`; a refused one is absent for every copy alike (one
+        // snapshot, one verdict).
+        let mut resolved: HashMap<FileId, ResolvedWal> = HashMap::new();
         for wal in snapshots.iter().flat_map(|(_, wals)| wals) {
-            if resolved.contains_key(&wal.path) {
+            if resolved.contains_key(&wal.id) {
                 continue;
             }
             if let Some(r) = self.resolve_wal(wal, cancel).await {
-                resolved.insert(wal.path.clone(), r);
+                resolved.insert(wal.id, r);
             }
         }
         // One check dominates the per-WAL ones: nothing between here and
@@ -182,21 +193,17 @@ impl TracesSourceSupplier {
                 let mut sources: Vec<TraceSource> = Vec::new();
                 for f in sealed {
                     sources.push(TraceSource::Sfst(TraceSfstCandidate {
-                        source_id: SourceId::new(f.path.display().to_string()),
+                        source_id: SourceId::new(f.id.to_filename(SFST_EXT)),
                         summary: f.summary.clone(),
                         source: sfsq::Source::File(f.path.clone()),
                         coverage: None,
                     }));
                 }
-                for w in wal_descs.iter().filter_map(|d| resolved.get(&d.path)) {
-                    let wal_id: Arc<str> = w.path.display().to_string().into();
+                for w in wal_descs.iter().filter_map(|d| resolved.get(&d.id)) {
+                    let wal_id: Arc<str> = w.id.to_filename(WAL_EXT).into();
                     for c in &w.chunks {
                         sources.push(TraceSource::Sfst(TraceSfstCandidate {
-                            source_id: SourceId::new(format!(
-                                "{}#chunk{}",
-                                w.path.display(),
-                                c.index
-                            )),
+                            source_id: SourceId::new(format!("{wal_id}#chunk{:06}", c.index)),
                             summary: c.summary.clone(),
                             source: sfsq::Source::Memory(c.bytes.clone()),
                             coverage: Some(WalCoverage {
@@ -207,11 +214,7 @@ impl TracesSourceSupplier {
                     }
                     if let Some(range) = w.tail {
                         sources.push(TraceSource::Tail(TraceWalTail {
-                            source_id: SourceId::new(format!(
-                                "{}#tail{}",
-                                w.path.display(),
-                                range.start()
-                            )),
+                            source_id: SourceId::new(format!("{wal_id}#tail{}", range.start())),
                             path: w.path.clone(),
                             coverage: WalCoverage {
                                 wal_id: Arc::clone(&wal_id),
@@ -246,11 +249,14 @@ impl TracesSourceSupplier {
         {
             Ok(Ok(frames)) => frames,
             Ok(Err(e)) => {
-                tracing::warn!(seq = wal.seq, "traces WAL boundary scan failed: {e}");
+                tracing::warn!(seq = wal.id.seq, "traces WAL boundary scan failed: {e}");
                 return None;
             }
             Err(e) => {
-                tracing::warn!(seq = wal.seq, "traces WAL boundary scan task failed: {e}");
+                tracing::warn!(
+                    seq = wal.id.seq,
+                    "traces WAL boundary scan task failed: {e}"
+                );
                 return None;
             }
         };
@@ -266,7 +272,7 @@ impl TracesSourceSupplier {
             if cancel.is_cancelled() {
                 return None;
             }
-            let seq = wal.seq;
+            let seq = wal.id.seq;
             let path = wal.path.clone();
             let (range, expected) = (chunk.range, chunk.entry_count);
             // The traces seal for the byte range; record-count
@@ -325,6 +331,7 @@ impl TracesSourceSupplier {
         let tail = (tail_begin < wal.valid_up_to)
             .then(|| wal::FrameRange::new(tail_begin, wal.valid_up_to));
         Some(ResolvedWal {
+            id: wal.id,
             path: wal.path.clone(),
             chunks,
             tail,

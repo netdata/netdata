@@ -1,5 +1,7 @@
 use super::*;
-use crate::ledger::rpc::traces::fixtures::{install_sfst, install_wal, make_registries, otlp_req};
+use crate::ledger::rpc::traces::fixtures::{
+    install_sfst, install_wal, make_registries, otlp_req, test_file_id,
+};
 
 // These tests cover `capture` end to end at the registry boundary —
 // registry state in, engine sources out. The sealed-file tests need no
@@ -20,6 +22,16 @@ fn make_supplier_with_min_entries(min_entries: u64) -> TracesSourceSupplier {
         Arc::new(ChunkCache::new(64 * 1024 * 1024)),
         min_entries,
     )
+}
+
+/// A sealed fixture file's expected source id.
+fn sfst_id(seq: u64) -> String {
+    test_file_id(seq).to_filename("sfst")
+}
+
+/// A fixture WAL's expected id (its chunks and tail extend it).
+fn wal_id(seq: u64) -> String {
+    test_file_id(seq).to_filename("wal")
 }
 
 /// Sources' ids in capture order (chunks and tails carry their identity
@@ -45,7 +57,7 @@ async fn empty_registries_yield_empty_copies() {
 }
 
 #[tokio::test]
-async fn sealed_file_maps_to_a_path_identified_file_source() {
+async fn sealed_file_maps_to_an_identity_named_file_source() {
     let supplier = make_supplier();
     let path = install_sfst(&supplier.registries, "default", 1, 1000, 1005).await;
 
@@ -57,9 +69,10 @@ async fn sealed_file_maps_to_a_path_identified_file_source() {
     let TraceSource::Sfst(c) = &sources[0] else {
         panic!("sealed file must map to an Sfst source");
     };
-    // Identity is the registry path (encodes the full FileId); sealed
-    // files carry no WAL coverage; the summary passes through.
-    assert_eq!(c.source_id, SourceId::new(path.display().to_string()));
+    // Identity is the file's FileId, not its path; sealed files carry no
+    // WAL coverage; the summary passes through; the bytes are read from
+    // the registry path.
+    assert_eq!(c.source_id, SourceId::new(sfst_id(1)));
     assert!(c.coverage.is_none());
     assert_eq!(c.summary.record_count, 6);
     assert_eq!(
@@ -89,7 +102,7 @@ async fn copies_are_structurally_identical() {
 #[tokio::test]
 async fn window_pruning_is_file_granular() {
     let supplier = make_supplier();
-    let in_window = install_sfst(&supplier.registries, "default", 1, 1000, 1005).await;
+    install_sfst(&supplier.registries, "default", 1, 1000, 1005).await;
     install_sfst(&supplier.registries, "default", 2, 5000, 5005).await;
 
     let mut sets = supplier
@@ -100,7 +113,7 @@ async fn window_pruning_is_file_granular() {
     // predicate keeping the wrong file must fail here.
     assert_eq!(
         source_ids(&sources),
-        [in_window.display().to_string()],
+        [sfst_id(1)],
         "exactly the file overlapping the window is captured"
     );
 }
@@ -110,7 +123,7 @@ async fn wal_resolves_to_chunks_and_a_tail() {
     // Three frames of 3 spans each at min_entries=4: frames 0+1 group
     // into one 6-entry chunk, frame 2 is the un-chunked tail.
     let supplier = make_supplier_with_min_entries(4);
-    let path = install_wal(
+    install_wal(
         &supplier.registries,
         "default",
         1,
@@ -128,7 +141,7 @@ async fn wal_resolves_to_chunks_and_a_tail() {
     let sources = sets.pop().unwrap();
     let ids = source_ids(&sources);
     assert_eq!(ids.len(), 2, "one chunk + one tail: {ids:?}");
-    assert_eq!(ids[0], format!("{}#chunk0", path.display()));
+    assert_eq!(ids[0], format!("{}#chunk000000", wal_id(1)));
     let TraceSource::Sfst(chunk) = &sources[0] else {
         panic!("first source must be the built chunk");
     };
@@ -137,14 +150,14 @@ async fn wal_resolves_to_chunks_and_a_tail() {
     assert_eq!(chunk.summary.record_count, 6);
     assert!(matches!(&chunk.source, sfsq::Source::Memory(_)));
     let coverage = chunk.coverage.as_ref().expect("chunks carry coverage");
-    assert_eq!(coverage.wal_id.as_ref(), path.display().to_string());
+    assert_eq!(coverage.wal_id.as_ref(), wal_id(1));
 
     let TraceSource::Tail(tail) = &sources[1] else {
         panic!("second source must be the tail");
     };
     assert_eq!(
         tail.source_id.as_str(),
-        format!("{}#tail{}", path.display(), tail.coverage.range.start())
+        format!("{}#tail{}", wal_id(1), tail.coverage.range.start())
     );
     // Chunk and tail partition the durable prefix: adjacent, no overlap.
     assert_eq!(coverage.range.end(), tail.coverage.range.start());
@@ -155,7 +168,7 @@ async fn wal_resolves_to_chunks_and_a_tail() {
 #[tokio::test]
 async fn wal_below_min_entries_is_all_tail() {
     let supplier = make_supplier_with_min_entries(1_000_000);
-    let path = install_wal(
+    install_wal(
         &supplier.registries,
         "default",
         2,
@@ -173,7 +186,7 @@ async fn wal_below_min_entries_is_all_tail() {
     };
     assert_eq!(
         tail.source_id.as_str(),
-        format!("{}#tail{}", path.display(), wal::HEADER_SIZE)
+        format!("{}#tail{}", wal_id(2), wal::HEADER_SIZE)
     );
 }
 
@@ -254,4 +267,73 @@ async fn capture_is_tenant_scoped() {
         sets.pop().unwrap().is_empty(),
         "another tenant's files are invisible"
     );
+}
+
+#[tokio::test]
+async fn source_ids_do_not_depend_on_the_directory() {
+    // The same files installed under two different base directories name
+    // the same sources: a file keeps its name wherever its bytes are
+    // served from (a local path today, a download-cache path once remote
+    // files are read back).
+    let mut captured = Vec::new();
+    let mut sealed_paths = Vec::new();
+    for _ in 0..2 {
+        let supplier = make_supplier_with_min_entries(4);
+        sealed_paths.push(install_sfst(&supplier.registries, "default", 1, 1000, 1005).await);
+        install_wal(
+            &supplier.registries,
+            "default",
+            2,
+            vec![
+                otlp_req(0x11, 3, 1_000_000_000),
+                otlp_req(0x22, 3, 2_000_000_000),
+                otlp_req(0x33, 3, 3_000_000_000),
+            ],
+        )
+        .await;
+        let mut sets = supplier
+            .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new())
+            .await;
+        captured.push(sets.pop().unwrap());
+    }
+    assert_ne!(sealed_paths[0], sealed_paths[1], "two distinct directories");
+    let ids: Vec<Vec<String>> = captured.iter().map(|s| source_ids(s)).collect();
+    assert_eq!(ids[0].len(), 3, "sealed + chunk + tail: {:?}", ids[0]);
+    assert_eq!(ids[0], ids[1]);
+    let coverages: Vec<Vec<Arc<str>>> = captured
+        .iter()
+        .map(|sources| {
+            sources
+                .iter()
+                .filter_map(|s| match s {
+                    TraceSource::Sfst(c) => c.coverage.as_ref().map(|c| Arc::clone(&c.wal_id)),
+                    TraceSource::Tail(t) => Some(Arc::clone(&t.coverage.wal_id)),
+                })
+                .collect()
+        })
+        .collect();
+    assert_eq!(coverages[0], coverages[1]);
+}
+
+#[tokio::test]
+async fn chunk_ids_order_numerically() {
+    // The engine reads sources in id order; with more than nine chunks a
+    // bare index would put chunk 10 before chunk 2. Twelve frames of 3
+    // spans at min_entries=3: one chunk per frame.
+    let supplier = make_supplier_with_min_entries(3);
+    let reqs = (0..12u8)
+        .map(|i| otlp_req(0x10 + i, 3, (u64::from(i) + 1) * 1_000_000_000))
+        .collect();
+    install_wal(&supplier.registries, "default", 1, reqs).await;
+
+    let mut sets = supplier
+        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new())
+        .await;
+    let ids = source_ids(&sets.pop().unwrap());
+    let chunk_ids: Vec<&String> = ids.iter().filter(|id| id.contains("#chunk")).collect();
+    assert!(chunk_ids.len() > 10, "more than ten chunks: {ids:?}");
+    assert_eq!(chunk_ids[10], &format!("{}#chunk000010", wal_id(1)));
+    let mut sorted = ids.clone();
+    sorted.sort();
+    assert_eq!(sorted, ids, "id order is capture (chunk index) order");
 }

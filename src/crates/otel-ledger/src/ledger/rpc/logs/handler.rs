@@ -304,11 +304,11 @@ impl OtelLogsHandler {
         {
             Ok(Ok(frames)) => frames,
             Ok(Err(e)) => {
-                tracing::warn!(seq = wal.seq, "WAL boundary scan failed: {e}");
+                tracing::warn!(seq = wal.id.seq, "WAL boundary scan failed: {e}");
                 return (Vec::new(), Vec::new());
             }
             Err(e) => {
-                tracing::warn!(seq = wal.seq, "WAL boundary scan task failed: {e}");
+                tracing::warn!(seq = wal.id.seq, "WAL boundary scan task failed: {e}");
                 return (Vec::new(), Vec::new());
             }
         };
@@ -319,7 +319,7 @@ impl OtelLogsHandler {
             if cancel.is_cancelled() {
                 return (Vec::new(), Vec::new());
             }
-            let seq = wal.seq;
+            let seq = wal.id.seq;
             let path = wal.path.clone();
             let (range, expected) = (chunk.range, chunk.entry_count);
             // The build future: index the byte range on a blocking
@@ -388,7 +388,7 @@ impl OtelLogsHandler {
         let tail_begin = tail_start(&chunks, header);
         if tail_begin < wal.valid_up_to {
             tails.push(WalTail {
-                file_seq: wal.seq,
+                file_seq: wal.id.seq,
                 path: wal.path.clone(),
                 range: wal::FrameRange::new(tail_begin, wal.valid_up_to),
             });

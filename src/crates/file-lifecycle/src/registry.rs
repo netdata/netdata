@@ -10,7 +10,9 @@ use file_registry::{FileId, SeqKey, TenantId};
 /// record count from its own frame-header scan.
 #[derive(Debug)]
 pub struct WalDesc {
-    pub seq: u64,
+    /// The WAL's full identity: query layers name its sources by it, so a
+    /// source's name never depends on the directory the file sits in.
+    pub id: FileId,
     pub path: PathBuf,
     pub valid_up_to: u64,
 }
@@ -516,7 +518,7 @@ impl TenantRegistries {
                     continue;
                 }
                 wals.push(WalDesc {
-                    seq: f.id.seq,
+                    id: f.id,
                     path: r.wal.file_path(f.id),
                     valid_up_to: f.valid_up_to.0,
                 });
