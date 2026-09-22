@@ -61,3 +61,53 @@ pub(crate) fn track_catalog_entry(
     );
     path
 }
+
+/// Make `path` a FIFO: reading it blocks until a writer opens it.
+#[cfg(unix)]
+pub(crate) fn mkfifo(path: &std::path::Path) {
+    use std::os::unix::ffi::OsStrExt;
+    let c_path = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
+    // SAFETY: `c_path` is a valid NUL-terminated path for the whole call.
+    let rc = unsafe { libc::mkfifo(c_path.as_ptr(), 0o600) };
+    assert_eq!(rc, 0, "mkfifo {}", path.display());
+}
+
+/// Open the FIFO at `path` for writing once a reader holds it open (a
+/// non-blocking open fails until then), within `deadline`.
+#[cfg(unix)]
+pub(crate) async fn open_fifo_writer(
+    path: &std::path::Path,
+    deadline: std::time::Duration,
+) -> std::fs::File {
+    use std::os::unix::fs::OpenOptionsExt;
+    let start = std::time::Instant::now();
+    loop {
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .custom_flags(libc::O_NONBLOCK)
+            .open(path)
+        {
+            Ok(f) => return f,
+            Err(e) if e.raw_os_error() == Some(libc::ENXIO) && start.elapsed() < deadline => {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+            Err(e) => panic!("no reader opened {} in time: {e}", path.display()),
+        }
+    }
+}
+
+/// On drop, open the FIFO at the path for writing and close it: a reader
+/// still blocked opening or reading it gets EOF instead of waiting forever.
+#[cfg(unix)]
+pub(crate) struct FifoUnblocker(pub(crate) std::path::PathBuf);
+
+#[cfg(unix)]
+impl Drop for FifoUnblocker {
+    fn drop(&mut self) {
+        use std::os::unix::fs::OpenOptionsExt;
+        let _ = std::fs::OpenOptions::new()
+            .write(true)
+            .custom_flags(libc::O_NONBLOCK)
+            .open(&self.0);
+    }
+}

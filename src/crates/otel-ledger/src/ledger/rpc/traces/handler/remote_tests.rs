@@ -403,3 +403,54 @@ async fn an_unreadable_catalog_in_the_completion_slack_spares_the_aggregate() {
     assert_eq!(v["data"]["overview"]["status"], json!({"complete": true}));
     assert_eq!(v["data"]["overview"]["totals"]["traces"], 4);
 }
+
+/// Traces read catalog files only after releasing the registry read lock. A
+/// catalog that blocks its reader (a FIFO not yet written) must not keep the
+/// write lock — which the ledger loop takes on every WAL event — from being
+/// granted.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn catalogs_are_read_off_the_registry_lock() {
+    use crate::test_helpers::{FifoUnblocker, mkfifo, open_fifo_writer};
+    use std::io::Write;
+    let registries = make_registries();
+    let remote = TestRemote::new(64 * MIB);
+    let one = remote
+        .evicted(&registries, "default", test_identity(), 1, file_one())
+        .await;
+    let catalog_bytes = std::fs::read(&one.catalog).unwrap();
+    std::fs::remove_file(&one.catalog).unwrap();
+    mkfifo(&one.catalog);
+    let h = Arc::new(handler(Arc::clone(&registries), &remote));
+
+    let query = tokio::spawn({
+        let h = Arc::clone(&h);
+        async move { call(&h, trace_body(0x0A)).await }
+    });
+    // Whatever happens below, a reader still blocked on the FIFO gets EOF
+    // when the test ends, so a failure cannot hang the runtime's shutdown.
+    let _unblock = FifoUnblocker(one.catalog.clone());
+
+    // The query is now blocked reading the catalog.
+    let deadline = std::time::Duration::from_secs(10);
+    let mut writer = open_fifo_writer(&one.catalog, deadline).await;
+    let write_lock = tokio::time::timeout(deadline, registries.write())
+        .await
+        .map(drop);
+    // Feed the catalog either way, so a failing run ends instead of hanging.
+    writer.write_all(&catalog_bytes).unwrap();
+    drop(writer);
+    let v = tokio::time::timeout(deadline, query)
+        .await
+        .expect("the query finishes once the catalog is fed")
+        .unwrap()
+        .unwrap();
+
+    assert!(
+        write_lock.is_ok(),
+        "the query held the registry lock while reading a catalog"
+    );
+    // The catalog was read after all: the evicted trace came back.
+    assert_eq!(v["status"], json!({"complete": true}));
+    assert_eq!(v["items"]["returned"], 1);
+}

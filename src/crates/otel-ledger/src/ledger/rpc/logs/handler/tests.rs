@@ -1255,53 +1255,6 @@ async fn remote_fetch_failure_degrades() {
     );
 }
 
-/// Make `path` a FIFO: reading it blocks until a writer opens it.
-#[cfg(unix)]
-fn mkfifo(path: &std::path::Path) {
-    use std::os::unix::ffi::OsStrExt;
-    let c_path = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
-    // SAFETY: `c_path` is a valid NUL-terminated path for the whole call.
-    let rc = unsafe { libc::mkfifo(c_path.as_ptr(), 0o600) };
-    assert_eq!(rc, 0, "mkfifo {}", path.display());
-}
-
-/// Open the FIFO at `path` for writing once a reader holds it open (a
-/// non-blocking open fails until then), within `deadline`.
-#[cfg(unix)]
-async fn open_fifo_writer(path: &std::path::Path, deadline: std::time::Duration) -> std::fs::File {
-    use std::os::unix::fs::OpenOptionsExt;
-    let start = std::time::Instant::now();
-    loop {
-        match std::fs::OpenOptions::new()
-            .write(true)
-            .custom_flags(libc::O_NONBLOCK)
-            .open(path)
-        {
-            Ok(f) => return f,
-            Err(e) if e.raw_os_error() == Some(libc::ENXIO) && start.elapsed() < deadline => {
-                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-            }
-            Err(e) => panic!("no reader opened {} in time: {e}", path.display()),
-        }
-    }
-}
-
-/// On drop, open the FIFO at the path for writing and close it: a reader
-/// still blocked opening or reading it gets EOF instead of waiting forever.
-#[cfg(unix)]
-struct FifoUnblocker(std::path::PathBuf);
-
-#[cfg(unix)]
-impl Drop for FifoUnblocker {
-    fn drop(&mut self) {
-        use std::os::unix::fs::OpenOptionsExt;
-        let _ = std::fs::OpenOptions::new()
-            .write(true)
-            .custom_flags(libc::O_NONBLOCK)
-            .open(&self.0);
-    }
-}
-
 /// The logs query reads catalog files only after releasing the registry
 /// read lock. A catalog that blocks its reader (a FIFO not yet written) must
 /// not keep the write lock — which the ledger loop takes on every WAL event —
@@ -1321,7 +1274,7 @@ async fn catalogs_are_read_off_the_registry_lock() {
     let catalog = track_remote_catalog(&mut tr, "default", id, "missing/object.sfst", min_s, min_s + 5, 10);
     let catalog_bytes = std::fs::read(&catalog).unwrap();
     std::fs::remove_file(&catalog).unwrap();
-    mkfifo(&catalog);
+    crate::test_helpers::mkfifo(&catalog);
 
     let registries = Arc::new(RwLock::new(tr));
     let storage = file_lifecycle::storage::OpendalStorage::new(&format!(
@@ -1352,11 +1305,11 @@ async fn catalogs_are_read_off_the_registry_lock() {
     });
     // Whatever happens below, a reader still blocked on the FIFO gets EOF
     // when the test ends, so a failure cannot hang the runtime's shutdown.
-    let _unblock = FifoUnblocker(catalog.clone());
+    let _unblock = crate::test_helpers::FifoUnblocker(catalog.clone());
 
     // The query is now blocked reading the catalog.
     let deadline = std::time::Duration::from_secs(10);
-    let mut writer = open_fifo_writer(&catalog, deadline).await;
+    let mut writer = crate::test_helpers::open_fifo_writer(&catalog, deadline).await;
     let write_lock = tokio::time::timeout(deadline, registries.write())
         .await
         .map(drop);
