@@ -1,0 +1,5 @@
+{
+  "update_every": 2,
+  "max_series": 15,
+  "metric_idle_timeout": 0
+}
