@@ -90,7 +90,7 @@ func TestRunGenerationCollectorFailureDoesNotDirtyManager(t *testing.T) {
 			require.NoError(t, generation.run.DirtyCause())
 			require.Eventually(t, func() bool { return generation.tasks.LongLivedCensus().Active == 1 }, time.Second, time.Millisecond,
 				"only the discovery pipeline should remain active")
-			require.Contains(t, output.String(), "failed")
+			output.waitContains(t, "failed")
 		})
 	}
 }
