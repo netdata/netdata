@@ -42,6 +42,8 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 //   emitting site's; the engine restores the caller's errno after the sink returns.
 // - Most formats end without a newline; the teardown narration and two file-check lines ("Not a regular file.",
 //   "File length is too short.") end with one.
+// - Every line past its site's own gate (below), whatever its severity and however many: no priority threshold and
+//   no per-source flood limit stand in front of the sink. What to keep is the sink's decision.
 //
 // When and where it is called
 // - From any engine thread - a caller's thread inside a public verb, the event loop, a libuv pool worker, a cache's
@@ -67,15 +69,17 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 //
 // What never reaches the sink
 // - Lines with no engine to route through, which go to netdata's logger: the process-wide page-data layer, the
-//   public verbs that reject a NULL storage instance, and what libnetdata logs itself while the engine calls it -
-//   a fault it recovered in a guarded read (for some reads the only report of a journal the engine then skips) and
-//   the failures of its file-mapping and madvise() helpers.
+//   public verbs that reject a NULL storage instance, and what libnetdata logs itself while the engine uses it - a
+//   fault it recovered in a guarded read (for some reads the only report of a journal the engine then skips), and
+//   failures in its file-mapping and madvise() helpers, thread creation and joining, allocators and CPU detection.
 // - fatal() and internal_fatal(), which end the process through netdata's logger.
-// - Lines a site's own gate drops. A debug site emits only in a build with internal checks, and only while
-//   libnetdata's process-wide debug_flags asks for it; an internal-error site only in a build with internal checks.
-//   A rate-limited site emits once per its window, and the window belongs to the call site for the whole process
-//   (or, for a thread-local limiter, the thread), not to an engine: one engine's line can use the window another
-//   engine's same line needed, and two threads reaching a shared limiter together can both get through.
+// - Lines a site's own gate drops. A debug-flag site (D_RRDENGINE - not the NDLP_DEBUG lines, which every build
+//   emits) emits only in a build with internal checks, and only while libnetdata's process-wide debug_flags asks for
+//   it; an internal-error site only in a build with internal checks. A rate-limited site emits once per its window,
+//   and the window belongs to the call site (or, for a thread-local limiter, the thread), not to an engine: one
+//   engine's line can use the window another engine's same line needed, and two threads reaching a shared limiter
+//   together can both get through. A site's first window is counted from boot, so on a host up for less than it the
+//   first line is dropped too.
 //
 // How long it must live
 // - Until every handle taken from the engine is released (metric, collection and query handles, anything holding a

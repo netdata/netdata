@@ -95,7 +95,8 @@ extern "C" inline void netdata_test_log_sink(void *data, ND_LOG_FIELD_PRIORITY p
     if (len < 0)
         return;
 
-    // A truncated message says so, in the captured log and in the A/B echo alike, instead of pretending to be whole.
+    // A truncated message says so, in the captured log and in the sink-echo output alike, instead of pretending to be
+    // whole.
     // The longest line the suite produces today is 424 bytes.
     const bool message_truncated = (size_t)len >= sizeof(message);
 
@@ -103,7 +104,8 @@ extern "C" inline void netdata_test_log_sink(void *data, ND_LOG_FIELD_PRIORITY p
     std::lock_guard<std::mutex> lock(capture->mutex);
 
     if (netdata_test_log_mode() == NETDATA_TEST_LOG_SINK_ECHO) {
-        // one line per message: the comparison is line oriented, so an embedded newline would desynchronise it
+        // one line per message: whatever reads this line by line - a diff against a "none" run, a grep - would be
+        // thrown by an embedded newline
         for (char *c = message; *c; c++)
             if (*c == '\n')
                 *c = ' ';

@@ -19,7 +19,7 @@
 // priority: netdata_log_debug()'s own debug_flags gate and its separate NDLS_DEBUG source, error_report()'s
 // errno_clear(), internal_error()'s compile-out, and the rate limiter.
 //
-// Two things a reader should know before converting a site:
+// Three things a reader should know before converting a site:
 //
 // - The sink has no log source. It is the engine's own stream, and what the engine emits is all of it; the
 //   NDLS_DAEMON / NDLS_DEBUG distinction survives only on the no-sink arm, where it is the original call making it.
@@ -49,7 +49,7 @@ struct dbengine_engine;
 bool dbengine_log_has_sink(struct dbengine_engine *engine);
 
 // hand one line to the engine's sink. Only ever called when dbengine_log_has_sink() just said yes, so the sink is
-// known to be there. errno is saved and restored around the sink, as the contract promises
+// known to be there. errno is the site's during the sink and the caller's again after it, as the contract promises
 void dbengine_log_emit(struct dbengine_engine *engine, ND_LOG_FIELD_PRIORITY priority,
                        const char *file, const char *function, unsigned long line,
                        const char *fmt, ...) PRINTFLIKE(6, 7);
@@ -88,8 +88,8 @@ void dbengine_log_emit_limit(struct dbengine_engine *engine, ERROR_LIMIT *erl, N
             nd_log_daemon(priority, args);                                                          \
     } while(0)
 
-// rate limited per call site. The gate is the sink's own on the sink arm; on the no-sink arm libnetdata's
-// netdata_logger_with_limit() runs whole, gate included, exactly as it does today
+// rate limited per call site, on both arms by libnetdata's gate over the site's ERROR_LIMIT: the no-sink arm is
+// netdata_logger_with_limit() whole, as it always was; the sink arm runs the same gate without its priority filter
 #define dbengine_log_limit(engine, erl, priority, args...) do {                                            \
         struct dbengine_engine *_dbengine_log_e = (engine);                                                \
         if(unlikely(dbengine_log_has_sink(_dbengine_log_e)))                                               \

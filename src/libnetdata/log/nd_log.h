@@ -166,8 +166,12 @@ typedef struct error_with_limit {
 void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) PRINTFLIKE(7, 8);
 
 // The per-call-site gate netdata_logger_with_limit() runs, for a caller that writes the line itself (dbengine's log
-// sink): nd_log_limit_admit() counts the attempt and says whether the site's window lets it through, setting *now for
-// the nd_log_limit_emitted() that records the line was written.
+// sink). nd_log_limit_admit() counts the attempt, sets *now whether or not it admits it, and says whether the site's
+// window lets it through; it may sleep (sleep_ut) and spin on the site's lock, and either can clear errno, so a caller
+// that reports errno saves it first. Every admitted attempt must be followed by nd_log_limit_emitted(), which moves
+// the window - skipped, the window never moves and every later attempt is admitted. The window is written after the
+// lock is released, so two threads on one shared limiter can both be admitted. A limiter's first window is counted
+// from boot (last_logged starts at 0).
 bool nd_log_limit_admit(ERROR_LIMIT *erl, time_t *now);
 void nd_log_limit_emitted(ERROR_LIMIT *erl, time_t now);
 #define nd_log_limit(erl, NDLS, NDLP, args...)   netdata_logger_with_limit(erl, NDLS, NDLP, __FILE__, __FUNCTION__, __LINE__, ##args)
