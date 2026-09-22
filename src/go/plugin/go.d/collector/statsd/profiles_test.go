@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
+	"unsafe"
+	"weak"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
@@ -143,6 +146,7 @@ func TestProfileConfigurationValidation(t *testing.T) {
 		"invalid name":       {map[string]string{"app": valid}, []string{"App"}, "must match"},
 		"listed twice":       {map[string]string{"app": valid}, []string{"app", "app"}, "more than once"},
 		"unknown field":      {map[string]string{"p": "match: '*'\napp: x\n" + "relabeling: []\n"}, []string{"p"}, "field app not found"},
+		"blank match":        {map[string]string{"p": "match: ' '\nrelabeling:\n  - match: '*'\n    metric_relabel_configs:\n      - target_label: a\n        replacement: b\n"}, []string{"p"}, "'match' is required"},
 		"missing match":      {map[string]string{"p": "relabeling:\n  - match: '*'\n    metric_relabel_configs:\n      - target_label: a\n        replacement: b\n"}, []string{"p"}, "'match' is required"},
 		"nothing to do":      {map[string]string{"p": "match: '*'\n"}, []string{"p"}, "at least one of"},
 		"drop action":        {map[string]string{"p": "match: '*'\nrelabeling:\n  - match: '*'\n    metric_relabel_configs:\n      - action: drop\n        source_labels: [a]\n        regex: b\n"}, []string{"p"}, "only replace"},
@@ -399,4 +403,31 @@ template:
 	assert.Empty(t, f.c.receiver.entries)
 	assert.Empty(t, f.c.receiver.metadata)
 	assert.Zero(t, applicationSeries(f.c))
+}
+
+// TestProfileReplaceRetainsNoInputRecord: the owning profile's reusable state
+// must not keep a large earlier record alive once a smaller one follows.
+func TestProfileReplaceRetainsNoInputRecord(t *testing.T) {
+	for name, key := range map[string]string{"admitted": "t", "rejected": "t!"} {
+		t.Run(name, func(t *testing.T) {
+			f := newProfileFixture(t, testProfiles, "shadow")
+			large := func() weak.Pointer[byte] {
+				var b strings.Builder
+				b.WriteString("svc.large:1|c|#")
+				for i := range 400 {
+					if i > 0 {
+						b.WriteByte(',')
+					}
+					fmt.Fprintf(&b, "%s%d:%s", key, i, strings.Repeat("v", 100))
+				}
+				line := b.String()
+				_ = f.c.receiver.ingest(line, f.time)
+				return weak.Make(unsafe.StringData(line))
+			}()
+			f.ingest(t, "svc.small:1|c|#a:b")
+			runtime.GC()
+			runtime.GC()
+			assert.Nil(t, large.Value(), "a previous input record is still reachable")
+		})
+	}
 }

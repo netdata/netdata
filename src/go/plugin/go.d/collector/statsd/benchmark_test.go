@@ -5,10 +5,13 @@ package statsd
 import (
 	"fmt"
 	"math"
+	"net"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 // No earlier Go StatsD implementation exists for a before/after baseline.
@@ -213,5 +216,55 @@ func BenchmarkMixedPublicationProfiles(b *testing.B) {
 			}
 		}
 		f.collect(b, false, false)
+	}
+}
+
+// Run with -benchtime=1x. Retained Go heap of a running receiver: listeners, a
+// full TCP client cap with per-connection framing buffers, active profiles,
+// mixed1000 receiving state and one publication. Not process RSS.
+func BenchmarkRuntimeEnvelope(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		runtime.GC()
+		var before, after runtime.MemStats
+		runtime.ReadMemStats(&before)
+		f := startRuntime(b, func(c *Collector) {
+			c.profileDirs = writeProfiles(b, testProfiles)
+			c.Profiles = []string{"pools", "shadow", "app", "meta"}
+		})
+		lines := mixedRecords(1000)
+		for j := range 100 {
+			lines[j] = fmt.Sprintf("svc.p%d.size:%d|g", j, j)
+		}
+		conns := make([]net.Conn, f.c.MaxTCPConnections)
+		for j := range conns {
+			conns[j] = f.dialTCP(b)
+		}
+		for j, line := range lines {
+			if _, err := fmt.Fprintln(conns[j%len(conns)], line); err != nil {
+				b.Fatal(err)
+			}
+		}
+		deadline := time.Now().Add(time.Minute)
+		for f.counts().accepted < uint64(len(lines)) {
+			if time.Now().After(deadline) {
+				b.Fatalf("accepted %d of %d", f.counts().accepted, len(lines))
+			}
+			time.Sleep(time.Millisecond)
+		}
+		f.collect(b, false, false)
+		for j, line := range lines {
+			if _, err := fmt.Fprintln(conns[j%len(conns)], line); err != nil {
+				b.Fatal(err)
+			}
+		}
+		for f.counts().accepted < uint64(2*len(lines)) {
+			time.Sleep(time.Millisecond)
+		}
+		runtime.GC()
+		runtime.ReadMemStats(&after)
+		b.ReportMetric(float64(after.HeapAlloc-before.HeapAlloc)/1e6, "retained_MB")
+		b.ReportMetric(float64(f.c.diagnostics.tcpConnections.Load()), "tcp_clients")
+		runtime.KeepAlive(f)
+		require.NoError(b, f.stop(b))
 	}
 }

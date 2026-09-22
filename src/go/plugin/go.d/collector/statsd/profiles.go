@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/prometheus/prometheus/model/labels"
 	"gopkg.in/yaml.v3"
@@ -38,15 +39,15 @@ type profileDocument struct {
 	Template   *charttpl.Group `yaml:"template,omitempty"`
 }
 
-// profile is one prepared, configured profile. Its pipeline and scratch are
-// mutable and used only under the receiver lock.
+// profile is one prepared, configured profile. Its pipeline and input buffer
+// are mutable and used only under the receiver lock.
 type profile struct {
 	name     string
 	root     matcher.Matcher
 	pipeline *relabel.Pipeline // nil for chart-only profiles
 	groups   []charttpl.Group  // nil for replace-only profiles
 	lifetime uint64            // longest chart or dimension expiry, in successful cycles
-	scratch  labels.ScratchBuilder
+	input    []labels.Label    // reused per record and cleared, so it pins no earlier record
 }
 
 // defaultProfileDirs lists user configuration directories. There is no stock
@@ -110,7 +111,7 @@ func newProfile(name string, data []byte, policy chartengine.EnginePolicy) (*pro
 	if err := dec.Decode(&doc); err != nil {
 		return nil, err
 	}
-	if doc.Match == "" {
+	if strings.TrimSpace(doc.Match) == "" {
 		return nil, errors.New("'match' is required")
 	}
 	root, err := matcher.NewSimplePatternsMatcher(doc.Match)
@@ -204,20 +205,28 @@ func (p *profile) replaces(name string) bool {
 // type, value, rate, gauge operation and member keep their meaning. Record.Labels
 // must not contain the virtual __name__, so a sender label with that key stays
 // outside the relabel record, invisible to rules, and is restored unchanged.
+//
+// Label strings are substrings of the receive record. The reused input buffer
+// is cleared before returning; the pipeline's processors keep only the most
+// recent record per block, a bound fixed by configuration.
 func (p *profile) replace(r record) (record, error) {
 	var held *metrix.Label
-	p.scratch.Reset()
 	for i, l := range r.labels {
 		if l.Key == metricNameLabel {
 			held = &r.labels[i]
 			continue
 		}
-		p.scratch.Add(l.Key, l.Value)
+		p.input = append(p.input, labels.Label{
+			Name:  l.Key,
+			Value: l.Value,
+		})
 	}
-	p.scratch.Sort()
+	in := labels.New(p.input...)
+	clear(p.input)
+	p.input = p.input[:0]
 	out, drop := p.pipeline.Apply(relabel.Record{
 		Name:   r.name,
-		Labels: p.scratch.Labels(),
+		Labels: in,
 	})
 	if drop.Dropped() {
 		// Replace-only rules drop only when the resulting name is invalid.

@@ -17,13 +17,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/pkg/relabel"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
-	"github.com/prometheus/prometheus/model/labels"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -436,51 +434,6 @@ func TestMetadataRetentionAndRevival(t *testing.T) {
 			assert.Empty(t, f.c.receiver.entries)
 		}
 	})
-}
-
-func TestProfileAliasPreparation(t *testing.T) {
-	// The shared replace API operates on names/labels only. Profile selection is
-	// deliberately outside this stage; the payload retains its gauge operation.
-	processor, err := relabel.New(
-		[]relabel.Config{
-			{Action: relabel.Replace, TargetLabel: "__name__", Replacement: "shared"},
-			{Action: relabel.Replace, TargetLabel: "measure_field", Replacement: ""},
-		},
-	)
-	require.NoError(t, err)
-	f := newCoreFixture(t, 1, time.Minute)
-	for _, line := range []string{"a:10|g|#measure_field:sender", "b:20|g", "a:+1|g"} {
-		r, err := parseRecord(line)
-		require.NoError(t, err)
-		ls := make([]string, 0, len(r.labels)*2)
-		for _, l := range r.labels {
-			ls = append(ls, l.Key, l.Value)
-		}
-		transformed, drop := processor.Apply(relabel.Record{
-			Name:   r.name,
-			Labels: labels.FromStrings(ls...),
-		})
-		require.False(t, drop.Dropped())
-		r.name = transformed.Name
-		r.labels = nil
-		transformed.Labels.Range(
-			func(l labels.Label) {
-				r.labels = append(r.labels, metrix.Label{
-					Key:   l.Name,
-					Value: l.Value,
-				})
-			},
-		)
-		p, err := prepareRecord(r)
-		require.NoError(t, err)
-		f.c.receiver.mu.Lock()
-		err = f.c.receiver.admit(p, f.time)
-		f.c.receiver.mu.Unlock()
-		require.NoError(t, err)
-	}
-	f.collect(t, false, false)
-	value(t, f.c, "g.value.shared", 21, nil)
-	assert.Len(t, f.c.receiver.entries, 1)
 }
 
 func TestFrameworkOutputLimitDoesNotRejectInput(t *testing.T) {

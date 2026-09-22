@@ -9,7 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -103,6 +105,9 @@ func (s *server) run(read func()) {
 	defer s.wg.Done()
 	defer func() {
 		if r := recover(); r != nil {
+			if logger.Level.Enabled(slog.LevelDebug) {
+				s.log.Errorf("STACK: %s", debug.Stack())
+			}
 			s.fail(fmt.Errorf("receiver panic: %v", r))
 		}
 	}()
@@ -138,10 +143,11 @@ func (s *server) fail(err error) {
 }
 
 // recoverable reports whether a socket error leaves the listener usable.
-// Temporary errors (descriptor exhaustion, interrupted calls, aborted
-// connections) back off on the same bound socket. Any other error while the
-// job is not stopping, including an unexpectedly closed socket, is permanent
-// listener loss and fails the whole receiver.
+// Errors reporting Temporary() (descriptor exhaustion, timeouts) back off on
+// the same bound socket; the Go runtime already retries interrupted calls and
+// aborted connections. Any other error while the job is not stopping, including
+// an unexpectedly closed socket, is permanent listener loss and fails the
+// whole receiver.
 func (s *server) recoverable(err error, listener string) bool {
 	select {
 	case <-s.done:

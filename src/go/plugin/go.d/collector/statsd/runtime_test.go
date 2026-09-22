@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strings"
+	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -279,6 +282,12 @@ func TestUDPFraming(t *testing.T) {
 		accepted: 5,
 		rejected: map[rejection]uint64{rejectSyntax: 2, rejectOversize: 1},
 	})
+	// A datagram of exactly the bound is complete.
+	f.sendUDP(t, strings.Repeat("h", 64-len(":1|c"))+":1|c")
+	f.waitCounts(t, receiverCounts{
+		accepted: 6,
+		rejected: map[rejection]uint64{rejectSyntax: 2, rejectOversize: 1},
+	})
 	f.collect(t, false, false)
 	for name, want := range map[string]float64{"a": 1, "b": 2, "c": 3, "d": 4, "g": 1} {
 		value(t, f.c, "c.total."+name, want, nil)
@@ -322,6 +331,20 @@ func TestTCPFraming(t *testing.T) {
 	value(t, f.c, "c.total."+exact[:len(exact)-len(":1|c")], 1, nil)
 	_, ok := f.c.store.Read().Value("c.total.e", nil)
 	assert.False(t, ok, "a fragment without newline at EOF is not a record")
+
+	// EOF while discarding an oversize record counts it once, not also as unterminated.
+	discarding := f.dialTCP(t)
+	_, err := discarding.Write([]byte(strings.Repeat("w", 3*bound)))
+	require.NoError(t, err)
+	require.NoError(t, discarding.(*net.TCPConn).CloseWrite())
+	f.waitCounts(t, receiverCounts{
+		accepted: 5,
+		rejected: map[rejection]uint64{
+			rejectSyntax:       1,
+			rejectOversize:     3,
+			rejectUnterminated: 1,
+		},
+	})
 }
 
 func TestTCPConnectionCapKeepsQuietClients(t *testing.T) {
@@ -582,4 +605,67 @@ func TestReaderPanicFailsOnlyTheReceiver(t *testing.T) {
 	require.ErrorIs(t, c.Collect(context.Background()), rejectUnavailable)
 	requireFree(t, protocolUDP, addr)
 	requireFree(t, protocolTCP, addr)
+}
+
+type temporaryFailingListener struct {
+	net.Listener
+	failures atomic.Int32
+}
+
+func (l *temporaryFailingListener) Accept() (net.Conn, error) {
+	if l.failures.Add(-1) >= 0 {
+		return nil, &net.OpError{Op: "accept", Net: protocolTCP, Err: os.NewSyscallError("accept", syscall.EMFILE)}
+	}
+	return l.Listener.Accept()
+}
+
+type temporaryFailingPacketConn struct {
+	net.PacketConn
+	failures atomic.Int32
+}
+
+func (c *temporaryFailingPacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
+	if c.failures.Add(-1) >= 0 {
+		return 0, nil, &net.OpError{Op: "read", Net: protocolUDP, Err: os.NewSyscallError("recvfrom", syscall.EMFILE)}
+	}
+	return c.PacketConn.ReadFrom(p)
+}
+
+func TestTemporaryListenerErrorsKeepServing(t *testing.T) {
+	addr := freeAddress(t)
+	c := New()
+	c.Listeners = []ListenerConfig{{Protocol: protocolUDP, Address: addr}, {Protocol: protocolTCP, Address: addr}}
+	c.profileDirs = nil
+	f := prepareFixture(t, c)
+	s, err := c.listen(context.Background())
+	require.NoError(t, err)
+	udp := &temporaryFailingPacketConn{PacketConn: s.udp[0]}
+	udp.failures.Store(2)
+	tcp := &temporaryFailingListener{Listener: s.tcp[0]}
+	tcp.failures.Store(2)
+	s.udp[0], s.tcp[0] = udp, tcp
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	ready := make(chan struct{})
+	go func() { done <- c.serve(ctx, s, func() { close(ready) }) }()
+	<-ready
+
+	client, err := net.Dial(protocolTCP, addr)
+	require.NoError(t, err)
+	defer client.Close()
+	_, err = client.Write([]byte("tcp:1|c\n"))
+	require.NoError(t, err)
+	sender, err := net.Dial(protocolUDP, addr)
+	require.NoError(t, err)
+	defer sender.Close()
+	_, err = sender.Write([]byte("udp:1|c"))
+	require.NoError(t, err)
+	f.waitCounts(t, receiverCounts{accepted: 2})
+	select {
+	case err := <-done:
+		t.Fatalf("temporary errors ended the receiver: %v", err)
+	default:
+	}
+	cancel()
+	require.NoError(t, <-done)
 }

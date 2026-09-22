@@ -114,6 +114,7 @@ func TestJobRuntimeEndToEnd(t *testing.T) {
 	case <-time.After(waitFor):
 		t.Fatal("job did not stop")
 	}
+	require.Nil(t, run.Failure(), "a requested stop is a normal runner return")
 	job.Cleanup()
 	requireFree(t, protocolUDP, addr)
 	requireFree(t, protocolTCP, addr)

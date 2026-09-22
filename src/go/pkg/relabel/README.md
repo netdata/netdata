@@ -8,7 +8,9 @@ They transform a `Record` containing only `Name` and `Labels`; values and metric
 MUST be used serially. Applying rules does not mutate the input label set. A dropped processor result returns the
 record at processor entry; a dropped pipeline result returns the record at entry to the dropping block, preserving
 changes from earlier successful blocks. Callers MUST discard dropped results and may use the returned record for
-diagnostics. Observer callbacks run synchronously and MUST NOT re-enter the same processor or pipeline.
+diagnostics. Observer callbacks run synchronously and MUST NOT re-enter the same processor or pipeline. A processor
+keeps the most recent record that entered it until the next `Apply`, so a caller passing substrings of large receive
+buffers retains at most one such record per compiled processor.
 
 The shared package does not assemble metric families, select profiles, or validate collector-specific values or
 labels. The following configuration guide describes its integration in the Prometheus collector, which owns the

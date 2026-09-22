@@ -14,9 +14,10 @@ already bound and returns, leaving retries to the framework's configured startup
 acquisition, not traffic. Cancellation stops admission, closes listeners and clients and joins every reader before
 `Run` returns.
 
-Temporary socket errors (descriptor exhaustion, interrupted calls, aborted connections) back off 100 ms on the same
-bound socket. Any other listener error while the job is not stopping, including an unexpectedly closed socket, is
-permanent listener loss: admission stops, peers close and `Run` returns the error, so the framework revokes output.
+Socket errors reporting `Temporary()` (descriptor exhaustion, timeouts) back off 100 ms on the same bound socket; the
+Go runtime already retries interrupted calls and aborted connections. Any other listener error while the job is not
+stopping, including an unexpectedly closed socket, is permanent listener loss: admission stops, peers close and `Run`
+returns the error, so the framework revokes output. A reader panic takes the same path instead of crashing the plugin.
 There is no rebind loop or fallback address. A client disconnect or read error ends only that connection.
 
 One framer-owned bound, 64 KiB, limits a record payload excluding its terminator; there is no receive queue.
