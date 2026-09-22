@@ -153,13 +153,23 @@ impl Registry {
     /// overlap on `[min_timestamp_s, max_timestamp_s]` against the
     /// query's `[start, end)` plus optional exact stream equality.
     pub fn candidates<'a>(&'a self, q: &Query) -> impl Iterator<Item = CatalogEntry> + 'a {
-        let q_for_filter = q.clone();
         let q_for_read = q.clone();
+        self.files_overlapping(q)
+            .flat_map(move |(path, _)| read_catalog_entries(path, &q_for_read))
+    }
+
+    /// The tracked catalog files a query over `q`'s window must read: those
+    /// whose filename-encoded range overlaps it, skipping files marked
+    /// `pending_deletion`. Reads nothing from disk.
+    pub fn files_overlapping<'a>(
+        &'a self,
+        q: &Query,
+    ) -> impl Iterator<Item = (&'a PathBuf, &'a File)> + 'a {
+        let q = q.clone();
         self.files
             .iter()
             .filter(|(_, f)| !f.pending_deletion)
-            .filter(move |(_, f)| file_overlaps(f, &q_for_filter))
-            .flat_map(move |(path, _)| read_catalog_entries(path, &q_for_read))
+            .filter(move |(_, f)| file_overlaps(f, &q))
     }
 
     pub fn len(&self) -> usize {
@@ -314,32 +324,49 @@ fn file_overlaps(f: &File, q: &Query) -> bool {
     q.overlaps(f.min_timestamp_s, f.max_timestamp_s)
 }
 
+/// Read and parse the catalog file at `path` and return its entries matching
+/// `q`, or `None` when the file no longer exists (catalog retention removed
+/// it). The fallible counterpart of [`Registry::candidates`]' per-file read,
+/// for callers that must report an unreadable catalog instead of skipping it.
+pub fn read_entries(path: &Path, q: &Query) -> Result<Option<Vec<CatalogEntry>>, crate::Error> {
+    let bytes = match std::fs::read(path) {
+        Ok(b) => b,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
+    let catalog = Catalog::from_container_bytes(&bytes)?;
+    Ok(Some(catalog.find(q).cloned().collect()))
+}
+
 /// Read and parse a catalog file from `path`, then return the entries
 /// matching `q`. Read or parse failures are logged and yield an empty
 /// vec so the calling iterator skips this file rather than erroring out
 /// the whole query.
 fn read_catalog_entries(path: &Path, q: &Query) -> Vec<CatalogEntry> {
-    let bytes = match std::fs::read(path) {
-        Ok(b) => b,
-        Err(e) => {
+    match read_entries(path, q) {
+        Ok(Some(entries)) => entries,
+        Ok(None) => {
+            tracing::warn!(
+                path = %path.display(),
+                "candidates: failed to read catalog file: not found",
+            );
+            Vec::new()
+        }
+        Err(crate::Error::Io(e)) => {
             tracing::warn!(
                 path = %path.display(),
                 "candidates: failed to read catalog file: {e}",
             );
-            return Vec::new();
+            Vec::new()
         }
-    };
-    let catalog = match Catalog::from_container_bytes(&bytes) {
-        Ok(c) => c,
         Err(e) => {
             tracing::warn!(
                 path = %path.display(),
                 "candidates: failed to parse catalog file: {e}",
             );
-            return Vec::new();
+            Vec::new()
         }
-    };
-    catalog.find(q).cloned().collect()
+    }
 }
 
 /// Highest `max_seq` encoded in any catalog filename under
@@ -961,6 +988,58 @@ mod tests {
             partition_keys: Vec::new(),
         };
         assert_eq!(seqs(reg.candidates(&q)), vec![1]);
+    }
+
+    #[test]
+    fn read_entries_reports_what_candidates_skips() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut reg = Registry::new(tmp.path(), TenantId::from(TENANT));
+        let good = write_catalog_file(
+            &mut reg,
+            10,
+            vec![
+                entry_at(1, 100, 200, "ns", "a"),
+                entry_at(2, 300, 400, "ns", "a"),
+            ],
+        );
+        let q = Query {
+            time_range: 50..250,
+            partition_keys: Vec::new(),
+        };
+        let found = read_entries(&good, &q).unwrap().expect("present");
+        assert_eq!(seqs(found.into_iter()), vec![1]);
+
+        let corrupt = tmp.path().join("corrupt.catalog");
+        std::fs::write(&corrupt, b"not a catalog").unwrap();
+        assert!(matches!(
+            read_entries(&corrupt, &q),
+            Err(crate::Error::Container(_))
+        ));
+
+        let gone = tmp.path().join("gone.catalog");
+        assert!(read_entries(&gone, &q).unwrap().is_none());
+    }
+
+    #[test]
+    fn files_overlapping_reads_nothing_and_skips_pending_deletion() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut reg = Registry::new(tmp.path(), TenantId::from(TENANT));
+        let inside = write_catalog_file(&mut reg, 10, vec![entry_at(1, 100, 200, "ns", "a")]);
+        write_catalog_file(&mut reg, 20, vec![entry_at(2, 1000, 2000, "ns", "a")]);
+        let evicting = write_catalog_file(&mut reg, 30, vec![entry_at(3, 100, 200, "ns", "a")]);
+        reg.mark_pending_deletion(&evicting);
+        // Bodies are never read: remove every file from disk first.
+        std::fs::remove_dir_all(tmp.path()).unwrap();
+
+        let q = Query {
+            time_range: 0..500,
+            partition_keys: Vec::new(),
+        };
+        let found: Vec<(PathBuf, u32, u32)> = reg
+            .files_overlapping(&q)
+            .map(|(path, f)| (path.clone(), f.min_timestamp_s, f.max_timestamp_s))
+            .collect();
+        assert_eq!(found, vec![(inside, 100, 200)]);
     }
 
     #[test]
