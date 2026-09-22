@@ -325,7 +325,8 @@ static bool journalfile_v2_mounted_data_unmount(struct dbengine_journalfile *jou
             if (nd_munmap(journalfile->mmap.data, journalfile->mmap.size)) {
                 char path[DBENGINE_PATH_MAX];
                 journalfile_v2_generate_path(journalfile->datafile, path, sizeof(path));
-                netdata_log_error("DBENGINE: failed to unmap index file \"%s\"", path);
+                dbengine_log_error(datafile_ctx(journalfile->datafile)->engine,
+                                   "DBENGINE: failed to unmap index file \"%s\"", path);
                 internal_fatal(true, "DBENGINE: failed to unmap file \"%s\"", path);
                 ctx_fs_error(datafile_ctx(journalfile->datafile));
             }
@@ -587,7 +588,8 @@ static void journalfile_v2_data_clear_unmapped_state(struct dbengine_journalfile
         else {
             has_references = true;
             nd_log_limit_static_global_var(journalfile_erl, 10, 0);
-            nd_log_limit(&journalfile_erl, NDLS_DAEMON, NDLP_WARNING, "DBENGINE: journalfile \"%s\" is not available for unmap", path_v2);
+            dbengine_log_limit(datafile_ctx(journalfile->datafile)->engine, &journalfile_erl, NDLP_WARNING,
+                               "DBENGINE: journalfile \"%s\" is not available for unmap", path_v2);
         }
 
         spinlock_tracked_unlock(&journalfile->data_spinlock);
@@ -684,7 +686,7 @@ uint8_t journalfile_destroy_unsafe(struct dbengine_journalfile *journalfile, str
     if (ret == 0)
         deleted |= JOURNALFILE_DELETED_V2;
     else if (ret != UV_ENOENT) {
-        netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path_v2, uv_strerror(ret));
+        dbengine_log_error(ctx->engine, "DBENGINE: uv_fs_unlink(\"%s\"): %s", path_v2, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req_v2);
@@ -693,7 +695,7 @@ uint8_t journalfile_destroy_unsafe(struct dbengine_journalfile *journalfile, str
     if (ret == 0)
         deleted |= JOURNALFILE_DELETED_V1;
     else if (ret != UV_ENOENT) {
-        netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path, uv_strerror(ret));
+        dbengine_log_error(ctx->engine, "DBENGINE: uv_fs_unlink(\"%s\"): %s", path, uv_strerror(ret));
         ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req_v1);
@@ -746,7 +748,7 @@ int journalfile_create(struct dbengine_journalfile *journalfile, struct dbengine
         journalfile_destroy_unsafe(journalfile, datafile);
         ctx_io_error(ctx);
         nd_log_limit_static_global_var(dbengine_erl, 10, 0);
-        nd_log_limit(&dbengine_erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: Failed to create journlfile \"%s\"", path);
+        dbengine_log_limit(ctx->engine, &dbengine_erl, NDLP_ERR, "DBENGINE: Failed to create journlfile \"%s\"", path);
         return ret;
     }
 
@@ -757,7 +759,7 @@ int journalfile_create(struct dbengine_journalfile *journalfile, struct dbengine
     return 0;
 }
 
-static int journalfile_check_superblock(uv_file file)
+static int journalfile_check_superblock(struct dbengine_engine *engine, uv_file file)
 {
     int ret;
     struct dbengine_jf_sb *superblock = NULL;
@@ -769,7 +771,7 @@ static int journalfile_check_superblock(uv_file file)
 
     ret = uv_fs_read(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_read: %s", uv_strerror(ret));
+        dbengine_log_error(engine, "DBENGINE: uv_fs_read: %s", uv_strerror(ret));
         uv_fs_req_cleanup(&req);
         goto error;
     }
@@ -781,7 +783,7 @@ static int journalfile_check_superblock(uv_file file)
     char jf_ver[DBENGINE_VER_SZ] = DBENGINE_JF_VER;
     if (strncmp(superblock->magic_number, jf_magic, DBENGINE_MAGIC_SZ) != 0 ||
         strncmp(superblock->version, jf_ver, DBENGINE_VER_SZ) != 0) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DBENGINE: File has invalid superblock.");
+        dbengine_log(engine, NDLP_ERR, "DBENGINE: File has invalid superblock.");
         ret = UV_EINVAL;
     } else {
         ret = 0;
@@ -802,7 +804,7 @@ static void journalfile_restore_extent_metadata(struct dbengine_tier *ctx, struc
     descr_size = sizeof(*jf_metric_data->descr) * count;
     payload_length = sizeof(*jf_metric_data) + descr_size;
     if (payload_length > max_size || !dbengine_valid_extent_disk_size(jf_metric_data->extent_size)) {
-        netdata_log_error("DBENGINE: corrupted transaction payload.");
+        dbengine_log_error(ctx->engine, "DBENGINE: corrupted transaction payload.");
         return;
     }
 
@@ -815,7 +817,7 @@ static void journalfile_restore_extent_metadata(struct dbengine_tier *ctx, struc
 
         if (page_type > DBENGINE_PAGE_TYPE_MAX) {
             if (!__atomic_exchange_n(&page_error_map[page_type], true, __ATOMIC_RELAXED)) {
-                netdata_log_error("DBENGINE: unknown page type %d encountered.", page_type);
+                dbengine_log_error(ctx->engine, "DBENGINE: unknown page type %d encountered.", page_type);
             }
             continue;
         }
@@ -906,36 +908,37 @@ static unsigned journalfile_replay_transaction(struct dbengine_tier *ctx, struct
     *id = 0;
     jf_header = buf;
     if (STORE_PADDING == jf_header->type) {
-        netdata_log_debug(D_RRDENGINE, "Skipping padding.");
+        dbengine_log_debug(ctx->engine, D_RRDENGINE, "Skipping padding.");
         return 0;
     }
     if (sizeof(*jf_header) > max_size) {
-        netdata_log_error("DBENGINE: corrupted transaction record, skipping.");
+        dbengine_log_error(ctx->engine, "DBENGINE: corrupted transaction record, skipping.");
         return 0;
     }
     *id = jf_header->id;
     payload_length = jf_header->payload_length;
     size_bytes = sizeof(*jf_header) + payload_length + sizeof(*jf_trailer);
     if (size_bytes > max_size) {
-        netdata_log_error("DBENGINE: corrupted transaction record, skipping.");
+        dbengine_log_error(ctx->engine, "DBENGINE: corrupted transaction record, skipping.");
         return 0;
     }
     jf_trailer = buf + sizeof(*jf_header) + payload_length;
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, buf, sizeof(*jf_header) + payload_length);
     ret = crc32cmp(jf_trailer->checksum, crc);
-    netdata_log_debug(D_RRDENGINE, "Transaction %"PRIu64" was read from disk. CRC32 check: %s", *id, ret ? "FAILED" : "SUCCEEDED");
+    dbengine_log_debug(ctx->engine, D_RRDENGINE, "Transaction %"PRIu64" was read from disk. CRC32 check: %s", *id,
+                       ret ? "FAILED" : "SUCCEEDED");
     if (unlikely(ret)) {
-        netdata_log_error("DBENGINE: transaction %"PRIu64" was read from disk. CRC32 check: FAILED", *id);
+        dbengine_log_error(ctx->engine, "DBENGINE: transaction %"PRIu64" was read from disk. CRC32 check: FAILED", *id);
         return size_bytes;
     }
     switch (jf_header->type) {
     case STORE_DATA:
-        netdata_log_debug(D_RRDENGINE, "Replaying transaction %"PRIu64"", jf_header->id);
+        dbengine_log_debug(ctx->engine, D_RRDENGINE, "Replaying transaction %"PRIu64"", jf_header->id);
             journalfile_restore_extent_metadata(ctx, journalfile, buf + sizeof(*jf_header), payload_length);
         break;
     default:
-        netdata_log_error("DBENGINE: unknown transaction type, skipping record.");
+        dbengine_log_error(ctx->engine, "DBENGINE: unknown transaction type, skipping record.");
         break;
     }
 
@@ -971,7 +974,7 @@ static uint64_t journalfile_iterate_transactions(struct dbengine_tier *ctx, stru
         iov = uv_buf_init(buf, size_bytes);
         ret = uv_fs_read(NULL, &req, file, &iov, 1, pos, NULL);
         if (ret < 0) {
-            netdata_log_error("DBENGINE: uv_fs_read: pos=%" PRIu64 ", %s", pos, uv_strerror(ret));
+            dbengine_log_error(ctx->engine, "DBENGINE: uv_fs_read: pos=%" PRIu64 ", %s", pos, uv_strerror(ret));
             uv_fs_req_cleanup(&req);
             goto skip_file;
         }
@@ -998,7 +1001,7 @@ skip_file:
 }
 
 // Checks that the extent list checksum is valid
-static int journalfile_check_v2_extent_list (void *data_start, size_t file_size)
+static int journalfile_check_v2_extent_list (struct dbengine_engine *engine, void *data_start, size_t file_size)
 {
     uLong crc;
 
@@ -1017,7 +1020,7 @@ static int journalfile_check_v2_extent_list (void *data_start, size_t file_size)
         (size_t)j2_header->extent_trailer_offset > file_size ||
         file_size - (size_t)j2_header->extent_trailer_offset < sizeof(struct journal_v2_block_trailer) ||
         (size_t)j2_header->extent_trailer_offset != (size_t)j2_header->extent_offset + (size_t)j2_header->extent_count * sizeof(struct journal_extent_list)) {
-        netdata_log_error("DBENGINE: extent list header offsets out of range");
+        dbengine_log_error(engine, "DBENGINE: extent list header offsets out of range");
         return 1;
     }
 
@@ -1025,7 +1028,7 @@ static int journalfile_check_v2_extent_list (void *data_start, size_t file_size)
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (uint8_t *) data_start + j2_header->extent_offset, j2_header->extent_count * sizeof(struct journal_extent_list));
     if (unlikely(crc32cmp(journal_v2_trailer->checksum, crc))) {
-        netdata_log_error("DBENGINE: extent list CRC32 check: FAILED");
+        dbengine_log_error(engine, "DBENGINE: extent list CRC32 check: FAILED");
         return 1;
     }
 
@@ -1033,7 +1036,7 @@ static int journalfile_check_v2_extent_list (void *data_start, size_t file_size)
 }
 
 // Checks that the metric list (UUIDs) checksum is valid
-static int journalfile_check_v2_metric_list(void *data_start, size_t file_size)
+static int journalfile_check_v2_metric_list(struct dbengine_engine *engine, void *data_start, size_t file_size)
 {
     uLong crc;
 
@@ -1052,7 +1055,7 @@ static int journalfile_check_v2_metric_list(void *data_start, size_t file_size)
         (size_t)j2_header->metric_trailer_offset > file_size ||
         file_size - (size_t)j2_header->metric_trailer_offset < sizeof(struct journal_v2_block_trailer) ||
         (size_t)j2_header->metric_trailer_offset != (size_t)j2_header->metric_offset + (size_t)j2_header->metric_count * sizeof(struct journal_metric_list)) {
-        netdata_log_error("DBENGINE: metric list header offsets out of range");
+        dbengine_log_error(engine, "DBENGINE: metric list header offsets out of range");
         return 1;
     }
 
@@ -1060,7 +1063,7 @@ static int journalfile_check_v2_metric_list(void *data_start, size_t file_size)
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (uint8_t *) data_start + j2_header->metric_offset, j2_header->metric_count * sizeof(struct journal_metric_list));
     if (unlikely(crc32cmp(journal_v2_trailer->checksum, crc))) {
-        netdata_log_error("DBENGINE: metric list CRC32 check: FAILED");
+        dbengine_log_error(engine, "DBENGINE: metric list CRC32 check: FAILED");
         return 1;
     }
     return 0;
@@ -1104,17 +1107,17 @@ static int journalfile_v2_validate(struct dbengine_tier *ctx, void *data_start, 
 
     rc = crc32cmp(journal_v2_trailer->checksum, crc);
     if (unlikely(rc)) {
-        netdata_log_error("DBENGINE: file CRC32 check: FAILED");
+        dbengine_log_error(ctx->engine, "DBENGINE: file CRC32 check: FAILED");
         return 1;
     }
 
-    rc = journalfile_check_v2_extent_list(data_start, journal_v2_file_size);
+    rc = journalfile_check_v2_extent_list(ctx->engine, data_start, journal_v2_file_size);
     if (rc) return 1;
 
     if (!ctx->engine->cfg.journal_integrity_check)
         return 0;
 
-    rc = journalfile_check_v2_metric_list(data_start, journal_v2_file_size);
+    rc = journalfile_check_v2_metric_list(ctx->engine, data_start, journal_v2_file_size);
     if (rc) return 1;
 
     // Verify complete UUID chain
@@ -1125,7 +1128,7 @@ static int journalfile_v2_validate(struct dbengine_tier *ctx, void *data_start, 
     unsigned entries;
     unsigned total_pages = 0;
 
-    netdata_log_info("DBENGINE: checking %u metrics that exist in the journal", j2_header->metric_count);
+    dbengine_log_info(ctx->engine, "DBENGINE: checking %u metrics that exist in the journal", j2_header->metric_count);
     for (entries = 0; entries < j2_header->metric_count; entries++) {
 
         char uuid_str[UUID_STR_LEN];
@@ -1133,7 +1136,7 @@ static int journalfile_v2_validate(struct dbengine_tier *ctx, void *data_start, 
         size_t page_offset = (size_t)metric->page_offset;
         if (page_offset > journal_v2_file_size ||
             journal_v2_file_size - page_offset < sizeof(struct journal_page_header)) {
-            netdata_log_info(
+            dbengine_log_info(ctx->engine,
                 "DBENGINE: verification failed invalid page list header offset -- index %u at offset %u",
                 entries, metric->page_offset);
             return 1;
@@ -1152,8 +1155,10 @@ static int journalfile_v2_validate(struct dbengine_tier *ctx, void *data_start, 
             size_t page_list_room = journal_v2_file_size - page_offset - sizeof(struct journal_page_header);
             if (page_list_room < sizeof(struct journal_v2_block_trailer) ||
                 (size_t)metric_list_header->entries > (page_list_room - sizeof(struct journal_v2_block_trailer)) / sizeof(struct journal_page_list)) {
-                netdata_log_info("DBENGINE: verification failed invalid page list entries -- index %u entries %u at offset %u",
-                                 entries, metric_list_header->entries, metric->page_offset);
+                dbengine_log_info(
+                    ctx->engine,
+                    "DBENGINE: verification failed invalid page list entries -- index %u entries %u at offset %u",
+                    entries, metric_list_header->entries, metric->page_offset);
                 return 1;
             }
 
@@ -1164,8 +1169,11 @@ static int journalfile_v2_validate(struct dbengine_tier *ctx, void *data_start, 
             crc = crc32(0L, Z_NULL, 0);
             crc = crc32(crc, (uint8_t *) metric_list_header + sizeof(struct journal_page_header), metric_list_header->entries * sizeof(struct journal_page_list));
             rc = crc32cmp(journal_trailer->checksum, crc);
-            internal_error(rc, "DBENGINE: index %u : %s entries %u at offset %u verified, DATA CRC computed %lu, stored %u", entries, uuid_str, metric->entries, metric->page_offset,
-                           crc, metric_list_header->crc);
+            dbengine_internal_error(
+                ctx->engine, rc,
+                "DBENGINE: index %u : %s entries %u at offset %u verified, DATA CRC computed %lu, stored %u",
+                entries, uuid_str, metric->entries, metric->page_offset,
+                crc, metric_list_header->crc);
             if (!rc) {
                 total_pages += metric_list_header->entries;
                 verified++;
@@ -1174,16 +1182,19 @@ static int journalfile_v2_validate(struct dbengine_tier *ctx, void *data_start, 
 
         metric++;
         if ((uint32_t)((uint8_t *) metric - (uint8_t *) data_start) > (uint32_t) journal_v2_file_size) {
-            netdata_log_info("DBENGINE: verification failed EOF reached -- total entries %u, verified %u", entries, verified);
+            dbengine_log_info(ctx->engine, "DBENGINE: verification failed EOF reached -- total entries %u, verified %u",
+                              entries, verified);
             return 1;
         }
     }
 
     if (entries != verified) {
-        netdata_log_info("DBENGINE: verification failed -- total entries %u, verified %u", entries, verified);
+        dbengine_log_info(ctx->engine, "DBENGINE: verification failed -- total entries %u, verified %u", entries,
+                          verified);
         return 1;
     }
-    netdata_log_info("DBENGINE: verification succeeded -- total entries %u, verified %u (%u total pages)", entries, verified, total_pages);
+    dbengine_log_info(ctx->engine, "DBENGINE: verification succeeded -- total entries %u, verified %u (%u total pages)",
+                      entries, verified, total_pages);
 
     return 0;
 }
@@ -1239,15 +1250,15 @@ void journalfile_v2_populate_retention_to_mrg(struct dbengine_tier *ctx, struct 
             mmap_size - (size_t)j2_header->metric_trailer_offset < sizeof(struct journal_v2_block_trailer) ||
             (size_t)j2_header->metric_trailer_offset != (size_t)j2_header->metric_offset + (size_t)j2_header->metric_count * sizeof(struct journal_metric_list)) {
             // header offsets out of range -- needs rebuild
-            nd_log_daemon(NDLP_ERR,
-                          "DBENGINE: journal v2 \"%s\" has out-of-range header offsets "
-                          "(metric_offset=%u, metric_count=%u, metric_trailer_offset=%u, mmap_size=%zu); "
-                          "marking unavailable for rebuild",
-                          path_v2,
-                          j2_header->metric_offset,
-                          j2_header->metric_count,
-                          j2_header->metric_trailer_offset,
-                          mmap_size);
+            dbengine_log(ctx->engine, NDLP_ERR,
+                         "DBENGINE: journal v2 \"%s\" has out-of-range header offsets "
+                         "(metric_offset=%u, metric_count=%u, metric_trailer_offset=%u, mmap_size=%zu); "
+                         "marking unavailable for rebuild",
+                         path_v2,
+                         j2_header->metric_offset,
+                         j2_header->metric_count,
+                         j2_header->metric_trailer_offset,
+                         mmap_size);
             failed = true;
         }
         else if (journalfile->v2.flags & JOURNALFILE_FLAG_METRIC_CRC_CHECK) {
@@ -1256,7 +1267,7 @@ void journalfile_v2_populate_retention_to_mrg(struct dbengine_tier *ctx, struct 
             // j2_header->journal_v2_file_size; the helper currently ignores the
             // size argument (UNUSED) but the value at the call site should
             // still reflect the trusted bound for clarity and future-proofing.
-            if (journalfile_check_v2_metric_list(data_start, mmap_size)) {
+            if (journalfile_check_v2_metric_list(ctx->engine, data_start, mmap_size)) {
                 // needs rebuild
                 failed = true;
             }
@@ -1327,7 +1338,8 @@ void journalfile_v2_populate_retention_to_mrg(struct dbengine_tier *ctx, struct 
 
     usec_t ended_ut = now_monotonic_usec();
 
-    nd_log_daemon(NDLP_DEBUG, "DBENGINE: journal v2 of tier %d, datafile %u populated, size: %0.2f MiB, metrics: %0.2f k, %0.2f ms"
+    dbengine_log(ctx->engine, NDLP_DEBUG,
+                 "DBENGINE: journal v2 of tier %d, datafile %u populated, size: %0.2f MiB, metrics: %0.2f k, %0.2f ms"
         , ctx->config.tier, journalfile->datafile->fileno
         , (double)data_size / 1024 / 1024
         , (double)entries / 1000
@@ -1368,13 +1380,13 @@ int journalfile_v2_load(struct dbengine_tier *ctx, struct dbengine_journalfile *
         if (errno == ENOENT)
             return 1;
         ctx_fs_error(ctx);
-        netdata_log_error("DBENGINE: failed to open \"%s\"", path_v2);
+        dbengine_log_error(ctx->engine, "DBENGINE: failed to open \"%s\"", path_v2);
         return 1;
     }
 
     ret = fstat(fd, &statbuf);
     if (ret) {
-        netdata_log_error("DBENGINE: failed to get file information for \"%s\"", path_v2);
+        dbengine_log_error(ctx->engine, "DBENGINE: failed to get file information for \"%s\"", path_v2);
         close(fd);
         return 1;
     }
@@ -1382,7 +1394,7 @@ int journalfile_v2_load(struct dbengine_tier *ctx, struct dbengine_journalfile *
     journal_v2_file_size = (size_t)statbuf.st_size;
 
     if (journal_v2_file_size < sizeof(struct journal_v2_header)) {
-        error_report("Invalid file \"%s\". Not the expected size", path_v2);
+        dbengine_error_report(ctx->engine, "Invalid file \"%s\". Not the expected size", path_v2);
         close(fd);
         return 1;
     }
@@ -1398,7 +1410,7 @@ int journalfile_v2_load(struct dbengine_tier *ctx, struct dbengine_journalfile *
     madvise_sequential(data_start, journal_v2_file_size);
     madvise_willneed(data_start, journal_v2_file_size);
 
-    nd_log_daemon(NDLP_DEBUG, "DBENGINE: checking integrity of \"%s\"", path_v2);
+    dbengine_log(ctx->engine, NDLP_DEBUG, "DBENGINE: checking integrity of \"%s\"", path_v2);
 
     usec_t validation_start_ut = now_monotonic_usec();
 
@@ -1413,14 +1425,14 @@ int journalfile_v2_load(struct dbengine_tier *ctx, struct dbengine_journalfile *
 
     if (unlikely(rc)) {
         if (rc == 2)
-            error_report("File \"%s\" needs to be rebuilt", path_v2);
+            dbengine_error_report(ctx->engine, "File \"%s\" needs to be rebuilt", path_v2);
         else if (rc == 3)
-            error_report("File \"%s\" will be skipped", path_v2);
+            dbengine_error_report(ctx->engine, "File \"%s\" will be skipped", path_v2);
         else
-            error_report("File \"%s\" is invalid and it will be rebuilt", path_v2);
+            dbengine_error_report(ctx->engine, "File \"%s\" is invalid and it will be rebuilt", path_v2);
 
         if (unlikely(nd_munmap(data_start, journal_v2_file_size)))
-            netdata_log_error("DBENGINE: failed to unmap \"%s\"", path_v2);
+            dbengine_log_error(ctx->engine, "DBENGINE: failed to unmap \"%s\"", path_v2);
 
         close(fd);
         return rc;
@@ -1431,7 +1443,7 @@ int journalfile_v2_load(struct dbengine_tier *ctx, struct dbengine_journalfile *
 
     if (unlikely(!entries)) {
         if (unlikely(nd_munmap(data_start, journal_v2_file_size)))
-            netdata_log_error("DBENGINE: failed to unmap \"%s\"", path_v2);
+            dbengine_log_error(ctx->engine, "DBENGINE: failed to unmap \"%s\"", path_v2);
 
         close(fd);
         return 1;
@@ -1439,7 +1451,7 @@ int journalfile_v2_load(struct dbengine_tier *ctx, struct dbengine_journalfile *
 
     usec_t finished_ut = now_monotonic_usec();
 
-    nd_log_daemon(NDLP_DEBUG, "DBENGINE: journal v2 \"%s\" loaded, size: %0.2f MiB, metrics: %0.2f k, "
+    dbengine_log(ctx->engine, NDLP_DEBUG, "DBENGINE: journal v2 \"%s\" loaded, size: %0.2f MiB, metrics: %0.2f k, "
          "mmap: %0.2f ms, validate: %0.2f ms"
          , path_v2
          , (double)journal_v2_file_size / 1024 / 1024
@@ -1618,7 +1630,9 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
     journalfile_v2_generate_path(datafile, path, sizeof(path));
 
-    netdata_log_info("DBENGINE: tier %d: indexing " WALFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 ": extents %zu, metrics %zu, pages %zu",
+    dbengine_log_info(
+        ctx->engine,
+        "DBENGINE: tier %d: indexing " WALFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 ": extents %zu, metrics %zu, pages %zu",
         ctx->config.tier, datafile->tier, datafile->fileno,
         number_of_extents,
         number_of_metrics,
@@ -1659,7 +1673,9 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     if(!data_start) {
         if(fd_v2 != -1)
             close(fd_v2);
-        nd_log_daemon(NDLP_WARNING, "DBENGINE: Failed to allocate %"PRIu64" bytes of memory for journal file \"%s\". Will retry later", total_file_size, path);
+        dbengine_log(ctx->engine, NDLP_WARNING,
+                     "DBENGINE: Failed to allocate %"PRIu64" bytes of memory for journal file \"%s\". Will retry later",
+                     total_file_size, path);
         return false;
     }
 
@@ -1693,7 +1709,7 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         struct journal_v2_block_trailer *journal_v2_trailer;
 
         uint8_t *data = journalfile_v2_write_extent_list(JudyL_extents_pos, data_start + extent_offset);
-        internal_error(
+        dbengine_internal_error(ctx->engine,
             true, "DBENGINE: write extent list so far %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
         fatal_assert(data == data_start + extent_offset_trailer);
@@ -1705,7 +1721,7 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         crc = crc32(crc, (uint8_t *)data_start + extent_offset, number_of_extents * sizeof(struct journal_extent_list));
         crc32set(journal_v2_trailer->checksum, crc);
 
-        internal_error(
+        dbengine_internal_error(ctx->engine,
             true, "DBENGINE: CALCULATE CRC FOR EXTENT %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
         // Skip the trailer, point to the metrics off
         data += sizeof(struct journal_v2_block_trailer);
@@ -1740,7 +1756,7 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         j2_header.end_time_ut = max_time_s * USEC_PER_SEC;
 
         qsort(&uuid_list[0], number_of_metrics, sizeof(struct journal_metric_list_to_sort), journalfile_metric_compare);
-        internal_error(
+        dbengine_internal_error(ctx->engine,
             true, "DBENGINE: traverse and qsort  UUID %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
         for (Index = 0; Index < number_of_metrics; Index++) {
@@ -1788,7 +1804,7 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         }
 
         if (data == data_start + metric_offset_trailer) {
-            internal_error(
+            dbengine_internal_error(ctx->engine,
                 true, "DBENGINE: WRITE METRICS AND PAGES  %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
             // Calculate CRC for metrics
@@ -1797,7 +1813,7 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
             crc = crc32(
                 crc, (uint8_t *)data_start + metrics_offset, number_of_metrics * sizeof(struct journal_metric_list));
             crc32set(journal_v2_trailer->checksum, crc);
-            internal_error(
+            dbengine_internal_error(ctx->engine,
                 true, "DBENGINE: CALCULATE CRC FOR UUIDs  %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
             // Prepare to write checksum for the file
@@ -1810,18 +1826,20 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
             // Write header to the file
             memcpy(data_start, &j2_header, sizeof(j2_header));
 
-            internal_error(
+            dbengine_internal_error(ctx->engine,
                 true, "DBENGINE: FILE COMPLETED --------> %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
             char size_for_humans[128];
             size_snprintf(size_for_humans, sizeof(size_for_humans), total_file_size, "B", false);
-            netdata_log_info("DBENGINE: tier %d: migrated " WALFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 ", %s",
-                           ctx->config.tier, datafile->tier, datafile->fileno, size_for_humans);
+            dbengine_log_info(
+                ctx->engine,
+                "DBENGINE: tier %d: migrated " WALFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 ", %s",
+                ctx->config.tier, datafile->tier, datafile->fileno, size_for_humans);
 
             // msync(data_start, total_file_size, MS_SYNC);
             journalfile_v2_data_set(journalfile, fd_v2, data_start, total_file_size);
 
-            internal_error(
+            dbengine_internal_error(ctx->engine,
                 true, "DBENGINE: ACTIVATING NEW INDEX JNL %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
             ctx_current_disk_space_increase(ctx, total_file_size);
             freez(uuid_list);
@@ -1829,12 +1847,12 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         }
     }
     else {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "DBENGINE: failed to write journal file \"%s\" (SIGBUS)", path);
+        dbengine_log(ctx->engine, NDLP_ERR, "DBENGINE: failed to write journal file \"%s\" (SIGBUS)", path);
     }
 
     freez(uuid_list);
 
-    netdata_log_info("DBENGINE: failed to build index \"%s\", file will be skipped", path);
+    dbengine_log_info(ctx->engine, "DBENGINE: failed to build index \"%s\", file will be skipped", path);
 
     nd_munmap(data_start, total_file_size);
     if(fd_v2 != -1)
@@ -1884,21 +1902,21 @@ int journalfile_load(struct dbengine_tier *ctx, struct dbengine_journalfile *jou
     journalfile->unsafe.pos = file_size;
     journalfile->file = file;
 
-    ret = journalfile_check_superblock(file);
+    ret = journalfile_check_superblock(ctx->engine, file);
     if (ret) {
-        netdata_log_info("DBENGINE: invalid journal file \"%s\" ; superblock check failed.", path);
+        dbengine_log_info(ctx->engine, "DBENGINE: invalid journal file \"%s\" ; superblock check failed.", path);
         error = ret;
         goto cleanup;
     }
     ctx_io_read_op_bytes(ctx, sizeof(struct dbengine_jf_sb));
 
-    nd_log_daemon(NDLP_DEBUG, "DBENGINE: loading journal file \"%s\"", path);
+    dbengine_log(ctx->engine, NDLP_DEBUG, "DBENGINE: loading journal file \"%s\"", path);
 
     max_id = journalfile_iterate_transactions(ctx, journalfile);
 
     __atomic_store_n(&ctx->atomic.transaction_id, MAX(__atomic_load_n(&ctx->atomic.transaction_id, __ATOMIC_RELAXED), max_id + 1), __ATOMIC_RELAXED);
 
-    nd_log_daemon(NDLP_DEBUG, "DBENGINE: journal file \"%s\" loaded (size:%" PRIu64 ").", path, file_size);
+    dbengine_log(ctx->engine, NDLP_DEBUG, "DBENGINE: journal file \"%s\" loaded (size:%" PRIu64 ").", path, file_size);
 
     bool is_last_file = (ctx_last_fileno_get(ctx) == journalfile->datafile->fileno);
     bool has_old_data = false;
