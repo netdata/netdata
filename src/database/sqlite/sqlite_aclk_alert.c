@@ -317,6 +317,9 @@ done:
     " AND hl.host_id = @host_id AND aq.host_id = hl.host_id AND hl.health_log_id = hld.health_log_id"                  \
     " ORDER BY aq.sequence_id ASC LIMIT "ACLK_MAX_ALERT_UPDATES
 
+// how many batches one commit_alert_events() call may drain before yielding to the next tick
+#define ACLK_COMMIT_MAX_PASSES   10
+
 //
 // Check all queued alerts for a host and commit them as if they have been send to the cloud
 // this will produce new versions as needed. We need this because we are about to send a
@@ -340,6 +343,7 @@ static void commit_alert_events(RRDHOST *host)
     int64_t consumed_seq[ACLK_MAX_ALERT_UPDATES_N];
     int64_t consumed_uid[ACLK_MAX_ALERT_UPDATES_N];
     size_t consumed;
+    int passes = 0;
 
     param = 0;
     do {
@@ -370,7 +374,11 @@ static void commit_alert_events(RRDHOST *host)
         for (size_t i = 0; i < consumed; i++)
             delete_alert_from_submit_queue(&host->host_id.uuid, consumed_seq[i], consumed_uid[i], &res_delete);
 
-    } while (consumed == ACLK_MAX_ALERT_UPDATES_N);
+        // A row re-pointed during the pass fails its guarded delete by design and stays queued, so a pass can
+        // come back full without making progress. That resolves itself - the next pass sees the newer
+        // transition and consumes that - but do not spin the ACLK worker on it: stop after a bounded number of
+        // passes and let the next tick continue, exactly as the push path does.
+    } while (consumed == ACLK_MAX_ALERT_UPDATES_N && ++passes < ACLK_COMMIT_MAX_PASSES);
 
 done:
     REPORT_BIND_FAIL(res, param);
@@ -526,6 +534,19 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
             return;
     }
 
+    // Deleting from aclk_queue while this SELECT is still being stepped would be relying on undefined
+    // behaviour: SQLite only guarantees that deleting the current or a prior row is safe for a SELECT over a
+    // SINGLE table, and this is a four-way join. What a joined SELECT does when the same connection modifies
+    // one of its tables mid-scan "depends on which release of SQLite is running, the schema of the database
+    // file, whether or not ANALYZE has been run, and the details of the query" (sqlite.org/isolation.html) -
+    // and a row skipped that way would be a transition that is never sent, which is the very bug this guard
+    // exists to prevent. So buffer what we consumed, reset the statement, then delete. One batch is bounded
+    // by the LIMIT, so the buffer is too. Declared before the first bind: `done:` runs this loop, so a
+    // SQLITE_BIND_FAIL goto must not be able to jump over the initialisation.
+    int64_t consumed_seq[ACLK_MAX_ALERT_UPDATES_N];
+    int64_t consumed_uid[ACLK_MAX_ALERT_UPDATES_N];
+    size_t consumed = 0;
+
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(*res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
@@ -539,17 +560,6 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
     size_t sent = 0;
     int64_t first_seq = 0, last_seq = 0;
 
-    // Deleting from aclk_queue while this SELECT is still being stepped would be relying on undefined
-    // behaviour: SQLite only guarantees that deleting the current or a prior row is safe for a SELECT over a
-    // SINGLE table, and this is a four-way join. What a joined SELECT does when the same connection modifies
-    // one of its tables mid-scan "depends on which release of SQLite is running, the schema of the database
-    // file, whether or not ANALYZE has been run, and the details of the query" (sqlite.org/isolation.html) -
-    // and a row skipped that way would be a transition that is never sent, which is the very bug this guard
-    // exists to prevent. So buffer what we consumed, reset the statement, then delete. One batch is bounded
-    // by the LIMIT, so the buffer is too.
-    int64_t consumed_seq[ACLK_MAX_ALERT_UPDATES_N];
-    int64_t consumed_uid[ACLK_MAX_ALERT_UPDATES_N];
-    size_t consumed = 0;
 
     param = 0;
     RRDCALC_STATUS status;
