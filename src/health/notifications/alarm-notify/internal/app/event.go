@@ -16,7 +16,8 @@ import (
 func readNotification(r io.Reader) (notifier.Notification, error) {
 	var input struct {
 		notifyevent.Event
-		CriticalSeenSinceClear *bool `json:"critical_seen_since_clear"`
+		CriticalSeenSinceClear *bool                `json:"critical_seen_since_clear"`
+		ProducerContext        producerContextInput `json:"producer_context"`
 	}
 	decoder := json.NewDecoder(r)
 	decoder.DisallowUnknownFields()
@@ -48,5 +49,9 @@ func readNotification(r io.Reader) (notifier.Notification, error) {
 	default:
 		return notifier.Notification{}, errors.New("event previous_status is not a recognized alert status")
 	}
-	return notifier.Notification{Event: event, CriticalSeenSinceClear: input.CriticalSeenSinceClear}, nil
+	producerContext := input.ProducerContext.value
+	if err := producerContext.Validate(); err != nil {
+		return notifier.Notification{}, err
+	}
+	return notifier.Notification{Event: event, CriticalSeenSinceClear: input.CriticalSeenSinceClear, ProducerContext: producerContext}, nil
 }

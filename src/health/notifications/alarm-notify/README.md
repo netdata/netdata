@@ -124,8 +124,7 @@ there is no automatic stock-file discovery:
 A successful check means **syntax support only**. It does not evaluate variable values, validate provider names,
 credentials, recipients or routing, or establish that a custom function will work. It reads no event from stdin,
 resolves no secrets and executes no configuration code. `send` and `validate` continue to accept YAML only.
-The internal recipient resolver below is available for future adapters. Old-format delivery mapping and the optional
-Unix Bash custom-function runtime remain later increments.
+Use `send-legacy` below for supported old-format delivery, including the optional Unix custom-function runtime.
 
 The reader supports this declarative subset:
 
@@ -164,10 +163,9 @@ commands and returns `0` on supported syntax or `1` on errors/cancellation.
 
 ## Legacy recipient routing
 
-`internal/legacyrouting.Resolve` resolves evaluated legacy settings for an explicit list of applicable method names
-and requested roles. It returns eligible method/recipient pairs; it does not enable old-format sending in the CLI.
-Provider mapping, `SEND_*` flags, credential prerequisites, executable discovery and custom-function execution remain
-separate adapter work. In particular, `check-legacy` still checks syntax only and does not invoke this resolver.
+`send-legacy` uses `internal/legacyrouting.Resolve` to resolve evaluated settings for the applicable methods and
+requested roles. It returns eligible method/recipient pairs before sender construction. `check-legacy` still checks
+syntax only and does not invoke this resolver.
 
 The resolver uses `role_recipients_<method>` and `DEFAULT_RECIPIENT_<METHOD>`. Its rules preserve the legacy format
 without changing native YAML routing:
@@ -193,7 +191,344 @@ without changing native YAML routing:
 
 Two intentional corrections to Bash apply: unknown modifiers fail instead of logging and permitting delivery, and
 role/recipient wildcard characters are literal instead of expanding against local filenames. Production Bash remains
-unchanged. Unix `custom_sender()` support, including helpers, event context and final-recipient batching, remains pending.
+unchanged. Unix `custom_sender()` receives the same filtered, deduplicated recipient batch.
+
+## Legacy configuration delivery
+
+`send-legacy` applies the supported shell-format settings to the existing Go providers. It does not require Bash for
+HTTP delivery. Supply stock and user files explicitly in order, and the same JSON event used by native `send`:
+
+```sh
+/tmp/alarm-notify send-legacy \
+  --config ../health_alarm_notify.conf \
+  --config /path/to/user/health_alarm_notify.conf \
+  --role sysadmin --method telegram < examples/event.json
+```
+
+Repeat `--role` or `--method` as needed. Without `--method`, all configured methods are considered. With it, only
+those methods are considered; names use the Bash suffixes below (`pd` and `sms`, not `pagerduty` and `smstools3`).
+Explicitly selecting an unknown or unimplemented method is an error. All files must parse even when selection is narrowed.
+
+Activation requires exact `SEND_<METHOD>=YES` (also `AUTO` for email), the method's nonempty prerequisites and,
+for recipient-based methods, an eligible recipient. Without stock configuration, recipient-based methods and Kafka
+default to `YES`. Dynatrace, SIGNL4, Opsgenie and ilert need an explicit `YES`, normally supplied by the stock file.
+Missing prerequisites or required recipients disable that method, except that an obsolete ilert source URL is rejected
+before credential gating (see below). Kafka, SIGNL4, Dynatrace, Opsgenie and ilert are global: they send once when
+enabled and configured, regardless of roles, including reserved roles. Gotify, Discord and Flock send once only when at least one
+recipient survives filtering. Email, Prowl, SMSEagle and custom functions batch their final eligible recipients. Teams sends once per distinct final URL after recipient filtering. Other mappings send
+once per distinct eligible target.
+
+All selected routing policies and eligible provider configurations are checked **before any delivery**. Missing
+required critical history, an eligible unsupported method, or invalid supported settings reject the whole invocation.
+No eligible targets is a successful no-op. Delivery uses the existing sequential, any-success result handling and
+invocation deadline. Logs use safe labels such as `telegram-1`, never recipient keys or URLs. The legacy summary counts
+attempted successes and failures; filtering happens before the plan is built, so it does not report a skipped count.
+
+| Method | Legacy settings and recipient meaning |
+|---|---|
+| `alerta` | `ALERTA_WEBHOOK_URL`, optional `ALERTA_API_KEY`; recipient is the environment |
+| `awssns` | `aws`, `AWSSNS_CREDENTIAL_SOURCE`, mode-specific `AWS_*` assignments, optional `AWSSNS_MESSAGE_FORMAT`; recipient is an SNS topic or platform endpoint ARN (see below) |
+| `custom` | Optional absolute `bash` path, `SEND_CUSTOM`, `custom_sender()` and helper definitions; one invocation with the filtered recipient batch (see below) |
+| `discord` | `DISCORD_WEBHOOK_URL`; recipients gate the single native webhook send |
+| `dynatrace` | `DYNATRACE_SERVER`, `DYNATRACE_SPACE`, `DYNATRACE_TOKEN`, `DYNATRACE_TAG_VALUE`, `DYNATRACE_EVENT`, optional `DYNATRACE_ANNOTATION_TYPE`; global Events API v2 send |
+| `email` | `sendmail`, `EMAIL_SENDER`, `EMAIL_PLAINTEXT_ONLY=YES`, `EMAIL_THREADING` (enabled unless `NO`); recipients are mail addresses/local users |
+| `fleep` | `FLEEP_SENDER` (initially the event node); each recipient is a hook ID appended to `https://fleep.io/hook/` |
+| `flock` | `FLOCK_WEBHOOK_URL`; recipients gate the single webhook send |
+| `gotify` | `GOTIFY_APP_URL`, `GOTIFY_APP_TOKEN`; recipients gate the single application send |
+| `ilert` | `ILERT_INTEGRATION_KEY`, optional `ILERT_API_URL`; global Event API send using an API alert source; obsolete `ILERT_ALERT_SOURCE_URL` must be empty |
+| `irc` | `nc`, `IRC_NETWORK`, `IRC_PORT` (initially `6667`), `IRC_NICKNAME`, `IRC_REALNAME`; recipient is a channel |
+| `kavenegar` | `KAVENEGAR_API_KEY`, `KAVENEGAR_SENDER`; recipient is a phone number |
+| `matrix` | `MATRIX_HOMESERVER`, `MATRIX_ACCESSTOKEN`; recipient is a room ID |
+| `messagebird` | `MESSAGEBIRD_ACCESS_KEY`, `MESSAGEBIRD_NUMBER`; recipient is a phone number |
+| `msteams` | `MSTEAMS_WEBHOOK_URL`, `MSTEAMS_ICON_<STATUS>`, `MSTEAMS_COLOR_<STATUS>`; recipient replaces each `CHANNEL` in the URL; singular `MSTEAM_*` aliases are supported |
+| `ntfy` | Recipient is a full topic URL; a complete `NTFY_USERNAME`/`NTFY_PASSWORD` pair takes precedence over `NTFY_ACCESS_TOKEN`; an incomplete pair is ignored |
+| `opsgenie` | `OPSGENIE_API_KEY`, optional `OPSGENIE_API_URL`; global Alert API v2 send using an API Integration |
+| `pd` | Recipient is the integration key; exact `USE_PD_VERSION=2` selects v2, other values select v1 |
+| `prowl` | Recipients are API keys, submitted together |
+| `pushbullet` | `PUSHBULLET_ACCESS_TOKEN`, optional `PUSHBULLET_SOURCE_DEVICE`; recipient is an email or `#channel-tag` |
+| `pushover` | `PUSHOVER_APP_TOKEN`; recipient is a user/group key |
+| `rocketchat` | `ROCKETCHAT_WEBHOOK_URL`; `#` is prepended to each legacy channel recipient |
+| `slack` | `SLACK_WEBHOOK_URL`; recipient is a bare channel, `#channel`, `@user`, or `#` for the webhook default; uses the host-derived sender name and optional `images_base_url` |
+| `sms` | `sendsms`; recipient is a phone number, delivered through SMS Server Tools 3 |
+| `syslog` | `logger`, `logger_options`, `SYSLOG_FACILITY`; recipient syntax is `[[facility.level][@host[:port]]/]prefix`, with bracketed IPv6 supported |
+| `telegram` | `TELEGRAM_BOT_TOKEN`, optional `TELEGRAM_API_URL`, `TELEGRAM_RETRIES_ON_LIMIT`; recipient is `chat` or `chat:topic` |
+| `twilio` | `TWILIO_ACCOUNT_SID`, `TWILIO_ACCOUNT_TOKEN`, `TWILIO_NUMBER`; recipient is a phone number |
+| `smseagle` | `SMSEAGLE_API_URL`, `SMSEAGLE_API_ACCESSTOKEN`, `SMSEAGLE_MSG_TYPE` (initially `sms`); `SMSEAGLE_CALL_DURATION` (initially `10`) and `SMSEAGLE_VOICE_ID` (initially `1`) apply only to their call modes |
+| `kafka` | `KAFKA_URL`, `KAFKA_SENDER_IP`; global send |
+| `signl4` | `SIGNL4_WEBHOOK_URL`; global send |
+
+The five implemented command mappings (email, SMS, syslog, IRC and AWS SNS) use an explicit absolute executable path or
+discovery in the invoking process's `PATH`. A missing discovered tool disables its method; an explicit path is
+validated by the native provider and attempted during delivery.
+`SEND_EMAIL=AUTO` checks sendmail availability. Child processes retain the native isolated environment, not the parent
+or configuration's arbitrary variables. `logger_options` splits on spaces, tabs and newlines into literal arguments;
+there is no second quoting pass, expansion or globbing. Native command delivery currently supports Linux/macOS.
+
+Evaluated values remain literal through validation and sending, even when resembling `${env:...}` or `${file:...}`.
+Use single quotes, such as `'${env:NAME}'`, to preserve these strings as literals in shell-format files. Unquoted
+and double-quoted forms are parsed as unsupported shell parameter expansion and rejected.
+Native field validation still applies; for example, an invalid token is rejected rather than interpreted as a secret
+reference. Native YAML retains its existing lazy secret-reference behavior. The internal input-mode setting is not a
+YAML option.
+
+Available initial event scalars are `roles`, `host`, `args_host`, `when` (Unix seconds), `name`, `chart`, `context`,
+`status`, `old_status`, `units`, `info`, `summary`, `value`, `old_value`, `duration`, `non_clear_duration`,
+`date`, `value_string`, `old_value_string` and `status_message`. The optional [producer context](#producer-context)
+adds the other Bash input scalars listed below. `date` is the event timestamp in UTC RFC3339. Supplied value strings
+are preserved; otherwise they include units when the numeric value is present. Missing optional numeric facts are
+empty, while zero remains `0` (or `0 <units>`). `status_message` is `needs attention`, `is critical` or `recovered`.
+All these facts are initialized before configuration evaluation. There is no ambient environment import or invented
+alarm/event ID. Producer-context keys are reserved event scalars even when their input is omitted.
+The senders use the current native event content and provider formatting, including already documented corrections;
+this is not byte-for-byte Bash output. Unknown scalar settings can serve as intermediate assignment variables but
+have no independent delivery effect.
+
+These configured behaviors are rejected when applicable to eligible delivery: nonempty `curl`/`curl_options` for
+HTTP methods; non-UTF-8 `EMAIL_CHARSET` for email; configured nonempty `PATH` for command methods; nonempty
+`date_format`; nonempty `images_base_url` when any eligible method is neither Slack nor custom; `use_fqdn=YES`/`clear_alarm_always=YES`;
+and final evaluated values of any event or producer-context scalar that differ from their initial values. Temporary
+assignments are allowed if those values are restored; settings derived during evaluation retain their assignment-time expansions. Use the native event/configuration
+contract to change event facts. Empty charset, `UTF-8` and `UTF8` (case-insensitive) use the existing UTF-8 email
+implementation.
+
+Unix `custom_sender()` runs only for eligible custom delivery (see below). HipChat is explicitly excluded and errors
+when eligible. Function bodies stay inert during native parsing/evaluation and preflight; original configuration files
+are never sourced by Bash.
+
+Seven Bash defects are intentionally corrected by approval: email AUTO checks sendmail instead of curl;
+PagerDuty/Prowl/ntfy can use role recipients without a global default; ntfy sends the resolved filtered recipients;
+Fleep does not require the unused `FLEEP_SERVER` setting; Teams sends once per distinct resolved URL; and SNS
+message assignments can use `date` and `status_message` before configuration evaluation instead of expanding them
+to empty strings; selected custom delivery rejects the shipped unconfigured placeholder instead of reporting a
+successful no-op. Production Bash and installation remain unchanged.
+
+### Legacy custom functions
+
+On Linux and macOS, `send-legacy --method custom` can run a trusted Bash `custom_sender()` function. Bash 4 or later
+is required only when custom has an eligible recipient. Set `bash` to an absolute executable path, or leave it
+unset/empty to discover it from the invoking process's `PATH`. Missing or incompatible Bash is an error for eligible
+custom delivery. Windows can still parse/check the configuration, but cannot run this adapter.
+
+```bash
+# Custom overlay; load after the stock configuration if using one.
+SEND_CUSTOM=YES
+DEFAULT_RECIPIENT_CUSTOM='ops'
+# bash=/absolute/path/to/bash
+curl=/usr/bin/curl
+CUSTOM_ENDPOINT='http://127.0.0.1:18080/custom'
+custom_sender() {
+    local httpcode
+    httpcode=$(docurl --data-urlencode "recipients=$1" \
+        --data-urlencode "message=$host $status_message: $alarm" "$CUSTOM_ENDPOINT") || return 1
+    [[ $httpcode == 200 || $httpcode == 202 ]]
+}
+```
+
+The final function definition wins across configuration files. It is called **once**, with one argument containing
+the final space-separated recipients; `to_custom` contains the same string. Role-only recipients work without a
+global default. Disabled, unselected and fully filtered custom delivery neither needs Bash nor executes functions.
+An absent function or either known shipped unconfigured placeholder is an error before any provider sends.
+Other functions determine their own acceptance through their final exit status; the adapter cannot verify that an
+arbitrary function actually sent a notification. Exit zero counts as one successful custom batch, and nonzero counts
+as one failed batch. Existing any-success handling applies across methods.
+
+Native evaluation supplies literal scalar globals and declared recipient associative maps. Quotes, newlines,
+Unicode and shell-looking values are not evaluated again. Only retained function bodies are executable code. Bash
+receives this state through stdin, never through process arguments or a second sourcing of the original files.
+The complete selection is preflighted first, including a fixed Bash-version probe and a syntax-only check with the
+selected interpreter. Neither check executes custom code. `check-legacy` remains a native syntax-subset check and
+does not perform these runtime checks.
+
+The function can read every [core legacy scalar](#legacy-configuration-delivery) and every
+[producer-context scalar](#producer-context), including IDs, source/expressions, formatted values, counts/lists and
+metadata. Missing optional facts remain empty; explicit numeric zero remains `0`. Derived presentation is computed
+for the custom runtime after settings evaluation, without retroactively expanding earlier assignments:
+
+| Globals | Meaning |
+|---|---|
+| `date`, `date_utc` | Event time in UTC RFC3339, following the legacy adapter's existing date contract |
+| `url_host`, `url_chart`, `url_name`, `url_value_string` | Byte-wise URL encoding of the supplied host, chart, alert and formatted value |
+| `goto_url` | The caller's event `url`; no registry file lookup or invented identity |
+| `duration_txt`, `non_clear_duration_txt` | Bash-style human durations, or empty when the input is missing |
+| `alarm`, `status_message`, `severity`, `raised_for` | Summary/value and transition presentation; recovery omits the current value; unknown durations do not create a duration claim |
+| `image`, `color` | Bash status artwork/color; `images_base_url` defaults to `https://registry.my-netdata.io` |
+
+Built-in helpers are available to retained functions:
+
+- `urlencode TEXT` prints the encoded text and sets `REPLY`, using lowercase escapes and byte-wise UTF-8 encoding.
+- `duration4human SECONDS` prints a duration and sets `REPLY`. It accepts decimal integers from 0 through 4294967295,
+  rejects expressions/negative values, and preserves Bash's duration rounding and wording.
+- `docurl ARGS...` invokes `curl` with literal arguments, discards the response body, prints the HTTP status and returns
+  curl's exit status. HTTP acceptance is the custom function's decision. Set `curl` to an absolute path or leave it
+  empty for optional discovery; missing curl makes this helper fail, without blocking functions that do not use it.
+  `curl_options` splits on spaces, tabs and newlines, with no globbing, quote re-parsing or evaluation; pass options
+  requiring embedded spaces as quoted arguments to `docurl` inside the function. Native Go HTTP providers still reject
+  these curl overrides when they are also eligible.
+- `info` and `error` return successful logging operations; child output is discarded by the runner. Custom helper
+  definitions may override these defaults. The adapter reports safe process failure/status diagnostics only.
+
+The child starts without ambient credentials, exported functions or startup scripts, with a private temporary `HOME`,
+`LC_ALL=C` and `PATH=/usr/local/bin:/usr/bin:/bin`. Settings are shell globals, not automatically exported environment
+variables; a custom function can explicitly export values needed by its own commands. Runtime-controlled shell names
+(such as `PATH`, `HOME`, `IFS`, `BASH*`, locale variables, special Bash variables and `_netdata_custom_*`) are rejected
+as settings rather than altering interpreter startup or data assignment. Reserved internal function names are also
+rejected. NUL cannot be represented and is rejected. Use absolute paths for commands outside the child's fixed PATH.
+
+Functions are trusted code with the notifier process's permissions, **not an OS sandbox**. They must run in the
+foreground, wait for their children and not detach from the process group. The existing invocation deadline and
+command process-group cancellation apply; private-home cleanup finishes before return. Native YAML command/webhook
+providers, public Event payloads, Agent invocation and production packaging are unchanged.
+
+### Legacy AWS SNS settings
+
+SNS uses the existing [AWS CLI v2 sender](#aws-sns), with the same isolated environment, private temporary home,
+ARN-derived region and delivery limits. Configure `aws` as an absolute path or leave it empty to discover `aws`
+in the invoking process's `PATH`. Missing discovery disables SNS. An eligible SNS target requires an explicit
+`AWSSNS_CREDENTIAL_SOURCE`; credentials from the invoking process, home directory or AWS profiles are not inherited.
+Use **ordinary assignments**, not `export` statements:
+
+```sh
+SEND_AWSSNS=YES
+aws=/usr/local/bin/aws
+AWSSNS_CREDENTIAL_SOURCE=static
+AWS_ACCESS_KEY_ID='REPLACE_WITH_ACCESS_KEY'
+AWS_SECRET_ACCESS_KEY='REPLACE_WITH_SECRET_KEY'
+DEFAULT_RECIPIENT_AWSSNS='arn:aws:sns:us-east-1:123456789012:alerts'
+role_recipients_awssns[ops]="$DEFAULT_RECIPIENT_AWSSNS"
+AWSSNS_MESSAGE_FORMAT="${status} on ${host} at ${date}: ${chart} ${value_string}"
+```
+
+The credential source and fields match the native provider:
+
+| `AWSSNS_CREDENTIAL_SOURCE` | Required assignments | Optional assignments |
+|---|---|---|
+| `static` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | `AWS_SESSION_TOKEN` |
+| `web_identity` | `AWS_ROLE_ARN`, `AWS_WEB_IDENTITY_TOKEN_FILE` (absolute path) | `AWS_ROLE_SESSION_NAME` |
+| `ecs` | `AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` (path on the fixed ECS metadata endpoint) | None |
+| `imds` | None; explicitly permits the standard EC2 metadata credential source | None |
+
+Empty optional fields are omitted. Nonempty `AWS_*` assignments outside the selected mode are rejected before any
+selected delivery, including wrong-mode credentials, profiles and endpoint overrides. These values stay literal:
+`${env:...}` and `${file:...}` are native YAML features, not secret references in shell-format configuration.
+`AWS_WEB_IDENTITY_TOKEN_FILE` retains its AWS CLI meaning: a file read by the CLI when it needs the identity token.
+There is no implicit credential source or fallback to profiles. Use the explicit source that matches the deployment.
+
+`AWSSNS_MESSAGE_FORMAT` is expanded **once, at assignment time**, by the native legacy reader. The resulting text
+is sent literally; native `{{field}}` placeholders, shell-looking text and `file://` prefixes are not interpreted again.
+Single-quoted references stay literal. A later variable assignment does not change an earlier message assignment;
+reassign the format in the later file to use new values. Empty/unset format uses the native default body.
+The subject keeps the native status wording. Messages must be valid UTF-8 and at most 262144 bytes; subjects must
+be under 100 characters without controls or line breaks. There is no Bash locale/date-format processing.
+Message assignments can reference the optional producer-context scalars as well as the core event scalars.
+
+### Legacy ilert, Opsgenie and Dynatrace settings
+
+These mappings use the same APIs, payloads and incident identity as the native YAML providers. Reading shell-format
+settings does not preserve the old service-side integration setup. All three require exact `SEND_<METHOD>=YES` and
+send once without recipients or recipient policies, even for `silent`/`disabled` roles.
+
+For [ilert](#ilert), create an **API alert source** and configure its integration key. This is different from the old
+Netdata-specific alert source and URL; the adapter does not extract a credential from that URL.
+
+```sh
+SEND_ILERT=YES
+ILERT_ALERT_SOURCE_URL=''
+ILERT_INTEGRATION_KEY='replace-with-api-source-key'
+# Optional; this is the default base, before /events:
+ILERT_API_URL='https://api.ilert.com/api'
+```
+
+When ilert is selected and enabled, any nonempty `ILERT_ALERT_SOURCE_URL` rejects the entire invocation before any
+send, including when `ILERT_INTEGRATION_KEY` is also set. Clear or remove the old URL assignment, including any value
+in an earlier loaded file. Disabled/unselected ilert ignores it. With neither a key nor an old URL, ilert is inactive.
+WARNING/CRITICAL send `ALERT`; CLEAR sends `RESOLVE` with the same stable incident key.
+
+For [Opsgenie](#opsgenie-alerts), use the key from an **API Integration**, replacing the old Netdata integration setup.
+The existing setting names remain:
+
+```sh
+SEND_OPSGENIE=YES
+OPSGENIE_API_KEY='replace-with-api-integration-key'
+# Optional; omit or leave empty for https://api.opsgenie.com:
+OPSGENIE_API_URL='https://api.eu.opsgenie.com'
+```
+
+WARNING/CRITICAL create P3/P1 alerts; CLEAR closes the stable incident alias. API acceptance is asynchronous and
+uses the same acknowledgment checks as native delivery.
+
+For [Dynatrace](#dynatrace), the API token needs `events.ingest`. The existing server/space settings form the environment
+base `DYNATRACE_SERVER/e/DYNATRACE_SPACE`, followed by `/api/v2/events/ingest`. One optional trailing slash on the
+server is reused as the separator; additional slashes and encoded path segments are retained. No hostname or SaaS
+URL is inferred. Use native YAML's explicit `api_url` for a different environment URL layout.
+
+```sh
+SEND_DYNATRACE=YES
+DYNATRACE_SERVER='https://monitor.example.test'
+DYNATRACE_SPACE='environment-id'
+DYNATRACE_TOKEN='replace-with-events-ingest-token'
+DYNATRACE_TAG_VALUE='netdata'
+DYNATRACE_EVENT='CUSTOM_INFO'
+DYNATRACE_ANNOTATION_TYPE='Netdata Alarm'
+```
+
+Server, space, token, tag and event type must all be nonempty to activate delivery. An empty or unset annotation type
+uses the native `Netdata Alarm` source. The tag selects HOST entities with that one literal manual tag, for example
+`type(HOST),tag("netdata")`. Commas/parentheses remain quoted data; literal colons are backslash-escaped to avoid
+key/value interpretation, following the [entity-selector syntax](https://docs.dynatrace.com/docs/dynatrace-api/environment-api/entity-v2/entity-selector).
+Tags with boundary whitespace, leading `[`, quotes, backslashes, tildes or control characters are rejected because
+the adapter cannot establish their literal selector interpretation. Use native YAML's explicit `entity_selector` for
+these cases or richer targeting. Spaces are URL-encoded in the environment ID; dot segments, path separators,
+percent encodings and control characters are rejected. Server URLs cannot contain credentials, queries or fragments.
+The configured event type applies to every status, including CLEAR; a recovery event does not explicitly close an
+existing Dynatrace problem. Native selector, event-type and content limits still apply.
+
+### Legacy Slack and Teams routing
+
+Slack shell-format delivery requires a [legacy incoming webhook](https://docs.slack.dev/legacy/legacy-custom-integrations/legacy-custom-integrations-incoming-webhooks/)
+for runtime channel/user and sender-identity overrides. Modern app webhooks bind these settings at installation;
+a URL alone does not identify which kind it is. Native YAML Slack destinations keep the modern app behavior.
+
+```sh
+SLACK_WEBHOOK_URL='https://example.test/slack-hook'
+DEFAULT_RECIPIENT_SLACK='#operations @oncall #'
+```
+
+Each distinct eligible recipient produces a request. A bare name becomes `#name`, `#channel` and `@user` remain intact,
+and `#` omits the channel field to use the webhook's default. The sender name is `netdata on <event node>`. The icon is
+`https://registry.my-netdata.io/images/banner-icon-144x144.png`; a nonempty `images_base_url` replaces its base.
+An unset or empty value uses the default. The final icon URL must be absolute HTTP(S) and at most 255 characters.
+This customization is supported when the eligible methods are Slack and/or custom; artwork for other providers remains pending. Slack keeps the native alert content,
+status colors and escaping. These legacy overrides are internal to `send-legacy`, not new YAML fields.
+
+Teams uses the already supported [Workflows setup](#microsoft-teams-workflows), with its trigger set to **Anyone**.
+An old connector URL must be replaced with a URL created by Workflows; the adapter cannot convert it automatically.
+Microsoft documents the [final connector retirement rollout in May 2026](https://devblogs.microsoft.com/microsoft365dev/retirement-of-office-365-connectors-within-microsoft-teams/).
+For one destination, configure the full URL and any nonempty recipient label:
+
+```sh
+MSTEAMS_WEBHOOK_URL='https://example.test/workflow?sig=synthetic-value'
+DEFAULT_RECIPIENT_MSTEAMS='operations'
+```
+
+For several destinations, use `CHANNEL` as the entire template and full URLs as recipients:
+
+```sh
+MSTEAMS_WEBHOOK_URL='CHANNEL'
+DEFAULT_RECIPIENT_MSTEAMS='https://example.test/workflow-one?sig=one https://example.test/workflow-two?sig=two'
+role_recipients_msteams[operations]="$DEFAULT_RECIPIENT_MSTEAMS"
+```
+
+The adapter replaces every literal `CHANNEL` with the eligible recipient, without another expansion or URL
+normalization. Recipient splitting and policy suffixes follow the existing rules, so full-URL recipients cannot
+contain raw commas, whitespace or `|`. Signed query strings retain their bytes and order. Teams sends once per distinct
+resulting URL **after filtering**; different recipient labels for a fixed URL no longer cause repeated messages.
+Existing per-recipient history requirements still apply before URL deduplication.
+
+`MSTEAMS_ICON_WARNING/CRITICAL/CLEAR` and `MSTEAMS_COLOR_WARNING/CRITICAL/CLEAR` override the native styles. Explicit
+empty values omit the icon/color. Default-status settings do not apply because the event contract permits only these
+three statuses. Old singular `MSTEAM_*`, `SEND_MSTEAM`, `DEFAULT_RECIPIENT_MSTEAM` and `role_recipients_msteam` aliases
+are applied after all files load: nonempty scalar aliases override plural settings; recipient aliases copy even
+empty entries. Teams retains MessageCard payloads and the inline alert link.
 
 ## Command and configuration contract
 
@@ -204,7 +539,7 @@ unchanged. Unix `custom_sender()` support, including helpers, event context and 
 - `send --config FILE --role ROLE [--role ROLE ...]` uses YAML routing to select destinations. Choose either an explicit
   destination or roles; mixing the selectors fails. Roles are exact, case-sensitive names, without comma splitting,
   wildcards, or implicit role selection. They do not become fields in the webhook payload.
-- All three commands accept a positive `--timeout` (default `10s`) covering input/configuration reads and delivery.
+- All commands accept a positive `--timeout` (default `10s`) covering input/configuration reads and delivery.
   Deadline expiration, Ctrl-C, or SIGTERM stops the invocation. Run this developer tool as an ordinary user.
 - Exit status is `0` when at least one delivery succeeds, no destinations are eligible, validation or the syntax check
   succeeds, or help is requested. Invalid options/configuration/input, all attempted deliveries failing, or command cancellation/timeout
@@ -395,8 +730,8 @@ routing:
 
 Use this with the top-level `version: 1`, as shown in `examples/notify.yaml`. Slack's webhook URL is a secret; supply
 it through an environment variable or file reference. Slack manages the channel, username and icon in the app's
-configuration. Runtime channel/user/username/icon overrides from Bash's legacy Slack integration remain pending and
-are not accepted by this provider. This does not change the active Bash integration.
+configuration. Runtime channel/user/username/icon overrides are available through
+[legacy configuration delivery](#legacy-slack-and-teams-routing), not through these native YAML destinations.
 
 Messages show a plain-text Block Kit summary above details in a status-colored attachment: warning/yellow,
 critical/red, clear/green. They include the status transition, node, alert, summary, chart/context when present,
@@ -1127,7 +1462,8 @@ routing:
 `https://activegate.example.com:9999/e/environment`. The notifier appends `/api/v2/events/ingest` and uses
 `Authorization: Api-Token ...`. The API base and token accept whole environment/file references. A token must be
 nonempty printable ASCII without whitespace. This native setup replaces Bash's separate server/space/tag settings
-and v1 payload; it does not read those shell settings.
+and v1 payload; native YAML does not read those shell settings. The [legacy adapter](#legacy-ilert-opsgenie-and-dynatrace-settings)
+maps them separately to Events API v2.
 
 `entity_selector` is a required literal of at most 2000 characters, sent unchanged. The server validates
 [selector syntax](https://docs.dynatrace.com/docs/dynatrace-api/environment-api/entity-v2/entity-selector);
@@ -2016,7 +2352,8 @@ Durations render as whole seconds. Additional fields are `status_message` (the s
 wording), `value_string` and `previous_value_string` (number plus units). Missing optional values become empty strings.
 Whitespace around a placeholder name is ignored. Write `{{{{` to emit a literal `{{`. Unknown or unclosed placeholders
 fail configuration validation. Substitution happens once: inserted text is not evaluated, shell syntax is literal,
-and templates do not resolve secret references. Richer Bash facts and its shell-format syntax remain later work.
+and templates do not resolve secret references. For shell-format message assignments, use the
+[legacy SNS mapping](#legacy-aws-sns-settings). Richer Bash facts remain later work.
 
 The adapter sends `TargetArn`, `Subject` and `Message` as JSON on stdin via `--cli-input-json file:///dev/stdin`.
 This avoids putting event text on the command line or treating text beginning with `file://` as a file to read.
@@ -2110,8 +2447,61 @@ to SNS message templates. Other providers' duration presentation remains pending
 The input additionally accepts `critical_seen_since_clear`, a routing fact kept outside the public Event. A JSON
 boolean supplies known history; omitted/null means unknown. It is required only when a selected `critical` policy
 needs it, as described under **Destination status filters**, and never appears in provider payloads. No initial-CLEAR
-eligibility or history is inferred by the notifier; both belong to the producer. Keep future input-only routing facts
-separate from the public Event too.
+eligibility or history is inferred by the notifier; both belong to the producer. The optional `producer_context`
+object below also stays outside the public Event.
+
+### Producer context
+
+Both `send` and `send-legacy` accept an optional top-level `producer_context` object alongside the event fields.
+It carries additional caller-supplied facts for legacy settings and the optional Unix Bash custom-function adapter.
+Omitting it, using `null`, or using `{}` keeps existing input valid. All members are optional; unknown members or
+wrong JSON types reject the entire invocation before delivery, even when no destination needs these facts.
+Repeated `producer_context` fields and duplicate member names are rejected, including case-insensitive or
+JSON-escape-equivalent spellings.
+
+| Members | JSON type | Meaning / Bash scalar names |
+|---|---|---|
+| `unique_id`, `alarm_id`, `event_id` | Integer or null | Producer notification, alarm and per-alarm event IDs; same scalar names |
+| `src` | String or null | Alert configuration source location |
+| `value_string`, `old_value_string` | String or null | Caller-formatted current and previous values |
+| `calc_expression`, `calc_param_values` | String or null | Alert expression and its evaluation details |
+| `total_warnings`, `total_critical` | Integer or null | Counts of other active WARNING/CRITICAL alerts, excluding this alarm |
+| `total_warn_alarms`, `total_crit_alarms` | String or null | Producer's list text; the Agent uses comma-separated `name=Unix-timestamp` entries |
+| `classification`, `component`, `type` | String or null | Alert classification, component and type |
+| `edit_command_line` | String or null | Configuration-edit command text, carried as data |
+| `child_machine_guid`, `transition_id` | String or null | Producer host and transition identities, carried as opaque strings |
+
+Integers must be from `0` through `4294967295`, without fractions, exponents or quotes. Omitted/null numbers are
+unknown and expand to empty strings in legacy settings; explicit zero expands to `0`. IDs are not inferred from
+`incident_id` and do not replace the stable identity used by native incident providers. Counts and list strings
+are supplied independently; the notifier does not compute or reconcile them.
+
+Strings preserve whitespace, Unicode and shell-looking text; NUL is rejected because shell variables cannot carry it.
+Omitted/null strings become empty, except `value_string` and `old_value_string`: those fall back to the existing
+numeric-value-plus-units formatting. An explicitly supplied empty formatted string stays empty. Supplied formatted
+values are accepted even when the corresponding numeric value is unknown.
+
+For example, add this member to `examples/event.json`:
+
+```json
+"producer_context": {
+  "unique_id": 42,
+  "alarm_id": 7,
+  "event_id": 3,
+  "value_string": "42.50 C",
+  "total_warnings": 2,
+  "total_critical": 0,
+  "calc_expression": "$this > 40"
+}
+```
+
+Then a legacy assignment such as `AWSSNS_MESSAGE_FORMAT="$alarm_id: $value_string ($calc_expression)"` expands to
+`7: 42.50 C ($this > 40)` once, before delivery. No expression or command text is executed or expanded again.
+
+Producer context is input-only. It is excluded from webhook JSON, command stdin, provider raw-event attachments and
+native message templates. Legacy settings can explicitly include its scalars in supported message assignments.
+It does not change ordinary provider formatting. The Agent does not yet generate this JSON; development callers
+supply it. The Unix custom adapter exposes these facts alongside its derived presentation and helpers.
 
 ## Internal packages
 
@@ -2125,8 +2515,8 @@ type Sender interface {
 
 A sender represents one configured destination. Success means the provider accepted the request; it does not promise
 that a human received the notification. The context carries the whole invocation deadline.
-The engine receives a `notifier.Notification` containing the public Event and input-only policy facts. It checks all
-selected policies before delivery, then passes only the public Event to each eligible sender.
+The engine receives a `notifier.Notification` containing the public Event, input-only policy facts and producer context.
+It checks all selected policies before delivery, then passes only the public Event to each eligible sender.
 
 | Package | Ownership |
 |---|---|
@@ -2141,6 +2531,10 @@ selected policies before delivery, then passes only the public Event to each eli
 | `internal/secret` | Whole-value reference syntax and lazy environment/file resolution |
 | `internal/httpclient` | Request construction, client settings, safe errors and bounded response reads |
 | `internal/commandexec` | Command options/environment, foreground processes, interactive sessions and cleanup |
+| `internal/legacyconfig` | Native shell-subset parsing and literal evaluation, with inert function retention |
+| `internal/legacyrouting` | Legacy role/recipient resolution and policy filtering |
+| `internal/legacydelivery` | Legacy settings mapped to typed senders after whole-selection preflight |
+| `internal/legacycustom` | Optional Unix Bash function execution, literal state handoff, context and helpers |
 | `internal/testutil` | Provider-independent test fixtures and helpers |
 
 To add a provider, create its package with a typed `Config`, validating `New` constructor and `Send` method, register

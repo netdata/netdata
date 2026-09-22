@@ -16,30 +16,32 @@ import (
 // Calls to Project must be serialized, as they are by the collector lifecycle.
 type Projector struct {
 	origin            string
-	endpointJob       string
 	resolveProvenance func(baseURI, raw string) (string, bool)
+	thresholdStates   map[string]*readingThresholdState
+	thresholdCycle    uint64
 	rateMu            sync.Mutex
 	rateBaselines     map[string]rateBaseline
 	identities        identity.Registry
 }
 
-// New binds endpoint labels and the acquisition layer's pure URI policy. A nil
+// New binds the endpoint identity and the acquisition layer's pure URI policy. A nil
 // resolver retains source-path identity for readings without canonical provenance.
-func New(origin, job string, resolveProvenance func(baseURI, raw string) (string, bool)) *Projector {
+func New(origin string, resolveProvenance func(baseURI, raw string) (string, bool)) *Projector {
 	p := &Projector{
 		origin:            origin,
-		endpointJob:       job,
 		resolveProvenance: resolveProvenance,
 	}
 	p.rateBaselines = make(map[string]rateBaseline)
 	return p
 }
 
-// Result contains observations and diagnostic messages for the collector to publish
-// and bound together with acquisition diagnostics. No input resource is modified.
+// Result contains metric observations, copied view facts and diagnostics from the
+// same measurement pass. No input resource is modified.
 type Result struct {
 	Observations []Observation
 	Diagnostics  []string
+	Components   []Component
+	Sensors      []Sensor
 }
 
 type Observation struct {
@@ -53,6 +55,8 @@ type Observation struct {
 // which authorizes pruning rate baselines for resources no longer present.
 func (c *Projector) Project(nodes []*Resource, complete bool, observedAt time.Time) (Result, error) {
 	var result Result
+	c.thresholdCycle++
+	defer c.pruneThresholdStates()
 	if complete {
 		c.pruneRateBaselines(nodes)
 	}
@@ -61,10 +65,14 @@ func (c *Projector) Project(nodes []*Resource, complete bool, observedAt time.Ti
 		readings[node.Key] = c.readingsForNode(node, observedAt)
 	}
 	if err := c.validateAndRegisterReadingIdentities(readings); err != nil {
+		c.ResetDerivedHealth()
 		return result, err
 	}
 	var observations []Observation
 	for _, node := range nodes {
+		if node.Kind != "service" {
+			result.Components = append(result.Components, componentView(node, observedAt))
+		}
 		values := c.scalarValues(node, observedAt)
 		if value, present, diagnostic := managerClockValue(node); present {
 			if diagnostic != "" {
@@ -93,6 +101,9 @@ func (c *Projector) Project(nodes []*Resource, complete bool, observedAt time.Ti
 		}
 		observations = append(observations, c.flagObservations(node, flagValues(node))...)
 		for _, reading := range readings[node.Key] {
+			if reading.Primary && reading.Metric != "" {
+				result.Sensors = append(result.Sensors, sensorView(node, reading, observedAt))
+			}
 			result.addDiagnostic(reading.SourceAlarmDiagnostic)
 			if reading.Valid || reading.SourceAlarm != "" {
 				observations = append(observations, c.readingObservations(node, reading)...)

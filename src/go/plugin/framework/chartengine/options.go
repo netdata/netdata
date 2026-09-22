@@ -24,6 +24,7 @@ type engineConfig struct {
 	autogenOverride         policyOverride[AutogenPolicy]
 	autogenRulesOverride    policyOverride[[]charttpl.ValidatedAutogenRule]
 	selectorOverride        policyOverride[metrixselector.Selector]
+	selectorExprOverride    *metrixselector.Expr
 	runtimeStore            metrix.RuntimeStore
 	runtimeStoreSet         bool
 	runtimeObserver         func(PlanRuntimeSample)
@@ -142,6 +143,7 @@ func WithEnginePolicy(policy EnginePolicy) Option {
 		}
 		if policy.Selector != nil {
 			cfg.selectorOverride = policyOverride[metrixselector.Selector]{set: true, value: compiledSelector}
+			cfg.selectorExprOverride = policy.Selector
 			cfg.selector = compiledSelector
 		}
 		return nil

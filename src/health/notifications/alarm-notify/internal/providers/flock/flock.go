@@ -44,7 +44,7 @@ func renderFlock(event notifyevent.Event) flockMessage {
 }
 
 func (dst Config) validateFlock() error {
-	reference, err := secret.IsReference(dst.URL)
+	reference, err := dst.Secrets.IsReference(dst.URL)
 	if err != nil {
 		return fmt.Errorf("flock url: %w", err)
 	}
@@ -58,7 +58,7 @@ func (dst Config) validateFlock() error {
 }
 
 func postJSON(ctx context.Context, client *http.Client, dst Config, message any) error {
-	endpoint, err := secret.Resolve(ctx, dst.URL)
+	endpoint, err := dst.Secrets.Resolve(ctx, dst.URL)
 	if err != nil {
 		return fmt.Errorf("destination.url: %w", err)
 	}
@@ -85,7 +85,8 @@ func sendFlock(ctx context.Context, dst Config, event notifyevent.Event, client 
 }
 
 type Config struct {
-	URL string `yaml:"url,omitempty"`
+	Secrets secret.InputMode `yaml:"-"`
+	URL     string           `yaml:"url,omitempty"`
 }
 
 type Sender struct {

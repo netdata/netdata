@@ -246,6 +246,10 @@ func enforceDimensionCapsWithObserver(
 		cs := chartsByID[chartID]
 		maxDims := cs.lifecycle.Dimensions.MaxDims
 		matChart := state.charts[chartID]
+		if matChart != nil && matChart.templateID != cs.templateID {
+			// The outgoing owner cannot supply incumbents to the replacement's cap.
+			matChart = nil
+		}
 		existingCount := 0
 		if matChart != nil {
 			existingCount = len(matChart.dimensions)

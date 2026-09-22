@@ -23,7 +23,7 @@ type collectorMetrics struct {
 }
 
 func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
-	vec := store.Write().SnapshotMeter("").Vec("endpoint_key", "endpoint_job")
+	vec := store.Write().SnapshotMeter("").Vec("endpoint_key")
 	return &collectorMetrics{
 		status: vec.StateSet(
 			"collection_status",
@@ -41,7 +41,7 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 			"limit",
 			"internal",
 		),
-		duration: vec.Gauge("collection_duration_seconds"),
+		duration: vec.Gauge("collection_duration_seconds", metrix.WithFloat(true)),
 		httpRequests: gaugeMap(
 			vec,
 			"collection_http_requests",
@@ -68,8 +68,8 @@ type cycleMetrics struct {
 	Duration float64
 }
 
-func (m *collectorMetrics) observe(endpointKey, endpointJob string, cycle cycleMetrics) {
-	labels := []string{endpointKey, endpointJob}
+func (m *collectorMetrics) observe(endpointKey string, cycle cycleMetrics) {
+	labels := []string{endpointKey}
 	if cycle.Status != "" {
 		m.status.WithLabelValues(labels...).Enable(cycle.Status)
 	}
@@ -102,7 +102,11 @@ func newHardwareMetrics(store metrix.CollectorStore) *hardwareMetrics {
 	}
 	for _, definition := range measurement.Definitions() {
 		if len(definition.States) == 0 {
-			result.gauges[definition.Name] = meter.Gauge(definition.Name)
+			var options []metrix.InstrumentOption
+			if definition.Float {
+				options = append(options, metrix.WithFloat(true))
+			}
+			result.gauges[definition.Name] = meter.Gauge(definition.Name, options...)
 		} else {
 			result.states[definition.Name] = meter.StateSet(definition.Name,
 				metrix.WithStateSetMode(metrix.ModeEnum),

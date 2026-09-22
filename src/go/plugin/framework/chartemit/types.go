@@ -23,6 +23,7 @@ type EmitEnv struct {
 	JobLabels   map[string]string
 	HostScope   *HostScope
 	MSSinceLast int
+	StoreFirst  bool
 }
 
 // Plan is one emission plan from chartengine planner.

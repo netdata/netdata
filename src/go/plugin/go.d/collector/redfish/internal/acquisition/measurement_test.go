@@ -3,6 +3,7 @@
 package acquisition
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 
 func measurementTestProject(t *testing.T, client *Client, nodes ...*graphNode) []measurement.Observation {
 	t.Helper()
-	projector := measurement.New(client.origin, "", ReadingProvenanceResolver(client.root, client.origin))
+	projector := measurement.New(client.origin, ReadingProvenanceResolver(client.root, client.origin))
 	resources := make([]*measurement.Resource, 0, len(nodes))
 	for _, node := range nodes {
 		resources = append(resources, &node.Resource)
@@ -56,7 +57,7 @@ func measurementTestRequireAlarm(t *testing.T, observations []measurement.Observ
 	t.Helper()
 	var alarms []string
 	for _, observation := range observations {
-		if observation.State != "" && measurementTestLabel(observation, "reading_key") != "" {
+		if strings.HasSuffix(observation.Metric, "_alarm_status") && measurementTestLabel(observation, "reading_key") != "" {
 			alarms = append(alarms, observation.State)
 		}
 	}

@@ -46,16 +46,21 @@ func TestSNSConfig(t *testing.T) {
 			d.CredentialSource = "ecs"
 			d.Env = map[string]string{"AWS_CONTAINER_CREDENTIALS_RELATIVE_URI": "/v2/credentials/example?key=value"}
 		}},
-		"platform endpoint": {change: func(d *Config) { d.TargetARN = "arn:aws:sns:eu-west-1:123456789012:endpoint/APNS/app/1234-5678" }},
-		"china":             {change: func(d *Config) { d.TargetARN = "arn:aws-cn:sns:cn-north-1:123456789012:alerts" }},
-		"government":        {change: func(d *Config) { d.TargetARN = "arn:aws-us-gov:sns:us-gov-west-1:123456789012:alerts" }},
-		"message":           {change: func(d *Config) { d.MessageTemplate = "{{ status }} {{node}}: {{summary}}\n{{info}}" }},
-		"executable":        {change: func(d *Config) { d.Executable = "aws" }, err: "absolute path"},
-		"source required":   {change: func(d *Config) { d.CredentialSource = "" }, err: "credential_source"},
-		"missing static":    {change: func(d *Config) { d.CredentialSource = "static" }, err: "required"},
-		"unknown template":  {change: func(d *Config) { d.MessageTemplate = "{{synthetic-private-value}}" }, err: "unknown placeholder"},
-		"unclosed template": {change: func(d *Config) { d.MessageTemplate = "{{node" }, err: "unclosed placeholder"},
-		"template size":     {change: func(d *Config) { d.MessageTemplate = strings.Repeat("x", snsMessageLimit+1) }, err: "262144"},
+		"platform endpoint":          {change: func(d *Config) { d.TargetARN = "arn:aws:sns:eu-west-1:123456789012:endpoint/APNS/app/1234-5678" }},
+		"china":                      {change: func(d *Config) { d.TargetARN = "arn:aws-cn:sns:cn-north-1:123456789012:alerts" }},
+		"government":                 {change: func(d *Config) { d.TargetARN = "arn:aws-us-gov:sns:us-gov-west-1:123456789012:alerts" }},
+		"legacy literal":             {change: func(d *Config) { d.LegacyMessage = "{{unknown}} ${date}" }},
+		"legacy max bytes":           {change: func(d *Config) { d.LegacyMessage = strings.Repeat("é", snsMessageLimit/2) }},
+		"legacy oversize":            {change: func(d *Config) { d.LegacyMessage = strings.Repeat("é", snsMessageLimit/2) + "x" }, err: "262144"},
+		"legacy invalid UTF8":        {change: func(d *Config) { d.LegacyMessage = "\xff" }, err: "UTF-8"},
+		"legacy and native template": {change: func(d *Config) { d.LegacyMessage, d.MessageTemplate = "literal", "{{node}}" }, err: "cannot combine"},
+		"message":                    {change: func(d *Config) { d.MessageTemplate = "{{ status }} {{node}}: {{summary}}\n{{info}}" }},
+		"executable":                 {change: func(d *Config) { d.Executable = "aws" }, err: "absolute path"},
+		"source required":            {change: func(d *Config) { d.CredentialSource = "" }, err: "credential_source"},
+		"missing static":             {change: func(d *Config) { d.CredentialSource = "static" }, err: "required"},
+		"unknown template":           {change: func(d *Config) { d.MessageTemplate = "{{synthetic-private-value}}" }, err: "unknown placeholder"},
+		"unclosed template":          {change: func(d *Config) { d.MessageTemplate = "{{node" }, err: "unclosed placeholder"},
+		"template size":              {change: func(d *Config) { d.MessageTemplate = strings.Repeat("x", snsMessageLimit+1) }, err: "262144"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dst := snsConfig(t)

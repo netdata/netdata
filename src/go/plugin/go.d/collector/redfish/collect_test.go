@@ -29,7 +29,7 @@ func TestCollectionSkipsProjectionForUnavailableOrUntrustedAcquisition(t *testin
 			client := &staticEndpointClient{}
 			collector := New()
 			collector.client = client
-			collector.measurement = measurement.New("https://fixture.example", "job", nil)
+			collector.measurement = measurement.New("https://fixture.example", nil)
 			at := time.Unix(100, 0)
 			collector.now = func() time.Time { return at }
 			client.result = collectionTestEnergy("100")
@@ -64,7 +64,7 @@ func TestCollectionUsesGraphCompletenessForRateHistory(t *testing.T) {
 			client := &staticEndpointClient{}
 			collector := New()
 			collector.client = client
-			collector.measurement = measurement.New("https://fixture.example", "job", nil)
+			collector.measurement = measurement.New("https://fixture.example", nil)
 			at := time.Unix(100, 0)
 			collector.now = func() time.Time { return at }
 			client.result = collectionTestEnergy("100")
@@ -119,7 +119,7 @@ func TestCollectionCombinesAcquisitionAndMeasurementDiagnostics(t *testing.T) {
 	}
 	collector := New()
 	collector.client = client
-	collector.measurement = measurement.New("https://fixture.example", "job", nil)
+	collector.measurement = measurement.New("https://fixture.example", nil)
 	result, err := collector.collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, result.Diagnostics, 257)

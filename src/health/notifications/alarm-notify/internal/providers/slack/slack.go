@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config/field"
@@ -31,6 +32,9 @@ var (
 )
 
 type slackMessage struct {
+	Channel     string            `json:"channel,omitempty"`
+	Username    string            `json:"username,omitempty"`
+	IconURL     string            `json:"icon_url,omitempty"`
 	Text        string            `json:"text"`
 	Mrkdwn      bool              `json:"mrkdwn"`
 	Parse       string            `json:"parse"`
@@ -61,6 +65,11 @@ func sendSlack(ctx context.Context, dst Config, event notifyevent.Event, client 
 	message, err := renderSlack(event)
 	if err != nil {
 		return err
+	}
+	if dst.Legacy != nil {
+		message.Channel = dst.Legacy.Channel
+		message.Username = dst.Legacy.Username
+		message.IconURL = dst.Legacy.IconURL
 	}
 	return postJSON(ctx, client, dst, message)
 }
@@ -127,7 +136,24 @@ func slackPlainText(value string, limit int) (slackText, error) {
 }
 
 func (dst Config) validateSlack() error {
-	reference, err := secret.IsReference(dst.URL)
+	if legacy := dst.Legacy; legacy != nil {
+		if legacy.Channel != "" && (legacy.Channel == "#" || legacy.Channel == "@" ||
+			strings.IndexFunc(legacy.Channel, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) >= 0) {
+			return errors.New("slack legacy channel must identify one channel or user without whitespace or controls")
+		}
+		if strings.IndexFunc(legacy.Username, unicode.IsControl) >= 0 {
+			return errors.New("slack legacy username must not contain controls")
+		}
+		if legacy.IconURL != "" {
+			if utf8.RuneCountInString(legacy.IconURL) > 255 {
+				return errors.New("slack legacy icon_url exceeds the 255-character limit")
+			}
+			if err := field.URL(legacy.IconURL); err != nil {
+				return fmt.Errorf("slack legacy icon_url: %w", err)
+			}
+		}
+	}
+	reference, err := dst.Secrets.IsReference(dst.URL)
 	if err != nil {
 		return fmt.Errorf("destination.url: %w", err)
 	}
@@ -141,7 +167,7 @@ func (dst Config) validateSlack() error {
 }
 
 func postJSON(ctx context.Context, client *http.Client, dst Config, message any) error {
-	endpoint, err := secret.Resolve(ctx, dst.URL)
+	endpoint, err := dst.Secrets.Resolve(ctx, dst.URL)
 	if err != nil {
 		return fmt.Errorf("destination.url: %w", err)
 	}
@@ -164,7 +190,17 @@ func postJSON(ctx context.Context, client *http.Client, dst Config, message any)
 }
 
 type Config struct {
-	URL string `yaml:"url,omitempty"`
+	Secrets secret.InputMode `yaml:"-"`
+	Legacy  *LegacyOverrides `yaml:"-"`
+	URL     string           `yaml:"url,omitempty"`
+}
+
+// LegacyOverrides is populated only by the shell-configuration adapter.
+// Modern app webhooks do not support these runtime overrides.
+type LegacyOverrides struct {
+	Channel  string
+	Username string
+	IconURL  string
 }
 
 type Sender struct {
@@ -178,6 +214,9 @@ func New(cfg Config, client *http.Client) (*Sender, error) {
 	}
 	if client == nil {
 		return nil, errors.New("slack HTTP client is required")
+	}
+	if cfg.Legacy != nil {
+		cfg.Legacy = new(*cfg.Legacy)
 	}
 	return &Sender{config: cfg, client: client}, nil
 }

@@ -254,6 +254,19 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 				}
 				postimage := graphConfig(record, dyncfg.StatusRunning)
 				failedPostimage := graphConfig(record, dyncfg.StatusFailed)
+				failurePlan := probeFailurePlan{
+					postimage:      failedPostimage,
+					failedCleanup:  dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
+					removedCleanup: dcjc.configDeleteCleanup(dcjc.externalID(id)),
+					result: func(*autoDetectionFailure) lifecycle.SealedResult {
+						return mustDynCfgMessage(204, "")
+					},
+					afterApply: func(failure *autoDetectionFailure) {
+						state.setError(failure.cause)
+						dcjc.scheduleAutoDetectionRetry(cloned, failure)
+					},
+					removePlainStock: cloned.SourceType() == confgroup.TypeStock,
+				}
 				if probeFailure != nil {
 					return dcjc.prepareProbeFailure(
 						scope,
@@ -261,19 +274,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 						permit,
 						autoDetectionRetryToken{},
 						probeFailure,
-						probeFailurePlan{
-							postimage:      failedPostimage,
-							failedCleanup:  dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
-							removedCleanup: dcjc.configDeleteCleanup(dcjc.externalID(id)),
-							result: func(*autoDetectionFailure) lifecycle.SealedResult {
-								return mustDynCfgMessage(204, "")
-							},
-							afterApply: func(failure *autoDetectionFailure) {
-								state.setError(failure.cause)
-								dcjc.scheduleAutoDetectionRetry(cloned, failure)
-							},
-							removePlainStock: cloned.SourceType() == confgroup.TypeStock,
-						},
+						failurePlan,
 					)
 				}
 				return dcjc.prepareMutationWithActivationFallbacks(
@@ -305,6 +306,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 							state.setError(jobmgr.ErrProcessAttemptQuarantined)
 						},
 					},
+					failurePlan,
 				)
 			},
 		},

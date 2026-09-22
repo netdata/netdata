@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -65,6 +66,9 @@ type stagedJobOwner struct {
 	retiring        bool
 	retirementCause error
 	finalized       bool
+	run             *jobruntime.ManagedRun
+	startupTimeout  time.Duration
+	notifyTerminal  func(*jobruntime.RunFailure)
 
 	startRequests       chan stagedJobStartRequest
 	retire              chan struct{}
@@ -89,8 +93,7 @@ const (
 )
 
 type stagedJobStartRequest struct {
-	ctx    context.Context
-	result chan<- error
+	run *jobruntime.ManagedRun
 }
 
 func newStagedJobOwner(
@@ -105,6 +108,7 @@ func newStagedJobOwner(
 	}
 	return &stagedJobOwner{
 		resources:       candidate,
+		startupTimeout:  jobmgr.DefaultProcessAttemptFuse,
 		attempts:        attempts,
 		candidateCtx:    candidateCtx,
 		runtimeIdentity: runtimeIdentity,
@@ -413,32 +417,37 @@ func (sjo *stagedJobOwner) Start(ctx context.Context) error {
 	if err := sjo.reserveStart(); err != nil {
 		return err
 	}
-	result := make(chan error, 1)
-	request := stagedJobStartRequest{
-		ctx:    ctx,
-		result: result,
+	sjo.mu.Lock()
+	run := jobruntime.NewManagedRun(context.Background(), sjo.resources.outputGate.RevokeAdmissions)
+	sjo.run = run
+	if sjo.retiring {
+		run.Stop(sjo.retirementErrorLocked("job output: retired before startup"))
 	}
+	timeout := sjo.startupTimeout
+	sjo.mu.Unlock()
+	timer := time.AfterFunc(timeout, run.Timeout)
+	defer timer.Stop()
+	stopContext := context.AfterFunc(ctx, func() { run.Stop(context.Cause(ctx)) })
+	defer stopContext()
 	select {
-	case sjo.startRequests <- request:
-	case <-sjo.retire:
-		return sjo.retirementError("job output: process-owned job is retiring")
-	case <-sjo.done:
-		return errors.New("job output: process-owned job is released")
-	case <-ctx.Done():
-		return context.Cause(ctx)
+	case sjo.startRequests <- stagedJobStartRequest{run: run}:
+	case <-run.StartupDone():
+		sjo.beginRetirement(run.StartupErr())
+		return sjo.startupResult(run)
 	}
-	select {
-	case err := <-result:
-		return err
-	case <-sjo.retire:
-		return sjo.retirementError("job output: process-owned job retired during start")
-	case <-sjo.done:
-		return errors.New("job output: process-owned job released during start")
-	case <-ctx.Done():
-		cause := context.Cause(ctx)
-		sjo.requestRetirement(cause)
-		return cause
+	<-run.StartupDone()
+	return sjo.startupResult(run)
+}
+
+func (sjo *stagedJobOwner) startupResult(run *jobruntime.ManagedRun) error {
+	err := run.StartupErr()
+	if failure, ok := errors.AsType[*jobruntime.RunFailure](err); ok {
+		sjo.mu.Lock()
+		resources := sjo.resources
+		sjo.mu.Unlock()
+		return &runtimeStartupFailure{failure: runtimeFailureFor(resources, failure, "startup")}
 	}
+	return err
 }
 
 func (sjo *stagedJobOwner) reserveStart() error {
@@ -501,6 +510,9 @@ func (sjo *stagedJobOwner) beginRetirement(cause error) ConstructedJob {
 		sjo.retirementCause = cause
 	}
 	sjo.retiring = true
+	if sjo.run != nil {
+		sjo.run.Stop(sjo.retirementErrorLocked("job output: runtime retired"))
+	}
 	resources := sjo.resources
 	resources.outputGate.RevokeAdmissions()
 	sjo.retireOnce.Do(func() {
@@ -527,13 +539,7 @@ func (sjo *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 	if sjo == nil {
 		return nil
 	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	defer sjo.doneOnce.Do(func() {
-		close(sjo.done)
-	})
-
+	defer sjo.doneOnce.Do(func() { close(sjo.done) })
 	var request stagedJobStartRequest
 	select {
 	case request = <-sjo.startRequests:
@@ -544,10 +550,12 @@ func (sjo *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 		sjo.cutBeforeStart(context.Cause(ctx))
 		return sjo.finalize()
 	}
-
+	run := request.run
+	stopContext := context.AfterFunc(ctx, func() { run.Stop(context.Cause(ctx)) })
+	defer stopContext()
 	resources, retiring, err := sjo.beginManagedStart()
 	if err != nil {
-		request.result <- err
+		run.Stop(err)
 		if retiring {
 			sjo.cutBeforeStart(nil)
 		}
@@ -555,62 +563,58 @@ func (sjo *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 	}
 	job := resources.candidateJob
 	if job == nil {
-		request.result <- errors.New("job output: missing process-owned runtime job")
-		sjo.requestRetirement(nil)
-		return sjo.finalize()
+		err := errors.New("job output: missing process-owned runtime job")
+		run.Stop(err)
+		sjo.beginRetirement(err)
+		return errors.Join(err, sjo.finalize())
 	}
-
-	ready := make(chan struct{})
 	exited := make(chan error, 1)
 	go func() {
 		exited <- callJobLifecycle("process-owned managed runtime", func() error {
-			job.StartManaged(ready)
+			job.StartManaged(run)
 			return nil
 		})
 	}()
-
-	physicalExited := false
-	select {
-	case <-ready:
-		request.result <- nil
-	case resultErr = <-exited:
-		physicalExited = true
-		request.result <- errors.Join(
-			errors.New("job output: process-owned managed loop exited before readiness"),
-			resultErr,
-		)
-		sjo.requestRetirement(nil)
-	case <-sjo.retire:
-		request.result <- sjo.retirementError("job output: process-owned job retired before readiness")
-	case <-ctx.Done():
-		cause := context.Cause(ctx)
-		sjo.requestRetirement(cause)
-		request.result <- cause
-	case <-request.ctx.Done():
-		cause := context.Cause(request.ctx)
-		sjo.requestRetirement(cause)
-		request.result <- cause
-	}
-
-	if !physicalExited {
-		select {
-		case loopErr := <-exited:
-			resultErr = errors.Join(resultErr, loopErr)
-			physicalExited = true
-			sjo.Retire()
-		case <-sjo.retire:
-		case <-ctx.Done():
-			sjo.requestRetirement(context.Cause(ctx))
+	failure := run.Failed()
+	notified := false
+	notifyFailure := func() {
+		if outcome := run.Failure(); outcome != nil && outcome.AfterReady() && !notified {
+			notified = true
+			if sjo.notifyTerminal != nil {
+				sjo.notifyTerminal(outcome)
+			}
 		}
 	}
-	if !physicalExited {
-		sjo.drainRetirement()
-		stopErr := callJobLifecycle("process-owned managed runtime Stop", func() error {
-			job.Stop()
-			return nil
-		})
-		resultErr = errors.Join(resultErr, stopErr)
-		resultErr = errors.Join(resultErr, <-exited)
+	physicalExited := false
+	for !physicalExited {
+		select {
+		case <-failure:
+			// Keep successful pending installation valid. The queued graph
+			// removal owns retirement/detachment, which finalization awaits.
+			notifyFailure()
+			failure = nil
+		case resultErr = <-exited:
+			physicalExited = true
+			notifyFailure()
+			if resultErr != nil {
+				run.Stop(resultErr)
+				sjo.beginRetirement(resultErr)
+			} else if outcome := run.Failure(); outcome == nil || !outcome.AfterReady() {
+				sjo.beginRetirement(nil)
+			}
+		case <-sjo.retire:
+			run.Stop(sjo.retirementError("job output: runtime retired"))
+			sjo.drainRetirement()
+			resultErr = callJobLifecycle("process-owned managed runtime Stop", func() error {
+				job.Stop()
+				return nil
+			})
+			resultErr = errors.Join(resultErr, <-exited)
+			notifyFailure()
+			physicalExited = true
+		case <-ctx.Done():
+			sjo.beginRetirement(context.Cause(ctx))
+		}
 	}
 	return errors.Join(resultErr, sjo.finalize())
 }
@@ -720,6 +724,7 @@ func (f *Factory) newCandidate(
 	return &preparedJobCandidate{
 		factory: &Factory{
 			config:         detached,
+			startupTimeout: f.startupTimeout,
 			runtimeStaging: f.config.Runtime != nil,
 		},
 		attempts: f.config.Attempts,
@@ -885,6 +890,7 @@ func (pjc *preparedJobCandidate) run(
 	if factory == nil || config == nil {
 		return context.Canceled
 	}
+	startupTimeout := factory.startupTimeout
 	cloned, err := config.Clone()
 	if err != nil {
 		workerResult <- stagedJobResult{err: err}
@@ -950,6 +956,7 @@ func (pjc *preparedJobCandidate) run(
 			candidate.candidateJob.FullName(),
 		),
 	)
+	owner.startupTimeout = startupTimeout
 	pjc.publish(stagedJobResult{
 		candidate:     candidate,
 		owner:         owner,

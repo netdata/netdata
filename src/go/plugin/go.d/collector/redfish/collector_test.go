@@ -36,6 +36,8 @@ func (c *staticEndpointClient) Acquire(ctx context.Context) (acquisition.Result,
 	result.AuthMethod = c.auth
 	return result, c.err
 }
+func (*staticEndpointClient) Logs() *acquisition.LogReader { return nil }
+
 func (c *staticEndpointClient) Close() {
 	c.closed = true
 }
@@ -51,7 +53,6 @@ func TestCollectorLogsSelectedAuthenticationMethodOnce(t *testing.T) {
 		URL:        "https://bmc.example.test",
 		AuthMethod: "none",
 	}
-	collector.Name = "endpoint-a"
 	collector.newClient = func(acquisition.Options, *http.Client) (endpointClient, error) {
 		return client, nil
 	}
@@ -88,22 +89,6 @@ func TestCollectorLogsCollectionDiagnosticsOnceWithinFixedBound(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(output.String(), "additional distinct diagnostics are suppressed"))
 }
 
-func TestCollectorRejectsOversizedJobNameBeforeClientConstruction(t *testing.T) {
-	collector := New()
-	collector.Config = Config{
-		URL:        "https://bmc.example.test",
-		AuthMethod: "none",
-	}
-	collector.Name = strings.Repeat("x", measurement.MaxLabelValueBytes+1)
-	collector.newClient = func(acquisition.Options, *http.Client) (endpointClient, error) {
-		t.Fatal("oversized job name reached client construction")
-		return nil, nil
-	}
-
-	err := collector.Init(context.Background())
-	require.ErrorContains(t, err, "job name must not exceed 256 bytes")
-}
-
 func TestCollectorCollectionErrorCanAbortMetricCycle(t *testing.T) {
 	collector := New()
 	managed, ok := metrix.AsCycleManagedStore(collector.store)
@@ -123,10 +108,9 @@ func TestCollectorDerivesCollectionDeadlineFromUpdateEvery(t *testing.T) {
 	}
 	collector := New()
 	collector.UpdateEvery = 12
-	collector.Name = "endpoint-a"
 	collector.endpointKey = "endpoint-key"
 	collector.client = client
-	collector.measurement = measurement.New("https://fixture.example", collector.Name, nil)
+	collector.measurement = measurement.New("https://fixture.example", nil)
 
 	managed, ok := metrix.AsCycleManagedStore(collector.store)
 	require.True(t, ok)
@@ -149,10 +133,9 @@ func TestCollectorPublishesPartialResultAtCycleDeadline(t *testing.T) {
 		err: context.DeadlineExceeded,
 	}
 	collector := New()
-	collector.Name = "endpoint-a"
 	collector.endpointKey = "endpoint-key"
 	collector.client = client
-	collector.measurement = measurement.New("https://fixture.example", collector.Name, nil)
+	collector.measurement = measurement.New("https://fixture.example", nil)
 
 	managed, ok := metrix.AsCycleManagedStore(collector.store)
 	require.True(t, ok)
@@ -163,7 +146,6 @@ func TestCollectorPublishesPartialResultAtCycleDeadline(t *testing.T) {
 	point, ok := collector.store.Read().
 		StateSet("collection_status", metrix.Labels{
 			"endpoint_key": "endpoint-key",
-			"endpoint_job": "endpoint-a",
 		})
 	require.True(t, ok)
 	assert.True(t, point.States["partial"])
@@ -177,10 +159,9 @@ func TestCollectorParentCancellationAbortsPartialResult(t *testing.T) {
 		},
 	}
 	collector := New()
-	collector.Name = "endpoint-a"
 	collector.endpointKey = "endpoint-key"
 	collector.client = client
-	collector.measurement = measurement.New("https://fixture.example", collector.Name, nil)
+	collector.measurement = measurement.New("https://fixture.example", nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

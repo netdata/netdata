@@ -15,10 +15,12 @@ Opsgenie uses Alert API v2 with an API Integration by explicit approval, retaini
 Teams uses Workflows MessageCards by explicit approval, with full URLs per destination and inline navigation replacing
 unsupported buttons; configurable status icons/colors are retained.
 Custom commands require foreground execution and waiting for their children by explicit approval; detached/background
-work is unsupported. Native executable/argv/JSON input replaces Bash function/global syntax; legacy adapters remain later work.
-SNS preserves message customization through native Event placeholders by explicit approval; Bash shell syntax and
-richer event facts remain later work. Kafka HTTP bridges use valid JSON with the existing payload field names and
-HTTP 204 acknowledgment by explicit approval, correcting Bash's hand-built JSON-like body and form content type.
+work is unsupported. Native command destinations use executable/argv/JSON input; the optional Unix legacy adapter
+retains Bash functions/globals and rejects the known unconfigured stock placeholder by explicit approval.
+SNS preserves message customization through native Event placeholders by explicit approval. Legacy SNS assignments
+expand once using core event and optional producer-context scalars; arbitrary shell evaluation remains unsupported.
+Kafka HTTP bridges use valid JSON with the existing payload field names and HTTP 204 acknowledgment by explicit approval,
+correcting Bash's hand-built JSON-like body and form content type.
 Optional duration facts preserve unknown versus zero and are available to public Event consumers and SNS templates.
 Email uses correct UTF-8 MIME and separate threading headers by explicit approval, replacing Bash's ineffective
 charset-label override. Current native facts and durations ship first; richer email content remains tracked below
@@ -33,11 +35,28 @@ HipChat is excluded from the Go migration by explicit approval following its
 - Standalone developer build, explicit YAML configuration, JSON input, and one selected generic webhook delivery.
 - Native legacy configuration reader and `check-legacy` syntax check: supported assignments/recipient maps, ordered
   evaluation and overlays, inert function preservation, explicit rejection of unsupported top-level shell. This does
-  not yet enable old-format notification delivery or validate provider settings/custom-function behavior.
+  not validate provider settings/custom-function behavior; delivery uses the separate `send-legacy` command.
 - Internal legacy recipient resolution: role/default fallback, literal tokenization, reserved-role suppression,
   per-occurrence policy unions and deduplication by method/recipient, reusing native alert-global history. Unknown
-  modifiers fail and wildcard patterns stay literal by approval. Provider activation/mapping, CLI delivery and Unix
-  custom_sender execution remain pending; check-legacy is still syntax-only.
+  modifiers fail and wildcard patterns stay literal by approval. `send-legacy` now uses this resolver;
+  check-legacy is still syntax-only. Unix custom_sender uses the same filtered batch.
+- Legacy delivery maps 30 methods to typed senders, with ordered files, optional method
+  selection, exact enable flags/prerequisites, tool discovery and filtered recipient batching. Eligible unsupported
+  behavior rejects the entire invocation before any sends. Legacy inputs stay literal; native YAML secrets are unchanged.
+  Email AUTO/sendmail, PagerDuty/Prowl/ntfy role-only routing, ntfy filtered delivery and Fleep
+  unused-server gating are corrected by approval. See [the mapping table and limits](README.md#legacy-configuration-delivery).
+- Legacy Slack channel/user/default recipients and sender-name/icon overrides; Teams URL substitution, old aliases
+  and status styles, with one send per distinct resolved URL after filtering by explicit approval. Native YAML
+  keeps modern Slack webhooks and Teams Workflows; old Teams connector URLs require replacement.
+- Legacy ilert API-source credentials with explicit obsolete-URL rejection, Opsgenie API Integration settings, and
+  Dynatrace server/space/manual-tag translation to Events API v2. Service setup changes are documented; native
+  payloads and global delivery semantics are retained.
+- Legacy AWS SNS credential-mode/settings and ARN recipient mapping through the existing isolated CLI sender;
+  once-expanded literal messages and initialized date/value/status facts. Ambient AWS profiles remain unsupported.
+- Optional input-only producer context carries remaining raw Bash notification facts: IDs, source/expressions,
+  formatted values, other-alert counts/lists and classification/identity metadata. Strict typed validation preserves
+  unknown versus zero, and native legacy evaluation exposes immutable scalar aliases. Native provider payloads remain
+  unchanged; Unix custom execution and derived helpers consume these facts. Agent JSON integration remains pending.
 - Configuration validation, literal/environment/file secrets, request timeout/cancellation, and safe diagnostics.
 - Central role-to-destination routing, defaults for unmapped roles, explicit suppression, reserved roles, and
   deduplication by destination name. Sequential fan-out records individual results and preserves any-success exits.
@@ -99,6 +118,11 @@ HipChat is excluded from the Go migration by explicit approval following its
 - IRC channel delivery through nc, with explicit host/port/nickname/realname/channel/environment, registration and
   join confirmation, PING responses, bounded protocol parsing, safe text splitting and owned process cleanup.
 
+- Optional Unix Bash4+ custom runtime with native inert settings evaluation, literal scalar/recipient-map handoff,
+  effective function/helper definitions, all available producer facts and documented derived presentation. One filtered
+  recipient batch uses the existing foreground lifecycle/private home; fixed probes and syntax preflight execute no
+  custom code. Known stock placeholders fail before delivery. Native parsing remains portable and independent of Bash.
+
 ## Bash providers
 
 All 31 `send_*` functions are accounted for, including providers absent from integration metadata. HipChat is
@@ -118,8 +142,8 @@ is scoped. This is not a claim that all legacy remote services remain available.
 | SMSEagle | `send_smseagle` | API v2 SMS/MMS/ring/TTS/advanced TTS, recipient arrays, automatic encoding, duration/voice controls and queued batch checks implemented |
 | Kavenegar | `send_kavenegar` | HTTPS v1 SMS, API-key secrets, sender/recipient, native plain text, custom API base and JSON acceptance checks implemented |
 | Telegram | `send_telegram` | Implemented with chats/topics, bot-token secrets, custom API bases, silent CLEAR, disabled previews and optional rate-limit retries; server-directed retry timing is an approved correction |
-| Microsoft Teams | `send_msteams` | Approved Workflows MessageCard setup, full webhook URLs, status icon/color overrides, native content and inline navigation implemented; HTTP acceptance does not confirm later workflow actions |
-| Slack | `send_slack` | Modern app webhooks implemented; legacy channel/user/username/icon overrides pending by explicit staged-delivery decision |
+| Microsoft Teams | `send_msteams` | Approved Workflows MessageCard setup, full webhook URLs, status icon/color overrides, native content and inline navigation implemented; legacy URL substitution/styles/aliases and final-URL deduplication implemented; HTTP acceptance does not confirm later workflow actions |
+| Slack | `send_slack` | Modern app webhooks and legacy configuration channel/user/default routing, host-derived username and icon overrides implemented |
 | Rocket.Chat | `send_rocketchat` | Webhook URL, optional channel/user override, host alias, status attachments, alert facts/navigation and acknowledgment checks implemented; extended artwork/presentation pending |
 | Alerta | `send_alerta` | API base, optional key, environments, node/chart correlation (including httpcheck), severity/recovery, current content/raw Event and acknowledgment/suppression checks implemented; extended legacy facts pending |
 | Flock | `send_flock` | Channel webhook URLs, host sender name, status attachments and alert facts/navigation implemented; ineffective channel loop omitted by explicit decision; extended artwork/presentation pending |
@@ -137,29 +161,30 @@ is scoped. This is not a claim that all legacy remote services remain available.
 | ntfy | `send_ntfy` | Topic URLs, anonymous/Basic/token auth, text messages, priorities/tags/navigation and acknowledgment checks implemented |
 | ilert | `send_ilert` | Event API/API alert source, integration key/API base, ALERT/RESOLVE, stable encoded incident key, complete event details and navigation implemented; extended artwork/presentation pending |
 | SIGNL4 | `send_signl4` | Team webhook URL, current event content/navigation and new/resolved events with stable incident_id implemented; Bash per-event identity corrected by explicit decision; extended artwork/presentation pending |
-| Custom | `send_custom` / `custom_sender` | Native JSON webhook and foreground command/argv/env destinations implemented; detached work excluded by approval, old Bash function/global adapters and richer event facts remain later work |
+| Custom | `send_custom` / `custom_sender` | Native JSON webhook and foreground command/argv/env destinations implemented; detached work excluded by approval, raw producer-context input and legacy scalar expansion implemented; optional Unix Bash4+ function execution, literal globals/maps, complete available producer context, documented derived presentation and helpers implemented |
 
 ## Other functionality
 
 | Area | Functional baseline | Go migration |
 |---|---|---|
-| Routing | Multiple roles, provider recipients, fallback/default recipients, disabled destinations, duplicate handling | Central named-destination routing/defaults/suppression/deduplication implemented; provider-specific native targets implemented; internal legacy recipient resolution implemented; provider mapping and CLI adapter remain pending |
+| Routing | Multiple roles, provider recipients, fallback/default recipients, disabled destinations, duplicate handling | Central named-destination routing/defaults/suppression/deduplication implemented; provider-specific native targets implemented; legacy recipient resolution and CLI delivery for 30 methods implemented; Unix custom execution and filtered batching implemented |
 | Status policy | Supported transitions, initial CLEAR, `critical`, `nowarn`, `noclear`, and modifier combinations | Native destination `critical`/`nowarn`/`noclear` booleans and all combinations implemented for direct/role sends; stateless filters take precedence and missing required history rejects the invocation before delivery. Initial-CLEAR eligibility/override belongs to future producer integration |
 | Lifecycle history | Per-recipient tracking used by critical-only notification policies | Stateless filtering with producer-supplied alert-global history implemented by approval; new destinations may receive later WARNING/CLEAR, and history does not imply successful delivery. Input-only fact is excluded from all provider payloads. Producer calculation/reset and Agent wiring remain later work |
 | Rendering | Provider content, titles, links, timestamps, durations, values, summaries, email MIME/threading | Slack, Discord, Telegram, Pushover, Pushbullet, Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar, SMSEagle, PagerDuty, Opsgenie, Teams and Matrix content/link/status formatting plus SMS Server Tools/syslog compact text, SNS subject/body templates and Kafka bridge payloads plus email MIME/threading/native content and IRC plain text implemented; optional duration facts are available, with richer presentation pending |
-| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook, Slack and Discord URLs; Telegram bot/chat/topic/API/retry; Pushover app/user/API; Pushbullet token/recipient/source/API; Twilio account/token/from/to/API; MessageBird key/originator/recipient/API; Gotify app/API; ntfy URL/auth; Rocket.Chat URL/channel; Flock URL; Fleep URL/sender; ilert integration key/API; SIGNL4 URL; Alerta API/key/environment; Dynatrace API/token/selector/type/source; Prowl API/key batch; Kavenegar API/key/sender/recipient; SMSEagle API/token/recipients/mode/duration/voice; PagerDuty integration key/API/version; Opsgenie API/key; Teams URL/icons/colors; Matrix API/token/room and custom command/sendsms executable/args/env/recipient and syslog facility/level/prefix/host/port and SNS target/credential/template and Kafka URL/sender-IP settings plus email executable/recipients/sender/modes/threading/env and IRC executable/host/port/nickname/realname/channel/env implemented; legacy syntax reading/checking is implemented; delivery mapping and automatic tool/provider discovery remain pending |
-| Results | Per-target failures and Bash's any-success invocation result | Implemented for all current Go providers, with separate skipped counts and successful all-skipped no-ops; IRC synchronization and subprocess acceptance do not guarantee recipient delivery |
+| Provider configuration | Credentials, endpoints, recipient-specific settings, enable/auto detection, local tool settings | Generic webhook, Slack and Discord URLs; Telegram bot/chat/topic/API/retry; Pushover app/user/API; Pushbullet token/recipient/source/API; Twilio account/token/from/to/API; MessageBird key/originator/recipient/API; Gotify app/API; ntfy URL/auth; Rocket.Chat URL/channel; Flock URL; Fleep URL/sender; ilert integration key/API; SIGNL4 URL; Alerta API/key/environment; Dynatrace API/token/selector/type/source; Prowl API/key batch; Kavenegar API/key/sender/recipient; SMSEagle API/token/recipients/mode/duration/voice; PagerDuty integration key/API/version; Opsgenie API/key; Teams URL/icons/colors; Matrix API/token/room and custom command/sendsms executable/args/env/recipient and syslog facility/level/prefix/host/port and SNS target/credential/template and Kafka URL/sender-IP settings plus email executable/recipients/sender/modes/threading/env and IRC executable/host/port/nickname/realname/channel/env implemented; legacy syntax reading/checking, 30 delivery mappings and command discovery are implemented; Unix custom execution and filtered batching implemented |
+| Results | Per-target failures and Bash's any-success invocation result | Implemented for all current Go providers, with native skipped counts and successful no-eligible-target no-ops; legacy filtering precedes plan construction and its summary counts attempts only; IRC synchronization and subprocess acceptance do not guarantee recipient delivery |
 | Utilities | Synthetic test transitions and configured-method reporting (`dump_methods`) | Synthetic tests/method reporting pending; YAML `validate` and legacy syntax-only `check-legacy` are available |
 | Logging | Alert-specific structured fields and operational diagnostics | Pending except basic safe command diagnostics |
-| Integration | Agent invocation, legacy config adapters, analytics, installation, operator docs, production cutover | Later milestone |
+| Integration | Agent invocation, legacy config adapters, analytics, installation, operator docs, production cutover | Experimental legacy reader/routing and 30 provider mappings implemented; remaining adapters and production integration are later milestones |
 
 The first twenty-five implementation PRs cover the foundation, routing/fan-out, Slack app webhooks, Discord, Telegram, Pushover,
 Pushbullet, Twilio, MessageBird, Gotify, ntfy, Rocket.Chat, Flock, Fleep, ilert, SIGNL4, Alerta, Dynatrace, Prowl, Kavenegar,
 SMSEagle, PagerDuty, Opsgenie, Teams, Matrix, custom commands, SMS Server Tools 3, syslog, AWS SNS, Kafka HTTP bridges,
 email, IRC and stateless destination filters. Windows command delivery remains a later platform increment; configuration validation and the existing HTTP providers still compile for Windows.
 Related providers may share small PRs.
-Legacy Slack override support remains pending; choosing modern webhooks first does not permanently remove that functionality.
+Legacy Slack overrides are implemented through the shell-format adapter; native YAML keeps modern app webhooks.
 The internal redesign is complete: shared event, formatting, secret, HTTP and process mechanisms have separate
 packages, and every provider owns typed configuration and delivery behind the sender interface. Critical-history
 filtering builds on that central routing boundary. Native legacy settings reading is the first compatibility increment;
-internal legacy recipient routing is implemented; provider mapping/activation, CLI delivery and optional Unix Bash custom execution follow separately. Remaining capabilities stay pending until delivered or explicitly excluded.
+legacy recipient routing, activation and CLI delivery now cover 30 methods, including optional Unix Bash custom
+functions with producer context and derived presentation/helpers. Agent JSON integration remains pending. Remaining capabilities stay pending until delivered or explicitly excluded.

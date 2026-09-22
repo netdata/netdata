@@ -418,6 +418,28 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 	}
 	failedPostimage := postimage
 	failedPostimage.Status = dyncfg.StatusFailed.String()
+	failurePlan := probeFailurePlan{
+		postimage: failedPostimage,
+		failedCleanup: dcjc.configCreateCleanup(
+			failedPostimage,
+			change.Config.SourceType(),
+			change.Config.Source(),
+			dcjc.configType(dcjc.modules[change.Config.Module()]),
+		),
+		removedCleanup: dcjc.configDeleteCleanup(
+			dcjc.configID(change.Config.Module(), change.Config.Name()),
+		),
+		result: func(*autoDetectionFailure) lifecycle.SealedResult {
+			return result
+		},
+		afterApply: func(failure *autoDetectionFailure) {
+			dcjc.scheduleAutoDetectionRetry(change.Config, failure)
+			if pendingSettlement != nil {
+				pendingSettlement()
+			}
+		},
+		removePlainStock: change.Config.SourceType() == confgroup.TypeStock,
+	}
 	if probeFailure != nil {
 		return dcjc.prepareProbeFailure(
 			scope,
@@ -425,28 +447,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			permit,
 			change.retry,
 			probeFailure,
-			probeFailurePlan{
-				postimage: failedPostimage,
-				failedCleanup: dcjc.configCreateCleanup(
-					failedPostimage,
-					change.Config.SourceType(),
-					change.Config.Source(),
-					dcjc.configType(dcjc.modules[change.Config.Module()]),
-				),
-				removedCleanup: dcjc.configDeleteCleanup(
-					dcjc.configID(change.Config.Module(), change.Config.Name()),
-				),
-				result: func(*autoDetectionFailure) lifecycle.SealedResult {
-					return result
-				},
-				afterApply: func(failure *autoDetectionFailure) {
-					dcjc.scheduleAutoDetectionRetry(change.Config, failure)
-					if pendingSettlement != nil {
-						pendingSettlement()
-					}
-				},
-				removePlainStock: change.Config.SourceType() == confgroup.TypeStock,
-			},
+			failurePlan,
 		)
 	}
 	failedCleanup := dcjc.configCreateCleanup(
@@ -484,5 +485,6 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			cleanup:    failedCleanup,
 			afterApply: settlement,
 		},
+		failurePlan,
 	)
 }

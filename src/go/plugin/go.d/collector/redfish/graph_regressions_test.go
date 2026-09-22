@@ -255,7 +255,7 @@ func TestGraphSensorAddressabilitySurvivesExcerptFallback(t *testing.T) {
 								map[string]string{name: state},
 								[]string{"clear", "warning", "critical"},
 							),
-							sourceTestMetricByResource(t, reader, "reading_alarm", "reading_alarm"),
+							sourceTestMetricByResource(t, reader, "reading_alarm_status", "reading_alarm_status"),
 							"phase %d source health",
 							p,
 						)

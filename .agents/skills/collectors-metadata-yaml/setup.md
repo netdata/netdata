@@ -17,6 +17,10 @@ Shape rules for every field (structure, admonitions, terms, Markdown safety, dep
   `python.d/<module>.conf`, `netdata.conf`). It MUST be the file the collector actually reads; the template prints
   the `edit-config` command with it.
 - `section_name` only for collectors configured inside `netdata.conf` (plugin sections); otherwise omit it.
+- A go.d collector using `InstancePolicySingle` MUST set `setup.single_job: true`. The existing
+  `integrations/templates/setup-generic.md` and `integrations/templates/setup/sample-go-config-single-job.md` then
+  show its fixed job name and omit the add-job UI instructions. `overview.multi_instance: false` alone does not
+  select that setup flow; it describes target scope.
 
 ## 2. `prerequisites`: One Action Each
 

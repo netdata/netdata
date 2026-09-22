@@ -22,5 +22,27 @@ func TestControllerGroupSignatureLayoutGolden(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.EqualValues(t, "059a7744aacc08166569b6f9546c82e8d9774d09c6b0b29c36ba55ec8f37d2cd", controller)
+	require.EqualValues(t, "8a1dd1efb56c362f31e92db60f18704a8794fc58d06fab80fec03ed535bcb966", controller)
+}
+
+func TestControllerGroupSignatureManagedMetadata(t *testing.T) {
+	base := funcapi.FunctionConfig{
+		ID:         "events",
+		RawRequest: true,
+	}
+	before, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{base}, nil)
+	require.NoError(t, err)
+	for name, change := range map[string]func(*funcapi.FunctionConfig){
+		"managed info":    func(method *funcapi.FunctionConfig) { method.ManagedInfo = true },
+		"history":         func(method *funcapi.FunctionConfig) { method.HasHistory = true },
+		"accepted inputs": func(method *funcapi.FunctionConfig) { method.AcceptedParams = []string{"after"} },
+	} {
+		t.Run(name, func(t *testing.T) {
+			method := base
+			change(&method)
+			after, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method}, nil)
+			require.NoError(t, err)
+			require.NotEqual(t, before, after, "changed metadata must replace the published generation")
+		})
+	}
 }

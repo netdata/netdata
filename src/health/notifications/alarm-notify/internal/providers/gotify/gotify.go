@@ -24,7 +24,7 @@ type gotifyMessage struct {
 
 func (dst Config) validateGotify() error {
 	for _, field := range []struct{ name, value string }{{"api_url", dst.APIURL}, {"app_token", dst.AppToken}} {
-		reference, err := secret.IsReference(field.value)
+		reference, err := dst.Secrets.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("gotify %s: %w", field.name, err)
 		}
@@ -54,7 +54,7 @@ func sendGotify(ctx context.Context, dst Config, event notifyevent.Event, client
 	}{
 		{"api_url", &dst.APIURL}, {"app_token", &dst.AppToken},
 	} {
-		value, err := secret.Resolve(ctx, *field.value)
+		value, err := dst.Secrets.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("gotify %s: %w", field.name, err)
 		}
@@ -101,8 +101,9 @@ func readGotifyResponse(response *http.Response) error {
 }
 
 type Config struct {
-	APIURL   string `yaml:"api_url,omitempty"`
-	AppToken string `yaml:"app_token,omitempty"`
+	Secrets  secret.InputMode `yaml:"-"`
+	APIURL   string           `yaml:"api_url,omitempty"`
+	AppToken string           `yaml:"app_token,omitempty"`
 }
 
 type Sender struct {

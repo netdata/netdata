@@ -137,25 +137,8 @@ func TestRunSNS(t *testing.T) {
 			captures := readCommandCaptures(t, capture)
 			require.Len(t, captures, 1)
 			got := captures[0]
-			wantEnv := []string{"AWS_CLI_AUTO_PROMPT=off", "AWS_CLI_FILE_ENCODING=UTF-8", "AWS_CONFIG_FILE=/dev/null", "AWS_DEFAULT_REGION=" + test.region,
-				"AWS_EC2_METADATA_DISABLED=true", "AWS_IGNORE_CONFIGURED_ENDPOINT_URLS=true", "AWS_MAX_ATTEMPTS=1", "AWS_PAGER=", "AWS_REGION=" + test.region,
-				"AWS_RETRY_MODE=standard", "AWS_SHARED_CREDENTIALS_FILE=/dev/null", "BOTO_CONFIG=/dev/null", "NO_PROXY=*", "PATH=/usr/local/bin:/usr/bin:/bin"}
-			if test.source == "imds" {
-				wantEnv[4] = "AWS_EC2_METADATA_DISABLED=false"
-			}
-			for key, value := range test.env {
-				wantEnv = append(wantEnv, key+"="+value)
-			}
-			for _, entry := range got.Env {
-				if strings.HasPrefix(entry, "HOME=") {
-					wantEnv = append(wantEnv, entry)
-				}
-			}
-			slices.Sort(wantEnv)
-			status := map[string]string{"WARNING": "needs attention", "CRITICAL": "is critical", "CLEAR": "recovered"}[test.status]
-			wantJSON, err := json.Marshal(struct{ TargetArn, Subject, Message string }{TargetArn: test.arn, Subject: "test-node " + status + " - test alert - test.chart", Message: "file://{{node}} $(literal) θερμοκρασία\ntext"})
-			require.NoError(t, err)
-			assert.Equal(t, commandCapture{Args: []string{"sns", "publish", "--region", test.region, "--cli-input-json", "file:///dev/stdin", "--no-cli-pager", "--no-cli-auto-prompt", "--output", "json"}, Env: wantEnv, Input: string(wantJSON) + "\n"}, got)
+			assert.Equal(t, expectedSNSCapture(t, got, test.source, test.region, test.arn, test.status,
+				"file://{{node}} $(literal) θερμοκρασία\ntext", test.env), got)
 			assertSNSHomeRemoved(t, got)
 		})
 	}
@@ -300,4 +283,27 @@ func snsDestination(t *testing.T) map[string]any {
 	executable, err := os.Executable()
 	require.NoError(t, err)
 	return map[string]any{"type": "awssns", "executable": executable, "target_arn": testSNSARN, "credential_source": "imds"}
+}
+
+func expectedSNSCapture(t *testing.T, got commandCapture, source, region, arn, severity, message string, env map[string]string) commandCapture {
+	t.Helper()
+	wantEnv := []string{"AWS_CLI_AUTO_PROMPT=off", "AWS_CLI_FILE_ENCODING=UTF-8", "AWS_CONFIG_FILE=/dev/null", "AWS_DEFAULT_REGION=" + region,
+		"AWS_EC2_METADATA_DISABLED=true", "AWS_IGNORE_CONFIGURED_ENDPOINT_URLS=true", "AWS_MAX_ATTEMPTS=1", "AWS_PAGER=", "AWS_REGION=" + region,
+		"AWS_RETRY_MODE=standard", "AWS_SHARED_CREDENTIALS_FILE=/dev/null", "BOTO_CONFIG=/dev/null", "NO_PROXY=*", "PATH=/usr/local/bin:/usr/bin:/bin"}
+	if source == "imds" {
+		wantEnv[4] = "AWS_EC2_METADATA_DISABLED=false"
+	}
+	for key, value := range env {
+		wantEnv = append(wantEnv, key+"="+value)
+	}
+	for _, entry := range got.Env {
+		if strings.HasPrefix(entry, "HOME=") {
+			wantEnv = append(wantEnv, entry)
+		}
+	}
+	slices.Sort(wantEnv)
+	status := map[string]string{"WARNING": "needs attention", "CRITICAL": "is critical", "CLEAR": "recovered"}[severity]
+	wantJSON, err := json.Marshal(struct{ TargetArn, Subject, Message string }{TargetArn: arn, Subject: "test-node " + status + " - test alert - test.chart", Message: message})
+	require.NoError(t, err)
+	return commandCapture{Args: []string{"sns", "publish", "--region", region, "--cli-input-json", "file:///dev/stdin", "--no-cli-pager", "--no-cli-auto-prompt", "--output", "json"}, Env: wantEnv, Input: string(wantJSON) + "\n"}
 }

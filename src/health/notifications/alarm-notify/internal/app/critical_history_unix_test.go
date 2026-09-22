@@ -8,10 +8,12 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/notifier"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -48,7 +50,7 @@ func TestRunCommandCriticalHistoryPreflight(t *testing.T) {
 	}
 }
 
-func TestRunCommandCriticalHistory(t *testing.T) {
+func TestRunCommandInputOnlyFacts(t *testing.T) {
 	t.Setenv("NOTIFIER_COMMAND_CRITICAL_MISSING", "")
 	require.NoError(t, os.Unsetenv("NOTIFIER_COMMAND_CRITICAL_MISSING"))
 	for name, test := range map[string]struct {
@@ -68,7 +70,7 @@ func TestRunCommandCriticalHistory(t *testing.T) {
 			}
 			cfg := testConfig{Version: 1, Destinations: map[string]map[string]any{"target": dst}, Routing: notifier.Routing{Policies: map[string]*notifier.DestinationPolicy{"target": {Critical: true}}}}
 			var stdout, stderr bytes.Buffer
-			require.Zero(t, Run(context.Background(), []string{"send", "--config", writeCommandConfig(t, cfg), "--destination", "target"}, bytes.NewReader(criticalHistoryInput(t, test.status, test.history)), &stdout, &stderr), stderr.String())
+			require.Zero(t, Run(context.Background(), []string{"send", "--config", writeCommandConfig(t, cfg), "--destination", "target"}, strings.NewReader(testutil.WithProducerContext(string(criticalHistoryInput(t, test.status, test.history)), testutil.ProducerContextJSON)), &stdout, &stderr), stderr.String())
 			assert.Empty(t, stdout.String())
 			if test.skip {
 				assert.Equal(t, "alarm-notify: destination \"target\" skipped: critical\nalarm-notify: delivery summary: 0 succeeded, 0 failed, 1 skipped\n", stderr.String())

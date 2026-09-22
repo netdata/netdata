@@ -23,7 +23,18 @@ type FunctionConfig struct {
 	Available func() bool
 	// RawRequest routes the complete Function request to a RawMethodHandler.
 	// Use this for Function APIs that need raw payloads, args, or full response envelopes.
-	RawRequest     bool
+	RawRequest bool
+	// ManagedInfo uses framework metadata for raw-input methods. For selectable
+	// jobs, info without __job returns declarations without invoking a handler;
+	// scoped info calls HandleRaw, which supplies domain RequiredParams.
+	// Requires RawRequest. RawResponse still bypasses managed serialization.
+	ManagedInfo bool
+	// HasHistory advertises time-range support in managed info and data responses.
+	HasHistory bool
+	// AcceptedParams advertises inputs in addition to required selector IDs.
+	// Requires RawRequest; structured handlers receive only resolved selectors.
+	// The raw handler owns parsing and validation of these extra inputs.
+	AcceptedParams []string
 	RequiredParams []ParamConfig // Required parameters for this method (including __sort if used)
 	// FIXME: Presentation is intentionally untyped here, while the shared UI schema
 	// currently defines only topology-specific presentation payloads.

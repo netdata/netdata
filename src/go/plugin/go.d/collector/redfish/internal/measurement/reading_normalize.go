@@ -60,6 +60,7 @@ func normalizeReading(node *Resource, raw rawReading) normalizedReading {
 
 	reading.Primary = reading.Primary && surface.Primary
 	if raw.ReadingScoped {
+		reading.Health = raw.Health
 		switch {
 		case strings.TrimSpace(raw.Health) == "":
 			reading.SourceAlarmDiagnostic = fmt.Sprintf(
@@ -159,7 +160,11 @@ func scaleReadingValue(value float64, scale valueScale) float64 {
 
 func (c *Projector) readingObservations(node *Resource, reading normalizedReading) []Observation {
 	labels := c.metricLabels(node, &reading)
-	result := make([]Observation, 0, 2)
+	capacity := 2
+	if reading.DerivedHealth != "" && reading.DerivedHealth != "unavailable" {
+		capacity++
+	}
+	result := make([]Observation, 0, capacity)
 	if reading.Valid {
 		result = append(result, Observation{
 			Metric: reading.Metric,
@@ -169,6 +174,9 @@ func (c *Projector) readingObservations(node *Resource, reading normalizedReadin
 	}
 	if reading.SourceAlarm != "" && reading.AlarmMetric != "" {
 		result = append(result, stateObservation(reading.AlarmMetric, reading.SourceAlarm, labels))
+	}
+	if reading.DerivedHealth != "" && reading.DerivedHealth != "unavailable" {
+		result = append(result, stateObservation("derived_health_status", reading.DerivedHealth, labels))
 	}
 	return result
 }

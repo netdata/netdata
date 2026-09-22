@@ -22,10 +22,14 @@ import (
 
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/commandexec"
 	notifyevent "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/event"
+	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/message"
 	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
 )
 
 type Config struct {
+	Secrets secret.InputMode `yaml:"-"`
+	// LegacyMessage is already expanded by the shell-format reader; never template it again.
+	LegacyMessage    string            `yaml:"-"`
 	Executable       string            `yaml:"executable,omitempty"`
 	Env              map[string]string `yaml:"env,omitempty"`
 	TargetARN        string            `yaml:"target_arn,omitempty"`
@@ -67,8 +71,14 @@ func (dst Config) validate() error {
 	if !snsARNPattern.MatchString(dst.TargetARN) {
 		return errors.New("awssns target_arn must be a literal standard SNS topic or platform endpoint ARN")
 	}
-	if err := validateSNSCredentials(dst.CredentialSource, dst.Env, true); err != nil {
+	if err := validateSNSCredentials(dst.CredentialSource, dst.Env, dst.Secrets != secret.LiteralInput); err != nil {
 		return err
+	}
+	if dst.LegacyMessage != "" {
+		if dst.MessageTemplate != "" {
+			return errors.New("awssns cannot combine a legacy message with message_template")
+		}
+		return validateSNSMessage(dst.LegacyMessage)
 	}
 	_, err := renderSNSTemplate(dst.MessageTemplate, snsFields(notifyevent.Event{}))
 	return err
@@ -155,28 +165,14 @@ func snsFields(event notifyevent.Event) map[string]string {
 		}
 		return strconv.FormatFloat(*number, 'g', -1, 64)
 	}
-	withUnits := func(number *float64) string {
-		text := value(number)
-		if text != "" && event.Units != "" {
-			text += " " + event.Units
-		}
-		return text
-	}
-	status := "needs attention"
-	switch event.Status {
-	case "CRITICAL":
-		status = "is critical"
-	case "CLEAR":
-		status = "recovered"
-	}
 	return map[string]string{
 		"version": strconv.Itoa(event.Version), "incident_id": event.IncidentID,
 		"timestamp": event.Timestamp.Format(time.RFC3339), "node": event.Node, "alert": event.Alert,
 		"chart": event.Chart, "context": event.Context, "status": event.Status, "previous_status": event.PreviousStatus,
 		"summary": event.Summary, "info": event.Info, "value": value(event.Value), "previous_value": value(event.PreviousValue),
-		"units": event.Units, "url": event.URL, "status_message": status,
+		"units": event.Units, "url": event.URL, "status_message": message.StatusDescription(event.Status),
 		"duration": duration(event.Duration), "non_clear_duration": duration(event.NonClearDuration),
-		"value_string": withUnits(event.Value), "previous_value_string": withUnits(event.PreviousValue),
+		"value_string": message.ValueString(event.Value, event.Units), "previous_value_string": message.ValueString(event.PreviousValue, event.Units),
 	}
 }
 
@@ -246,23 +242,32 @@ func renderSNS(dst Config, event notifyevent.Event) (snsPublish, error) {
 	if fields["value_string"] != "" {
 		message += " " + fields["value_string"]
 	}
-	if dst.MessageTemplate != "" {
+	if dst.LegacyMessage != "" {
+		message = dst.LegacyMessage
+	} else if dst.MessageTemplate != "" {
 		var err error
 		message, err = renderSNSTemplate(dst.MessageTemplate, fields)
 		if err != nil {
 			return snsPublish{}, err
 		}
 	}
-	if message == "" || !utf8.ValidString(message) || len(message) > snsMessageLimit {
-		return snsPublish{}, errors.New("awssns message must be nonempty UTF-8 and at most 262144 bytes")
+	if err := validateSNSMessage(message); err != nil {
+		return snsPublish{}, err
 	}
 	return snsPublish{TargetARN: dst.TargetARN, Subject: subject, Message: message}, nil
+}
+
+func validateSNSMessage(message string) error {
+	if message == "" || !utf8.ValidString(message) || len(message) > snsMessageLimit {
+		return errors.New("awssns message must be nonempty UTF-8 and at most 262144 bytes")
+	}
+	return nil
 }
 
 func snsEnvironment(ctx context.Context, dst Config, region string) ([]string, error) {
 	credentials := make(map[string]string, len(dst.Env))
 	for key, raw := range dst.Env {
-		value, err := secret.Resolve(ctx, raw)
+		value, err := dst.Secrets.Resolve(ctx, raw)
 		if err != nil {
 			return nil, fmt.Errorf("awssns env: %w", err)
 		}

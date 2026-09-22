@@ -27,7 +27,13 @@ func TestCollectorDecodedJobInitializes(t *testing.T) {
 	creator, ok := collectorapi.DefaultRegistry.Lookup("redfish")
 	require.True(t, ok)
 	require.Nil(t, creator.AgentFunctions)
-	require.Nil(t, creator.MethodHandler)
+	require.NotNil(t, creator.MethodHandler)
+	require.NotNil(t, creator.SharedFunctions)
+	methods := creator.SharedFunctions()
+	require.Len(t, methods, 3)
+	assert.Equal(t, "logs", methods[2].ID)
+	assert.Equal(t, "sensors", methods[0].ID)
+	assert.Equal(t, "hardware", methods[1].ID)
 	server := testutil.NewServer(t, testutil.ServerConfig{})
 	defer server.Close()
 
@@ -59,7 +65,6 @@ func TestCollectorDecodedJobInitializes(t *testing.T) {
 			require.NoError(t, err)
 			labels := metrix.Labels{
 				"endpoint_key": identity.Key("netdata:redfish:endpoint:v1", origin, identity.EndpointKeyHexChars),
-				"endpoint_job": "endpoint-a",
 			}
 			point, ok := collector.MetricStore().Read().StateSet("collection_status", labels)
 			require.True(t, ok)
@@ -67,11 +72,8 @@ func TestCollectorDecodedJobInitializes(t *testing.T) {
 			hardwareSeries := 0
 			collector.MetricStore().
 				Read(metrix.ReadFlatten()).
-				ForEachByName("system_health", func(labels metrix.LabelView, value metrix.SampleValue) {
+				ForEachByName("system_health_status", func(metrix.LabelView, metrix.SampleValue) {
 					hardwareSeries++
-					job, found := labels.Get("endpoint_job")
-					require.True(t, found)
-					assert.Equal(t, "endpoint-a", job)
 				})
 			assert.Positive(t, hardwareSeries)
 			collecttest.AssertChartCoverage(t, collector, collecttest.ChartCoverageExpectation{})
@@ -130,7 +132,6 @@ func TestCollectorSessionStartsDuringRunningCollection(t *testing.T) {
 	defer server.Close()
 	collector := New()
 	collector.Config = testConfig(server.URL, "session")
-	collector.Name = "endpoint"
 	defer collector.Cleanup(context.Background())
 	require.NoError(t, collector.Init(context.Background()))
 	require.NoError(t, collector.Check(context.Background()))
@@ -180,7 +181,6 @@ func TestDecodedCollectorSessionRecovery(t *testing.T) {
 	require.NoError(t, err)
 	labels := metrix.Labels{
 		"endpoint_key": identity.Key("netdata:redfish:endpoint:v1", origin, identity.EndpointKeyHexChars),
-		"endpoint_job": "session",
 	}
 	for cycle := range 3 {
 		managed.CycleController().BeginCycle()
@@ -192,7 +192,7 @@ func TestDecodedCollectorSessionRecovery(t *testing.T) {
 		var hardwareSeries int
 		collector.MetricStore().
 			Read(metrix.ReadFlatten()).
-			ForEachByName("system_health", func(metrix.LabelView, metrix.SampleValue) {
+			ForEachByName("system_health_status", func(metrix.LabelView, metrix.SampleValue) {
 				hardwareSeries++
 			})
 		assert.Positive(t, hardwareSeries, "session recovery must not leave a hardware gap")

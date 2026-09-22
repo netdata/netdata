@@ -28,9 +28,6 @@ func newTestCollector(t *testing.T, cfg Config) *Collector {
 	t.Helper()
 	c := New()
 	c.Config = cfg
-	if c.Name == "" {
-		c.Name = "test-job"
-	}
 	require.NoError(t, c.Init(t.Context()))
 	t.Cleanup(func() { c.Cleanup(context.Background()) })
 	return c

@@ -94,7 +94,7 @@ func TestGraphMembershipPrunesRemovedSubtreesAndRetainsUnknown(t *testing.T) {
 				assert.True(t, parents[snapshot.ParentKey], "removed-parent snapshot survived")
 			}
 			readings := make(map[string]float64)
-			projector := measurement.New(origin, "", ReadingProvenanceResolver(client.root, origin))
+			projector := measurement.New(origin, ReadingProvenanceResolver(client.root, origin))
 			projected, err := projector.Project(acquired.Resources, acquired.GraphComplete, time.Unix(10, 0))
 			require.NoError(t, err)
 			for _, observation := range projected.Observations {

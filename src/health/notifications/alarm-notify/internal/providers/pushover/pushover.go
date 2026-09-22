@@ -39,7 +39,7 @@ func (dst Config) validatePushover() error {
 	for _, field := range []struct{ name, value string }{
 		{"app_token", dst.AppToken}, {"user_key", dst.UserKey}, {"api_url", dst.APIURL},
 	} {
-		reference, err := secret.IsReference(field.value)
+		reference, err := dst.Secrets.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("pushover %s: %w", field.name, err)
 		}
@@ -70,7 +70,7 @@ func sendPushover(ctx context.Context, dst Config, event notifyevent.Event, clie
 	}{
 		{"app_token", &dst.AppToken}, {"user_key", &dst.UserKey}, {"api_url", &dst.APIURL},
 	} {
-		value, err := secret.Resolve(ctx, *field.value)
+		value, err := dst.Secrets.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("pushover %s: %w", field.name, err)
 		}
@@ -192,9 +192,10 @@ func renderPushoverText(parts []pushoverText) string {
 }
 
 type Config struct {
-	AppToken string `yaml:"app_token,omitempty"`
-	UserKey  string `yaml:"user_key,omitempty"`
-	APIURL   string `yaml:"api_url,omitempty"`
+	Secrets  secret.InputMode `yaml:"-"`
+	AppToken string           `yaml:"app_token,omitempty"`
+	UserKey  string           `yaml:"user_key,omitempty"`
+	APIURL   string           `yaml:"api_url,omitempty"`
 }
 
 type Sender struct {

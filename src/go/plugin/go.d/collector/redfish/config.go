@@ -25,7 +25,6 @@ var (
 )
 
 type Config struct {
-	Name               string `yaml:"name,omitempty"                json:"name,omitempty"`
 	Vnode              string `yaml:"vnode,omitempty"               json:"vnode"`
 	UpdateEvery        int    `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`

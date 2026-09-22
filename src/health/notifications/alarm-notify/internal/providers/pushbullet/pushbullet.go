@@ -50,7 +50,7 @@ func (dst Config) validatePushbullet() error {
 	for _, field := range []struct{ name, value string }{
 		{"access_token", dst.AccessToken}, {"api_url", dst.APIURL},
 	} {
-		reference, err := secret.IsReference(field.value)
+		reference, err := dst.Secrets.IsReference(field.value)
 		if err != nil {
 			return fmt.Errorf("pushbullet %s: %w", field.name, err)
 		}
@@ -83,7 +83,7 @@ func sendPushbullet(ctx context.Context, dst Config, event notifyevent.Event, cl
 	}{
 		{"access_token", &dst.AccessToken}, {"api_url", &dst.APIURL},
 	} {
-		value, err := secret.Resolve(ctx, *field.value)
+		value, err := dst.Secrets.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("pushbullet %s: %w", field.name, err)
 		}
@@ -137,11 +137,12 @@ func renderPushbullet(dst Config, event notifyevent.Event) pushbulletMessage {
 }
 
 type Config struct {
-	AccessToken    string `yaml:"access_token,omitempty"`
-	Email          string `yaml:"email,omitempty"`
-	ChannelTag     string `yaml:"channel_tag,omitempty"`
-	SourceDeviceID string `yaml:"source_device_id,omitempty"`
-	APIURL         string `yaml:"api_url,omitempty"`
+	Secrets        secret.InputMode `yaml:"-"`
+	AccessToken    string           `yaml:"access_token,omitempty"`
+	Email          string           `yaml:"email,omitempty"`
+	ChannelTag     string           `yaml:"channel_tag,omitempty"`
+	SourceDeviceID string           `yaml:"source_device_id,omitempty"`
+	APIURL         string           `yaml:"api_url,omitempty"`
 }
 
 type Sender struct {

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func fixtureClient() *Projector { return New("https://fixture.example", "", nil) }
+func fixtureClient() *Projector { return New("https://fixture.example", nil) }
 
 func loadFixture(t *testing.T, name string) map[string]any {
 	t.Helper()

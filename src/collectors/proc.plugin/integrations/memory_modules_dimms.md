@@ -91,8 +91,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ ecc_memory_mc_noinfo_correctable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_errors | memory controller ${label:controller} ECC correctable errors (unknown DIMM slot) |
-| [ ecc_memory_mc_noinfo_uncorrectable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_errors | memory controller ${label:controller} ECC uncorrectable errors (unknown DIMM slot) |
+| [ ecc_memory_mc_correctable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_errors | Memory controller ${label:controller} ECC correctable errors |
+| [ ecc_memory_mc_uncorrectable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_errors | Memory controller ${label:controller} ECC uncorrectable errors |
 | [ ecc_memory_dimm_correctable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_dimm_errors | DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC correctable errors |
 | [ ecc_memory_dimm_uncorrectable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf) | mem.edac_mc_dimm_errors | DIMM ${label:dimm} controller ${label:controller} (location ${label:dimm_location}) ECC uncorrectable errors |
 

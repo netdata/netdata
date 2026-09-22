@@ -13,6 +13,28 @@ import (
 
 const maxFileSize = 1 << 20
 
+// InputMode distinguishes native references from already evaluated legacy values.
+// The zero value preserves native environment and file reference handling.
+type InputMode uint8
+
+const LiteralInput InputMode = 1
+
+// IsReference recognizes references only for native configuration inputs.
+func (mode InputMode) IsReference(value string) (bool, error) {
+	if mode == LiteralInput {
+		return false, nil
+	}
+	return IsReference(value)
+}
+
+// Resolve preserves literal inputs exactly, without reading environment or files.
+func (mode InputMode) Resolve(ctx context.Context, value string) (string, error) {
+	if mode == LiteralInput {
+		return value, nil
+	}
+	return Resolve(ctx, value)
+}
+
 // IsReference checks whole-value secret reference syntax without resolving it.
 func IsReference(value string) (bool, error) {
 	if !strings.Contains(value, "${") {

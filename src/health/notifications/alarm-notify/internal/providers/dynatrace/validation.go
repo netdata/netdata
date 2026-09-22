@@ -9,8 +9,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/secret"
-
 	configfield "github.com/netdata/netdata/src/health/notifications/alarm-notify/internal/config/field"
 )
 
@@ -27,7 +25,7 @@ func (dst Config) validate() error {
 		return errors.New("dynatrace source must be a nonempty literal of at most 4096 characters when set")
 	}
 	for _, field := range dst.secretFields() {
-		reference, err := secret.IsReference(*field.value)
+		reference, err := dst.Secrets.IsReference(*field.value)
 		if err != nil {
 			return fmt.Errorf("dynatrace %s: %w", field.name, err)
 		}
@@ -62,7 +60,7 @@ func validateField(name, value string) error {
 
 func (dst *Config) resolve(ctx context.Context) error {
 	for _, field := range dst.secretFields() {
-		value, err := secret.Resolve(ctx, *field.value)
+		value, err := dst.Secrets.Resolve(ctx, *field.value)
 		if err != nil {
 			return fmt.Errorf("dynatrace %s: %w", field.name, err)
 		}
