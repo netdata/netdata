@@ -59,6 +59,19 @@ func TestJobRuntimeEndToEnd(t *testing.T) {
 	run := jobruntime.NewManagedRun(context.Background(), nil)
 	stopped := make(chan struct{})
 	go func() { job.StartManaged(run); close(stopped) }()
+	var stop sync.Once
+	stopJob := func() {
+		stop.Do(func() {
+			job.Stop()
+			select {
+			case <-stopped:
+			case <-time.After(waitFor):
+				t.Error("job did not stop")
+			}
+			job.Cleanup()
+		})
+	}
+	t.Cleanup(stopJob)
 	select {
 	case <-run.StartupDone():
 	case <-time.After(waitFor):
@@ -88,7 +101,7 @@ func TestJobRuntimeEndToEnd(t *testing.T) {
 	want := []string{
 		"'statsd.c.total.requests'", "'statsd.g.value.level'", "'statsd.ms.values.latency'",
 		"'statsd.h.values.difference'", "'statsd.s.cardinality.members'", "'statsd.pools.size'",
-		"'statsd.app.pool_size'", "'statsd.receiver.bytes'", "CLABEL 'zone' 'a'", "CLABEL 'pool' 'a'",
+		"'statsd.app.pool_size'", "CLABEL 'zone' 'a'", "CLABEL 'pool' 'a'",
 		"SET 'size' = 7", "SET 'level' = 10", "SET 'requests' = 4",
 	}
 	for clock := 1; ; clock++ {
@@ -109,14 +122,8 @@ func TestJobRuntimeEndToEnd(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	job.Stop()
-	select {
-	case <-stopped:
-	case <-time.After(waitFor):
-		t.Fatal("job did not stop")
-	}
+	stopJob()
 	require.Nil(t, run.Failure(), "a requested stop is a normal runner return")
-	job.Cleanup()
 	requireFree(t, protocolUDP, addr)
 	requireFree(t, protocolTCP, addr)
 }

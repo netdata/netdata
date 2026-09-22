@@ -8,8 +8,7 @@ import (
 )
 
 // readUDP reads datagrams until the listener closes or fails permanently.
-func (s *server) readUDP(conn net.PacketConn) {
-	listener := "udp listener " + conn.LocalAddr().String()
+func (s *server) readUDP(conn net.PacketConn, listener string) {
 	buf := make([]byte, s.maxRecord+1)
 	for {
 		n, _, err := conn.ReadFrom(buf)

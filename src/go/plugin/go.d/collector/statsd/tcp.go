@@ -12,8 +12,7 @@ import (
 )
 
 // acceptTCP accepts clients until the listener closes or fails permanently.
-func (s *server) acceptTCP(ln net.Listener) {
-	listener := "tcp listener " + ln.Addr().String()
+func (s *server) acceptTCP(ln net.Listener, listener string) {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -23,7 +22,7 @@ func (s *server) acceptTCP(ln net.Listener) {
 			return
 		}
 		if s.track(conn) {
-			go s.guard(func() { s.readTCP(conn) })
+			go s.guard(listener+" client", func() { s.readTCP(conn) })
 		}
 	}
 }
@@ -43,7 +42,7 @@ func (s *server) track(conn net.Conn) bool {
 	if !admitted {
 		_ = conn.Close()
 		if !closed {
-			s.receiver.reject(rejectConnectionLimit)
+			s.stats.tcpRefused.Add(1)
 		}
 	}
 	return admitted

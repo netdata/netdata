@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -109,6 +110,13 @@ func newProfile(name string, data []byte) (*profile, error) {
 	dec.KnownFields(true)
 	if err := dec.Decode(&doc); err != nil {
 		return nil, err
+	}
+	switch err := dec.Decode(new(yaml.Node)); {
+	case errors.Is(err, io.EOF):
+	case err != nil:
+		return nil, err
+	default:
+		return nil, errors.New("a profile file must contain exactly one YAML document")
 	}
 	if strings.TrimSpace(doc.Match) == "" {
 		return nil, errors.New("'match' is required")

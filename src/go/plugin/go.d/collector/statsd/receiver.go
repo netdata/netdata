@@ -188,7 +188,7 @@ func (r *receiver) countRejection(reason rejection) {
 func (r *receiver) admit(p preparedRecord, now time.Time) error {
 	id := identity{p.name, p.labelKey}
 	e := r.entries[id]
-	if r.expiryMayMatter(e, p.name, now) {
+	if r.expiryMayMatter(e, p.name, p.kind, now) {
 		r.retireIdle(now)
 		e = r.entries[id]
 	}
@@ -221,13 +221,18 @@ func (r *receiver) admit(p preparedRecord, now time.Time) error {
 }
 
 // expiryMayMatter reports whether retiring idle entries could change this
-// admission: the entry itself expired, or a new identity needs a free slot or a
-// released type binding. Collect normally retires entries.
-func (r *receiver) expiryMayMatter(e *series, name string, now time.Time) bool {
+// admission: the entry itself expired, or a new identity needs a free slot or
+// the release of a binding to another wire type. Collect normally retires
+// entries; with idle expiry disabled nothing can expire.
+func (r *receiver) expiryMayMatter(e *series, name string, kind wireType, now time.Time) bool {
+	if r.idle <= 0 {
+		return false
+	}
 	if e != nil {
 		return r.expired(e, now)
 	}
-	return len(r.entries) >= r.capacity || r.bindings[name].refs > 0
+	b, bound := r.bindings[name]
+	return len(r.entries) >= r.capacity || bound && b.kind != kind
 }
 
 func (r *receiver) expired(e *series, now time.Time) bool {

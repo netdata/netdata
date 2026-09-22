@@ -118,24 +118,30 @@ func (c *Collector) serve(ctx context.Context, s *server, ready func()) error {
 func (s *server) start() {
 	s.wg.Add(len(s.udp) + len(s.tcp))
 	for _, conn := range s.udp {
-		go s.guard(func() { s.readUDP(conn) })
+		listener := "udp listener " + conn.LocalAddr().String()
+		go s.guard(listener, func() { s.readUDP(conn, listener) })
 	}
 	for _, ln := range s.tcp {
-		go s.guard(func() { s.acceptTCP(ln) })
+		listener := "tcp listener " + ln.Addr().String()
+		go s.guard(listener, func() { s.acceptTCP(ln, listener) })
 	}
 }
 
-// guard runs one reader for this job. The framework recovers panics only in
-// Run's goroutine, so a reader panic on untrusted input fails the receiver the
-// same way instead of crashing the plugin process.
-func (s *server) guard(read func()) {
+// guard runs one named reader for this job. The framework recovers panics only
+// in Run's goroutine, so a reader panic on untrusted input fails the receiver
+// the same way instead of crashing the plugin process.
+func (s *server) guard(reader string, read func()) {
 	defer s.wg.Done()
 	defer func() {
 		if r := recover(); r != nil {
 			if logger.Level.Enabled(slog.LevelDebug) {
-				s.log.Errorf("STACK: %s", debug.Stack())
+				s.log.Errorf("%s: STACK: %s", reader, debug.Stack())
 			}
-			s.fail(fmt.Errorf("receiver panic: %v", r))
+			err, ok := r.(error)
+			if !ok {
+				err = fmt.Errorf("%v", r)
+			}
+			s.fail(fmt.Errorf("%s: receiver panic: %w", reader, err))
 		}
 	}()
 	read()

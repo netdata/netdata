@@ -6,6 +6,7 @@ import (
 	"context"
 	"net"
 	"os"
+	"runtime"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -200,7 +201,9 @@ func TestReaderPanicFailsOnlyTheReceiver(t *testing.T) {
 	require.NoError(t, err)
 	select {
 	case err := <-done:
-		require.ErrorContains(t, err, "receiver panic")
+		require.ErrorContains(t, err, "tcp listener "+addr+" client: receiver panic")
+		var cause runtime.Error
+		require.ErrorAs(t, err, &cause, "an error panic value stays in the chain")
 	case <-time.After(waitFor):
 		t.Fatal("reader panic did not fail the receiver")
 	}

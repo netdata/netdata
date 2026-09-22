@@ -14,13 +14,15 @@ import (
 type diagnostics struct {
 	udpBytes, tcpBytes atomic.Uint64
 	tcpConnections     atomic.Int64
+	tcpRefused         atomic.Uint64 // connections closed at max_tcp_connections
 	withheld           [len(withheldReasons)]uint64
 
 	udpBytesTotal, tcpBytesTotal metrix.SnapshotCounter // nil for an unconfigured transport
 	updates                      metrix.SnapshotCounter
 	rejections                   [len(rejectReasons)]metrix.SnapshotCounter
 	series, seriesLimit          metrix.SnapshotGauge
-	connections, connectionLimit metrix.SnapshotGauge // nil without TCP listeners
+	connections, connectionLimit metrix.SnapshotGauge   // nil without TCP listeners
+	connectionsRefused           metrix.SnapshotCounter // nil without TCP listeners
 	withheldTotal                [len(withheldReasons)]metrix.SnapshotCounter
 	maxSeries, maxConnections    float64
 }
@@ -42,6 +44,7 @@ func newDiagnostics(store metrix.CollectorStore, cfg Config) *diagnostics {
 		d.tcpBytesTotal = bytes.WithLabelValues(protocolTCP)
 		d.connections = m.Gauge("tcp_connections")
 		d.connectionLimit = m.Gauge("tcp_connections_limit")
+		d.connectionsRefused = m.Counter("tcp_connections_refused")
 	}
 	rejections := m.Vec("reason").Counter("rejections")
 	for i, reason := range rejectReasons {
@@ -73,6 +76,7 @@ func (d *diagnostics) write(stats receiverStats) {
 		d.tcpBytesTotal.ObserveTotal(float64(d.tcpBytes.Load()))
 		d.connections.Observe(float64(d.tcpConnections.Load()))
 		d.connectionLimit.Observe(d.maxConnections)
+		d.connectionsRefused.ObserveTotal(float64(d.tcpRefused.Load()))
 	}
 	d.updates.ObserveTotal(float64(stats.accepted))
 	for i, total := range stats.rejects {

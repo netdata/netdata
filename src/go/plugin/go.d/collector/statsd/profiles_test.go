@@ -12,6 +12,7 @@ import (
 	"unsafe"
 	"weak"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/stretchr/testify/assert"
@@ -110,6 +111,19 @@ template:
       dimensions:
         - selector: undeclared
 `, wantErr: "'template'"},
+		"misspelled rule field": {doc: `
+match: '*'
+relabeling:
+  - match: '*'
+    metric_relabel_configs:
+      - target_lable: a
+        replacement: b
+`, wantErr: "field target_lable not found"},
+		"second document": {
+			doc:     testProfiles["app"] + "---\nmatch: 'other.*'\n",
+			wantErr: "exactly one YAML document",
+		},
+		"malformed trailing document": {doc: testProfiles["app"] + "---\nmatch: [\n", wantErr: "yaml"},
 		"disabled dimension expiry": {doc: appWithLifecycle(`
         dimensions:
           max_dims: 3`), wantErr: "must be positive"},
@@ -185,6 +199,8 @@ func TestProfileReplaceAndIdentity(t *testing.T) {
 	f.ingest(t, "meta.x:5|g|#measure_field:m,nd_unit:items")
 	// Same-type aliases combine.
 	f.ingest(t, "meta.alias.a:10|g", "meta.alias.b:20|g", "meta.alias.a:+1|g")
+	// Rules can source sender tags.
+	f.ingest(t, "meta.tagged:1|g|#zone:eu")
 	for line, want := range map[string]rejection{
 		"svc.c.size:1|c": rejectType,     // Type binding follows the final name.
 		"meta.empty:1|g": rejectSyntax,   // Replacement produced an invalid name.
@@ -208,6 +224,7 @@ func TestProfileReplaceAndIdentity(t *testing.T) {
 	})
 	value(t, f.c, "g.value.meta.x", 5, nil)
 	value(t, f.c, "g.value.meta.alias", 21, nil)
+	value(t, f.c, "g.value.meta.tagged", 1, metrix.Labels{"zone": "eu", "region": "r-eu"})
 	meta, ok := f.c.store.Read().MetricMeta("g.value.meta.x")
 	require.True(t, ok)
 	assert.Equal(t, "bytes", meta.Unit)
@@ -296,7 +313,8 @@ func TestActivationSurvivesPublicationFailure(t *testing.T) {
 // TestProfileDimensionChurnRetires uses the case that motivates finite omitted
 // dimension expiry: a name_from_label chart whose label values keep changing.
 func TestProfileDimensionChurnRetires(t *testing.T) {
-	f := newProfileFixture(t, map[string]string{"jobs": `
+	idle := func(c *Collector) { c.MetricIdleTimeout = confopt.Duration(time.Second) }
+	f := newConfiguredProfileFixture(t, idle, map[string]string{"jobs": `
 match: 'jobs.*'
 template:
   family: jobs
@@ -309,7 +327,6 @@ template:
         - selector: g.value.jobs.active
           name_from_label: worker
 `}, "jobs")
-	f.c.receiver.idle = time.Second
 	live := map[string]bool{}
 	chartLive, created, peak := false, 0, 0
 	track := func(wire string) {

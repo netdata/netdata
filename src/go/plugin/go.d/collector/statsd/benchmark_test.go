@@ -74,16 +74,22 @@ func BenchmarkMixedPublication(b *testing.B) {
 	}
 }
 
+// A rejected new identity at capacity scans for idle entries only when idle
+// expiry is enabled: O(max_series) per record then, O(1) when disabled.
 func BenchmarkCapacityPressure(b *testing.B) {
-	f := newCoreFixture(b, 1000, 5*time.Minute)
-	f.ingest(b, mixedRecords(1000)...)
-	f.collect(b, false, false)
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if err := f.c.receiver.ingest("additional:1|c", f.time); err != rejectCapacity {
-			b.Fatal(err)
-		}
+	for name, idle := range map[string]time.Duration{"idle expiry": 5 * time.Minute, "idle disabled": 0} {
+		b.Run(name, func(b *testing.B) {
+			f := newCoreFixture(b, 1000, idle)
+			f.ingest(b, mixedRecords(1000)...)
+			f.collect(b, false, false)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if err := f.c.receiver.ingest("additional:1|c", f.time); err != rejectCapacity {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }
 
@@ -258,6 +264,9 @@ func BenchmarkRuntimeEnvelope(b *testing.B) {
 			}
 		}
 		for f.counts().accepted < uint64(2*len(lines)) {
+			if time.Now().After(deadline) {
+				b.Fatalf("accepted %d of %d", f.counts().accepted, 2*len(lines))
+			}
 			time.Sleep(time.Millisecond)
 		}
 		runtime.GC()

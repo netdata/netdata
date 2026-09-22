@@ -248,6 +248,10 @@ relabeling:
         regex: 'meta\.typo'
         target_label: nd_units
         replacement: bytes
+      - source_labels: [zone]
+        regex: '(.+)'
+        target_label: region
+        replacement: 'r-$1'
 `,
 }
 
@@ -263,10 +267,22 @@ func writeProfiles(t testing.TB, files map[string]string) []profilecatalog.DirSp
 
 func newProfileFixture(t testing.TB, files map[string]string, names ...string) *coreFixture {
 	t.Helper()
+	return newConfiguredProfileFixture(t, func(*Collector) {}, files, names...)
+}
+
+// newConfiguredProfileFixture lets configure adjust configuration before Init.
+func newConfiguredProfileFixture(
+	t testing.TB,
+	configure func(*Collector),
+	files map[string]string,
+	names ...string,
+) *coreFixture {
+	t.Helper()
 	c := New()
 	c.Listeners = testListeners
 	c.profileDirs = writeProfiles(t, files)
 	c.Profiles = names
+	configure(c)
 	f := prepareFixture(t, c)
 	f.time = time.Unix(1000, 0)
 	c.now = func() time.Time { return f.time }

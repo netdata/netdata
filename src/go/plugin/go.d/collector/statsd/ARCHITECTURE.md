@@ -42,8 +42,8 @@ One framer-owned bound, 64 KiB, limits a record payload excluding its terminator
 - TCP: every record needs LF or CRLF, including the last; a fragment at EOF is rejected. A record longer than the
   bound is rejected once and discarded through its newline, then reading resumes. Each connection buffers at most one
   bound plus its terminator.
-- `max_tcp_connections` caps simultaneous clients across the job's TCP listeners. A new client at capacity is closed;
-  established clients keep their slots however quiet they are. There is no idle-client timer.
+- `max_tcp_connections` caps simultaneous clients across the job's TCP listeners. A new client at capacity is closed
+  and counted as refused; established clients keep their slots however quiet they are. There is no idle-client timer.
 
 Empty lines are not records. Every other record is parsed independently, so malformed neighbors do not affect it.
 
@@ -82,8 +82,8 @@ Accepted retained strings are cloned at admission, so substrings cannot retain c
 
 `profiles` lists profile names in precedence order. Files `<name>.yaml` or `<name>.yml` are found through
 `profilecatalog` in the user configuration directories' `statsd.profiles/`; there is no stock catalog and no
-automatic eligibility. `Init` strictly decodes only the selected files, so an unrelated invalid file does not affect
-the job. Files are not watched: a changed profile applies when the job restarts.
+automatic eligibility. `Init` strictly decodes only the selected files, each a single YAML document, so an unrelated
+invalid file does not affect the job. Files are not watched: a changed profile applies when the job restarts.
 
 ```yaml
 match: 'myapp.*'          # required; simple patterns over original StatsD names
@@ -199,7 +199,8 @@ while that cycle is still open. Unreferenced committed metadata retires after
 The longest expiry covers generic autogen and every prepared profile chart and dimension. Existing store
 expiry/grace remain 10/10, so the generic path has `H=20`; a longer authored profile lifetime extends it.
 Uncommitted unreferenced declarations retire on reconciliation. This bounds retained cohorts by the accepted series
-cap and downstream lifetime, without a new metadata quota. Detached cleanup cannot remove a newly admitted replacement entry.
+cap and downstream lifetime, without a new metadata quota. Detached cleanup cannot remove a newly admitted
+replacement entry.
 
 Input work is proportional to record size, canonical label sorting and bounded estimator insertion, plus matching the
 original name against configured profiles that have rules or are not yet active, and running at most one pipeline.
@@ -219,9 +220,10 @@ collection-health charts.
 |---|---|
 | `receiver.bytes{transport}` | Cumulative bytes read per configured transport |
 | `receiver.updates` | Cumulative fully admitted records |
-| `receiver.rejections{reason}` | Cumulative rejections: `syntax`, `value`, `rate`, `labels`, `metadata`, `type_conflict`, `gauge_baseline`, `capacity`, `overflow`, `oversize`, `unterminated`, `tcp_connection_limit` |
+| `receiver.rejections{reason}` | Cumulative rejections: `syntax`, `value`, `rate`, `labels`, `metadata`, `type_conflict`, `gauge_baseline`, `capacity`, `overflow`, `oversize`, `unterminated` |
 | `receiver.series`, `receiver.series_limit` | Retained identities after the cut and `max_series` |
 | `receiver.tcp_connections`, `receiver.tcp_connections_limit` | Open TCP clients and `max_tcp_connections`, TCP jobs only |
+| `receiver.tcp_connections_refused` | Cumulative clients closed at `max_tcp_connections`, TCP jobs only |
 | `receiver.percentiles_withheld{reason}` | Cumulative ms/h windows with observations whose percentiles were gapped: `numeric_domain`, `observation_bound`, `mapping_domain`, `mapping_error`, `span`, `ambiguous_rank` |
 
 Counters are cumulative, so the Agent computes rates. A quiet interval publishes zero rates, not a failure. Rank

@@ -10,6 +10,7 @@ groups:
       - receiver.series_limit
       - receiver.tcp_connections
       - receiver.tcp_connections_limit
+      - receiver.tcp_connections_refused
       - receiver.percentiles_withheld
     charts:
       - title: StatsD received bytes
@@ -46,6 +47,12 @@ groups:
             name: active
           - selector: receiver.tcp_connections_limit
             name: limit
+      - title: StatsD refused TCP connections
+        context: receiver.tcp_connections_refused
+        units: connections/s
+        dimensions:
+          - selector: receiver.tcp_connections_refused
+            name: refused
       - title: StatsD withheld percentiles
         context: receiver.percentiles_withheld
         units: windows/s

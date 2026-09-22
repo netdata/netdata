@@ -112,9 +112,7 @@ func TestTCPConnectionCapKeepsQuietClients(t *testing.T) {
 	require.NoError(t, refused.SetReadDeadline(time.Now().Add(waitFor)))
 	_, err := refused.Read(make([]byte, 1))
 	require.Error(t, err, "a client beyond the cap is closed")
-	f.waitCounts(t, receiverCounts{
-		rejected: map[rejection]uint64{rejectConnectionLimit: 1},
-	})
+	require.Eventually(t, func() bool { return f.c.diagnostics.tcpRefused.Load() == 1 }, waitFor, time.Millisecond)
 
 	for i, conn := range []net.Conn{first, second} {
 		_, err := fmt.Fprintf(conn, "quiet%d:1|c\n", i)
@@ -122,7 +120,6 @@ func TestTCPConnectionCapKeepsQuietClients(t *testing.T) {
 	}
 	f.waitCounts(t, receiverCounts{
 		accepted: 2,
-		rejected: map[rejection]uint64{rejectConnectionLimit: 1},
 	})
 
 	// A disconnect is routine: it frees a slot and the receiver keeps serving.
@@ -133,12 +130,12 @@ func TestTCPConnectionCapKeepsQuietClients(t *testing.T) {
 	require.NoError(t, err)
 	f.waitCounts(t, receiverCounts{
 		accepted: 3,
-		rejected: map[rejection]uint64{rejectConnectionLimit: 1},
 	})
 	f.collect(t, false, false)
 	value(t, f.c, "c.total.next", 1, nil)
 	value(t, f.c, "receiver.tcp_connections", 2, nil)
 	value(t, f.c, "receiver.tcp_connections_limit", 2, nil)
+	value(t, f.c, "receiver.tcp_connections_refused", 1, nil)
 	select {
 	case err := <-f.done:
 		t.Fatalf("client disconnect ended Run: %v", err)
