@@ -165,6 +165,7 @@ static inline bool check_completed_page_consistency(struct dbengine_collect_hand
         handle->page_flags |= DBENGINE_PAGE_COMPLETED_IN_FUTURE;
 
     VALIDATED_PAGE_DESCRIPTOR vd = validate_page(
+            ctx->engine,
             uuid,
             start_time_s,
             end_time_s,

@@ -816,7 +816,8 @@ typedef struct validated_page_descriptor {
 #define page_entries_by_size(page_length_in_bytes, point_size_in_bytes) \
         ((page_length_in_bytes) / (point_size_in_bytes))
 
-VALIDATED_PAGE_DESCRIPTOR validate_page(nd_uuid_t *uuid,
+VALIDATED_PAGE_DESCRIPTOR validate_page(struct dbengine_engine *engine,
+                                        nd_uuid_t *uuid,
                                         time_t start_time_s,
                                         time_t end_time_s,
                                         uint32_t update_every_s,
@@ -828,7 +829,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(nd_uuid_t *uuid,
                                         bool have_read_error,
                                         const char *msg,
                                         DBENGINE_COLLECT_PAGE_FLAGS flags);
-VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct dbengine_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error);
+VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(struct dbengine_engine *engine, const struct dbengine_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error);
 void collect_page_flags_to_buffer(BUFFER *wb, DBENGINE_COLLECT_PAGE_FLAGS flags);
 
 typedef enum {

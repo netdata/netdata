@@ -827,7 +827,7 @@ static void journalfile_restore_extent_metadata(struct dbengine_tier *ctx, struc
 
         struct dbengine_extent_page_descr *descr = &jf_metric_data->descr[i];
         VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(
-                descr, now_s,
+                ctx->engine, descr, now_s,
                 (metric) ? mrg_metric_get_update_every_s(ctx->engine->main_mrg, metric) : 0,
                 false);
 
