@@ -76,17 +76,20 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 //   public verbs that reject a NULL storage instance - which is exactly when there is no engine to ask - and a
 //   failed protected read of a mapped journal, which libnetdata's own recovery reports.
 //
-//   That recovery is the host's to provide, and it is worth knowing you have it. Reading a mapped journal that
-//   turns out to be truncated or unreadable raises SIGBUS, and the engine survives it only because a signal
-//   handler routes the fault to libnetdata's protected-access check first (nd_initialize_signals() does this for
-//   the daemon). An embedder that installs no such handler does not get a recovered read and a logged fault: it
-//   gets the process, on a damaged file the engine would otherwise have skipped.
+//   That recovery is the host's to provide. Reading a mapped journal that turns out to be truncated or unreadable
+//   raises SIGBUS or SIGSEGV, and the engine survives it only if the process's handler for those signals calls
+//   libnetdata's signal_protected_access_check() first, as the daemon's does (nd_initialize_signals()). With no
+//   such handler the fault terminates the process, on a damaged file the engine would otherwise have skipped.
+//   With one, the report of the recovered fault is libnetdata's and goes to netdata's logger; for some guarded
+//   reads it is the only report there is, so a sink may hear nothing about a journal the engine skipped.
 //
-//   A sink is never handed a pointer into memory the engine is reading under a fault guard, and no line it
-//   receives points into a mapped journal. That is what lets the engine emit while such a guard is armed: the
-//   guard recovers only a fault inside the mapping it registered, so a sink faulting on its own memory is not
-//   diverted into the engine's recovery path. A new emission site must keep it that way - format a value out of
-//   a mapping rather than passing a pointer into one.
+//   The engine does call the sink while such a guard is armed. The guard recovers a fault only at an address
+//   inside the range it registered, so two rules keep a sink out of that recovery, and a new emission site or a
+//   new guarded read must keep both: no line the sink receives points into a mapped journal - a site formats a
+//   value out of a mapping rather than passing a pointer into one - and no guard stays armed over a range the
+//   engine has released, because the release can unmap the journal and whatever later occupies that range could
+//   be the sink's own memory. With both held, a sink that faults on its own memory faults exactly as it would
+//   with no guard armed; it is never diverted into the engine's recovery path.
 //
 //   And some lines are dropped before the sink is reached, by the gate the emitting site has always had: a rate
 //   limited site emits at most once per its own window, a debug site emits only when the matching debug flag is

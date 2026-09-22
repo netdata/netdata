@@ -1218,98 +1218,103 @@ void journalfile_v2_populate_retention_to_mrg(struct dbengine_tier *ctx, struct 
     // Calculate number of samples here and update once the file is loaded
     uint64_t journal_samples = 0;
 
-    // Protect the whole walk -- both the optional CRC check and the mrg update
-    // read into the mmap'd v2 journal. If a backing page cannot be paged in
-    // (file truncated, sparse hole, transient I/O error) the kernel raises
-    // SIGBUS; without a protected region active the process aborts. Same
-    // pattern as journalfile_v2_validate() in journalfile_v2_load().
-    PROTECTED_ACCESS_SETUP(journalfile->mmap.data, journalfile->mmap.size, path_v2, "mrg-load");
-    if(no_signal_received) {
-        // Validate header-controlled offsets against the actual mapping size
-        // BEFORE reading through them. PROTECTED_ACCESS_SETUP only catches
-        // faults whose address falls within [data_start, data_start+mmap.size);
-        // an over-read driven by a corrupted offset past the registered range
-        // would not be recovered and the process would still abort. Out-of-
-        // range offsets are treated as a rebuild trigger (same outcome as a
-        // CRC failure).
-        size_t mmap_size = journalfile->mmap.size;
-        // Order matters: short-circuit on metric_offset > mmap_size first so the
-        // subtraction below cannot underflow, then compare metric_count against
-        // the available slot capacity via division rather than multiplying out
-        // metric_count * sizeof(...), which would wrap size_t on 32-bit builds
-        // and silently pass a malformed header. Only after those two checks is
-        // metric_count * sizeof(...) known to fit in size_t, which lets the
-        // trailer-ordering check below compute the expected trailer offset
-        // safely. The on-disk layout (see journalfile_migrate_to_v2_callback)
-        // places the metric-list trailer immediately after the metric list, so
-        // any deviation indicates a corrupted header that would otherwise let
-        // the CRC compare against bytes inside the metric list itself.
-        if ((size_t)j2_header->metric_offset > mmap_size ||
-            (size_t)j2_header->metric_count > (mmap_size - (size_t)j2_header->metric_offset) / sizeof(struct journal_metric_list) ||
-            (size_t)j2_header->metric_trailer_offset > mmap_size ||
-            mmap_size - (size_t)j2_header->metric_trailer_offset < sizeof(struct journal_v2_block_trailer) ||
-            (size_t)j2_header->metric_trailer_offset != (size_t)j2_header->metric_offset + (size_t)j2_header->metric_count * sizeof(struct journal_metric_list)) {
-            // header offsets out of range -- needs rebuild
-            dbengine_log(ctx->engine, NDLP_ERR,
-                         "DBENGINE: journal v2 \"%s\" has out-of-range header offsets "
-                         "(metric_offset=%u, metric_count=%u, metric_trailer_offset=%u, mmap_size=%zu); "
-                         "marking unavailable for rebuild",
-                         path_v2,
-                         j2_header->metric_offset,
-                         j2_header->metric_count,
-                         j2_header->metric_trailer_offset,
-                         mmap_size);
-            failed = true;
-        }
-        else if (journalfile->v2.flags & JOURNALFILE_FLAG_METRIC_CRC_CHECK) {
-            journalfile->v2.flags &= ~JOURNALFILE_FLAG_METRIC_CRC_CHECK;
-            // Pass the verified mmap_size, not the header-controlled
-            // j2_header->journal_v2_file_size; the helper currently ignores the
-            // size argument (UNUSED) but the value at the call site should
-            // still reflect the trusted bound for clarity and future-proofing.
-            if (journalfile_check_v2_metric_list(ctx->engine, data_start, mmap_size)) {
-                // needs rebuild
+    // The frame gets its own scope so it ends before the release below: the release can unmap the journal, and
+    // a frame still armed over released memory would take a later fault in whatever occupies that range - the
+    // log sink's memory, for one - as a fault of this read.
+    {
+        // Protect the whole walk -- both the optional CRC check and the mrg update
+        // read into the mmap'd v2 journal. If a backing page cannot be paged in
+        // (file truncated, sparse hole, transient I/O error) the kernel raises
+        // SIGBUS; without a protected region active the process aborts. Same
+        // pattern as journalfile_v2_validate() in journalfile_v2_load().
+        PROTECTED_ACCESS_SETUP(journalfile->mmap.data, journalfile->mmap.size, path_v2, "mrg-load");
+        if(no_signal_received) {
+            // Validate header-controlled offsets against the actual mapping size
+            // BEFORE reading through them. PROTECTED_ACCESS_SETUP only catches
+            // faults whose address falls within [data_start, data_start+mmap.size);
+            // an over-read driven by a corrupted offset past the registered range
+            // would not be recovered and the process would still abort. Out-of-
+            // range offsets are treated as a rebuild trigger (same outcome as a
+            // CRC failure).
+            size_t mmap_size = journalfile->mmap.size;
+            // Order matters: short-circuit on metric_offset > mmap_size first so the
+            // subtraction below cannot underflow, then compare metric_count against
+            // the available slot capacity via division rather than multiplying out
+            // metric_count * sizeof(...), which would wrap size_t on 32-bit builds
+            // and silently pass a malformed header. Only after those two checks is
+            // metric_count * sizeof(...) known to fit in size_t, which lets the
+            // trailer-ordering check below compute the expected trailer offset
+            // safely. The on-disk layout (see journalfile_migrate_to_v2_callback)
+            // places the metric-list trailer immediately after the metric list, so
+            // any deviation indicates a corrupted header that would otherwise let
+            // the CRC compare against bytes inside the metric list itself.
+            if ((size_t)j2_header->metric_offset > mmap_size ||
+                (size_t)j2_header->metric_count > (mmap_size - (size_t)j2_header->metric_offset) / sizeof(struct journal_metric_list) ||
+                (size_t)j2_header->metric_trailer_offset > mmap_size ||
+                mmap_size - (size_t)j2_header->metric_trailer_offset < sizeof(struct journal_v2_block_trailer) ||
+                (size_t)j2_header->metric_trailer_offset != (size_t)j2_header->metric_offset + (size_t)j2_header->metric_count * sizeof(struct journal_metric_list)) {
+                // header offsets out of range -- needs rebuild
+                dbengine_log(ctx->engine, NDLP_ERR,
+                             "DBENGINE: journal v2 \"%s\" has out-of-range header offsets "
+                             "(metric_offset=%u, metric_count=%u, metric_trailer_offset=%u, mmap_size=%zu); "
+                             "marking unavailable for rebuild",
+                             path_v2,
+                             j2_header->metric_offset,
+                             j2_header->metric_count,
+                             j2_header->metric_trailer_offset,
+                             mmap_size);
                 failed = true;
             }
-        }
+            else if (journalfile->v2.flags & JOURNALFILE_FLAG_METRIC_CRC_CHECK) {
+                journalfile->v2.flags &= ~JOURNALFILE_FLAG_METRIC_CRC_CHECK;
+                // Pass the verified mmap_size, not the header-controlled
+                // j2_header->journal_v2_file_size; the helper currently ignores the
+                // size argument (UNUSED) but the value at the call site should
+                // still reflect the trusted bound for clarity and future-proofing.
+                if (journalfile_check_v2_metric_list(ctx->engine, data_start, mmap_size)) {
+                    // needs rebuild
+                    failed = true;
+                }
+            }
 
-        if (!failed) {
-            entries = j2_header->metric_count;
-            struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
-            time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
-            global_first_time_s = header_start_time_s;
-            time_t now_s = max_acceptable_collected_time();
-            for (size_t i=0; i < entries; i++) {
-                // Copy uuid out of the mmap onto the stack BEFORE calling mrg.
-                // If a backing page is unreadable, uuid_copy SIGBUSes here and
-                // the protected region recovers cleanly; the mrg call then
-                // never executes. If we passed &metric->uuid into mrg, a
-                // SIGBUS could fire INSIDE mrg while it holds internal locks,
-                // and siglongjmp would skip mrg's unlock paths.
-                nd_uuid_t local_uuid;
-                uuid_copy(local_uuid, metric->uuid);
-                time_t start_time_s = header_start_time_s + metric->delta_start_s;
-                time_t end_time_s = header_start_time_s + metric->delta_end_s;
-                uint32_t update_every_s = metric->update_every_s;
+            if (!failed) {
+                entries = j2_header->metric_count;
+                struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
+                time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
+                global_first_time_s = header_start_time_s;
+                time_t now_s = max_acceptable_collected_time();
+                for (size_t i=0; i < entries; i++) {
+                    // Copy uuid out of the mmap onto the stack BEFORE calling mrg.
+                    // If a backing page is unreadable, uuid_copy SIGBUSes here and
+                    // the protected region recovers cleanly; the mrg call then
+                    // never executes. If we passed &metric->uuid into mrg, a
+                    // SIGBUS could fire INSIDE mrg while it holds internal locks,
+                    // and siglongjmp would skip mrg's unlock paths.
+                    nd_uuid_t local_uuid;
+                    uuid_copy(local_uuid, metric->uuid);
+                    time_t start_time_s = header_start_time_s + metric->delta_start_s;
+                    time_t end_time_s = header_start_time_s + metric->delta_end_s;
+                    uint32_t update_every_s = metric->update_every_s;
 
-                mrg_update_metric_retention_and_granularity_by_uuid(
-                    ctx->engine->main_mrg,
-                    (Word_t)ctx,
-                    &local_uuid,
-                    start_time_s,
-                    end_time_s,
-                    update_every_s,
-                    now_s,
-                    &journal_samples);
+                    mrg_update_metric_retention_and_granularity_by_uuid(
+                        ctx->engine->main_mrg,
+                        (Word_t)ctx,
+                        &local_uuid,
+                        start_time_s,
+                        end_time_s,
+                        update_every_s,
+                        now_s,
+                        &journal_samples);
 
-                metric++;
+                    metric++;
+                }
             }
         }
-    }
-    else {
-        // SIGBUS/SIGSEGV inside the mmap walk. The PROTECTED_ACCESS_SETUP
-        // macro already rate-limits the error log.
-        failed = true;
+        else {
+            // SIGBUS/SIGSEGV inside the mmap walk. The PROTECTED_ACCESS_SETUP
+            // macro already rate-limits the error log.
+            failed = true;
+        }
     }
 
     if (unlikely(failed)) {
@@ -1836,11 +1841,14 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
                 "DBENGINE: tier %d: migrated " WALFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 ", %s",
                 ctx->config.tier, datafile->tier, datafile->fileno, size_for_humans);
 
+            // said before journalfile_v2_data_set() rather than after it: that call unmaps this mapping while the
+            // frame above is still armed over it, and nothing may reach the log sink in that state
+            dbengine_internal_error(ctx->engine,
+                true, "DBENGINE: ACTIVATING NEW INDEX JNL %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
+
             // msync(data_start, total_file_size, MS_SYNC);
             journalfile_v2_data_set(journalfile, fd_v2, data_start, total_file_size);
 
-            dbengine_internal_error(ctx->engine,
-                true, "DBENGINE: ACTIVATING NEW INDEX JNL %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
             ctx_current_disk_space_increase(ctx, total_file_size);
             freez(uuid_list);
             return true;
