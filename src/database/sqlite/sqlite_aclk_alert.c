@@ -186,7 +186,8 @@ done:
 }
 
 #define SQL_DELETE_QUEUE_ALERT_TO_CLOUD                                                                                \
-    "DELETE FROM aclk_queue WHERE host_id = @host_id AND sequence_id = @sequence_id AND unique_id = @unique_id"
+    "DELETE FROM aclk_queue WHERE host_id = @host_id AND sequence_id = @sequence_id AND unique_id = @unique_id"        \
+    " RETURNING sequence_id"
 
 //
 // Remove one alert from the submit queue, after that transition was sent to the cloud.
@@ -200,11 +201,15 @@ done:
 // The caller owns the statement: this runs once per row sent, and re-preparing it each time would take
 // the global sqlite_spinlock in simple_prepare_statement() - and a full SQL parse - up to
 // ACLK_MAX_ALERT_UPDATES times per host per tick, on a lock every web, API and metadata thread contends on.
-static int delete_alert_from_submit_queue(nd_uuid_t *host_id, int64_t sequence_id, int64_t unique_id, sqlite3_stmt **res)
+// Returns true when the row was actually removed. A false means the row was re-pointed after we read it - the
+// guard did its job and the newer transition is still queued, which the caller must not mistake for "done".
+static bool delete_alert_from_submit_queue(nd_uuid_t *host_id, int64_t sequence_id, int64_t unique_id, sqlite3_stmt **res)
 {
+    bool deleted = false;
+
     if (!*res) {
         if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_QUEUE_ALERT_TO_CLOUD, res))
-            return -1;
+            return false;
     }
 
     int param = 0;
@@ -213,14 +218,17 @@ static int delete_alert_from_submit_queue(nd_uuid_t *host_id, int64_t sequence_i
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(*res, ++param, unique_id));
 
     param = 0;
+    // RETURNING: one row back means this exact transition was consumed, none means it was re-pointed
     int rc = sqlite3_step_monitored(*res);
-    if (rc != SQLITE_DONE)
+    if (rc == SQLITE_ROW)
+        deleted = true;
+    else if (rc != SQLITE_DONE)
         error_report("Failed to delete submitted to ACLK");
 
 done:
     REPORT_BIND_FAIL(*res, param);
     SQLITE_RESET(*res);
-    return 0;
+    return deleted;
 }
 
 int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
@@ -349,10 +357,12 @@ static bool commit_alert_events(RRDHOST *host)
     int64_t consumed_uid[ACLK_MAX_ALERT_UPDATES_N];
     size_t consumed;
     int passes = 0;
+    bool missed_delete = false;
 
     param = 0;
     do {
         consumed = 0;
+        missed_delete = false;
 
         while (sqlite3_step_monitored(res) == SQLITE_ROW) {
 
@@ -377,13 +387,17 @@ static bool commit_alert_events(RRDHOST *host)
 
         // same guard as the push path: consume exactly the transitions we committed
         for (size_t i = 0; i < consumed; i++)
-            delete_alert_from_submit_queue(&host->host_id.uuid, consumed_seq[i], consumed_uid[i], &res_delete);
+            if (!delete_alert_from_submit_queue(&host->host_id.uuid, consumed_seq[i], consumed_uid[i], &res_delete))
+                missed_delete = true;
 
         // A row re-pointed during the pass fails its guarded delete by design and stays queued, so a pass can
         // come back full without making progress. That resolves itself - the next pass sees the newer
         // transition and consumes that - but do not spin the ACLK worker on it: stop after a bounded number of
         // passes and let the next tick continue, exactly as the push path does.
-        more_queued = (consumed == ACLK_MAX_ALERT_UPDATES_N);
+        // A full batch means there is more to read. A delete that matched nothing means a row we just
+        // committed was re-pointed mid-pass and is still queued - both are remaining work, and on the
+        // non-streaming path nothing but our return value will re-arm this host.
+        more_queued = (consumed == ACLK_MAX_ALERT_UPDATES_N) || missed_delete;
 
     } while (more_queued && ++passes < ACLK_COMMIT_MAX_PASSES);
 
@@ -588,7 +602,7 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
         last_seq = alarm_log.sequence_id;
 
         // The statement to set the version will be compiled once and reset when done
-        // out caller will finalize the statement to release resources
+        // our caller will finalize the statement to release resources
         //
         // Ordered version-then-delete on purpose: cloud_status_matches() reads alert_version, so until it is
         // updated a concurrent insert still sees the pre-send status. Deleting first would widen that window.
@@ -625,7 +639,8 @@ done:
 
     // the cursor is closed now, so these cannot perturb it
     for (size_t i = 0; i < consumed; i++)
-        delete_alert_from_submit_queue(&host->host_id.uuid, consumed_seq[i], consumed_uid[i], res_delete);
+        if (!delete_alert_from_submit_queue(&host->host_id.uuid, consumed_seq[i], consumed_uid[i], res_delete))
+            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 }
 
 // The unique_id guard is what makes this safe against the same re-pointing the submit queue does:
@@ -858,7 +873,11 @@ void aclk_push_alert_events_for_all_hosts(void)
 
         // A failed reap must not buy the failure an hour of silence. Retry sooner instead - but not on the
         // next tick: this worker runs every second, and a persistently failing reap would then hammer db_meta.
-        if (next_s && aclk_queue_reap_unsendable(ACLK_QUEUE_REAP_AGE_S) < 0)
+        //
+        // This runs on the first deadline too. Skipping the first pass bought nothing: what keeps the reaper
+        // off a row that is merely waiting for connectivity is the age guard and the unjoinable predicate, not
+        // the pass number - so rows left unsendable by a previous run had to wait an hour for no reason.
+        if (aclk_queue_reap_unsendable(ACLK_QUEUE_REAP_AGE_S) < 0)
             again_in_s = ACLK_QUEUE_REAP_RETRY_S;
 
         __atomic_store_n(&next_reap_s, nd_time_t_add_saturating(now_s, again_in_s), __ATOMIC_RELAXED);
