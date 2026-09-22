@@ -861,7 +861,8 @@ void ml_dimension_finalize_constant_state(ml_dimension_t *dim)
     dim->suppression_window_counter = 0;
 }
 
-static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, uint32_t expected_generation, bool from_downstream)
+static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, const ml_kmeans_t *km,
+                                       uint32_t expected_generation, bool from_downstream)
 {
     worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
 
@@ -891,24 +892,24 @@ static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim,
         if (dim->km_contexts.empty())
             dim->km_contexts.reserve(Cfg.num_models_to_use);
 
-        dim->km_contexts.emplace_back(dim->kmeans);
+        dim->km_contexts.emplace_back(*km);
     } else {
         bool can_drop_middle_km = false;
 
         if (Cfg.num_models_to_use > 2) {
             const ml_kmeans_inlined_t *old_km = &dim->km_contexts[dim->km_contexts.size() - 1];
             const ml_kmeans_inlined_t *middle_km = &dim->km_contexts[dim->km_contexts.size() - 2];
-            const ml_kmeans_t *new_km = &dim->kmeans;
+            const ml_kmeans_t *new_km = km;
 
             can_drop_middle_km = (middle_km->after < old_km->before) &&
                                  (middle_km->before > new_km->after);
         }
 
         if (can_drop_middle_km) {
-            dim->km_contexts.back() = dim->kmeans;
+            dim->km_contexts.back() = *km;
         } else {
             std::rotate(std::begin(dim->km_contexts), std::begin(dim->km_contexts) + 1, std::end(dim->km_contexts));
-            dim->km_contexts[dim->km_contexts.size() - 1] = dim->kmeans;
+            dim->km_contexts[dim->km_contexts.size() - 1] = *km;
         }
     }
 
@@ -1011,9 +1012,9 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
             return ML_WORKER_RESULT_NOT_ENOUGH_COLLECTED_VALUES;
         }
 
-        ml_kmeans_init(&dim->kmeans);
+        ml_kmeans_init(&worker->kmeans_scratch);
         try {
-            ml_kmeans_train(&dim->kmeans, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
+            ml_kmeans_train(&worker->kmeans_scratch, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
         }
         catch (const dlib::error &e) {
             // dlib (kmeans/matrix) can throw dlib::fatal_error (and other
@@ -1036,7 +1037,7 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
     }
 
     // update models
-    (void) ml_dimension_update_models(worker, dim, generation, /*from_downstream=*/false);
+    (void) ml_dimension_update_models(worker, dim, &worker->kmeans_scratch, generation, /*from_downstream=*/false);
 
     return worker_result;
 }
@@ -1054,7 +1055,7 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
 
     // Don't treat values that don't exist as anomalous
     if (!exists) {
-        dim->cns.clear();
+        dim->cns_count = 0;
         dim->cns_head = 0;
         spinlock_unlock(&dim->slock);
         return false;
@@ -1064,7 +1065,11 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     size_t smoothing_window = ml_dimension_smoothing_window(dim);
     unsigned n = Cfg.diff_n + smoothing_window + Cfg.lag_n;
 
-    size_t cns_size = dim->cns.size();
+    fatal_assert(n <= ML_DIMENSION_MAX_CNS &&
+                 "Prediction history ring too small. This should not be possible with the "
+                 "default clamping of feature extraction options (ml_config.cc:173-175)");
+
+    size_t cns_size = dim->cns_count;
 
     // The ring buffer modulus is derived from the current effective smoothing
     // window. When the effective window changes, the existing history is only
@@ -1075,13 +1080,15 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     bool size_changed_with_wrapped_state = (cns_size != n && dim->cns_head != 0);
     bool shrunk_below_existing_history = (cns_size > n);
     if (invalid_head || size_changed_with_wrapped_state || shrunk_below_existing_history) {
-        dim->cns.clear();
+        dim->cns_count = 0;
         dim->cns_head = 0;
         cns_size = 0;
     }
 
     if (cns_size < n) {
-        dim->cns.push_back(value);
+        // Warmup. cns_head is still 0 until the ring first fills, so appending
+        // at cns_count is exactly what push_back() did on the vector.
+        dim->cns[dim->cns_count++] = value;
         spinlock_unlock(&dim->slock);
         return false;
     }
@@ -1106,7 +1113,7 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     size_t newest_idx = (dim->cns_head + n - 1) % n;
     bool same_value = (dim->cns[newest_idx] == value);
     dim->cns[dim->cns_head] = value;
-    dim->cns_head = (dim->cns_head + 1) % n;
+    dim->cns_head = (uint8_t)((dim->cns_head + 1) % n);
 
     // Create the sample
     calculated_number_t src_cns[128];
@@ -1118,16 +1125,20 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
                  "This should not be possible with the default clamping of feature extraction options");
 
     size_t first_chunk = n - dim->cns_head;
-    memcpy(src_cns, dim->cns.data() + dim->cns_head, first_chunk * sizeof(calculated_number_t));
+    memcpy(src_cns, dim->cns + dim->cns_head, first_chunk * sizeof(calculated_number_t));
     if (dim->cns_head)
-        memcpy(src_cns + first_chunk, dim->cns.data(), dim->cns_head * sizeof(calculated_number_t));
+        memcpy(src_cns + first_chunk, dim->cns, dim->cns_head * sizeof(calculated_number_t));
     memcpy(dst_cns, src_cns, n * sizeof(calculated_number_t));
 
     ml_features_t features = {
         Cfg.diff_n, smoothing_window, Cfg.lag_n,
         dst_cns, n, src_cns, n
     };
-    ml_features_preprocess_predict(&features, dim->feature);
+    // The feature vector is live only inside this call (built here, consumed by
+    // the scoring loop below), so it is a local. It used to be a 48-byte member
+    // of every ml_dimension_t.
+    DSample feature;
+    ml_features_preprocess_predict(&features, feature);
 
     // Mark the metric time as variable if we received different values
     if (!same_value)
@@ -1151,7 +1162,7 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     for (const auto &km_ctx : dim->km_contexts) {
         models_consulted++;
 
-        calculated_number_t anomaly_score = ml_kmeans_anomaly_score(&km_ctx, dim->feature);
+        calculated_number_t anomaly_score = ml_kmeans_anomaly_score(&km_ctx, feature);
         if (std::isnan(anomaly_score))
             continue;
 
@@ -1187,7 +1198,7 @@ ml_chart_is_available_for_ml(ml_chart_t *chart)
     return rrdset_is_available_for_exporting_and_alarms(chart->rs);
 }
 
-static void ml_chart_stats_add(ml_machine_learning_stats_t *dst, const ml_machine_learning_stats_t &src)
+void ml_chart_stats_add(ml_machine_learning_stats_t *dst, const ml_machine_learning_stats_t &src)
 {
     dst->num_machine_learning_status_enabled += src.num_machine_learning_status_enabled;
     dst->num_machine_learning_status_disabled_sp += src.num_machine_learning_status_disabled_sp;
@@ -1200,6 +1211,7 @@ static void ml_chart_stats_add(ml_machine_learning_stats_t *dst, const ml_machin
     dst->num_training_status_trained += src.num_training_status_trained;
     dst->num_training_status_pending_with_model += src.num_training_status_pending_with_model;
     dst->num_training_status_silenced += src.num_training_status_silenced;
+    dst->num_dimensions_with_models += src.num_dimensions_with_models;
 
     dst->num_anomalous_dimensions += src.num_anomalous_dimensions;
     dst->num_normal_dimensions += src.num_normal_dimensions;
@@ -1228,9 +1240,13 @@ ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomal
     enum ml_machine_learning_status mls = dim->mls;
     enum ml_metric_type mt = dim->mt;
     enum ml_training_status ts = dim->ts;
+    bool has_models = !dim->km_contexts.empty();
     spinlock_unlock(&dim->slock);
 
     ml_machine_learning_stats_t delta = {};
+
+    if (has_models)
+        delta.num_dimensions_with_models++;
 
     switch (mls) {
         case MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART:
@@ -1318,20 +1334,11 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
 
             ml_machine_learning_stats_t chart_mls = ml_chart_get_stats(chart);
 
-            host_mls.num_machine_learning_status_enabled += chart_mls.num_machine_learning_status_enabled;
-            host_mls.num_machine_learning_status_disabled_sp += chart_mls.num_machine_learning_status_disabled_sp;
-
-            host_mls.num_metric_type_constant += chart_mls.num_metric_type_constant;
-            host_mls.num_metric_type_variable += chart_mls.num_metric_type_variable;
-
-            host_mls.num_training_status_untrained += chart_mls.num_training_status_untrained;
-            host_mls.num_training_status_pending_without_model += chart_mls.num_training_status_pending_without_model;
-            host_mls.num_training_status_trained += chart_mls.num_training_status_trained;
-            host_mls.num_training_status_pending_with_model += chart_mls.num_training_status_pending_with_model;
-            host_mls.num_training_status_silenced += chart_mls.num_training_status_silenced;
-
-            host_mls.num_anomalous_dimensions += chart_mls.num_anomalous_dimensions;
-            host_mls.num_normal_dimensions += chart_mls.num_normal_dimensions;
+            // Roll the chart's counters into the host's through the same
+            // helper the dimension->chart step uses. This was a hand-rolled
+            // copy of ml_chart_stats_add()'s field list, and a field added to
+            // one enumeration but not the other silently published as zero.
+            ml_chart_stats_add(&host_mls, chart_mls);
 
             if (spinlock_trylock(&host->context_anomaly_rate_spinlock))
             {
@@ -1584,6 +1591,13 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
     // Reject models that are not newer than the newest accepted model. This
     // prevents an older model from being re-accepted after it has been evicted
     // from km_contexts and later loops back from downstream.
+    //
+    // This check does NOT depend on models persisted before a restart, which is
+    // why ml_dimension_new() may skip loading them for ML-excluded dimensions
+    // (see the comment there). Models are emitted only on install --
+    // ml_dimension_stream_kmeans() has a single caller, below -- and are never
+    // replayed on stream connect, so an arriving model is always newer than any
+    // pre-restart persisted model and would never have been rejected here.
     if (!Dim->km_contexts.empty()) {
         const auto &latest_km = Dim->km_contexts.back();
         if (req.inlined_km.before <= latest_km.before) {
@@ -1600,15 +1614,16 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
         return ML_WORKER_RESULT_OK;
     }
 
-    // Stage the incoming kmeans into the dim's working buffer; the actual
-    // install into km_contexts and the has_received_downstream_model flag-set
-    // happen inside ml_dimension_update_models() under the same slock as the
-    // publish-check, so a concurrent ml_host_stop() either commits both or
-    // cancels both.
-    Dim->kmeans = req.inlined_km;
     uint32_t generation = Dim->reset_generation;
     spinlock_unlock(&Dim->slock);
-    if (ml_dimension_update_models(worker, Dim, generation, /*from_downstream=*/true))
+
+    // Stage the incoming kmeans into the WORKER's scratch, not the dimension.
+    // The install into km_contexts and the has_received_downstream_model
+    // flag-set still happen inside ml_dimension_update_models() under the same
+    // slock as the publish-check, so a concurrent ml_host_stop() either commits
+    // both or cancels both. Staging is now worker-local, so it needs no lock.
+    worker->kmeans_scratch = req.inlined_km;
+    if (ml_dimension_update_models(worker, Dim, &worker->kmeans_scratch, generation, /*from_downstream=*/true))
         pulse_ml_models_received();
 
     return ML_WORKER_RESULT_OK;

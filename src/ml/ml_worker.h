@@ -22,6 +22,14 @@ typedef struct {
     calculated_number_t *scratch_training_cns;
     std::vector<DSample> training_samples;
 
+    // Scratch k-means model, staged here and then installed into the
+    // dimension's km_contexts by ml_dimension_update_models(). It used to live
+    // in every ml_dimension_t, where it cost 56 bytes inline plus a 96-byte
+    // cluster_centers allocation per dimension - for state that is only live
+    // between staging and install. A worker processes one request at a time,
+    // so one scratch per worker is enough.
+    ml_kmeans_t kmeans_scratch;
+
     std::vector<ml_model_info_t> pending_model_info;
 
     // Reusable buffers for streaming kmeans models
