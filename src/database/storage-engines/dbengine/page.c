@@ -586,6 +586,13 @@ ALWAYS_INLINE void dbengine_extent_free(void *extent, size_t size) {
 // ----------------------------------------------------------------------------
 // management api
 
+// The log calls from here down stay on netdata's logger rather than going through dbengine-log.h, and that is
+// deliberate: a page has no engine. This layer is process-wide, shared by every engine in the process, and these
+// sites are handed a PGD or a page type - reaching an engine from them would mean a parameter on pgd_free(),
+// pgdc_get_next_point() and their neighbours, for arms that fire only on a page the engine could not have made.
+// pgd_init_arals() is the exception, and it takes one. dbengine-config.h's contract tells an embedder that these
+// lines do not reach its sink.
+
 ALWAYS_INLINE PGD *pgd_create(uint8_t type, uint32_t slots) {
 
     PGD *pg = pgd_alloc(true); // this is malloc'd !
