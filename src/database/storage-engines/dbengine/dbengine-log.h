@@ -52,13 +52,8 @@ void dbengine_log_emit(struct dbengine_engine *engine, ND_LOG_FIELD_PRIORITY pri
                        const char *file, const char *function, unsigned long line,
                        const char *fmt, ...) PRINTFLIKE(6, 7);
 
-// the same, rate limited per call site, for the sink arm of dbengine_log_limit(). It carries dbengine's own copy of
-// libnetdata's gate (nd_log.c, netdata_logger_with_limit) because the engine may not edit libnetdata in this
-// change; it operates on the very same public ERROR_LIMIT objects the call sites already declare, so a site's
-// throttling state is one object whichever arm runs. Three deliberate differences from the original, two of them
-// forced: it cannot see nd_log's single-threaded-child elision, so it always takes the spinlock, and it applies no
-// priority pre-filter, because filtering is the sink's job. The third is a choice - it restores errno on every
-// path out, which libnetdata's does not, because the sink contract promises it
+// the same, rate limited per call site, for the sink arm of dbengine_log_limit(): libnetdata's own per-site gate over
+// the site's own ERROR_LIMIT, with no priority filter in front of it (filtering is the sink's job)
 void dbengine_log_emit_limit(struct dbengine_engine *engine, ERROR_LIMIT *erl, ND_LOG_FIELD_PRIORITY priority,
                              const char *file, const char *function, unsigned long line,
                              const char *fmt, ...) PRINTFLIKE(7, 8);

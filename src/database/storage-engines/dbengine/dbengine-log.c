@@ -31,44 +31,26 @@ void dbengine_log_emit(struct dbengine_engine *engine, ND_LOG_FIELD_PRIORITY pri
     va_end(ap);
 }
 
-// The rate limiter, step for step as libnetdata's netdata_logger_with_limit() runs it (nd_log.c): sleep if the
-// site asks for one, count the attempt under the site's spinlock, drop it when the site logged too recently, and
-// only on a line that is emitted move the window and reset the count. The ERROR_LIMIT is the site's own object -
-// the same one the no-sink arm hands to libnetdata - so a site that switches arms carries its state across.
-//
-// It differs from the original in three ways. Two are forced (dbengine-log.h says why): no single-threaded-child
-// lock elision, and no priority pre-filter. The third is deliberate: libnetdata captures errno only to annotate
-// the line and leaves it cleared once the line is written, while this restores it on every path out, because the
-// sink contract promises a caller that its errno survives an engine verb. What it does not carry over is
-// libnetdata's Windows GetLastError() capture: the contract promises errno and nothing else. The sleep is kept
-// although every dbengine call site declares sleep_ut 0, so a site that ever sets one behaves as it would have
-// on the old path.
+// The rate limiter is libnetdata's own gate (nd_log_limit_admit() / nd_log_limit_emitted(), which
+// netdata_logger_with_limit() runs too), over the site's own ERROR_LIMIT - the object the no-sink arm hands to
+// libnetdata - so a site's window is one object whichever arm runs. Unlike the logger it applies no priority filter
+// first, because filtering is the sink's job, and it restores errno on every path out.
 void dbengine_log_emit_limit(struct dbengine_engine *engine, ERROR_LIMIT *erl, ND_LOG_FIELD_PRIORITY priority,
                              const char *file, const char *function, unsigned long line,
                              const char *fmt, ...) {
-    // captured here, where netdata_logger_with_limit() captures it: the sleep and the lock below can both set it
+    // captured before the gate, as netdata_logger_with_limit() captures it: its sleep and its lock can both clear it
     int saved_errno = errno;
 
-    if(erl->sleep_ut)
-        sleep_usec(erl->sleep_ut);
-
-    spinlock_lock(&erl->spinlock);
-
-    erl->count++;
-    time_t now = now_boottime_sec();
-    if(now - erl->last_logged < erl->log_every) {
-        spinlock_unlock(&erl->spinlock);
+    time_t now;
+    if(!nd_log_limit_admit(erl, &now)) {
         errno = saved_errno;
         return;
     }
-
-    spinlock_unlock(&erl->spinlock);
 
     va_list ap;
     va_start(ap, fmt);
     dbengine_log_to_sink(engine, priority, file, function, line, fmt, ap, saved_errno);
     va_end(ap);
 
-    erl->last_logged = now;
-    erl->count = 0;
+    nd_log_limit_emitted(erl, now);
 }

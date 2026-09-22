@@ -164,6 +164,12 @@ typedef struct error_with_limit {
 #define nd_log_limit_static_global_var(var, log_every_secs, sleep_usecs) static ERROR_LIMIT var = { .spinlock = SPINLOCK_INITIALIZER, .log_every = (log_every_secs), .count = 0, .last_logged = 0, .sleep_ut = (sleep_usecs) }
 #define nd_log_limit_static_thread_var(var, log_every_secs, sleep_usecs) static __thread ERROR_LIMIT var = { .last_logged = 0, .count = 0, .log_every = (log_every_secs), .sleep_ut = (sleep_usecs) }
 void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const char *file, const char *function, unsigned long line, const char *fmt, ... ) PRINTFLIKE(7, 8);
+
+// The per-call-site gate netdata_logger_with_limit() runs, for a caller that writes the line itself (dbengine's log
+// sink): nd_log_limit_admit() counts the attempt and says whether the site's window lets it through, setting *now for
+// the nd_log_limit_emitted() that records the line was written.
+bool nd_log_limit_admit(ERROR_LIMIT *erl, time_t *now);
+void nd_log_limit_emitted(ERROR_LIMIT *erl, time_t now);
 #define nd_log_limit(erl, NDLS, NDLP, args...)   netdata_logger_with_limit(erl, NDLS, NDLP, __FILE__, __FUNCTION__, __LINE__, ##args)
 
 // ----------------------------------------------------------------------------
