@@ -516,28 +516,9 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct dbengine_tier 
 
         char file_path[DBENGINE_PATH_MAX];
         journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
-        // What the guarded read below found, reported after its frame is gone rather than under it.
-        // Not because a sink could be siglongjmped out of: the handler jumps only when the faulting address is
-        // inside the registered mapping (protected-access.c, signal_protected_access_check), and no line the
-        // engine emits hands the sink a pointer into it. The reason is the one the comment above
-        // update_metrics_first_time_s() already gives for scoping a frame tightly - a frame that stays armed
-        // across the reporting, the releases and any nested protected read covers memory this code is no longer
-        // walking, so an unrelated fault in that range is silently recovered as this read's SIGBUS, and the
-        // nesting depth (capped at 8, fatal past it) is held longer than it needs to be.
-        //
-        // The carriers are volatile for the reason rrdengine.c update_metrics_first_time_s() gives for
-        // journal_access_failed: a value changed between the sigsetjmp and a siglongjmp is indeterminate after
-        // the jump unless it is volatile, and whether any write here is followed by a mapped read that could
-        // jump is a property of today's control flow rather than of the declaration.
-        enum {
-            JV2_NO_PROBLEM = 0,
-            JV2_METRIC_LIST_OVERFLOWS_FILE,
-            JV2_PAGE_LIST_HEADER_INVALID,
-            JV2_PAGE_LIST_OVERFLOWS_FILE,
-            JV2_EXTENT_INDEX_INVALID,
-            JV2_JOURNAL_FAULTED,
-        } volatile problem = JV2_NO_PROBLEM;
-        volatile size_t problem_metric_offset = 0, problem_list_size = 0, problem_file_size = 0;
+        // The frame gets its own scope so it ends before release_journal: the release there can unmap the
+        // journal, and a frame still armed over released memory would take a later fault in that range as a
+        // fault of this read.
         {
             PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "read");
             if(no_signal_received) {
@@ -555,10 +536,10 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct dbengine_tier 
                 if (__builtin_mul_overflow(journal_metric_count, sizeof(*uuid_list), &metric_list_size) ||
                     metric_offset > journal_v2_file_size ||
                     metric_list_size > journal_v2_file_size - metric_offset) {
-                    problem = JV2_METRIC_LIST_OVERFLOWS_FILE;
-                    problem_metric_offset = metric_offset;
-                    problem_list_size = metric_list_size;
-                    problem_file_size = journal_v2_file_size;
+                    nd_log_limit_static_thread_var(erl, 60, 0);
+                    dbengine_log_limit(ctx->engine, &erl, NDLP_ERR,
+                                       "DBENGINE: Metric list exceeds journal file size in journalfile %u of tier %u (metric_offset=%zu, list_size=%zu, file_size=%zu)",
+                                       datafile->fileno, datafile->tier, metric_offset, metric_list_size, journal_v2_file_size);
                     goto release_journal;
                 }
 
@@ -574,7 +555,10 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct dbengine_tier 
                     (struct journal_page_header *)((uint8_t *)j2_header + uuid_entry->page_offset);
                 size_t page_offset = (uint8_t *)page_list_header - (uint8_t *)j2_header;
                 if (page_offset > journal_v2_file_size - sizeof(*page_list_header)) {
-                    problem = JV2_PAGE_LIST_HEADER_INVALID;
+                    nd_log_limit_static_thread_var(erl, 60, 0);
+                    dbengine_log_limit(ctx->engine, &erl, NDLP_ERR,
+                                       "DBENGINE: Invalid page list header in journalfile %u of tier %u",
+                                       datafile->fileno, datafile->tier);
                     goto release_journal;
                 }
 
@@ -588,7 +572,10 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct dbengine_tier 
 
                 if (__builtin_mul_overflow((size_t)uuid_page_entries, sizeof(*page_list), &page_list_size) ||
                     page_list_size > journal_v2_file_size - page_offset - sizeof(*page_list_header)) {
-                    problem = JV2_PAGE_LIST_OVERFLOWS_FILE;
+                    nd_log_limit_static_thread_var(erl, 60, 0);
+                    dbengine_log_limit(ctx->engine, &erl, NDLP_ERR,
+                                       "DBENGINE: Page list exceeds journal file size in journalfile %u of tier %u",
+                                       datafile->fileno, datafile->tier);
                     goto release_journal;
                 }
 
@@ -610,7 +597,10 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct dbengine_tier 
                     // Make sure index is valid for this file
                     uint32_t extent_index = page_entry_in_journal->extent_index;
                     if (extent_index >= extent_entries) {
-                        problem = JV2_EXTENT_INDEX_INVALID;
+                        nd_log_limit_static_thread_var(erl, 60, 0);
+                        dbengine_log_limit(ctx->engine, &erl, NDLP_ERR,
+                                           "DBENGINE: Invalid extent index in journalfile %u",
+                                           datafile->fileno);
                         break;
                     }
 
@@ -656,57 +646,13 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct dbengine_tier 
                     }
                 }
             }
-            else
-                problem = JV2_JOURNAL_FAULTED;
+            else {
+                nd_log_limit_static_thread_var(erl, 10, 0);
+                dbengine_log_limit(ctx->engine, &erl, NDLP_ERR, "DBENGINE: failed to access journal file %u of tier %d (SIGBUS)",
+                                   datafile->fileno, datafile->ctx->config.tier);
+            }
         }
 release_journal:
-
-        switch(problem) {
-            case JV2_METRIC_LIST_OVERFLOWS_FILE: {
-                nd_log_limit_static_thread_var(erl, 60, 0);
-                dbengine_log_limit(
-                    ctx->engine, &erl, NDLP_ERR,
-                    "DBENGINE: Metric list exceeds journal file size in journalfile %u of tier %u (metric_offset=%zu, list_size=%zu, file_size=%zu)",
-                    datafile->fileno, datafile->tier, problem_metric_offset, problem_list_size, problem_file_size);
-                break;
-            }
-
-            case JV2_PAGE_LIST_HEADER_INVALID: {
-                nd_log_limit_static_thread_var(erl, 60, 0);
-                dbengine_log_limit(ctx->engine, &erl, NDLP_ERR,
-                                   "DBENGINE: Invalid page list header in journalfile %u of tier %u",
-                                   datafile->fileno, datafile->tier);
-                break;
-            }
-
-            case JV2_PAGE_LIST_OVERFLOWS_FILE: {
-                nd_log_limit_static_thread_var(erl, 60, 0);
-                dbengine_log_limit(ctx->engine, &erl, NDLP_ERR,
-                                   "DBENGINE: Page list exceeds journal file size in journalfile %u of tier %u",
-                                   datafile->fileno, datafile->tier);
-                break;
-            }
-
-            case JV2_EXTENT_INDEX_INVALID: {
-                nd_log_limit_static_thread_var(erl, 60, 0);
-                dbengine_log_limit(ctx->engine, &erl, NDLP_ERR,
-                                   "DBENGINE: Invalid extent index in journalfile %u",
-                                   datafile->fileno);
-                break;
-            }
-
-            case JV2_JOURNAL_FAULTED: {
-                nd_log_limit_static_thread_var(erl, 10, 0);
-                dbengine_log_limit(ctx->engine, &erl, NDLP_ERR,
-                                   "DBENGINE: failed to access journal file %u of tier %d (SIGBUS)",
-                                   datafile->fileno, datafile->ctx->config.tier);
-                break;
-            }
-
-            case JV2_NO_PROBLEM:
-                break;
-        }
-
         journalfile_v2_data_release(datafile->journalfile);
         datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
     }

@@ -1288,11 +1288,11 @@ static time_t find_uuid_first_time(
     volatile size_t binary_match = 0;
     volatile size_t not_matching_bsearches = 0;
 
-    // agent_shutdown here, and any_matching and journal_access_failed in the loop, are written inside the guarded
-    // block below and read after it, so they are volatile for the same reason as the carriers there. The other
-    // two leave the block right after their write; any_matching does not - the walk keeps reading the mapping
-    // after setting it, so without volatile its value would be indeterminate on the recovery path, and only the
-    // journal_access_failed check below would stand between that value and the read after the block
+    // Written inside the guarded block below and read after it. any_matching is the one a jump can actually
+    // leave indeterminate - the walk keeps reading the mapping after setting it - and only the
+    // journal_access_failed check below keeps that value from being read. agent_shutdown and
+    // journal_access_failed are set just before the walk stops, or after the jump; they are marked so the three
+    // read alike, which also clears gcc's -Wclobbered on any_matching and journal_access_failed.
     volatile bool agent_shutdown = false;
     while (datafile) {
         size_t journal_v2_file_size = 0;
@@ -1308,29 +1308,9 @@ static time_t find_uuid_first_time(
 
         char file_path[DBENGINE_PATH_MAX];
         journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
-        // What the guarded read below found, reported after its frame is gone rather than under it.
-        // Not because a sink could be siglongjmped out of: the handler jumps only when the faulting address is
-        // inside the registered mapping (protected-access.c, signal_protected_access_check), and no line the
-        // engine emits hands the sink a pointer into it. The reason is the one the comment above
-        // update_metrics_first_time_s() already gives for scoping a frame tightly - a frame that stays armed
-        // across the reporting, the releases and any nested protected read covers memory this code is no longer
-        // walking, so an unrelated fault in that range is silently recovered as this read's SIGBUS, and the
-        // nesting depth (capped at 8, fatal past it) is held longer than it needs to be.
-        //
-        // The frame here had no inner scope at all, so it gains the one update_metrics_first_time_s() below
-        // already has.
-        //
-        // The carriers are volatile for the reason that function gives for journal_access_failed: a value
-        // changed between the sigsetjmp and a siglongjmp is indeterminate after the jump unless it is volatile,
-        // and whether any write here is followed by a mapped read that could jump is a property of today's
-        // control flow rather than of the declaration.
-        enum {
-            JV2_NO_PROBLEM = 0,
-            JV2_METRIC_LIST_SIZE_OVERFLOWS,
-            JV2_METRIC_LIST_OVERFLOWS_FILE,
-        } volatile problem = JV2_NO_PROBLEM;
-        volatile size_t problem_metric_count = 0, problem_metric_offset = 0, problem_list_size = 0,
-                        problem_file_size = 0;
+        // The frame gets its own scope so it ends before release_journal: the release there can unmap the
+        // journal, and a frame still armed over released memory would take a later fault in that range as a
+        // fault of this read.
         {
             PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "read");
             if (no_signal_received) {
@@ -1346,17 +1326,19 @@ static time_t find_uuid_first_time(
                 size_t journal_metric_count = j2_header->metric_count;
                 size_t metric_list_size;
                 if (__builtin_mul_overflow(journal_metric_count, sizeof(struct journal_metric_list), &metric_list_size)) {
-                    problem = JV2_METRIC_LIST_SIZE_OVERFLOWS;
-                    problem_metric_count = journal_metric_count;
+                    dbengine_log(ctx->engine, NDLP_ERR,
+                                 "DBENGINE: metric list size overflow in journalfile \"%s\" "
+                                 "(metric_count=%zu, entry_size=%zu), skipping it",
+                                 file_path, journal_metric_count, sizeof(struct journal_metric_list));
                     journal_access_failed = true;
                     goto release_journal;
                 }
                 if (metric_offset > journal_v2_file_size ||
                     metric_list_size > journal_v2_file_size - metric_offset) {
-                    problem = JV2_METRIC_LIST_OVERFLOWS_FILE;
-                    problem_metric_offset = metric_offset;
-                    problem_list_size = metric_list_size;
-                    problem_file_size = journal_v2_file_size;
+                    dbengine_log(ctx->engine, NDLP_ERR,
+                                 "DBENGINE: metric list exceeds journal file size in journalfile \"%s\" "
+                                 "(metric_offset=%zu, list_size=%zu, file_size=%zu), skipping it",
+                                 file_path, metric_offset, metric_list_size, journal_v2_file_size);
                     journal_access_failed = true;
                     goto release_journal;
                 }
@@ -1421,18 +1403,6 @@ static time_t find_uuid_first_time(
             }
         }
 release_journal:
-
-        if(problem == JV2_METRIC_LIST_SIZE_OVERFLOWS)
-            dbengine_log(ctx->engine, NDLP_ERR,
-                         "DBENGINE: metric list size overflow in journalfile \"%s\" "
-                         "(metric_count=%zu, entry_size=%zu), skipping it",
-                         file_path, problem_metric_count, sizeof(struct journal_metric_list));
-        else if(problem == JV2_METRIC_LIST_OVERFLOWS_FILE)
-            dbengine_log(ctx->engine, NDLP_ERR,
-                         "DBENGINE: metric list exceeds journal file size in journalfile \"%s\" "
-                         "(metric_offset=%zu, list_size=%zu, file_size=%zu), skipping it",
-                         file_path, problem_metric_offset, problem_list_size, problem_file_size);
-
         journalfile_v2_data_release(datafile->journalfile);
 
         if (agent_shutdown) {
@@ -1584,10 +1554,6 @@ static void update_metrics_first_time_s(struct dbengine_tier *ctx, struct dbengi
     // find_uuid_first_time() (which registers its own frame), and the final
     // cleanup -- masking unrelated faults that might land in the mmap range
     // and inflating nesting depth unnecessarily.
-    // reported after the frame below is gone rather than under it, for the reason the comment above already
-    // gives for scoping the frame tightly: an armed frame covers memory this code has stopped walking
-    volatile bool metric_list_overflows_file = false;
-    volatile size_t overflow_metric_offset = 0, overflow_list_size = 0, overflow_file_size = 0;
     {
         PROTECTED_ACCESS_SETUP(journalfile->mmap.data, journalfile->mmap.size, file_path, "mrg-retention");
         if(no_signal_received) {
@@ -1605,10 +1571,10 @@ static void update_metrics_first_time_s(struct dbengine_tier *ctx, struct dbengi
                 __builtin_mul_overflow(count, sizeof(struct uuid_first_time_s), &entry_list_size) ||
                 metric_offset > journal_v2_file_size ||
                 metric_list_size > journal_v2_file_size - metric_offset) {
-                metric_list_overflows_file = true;
-                overflow_metric_offset = metric_offset;
-                overflow_list_size = metric_list_size;
-                overflow_file_size = journal_v2_file_size;
+                dbengine_log(ctx->engine, NDLP_ERR,
+                             "DBENGINE: metric list exceeds journal file size in journalfile \"%s\" "
+                             "(metric_offset=%zu, list_size=%zu, file_size=%zu), skipping retention update",
+                             file_path, metric_offset, metric_list_size, journal_v2_file_size);
                 journal_access_failed = true;
             }
             else {
@@ -1644,12 +1610,6 @@ static void update_metrics_first_time_s(struct dbengine_tier *ctx, struct dbengi
             journal_access_failed = true;
         }
     }
-
-    if(metric_list_overflows_file)
-        dbengine_log(ctx->engine, NDLP_ERR,
-                     "DBENGINE: metric list exceeds journal file size in journalfile \"%s\" "
-                     "(metric_offset=%zu, list_size=%zu, file_size=%zu), skipping retention update",
-                     file_path, overflow_metric_offset, overflow_list_size, overflow_file_size);
 
     dbengine_log_info(ctx->engine,
         "DBENGINE: tier %d: recalculating retention for %zu metrics starting with datafile %u",
