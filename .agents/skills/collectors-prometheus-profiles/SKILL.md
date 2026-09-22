@@ -18,7 +18,7 @@ tests; the lists below are a source map, not evidence that a changed implementat
   contribution policy for `autogen.selector` and relabeling, chart-template rules, job-side profile selection.
 - `src/go/plugin/framework/charttpl/README.md`: every group and chart field, the validation rules, engine-derived
   behavior.
-- `src/go/plugin/go.d/collector/prometheus/relabel/README.md`: relabel actions, stage order, histogram and summary
+- `src/go/pkg/relabel/README.md`: relabel actions, stage order, histogram and summary
   safety, profile precedence.
 - `src/go/tools/prometheus-profile-validation/README.md`: the validator CLI, safe job policy, what `PASS` establishes
   (one finding code per objective check), the warning classes.

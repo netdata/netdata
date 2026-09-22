@@ -89,7 +89,7 @@
       },
       "relabeling": {
         "title": "Metric relabeling",
-        "description": "Job-owned Prometheus-compatible metric relabeling, applied after `selector` and before profile selection. Each block scopes its rules to metrics whose name matches `match`. Profiles may own the same block format for exporter normalization after selection. See the [relabeling reference](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/prometheus/relabel#readme) for ordering, syntax, and examples.",
+        "description": "Job-owned Prometheus-compatible metric relabeling, applied after `selector` and before profile selection. Each block scopes its rules to metrics whose name matches `match`. Profiles may own the same block format for exporter normalization after selection. See the [relabeling reference](https://github.com/netdata/netdata/tree/master/src/go/pkg/relabel#readme) for ordering, syntax, and examples.",
         "type": [
           "array",
           "null"

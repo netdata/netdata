@@ -443,7 +443,7 @@ than copying go.d wiring or applying the new-go.d V2 mandate to it.
 | statsd synthetic_charts | operator-curated dashboards | `src/collectors/statsd.plugin/README.md#synthetic-statsd-charts` |
 | Prometheus mapping | generic exposition scrape and authored profiles | `src/go/plugin/go.d/collector/prometheus/profile-format.md`, `src/go/plugin/go.d/collector/prometheus/` source; generated README is an operator output |
 | Prometheus profile format | curated exporter dashboards + autogen fallback selectors | `src/go/plugin/go.d/collector/prometheus/profile-format.md` |
-| Prometheus metric relabeling | rewriting scraped metric names/labels | `src/go/plugin/go.d/collector/prometheus/relabel/README.md` |
+| Prometheus metric relabeling | rewriting scraped metric names/labels | `src/go/pkg/relabel/README.md` |
 | log2journal | parsing application logs into the journal | `src/collectors/log2journal/log2journal.d/` |
 | Auto-discovery rules | adding service-detection rules | `src/go/plugin/go.d/config/go.d/sd/{net_listeners,docker,snmp,http}.conf` |
 | Topology library | topology producers in Go | `src/go/pkg/topology/v1` |

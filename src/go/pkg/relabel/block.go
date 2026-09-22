@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 )
 
 // Block scopes an ordered list of metric relabel rules to matching metric names.
@@ -94,7 +93,7 @@ func (p *Pipeline) Matches(name string) bool {
 
 // Apply runs matching blocks in order. Each block matches the current sample
 // name, including a name produced by an earlier block.
-func (p *Pipeline) Apply(sample prompkg.Sample) (prompkg.Sample, DropInfo) {
+func (p *Pipeline) Apply(sample Record) (Record, DropInfo) {
 	if p == nil {
 		return sample, DropInfo{}
 	}
@@ -115,10 +114,10 @@ func (p *Pipeline) Apply(sample prompkg.Sample) (prompkg.Sample, DropInfo) {
 // ApplyWithObserver runs the same pipeline as Apply and reports entered blocks
 // and evaluated rules. It is intended for opt-in validation diagnostics.
 func (p *Pipeline) ApplyWithObserver(
-	sample prompkg.Sample,
+	sample Record,
 	observeBlock BlockDiagnosticObserver,
 	observeRule PipelineRuleDiagnosticObserver,
-) (prompkg.Sample, DropInfo) {
+) (Record, DropInfo) {
 	if p == nil {
 		return sample, DropInfo{}
 	}

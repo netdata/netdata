@@ -1,5 +1,21 @@
 # Metric relabeling
 
+`pkg/relabel` provides the shared Prometheus-compatible rule processor and ordered block pipeline.
+They transform a `Record` containing only `Name` and `Labels`; values and metric types remain with the caller.
+`__name__` is a virtual label backed by `Name` and MUST NOT also appear in `Labels`.
+
+`New` compiles rules into a `Processor`; `NewPipeline` compiles name-matched blocks. Both own reusable scratch and
+MUST be used serially. Applying rules does not mutate the input label set. A dropped processor result returns the
+record at processor entry; a dropped pipeline result returns the record at entry to the dropping block, preserving
+changes from earlier successful blocks. Callers MUST discard dropped results and may use the returned record for
+diagnostics. Observer callbacks run synchronously and MUST NOT re-enter the same processor or pipeline.
+
+The shared package does not assemble metric families, select profiles, or validate collector-specific values or
+labels. The following configuration guide describes its integration in the Prometheus collector, which owns the
+stage order and histogram/summary protection.
+
+## Prometheus collector integration
+
 Relabeling rewrites, adds, drops, or filters a scraped metric -- its name and its labels -- before charts are built.
 The same `relabeling` block format has two configuration levels:
 
@@ -171,7 +187,7 @@ Inside a block, `metric_relabel_configs` is a list of rules applied **in order**
 
 ## How relabeling runs
 
-The stage order is fixed:
+The Prometheus collector fixes the stage order:
 
 1. The job `selector` filters original scraped series.
 2. Job relabeling runs and its result is assembled and checked.
@@ -188,7 +204,7 @@ Inside either relabeling stage:
 
 ### Histogram and summary safety
 
-A histogram or summary is assembled from several series -- `_bucket`/`_sum`/`_count`, or per-quantile series. Netdata
+In the Prometheus collector, a histogram or summary is assembled from several series -- `_bucket`/`_sum`/`_count`, or per-quantile series. Netdata
 will **not** let relabeling silently corrupt one. A rule that would:
 
 - split a histogram/summary across multiple metric names,

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Package relabel applies Prometheus-compatible metric-relabeling rules to
-// scraped samples (the metric name plus labels, including le/quantile) before
-// typed-family assembly. It is collector-local to the prometheus collector.
+// metric names and labels. Callers retain ownership of values, types, and any
+// validation required by their metric model.
 package relabel
 
 import (
@@ -18,9 +18,15 @@ import (
 	"github.com/grafana/regexp"
 	commonmodel "github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
-
-	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 )
+
+// Record is the name and labels transformed by relabeling. Name represents the
+// virtual __name__ label; Labels must not contain __name__. Callers retain any
+// value or type information separately. Apply does not mutate the input labels.
+type Record struct {
+	Name   string
+	Labels labels.Labels
+}
 
 var (
 	relabelTargetLegacy = regexp.MustCompile(`^(?:(?:[a-zA-Z_]|\$(?:\{\w+\}|\w+))+\w*)+$`)
@@ -474,18 +480,17 @@ func (re Regexp) IsZero() bool {
 // Apply runs the rules against one sample. It returns the (possibly mutated)
 // sample and a DropInfo. When DropInfo.Dropped() is true the sample must be
 // discarded; the returned sample is the original (unmutated) so the caller can
-// log its name. Value, Kind and FamilyType are passed through unchanged — a
-// relabeled sample is never re-typed.
-func (p *Processor) Apply(sample prompkg.Sample) (prompkg.Sample, DropInfo) {
+// log its name. The caller is responsible for preserving any associated payload.
+func (p *Processor) Apply(sample Record) (Record, DropInfo) {
 	return p.apply(sample, nil)
 }
 
 // ApplyWithObserver is Apply with synchronous rule diagnostics enabled.
-func (p *Processor) ApplyWithObserver(sample prompkg.Sample, observe RuleDiagnosticObserver) (prompkg.Sample, DropInfo) {
+func (p *Processor) ApplyWithObserver(sample Record, observe RuleDiagnosticObserver) (Record, DropInfo) {
 	return p.apply(sample, observe)
 }
 
-func (p *Processor) apply(sample prompkg.Sample, observe RuleDiagnosticObserver) (prompkg.Sample, DropInfo) {
+func (p *Processor) apply(sample Record, observe RuleDiagnosticObserver) (Record, DropInfo) {
 	if len(p.cfgs) == 0 {
 		return sample, DropInfo{}
 	}

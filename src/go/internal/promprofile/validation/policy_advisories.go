@@ -8,8 +8,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	promrelabel "github.com/netdata/netdata/go/plugins/pkg/relabel"
 	promcollector "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus"
-	promrelabel "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 // addProfileMatchHeuristics checks whether the auto-selection signature also
