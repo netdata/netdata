@@ -518,6 +518,11 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct dbengine_tier 
         journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
         // What the guarded read below found, reported after its frame is gone rather than under it.
         //
+        // The carriers below are volatile for the reason this file's neighbour states at
+        // rrdengine.c update_metrics_first_time_s(): today every write to one is followed immediately by a
+        // goto or break that leaves the guarded block, so no write is ever followed by a mapped read that
+        // could jump - but that invariant is one edit away from being broken silently, and a value changed
+        // between sigsetjmp and siglongjmp is indeterminate after the jump unless it is volatile.
         // Not because a sink could be siglongjmped out of: the handler jumps only when the faulting address is
         // inside the registered mapping (protected-access.c, signal_protected_access_check), and no line the
         // engine emits hands the sink a pointer into it. The reason is the one the comment above
@@ -532,8 +537,8 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct dbengine_tier 
             JV2_PAGE_LIST_OVERFLOWS_FILE,
             JV2_EXTENT_INDEX_INVALID,
             JV2_JOURNAL_FAULTED,
-        } problem = JV2_NO_PROBLEM;
-        size_t problem_metric_offset = 0, problem_list_size = 0, problem_file_size = 0;
+        } volatile problem = JV2_NO_PROBLEM;
+        volatile size_t problem_metric_offset = 0, problem_list_size = 0, problem_file_size = 0;
         {
             PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "read");
             if(no_signal_received) {

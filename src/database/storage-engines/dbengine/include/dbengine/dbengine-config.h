@@ -63,9 +63,10 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 //   handles, collection and query handles, anything holding a cache page, and the preload references
 //   dbengine_preload_release() drops) AND a dbengine_destroy() has run after that. The return value alone does
 //   not say when that is: it counts registry metrics only, so it can be 0 while a cache the engine still points
-//   at holds referenced pages, and that cache can emit. Simplest rule that is always right: an engine a
-//   dbengine_destroy() left retained can still call the sink, from a later verb on it or from a later destroy,
-//   so keep the sink alive until a destroy has left nothing retained.
+//   at holds referenced pages, and that cache can emit. No verb reports retention, so "nothing retained" is not
+//   a state the embedder can observe - and an engine can be retained for a reason that is not the embedder's
+//   doing. The rule an embedder can actually follow, and the one the engine's own test suite follows, is to give
+//   the sink and its data the lifetime of the process.
 // - Never called after the engine is freed, and never for what the engine cannot survive: fatal() and
 //   internal_fatal() end the process through netdata's logger whatever this field holds.
 // - Does not receive every line the engine's work produces, for two separate reasons.
@@ -74,6 +75,12 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 //   the engine's file and decompression primitives, which sit below the level where an engine is in hand, the
 //   public verbs that reject a NULL storage instance - which is exactly when there is no engine to ask - and a
 //   failed protected read of a mapped journal, which libnetdata's own recovery reports.
+//
+//   That recovery is the host's to provide, and it is worth knowing you have it. Reading a mapped journal that
+//   turns out to be truncated or unreadable raises SIGBUS, and the engine survives it only because a signal
+//   handler routes the fault to libnetdata's protected-access check first (nd_initialize_signals() does this for
+//   the daemon). An embedder that installs no such handler does not get a recovered read and a logged fault: it
+//   gets the process, on a damaged file the engine would otherwise have skipped.
 //
 //   A sink is never handed a pointer into memory the engine is reading under a fault guard, and no line it
 //   receives points into a mapped journal. That is what lets the engine emit while such a guard is armed: the

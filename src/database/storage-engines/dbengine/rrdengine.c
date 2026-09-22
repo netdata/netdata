@@ -1305,6 +1305,9 @@ static time_t find_uuid_first_time(
         journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
         // What the guarded read below found, reported after its frame is gone rather than under it.
         //
+        // The carriers below are volatile for the reason update_metrics_first_time_s() states three
+        // hundred lines down for journal_access_failed: today no write to one is followed by a mapped read
+        // that could jump, and a future edit could break that silently.
         // Not because a sink could be siglongjmped out of: the handler jumps only when the faulting address is
         // inside the registered mapping (protected-access.c, signal_protected_access_check), and no line the
         // engine emits hands the sink a pointer into it. The reason is the one the comment above
@@ -1318,8 +1321,9 @@ static time_t find_uuid_first_time(
             JV2_NO_PROBLEM = 0,
             JV2_METRIC_LIST_SIZE_OVERFLOWS,
             JV2_METRIC_LIST_OVERFLOWS_FILE,
-        } problem = JV2_NO_PROBLEM;
-        size_t problem_metric_count = 0, problem_metric_offset = 0, problem_list_size = 0, problem_file_size = 0;
+        } volatile problem = JV2_NO_PROBLEM;
+        volatile size_t problem_metric_count = 0, problem_metric_offset = 0, problem_list_size = 0,
+                        problem_file_size = 0;
         {
             PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "read");
             if (no_signal_received) {
@@ -1575,8 +1579,8 @@ static void update_metrics_first_time_s(struct dbengine_tier *ctx, struct dbengi
     // and inflating nesting depth unnecessarily.
     // reported after the frame below is gone rather than under it, for the reason the comment above already
     // gives for scoping the frame tightly: an armed frame covers memory this code has stopped walking
-    bool metric_list_overflows_file = false;
-    size_t overflow_metric_offset = 0, overflow_list_size = 0, overflow_file_size = 0;
+    volatile bool metric_list_overflows_file = false;
+    volatile size_t overflow_metric_offset = 0, overflow_list_size = 0, overflow_file_size = 0;
     {
         PROTECTED_ACCESS_SETUP(journalfile->mmap.data, journalfile->mmap.size, file_path, "mrg-retention");
         if(no_signal_received) {
