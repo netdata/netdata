@@ -6,16 +6,10 @@ how-to uses the token-safe wrappers from
 the `snmp:traps` Function with optional `__logs_sources`
 selection.
 
-## The "if you analyze, you author a how-to" rule
+## Knowledge Capture
 
-The catalog is live. Every time an AI assistant or operator answers a
-new concrete SNMP trap query that needs multiple wrapper calls, jq
-pipelines, or cross-referencing more than one guide, add the recipe
-here before completing the task.
-
-Keep these how-tos operator-facing. Developer validation, schema
-work, collector implementation, test fixtures, or SOW handoff notes
-belong in `.agents/skills/` and SOW files, not in this public skill.
+Capture timing, authorization, and audience boundaries follow
+[the skill's Knowledge Capture section](../SKILL.md#knowledge-capture).
 
 ## How-to authoring template
 
@@ -25,7 +19,7 @@ Sections:
 
 1. **Question** -- the operator question.
 2. **Inputs** -- placeholders the operator must provide.
-3. **Steps** -- runnable commands using token-safe wrappers.
+3. **Steps** -- runnable commands; credential-bearing requests use the shared wrappers.
 4. **Output** -- what to return or inspect.
 5. **Notes / gotchas** -- privacy, scale, and query caveats.
 6. **Source guides** -- links to the guides used.
@@ -33,6 +27,9 @@ Sections:
 Do not include raw Cloud tokens, agent bearers, SNMP communities, USM
 secrets, public device IPs, raw MAC addresses, customer hostnames, or
 full trap payloads in durable artifacts.
+
+Follow [Choose The Task](../SKILL.md#choose-the-task) and [Safe Execution](../SKILL.md#safe-execution). Explanation
+and review do not execute these recipes. Keep conversion, installation and verification stages scoped to the request.
 
 ## Index
 

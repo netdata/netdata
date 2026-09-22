@@ -3,6 +3,7 @@
 package bind
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -38,8 +39,8 @@ type jsonClient struct {
 	request    web.RequestConfig
 }
 
-func (c jsonClient) serverStats() (*serverStats, error) {
-	req, err := web.NewHTTPRequestWithPath(c.request, "/server")
+func (c jsonClient) serverStats(ctx context.Context) (*serverStats, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.request, "/server")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
 	}

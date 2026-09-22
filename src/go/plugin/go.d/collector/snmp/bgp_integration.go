@@ -61,10 +61,10 @@ func (c *Collector) prepareProfileMetrics(pms []*ddsnmp.ProfileMetrics) []ddsnmp
 	if c.bgp == nil {
 		return flattenProfileMetrics(pms)
 	}
-	return c.bgp.prepareProfileMetrics(pms)
+	return c.bgp.prepareProfileMetrics(pms, func(metric ddsnmp.Metric) { c.recordNormalMetric(metric, "bgp_chart_filter", nil) })
 }
 
-func (b *bgpIntegration) prepareProfileMetrics(pms []*ddsnmp.ProfileMetrics) []ddsnmp.Metric {
+func (b *bgpIntegration) prepareProfileMetrics(pms []*ddsnmp.ProfileMetrics, filtered func(ddsnmp.Metric)) []ddsnmp.Metric {
 	b.collectError, b.collectFailedSources = bgpCollectErrorsBySource(pms)
 
 	metrics := flattenProfileMetrics(pms)
@@ -80,7 +80,7 @@ func (b *bgpIntegration) prepareProfileMetrics(pms []*ddsnmp.ProfileMetrics) []d
 
 	metrics = append(metrics, typedBGPMetricsFromProfileMetrics(successfulBGPProfileMetrics(pms))...)
 
-	return filterChartMetrics(metrics)
+	return filterChartMetrics(metrics, filtered)
 }
 
 func (c *Collector) finalizeProfileMetrics() {

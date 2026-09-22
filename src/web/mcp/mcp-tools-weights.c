@@ -228,21 +228,25 @@ static void add_weights_filter_parameters(BUFFER *buffer) {
     mcp_schema_add_array_param(
         buffer, "metrics",
         "Filter by metrics",
-        "Array of metrics (contexts) to filter (e.g., ['system.cpu', 'disk.io', 'mysql.queries']). Use '" MCP_TOOL_LIST_METRICS "' to discover available metrics.");
+        "Array of metrics (contexts) to filter (e.g., ['system.cpu', 'disk.io', 'mysql.queries']). Use '" MCP_TOOL_LIST_METRICS "' to discover available metrics.",
+        false);
     
     mcp_schema_add_array_param(
         buffer, "nodes",
         "Filter by nodes",
-        "Array of nodes to filter (e.g., ['web-server-1', 'database-primary']). Use '" MCP_TOOL_LIST_NODES "' to discover available nodes.");
+        "Array of nodes to filter (e.g., ['web-server-1', 'database-primary']). Use '" MCP_TOOL_LIST_NODES "' to discover available nodes.",
+        false);
     
     mcp_schema_add_array_param(
         buffer, "instances",
         "Filter by instances",
-        "Array of metric instances to filter (e.g., ['eth0', 'sda', 'production_db']). Use '" MCP_TOOL_GET_METRICS_DETAILS "' to discover instances for a metric.");
+        "Array of metric instances to filter (e.g., ['eth0', 'sda', 'production_db']). Use '" MCP_TOOL_GET_METRICS_DETAILS "' to discover instances for a metric.",
+        false);
     
     mcp_schema_add_array_param(buffer, "dimensions",
         "Filter by dimensions",
-        "Array of dimension names to filter (e.g., ['user', 'writes', 'slow_queries']). Use '" MCP_TOOL_GET_METRICS_DETAILS "' to discover dimensions for a metric.");
+        "Array of dimension names to filter (e.g., ['user', 'writes', 'slow_queries']). Use '" MCP_TOOL_GET_METRICS_DETAILS "' to discover dimensions for a metric.",
+        false);
     
     mcp_schema_add_labels_object(buffer,
         "Filter by labels",

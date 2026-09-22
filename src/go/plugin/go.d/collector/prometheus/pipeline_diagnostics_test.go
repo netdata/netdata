@@ -16,7 +16,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
+	"github.com/netdata/netdata/go/plugins/pkg/relabel"
 )
 
 func TestPipelineDiagnosticsDoNotChangeNoRelabelOutput(t *testing.T) {

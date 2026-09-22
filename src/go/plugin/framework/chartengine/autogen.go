@@ -16,6 +16,25 @@ const (
 	autogenTemplatePrefix = "__autogen__:"
 )
 
+// Autogen output also depends on current reader metadata and flattened kinds;
+// series identity and template revision alone do not validate these routes.
+type autogenRouteGuard struct {
+	source      autogenSource
+	metadata    metrix.MetricMeta
+	hasMetadata bool
+	kind        metrix.MetricKind
+	sourceKind  metrix.MetricKind
+	role        metrix.FlattenRole
+}
+
+func (g *autogenRouteGuard) valid(reader metrix.Reader, meta metrix.SeriesMeta) bool {
+	if g == nil || g.kind != meta.Kind || g.sourceKind != meta.SourceKind || g.role != meta.FlattenRole {
+		return false
+	}
+	mm, ok := autogenMetricMeta(reader, g.source)
+	return ok == g.hasMetadata && mm == g.metadata
+}
+
 type autogenRoute struct {
 	chartID           string
 	chartName         string
@@ -102,7 +121,8 @@ func (e *Engine) resolveAutogenRouteWithReason(
 	if !ok {
 		return nil, false, PlanRouteReasonAutogenBuildRejected, -1, nil
 	}
-	if metricMeta, ok := autogenMetricMeta(reader, source); ok {
+	metricMeta, hasMetadata := autogenMetricMeta(reader, source)
+	if hasMetadata {
 		route = applyAutogenMetricMeta(route, metricMeta, meta)
 	}
 	route.priority = effectiveChartPriority(route.priority)
@@ -112,6 +132,14 @@ func (e *Engine) resolveAutogenRouteWithReason(
 	}
 	return []routeBinding{
 		{
+			autogenGuard: &autogenRouteGuard{
+				source:      source,
+				metadata:    metricMeta,
+				hasMetadata: hasMetadata,
+				kind:        meta.Kind,
+				sourceKind:  meta.SourceKind,
+				role:        meta.FlattenRole,
+			},
 			ChartTemplateID:   autogenTemplatePrefix + route.chartID,
 			ChartID:           route.chartID,
 			DimensionIndex:    0,

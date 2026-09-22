@@ -1,0 +1,350 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-smbios_memory
+      plugin_name: go.d.plugin
+      module_name: smbios_memory
+      monitored_instance:
+        name: SMBIOS Memory
+        link: https://www.dmtf.org/standards/smbios
+        icon_filename: microchip.svg
+        categories:
+          - data-collection.hardware-and-sensors
+      keywords: [smbios memory, smbios, dmi, dimm, ram, firmware, memory inventory]
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor physical memory inventory and detect missing or smaller memory devices relative to an accepted baseline.
+          The Memory Inventory live table exposes slot locations, capacities, device identifiers, rank counts, and rated and configured speeds for local inspection or retrieval through the Functions API.
+        method_description: |
+          Reads `/sys/firmware/dmi/tables/smbios_entry_point` and `/sys/firmware/dmi/tables/DMI` every 60 seconds by default, respecting `NETDATA_HOST_PREFIX`. No external command or EDAC support is required.
+
+          These are boot-time firmware tables: a recent read does not establish current usable memory, operating frequency, or hardware health. Only physical devices in system-memory arrays contribute to inventory totals.
+
+          :::info
+
+          The collector keeps a private baseline: `smbios-memory.json` in the Agent's library directory (`/var/lib/netdata` by default). The first complete inventory it saves becomes the configuration every later read is compared with, and a confirmed loss stays recorded there across restarts and reboots. To accept a smaller configuration as the new baseline, stop Netdata, move the file aside, and start Netdata again; Troubleshooting has the exact steps. This is the only file the collector writes; it never changes firmware, kernel settings, or device permissions.
+
+          :::
+      supported_platforms:
+        include: [Linux]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: |
+          A standard installation needs nothing extra: the installer grants `go.d.plugin` the `CAP_DAC_READ_SEARCH` capability that reads the root-only firmware files, and the Agent's library directory is already writable.
+
+          | Access | Needed when |
+          |---|---|
+          | Read `/sys/firmware/dmi/tables/smbios_entry_point` and `/sys/firmware/dmi/tables/DMI` (root-only files, so `CAP_DAC_READ_SEARCH` or equivalent) | Always. Restore the plugin's file capabilities if a hardened install or a container drops them. |
+          | Write to the Agent's library directory (`/var/lib/netdata` by default) | To save the baseline and any confirmed loss. Without it the inventory is still read, but comparison reports `state_error`. |
+      default_behavior:
+        auto_detection:
+          description: |
+            The stock configuration starts the single `smbios_memory` job when the host exposes a readable SMBIOS table with a system-memory array. A host that already has a saved baseline also starts when the table cannot be read, so an unresolved loss stays visible.
+
+            The baseline is learned automatically: the first complete inventory with unique slot locators and known capacities is saved as the accepted configuration. It is the first configuration observed, not an independently verified healthy one. Added devices and capacity increases are accepted automatically only while every previously accepted slot still has at least its accepted capacity; a missing or smaller slot is reported as loss until it is restored or the baseline is reset (see Troubleshooting).
+        limits:
+          description: |
+            Comparison depends on firmware quality. Blank or repeated slot locators, unknown device capacities or array use, malformed records, and inconsistent array counts leave the inventory readable but not comparable: the comparison status chart reports `uncomparable` and the `smbios_memory_comparison_unavailable` alert raises a warning.
+
+            Slot locators must stay stable across boots; a firmware update that renames slots is not matched automatically and shows every old slot as missing and every new slot as not in the baseline. Replacing a device with one of equal or larger capacity in the same slot is not loss.
+
+            Inventory does not attribute EDAC errors to physical devices: the evidence needed to join platform-specific EDAC ranks to SMBIOS slots is not available.
+        performance_impact:
+          description: |
+            Reads two local firmware files per collection. Baseline and loss-state changes write one private state file; unchanged observations do not rewrite it.
+    setup:
+      single_job: true
+      prerequisites:
+        list:
+          - title: Expose the host firmware tables to a containerized Agent
+            description: |
+              Applies only to Agents running in a container. The collector reads the host's firmware through `NETDATA_HOST_PREFIX`, so the host's `/sys` must be mounted there read-only. The documented `docker run` and Compose examples already include this mount:
+
+              ```text
+              -v /sys:/host/sys:ro
+              ```
+
+              Verify: the Memory Inventory Live Data table lists the host's memory slots and the comparison status chart reports `comparable` after the first collection.
+      configuration:
+        file:
+          name: go.d/smbios_memory.conf
+          description: ""
+        options:
+          description: |
+            Options apply to the host's single `smbios_memory` job. This collector has no remote target and cannot be attached to a virtual node.
+          folding:
+            title: Options
+            enabled: false
+          list:
+            - name: update_every
+              description: Interval in seconds between reads of the boot-time firmware inventory. Reading more frequently does not refresh
+                the firmware's hardware information.
+              default_value: 60
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Basic
+              description: The stock configuration. The single job monitors the local host's memory inventory with the default interval.
+              config: |
+                jobs:
+                  - name: smbios_memory
+            - name: Read the firmware table less often
+              description: The table changes only at boot, so a longer interval loses nothing except how quickly a change after a reboot is reported.
+              config: |
+                jobs:
+                  - name: smbios_memory
+                    update_every: 300
+    troubleshooting:
+      errors:
+        list:
+          - error: Intentionally accepting a smaller memory configuration
+            cause: A planned removal or downsizing is still a loss relative to the previously accepted baseline, and acknowledging or silencing the alert does not replace the baseline.
+            fix: |
+              Reset the baseline while the collector is stopped. Stop Netdata, move the state file aside as a backup, then start Netdata; the next valid, comparable inventory becomes the new baseline:
+
+              ```bash
+              sudo systemctl stop netdata
+              sudo mv -i /var/lib/netdata/smbios-memory.json /var/lib/netdata/smbios-memory.json.backup
+              sudo systemctl start netdata
+              ```
+
+              Use the Agent's configured library directory if it differs (static installations commonly use `/opt/netdata/var/lib/netdata`). Alternatively, disable the collector through Dynamic Configuration, wait for it to stop, move the file, then re-enable it.
+
+              :::caution
+
+              Only the running Agent's collector writes this file. A `go.d.plugin` debug run from a terminal reads and compares against it but never saves, so debugging is safe; do not run a second Agent against the same library directory.
+
+              :::
+
+              Verify that the comparison status returns to `comparable`. If reading or saving fails, no replacement baseline is accepted and the status stays `unbaselined` or `state_error`. Keep the backup if the old evidence is needed.
+          - error: 'read SMBIOS entry point: open `path`: permission denied'
+            cause: '`go.d.plugin` lost read access to the root-only firmware files, usually because its `CAP_DAC_READ_SEARCH` file capability was dropped by a hardened install or is not available inside the container.'
+            fix: Re-run the Netdata installer, which restores the plugin's file capabilities, or grant `CAP_DAC_READ_SEARCH` to the container. Existing charts and any saved baseline are kept while the source is unreadable.
+          - error: 'read SMBIOS entry point: open `path`: no such file or directory'
+            when: The host or container does not expose `/sys/firmware/dmi/tables`.
+            cause: The kernel exposes no SMBIOS tables on this platform, or the container was started without the host's `/sys` mounted under `NETDATA_HOST_PREFIX`.
+            fix: In a container, add the `-v /sys:/host/sys:ro` mount from the prerequisites. A host without SMBIOS tables cannot use this collector; disable it to silence the message.
+          - error: no system memory array
+            cause: The firmware table contains no physical memory array marked as system memory, which happens on some virtual machines and boards.
+            fix: Nothing to configure. This host cannot be inventoried through SMBIOS; disable the collector.
+          - error: Unknown device capacity
+            cause: Firmware reports at least one memory device with an unknown size, so totals and a per-slot baseline cannot be trusted.
+            fix: The inventory table remains available; comparison stays `uncomparable` until firmware reports every capacity. Check the vendor's firmware updates.
+          - error: Physical memory array use is unknown or unsupported
+            cause: Firmware does not state whether a memory array holds system memory, so the collector cannot tell which devices are host RAM.
+            fix: The inventory table remains available with totals withheld; comparison stays `uncomparable`. Check the vendor's firmware updates.
+          - error: Slot locators are missing or duplicated
+            cause: Firmware does not give every memory device a unique slot locator, so devices cannot be matched across observations.
+            fix: The inventory table remains available; comparison stays `uncomparable` for this firmware. Check the vendor's firmware updates.
+          - error: physical array device count disagrees with table
+            cause: The firmware table is inconsistent; it declares more or fewer memory devices than it lists.
+            fix: Check the table with the hardware vendor's tools and firmware updates. A missing record in an inconsistent table is not proof of a lost memory device, so nothing is reported as loss.
+          - error: memory baseline has unsupported version, owner or content
+            cause: The state file belongs to another Agent, is damaged, or uses an unsupported format.
+            fix: Restore the matching state file from a backup, or start a new baseline with the stopped-collector reset above; do not edit the file in place. Restart the collector afterwards, because a failed state load is reported until restart.
+          - error: memory baseline contains an invalid slot
+            cause: The state file was edited or truncated and no longer describes valid accepted slots.
+            fix: Restore the state file from a backup, or start a new baseline with the stopped-collector reset above, then restart the collector.
+          - error: memory baseline contains invalid loss evidence
+            cause: The state file was edited or truncated and its recorded loss no longer matches its accepted slots.
+            fix: Restore the state file from a backup, or start a new baseline with the stopped-collector reset above, then restart the collector.
+          - error: 'create baseline temporary file: `error`'
+            cause: The Agent's library directory is missing, not writable, or on a full filesystem, so a new baseline or a newly observed loss cannot be saved.
+            fix: Restore the directory, its permissions and free space; saving is retried on every collection. A loss observed while saving fails is kept in memory but does not survive a restart until it has been saved.
+          - error: 'publish baseline: `error`'
+            cause: The temporary file was written but could not replace `smbios-memory.json`, usually because the directory permissions changed.
+            fix: Restore write permission on the Agent's library directory; saving is retried on every collection.
+          - error: Agent registry identity is unavailable; baseline persistence disabled
+            cause: The collector cannot read the Agent's registry identity, which every saved baseline is bound to.
+            fix: Restore the Agent's registry directory and its permissions, then restart the collector. Inventory is still read, but no baseline is accepted without an Agent identity.
+    alerts:
+      - name: smbios_memory_confirmed_loss
+        metric: smbios_memory.confirmed_loss_status
+        info: Physical memory is missing or smaller than the accepted firmware inventory baseline
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/smbios_memory.conf
+      - name: smbios_memory_comparison_unavailable
+        metric: smbios_memory.comparison_status
+        info: The current firmware inventory cannot be compared with a durable memory baseline
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/smbios_memory.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        All charts belong to the local host. Unavailable measurements leave gaps rather than zeroes.
+        The confirmed-loss status retains a previously observed loss through source failures and restarts; it does not claim a fresh hardware measurement. Missing-device and capacity-deficit quantities appear only after a successful comparable observation.
+      availability: []
+      scopes:
+        - name: global
+          description: The host's physical system-memory inventory and accepted baseline comparison.
+          labels: []
+          metrics:
+            - name: smbios_memory.installed_capacity
+              description: Firmware-Reported Installed Memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: installed
+            - name: smbios_memory.slots
+              description: Firmware-Reported Memory Slots
+              unit: slots
+              chart_type: stacked
+              dimensions:
+                - name: populated
+                - name: empty
+            - name: smbios_memory.inventory_status
+              description: Memory Inventory Availability
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: available
+                - name: unavailable
+            - name: smbios_memory.comparison_status
+              description: Memory Baseline Comparison Status
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: comparable
+                - name: unavailable
+                - name: uncomparable
+                - name: unbaselined
+                - name: state_error
+            - name: smbios_memory.confirmed_loss_status
+              description: Confirmed Memory Loss
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: present
+                - name: absent
+                - name: unknown
+            - name: smbios_memory.missing_devices
+              description: Missing Memory Devices Relative to Baseline
+              unit: devices
+              chart_type: line
+              dimensions:
+                - name: missing
+            - name: smbios_memory.capacity_deficit
+              description: Memory Capacity Deficit Relative to Baseline Slots
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: deficit
+    functions:
+      description: Inspect the latest completed inventory read through Live Data or the Functions API. Opening the table performs no
+        firmware read and does not change the baseline.
+      list:
+        - id: inventory
+          function_name: smbios-memory-inventory
+          name: Memory Inventory
+          description: Inspect populated and empty physical system-memory slots alongside their accepted capacities and comparison status.
+          parameters: []
+          returns:
+            description: One row per current physical system-memory device, plus accepted populated slots absent from the current table.
+              Baseline-only rows identify their metadata as historical; unknown readings are null.
+            columns:
+              - name: Key
+                type: string
+                unit: ''
+                visibility: hidden
+                description: Identity within this snapshot; not a persistent hardware identity.
+              - name: Slot
+                type: string
+                unit: ''
+                description: Firmware device locator.
+              - name: Bank
+                type: string
+                unit: ''
+                visibility: hidden
+                description: Firmware bank locator.
+              - name: Population
+                type: string
+                unit: ''
+                description: Populated, empty, or unknown.
+              - name: Capacity
+                type: integer
+                unit: bytes
+                description: Current firmware-reported physical capacity.
+              - name: Accepted capacity
+                type: integer
+                unit: bytes
+                description: Capacity in the accepted baseline.
+              - name: Comparison
+                type: string
+                unit: ''
+                description: Slot comparison or reason comparison is unavailable.
+              - name: Data availability
+                type: string
+                unit: ''
+                visibility: hidden
+                description: Current firmware data or baseline-only evidence.
+              - name: Memory type
+                type: string
+                unit: ''
+                description: Firmware memory technology.
+              - name: Form factor
+                type: string
+                unit: ''
+                visibility: hidden
+                description: Firmware form factor.
+              - name: Manufacturer
+                type: string
+                unit: ''
+                description: Current or baseline-only device manufacturer.
+              - name: Part number
+                type: string
+                unit: ''
+                description: Current or baseline-only device part.
+              - name: Serial number
+                type: string
+                unit: ''
+                visibility: hidden
+                description: Current or baseline-only device serial.
+              - name: Ranks
+                type: integer
+                unit: ranks
+                visibility: hidden
+                description: Number of device ranks.
+              - name: Rated speed
+                type: integer
+                unit: MT/s
+                description: Maximum capable firmware transfer rate.
+              - name: Configured speed
+                type: integer
+                unit: MT/s
+                description: Configured boot-time transfer rate.
+              - name: ECC association
+                type: string
+                unit: ''
+                visibility: hidden
+                description: 'Unavailable: no verified physical EDAC join.'
+              - name: Read attempt
+                type: timestamp
+                unit: ''
+                visibility: hidden
+                description: Last attempt to read the boot-time firmware table.
+              - name: Inventory status
+                type: string
+                unit: ''
+                visibility: hidden
+                description: Availability of the current firmware table.
+              - name: Loss recorded
+                type: timestamp
+                unit: ''
+                visibility: hidden
+                description: When the retained loss evidence last changed; null when no loss is retained.
+          performance: Reads the completed collection snapshot; response size grows with the number of memory slots.
+          security: Read-only. Exposes firmware identifiers, including device serials, to authorized Function callers. The local baseline
+            file is private to its owner.
+          availability: Published while the canonical collector is running. Before the first collection it returns HTTP 503; source failures
+            retain baseline rows with unavailable status.
+          require_cloud: false

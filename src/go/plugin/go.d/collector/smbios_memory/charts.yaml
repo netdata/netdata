@@ -1,0 +1,81 @@
+version: v1
+context_namespace: smbios_memory
+groups:
+  - family: Overview
+    chart_defaults:
+      priority: 70000
+    metrics:
+      - installed_capacity_bytes
+      - confirmed_loss_status
+    charts:
+      - title: Firmware-Reported Installed Memory
+        context: installed_capacity
+        units: bytes
+        dimensions:
+          - selector: installed_capacity_bytes
+            name: installed
+      - title: Confirmed Memory Loss
+        context: confirmed_loss_status
+        units: state
+        type: stacked
+        dimensions:
+          - selector: confirmed_loss_status
+  - family: Inventory
+    chart_defaults:
+      priority: 70100
+    groups:
+      - family: Slots
+        metrics:
+          - populated_slots
+          - empty_slots
+        charts:
+          - title: Firmware-Reported Memory Slots
+            context: slots
+            units: slots
+            type: stacked
+            dimensions:
+              - selector: populated_slots
+                name: populated
+              - selector: empty_slots
+                name: empty
+      - family: Availability
+        metrics:
+          - inventory_status
+        charts:
+          - title: Memory Inventory Availability
+            context: inventory_status
+            units: state
+            type: stacked
+            dimensions:
+              - selector: inventory_status
+  - family: Baseline Comparison
+    chart_defaults:
+      priority: 70200
+    groups:
+      - family: Comparison Status
+        metrics:
+          - comparison_status
+        charts:
+          - title: Memory Baseline Comparison Status
+            context: comparison_status
+            units: state
+            type: stacked
+            dimensions:
+              - selector: comparison_status
+      - family: Loss
+        metrics:
+          - missing_devices
+          - capacity_deficit_bytes
+        charts:
+          - title: Missing Memory Devices Relative to Baseline
+            context: missing_devices
+            units: devices
+            dimensions:
+              - selector: missing_devices
+                name: missing
+          - title: Memory Capacity Deficit Relative to Baseline Slots
+            context: capacity_deficit
+            units: bytes
+            dimensions:
+              - selector: capacity_deficit_bytes
+                name: deficit

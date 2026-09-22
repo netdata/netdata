@@ -30,10 +30,12 @@ func New(cfg Config, makeDiscoverers DiscovererFactory) (*Pipeline, error) {
 			slog.String("component", "service discovery"),
 			slog.String("pipeline", cfg.Name),
 		),
-		configDefaults: cfg.ConfigDefaults,
-		accum:          newAccumulator(),
-		discoverers:    make([]model.Discoverer, 0),
-		configs:        make(map[string]map[uint64][]confgroup.Config),
+		configDefaults:         cfg.ConfigDefaults,
+		pipelineID:             cfg.PipelineID,
+		trustDiscoveredTargets: cfg.TrustDiscoveredTargets,
+		accum:                  newAccumulator(),
+		discoverers:            make([]model.Discoverer, 0),
+		configs:                make(map[string]map[uint64][]confgroup.Config),
 	}
 
 	p.accum.Logger = p.Logger
@@ -56,9 +58,11 @@ type (
 	Pipeline struct {
 		*logger.Logger
 
-		configDefaults confgroup.Registry
-		discoverers    []model.Discoverer
-		accum          *accumulator
+		configDefaults         confgroup.Registry
+		pipelineID             string
+		trustDiscoveredTargets bool
+		discoverers            []model.Discoverer
+		accum                  *accumulator
 
 		configs map[string]map[uint64][]confgroup.Config // [targetSource][targetHash]
 
@@ -206,6 +210,9 @@ func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 					cfg.SetProvider(tgg.Provider())
 					cfg.SetSource(tgg.Source())
 					cfg.SetSourceType(confgroup.TypeDiscovered)
+					// Authority comes from the pipeline, never from rendered target data.
+					cfg.SetTrustDiscoveredTargets(p.trustDiscoveredTargets)
+					cfg.SetDiscoveryPipelineID(p.pipelineID)
 					if def, ok := p.configDefaults.Lookup(cfg.Module()); ok {
 						cfg.ApplyDefaults(def)
 					}

@@ -72,7 +72,6 @@ Our [static builds](#static-builds) are expected to work on these platforms if a
 | Docker                   | 19.03 or newer | x86\_64, ARMv7, AArch64       | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker           |
 | Debian                   | 13.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
 | Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
-| Debian                   | 11.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
 | Fedora                   | 44             | x86\_64, AArch64              |                                                                                                                |
 | Fedora                   | 43             | x86\_64, AArch64              |                                                                                                                |
 | openSUSE                 | Tumbleweed     | x86\_64, AArch64              |                                                                                                                |
@@ -174,6 +173,7 @@ This is a list of platforms that we have supported in the recent past but no lon
 |--------------------------|-----------|----------------------|
 | Amazon Linux             | 2         | EOL as of 2026-06-30 |
 | CentOS                   | 7.x       | EOL as of 2026-06-30 |
+| Debian                   | 11.x      | EOL as of 2026-08-31 |
 | Debian                   | 10.x      | EOL as of 2024-07-01 |
 | Fedora                   | 42        | EOL as of 2026-05-13 |
 | Fedora                   | 41        | EOL as of 2025-12-15 |

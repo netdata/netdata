@@ -279,26 +279,59 @@ Metrics are created dynamically from supported OpenTelemetry data. The exact cha
 
 ## Troubleshooting
 
-### The plugin does not start
+### Known Errors
+
+#### `failed to bind gRPC endpoint 127.0.0.1:4317: Address already in use (os error 98)`
+
+**When**
+
+Logged in the Agent journal at startup by the `otel-plugin/ingestor` worker, followed by `exited with error code 1 and haven't collected any data. Disabling it.` from the Agent.
+
+
+**Cause**
+
+Another process already listens on the configured endpoint. Typical sources are a standalone OpenTelemetry Collector on the same host, or several Netdata Agents running in containers that share the host network namespace (`--network host`), where only one of them can own `127.0.0.1:4317`. The plugin binds the endpoint before it advertises anything, so on a conflict it exits once and the Agent disables it until the next Agent restart.
+
+
+**Fix**
+
+Find the owner with `ss -ltnp 'sport = :4317'`. Then either stop that listener, or give this Agent its own endpoint in `otel.yaml` and point every OTLP sender at the new port (avoid `4318`, the conventional OTLP/HTTP port, which this plugin does not serve):
+
+```yaml
+endpoint:
+  path: 127.0.0.1:14317
+```
+
+When several Agents share one network namespace and only one needs to receive OTLP, disable the plugin on the others in `netdata.conf`:
+
+```ini
+[plugins]
+  otel = no
+```
+
+
+### Other Problems
+
+#### The plugin does not start
 
 Check the Agent journal for `otel-plugin` configuration errors. User YAML and `NETDATA_OTEL_CFG_*` variables are validated strictly, so a typo or an option from the former experimental schema stops startup. For a source install, confirm that a compatible Rust toolchain is available; Linux installs using `netdata-installer.sh` also require `--enable-plugin-otel`.
 
 
-### The endpoint is reachable but no data appears
+#### The endpoint is reachable but no data appears
 
 A successful TCP connection proves only that something is listening. Confirm that the sender uses OTLP/gRPC on port `4317`; OTLP/HTTP on port `4318` is unsupported. With the default endpoint, use `127.0.0.1` explicitly if `localhost` resolves to IPv6. Then send a real OTLP record and verify the resulting chart or log entry.
 
 
-### A metric does not create the expected chart
+#### A metric does not create the expected chart
 
 Exponential histograms are not currently ingested. For other supported metrics, inspect the Agent journal for rejected user mapping files and verify the metric name, instrumentation scope, and `dimension_attribute_key`. The resulting chart context is `otel.<metric-name>`.
 
 
-### Some exported logs are missing
+#### Some exported logs are missing
 
 By default, the plugin rejects log records timestamped more than 24 hours in the past or more than 10 minutes in the future. It reports rejected records through OTLP `partial_success`; whether this is visible depends on the sender or exporter. Check the sender's clock, backfill age, sender logs, and Netdata Agent journal.
 
 
-### Logs from the former experimental plugin are not visible
+#### Logs from the former experimental plugin are not visible
 
 A former-schema `otel.yaml` stops the current plugin and prints a migration guide. Replace it with a partial configuration based on the current stock file. The legacy `logs.journal_dir` key is accepted only to locate the former plugin's read-only journals; it is not part of the current storage layout.

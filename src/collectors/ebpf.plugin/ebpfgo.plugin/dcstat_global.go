@@ -229,6 +229,36 @@ func runDCStatGlobalCollector(
 			return
 		}
 
+		// Lazy SHM open + publish, in one place so the failure path below can use
+		// it too.  dcstat is the elected publisher when cachestat has no
+		// apps/cgroup integration, and fd/socket may still have healthy rows: if
+		// this only ran on the success path, dcstat's very first snapshot failing
+		// would leave the segment UNCREATED (the publisher is what creates it), so
+		// consumers would see no segment at all rather than one without dcstat
+		// rows.  Mirrors cachestat's and fd's publishSharedStore for the same
+		// reason.
+		//
+		// The open is lazy so the default config (no apps, no cgroups) never pays
+		// the VMA cost — main.go leaves store nil in that case and the loop returns
+		// above.  The handle is mutated under the loop's single-goroutine guarantee
+		// so no extra lock is needed.
+		publishSharedStore := func() {
+			if handle.SharedMemory == nil {
+				publisher, perr := NewSharedPidMemoryPublisher(
+					productionSHMName, productionSEMName, handle.PidTableSize, uint32(updateEvery))
+				if perr != nil {
+					logPluginErr("dcstat.shm_open", "dcstat", "shared memory open", perr)
+				} else {
+					handle.SharedMemory = publisher
+				}
+			}
+			if handle.SharedMemory != nil {
+				if perr := store.Publish(handle.SharedMemory, ebpfgoSHMFlagDCStat); perr != nil {
+					logPluginErr("dcstat.publish", "dcstat", "shared memory publish", perr)
+				}
+			}
+		}
+
 		apps, err := handle.Runtime.SnapshotApps(handle.MapsPerCore)
 		if err != nil {
 			logPluginErr("dcstat.snapshot_apps", "dcstat", "snapshot-apps", err)
@@ -239,10 +269,8 @@ func runDCStatGlobalCollector(
 			// and the owner publishes on its own interval, so the window in which
 			// they can still see the previous header is bounded by that interval.
 			store.ClearDCStatApps()
-			if shouldPublish && handle.SharedMemory != nil {
-				if perr := store.Publish(handle.SharedMemory, ebpfgoSHMFlagDCStat); perr != nil {
-					logPluginErr("dcstat.publish", "dcstat", "shared memory publish", perr)
-				}
+			if shouldPublish {
+				publishSharedStore()
 			}
 			return
 		}
@@ -273,24 +301,7 @@ func runDCStatGlobalCollector(
 			return
 		}
 
-		// Lazy SHM open: allocate the publisher on the first cycle that reaches
-		// here, so the default config (no apps, no cgroups) never pays the VMA
-		// cost — main.go leaves store nil in that case and the loop returns
-		// above.  The handle is mutated under the loop's single-goroutine
-		// guarantee so no extra lock is needed.
-		if handle.SharedMemory == nil {
-			publisher, perr := NewSharedPidMemoryPublisher(productionSHMName, productionSEMName, handle.PidTableSize, uint32(updateEvery))
-			if perr != nil {
-				logPluginErr("dcstat.shm_open", "dcstat", "shared memory open", perr)
-			} else {
-				handle.SharedMemory = publisher
-			}
-		}
-		if handle.SharedMemory != nil {
-			if err := store.Publish(handle.SharedMemory, ebpfgoSHMFlagDCStat); err != nil {
-				logPluginErr("dcstat.publish", "dcstat", "shared memory publish", err)
-			}
-		}
+		publishSharedStore()
 	}
 
 	collectAndPublish(0)

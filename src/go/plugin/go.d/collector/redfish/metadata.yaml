@@ -1,0 +1,4607 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-redfish
+      plugin_name: go.d.plugin
+      module_name: redfish
+      monitored_instance:
+        name: Redfish
+        link: https://www.dmtf.org/standards/redfish
+        icon_filename: hardware.svg
+        categories:
+          - data-collection.hardware-and-sensors
+      keywords:
+        - redfish
+        - bmc
+        - out-of-band
+        - hardware
+        - server
+        - idrac
+        - ilo
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor server hardware through the DMTF Redfish API of a baseboard management controller (BMC). One job
+          covers the health, environmental readings, and inventory of everything behind a single BMC endpoint.
+
+          The collector reads these areas. Each component reports its own readings alongside the health and state the
+          BMC publishes for it.
+
+          | Area | Components |
+          |---|---|
+          | Base | ServiceRoot, systems, chassis, managers. Always collected. |
+          | Compute | Processors and processor metrics. |
+          | Memory | Memory modules and memory metrics. |
+          | Thermal | Fans, pumps, coolant connectors, filters, heaters, leak detection, environmental readings. |
+          | Power | Power subsystem, power supplies, batteries. |
+          | Storage | Storage subsystems, controllers, drives, volumes. |
+          | Network | Network adapters, ports, interfaces, device functions. |
+          | PCIe | PCIe devices and functions. |
+          | Sensors | Individual sensor readings: thermal, electrical, rotational, and quantities derived from them. |
+          | Firmware | Firmware and software inventory, update service, assemblies. |
+
+          Every system the endpoint exposes appears on this job's virtual node, or on the collecting Agent when the job
+          has no virtual node.
+        method_description: |
+          The collector connects to the Redfish ServiceRoot over HTTP or HTTPS and reads the standard resource types,
+          following links within the same origin. It walks the endpoint once per collection interval, sending several
+          requests at a time up to `max_concurrent_requests`.
+
+          Authentication is set by `auth_method`:
+
+          | Mode | Behavior |
+          |---|---|
+          | `auto` | Uses a Redfish session when the BMC advertises one, otherwise HTTP Basic. The default. |
+          | `session` | Always uses a session. The BMC must publish an origin-relative `Links.Sessions` endpoint. |
+          | `basic` | Sends HTTP Basic credentials with every request. |
+          | `none` | Sends no credentials. |
+
+          The only writes it makes are creating and deleting its own Redfish sessions. Everything else is read-only: it
+          changes no setting on the BMC and touches nothing on the systems behind it.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          A read-only Redfish account on the BMC. No elevated privileges are needed on the Agent host.
+      default_behavior:
+        auto_detection:
+          description: |
+            Endpoints are not auto-detected. Configure each BMC as a static or DynCfg job.
+        limits:
+          description: |
+            Only standard Redfish properties are collected. Vendor-specific OEM extensions are not.
+
+            A reading the endpoint does not return leaves a gap on the chart rather than a zero. Each request must
+            finish within `timeout` (15 seconds by default) and the whole walk within `update_every` (60 seconds by
+            default); when a walk runs out of time the collector publishes what it finished and starts fresh at the
+            next interval, so some charts skip that cycle.
+        performance_impact:
+          description: |
+            On the Agent host the cost is negligible — HTTP requests and JSON parsing.
+
+            On the BMC it scales with how many components the endpoint exposes, since one collection walks every
+            selected resource. The collector sends up to `max_concurrent_requests` at a time (3 by default, or one
+            when the ServiceRoot declares it cannot serve concurrent requests). BMCs are frequently slow and serialize
+            work internally, so a large chassis can keep the controller busy for much of the interval.
+
+            If the BMC struggles, raise `update_every`, lower `max_concurrent_requests`, or narrow `collect` to the
+            areas you need.
+    setup:
+      prerequisites:
+        list:
+          - title: Enable and authorize Redfish
+            description: |
+              Enable the BMC's Redfish service and create a least-privilege monitoring account that can read the desired systems,
+              chassis, managers, sensors, and storage.
+          - title: Establish network and TLS trust
+            description: |
+              Ensure the Netdata Agent can reach the BMC. Prefer HTTPS with a trusted BMC certificate or configure `tls_ca`.
+              `tls_skip_verify` is available for legacy/self-signed deployments but permits machine-in-the-middle attacks.
+      configuration:
+        file:
+          name: go.d/redfish.conf
+        options:
+          description: |
+            The following options apply per Redfish endpoint job. Credentials and private-key fields support Netdata secret
+            references such as `${env:VARIABLE}` and `${file:/path}`.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              group: Collection
+              description: Data collection interval, in seconds.
+              default_value: 60
+              required: false
+            - name: autodetection_retry
+              group: Collection
+              description: How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.
+              default_value: 0
+              required: false
+            - name: url
+              group: Target
+              description: URL of the Redfish service. Accepts the origin or the full ServiceRoot path, over HTTP or HTTPS. Use HTTPS when the job sends credentials; over HTTP they travel in clear text, and the job logs a warning.
+              default_value: ""
+              required: true
+            - name: vnode
+              group: Virtual Node
+              description: Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+            - name: auth_method
+              group: Authentication
+              description: "How to authenticate with the BMC: `auto`, `session`, `basic`, or `none`. `auto` prefers a Redfish session and falls back to HTTP Basic."
+              default_value: auto
+              required: false
+            - name: username
+              group: Authentication
+              description: Username of the BMC account. Required unless the authentication method is `none`.
+              default_value: ""
+              required: false
+            - name: password
+              group: Authentication
+              description: Password of the BMC account. Required unless the authentication method is `none`.
+              default_value: ""
+              required: false
+            - name: timeout
+              group: HTTP
+              description: HTTP request timeout, in seconds.
+              default_value: 15
+              required: false
+            - name: max_concurrent_requests
+              group: HTTP
+              description: Maximum number of requests sent to this BMC at the same time. Lower it for controllers that rate-limit or respond slowly.
+              default_value: 3
+              required: false
+            - name: proxy_url
+              group: HTTP
+              description: Proxy to use for the BMC requests. Leave empty to use the proxy settings from the environment.
+              default_value: ""
+              required: false
+            - name: tls_ca
+              group: TLS
+              description: Path to a CA bundle file used to verify the BMC certificate. Leave empty to use the system trust store.
+              default_value: ""
+              required: false
+            - name: tls_cert
+              group: TLS
+              description: Path to a client certificate file for mutual TLS. Requires a client key.
+              default_value: ""
+              required: false
+            - name: tls_key
+              group: TLS
+              description: Path to the client key file for mutual TLS. Requires a client certificate.
+              default_value: ""
+              required: false
+            - name: tls_skip_verify
+              group: TLS
+              description: Accept any certificate the BMC presents, including self-signed and expired ones.
+              default_value: false
+              required: false
+            - name: collect
+              group: Collection
+              description: "Simple pattern selecting which component areas to collect: `base`, `compute`, `memory`, `thermal`, `power`, `storage`, `network`, `pcie`, `sensors`, `firmware`. Base is always collected."
+              default_value: "*"
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Monitor a BMC
+              description: Collect hardware readings and health from one Redfish endpoint.
+              config: |
+                jobs:
+                  - name: bmc
+                    url: https://192.0.2.1/redfish/v1/
+                    username: monitoring
+                    password: ${file:/etc/netdata/redfish-password}
+                    tls_ca: /etc/netdata/redfish-ca.pem
+            - name: Attach to a configured virtual node
+              description: Define a virtual node in vnodes.conf, then attach this endpoint job to it.
+              config: |
+                jobs:
+                  - name: remote-bmc
+                    vnode: server-one
+                    url: https://192.0.2.1/redfish/v1/
+                    username: monitoring
+                    password: ${file:/etc/netdata/redfish-password}
+    troubleshooting:
+      errors:
+        list:
+          - error: "`config validation: 'username' and 'password' are required for auth_method \"<method>\"`"
+            when: |
+              At job start, with `auth_method` set to `auto`, `session`, or `basic`.
+            cause: |
+              Only these three modes send credentials, and both `username` and `password` must be set for them. The
+              message also appears the other way round (`must be empty for auth_method "none"`) when credentials are
+              left in place after switching a job to `none`.
+            fix: |
+              Set both fields, or switch `auth_method` to `none` for an endpoint that takes no credentials. Values may
+              be secret references such as `${file:/etc/netdata/redfish-password}` rather than literals.
+          - error: "`ServiceRoot has no RedfishVersion`"
+            when: |
+              At job start or on the first collection, after the URL responded.
+            cause: |
+              The address answered, but what it returned is not a Redfish ServiceRoot. Usually `url` points at the BMC's
+              web UI, a load balancer, or a captive portal rather than at the Redfish service.
+            fix: |
+              Point `url` at the service origin or its ServiceRoot path — `https://<bmc-address>` or
+              `https://<bmc-address>/redfish/v1/`. Confirm with
+              `curl -k https://<bmc-address>/redfish/v1/`, which must return JSON containing `RedfishVersion`.
+          - error: "`Redfish endpoint check: Redfish TLS certificate verification failed`"
+            when: |
+              With an `https://` URL and a BMC presenting a self-signed or internally issued certificate, or a
+              certificate issued for a different name than the one in `url`. During collection the same message
+              appears without the `Redfish endpoint check:` prefix.
+            cause: |
+              The Agent host does not trust the certificate authority that signed the BMC's certificate, or the
+              certificate does not cover the address in `url`. Most BMCs ship with a self-signed certificate. The
+              collector logs this summary rather than the underlying TLS error text.
+            fix: |
+              Point `tls_ca` at the CA bundle that signed the certificate, or install that CA in the Agent host's trust
+              store; for a name mismatch, use the address the certificate was issued for. `tls_skip_verify: true` will
+              also connect, but it accepts any certificate and leaves the session open to interception — use it to
+              confirm the diagnosis, not as the permanent setting.
+          - error: "The job starts and passes its check, then collects nothing"
+            when: |
+              With `auth_method` set to `auto` or `session`.
+            cause: |
+              In these modes the configuration test identifies the endpoint without opening a session, so it succeeds
+              before the credentials are ever used. They are validated when collection starts.
+            fix: |
+              Check the username and password, and that the BMC account may read the systems, chassis, managers,
+              sensors, and storage you expect. `auth_method: basic` exercises the credentials on every request and
+              fails more visibly while you are diagnosing.
+          - error: "Collection takes as long as, or longer than, the interval"
+            cause: |
+              The endpoint exposes more components than it can serve within `update_every`. BMCs are frequently slow and
+              many serialize requests internally, so the walk cannot be shortened by concurrency alone. The collector
+              publishes what it finished and starts fresh at the next interval, leaving gaps on some charts.
+            fix: |
+              Raise `update_every`, narrow `collect` to the areas you need, or lower `max_concurrent_requests` for a
+              controller that degrades under parallel load. Raise `timeout` only when individual responses genuinely
+              need longer.
+          - error: "A component or reading is missing from the charts"
+            cause: |
+              The collector reads standard Redfish properties only; vendor-specific OEM extensions are skipped. A BMC
+              may also omit a property, or expose it in a shape the standard schemas do not describe. Its area may also
+              be excluded by `collect`.
+            fix: |
+              Check `collect` covers the area first. If it does, report the vendor, model, and firmware version with a
+              sanitized payload from the affected resource so support can be added.
+
+    alerts:
+      - name: redfish_assembly_conditions
+        metric: redfish.assembly.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Assembly Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_assembly_health
+        metric: redfish.assembly.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Assembly Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_assembly_health_rollup
+        metric: redfish.assembly.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Assembly Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_battery_conditions
+        metric: redfish.battery.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Battery Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_battery_health
+        metric: redfish.battery.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Battery Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_battery_health_rollup
+        metric: redfish.battery.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Battery Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_chassis_conditions
+        metric: redfish.chassis.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Chassis Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_chassis_health
+        metric: redfish.chassis.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Chassis Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_chassis_health_rollup
+        metric: redfish.chassis.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Chassis Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_chassis_intrusion_state
+        metric: redfish.chassis.intrusion_state
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Chassis Intrusion State"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_collection_status
+        metric: redfish.collection.status
+        info: "Redfish endpoint ${label:_collect_job} reports a non-healthy state for Redfish Collection Status"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_control_conditions
+        metric: redfish.control.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Control Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_control_health
+        metric: redfish.control.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Control Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_control_health_rollup
+        metric: redfish.control.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Control Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_coolant_connector_conditions
+        metric: redfish.coolant_connector.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Coolant Connector Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_coolant_connector_health
+        metric: redfish.coolant_connector.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Coolant Connector Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_coolant_connector_health_rollup
+        metric: redfish.coolant_connector.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Coolant Connector Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_drive_conditions
+        metric: redfish.drive.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Drive Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_drive_failure_predicted
+        metric: redfish.drive.failure_predicted
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Drive Failure Prediction"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_drive_health
+        metric: redfish.drive.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Drive Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_drive_health_rollup
+        metric: redfish.drive.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Drive Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_drive_status_indicator
+        metric: redfish.drive.status_indicator
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Drive Status Indicator"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_ethernet_interface_conditions
+        metric: redfish.ethernet_interface.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Ethernet Interface Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_ethernet_interface_health
+        metric: redfish.ethernet_interface.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Ethernet Interface Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_ethernet_interface_health_rollup
+        metric: redfish.ethernet_interface.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Ethernet Interface Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_fan_conditions
+        metric: redfish.fan.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Fan Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_fan_health
+        metric: redfish.fan.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Fan Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_fan_health_rollup
+        metric: redfish.fan.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Fan Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_filter_conditions
+        metric: redfish.filter.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Filter Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_filter_health
+        metric: redfish.filter.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Filter Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_filter_health_rollup
+        metric: redfish.filter.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Filter Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_firmware_conditions
+        metric: redfish.firmware.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Firmware Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_firmware_health
+        metric: redfish.firmware.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Firmware Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_firmware_health_rollup
+        metric: redfish.firmware.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Firmware Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_heater_conditions
+        metric: redfish.heater.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Heater Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_heater_health
+        metric: redfish.heater.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Heater Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_heater_health_rollup
+        metric: redfish.heater.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Heater Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_leak_detection_conditions
+        metric: redfish.leak_detection.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Leak Detection Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_leak_detection_health
+        metric: redfish.leak_detection.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Leak Detection Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_leak_detection_health_rollup
+        metric: redfish.leak_detection.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Leak Detection Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_leak_detector_conditions
+        metric: redfish.leak_detector.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Leak Detector Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_leak_detector_detector_state
+        metric: redfish.leak_detector.detector_state
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Leak Detector State"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_leak_detector_health
+        metric: redfish.leak_detector.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Leak Detector Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_leak_detector_health_rollup
+        metric: redfish.leak_detector.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Leak Detector Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_leak_detector_group_conditions
+        metric: redfish.leak_detector_group.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Leak Detector Group Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_leak_detector_group_health
+        metric: redfish.leak_detector_group.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Leak Detector Group Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_leak_detector_group_health_rollup
+        metric: redfish.leak_detector_group.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Leak Detector Group Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_manager_conditions
+        metric: redfish.manager.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Manager Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_manager_health
+        metric: redfish.manager.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Manager Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_manager_health_rollup
+        metric: redfish.manager.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Manager Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_memory_conditions
+        metric: redfish.memory.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Memory Module Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_memory_health
+        metric: redfish.memory.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Memory Module Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_memory_health_rollup
+        metric: redfish.memory.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Memory Module Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_network_adapter_conditions
+        metric: redfish.network_adapter.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Network Adapter Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_network_adapter_health
+        metric: redfish.network_adapter.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Network Adapter Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_network_adapter_health_rollup
+        metric: redfish.network_adapter.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Network Adapter Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_network_device_function_conditions
+        metric: redfish.network_device_function.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Network Device Function Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_network_device_function_health
+        metric: redfish.network_device_function.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Network Device Function Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_network_device_function_health_rollup
+        metric: redfish.network_device_function.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Network Device Function Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_network_interface_conditions
+        metric: redfish.network_interface.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Network Interface Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_network_interface_health
+        metric: redfish.network_interface.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Network Interface Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_network_interface_health_rollup
+        metric: redfish.network_interface.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Network Interface Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_network_port_conditions
+        metric: redfish.network_port.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Network Port Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_network_port_health
+        metric: redfish.network_port.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Network Port Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_network_port_health_rollup
+        metric: redfish.network_port.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Network Port Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_pcie_device_conditions
+        metric: redfish.pcie_device.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for PCIe Device Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_pcie_device_health
+        metric: redfish.pcie_device.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for PCIe Device Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_pcie_device_health_rollup
+        metric: redfish.pcie_device.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for PCIe Device Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_pcie_function_conditions
+        metric: redfish.pcie_function.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for PCIe Function Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_pcie_function_health
+        metric: redfish.pcie_function.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for PCIe Function Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_pcie_function_health_rollup
+        metric: redfish.pcie_function.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for PCIe Function Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_port_conditions
+        metric: redfish.port.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Port Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_port_health
+        metric: redfish.port.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Port Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_port_health_rollup
+        metric: redfish.port.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Port Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_power_subsystem_conditions
+        metric: redfish.power_subsystem.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Power Subsystem Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_power_subsystem_health
+        metric: redfish.power_subsystem.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Power Subsystem Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_power_subsystem_health_rollup
+        metric: redfish.power_subsystem.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Power Subsystem Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_power_supply_conditions
+        metric: redfish.power_supply.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Power Supply Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_power_supply_health
+        metric: redfish.power_supply.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Power Supply Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_power_supply_health_rollup
+        metric: redfish.power_supply.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Power Supply Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_power_supply_line_input_status
+        metric: redfish.power_supply.line_input_status
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Power Supply Line Input Status"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_processor_conditions
+        metric: redfish.processor.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Processor Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_processor_health
+        metric: redfish.processor.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Processor Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_processor_health_rollup
+        metric: redfish.processor.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Processor Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_processor_throttling_state
+        metric: redfish.processor.throttling_state
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Processor Throttling State"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_pump_conditions
+        metric: redfish.pump.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Pump Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_pump_health
+        metric: redfish.pump.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Pump Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_pump_health_rollup
+        metric: redfish.pump.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Pump Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_reading_alarm
+        metric: redfish.reading.alarm
+        info: "Redfish ${label:resource_name} reading ${label:reading_key} reports a non-healthy state for Redfish Reading Source Health State"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_redundancy_conditions
+        metric: redfish.redundancy.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Redundancy Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_redundancy_health
+        metric: redfish.redundancy.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Redundancy Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_redundancy_health_rollup
+        metric: redfish.redundancy.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Redundancy Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_sensor_conditions
+        metric: redfish.sensor.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Sensor Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_sensor_health
+        metric: redfish.sensor.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Sensor Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_sensor_health_rollup
+        metric: redfish.sensor.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Sensor Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_software_conditions
+        metric: redfish.software.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Software Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_software_health
+        metric: redfish.software.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Software Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_software_health_rollup
+        metric: redfish.software.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Software Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_storage_conditions
+        metric: redfish.storage.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Storage Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_storage_health
+        metric: redfish.storage.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Storage Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_storage_health_rollup
+        metric: redfish.storage.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Storage Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_storage_controller_conditions
+        metric: redfish.storage_controller.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Storage Controller Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_storage_controller_health
+        metric: redfish.storage_controller.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Storage Controller Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_storage_controller_health_rollup
+        metric: redfish.storage_controller.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Storage Controller Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_system_conditions
+        metric: redfish.system.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for System Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_system_health
+        metric: redfish.system.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for System Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_system_health_rollup
+        metric: redfish.system.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for System Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_thermal_subsystem_conditions
+        metric: redfish.thermal_subsystem.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Thermal Subsystem Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_thermal_subsystem_health
+        metric: redfish.thermal_subsystem.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Thermal Subsystem Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_thermal_subsystem_health_rollup
+        metric: redfish.thermal_subsystem.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Thermal Subsystem Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_volume_conditions
+        metric: redfish.volume.conditions
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Volume Conditions"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_volume_health
+        metric: redfish.volume.health
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Volume Health"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_volume_health_rollup
+        metric: redfish.volume.health_rollup
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Volume Health Rollup"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+      - name: redfish_volume_write_cache_state
+        metric: redfish.volume.write_cache_state
+        info: "Redfish ${label:resource_name} reports a non-healthy state for Volume Write Cache State"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redfish.conf
+    functions:
+      description: |
+        Inspect one configured endpoint's latest sensor readings, hardware health, and BMC-retained events, selected with
+        the Instance parameter. Sensors and Hardware show the latest completed collection and do not query the BMC when
+        you open them, so a row can be up to one `update_every` (60 seconds by default) plus that collection's duration
+        old; the Observed column is the start time of that collection and is the same for every row. Logs queries the
+        BMC on demand.
+      list:
+        - id: sensors
+          name: Redfish Sensors
+          description: |
+            Inspect current sensor readings beside the health the BMC reports and an independently derived threshold
+            health, so a crossed limit can be told apart from a fault the BMC has declared. The table holds one row per
+            sensor with its current reading; the average, peak, and threshold values a sensor also publishes are not
+            rows here (they appear on the charts), and power derived from energy is labeled as such. Derived health
+            reads OK when none of that sensor's own upper and lower limits is active (the BMC may still report other
+            faults), Not applicable when the sensor publishes no limits, and Unavailable when the published limits
+            cannot be used, the reading itself is unavailable, or too few readings have arrived to decide.
+          parameters:
+            - id: __job
+              name: Instance
+              description: Select the configured Redfish endpoint job.
+              type: select
+              required: false
+              default: First available job
+              options: []
+          returns:
+            description: |
+              One row per supported primary reading from the current collection. Missing or invalid values are blank; missing health is Not reported.
+            columns:
+              - name: "Key"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Stable row identity."
+              - name: "Sort"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Attention, name and identity ordering."
+              - name: "Sensor"
+                type: string
+                unit: ""
+                description: "Sensor or component reading."
+              - name: "Type"
+                type: string
+                unit: ""
+                description: "Measured quantity."
+              - name: "Reading"
+                type: float
+                unit: ""
+                description: "Current value; blank when unavailable."
+              - name: "Units"
+                type: string
+                unit: ""
+                description: "Reading units."
+              - name: "Health"
+                type: string
+                unit: ""
+                description: "BMC-reported health of this reading; not inherited component health."
+              - name: "Derived health (thresholds)"
+                type: string
+                unit: ""
+                description: "Locally evaluated threshold status; OK does not imply overall hardware health."
+              - name: "Data availability"
+                type: string
+                unit: ""
+                description: "Whether this reading has a usable value."
+              - name: "Observed"
+                type: timestamp
+                unit: ""
+                description: "Collection observation time; not the BMC's internal sampling time."
+              - name: "Resource"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Resource supplying this reading."
+              - name: "Resource URI"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Source resource address."
+              - name: "Source property"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Source reading property."
+              - name: "Location"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "BMC-reported physical context."
+              - name: "Source"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Whether this value was reported or calculated."
+              - name: "rowOptions"
+                type: none
+                unit: ""
+                visibility: hidden
+                description: "Row presentation."
+          performance: |
+            Reads data already collected by the job; no additional BMC requests. Response size grows with the number of rows.
+          security: |
+            Exposes device identity, health and source resource addresses to authorized operators. Does not expose credentials or session tokens.
+          availability: |
+            Available after collection produces usable data. Returns HTTP 503 before the first collection and after a total failure. Partial collections retain current rows and mark gaps.
+          require_cloud: false
+        - id: hardware
+          name: Redfish Hardware
+          description: |
+            Find components needing attention and inspect their identity, configuration and reported condition. Optional columns show CPU counts, memory and storage capacity, firmware release dates and assembly revisions. Component health, aggregate health and collection availability are kept distinct.
+          parameters:
+            - id: __job
+              name: Instance
+              description: Select the configured Redfish endpoint job.
+              type: select
+              required: false
+              default: First available job
+              options: []
+          returns:
+            description: |
+              One row per monitored component or logical resource, including known resources that could not be read. Identity, configuration and version details are optional columns populated when reported by the BMC. Capacity belongs to the individual resource; physical drives and logical volumes must not be added together. Release date describes the firmware or software release, not its installation. Missing or unusable details are blank.
+            columns:
+              - name: "Key"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Stable row identity."
+              - name: "Sort"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Attention, name and identity ordering."
+              - name: "Component"
+                type: string
+                unit: ""
+                description: "Component or logical resource name."
+              - name: "Type"
+                type: string
+                unit: ""
+                description: "Resource kind."
+              - name: "Health"
+                type: string
+                unit: ""
+                description: "BMC-reported health of this component."
+              - name: "State"
+                type: string
+                unit: ""
+                description: "BMC-reported operational state."
+              - name: "Location"
+                type: string
+                unit: ""
+                description: "BMC-reported location or slot."
+              - name: "Reported issue"
+                type: string
+                unit: ""
+                description: "BMC conditions, rollup warnings or predicted failure."
+              - name: "Data availability"
+                type: string
+                unit: ""
+                description: "Whether this component was read in this collection."
+              - name: "Observed"
+                type: timestamp
+                unit: ""
+                description: "Collection observation time; not the BMC's internal sampling time."
+              - name: "Manufacturer"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Component manufacturer."
+              - name: "Model"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Component model."
+              - name: "Serial number"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Component serial number."
+              - name: "Part number"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Component part number."
+              - name: "Asset tag"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Component asset tag."
+              - name: "Firmware"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Firmware, software or BIOS version."
+              - name: "Power state"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "BMC-reported power state."
+              - name: "Health rollup"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "BMC-reported aggregate health, separate from component health."
+              - name: "Failure predicted"
+                type: boolean
+                unit: ""
+                visibility: hidden
+                description: "BMC predicts component failure."
+              - name: "Resource URI"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Source resource address."
+              - name: "Processor cores"
+                type: integer
+                unit: "cores"
+                visibility: hidden
+                description: "Total cores in this processor."
+              - name: "Enabled cores"
+                type: integer
+                unit: "cores"
+                visibility: hidden
+                description: "Enabled cores in this processor."
+              - name: "Supported threads"
+                type: integer
+                unit: "threads"
+                visibility: hidden
+                description: "Execution threads supported by this processor."
+              - name: "Capacity"
+                type: integer
+                unit: "bytes"
+                visibility: hidden
+                description: "Capacity of this memory device, physical drive or logical volume. Memory capacity is converted from MiB to bytes."
+              - name: "Memory type"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Memory device technology, such as DDR4 or DDR5."
+              - name: "Media type"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Drive media type, such as SSD or HDD."
+              - name: "Drive protocol"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Protocol used by this drive, such as SAS, SATA or NVMe."
+              - name: "RAID type"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "RAID configuration of this logical volume."
+              - name: "Release date"
+                type: timestamp
+                unit: ""
+                visibility: hidden
+                description: "Firmware or software release/production date; not installation time."
+              - name: "Hardware version"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Vendor-reported hardware version of this assembly."
+              - name: "Engineering revision"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Engineering change level or revision of this assembly."
+              - name: "rowOptions"
+                type: none
+                unit: ""
+                visibility: hidden
+                description: "Row presentation."
+          performance: |
+            Reads data already collected by the job; no additional BMC requests. Response size grows with the number of rows.
+          security: |
+            Exposes device identity, health and source resource addresses to authorized operators. Does not expose credentials or session tokens.
+          availability: |
+            Available after collection produces usable data. Returns HTTP 503 before the first collection and after a total failure. Partial collections retain current rows and mark gaps.
+          require_cloud: false
+        - id: logs
+          name: Redfish Logs
+          description: |
+            Browse events currently retained by one BMC log service in the Logs view. Select the endpoint job and a service linked from its Systems, Managers or Chassis. Refresh reads the log again; BMC rotation or clearing can remove events. This viewer does not store an archive.
+          parameters:
+            - id: __job
+              name: Instance
+              description: Select the configured Redfish endpoint job.
+              type: select
+              required: false
+              default: First available job
+              options: []
+            - id: service
+              name: Log service
+              description: Select a linked service advertised by this endpoint.
+              type: select
+              required: true
+              default: First advertised service in the UI
+              options: []
+            - id: severity
+              name: Severity
+              description: Filter by BMC severity. Unknown includes missing and unrecognized values.
+              type: select
+              required: false
+              default: all
+              options:
+                - {id: all, name: All severities, default: true}
+                - {id: Critical, name: Critical}
+                - {id: Warning, name: Warning}
+                - {id: OK, name: OK}
+                - {id: Unknown, name: Unknown}
+            - id: after
+              name: After
+              description: Inclusive lower time boundary in integer Unix seconds. A negative value is relative to before, or to now when before is omitted.
+              type: integer
+              required: false
+              default: No lower boundary
+              options: []
+            - id: before
+              name: Before
+              description: Inclusive upper time boundary in integer Unix seconds. Zero or a negative value is relative to now.
+              type: integer
+              required: false
+              default: No upper boundary
+              options: []
+            - id: query
+              name: Search
+              description: 'Case-sensitive Netdata simple patterns against the combined message, IDs, resource addresses, entry type and reported severity. Use `*failure*` for a substring. Space-separated patterns are checked in order; the first match decides, `!` excludes, and no match excludes the row. Use `!*noise* *` to exclude noise and keep everything else.'
+              type: string
+              required: false
+              default: No text filter
+              options: []
+          returns:
+            description: |
+              One row per matching retained entry. Time uses EventTimestamp, then valid Created. Both originals and the time basis remain available in details. Undated entries remain visible as Unavailable after dated rows, with a notice that the time range cannot filter them. Refresh replaces all rows. Failed pages or members fail the request instead of returning a partial log as complete.
+            columns:
+              - name: "Order"
+                type: integer
+                unit: ""
+                visibility: hidden
+                description: "Newest first, then undated entries; row position within this query."
+              - name: "Time"
+                type: timestamp
+                unit: ""
+                description: "EventTimestamp with valid Created fallback; Unavailable when neither can be used."
+              - name: "Severity"
+                type: string
+                unit: ""
+                description: "OK, Warning, Critical or Unknown."
+              - name: "Message"
+                type: string
+                unit: ""
+                description: "BMC event message."
+              - name: "Entry ID"
+                type: string
+                unit: ""
+                description: "Identifier assigned by this log service."
+              - name: "Entry type"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "BMC event format."
+              - name: "Log service"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Selected source resource."
+              - name: "Entry URI"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Source entry resource."
+              - name: "Message ID"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "BMC message registry identifier."
+              - name: "EventTimestamp"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Original event time, including invalid source values."
+              - name: "Created"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Original entry creation time, including invalid source values."
+              - name: "Time basis"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "EventTimestamp, Created or Unavailable."
+              - name: "Reported severity"
+                type: string
+                unit: ""
+                visibility: hidden
+                description: "Original severity, including unrecognized source values."
+              - name: "rowOptions"
+                type: none
+                unit: ""
+                visibility: hidden
+                description: "Row presentation."
+          performance: |
+            Each query discovers linked services and reads every page and entry of the selected log before filtering. There is no event cap; cost grows with BMC retention and pagination. Reads share the job's `max_concurrent_requests` budget with metrics. The default UI refresh is 60 seconds. Slow full scans can fail at the Function deadline; narrow time or text filters do not reduce BMC reads.
+          security: |
+            Uses the job's existing credentials, TLS and proxy settings. Reading logs requires BMC permissions for the linked services and entries. Queries are read-only apart from creating and deleting their authentication sessions. Event messages may contain sensitive operational information; credentials and session tokens are not returned.
+          availability: |
+            Available for running jobs without waiting for a successful metric poll. An empty service selector means no supported linked services were advertised. Missing Entries support and inaccessible services return an error; an empty readable log returns an empty table. The view has no histogram, live tail or historical archive, and a multi-page read is not an atomic snapshot.
+          require_cloud: false
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Charts appear when the endpoint exposes their source properties. Resource health includes BMC-provided HealthRollup.
+      availability: []
+      dynamic_context_prefixes:
+        - prefix: redfish.
+          reason: Optional resource, reading, and collection charts depend on the properties the endpoint exposes.
+      scopes:
+        - name: endpoint
+          description: Collection state for one configured Redfish endpoint job.
+          labels:
+            - name: endpoint_key
+              description: Stable canonical endpoint key.
+          metrics:
+            - name: redfish.collection.duration
+              description: Redfish Collection Duration
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: redfish.collection.failures
+              description: Redfish Collection Failures
+              unit: failures
+              chart_type: stacked
+              dimensions:
+                - name: auth
+                - name: tls
+                - name: transport
+                - name: timeout
+                - name: protocol
+                - name: limit
+                - name: internal
+            - name: redfish.collection.http_requests
+              description: Redfish Collection HTTP Requests
+              unit: requests/cycle
+              chart_type: line
+              dimensions:
+                - name: started
+                - name: redirected
+            - name: redfish.collection.operations
+              description: Redfish Collection Operations
+              unit: operations/cycle
+              chart_type: stacked
+              dimensions:
+                - name: successful
+                - name: failed
+            - name: redfish.collection.resources
+              description: Redfish Collection Resources
+              unit: resources
+              chart_type: line
+              dimensions:
+                - name: discovered
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.collection.status
+              description: Redfish Collection Status
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: partial
+                - name: unavailable
+            - name: redfish.collection.traffic
+              description: Redfish Collection Traffic
+              unit: bytes/cycle
+              chart_type: line
+              dimensions:
+                - name: received
+        - name: resource
+          description: Measurements and health states for each supported resource exposed by the endpoint.
+          labels:
+            - name: endpoint_key
+              description: Stable canonical endpoint key.
+            - name: resource_key
+              description: Stable resource identity within the endpoint.
+            - name: resource_kind
+              description: Redfish resource kind.
+            - name: resource_name
+              description: Current resource display name.
+            - name: slot
+              description: Slot, device locator, or socket, when the resource reports one.
+            - name: location
+              description: Service label of the physical location, when the resource reports one.
+            - name: manufacturer
+              description: Manufacturer, when the resource reports one.
+            - name: model
+              description: Model, when the resource reports one.
+          metrics:
+            - name: redfish.chassis.acquisition_state
+              description: Chassis Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.chassis.conditions
+              description: Chassis Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.chassis.health
+              description: Chassis Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.chassis.health_rollup
+              description: Chassis Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.chassis.intrusion_state
+              description: Chassis Intrusion State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: normal
+                - name: hardware_intrusion
+                - name: tampering_detected
+                - name: unknown
+            - name: redfish.chassis.power_state
+              description: Chassis Power State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: on
+                - name: off
+                - name: powering_on
+                - name: powering_off
+                - name: paused
+                - name: unknown
+            - name: redfish.chassis.state
+              description: Chassis State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.redundancy.acquisition_state
+              description: Redundancy Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.redundancy.conditions
+              description: Redundancy Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.redundancy.enabled
+              description: Redundancy Enabled
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: disabled
+                - name: enabled
+                - name: unknown
+            - name: redfish.redundancy.health
+              description: Redundancy Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.redundancy.health_rollup
+              description: Redundancy Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.redundancy.members
+              description: Redundancy Members
+              unit: members
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: total
+            - name: redfish.redundancy.mode
+              description: Redundancy Mode
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: failover
+                - name: n_plus_m
+                - name: sharing
+                - name: sparing
+                - name: not_redundant
+                - name: unknown
+            - name: redfish.redundancy.state
+              description: Redundancy State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.sensor.acquisition_state
+              description: Sensor Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.sensor.conditions
+              description: Sensor Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.sensor.health
+              description: Sensor Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.sensor.health_rollup
+              description: Sensor Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.sensor.state
+              description: Sensor State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.service.acquisition_state
+              description: Redfish Service Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.system.memory_bandwidth
+              description: System Memory Bandwidth
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: bandwidth
+            - name: redfish.system.memory_summary_health
+              description: System Memory Summary Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.system.memory_summary_health_rollup
+              description: System Memory Summary Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.system.memory_summary_state
+              description: System Memory Summary State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.system.memory_utilization
+              description: System Memory Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: capacity
+            - name: redfish.system.processor_bandwidth
+              description: System Processor Bandwidth
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: bandwidth
+            - name: redfish.system.processor_summary_health
+              description: System Processor Summary Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.system.processor_summary_health_rollup
+              description: System Processor Summary Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.system.processor_summary_state
+              description: System Processor Summary State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.system.processor_utilization
+              description: System Processor Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: kernel
+                - name: user
+            - name: redfish.system.acquisition_state
+              description: System Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.system.conditions
+              description: System Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.system.health
+              description: System Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.system.health_rollup
+              description: System Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.system.power_state
+              description: System Power State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: on
+                - name: off
+                - name: powering_on
+                - name: powering_off
+                - name: paused
+                - name: unknown
+            - name: redfish.system.state
+              description: System State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.processor.pcie_error_rate
+              description: Processor PCIe Error Rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: bad_dllp
+                - name: bad_tlp
+                - name: correctable
+                - name: fatal
+                - name: flow_control_timeout
+                - name: l0_to_recovery
+                - name: nak_received
+                - name: nak_sent
+                - name: non_fatal
+                - name: replay
+                - name: replay_rollover
+                - name: unsupported_request
+            - name: redfish.processor.acquisition_state
+              description: Processor Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.processor.bandwidth_utilization
+              description: Processor Bandwidth Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: bandwidth
+            - name: redfish.processor.clock_speed
+              description: Processor Clock Speed
+              unit: MHz
+              chart_type: line
+              dimensions:
+                - name: operating
+            - name: redfish.processor.conditions
+              description: Processor Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.processor.error_rate
+              description: Processor Error Rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: correctable_core
+                - name: correctable_other
+                - name: uncorrectable_core
+                - name: uncorrectable_other
+            - name: redfish.processor.frequency_ratio
+              description: Processor Frequency Ratio
+              unit: ratio
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: redfish.processor.health
+              description: Processor Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.processor.health_rollup
+              description: Processor Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.processor.power_state
+              description: Processor Power State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: on
+                - name: off
+                - name: powering_on
+                - name: powering_off
+                - name: paused
+                - name: unknown
+            - name: redfish.processor.state
+              description: Processor State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.processor.thermal_headroom
+              description: Processor Thermal Headroom
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: headroom
+            - name: redfish.processor.throttle_time
+              description: Processor Throttle Time
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: power_limit
+                - name: thermal_limit
+            - name: redfish.processor.throttling_state
+              description: Processor Throttling State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: clear
+                - name: throttled
+                - name: unknown
+            - name: redfish.processor.utilization
+              description: Processor Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: user
+                - name: kernel
+            - name: redfish.processor_core.acquisition_state
+              description: Processor Core Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.processor_core.cycle_rate
+              description: Processor Core Cycle Rate
+              unit: cycles/s
+              chart_type: line
+              dimensions:
+                - name: io_stall
+                - name: memory_stall
+                - name: unhalted
+            - name: redfish.processor_core.error_rate
+              description: Processor Core Error Rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: correctable_core
+                - name: correctable_other
+                - name: uncorrectable_core
+                - name: uncorrectable_other
+            - name: redfish.processor_core.instructions_per_cycle
+              description: Processor Core Instructions per Cycle
+              unit: instructions/cycle
+              chart_type: line
+              dimensions:
+                - name: instructions
+            - name: redfish.memory.acquisition_state
+              description: Memory Module Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.memory.bandwidth_utilization
+              description: Memory Module Bandwidth Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: redfish.memory.capacity_utilization
+              description: Memory Module Capacity Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: redfish.memory.conditions
+              description: Memory Module Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.memory.dirty_shutdown_rate
+              description: Memory Module Dirty Shutdown Rate
+              unit: shutdowns/s
+              chart_type: line
+              dimensions:
+                - name: shutdowns
+            - name: redfish.memory.error_rate
+              description: Memory Module Error Rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: correctable
+                - name: indeterminate_correctable
+                - name: uncorrectable
+                - name: indeterminate_uncorrectable
+            - name: redfish.memory.health
+              description: Memory Module Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.memory.health_flags
+              description: Memory Module Health Flags
+              unit: flags
+              chart_type: stacked
+              dimensions:
+                - name: data_loss
+                - name: last_shutdown_failed
+                - name: performance_degraded
+                - name: address_parity
+                - name: correctable_ecc
+                - name: spare_block
+                - name: temperature
+                - name: uncorrectable_ecc
+            - name: redfish.memory.health_rollup
+              description: Memory Module Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.memory.io
+              description: Memory Module I/O
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+            - name: redfish.memory.media_health
+              description: Memory Module Media Health
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: life_left
+                - name: spare_remaining
+            - name: redfish.memory.state
+              description: Memory Module State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.control.acquisition_state
+              description: Control Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.control.conditions
+              description: Control Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.control.frequency
+              description: Control Frequency
+              unit: hertz
+              chart_type: line
+              dimensions:
+                - name: sensor
+                - name: setpoint
+                - name: setpoint_error
+            - name: redfish.control.health
+              description: Control Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.control.health_rollup
+              description: Control Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.control.linear_acceleration
+              description: Control Linear Acceleration
+              unit: meters/second2
+              chart_type: line
+              dimensions:
+                - name: sensor
+                - name: setpoint
+                - name: setpoint_error
+            - name: redfish.control.linear_position
+              description: Control Linear Position
+              unit: meters
+              chart_type: line
+              dimensions:
+                - name: sensor
+                - name: setpoint
+                - name: setpoint_error
+            - name: redfish.control.linear_velocity
+              description: Control Linear Velocity
+              unit: meters/second
+              chart_type: line
+              dimensions:
+                - name: sensor
+                - name: setpoint
+                - name: setpoint_error
+            - name: redfish.control.liquid_flow
+              description: Control Liquid Flow
+              unit: liters/minute
+              chart_type: line
+              dimensions:
+                - name: sensor
+                - name: setpoint
+                - name: setpoint_error
+            - name: redfish.control.percentage
+              description: Control Percentage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: sensor
+                - name: setpoint
+                - name: setpoint_error
+            - name: redfish.control.power
+              description: Control Power
+              unit: watts
+              chart_type: line
+              dimensions:
+                - name: sensor
+                - name: setpoint
+                - name: setpoint_error
+            - name: redfish.control.pressure
+              description: Control Pressure
+              unit: pascals
+              chart_type: line
+              dimensions:
+                - name: sensor
+                - name: setpoint
+                - name: setpoint_error
+            - name: redfish.control.rotational_acceleration
+              description: Control Rotational Acceleration
+              unit: radians/second2
+              chart_type: line
+              dimensions:
+                - name: sensor
+                - name: setpoint
+                - name: setpoint_error
+            - name: redfish.control.rotational_position
+              description: Control Rotational Position
+              unit: radians
+              chart_type: line
+              dimensions:
+                - name: sensor
+                - name: setpoint
+                - name: setpoint_error
+            - name: redfish.control.rotational_velocity
+              description: Control Rotational Velocity
+              unit: radians/second
+              chart_type: line
+              dimensions:
+                - name: sensor
+                - name: setpoint
+                - name: setpoint_error
+            - name: redfish.control.state
+              description: Control State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.control.temperature
+              description: Control Temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: sensor
+                - name: setpoint
+                - name: setpoint_error
+            - name: redfish.control.valve_position
+              description: Control Valve Position
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: sensor
+                - name: setpoint
+                - name: setpoint_error
+            - name: redfish.coolant_connector.acquisition_state
+              description: Coolant Connector Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.coolant_connector.conditions
+              description: Coolant Connector Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.coolant_connector.health
+              description: Coolant Connector Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.coolant_connector.health_rollup
+              description: Coolant Connector Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.coolant_connector.state
+              description: Coolant Connector State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.fan.acquisition_state
+              description: Fan Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.fan.conditions
+              description: Fan Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.fan.health
+              description: Fan Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.fan.health_rollup
+              description: Fan Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.fan.state
+              description: Fan State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.filter.acquisition_state
+              description: Filter Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.filter.conditions
+              description: Filter Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.filter.health
+              description: Filter Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.filter.health_rollup
+              description: Filter Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.filter.state
+              description: Filter State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.heater.acquisition_state
+              description: Heater Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.heater.conditions
+              description: Heater Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.heater.health
+              description: Heater Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.heater.health_rollup
+              description: Heater Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.heater.heating_time
+              description: Heater Heating Time
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: pre_power_on
+                - name: runtime
+            - name: redfish.heater.state
+              description: Heater State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.leak_detection.acquisition_state
+              description: Leak Detection Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.leak_detection.conditions
+              description: Leak Detection Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.leak_detection.health
+              description: Leak Detection Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.leak_detection.health_rollup
+              description: Leak Detection Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.leak_detection.state
+              description: Leak Detection State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.leak_detector.acquisition_state
+              description: Leak Detector Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.leak_detector.conditions
+              description: Leak Detector Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.leak_detector.detector_state
+              description: Leak Detector State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unavailable
+                - name: absent
+                - name: unknown
+            - name: redfish.leak_detector.health
+              description: Leak Detector Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.leak_detector.health_rollup
+              description: Leak Detector Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.leak_detector.state
+              description: Leak Detector State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.leak_detector_group.acquisition_state
+              description: Leak Detector Group Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.leak_detector_group.conditions
+              description: Leak Detector Group Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.leak_detector_group.health
+              description: Leak Detector Group Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.leak_detector_group.health_rollup
+              description: Leak Detector Group Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.leak_detector_group.state
+              description: Leak Detector Group State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.pump.acquisition_state
+              description: Pump Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.pump.conditions
+              description: Pump Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.pump.health
+              description: Pump Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.pump.health_rollup
+              description: Pump Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.pump.state
+              description: Pump State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.thermal_subsystem.acquisition_state
+              description: Thermal Subsystem Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.thermal_subsystem.conditions
+              description: Thermal Subsystem Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.thermal_subsystem.health
+              description: Thermal Subsystem Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.thermal_subsystem.health_rollup
+              description: Thermal Subsystem Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.thermal_subsystem.state
+              description: Thermal Subsystem State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.battery.acquisition_state
+              description: Battery Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.battery.c_rate
+              description: Battery C-rate
+              unit: ratio
+              chart_type: line
+              dimensions:
+                - name: rate
+            - name: redfish.battery.charge_capacity
+              description: Battery Charge Capacity
+              unit: ampere-hours
+              chart_type: line
+              dimensions:
+                - name: actual
+            - name: redfish.battery.charge_state
+              description: Battery Charge State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: idle
+                - name: charging
+                - name: discharging
+                - name: unknown
+            - name: redfish.battery.conditions
+              description: Battery Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.battery.e_rate
+              description: Battery E-rate
+              unit: ratio
+              chart_type: line
+              dimensions:
+                - name: rate
+            - name: redfish.battery.energy_capacity
+              description: Battery Energy Capacity
+              unit: watt-hours
+              chart_type: line
+              dimensions:
+                - name: actual
+            - name: redfish.battery.health
+              description: Battery Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.battery.health_rollup
+              description: Battery Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.battery.metrics_health
+              description: Battery Metrics Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.battery.metrics_health_rollup
+              description: Battery Metrics Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.battery.metrics_state
+              description: Battery Metrics State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.battery.state
+              description: Battery State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.power_subsystem.acquisition_state
+              description: Power Subsystem Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.power_subsystem.capacity
+              description: Power Subsystem Capacity
+              unit: watts
+              chart_type: line
+              dimensions:
+                - name: allocated
+                - name: requested
+            - name: redfish.power_subsystem.conditions
+              description: Power Subsystem Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.power_subsystem.health
+              description: Power Subsystem Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.power_subsystem.health_rollup
+              description: Power Subsystem Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.power_subsystem.state
+              description: Power Subsystem State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.power_supply.acquisition_state
+              description: Power Supply Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.power_supply.conditions
+              description: Power Supply Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.power_supply.health
+              description: Power Supply Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.power_supply.health_rollup
+              description: Power Supply Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.power_supply.line_input_status
+              description: Power Supply Line Input Status
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: normal
+                - name: loss_of_input
+                - name: out_of_range
+                - name: unknown
+            - name: redfish.power_supply.metrics_health
+              description: Power Supply Metrics Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.power_supply.metrics_health_rollup
+              description: Power Supply Metrics Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.power_supply.metrics_state
+              description: Power Supply Metrics State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.power_supply.state
+              description: Power Supply State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.drive.acquisition_state
+              description: Drive Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.drive.conditions
+              description: Drive Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.drive.error_rate
+              description: Drive Error Rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: correctable_read
+                - name: correctable_write
+                - name: uncorrectable_read
+                - name: uncorrectable_write
+                - name: bad_blocks
+            - name: redfish.drive.failure_predicted
+              description: Drive Failure Prediction
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: clear
+                - name: predicted
+                - name: unknown
+            - name: redfish.drive.health
+              description: Drive Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.drive.health_rollup
+              description: Drive Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.drive.io
+              description: Drive I/O
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+            - name: redfish.drive.link_speed
+              description: Drive Link Speed
+              unit: bit/s
+              chart_type: line
+              dimensions:
+                - name: negotiated
+            - name: redfish.drive.media_life
+              description: Drive Media Life
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: remaining
+            - name: redfish.drive.nvme.busy_time
+              description: Drive NVMe Busy Time
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: busy
+            - name: redfish.drive.nvme.commands
+              description: Drive NVMe Commands
+              unit: commands/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+            - name: redfish.drive.nvme.critical_warnings
+              description: Drive NVMe Critical Warnings
+              unit: flags
+              chart_type: stacked
+              dimensions:
+                - name: media_read_only
+                - name: subsystem_degraded
+                - name: pmr_unreliable
+                - name: power_backup_failed
+                - name: spare_capacity_worn_out
+                - name: namespaces_read_only
+                - name: reliability_degraded
+                - name: spare_capacity_under_threshold
+            - name: redfish.drive.nvme.error_rate
+              description: Drive NVMe Error Rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: media_integrity
+                - name: error_log_entries
+            - name: redfish.drive.nvme.event_rate
+              description: Drive NVMe Event Rate
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: unsafe_shutdowns
+                - name: power_cycles
+            - name: redfish.drive.nvme.io
+              description: Drive NVMe I/O
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+            - name: redfish.drive.nvme.spare
+              description: Drive NVMe Spare
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: available
+            - name: redfish.drive.nvme.temperature
+              description: Drive NVMe Temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: composite
+            - name: redfish.drive.nvme.thermal_time
+              description: Drive NVMe Thermal Time
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: warning
+                - name: critical
+                - name: management_1
+                - name: management_2
+            - name: redfish.drive.nvme.thermal_transition_rate
+              description: Drive NVMe Thermal Transition Rate
+              unit: transitions/s
+              chart_type: line
+              dimensions:
+                - name: management_1
+                - name: management_2
+            - name: redfish.drive.nvme.wear
+              description: Drive NVMe Wear
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: redfish.drive.queue_depth
+              description: Drive Queue Depth
+              unit: commands
+              chart_type: line
+              dimensions:
+                - name: commands
+            - name: redfish.drive.state
+              description: Drive State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.drive.status_indicator
+              description: Drive Status Indicator
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: fail
+                - name: rebuild
+                - name: predictive_failure_analysis
+                - name: hotspare
+                - name: in_a_critical_array
+                - name: in_a_failed_array
+                - name: unknown
+            - name: redfish.storage.acquisition_state
+              description: Storage Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.storage.conditions
+              description: Storage Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.storage.health
+              description: Storage Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.storage.health_rollup
+              description: Storage Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.storage.io
+              description: Storage I/O
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+            - name: redfish.storage.iops
+              description: Storage IOPS
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+                - name: read_hit
+                - name: write_hit
+                - name: non_io
+            - name: redfish.storage.state
+              description: Storage State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.storage.state_change_rate
+              description: Storage State Change Rate
+              unit: changes/s
+              chart_type: line
+              dimensions:
+                - name: changes
+            - name: redfish.storage_controller.acquisition_state
+              description: Storage Controller Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.storage_controller.cache_health
+              description: Storage Controller Cache Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.storage_controller.cache_health_rollup
+              description: Storage Controller Cache Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.storage_controller.cache_state
+              description: Storage Controller Cache State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.storage_controller.conditions
+              description: Storage Controller Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.storage_controller.error_rate
+              description: Storage Controller Error Rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: correctable_ecc
+                - name: correctable_parity
+                - name: uncorrectable_ecc
+                - name: uncorrectable_parity
+            - name: redfish.storage_controller.health
+              description: Storage Controller Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.storage_controller.health_rollup
+              description: Storage Controller Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.storage_controller.nvme.busy_time
+              description: Storage Controller NVMe Busy Time
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: busy
+            - name: redfish.storage_controller.nvme.commands
+              description: Storage Controller NVMe Commands
+              unit: commands/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+            - name: redfish.storage_controller.nvme.critical_warnings
+              description: Storage Controller NVMe Critical Warnings
+              unit: flags
+              chart_type: stacked
+              dimensions:
+                - name: media_read_only
+                - name: subsystem_degraded
+                - name: pmr_unreliable
+                - name: power_backup_failed
+                - name: spare_capacity_worn_out
+                - name: namespaces_read_only
+                - name: reliability_degraded
+                - name: spare_capacity_under_threshold
+            - name: redfish.storage_controller.nvme.error_rate
+              description: Storage Controller NVMe Error Rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: media_integrity
+                - name: error_log_entries
+            - name: redfish.storage_controller.nvme.event_rate
+              description: Storage Controller NVMe Event Rate
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: unsafe_shutdowns
+                - name: power_cycles
+            - name: redfish.storage_controller.nvme.io
+              description: Storage Controller NVMe I/O
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+            - name: redfish.storage_controller.nvme.spare
+              description: Storage Controller NVMe Spare
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: available
+            - name: redfish.storage_controller.nvme.temperature
+              description: Storage Controller NVMe Temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: composite
+            - name: redfish.storage_controller.nvme.thermal_time
+              description: Storage Controller NVMe Thermal Time
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: warning
+                - name: critical
+                - name: management_1
+                - name: management_2
+            - name: redfish.storage_controller.nvme.thermal_transition_rate
+              description: Storage Controller NVMe Thermal Transition Rate
+              unit: transitions/s
+              chart_type: line
+              dimensions:
+                - name: management_1
+                - name: management_2
+            - name: redfish.storage_controller.nvme.wear
+              description: Storage Controller NVMe Wear
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: redfish.storage_controller.pcie_lanes
+              description: Storage Controller PCIe Lanes
+              unit: lanes
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: redfish.storage_controller.state
+              description: Storage Controller State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.storage_controller.state_change_rate
+              description: Storage Controller State Change Rate
+              unit: changes/s
+              chart_type: line
+              dimensions:
+                - name: changes
+            - name: redfish.volume.acquisition_state
+              description: Volume Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.volume.conditions
+              description: Volume Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.volume.error_rate
+              description: Volume Error Rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: correctable_read
+                - name: correctable_write
+                - name: uncorrectable_read
+                - name: uncorrectable_write
+                - name: consistency_check
+                - name: rebuild
+            - name: redfish.volume.event_rate
+              description: Volume Event Rate
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: consistency_checks
+                - name: state_changes
+            - name: redfish.volume.health
+              description: Volume Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.volume.health_rollup
+              description: Volume Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.volume.io
+              description: Volume I/O
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+            - name: redfish.volume.io_time
+              description: Volume I/O Time
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+                - name: non_io
+            - name: redfish.volume.iops
+              description: Volume IOPS
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: written
+                - name: read_hit
+                - name: write_hit
+                - name: non_io
+            - name: redfish.volume.remaining_capacity
+              description: Volume Remaining Capacity
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: remaining
+            - name: redfish.volume.space_savings
+              description: Volume Space Savings
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: compression
+                - name: deduplication
+                - name: thin_provisioning
+            - name: redfish.volume.state
+              description: Volume State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.volume.write_cache_state
+              description: Volume Write Cache State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: unprotected
+                - name: protected
+                - name: degraded
+                - name: unknown
+            - name: redfish.ethernet_interface.acquisition_state
+              description: Ethernet Interface Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.ethernet_interface.conditions
+              description: Ethernet Interface Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.ethernet_interface.health
+              description: Ethernet Interface Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.ethernet_interface.health_rollup
+              description: Ethernet Interface Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.ethernet_interface.link_speed
+              description: Ethernet Interface Link Speed
+              unit: bit/s
+              chart_type: line
+              dimensions:
+                - name: speed
+            - name: redfish.ethernet_interface.link_status
+              description: Ethernet Interface Link Status
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: link_up
+                - name: no_link
+                - name: link_down
+                - name: unknown
+            - name: redfish.ethernet_interface.state
+              description: Ethernet Interface State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.network_adapter.acquisition_state
+              description: Network Adapter Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.network_adapter.conditions
+              description: Network Adapter Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.network_adapter.cpu_utilization
+              description: Network Adapter CPU Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: cpu
+            - name: redfish.network_adapter.frames
+              description: Network Adapter Frame Rate
+              unit: frames/s
+              chart_type: line
+              dimensions:
+                - name: received_unicast
+                - name: received_multicast
+                - name: sent_unicast
+                - name: sent_multicast
+            - name: redfish.network_adapter.health
+              description: Network Adapter Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.network_adapter.health_rollup
+              description: Network Adapter Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.network_adapter.host_bus_utilization
+              description: Network Adapter Host Bus Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: redfish.network_adapter.ncsi_frames
+              description: Network Adapter NCSI Frame Rate
+              unit: frames/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: redfish.network_adapter.ncsi_traffic
+              description: Network Adapter NCSI Traffic
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: redfish.network_adapter.state
+              description: Network Adapter State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.network_adapter.traffic
+              description: Network Adapter Traffic
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: redfish.network_device_function.acquisition_state
+              description: Network Device Function Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.network_device_function.conditions
+              description: Network Device Function Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.network_device_function.frames
+              description: Network Device Function Frame Rate
+              unit: frames/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: received_unicast
+                - name: sent_unicast
+                - name: received_multicast
+                - name: sent_multicast
+            - name: redfish.network_device_function.health
+              description: Network Device Function Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.network_device_function.health_rollup
+              description: Network Device Function Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.network_device_function.queue_depth
+              description: Network Device Function Queue Depth
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: redfish.network_device_function.queue_empty_state
+              description: Network Device Function Empty Queue State
+              unit: flags
+              chart_type: stacked
+              dimensions:
+                - name: received
+                - name: sent
+            - name: redfish.network_device_function.queue_full
+              description: Network Device Function Full Queues
+              unit: queues
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: redfish.network_device_function.state
+              description: Network Device Function State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.network_device_function.traffic
+              description: Network Device Function Traffic
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: redfish.network_interface.acquisition_state
+              description: Network Interface Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.network_interface.conditions
+              description: Network Interface Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.network_interface.health
+              description: Network Interface Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.network_interface.health_rollup
+              description: Network Interface Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.network_interface.state
+              description: Network Interface State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.network_port.acquisition_state
+              description: Network Port Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.network_port.conditions
+              description: Network Port Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.network_port.health
+              description: Network Port Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.network_port.health_rollup
+              description: Network Port Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.network_port.link_speed
+              description: Network Port Link Speed
+              unit: bit/s
+              chart_type: line
+              dimensions:
+                - name: speed
+            - name: redfish.network_port.link_status
+              description: Network Port Link Status
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: down
+                - name: up
+                - name: starting
+                - name: training
+                - name: unknown
+            - name: redfish.network_port.signal_detected
+              description: Network Port Signal Detected
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: clear
+                - name: detected
+                - name: unknown
+            - name: redfish.network_port.state
+              description: Network Port State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.pcie_device.acquisition_state
+              description: PCIe Device Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.pcie_device.conditions
+              description: PCIe Device Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.pcie_device.health
+              description: PCIe Device Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.pcie_device.health_rollup
+              description: PCIe Device Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.pcie_device.link_width
+              description: PCIe Device Link Width
+              unit: lanes
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: redfish.pcie_device.state
+              description: PCIe Device State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.pcie_function.acquisition_state
+              description: PCIe Function Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.pcie_function.conditions
+              description: PCIe Function Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.pcie_function.health
+              description: PCIe Function Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.pcie_function.health_rollup
+              description: PCIe Function Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.pcie_function.state
+              description: PCIe Function State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.port.acquisition_state
+              description: Port Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.port.conditions
+              description: Port Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.port.error_rate
+              description: Port Error Rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: redfish.port.frames
+              description: Port Frame Rate
+              unit: frames/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+                - name: received_unicast
+                - name: sent_unicast
+                - name: received_multicast
+                - name: sent_multicast
+                - name: received_broadcast
+                - name: sent_broadcast
+            - name: redfish.port.health
+              description: Port Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.port.health_rollup
+              description: Port Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.port.link_speed
+              description: Port Link Speed
+              unit: bit/s
+              chart_type: line
+              dimensions:
+                - name: speed
+            - name: redfish.port.link_state
+              description: Port Link State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: unknown
+            - name: redfish.port.link_status
+              description: Port Link Status
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: link_up
+                - name: starting
+                - name: training
+                - name: link_down
+                - name: no_link
+                - name: unknown
+            - name: redfish.port.link_width
+              description: Port Link Width
+              unit: lanes
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: redfish.port.network_error_rate
+              description: Port Network Error Rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: received_discards
+                - name: sent_discards
+                - name: received_fcs
+                - name: received_false_carrier
+                - name: received_alignment
+                - name: received_oversize
+                - name: received_undersize
+                - name: sent_excessive_collisions
+                - name: sent_late_collisions
+                - name: sent_multiple_collisions
+                - name: sent_single_collisions
+            - name: redfish.port.pcie_drop_rate
+              description: Port PCIe Drop Rate
+              unit: drops/s
+              chart_type: line
+              dimensions:
+                - name: completion_credit
+                - name: non_posted_credit
+                - name: tag_unavailable
+            - name: redfish.port.pcie_error_rate
+              description: Port PCIe Error Rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: bad_dllp
+                - name: bad_tlp
+                - name: correctable
+                - name: fatal
+                - name: flow_control_timeout
+                - name: l0_to_recovery
+                - name: nak_received
+                - name: nak_sent
+                - name: non_fatal
+                - name: replay
+                - name: replay_rollover
+                - name: unsupported_request
+            - name: redfish.port.pcie_tlp_rate
+              description: Port PCIe TLP Rate
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: completion
+                - name: read
+                - name: write
+            - name: redfish.port.pcie_traffic
+              description: Port PCIe Traffic
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: completion
+                - name: read
+                - name: write
+            - name: redfish.port.rdma_error_rate
+              description: Port RDMA Error Rate
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: protection
+                - name: protocol
+            - name: redfish.port.rdma_traffic
+              description: Port RDMA Traffic
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: redfish.port.signal_detected
+              description: Port Signal Detected
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: clear
+                - name: detected
+                - name: unknown
+            - name: redfish.port.state
+              description: Port State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.port.traffic
+              description: Port Traffic
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: redfish.assembly.acquisition_state
+              description: Assembly Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.assembly.conditions
+              description: Assembly Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.assembly.health
+              description: Assembly Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.assembly.health_rollup
+              description: Assembly Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.assembly.state
+              description: Assembly State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.firmware.acquisition_state
+              description: Firmware Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.firmware.conditions
+              description: Firmware Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.firmware.health
+              description: Firmware Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.firmware.health_rollup
+              description: Firmware Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.firmware.state
+              description: Firmware State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.manager.acquisition_state
+              description: Manager Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.manager.clock_offset
+              description: Manager Clock Offset
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: offset
+            - name: redfish.manager.conditions
+              description: Manager Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.manager.health
+              description: Manager Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.manager.health_rollup
+              description: Manager Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.manager.power_state
+              description: Manager Power State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: on
+                - name: off
+                - name: powering_on
+                - name: powering_off
+                - name: paused
+                - name: unknown
+            - name: redfish.manager.state
+              description: Manager State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+            - name: redfish.software.acquisition_state
+              description: Software Acquisition State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: readable
+                - name: unreadable
+                - name: unknown
+            - name: redfish.software.conditions
+              description: Software Conditions
+              unit: conditions
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.software.health
+              description: Software Health
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.software.health_rollup
+              description: Software Health Rollup
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+                - name: unknown
+            - name: redfish.software.state
+              description: Software State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: enabled
+                - name: disabled
+                - name: standby_offline
+                - name: standby_spare
+                - name: in_test
+                - name: starting
+                - name: absent
+                - name: unavailable_offline
+                - name: deferring
+                - name: quiesced
+                - name: updating
+                - name: qualified
+                - name: degraded
+                - name: unknown
+        - name: reading
+          description: One physical sensor reading or source-provided measurement excerpt.
+          labels:
+            - name: endpoint_key
+              description: Stable canonical endpoint key.
+            - name: resource_key
+              description: Stable identity of the resource supplying the reading.
+            - name: resource_kind
+              description: Kind of the resource supplying the reading.
+            - name: resource_name
+              description: Resource supplying the reading.
+            - name: slot
+              description: Slot, device locator, or socket of the supplying resource, when reported.
+            - name: location
+              description: Service label of the supplying resource's physical location, when reported.
+            - name: manufacturer
+              description: Manufacturer of the supplying resource, when reported.
+            - name: model
+              description: Model of the supplying resource, when reported.
+            - name: reading_key
+              description: Stable reading identity within the endpoint.
+            - name: reading_type
+              description: Reading type, such as temperature or voltage.
+            - name: physical_context
+              description: Redfish physical context of the sensor, when reported.
+            - name: physical_subcontext
+              description: Redfish physical sub-context of the sensor, when reported.
+            - name: reading_basis
+              description: Zero, delta, or headroom measurement basis.
+            - name: reading_role
+              description: Current, average, minimum, or peak reading.
+          metrics:
+            - name: redfish.reading.percentage
+              description: Percentage Readings
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.alarm
+              description: Redfish Reading Source Health State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: critical
+            - name: redfish.reading.derived_health
+              description: Redfish Reading Derived Health (Thresholds)
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: ok
+                - name: warning
+                - name: critical
+            - name: redfish.reading.absolute_humidity
+              description: Absolute Humidity Readings
+              unit: grams/cubic-meter
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.air_flow
+              description: Air Flow Readings
+              unit: cubic-meters/minute
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.altitude
+              description: Altitude Readings
+              unit: meters
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.barometric_pressure
+              description: Barometric Pressure Readings
+              unit: pascals
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.heat
+              description: Heat Readings
+              unit: watts
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.humidity
+              description: Relative Humidity Readings
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.linear_acceleration
+              description: Linear Acceleration Readings
+              unit: meters/second2
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.linear_position
+              description: Linear Position Readings
+              unit: meters
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.linear_velocity
+              description: Linear Velocity Readings
+              unit: meters/second
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.liquid_flow
+              description: Liquid Flow Readings
+              unit: liters/minute
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.liquid_level
+              description: Liquid Level Readings
+              unit: meters
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.pressure
+              description: Pressure Readings
+              unit: pascals
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.rotational_acceleration
+              description: Rotational Acceleration Readings
+              unit: radians/second2
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.rotational_position
+              description: Rotational Position Readings
+              unit: radians
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.rotational_speed
+              description: Rotational Speed Readings
+              unit: RPM
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.rotational_velocity
+              description: Rotational Velocity Readings
+              unit: radians/second
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.temperature
+              description: Temperature Readings
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.valve_position
+              description: Valve Position Readings
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.apparent_energy
+              description: Apparent Energy Readings
+              unit: joule-equivalent
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.apparent_power
+              description: Apparent Power Readings
+              unit: volt-amperes
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.charge
+              description: Charge Readings
+              unit: ampere-hours
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.crest_factor
+              description: Crest Factor Readings
+              unit: ratio
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.current
+              description: Current Readings
+              unit: amperes
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.energy
+              description: Energy Readings
+              unit: joules
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.frequency
+              description: Frequency Readings
+              unit: hertz
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.harmonic_distortion
+              description: Harmonic Distortion Readings
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.phase_angle
+              description: Phase Angle Readings
+              unit: degrees
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.power
+              description: Power Readings
+              unit: watts
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.power_factor
+              description: Power Factor Readings
+              unit: ratio
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.reactive_energy
+              description: Reactive Energy Readings
+              unit: joule-equivalent
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.reactive_power
+              description: Reactive Power Readings
+              unit: vars
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.stored_energy
+              description: Stored Energy Readings
+              unit: watt-hours
+              chart_type: line
+              dimensions:
+                - name: value
+            - name: redfish.reading.voltage
+              description: Voltage Readings
+              unit: volts
+              chart_type: line
+              dimensions:
+                - name: value

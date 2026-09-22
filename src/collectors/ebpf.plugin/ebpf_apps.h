@@ -17,7 +17,6 @@
 
 #include "ebpf_process.h"
 #include "ebpf_disk.h"
-#include "ebpf_fd.h"
 #include "ebpf_filesystem.h"
 #include "ebpf_hardirq.h"
 #include "ebpf_mdflush.h"
@@ -42,7 +41,6 @@ enum ebpf_main_index {
     EBPF_MODULE_FILESYSTEM_IDX,
     EBPF_MODULE_DISK_IDX,
     EBPF_MODULE_MOUNT_IDX,
-    EBPF_MODULE_FD_IDX,
     EBPF_MODULE_HARDIRQ_IDX,
     EBPF_MODULE_SOFTIRQ_IDX,
     EBPF_MODULE_OOMKILL_IDX,
@@ -78,7 +76,6 @@ struct ebpf_target {
     // Changes made to simplify integration between apps and eBPF.
     netdata_publish_swap_t swap;
     netdata_publish_vfs_t vfs;
-    netdata_fd_stat_t fd;
     netdata_publish_shm_t shm;
     ebpf_process_stat_t process;
 
@@ -128,7 +125,6 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
     struct ebpf_pid_data *prev;
     struct ebpf_pid_data *next;
 
-    netdata_publish_fd_stat_t *fd;
     netdata_publish_swap_t *swap;
     netdata_publish_shm_t *shm;
     netdata_publish_vfs_t *vfs;
@@ -205,7 +201,6 @@ typedef struct ebpf_pid_stat {
     int sortlist; // higher numbers = top on the process tree
 
     // each process gets a unique number
-    netdata_fd_stat_t fd;
     ebpf_process_stat_t process;
     netdata_publish_shm_t shm;
     netdata_publish_swap_t swap;

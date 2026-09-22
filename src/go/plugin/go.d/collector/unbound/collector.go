@@ -46,14 +46,14 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode              string           `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery        int              `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	Address            string           `yaml:"address" json:"address"`
-	ConfPath           string           `yaml:"conf_path,omitempty" json:"conf_path"`
-	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	Cumulative         bool             `yaml:"cumulative_stats" json:"cumulative_stats"`
-	UseTLS             bool             `yaml:"use_tls,omitempty" json:"use_tls"`
+	Address            string           `yaml:"address"                       json:"address"`
+	ConfPath           string           `yaml:"conf_path,omitempty"           json:"conf_path"`
+	Timeout            confopt.Duration `yaml:"timeout,omitempty"             json:"timeout"`
+	Cumulative         bool             `yaml:"cumulative_stats"              json:"cumulative_stats"`
+	UseTLS             bool             `yaml:"use_tls,omitempty"             json:"use_tls"`
 	tlscfg.TLSConfig   `yaml:",inline" json:""`
 }
 
@@ -75,12 +75,12 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if enabled := c.initConfig(); !enabled {
 		return errors.New("remote control is disabled in the configuration file")
 	}
 
-	if err := c.initClient(); err != nil {
+	if err := c.initClient(ctx); err != nil {
 		return fmt.Errorf("creating client: %v", err)
 	}
 
@@ -94,7 +94,7 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
+func (c *Collector) Check(ctx context.Context) error {
 	mx, err := c.collect()
 	if err != nil {
 		return err
@@ -109,7 +109,7 @@ func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
+func (c *Collector) Collect(ctx context.Context) map[string]int64 {
 	mx, err := c.collect()
 	if err != nil {
 		c.Error(err)
@@ -121,7 +121,7 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
 	if c.client != nil {
 		_ = c.client.Disconnect()
 	}

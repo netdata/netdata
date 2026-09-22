@@ -2,6 +2,7 @@
 
 #include "database/rrd.h"
 #include "KolmogorovSmirnovDist.h"
+#include "weights-ranking.h"
 
 #define MAX_POINTS 10000
 
@@ -72,6 +73,10 @@ struct register_result {
     STORAGE_POINT highlighted;
     STORAGE_POINT baseline;
     usec_t duration_ut;
+    bool selected;
+    bool instance_selected;
+    bool context_selected;
+    bool node_selected;
 };
 
 struct weights_host_snapshot {
@@ -215,6 +220,84 @@ static void register_result(DICTIONARY *results, RRDHOST *host, STRING *hostname
     dictionary_set_advanced(results, buf, len, &t, sizeof(struct register_result), NULL);
 }
 
+static int weights_result_compare(const void *left, const void *right, void *data) {
+    const struct register_result *a = left, *b = right;
+    bool normalized = *(bool *)data;
+    if(a->value != b->value)
+        return ((a->value < b->value) == normalized) ? -1 : 1;
+
+    const ND_UUID *aid = UUIDiszero(a->host->host_id) ? &a->host->node_id : &a->host->host_id;
+    const ND_UUID *bid = UUIDiszero(b->host->host_id) ? &b->host->node_id : &b->host->host_id;
+    int rc = memcmp(aid->uuid, bid->uuid, sizeof(aid->uuid));
+    if(!rc) rc = strcmp(rrdcontext_acquired_id(a->rca), rrdcontext_acquired_id(b->rca));
+    if(!rc) rc = strcmp(rrdinstance_acquired_id(a->ria), rrdinstance_acquired_id(b->ria));
+    if(!rc) rc = strcmp(rrdmetric_acquired_id(a->rma), rrdmetric_acquired_id(b->rma));
+    return rc;
+}
+
+static void weights_parent_key(char *key, size_t size, char type, const void *parent) {
+    snprintfz(key, size, "%c%p", type, parent);
+}
+
+static WEIGHTS_RANKING weights_select_results(DICTIONARY *results, size_t limit, bool *normalized, bool mark_parents) {
+    size_t total = dictionary_entries(results);
+    WEIGHTS_RANKING ranking = {
+        .capacity = MIN(limit, total), .compare = weights_result_compare, .data = normalized,
+    };
+    struct register_result *t;
+    if(mark_parents && limit >= total) {
+        dfe_start_read(results, t)
+            t->selected = t->instance_selected = t->context_selected = t->node_selected = true;
+        dfe_done(t);
+        return ranking;
+    }
+
+    ranking.items = callocz(ranking.capacity, sizeof(*ranking.items));
+    dfe_start_read(results, t)
+        weights_ranking_offer(&ranking, t);
+    dfe_done(t);
+
+    if(!mark_parents)
+        return ranking;
+
+    DICTIONARY *parents = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    char key[2 * sizeof(void *) + 4];
+    for(size_t i = 0; i < ranking.used; i++) {
+        t = ranking.items[i];
+        t->selected = true;
+        weights_parent_key(key, sizeof(key), 'n', t->host);
+        dictionary_set(parents, key, "", 1);
+        weights_parent_key(key, sizeof(key), 'c', t->rca);
+        dictionary_set(parents, key, "", 1);
+        weights_parent_key(key, sizeof(key), 'i', t->ria);
+        dictionary_set(parents, key, "", 1);
+    }
+    dfe_start_read(results, t) {
+        weights_parent_key(key, sizeof(key), 'n', t->host);
+        t->node_selected = dictionary_get(parents, key) != NULL;
+        weights_parent_key(key, sizeof(key), 'c', t->rca);
+        t->context_selected = dictionary_get(parents, key) != NULL;
+        weights_parent_key(key, sizeof(key), 'i', t->ria);
+        t->instance_selected = dictionary_get(parents, key) != NULL;
+    }
+    dfe_done(t);
+    dictionary_destroy(parents);
+    return ranking;
+}
+
+static void weights_result_limit_to_json(BUFFER *wb, size_t limit, size_t total, size_t returned, bool grouped) {
+    if(!limit)
+        return;
+    buffer_json_member_add_object(wb, "result_limit");
+    buffer_json_member_add_uint64(wb, "limit", limit);
+    buffer_json_member_add_uint64(wb, "total", total);
+    buffer_json_member_add_uint64(wb, "returned", returned);
+    buffer_json_member_add_string(wb, "unit", grouped ? "groups" : "dimensions");
+    buffer_json_member_add_boolean(wb, "truncated", total > returned);
+    buffer_json_member_add_string(wb, "summary_scope", "all");
+    buffer_json_object_close(wb);
+}
+
 // ----------------------------------------------------------------------------
 // Generation of JSON output for the results
 
@@ -266,7 +349,7 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
                                                 size_t points, WEIGHTS_METHOD method,
                                                 RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                 size_t examined_dimensions, usec_t duration,
-                                                WEIGHTS_STATS *stats) {
+                                                WEIGHTS_STATS *stats, size_t limit) {
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
@@ -279,6 +362,8 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
     struct register_result *t;
     RRDINSTANCE_ACQUIRED *last_ria = NULL; // never access this - we use it only for comparison
     dfe_start_read(results, t) {
+        if(limit && !t->selected)
+            continue;
         if(t->ria != last_ria) {
             last_ria = t->ria;
 
@@ -305,8 +390,9 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
 
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
+    buffer_json_member_add_uint64(wb, "correlated_dimensions", dictionary_entries(results));
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
+    weights_result_limit_to_json(wb, limit, dictionary_entries(results), total_dimensions, false);
     buffer_json_finalize(wb);
 
     return total_dimensions;
@@ -318,7 +404,7 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
                                                   size_t points, WEIGHTS_METHOD method,
                                                   RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                   size_t examined_dimensions, usec_t duration,
-                                                  WEIGHTS_STATS *stats) {
+                                                  WEIGHTS_STATS *stats, size_t limit) {
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, (options & RRDR_OPTION_MINIFY) ? BUFFER_JSON_OPTIONS_MINIFY : BUFFER_JSON_OPTIONS_DEFAULT);
 
@@ -333,6 +419,8 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
     RRDCONTEXT_ACQUIRED *last_rca = NULL;
     RRDINSTANCE_ACQUIRED *last_ria = NULL;
     dfe_start_read(results, t) {
+        if(limit && !t->context_selected)
+            continue;
 
         if(t->rca != last_rca) {
             last_rca = t->rca;
@@ -357,6 +445,11 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
             last_ria = NULL;
         }
 
+        contexts_total_weight += t->value;
+        context_dims++;
+        if(limit && !t->instance_selected)
+            continue;
+
         if(t->ria != last_ria) {
             last_ria = t->ria;
 
@@ -374,12 +467,12 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
             charts_total_weight = 0.0;
         }
 
-        buffer_json_member_add_double(wb, rrdmetric_acquired_name(t->rma), t->value);
         charts_total_weight += t->value;
-        contexts_total_weight += t->value;
         chart_dims++;
-        context_dims++;
-        total_dimensions++;
+        if(!limit || t->selected) {
+            buffer_json_member_add_double(wb, rrdmetric_acquired_name(t->rma), t->value);
+            total_dimensions++;
+        }
     }
     dfe_done(t);
 
@@ -395,8 +488,9 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
 
     buffer_json_object_close(wb);
 
-    buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
+    buffer_json_member_add_uint64(wb, "correlated_dimensions", dictionary_entries(results));
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
+    weights_result_limit_to_json(wb, limit, dictionary_entries(results), total_dimensions, false);
     buffer_json_finalize(wb);
 
     return total_dimensions;
@@ -440,6 +534,7 @@ struct query_weights_data {
     DICTIONARY *results;
     DICTIONARY *host_snapshots;
     struct weights_host_snapshot *host_snapshot;
+    ONEWAYALLOC *query_owa;
     WEIGHTS_STATS stats;
     RRDHOST **hosts_array;
     size_t total_hosts;
@@ -590,6 +685,8 @@ void query_weights_worker_thread(void *arg)
         thread_data->local_examined_dimensions = local_qwd.examined_dimensions;
         thread_data->local_stats = local_qwd.stats;
     }
+
+    onewayalloc_destroy(local_qwd.query_owa);
 }
 
 // Thread-safe statistics merging - use simple addition since we're in single-threaded merge
@@ -758,6 +855,8 @@ typedef enum {
 
 struct aggregated_weight {
     const char *name;
+    const char *id;
+    bool selected;
     NETDATA_DOUBLE min;
     NETDATA_DOUBLE max;
     NETDATA_DOUBLE sum;
@@ -765,6 +864,28 @@ struct aggregated_weight {
     STORAGE_POINT hsp;
     STORAGE_POINT bsp;
 };
+
+static NETDATA_DOUBLE weights_group_score(const struct aggregated_weight *aw, RRDR_GROUP_BY_FUNCTION aggregation) {
+    switch(aggregation) {
+        case RRDR_GROUP_BY_FUNCTION_MIN: return aw->min;
+        case RRDR_GROUP_BY_FUNCTION_MAX:
+        case RRDR_GROUP_BY_FUNCTION_EXTREMES: return aw->max;
+        case RRDR_GROUP_BY_FUNCTION_SUM:
+        case RRDR_GROUP_BY_FUNCTION_PERCENTAGE: return aw->sum;
+        default: return aw->count ? aw->sum / (NETDATA_DOUBLE)aw->count : 0.0;
+    }
+}
+
+static int weights_group_compare(const void *left, const void *right, void *data) {
+    const struct aggregated_weight *a = left, *b = right;
+    const QUERY_WEIGHTS_REQUEST *qwr = data;
+    NETDATA_DOUBLE av = weights_group_score(a, qwr->group_by.aggregation);
+    NETDATA_DOUBLE bv = weights_group_score(b, qwr->group_by.aggregation);
+    bool normalized = !(qwr->options & RRDR_OPTION_RETURN_RAW) && qwr->method != WEIGHTS_METHOD_VALUE;
+    if(av != bv)
+        return ((av < bv) == normalized) ? -1 : 1;
+    return strcmp(a->id, b->id);
+}
 
 static inline void storage_point_to_json(BUFFER *wb, WEIGHTS_POINT_TYPE type, ssize_t di, ssize_t ii, ssize_t ci, ssize_t ni, struct aggregated_weight *aw, RRDR_OPTIONS options __maybe_unused, bool baseline) {
     if(type != WPT_GROUP) {
@@ -1029,6 +1150,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
 
     bool baseline = method == WEIGHTS_METHOD_MC_KS2 || method == WEIGHTS_METHOD_MC_VOLUME;
     multinode_data_schema(wb, options, "schema", baseline, false);
+    size_t limit = qwd->qwr->cardinality_limit;
 
     DICTIONARY *dict_nodes = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_node));
     DICTIONARY *dict_contexts = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_name_units));
@@ -1049,27 +1171,33 @@ static size_t registered_results_to_json_multinode_no_group_by(
     ssize_t di = -1, ii = -1, ci = -1, ni = -1;
     ssize_t di_max = 0, ii_max = 0, ci_max = 0, ni_max = 0;
     size_t total_dimensions = 0;
+    bool node_selected = false;
     dfe_start_read(results, t) {
 
         // close instance
         if(t->ria != last_ria && last_ria) {
-            storage_point_to_json(wb, WPT_INSTANCE, di, ii, ci, ni, &instance_aw, options, baseline);
-            instance_dun->exposed = true;
+            if(instance_dun) {
+                storage_point_to_json(wb, WPT_INSTANCE, di, ii, ci, ni, &instance_aw, options, baseline);
+                instance_dun->exposed = true;
+            }
             last_ria = NULL;
             instance_aw = AGGREGATED_WEIGHT_EMPTY;
         }
 
         // close context
         if(t->rca != last_rca && last_rca) {
-            storage_point_to_json(wb, WPT_CONTEXT, di, ii, ci, ni, &context_aw, options, baseline);
-            context_dun->exposed = true;
+            if(context_dun) {
+                storage_point_to_json(wb, WPT_CONTEXT, di, ii, ci, ni, &context_aw, options, baseline);
+                context_dun->exposed = true;
+            }
             last_rca = NULL;
             context_aw = AGGREGATED_WEIGHT_EMPTY;
         }
 
         // close node
         if(t->host != last_host && last_host) {
-            storage_point_to_json(wb, WPT_NODE, di, ii, ci, ni, &node_aw, options, baseline);
+            if(node_selected)
+                storage_point_to_json(wb, WPT_NODE, di, ii, ci, ni, &node_aw, options, baseline);
             node_dun->exposed = true;
             last_host = NULL;
             node_aw = AGGREGATED_WEIGHT_EMPTY;
@@ -1080,64 +1208,68 @@ static size_t registered_results_to_json_multinode_no_group_by(
             last_host = t->host;
             node_dun = dict_unique_node_add(dict_nodes, t->host, &ni_max);
             ni = node_dun->i;
+            node_selected = !limit || t->node_selected;
+            node_dun->exposed = true;
         }
 
         // open context
         if(t->rca != last_rca) {
             last_rca = t->rca;
-            context_dun = dict_unique_name_units_add(dict_contexts, rrdcontext_acquired_id(t->rca),
-                                                     rrdcontext_acquired_units(t->rca), &ci_max);
-            ci = context_dun->i;
+            context_dun = (!limit || t->context_selected) ?
+                dict_unique_name_units_add(dict_contexts, rrdcontext_acquired_id(t->rca),
+                                           rrdcontext_acquired_units(t->rca), &ci_max) : NULL;
+            ci = context_dun ? context_dun->i : -1;
         }
 
         // open instance
         if(t->ria != last_ria) {
             last_ria = t->ria;
-            instance_dun = dict_unique_id_name_add(dict_instances, rrdinstance_acquired_id(t->ria), rrdinstance_acquired_name(t->ria), &ii_max);
-            ii = instance_dun->i;
+            instance_dun = (!limit || t->instance_selected) ?
+                dict_unique_id_name_add(dict_instances, rrdinstance_acquired_id(t->ria), rrdinstance_acquired_name(t->ria), &ii_max) : NULL;
+            ii = instance_dun ? instance_dun->i : -1;
         }
 
-        dimension_dun = dict_unique_id_name_add(dict_dimensions, rrdmetric_acquired_id(t->rma), rrdmetric_acquired_name(t->rma), &di_max);
-        di = dimension_dun->i;
-
-        struct aggregated_weight aw = {
+        if(!limit || t->selected) {
+            dimension_dun = dict_unique_id_name_add(dict_dimensions, rrdmetric_acquired_id(t->rma), rrdmetric_acquired_name(t->rma), &di_max);
+            di = dimension_dun->i;
+            struct aggregated_weight aw = {
                 .min = t->value,
                 .max = t->value,
                 .sum = t->value,
                 .count = 1,
                 .hsp = t->highlighted,
                 .bsp = t->baseline,
-        };
+            };
 
-        storage_point_to_json(wb, WPT_DIMENSION, di, ii, ci, ni, &aw, options, baseline);
-        node_dun->exposed = true;
-        context_dun->exposed = true;
-        instance_dun->exposed = true;
-        dimension_dun->exposed = true;
+            storage_point_to_json(wb, WPT_DIMENSION, di, ii, ci, ni, &aw, options, baseline);
+            context_dun->exposed = true;
+            instance_dun->exposed = true;
+            dimension_dun->exposed = true;
+            total_dimensions++;
+        }
 
         merge_into_aw(instance_aw, t);
         merge_into_aw(context_aw, t);
         merge_into_aw(node_aw, t);
 
         node_dun->duration_ut += t->duration_ut;
-        total_dimensions++;
     }
     dfe_done(t);
 
     // close instance
-    if(last_ria) {
+    if(last_ria && instance_dun) {
         storage_point_to_json(wb, WPT_INSTANCE, di, ii, ci, ni, &instance_aw, options, baseline);
         instance_dun->exposed = true;
     }
 
     // close context
-    if(last_rca) {
+    if(last_rca && context_dun) {
         storage_point_to_json(wb, WPT_CONTEXT, di, ii, ci, ni, &context_aw, options, baseline);
         context_dun->exposed = true;
     }
 
     // close node
-    if(last_host) {
+    if(last_host && node_selected) {
         storage_point_to_json(wb, WPT_NODE, di, ii, ci, ni, &node_aw, options, baseline);
         node_dun->exposed = true;
     }
@@ -1218,8 +1350,9 @@ static size_t registered_results_to_json_multinode_no_group_by(
     buffer_json_object_close(wb); //dictionaries
 
     buffer_json_agents_v2(wb, &qwd->timings, 0, false, true, rrdr_options_to_contexts_options(options));
-    buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
+    buffer_json_member_add_uint64(wb, "correlated_dimensions", dictionary_entries(results));
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
+    weights_result_limit_to_json(wb, limit, dictionary_entries(results), total_dimensions, false);
     buffer_json_finalize(wb);
 
     dictionary_destroy(dict_nodes);
@@ -1335,28 +1468,46 @@ static size_t registered_results_to_json_multinode_group_by(
     buffer_free(name); name = NULL;
 
     struct aggregated_weight *aw;
+    size_t limit = qwd->qwr->cardinality_limit;
+    size_t total_groups = dictionary_entries(group_by), returned_groups = 0;
+    WEIGHTS_RANKING ranking = {.capacity = MIN(limit, total_groups), .compare = weights_group_compare, .data = qwd->qwr};
+    if(limit && limit < total_groups) {
+        ranking.items = callocz(ranking.capacity, sizeof(*ranking.items));
+        dfe_start_read(group_by, aw) {
+            aw->id = aw_dfe.name;
+            weights_ranking_offer(&ranking, aw);
+        }
+        dfe_done(aw);
+        for(size_t i = 0; i < ranking.used; i++)
+            ((struct aggregated_weight *)ranking.items[i])->selected = true;
+    }
     buffer_json_member_add_array(wb, "result");
     dfe_start_read(group_by, aw) {
         const char *k = aw_dfe.name;
         const char *n = aw->name;
 
-        buffer_json_add_array_item_object(wb);
-        buffer_json_member_add_string(wb, "id", k);
+        if(!limit || limit >= total_groups || aw->selected) {
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_string(wb, "id", k);
 
-        if(strcmp(k, n) != 0)
-            buffer_json_member_add_string(wb, "nm", n);
+            if(strcmp(k, n) != 0)
+                buffer_json_member_add_string(wb, "nm", n);
 
-        storage_point_to_json(wb, WPT_GROUP, 0, 0, 0, 0, aw, options, baseline);
-        buffer_json_object_close(wb);
+            storage_point_to_json(wb, WPT_GROUP, 0, 0, 0, 0, aw, options, baseline);
+            buffer_json_object_close(wb);
+            returned_groups++;
+        }
 
         freez((void *)aw->name);
     }
     dfe_done(aw);
     buffer_json_array_close(wb); // result
+    freez(ranking.items);
 
     buffer_json_agents_v2(wb, &qwd->timings, 0, false, true, rrdr_options_to_contexts_options(options));
     buffer_json_member_add_uint64(wb, "correlated_dimensions", total_dimensions);
     buffer_json_member_add_uint64(wb, "total_dimensions_count", examined_dimensions);
+    weights_result_limit_to_json(wb, limit, total_groups, returned_groups, true);
     buffer_json_finalize(wb);
 
     dictionary_destroy(group_by);
@@ -1370,30 +1521,18 @@ static size_t registered_results_to_json_multinode_group_by(
 typedef long int DIFFS_NUMBERS;
 #define DOUBLE_TO_INT_MULTIPLIER 100000
 
-static inline int binary_search_bigger_than(const DIFFS_NUMBERS arr[], int left, int size, DIFFS_NUMBERS K) {
-    // binary search to find the index the smallest index
-    // of the first value in the array that is greater than K
-
-    int right = size;
-    while(left < right) {
-        int middle = (int)(((unsigned int)(left + right)) >> 1);
-
-        if(arr[middle] > K)
-            right = middle;
-
-        else
-            left = middle + 1;
-    }
-
-    return left;
-}
-
 int compare_diffs(const void *left, const void *right) {
     DIFFS_NUMBERS lt = *(DIFFS_NUMBERS *)left;
     DIFFS_NUMBERS rt = *(DIFFS_NUMBERS *)right;
 
     // https://stackoverflow.com/a/3886497/1114110
     return (lt > rt) - (lt < rt);
+}
+
+static inline int cursor_bigger_than(const DIFFS_NUMBERS arr[], int cursor, int size, DIFFS_NUMBERS key) {
+    while(cursor < size && arr[cursor] <= key)
+        cursor++;
+    return cursor;
 }
 
 static size_t calculate_pairs_diff(DIFFS_NUMBERS *diffs, NETDATA_DOUBLE *arr, size_t size) {
@@ -1436,25 +1575,24 @@ static double ks_2samp(
     //
     // It should look like this:
     //
-    // base_pcent = binary_search_bigger_than(...) / base_size;
-    // high_pcent = binary_search_bigger_than(...) / high_size;
+    // base_pcent = upper_bound(baseline_diffs, K) / base_size;
+    // high_pcent = upper_bound(highlight_diffs, K) / high_size;
     // delta = base_pcent - high_pcent;
     // if(delta < min) min = delta;
     // if(delta > max) max = delta;
     //
     // This would require a lot of multiplications and divisions.
     //
-    // To speed it up, we do the binary search to find the index of each number
-    // but, then we divide the base index by the power of two number (shifts) it
-    // is bigger than high index. So the 2 indexes are now comparable.
+    // Sorted keys let each upper-bound cursor advance monotonically.
+    // Scale the highlight index by the requested power-of-two baseline ratio.
     // We also keep track of the original indexes with min and max, to properly
     // calculate their percentages once the loops finish.
 
 
     // initialize min and max using the first number of baseline_diffs
     DIFFS_NUMBERS K = baseline_diffs[0];
-    int base_idx = binary_search_bigger_than(baseline_diffs, 1, base_size, K);
-    int high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
+    int base_idx = cursor_bigger_than(baseline_diffs, 1, base_size, K);
+    int high_idx = cursor_bigger_than(highlight_diffs, 0, high_size, K);
     int64_t delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
     int64_t min = delta, max = delta;
     int base_min_idx = base_idx;
@@ -1465,8 +1603,8 @@ static double ks_2samp(
     // do the baseline_diffs starting from 1 (we did position 0 above)
     for(int i = 1; i < base_size; i++) {
         K = baseline_diffs[i];
-        base_idx = binary_search_bigger_than(baseline_diffs, i + 1, base_size, K); // starting from i, since data1 is sorted
-        high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
+        base_idx = cursor_bigger_than(baseline_diffs, base_idx, base_size, K);
+        high_idx = cursor_bigger_than(highlight_diffs, high_idx, high_size, K);
 
         delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
         if(delta < min) {
@@ -1481,11 +1619,12 @@ static double ks_2samp(
         }
     }
 
-    // do the highlight_diffs starting from 0
+    // Preserve baseline-first visitation and first-winner ties when lengths do not match the shift ratio.
+    base_idx = high_idx = 0;
     for(int i = 0; i < high_size; i++) {
         K = highlight_diffs[i];
-        base_idx = binary_search_bigger_than(baseline_diffs, 0, base_size, K);
-        high_idx = binary_search_bigger_than(highlight_diffs, i + 1, high_size, K); // starting from i, since data2 is sorted
+        base_idx = cursor_bigger_than(baseline_diffs, base_idx, base_size, K);
+        high_idx = cursor_bigger_than(highlight_diffs, high_idx, high_size, K);
 
         delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
         if(delta < min) {
@@ -1638,6 +1777,7 @@ cleanup:
 }
 
 static void rrdset_metric_correlations_ks2(
+        ONEWAYALLOC *owa,
         RRDHOST *host, STRING *hostname,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
@@ -1652,8 +1792,6 @@ static void rrdset_metric_correlations_ks2(
     options |= RRDR_OPTION_NATURAL_POINTS;
 
     usec_t started_ut = now_monotonic_usec();
-    ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
-
     size_t high_points = 0;
     STORAGE_POINT highlighted_sp;
     NETDATA_DOUBLE *highlight = NULL, *baseline = NULL;
@@ -1674,7 +1812,7 @@ static void rrdset_metric_correlations_ks2(
     if(!baseline)
         goto cleanup;
 
-    stats->binary_searches += 2 * (base_points - 1) + 2 * (high_points - 1);
+    // Sorted cursor scans perform no binary searches.
 
     double prob = kstwo(owa, baseline, (int)base_points, highlight, (int)high_points, shifts);
     if(!isnan(prob) && !isinf(prob)) {
@@ -1700,7 +1838,7 @@ static void rrdset_metric_correlations_ks2(
 cleanup:
     onewayalloc_freez(owa, highlight);
     onewayalloc_freez(owa, baseline);
-    onewayalloc_destroy(owa);
+    onewayalloc_reset(owa);
 }
 
 // ----------------------------------------------------------------------------
@@ -1715,6 +1853,7 @@ static void merge_query_value_to_stats(QUERY_VALUE *qv, WEIGHTS_STATS *stats, si
 }
 
 static void rrdset_metric_correlations_volume(
+        ONEWAYALLOC *owa,
         RRDHOST *host, STRING *hostname,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
@@ -1726,9 +1865,11 @@ static void rrdset_metric_correlations_volume(
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_ABSOLUTE | RRDR_OPTION_NATURAL_POINTS;
 
-    QUERY_VALUE baseline_average = rrdmetric2value(host, rca, ria, rma, baseline_after, baseline_before,
-                                                   options, time_group_method, time_group_options, tier, 0,
-                                                   QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    QUERY_VALUE baseline_average = rrdmetric2value_with_owa(
+            owa, host, rca, ria, rma, baseline_after, baseline_before,
+            options, time_group_method, time_group_options, tier, 0,
+            QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    onewayalloc_reset(owa);
     merge_query_value_to_stats(&baseline_average, stats, 1);
 
     if(!netdata_double_isnumber(baseline_average.value)) {
@@ -1736,9 +1877,11 @@ static void rrdset_metric_correlations_volume(
         baseline_average.value = 0.0;
     }
 
-    QUERY_VALUE highlight_average = rrdmetric2value(host, rca, ria, rma, after, before,
-                                                    options, time_group_method, time_group_options, tier, 0,
-                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    QUERY_VALUE highlight_average = rrdmetric2value_with_owa(
+            owa, host, rca, ria, rma, after, before,
+            options, time_group_method, time_group_options, tier, 0,
+            QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    onewayalloc_reset(owa);
     merge_query_value_to_stats(&highlight_average, stats, 1);
 
     if(!netdata_double_isnumber(highlight_average.value))
@@ -1756,9 +1899,11 @@ static void rrdset_metric_correlations_volume(
 
     char highlight_countif_options[50 + 1];
     snprintfz(highlight_countif_options, 50, "%s" NETDATA_DOUBLE_FORMAT, highlight_average.value < baseline_average.value ? "<" : ">", baseline_average.value);
-    QUERY_VALUE highlight_countif = rrdmetric2value(host, rca, ria, rma, after, before,
-                                                    options, RRDR_GROUPING_COUNTIF, highlight_countif_options, tier, 0,
-                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    QUERY_VALUE highlight_countif = rrdmetric2value_with_owa(
+            owa, host, rca, ria, rma, after, before,
+            options, RRDR_GROUPING_COUNTIF, highlight_countif_options, tier, 0,
+            QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    onewayalloc_reset(owa);
     merge_query_value_to_stats(&highlight_countif, stats, 1);
 
     if(!netdata_double_isnumber(highlight_countif.value)) {
@@ -1790,6 +1935,7 @@ static void rrdset_metric_correlations_volume(
 // VALUE / ANOMALY RATE algorithm functions
 
 static void rrdset_weights_value(
+        ONEWAYALLOC *owa,
         RRDHOST *host, STRING *hostname,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
@@ -1800,9 +1946,11 @@ static void rrdset_weights_value(
 
     options |= RRDR_OPTION_MATCH_IDS | RRDR_OPTION_NATURAL_POINTS;
 
-    QUERY_VALUE qv = rrdmetric2value(host, rca, ria, rma, after, before,
-                                     options, time_group_method, time_group_options, tier, 0,
-                                     QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    QUERY_VALUE qv = rrdmetric2value_with_owa(
+            owa, host, rca, ria, rma, after, before,
+            options, time_group_method, time_group_options, tier, 0,
+            QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS_FIRST);
+    onewayalloc_reset(owa);
 
     merge_query_value_to_stats(&qv, stats, 1);
 
@@ -1989,16 +2137,6 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
 // MCP format output
 
 // Comparator for sorting results by value (descending order - highest scores first)
-static int registered_results_value_compare(const DICTIONARY_ITEM **item1, const DICTIONARY_ITEM **item2) {
-    struct register_result *r1 = dictionary_acquired_item_value(*item1);
-    struct register_result *r2 = dictionary_acquired_item_value(*item2);
-    
-    // Sort by value in descending order (highest first)
-    if (r1->value < r2->value) return 1;
-    if (r1->value > r2->value) return -1;
-    return 0;
-}
-
 // Callback for sorted dictionary walkthrough
 struct mcp_output_state {
     BUFFER *wb;
@@ -2156,8 +2294,12 @@ static size_t registered_results_to_json_mcp(
         .limit = cardinality_limit
     };
     
-    // Walk through dictionary in sorted order (by value descending)
-    dictionary_sorted_walkthrough_rw(results, 'r', registered_results_to_json_mcp_callback, &state, registered_results_value_compare);
+    bool normalized = false;
+    WEIGHTS_RANKING ranking = weights_select_results(results, cardinality_limit, &normalized, false);
+    weights_ranking_sort(&ranking);
+    for(size_t i = 0; i < ranking.used; i++)
+        registered_results_to_json_mcp_callback(NULL, ranking.items[i], &state);
+    freez(ranking.items);
     
     buffer_json_array_close(wb); // results
     
@@ -2166,7 +2308,7 @@ static size_t registered_results_to_json_mcp(
     buffer_json_member_add_uint64(wb, "total_time_series_analyzed", examined_dimensions);
     buffer_json_member_add_uint64(wb, "total_time_series_returned", state.count);
     buffer_json_member_add_string(wb, "method", weights_method_to_string(method));
-    if (state.count >= cardinality_limit) {
+    if (dictionary_entries(results) > state.count) {
         buffer_json_member_add_uint64(wb, "cardinality_limit", cardinality_limit);
         buffer_json_member_add_boolean(wb, "truncated", true);
     }
@@ -2207,9 +2349,13 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
 
     __atomic_fetch_add(&qwd->examined_dimensions, 1, __ATOMIC_RELAXED);
 
+    if(unlikely(!qwd->query_owa))
+        qwd->query_owa = onewayalloc_create(16 * 1024);
+
     switch(qwr->method) {
         case WEIGHTS_METHOD_VALUE:
             rrdset_weights_value(
+                    qwd->query_owa,
                     host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->after, qwr->before,
@@ -2220,6 +2366,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
 
         case WEIGHTS_METHOD_ANOMALY_RATE:
             rrdset_weights_value(
+                    qwd->query_owa,
                     host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->after, qwr->before,
@@ -2231,6 +2378,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
 
         case WEIGHTS_METHOD_MC_VOLUME:
             rrdset_metric_correlations_volume(
+                    qwd->query_owa,
                     host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->baseline_after, qwr->baseline_before,
@@ -2243,6 +2391,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
         default:
         case WEIGHTS_METHOD_MC_KS2:
             rrdset_metric_correlations_ks2(
+                    qwd->query_owa,
                     host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->baseline_after, qwr->baseline_before,
@@ -2657,6 +2806,15 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
         qwr->format != WEIGHTS_FORMAT_MCP)
         spread_results_evenly(qwd.results, &qwd.stats);
 
+    // Select only after complete scoring and normalization; parents keep full-query aggregates.
+    qwr->group_by.group_by &= ~(RRDR_GROUP_BY_LABEL|RRDR_GROUP_BY_SELECTED|RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE);
+    if(qwr->cardinality_limit && qwr->format != WEIGHTS_FORMAT_MCP &&
+       (qwr->format != WEIGHTS_FORMAT_MULTINODE || qwr->group_by.group_by == RRDR_GROUP_BY_NONE)) {
+        bool normalized = !(qwr->options & RRDR_OPTION_RETURN_RAW) && qwr->method != WEIGHTS_METHOD_VALUE;
+        WEIGHTS_RANKING ranking = weights_select_results(qwd.results, qwr->cardinality_limit, &normalized, true);
+        freez(ranking.items);
+    }
+
     usec_t ended_usec = qwd.timings.executed_ut = now_monotonic_usec();
 
     // generate the json output we need
@@ -2672,7 +2830,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
                             qwr->baseline_after, qwr->baseline_before,
                             qwr->points, qwr->method, qwr->time_group_method, qwr->options, qwd.shifts,
                             qwd.examined_dimensions,
-                            ended_usec - qwd.timings.received_ut, &qwd.stats);
+                            ended_usec - qwd.timings.received_ut, &qwd.stats, qwr->cardinality_limit);
             break;
 
         case WEIGHTS_FORMAT_CONTEXTS:
@@ -2683,7 +2841,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
                             qwr->baseline_after, qwr->baseline_before,
                             qwr->points, qwr->method, qwr->time_group_method, qwr->options, qwd.shifts,
                             qwd.examined_dimensions,
-                            ended_usec - qwd.timings.received_ut, &qwd.stats);
+                            ended_usec - qwd.timings.received_ut, &qwd.stats, qwr->cardinality_limit);
             break;
 
         case WEIGHTS_FORMAT_MCP:
@@ -2699,8 +2857,6 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
         default:
         case WEIGHTS_FORMAT_MULTINODE:
-            // we don't support these groupings in weights
-            qwr->group_by.group_by &= ~(RRDR_GROUP_BY_LABEL|RRDR_GROUP_BY_SELECTED|RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE);
             if(qwr->group_by.group_by == RRDR_GROUP_BY_NONE) {
                 added_dimensions =
                         registered_results_to_json_multinode_no_group_by(
@@ -2730,6 +2886,8 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
     }
 
 cleanup:
+    onewayalloc_destroy(qwd.query_owa);
+
     simple_pattern_free(qwd.scope_nodes_sp);
     simple_pattern_free(qwd.scope_contexts_sp);
     simple_pattern_free(qwd.scope_instances_sp);
@@ -2804,6 +2962,178 @@ static int double_expect(double v, const char *str, const char *descr) {
 
     fprintf(stderr, "%s %s, expected %s, got %s\n", ret?"FAILED":"OK", descr, str, buf);
     return ret;
+}
+
+// Keep the original lookup only as a regression-test oracle.
+static inline int binary_search_bigger_than(const DIFFS_NUMBERS arr[], int left, int size, DIFFS_NUMBERS key) {
+    int right = size;
+    while(left < right) {
+        int middle = (int)(((unsigned int)(left + right)) >> 1);
+        if(arr[middle] > key)
+            right = middle;
+        else
+            left = middle + 1;
+    }
+    return left;
+}
+
+// Differential reference: netdata/netdata @ 5e76a5ca7f,
+// src/web/api/queries/weights.c:1416-1528. Known-answer tests below remain independent.
+static double ks_2samp_binary_reference(
+        DIFFS_NUMBERS baseline_diffs[], int base_size,
+        DIFFS_NUMBERS highlight_diffs[], int high_size,
+        uint32_t base_shifts) {
+
+    // high_idx is bounded by high_size; keep the scaled comparison representable.
+    if(unlikely(base_shifts >= sizeof(int64_t) * CHAR_BIT - 1))
+        return NAN;
+    int64_t high_multiplier = 1;
+    for(uint32_t shift = 0; shift < base_shifts; shift++)
+        high_multiplier *= 2;
+    if(unlikely((int64_t)high_size > INT64_MAX / high_multiplier))
+        return NAN;
+
+    qsort(baseline_diffs, base_size, sizeof(DIFFS_NUMBERS), compare_diffs);
+    qsort(highlight_diffs, high_size, sizeof(DIFFS_NUMBERS), compare_diffs);
+
+    // Preserve the pre-cursor algorithm independently of the production walk.
+    // initialize min and max using the first number of baseline_diffs
+    DIFFS_NUMBERS K = baseline_diffs[0];
+    int base_idx = binary_search_bigger_than(baseline_diffs, 1, base_size, K);
+    int high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
+    int64_t delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
+    int64_t min = delta, max = delta;
+    int base_min_idx = base_idx;
+    int base_max_idx = base_idx;
+    int high_min_idx = high_idx;
+    int high_max_idx = high_idx;
+
+    // do the baseline_diffs starting from 1 (we did position 0 above)
+    for(int i = 1; i < base_size; i++) {
+        K = baseline_diffs[i];
+        base_idx = binary_search_bigger_than(baseline_diffs, i + 1, base_size, K); // starting from i, since data1 is sorted
+        high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
+
+        delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
+        if(delta < min) {
+            min = delta;
+            base_min_idx = base_idx;
+            high_min_idx = high_idx;
+        }
+        else if(delta > max) {
+            max = delta;
+            base_max_idx = base_idx;
+            high_max_idx = high_idx;
+        }
+    }
+
+    // do the highlight_diffs starting from 0
+    for(int i = 0; i < high_size; i++) {
+        K = highlight_diffs[i];
+        base_idx = binary_search_bigger_than(baseline_diffs, 0, base_size, K);
+        high_idx = binary_search_bigger_than(highlight_diffs, i + 1, high_size, K); // starting from i, since data2 is sorted
+
+        delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
+        if(delta < min) {
+            min = delta;
+            base_min_idx = base_idx;
+            high_min_idx = high_idx;
+        }
+        else if(delta > max) {
+            max = delta;
+            base_max_idx = base_idx;
+            high_max_idx = high_idx;
+        }
+    }
+
+    // now we have the min, max and their indexes
+    // properly calculate min and max as dmin and dmax
+    double dbase_size = (double)base_size;
+    double dhigh_size = (double)high_size;
+    double dmin = ((double)base_min_idx / dbase_size) - ((double)high_min_idx / dhigh_size);
+    double dmax = ((double)base_max_idx / dbase_size) - ((double)high_max_idx / dhigh_size);
+
+    dmin = -dmin;
+    if(islessequal(dmin, 0.0)) dmin = 0.0;
+    else if(isgreaterequal(dmin, 1.0)) dmin = 1.0;
+
+    double d;
+    if(isgreaterequal(dmin, dmax)) d = dmin;
+    else d = dmax;
+
+    double en = round(dbase_size * dhigh_size / (dbase_size + dhigh_size));
+
+    // under these conditions, KSfbar() crashes
+    if(unlikely(isnan(en) || isinf(en) || en == 0.0 || isnan(d) || isinf(d)))
+        return NAN;
+
+    return KSfbar((int)en, d);
+}
+
+static uint64_t ks2_test_random(uint64_t *state) {
+    *state ^= *state << 13;
+    *state ^= *state >> 7;
+    *state ^= *state << 17;
+    return *state;
+}
+
+static int ks2_cursor_unittest(void) {
+    uint64_t random = 0x9182abcd1234ULL;
+    DIFFS_NUMBERS *base = mallocz(MAX_POINTS * sizeof(*base));
+    DIFFS_NUMBERS *high = mallocz(MAX_POINTS * sizeof(*high));
+    DIFFS_NUMBERS *base_ref = mallocz(MAX_POINTS * sizeof(*base_ref));
+    DIFFS_NUMBERS *high_ref = mallocz(MAX_POINTS * sizeof(*high_ref));
+    int errors = 0;
+    for(size_t trial = 0; trial < 20000; trial++) {
+        int bs = 1 + ks2_test_random(&random) % 64;
+        int hs = 1 + ks2_test_random(&random) % 64;
+        uint32_t shifts = ks2_test_random(&random) % 10;
+        // Include request-bound-sized arrays and the largest reachable window ratio.
+        if(trial >= 19980) {
+            bs = MAX_POINTS - 1;
+            hs = trial % 2 ? 14 : MAX_POINTS - 1;
+            shifts = trial % 10;
+        }
+        for(int i = 0; i < bs; i++)
+            base[i] = (DIFFS_NUMBERS)(ks2_test_random(&random) % 17) - 8;
+        for(int i = 0; i < hs; i++)
+            high[i] = (DIFFS_NUMBERS)(ks2_test_random(&random) % 17) - 8;
+        if(trial % 3 == 0) base[0] = LONG_MIN;
+        if(trial % 5 == 0) high[0] = LONG_MAX;
+        memcpy(base_ref, base, bs * sizeof(*base));
+        memcpy(high_ref, high, hs * sizeof(*high));
+        double expected = ks_2samp_binary_reference(base_ref, bs, high_ref, hs, shifts);
+        double actual = ks_2samp(base, bs, high, hs, shifts);
+        if(!(actual == expected || (isnan(actual) && isnan(expected)))) {
+            fprintf(stderr, "FAILED KS2 cursor trial %zu (%d/%d shift %u): %.17g != %.17g\n",
+                    trial, bs, hs, shifts, actual, expected);
+            errors++;
+            break;
+        }
+        // Every visited upper-bound pair must match, including equal-delta ties.
+        for(int pass = 0; pass < 2; pass++) {
+            int bi = 0, hi = 0, size = pass ? hs : bs;
+            DIFFS_NUMBERS *keys = pass ? high : base;
+            for(int i = 0; i < size; i++) {
+                bi = cursor_bigger_than(base, bi, bs, keys[i]);
+                hi = cursor_bigger_than(high, hi, hs, keys[i]);
+                if(bi != binary_search_bigger_than(base, 0, bs, keys[i]) ||
+                   hi != binary_search_bigger_than(high, 0, hs, keys[i])) {
+                    fprintf(stderr, "FAILED KS2 cursor upper-bound pair trial %zu\n", trial);
+                    errors++;
+                    goto cleanup;
+                }
+            }
+        }
+    }
+cleanup:
+    freez(base);
+    freez(high);
+    freez(base_ref);
+    freez(high_ref);
+    fprintf(stderr, "%s KS2 cursor: 20000 unequal-length/tie/extreme/boundary differential trials\n",
+            errors ? "FAILED" : "OK");
+    return errors;
 }
 
 static int mc_unittest1(void) {
@@ -2890,6 +3220,8 @@ static int weights_points_exceed_max_unittest(void) {
 
 int mc_unittest(void) {
     int errors = 0;
+
+    errors += ks2_cursor_unittest();
 
     errors += mc_unittest1();
     errors += mc_unittest2();

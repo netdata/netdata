@@ -12,9 +12,11 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
 )
@@ -114,6 +116,104 @@ func TestConfigModuleFactoryRedactsResolvedValuesFromDecodeErrors(t *testing.T) 
 	require.Error(t, err)
 	require.NotContains(t, err.Error(), resolvedFixture)
 	require.True(t, strings.Contains(err.Error(), "resolved") && strings.Contains(err.Error(), "redacted"))
+}
+
+func TestConfigModuleFactorySecretReferenceSourcePolicy(t *testing.T) {
+	const references = "${env:value}|${file:/synthetic/value}|${cmd:/synthetic/command}|${store:vault:main:value}"
+	tests := map[string]struct {
+		sourceType string
+		trust      bool
+		value      string
+		resolve    bool
+	}{
+		"stock":                {sourceType: confgroup.TypeStock, value: references, resolve: true},
+		"user":                 {sourceType: confgroup.TypeUser, value: references, resolve: true},
+		"dyncfg":               {sourceType: confgroup.TypeDyncfg, value: references, resolve: true},
+		"trusted discovered":   {sourceType: confgroup.TypeDiscovered, trust: true, value: references, resolve: true},
+		"discovered":           {sourceType: confgroup.TypeDiscovered, value: references},
+		"discovered malformed": {sourceType: confgroup.TypeDiscovered, value: "${store:invalid}|${env:}"},
+		"empty":                {value: references},
+		"unknown":              {sourceType: "future-source", value: references},
+	}
+	variants := map[string]func() (collectorapi.Creator, func() string){
+		"V1": func() (collectorapi.Creator, func() string) {
+			var module *collectorapi.MockCollectorV1
+			return collectorapi.Creator{
+				Create: func() collectorapi.CollectorV1 {
+					module = &collectorapi.MockCollectorV1{}
+					return module
+				},
+			}, func() string { return module.Config.OptionStr }
+		},
+		"V2": func() (collectorapi.Creator, func() string) {
+			var module *factoryTestV2
+			return collectorapi.Creator{
+				CreateV2: func() collectorapi.CollectorV2 {
+					module = &factoryTestV2{state: &factoryTestState{}}
+					return module
+				},
+			}, func() string { return module.OptionStr }
+		},
+	}
+	for name, test := range tests {
+		for variantName, newVariant := range variants {
+			for _, operation := range []string{"validate", "test", "snapshot"} {
+				t.Run(name+"/"+variantName+"/"+operation, func(t *testing.T) {
+					providerCalls := map[string]int{}
+					scopeCalls := 0
+					providers := map[string]secretresolver.AtomicProvider{}
+					for _, scheme := range []string{"env", "file", "cmd"} {
+						providers[scheme] = secretresolver.AtomicProviderFunc(func(context.Context, string) ([]byte, error) {
+							providerCalls[scheme]++
+							return []byte(scheme + "-resolved"), nil
+						})
+					}
+					resolver, err := secretresolver.NewAtomicResolver(providers)
+					require.NoError(t, err)
+					creator, option := newVariant()
+					factory, err := NewConfigModuleFactory(ConfigModuleFactoryConfig{
+						Modules:  collectorapi.Registry{"module": creator},
+						Resolver: resolver,
+						StoreScope: func([]string) (secretresolver.AtomicScope, error) {
+							scopeCalls++
+							return &factoryTestAtomicScope{value: "store-resolved"}, nil
+						},
+					})
+					require.NoError(t, err)
+					config := factoryTestConfig(false)
+					config.SetSourceType(test.sourceType).SetTrustDiscoveredTargets(test.trust)
+					config["option_str"] = test.value
+					config["option_int"] = 1
+
+					if operation == "validate" {
+						err = factory.Validate(context.Background(), config)
+					} else if operation == "test" {
+						err = factory.Test(context.Background(), config)
+					} else {
+						probe, constructErr := factory.construct(config.Module())
+						require.NoError(t, constructErr)
+						defer probe.cleanup(context.Background())
+						var snapshot secretresolver.AtomicScopeSnapshot
+						var redact bool
+						redact, snapshot, err = factory.applyResolvedWithSnapshot(context.Background(), config, probe.module)
+						require.Equal(t, test.resolve, redact)
+						require.Equal(t, test.resolve, snapshot != nil)
+					}
+					require.NoError(t, err)
+					require.Equal(t, test.value, config.Get("option_str"))
+					if test.resolve {
+						require.Equal(t, "env-resolved|file-resolved|cmd-resolved|store-resolved", option())
+						require.Equal(t, map[string]int{"env": 1, "file": 1, "cmd": 1}, providerCalls)
+						require.Equal(t, 1, scopeCalls)
+					} else {
+						require.Equal(t, test.value, option())
+						require.Empty(t, providerCalls)
+						require.Zero(t, scopeCalls)
+					}
+				})
+			}
+		}
+	}
 }
 
 func TestConfigModuleFactoryRedactsReferenceResolutionFailures(t *testing.T) {
@@ -316,6 +416,15 @@ func (sensitiveCodedRetryableError) Error() string         { return "resolved-se
 func (sensitiveCodedRetryableError) DyncfgCode() int       { return 429 }
 func (sensitiveCodedRetryableError) DyncfgRetryable() bool { return true }
 
+type sensitiveCodedProcessControlError struct {
+	cause error
+}
+
+func (err *sensitiveCodedProcessControlError) Error() string         { return "resolved-sensitive-control" }
+func (err *sensitiveCodedProcessControlError) Unwrap() error         { return err.cause }
+func (err *sensitiveCodedProcessControlError) DyncfgCode() int       { return 429 }
+func (err *sensitiveCodedProcessControlError) DyncfgRetryable() bool { return true }
+
 func TestResolvedLifecycleRedactionPreservesControlClassifications(t *testing.T) {
 	err := lifecycle.RetainOwnership(errors.Join(
 		lifecycle.ErrTaskPanic,
@@ -329,6 +438,85 @@ func TestResolvedLifecycleRedactionPreservesControlClassifications(t *testing.T)
 	require.Contains(t, redacted.Error(), "redacted")
 	require.ErrorIs(t, redacted, lifecycle.ErrTaskPanic)
 	require.ErrorIs(t, redacted, context.Canceled)
+	require.True(t, lifecycle.OwnershipRetained(redacted))
+	require.True(t, dyncfg.IsRetryableError(redacted))
+	coded, ok := errors.AsType[dyncfg.CodedError](redacted)
+	require.True(t, ok)
+	require.Equal(t, 429, coded.DyncfgCode())
+}
+
+func TestResolvedLifecycleRedactionPreservesPureProcessControlTrees(t *testing.T) {
+	tests := map[string]struct {
+		err  error
+		want []error
+	}{
+		"retired": {
+			err:  fmt.Errorf("resolved-sensitive-retired: %w", jobmgr.ErrProcessAttemptRetired),
+			want: []error{jobmgr.ErrProcessAttemptRetired},
+		},
+		"stopped": {
+			err:  fmt.Errorf("resolved-sensitive-stopped: %w", jobmgr.ErrProcessAttemptStopped),
+			want: []error{jobmgr.ErrProcessAttemptStopped},
+		},
+		"joined": {
+			err: errors.Join(
+				fmt.Errorf("resolved-sensitive-retired: %w", jobmgr.ErrProcessAttemptRetired),
+				fmt.Errorf("resolved-sensitive-stopped: %w", jobmgr.ErrProcessAttemptStopped),
+			),
+			want: []error{jobmgr.ErrProcessAttemptRetired, jobmgr.ErrProcessAttemptStopped},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			redacted := redactResolvedLifecycleError(test.err)
+
+			require.Contains(t, redacted.Error(), "redacted")
+			require.NotContains(t, redacted.Error(), "resolved-sensitive")
+			for _, want := range test.want {
+				require.ErrorIs(t, redacted, want)
+			}
+			require.True(t, jobmgr.ContainsOnlyErrorLeaves(
+				redacted,
+				jobmgr.ErrProcessAttemptRetired,
+				jobmgr.ErrProcessAttemptStopped,
+			))
+		})
+	}
+}
+
+func TestResolvedLifecycleRedactionRejectsMixedProcessControlTree(t *testing.T) {
+	err := errors.Join(
+		fmt.Errorf("resolved-sensitive-stopped: %w", jobmgr.ErrProcessAttemptStopped),
+		errors.New("resolved-sensitive-operational"),
+	)
+
+	redacted := redactResolvedLifecycleError(err)
+
+	require.Contains(t, redacted.Error(), "redacted")
+	require.NotContains(t, redacted.Error(), "resolved-sensitive")
+	require.NotErrorIs(t, redacted, jobmgr.ErrProcessAttemptStopped)
+	require.False(t, jobmgr.ContainsOnlyErrorLeaves(
+		redacted,
+		jobmgr.ErrProcessAttemptRetired,
+		jobmgr.ErrProcessAttemptStopped,
+	))
+}
+
+func TestResolvedLifecycleRedactionComposesProcessControlMetadata(t *testing.T) {
+	err := lifecycle.RetainOwnership(&sensitiveCodedProcessControlError{
+		cause: jobmgr.ErrProcessAttemptStopped,
+	})
+
+	redacted := redactResolvedLifecycleError(err)
+
+	require.Contains(t, redacted.Error(), "redacted")
+	require.NotContains(t, redacted.Error(), "resolved-sensitive")
+	require.ErrorIs(t, redacted, jobmgr.ErrProcessAttemptStopped)
+	require.True(t, jobmgr.ContainsOnlyErrorLeaves(
+		redacted,
+		jobmgr.ErrProcessAttemptRetired,
+		jobmgr.ErrProcessAttemptStopped,
+	))
 	require.True(t, lifecycle.OwnershipRetained(redacted))
 	require.True(t, dyncfg.IsRetryableError(redacted))
 	coded, ok := errors.AsType[dyncfg.CodedError](redacted)

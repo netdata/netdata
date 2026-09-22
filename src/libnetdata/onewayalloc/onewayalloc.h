@@ -8,19 +8,21 @@ typedef void ONEWAYALLOC;
 ONEWAYALLOC *onewayalloc_create(size_t size_hint);
 void onewayalloc_destroy(ONEWAYALLOC *owa);
 
-// Reset the arena to an empty state without destroying it. Frees every
-// page except the head, and rolls the head page's bump pointer back to
-// its initial offset so the arena is reusable. Intended for callers that
-// do many short bursts of allocations back-to-back (e.g. evaluating all
-// the alerts of one host) and want to amortise the mmap/munmap cost of
-// create/destroy across the whole burst.
+// Reset invalidates all allocations and retains every page for reuse.
+// The allocation cursor is rewound in O(1); retained overflow pages are
+// rewound lazily as needed. Only a fitting unused page is moved after
+// the current page; skipped pages remain available to later allocations.
+// Capacity is released only by destroy, so the caller owns the lifetime
+// of the arena's high-water footprint.
 //
-// Important: reset does NOT zero the retained head page. Subsequent
+// Important: reset does NOT zero retained pages. Subsequent
 // onewayalloc_mallocz() calls may return memory that still holds bytes
 // from the previous burst — this matches the mallocz() contract (the "z"
 // means "fatal on failure", not "zeroed"). Callers that need zeroed
 // memory must use onewayalloc_callocz() just as they would against a
 // freshly-created arena; the reset path does not relax that contract.
+// Under ASAN, allocations bypass the arena and callers must free them
+// individually with onewayalloc_freez(); reset remains a no-op.
 void onewayalloc_reset(ONEWAYALLOC *owa);
 
 size_t onewayalloc_mul_or_fatal(size_t nmemb, size_t size, const char *context);

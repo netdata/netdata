@@ -22,21 +22,25 @@ metadata:
 
 metric_tags:
   - tag: zyxel_sys_sw_platform
-    OID: 1.3.6.1.4.1.890.1.15.3.1.1.0
-    symbol: sysSwPlatform
+    symbol:
+      OID: 1.3.6.1.4.1.890.1.15.3.1.1.0
+      name: sysSwPlatform
     mapping:
       1: other
       2: zynos
       3: zld
   - tag: zyxel_sys_sw_version_string
-    OID: 1.3.6.1.4.1.890.1.15.3.1.6.0
-    symbol: sysSwVersionString
+    symbol:
+      OID: 1.3.6.1.4.1.890.1.15.3.1.6.0
+      name: sysSwVersionString
   - tag: zyxel_sys_product_model
-    OID: 1.3.6.1.4.1.890.1.15.3.1.11.0
-    symbol: sysProductModel
+    symbol:
+      OID: 1.3.6.1.4.1.890.1.15.3.1.11.0
+      name: sysProductModel
   - tag: zyxel_sys_product_serial_number
-    OID: 1.3.6.1.4.1.890.1.15.3.1.12.0
-    symbol: sysProductSerialNumber
+    symbol:
+      OID: 1.3.6.1.4.1.890.1.15.3.1.12.0
+      name: sysProductSerialNumber
 
 # ZYXEL-ES-COMMON
 # https://mibbrowser.online/mibdb_search.php?mib=ZYXEL-ES-COMMON

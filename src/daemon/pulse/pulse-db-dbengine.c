@@ -1562,6 +1562,42 @@ void pulse_dbengine_do(bool extended) {
             // ----------------------------------------------------------------
 
             {
+                static RRDSET *st_decompression = NULL;
+                static RRDDIM *rd_compressed = NULL;
+                static RRDDIM *rd_uncompressed = NULL;
+
+                if (unlikely(!st_decompression)) {
+                    st_decompression = rrdset_create_localhost(
+                        "netdata",
+                        "dbengine_decompression_throughput",
+                        NULL,
+                        "dbengine io",
+                        NULL,
+                        "Netdata DB engine extent decompression throughput",
+                        "MiB/s",
+                        "netdata",
+                        "pulse",
+                        priority,
+                        localhost->rrd_update_every,
+                        RRDSET_TYPE_LINE);
+
+                    rd_compressed = rrddim_add(st_decompression, "compressed", NULL, 1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
+                    rd_uncompressed = rrddim_add(st_decompression, "uncompressed", NULL, 1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
+                }
+                priority++;
+
+                // an extent is decompressed as a whole, on every access, including extent cache hits.
+                // comparing "uncompressed" against the pages queries actually consume shows how much
+                // of each decompression is discarded.
+                rrddim_set_by_pointer(st_decompression, rd_compressed, (collected_number)stats_array[13]);
+                rrddim_set_by_pointer(st_decompression, rd_uncompressed, (collected_number)stats_array[14]);
+
+                rrdset_done(st_decompression);
+            }
+
+            // ----------------------------------------------------------------
+
+            {
                 static RRDSET *st_io_stats = NULL;
                 static RRDDIM *rd_reads = NULL;
                 static RRDDIM *rd_writes = NULL;

@@ -275,7 +275,11 @@ enrichment:
 
 
 
-### Default 200ms timeout too aggressive
+## Troubleshooting
+
+### Other Problems
+
+#### Default 200ms timeout too aggressive
 
 `timeout` covers the gRPC connect plus the `GetRouters` and `ObserveRIB`
 setup RPCs. Over the public internet to a remote bio-rd, 200ms is often not
@@ -284,7 +288,7 @@ enough. If you see "deadline exceeded" errors in the journal, raise to 2-5s.
 message stream reads (default 10s).
 
 
-### Initial dump takes minutes for full feeds
+#### Initial dump takes minutes for full feeds
 
 A full IPv4+IPv6 RIB from a full-table bio-rd source can contain millions of
 prefixes. The first `DumpRIB` after enabling (or after a plugin restart) takes
@@ -292,7 +296,7 @@ time -- BGP attribution is incomplete until it finishes. Subsequent
 `ObserveRIB` streams are incremental.
 
 
-### Plugin restart wipes the trie
+#### Plugin restart wipes the trie
 
 The trie is in-memory only -- restarting the netflow plugin loses every
 learned BGP route. Convergence over BioRIS depends on the upstream feed; a
@@ -300,7 +304,7 @@ full DumpRIB from a full-table bio-rd source can take minutes. Schedule
 restarts off-peak if BGP attribution matters for your workflow.
 
 
-### Pointing grpc_addr at RIPE RIS does not work
+#### Pointing grpc_addr at RIPE RIS does not work
 
 `grpc_addr` must point to a bio-rd-compatible `RoutingInformationService`
 endpoint. RIPE RIS Live, RIPEstat, RIS MRT dumps, and route collector BGP
@@ -309,7 +313,7 @@ sessions use different protocols, so they cannot be used directly as
 front of RIPE-derived data if you need that external view.
 
 
-### Memory growth without bound
+#### Memory growth without bound
 
 The trie has no time-based eviction. Routes are removed only when the
 upstream BGP source withdraws them, when a router disappears from
@@ -317,21 +321,21 @@ upstream BGP source withdraws them, when a router disappears from
 several hundred MB of RSS per peer, permanently.
 
 
-### AS path / communities missing on older queries
+#### AS path / communities missing on older queries
 
 `DST_AS_PATH`, `DST_COMMUNITIES`, and `DST_LARGE_COMMUNITIES` only exist in
 the raw journal tier. The 1m / 5m / 1h rollup tiers do not carry them. Queries that span beyond the raw
 retention horizon will not return BGP path data.
 
 
-### AS path inconsistent with the exporter's view
+#### AS path inconsistent with the exporter's view
 
 Different vantage points see different BGP paths. If your flow exporter and
 the BGP source bio-rd is peering with are different boxes with different
 routing tables, expect divergence. This is normal in BGP, not a bug.
 
 
-### Validate BioRIS enrichment after enabling
+#### Validate BioRIS enrichment after enabling
 
 BioRIS-derived enrichment depends on the bio-rd version, upstream BGP source,
 route visibility, and refresh cadence. Validate against your bio-rd setup

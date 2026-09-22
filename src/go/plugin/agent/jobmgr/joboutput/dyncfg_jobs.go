@@ -120,6 +120,7 @@ func (dcjc *DynCfgJobController) BindBackgroundWorkers(
 		dcjc.scheduler.accepted.stopWorker()
 		return err
 	}
+	dcjc.bindRuntimeFailures(commands, run, failure)
 	return nil
 }
 
@@ -166,9 +167,8 @@ func (dcjc *DynCfgJobController) Handle(
 				return lifecycle.SealedResult{}, err
 			}
 			code := 422
-			if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
-				errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
-				errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
+			switch classifyActivationError(err).kind {
+			case activationFailureBusy, activationFailureDeadline, activationFailureQuarantined:
 				code = 503
 			}
 			return dynCfgMessage(code, err.Error())
@@ -192,9 +192,8 @@ func (dcjc *DynCfgJobController) Handle(
 				return lifecycle.SealedResult{}, err
 			}
 			code := 500
-			if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
-				errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
-				errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
+			switch classifyActivationError(err).kind {
+			case activationFailureBusy, activationFailureDeadline, activationFailureQuarantined:
 				code = 503
 			}
 			return dynCfgMessage(code, err.Error())

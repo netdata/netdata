@@ -7,6 +7,7 @@ on:
     paths:
       - ".agents/sow/**"
       - ".agents/skills/**"
+      - "docs/netdata-ai/skills/**"
       - ".agents/skill-verification/**"
       - ".agents/ENV.md"
       - "AGENTS.md"
@@ -61,7 +62,7 @@ jobs:
           mapfile -t files < <(
             git diff --name-only --diff-filter=ACMR "$base...$head" -- \
               .agents/sow .agents/skills .agents/skill-verification .agents/ENV.md \
-              AGENTS.md CLAUDE.md GEMINI.md \
+              docs/netdata-ai/skills AGENTS.md CLAUDE.md GEMINI.md \
               | while IFS= read -r file; do
                   [ -f "$file" ] && printf '%s\n' "$file"
                 done

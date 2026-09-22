@@ -1,0 +1,6 @@
+{
+  "msgtype": "m.notice",
+  "body": "✅ summary\nNode: node\nAlert: alert\nStatus: CLEAR\nTime: 2026-09-14T12:00:00Z",
+  "format": "org.matrix.custom.html",
+  "formatted_body": "✅ summary<br>Node: node<br>Alert: alert<br>Status: CLEAR<br>Time: 2026-09-14T12:00:00Z"
+}

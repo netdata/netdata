@@ -10,23 +10,30 @@ placements:
     properties: {important: true, grouping: true}
     items:
       - type: group
-        id: lifecycle
-        title: Object Lifecycle
+        id: status
+        title: Status
         items:
-          - s3check.stage_status
-          - s3check.stage_duration
-          - s3check.stage_latency_status
-          - s3check.stage_requests
+          - s3check.runtime_status
+          - s3check.probe_status
+          - s3check.payload_mismatch
       - type: group
-        id: multisite
-        title: Multisite Replication
+        id: objectives
+        title: Replication Objectives
         items:
-          - s3check.multisite_phase_failure
-          - s3check.multisite_payload_mismatch
-          - s3check.multisite_replication_lag
-          - s3check.multisite_rpo_status
-          - s3check.multisite_delete_lag
-          - s3check.multisite_delete_status
-          - s3check.multisite_status
-          - s3check.multisite_phase_duration
-          - s3check.multisite_phase_requests
+          - s3check.write_visibility_lag
+          - s3check.write_visibility_objective
+          - s3check.delete_visibility_lag
+          - s3check.delete_visibility_objective
+      - type: group
+        id: ownership
+        title: Ownership Cleanup
+        items:
+          - s3check.cleanup_pending_objects
+          - s3check.mutation_backpressure
+      - type: group
+        id: operations
+        title: S3 Operations
+        items:
+          - s3check.operation_status
+          - s3check.operation_duration
+          - s3check.operation_calls

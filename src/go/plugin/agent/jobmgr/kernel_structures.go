@@ -7,8 +7,9 @@ import (
 )
 
 type functionCleanupTask struct {
-	ref FunctionCleanupRef
-	err error
+	ref  FunctionCleanupRef
+	err  error
+	task oneShotTask
 }
 
 // Fixed chunks keep every kernel-loop queue operation worst-case O(1). The

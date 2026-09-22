@@ -12,6 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -186,21 +187,22 @@ func (cmf *ConfigModuleFactory) applyResolvedInternal(
 	snapshot secretresolver.AtomicScopeSnapshot,
 	resultErr error,
 ) {
+	defer func() { resultErr = withJobConfigFailure(resultErr, "configuration", "") }()
 	hasReferences := false
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			snapshot = nil
 			if hasReferences {
 				redactLifecycle = true
-				resultErr = invalidJobConfiguration(errors.New(
+				resultErr = withJobConfigFailure(invalidJobConfiguration(errors.New(
 					"job output: applying resolved configuration failed; details redacted",
-				))
+				)), "configuration", "panic")
 				return
 			}
 			redactLifecycle = false
-			resultErr = invalidJobConfiguration(
+			resultErr = withJobConfigFailure(invalidJobConfiguration(
 				errors.New("job output: applying configuration panicked"),
-			)
+			), "configuration", "panic")
 		}
 	}()
 	resolveCtx := logger.ContextWithLogger(
@@ -210,9 +212,14 @@ func (cmf *ConfigModuleFactory) applyResolvedInternal(
 	var resolved any
 	var references bool
 	var err error
-	if captureSnapshot {
-		resolved, references, snapshot, err =
-			cmf.config.Resolver.ResolveWithSnapshot(resolveCtx, map[string]any(config), cmf.config.StoreScope)
+	if !policy.SecretReferencesAllowed(config) {
+		resolved, err = secretresolver.CloneLiteral(map[string]any(config))
+	} else if captureSnapshot {
+		resolved, references, snapshot, err = cmf.config.Resolver.ResolveWithSnapshot(
+			resolveCtx,
+			map[string]any(config),
+			cmf.config.StoreScope,
+		)
 	} else {
 		resolved, references, err =
 			cmf.config.Resolver.ResolveWithReferences(resolveCtx, map[string]any(config), cmf.config.StoreScope)
@@ -238,7 +245,7 @@ func (cmf *ConfigModuleFactory) applyResolvedInternal(
 	}
 	if len(payload) > secretresolver.MaximumAtomicResolvedBytes {
 		return false, nil, invalidJobConfiguration(
-			errors.New("job output: serialized configuration exceeds maximum size"),
+			withJobConfigFailure(errors.New("job output: serialized configuration exceeds maximum size"), "configuration", "result_limit"),
 		)
 	}
 	if err := yaml.Unmarshal(payload, module); err != nil {

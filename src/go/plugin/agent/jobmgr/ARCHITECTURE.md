@@ -264,6 +264,18 @@ Which mechanism each command surface uses:
 - **Process-owned off-loop** — contained attempts own their physical worker, per-identity exclusion, and final cleanup
   across run rotation.
 
+Shutdown barrier, run finalizer, and Function cleanup work share the kernel-local `oneShotTask` handshake
+(`kernel_one_shot.go`). It validates request-to-task starts, the sequence-1 no-value completion, and the expected
+sequence-2 terminate/abandon acknowledgment. A terminal action is recorded only after the supervisor accepts it;
+replayed completion dirties the run without replacing that accepted action. Invalid acknowledgments and failed
+release retain ownership. Task references clear only after `TaskSupervisor.Release` succeeds.
+
+Each caller keeps its domain policy: barrier/finalizer errors dirty the run immediately, and their readiness gates
+preserve shutdown ordering. Function cleanup stores ordinary work errors until physical release, then acknowledges
+the exact catalog cleanup generation and reports errors. Resource stop/finalize and prepare/apply/dispose
+transactions retain their separate multi-phase protocols. The shared record is a value in the existing owner or map;
+it adds no scheduler, worker, per-task heap object, or population scan.
+
 ### Fairness and timeout rules
 
 - **`TaskSupervisor` runs two independent classes** — framework-control work (lifecycle/DynCfg commands) and generic
@@ -594,7 +606,7 @@ flowchart TD
      the authority cut returns. The worker later drains output leases and performs detach/cleanup outside the authority
      lock. A later stopped/retired cut never overwrites an earlier structural failure.
    - Start eligibility and retirement arbitrate under the process owner. The worker rechecks that decision after receiving
-     the start request, so a ready channel send cannot launch `StartManaged` after containment has won.
+     the start request, so sending it cannot launch `StartManaged` after containment has won.
    - Once output and permit acceptance wins and start remains eligible, the managed loop starts.
    - The resource transaction owns this successor until installation acknowledgement. An apply failure aborts it when
      possible, or returns the still-live retained generation to the kernel for fail-closed ownership.
@@ -620,6 +632,50 @@ flowchart TD
      terminal chart-obsoletion frames only after the managed loop and Function handlers physically quiesce.
    - The `job-runtime` identity stays occupied through cleanup, so a same-job successor cannot start before those
      terminal frames complete.
+
+### Collector runtime readiness and terminal outcomes
+
+The optional V2 `Run(ctx, ready) error` hook acquires resources after runtime promotion, which requires predecessor
+physical release. `ManagedRun` serializes readiness, startup error, cancellation and timeout; only accepted readiness
+starts collection and running availability. Non-Runner V1/V2 jobs signal readiness directly. Job Manager starts a separate
+startup timer in the owner's `Start`, using `jobmgr.DefaultProcessAttemptFuse` for its two-minute duration. Runtime
+admission has already stopped the preparation fuse; neither timer limits the successfully started runtime lifetime.
+
+A typed `runtimeStartupFailure` carries the collector outcome through the existing source-specific activation
+fallback: discovery, DynCfg update/enable/restart, accepted activation and secret-dependent restart commit Failed,
+return their operational response and use the existing configured retry policy. Uncoded startup errors use response
+code 503; stock configurations remain visible as Failed after successful detection followed by runtime acquisition
+failure. Existing plain-stock removal for unsuccessful Init/Check detection is unchanged. A recovered collector `Run`
+panic or unexpected nil return is non-retryable. Positive classification must survive secret redaction without
+absorbing a joined structural or cleanup error. Operational outcomes do not become errors from the process-owned
+worker; physical cleanup still does.
+
+After accepted readiness, unexpected return atomically revokes new output admission before logging or joining the
+managed loop. The owner submits a response-free command on the job's existing lane with its exact resource generation.
+The command commits Failed and detaches that generation, without scheduling a retry; a stale command is a no-op.
+Submission does not wait for reconciliation, because finalization itself waits for detachment. Successful pending
+installation stays valid when terminal failure arrives before acknowledgement. Existing admitted writes drain
+normally, and no collector cleanup runs until both Run and Collect have physically exited. A recovered collector panic
+is restartable after clean release; independent ownership, lifecycle or cleanup failure still quarantines the process
+identity.
+
+### Activation failure classification
+
+`joboutput/activation_error.go` owns the error classification shared by discovery, synchronous DynCfg activation,
+accepted-job activation, and SecretStore-dependent restarts. Candidate preparation returns that classification with
+the original error. Config-only validation and runtime activation fallbacks use the same classifier.
+
+The classification distinguishes invalid proposals, transient dependencies, busy physical identities, stale Store
+snapshots, superseded attempts, containment deadlines, quarantine, and other operational failures. These are failure
+facts, not a universal retry policy: synchronous UPDATE preserves its incumbent on busy/stale preparation, while an
+already-applied accepted ENABLE retains activation authority and uses timed recovery. Runtime fallback handles busy
+and quarantine only; a stale Store snapshot is rejected during candidate preparation.
+
+Each caller keeps its command-specific response, graph disposition, and recovery policy explicit. Caller cancellation
+and retained ownership take precedence over ordinary recovery. The classifier preserves the original error tree so
+those lifetime decisions remain available; a provider's own canceled operation does not by itself mean its caller
+was canceled. Managed probe failures keep their separate collector-supplied response and retry metadata. Recovery is
+armed only in `AfterApply`, after the corresponding graph mutation commits.
 
 ### Accepted-job activation
 
@@ -686,6 +742,26 @@ Secrets keep credentials out of collector configs. A config value can carry a **
   Manager).
 - `${env:...}`, `${file:...}`, `${cmd:...}` — resolved from the plugin process's own environment variables, files, or
   command output.
+
+`policy.SecretReferencesAllowed` permits references for `stock`, `user`, and `dyncfg` collector sources. A discovered
+source requires the strict boolean `__trust_discovered_targets__` stamp. The discovery pipeline overwrites that stamp
+on every rendered job using its own `trust_discovered_targets` option (default false); rendered content cannot grant
+itself authority. It also stamps `__discovery_pipeline_id__` from the manager-owned pipeline key, independently of
+target source text. Enabled discovered trust and its pipeline ID participate in `confgroup.Config.Hash` so changing
+the setting or trusted owner reconciles jobs even when their other values are unchanged. Absent/false trust stamps
+preserve the default hash. Cloning and graph payload serialization preserve both stamps.
+When opting out makes a literal field invalid, discovery commits the replacement as failed and removes the old
+trusted runtime and its dependencies only if both configs carry the same nonempty pipeline ID. Invalid proposals
+from a different or unidentified pipeline retain ordinary rejection behavior, preserving the trusted incumbent.
+Rejected discovered candidates are scoped by pipeline ID too, so a competing candidate's rejection cannot suppress
+a later opt-out from the actual owner, even when their untrusted hashes match.
+
+`joboutput/config_factory.go` and `secrets/dependency.go` enforce the same policy before resolving or indexing
+references. Untrusted discovered, empty, and unknown sources keep every string literal, including malformed reference
+syntax, and create no SecretStore dependencies. Their application still uses the resolver's bounded literal clone.
+The pipeline option does not resolve discovery connection credentials.
+DynCfg adoption re-stamps the complete submitted configuration as `dyncfg`, enabling reference resolution throughout
+that payload. Operators must review the whole configuration when adopting a discovered job.
 
 Resolution happens only in memory, only when a job is built. The key property is that it is **atomic — all references
 resolve, or none do**. Picture a notary: photocopy the whole document, list every blank, check out the referenced
@@ -807,8 +883,10 @@ flowchart LR
 
 The Store change remains committed if a later job restart fails, and the graph truthfully shows that job as `Failed`.
 A retained busy/contained restart revalidates the Store dependency, source winner, desired config, resource absence,
-and run generation. A normal probe failure follows the collector's ordinary autodetection-retry policy.
-`secrets/pending.go`.
+and run generation. Transient provider/scope or other transient construction failures schedule the collector's
+ordinary autodetection retry after the Failed mutation applies, as normal probe failures do. A later disable, removal,
+replacement, or run stop revokes that retry. Invalid proposals and quarantine do not gain a timed retry.
+`joboutput/secret_restart.go`, `joboutput/autodetection_retry.go`, `secrets/pending.go`.
 
 Two rules that surprise people:
 
@@ -1020,6 +1098,19 @@ agent-level module) stages one stable process-owned handler bundle outside contr
 `functions/bundle.go`, `functions/module_stage.go`, `functions/controller.go`, `containment/authority.go`,
 `process_attempt.go`.
 
+Availability callback, contained-attempt, and asynchronous reconciliation failures emit separate fixed diagnostic
+categories through the process observer. Events contain the run generation, sanitized bundle identity, and a safe
+failure/panic classification; callback error text and recovered values are omitted. The production logger limits
+each category to one message per hour across all bundles and run generations. Pure cancellation, retirement,
+supersession, and process-stop results remain quiet; mixed failures remain observable. Existing containment events
+and synchronous reconciliation error propagation keep their separate roles.
+
+Run finalization passes its caller's context through `FunctionAssembly.FinalizeRun` and `Controller.Stop` to any
+remaining bundle cleanup waits. Wait expiry does not complete physical cleanup or reopen publication. Agent-module
+owners are released without waiting in the run finalizer; their process attempts keep ownership until the handler
+actually returns. Physical handler cleanup retains its process-owned context. Normal kernel shutdown detaches job
+handles before finalization; the cancelable waits also cover retained job bundles at the assembly boundary.
+
 ### DynCfg is not a published Function
 
 - DynCfg `config` prefix routes are **private catalog routes**, not Function publications. Netdata owns the global
@@ -1168,7 +1259,7 @@ attempt until it releases.
 | `plugin/framework/functions` | Passive Function values and the stdin input capsule |
 | `plugin/framework/dyncfg` | The dynamic-configuration `Graph` |
 | `plugin/framework/jobruntime` | V1 / V2 job runtime and host/vnode scope |
-| `plugin/framework/vnoderegistry` | Post-success vnode owner/conflict registry |
+| `plugin/framework/hostoutput` | Process-owned host publication and contributor lifetimes |
 | `plugin/agent/secrets/resolver` | Atomic config clone, reference compilation, scoped resolution |
 | `plugin/agent/secrets/secretstore` | Frozen creator catalog and process-owned Store epoch generations |
 | `plugin/agent/discovery` | Provider catalog and the discovery pipeline generation |

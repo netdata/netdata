@@ -6,13 +6,19 @@ An alert tells you *what* changed. It rarely tells you *why*. That answer usuall
 
 This is the reverse of connecting an AI client *to* Netdata. Here, **Netdata reaches out to your MCP servers**. To instead connect an AI assistant (Claude, Cursor, a CLI) to Netdata's own MCP server, see [Supported AI Clients](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md).
 
+MCP Connections bring in context from other systems. For the context only your team can provide — service tiers, known behaviours, ownership — see [Infrastructure Knowledge](/docs/netdata-ai/infrastructure-knowledge.md).
+
 ![MCP Connections settings](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/mcp-connections-settings.png)
 
 ## Prerequisites
 
 - A **Netdata Cloud** account on a **Paid plan**.
 - **Space admin** access — MCP Connections are configured per Space, under **Settings → AI → MCP Connections**.
-- A reachable **MCP server** to connect to. Netdata ships built-in integrations for popular providers (GitHub, PagerDuty, Atlassian Cloud for Jira/Confluence/Bitbucket) and a **Custom MCP Server** option for any HTTPS MCP endpoint.
+- A reachable **MCP server** to connect to. Netdata ships built-in integrations for popular providers (GitHub, [PagerDuty](/docs/netdata-ai/mcp/mcp-connections/pagerduty.md), Atlassian Cloud for Jira/Confluence/Bitbucket) and a **Custom MCP Server** option for any HTTPS MCP endpoint.
+
+## Provider guides
+
+- [PagerDuty](/docs/netdata-ai/mcp/mcp-connections/pagerduty.md): connect Netdata AI to PagerDuty incidents, on-call schedules and change events.
 
 ## Configure a new integration
 
@@ -24,7 +30,7 @@ This is the reverse of connecting an AI client *to* Netdata. Here, **Netdata rea
 
 4. Provide the required configuration parameters — such as the connection name, or your account URL with the provider — then click **Connect & discover tools**.
 
-   An **account URL** is the address you use to reach the provider, including your organization's subdomain. For PagerDuty that is `https://acme.pagerduty.com`, or `https://acme.eu.pagerduty.com` if your account is hosted in the EU. Netdata derives the correct regional endpoint from it, and refuses the connection if the account you authorize with is not the one configured here.
+   An **account URL** is the address you use to reach the provider, including your organization's subdomain, such as `https://acme.pagerduty.com`. See the provider guide for provider-specific URL requirements, regional endpoint handling and account matching.
 
    ![Connection parameters](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/mcp-connections-connection.png)
 

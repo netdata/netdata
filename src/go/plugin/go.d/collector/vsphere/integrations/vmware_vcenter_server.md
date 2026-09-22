@@ -917,7 +917,9 @@ Cached vSphere inventory topology payload using the netdata.topology.v1 schema. 
 
 ## Troubleshooting
 
-### Debug Mode
+### Diagnostics
+
+#### Debug Mode
 
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
@@ -949,14 +951,14 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m vsphere -j jobName
   ```
 
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `vsphere` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -964,7 +966,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep vsphere
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -974,7 +976,7 @@ grep vsphere /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 
@@ -982,16 +984,18 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep vsphere
 ```
 
-### Missing performance samples
+### Other Problems
+
+#### Missing performance samples
 
 If the logs show `vsphere:host-no-perf-samples` or `vsphere:vm-no-perf-samples`, verify that the configured account can read vCenter performance counters for the selected hosts and VMs, and that the entities are powered on when performance metrics are expected.
 
 
-### Periodic discovery errors
+#### Periodic discovery errors
 
 If the logs show `vsphere:periodic-discovery-error`, check vCenter reachability, account permissions for the enabled optional surfaces, and whether the configured `timeout` is large enough for the inventory size.
 
 
-### vCenter reboot recovery
+#### vCenter reboot recovery
 
 The collector cannot always recover an existing session after a vCenter reboot. Restart `go.d.plugin` if collection does not resume after vCenter becomes available again.

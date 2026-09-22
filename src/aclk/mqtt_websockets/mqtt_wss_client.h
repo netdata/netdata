@@ -56,9 +56,26 @@ struct mqtt_wss_proxy;
 #define MQTT_WSS_SSL_DONT_CHECK_CERTS  0x08
 
 /* Will block until the MQTT over WSS connection is established or return error. The blocking is
- * bounded: the setup phase has an overall budget (see MQTT_WSS_CONNECT_BUDGET_SECS) so a peer that
- * completes the TCP connection and then goes quiet fails the attempt instead of hanging, and a
- * shutdown of SERVICE_ACLK interrupts the wait.
+ * bounded phase by phase, and the phases differ in whether a SERVICE_ACLK shutdown ends them:
+ *   - hostname resolution is synchronous and NOT covered by any timeout here (getaddrinfo() inside
+ *     connect_to_this_ip46(), and again for the target host under SOCKS5 - SOCKS5H delegates that
+ *     to the proxy), so a stalled resolver blocks for as long as it takes.
+ *   - TCP connect requests a 10s send timeout. An address whose connect() fails immediately is
+ *     skipped and the next resolved address is tried; an address that times out ends the attempt.
+ *     On Linux the socket is still blocking across connect(), so one silent address can cost about
+ *     10s there and about 10s more in the wait that follows - other platforms may bound a blocking
+ *     connect differently. That wait DOES observe a thread cancel, which is what stopping
+ *     SERVICE_ACLK signals, so a shutdown ends it promptly.
+ *   - proxy negotiation, when configured, carries its own 10s timeout and observes no shutdown.
+ *   - the first SSL_connect() runs on the non-blocking socket, so it starts the handshake without
+ *     waiting on the peer.
+ *   - the loop that follows finishes the TLS handshake, performs the WebSocket upgrade and waits
+ *     for CONNACK under an overall budget (see MQTT_WSS_CONNECT_BUDGET_SECS), so a peer that
+ *     completes the TCP connection and then goes quiet fails the attempt instead of hanging. It
+ *     re-tests SERVICE_ACLK between polls, so a shutdown ends it within one poll slice (see
+ *     MQTT_WSS_CONNECT_POLL_SLICE_MS) rather than waking the thread immediately.
+ * So a shutdown arriving here is not immediate: it still waits out the resolver, the blocking
+ * connect() under SO_SNDTIMEO, and any proxy negotiation.
  * @param client mqtt_wss_client which should connect
  * @param host to connect to (where MQTT over WSS server is listening)
  * @param port to connect to (where MQTT over WSS server is listening)

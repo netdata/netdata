@@ -367,6 +367,8 @@ Control chart playback and interact with time using the **Time Controls**. These
 
 These controls work when the **default “Pan” action** is selected in the toolbar.
 
+For Space Admins, clicking on the chart also starts a draft [annotation](/docs/dashboards-and-charts/chart-annotations.md) at that point in time.
+
 ## Toolbar
 
 The chart **Toolbar** provides interactive tools for manipulating the chart view:
@@ -419,6 +421,12 @@ The **Chart Zoom** tool allows you to zoom in and out to view different time ran
 | Zoom in/out      | Shift + mouse scrollwheel | Two-finger pinch or Shift + two-finger scroll |
 
 Zooming in helps you analyze recent events in detail, while zooming out provides an overview of longer-term trends.
+
+## Annotations
+
+Space **Admins** can click on a chart to pin a note to that moment in time, pick a priority color, and share it with everyone in the Space who can open dashboards. Hover the marker to edit it, make it visible on all charts, copy a link, or run Metric Correlations around it. Other roles with dashboard access see annotations read-only.
+
+See [Chart Annotations](/docs/dashboards-and-charts/chart-annotations.md) for the full guide.
 
 ## Dimensions Bar
 

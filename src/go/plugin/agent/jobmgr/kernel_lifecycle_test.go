@@ -3188,7 +3188,7 @@ func completeNoopShutdownBarrier(t *testing.T, kernel *testCommandKernel) {
 	case <-time.After(time.Second):
 		require.FailNow(t, "shutdown barrier termination was not acknowledged")
 	}
-	require.True(t, kernel.shutdownBarrierDone)
+	require.True(t, kernel.barrierWork.done)
 }
 
 func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {

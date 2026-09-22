@@ -1,0 +1,322 @@
+---
+name: collectors-go-framework-v2
+description: Implement, migrate or review Go go.d framework V2 collectors, CollectorV2 lifecycle, metrix metric stores, charts.yaml authoring (defaults, families, ordering, statesets, labels), charttpl/chartengine, Functions and host scopes/vnodes. Use affected contracts and source owners; collector product/config design uses collectors-go-design.
+---
+
+# Writing Go go.d Modules With Framework V2
+
+Use with `collectors-authoring` and apply `AGENTS.md#skill-selection`. This skill owns V2 implementation patterns;
+source files and their tests establish the affected framework contract. Use `collectors-go-design` when product,
+ownership, option or metric-semantics decisions are involved, including their review.
+
+For review, assess applicable requirements and existing evidence. The implementation gates, migration manifests and
+pre-PR actions below are review criteria, not instructions to create artifacts or perform live operations. Verify
+claims affected by the change at source; a narrow lens does not exempt a relevant contract.
+
+## Read First
+
+Select references by the changed behavior. New collectors need the lifecycle contract and authoring guide; a migration
+also needs its compatibility guide. Follow dependencies when a change reaches additional contracts.
+
+| Task or affected contract | Read |
+|---|---|
+| Collector lifecycle, registration or optional interfaces | `src/go/plugin/framework/collectorapi/collector.go` and applicable Core Style below |
+| New collector or lifecycle implementation patterns | `src/go/plugin/go.d/docs/how-to-write-a-collector.md` |
+| Existing plumbing or helper choice | `src/go/plugin/go.d/docs/helper-packages.md` |
+| V1-to-V2 migration, including review | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` and Compatibility Rules below |
+| Shared framework behavior or a missing general capability | `src/go/plugin/framework/docs/changing-framework-code.md`; its implementation approval tiers still apply |
+| Metric-store cycles, descriptors or caching | `src/go/pkg/metrix/README.md` and Metrics And Charts below |
+| Runtime chart output or lifecycle | `src/go/plugin/framework/chartengine/README.md` |
+| Template format, identity or reducers | `src/go/plugin/framework/charttpl/README.md` and Chart Label Identity below |
+| Writing or reviewing a `charts.yaml`: defaults, families, ordering, statesets, labels, shared contexts, tests | `./chart-template.md` |
+| Host scopes or vnodes | `.agents/skills/collectors-go-framework-v2/go-v2-host-scope.md` and Host Scopes below |
+
+Primary modern example: `src/go/plugin/go.d/collector/cato_networks/`. Use focused pieces, not the whole collector
+shape. Older V2 collectors can supply local patterns, but check for stale style before treating them as examples.
+
+## Decision Discipline
+
+- You MUST aim for the clean end state, not the smallest collector diff. If a
+  framework capability is missing and the problem is general, design the
+  framework change instead of hiding the issue in collector-local glue.
+- If any framework-scope package changes, stop and satisfy
+  `src/go/plugin/framework/docs/changing-framework-code.md` before writing code.
+- You MUST re-check scope after each coherent batch. If the work reveals an
+  independent collector cleanup, framework fix, or integration-doc change,
+  either defer it explicitly or land it separately before continuing.
+- Coupling across jobs or owners, durable state for independent reads, schedulers,
+  queues, or cleanup that would freeze measurement go through the Architecture
+  Gate in `collectors-go-design` before code, not through this skill.
+
+## Core Style
+
+- New collectors MUST implement `collectorapi.CollectorV2` from
+  `src/go/plugin/framework/collectorapi/collector.go` and register via
+  `CreateV2`.
+- `New()` SHOULD own scalar defaults, `metrix.NewCollectorStore()`, typed metric instruments, and test seams;
+  conditional or mode-dependent defaults follow `collectors-go-design/operator-surface.md` §4.
+- V2 collectors MUST write metrics through `metrix.CollectorStore` during
+  `Collect()` and expose exactly one chart provider. Embedded `charts.yaml` through `ChartTemplateYAML()` is
+  RECOMMENDED for static definitions. Changing native membership uses `ChartTemplateSet()`; its ownership,
+  normalization, fixed-policy and replacement contracts are in
+  `src/go/plugin/framework/chartengine/README.md#named-active-template-sets`.
+- `Collect(ctx)` MUST return `error` and write metrics to `metrix`; it MUST NOT
+  return a V1 `map[string]int64`.
+- Receivers and long-running background loops MAY implement optional `collectorapi.CollectorV2Runner.Run(ctx, ready)`.
+  Keep exclusive acquisition and operational polling out of `Init`/`Check`, which may run while an incumbent is active.
+  Readiness, retry, cancellation, panic, cleanup and output fencing MUST follow
+  `src/go/plugin/framework/jobruntime/README.md#runtime-readiness-and-termination`.
+- Collector `Cleanup(ctx)` MUST be idempotent. The framework may call it more
+  than once, including after partial `Init` / `Check` setup.
+- `Check()` MUST stay a cheap detection path: no reservation, no remote side
+  effect, no state it must later release.
+- Cleanup either honors the caller's context or uses a detached best-effort
+  context with a fixed budget that does not scale with public request or retry
+  settings; trace that deadline through every cleanup I/O and keep unfinished
+  ownership for recovery instead of blocking shutdown on it.
+- Files SHOULD stay boring: public lifecycle methods in `collector.go`, setup
+  helpers in `init.go` when needed, orchestration in `collect.go`, distinct
+  upstream operations in `collect_<operation>.go`, metrics in `metrix.go` /
+  `write_metrics.go`, focused tests.
+- Before adding custom HTTP, selector, logging, command-execution, SQL, ping,
+  or log-file plumbing, check `src/go/plugin/go.d/docs/helper-packages.md` and
+  reuse an existing helper when it fits.
+- If Functions exist, isolate them in a `<name>func/` subpackage with a narrow
+  `Deps` interface declared there. The Function package MUST NOT import the
+  collector package or hold `*Collector`.
+- If a single-instance collector exposes `Creator.SharedFunctions`, its
+  `MethodHandler(job)` receives the running canonical runtime job and the public
+  Function shape has no `__job` parameter. Use `job.Collector()` to bind the
+  Function handler to collector-owned state; do not add a package-global
+  registry to bridge Function dispatch. The Function is still job-backed:
+  publication waits for the canonical job to be running and available, and
+  dispatch rejects unavailable jobs before calling `MethodHandler`.
+- Shared and instance job-backed Functions are published only while their
+  backing running jobs are available. By default, every running job is available
+  for every shared or instance Function. If a collector needs runtime readiness
+  gating per job-backed Function, implement `collectorapi.FunctionAvailability`;
+  keep `FunctionAvailable(functionID)` cheap and non-blocking.
+  `funcapi.FunctionConfig.Available` applies to `AgentFunctions`, not
+  job-backed `SharedFunctions` or `InstanceFunctions`.
+- `collectorapi.Creator.InstancePolicy` defaults to
+  `InstancePolicyPerJob`. Use `InstancePolicySingle` only for collectors that
+  are intentionally one canonical job per agent. Single-instance configs MUST
+  use `name == module` after defaults are applied. DynCfg exposes opted-in
+  single-instance configs as `single` objects with the module-level collector
+  config ID, no collector template, and no `add`/`remove`; updates target that
+  single object.
+- Before opting in a production collector to `InstancePolicySingle`, decide how
+  its initial `single` object appears in DynCfg. The framework exposes a single
+  object only after a config exists; it does not publish a template placeholder,
+  and plain stock enable failures can remove the stock object.
+- Public config options: decision record, lifecycle, form, and defaults rules are
+  owned by `collectors-go-design/operator-surface.md`; the constants list
+  is in the how-to guide's Config section.
+
+## Metrics And Charts
+
+- Instruments SHOULD be created once when the metric surface is known.
+- Use `store.Write().SnapshotMeter("")` for normal metrics.
+- Use `Vec(...)` for labels, `Gauge` for current values,
+  `Counter.ObserveTotal()` for source counters, and `StateSet` for fixed
+  one-active-state values.
+- Metric names MUST be stable and selected by `charts.yaml`; stateset metric naming is owned by
+  `./chart-template.md#statesets`.
+- Template authoring (defaults, contexts, families, ordering, statesets, values, labels, shared contexts, tests) is
+  owned by `./chart-template.md`; the bullets below are the runtime contracts it relies on.
+- Charts SHOULD omit `algorithm` for normal type-driven behavior. At runtime,
+  chartengine maps `metrix` counters to `incremental` dimensions and gauges or
+  other kinds to `absolute`, including dynamically built `charttpl.Chart`
+  values. Metric names and suffixes do not determine the algorithm.
+- A chart MAY set `algorithm` to intentionally override runtime kind for every
+  dimension in that chart. This is also REQUIRED when differently typed series
+  are deliberately aggregated into the same rendered dimension; otherwise,
+  contributors to one rendered dimension MUST have the same runtime kind.
+  Chartengine does not diagnose violations at runtime, so real-path collector
+  tests MUST enforce this authoring rule.
+- Mixed counter and gauge dimensions MAY share one authored chart when they
+  render as distinct dimensions; each omitted algorithm is resolved from that
+  dimension's matched series kind.
+- A live metric identity MUST keep a stable runtime kind while its dimension is
+  materialized. A kind change does not redefine an existing Netdata dimension;
+  its creation-time wire algorithm remains until expiry and recreation.
+- Histogram bucket charts use range bucket values from `metrix.ReadFlatten()`
+  and chartengine forces them to `heatmap`. Bucket dimensions are named by the
+  bare `le` upper-bound value and ordered numerically with `+Inf` last. Do NOT
+  add collector-local cumulative-bucket workaround metrics or a bucket-mode
+  option for V2 charts.
+- Multipliers, divisors and hidden flags belong in the chart template, not ad hoc chart-emission code; the float
+  flag is instrument metadata (`./chart-template.md#values`).
+- When instance identity omits labels—either because `instances.by_labels` does not select them or an
+  `instances.optional_by_labels` key is absent—multiple source series can map to one rendered dimension. The effective
+  `aggregation` MUST match the metric meaning. Set it on the chart; it applies to every dimension. Absence means
+  `sum`; available reducers are `sum`, `min`, `max`, and unweighted `avg`
+  (`avg` forces floating-point emission). Use separate charts when metrics need
+  different reducers. Metric kind is not enough to infer this policy: gauges
+  may be additive stocks, states, timestamps, limits, or averages.
+- Histogram buckets/counts/sums are mergeable only with `sum`. Summary
+  quantiles are not globally mergeable with these reducers. Non-sum reduction
+  of cumulative counters happens before Netdata calculates rates and can be
+  misleading when source membership changes.
+- `metrix` keeps ONE descriptor per metric NAME, resolved atomically at commit. With finite age expiry,
+  a name idle past its retention window (`expireAfterSuccessCycles +
+  descriptorGraceCycles`, both configurable on `NewCollectorStore(...)`) is evicted
+  and can then re-register with a changed contract. Within that window the
+  descriptor is authoritative — re-registering a TRULY-LIVE name with a changed
+  kind / summary quantiles / histogram bounds fails the commit (loud), an idle name
+  is superseded, and Init-time (out-of-cycle) registration still panics
+  synchronously on conflict.
+- Dynamic per-name handle caches MUST follow the store's descriptor lifetime through the optional
+  `metrix.DescriptorRetention` accessor (`DescriptorRetentionWindow()`, `SuccessfulCommits()`). Age finite-window
+  caches on successful commits in step with descriptor retention; keeping obsolete handles forever can drift-skip a
+  changed-contract name after eviction. When the window is `DescriptorRetentionUnbounded`, do not age out cached
+  state for that name. This does not forbid reusing instruments for a fixed known metric surface. The source owner is
+  `src/go/pkg/metrix/README.md#consumers-that-cache-per-name-state`; the Prometheus writer
+  (`src/go/plugin/go.d/collector/prometheus/writer.go`) demonstrates commit-aware retention. If the store lacks this
+  optional accessor, preserve cached handles rather than inventing a finite expiry.
+- To reproduce a V1 chart context in a migration, inject `context_namespace` (the
+  fixed prefix, or `prefix.<app>` per job) so autogen rebuilds `prefix.<metric>` /
+  `prefix.<app>.<metric>` without hand-built chart IDs.
+- When a collector builds a static YAML document at runtime (the supported `ChartTemplateYAML` capability):
+  - Emit it with `charttpl.Spec.MarshalTemplate()` (runs `Validate()` only, then
+    marshals with `yaml.v2`, the decoder's library). Do NOT hand-roll `Validate()` +
+    `yaml.Marshal`, and do NOT marshal with `yaml.v3`.
+  - If you mutate a `charttpl.Group` borrowed from a shared profile/catalog, deep-copy
+    it first with `Group.Clone()` so per-job edits cannot corrupt the shared template.
+    A `Group` you decoded yourself per job is already owned and needs no clone.
+- For native snapshots, handle `NewTemplateSet` errors where content is selected and retain the resulting pointer.
+  Use the live provider and store with `collecttest.AssertChartCoverage`; do not reconstruct a second test-only set.
+- Collectors MUST choose whether an empty observation window omits the family or publishes unavailable fields.
+  Snapshot MeasureSet gauge availability and its effect on chart lifetime are owned by
+  `src/go/pkg/metrix/README.md#field-availability`; do not universally skip all-NaN families.
+- For dynamic surfaces whose label sets churn, `metrix`'s `Vec` handle cache is
+  unbounded; cache per-series instruments yourself and evict handles unseen for N
+  cycles to stay bounded. Prefer a framework fix if the need is general
+  (Decision Discipline).
+
+## Compatibility Rules
+
+- For V1-to-V2 migrations, start with
+  `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`.
+
+### Migration Hard Stops
+
+- A collector using V1 chart `Vars` is blocked until framework support, an
+  approved equivalent design, or explicit breaking-alert approval exists.
+- `collecttest.AssertChartCoverage` is not chart-identity parity; it cannot
+  prove old chart IDs, family, priority, lifecycle, labels, or alert variables.
+- A finished migration MUST pass an import/runtime-path audit proving no V1
+  collection path or V1 map-to-`metrix` bridge remains reachable from normal
+  execution.
+
+- Temporary V1-to-V2 parity bridges MAY be used during development, but the
+  finished collector MUST NOT keep a runtime V1 map-to-`metrix` bridge.
+- For migrations, first create a compatibility manifest covering chart IDs,
+  contexts, dimension IDs/names, labels, config keys, DynCfg schema keys,
+  stock config, alerts, docs, and lifecycle behavior.
+- Migrations MUST preserve existing public contracts unless the SOW records an
+  explicit breaking decision.
+- Migrations MUST keep old YAML/JSON field names. Add new config as opt-in when
+  cardinality, cost, or user-visible identity could surprise existing users.
+- Collector integration artifacts MUST follow
+  `.agents/skills/integrations-lifecycle/consistency.md`; do not preserve a
+  partial local artifact checklist in V2 collector work.
+- MUST NOT log raw secrets, DSNs, bearer tokens, or URLs with embedded
+  credentials.
+
+## Hot-Path Logging
+
+- Collectors MUST NOT emit `Warningf`/`Errorf` every collection cycle for a
+  recoverable partial failure. Use the built-in logger limiter:
+  `c.Limit("collector:stable-operation-key", 1, time.Hour).Warningf(...)`.
+- Limiter keys MUST be stable and low-cardinality. Use operation names, not
+  entity IDs, labels, URLs, raw errors, or user-controlled values.
+- `Once()` is reset by `JobV2.runOnce()`, so it is useful inside one cycle only;
+  it is not cross-cycle spam protection.
+- Full collection failure SHOULD still return an error with context so the job
+  retry path handles it. Limit only fail-soft warnings/errors where collection
+  continues with partial or stale data.
+
+## Chart Label Identity
+
+- Labels used by `instances.by_labels`, a present nonblank `instances.optional_by_labels` key, or a dimension
+  `name_from_label` define chart or dimension identity. Changing one creates a new chart or dimension; collectors MUST
+  NOT use identity churn merely to refresh metadata.
+- Use `instances.optional_by_labels` only when a source conditionally exposes a bounded, sufficiently stable,
+  operator-useful identity axis. Missing and blank values are omitted; present values create refined instances. Authors
+  MUST assess value count and churn, and MUST NOT create a duplicate aggregate chart when NIDL/query aggregation already
+  provides that view.
+- Optional-label presence or value transitions create a new chart while the old chart follows normal lifecycle expiry.
+  A template MUST choose lifecycle limits appropriate for the source's observed churn.
+- A present optional identity contributes both its key and value to the chart-ID suffix (for example,
+  `pid="1234"` becomes `_pid_1234`); missing or blank optional identities contribute nothing.
+- `label_promotion` defines non-identity chart metadata. Chartengine reconciles
+  its effective intersection across every routed contributor, including an
+  empty source-label set, and emits a complete replacement only when it changes.
+- Collectors MUST continue publishing numeric samples at their required cadence.
+  A label-only replacement updates chart metadata; it is not a substitute for
+  numeric sample-and-hold output.
+
+## Host Scopes
+
+- Host scopes SHOULD be used only after a product decision says the data belongs on a generated vnode (the decision is
+  described in `.agents/skills/collectors-authoring/collector-practices.md#19-remote-monitored-systems-and-vnodes`).
+- `ScopeKey` and `GUID` MUST be deterministic.
+- Collector-generated vnodes MUST set `_vnode_type=<source>`.
+- Host-scope cardinality MUST be bounded and documented. Collectors SHOULD NOT
+  create VM/disk/NIC/path/sensor scopes by default.
+- Scope identity MUST use stable IDs. Human-readable names SHOULD be hostnames
+  or promoted labels only.
+
+## Tests
+
+For implementation, V2 work MUST include evidence from these tests, or the PR/SOW MUST justify why a specific item
+does not apply. Relevant existing tests count; do not add duplicate tests merely to satisfy this list. Review checks
+applicable coverage and required validation evidence without creating a new PR/SOW:
+
+- config YAML/JSON serialization compatibility;
+- `Init`, `Check`, `Collect`, and `Cleanup` lifecycle coverage;
+- explicit metric-store cycle tests with `BeginCycle`, success commit, and abort
+  on expected collection errors;
+- chart-template schema/decode/validate/compile coverage and the artifact drift checks in
+  `src/go/plugin/go.d/pkg/collecttest/artifacts.go` (`./chart-template.md#tests`);
+- chart coverage assertions for fixtures expected to materialize all dimensions;
+- host-scope tests when scopes/vnodes are used.
+
+Tests are evidence only when they have an independent oracle:
+
+- The oracle is a provider behavior, a supported public contract, or an approved
+  decision, named before the expectation is written. A test MUST NOT restate
+  prose, inventories, or defaults copied from the source it tests; cross-artifact
+  drift checks and forbidden-pattern rules are legitimate, agreement between two
+  files is not proof either expresses the right contract.
+- The regression path MUST reach its state through real construction and
+  transitions. Populating private state after construction, or stubbing past the
+  bug, tests the renderer, not the engine.
+- A fake MUST derive its downstream state from its own inputs and operation
+  history, never from the collector's expected destination, phase, or result.
+  Ask: where did the fake get the expected answer? An incorrect collector mapping
+  must fail the test without changing the fake. Inspect the production adapter
+  and its construction order as well as the fake (transport set before the
+  credential provider, deadlines per endpoint, error classification).
+
+## Pre-PR Check
+
+- A finished V1-to-V2 migration MUST NOT keep a runtime
+  `map[string]int64` collection path or V1 map-to-`metrix` bridge.
+- The PR description or design note MUST enumerate affected collector
+  consistency artifacts and justify every artifact that did not need a matching
+  change. SHOULD-level exceptions and escape hatches MUST be reviewer-visible.
+- Existing public chart/metric/config identity MUST be preserved unless the SOW
+  records an explicit breaking decision.
+- New labels and scopes MUST be bounded and documented.
+- Enrichment SHOULD be split from the V2 compatibility migration when possible.
+- Final sweep: dead fields and helpers, duplicated defaults, unused persisted
+  state, repeated finalization, interfaces or knobs whose motivating requirement
+  disappeared, and tests that pin prose are removed before review.
+- Checklist pass: before declaring a new collector ready, you MUST check the complete diff against
+  `src/go/plugin/go.d/docs/how-to-write-a-collector.md` (File Layout, Registration And Lifecycle, Collect Flow, Tests),
+  `AGENTS.md#go-test-style`, `./chart-template.md#review-checklist` and the review questions of every
+  `collectors-metadata-yaml` family the collector's `metadata.yaml` fills. Record each deviation and its reason in the
+  SOW; a passing build and test run is not evidence that these were applied. When independent review is required,
+  put the same sections in the reviewer's brief; a parser-only or arithmetic-only review does not cover them.

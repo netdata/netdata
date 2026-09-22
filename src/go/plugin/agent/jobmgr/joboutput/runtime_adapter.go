@@ -14,7 +14,7 @@ import (
 // ManagedJob is the V1/V2 collector-loop boundary consumed by Job Manager.
 // Collector-specific chart, cycle, and runner state remains private.
 type ManagedJob interface {
-	StartManaged(chan<- struct{})
+	StartManaged(*jobruntime.ManagedRun)
 	Stop()
 	Cleanup()
 }
@@ -217,6 +217,19 @@ func (fw FrameWriter) PoisonOutput(err error) {
 	if fw.Owner != nil {
 		fw.Owner.Poison(err)
 	}
+}
+
+func (fw FrameWriter) CommitBuiltJobOutput(
+	build func() ([]byte, error),
+	transaction jobruntime.OutputStateTransaction,
+) error {
+	if transaction == nil {
+		return errors.New("job output: invalid FrameOwner transaction")
+	}
+	if fw.Owner == nil {
+		return errors.Join(errors.New("job output: nil FrameOwner writer"), transaction.Abort())
+	}
+	return fw.Owner.CommitBuiltProtocolTransaction(build, transaction)
 }
 
 func finalizeProcessOwnedConstructed(constructed ConstructedJob) (resultErr error) {

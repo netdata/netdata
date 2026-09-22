@@ -3,52 +3,47 @@
 package snmptopology
 
 import (
-	"fmt"
 	"runtime"
 	"testing"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
 
 func BenchmarkSNMPTopologyOfflineInspectionScaling(b *testing.B) {
-	tests := []struct {
+	tests := map[string]struct {
 		devices             int
 		fdbEntriesPerDevice int
 		sharedEndpoints     bool
 	}{
-		{devices: 8, fdbEntriesPerDevice: 128},
-		{devices: 40, fdbEntriesPerDevice: 1600},
-		{devices: 40, fdbEntriesPerDevice: 1600, sharedEndpoints: true},
+		"devices=8/fdb_entries_per_device=128/shared_endpoints=false":   {devices: 8, fdbEntriesPerDevice: 128},
+		"devices=40/fdb_entries_per_device=1600/shared_endpoints=false": {devices: 40, fdbEntriesPerDevice: 1600},
+		"devices=40/fdb_entries_per_device=1600/shared_endpoints=true":  {devices: 40, fdbEntriesPerDevice: 1600, sharedEndpoints: true},
 	}
 
-	for _, tc := range tests {
-		name := fmt.Sprintf(
-			"devices=%d/fdb_entries_per_device=%d/shared_endpoints=%t",
-			tc.devices,
-			tc.fdbEntriesPerDevice,
-			tc.sharedEndpoints,
-		)
+	for name, tc := range tests {
 		b.Run(name, func(b *testing.B) {
 			scenario := benchmarkTopologyReplayScenario(tc.devices, tc.fdbEntriesPerDevice, tc.sharedEndpoints)
 			_, diagnostics := newTopologyScenarioReplayFixture(b, scenario)
-			options := topologyoptions.DefaultQueryOptions()
-			replay := replayTopologyDiagnosticStages(diagnostics, options)
-			if replay.graph.state != topologyInspectionPresent || len(replay.data.Links) == 0 {
-				b.Fatalf("inspection probe graph=%d links=%d err=%v", replay.graph.state, len(replay.data.Links), replay.err)
+			document, err := newTopologyDiagnosticArchiveDocumentV1(diagnostics, "benchmark")
+			if err != nil {
+				b.Fatal(err)
 			}
-			linkSubject, ok := topologyInspectionSubjectFromLink(replay.data, 0)
-			if !ok {
-				b.Fatal("inspection probe could not resolve first link")
+			archive, err := InspectDiagnosticDocument(document)
+			if err != nil {
+				b.Fatal(err)
 			}
+			options := DefaultDiagnosticQueryOptions()
+			exact, err := archive.InspectLinkAt(options, 0)
+			if err != nil {
+				b.Fatal(err)
+			}
+			linkSubject := exact.Subject
 
 			b.Run("subject=device", func(b *testing.B) {
 				b.ReportAllocs()
 				b.ResetTimer()
 				for b.Loop() {
-					report, err := inspectTopologyDevice(diagnostics, options, ddsnmp.DeviceRegistrationID(1))
-					if err != nil || report.graphIdentity.membership.state == topologyInspectionUndetermined {
-						b.Fatalf("device inspection state=%d err=%v", report.graphIdentity.membership.state, err)
+					report, err := archive.InspectDevice(options, 1)
+					if err != nil || report.GraphIdentity.Membership.State == "undetermined" {
+						b.Fatalf("device inspection state=%s err=%v", report.GraphIdentity.Membership.State, err)
 					}
 					runtime.KeepAlive(report)
 				}
@@ -58,9 +53,9 @@ func BenchmarkSNMPTopologyOfflineInspectionScaling(b *testing.B) {
 				b.ReportAllocs()
 				b.ResetTimer()
 				for b.Loop() {
-					report, err := inspectTopologyLink(diagnostics, options, linkSubject)
-					if err != nil || report.graphLink.membership.state == topologyInspectionUndetermined {
-						b.Fatalf("link inspection state=%d err=%v", report.graphLink.membership.state, err)
+					report, err := archive.InspectLink(options, linkSubject)
+					if err != nil || report.GraphLink.Membership.State == "undetermined" {
+						b.Fatalf("link inspection state=%s err=%v", report.GraphLink.Membership.State, err)
 					}
 					runtime.KeepAlive(report)
 				}

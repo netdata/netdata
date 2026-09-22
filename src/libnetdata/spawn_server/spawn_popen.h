@@ -20,8 +20,9 @@ int spawn_popen_wait(POPEN_INSTANCE *pi);
 // bounded poll; the wait is always bounded, never infinite.
 // SPAWN_TIMEDWAIT_EXITED: the child exited; *code holds its spawn_popen_wait()-style return code
 //   and pi has been freed.
-// SPAWN_TIMEDWAIT_RUNNING: still running after timeout_ms; pi remains valid - call again, or
-//   spawn_popen_wait()/spawn_popen_kill().
+// SPAWN_TIMEDWAIT_RUNNING: no exit was observed within timeout_ms; pi remains valid - call again, or
+//   spawn_popen_wait()/spawn_popen_kill(). Not proof the child is alive: see the note on
+//   SPAWN_TIMEDWAIT_RUNNING in spawn_server.h before using pi's pid for anything.
 // SPAWN_TIMEDWAIT_ERROR: the wait could not be completed (the child's state is unknown); pi remains
 //   valid and the caller must reclaim it with spawn_popen_kill(). Do NOT loop on ERROR.
 SPAWN_TIMEDWAIT_RESULT spawn_popen_timedwait(POPEN_INSTANCE *pi, int timeout_ms, int *code);

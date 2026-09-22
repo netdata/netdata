@@ -185,7 +185,11 @@ enrichment:
 
 
 
-### Private IPs have empty GeoIP fields
+## Troubleshooting
+
+### Other Problems
+
+#### Private IPs have empty GeoIP fields
 
 GeoIP databases normally have no country, city, or coordinate entry for RFC 1918 /
 private space. The DB-IP-built ASN database tags private ranges so `*_AS_NAME`
@@ -195,7 +199,7 @@ private addresses do not appear on maps. Declare your internal CIDRs under
 [Private and non-routable IPs](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md#private-and-non-routable-ips).
 
 
-### Stale databases
+#### Stale databases
 
 The plugin does not alert on staleness. Check file mtime:
 `ls -la /var/cache/netdata/topology-ip-intel/`. DB-IP Lite is published monthly,
@@ -204,7 +208,7 @@ upstream cadence when the downloader is installed; running it more often will no
 produce fresher data.
 
 
-### Map renders empty over a long time window
+#### Map renders empty over a long time window
 
 `SRC_GEO_CITY`, `DST_GEO_CITY`, `SRC_GEO_LATITUDE`, `DST_GEO_LATITUDE`,
 `SRC_GEO_LONGITUDE`, and `DST_GEO_LONGITUDE` are stored only in the raw journal

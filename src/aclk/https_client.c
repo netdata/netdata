@@ -476,6 +476,12 @@ typedef struct https_req_ctx {
 
     usec_t req_start_ut;
     usec_t req_timeout_ut;
+
+    // Set by cert_verify_callback() when it waives this connection's certificate. Recorded per
+    // connection, not re-derived from the config later: cloud_conf_regenerate() can flip the
+    // insecure setting while a request is in flight, and the question the error path has to answer
+    // is what was decided for THIS handshake, not what the config says now.
+    bool cert_waived;
 } https_req_ctx_t;
 
 // Converts a request timeout into a monotonic budget. A non-positive timeout_s yields a zero
@@ -818,6 +824,14 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
     if(cloud_config_insecure_get()) {
         if (!preverify_ok && err == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT) {
             preverify_ok = 1;
+
+            // Remember the waiver on the connection itself, so the error path below can tell a
+            // waived certificate from a rejected one without consulting the config again.
+            SSL *ssl = X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
+            https_req_ctx_t *req_ctx = ssl ? SSL_get_app_data(ssl) : NULL;
+            if (req_ctx)
+                req_ctx->cert_waived = true;
+
             netdata_log_error(
                 "ACLK: Self Signed Certificate Accepted as the agent was configured with ACLK_SSL_ALLOW_SELF_SIGNED");
         }
@@ -834,6 +848,28 @@ static https_client_resp_t https_client_cert_error(SSL *ssl, const char *host, h
 {
     long verify_result = SSL_get_verify_result(ssl);
     if (verify_result == X509_V_OK)
+        return fallback;
+
+    // OpenSSL keeps the verification error in the session even when the verify
+    // callback overrode it: cert_verify_callback() returns 1 for a self-signed
+    // certificate in insecure mode, the handshake succeeds, and this still reads
+    // X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT afterwards. Without this check every
+    // later I/O or protocol failure on such a connection would be reported as a
+    // certificate rejection the operator explicitly opted out of, hiding the real
+    // error.
+    //
+    // Two conditions, and each covers something the other cannot:
+    //
+    //  - cert_waived says THIS connection's handshake waived a self-signed certificate. Asking the
+    //    connection beats re-reading the config, because the insecure setting can change under us
+    //    (cloud_conf_regenerate()) and a certificate this handshake actually rejected must keep
+    //    being reported as a rejection even if insecure mode was switched on in the meantime.
+    //  - verify_result says the error we are about to report is still the one that was waived.
+    //    Waiving lets verification CONTINUE, so a later check - certificate validity, say - can
+    //    fail with a different error and overwrite what SSL_get_verify_result() returns. That is a
+    //    genuine rejection and must not be suppressed just because something earlier was waived.
+    https_req_ctx_t *req_ctx = SSL_get_app_data(ssl);
+    if (req_ctx && req_ctx->cert_waived && verify_result == X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT)
         return fallback;
 
     netdata_log_error(
@@ -958,6 +994,17 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
         rc = HTTPS_CLIENT_RESP_NO_SSL_NEW;
         netdata_log_error("ACLK: cannot allocate SSL");
         goto exit_CTX;
+    }
+
+    // Before anything can trigger the verify callback, so it always has somewhere to record a
+    // waiver. This SSL is ours alone; mqtt_wss_client.c keeps its own objects and callback.
+    // Checked, like the same call in mqtt_wss_client.c: without the context attached the callback
+    // cannot record a waiver, and every insecure-mode failure would be reported as a certificate
+    // rejection again - the bug this whole path exists to avoid.
+    if (!SSL_set_app_data(ctx->ssl, ctx)) {
+        rc = HTTPS_CLIENT_RESP_NO_MEM;
+        netdata_log_error("ACLK: cannot attach the request context to SSL");
+        goto exit_SSL;
     }
 
     if (!SSL_set_tlsext_host_name(ctx->ssl, request->host)) {

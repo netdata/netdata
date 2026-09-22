@@ -34,7 +34,13 @@ type tableCollector struct {
 }
 
 // newTableCollector creates a new table collector
-func newTableCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, tableCache *tableCache, log *logger.Logger, disableBulkWalk bool) *tableCollector {
+func newTableCollector(
+	snmpClient gosnmp.Handler,
+	missingOIDs map[string]bool,
+	tableCache *tableCache,
+	log *logger.Logger,
+	disableBulkWalk bool,
+) *tableCollector {
 	return &tableCollector{
 		snmpClient:      snmpClient,
 		disableBulkWalk: disableBulkWalk,
@@ -50,7 +56,10 @@ func (tc *tableCollector) collect(prof *ddsnmp.Profile, stats *ddsnmp.Collection
 	return tc.collectWithSymbolMode(prof, tableSymbolModeValue, stats)
 }
 
-func (tc *tableCollector) collectTopology(prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
+func (tc *tableCollector) collectTopology(
+	prof *ddsnmp.Profile,
+	stats *ddsnmp.CollectionStats,
+) ([]ddsnmp.Metric, error) {
 	return tc.collectWithSymbolMode(prof, tableSymbolModePresence, stats)
 }
 
@@ -72,6 +81,8 @@ type (
 	}
 
 	tableProcessingContext struct {
+		cacheEvidence   *AcquisitionCacheInput
+		processingRoute *AcquisitionRouteReport
 		// === Input data (set when context is created) ===
 
 		// config is the metric configuration for this table
@@ -222,7 +233,11 @@ func (tc *tableCollector) tryCollectFromCache(
 }
 
 // processTableData processes walked table data
-func (tc *tableCollector) processTableData(ctx *tableProcessingContext, collectionCtx *tableCollectionContext, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
+func (tc *tableCollector) processTableData(
+	ctx *tableProcessingContext,
+	collectionCtx *tableCollectionContext,
+	stats *ddsnmp.CollectionStats,
+) ([]ddsnmp.Metric, error) {
 	ctx.columnOIDs = buildColumnOIDs(ctx.config)
 
 	ctx.orderedTags = buildOrderedTags(ctx.config)
@@ -238,7 +253,7 @@ func (tc *tableCollector) processTableData(ctx *tableProcessingContext, collecti
 		switch {
 		case len(ctx.rows) > 0 && dependenciesReady:
 			deps := extractTableDependencies(ctx.config, collectionCtx.tableNameToOID)
-			tc.tableCache.cacheRows(ctx.config, ctx.oidCache, ctx.tagCache, deps)
+			tc.tableCache.cacheRows(ctx.config, ctx.oidCache, ctx.tagCache, deps, ctx.cacheEvidence)
 			tc.log.Debugf("Cached table %s structure with %d rows", ctx.config.Table.Name, len(ctx.oidCache))
 		case len(ctx.rows) > 0:
 			tc.tableCache.invalidateConfig(ctx.config)
@@ -252,7 +267,10 @@ func (tc *tableCollector) processTableData(ctx *tableProcessingContext, collecti
 	return metrics, err
 }
 
-func (tc *tableCollector) resolvedDependenciesAvailable(cfg ddprofiledefinition.MetricsConfig, collectionCtx *tableCollectionContext) bool {
+func (tc *tableCollector) resolvedDependenciesAvailable(
+	cfg ddprofiledefinition.MetricsConfig,
+	collectionCtx *tableCollectionContext,
+) bool {
 	for _, tableOID := range extractTableDependencies(cfg, collectionCtx.tableNameToOID) {
 		if _, ok := collectionCtx.walkedData[tableOID]; !ok {
 			return false
@@ -262,7 +280,9 @@ func (tc *tableCollector) resolvedDependenciesAvailable(cfg ddprofiledefinition.
 }
 
 // organizePDUsByRow groups PDUs by their row index
-func (tc *tableCollector) organizePDUsByRow(ctx *tableProcessingContext) (rows map[string]map[string]gosnmp.SnmpPDU, oidCache, tagCache map[string]map[string]string) {
+func (tc *tableCollector) organizePDUsByRow(
+	ctx *tableProcessingContext,
+) (rows map[string]map[string]gosnmp.SnmpPDU, oidCache, tagCache map[string]map[string]string) {
 	// Combine all column OIDs
 	allColumnOIDs := make([]string, 0, len(ctx.columnOIDs)+len(ctx.orderedTags))
 
@@ -324,7 +344,10 @@ func (tc *tableCollector) organizePDUsByRow(ctx *tableProcessingContext) (rows m
 }
 
 // processRows processes all rows and returns metrics
-func (tc *tableCollector) processRows(ctx *tableProcessingContext, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
+func (tc *tableCollector) processRows(
+	ctx *tableProcessingContext,
+	stats *ddsnmp.CollectionStats,
+) ([]ddsnmp.Metric, error) {
 	var metrics []ddsnmp.Metric
 	var errs []error
 
@@ -344,6 +367,7 @@ func (tc *tableCollector) processRows(ctx *tableProcessingContext, stats *ddsnmp
 		crossTableCtx.rowTags = row.tags
 
 		rowCtx := &tableRowProcessingContext{
+			processing:         ctx.acquisition.processing(index),
 			config:             ctx.config,
 			columnOIDs:         ctx.columnOIDs,
 			crossTableCtx:      crossTableCtx,
@@ -364,7 +388,7 @@ func (tc *tableCollector) processRows(ctx *tableProcessingContext, stats *ddsnmp
 		}
 
 		metrics = append(metrics, rowMetrics...)
-		ctx.acquisition.addValueReferences(currentRowOrdinal, len(rowMetrics))
+		ctx.acquisition.addValueReferences(currentRowOrdinal, index, rowMetrics)
 	}
 
 	if len(errs) > 0 {
@@ -375,7 +399,10 @@ func (tc *tableCollector) processRows(ctx *tableProcessingContext, stats *ddsnmp
 }
 
 // collectWithCache collects metrics using cached structure
-func (tc *tableCollector) collectWithCache(ctx *cacheProcessingContext, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
+func (tc *tableCollector) collectWithCache(
+	ctx *cacheProcessingContext,
+	stats *ddsnmp.CollectionStats,
+) ([]ddsnmp.Metric, error) {
 	// Build list of OIDs to GET
 	var oidsToGet []string
 	for _, columns := range ctx.cachedOIDs {
@@ -391,7 +418,21 @@ func (tc *tableCollector) collectWithCache(ctx *cacheProcessingContext, stats *d
 	}
 
 	// GET current values
+	source := sourceRecorder(tc.snmpClient)
+	cursor := source.Cursor()
 	pdus, err := tc.snmpGet(oidsToGet, stats)
+	if source != nil && ctx.acquisition != nil {
+		requests := source.requestsSince(cursor)
+		for _, oid := range oidsToGet {
+			for _, operation := range requests[trimOID(oid)] {
+				ctx.acquisition.candidateSources = append(ctx.acquisition.candidateSources, ddsnmp.SourceBinding{
+					Operation: operation,
+					OID:       trimOID(oid),
+					Role:      "primary",
+				})
+			}
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cached OIDs: %w", err)
 	}
@@ -420,7 +461,10 @@ func (tc *tableCollector) collectWithCache(ctx *cacheProcessingContext, stats *d
 }
 
 // buildMetricsFromCache builds metrics from cached structure and current values
-func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
+func (tc *tableCollector) buildMetricsFromCache(
+	ctx *cacheProcessingContext,
+	stats *ddsnmp.CollectionStats,
+) ([]ddsnmp.Metric, error) {
 	staticTags := parseStaticTags(ctx.config.StaticTags)
 	var metrics []ddsnmp.Metric
 	var firstErr error
@@ -484,11 +528,13 @@ func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext, sta
 				metrics = append(metrics, *metric)
 			}
 		}
-		ctx.acquisition.addValueReferences(currentRowOrdinal, len(metrics)-valueStart)
+		ctx.acquisition.addValueReferences(currentRowOrdinal, index, metrics[valueStart:])
 	}
 
 	if errorCount > 0 {
-		key := tableRowsProcessingErrorLogKey + ctx.profileSource + "|" + ctx.config.Table.OID + "|" + tc.tableCache.generateConfigID(ctx.config)
+		key := tableRowsProcessingErrorLogKey + ctx.profileSource + "|" + ctx.config.Table.OID + "|" + tc.tableCache.generateConfigID(
+			ctx.config,
+		)
 		tc.log.Limit(key, 1, tableRowsErrorLogEvery).
 			Warningf("failed to collect %d cached table metrics; first error: %v", errorCount, firstErr)
 	}
@@ -498,7 +544,11 @@ func (tc *tableCollector) buildMetricsFromCache(ctx *cacheProcessingContext, sta
 
 // SNMP operations
 
-func (tc *tableCollector) snmpWalk(oid string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
+func (tc *tableCollector) snmpWalk(
+	oid string,
+	stats *ddsnmp.CollectionStats,
+	execution *AcquisitionExecutionReport,
+) (map[string]gosnmp.SnmpPDU, error) {
 	pdus := make(map[string]gosnmp.SnmpPDU)
 
 	var resp []gosnmp.SnmpPDU
@@ -506,10 +556,14 @@ func (tc *tableCollector) snmpWalk(oid string, stats *ddsnmp.CollectionStats) (m
 
 	stats.SNMP.WalkRequests++
 
-	if tc.snmpClient.Version() == gosnmp.Version1 || tc.disableBulkWalk {
+	useWalk := tc.snmpClient.Version() == gosnmp.Version1 || tc.disableBulkWalk
+	if useWalk {
 		resp, err = tc.snmpClient.WalkAll(oid)
 	} else {
 		resp, err = tc.snmpClient.BulkWalkAll(oid)
+	}
+	if operation := sourceRecorder(tc.snmpClient).Cursor(); execution != nil && operation != 0 {
+		execution.WalkOperations = append(execution.WalkOperations, operation)
 	}
 	if err != nil {
 		return nil, err
@@ -529,29 +583,7 @@ func (tc *tableCollector) snmpWalk(oid string, stats *ddsnmp.CollectionStats) (m
 }
 
 func (tc *tableCollector) snmpGet(oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
-	pdus := make(map[string]gosnmp.SnmpPDU)
-
-	for chunk := range slices.Chunk(oids, tc.snmpClient.MaxOids()) {
-		stats.SNMP.GetRequests++
-		stats.SNMP.GetOIDs += int64(len(chunk))
-
-		result, err := tc.snmpClient.Get(chunk)
-		if err != nil {
-			stats.Errors.SNMP++
-			return nil, err
-		}
-
-		for _, pdu := range result.Variables {
-			if !isPduWithData(pdu) {
-				stats.Errors.MissingOIDs++
-				tc.missingOIDs[trimOID(pdu.Name)] = true
-				continue
-			}
-			pdus[trimOID(pdu.Name)] = pdu
-		}
-	}
-
-	return pdus, nil
+	return getSNMPValues(tc.snmpClient, oids, tc.missingOIDs, stats)
 }
 
 func parseStaticTags(staticTags []ddprofiledefinition.StaticMetricTagConfig) map[string]string {
@@ -602,7 +634,7 @@ func buildOrderedTags(cfg ddprofiledefinition.MetricsConfig) []orderedTagConfig 
 	for _, tagCfg := range cfg.MetricTags {
 		var tt tagType
 		switch {
-		case isIndexTagConfig(tagCfg):
+		case tagCfg.IsIndexTag():
 			tt = tagTypeIndex
 		case tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name:
 			tt = tagTypeCrossTable
@@ -617,24 +649,4 @@ func buildOrderedTags(cfg ddprofiledefinition.MetricsConfig) []orderedTagConfig 
 	}
 
 	return ordered
-}
-
-func isIndexTagConfig(tagCfg ddprofiledefinition.MetricTagConfig) bool {
-	if tagCfg.Index != 0 {
-		return true
-	}
-
-	if tagCfg.Table != "" {
-		return false
-	}
-
-	if tagCfg.Symbol.OID != "" {
-		return false
-	}
-
-	return len(tagCfg.IndexTransform) > 0 ||
-		tagCfg.Symbol.Format != "" ||
-		tagCfg.Symbol.ExtractValue != "" ||
-		tagCfg.Symbol.MatchPattern != "" ||
-		tagCfg.Mapping.HasItems()
 }

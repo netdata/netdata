@@ -1,0 +1,571 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "INV-01",
+      "prompt": "Review a go.d V2 collector parser optimization for performance. The diff replaces temporary parsing buffers; option defaults, metric meaning, identities and lifecycle are unchanged. Do not edit.",
+      "required": [
+        "collectors-authoring",
+        "collectors-go-framework-v2"
+      ],
+      "optional": [
+        "collectors-go-design",
+        "integrations-lifecycle"
+      ],
+      "not_selected_by_prompt": [
+        "repo-pr-reviews",
+        "packaging-static-installer"
+      ],
+      "expect": [
+        "Assess allocations, bounded work and relevant shared correctness contracts.",
+        "Design entry may be inspected if relevance is uncertain; do not require every design reference or a new design artifact."
+      ]
+    },
+    {
+      "id": "INV-02",
+      "prompt": "Review this go.d collector change with a performance lens: it adds a default-enabled mode that skips expensive probes and emits zero latency for skipped probes. Do not edit.",
+      "required": [
+        "collectors-authoring",
+        "collectors-go-design"
+      ],
+      "optional": [
+        "collectors-go-framework-v2",
+        "integrations-lifecycle"
+      ],
+      "not_selected_by_prompt": [
+        "repo-pr-reviews"
+      ],
+      "expect": [
+        "A performance lens does not exempt option/default or measurement semantics.",
+        "Check skipped-versus-measured meaning and existing evidence; report defects without implementing a design note."
+      ]
+    },
+    {
+      "id": "INV-03",
+      "prompt": "Review maintainability of a go.d V2 collector change that retains remote-object ownership records across restarts and transfers them between jobs. Do not edit.",
+      "required": [
+        "collectors-authoring",
+        "collectors-go-design",
+        "collectors-go-framework-v2"
+      ],
+      "optional": [
+        "integrations-lifecycle"
+      ],
+      "not_selected_by_prompt": [
+        "query-netdata-cloud"
+      ],
+      "expect": [
+        "Read ownership, lifecycle and durable-state contracts.",
+        "No remote writes or mutation experiments just because a design recipe describes them."
+      ]
+    },
+    {
+      "id": "INV-04",
+      "prompt": "Improve help text and field grouping in a go.d collector config_schema.json form. No options, defaults or behavior change.",
+      "required": [
+        "collectors-go-design"
+      ],
+      "optional": [
+        "collectors-authoring",
+        "integrations-lifecycle"
+      ],
+      "not_selected_by_prompt": [
+        "collectors-metadata-yaml"
+      ],
+      "expect": [
+        "Use the config-schema presentation reference.",
+        "Do not require a new collector product-design note for a pure presentation edit."
+      ]
+    },
+    {
+      "id": "INV-05",
+      "prompt": "Review a go.d collector migration from V1 to V2; metric meanings and public options are preserved.",
+      "required": [
+        "collectors-authoring",
+        "collectors-go-framework-v2"
+      ],
+      "optional": [
+        "collectors-go-design",
+        "integrations-lifecycle"
+      ],
+      "not_selected_by_prompt": [
+        "query-netdata-agents"
+      ],
+      "expect": [
+        "Use migration and V2 lifecycle/store/chart contracts.",
+        "Preserve compatibility; do not invent product enrichment or execute the authoring steps during review."
+      ]
+    },
+    {
+      "id": "INV-06",
+      "prompt": "Review the overview and prerequisites wording in a collector metadata.yaml. No schema or generator change.",
+      "required": [
+        "collectors-metadata-yaml"
+      ],
+      "optional": [
+        "collectors-authoring",
+        "integrations-lifecycle"
+      ],
+      "not_selected_by_prompt": [
+        "collectors-go-design",
+        "docs-learn-pr-preview"
+      ],
+      "expect": [
+        "Inspect affected metadata fields and evidence of operator claims.",
+        "Existing metadata preview evidence can be reviewed without rebuilding Learn."
+      ]
+    },
+    {
+      "id": "INV-07",
+      "prompt": "Review an ibm.d docgen change and its generated runtime schema and context artifacts for source-PR completeness.",
+      "required": [
+        "integrations-lifecycle"
+      ],
+      "optional": [
+        "collectors-authoring",
+        "collectors-metadata-yaml"
+      ],
+      "not_selected_by_prompt": [
+        "collectors-go-framework-v2"
+      ],
+      "expect": [
+        "Use IBM subtree/framework owners.",
+        "Distinguish generated runtime/schema/context artifacts required in source PR from generated integration documentation delivered later."
+      ]
+    },
+    {
+      "id": "INV-08",
+      "prompt": "Review a new SNMP polling profile symbol that is a table INDEX with MAX-ACCESS not-accessible.",
+      "required": [
+        "collectors-authoring",
+        "collectors-snmp-profiles"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "collectors-snmp-trap-profiles",
+        "query-snmp-traps"
+      ],
+      "expect": [
+        "Verify MIB accessibility and row-index extraction; do not blindly poll an inaccessible INDEX object.",
+        "Do not query a live device solely for review."
+      ]
+    },
+    {
+      "id": "INV-09",
+      "prompt": "Review a stock SNMP trap profile change adding a category and using a varbind value as a chart label.",
+      "required": [
+        "collectors-authoring",
+        "collectors-snmp-trap-profiles"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "collectors-snmp-profiles",
+        "query-snmp-traps"
+      ],
+      "expect": [
+        "Check closed category/severity taxonomy, file-scoped varbinds and label cardinality.",
+        "Review existing generator/proof evidence; do not regenerate or install the pack solely because the skill loads."
+      ]
+    },
+    {
+      "id": "INV-10",
+      "prompt": "Review a Prometheus chart profile selector/relabel change and the attached semantic proof bundle.",
+      "required": [
+        "collectors-authoring",
+        "collectors-prometheus-profiles"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "query-netdata-cloud"
+      ],
+      "expect": [
+        "Assess selector policy, reset semantics, coverage and cardinality through relevant proof contracts.",
+        "Do not fetch fresh exporter data or install the profile as an automatic review step."
+      ]
+    },
+    {
+      "id": "INV-11",
+      "prompt": "Review a C topology producer payload change that alters actor identity and link evidence tables.",
+      "required": [
+        "topology-authoring"
+      ],
+      "optional": [
+        "collectors-authoring"
+      ],
+      "not_selected_by_prompt": [
+        "query-netdata-cloud",
+        "collectors-go-design"
+      ],
+      "expect": [
+        "Use topology identity, evidence, correlation and validator contracts.",
+        "This is producer review, not an operator query or Go design task.",
+        "Read shared collector contracts if the producer is collector-hosted; C alone does not establish that, since streaming can also produce topology."
+      ]
+    },
+    {
+      "id": "INV-12",
+      "prompt": "Review an alert template changing warn/crit, missing-data handling and delay before notifications.",
+      "required": [
+        "health-alert-authoring"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "triage-agent-events"
+      ],
+      "expect": [
+        "Inspect threshold state/hysteresis, NaN and lifecycle/identity.",
+        "Distinguish immediate alert status from delayed notification execution; no live alert deployment."
+      ]
+    },
+    {
+      "id": "INV-13",
+      "prompt": "Review moving a Learn page and changing its redirect and sidebar mapping. Do not build the site.",
+      "required": [
+        "docs-learn-site-structure"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "docs-learn-pr-preview"
+      ],
+      "expect": [
+        "Use mapping, URL/redirect and sidebar owners.",
+        "No local preview triggered by ordinary docs publication review."
+      ]
+    },
+    {
+      "id": "INV-14",
+      "prompt": "Preview this documentation PR locally on Learn using its exact committed revision. Do not start from my uncommitted files.",
+      "required": [
+        "docs-learn-pr-preview",
+        "docs-learn-site-structure"
+      ],
+      "optional": [
+        "integrations-lifecycle"
+      ],
+      "not_selected_by_prompt": [
+        "packaging-static-installer"
+      ],
+      "expect": [
+        "Use isolated source/Learn workspaces and verified committed input.",
+        "Do not replace the requested revision with ambient working-tree files; local build requested, publishing is not."
+      ]
+    },
+    {
+      "id": "INV-15",
+      "prompt": "Review packaging/makeself changes for aarch64 compatibility. I only want review, not a build or deployment.",
+      "required": [
+        "packaging-static-installer"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "repo-pr-reviews"
+      ],
+      "expect": [
+        "Use architecture/cache/artifact contracts and existing evidence.",
+        "Do not initialize builds, remove images or install binfmt merely because the build recipe describes them."
+      ]
+    },
+    {
+      "id": "INV-16",
+      "prompt": "Build a local x86_64 static makeself artifact from this checkout. Do not deploy it anywhere.",
+      "required": [
+        "packaging-static-installer"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "query-netdata-agents"
+      ],
+      "expect": [
+        "Check actual build preconditions and architecture policy.",
+        "A build request does not authorize installation, remote deployment or removing unrelated caches."
+      ]
+    },
+    {
+      "id": "INV-17",
+      "prompt": "Review a tests/query-corpus oracle change proposed because the current engine returns a different value.",
+      "required": [
+        "tests-query-corpus"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "repo-pr-reviews"
+      ],
+      "expect": [
+        "Require independent semantics, not fitting the oracle to observed engine output.",
+        "A proven test defect can be corrected; an engine discrepancy alone is insufficient."
+      ]
+    },
+    {
+      "id": "INV-18",
+      "prompt": "Explain how to query /api/v3/info directly from an Agent with bearer protection; show a recipe without executing it.",
+      "required": [
+        "query-netdata-agents"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "query-netdata-cloud"
+      ],
+      "expect": [
+        "Use direct Agent authentication/API contracts.",
+        "Do not read credentials or mint a bearer to explain a recipe; load environment explicitly for a later authorized execution."
+      ]
+    },
+    {
+      "id": "INV-19",
+      "prompt": "Review a recipe for querying topology:snmp through Netdata Cloud. The recipe and response fixture are attached.",
+      "required": [
+        "query-netdata-cloud"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "topology-authoring",
+        "triage-snmp-diagnostics"
+      ],
+      "expect": [
+        "Select Cloud transport and relevant Function/topology-query references.",
+        "Operator topology queries do not select producer authoring; supplied evidence needs no live request."
+      ]
+    },
+    {
+      "id": "INV-20",
+      "prompt": "Explain SNMP trap deduplication summaries and TRAP_VAR_* fields in this saved direct-Agent response.",
+      "required": [
+        "query-snmp-traps"
+      ],
+      "optional": [
+        "query-netdata-agents"
+      ],
+      "not_selected_by_prompt": [
+        "collectors-snmp-trap-profiles",
+        "collectors-snmp-profiles"
+      ],
+      "expect": [
+        "Use trap field/dedup semantics and direct transport if necessary.",
+        "No trap-profile authoring, Cloud lookup or new capture merely to interpret supplied data."
+      ]
+    },
+    {
+      "id": "INV-21",
+      "prompt": "Investigate this saved agent-events crash batch: compare observed versions and explain why events appeared only after restart.",
+      "required": [
+        "triage-agent-events"
+      ],
+      "optional": [
+        "query-netdata-agents",
+        "query-netdata-cloud"
+      ],
+      "not_selected_by_prompt": [
+        "health-alert-authoring"
+      ],
+      "expect": [
+        "Use AE fields, restart ingestion and 23h dedup/window constraints.",
+        "Saved batch analysis needs no credential load or fleet query; observed versions are not a release catalog."
+      ]
+    },
+    {
+      "id": "INV-22",
+      "prompt": "Review the Codacy JSON I supplied and explain why local zero findings disagree with the current-head CI check. Do not run tools or fetch new results.",
+      "required": [
+        "triage-codacy"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "repo-pr-reviews"
+      ],
+      "expect": [
+        "Distinguish local scope/version evidence from current remote gate.",
+        "Do not run analyzer/API/self-test or read .env solely because the skill loaded."
+      ]
+    },
+    {
+      "id": "INV-23",
+      "prompt": "Review two supplied SonarCloud issues for false-positive classification. There are 500 other findings with the same rule ID.",
+      "required": [
+        "triage-sonarqube"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "triage-codeql"
+      ],
+      "expect": [
+        "Verify the two selected findings against code.",
+        "Neither review nor shared rule ID authorizes comments/transitions, family dismissal or profile changes."
+      ]
+    },
+    {
+      "id": "INV-24",
+      "prompt": "Apply the already reviewed and authorized Sonar false-positive decisions to keys A and B. Do not touch other findings.",
+      "required": [
+        "triage-sonarqube"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "repo-pr-reviews"
+      ],
+      "expect": [
+        "Use selected-key operations and preserve the existing authorization.",
+        "Do not re-enumerate/mutate the whole family or ask for the same approval again."
+      ]
+    },
+    {
+      "id": "INV-25",
+      "prompt": "Review supplied CodeQL cpp/uninitialized-local alerts in a test directory. Do not dismiss anything.",
+      "required": [
+        "triage-codeql"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "triage-sonarqube"
+      ],
+      "expect": [
+        "Check each alert and reachable context; a path or rule family is not itself a false-positive proof.",
+        "No GitHub dismissal or remote comment from a review-only request."
+      ]
+    },
+    {
+      "id": "INV-26",
+      "prompt": "Review a saved Coverity CID bundle and assess a proposed true-bug Fix Submitted classification with no fixing commit recorded.",
+      "required": [
+        "triage-coverity"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "triage-codacy"
+      ],
+      "expect": [
+        "Check the concrete defect and distinction between fix required and a fix actually submitted.",
+        "Do not change Coverity state; absence of fixing evidence cannot establish submission."
+      ]
+    },
+    {
+      "id": "INV-27",
+      "prompt": "Investigate missing BGP peer state in an offline SNMP support bundle. No live polling is requested.",
+      "required": [
+        "triage-snmp-diagnostics"
+      ],
+      "optional": [
+        "collectors-snmp-profiles"
+      ],
+      "not_selected_by_prompt": [
+        "query-snmp-traps",
+        "query-netdata-cloud"
+      ],
+      "expect": [
+        "Start relevant inventory/normal-device evidence and producer/run context; topology checkpoint is not required for normal BGP evidence.",
+        "Respect partial listing, cached-input and captured-window limits; no live replacement of missing data."
+      ]
+    },
+    {
+      "id": "INV-28",
+      "prompt": "Review a change to snmp-diagnostics selected-document limits and tar traversal. No customer bundle is available.",
+      "required": [
+        "triage-snmp-diagnostics"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "query-netdata-agents"
+      ],
+      "expect": [
+        "Use input and container-cost owners plus existing synthetic fixtures.",
+        "Do not demand a private capture or confuse selected-document limits with enclosing bundle traversal bounds."
+      ]
+    },
+    {
+      "id": "INV-29",
+      "prompt": "Find the Cloud-side consumer of this contract in my existing Netdata source mirror. Do not refresh or sync it.",
+      "required": [
+        "repo-mirror-sources"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "repo-pr-reviews"
+      ],
+      "expect": [
+        "Inspect existing checkouts and qualify commit/freshness evidence.",
+        "No branch switches, pulls, clones or submodule updates."
+      ]
+    },
+    {
+      "id": "INV-30",
+      "prompt": "Inspect the two PR review threads I supplied; assess whether their claims are valid. Do not fetch all PR comments or send replies.",
+      "required": [
+        "repo-pr-reviews"
+      ],
+      "optional": [
+        "triage-sonarqube"
+      ],
+      "not_selected_by_prompt": [
+        "repo-mirror-sources"
+      ],
+      "expect": [
+        "Keep scope to selected evidence and load relevant domain contracts if identified.",
+        "Do not imply full-PR coverage or fetch configured sources automatically; no replies/resolutions."
+      ]
+    },
+    {
+      "id": "INV-31",
+      "prompt": "Correct one stale command in an existing Netdata skill; preserve the surrounding domain rules.",
+      "required": [
+        "repo-skill-authoring"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "repo-pr-reviews"
+      ],
+      "expect": [
+        "Use bounded amendment workflow and verify the affected command/source owner.",
+        "No full restructure inventory or skill-described live operation solely to validate prose."
+      ]
+    },
+    {
+      "id": "INV-32",
+      "prompt": "Review a diff that restructures a Netdata skill into an entry and supporting references. Do not edit.",
+      "required": [
+        "repo-skill-authoring"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "repo-pr-reviews"
+      ],
+      "expect": [
+        "Assess preservation, reachability, trigger and action boundaries across the whole assigned unit.",
+        "Review is read-only and need not create implementation SOW/design artifacts."
+      ]
+    },
+    {
+      "id": "INV-33",
+      "prompt": "Review this pure C storage-engine allocation optimization. It does not touch collectors, health, query corpus, skills, or PR-comment handling.",
+      "required": [],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "collectors-authoring",
+        "collectors-go-design",
+        "repo-pr-reviews",
+        "tests-query-corpus"
+      ],
+      "expect": [
+        "Use applicable source/subtree contracts; none of these runtime skill names is required by this prompt alone.",
+        "Do not force an unrelated skill simply because this is Netdata or a performance review."
+      ]
+    },
+    {
+      "id": "INV-34",
+      "prompt": "Review a go.d V2 parser patch for performance. It is not yet clear whether the new cache changes sample lifetime or ownership.",
+      "required": [
+        "collectors-authoring",
+        "collectors-go-framework-v2"
+      ],
+      "optional": [
+        "collectors-go-design",
+        "integrations-lifecycle"
+      ],
+      "not_selected_by_prompt": [
+        "query-netdata-agents"
+      ],
+      "expect": [
+        "Inspect the candidate design entry and reachable cache/lifecycle dependencies to resolve relevance.",
+        "If ownership/lifecycle contracts change, expand the applicable design rules; uncertainty is not an automatic exemption or a reason to load all references."
+      ]
+    }
+  ]
+}

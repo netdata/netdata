@@ -7,10 +7,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsregion"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/awsauth"
 )
 
 type planCompiler struct {

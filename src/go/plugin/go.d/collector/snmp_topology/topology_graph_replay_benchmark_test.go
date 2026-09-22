@@ -11,22 +11,16 @@ import (
 )
 
 func BenchmarkSNMPTopologyTypedGraphReplayScaling(b *testing.B) {
-	tests := []struct {
+	tests := map[string]struct {
 		devices             int
 		fdbEntriesPerDevice int
 		sharedEndpoints     bool
 	}{
-		{devices: 8, fdbEntriesPerDevice: 128},
-		{devices: 40, fdbEntriesPerDevice: 1600, sharedEndpoints: true},
+		"devices=8/fdb_entries_per_device=128/shared_endpoints=false":  {devices: 8, fdbEntriesPerDevice: 128},
+		"devices=40/fdb_entries_per_device=1600/shared_endpoints=true": {devices: 40, fdbEntriesPerDevice: 1600, sharedEndpoints: true},
 	}
 
-	for _, tc := range tests {
-		name := fmt.Sprintf(
-			"devices=%d/fdb_entries_per_device=%d/shared_endpoints=%t",
-			tc.devices,
-			tc.fdbEntriesPerDevice,
-			tc.sharedEndpoints,
-		)
+	for name, tc := range tests {
 		b.Run(name, func(b *testing.B) {
 			scenario := benchmarkTopologyReplayScenario(
 				tc.devices,
@@ -55,19 +49,29 @@ func BenchmarkSNMPTopologyTypedGraphReplayScaling(b *testing.B) {
 				}
 			})
 
+			document, err := newTopologyDiagnosticArchiveDocumentV1(diagnostics, "benchmark")
+			if err != nil {
+				b.Fatal(err)
+			}
+			archive, err := InspectDiagnosticDocument(document)
+			if err != nil {
+				b.Fatal(err)
+			}
+			query := DefaultDiagnosticQueryOptions()
+
 			b.Run("source=offline_replay", func(b *testing.B) {
-				probe, ok, err := replayTopologyDiagnostics(diagnostics, options)
-				if err != nil || !ok || probe.Links.Rows == 0 {
-					b.Fatalf("replay probe links=%d ok=%t err=%v", probe.Links.Rows, ok, err)
+				probe, err := archive.Replay(query)
+				if err != nil || probe.Links.Rows == 0 {
+					b.Fatalf("replay probe links=%d err=%v", probe.Links.Rows, err)
 				}
 				b.ReportMetric(float64(probe.Actors.Rows), "actors/op")
 				b.ReportMetric(float64(probe.Links.Rows), "links/op")
 				b.ReportAllocs()
 				b.ResetTimer()
 				for b.Loop() {
-					payload, ok, err := replayTopologyDiagnostics(diagnostics, options)
-					if err != nil || !ok {
-						b.Fatalf("offline typed graph replay ok=%t err=%v", ok, err)
+					payload, err := archive.Replay(query)
+					if err != nil {
+						b.Fatalf("offline typed graph replay err=%v", err)
 					}
 					runtime.KeepAlive(payload)
 				}

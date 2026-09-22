@@ -194,6 +194,7 @@ type planBuildContext struct {
 	dimCapHints      map[string]int
 	materialized     *materializedState
 	materializedByID map[string]*materializedChartState
+	retired          map[string]*materializedChartState
 
 	planRouteStats
 }
@@ -207,31 +208,24 @@ func isHistogramBucketSeries(meta metrix.SeriesMeta) bool {
 		meta.FlattenRole == metrix.FlattenRoleHistogramBucket
 }
 
-func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uint64, uint64, uint64, bool, error) {
-	if e == nil {
-		return Plan{}, materializedState{}, 0, 0, 0, false, fmt.Errorf("chartengine: nil engine")
-	}
-	if reader == nil {
-		return Plan{}, materializedState{}, 0, 0, 0, false, fmt.Errorf("chartengine: nil metrics reader")
-	}
+// buildPlan runs with the owning engine locked, possibly against a private
+// candidate view. Only derived cache/diagnostic bookkeeping changes here.
+func (e *Engine) buildPlan(reader metrix.Reader, retired map[string]*materializedChartState) (Plan, materializedState, bool, error) {
 	out := Plan{
 		Actions:            make([]EngineAction, 0),
 		InferredDimensions: make([]InferredDimension, 0),
 	}
 	collectMeta := reader.CollectMeta()
 
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if e.state.outstanding != 0 {
-		return Plan{}, materializedState{}, 0, 0, 0, false, ErrOutstandingPlanAttempt
+	sample := PlanRuntimeSample{
+		startedAt: time.Now(),
 	}
-	sample := PlanRuntimeSample{startedAt: time.Now()}
 	defer func() { e.observeBuildSample(sample) }()
 	// Failed attempt must not trigger lifecycle transitions.
 	if collectMeta.LastAttemptStatus != metrix.CollectStatusSuccess {
 		sample.skippedFailed = true
 		e.logDebugf("chartengine build skipped: collect status=%d", collectMeta.LastAttemptStatus)
-		return out, materializedState{}, 0, 0, 0, false, nil
+		return out, materializedState{}, false, nil
 	}
 
 	obs := e.observeBuildSuccessSeq(collectMeta.LastSuccessSeq)
@@ -262,14 +256,15 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 	if err != nil {
 		sample.buildErr = true
 		e.logWarningf("chartengine build prepare failed: %v", err)
-		return Plan{}, materializedState{}, 0, 0, 0, false, err
+		return Plan{}, materializedState{}, false, err
 	}
+	ctx.retired = retired
 	phaseStartedAt = time.Now()
 	if err := validateBuildReaderForInferredDimensions(ctx.index, reader); err != nil {
 		sample.phaseValidateSeconds = time.Since(phaseStartedAt).Seconds()
 		sample.buildErr = true
 		e.logWarningf("chartengine build reader validation failed: %v", err)
-		return Plan{}, materializedState{}, 0, 0, 0, false, err
+		return Plan{}, materializedState{}, false, err
 	}
 	sample.phaseValidateSeconds = time.Since(phaseStartedAt).Seconds()
 	phaseStartedAt = time.Now()
@@ -277,7 +272,7 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 		sample.phaseScanSeconds = time.Since(phaseStartedAt).Seconds()
 		sample.buildErr = true
 		e.logWarningf("chartengine build scan failed: %v", err)
-		return Plan{}, materializedState{}, 0, 0, 0, false, err
+		return Plan{}, materializedState{}, false, err
 	}
 	sample.phaseScanSeconds = time.Since(phaseStartedAt).Seconds()
 
@@ -314,7 +309,7 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 		sample.phaseMaterializeSeconds = time.Since(phaseStartedAt).Seconds()
 		sample.buildErr = true
 		e.logWarningf("chartengine build materialization failed: %v", err)
-		return Plan{}, materializedState{}, 0, 0, 0, false, err
+		return Plan{}, materializedState{}, false, err
 	}
 	sample.phaseMaterializeSeconds = time.Since(phaseStartedAt).Seconds()
 	phaseStartedAt = time.Now()
@@ -329,6 +324,8 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 		out.Actions = append(out.Actions, action)
 	}
 	phaseStartedAt = time.Now()
+	ctx.reconcileRetirements()
+	staged.recordEmittedChartDefinitions(out.Actions)
 	sortInferredDimensions(out.InferredDimensions)
 	sample.phaseSortSeconds = time.Since(phaseStartedAt).Seconds()
 
@@ -347,9 +344,7 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 	e.state.hints.chartsByID = len(ctx.chartsByID)
 	e.state.hints.seenInfer = len(ctx.seenInfer)
 
-	attemptID := e.nextAttemptIDLocked()
-	e.state.outstanding = attemptID
-	return out, staged, e.state.engineEpoch, e.state.commitSeq, attemptID, true, nil
+	return out, staged, true, nil
 }
 
 func validateBuildReaderForInferredDimensions(index matchIndex, reader metrix.Reader) error {
@@ -433,7 +428,7 @@ func (e *Engine) preparePlanBuildContext(
 		prog:              prog,
 		cache:             cache,
 		routeCacheEnabled: e.state.cfg.routeObserver == nil,
-		routeObserver:     e.state.cfg.routeObserver,
+		routeObserver:     e.state.templateSet.diagnosticObserver(e.state.cfg.routeObserver),
 		index:             index,
 		flat:              reader,
 		seenInfer:         make(map[string]struct{}, seenInferCap),
@@ -528,6 +523,13 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 				ctx.routeCacheMisses++
 			}
 		}
+		if len(routes) > 0 && routes[0].Autogen && !routes[0].autogenGuard.valid(ctx.reader, meta) {
+			routes = nil
+			// Release obsolete discovery even if autogen rebuilding is rejected.
+			if ctx.routeCacheEnabled {
+				ctx.cache.Store(identity, ctx.prog.Revision(), buildSeq, nil)
+			}
+		}
 		if len(routes) == 0 {
 			autoRoutes, ok, reason, ruleIndex, err := e.resolveAutogenRouteWithReason(ctx.reader, name, labels, meta)
 			if err != nil {
@@ -536,6 +538,9 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 			}
 			if ok {
 				routes = autoRoutes
+				if ctx.routeCacheEnabled {
+					ctx.cache.Store(identity, ctx.prog.Revision(), buildSeq, routes)
+				}
 				if trackStats {
 					ctx.seriesAutogenMatched++
 					ctx.seriesMatched++
@@ -562,6 +567,9 @@ func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool
 				return
 			}
 		} else if trackStats {
+			if routes[0].Autogen {
+				ctx.seriesAutogenMatched++
+			}
 			ctx.seriesMatched++
 		}
 
@@ -674,6 +682,7 @@ func (ctx *planBuildContext) accumulateRoute(
 		var entries map[string]*dimBuildEntry
 		matChart := ctx.materializedByID[route.ChartID]
 		matchingMaterializedChart := matChart != nil && matChart.templateID == route.ChartTemplateID
+
 		if matchingMaterializedChart {
 			entries = matChart.checkoutScratchEntries(dimCap)
 		} else {
@@ -813,6 +822,18 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 
 	for _, chartID := range chartIDs {
 		cs := ctx.chartsByID[chartID]
+		previous := ctx.materialized.charts[chartID]
+		dimensionExpiry := cs.lifecycle.Dimensions.ExpireAfterCycles
+		if previous != nil {
+			dimensionExpiry = previous.lifecycle.Dimensions.ExpireAfterCycles
+		}
+		if previous != nil &&
+			(previous.templateID != cs.templateID || needsChartRevival(previous, cs, ctx.collectMeta.LastSuccessSeq)) {
+			// Caps may already have pruned staged dimensions and queued their removal.
+			// Reconciliation needs the complete committed definition to retain those removals.
+			ctx.rememberRetired(chartID, e.state.materialized.charts[chartID])
+			delete(ctx.materialized.charts, chartID)
+		}
 		matChart, chartCreated := ctx.materialized.ensureChart(cs.chartID, cs.templateID, cs.meta, cs.lifecycle)
 		previousPresentation := matChart.presentation
 		membershipChanged := cs.labelTracker.changed()
@@ -842,7 +863,17 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 				matChart.replaceLabelMembership(membership)
 			}
 		} else if chartCreated {
-			return fmt.Errorf("chartengine: new chart %q unexpectedly matched prior label membership", cs.chartID)
+			if previous == nil || previous.presentation == nil {
+				return fmt.Errorf("chartengine: new chart %q unexpectedly matched prior label membership", cs.chartID)
+			}
+			// Revival can recreate a definition without changing its exact series membership.
+			matChart.replaceLabels(previous.presentation.labelValues, previous.presentation.labelMembership)
+			ctx.out.Actions = append(ctx.out.Actions, CreateChartAction{
+				ChartTemplateID: cs.templateID,
+				ChartID:         cs.chartID,
+				Meta:            cs.meta,
+				Labels:          maps.Clone(previous.presentation.labelValues),
+			})
 		}
 		matChart.lastSeenSuccessSeq = ctx.collectMeta.LastSuccessSeq
 
@@ -851,6 +882,11 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 			entry := cs.entries[name]
 			if entry == nil || entry.seenSeq != cs.currentBuildSeq {
 				continue
+			}
+			if dim := matChart.dimensions[name]; dim != nil &&
+				expiredBeforeCycle(dim.lastSeenSuccessSeq, ctx.collectMeta.LastSuccessSeq, dimensionExpiry) &&
+				dimensionDefinitionChanged(dim, entry.dimensionState) {
+				matChart.removeDimension(name)
 			}
 			matDim, dimCreated := matChart.ensureDimension(name, entry.dimensionState)
 			if dimCreated {
@@ -876,7 +912,10 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 				if math.IsNaN(entry.value) || math.IsInf(entry.value, 0) {
 					// A non-finite value (e.g. a summary quantile with no observations this
 					// cycle) must render as a gap, not 0: emit SETEMPTY rather than carry NaN.
-					values = append(values, UpdateDimensionValue{Name: name, IsEmpty: true})
+					values = append(values, UpdateDimensionValue{
+						Name:    name,
+						IsEmpty: true,
+					})
 					continue
 				}
 				values = append(values, UpdateDimensionValue{
@@ -999,7 +1038,10 @@ func sortInferredDimensions(in []InferredDimension) {
 		if lhs.DimensionIndex != rhs.DimensionIndex {
 			return lhs.DimensionIndex < rhs.DimensionIndex
 		}
-		if histogramGroups[inferredDimensionGroup{chartTemplateID: lhs.ChartTemplateID, dimensionIndex: lhs.DimensionIndex}] {
+		if histogramGroups[inferredDimensionGroup{
+			chartTemplateID: lhs.ChartTemplateID,
+			dimensionIndex:  lhs.DimensionIndex,
+		}] {
 			lhsBound, lhsOK := parseHistogramBucketUpperBound(lhs.Name)
 			rhsBound, rhsOK := parseHistogramBucketUpperBound(rhs.Name)
 			if lhsOK && rhsOK && lhsBound != rhsBound {

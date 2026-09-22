@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -18,7 +19,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
@@ -263,7 +264,10 @@ func TestDynCfgAddCollisionIsReplayUpsert(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, graph.Commit(mutation))
 
-	identity := lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}
+	identity := lifecycle.ResourceIdentity{
+		ID:         config.FullName(),
+		Generation: 1,
+	}
 	current := &transactionTestReadyResource{
 		identity: identity,
 		prefix:   "current",
@@ -304,6 +308,83 @@ func TestDynCfgAddCollisionIsReplayUpsert(t *testing.T) {
 	require.NotEmpty(t, *current.events)
 }
 
+func TestDynCfgAdoptionTransfersSecretAuthorityForFullPayload(t *testing.T) {
+	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+	creator := controller.modules["module"]
+	creator.Create = func() collectorapi.CollectorV1 {
+		module := state.module(nil, false)
+		charts := collectorapi.Charts{}
+		module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+		return module
+	}
+	controller.modules["module"] = creator
+	providerCalls := 0
+	resolver, err := secretresolver.NewAtomicResolver(map[string]secretresolver.AtomicProvider{
+		"fixture": secretresolver.AtomicProviderFunc(func(context.Context, string) ([]byte, error) {
+			providerCalls++
+			return []byte("resolved"), nil
+		}),
+	})
+	require.NoError(t, err)
+	controller.factory.config.ConfigModules.config.Resolver = resolver
+
+	discovered := factoryTestConfig(false)
+	discovered.SetSourceType(confgroup.TypeDiscovered)
+	discovered.SetSource("discovery-source")
+	discovered.SetProvider("discovery")
+	discovered.Set("option_str", "${fixture:value}")
+	discovered.Set("option_int", 1)
+	require.NoError(t, controller.factory.config.ConfigModules.Validate(context.Background(), discovered))
+	require.Zero(t, providerCalls)
+	seedDynCfgJobGraphRecord(t, graph, discovered, dyncfg.StatusRunning)
+
+	identity := lifecycle.ResourceIdentity{ID: discovered.FullName(), Generation: 1}
+	current := &transactionTestReadyResource{identity: identity, events: new([]string)}
+	permit, tasks := issueTestJobPermit(t, discovered.FullName(), 2)
+	transaction, err := controller.Prepare(
+		context.Background(),
+		DynCfgJobRequest{
+			Args: []string{"go.d:collector:module:job", "update"},
+			Payload: []byte(`{
+				"option_str":"${fixture:value}",
+				"option_int":1
+			}`),
+			ContentType:  "application/json",
+			CallerSource: "user=test",
+			HasPayload:   true,
+		},
+		current,
+		lifecycle.ResourceTransactionScope{
+			ID:        discovered.FullName(),
+			Current:   identity,
+			Successor: lifecycle.ResourceIdentity{ID: discovered.FullName(), Generation: 2},
+		},
+		permit,
+	)
+	require.NoError(t, err)
+
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	_, disposition, active := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionReplaced, disposition)
+	require.NotNil(t, active)
+	require.Equal(t, 200, applied.ResultStatus())
+	record, exists := graph.Lookup(discovered.FullName())
+	require.True(t, exists)
+	adopted, err := graphRecordConfig(record)
+	require.NoError(t, err)
+	require.Equal(t, confgroup.TypeDyncfg, adopted.SourceType())
+	require.Equal(t, "${fixture:value}", adopted.Get("option_str"))
+	callsAfterAdoption := providerCalls
+	require.Positive(t, callsAfterAdoption)
+
+	require.NoError(t, controller.factory.config.ConfigModules.Validate(context.Background(), adopted))
+	require.Greater(t, providerCalls, callsAfterAdoption)
+	require.NoError(t, active.Stop(context.Background()))
+	require.NoError(t, active.Finalize())
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+}
+
 func TestDiscoveredChangeCannotReplaceHigherPriorityGraphOwner(t *testing.T) {
 	controller, graph, supervisor, _, _ := newDynCfgJobTestHarness(t)
 	winner := factoryTestConfig(false).
@@ -318,13 +399,19 @@ func TestDiscoveredChangeCannotReplaceHigherPriorityGraphOwner(t *testing.T) {
 		SetSourceType(confgroup.TypeUser).
 		SetSource("file=/etc/netdata/go.d/module.conf").
 		SetProvider(confgroup.TypeUser)
-	currentIdentity := lifecycle.ResourceIdentity{ID: winner.FullName(), Generation: 1}
+	currentIdentity := lifecycle.ResourceIdentity{
+		ID:         winner.FullName(),
+		Generation: 1,
+	}
 	current := &transactionTestReadyResource{
 		identity: currentIdentity,
 		prefix:   "current",
 		events:   new([]string),
 	}
-	successorIdentity := lifecycle.ResourceIdentity{ID: winner.FullName(), Generation: 2}
+	successorIdentity := lifecycle.ResourceIdentity{
+		ID:         winner.FullName(),
+		Generation: 2,
+	}
 	permit, err := supervisor.IssueLongLivedPermit(
 		successorIdentity,
 		lifecycle.NewJobLongLivedPlan(),
@@ -403,7 +490,9 @@ func TestDiscoveredRemovalCannotDeleteDifferentGraphOwner(t *testing.T) {
 					Remove: true,
 				},
 				nil,
-				lifecycle.ResourceTransactionScope{ID: test.winner.FullName()},
+				lifecycle.ResourceTransactionScope{
+					ID: test.winner.FullName(),
+				},
 				lifecycle.LongLivedPermit{},
 			)
 			require.NoError(t, err)
@@ -774,7 +863,9 @@ func TestDynCfgCommandsCommitFailedForQuarantinedCandidateIdentity(t *testing.T)
 			require.EqualValues(t, lifecycle.LongLivedCensus{}, permitTasks.LongLivedCensus())
 			attempts, ok := controller.factory.config.Attempts.(*containment.Authority)
 			require.True(t, ok)
-			require.Equal(t, containment.Census{Quarantined: 1}, attempts.Census())
+			require.Equal(t, containment.Census{
+				Quarantined: 1,
+			}, attempts.Census())
 		})
 	}
 }
@@ -1025,14 +1116,23 @@ func TestNonRetryableAutoDetectionFailureSettlesExistingRetry(t *testing.T) {
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
-func TestDiscoveredTransientConstructionFailureCommitsFailedAndSchedulesRetry(t *testing.T) {
+func TestDiscoveredSecretReferenceRemainsLiteralAndDoesNotScheduleRetry(t *testing.T) {
 	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+	creator := controller.modules["module"]
+	creator.Create = func() collectorapi.CollectorV1 {
+		module := state.module(nil, false)
+		charts := collectorapi.Charts{}
+		module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+		return module
+	}
+	controller.modules["module"] = creator
 	installFailingFixtureResolver(t, controller)
 	commands := &autoDetectionRetryTestCommands{}
 	require.NoError(t, controller.BindBackgroundWorkers(commands, 1, func(error) {}))
 
 	config := factoryTestConfig(false)
-	config.Set("option", "${fixture:value}")
+	config.Set("option_str", "${fixture:value}")
+	config.Set("option_int", 1)
 	config.Set("autodetection_retry", 1)
 	config.SetSourceType(confgroup.TypeDiscovered)
 	config.SetSource("discovery-source")
@@ -1057,18 +1157,76 @@ func TestDiscoveredTransientConstructionFailureCommitsFailedAndSchedulesRetry(t 
 		permit,
 	)
 	require.NoError(t, err)
-	_, err = transaction.Apply(context.Background())
+	applied, err := transaction.Apply(context.Background())
 	require.NoError(t, err)
+	_, disposition, current := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionInstalled, disposition)
+	require.NotNil(t, current)
 
 	record, ok := graph.Lookup(config.FullName())
 	require.True(t, ok)
-	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
-	require.EqualValues(t, 1, state.collectorCleanup)
-	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+	require.Equal(t, dyncfg.StatusRunning.String(), record.Status)
+	require.Zero(t, state.collectorCleanup)
 
 	require.NoError(t, controller.scheduler.Tick(context.Background(), 0))
 	require.NoError(t, controller.scheduler.Tick(context.Background(), 1))
-	commands.waitForSubmissions(t, 1)
+	submitted, _, _ := commands.snapshot()
+	require.Empty(t, submitted)
+
+	require.NoError(t, current.Stop(context.Background()))
+	require.NoError(t, current.Finalize())
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+}
+
+func TestDiscoveredSecretReferenceRemainsLiteralInV2Construction(t *testing.T) {
+	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+	creator := controller.modules["module"]
+	creator.Create = nil
+	creator.CreateV2 = func() collectorapi.CollectorV2 {
+		return &factoryTestV2{
+			state:    state,
+			store:    metrix.NewCollectorStore(),
+			template: factoryTestChartTemplate,
+		}
+	}
+	controller.modules["module"] = creator
+	installFailingFixtureResolver(t, controller)
+
+	config := factoryTestConfig(false)
+	config.Set("option_str", "${fixture:value}")
+	config.Set("option_int", 1)
+	config.SetSourceType(confgroup.TypeDiscovered)
+	config.SetSource("discovery-source")
+	config.SetProvider("discovery")
+	permit, tasks := issueTestJobPermit(t, config.FullName(), 1)
+	scope := lifecycle.ResourceTransactionScope{
+		ID: config.FullName(),
+		Successor: lifecycle.ResourceIdentity{
+			ID:         config.FullName(),
+			Generation: 1,
+		},
+	}
+
+	transaction, err := controller.prepareDiscovered(
+		context.Background(),
+		DiscoveredJobChange{Config: config, Status: dyncfg.StatusRunning},
+		nil,
+		scope,
+		permit,
+	)
+	require.NoError(t, err)
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	_, disposition, current := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionInstalled, disposition)
+	require.NotNil(t, current)
+
+	record, ok := graph.Lookup(config.FullName())
+	require.True(t, ok)
+	require.Equal(t, dyncfg.StatusRunning.String(), record.Status)
+	require.NoError(t, current.Stop(context.Background()))
+	require.NoError(t, current.Finalize())
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
 func TestDiscoveredInvalidConfigurationIsProposalRejection(t *testing.T) {
@@ -1251,7 +1409,9 @@ func TestRunningUpdateTransientConstructionFailureCommitsFailedAndSchedulesRetry
 
 func TestRunningUpdateRejectsStaleStoreCandidateAndPreservesIncumbent(t *testing.T) {
 	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
-	scopeState := &factoryTestAtomicScope{value: "initial"}
+	scopeState := &factoryTestAtomicScope{
+		value: "initial",
+	}
 	creator := controller.modules["module"]
 	creator.Create = func() collectorapi.CollectorV1 {
 		module := state.module(func(context.Context) error {
@@ -1278,13 +1438,21 @@ func TestRunningUpdateRejectsStaleStoreCandidateAndPreservesIncumbent(t *testing
 	require.True(t, exists)
 	incumbentPayload := record.Payload()
 
-	currentIdentity := lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}
-	current := &transactionTestReadyResource{identity: currentIdentity}
+	currentIdentity := lifecycle.ResourceIdentity{
+		ID:         config.FullName(),
+		Generation: 1,
+	}
+	current := &transactionTestReadyResource{
+		identity: currentIdentity,
+	}
 	permit, tasks := issueTestJobPermit(t, config.FullName(), 2)
 	scope := lifecycle.ResourceTransactionScope{
-		ID:        config.FullName(),
-		Current:   currentIdentity,
-		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 2},
+		ID:      config.FullName(),
+		Current: currentIdentity,
+		Successor: lifecycle.ResourceIdentity{
+			ID:         config.FullName(),
+			Generation: 2,
+		},
 	}
 	target := dynCfgTarget{
 		module:     config.Module(),
@@ -1328,7 +1496,9 @@ func TestRunningUpdateRejectsStaleStoreCandidateAndPreservesIncumbent(t *testing
 func TestRunningUpdateCommitsFailedWhenInstalledRuntimeRemainsBusy(t *testing.T) {
 	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
 	delegate := controller.factory.config.Attempts.(*containment.Authority)
-	controller.factory.config.Attempts = runtimeBusyTestAuthority{delegate: delegate}
+	controller.factory.config.Attempts = runtimeBusyTestAuthority{
+		delegate: delegate,
+	}
 	creator := controller.modules["module"]
 	creator.Create = func() collectorapi.CollectorV1 {
 		module := state.module(nil, false)
@@ -1347,7 +1517,10 @@ func TestRunningUpdateCommitsFailedWhenInstalledRuntimeRemainsBusy(t *testing.T)
 	require.True(t, exists)
 
 	var events []string
-	currentIdentity := lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}
+	currentIdentity := lifecycle.ResourceIdentity{
+		ID:         config.FullName(),
+		Generation: 1,
+	}
 	current := &transactionTestReadyResource{
 		identity: currentIdentity,
 		prefix:   "current",
@@ -1355,9 +1528,12 @@ func TestRunningUpdateCommitsFailedWhenInstalledRuntimeRemainsBusy(t *testing.T)
 	}
 	permit, tasks := issueTestJobPermit(t, config.FullName(), 2)
 	scope := lifecycle.ResourceTransactionScope{
-		ID:        config.FullName(),
-		Current:   currentIdentity,
-		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 2},
+		ID:      config.FullName(),
+		Current: currentIdentity,
+		Successor: lifecycle.ResourceIdentity{
+			ID:         config.FullName(),
+			Generation: 2,
+		},
 	}
 	target := dynCfgTarget{
 		module:     config.Module(),
@@ -1813,7 +1989,7 @@ func newDynCfgJobTestHarnessWithDiagnostics(
 			Frames:        frames,
 			CleanupOutput: cleanupOutput,
 			ConfigModules: configModules,
-			Vnodes:        vnoderegistry.New(),
+			Publication:   hostoutput.New(),
 			Scheduler:     newTestScheduler(t),
 		},
 	)
@@ -1866,7 +2042,9 @@ func seedDynCfgJobGraphRecord(
 func TestFailedAutoDetectionPublishesConfigLifecycleOnlyAfterGraphCommit(t *testing.T) {
 	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
 	events := []string{}
-	lifecycleHook := &recordingJobConfigLifecycle{events: &events}
+	lifecycleHook := &recordingJobConfigLifecycle{
+		events: &events,
+	}
 	creator := controller.modules["module"]
 	creator.JobConfigLifecycle = lifecycleHook
 	creator.Create = func() collectorapi.CollectorV1 {
@@ -1888,8 +2066,15 @@ func TestFailedAutoDetectionPublishesConfigLifecycleOnlyAfterGraphCommit(t *test
 	config.SetSource("user=test")
 	config.SetProvider("test")
 	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
-	currentIdentity := lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}
-	current := &transactionTestReadyResource{identity: currentIdentity, prefix: "current", events: &events}
+	currentIdentity := lifecycle.ResourceIdentity{
+		ID:         config.FullName(),
+		Generation: 1,
+	}
+	current := &transactionTestReadyResource{
+		identity: currentIdentity,
+		prefix:   "current",
+		events:   &events,
+	}
 	permit, _ := issueTestJobPermit(t, config.FullName(), 2)
 	scope := lifecycle.ResourceTransactionScope{
 		ID:      config.FullName(),
@@ -1902,7 +2087,11 @@ func TestFailedAutoDetectionPublishesConfigLifecycleOnlyAfterGraphCommit(t *test
 
 	transaction, err := controller.prepareDiscovered(
 		context.Background(),
-		DiscoveredJobChange{Config: config, Status: dyncfg.StatusRunning, Restart: true},
+		DiscoveredJobChange{
+			Config:  config,
+			Status:  dyncfg.StatusRunning,
+			Restart: true,
+		},
 		current,
 		scope,
 		permit,
@@ -1921,7 +2110,9 @@ func TestFailedAutoDetectionPublishesConfigLifecycleOnlyAfterGraphCommit(t *test
 	require.Equal(t, lifecycleHook.bound, lifecycleHook.reconciliations[0].previous)
 	require.Equal(t, "reconcile", events[len(events)-1])
 
-	removeScope := lifecycle.ResourceTransactionScope{ID: config.FullName()}
+	removeScope := lifecycle.ResourceTransactionScope{
+		ID: config.FullName(),
+	}
 	removeTransaction, err := controller.prepareMutation(
 		removeScope,
 		nil,
@@ -1944,7 +2135,9 @@ func TestFailedAutoDetectionPublishesConfigLifecycleOnlyAfterGraphCommit(t *test
 func TestTransientPreConstructionFailurePublishesConfigLifecycleAfterGraphCommit(t *testing.T) {
 	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 	events := []string{}
-	lifecycleHook := &recordingJobConfigLifecycle{events: &events}
+	lifecycleHook := &recordingJobConfigLifecycle{
+		events: &events,
+	}
 	creator := controller.modules["module"]
 	creator.JobConfigLifecycle = lifecycleHook
 	controller.modules["module"] = creator
@@ -1955,8 +2148,15 @@ func TestTransientPreConstructionFailurePublishesConfigLifecycleAfterGraphCommit
 	config.SetProvider("test")
 	config.Set("vnode", "missing-vnode")
 	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
-	currentIdentity := lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}
-	current := &transactionTestReadyResource{identity: currentIdentity, prefix: "current", events: &events}
+	currentIdentity := lifecycle.ResourceIdentity{
+		ID:         config.FullName(),
+		Generation: 1,
+	}
+	current := &transactionTestReadyResource{
+		identity: currentIdentity,
+		prefix:   "current",
+		events:   &events,
+	}
 	permit, _ := issueTestJobPermit(t, config.FullName(), 2)
 	scope := lifecycle.ResourceTransactionScope{
 		ID:      config.FullName(),
@@ -1969,7 +2169,11 @@ func TestTransientPreConstructionFailurePublishesConfigLifecycleAfterGraphCommit
 
 	transaction, err := controller.prepareDiscovered(
 		context.Background(),
-		DiscoveredJobChange{Config: config, Status: dyncfg.StatusRunning, Restart: true},
+		DiscoveredJobChange{
+			Config:  config,
+			Status:  dyncfg.StatusRunning,
+			Restart: true,
+		},
 		current,
 		scope,
 		permit,
@@ -2004,7 +2208,9 @@ func (r *recordingJobConfigLifecycle) Project(
 	_ map[string]any,
 ) collectorapi.JobConfigLifecycleSnapshot {
 	*r.events = append(*r.events, "project")
-	return &recordingJobConfigLifecycleSnapshot{identity: identity}
+	return &recordingJobConfigLifecycleSnapshot{
+		identity: identity,
+	}
 }
 
 func (r *recordingJobConfigLifecycle) Bind(identity collectorapi.JobConfigIdentity, _ collectorapi.RuntimeJob) {
@@ -2017,7 +2223,9 @@ func (r *recordingJobConfigLifecycle) Capture(
 	_ collectorapi.RuntimeJob,
 ) collectorapi.JobConfigLifecycleSnapshot {
 	*r.events = append(*r.events, "capture")
-	return &recordingJobConfigLifecycleSnapshot{identity: identity}
+	return &recordingJobConfigLifecycleSnapshot{
+		identity: identity,
+	}
 }
 
 func (r *recordingJobConfigLifecycle) Reconcile(

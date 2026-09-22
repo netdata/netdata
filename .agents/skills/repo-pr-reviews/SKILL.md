@@ -1,0 +1,514 @@
+---
+name: repo-pr-reviews
+description: Inspect selected PR comments or perform complete PR review triage; address verified findings when authorized. Covers GitHub review threads, bot feedback, SonarCloud findings and CI. Ordinary code review without PR-comment handling uses the relevant domain skills.
+---
+
+# PR review handler skill
+
+This skill gathers and verifies PR findings, then applies the authorized handling path below.
+
+## Your role on a PR
+
+Authorization and read-only scope are owned by `AGENTS.md#when-a-sow-is-required`; Git operations by
+`AGENTS.md#git-and-pr-workflow`; finding classification, review repetition and stopping by `AGENTS.md#review`.
+
+- **Inspect/report:** requests such as "look at the reviews" gather and verify findings using steps 1-2, then report
+  them under step 8. Do not fix source, post replies, resolve threads, mark Sonar findings, or trigger reviewers.
+- **Address:** when fixes are authorized, solve the original PR problem and handle verified findings within approved
+  scope. Posting replies, resolving threads, changing remote triage state and triggering bots require user
+  authorization for those actions; permission to fix code alone does not grant it. Preserve already-granted approval.
+  Prepare proposed replies or triage decisions for the user when remote actions are not authorized.
+- **Focused inspection:** gather the requested comments, reviewer or finding source and enough surrounding thread/code
+  context to verify the claim. Paginate the selected source completely when the request needs its full results; a
+  specific comment lookup does not require fetching unrelated Sonar findings or setting up their credentials. State
+  the inspected scope and unexamined sources; do not claim complete PR triage or merge readiness.
+- **Complete PR triage:** fetch every configured finding source below, including Sonar and CI. An unavailable source
+  is a coverage gap, not an empty result. Broad addressing/iteration requests use this path unless the user limits scope.
+- Mutation steps apply only to authorized actions. Human-comment handling retains the direction requirement under
+  "Author classes"; use already-granted direction without asking again.
+
+Sources of findings, in priority order:
+
+1. **Human review comments** -- maintainers / devs / community.
+2. **AI bot review comments** -- cubic-dev-ai, coderabbitai, etc.
+3. **SonarCloud PR findings** -- new code-smell / vulnerability /
+   security-hotspot issues introduced by this PR. SonarCloud does NOT
+   post these as inline GitHub review-comments; only a QualityGate
+   summary is posted to GitHub. The actual findings live behind the
+   SonarCloud API and must be pulled explicitly.
+4. **CI failures relevant to this PR** -- shellcheck, codeql, build /
+   test failures caused by the PR's changes.
+5. **Anything else this repo configures** (Codacy, custom workflows, ...).
+
+A finding is "relevant to this PR" if its existence (or its line
+location) is plausibly caused by the PR's diff. CI failures unrelated to
+this PR (a flaky test on an unrelated module, an infra outage) are NOT
+in scope -- note them, surface to the user at the end, do not fix them
+here.
+
+The bar is the project's performance, stability, and long-term
+maintainability. Don't dismiss findings because they look minor.
+
+## MANDATORY rules
+
+These are non-negotiable. Skipping any of them will cost the user time.
+
+1. **Pagination paranoia for selected result sets.** Do not stop at round numbers. If a fetch returns
+   exactly 100 / 200 / 300 items, verify completion: these helpers request 100
+   items per page, so a round multiple may hide a missed next page. Always re-probe with an
+   explicit `page=N+1` request. `fetch-all.sh` does this automatically.
+2. **Triage every in-scope comment.** Verify it and classify it under `AGENTS.md#review`. Handle non-blocking findings under
+   `AGENTS.md#scope-discipline-at-every-step` and `AGENTS.md#followup-discipline`; do not silently discard them or
+   promote them to shipping blockers merely because a reviewer requested them.
+3. **Verify every comment properly.** No shortcuts. Read the code, follow
+   the trace, confirm the claim. AI bots produce false positives -- judge
+   each one on its merits.
+4. **When replies are authorized, reply per-thread, one by one.** No bulk replies. No mechanical "fixed"
+   answers. Each thread gets a substantive reply that explains what you
+   did or why the comment doesn't apply.
+5. **Assess materiality, not phrasing.** Optional improvements receive an explicit disposition; they do not
+   independently extend the review cycle (`AGENTS.md#review`).
+6. **Explain false positives with evidence.** During authorized fixes, add a source comment only when it clarifies
+   otherwise ambiguous intent. Bot confusion alone does not justify changing correct code.
+7. **Check CI BEFORE every push, but never WAIT for CI between iterations.**
+   Waiting for CI between bot-review cycles destroys throughput -- a CI
+   run can take 30+ minutes, and during that time the AI reviewers are
+   idle. The right cadence is:
+   - Before each push: run `ci-status.sh`. If there are PR-caused failures, fix
+     them and bundle into the same push. If checks are still running,
+     that's fine -- ignore them and push anyway. The next push triggers
+     fresh CI on the new code, which is what we actually care about.
+   - After a push: if another round is warranted under `AGENTS.md#review` and trigger comments are authorized,
+     re-trigger the selected bots, then use `wait-for-activity.sh` for their feedback.
+   - If `wait-for-activity.sh` times out (30 min, no new comments):
+     re-check `ci-status.sh`. If checks are still running, that's normal,
+     surface to the user. Treat PR-caused failures as blockers; report unrelated failures without fixing them.
+8. **Re-trigger selected reviewers when another round is warranted.** Use `AGENTS.md#review` to decide whether to
+   repeat a round; do not re-trigger solely to obtain an approval phrase. Trigger comments require authorization.
+   - cubic-dev-ai: post a new top-level comment mentioning it
+     (`trigger-cubic.sh`).
+   - coderabbitai: post a new top-level comment with a command
+     (`trigger-coderabbit.sh`; `@coderabbitai review` is incremental,
+     `full review` re-reads the whole PR).
+   - Copilot: NOT re-triggered. Its billing model means the org normally has
+     no credits for it, so a re-request produces nothing and only adds
+     latency. `trigger-copilot.sh` is kept for the case where credits exist,
+     but it is not part of the loop and Copilot never blocks the exit
+     condition. Address any comments it does post like any other AI bot.
+9. **Don't loop forever on silent bots.** Some assistants stop responding.
+   That's fine. Use `wait-for-activity.sh` with the 30-min timeout and
+   move on if nothing changes.
+10. **Check for the same root cause in related code.** Trace where the defective pattern can recur within the
+    selected scope and relevant dependencies. Broaden the search across the PR when the cause is shared; a local
+    finding does not automatically require a full-PR re-audit. Reuse a completed same-cause search unless new evidence
+    invalidates it. Review strategy and follow-up scope follow `AGENTS.md#review`.
+11. **Don't trust linters alone -- smoke-test every fix.** Static
+    analyzers (shellcheck, etc.) verify a property of the code; they
+    don't verify behavior. A "correct per the linter" fix can change
+    runtime behavior in subtle ways (e.g. a printf format-string fix
+    that stops escape-sequence interpretation, breaking colored output
+    that the linter never knew about). After every fix, run the
+    affected script (or the smallest invocation that exercises the
+    change) and verify the output looks right. "Linter green" is not
+    the same as "still works."
+12. **Check review and validation coverage before pushing.** Step 4a applies `AGENTS.md#review`; a push alone does not
+    require another review when the current change already has adequate coverage.
+13. **Before every authorized push, refresh the selected finding sources.** Step 4-pre verifies and dispositions newly arrived
+    feedback against the current HEAD; do not leave findings unassessed or assume the fetch prevents later arrivals.
+
+## Author classes -- different handling per class
+
+- **AI bots** (`cubic-dev-ai[bot]`, `coderabbitai[bot]`, `copilot[bot]` and
+  variants): handle
+  within the authorized path above. Verify every finding; fix, reply and resolve only when those actions are
+  authorized. Inspection alone ends with a report.
+- **Informational bots** (`sonarqubecloud[bot]`, `github-actions[bot]`,
+  `netdata-bot[bot]`): read for signal (e.g. quality
+  gate status). They don't usually require a reply.
+- **Humans** (developers, maintainers, community): consult the user.
+  Maintainer comments matter most -- in this project, we are usually
+  contributors, they are the project owners. Do not respond on the user's
+  behalf without their direction. Surface human comments to the user with
+  a recommendation, then act per their instruction.
+
+## Setup
+
+For live GitHub fetching, use `gh` authenticated for the repo. Sonar fetching additionally needs its configured
+authentication below. Reading supplied comments or reviewing this skill needs neither setup.
+
+The skill reads `upstream` (or `origin`) from git remotes to derive the
+repo slug. Override with `PR_REPO_SLUG=owner/repo` if working cross-repo.
+
+State for each PR is cached under `<repo-root>/.local/audits/pr-reviews/pr-<N>/`:
+
+- `pr.json` -- top-level PR metadata
+- `issue-comments.json` -- top-level PR comments (REST)
+- `review-comments.json` -- inline review comments (REST)
+- `reviews.json` -- review submissions with body (REST)
+- `review-threads.json` -- per-thread, with `isResolved` (GraphQL)
+- `summary.txt` -- human-readable triage summary
+- `FETCH-INCOMPLETE` -- present only while a fetch is running or after one aborted; the snapshot is partial, re-run
+  `fetch-all.sh` before reading anything else here
+
+## Workflow
+
+For supplied-comment-only inspection, skip the commands in steps 1-2, verify the supplied findings directly, then
+report under step 8. For other inspections, use the selected sources in steps 1-2, verify the findings, then report
+under step 8. For complete triage, all sources apply. For authorized addressing, apply
+steps 3-4, perform only authorized remote actions, and use `AGENTS.md#review` to decide whether steps 5-7 are needed.
+
+### 1a. Fetch all comments (paranoid)
+
+Run when the selected scope requires fetching GitHub comments. For supplied-comment-only inspection, use the supplied
+evidence directly and skip this step.
+
+```
+bash .agents/skills/repo-pr-reviews/scripts/fetch-all.sh <PR_NUMBER>
+```
+
+Tail-prints a `summary.txt` that shows the per-author count and the list of
+open review threads. Use this as the input to the rest of the cycle.
+
+### 1b. Fetch SonarCloud PR findings
+
+Run only when Sonar findings belong to the selected scope and need fetching. Supplied Sonar evidence can be inspected
+without this fetch or credential setup; a comment-only scope skips this step.
+
+```
+bash .agents/skills/repo-pr-reviews/scripts/fetch-sonar-findings.sh <PR_NUMBER>
+```
+
+This script fetches SonarCloud findings that are not posted inline on GitHub:
+- `.local/audits/pr-reviews/pr-<N>/sonar-issues.json`
+- `.local/audits/pr-reviews/pr-<N>/sonar-hotspots.json`
+- a brief summary to stdout (counts by rule and severity).
+
+Requires the same `.env` config the `triage-sonarqube` skill uses
+(`SONAR_TOKEN`, `SONAR_HOST_URL`, `SONAR_PROJECT`). If `.env` is missing,
+the script prints what's needed and exits.
+
+An empty issue/hotspot list does not prove the quality gate passed. Inspect
+`/api/qualitygates/project_status?projectKey=<project>&pullRequest=<PR>` for
+failed metric conditions. For duplication, use
+`/api/duplications/show?key=<file-component-key>&pullRequest=<PR>`: each
+`duplications[].blocks[]` identifies `from`, `size`, and `_ref`; `files`
+resolves those references. Preserve test cases when sharing duplicated setup.
+
+### 1c. Note the CI signal as a third source
+
+For complete triage, or when CI belongs to the selected inspection scope, run
+`bash .agents/skills/repo-pr-reviews/scripts/ci-status.sh <PR>` once early to capture which checks are failing
+**right now**. You're looking for failures caused by the current PR
+(typo in a YAML file you added, a script that doesn't pass shellcheck,
+a build that breaks because of the diff). DO NOT fix CI yet -- just note
+the failures as input alongside review comments and Sonar findings. They
+all get addressed in the same iteration so a single push covers them.
+
+### 2. List open threads (and Sonar findings)
+
+These commands read a completed `fetch-all.sh` cache and apply only when fetched GitHub threads are selected evidence.
+For supplied-comment-only inspection, assistants MUST skip both commands even if a cache exists and verify the
+supplied evidence directly.
+
+```
+bash .agents/skills/repo-pr-reviews/scripts/list-open-threads.sh <PR_NUMBER>          # full bodies
+bash .agents/skills/repo-pr-reviews/scripts/list-open-threads.sh <PR_NUMBER> --short  # one line per thread
+```
+
+The "short" output is a table: `thread-id | path:line | author`. The full
+form prints every comment in each thread.
+
+### 3. For each open thread, ONE AT A TIME
+
+**This is per-thread, not batched.** Do not prepare a list of replies and
+fire them in a loop. Do not post all replies first and resolve all later.
+Walk one thread at a time:
+
+For thread N:
+
+1. **Read the comment carefully.** What is the bot/dev claiming?
+2. **Open the file at the line and verify.** Does the claim hold against
+   the current code? Is it valid in context?
+3. **Check related code for the same root cause** under rule #10. Reuse a completed search for subsequent findings
+   of that cause; broaden it when new evidence changes the affected scope.
+4. **Decide**:
+   - If valid -> classify under `AGENTS.md#review`; fix blockers and approved improvements, including similar
+     in-scope instances. Record dispositions for non-blocking items under the root scope and follow-up rules.
+   - If invalid -> record the evidence; clarify source intent only when warranted under rule 6.
+5. **Reply in the thread.**
+   ```
+   bash .agents/skills/repo-pr-reviews/scripts/reply-thread.sh <PR> <comment-id> "<reply>"
+   ```
+   `<comment-id>` is the `databaseId` of the FIRST comment in the thread
+   (from `review-threads.json` -> `.[].comments.nodes[0].databaseId`).
+6. **Resolve the thread immediately after the reply succeeds.** "Succeeds"
+   means you saw `posted reply id=...`. Resolving a thread whose reply failed
+   hides it from the needs-attention view with nothing written in it, which
+   reads to a human as a silently dismissed review.
+   ```
+   bash .agents/skills/repo-pr-reviews/scripts/resolve-thread.sh <thread-id>
+   ```
+   `<thread-id>` is the GraphQL node id (`review-threads.json` -> `.[].id`,
+   starts with `PRRT_`). Resolving immediately after replying takes the
+   thread out of the "needs attention" view; leaving threads open without
+   resolution accumulates noise.
+
+Then move to thread N+1. Reply-and-resolve, reply-and-resolve. Never
+queue them up.
+
+The reason: the order makes intent visible to humans watching the PR --
+they see "agent posted reply, agent resolved" as one motion per thread,
+not "agent dumped 14 replies, then dumped 14 resolves". Bulk operations
+look mechanical and erode trust in the address pass.
+
+### 3b. Address each Sonar finding
+
+Skip this step when Sonar findings are outside the selected scope. Use supplied evidence or the selected fetch from
+step 1b; an unrelated cached Sonar file does not add it to scope.
+
+For each issue in `sonar-issues.json` and each hotspot in
+`sonar-hotspots.json`:
+
+1. **Read the rule and the message.** What is Sonar claiming?
+2. **Open the file at the line and verify.** Does the claim hold against
+   the current code?
+3. **Check related code for the same root cause** under rule #10. A shared rule ID alone does not prove every
+   matching construct is defective; use the actual trigger and contract to choose the search and review scope.
+4. **Decide**:
+   - If valid -> classify under `AGENTS.md#review`; fix blockers and approved improvements, including similar
+     in-scope instances. Disposition other findings under the root scope and follow-up rules.
+   - If invalid -> record the evidence. When remote triage is authorized, `triage-sonarqube` provides
+     `sonar-mark.sh fp <KEY> "<reason>"` to mark it False Positive in SonarCloud. Comments are ASCII-only (Cloudflare).
+5. Account for every finding. An open issue count alone is not the stopping condition; use `AGENTS.md#review` and
+   report unmet required quality gates explicitly.
+
+For Sonar there is no "thread reply" -- you address the issue with
+either a code fix or a `sonar-mark.sh` action. There's nothing to
+resolve in GitHub for Sonar findings.
+
+### 4-pre. Before pushing -- refresh and triage findings
+
+Reviewers run in parallel. Multiple bots and humans can be appending
+findings WHILE you're addressing the current batch. If you push the
+moment your queue is empty, the findings that arrived during this
+iteration get attributed to your fresh commit instead of the previous
+one -- and on the next round you end up "fixing" findings that no
+longer apply because you addressed them implicitly with the next push.
+The result: chronic desync, where your commit and the reviewers'
+findings are always one round apart.
+
+Before an authorized push for complete triage, re-fetch all sources (comments, Sonar, CI). For explicitly scoped
+handling, refresh the selected finding sources and check CI; report the scope limit. Triage new findings against HEAD.
+Resolve verified blockers before pushing; handle non-blocking items under the root scope/follow-up rules.
+This reduces stale work but is not an atomic barrier: new feedback can arrive after the fetch.
+
+```bash
+# Complete-triage example. Scoped handling refreshes only its selected finding sources.
+# Both paths check CI before an authorized push.
+bash .agents/skills/repo-pr-reviews/scripts/fetch-all.sh <PR_NUMBER>
+bash .agents/skills/repo-pr-reviews/scripts/fetch-sonar-findings.sh <PR_NUMBER>
+bash .agents/skills/repo-pr-reviews/scripts/ci-status.sh <PR_NUMBER>
+```
+
+The `ci-status.sh` line is the third source: a CI failure that is
+CAUSED by this PR's changes (added a script that doesn't pass
+shellcheck, broke a YAML parse, etc.) is in scope and must be folded
+in. CI failures unrelated to this PR are noted, surfaced to the user
+at the end, but not fixed here.
+
+If the fresh snapshot contains an unassessed finding, verify and disposition it before pushing. Additional fixes
+require relevant validation; repeat review only under `AGENTS.md#review`, not merely because another comment arrived.
+
+### 4a. Before pushing -- verify review and validation coverage
+
+Assess whether the current change has adequate review and validation under `AGENTS.md#review`. The main agent owns
+that assessment; independent review of the entire PR is not a prerequisite for every push. Reuse earlier evidence
+that still holds, assess new fixes and their interactions, and widen coverage when changes invalidate earlier
+assumptions. Do not launch a reviewer merely because a push is next or claim readiness for unassessed work.
+
+When independent review is useful, adapt the scope and lenses to the unresolved question:
+
+> Review <decision/change/fix and affected interactions> on branch <X>, against <base or reviewed state>.
+> Read AGENTS.md and the active SOW <filename, if any>. Assess <relevant risks/questions> using <owner/validation
+> evidence>. Trace dependencies needed for this scope and report material gaps beyond it.
+> Classify each finding under AGENTS.md Review, with file/line evidence, trigger, consequence and a suggested fix.
+> This is read-only: do not edit files, mutate remote or Git state, stop processes, or launch other agents.
+
+Verify reviewer findings before acting. Handle blockers and optional improvements under the root review, scope and
+follow-up rules. A reviewer returning no suggestions is not required before proceeding.
+
+### 4b. Before pushing -- check CI for FAILURES (don't wait)
+
+```
+bash .agents/skills/repo-pr-reviews/scripts/ci-status.sh <PR_NUMBER>
+```
+
+Exit codes:
+- `0` -- no observed failed or running checks; this also covers an empty rollup and is not proof of required coverage
+- `2` -- runs in progress; this need not delay an already-authorized fix push. Waiting for CI
+  between iterations destroys throughput. The new push triggers fresh CI
+  on the new code, which is what matters.
+- `3` -- runs failing -- fix the failures and bundle them into the push.
+
+CI failures unrelated to this PR (a flaky test on a different module, an
+infra outage) are NOT in scope for this PR -- note them, surface to the
+user, move on. Do not make drive-by fixes here.
+
+### 5. Push, then re-trigger reviewers
+
+When a further review round is warranted under `AGENTS.md#review`, and posting trigger comments is authorized,
+run the selected reviewers after the fix commits have been pushed:
+
+```
+bash .agents/skills/repo-pr-reviews/scripts/trigger-cubic.sh      <PR_NUMBER>
+bash .agents/skills/repo-pr-reviews/scripts/trigger-coderabbit.sh <PR_NUMBER>
+```
+
+cubic and coderabbit re-review when mentioned in a new top-level PR comment.
+Copilot is deliberately absent: see rule 8. If a new reviewer is selected for repeated review, document its
+re-trigger mechanism here; recognizing its comments does not by itself require repeatedly invoking it.
+
+### 6. Wait for new activity
+
+```
+bash .agents/skills/repo-pr-reviews/scripts/wait-for-activity.sh <PR_NUMBER>
+```
+
+Default timeout 30 min, poll every 30 s. Returns 0 on new activity, 124 on timeout. Use it when awaiting a warranted
+review round; a bot's "no new findings" comment is evidence to assess, not a required exit phrase.
+
+What counts as "new activity":
+- New issue comment / review comment / review on the PR.
+- New commit pushed to the PR head.
+- A review thread getting resolved or unresolved (often by a bot saying
+  "addressed; resolving" -- without this signal we'd miss thread state
+  flips and time out spuriously).
+
+### 7. Loop
+
+Iteration and completion follow `AGENTS.md#review`. Re-fetch and assess new findings when another round is warranted;
+do not repeat merely to reach zero open threads, zero optional suggestions, or a particular bot verdict.
+
+- Before concluding, account for findings from every in-scope source and report their verified disposition. Required CI,
+  quality gates, human decisions and actual merge requirements remain prerequisites for claiming merge readiness.
+- A silent reviewer or a wait timeout is not approval. Re-check CI and available feedback, then report any remaining
+  coverage or validation limitation; do not loop solely to make the bot respond.
+- If required checks are running or human input is pending, report that waiting state without claiming readiness.
+  If a required check fails because of this PR, treat it as a blocker. Unrelated failures are reported, not fixed here.
+
+### 8. Final report
+
+When the inspection or authorized handling ends, summarize for the user:
+- Requested scope, inspected sources and any unavailable or unexamined sources.
+- Findings addressed (count by source: review threads, Sonar, CI).
+- Any unrelated CI failures observed but not fixed (with check name + URL).
+- Any human comments that need their attention.
+- Current PR state when inspected (mergeable / blocked / awaiting validation or input, decision, head SHA);
+  otherwise state that it is unassessed. Supplied-comment inspection does not require a live metadata lookup.
+- Proposed but unperformed replies or remote actions, remaining optional findings and their dispositions, and any
+  review/validation coverage limits.
+
+## Commit message hygiene
+
+Commit messages on the address-the-comments cycle should describe **the
+change**, not the reviewer or the cycle:
+
+- BAD: "address copilot comments"
+- BAD: "fix bot review feedback"
+- GOOD: "scripts: fix dry-run env var name and printf format-string usage"
+
+Follow `AGENTS.md#git-and-pr-workflow` for attribution. Describe the technical change without reviewer credit;
+a tool name needed to explain changed integration behavior is valid technical context.
+
+(Comments on the PR are an exception when they're operational mentions
+required by the bot itself: `@cubic-dev-ai please review again` is a
+direct trigger for that bot, and the trigger script enforces it. Outside
+operational triggers, the same rule applies to comments.)
+
+## Replying to bots -- tone
+
+Be substantive but brief. The bot's prompt-text is verbose; your reply
+doesn't have to be. Examples:
+
+- For a valid fix: "Fixed in <sha-or-paragraph>: <one-sentence what changed>."
+- For a false positive: "False positive -- <one-sentence why>: <evidence
+  citation>." Add a code comment if it'll help future reviewers.
+- For a partial fix: "Partial -- fixed the immediate case at <line>, but the
+  related <other-line> is intentional because <reason>."
+
+## Replying to humans -- consult the user
+
+Maintainer / dev / community comments go to the user FIRST. Your message
+should:
+1. Quote the relevant part of their comment.
+2. State your read of what they're asking for.
+3. Propose 1-3 options if it's a design call, or one option if obvious.
+4. Wait for the user's decision.
+
+Then act per their direction. Do not respond to humans on the user's
+behalf without explicit direction. Existing explicit direction for the response remains valid; do not request it
+again. A request to review a human comment does not itself authorize a reply.
+
+## Bot directory
+
+| Bot                          | Role                                       | Re-trigger                                       |
+|------------------------------|--------------------------------------------|--------------------------------------------------|
+| `cubic-dev-ai[bot]`          | Line-level code review                     | New PR comment mentioning `@cubic-dev-ai`        |
+| `coderabbitai[bot]`          | Line-level code review                     | `trigger-coderabbit.sh` (`@coderabbitai review`) -- NEVER `@coderabbit`, that is a different, unrelated GitHub user |
+| `copilot[bot]`               | Line-level code review                     | Not re-triggered -- no credits (see rule 8)      |
+| `sonarqubecloud[bot]`        | Quality-gate status                        | Auto, on each scan run -- read its issue comment |
+| `github-actions[bot]`        | CI status / labels                         | Auto, on each workflow run                        |
+| `netdata-bot[bot]`           | Repo automation (labels, etc.)             | Auto                                              |
+
+If a new AI reviewer appears in the project, classify it by adding to
+`PR_AI_BOT_RE` in `_lib.sh` so the skill recognizes it.
+
+## Reviewer-specific notes
+
+- **The mention is `@coderabbitai`, never `@coderabbit`.** `@coderabbit` is a
+  real, unrelated GitHub user; mentioning it pings a stranger on every
+  iteration and never reaches the bot. `trigger-coderabbit.sh` hardcodes the
+  correct handle -- do not hand-write the mention. The same care applies to
+  `@cubic-dev-ai`. Before posting any comment containing an `@`, check the
+  handle against the bot directory above.
+
+- **`coderabbitai[bot]` posts line-level findings**, not just summaries. It was
+  originally classified here as informational; it is an AI reviewer and its
+  threads need the same verify-reply-resolve treatment as cubic's.
+- coderabbit cites external URLs (learn.netdata.cloud, upstream GitHub) as
+  evidence. Those citations are often *directionally* right but not
+  authoritative for the branch under review -- verify against the source in the
+  checkout before acting. Example: it correctly flagged that a Function needs a
+  signed-in identity, but the proof is the `HTTP_ACCESS_*` flags in the
+  producer, not the doc page it linked.
+- Both reviewers will flag a generated page's *content* when the real defect is
+  in the generator or the shared template. Fix the producer, regenerate, and say
+  so in the reply -- otherwise the same finding returns on the next vendor page.
+
+## Failure modes -- quick diagnosis
+
+| Symptom                                                | Likely cause                                                         |
+|--------------------------------------------------------|----------------------------------------------------------------------|
+| `fetch-all.sh` returns suspiciously round counts       | Pagination missed pages. Re-run; fetch-all auto-probes when count is a multiple of 100. |
+| `fetch-all.sh` aborts with `page N probe FAILED` and leaves `FETCH-INCOMPLETE` in the state dir | `gh` auth or rate limit; the cache is incomplete. Fix `gh auth status`, re-run; do not read the partial dump. |
+| A GraphQL helper script fails with `cursor_args[@]: unbound variable` | macOS Bash 3.2 plus `set -u` treats empty array expansion as unbound. Keep `gh api` argument arrays non-empty before expansion or branch the first-page GraphQL call. This affected both `fetch-all.sh` and `wait-for-activity.sh`. |
+| `reply-thread.sh` -> 404                               | Wrong comment id (use `databaseId` from `review-threads.json`, not the GraphQL node id). |
+| `reply-thread.sh` -> `line N: 2: usage`, yet the thread ends up resolved | The comment id expanded to empty AND the resolve ran anyway. Never chain reply and resolve so that resolve can run after reply fails: run `reply-thread.sh`, confirm it printed `posted reply id=...`, THEN resolve. See the bash-vs-zsh note below. |
+| An associative-array lookup (`${MAP[key]}`) is empty in a helper loop | The interactive shell here is zsh, not bash. `declare -A` plus `${MAP[key]}` does not behave the same, so ids silently expand to nothing. Pass literal ids, or drive the loop from `python3` output one line at a time, rather than building a shell map. |
+| `resolve-thread.sh` -> "thread not found"              | Used REST id instead of GraphQL node id.                              |
+| `trigger-copilot.sh` succeeds but no new review        | Expected. The org has no Copilot review credits, which is why it is not in the loop. Do not wait on it. |
+| `trigger-cubic.sh` succeeds but no new review          | cubic ignores comments without an explicit `@cubic-dev-ai` mention. The script always prepends it. |
+| `ci-status.sh` exits 3 (failing)                       | Fix PR-caused failures before pushing; report unrelated failures. Exit 3 wins over 2 when checks are also running. |
+| `ci-status.sh` exits 2 (running)                       | CI hasn't finished. Push anyway -- waiting on CI between iterations destroys throughput. The next push triggers a fresh CI run on the new code, which is what matters. (See Step 4b.) |
+| Bot keeps re-flagging the same line after a fix push   | The bot didn't see the new commit because it wasn't re-triggered.    |
+| `wait-for-activity.sh` 124 timeout                     | Check available feedback and CI; use `AGENTS.md#review` and report coverage gaps. Silence or resolved threads alone do not establish readiness. |
+
+## MANDATORY -- keep this skill alive
+
+For capture timing and authorization, follow `AGENTS.md#knowledge-capture`.
+
+Examples of things to capture:
+- A new AI reviewer bot that appears in the project (add to the directory + `PR_AI_BOT_RE`)
+- A new common false-positive pattern that warrants a clarifying source comment
+- A new GitHub API quirk (rate limits, undocumented response shapes, pagination edge cases)
+- A retrigger mechanism that changed (e.g. copilot's re-request behavior)

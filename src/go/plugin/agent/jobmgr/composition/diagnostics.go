@@ -6,9 +6,11 @@ import (
 	"io"
 	"log/slog"
 	"sync/atomic"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 )
 
 type diagnosticLogger struct {
@@ -69,6 +71,21 @@ func (dl *diagnosticLogger) ObserveDiagnostic(event jobmgr.DiagnosticEvent) {
 		attributes = append(attributes, slog.String("error", event.Err.Error()))
 	}
 	log := dl.logger.With(attributes...)
+	switch event.Name {
+	case functionadapter.DiagnosticAvailabilityCallbackFailed,
+		functionadapter.DiagnosticAvailabilityAttemptFailed,
+		functionadapter.DiagnosticAvailabilityReconciliationFailed:
+		// Poll failures can recur every scheduler tick across many bundles. Use
+		// fixed category keys shared across jobs and run generations.
+		limited := log.Limit(event.Name, 1, time.Hour)
+		switch event.Level {
+		case jobmgr.DiagnosticWarning:
+			limited.Warning(event.Name)
+		case jobmgr.DiagnosticError:
+			limited.Error(event.Name)
+		}
+		return
+	}
 	// The jobmgr.ObserveDiagnostic production gateway rejects invalid levels before dispatch.
 	switch event.Level {
 	case jobmgr.DiagnosticInfo:

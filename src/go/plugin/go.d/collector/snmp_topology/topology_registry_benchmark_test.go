@@ -470,10 +470,9 @@ func BenchmarkTopologyGenerationAliasSnapshotRead(b *testing.B) {
 					AddressType: "ipv4",
 					Source:      "ip_mib",
 				})
-				cache.l3InterfacesByIP[ip] = topologymodel.L3Interface{
-					IP:      ip,
-					Netmask: "255.255.255.0",
-					IfIndex: fmt.Sprintf("%d", i+1),
+				cache.ipAddressesByIP[ip] = resolvedIPAddress{
+					ifIndex: fmt.Sprintf("%d", i+1),
+					netmask: "255.255.255.0",
 				}
 			}
 			generation := freezeTestTopologyBuilder(1, cache)
@@ -858,11 +857,7 @@ func benchmarkAliasRichTopologyRegistry(deviceCount, aliasCount int, sharedPrima
 
 	for deviceIndex, cache := range caches {
 		ip := fmt.Sprintf("203.0.113.%d", deviceIndex+1)
-		cache.l3InterfacesByIP[ip] = topologymodel.L3Interface{
-			IP:      ip,
-			Netmask: "255.255.255.0",
-			IfIndex: "100",
-		}
+		cache.ipAddressesByIP[ip] = resolvedIPAddress{ifIndex: "100", netmask: "255.255.255.0"}
 	}
 
 	logicalPeerCount = min(logicalPeerCount, len(caches)-1)
@@ -870,15 +865,13 @@ func benchmarkAliasRichTopologyRegistry(deviceCount, aliasCount int, sharedPrima
 		networkOffset := (peerIndex - 1) * 4
 		localIP := fmt.Sprintf("198.51.100.%d", networkOffset+1)
 		remoteIP := fmt.Sprintf("198.51.100.%d", networkOffset+2)
-		caches[0].l3InterfacesByIP[localIP] = topologymodel.L3Interface{
-			IP:      localIP,
-			Netmask: "255.255.255.252",
-			IfIndex: fmt.Sprintf("%d", peerIndex),
+		caches[0].ipAddressesByIP[localIP] = resolvedIPAddress{
+			ifIndex: fmt.Sprintf("%d", peerIndex),
+			netmask: "255.255.255.252",
 		}
-		caches[peerIndex].l3InterfacesByIP[remoteIP] = topologymodel.L3Interface{
-			IP:      remoteIP,
-			Netmask: "255.255.255.252",
-			IfIndex: "1",
+		caches[peerIndex].ipAddressesByIP[remoteIP] = resolvedIPAddress{
+			ifIndex: "1",
+			netmask: "255.255.255.252",
 		}
 		caches[0].ospfNeighborsByKey[fmt.Sprintf("benchmark-neighbor-%d", peerIndex)] = topologymodel.OSPFNeighbor{
 			LocalRouterID: caches[0].localDevice.OSPFRouterID,

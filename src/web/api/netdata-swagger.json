@@ -5257,7 +5257,10 @@
             "$ref": "#/components/parameters/dataTimeGroupOptions2"
           },
           {
-            "$ref": "#/components/parameters/cardinalityLimit"
+            "$ref": "#/components/parameters/weightsLimit"
+          },
+          {
+            "$ref": "#/components/parameters/weightsCardinalityLimit"
           }
         ],
         "responses": {
@@ -6061,7 +6064,10 @@
             "$ref": "#/components/parameters/dataTimeGroupOptions2"
           },
           {
-            "$ref": "#/components/parameters/cardinalityLimit"
+            "$ref": "#/components/parameters/weightsLimit"
+          },
+          {
+            "$ref": "#/components/parameters/weightsCardinalityLimit"
           }
         ],
         "responses": {
@@ -6141,6 +6147,12 @@
           },
           {
             "$ref": "#/components/parameters/dataTimeGroupOptions1"
+          },
+          {
+            "$ref": "#/components/parameters/weightsLimit"
+          },
+          {
+            "$ref": "#/components/parameters/weightsCardinalityLimit"
           }
         ],
         "responses": {
@@ -6217,6 +6229,12 @@
           },
           {
             "$ref": "#/components/parameters/dataTimeGroupOptions1"
+          },
+          {
+            "$ref": "#/components/parameters/weightsLimit"
+          },
+          {
+            "$ref": "#/components/parameters/weightsCardinalityLimit"
           }
         ],
         "responses": {
@@ -7339,7 +7357,7 @@
       "cardinalityLimit": {
         "name": "cardinality_limit",
         "in": "query",
-        "description": "Limits the number of unique items returned, to prevent excessive memory usage and response sizes when a request matches a large number of items. For data queries, the query engine keeps the top contributing dimensions and folds the rest into one `remaining` aggregate dimension, so the total number of returned dimensions equals this limit; the `jsonwrap` summary metadata (nodes, instances, dimensions, labels) stays complete unless the `cardinality-limit-all` option is also given. Other endpoints (weights, alerts, contexts) apply this limit to their own result items.\n",
+        "description": "Limits the number of unique items returned, to prevent excessive memory usage and response sizes when a request matches a large number of items. For data queries, the query engine keeps the top contributing dimensions and folds the rest into one `remaining` aggregate dimension, so the total number of returned dimensions equals this limit; the `jsonwrap` summary metadata (nodes, instances, dimensions, labels) stays complete unless the `cardinality-limit-all` option is also given. Other endpoints (alerts, contexts) apply this limit to their own result items. Weights endpoints define separate result-limit semantics.\n",
         "required": false,
         "schema": {
           "type": "integer",
@@ -7615,6 +7633,28 @@
             "anomaly-rate",
             "value"
           ]
+        }
+      },
+      "weightsLimit": {
+        "name": "limit",
+        "in": "query",
+        "allowEmptyValue": true,
+        "description": "Returns at most N strongest physical time series, or N complete groups when group_by is used. Parent instance, context, and node rows do not count toward N and retain their complete-query summaries. No remaining bucket is added. All matching metrics are still evaluated and normalized before selection; this bounds response size, not query work or duration.\n\nRaw scores and method=value rank higher values first. Normalized scores rank lower values first. Groups rank by the requested aggregation after complete aggregation. Equal scores use stable node/context/instance/dimension identities (group IDs for groups). Metric dictionaries include only retained entries; node metadata remains complete. correlated_dimensions and total_dimensions_count describe the complete query. A positive cap adds result_limit metadata with summary_scope=all.\n\nLegacy v1 dimension objects retain their display-name keys. Duplicate display names can collapse in clients that decode these objects into maps; returned counts emitted physical entries, not unique display-name keys. The v2/v3 dimension dictionaries use metric IDs.\n\nOmitted, empty, or zero means unlimited. Values must be nonnegative decimal integers within the Agent's size_t range; malformed, negative, fractional, and overflowing values return HTTP 400. Repeated values use the last nonempty value of each alias, but every nonempty supplied value must be valid. cardinality_limit takes precedence, including zero. Agents without weights result-limit support may ignore either parameter; clients must inspect result_limit before claiming that results were capped.\n",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "weightsCardinalityLimit": {
+        "name": "cardinality_limit",
+        "in": "query",
+        "allowEmptyValue": true,
+        "description": "Alias of the weights limit parameter with identical strongest-result selection and complete-query summary semantics. Takes precedence over limit when both are supplied, including zero (unlimited). Unlike data-query cardinality_limit, it does not reserve a slot for a remaining bucket. See limit for validation, repeated-value, ranking, and compatibility behavior.\n",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -9570,6 +9610,9 @@
       "metric_correlations": {
         "type": "object",
         "properties": {
+          "result_limit": {
+            "$ref": "#/components/schemas/weightsResultLimit"
+          },
           "after": {
             "description": "the start time of the highlighted window",
             "type": "integer"
@@ -9615,7 +9658,7 @@
             "type": "string"
           },
           "correlated_dimensions": {
-            "description": "the number of dimensions returned in the result"
+            "description": "the number of contributing dimensions before result limiting"
           },
           "total_dimensions_count": {
             "description": "the total number of dimensions evaluated",
@@ -9688,11 +9731,27 @@
         }
       },
       "weights2": {
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "result_limit": {
+            "$ref": "#/components/schemas/weightsResultLimit"
+          },
+          "correlated_dimensions": {
+            "type": "integer",
+            "description": "the number of contributing physical dimensions before result limiting or grouping"
+          },
+          "total_dimensions_count": {
+            "type": "integer",
+            "description": "the total number of dimensions evaluated before result limiting"
+          }
+        }
       },
       "weights": {
         "type": "object",
         "properties": {
+          "result_limit": {
+            "$ref": "#/components/schemas/weightsResultLimit"
+          },
           "after": {
             "description": "the start time of the highlighted window",
             "type": "integer"
@@ -9738,7 +9797,7 @@
             "type": "string"
           },
           "correlated_dimensions": {
-            "description": "the number of dimensions returned in the result"
+            "description": "the number of contributing dimensions before result limiting"
           },
           "total_dimensions_count": {
             "description": "the total number of dimensions evaluated",
@@ -9949,6 +10008,53 @@
             "type": "object",
             "description": "The data payload of the response, contents vary depending on the specific request and action.",
             "additionalProperties": true
+          }
+        }
+      },
+      "weightsResultLimit": {
+        "type": "object",
+        "description": "Present only for a positive weights result cap. Parent summaries and analyzed counts cover the complete query.",
+        "required": [
+          "limit",
+          "total",
+          "returned",
+          "unit",
+          "truncated",
+          "summary_scope"
+        ],
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "requested cap after alias precedence"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "eligible dimensions or complete groups before limiting"
+          },
+          "returned": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "retained dimensions or groups, excluding parent rows"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "dimensions",
+              "groups"
+            ]
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "true exactly when total is greater than returned"
+          },
+          "summary_scope": {
+            "type": "string",
+            "enum": [
+              "all"
+            ],
+            "description": "retained parent summaries cover all contributing metrics, including omitted children"
           }
         }
       }

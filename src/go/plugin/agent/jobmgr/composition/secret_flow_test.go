@@ -171,7 +171,7 @@ func TestProcessCoreSecretUpdateDuringInitialCandidateRetriesLatestStoreGenerati
 	testProcessCoreSecretMutationDependentRestart(t, "update", nil, true, false)
 }
 
-func TestProcessCoreShutdownDuringPendingSecretCandidatePromotionQuiesces(t *testing.T) {
+func TestProcessCoreShutdownAfterSecretReplacementInitializationQuiesces(t *testing.T) {
 	testProcessCoreSecretMutationDependentRestart(t, "update", nil, true, true)
 }
 

@@ -57,21 +57,14 @@ func TestLoadCachestatConfigFilesPrefersUserAndLegacyOverlay(t *testing.T) {
 		t.Fatal("expected config files to be detected")
 	}
 
-	if cfg.UpdateEvery == nil || *cfg.UpdateEvery != 23 {
-		t.Fatalf("unexpected update every: %#v", cfg.UpdateEvery)
-	}
-	if cfg.PidTable == nil || *cfg.PidTable != 4096 {
-		t.Fatalf("unexpected pid table size: %#v", cfg.PidTable)
-	}
-	if cfg.MapsPerCore == nil || *cfg.MapsPerCore {
-		t.Fatalf("unexpected maps per core: %#v", cfg.MapsPerCore)
-	}
-	if cfg.BTFPath == nil || *cfg.BTFPath != "/stock/btf" {
-		t.Fatalf("unexpected btf path: %#v", cfg.BTFPath)
-	}
-	if cfg.ObjectFlavor == nil || *cfg.ObjectFlavor != "buffer" {
-		t.Fatalf("unexpected object flavor: %#v", cfg.ObjectFlavor)
-	}
+	assertMergedCommonConfig(t, cfg, mergedCommonExpect{
+		UpdateEvery:     23,
+		PidTable:        4096,
+		MapsPerCore:     false,
+		BTFPath:         "/stock/btf",
+		ObjectFlavor:    "buffer",
+		CollectPidLevel: -1,
+	})
 }
 
 func TestLoadCachestatConfigFilesMissingReturnsNotFound(t *testing.T) {
@@ -86,5 +79,28 @@ func TestLoadCachestatConfigFilesMissingReturnsNotFound(t *testing.T) {
 	}
 	if cfg.UpdateEvery != nil || cfg.PidTable != nil || cfg.MapsPerCore != nil || cfg.BTFPath != nil || cfg.Lifetime != nil || cfg.ObjectFlavor != nil {
 		t.Fatalf("expected empty config, got %#v", cfg)
+	}
+}
+
+func TestCachestatConfigAutoPreservesEarlierExplicitFlavor(t *testing.T) {
+	tests := map[string]string{
+		"auto":  "auto",
+		"co-re": "co-re",
+	}
+
+	for name, typeFormat := range tests {
+		t.Run(name, func(t *testing.T) {
+			writeCollectorConfigFixture(t, "cachestat.conf",
+				"[global]\n    ebpf object flavor = arena\n", "", "",
+				"[global]\n    ebpf type format = "+typeFormat+"\n")
+
+			cfg, err := resolveCachestatLegacyConfig()
+			if err != nil {
+				t.Fatalf("resolveCachestatLegacyConfig(): %v", err)
+			}
+			if cfg.ObjectFlavor != "arena" {
+				t.Fatalf("ObjectFlavor = %q, want arena", cfg.ObjectFlavor)
+			}
+		})
 	}
 }

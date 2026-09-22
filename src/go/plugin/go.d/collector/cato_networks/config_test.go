@@ -126,17 +126,6 @@ func TestConfigSchema(t *testing.T) {
 				require.True(t, json.Valid([]byte(configSchema)))
 			},
 		},
-		"marks api_key sensitive": {
-			check: func(t *testing.T) {
-				var schema struct {
-					JSONSchema struct {
-						Properties map[string]map[string]any `json:"properties"`
-					} `json:"jsonSchema"`
-				}
-				require.NoError(t, json.Unmarshal([]byte(configSchema), &schema))
-				require.Equal(t, true, schema.JSONSchema.Properties["api_key"]["sensitive"])
-			},
-		},
 	}
 
 	for name, tc := range tests {

@@ -3,6 +3,7 @@
 package pihole
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,12 +11,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
-func (c *Collector) checkAuthSession() error {
+func (c *Collector) checkAuthSession(ctx context.Context) error {
 	if c.auth == nil {
 		return nil
 	}
 
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPIAuth)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPIAuth)
 	if err != nil {
 		return err
 	}
@@ -40,7 +41,7 @@ func (c *Collector) checkAuthSession() error {
 	return nil
 }
 
-func (c *Collector) getAuthSession() (*ftlAPIAuthResponse, error) {
+func (c *Collector) getAuthSession(ctx context.Context) (*ftlAPIAuthResponse, error) {
 	var pass struct {
 		Password string `json:"password"`
 	}
@@ -51,7 +52,7 @@ func (c *Collector) getAuthSession() (*ftlAPIAuthResponse, error) {
 	cfg.Method = http.MethodPost
 	cfg.Body = string(bs)
 
-	req, err := web.NewHTTPRequestWithPath(cfg, urlPathAPIAuth)
+	req, err := web.NewHTTPRequestWithPath(ctx, cfg, urlPathAPIAuth)
 	if err != nil {
 		return nil, err
 	}

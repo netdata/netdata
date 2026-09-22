@@ -3,6 +3,7 @@
 package discover
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"net/url"
@@ -545,7 +546,7 @@ func prepareDiscovererSim(t *testing.T) (d *Discoverer, model *simulator.Model, 
 }
 
 func newClient(t *testing.T, vCenterURL *url.URL) *client.Client {
-	c, err := client.New(client.Config{
+	c, err := client.New(context.Background(), client.Config{
 		URL:       vCenterURL.String(),
 		User:      "admin",
 		Password:  "password",

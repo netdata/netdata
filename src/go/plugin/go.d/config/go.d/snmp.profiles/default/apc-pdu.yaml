@@ -17,20 +17,25 @@ metadata:
 
 metric_tags:
   - tag: powernet_r_pdu_ident_name
-    OID: 1.3.6.1.4.1.318.1.1.12.1.1.0
-    symbol: rPDUIdentName
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.12.1.1.0
+      name: rPDUIdentName
   - tag: powernet_r_pdu_ident_hardware_rev
-    OID: 1.3.6.1.4.1.318.1.1.12.1.2.0
-    symbol: rPDUIdentHardwareRev
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.12.1.2.0
+      name: rPDUIdentHardwareRev
   - tag: powernet_r_pdu_ident_firmware_rev
-    OID: 1.3.6.1.4.1.318.1.1.12.1.3.0
-    symbol: rPDUIdentFirmwareRev
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.12.1.3.0
+      name: rPDUIdentFirmwareRev
   - tag: powernet_r_pdu_ident_model_number
-    OID: 1.3.6.1.4.1.318.1.1.12.1.5.0
-    symbol: rPDUIdentModelNumber
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.12.1.5.0
+      name: rPDUIdentModelNumber
   - tag: powernet_r_pdu_ident_serial_number
-    OID: 1.3.6.1.4.1.318.1.1.12.1.6.0
-    symbol: rPDUIdentSerialNumber
+    symbol:
+      OID: 1.3.6.1.4.1.318.1.1.12.1.6.0
+      name: rPDUIdentSerialNumber
 
 metrics:
   - MIB: PowerNet-MIB

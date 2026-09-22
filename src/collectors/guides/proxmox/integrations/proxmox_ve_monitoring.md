@@ -128,7 +128,9 @@ This guide does not collect metrics directly. Metrics are collected by the relat
 
 ## Troubleshooting
 
-### VM or container names not resolved
+### Other Problems
+
+#### VM or container names not resolved
 
 If VMs or containers show raw cgroup paths instead of friendly names, verify that:
 
@@ -137,11 +139,11 @@ If VMs or containers show raw cgroup paths instead of friendly names, verify tha
 3. The `cgroup-name` helper can read VM/container configuration files
 
 
-### Missing ZFS metrics
+#### Missing ZFS metrics
 
 If ZFS pool metrics are not showing, ensure the `zfspool` collector is enabled and the `zpool` command is available to the netdata user.
 
 
-### Missing Ceph metrics
+#### Missing Ceph metrics
 
 Ceph metrics require the Ceph collector to be configured with the Ceph REST API endpoint. See the Ceph integration page for details.

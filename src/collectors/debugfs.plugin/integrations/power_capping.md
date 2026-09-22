@@ -25,7 +25,7 @@ Module: intel_rapl
 Collects power capping performance metrics on Linux systems.
 
 
-Parse data from `debugfs file.
+Read Intel RAPL energy counters from the powercap `sysfs` interface under `/sys/devices/virtual/powercap`.
 
 This collector is only supported on the following platforms:
 
@@ -33,14 +33,14 @@ This collector is only supported on the following platforms:
 
 This collector only supports collecting metrics from a single instance of this integration.
 
-This integration requires read access to files under `/sys/devices/virtual/powercap`, which are accessible only to the root user by default. Netdata uses Linux Capabilities to give the plugin access to debugfs. `CAP_DAC_READ_SEARCH` is added automatically during installation. This capability allows bypassing file read permission checks and directory read and execute permission checks. If file capabilities are not usable, then the plugin is instead installed with the SUID bit set in permissions so that it runs as root.
+This integration requires read access to files under `/sys/devices/virtual/powercap`, which are accessible only to the root user by default. Netdata uses Linux Capabilities to give the plugin access to these files. `CAP_DAC_READ_SEARCH` is added automatically during installation. This capability allows bypassing file read permission checks and directory read and execute permission checks. If file capabilities are not usable, then the plugin is instead installed with the SUID bit set in permissions so that it runs as root.
 
 
 ### Default Behavior
 
 #### Auto-Detection
 
-Assuming that debugfs is mounted and the required permissions are available, this integration will automatically detect whether or not the system is using zswap.
+Assuming the kernel exposes the Intel RAPL powercap interface and the required permissions are available, this integration runs automatically.
 
 
 #### Limits
@@ -56,9 +56,9 @@ The default configuration for this integration is not expected to impose a signi
 
 ### Prerequisites
 
-#### filesystem
+#### Check that the kernel exposes the powercap interface
 
-The debugfs filesystem must be mounted on your host for plugin to collect data. You can run the command-line (`sudo mount -t debugfs none /sys/kernel/debug/`) to mount it locally. It is also recommended to modify your fstab (5) avoiding necessity to mount the filesystem before starting netdata.
+The Intel RAPL powercap driver must be loaded, so that `intel-rapl` zones exist under `/sys/devices/virtual/powercap`. It is present on supported Intel and AMD processors with a recent Linux kernel and needs no mount.
 
 
 

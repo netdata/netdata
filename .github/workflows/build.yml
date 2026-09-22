@@ -506,7 +506,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/setup-go@v7
         with:
-          go-version: "^1.26"
+          go-version: "^1.27"
       - name: Set Up Dependencies
         id: deps
         if: needs.file-check.outputs.run == 'true'
@@ -693,23 +693,32 @@ jobs:
           pattern: windows-*-installer
           path: dist-artifacts
           merge-multiple: true
+      - name: Import GPG Keys
+        id: import-keys
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
       - name: Prepare Artifacts
         id: consolidate
         if: needs.file-check.outputs.run == 'true'
-        working-directory: ./artifacts/
-        run: |
-          mv ../dist-artifacts/* . || exit 1
-          ln -s ${{ needs.build-dist.outputs.distfile }} netdata-latest.tar.gz || exit 1
-          cp ../packaging/version ./latest-version.txt || exit 1
-          sha256sum -b ./* > sha256sums.txt || exit 1
-          cat sha256sums.txt
-      - name: Store Artifacts
-        id: store
+        run: .github/scripts/prepare-artifacts.sh dist-artifacts ${{ steps.import-keys.outputs.fingerprint }}
+      - name: Store GitHub Artifacts
+        id: store-github
         if: needs.file-check.outputs.run == 'true'
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: final-artifacts
-          path: artifacts/*
+          name: github-artifacts
+          path: artifacts/github/*
+          compression-level: 0
+          retention-days: 30
+      - name: Store R2 Artifacts
+        id: store-r2
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: r2-artifacts
+          path: artifacts/r2/*
           compression-level: 0
           retention-days: 30
       - name: Failure Notification
@@ -727,7 +736,8 @@ jobs:
               Fetch dist artifacts: ${{ steps.fetch-dist.outcome }}
               Fetch Windows installers: ${{ steps.fetch-windows.outcome }}
               Consolidate artifacts: ${{ steps.consolidate.outcome }}
-              Store: ${{ steps.store.outcome }}
+              Store Github: ${{ steps.store-github.outcome }}
+              Store R2: ${{ steps.store-r2.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
@@ -765,7 +775,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/download-artifact@v4
         with:
-          name: final-artifacts
+          name: github-artifacts
           path: artifacts
       - name: Prepare artifacts directory
         id: prepare
@@ -832,7 +842,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/download-artifact@v4
         with:
-          name: final-artifacts
+          name: github-artifacts
           path: artifacts
       - name: Prepare artifacts directory
         id: prepare
@@ -899,7 +909,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/download-artifact@v4
         with:
-          name: final-artifacts
+          name: github-artifacts
           path: artifacts
       - name: Prepare artifacts directory
         id: prepare
@@ -967,7 +977,7 @@ jobs:
         id: fetch
         uses: actions/download-artifact@v4
         with:
-          name: final-artifacts
+          name: github-artifacts
           path: final-artifacts
       - name: Prepare version info
         id: version
@@ -982,7 +992,7 @@ jobs:
         with:
           allowUpdates: false
           artifactErrorsFailBuild: true
-          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run,final-artifacts/netdata-*.msi'
+          artifacts: 'final-artifacts/*'
           owner: netdata
           repo: netdata-nightlies
           body: Netdata nightly build for ${{ steps.version.outputs.date }}.
@@ -1056,6 +1066,60 @@ jobs:
             && github.event_name == 'workflow_dispatch'
           }}
 
+  publish-nightly-artifacts:
+    name: Publish Nightly Release Artifacts
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly' && github.repository == 'netdata/netdata'
+    needs:
+      - prepare-upload
+      - windows-test
+      - artifact-verification-dist
+      - artifact-verification-static
+    steps:
+      - name: Install RClone
+        id: install-rclone
+        run: |
+          sudo apt-get update || exit 1
+          sudo apt-get install -y rclone || exit 1
+      - name: Retrieve Artifacts
+        id: fetch
+        uses: actions/download-artifact@v4
+        with:
+          name: r2-artifacts
+          path: artifacts
+      - name: Upload Artifacts
+        id: upload
+        env:
+          RCLONE_CONFIG_S3_TYPE: "s3"
+          RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
+          RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}"
+          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "${{ secrets.CLOUDFLARE_R2_SECRET_KEY }}"
+          RCLONE_CONFIG_S3_ENDPOINT: "${{ secrets.CLOUDFLARE_R2_RELEASE_ENDPOINT }}"
+          RCLONE_CONFIG_S3_REGION: "auto"
+        working-directory: artifacts
+        run: |
+          rclone copy --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/nightlies/
+          rclone sync --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/nightlies/latest/
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to upload nightly artifacts:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to upload nightly build artifacts.
+              Install RClone: ${{ steps.install-rclone.outcome }}
+              Fetch artifacts: ${{ steps.fetch.outcome }}
+              Upload artifacts: ${{ steps.upload.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name == 'workflow_dispatch'
+          }}
+
   normalize-tag: # Fix the release tag if needed
     name: Normalize Release Tag
     runs-on: ubuntu-latest
@@ -1089,7 +1153,7 @@ jobs:
         id: fetch
         uses: actions/download-artifact@v4
         with:
-          name: final-artifacts
+          name: github-artifacts
           path: final-artifacts
       - name: Create Release
         id: create-release
@@ -1097,7 +1161,7 @@ jobs:
         with:
           allowUpdates: false
           artifactErrorsFailBuild: true
-          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run,final-artifacts/netdata-*.msi'
+          artifacts: 'final-artifacts/*'
           draft: true
           tag: ${{ needs.normalize-tag.outputs.tag }}
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
@@ -1190,7 +1254,7 @@ jobs:
       - file-check
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 16
       matrix: ${{ fromJson(needs.src-matrix.outputs.matrix) }}
     steps:
       - name: Skip Check
@@ -1208,7 +1272,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
       - name: Build test environment
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           push: false
           load: true
@@ -1256,7 +1320,6 @@ jobs:
       - file-check
     strategy:
       fail-fast: false
-      max-parallel: 8
       matrix:
         include:
           - name: macos-14-M1
@@ -1299,6 +1362,18 @@ jobs:
         if: needs.file-check.outputs.run == 'true' && matrix.name == 'macos-15-M1'
         run: |
           ./tests/ndsudo-macos.sh /usr/local/netdata/usr/libexec/netdata/plugins.d/ndsudo
+      - name: Test spawn-server unit tests
+        id: test-spawn-server
+        # The spawn servers depend on platform primitives: posix_spawn with POSIX_SPAWN_SETSIGDEF,
+        # and the signal disposition and mask a child inherits across exec. Passing on Linux does
+        # not establish the behaviour here, and macOS is where netdata/netdata#23730 was observed -
+        # a child that inherited an ignored SIGPIPE, so closing its stdio left it running. Until now
+        # these tests ran only on ubuntu (tests/run-unit-tests.sh), so that platform-specific
+        # behaviour was verified nowhere.
+        if: needs.file-check.outputs.run == 'true' && matrix.name == 'macos-15-M1'
+        timeout-minutes: 5
+        run: |
+          ./tests/spawn-server-tests.sh
       - name: Test Agent start up
         id: test-agent
         if: needs.file-check.outputs.run == 'true'
@@ -1323,6 +1398,7 @@ jobs:
               Install netdata required packages: ${{ steps.install-nd-dep.outcome }}
               Build from source: ${{ steps.build-source.outcome }}
               Test ndsudo argument validation: ${{ steps.test-ndsudo.outcome }}
+              Test spawn-server unit tests: ${{ steps.test-spawn-server.outcome }}
               Test Agent runtime: ${{ steps.test-agent.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-

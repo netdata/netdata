@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type cloneMe struct {
@@ -36,67 +37,100 @@ func (c *cloneMe) Clone() *cloneMe {
 }
 
 func TestCloneSlice(t *testing.T) {
-	items := []*cloneMe{
-		item("a", 1, 2, 3, 4),
-		item("b", 1, 2),
+	tests := map[string]struct {
+		input        []*cloneMe
+		wantOriginal []*cloneMe
+		wantClone    []*cloneMe
+		mutate       func([]*cloneMe) []*cloneMe
+	}{
+		"nil":   {},
+		"empty": {input: []*cloneMe{}, wantOriginal: []*cloneMe{}, wantClone: []*cloneMe{}},
+		"nested mutation": {
+			input:        []*cloneMe{item("a", 1, 2, 3, 4), item("b", 1, 2)},
+			wantOriginal: []*cloneMe{item("a", 1, 2, 3, 4), item("b", 1, 2)},
+			wantClone:    []*cloneMe{item("aaa", 1, 2, 3, 4), item("bbb", 10, 20), item("ccc", 100, 200)},
+			mutate: func(cloned []*cloneMe) []*cloneMe {
+				*cloned[0].label = "aaa"
+				cloned[1] = item("bbb", 10, 20)
+				return append(cloned, item("ccc", 100, 200))
+			},
+		},
 	}
-	itemsCopy := cloneSlice(items)
-	*itemsCopy[0].label = "aaa"
-	itemsCopy[1] = item("bbb", 10, 20)
-	itemsCopy = append(itemsCopy, item("ccc", 100, 200))
-	// items is unchanged
-	assert.Equal(t, []*cloneMe{
-		item("a", 1, 2, 3, 4),
-		item("b", 1, 2),
-	}, items)
-	assert.Equal(t, []*cloneMe{
-		item("aaa", 1, 2, 3, 4),
-		item("bbb", 10, 20),
-		item("ccc", 100, 200),
-	}, itemsCopy)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cloned := cloneSlice(tc.input)
+			require.Equal(t, tc.wantOriginal, cloned)
+			if tc.mutate != nil {
+				cloned = tc.mutate(cloned)
+			}
+			assert.Equal(t, tc.wantOriginal, tc.input)
+			assert.Equal(t, tc.wantClone, cloned)
+		})
+	}
 }
 
 func TestCloneMap(t *testing.T) {
-	m := map[string]*cloneMe{
-		"Item A": item("a", 1, 2, 3, 4),
-		"Item B": item("b", 1, 2),
+	tests := map[string]struct {
+		input        map[string]*cloneMe
+		wantOriginal map[string]*cloneMe
+		wantClone    map[string]*cloneMe
+		mutate       func(map[string]*cloneMe)
+	}{
+		"nil":   {},
+		"empty": {input: map[string]*cloneMe{}, wantOriginal: map[string]*cloneMe{}, wantClone: map[string]*cloneMe{}},
+		"nested mutation": {
+			input:        map[string]*cloneMe{"Item A": item("a", 1, 2, 3, 4), "Item B": item("b", 1, 2)},
+			wantOriginal: map[string]*cloneMe{"Item A": item("a", 1, 2, 3, 4), "Item B": item("b", 1, 2)},
+			wantClone: map[string]*cloneMe{
+				"Item A": item("a", 100, 2, 3, 4),
+				"Item B": item("bbb", 10, 20),
+				"Item C": item("ccc", 100, 200),
+			},
+			mutate: func(cloned map[string]*cloneMe) {
+				cloned["Item A"].ps[0] = 100
+				cloned["Item B"] = item("bbb", 10, 20)
+				cloned["Item C"] = item("ccc", 100, 200)
+			},
+		},
 	}
-	mCopy := cloneMap(m)
-	mCopy["Item A"].ps[0] = 100
-	mCopy["Item B"] = item("bbb", 10, 20)
-	mCopy["Item C"] = item("ccc", 100, 200)
-	assert.Equal(t, map[string]*cloneMe{
-		"Item A": item("a", 1, 2, 3, 4),
-		"Item B": item("b", 1, 2),
-	}, m)
-	assert.Equal(t, map[string]*cloneMe{
-		"Item A": item("a", 100, 2, 3, 4),
-		"Item B": item("bbb", 10, 20),
-		"Item C": item("ccc", 100, 200),
-	}, mCopy)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cloned := cloneMap(tc.input)
+			require.Equal(t, tc.wantOriginal, cloned)
+			if tc.mutate != nil {
+				tc.mutate(cloned)
+			}
+			assert.Equal(t, tc.wantOriginal, tc.input)
+			assert.Equal(t, tc.wantClone, cloned)
+		})
+	}
 }
 
-func TestCustomSliceClone(t *testing.T) {
+func TestCloneNamedContainers(t *testing.T) {
 	type customSlice []*cloneMe
-
-	items := customSlice{
-		item("a", 1, 2, 3, 4),
-		item("b", 1, 2),
-	}
-	itemsCopy := cloneSlice(items)
-
-	assert.IsType(t, customSlice{}, itemsCopy)
-	assert.Equal(t, items, itemsCopy)
-}
-
-func TestCustomMapClone(t *testing.T) {
 	type customMap map[string]*cloneMe
-
-	m := customMap{
-		"Item A": item("a", 1, 2, 3, 4),
-		"Item B": item("b", 1, 2),
+	tests := map[string]struct {
+		clone func() any
+		want  any
+	}{
+		"slice": {
+			clone: func() any { return cloneSlice(customSlice{item("a", 1, 2, 3, 4), item("b", 1, 2)}) },
+			want:  customSlice{item("a", 1, 2, 3, 4), item("b", 1, 2)},
+		},
+		"map": {
+			clone: func() any {
+				return cloneMap(customMap{
+					"Item A": item("a", 1, 2, 3, 4),
+					"Item B": item("b", 1, 2),
+				})
+			},
+			want: customMap{
+				"Item A": item("a", 1, 2, 3, 4),
+				"Item B": item("b", 1, 2),
+			},
+		},
 	}
-	mCopy := cloneMap(m)
-	assert.IsType(t, customMap{}, mCopy)
-	assert.Equal(t, m, mCopy)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) { assert.Equal(t, tc.want, tc.clone()) })
+	}
 }

@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	DefaultFuse                     = 2 * time.Minute
+	DefaultFuse                     = jobmgr.DefaultProcessAttemptFuse
 	DefaultSupersessionGrace        = 2 * time.Second
 	MaximumDiagnosticIdentitySample = 8
 )

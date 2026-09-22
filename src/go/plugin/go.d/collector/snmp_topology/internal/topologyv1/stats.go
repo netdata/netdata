@@ -7,7 +7,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
 
-func topologyStatsToV1(stats topologymodel.Stats) map[string]any {
+// RenderStats converts graph statistics to the same stable map used by the
+// topology-v1 payload.
+func RenderStats(stats topologymodel.Stats) map[string]any {
 	if !stats.HasL2 && !stats.HasShape && !stats.HasFocus && !stats.HasL3 && !stats.HasOSPF && !stats.HasBGP && !stats.HasComputed {
 		return nil
 	}

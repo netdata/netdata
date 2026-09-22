@@ -915,6 +915,67 @@ func TestProjectionPairwiseCoalescesOverlappingFDBSources(t *testing.T) {
 	}
 }
 
+func TestProjectionPairwiseRejectsAmbiguousAliasOwners(t *testing.T) {
+	result, err := BuildL2ResultFromObservations([]L2Observation{
+		{
+			DeviceID:    "switch-a",
+			Hostname:    "switch-a",
+			ChassisID:   "02:00:00:00:00:01",
+			Interfaces:  []ObservedInterface{{IfIndex: 1, IfName: "Ethernet1"}},
+			BridgePorts: []BridgePortObservation{{BasePort: "1", IfIndex: 1}},
+			FDBEntries: []FDBObservation{
+				{MAC: "02:00:00:00:ff:ff", BridgePort: "1", Status: "learned"},
+			},
+		},
+		{
+			DeviceID:  "switch-b",
+			Hostname:  "switch-b",
+			ChassisID: "02:00:00:00:00:02",
+			Interfaces: []ObservedInterface{
+				{IfIndex: 2, IfName: "Ethernet2", MAC: "02:00:00:00:ff:ff"},
+			},
+			BridgePorts: []BridgePortObservation{{BasePort: "2", IfIndex: 2}},
+			FDBEntries: []FDBObservation{
+				{MAC: "02:00:00:00:00:01", BridgePort: "2", Status: "learned"},
+			},
+		},
+		{
+			DeviceID:  "switch-c",
+			Hostname:  "switch-c",
+			ChassisID: "02:00:00:00:00:03",
+			Interfaces: []ObservedInterface{
+				{IfIndex: 3, IfName: "Ethernet3", MAC: "02:00:00:00:ff:ff"},
+			},
+			BridgePorts: []BridgePortObservation{{BasePort: "3", IfIndex: 3}},
+			FDBEntries: []FDBObservation{
+				{MAC: "02:00:00:00:00:01", BridgePort: "3", Status: "learned"},
+			},
+		},
+	}, DiscoverOptions{EnableBridge: true})
+	require.NoError(t, err)
+
+	for _, strategy := range []string{
+		"fdb_pairwise_minimum_knowledge",
+		"stp_fdb_correlated",
+		"cdp_fdb_hybrid",
+	} {
+		t.Run(strategy, func(t *testing.T) {
+			projection := ToGraph(result, GraphOptions{
+				Source:            "snmp",
+				Layer:             "2",
+				InferenceStrategy: strategy,
+			})
+			multiParentSegments := 0
+			for _, detail := range projection.ActorDetails {
+				if len(detail.Segment.ParentDevices) > 1 {
+					multiParentSegments++
+				}
+			}
+			require.Zero(t, multiParentSegments)
+		})
+	}
+}
+
 func TestProjectionCorrelatesBridgeMIBWithCanonicalSTPPort(t *testing.T) {
 	result, err := BuildL2ResultFromObservations([]L2Observation{
 		{

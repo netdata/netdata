@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package ddsnmpcollector
+
+import "time"
+
+// AcquisitionExecutionReport records work charged to this profile, not to each
+// configured route consuming it. Nil means execution accounting was not recorded.
+type AcquisitionExecutionReport struct {
+	Preparation AcquisitionPreparationStats
+	// One-based IDs into the context's SourceRecorder output. A shared operation
+	// is charged once, while each logical consumer has its own SourceBinding.
+	WalkOperations []uint64
+}
+
+type AcquisitionPreparationStats struct {
+	Elapsed          time.Duration
+	GetRequests      int64
+	GetOIDs          int64
+	SNMPErrors       int64
+	MissingOIDs      int64
+	ProcessingErrors int64
+}
+
+func (c *acquisitionProfileCollection) executionReport() *AcquisitionExecutionReport {
+	if c == nil {
+		return nil
+	}
+	return &c.execution
+}

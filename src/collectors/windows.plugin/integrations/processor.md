@@ -25,7 +25,8 @@ Module: PerflibProcessor
 Monitor processor performance statistics on Windows hosts through Perflib.
 
 
-It queries Processor object from Perflib in order to gather the metrics.
+It queries the Processor Information object from Perflib in order to gather the metrics, falling back to the
+legacy Processor object only when Processor Information is unavailable.
 
 
 This collector is only supported on the following platforms:

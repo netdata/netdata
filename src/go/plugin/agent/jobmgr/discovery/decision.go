@@ -49,8 +49,9 @@ type decisionCandidateKey struct {
 }
 
 type decisionCandidateRevision struct {
-	key decisionCandidateKey
-	uid string
+	key        decisionCandidateKey
+	uid        string
+	pipelineID string
 }
 
 type decisionSelection struct {
@@ -435,8 +436,13 @@ func (di *DecisionIndex) candidateRejected(
 }
 
 func candidateRevision(key decisionCandidateKey, candidate confgroup.Config) decisionCandidateRevision {
-	return decisionCandidateRevision{
+	revision := decisionCandidateRevision{
 		key: key,
 		uid: candidate.UID(),
 	}
+	if candidate.SourceType() == confgroup.TypeDiscovered {
+		// Untrusted hashes omit the owner, but its rejection must not block another pipeline's opt-out.
+		revision.pipelineID = candidate.DiscoveryPipelineID()
+	}
+	return revision
 }

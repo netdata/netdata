@@ -3,6 +3,7 @@
 package nginxunit
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,11 +27,11 @@ type nuStatus struct {
 	} `json:"connections" stm:"connections"`
 	Requests struct {
 		Total int64 `json:"total" stm:"total"`
-	} `json:"requests" stm:"requests"`
+	} `json:"requests"    stm:"requests"`
 }
 
-func (c *Collector) collect() (map[string]int64, error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathStatus)
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathStatus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request to '%s': %v", c.URL, err)
 	}

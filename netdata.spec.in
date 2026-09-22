@@ -323,9 +323,9 @@ BuildRequires: cups-devel
 # distro handling of versioning).
 %if %{?_upstream_go_toolchain:0}%{!?_upstream_go_toolchain:1}
 %if 0%{?suse_version}
-BuildRequires: go >= 1.26
+BuildRequires: go >= 1.27
 %else
-BuildRequires: golang >= 1.26
+BuildRequires: golang >= 1.27
 %endif
 %endif
 # end - go.d.plugin plugin dependencies

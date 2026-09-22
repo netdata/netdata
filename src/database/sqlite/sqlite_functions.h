@@ -109,6 +109,16 @@ int simple_prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt 
 void finalize_self_prepared_sql_statements();
 void finalize_all_prepared_sql_statements();
 
+// The SQLite teardown latch. Set it from any shutdown path that stops waiting for a SQLite
+// user instead of proving it finished; every teardown entry point (ml_fini(),
+// sqlite_close_databases(), sqlite_library_shutdown()) then skips its destruction and leaks
+// deliberately. One-way within a library lifetime: nothing clears it during a shutdown, and
+// only sqlite_library_init() re-arms it (which in practice means the -W unittest drivers, the
+// sole place the library is re-initialized in one process). See the contract at the top of
+// sqlite_functions.c.
+void sqlite_mark_teardown_unsafe(const char *reason);
+bool sqlite_teardown_is_unsafe(void);
+
 int execute_insert(sqlite3_stmt *res);
 int db_execute(sqlite3 *database, const char *cmd, int *sqlite_rc);
 char *get_database_extented_error(sqlite3 *database, int i, const char *description);

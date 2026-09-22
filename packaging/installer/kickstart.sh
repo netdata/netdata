@@ -409,7 +409,7 @@ sanitize_path() {
   if [ -z "${_path_replace}" ]; then
     _path_replace="$(printf "%$(printf "%s" "${_path_unsafe}" | wc -m)s" | tr " " "_")"
   fi
-  r="$(printf '%s\n' "$1" | tr "${_path_unsafe}" "${_path_replace}")"
+  r="$(printf '%s' "$1" | tr "${_path_unsafe}" "${_path_replace}")"
   [ "${v}" = "${r}" ] || warning "Unsafe characters found in path, sanitized to ${r}"
   echo "${r}"
 }

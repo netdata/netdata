@@ -114,3 +114,14 @@ There are no alerts configured by default for this integration.
 
 
 ## Metrics
+
+
+
+
+## Troubleshooting
+
+### Other Problems
+
+#### Collect Diagnostics for Netdata Support
+
+For SNMP metrics, BGP, licensing, or topology issues, follow [Collect SNMP troubleshooting data](https://github.com/netdata/netdata/blob/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to include built-in diagnostics in a support bundle. SNMP evidence is unsanitized; share the bundle through a restricted Netdata Support ticket.

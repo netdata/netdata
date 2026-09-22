@@ -1503,3 +1503,42 @@ func (ptt protocolTestTransaction) Commit() error {
 func (ptt protocolTestTransaction) Abort() error {
 	return ptt.abort()
 }
+
+func TestFrameOwnerBuiltTransactionPreflight(t *testing.T) {
+	for name, tc := range map[string]struct {
+		build func() ([]byte, error)
+		fail  bool
+	}{
+		"empty suppressed frame":       {build: func() ([]byte, error) { return nil, nil }},
+		"builder error":                {build: func() ([]byte, error) { return nil, errors.New("build failed") }, fail: true},
+		"builder panic":                {build: func() ([]byte, error) { panic("build failed") }, fail: true},
+		"expanded frame exceeds limit": {build: func() ([]byte, error) { return make([]byte, MaximumOtherFrameBytes+1), nil }, fail: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var output bytes.Buffer
+			owner, err := NewFrameOwner(&output)
+			require.NoError(t, err)
+			observer := &recordingRuntimeObserver{}
+			require.NoError(t, owner.BindRunNotifications(1, func() {}, func(error) {}, observer))
+			commits, aborts := 0, 0
+			tx := protocolTestTransaction{
+				commit: func() error { commits++; return nil },
+				abort:  func() error { aborts++; return nil },
+			}
+			err = owner.CommitBuiltProtocolTransaction(tc.build, tx)
+			if tc.fail {
+				require.Error(t, err)
+				require.Equal(t, []int{0, 1}, []int{commits, aborts})
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, []int{1, 0}, []int{commits, aborts})
+			}
+			require.Empty(t, output.String())
+			require.Zero(t, observer.counter(RuntimeCounterFramesCommitted))
+			require.False(t, owner.Census().Poisoned)
+			require.NoError(t, owner.CommitBorrowedProtocolFrame([]byte("next")))
+			require.Equal(t, "next", output.String())
+			require.EqualValues(t, 1, observer.counter(RuntimeCounterFramesCommitted))
+		})
+	}
+}

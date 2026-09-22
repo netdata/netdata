@@ -31,27 +31,52 @@ use file_lifecycle::registry::TenantRegistries;
 
 use sfsq::traces::{
     AttributeNamesQuery, AttributeRequestError, AttributeValuesQuery, DEFAULT_SLOWEST_LIMIT,
-    OverviewQuery, OverviewRequestError, SLOWEST_LIMIT_MAX, SPANS_PER_TRACE_MAX, SearchQuery,
-    SearchRequestError, SearchSources, SlowestQuery, SlowestRequestError, TimeWindow, TraceQuery,
+    OverviewQuery, OverviewRequestError, Predicate, PredicateTarget, SLOWEST_LIMIT_MAX,
+    SPANS_PER_TRACE_MAX,
+    SearchQuery, SearchRequestError, SearchSources, SlowestQuery, SlowestRequestError, TimeWindow,
+    TraceQuery,
     TraceRequestError, attribute_names, attribute_values, overview, search, slowest, trace_by_id,
 };
 
 use super::adapter::{
-    ResolvedWindow, build_predicate, parse_cursor, parse_enumeration_key, parse_owner_word,
-    completion_capture_range, parse_trace_id, resolve_window, to_attribute_values_result,
-    to_attributes_result, to_overview_result, to_search_result, to_slowest_result,
-    to_trace_result, validate_trace_bounds,
+    ResolvedWindow, build_predicate, builtin_word, completion_capture_range, heatmap_predicate,
+    parse_cursor,
+    parse_enumeration_key, parse_owner_word, parse_trace_id, resolve_window,
+    to_attribute_values_result,
+    to_attributes_result, to_overview_result, to_overview_section, to_search_result,
+    to_slowest_result, to_trace_result, validate_trace_bounds,
 };
 use super::sources::TracesSourceSupplier;
 use super::wire::{
-    AttributeValuesParams, AttributesParams, CoverageWire, InfoResponse, OtelTracesRequest,
-    OtelTracesResponse, OverviewParams, SearchParams, SearchResult, SlowestParams, TraceParams,
-    TracesMode,
+    AttributeValuesParams, AttributesParams, CoverageWire, FunctionsParams,
+    FunctionsTracesResponse, InfoResponse, OVERVIEW_SCOPE_SELECTION, OVERVIEW_SCOPE_WINDOW,
+    OtelTracesRequest, OtelTracesResponse, OverviewParams, SearchParams, SearchResult,
+    SlowestParams, TraceParams, TracesMode,
 };
 
 /// Shorthand for the handler-level error every failure path maps to.
 fn handler_err(message: String) -> netdata_plugin_error::NetdataPluginError {
     netdata_plugin_error::NetdataPluginError::FunctionHandler { message }
+}
+
+/// The Functions view's aggregate half: what the second engine pass
+/// needs beyond the page's own window. The window itself is the page's
+/// (aligned to the grid); the predicate is the page's `selections` and
+/// nothing else — never the duration bounds — and the wire's scope flag
+/// reports whether one ran.
+///
+/// Requested as an `Option`: `None` means no second pass and no
+/// `overview` section on the response. The Functions view passes `None`
+/// on an ANCHOR page (see the anchor gate in `functions`); the legacy
+/// `search` mode always does.
+struct AggregateRequest {
+    /// Root-facet lists: opted in by the request AND allowed by the
+    /// scope gate (see `functions`).
+    facets: bool,
+    /// The heatmap's filter: the page's selections when they are all
+    /// span-level, `None` for the plain window grid (no selections, or
+    /// a trace-level word — see `functions`).
+    predicate: Option<Predicate>,
 }
 
 pub(crate) struct OtelTracesHandler {
@@ -178,12 +203,20 @@ impl OtelTracesHandler {
     /// The `search` mode: the engine's bounded most-recent-first trace
     /// search over the request's (canonicalized) window, with wire-level
     /// tie-safe pagination — see the adapter's cursor docs.
-    async fn search(
+    ///
+    /// `aggregate` adds the Functions view's full-window section: a
+    /// SECOND engine pass in this same call, off the same capture. It
+    /// cannot ride along with the first — search is top-K with early
+    /// termination and hard-caps its assembly far below the window's
+    /// population, so an accumulator on its scan loop would describe the
+    /// few hundred traces the ranker happened to touch, not the window.
+    async fn search_result(
         &self,
         ctx: &FunctionCallContext,
         params: &SearchParams,
         tenant: Option<&str>,
-    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
+        aggregate: Option<AggregateRequest>,
+    ) -> netdata_plugin_error::Result<SearchResult> {
         let client_err =
             |e: String| handler_err(format!("invalid otel-traces request: {e}"));
 
@@ -260,54 +293,194 @@ impl OtelTracesHandler {
             after: completion_range.start,
             before: completion_range.end,
         };
+        // The aggregate's geometry and window: the grid's, snapped
+        // outward to wall-clock bucket multiples — NOT the page's
+        // slack-widened range. Its sources are captured by that window
+        // alone, so the section reports exactly what the standalone
+        // `overview` mode reports for the same window.
+        let aggregate_grid = aggregate.as_ref().map(|_| {
+            super::super::grid::grid_for_window_s(window.capture.start, window.capture.end)
+        });
+
         let tenant = TenantId::resolve_query(tenant);
+        // ONE capture for every pass: the two search roles over the
+        // completion range, the aggregate over the grid's. One snapshot
+        // means one `valid_up_to`, so the page and the section can never
+        // describe two different corpora.
+        let mut ranges = vec![completion_range.clone(), completion_range];
+        if let Some((_, aligned_after, aligned_before)) = aggregate_grid {
+            ranges.push(aligned_after..aligned_before);
+        }
         let mut sets = self
             .supplier
-            .capture(&tenant, completion_range, 2, &ctx.cancellation)
+            .capture_ranges(&tenant, &ranges, &ctx.cancellation)
             .await;
+        let aggregate_sources = match aggregate_grid {
+            Some(_) => sets.pop().unwrap_or_default(),
+            None => Vec::new(),
+        };
         let completion = sets.pop().unwrap_or_default();
         let window_sources = sets.pop().unwrap_or_default();
 
-        ctx.progress.set_total(completion.len());
+        // Two passes, two source sets: the progress total is their sum
+        // (the logs handler's arithmetic for its own two passes).
+        ctx.progress
+            .set_total(completion.len() + aggregate_sources.len());
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
+        let (aggregate_facets, aggregate_predicate) = aggregate
+            .map(|a| (a.facets, a.predicate))
+            .unwrap_or((false, None));
+        // The flag is set from what runs, never from what was asked.
+        let aggregate_scope = if aggregate_predicate.is_some() {
+            OVERVIEW_SCOPE_SELECTION
+        } else {
+            OVERVIEW_SCOPE_WINDOW
+        };
+        let aggregate_query = aggregate_grid.map(|(grid, ..)| {
+            let query = OverviewQuery::new(grid).root_facets(aggregate_facets);
+            match aggregate_predicate {
+                Some(predicate) => query.predicate(predicate),
+                None => query,
+            }
+        });
 
-        let data = match tokio::task::spawn_blocking(move || {
-            search(
+        // Both engine calls are pure-sync and expect to run off the
+        // runtime thread, so one blocking task covers the pair — and a
+        // cancellation between them cannot pair mismatched snapshots.
+        let joined = tokio::task::spawn_blocking(move || {
+            let page = search(
                 SearchSources {
                     window: window_sources,
                     completion,
                 },
                 query,
-                cancel,
-                done,
-            )
+                cancel.clone(),
+                Arc::clone(&done),
+            );
+            let section = aggregate_query.map(|q| overview(aggregate_sources, q, cancel, done));
+            (page, section)
         })
-        .await
-        {
-            Ok(Ok(data)) => data,
-            // These two are structurally impossible from one capture —
-            // an occurrence means the supplier broke its contract.
-            Ok(Err(e @ SearchRequestError::SourceSet(_)))
-            | Ok(Err(e @ SearchRequestError::WindowNotInCompletion(_))) => {
-                return Err(handler_err(format!(
-                    "otel-traces internal error: captured source set is inconsistent: {e}"
-                )));
-            }
-            Ok(Err(e)) => return Err(client_err(e.to_string())),
+        .await;
+        let (page, section) = match joined {
+            Ok(both) => both,
             Err(e) => {
                 return Err(handler_err(format!("otel-traces search task failed: {e}")));
             }
         };
 
-        let result: SearchResult = to_search_result(
+        let data = match page {
+            Ok(data) => data,
+            // These two are structurally impossible from one capture —
+            // an occurrence means the supplier broke its contract.
+            Err(e @ SearchRequestError::SourceSet(_))
+            | Err(e @ SearchRequestError::WindowNotInCompletion(_)) => {
+                return Err(handler_err(format!(
+                    "otel-traces internal error: captured source set is inconsistent: {e}"
+                )));
+            }
+            Err(e) => return Err(client_err(e.to_string())),
+        };
+
+        let mut result: SearchResult = to_search_result(
             data,
             params.limit,
             cursor.as_ref(),
             (window.capture.start, window.capture.end),
             completion_coverage,
         );
-        Ok(OtelTracesResponse::Search(Box::new(result)))
+        if let (Some(section), Some((grid, aligned_after, aligned_before))) =
+            (section, aggregate_grid)
+        {
+            let section = match section {
+                Ok(section) => section,
+                Err(OverviewRequestError::SourceSet(e)) => {
+                    return Err(handler_err(format!(
+                        "otel-traces internal error: captured source set is inconsistent: {e}"
+                    )));
+                }
+                Err(e) => return Err(client_err(e.to_string())),
+            };
+            result.overview = Some(to_overview_section(
+                section,
+                grid,
+                CoverageWire {
+                    after: aligned_after,
+                    before: aligned_before,
+                },
+                aggregate_scope,
+            ));
+        }
+        Ok(result)
+    }
+
+    async fn search(
+        &self,
+        ctx: &FunctionCallContext,
+        params: &SearchParams,
+        tenant: Option<&str>,
+    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
+        // The native mode keeps its own contract: no embedded section.
+        Ok(OtelTracesResponse::Search(Box::new(
+            self.search_result(ctx, params, tenant, None).await?,
+        )))
+    }
+
+    /// The Functions view: the search page plus the full-window
+    /// aggregate, in one request. Nothing else composes both — and only
+    /// a FIRST page does, since an anchor page's aggregate would repeat
+    /// the first page's (the anchor gate below).
+    async fn functions(
+        &self,
+        ctx: &FunctionCallContext,
+        params: &FunctionsParams,
+        tenant: Option<&str>,
+    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
+        let search_params = params
+            .search_params(unix_now_s())
+            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
+        // The heatmap's predicate: the page's selections and NOTHING
+        // else. The duration bounds stay off the grid by design (duration
+        // is the grid's own axis — applying a cell click's band would
+        // blank every other row), and a trace-level word (`root_name`,
+        // `root_service_name`, `trace_duration`, `trace_id`) cannot be
+        // answered from stored rows, so the grid falls back to the plain
+        // window and SAYS so through `scope` rather than guess. The
+        // engine owns that word list (`trace_level_target`).
+        let heatmap_predicate = heatmap_predicate(&params.selections)
+            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?
+            .filter(|p| p.trace_level_target().is_none());
+        // The anchor gate. An anchor page reruns the same query — same
+        // selections — over the cursor's FROZEN window, so the section it
+        // would compose is the one the first page already delivered,
+        // byte for byte. Only the rows advance. Composing it again would
+        // spend a second full-window engine pass per page of a walk, so
+        // it is skipped and the section is simply ABSENT: consumers
+        // detect it by presence (a `null` was never on the wire), and the
+        // window can only change on a request that carries no anchor (an
+        // anchor page IGNORES the request's own bounds), which composes
+        // it afresh.
+        //
+        // The scope gate. The root-facet lists stay suppressed while ANY
+        // page filter is active. For the duration bounds this is
+        // correctness: the grid never applies them, so lists over the
+        // unfiltered durations would contradict the page. For the
+        // selections it is a product choice (the lists would be exact,
+        // since the grid now applies them) kept for one uniform rule:
+        // facets describe the whole window or not at all. Gated before
+        // the engine call, so the suppressed lists also cost nothing (the
+        // facets' price is the sealed sources' dictionary decodes).
+        let aggregate = params.anchor.is_none().then(|| AggregateRequest {
+            facets: params.overview_facets.unwrap_or(false)
+                && params.selections.is_empty()
+                && params.min_trace_duration_ns.is_none()
+                && params.max_trace_duration_ns.is_none(),
+            predicate: heatmap_predicate,
+        });
+        let data = self.search_result(ctx, &search_params, tenant, aggregate).await?;
+        Ok(OtelTracesResponse::Functions(Box::new(
+            FunctionsTracesResponse::new(data),
+        )))
     }
 
     /// Common setup for the windowed fold modes (enumeration, slowest):
@@ -451,7 +624,28 @@ impl OtelTracesHandler {
             resolve_window(params.after, params.before, now_s, None).map_err(client_err)?;
         let (grid, aligned_after, aligned_before) =
             super::super::grid::grid_for_window_s(window.capture.start, window.capture.end);
-        let query = OverviewQuery::new(grid).root_facets(params.facets.unwrap_or(false));
+        // Selections filter the grid as on the Functions view; unlike
+        // there, a trace-level word is a client error — this request has
+        // no list the word could legitimately be for.
+        let predicate = heatmap_predicate(&params.selections).map_err(client_err)?;
+        if let Some(PredicateTarget::Builtin(field)) =
+            predicate.as_ref().and_then(|p| p.trace_level_target())
+        {
+            return Err(client_err(format!(
+                "selection {:?} is a trace-level word; the overview grid applies span-level \
+                 selections only (the Functions view's list applies it beside its grid)",
+                builtin_word(*field)
+            )));
+        }
+        let scope = if predicate.is_some() {
+            OVERVIEW_SCOPE_SELECTION
+        } else {
+            OVERVIEW_SCOPE_WINDOW
+        };
+        let mut query = OverviewQuery::new(grid).root_facets(params.facets.unwrap_or(false));
+        if let Some(predicate) = predicate {
+            query = query.predicate(predicate);
+        }
 
         // Alignment can widen the window; prune files by the widened one.
         let tenant = TenantId::resolve_query(tenant);
@@ -467,7 +661,7 @@ impl OtelTracesHandler {
 
         match tokio::task::spawn_blocking(move || overview(sources, query, cancel, done)).await {
             Ok(Ok(data)) => Ok(OtelTracesResponse::Overview(Box::new(to_overview_result(
-                data, grid,
+                data, grid, scope,
             )))),
             Ok(Err(OverviewRequestError::SourceSet(e))) => Err(handler_err(format!(
                 "otel-traces internal error: captured source set is inconsistent: {e}"
@@ -546,6 +740,7 @@ impl FunctionHandler for OtelTracesHandler {
     ) -> netdata_plugin_error::Result<Self::Response> {
         let tenant = req.tenant.as_deref();
         match &req.mode {
+            TracesMode::Functions(params) => self.functions(&ctx, params, tenant).await,
             TracesMode::Info => Ok(OtelTracesResponse::Info(InfoResponse::default())),
             TracesMode::Trace(params) => self.trace(&ctx, params, tenant).await,
             TracesMode::Search(params) => self.search(&ctx, params, tenant).await,

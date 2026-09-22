@@ -199,21 +199,23 @@ jobs:
 
 ## Troubleshooting
 
-### Find the exact error
+### Other Problems
+
+#### Find the exact error
 
 Check the Netdata Agent logs when the collector starts or restarts. GCP resolver errors include messages such as `metadata token request returned HTTP 404`, `invalid project ID`, `invalid version`, or `reading service account file`.
 
 
-### Metadata mode does not work
+#### Metadata mode does not work
 
 `mode: metadata` requires the Google metadata server. If Netdata is not running in a supported Google Cloud environment, switch to `service_account_file`.
 
 
-### Service account file cannot be read
+#### Service account file cannot be read
 
 Check the file path, the JSON contents, and that the `netdata` user can read the file. Because the file contains a private key, keep its permissions as tight as possible.
 
 
-### Permission denied or secret not found
+#### Permission denied or secret not found
 
 Make sure the Google identity used by Netdata can access the referenced secret, and confirm that the operand uses the correct `project/secret` or `project/secret/version` format.

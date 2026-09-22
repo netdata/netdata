@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
@@ -19,12 +20,7 @@ type topologyDeviceSnapshot struct {
 	observation    topologymodel.ObservationSnapshot
 	hasObservation bool
 	trap           topologyTrapDeviceGeneration
-	acquisition    *topologyAcquisitionCapture
-}
-
-type topologyEvidenceRef struct {
-	registrationID ddsnmp.DeviceRegistrationID
-	generation     uint64
+	acquisition    *topologydiag.AcquisitionCapture
 }
 
 // topologyDeviceGeneration is an immutable collected snapshot activated at a
@@ -32,13 +28,13 @@ type topologyEvidenceRef struct {
 // published to runtime readers.
 type topologyDeviceGeneration struct {
 	registrationID ddsnmp.DeviceRegistrationID
-	evidenceRef    topologyEvidenceRef
+	evidenceRef    topologydiag.EvidenceRef
 	collectedAt    time.Time
 	expiresAt      time.Time
 	observation    topologymodel.ObservationSnapshot
 	hasObservation bool
 	trap           topologyTrapDeviceGeneration
-	acquisition    *topologyAcquisitionCapture
+	acquisition    *topologydiag.AcquisitionCapture
 }
 
 // topologyGeneration is the immutable device vector published after one
@@ -49,7 +45,7 @@ type topologyGeneration struct {
 	producerScopeID   string
 	devices           []*topologyDeviceGeneration
 	renderableDevices []*topologyDeviceGeneration
-	diagnostic        *topologySweepDiagnosticCut
+	diagnostic        *topologydiag.SweepCut
 }
 
 func freezeTopologyBuilder(builder *topologyBuilder) (*topologyDeviceSnapshot, topologyBuilderFinalizeStats) {
@@ -86,9 +82,9 @@ func activateTopologyDeviceSnapshot(
 	}
 	return &topologyDeviceGeneration{
 		registrationID: registrationID,
-		evidenceRef: topologyEvidenceRef{
-			registrationID: registrationID,
-			generation:     generation,
+		evidenceRef: topologydiag.EvidenceRef{
+			RegistrationID: registrationID,
+			Generation:     generation,
 		},
 		collectedAt:    snapshot.collectedAt,
 		expiresAt:      expiresAt,

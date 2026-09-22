@@ -16,8 +16,9 @@ licensing:
       impact:
         value: Smart Licensing registration state on the device
     state:
-      OID: 1.3.6.1.4.1.9.9.831.0.6.1.0
-      name: ciscoSlaRegistrationStatus
+      symbol:
+        OID: 1.3.6.1.4.1.9.9.831.0.6.1.0
+        name: ciscoSlaRegistrationStatus
       mapping:
         1: "1"
         2: "0"
@@ -40,8 +41,9 @@ licensing:
       impact:
         value: Overall Smart Licensing compliance or authorization state on the device
     state:
-      OID: 1.3.6.1.4.1.9.9.831.0.7.2.0
-      name: ciscoSlaAuthComplianceStatus
+      symbol:
+        OID: 1.3.6.1.4.1.9.9.831.0.7.2.0
+        name: ciscoSlaAuthComplianceStatus
       mapping:
         Authorized: "0"
         AUTHORIZED: "0"
@@ -66,8 +68,9 @@ licensing:
     signals:
       authorization:
         timestamp:
-          OID: 1.3.6.1.4.1.9.9.831.0.7.1.0
-          name: ciscoSlaAuthExpireTime
+          symbol:
+            OID: 1.3.6.1.4.1.9.9.831.0.7.1.0
+            name: ciscoSlaAuthExpireTime
 
   - MIB: CISCO-SMART-LIC-MIB
     id: smart_id_certificate
@@ -84,8 +87,9 @@ licensing:
     signals:
       certificate:
         timestamp:
-          OID: 1.3.6.1.4.1.9.9.831.0.6.3.0
-          name: ciscoSlaNextCertificateExpireTime
+          symbol:
+            OID: 1.3.6.1.4.1.9.9.831.0.6.3.0
+            name: ciscoSlaNextCertificateExpireTime
 
   - MIB: CISCO-SMART-LIC-MIB
     id: smart_evaluation_period
@@ -102,8 +106,9 @@ licensing:
     signals:
       grace:
         timestamp:
-          OID: 1.3.6.1.4.1.9.9.831.0.7.4.2.0
-          name: ciscoSlaAuthEvalExpiredTime
+          symbol:
+            OID: 1.3.6.1.4.1.9.9.831.0.7.4.2.0
+            name: ciscoSlaAuthEvalExpiredTime
 
   - MIB: CISCO-SMART-LIC-MIB
     id: smart_entitlements
@@ -112,25 +117,30 @@ licensing:
       name: ciscoSlaEntitlementInfoTable
     identity:
       id:
-        OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.3
-        name: ciscoSlaEntitlementTag
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.3
+          name: ciscoSlaEntitlementTag
       name:
-        OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.7
-        name: ciscoSlaEntitlementFeatureName
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.7
+          name: ciscoSlaEntitlementFeatureName
       feature:
-        OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.4
-        name: ciscoSlaEntitlementVersion
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.4
+          name: ciscoSlaEntitlementVersion
       component:
         value: smart_licensing
     descriptors:
       type:
         value: entitlement
       impact:
-        OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.6
-        name: ciscoSlaEntitlementDescription
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.6
+          name: ciscoSlaEntitlementDescription
     state:
-      OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.5
-      name: ciscoSlaEntitlementEnforceMode
+      symbol:
+        OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.5
+        name: ciscoSlaEntitlementEnforceMode
       mapping:
         1: "1"
         2: "1"
@@ -151,5 +161,6 @@ licensing:
     signals:
       usage:
         used:
-          OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.2
-          name: ciscoSlaEntitlementRequestCount
+          symbol:
+            OID: 1.3.6.1.4.1.9.9.831.0.5.1.1.2
+            name: ciscoSlaEntitlementRequestCount

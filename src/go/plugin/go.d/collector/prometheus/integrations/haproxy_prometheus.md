@@ -170,7 +170,7 @@ fallback_type:
 A list of job-owned relabeling blocks, applied after `selector` and before profile selection. Each block
 applies a list of Prometheus `metric_relabel_configs` rules to the metrics whose name matches `match`.
 Profiles may own the same block format for exporter normalization after selection. See the
-[relabeling reference](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/relabel/README.md) for
+[relabeling reference](https://github.com/netdata/netdata/blob/master/src/go/pkg/relabel/README.md) for
 the full action set and more examples.
 
 - `match`: Netdata simple patterns matched against the full metric name — including any
@@ -574,7 +574,9 @@ Curated process, frontend, listener, backend, server, and stick-table metrics fr
 
 ## Troubleshooting
 
-### Debug Mode
+### Diagnostics
+
+#### Debug Mode
 
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
@@ -606,14 +608,14 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m prometheus -j jobName
   ```
 
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `prometheus` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -621,7 +623,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep prometheus
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -631,7 +633,7 @@ grep prometheus /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 
@@ -639,7 +641,9 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep prometheus
 ```
 
-### Disappearing or sparse metrics not clearing alerts
+### Other Problems
+
+#### Disappearing or sparse metrics not clearing alerts
 
 The Prometheus collector detects metrics that disappear from a successful scrape response. Generated charts
 and individual dimensions expire after their configured successful-cycle lifetime. An expired chart or

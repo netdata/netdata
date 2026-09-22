@@ -13,6 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	snmptraps "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps"
@@ -24,6 +25,7 @@ import (
 var serviceModulePattern = regexp.MustCompile(`(?m)^\s*(?:-\s*)?module:\s*([A-Za-z0-9_.-]+)\s*$`)
 
 func TestStockServiceDiscoveryRulesTargetRegisteredCollectors(t *testing.T) {
+	registry, _ := NewRegistry(t.TempDir())
 	files, err := filepath.Glob("../config/go.d/sd/*.conf")
 	require.NoError(t, err)
 	require.NotEmpty(t, files)
@@ -50,17 +52,38 @@ func TestStockServiceDiscoveryRulesTargetRegisteredCollectors(t *testing.T) {
 				modules = [][]string{{"", rule.ID}}
 			}
 			for _, match := range modules {
-				_, ok := collectorapi.DefaultRegistry.Lookup(match[1])
+				_, ok := registry.Lookup(match[1])
 				assert.Truef(t, ok, "%s service rule %q targets unregistered collector %q", filepath.Base(file), rule.ID, match[1])
 			}
 		}
 	}
 }
 
+func TestRedfishRegistration(t *testing.T) {
+	registry, _ := NewRegistry(t.TempDir())
+	creator := requireCreator(t, registry, "redfish")
+	assert.NotContains(t, registry, "redfish_logs")
+	assert.Nil(t, creator.Create)
+	require.NotNil(t, creator.CreateV2)
+	require.NotNil(t, creator.Config)
+	assert.Nil(t, creator.AgentFunctions)
+	assert.NotNil(t, creator.SharedFunctions)
+	assert.NotNil(t, creator.MethodHandler)
+	assert.Equal(t, 60, creator.Defaults.UpdateEvery)
+	first, ok := creator.CreateV2().(*redfish.Collector)
+	require.True(t, ok)
+	second, ok := creator.CreateV2().(*redfish.Collector)
+	require.True(t, ok)
+	assert.NotSame(t, first, second)
+	assert.NotSame(t, first.MetricStore(), second.MetricStore())
+}
+
 func TestSNMPFamilyRegistrationUsesSharedDependencies(t *testing.T) {
-	snmpCreator := requireCreator(t, "snmp")
-	topologyCreator := requireCreator(t, "snmp_topology")
-	trapsCreator := requireCreator(t, "snmp_traps")
+	registry, publisher := NewRegistry(t.TempDir())
+	require.NotNil(t, publisher)
+	snmpCreator := requireCreator(t, registry, "snmp")
+	topologyCreator := requireCreator(t, registry, "snmp_topology")
+	trapsCreator := requireCreator(t, registry, "snmp_traps")
 
 	assert.NotNil(t, snmpCreator.Create)
 	assert.Nil(t, snmpCreator.CreateV2)
@@ -109,9 +132,9 @@ func TestSNMPFamilyRegistrationUsesSharedDependencies(t *testing.T) {
 	assert.Equal(t, 5*time.Minute, negativeTTL)
 }
 
-func requireCreator(t *testing.T, module string) collectorapi.Creator {
+func requireCreator(t *testing.T, registry collectorapi.Registry, module string) collectorapi.Creator {
 	t.Helper()
-	creator, ok := collectorapi.DefaultRegistry.Lookup(module)
+	creator, ok := registry.Lookup(module)
 	require.True(t, ok, "collector %q is not registered", module)
 	return creator
 }

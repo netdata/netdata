@@ -884,6 +884,13 @@ static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim,
         dim->has_received_downstream_model = true;
 
     if (dim->km_contexts.size() < Cfg.num_models_to_use) {
+        // First install: reserve exactly the final capacity, so a dimension
+        // that never gets a model never pays for the model array, and one that
+        // does still allocates only once (push_back growth would otherwise
+        // realloc its way up to 32 slots).
+        if (dim->km_contexts.empty())
+            dim->km_contexts.reserve(Cfg.num_models_to_use);
+
         dim->km_contexts.emplace_back(dim->kmeans);
     } else {
         bool can_drop_middle_km = false;
@@ -1406,11 +1413,8 @@ void ml_detect_main(void *arg)
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
 
-    // Single onewayalloc arena reused across every host and loop iteration
-    // for the whole detect thread lifetime — one mmap/munmap pair instead
-    // of one per host per second. The arena is reset between hosts inside
-    // ml_update_host_and_detection_rate_charts, so peak memory stays bounded
-    // by a single host's anomaly-rate query scratch.
+    // Reuse query scratch across hosts and iterations. Reset between hosts
+    // retains the arena's high-water capacity until this detector stops.
     ONEWAYALLOC *detect_owa = onewayalloc_create(0);
 
     while (!Cfg.detection_stop && service_running(SERVICE_COLLECTORS)) {

@@ -292,7 +292,11 @@ enrichment:
 
 
 
-### Endpoint requires pagination
+## Troubleshooting
+
+### Other Problems
+
+#### Endpoint requires pagination
 
 The plugin does not paginate. Either raise the page size in the URL to
 cover your full inventory, or wrap the endpoint with a server-side
@@ -300,7 +304,7 @@ aggregator that returns all results at one URL. There is no built-in
 `Link: rel=next` follower.
 
 
-### POST endpoint requires a request body
+#### POST endpoint requires a request body
 
 The plugin's POST request is sent with no body. If your CMDB requires a
 JSON query body to return prefixes, wrap it server-side with an endpoint
@@ -308,7 +312,7 @@ that accepts GET (or accepts POST with no body) and returns the full prefix
 set.
 
 
-### TLS verification cannot be disabled
+#### TLS verification cannot be disabled
 
 `tls.verify: false` and `tls.skip_verify: true` are both rejected during
 configuration validation. Use `tls.ca_file` to trust internal CAs. This is
@@ -317,7 +321,7 @@ investigations and capacity decisions, where silently accepting MITM-able
 responses would corrupt every downstream analysis.
 
 
-### Empty result back-off
+#### Empty result back-off
 
 An empty stream from the jq transform is treated as a fetch failure.
 The source then backs
@@ -328,7 +332,7 @@ IPAM legitimately has no prefixes (a quiet state), have the upstream
 return at least one synthetic prefix so the source does not back off.
 
 
-### Refresh appears slower than configured
+#### Refresh appears slower than configured
 
 The fetch loop floors the configured `interval` at 60 seconds. Configuring
 `interval: 5s` does not produce a 5-second loop -- it produces a 60-second
@@ -336,7 +340,7 @@ loop. Pick a value at or above 60s that matches how often your IPAM
 actually changes (5-15 minutes is typical for a curated CMDB).
 
 
-### Unknown config keys cause errors
+#### Unknown config keys cause errors
 
 The config struct uses `deny_unknown_fields`. Typos like `headres:` or a
 non-existent option fail config load with a parse error rather than being
@@ -344,7 +348,7 @@ silently ignored. Check the `enrichment.network_sources.<name>` schema
 listed under "Config options".
 
 
-### JSON parse errors are silent in the dashboard
+#### JSON parse errors are silent in the dashboard
 
 Decode failures (HTTP error, JSON parse error, jq runtime error, schema
 mismatch on `prefix`) are logged but do not surface in the dashboard.
@@ -352,7 +356,7 @@ Watch the Netdata journal for warnings:
 `journalctl --namespace netdata | grep network_sources`.
 
 
-### Prefer explicit authorization headers over URL credentials
+#### Prefer explicit authorization headers over URL credentials
 
 URLs with embedded credentials (`https://user:pass@host`) are converted to
 HTTP Basic authentication by the HTTP client. Prefer `headers:` for clarity

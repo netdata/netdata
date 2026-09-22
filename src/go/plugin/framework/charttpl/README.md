@@ -1211,7 +1211,11 @@ All rules below produce semantic validation errors unless noted:
 ## Programmatic API
 
 > [!NOTE]
-> Most collectors ship a static `charts.yaml` and never touch the Go API. This section is for collectors that **build a chart template at runtime** — for example from discovery results or selected profiles — and return it from `CollectorV2.ChartTemplateYAML()`.
+> Most collectors ship a static `charts.yaml` and never touch the Go API. This section is for collectors that **build a chart template at runtime** — for example from discovery results or selected profiles — and return it from `StaticChartTemplateProvider.ChartTemplateYAML()`.
+
+For changing active membership, use native `chartengine.NewTemplateSet` and
+`collectorapi.ChartTemplateSetProvider`; see [named active sets](/src/go/plugin/framework/chartengine/README.md#named-active-template-sets).
+Static document composition remains supported through the API below.
 
 The package exposes a small Go surface for decoding, cloning, and re-emitting templates:
 
@@ -1219,12 +1223,13 @@ The package exposes a small Go surface for decoding, cloning, and re-emitting te
 |----------------------------------------------------|-------------------------------------------------------------------------------------------------|
 | `DecodeYAML([]byte) (*Spec, error)`                | Strict parse, apply decode-time defaults, then validate. The canonical read path.               |
 | `DecodeYAMLValidated([]byte) (*Spec, Validation, error)` | Decode plus immutable derived validation artifacts for runtime consumers such as chartengine. |
+| `NormalizeGroups([]Group) ([]Group, error)` | Return owned, default-applied, validated native groups without serialization. |
 | `Group.Clone() Group`                              | Typed deep copy of a group and everything nested under it.                                      |
 | `Spec.MarshalTemplate() (string, error)`           | Validate (only) and serialize a runtime-built template to YAML.                                 |
 
-### Building a template at runtime
+### Building a static document at runtime
 
-`CollectorV2.ChartTemplateYAML()` returns a plain `string`, so build the template where the error can be handled — typically once during `Init` — and cache the result; `ChartTemplateYAML()` then returns the cached string. Assemble a `Spec` from `charttpl` types and serialize it with `MarshalTemplate`:
+`StaticChartTemplateProvider.ChartTemplateYAML()` returns a plain `string`, so build the template where the error can be handled — typically once during `Init` — and cache the result; `ChartTemplateYAML()` then returns the cached string. Assemble a `Spec` from `charttpl` types and serialize it with `MarshalTemplate`:
 
 ```go
 func buildChartTemplate(groups []charttpl.Group) (string, error) {

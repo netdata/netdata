@@ -18,6 +18,7 @@ const pluginPrimaryConfigFile = "ebpf.d.conf"
 type pluginConfigFile struct {
 	Cachestat                 *bool // [ebpf programs] cachestat key
 	Dcstat                    *bool // [ebpf programs] dcstat key
+	Fd                        *bool // [ebpf programs] fd key
 	Socket                    *bool // [ebpf programs] socket key
 	DNS                       *bool // [ebpf programs] dns key
 	UpdateEvery               *int
@@ -30,9 +31,15 @@ type pluginConfigFile struct {
 	BTFPath                   *string
 	Lifetime                  *int
 	ObjectFlavor              *string
+	objectFlavorExplicit      bool
+	LoadMethod                *LoadMethod
 	CollectPidLevel           *int  // "collect pid" key → BPF apps collection level (0=real parent, 1=parent, 2=all)
 	PerQueryTracking          *bool // "per query tracking" key → DNS per-query flow capture
 	FlowTTL                   *int  // "flow ttl" key → DNS flow record lifetime in seconds (dns.conf only)
+	// LoadModeReturn is `ebpf load mode = return|dev` (true) vs `entry` (false).
+	// Only modules with error-reporting charts consume it (fd); for the others the
+	// key stays a warned-about no-op.
+	LoadModeReturn *bool
 }
 
 // loadPluginConfigFiles loads the plugin-wide ebpf.d.conf from stock then
@@ -48,7 +55,7 @@ func loadPluginConfigFiles() (pluginConfigFile, bool, error) {
 		filepath.Join(stockRoot, pluginPrimaryConfigFile),
 		filepath.Join(userRoot, pluginPrimaryConfigFile),
 	} {
-		cfg, ok, err := parsePluginConfigFile(path, false)
+		cfg, ok, err := parsePluginConfigFile(path)
 		if err != nil {
 			return pluginConfigFile{}, false, err
 		}
@@ -72,21 +79,13 @@ func loadCollectorConfigFiles(legacyFile string) (pluginConfigFile, bool, error)
 
 	var merged pluginConfigFile
 	found := false
-	// `ebpf load mode = return` is warned about for every module except dcstat.
-	// The C dcstat module always attached both a kprobe and a kretprobe, so
-	// `return` was a no-op there rather than a request for behaviour this port
-	// dropped; warning about it would flag a config that was always redundant.
-	// The exemption is keyed on the module's own overlay file, but the [global]
-	// section of ebpf.d.conf is parsed under the same call, so a global `return`
-	// is also silent while dcstat is the module being loaded.
-	allowReturnLoadMode := legacyFile == dcstatLegacyConfigFile
 	for _, path := range []string{
 		filepath.Join(stockRoot, pluginPrimaryConfigFile),
 		filepath.Join(stockRoot, legacyFile),
 		filepath.Join(userRoot, pluginPrimaryConfigFile),
 		filepath.Join(userRoot, legacyFile),
 	} {
-		cfg, ok, err := parsePluginConfigFile(path, allowReturnLoadMode)
+		cfg, ok, err := parsePluginConfigFile(path)
 		if err != nil {
 			return pluginConfigFile{}, false, err
 		}
@@ -114,7 +113,7 @@ func pluginConfigRoots() (userRoot, stockRoot string) {
 	return userRoot, stockRoot
 }
 
-func parsePluginConfigFile(path string, allowReturnLoadMode bool) (pluginConfigFile, bool, error) {
+func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -165,6 +164,14 @@ func parsePluginConfigFile(path string, allowReturnLoadMode bool) (pluginConfigF
 					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid dcstat %q, using default\n", path, value)
 				} else {
 					cfg.Dcstat = new(b)
+				}
+				found = true
+			case "fd":
+				b, ok := parseConfigBool(value)
+				if !ok {
+					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid fd %q, using default\n", path, value)
+				} else {
+					cfg.Fd = new(b)
 				}
 				found = true
 			case "socket":
@@ -272,29 +279,59 @@ func parsePluginConfigFile(path string, allowReturnLoadMode bool) (pluginConfigF
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized ebpf object flavor %q, using default\n", path, value)
 			} else {
 				cfg.ObjectFlavor = new(flavor)
+				cfg.objectFlavorExplicit = true
 			}
 			found = true
 		case "ebpf load mode":
+			// `return` is only meaningful for a module that has error charts, which
+			// today means fd alone (see collectorCommonConfig.ReturnMode); for every
+			// other module it selects nothing, exactly as in the C plugin where they
+			// had no error charts either.  It is therefore NOT warned about: the
+			// [global] section of ebpf.d.conf is parsed once per module, so a warning
+			// here would fire several times for one setting and name the wrong
+			// module every time.
+			//
+			// The C plugin's ebpf_select_mode() accepted `return` and its legacy
+			// `dev` alias as the two non-entry modes. Preserve that contract: fd
+			// exposes error charts in both modes.
 			switch strings.ToLower(strings.TrimSpace(value)) {
 			case "entry":
-			case "return":
-				if !allowReturnLoadMode {
-					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: ebpf load mode %q is unsupported and ignored\n", path, value)
-				}
+				cfg.LoadModeReturn = new(false)
+			case "return", "dev":
+				cfg.LoadModeReturn = new(true)
 			default:
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized ebpf load mode %q, using default\n", path, value)
 			}
 			found = true
 		case "ebpf type format":
-			// Legacy key from the old ebpf.plugin; maps to ebpf object flavor.
-			// "legacy" forces the kprobe-based tracing path; "co-re" and "auto"
-			// are explicit no-ops (leave flavor to auto-detection).  Any other
-			// value is unrecognized — warn so the operator can correct a typo.
+			// Legacy key from the old ebpf.plugin. An explicit type format selects
+			// the load method and takes precedence over ebpf object flavor.
 			switch strings.ToLower(value) {
 			case "legacy":
+				cfg.LoadMethod = new(LoadLegacy)
 				cfg.ObjectFlavor = new("tracing")
 			case "co-re", "auto":
-				// no-op: these are the documented default choices
+				// Both mean "let auto-detection choose the object", so they must
+				// also RETRACT a legacy marker merged from an earlier config layer.
+				// Clearing LoadMethod alone is not enough: apply() merges each
+				// field independently, so a stale ObjectFlavor of "tracing" would
+				// survive and still force the base object, leaving the override
+				// unable to restore the normal family.  The empty string is the
+				// reset: applyCommonCollectorConfig skips a blank flavor, so the
+				// collector default applies.
+				// Keep an explicit flavor from this same file. A blank is only a
+				// layer-level retraction for a legacy marker supplied by an earlier
+				// file; otherwise `object flavor = arena` followed by `type format =
+				// auto` would silently revert to the collector default.
+				if !cfg.objectFlavorExplicit {
+					cfg.ObjectFlavor = new("")
+				}
+				if strings.EqualFold(value, "co-re") {
+					cfg.LoadMethod = new(LoadCore)
+				} else {
+					// LoadPlayDice means auto-detection in this config layer.
+					cfg.LoadMethod = new(LoadPlayDice)
+				}
 			default:
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized ebpf type format %q, using default\n", path, value)
 			}
@@ -356,6 +393,9 @@ func (c *pluginConfigFile) apply(other pluginConfigFile) {
 	if other.Dcstat != nil {
 		c.Dcstat = other.Dcstat
 	}
+	if other.Fd != nil {
+		c.Fd = other.Fd
+	}
 	if other.Socket != nil {
 		c.Socket = other.Socket
 	}
@@ -390,7 +430,13 @@ func (c *pluginConfigFile) apply(other pluginConfigFile) {
 		c.Lifetime = other.Lifetime
 	}
 	if other.ObjectFlavor != nil {
-		c.ObjectFlavor = other.ObjectFlavor
+		if *other.ObjectFlavor != "" || !c.objectFlavorExplicit {
+			c.ObjectFlavor = other.ObjectFlavor
+		}
+		c.objectFlavorExplicit = c.objectFlavorExplicit || other.objectFlavorExplicit
+	}
+	if other.LoadMethod != nil {
+		c.LoadMethod = other.LoadMethod
 	}
 	if other.CollectPidLevel != nil {
 		c.CollectPidLevel = other.CollectPidLevel
@@ -400,6 +446,9 @@ func (c *pluginConfigFile) apply(other pluginConfigFile) {
 	}
 	if other.FlowTTL != nil {
 		c.FlowTTL = other.FlowTTL
+	}
+	if other.LoadModeReturn != nil {
+		c.LoadModeReturn = other.LoadModeReturn
 	}
 }
 

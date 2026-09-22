@@ -16,9 +16,7 @@ func newTopologyBuilder() *topologyBuilder {
 		cdpRemotes:         make(map[string]*cdpRemote),
 		ifNamesByIndex:     make(map[string]string),
 		ifStatusByIndex:    make(map[string]ifStatus),
-		ifIndexByIP:        make(map[string]string),
-		ifNetmaskByIP:      make(map[string]string),
-		l3InterfacesByIP:   make(map[string]topologymodel.L3Interface),
+		ipAddressesByIP:    make(map[string]resolvedIPAddress),
 		bridgePortToIf:     make(map[string]string),
 		fdbEntries:         make(map[string]*fdbEntry),
 		vlanByFDBID:        make(map[string]fdbVLANMapping),
@@ -53,7 +51,8 @@ func (c *topologyBuilder) finalize() topologyBuilderFinalizeStats {
 		return topologyBuilderFinalizeStats{}
 	}
 
-	finalizeLocalManagementAddresses(&c.localDevice, c.targetManagementIPs, c.ifNetmaskByIP)
+	c.finalizeIPAddresses()
+	finalizeLocalManagementAddressesWithLookup(&c.localDevice, c.targetManagementIPs, c.ipNetmask)
 	c.localManagementAddressKeys = nil
 	c.rebuildTrapSourceMatchMethods()
 	c.finalizeFDBVLANs()
@@ -71,8 +70,8 @@ func (c *topologyBuilder) finalize() topologyBuilderFinalizeStats {
 }
 
 func (c *topologyBuilder) rebuildTrapSourceMatchMethods() {
-	methods := make(map[string]string, len(c.ifIndexByIP)+len(c.localDevice.ManagementAddresses)+1)
-	for value := range c.ifIndexByIP {
+	methods := make(map[string]string, len(c.ipAddressesByIP)+len(c.localDevice.ManagementAddresses)+1)
+	for value := range c.ipAddressesByIP {
 		if addr, ok := topologyutil.ParseIPAddress(value); ok {
 			methods[addr.String()] = "local_interface_ip"
 		}

@@ -10,30 +10,32 @@ import (
 	"net/url"
 	"slices"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 const precision = 1000
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	if err := c.collectSystemEvents(mx); err != nil {
+	if err := c.collectSystemEvents(ctx, mx); err != nil {
 		return nil, err
 	}
-	if err := c.collectSystemMetrics(mx); err != nil {
+	if err := c.collectSystemMetrics(ctx, mx); err != nil {
 		return nil, err
 	}
-	if err := c.collectSystemAsyncMetrics(mx); err != nil {
+	if err := c.collectSystemAsyncMetrics(ctx, mx); err != nil {
 		return nil, err
 	}
-	if err := c.collectSystemParts(mx); err != nil {
+	if err := c.collectSystemParts(ctx, mx); err != nil {
 		return nil, err
 	}
-	if err := c.collectSystemDisks(mx); err != nil {
+	if err := c.collectSystemDisks(ctx, mx); err != nil {
 		return nil, err
 	}
-	if err := c.collectLongestRunningQueryTime(mx); err != nil {
+	if err := c.collectLongestRunningQueryTime(ctx, mx); err != nil {
 		return nil, err
 	}
 

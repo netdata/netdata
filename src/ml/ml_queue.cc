@@ -20,7 +20,7 @@ void ml_queue_destroy(ml_queue_t *q)
     delete q;
 }
 
-void ml_queue_push(ml_queue_t *q, const ml_queue_item_t req)
+void ml_queue_push(ml_queue_t *q, const ml_queue_item_t &req)
 {
     netdata_mutex_lock(&q->mutex);
 
