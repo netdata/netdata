@@ -527,95 +527,12 @@ impl TenantRegistries {
         (sfsts, wals)
     }
 
-    /// Parse `tenant`'s in-window catalog entries once (pass a time-only query —
-    /// empty `partition_keys` — so it yields every stream's in-window entries). The
-    /// handler shares the result between the selector and the remote fetch to avoid
-    /// a second parse under the read lock. An unknown tenant yields empty.
-    pub fn catalog_entries_in_window(
-        &self,
-        tenant: &TenantId,
-        q: &file_registry::Query,
-    ) -> Vec<otel_catalog::CatalogEntry> {
+    /// The in-memory half of `tenant`'s stream selector over `q`'s window; see
+    /// [`Registry::local_streams`]. An unknown tenant has no local streams.
+    pub fn local_streams(&self, tenant: &TenantId, q: &file_registry::Query) -> LocalStreams {
         self.tenants
             .get(tenant)
-            .map(|r| r.catalog_files.candidates(q).collect())
-            .unwrap_or_default()
-    }
-
-    /// Seqs in `q`'s window with a servable local copy — the mask that hides a
-    /// remote catalog entry already served locally. See
-    /// [`Registry::local_servable_seqs`]. An unknown tenant yields empty.
-    pub fn local_servable_seqs(
-        &self,
-        tenant: &TenantId,
-        q: &file_registry::Query,
-    ) -> HashSet<SeqKey> {
-        self.tenants
-            .get(tenant)
-            .map(|r| r.local_servable_seqs(q))
-            .unwrap_or_default()
-    }
-
-    /// Window-scoped, remote-inclusive selector stats from a pre-parsed `catalog`
-    /// (the 3b shared-parse path). See [`Registry::enumerate_streams_from`]. An
-    /// unknown tenant yields empty.
-    pub fn enumerate_streams_from(
-        &self,
-        tenant: &TenantId,
-        q: &file_registry::Query,
-        catalog: &[otel_catalog::CatalogEntry],
-    ) -> Vec<PartitionStat> {
-        self.tenants
-            .get(tenant)
-            .map(|r| r.enumerate_streams_from(q, catalog))
-            .unwrap_or_default()
-    }
-
-    /// Remote-only catalog entries for `tenant`/`q` from a pre-parsed `catalog` +
-    /// `local_seqs` (the 3b shared-parse path). See
-    /// [`Registry::remote_candidates_from`]. An unknown tenant yields empty.
-    pub fn remote_candidates_from(
-        &self,
-        tenant: &TenantId,
-        q: &file_registry::Query,
-        catalog: &[otel_catalog::CatalogEntry],
-        local_seqs: &HashSet<SeqKey>,
-    ) -> Vec<otel_catalog::CatalogEntry> {
-        self.tenants
-            .get(tenant)
-            .map(|r| r.remote_candidates_from(q, catalog, local_seqs))
-            .unwrap_or_default()
-    }
-
-    /// Window-scoped, remote-inclusive stream selector list for `tenant`: every
-    /// stream with data in `q`'s window — local files plus remote-only
-    /// (evicted-but-cataloged) streams — so a stream with no in-window data is
-    /// omitted. Only `q.time_range` matters (the stream filter is ignored — the
-    /// selector lists all streams, independent of the user's current pick).
-    /// Self-parsing convenience over [`Self::enumerate_streams_from`] (the handler
-    /// shares one catalog parse via the `_from` variant). Deduped by `part_key`,
-    /// SFST-wins over WAL over remote per seq; sorted by `part_key`. The signal's
-    /// query layer decodes each `content_meta` and re-sorts for display.
-    /// Unknown tenant ⇒ empty.
-    pub fn enumerate_streams(
-        &self,
-        tenant: &TenantId,
-        q: &file_registry::Query,
-    ) -> Vec<PartitionStat> {
-        // Time-only: parse the catalog across all streams (the stream filter is the
-        // selector's output, not its input). `enumerate_streams_from` likewise forces
-        // the filter empty for its local fold.
-        let stream_q = file_registry::Query {
-            time_range: q.time_range.clone(),
-            partition_keys: Vec::new(),
-        };
-        self.tenants
-            .get(tenant)
-            .map(|r| {
-                let catalog: Vec<otel_catalog::CatalogEntry> =
-                    r.catalog_files.candidates(&stream_q).collect();
-                r.enumerate_streams_from(&stream_q, &catalog)
-            })
+            .map(|r| r.local_streams(q))
             .unwrap_or_default()
     }
 }
@@ -624,10 +541,10 @@ impl Registry {
     /// Seqs in `q`'s window with a servable local copy: every local SFST, plus
     /// every WAL with a durable prefix (`valid_up_to != 0`) — the same servable
     /// set [`TenantRegistries::query_snapshot`] builds. This is the mask that
-    /// hides a remote catalog entry whose data is already local. Safe to compute
-    /// time-only and reuse for the remote fetch (one seq → one stream; see
-    /// [`Registry::remote_candidates_from`]). Keyed by [`SeqKey`] so the mask
-    /// hides a remote entry only when THIS identity holds the local copy — a
+    /// hides a remote catalog entry whose data is already local; a remote plan
+    /// computes it per range ([`Registry::remote_plan_input`]). Keyed by
+    /// [`SeqKey`] so the mask hides a remote entry only when THIS identity holds
+    /// the local copy — a
     /// remote entry of a prior instance / other machine at an equal seq is not
     /// masked by a current-identity local file.
     pub fn local_servable_seqs(&self, q: &file_registry::Query) -> HashSet<SeqKey> {
@@ -643,42 +560,22 @@ impl Registry {
             .collect()
     }
 
-    /// Window-scoped per-partition selector stats: folds the in-window local SFST/WAL
-    /// candidates and the pre-parsed in-window `catalog` (remote-only partitions),
-    /// keyed on `part_key`. SFST-wins over WAL over catalog per seq; sorted by
-    /// `part_key` (the signal's query layer decodes `content_meta` and re-sorts for
-    /// display). Dedup keys on the seqs actually folded from a local file, so a
-    /// catalog entry whose seq has any local file (even an unsynced
-    /// `valid_up_to == 0` WAL) is skipped — no double-count.
-    ///
-    /// Only `q.time_range` is used: the partition filter is forced empty internally,
-    /// so the selector always lists EVERY in-window partition regardless of the
-    /// caller's `q.partition_keys`. The caller must pass the in-window catalog entries
-    /// (e.g. from [`TenantRegistries::catalog_entries_in_window`]); folded as-is.
-    pub fn enumerate_streams_from(
-        &self,
-        q: &file_registry::Query,
-        catalog: &[otel_catalog::CatalogEntry],
-    ) -> Vec<PartitionStat> {
-        // The selector lists all in-window partitions, never the caller's current
-        // pick: force the filter empty so a partition-filtered `q` cannot narrow it.
+    /// The in-memory half of the window-scoped stream selector: the in-window
+    /// local SFST/WAL files folded per partition (`part_key`), SFST-wins over its
+    /// own WAL per seq. Only `q.time_range` is used — the selector lists every
+    /// in-window partition regardless of the caller's current pick. Owned, so
+    /// the registry lock can drop before [`LocalStreams::with_catalog`] folds the
+    /// remote-only partitions from catalog entries read off the lock.
+    pub fn local_streams(&self, q: &file_registry::Query) -> LocalStreams {
         let q = &file_registry::Query {
             time_range: q.time_range.clone(),
             partition_keys: Vec::new(),
         };
-        let mut by_part: HashMap<u64, PartitionStat> = HashMap::new();
-        // Seqs already folded from a local file. Dedup is keyed on the *folded*
-        // seqs (not the servable `local_seqs` mask): a catalog entry whose seq was
-        // folded locally is that same file's remote copy, so skipping it keeps a
-        // stream's `file_count`/`total_size` counted once. This closes the count
-        // even in the (catalog-write-lifecycle-unreachable) case of a catalog entry
-        // over an unsynced, `valid_up_to == 0` WAL's seq, which a servable-only mask
-        // would not catch. `insert` returns false on a seq already present, giving
-        // SFST-wins-over-WAL and single-entry-per-seq for free.
-        let mut folded: HashSet<SeqKey> = HashSet::new();
+        let mut streams = LocalStreams::default();
         for f in self.sfst.candidates(q) {
-            folded.insert(SeqKey::from(&f.id));
-            by_part
+            streams.folded.insert(SeqKey::from(&f.id));
+            streams
+                .by_part
                 .entry(f.id.part_key)
                 .or_insert_with(|| {
                     PartitionStat::new(f.id.part_key, f.summary.content_meta.clone())
@@ -691,7 +588,7 @@ impl Registry {
         }
         for f in self.wal.candidates(q) {
             // SFST-wins over its own WAL in the post-index/pre-delete window.
-            if !folded.insert(SeqKey::from(&f.id)) {
+            if !streams.folded.insert(SeqKey::from(&f.id)) {
                 continue;
             }
             // WAL ranges are nanoseconds; the selector works in seconds. `File.size`
@@ -699,26 +596,45 @@ impl Registry {
             // the size proxy for an unsealed WAL.
             let to_s = |ns: u64| (ns / 1_000_000_000) as u32;
             let size = f.size.0.max(f.valid_up_to.0);
-            by_part
+            streams
+                .by_part
                 .entry(f.id.part_key)
                 .or_insert_with(|| PartitionStat::new(f.id.part_key, f.content_meta.clone()))
                 .add(size, to_s(f.min_timestamp_ns.0), to_s(f.max_timestamp_ns.0));
         }
-        // Remote-only partitions: catalog entries whose seq has no local file folded
-        // above (and deduped against a seq re-cataloged into more than one file).
+        streams
+    }
+}
+
+/// The local half of a window-scoped, remote-inclusive stream selector
+/// ([`Registry::local_streams`]): per-partition stats of the window's local
+/// files and the identities+seqs they hold.
+#[derive(Debug, Default)]
+pub struct LocalStreams {
+    by_part: HashMap<u64, PartitionStat>,
+    /// Identities+seqs folded from a local file (every in-window SFST and WAL,
+    /// even an unsynced one), so a catalog entry for one of them — that same
+    /// file's remote copy — is never counted twice.
+    folded: HashSet<SeqKey>,
+}
+
+impl LocalStreams {
+    /// Complete the selector with the remote-only partitions of `catalog` (the
+    /// window's catalog entries, read off the lock): entries whose identity+seq
+    /// was not folded locally, one per identity+seq. Sorted by the opaque
+    /// `part_key`; the signal's query layer decodes `content_meta` and re-sorts
+    /// for display.
+    pub fn with_catalog(mut self, catalog: &[otel_catalog::CatalogEntry]) -> Vec<PartitionStat> {
         for e in catalog {
-            if !folded.insert(SeqKey::from(&e.id)) {
+            if !self.folded.insert(SeqKey::from(&e.id)) {
                 continue;
             }
-            by_part
+            self.by_part
                 .entry(e.id.part_key)
                 .or_insert_with(|| PartitionStat::new(e.id.part_key, e.content_meta.clone()))
                 .add(e.size.0, e.min_timestamp_s, e.max_timestamp_s);
         }
-
-        // Sort by the opaque `part_key` for a deterministic order; the signal's
-        // query layer decodes `content_meta` and re-sorts for display.
-        let mut out: Vec<PartitionStat> = by_part.into_values().collect();
+        let mut out: Vec<PartitionStat> = self.by_part.into_values().collect();
         out.sort_by_key(|p| p.part_key);
         out
     }

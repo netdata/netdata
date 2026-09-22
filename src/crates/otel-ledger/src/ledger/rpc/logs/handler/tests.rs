@@ -1034,8 +1034,9 @@ fn accepted_params_advertise_tenant() {
 
 // ── remote-read query path (evicted SFST fetched back from remote) ───────────
 
-/// Register a catalog entry for `id` (no local SFST) so `remote_candidates`
-/// surfaces it. Mirrors the catalog-write fixture used in `query/tests.rs`.
+/// Register a catalog entry for `id` (no local SFST) so a remote plan
+/// selects it; returns the catalog file's path. Mirrors the catalog-write
+/// fixture used in `query/tests.rs`.
 fn track_remote_catalog(
     tr: &mut TenantRegistries,
     tenant: &str,
@@ -1044,7 +1045,7 @@ fn track_remote_catalog(
     min_s: u32,
     max_s: u32,
     size: u64,
-) {
+) -> std::path::PathBuf {
     use chrono::NaiveDate;
     let stream = ServiceStream::new("ns", "svc");
     // Production `build_catalog_entry` copies both id and stream from one SFST, so
@@ -1088,8 +1089,9 @@ fn track_remote_catalog(
             max_s,
             csize,
         ),
-        path,
+        path.clone(),
     );
+    path
 }
 
 fn make_handler_with_remote(tr: TenantRegistries, remote: RemoteRead) -> OtelLogsHandler {
@@ -1235,5 +1237,114 @@ async fn remote_fetch_failure_degrades() {
     assert_eq!(
         v["items"]["matched"], 0,
         "unreadable remote source is omitted: {v:#}"
+    );
+}
+
+/// Make `path` a FIFO: reading it blocks until a writer opens it.
+#[cfg(unix)]
+fn mkfifo(path: &std::path::Path) {
+    use std::os::unix::ffi::OsStrExt;
+    let c_path = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
+    // SAFETY: `c_path` is a valid NUL-terminated path for the whole call.
+    let rc = unsafe { libc::mkfifo(c_path.as_ptr(), 0o600) };
+    assert_eq!(rc, 0, "mkfifo {}", path.display());
+}
+
+/// Open the FIFO at `path` for writing once a reader holds it open (a
+/// non-blocking open fails until then), within `deadline`.
+#[cfg(unix)]
+async fn open_fifo_writer(path: &std::path::Path, deadline: std::time::Duration) -> std::fs::File {
+    use std::os::unix::fs::OpenOptionsExt;
+    let start = std::time::Instant::now();
+    loop {
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .custom_flags(libc::O_NONBLOCK)
+            .open(path)
+        {
+            Ok(f) => return f,
+            Err(e) if e.raw_os_error() == Some(libc::ENXIO) && start.elapsed() < deadline => {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+            Err(e) => panic!("no reader opened {} in time: {e}", path.display()),
+        }
+    }
+}
+
+/// The logs query reads catalog files only after releasing the registry
+/// read lock. A catalog that blocks its reader (a FIFO not yet written) must
+/// not keep the write lock — which the ledger loop takes on every WAL event —
+/// from being granted.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn catalogs_are_read_off_the_registry_lock() {
+    use std::io::Write;
+    let mut tr = make_tenant_registries();
+    let id = FileId::new(
+        Identity::new(MachineId::new(Uuid::from_u128(0x11)).unwrap(), InstanceId::new(Uuid::from_u128(0x22)).unwrap()),
+        0,
+        1,
+        ServiceStream::new("ns", "svc").ns_hash(),
+    );
+    let min_s = 1_700_000_000u32;
+    let catalog = track_remote_catalog(&mut tr, "default", id, "missing/object.sfst", min_s, min_s + 5, 10);
+    let catalog_bytes = std::fs::read(&catalog).unwrap();
+    std::fs::remove_file(&catalog).unwrap();
+    mkfifo(&catalog);
+
+    let registries = Arc::new(RwLock::new(tr));
+    let storage = file_lifecycle::storage::OpendalStorage::new(&format!(
+        "fs://{}",
+        tempfile::tempdir().unwrap().keep().display()
+    ))
+    .unwrap();
+    let cache =
+        file_cache::FileCache::open(tempfile::tempdir().unwrap().keep(), 64 * 1024 * 1024).unwrap();
+    let handler = Arc::new(OtelLogsHandler::new(
+        Arc::clone(&registries),
+        Arc::new(file_lifecycle::chunk::ChunkCache::new(64 * 1024 * 1024)),
+        16_384,
+        Some(RemoteRead::new(storage, cache)),
+    ));
+    let req: OtelLogsRequest = serde_json::from_slice(
+        format!(
+            r#"{{"info":false,"tenant":"default","after":{},"before":{}}}"#,
+            min_s - 10,
+            min_s + 100
+        )
+        .as_bytes(),
+    )
+    .unwrap();
+    let query = tokio::spawn({
+        let handler = Arc::clone(&handler);
+        async move { handler.on_call(make_ctx("t1"), req).await }
+    });
+
+    // The query is now blocked reading the catalog.
+    let deadline = std::time::Duration::from_secs(10);
+    let mut writer = open_fifo_writer(&catalog, deadline).await;
+    let write_lock = tokio::time::timeout(deadline, registries.write())
+        .await
+        .map(drop);
+    // Feed the catalog either way, so a failing run ends instead of hanging.
+    writer.write_all(&catalog_bytes).unwrap();
+    drop(writer);
+    let v = serde_json::to_value(query.await.unwrap().unwrap()).unwrap();
+
+    assert!(
+        write_lock.is_ok(),
+        "the query held the registry lock while reading a catalog"
+    );
+    // The catalog was read after all: its remote-only stream is listed.
+    let streams = v["required_params"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == "__streams")
+        .and_then(|p| p["options"].as_array())
+        .expect("stream selector present");
+    assert!(
+        streams.iter().any(|o| o["name"] == "ns/svc"),
+        "the catalog's stream must be listed: {v:#}"
     );
 }

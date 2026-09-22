@@ -326,58 +326,65 @@ impl FunctionHandler for OtelLogsHandler {
             }
         })?;
         let time_range = window_secs(&query.grid());
-        // Snapshot the candidate set under a brief read lock: on-disk
-        // SFSTs plus the unindexed WALs overlapping the window, owned so
-        // the lock drops before any I/O. `valid_up_to` is captured here,
-        // once — every chunk and tail derives from this single value, so
-        // the whole query sees one consistent durable prefix even as
-        // ingestion advances it. Under the same lock, enumerate the
-        // tenant's streams (window-scoped) for the selector control, and parse
-        // the in-window catalog ONCE — shared by the selector and the remote
-        // fetch so we don't read+parse it twice under the lock.
-        let (mut sfst_candidates, wal_descs, required_params, remote_cands) = {
+        // The selector lists every stream in the window, independent of the
+        // user's current pick, so it uses a time-only query (empty
+        // partition_keys); `q` carries the user's filter for the data query.
+        let stream_q = file_registry::Query {
+            time_range: time_range.clone(),
+            partition_keys: Vec::new(),
+        };
+        let q = file_registry::Query {
+            time_range,
+            partition_keys,
+        };
+        // Snapshot under a brief read lock, in memory only: on-disk SFSTs plus
+        // the unindexed WALs overlapping the window, the local half of the
+        // stream selector, and (with remote storage) which catalog files to read
+        // and what each range already serves locally. All owned, so the lock
+        // drops before any file is read — catalogs included. `valid_up_to` is
+        // captured here, once — every chunk and tail derives from this single
+        // value, so the whole query sees one consistent durable prefix even as
+        // ingestion advances it.
+        let (mut sfst_candidates, wal_descs, local_streams, remote_input) = {
             let guard = self.registries.read().await;
-            // The selector lists every stream in the window, independent of the
-            // user's current pick, so it uses a time-only query (empty
-            // partition_keys); `q` carries the user's filter for the data query.
-            let stream_q = file_registry::Query {
-                time_range: time_range.clone(),
-                partition_keys: Vec::new(),
-            };
-            let q = file_registry::Query {
-                time_range: time_range.clone(),
-                partition_keys,
-            };
             let (sfsts, wals) = guard.query_snapshot(&tenant, &q);
-            // Parse the in-window catalog ONLY when remote is configured:
-            // otherwise the selector would advertise evicted streams that can't
-            // be fetched, and a remote-disabled agent would pay a needless parse
-            // under the lock.
-            let catalog = if self.remote.is_some() {
-                guard.catalog_entries_in_window(&tenant, &stream_q)
-            } else {
-                Vec::new()
-            };
-            // The selector folds the local candidates + the (remote-only) catalog and
-            // computes its own per-seq dedup internally — it needs no servable mask.
-            let required_params =
-                stream_required_params(guard.enumerate_streams_from(&tenant, &stream_q, &catalog));
-            // The remote fetch masks the catalog by the servable-local seqs. Compute
-            // that mask only when remote is enabled (its sole consumer); a single
-            // time-only mask is sound to reuse for the stream-filtered fetch because
-            // one seq maps to exactly one stream.
-            let remote_cands = if self.remote.is_some() {
-                let local_seqs = guard.local_servable_seqs(&tenant, &stream_q);
-                guard.remote_candidates_from(&tenant, &q, &catalog, &local_seqs)
-            } else {
-                Vec::new()
-            };
+            let local_streams = guard.local_streams(&tenant, &stream_q);
+            // Plan remote reads ONLY when remote is configured: otherwise the
+            // selector would advertise evicted streams that can't be fetched.
+            // Range 0 is the selector's window, range 1 the user's fetch.
+            let remote_input = self
+                .remote
+                .is_some()
+                .then(|| guard.remote_plan_input(&tenant, &[stream_q, q]));
             // Convert the signal-neutral selected files into the logs engine's
             // sealed-SFST candidates at this (logs-specific) boundary.
             let sfst_candidates: Vec<SfstCandidate> =
                 sfsts.into_iter().map(SfstCandidate::from).collect();
-            (sfst_candidates, wals, required_params, remote_cands)
+            (sfst_candidates, wals, local_streams, remote_input)
         };
+
+        // Read the catalogs off the lock (blocking file I/O) and finish the
+        // selector with the remote-only streams. A catalog that cannot be read
+        // is logged and skipped: the logs wire has no partial status. Logs
+        // plans without a size limit, so a too-large query is refused by the
+        // download cache below, with its own message.
+        let (selector_catalog, remote_cands) = match remote_input {
+            Some(input) => match tokio::task::spawn_blocking(move || input.plan()).await {
+                Ok(plan) => {
+                    let [selector, fetch]: [Vec<otel_catalog::CatalogEntry>; 2] = plan
+                        .per_range
+                        .try_into()
+                        .expect("a plan has one range per query");
+                    (selector, fetch)
+                }
+                Err(e) => {
+                    tracing::warn!("otel-logs remote planning task failed: {e}");
+                    (Vec::new(), Vec::new())
+                }
+            },
+            None => (Vec::new(), Vec::new()),
+        };
+        let required_params = stream_required_params(local_streams.with_catalog(&selector_catalog));
 
         // Resolve each WAL into in-memory chunk SFSTs + a tail (off the
         // lock; chunk builds are singleflighted through the cache). The

@@ -42,6 +42,9 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 bytesize = { workspace = true }
+# `mkfifo` for the test that proves the logs query reads catalogs off the
+# registry lock (a FIFO catalog blocks its reader until the test writes it).
+libc = { workspace = true }
 # test-util exposes the chunk-level writer for the hand-built SFST fixtures in
 # ledger/rpc/handler/tests.rs.
 sfst = { workspace = true, features = ["test-util"] }
