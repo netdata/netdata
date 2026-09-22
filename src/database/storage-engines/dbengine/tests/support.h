@@ -60,17 +60,17 @@ inline NetdataTestLogCapture &netdata_test_log_capture() {
     return *capture;
 }
 
-// DBENGINE_TEST_LOG, read once, for the A/B check that the sink stream and the nd_log stream are the same stream:
+// DBENGINE_TEST_LOG, read once:
 //
 //   unset        what a normal run does - capture, and print a case's lines only when that case failed or ended in
 //                fatal(); a case that dies by a signal, or hangs, loses them, and is rerun with sink-echo to see them
 //   none         no sink is installed, so the engine logs the way it did before there was one
-//   sink-echo    the sink is installed and also writes each line to stderr as it arrives, in a form that can be
-//                compared against what the logger prints in a "none" run
+//   sink-echo    the sink is installed and also writes each line to stderr as it arrives, one line per message:
+//                the way to watch a case that crashes or hangs, and a form that can be set beside a "none" run
 //
-// It is here rather than in a throwaway build because the comparison is worth repeating: it is the one check that
-// says the no-sink arm and the sink arm carry the same lines, and it should still be runnable the next time
-// someone touches this layer.
+// The last two are also how a change to the macro layer can be compared by hand - the same run's lines once through
+// the sink and once through the logger. That comparison is not part of the suite; the routing itself is tested in
+// api_log_sink.cc and internal_log_sink.cc.
 enum NetdataTestLogMode { NETDATA_TEST_LOG_CAPTURE, NETDATA_TEST_LOG_NONE, NETDATA_TEST_LOG_SINK_ECHO };
 
 inline NetdataTestLogMode netdata_test_log_mode() {
