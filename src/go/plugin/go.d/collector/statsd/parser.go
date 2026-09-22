@@ -67,7 +67,22 @@ func parseRecord(line string) (record, error) {
 		return r, rejectSyntax
 	}
 	kind, rest, hasOptions := strings.Cut(rest, "|")
-	r.kind = wireType(kind)
+	// Retained declarations/bindings must not keep a substring of the record.
+	// Canonical constants also avoid an allocation on every accepted update.
+	switch wireType(kind) {
+	case counter:
+		r.kind = counter
+	case gauge:
+		r.kind = gauge
+	case timer:
+		r.kind = timer
+	case histogram:
+		r.kind = histogram
+	case set:
+		r.kind = set
+	default:
+		return r, rejectSyntax
+	}
 	switch r.kind {
 	case counter, gauge, timer, histogram:
 		value, err := parseNumber(head)
@@ -78,8 +93,6 @@ func parseRecord(line string) (record, error) {
 		r.delta = r.kind == gauge && (head[0] == '+' || head[0] == '-')
 	case set:
 		r.member = head
-	default:
-		return r, rejectSyntax
 	}
 	var seenRate, seenTags bool
 	for hasOptions {

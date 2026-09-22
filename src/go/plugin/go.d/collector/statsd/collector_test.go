@@ -5,13 +5,14 @@ package statsd
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	_ "embed"
 	"fmt"
 	"math"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -24,8 +25,20 @@ import (
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 )
+
+//go:embed testdata/config.json
+var configJSON []byte
+
+//go:embed testdata/config.yaml
+var configYAML []byte
+
+func TestConfigurationSerialize(t *testing.T) {
+	c := New()
+	collecttest.TestConfigurationSerialize(t, c, configJSON, configYAML)
+	require.NoError(t, c.Init(context.Background()))
+	assert.Zero(t, c.receiver.idle) // Explicit zero survives New, decode, retrieval and Init.
+}
 
 type coreFixture struct {
 	c      *Collector
@@ -464,6 +477,42 @@ func TestRecordBoundariesAndMetadata(t *testing.T) {
 	)
 }
 
+func TestRetainedStringsOwnStorage(t *testing.T) {
+	f := newCoreFixture(t, 1, time.Minute)
+	line := "members:" + strings.Repeat("member", 5000) + "|s|#pool:main,nd_unit:users,nd_title:Distinct users,nd_family:traffic"
+	f.ingest(t, line)
+	start := uintptr(unsafe.Pointer(unsafe.StringData(line)))
+	end := start + uintptr(len(line))
+	check := func(name, text string) {
+		t.Helper()
+		if text == "" {
+			return
+		}
+		address := uintptr(unsafe.Pointer(unsafe.StringData(text)))
+		assert.False(t, start <= address && address < end, "%s retains the complete input record", name)
+	}
+	for id, e := range f.c.receiver.entries {
+		check("identity name", id.name)
+		check("identity labels", id.labels)
+		for _, label := range e.labels {
+			check("label key", label.Key)
+			check("label value", label.Value)
+		}
+	}
+	for key, meta := range f.c.receiver.metadata {
+		check("declaration name", key.name)
+		check("declaration type", string(key.kind))
+		check("unit", meta.unit)
+		check("title", meta.title)
+		check("family", meta.family)
+		check("encoded name", meta.encodedName)
+	}
+	for name, binding := range f.c.receiver.bindings {
+		check("binding name", name)
+		check("binding type", string(binding.kind))
+	}
+}
+
 func TestRetirementUnderChurn(t *testing.T) {
 	f := newCoreFixture(t, 4, time.Second)
 	for generation := 0; generation < 70; generation++ {
@@ -535,25 +584,7 @@ func TestCollectorLifecycle(t *testing.T) {
 			func(t *testing.T) { c := New(); c.Config = config; require.Error(t, c.Init(context.Background())) },
 		)
 	}
-	t.Run("configuration formats", func(t *testing.T) {
-		want := Config{
-			UpdateEvery:       2,
-			MaxSeries:         15,
-			MetricIdleTimeout: confopt.Duration(0),
-		}
-		for _, format := range []string{"yaml", "json"} {
-			var got Config
-			if format == "yaml" {
-				require.NoError(
-					t,
-					yaml.Unmarshal([]byte("update_every: 2\nmax_series: 15\nmetric_idle_timeout: 0\n"), &got),
-				)
-			} else {
-				require.NoError(t, json.Unmarshal([]byte(`{"update_every":2,"max_series":15,"metric_idle_timeout":0}`), &got))
-			}
-			assert.Equal(t, want, got)
-		}
-	})
+
 }
 
 func TestConcurrentIngestionAndCollection(t *testing.T) {
