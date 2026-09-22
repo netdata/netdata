@@ -184,16 +184,20 @@ static PSECURITY_DESCRIPTOR nd_windows_sd_from_mode(int mode, PSID owner_sid) {
         (mode & 0200)         ? L"FWRCSDWD"   :
                                 L"RCSDWD";
 
-    size_t needed = 64 + wcslen(owner_rights) + wcslen(owner_str);
-    wchar_t *sddl = mallocz(needed * sizeof(*sddl));
-    swprintf(sddl, needed, L"D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;%ls;;;%ls)", owner_rights, owner_str);
+    // Bounded by construction: the literal ACEs are 31 wide chars, the rights
+    // string at most 10, and a SID in string form tops out well under 200.
+    wchar_t sddl[256];
+    int written = swprintf(sddl, _countof(sddl), L"D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;%ls;;;%ls)",
+                           owner_rights, owner_str);
+    LocalFree(owner_str);
+    if (written < 0 || (size_t)written >= _countof(sddl))
+        return NULL;
 
     PSECURITY_DESCRIPTOR descriptor = NULL;
-    bool ok = ConvertStringSecurityDescriptorToSecurityDescriptorW(
-                  sddl, SDDL_REVISION_1, &descriptor, NULL) != 0;
-    freez(sddl);
-    LocalFree(owner_str);
-    return ok ? descriptor : NULL;
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, SDDL_REVISION_1, &descriptor, NULL))
+        return NULL;
+
+    return descriptor;
 }
 
 // The SID that will own a file this process creates. Returns NULL on failure;

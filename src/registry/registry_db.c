@@ -104,6 +104,17 @@ static inline int registry_person_save(const DICTIONARY_ITEM *item __maybe_unuse
 // SAVE THE REGISTRY DATABASE
 
 static FILE *registry_db_open_tmp_file(const char *filename) {
+#if defined(OS_WINDOWS)
+    // Create atomically first.  A preliminary lstat() would introduce a
+    // pathname race; nd_open_no_follow() protects both the create and reuse
+    // paths from reparse-point redirection.
+    bool reuse = false;
+    int fd = nd_open_no_follow(filename, O_WRONLY | O_CREAT | O_EXCL | O_NONBLOCK, 0600);
+    if(fd == -1 && errno == EEXIST) {
+        reuse = true;
+        fd = nd_open_no_follow(filename, O_WRONLY | O_NONBLOCK, 0);
+    }
+#else
     struct stat before;
     bool reuse = lstat(filename, &before) == 0;
     if(reuse && !S_ISREG(before.st_mode)) {
@@ -122,10 +133,6 @@ static FILE *registry_db_open_tmp_file(const char *filename) {
     else
         flags |= O_CREAT | O_EXCL;
 
-#if defined(OS_WINDOWS)
-    int fd = reuse ? nd_open_no_follow(filename, flags & ~O_NOFOLLOW, 0666) :
-                     open(filename, flags, 0666);
-#else
     int fd = open(filename, flags, 0666);
 #endif
     if(fd == -1)
@@ -141,8 +148,11 @@ static FILE *registry_db_open_tmp_file(const char *filename) {
         return NULL;
     }
 
-    if(!S_ISREG(after.st_mode) ||
-       (reuse && (before.st_dev != after.st_dev || before.st_ino != after.st_ino))) {
+    if(!S_ISREG(after.st_mode)
+#if !defined(OS_WINDOWS)
+       || (reuse && (before.st_dev != after.st_dev || before.st_ino != after.st_ino))
+#endif
+    ) {
         if(!reuse)
             unlink(filename);
         close(fd);
