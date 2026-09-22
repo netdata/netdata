@@ -22,6 +22,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,9 +37,19 @@ var configYAML []byte
 func TestConfigurationSerialize(t *testing.T) {
 	c := New()
 	collecttest.TestConfigurationSerialize(t, c, configJSON, configYAML)
+	c.profileDirs = testProfileDirs
 	require.NoError(t, c.Init(context.Background()))
 	assert.Zero(t, c.receiver.idle) // Explicit zero survives New, decode, retrieval and Init.
 }
+
+// testProfileDirs holds the profile named by the serialization fixtures.
+var testProfileDirs = []profilecatalog.DirSpec{{Path: "testdata/profiles"}}
+
+// testListeners is an explicit fixture endpoint. Init validates it; only Run binds.
+var testListeners = []ListenerConfig{{
+	Protocol: protocolUDP,
+	Address:  "127.0.0.1:18125",
+}}
 
 type coreFixture struct {
 	c      *Collector
@@ -51,16 +62,28 @@ type coreFixture struct {
 func newCoreFixture(t testing.TB, capacity int, idle time.Duration, opts ...metrix.CollectorStoreOption) *coreFixture {
 	t.Helper()
 	c := New()
+	c.Listeners = testListeners
 	c.MaxSeries = capacity
 	c.MetricIdleTimeout = confopt.Duration(idle)
 	if len(opts) > 0 {
 		c.store = metrix.NewCollectorStore(opts...)
 	}
-	f := &coreFixture{
-		c:    c,
-		time: time.Unix(1000, 0),
-	}
+	f := prepareFixture(t, c)
+	f.time = time.Unix(1000, 0)
 	c.now = func() time.Time { return f.time }
+	// Record-level tests drive the receiver directly. Run activates it after
+	// binding; socket framing and lifecycle are covered by the runtime tests.
+	c.receiver.start()
+	return f
+}
+
+// prepareFixture runs Init/Check and binds the real template capture, metric
+// cycle and native engine used by the framework's publication path.
+func prepareFixture(t testing.TB, c *Collector) *coreFixture {
+	t.Helper()
+	f := &coreFixture{
+		c: c,
+	}
 	require.NoError(t, c.Init(context.Background()))
 	require.NoError(t, c.Check(context.Background()))
 	managed, ok := metrix.AsCycleManagedStore(c.MetricStore())
@@ -73,7 +96,6 @@ func newCoreFixture(t testing.TB, capacity int, idle time.Duration, opts ...metr
 	require.NoError(t, err)
 	f.engine, err = chartengine.New(chartengine.WithRuntimeStore(nil))
 	require.NoError(t, err)
-	c.receiver.start() // Test harness supplies operational readiness; socket Run is the next stage.
 	t.Cleanup(func() { c.Cleanup(context.Background()) })
 	return f
 }
@@ -129,6 +151,29 @@ func (f *coreFixture) finish(t testing.TB, metricAbort, outputAbort bool) string
 	return buf.String()
 }
 
+// applicationCharts counts CHART definitions outside the fixed receiver diagnostics.
+func applicationCharts(wire string) int {
+	n := 0
+	for line := range strings.Lines(wire) {
+		if strings.HasPrefix(line, "CHART ") && !strings.Contains(line, "'statsd.receiver.") {
+			n++
+		}
+	}
+	return n
+}
+
+// applicationSeries counts retained store series outside the receiver diagnostics.
+func applicationSeries(c *Collector) int {
+	n := 0
+	c.store.Read(metrix.ReadRaw(), metrix.ReadFlatten()).
+		ForEachSeries(func(name string, _ metrix.LabelView, _ metrix.SampleValue) {
+			if !strings.HasPrefix(name, "receiver.") {
+				n++
+			}
+		})
+	return n
+}
+
 func value(t testing.TB, c *Collector, name string, want float64, ls metrix.Labels) {
 	t.Helper()
 	got, ok := c.store.Read().Value(name, ls)
@@ -160,7 +205,7 @@ func TestMeasurementsAndGenericCharts(t *testing.T) {
 			assert.InDelta(t, want[i], p.Values[i], math.Abs(want[i])*.01)
 		}
 	}
-	assert.Equal(t, 9, strings.Count(wire, "CHART "))
+	assert.Equal(t, 9, applicationCharts(wire))
 	assert.Contains(t, wire, "requests/s")
 	assert.Contains(t, wire, "incremental")
 	assert.Contains(t, wire, "CLABEL 'zone' 'a'")
@@ -311,8 +356,9 @@ func TestDetachedBatchOwnership(t *testing.T) {
 	f.ingest(t, "x:5|c", "latency:10|ms")
 	f.time = f.time.Add(time.Second)
 	f.cycle.BeginCycle()
-	batch, err := f.c.receiver.cut(f.time)
+	cut, err := f.c.receiver.cut(f.time, 0)
 	require.NoError(t, err)
+	batch := cut.batch
 	// New admission while the old batch is being published uses fresh receiver state.
 	f.ingest(t, "x:20|g", "latency:100|ms")
 	for _, m := range batch {
@@ -443,7 +489,7 @@ func TestFrameworkOutputLimitDoesNotRejectInput(t *testing.T) {
 	f.ingest(t, name+":1|g", "short:2|g")
 	wire := f.collect(t, false, false)
 	value(t, f.c, "g.value."+name, 1, nil)
-	assert.Equal(t, 1, strings.Count(wire, "CHART "))
+	assert.Equal(t, 1, applicationCharts(wire))
 	assert.Contains(t, wire, "short")
 	assert.NotContains(t, wire, name)
 }
@@ -529,10 +575,7 @@ func TestRetirementUnderChurn(t *testing.T) {
 		f.collect(t, false, false)
 	}
 	assert.Empty(t, f.c.receiver.metadata)
-	retained := 0
-	f.c.store.Read(metrix.ReadRaw(), metrix.ReadFlatten()).
-		ForEachSeries(func(_ string, _ metrix.LabelView, _ metrix.SampleValue) { retained++ })
-	assert.Zero(t, retained)
+	assert.Zero(t, applicationSeries(f.c))
 }
 
 func TestSetEstimate(t *testing.T) {
@@ -557,6 +600,7 @@ func TestSetEstimate(t *testing.T) {
 func TestCollectorLifecycle(t *testing.T) {
 	t.Run("no publication before readiness or after stop", func(t *testing.T) {
 		c := New()
+		c.Listeners = testListeners
 		require.NoError(t, c.Init(context.Background()))
 		require.NoError(t, c.Check(context.Background()))
 		require.ErrorIs(t, c.Collect(context.Background()), rejectUnavailable)

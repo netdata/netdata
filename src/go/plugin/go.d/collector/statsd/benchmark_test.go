@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -112,10 +113,11 @@ func BenchmarkOwnershipEnvelope(b *testing.B) {
 				runtime.ReadMemStats(&before)
 				feed()
 				f.cycle.BeginCycle()
-				batch, err := f.c.receiver.cut(f.time)
+				cut, err := f.c.receiver.cut(f.time, 0)
 				if err != nil {
 					b.Fatal(err)
 				}
+				batch := cut.batch
 				feed()
 				runtime.GC()
 				runtime.ReadMemStats(&windows)
@@ -132,5 +134,84 @@ func BenchmarkOwnershipEnvelope(b *testing.B) {
 				runtime.KeepAlive(batch)
 			}
 		})
+	}
+}
+
+// Profile preprocessing on the ingest path: owner matching over configured
+// profiles, one replace pipeline and, until activation, root matching.
+func BenchmarkIngestProfiles(b *testing.B) {
+	for name, line := range map[string]string{
+		"replace owner": "svc.a.size:5|g|#region:eu",
+		"second owner":  "svc.other:2|c|@.5|#region:eu",
+		"no owner":      "plain:15|ms|#region:eu",
+	} {
+		b.Run(name, func(b *testing.B) {
+			f := newProfileFixture(b, testProfiles, "pools", "shadow", "app", "meta")
+			f.ingest(b, line)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if err := f.c.receiver.ingest(line, f.time); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+// Complete TCP path: socket read, framing, parsing, admission and aggregation.
+// Allocation counts include the server goroutines; ns/op is per record.
+func BenchmarkTCPReceive(b *testing.B) {
+	f := startRuntime(b, func(c *Collector) { c.MetricIdleTimeout = 0 })
+	lines := mixedRecords(1000)
+	conn := f.dialTCP(b)
+	var payload []byte
+	for _, line := range lines {
+		payload = append(payload, line...)
+		payload = append(payload, '\n')
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	sent := 0
+	for sent < b.N {
+		n := min(len(lines), b.N-sent)
+		chunk := payload
+		if n < len(lines) {
+			chunk = []byte(strings.Join(lines[:n], "\n") + "\n")
+		}
+		if _, err := conn.Write(chunk); err != nil {
+			b.Fatal(err)
+		}
+		sent += n
+	}
+	deadline := time.Now().Add(time.Minute)
+	for f.counts().accepted < uint64(b.N) {
+		if time.Now().After(deadline) {
+			b.Fatalf("accepted %d of %d", f.counts().accepted, b.N)
+		}
+		time.Sleep(50 * time.Microsecond)
+	}
+}
+
+// Normal mixed publication with profile entries active and one replace owner.
+func BenchmarkMixedPublicationProfiles(b *testing.B) {
+	f := newProfileFixture(b, testProfiles, "pools", "shadow", "app", "meta")
+	lines := mixedRecords(1000)
+	for i := range 100 {
+		lines[i] = fmt.Sprintf("svc.p%d.size:%d|g", i, i)
+	}
+	for range 3 {
+		f.ingest(b, lines...)
+		f.collect(b, false, false)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for _, line := range lines {
+			if err := f.c.receiver.ingest(line, f.time); err != nil {
+				b.Fatal(err)
+			}
+		}
+		f.collect(b, false, false)
 	}
 }

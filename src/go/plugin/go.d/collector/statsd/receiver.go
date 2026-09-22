@@ -3,6 +3,7 @@
 package statsd
 
 import (
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -54,18 +55,48 @@ type receiver struct {
 	metadata                 map[declarationKey]*declaration
 	retention                metrix.DescriptorRetention
 	horizon, priorCutSuccess uint64
+
+	// Configured profiles, in precedence order. membership records native
+	// profiles activated by admitted input; it only grows until restart.
+	profiles    []*profile
+	membership  []bool
+	activated   int
+	activatable int
+
+	accepted uint64
+	rejects  [len(rejectReasons)]uint64
 }
 
-func newReceiver(capacity int, idle time.Duration, retention metrix.DescriptorRetention, chartExpiry uint64) *receiver {
-	return &receiver{
-		capacity:  capacity,
-		idle:      idle,
-		entries:   make(map[identity]*series),
-		bindings:  make(map[string]typeBinding),
-		metadata:  make(map[declarationKey]*declaration),
-		retention: retention,
-		horizon:   max(retention.DescriptorRetentionWindow(), chartExpiry+1),
+// cutResult is one coherent handoff: the batch, the desired profile membership
+// captured with the input that activated it, and receiver diagnostics.
+type cutResult struct {
+	batch      []measurement
+	membership []bool // nil when unchanged since the caller's last build
+	activated  int
+	accepted   uint64
+	rejects    [len(rejectReasons)]uint64
+	series     int
+}
+
+// lifetime is the longest prepared chart or dimension expiry in successful cycles.
+func newReceiver(capacity int, idle time.Duration, retention metrix.DescriptorRetention, lifetime uint64, profiles []*profile) *receiver {
+	r := &receiver{
+		capacity:   capacity,
+		idle:       idle,
+		entries:    make(map[identity]*series),
+		bindings:   make(map[string]typeBinding),
+		metadata:   make(map[declarationKey]*declaration),
+		retention:  retention,
+		horizon:    max(retention.DescriptorRetentionWindow(), lifetime+1),
+		profiles:   profiles,
+		membership: make([]bool, len(profiles)),
 	}
+	for _, p := range profiles {
+		if p.groups != nil {
+			r.activatable++
+		}
+	}
+	return r
 }
 
 // start is called only after the required receiver resources are acquired.
@@ -88,23 +119,71 @@ func (r *receiver) remove(e *series) {
 	}
 }
 
-// ingest owns preparation and mutation under one lock. Profile processing will
-// use the same lock: its compiled replace processor owns mutable scratch.
+// ingest owns preparation and mutation under one lock, including the selected
+// profile's replace pipeline, whose compiled processors own mutable scratch.
 func (r *receiver) ingest(line string, now time.Time) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.active {
 		return rejectUnavailable
 	}
+	err := r.ingestLocked(line, now)
+	if err == nil {
+		r.accepted++
+	} else if rejected, ok := err.(rejection); ok {
+		r.countLocked(rejected)
+	}
+	return err
+}
+
+func (r *receiver) ingestLocked(line string, now time.Time) error {
 	input, err := parseRecord(line)
 	if err != nil {
 		return err
+	}
+	original := input.name
+	// Original names choose the single preprocessing owner; pipelines never chain.
+	for _, p := range r.profiles {
+		if p.replaces(original) {
+			if input, err = p.replace(input); err != nil {
+				return err
+			}
+			break
+		}
 	}
 	p, err := prepareRecord(input)
 	if err != nil {
 		return err
 	}
-	return r.admit(p, now)
+	if err := r.admit(p, now); err != nil {
+		return err
+	}
+	// Only fully admitted input activates native profiles.
+	if r.activated < r.activatable {
+		for i, p := range r.profiles {
+			if p.groups != nil && !r.membership[i] && p.root.MatchString(original) {
+				r.membership[i] = true
+				r.activated++
+			}
+		}
+	}
+	return nil
+}
+
+// reject counts input refused before record ingestion: framing and connection limits.
+func (r *receiver) reject(reason rejection) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.countLocked(reason)
+}
+
+func (r *receiver) countLocked(reason rejection) {
+	for i, known := range rejectReasons {
+		if known == reason {
+			r.rejects[i]++
+			return
+		}
+	}
 }
 
 // admit requires the receiver lock and a fully prepared record.
@@ -191,11 +270,13 @@ func (r *receiver) reconcileMetadata() {
 	r.priorCutSuccess = success
 }
 
-func (r *receiver) cut(now time.Time) ([]measurement, error) {
+// cut detaches the batch. built is the membership count the caller last
+// published; a changed count returns a membership copy with this batch.
+func (r *receiver) cut(now time.Time, built int) (cutResult, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.active {
-		return nil, rejectUnavailable
+		return cutResult{}, rejectUnavailable
 	}
 	// Only a later Collect knows whether the previous staged cycle committed.
 	// Incoming traffic must retain its metadata authority until this point.
@@ -213,7 +294,17 @@ func (r *receiver) cut(now time.Time) ([]measurement, error) {
 			r.remove(e)
 		}
 	}
-	return batch, nil
+	result := cutResult{
+		batch:     batch,
+		activated: r.activated,
+		accepted:  r.accepted,
+		rejects:   r.rejects,
+		series:    len(r.entries),
+	}
+	if r.activated != built {
+		result.membership = slices.Clone(r.membership)
+	}
+	return result, nil
 }
 
 func (r *receiver) release(batch []measurement) {

@@ -21,17 +21,27 @@ func (c *Collector) collect(ctx context.Context) error {
 	if c.receiver == nil {
 		return rejectUnavailable
 	}
-	batch, err := c.receiver.cut(c.now())
+	cut, err := c.receiver.cut(c.now(), c.built)
 	if err != nil {
 		return err
 	}
-	defer c.receiver.release(batch)
-	for _, m := range batch {
+	defer c.receiver.release(cut.batch)
+	// Newly activated profiles join the snapshot captured with the batch that
+	// activated them, before this cycle's metrics commit.
+	if cut.membership != nil {
+		set, err := c.templateSet(cut.membership)
+		if err != nil {
+			return err
+		}
+		c.templates, c.built = set, cut.activated
+	}
+	for _, m := range cut.batch {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 		c.writeMeasurement(m)
 	}
+	c.diagnostics.write(cut)
 	return ctx.Err()
 }
 
@@ -62,6 +72,10 @@ func (c *Collector) writeMeasurement(m measurement) {
 			count, sum = w.count, w.sum
 			var q [2]float64
 			q, c.scratch = w.quantiles.query(c.scratch)
+			if math.IsNaN(q[0]) {
+				// Rank ambiguity is known only here, before the window resets at release.
+				c.diagnostics.percentilesWithheld(w.quantiles.reason)
+			}
 			values = []metrix.SampleValue{w.min, w.max, sum / count, q[0], q[1]}
 		}
 		meter.MeasureSetGauge("values."+meta.encodedName, append(opts, metrix.WithMeasureSetFields(valueFields...))...).
