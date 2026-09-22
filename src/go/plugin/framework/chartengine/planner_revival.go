@@ -10,7 +10,7 @@ func needsChartRevival(previous *materializedChartState, current *chartState, se
 	if !expiredBeforeCycle(previous.lastSeenSuccessSeq, seq, previous.lifecycle.ExpireAfterCycles) {
 		return false
 	}
-	if chartDefinitionChanged(previous.meta, current.meta) {
+	if chartDefinitionChanged(previous.emittedMeta, current.meta) {
 		return true
 	}
 	for name, entry := range current.entries {
@@ -22,6 +22,33 @@ func needsChartRevival(previous *materializedChartState, current *chartState, se
 		}
 	}
 	return false
+}
+
+// Chart creation, label updates and dimension actions all emit CHART commands.
+// Record their final metadata in the staged state, so Abort preserves the prior
+// published definition. Create/label actions use the same current chart metadata;
+// removals are emitted last and may carry older metadata from cap enforcement.
+func (s *materializedState) recordEmittedChartDefinitions(actions []EngineAction) {
+	remember := func(id string, meta program.ChartMeta) {
+		if chart := s.charts[id]; chart != nil {
+			chart.emittedMeta = meta
+		}
+	}
+	for _, action := range actions {
+		switch a := action.(type) {
+		case CreateChartAction:
+			remember(a.ChartID, a.Meta)
+		case CreateDimensionAction:
+			remember(a.ChartID, a.ChartMeta)
+		case UpdateChartLabelsAction:
+			remember(a.ChartID, a.Meta)
+		}
+	}
+	for _, action := range actions {
+		if a, ok := action.(RemoveDimensionAction); ok {
+			remember(a.ChartID, a.ChartMeta)
+		}
+	}
 }
 
 func expiredBeforeCycle(lastSeen, current uint64, expiry int) bool {

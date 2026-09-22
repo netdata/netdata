@@ -325,6 +325,7 @@ func (e *Engine) buildPlan(reader metrix.Reader, retired map[string]*materialize
 	}
 	phaseStartedAt = time.Now()
 	ctx.reconcileRetirements()
+	staged.recordEmittedChartDefinitions(out.Actions)
 	sortInferredDimensions(out.InferredDimensions)
 	sample.phaseSortSeconds = time.Since(phaseStartedAt).Seconds()
 

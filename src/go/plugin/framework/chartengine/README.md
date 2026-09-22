@@ -228,6 +228,7 @@ If inferred dimensions are present without flattened reader metadata, `PreparePl
 |-------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
 | `CreateChartAction`     | Materialize chart instance (with chart metadata and labels)                                                                          |
 | `CreateDimensionAction` | Materialize dimension for a chart                                                                                                    |
+| `UpdateChartLabelsAction` | Re-emit chart metadata and replace chart labels                                                                                   |
 | `UpdateChartAction`     | Emit chart values for current cycle; unseen dims, and dims whose value is non-finite (NaN/Inf), become `IsEmpty=true` (gap, never 0) |
 | `RemoveDimensionAction` | Obsolete one dimension                                                                                                               |
 | `RemoveChartAction`     | Obsolete one chart                                                                                                                   |
@@ -235,8 +236,9 @@ If inferred dimensions are present without flattened reader metadata, `PreparePl
 `chartemit` normalizes emitted action order by phase:
 
 1. create chart/dimensions
-2. update values
-3. remove dimensions/charts
+2. update chart labels
+3. update values
+4. remove dimensions/charts
 
 ## Routing and Collision Rules
 
@@ -326,7 +328,8 @@ Default lifecycle policy when template omits lifecycle:
 
 Metric collection can advance while output plans are aborted, leaving published definitions past their expiry.
 When an identity returns after it was eligible for expiry in an intervening cycle, the planner recreates its staged
-definition if its emitted settings changed:
+definition if its settings differ from the last committed emitted definition. Ordinary observations do not advance
+that definition baseline. Chart metadata re-emitted by label updates or dimension creation/removal does advance it:
 
 - Chart settings are title, units, family, context, type and priority. An expired chart also recreates when a returning
   dimension's creation settings changed.
