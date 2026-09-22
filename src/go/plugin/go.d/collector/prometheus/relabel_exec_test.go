@@ -13,8 +13,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/relabel"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 // A clean histogram plus an unrelated gauge sibling. Each corruption case relabels

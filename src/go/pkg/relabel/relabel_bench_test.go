@@ -8,19 +8,17 @@ import (
 
 	commonmodel "github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
-
-	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 )
 
 var (
-	benchSampleSink prompkg.Sample
+	benchSampleSink Record
 	benchKeepSink   bool
 )
 
 // relabel runs on every kept sample on the scrape hot path, so keep these
 // numbers current before/after changes to the engine. Run with:
 //
-//	go test ./plugin/go.d/collector/prometheus/relabel -run '^$' -bench BenchmarkProcessorApply -benchmem
+//	go test ./pkg/relabel -run '^$' -bench BenchmarkProcessorApply -benchmem
 //
 // Numbers are machine-specific; compare relative before/after deltas, and watch
 // the allocation columns (the no-rules and passthrough cases should stay at 0).
@@ -28,14 +26,14 @@ func BenchmarkProcessorApply(b *testing.B) {
 	type testCase struct {
 		name   string
 		cfgs   []Config
-		sample prompkg.Sample
+		sample Record
 	}
 
 	tests := []testCase{
 		{
 			name:   "no_rules",
 			cfgs:   nil,
-			sample: benchSample("http_requests_total", benchLabels(4), prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
+			sample: benchSample("http_requests_total", benchLabels(4)),
 		},
 		{
 			name: "keep_passthrough",
@@ -51,7 +49,7 @@ func BenchmarkProcessorApply(b *testing.B) {
 				"job":      "api",
 				"method":   "GET",
 				"status":   "200",
-			}, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
+			}),
 		},
 		{
 			name: "name_only_rewrite",
@@ -64,7 +62,7 @@ func BenchmarkProcessorApply(b *testing.B) {
 					Action:       Replace,
 				},
 			},
-			sample: benchSample("http_requests_total", benchLabels(4), prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
+			sample: benchSample("http_requests_total", benchLabels(4)),
 		},
 		{
 			name: "label_replace",
@@ -81,7 +79,7 @@ func BenchmarkProcessorApply(b *testing.B) {
 				"job":      "api",
 				"method":   "GET",
 				"status":   "200",
-			}, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
+			}),
 		},
 		{
 			name: "multi_source_replace",
@@ -99,7 +97,7 @@ func BenchmarkProcessorApply(b *testing.B) {
 				"job":      "api",
 				"method":   "GET",
 				"status":   "200",
-			}, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
+			}),
 		},
 		{
 			name: "labeldrop_many_labels",
@@ -109,7 +107,7 @@ func BenchmarkProcessorApply(b *testing.B) {
 					Action: LabelDrop,
 				},
 			},
-			sample: benchSample("http_requests_total", benchLabels(12), prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
+			sample: benchSample("http_requests_total", benchLabels(12)),
 		},
 	}
 
@@ -138,13 +136,10 @@ func BenchmarkProcessorApply(b *testing.B) {
 	}
 }
 
-func benchSample(name string, lbs map[string]string, kind prompkg.SampleKind, familyType commonmodel.MetricType) prompkg.Sample {
-	return prompkg.Sample{
-		Name:       name,
-		Labels:     labels.FromMap(lbs),
-		Value:      1,
-		Kind:       kind,
-		FamilyType: familyType,
+func benchSample(name string, lbs map[string]string) Record {
+	return Record{
+		Name:   name,
+		Labels: labels.FromMap(lbs),
 	}
 }
 

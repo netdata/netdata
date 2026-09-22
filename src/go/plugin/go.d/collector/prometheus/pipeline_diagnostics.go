@@ -9,7 +9,7 @@ import (
 
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
+	"github.com/netdata/netdata/go/plugins/pkg/relabel"
 	"github.com/prometheus/prometheus/model/labels"
 )
 

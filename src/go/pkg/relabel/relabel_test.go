@@ -10,8 +10,6 @@ import (
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 )
 
 func TestRegexp_String(t *testing.T) {
@@ -36,8 +34,8 @@ func TestRegexp_String(t *testing.T) {
 func TestProcessor_Apply(t *testing.T) {
 	tests := map[string]struct {
 		cfgs             []Config
-		in               prompkg.Sample
-		want             prompkg.Sample
+		in               Record
+		want             Record
 		keep             bool
 		sameLabelBacking bool
 	}{
@@ -47,11 +45,11 @@ func TestProcessor_Apply(t *testing.T) {
 				Replacement: "copy_${1}",
 				Action:      LabelMap,
 			}},
-			in: sample("m", map[string]string{"job": "api"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in: sample("m", map[string]string{"job": "api"}),
 			want: sample("m", map[string]string{
 				"job":      "api",
 				"copy_job": "api",
-			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			}),
 			keep: true,
 		},
 		"labelmap can rewrite __name__ from an application label": {
@@ -62,10 +60,10 @@ func TestProcessor_Apply(t *testing.T) {
 			}},
 			in: sample("original_metric", map[string]string{
 				"metric_name": "renamed_metric",
-			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			}),
 			want: sample("renamed_metric", map[string]string{
 				"metric_name": "renamed_metric",
-			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			}),
 			keep: true,
 		},
 		"explicit empty separator joins without the default ';'": {
@@ -76,8 +74,8 @@ func TestProcessor_Apply(t *testing.T) {
 				TargetLabel:  "c",
 				Action:       Replace,
 			}},
-			in:   sample("m", map[string]string{"a": "foo", "b": "bar"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
-			want: sample("m", map[string]string{"a": "foo", "b": "bar", "c": "foobar"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in:   sample("m", map[string]string{"a": "foo", "b": "bar"}),
+			want: sample("m", map[string]string{"a": "foo", "b": "bar", "c": "foobar"}),
 			keep: true,
 		},
 		"non-canonical action is canonicalized (KEEP -> keep)": {
@@ -86,17 +84,17 @@ func TestProcessor_Apply(t *testing.T) {
 				Regex:        MustNewRegexp("foo"),
 				Action:       Action("KEEP"),
 			}},
-			in:   sample("m", map[string]string{"a": "foo"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
-			want: sample("m", map[string]string{"a": "foo"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in:   sample("m", map[string]string{"a": "foo"}),
+			want: sample("m", map[string]string{"a": "foo"}),
 			keep: true,
 		},
 		"zero rules pass through without rematerializing labels": {
-			in:               sample("test_metric", map[string]string{"a": "foo"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
-			want:             sample("test_metric", map[string]string{"a": "foo"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in:               sample("test_metric", map[string]string{"a": "foo"}),
+			want:             sample("test_metric", map[string]string{"a": "foo"}),
 			keep:             true,
 			sameLabelBacking: true,
 		},
-		"replace rewrites label and preserves sample payload": {
+		"replace rewrites label": {
 			cfgs: []Config{
 				{
 					SourceLabels: []string{"a"},
@@ -106,11 +104,11 @@ func TestProcessor_Apply(t *testing.T) {
 					Action:       Replace,
 				},
 			},
-			in: sample("test_total", map[string]string{"a": "foo"}, 1.5, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
+			in: sample("test_total", map[string]string{"a": "foo"}),
 			want: sample("test_total", map[string]string{
 				"a": "foo",
 				"b": "choo",
-			}, 1.5, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
+			}),
 			keep: true,
 		},
 		"replace can rewrite __name__": {
@@ -123,8 +121,8 @@ func TestProcessor_Apply(t *testing.T) {
 					Action:       Replace,
 				},
 			},
-			in:   sample("http_requests_total", map[string]string{"method": "GET"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
-			want: sample("http_requests", map[string]string{"method": "GET"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
+			in:   sample("http_requests_total", map[string]string{"method": "GET"}),
+			want: sample("http_requests", map[string]string{"method": "GET"}),
 			keep: true,
 		},
 		"label-only relabel preserves existing utf8 metric name": {
@@ -135,11 +133,11 @@ func TestProcessor_Apply(t *testing.T) {
 					Action:       Uppercase,
 				},
 			},
-			in: sample("http.requests_total", map[string]string{"method": "get"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
+			in: sample("http.requests_total", map[string]string{"method": "get"}),
 			want: sample("http.requests_total", map[string]string{
 				"method":       "get",
 				"method_upper": "GET",
-			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
+			}),
 			keep: true,
 		},
 		"replace rewrites __name__ with explicit utf8 scheme at runtime": {
@@ -153,12 +151,12 @@ func TestProcessor_Apply(t *testing.T) {
 					NameScheme:   commonmodel.UTF8Validation,
 				},
 			},
-			in:               sample("http_requests_total", map[string]string{"method": "GET"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
-			want:             sample("http_requests.total", map[string]string{"method": "GET"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
+			in:               sample("http_requests_total", map[string]string{"method": "GET"}),
+			want:             sample("http_requests.total", map[string]string{"method": "GET"}),
 			keep:             true,
 			sameLabelBacking: true,
 		},
-		"histogram bucket relabel preserves kind and family type": {
+		"name rewrite preserves le label": {
 			cfgs: []Config{
 				{
 					SourceLabels: []string{commonmodel.MetricNameLabel},
@@ -171,15 +169,15 @@ func TestProcessor_Apply(t *testing.T) {
 			in: sample("request_duration_seconds_bucket", map[string]string{
 				"le":     "0.5",
 				"method": "GET",
-			}, 42, prompkg.SampleKindHistogramBucket, commonmodel.MetricTypeHistogram),
+			}),
 			want: sample("nginx_request_duration_seconds_bucket", map[string]string{
 				"le":     "0.5",
 				"method": "GET",
-			}, 42, prompkg.SampleKindHistogramBucket, commonmodel.MetricTypeHistogram),
+			}),
 			keep:             true,
 			sameLabelBacking: true,
 		},
-		"summary quantile relabel preserves kind and family type": {
+		"name rewrite preserves quantile label": {
 			cfgs: []Config{
 				{
 					SourceLabels: []string{commonmodel.MetricNameLabel},
@@ -192,11 +190,11 @@ func TestProcessor_Apply(t *testing.T) {
 			in: sample("request_duration_seconds", map[string]string{
 				"method":   "GET",
 				"quantile": "0.9",
-			}, 7, prompkg.SampleKindSummaryQuantile, commonmodel.MetricTypeSummary),
+			}),
 			want: sample("nginx_request_duration_seconds", map[string]string{
 				"method":   "GET",
 				"quantile": "0.9",
-			}, 7, prompkg.SampleKindSummaryQuantile, commonmodel.MetricTypeSummary),
+			}),
 			keep:             true,
 			sameLabelBacking: true,
 		},
@@ -208,7 +206,7 @@ func TestProcessor_Apply(t *testing.T) {
 					Action:       Drop,
 				},
 			},
-			in:   sample("test_metric", map[string]string{"a": "foo"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in:   sample("test_metric", map[string]string{"a": "foo"}),
 			keep: false,
 		},
 		"drop uses anchored regex semantics": {
@@ -219,8 +217,8 @@ func TestProcessor_Apply(t *testing.T) {
 					Action:       Drop,
 				},
 			},
-			in:               sample("test_metric", map[string]string{"a": "foo"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
-			want:             sample("test_metric", map[string]string{"a": "foo"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in:               sample("test_metric", map[string]string{"a": "foo"}),
+			want:             sample("test_metric", map[string]string{"a": "foo"}),
 			keep:             true,
 			sameLabelBacking: true,
 		},
@@ -232,7 +230,7 @@ func TestProcessor_Apply(t *testing.T) {
 					Action:       Keep,
 				},
 			},
-			in:   sample("test_metric", map[string]string{"a": "foo"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in:   sample("test_metric", map[string]string{"a": "foo"}),
 			keep: false,
 		},
 		"ordered rules see prior __name__ rewrite": {
@@ -253,11 +251,11 @@ func TestProcessor_Apply(t *testing.T) {
 			},
 			in: sample("request_total", map[string]string{
 				"rename_to": "request.total",
-			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
+			}),
 			want: sample("request.total", map[string]string{
 				"rename_to": "request.total",
 				"seen_name": "prefix_request.total",
-			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter),
+			}),
 			keep: true,
 		},
 		"keepequal keeps when values match": {
@@ -268,11 +266,11 @@ func TestProcessor_Apply(t *testing.T) {
 					Action:       KeepEqual,
 				},
 			},
-			in: sample("test_metric", map[string]string{"__tmp_port": "1234", "__port1": "1234"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in: sample("test_metric", map[string]string{"__tmp_port": "1234", "__port1": "1234"}),
 			want: sample("test_metric", map[string]string{
 				"__tmp_port": "1234",
 				"__port1":    "1234",
-			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			}),
 			keep: true,
 		},
 		"dropequal drops when values match": {
@@ -283,7 +281,7 @@ func TestProcessor_Apply(t *testing.T) {
 					Action:       DropEqual,
 				},
 			},
-			in:   sample("test_metric", map[string]string{"__tmp_port": "1234", "__port1": "1234"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in:   sample("test_metric", map[string]string{"__tmp_port": "1234", "__port1": "1234"}),
 			keep: false,
 		},
 		"hashmod matches upstream example": {
@@ -295,13 +293,13 @@ func TestProcessor_Apply(t *testing.T) {
 					Modulus:      1000,
 				},
 			},
-			in: sample("test_metric", map[string]string{"a": "foo", "b": "bar", "c": "baz"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in: sample("test_metric", map[string]string{"a": "foo", "b": "bar", "c": "baz"}),
 			want: sample("test_metric", map[string]string{
 				"a": "foo",
 				"b": "bar",
 				"c": "baz",
 				"d": "976",
-			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			}),
 			keep: true,
 		},
 		"labelmap copies matching labels": {
@@ -312,14 +310,14 @@ func TestProcessor_Apply(t *testing.T) {
 					Action:      LabelMap,
 				},
 			},
-			in: sample("test_metric", map[string]string{"a": "foo", "b1": "bar", "b2": "baz"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in: sample("test_metric", map[string]string{"a": "foo", "b1": "bar", "b2": "baz"}),
 			want: sample("test_metric", map[string]string{
 				"a":      "foo",
 				"b1":     "bar",
 				"b2":     "baz",
 				"bar_b1": "bar",
 				"bar_b2": "baz",
-			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			}),
 			keep: true,
 		},
 		"labeldrop removes matching labels": {
@@ -329,10 +327,10 @@ func TestProcessor_Apply(t *testing.T) {
 					Action: LabelDrop,
 				},
 			},
-			in: sample("test_metric", map[string]string{"a": "foo", "b1": "bar", "b2": "baz"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in: sample("test_metric", map[string]string{"a": "foo", "b1": "bar", "b2": "baz"}),
 			want: sample("test_metric", map[string]string{
 				"a": "foo",
-			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			}),
 			keep: true,
 		},
 		"labeldrop does not drop __name__": {
@@ -342,8 +340,8 @@ func TestProcessor_Apply(t *testing.T) {
 					Action: LabelDrop,
 				},
 			},
-			in:   sample("test_metric", map[string]string{"a": "foo"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
-			want: sample("test_metric", map[string]string{}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in:   sample("test_metric", map[string]string{"a": "foo"}),
+			want: sample("test_metric", map[string]string{}),
 			keep: true,
 		},
 		"labelkeep keeps __name__ even when the regex excludes it": {
@@ -353,8 +351,8 @@ func TestProcessor_Apply(t *testing.T) {
 					Action: LabelKeep,
 				},
 			},
-			in:   sample("test_metric", map[string]string{"b1": "bar", "other": "x"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
-			want: sample("test_metric", map[string]string{"b1": "bar"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in:   sample("test_metric", map[string]string{"b1": "bar", "other": "x"}),
+			want: sample("test_metric", map[string]string{"b1": "bar"}),
 			keep: true,
 		},
 		"lowercase and uppercase write derived labels": {
@@ -370,12 +368,12 @@ func TestProcessor_Apply(t *testing.T) {
 					Action:       Lowercase,
 				},
 			},
-			in: sample("test_metric", map[string]string{"foo": "bAr123Foo"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in: sample("test_metric", map[string]string{"foo": "bAr123Foo"}),
 			want: sample("test_metric", map[string]string{
 				"foo":           "bAr123Foo",
 				"foo_lowercase": "bar123foo",
 				"foo_uppercase": "BAR123FOO",
-			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			}),
 			keep: true,
 		},
 		"explicit empty replacement deletes target label": {
@@ -388,10 +386,10 @@ func TestProcessor_Apply(t *testing.T) {
 					replacementSet: true,
 				},
 			},
-			in: sample("test_metric", map[string]string{"a": "foo", "b": "bar"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in: sample("test_metric", map[string]string{"a": "foo", "b": "bar"}),
 			want: sample("test_metric", map[string]string{
 				"a": "foo",
-			}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			}),
 			keep: true,
 		},
 		"invalid final metric name drops the sample": {
@@ -404,7 +402,7 @@ func TestProcessor_Apply(t *testing.T) {
 					replacementSet: true,
 				},
 			},
-			in:   sample("test_metric", map[string]string{"a": "foo"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in:   sample("test_metric", map[string]string{"a": "foo"}),
 			keep: false,
 		},
 	}
@@ -453,7 +451,7 @@ func TestProcessorApplyWithObserverReportsActualRuleBoundaries(t *testing.T) {
 
 	var facts []RuleDiagnostic
 	_, drop := processor.ApplyWithObserver(
-		sample("app_drop", map[string]string{"code": "5"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+		sample("app_drop", map[string]string{"code": "5"}),
 		func(fact RuleDiagnostic) { facts = append(facts, fact) },
 	)
 	require.True(t, drop.Dropped())
@@ -600,48 +598,45 @@ func TestNew_Validate(t *testing.T) {
 	}
 }
 
-func sample(name string, lbs map[string]string, value float64, kind prompkg.SampleKind, familyType commonmodel.MetricType) prompkg.Sample {
-	return prompkg.Sample{
-		Name:       name,
-		Labels:     labels.FromMap(lbs),
-		Value:      value,
-		Kind:       kind,
-		FamilyType: familyType,
+func sample(name string, lbs map[string]string) Record {
+	return Record{
+		Name:   name,
+		Labels: labels.FromMap(lbs),
 	}
 }
 
 func TestProcessor_Apply_dropInfo(t *testing.T) {
 	tests := map[string]struct {
 		cfgs       []Config
-		in         prompkg.Sample
+		in         Record
 		wantReason DropReason
 		wantRule   int
 		wantAction Action
 	}{
 		"drop rule matched": {
 			cfgs:       []Config{{SourceLabels: []string{"a"}, Regex: MustNewRegexp("foo"), Action: Drop}},
-			in:         sample("m", map[string]string{"a": "foo"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in:         sample("m", map[string]string{"a": "foo"}),
 			wantReason: DropReasonDropRuleMatched,
 			wantRule:   0,
 			wantAction: Drop,
 		},
 		"dropequal matched": {
 			cfgs:       []Config{{SourceLabels: []string{"a"}, TargetLabel: "b", Action: DropEqual}},
-			in:         sample("m", map[string]string{"a": "x", "b": "x"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in:         sample("m", map[string]string{"a": "x", "b": "x"}),
 			wantReason: DropReasonDropEqualMatched,
 			wantRule:   0,
 			wantAction: DropEqual,
 		},
 		"keepequal did not match": {
 			cfgs:       []Config{{SourceLabels: []string{"a"}, TargetLabel: "b", Action: KeepEqual}},
-			in:         sample("m", map[string]string{"a": "x", "b": "y"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in:         sample("m", map[string]string{"a": "x", "b": "y"}),
 			wantReason: DropReasonKeepEqualMismatch,
 			wantRule:   0,
 			wantAction: KeepEqual,
 		},
 		"keep rule did not match": {
 			cfgs:       []Config{{SourceLabels: []string{"a"}, Regex: MustNewRegexp("foo"), Action: Keep}},
-			in:         sample("m", map[string]string{"a": "bar"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in:         sample("m", map[string]string{"a": "bar"}),
 			wantReason: DropReasonKeepRuleMismatch,
 			wantRule:   0,
 			wantAction: Keep,
@@ -655,7 +650,7 @@ func TestProcessor_Apply_dropInfo(t *testing.T) {
 				replacementSet: true,
 				Action:         Replace,
 			}},
-			in:         sample("m", map[string]string{"a": "x"}, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge),
+			in:         sample("m", map[string]string{"a": "x"}),
 			wantReason: DropReasonInvalidMetricName,
 			wantRule:   -1,
 			wantAction: "",

@@ -14,8 +14,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/relabel"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 )
 

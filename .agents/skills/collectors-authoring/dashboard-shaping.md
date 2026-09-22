@@ -66,7 +66,7 @@ The generic Prometheus scraper (`src/go/plugin/go.d/collector/prometheus/`) auto
 - unit suffixes drive the units string: `_seconds`, `_bytes`, `_hertz`
 
 Operator controls (profiles documented in `src/go/plugin/go.d/collector/prometheus/profile-format.md`, relabeling in
-`src/go/plugin/go.d/collector/prometheus/relabel/README.md`):
+`src/go/pkg/relabel/README.md`):
 
 - **Scoping**: the time-series `selector` job option (allow/deny on metric name and label values, syntax in
   `src/go/pkg/prometheus/selector/README.md`) and `fallback_type` glob patterns for untyped metrics.
