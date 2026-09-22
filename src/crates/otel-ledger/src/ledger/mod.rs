@@ -30,7 +30,7 @@ mod traces_pipeline;
 mod uploader;
 
 use file_lifecycle::Pipeline;
-pub(crate) use rpc::{OtelLogsHandler, RemoteRead};
+pub(crate) use rpc::OtelLogsHandler;
 
 use std::collections::HashMap;
 use std::sync::Arc;

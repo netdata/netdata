@@ -43,7 +43,8 @@ use file_lifecycle::recovery::{
 use file_lifecycle::registry::TenantRegistries;
 use file_lifecycle::storage::OpendalStorage;
 
-use super::{OtelLogsHandler, RemoteRead};
+use super::OtelLogsHandler;
+use file_lifecycle::remote_read::RemoteRead;
 
 /// Minimum records per chunk when indexing an active WAL's prefix at
 /// query time. A fixed default for now; made configurable with the rest

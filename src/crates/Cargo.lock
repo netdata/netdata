@@ -1195,6 +1195,7 @@ dependencies = [
  "chrono",
  "chunk-file",
  "ferryboat",
+ "file-cache",
  "file-registry",
  "futures",
  "moka",

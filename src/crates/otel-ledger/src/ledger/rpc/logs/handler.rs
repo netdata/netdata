@@ -17,7 +17,6 @@
 //! the parent `rpc` module; traces installs its own.)
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 use bridge::function::{FunctionCallContext, FunctionHandler};
@@ -27,7 +26,7 @@ use netdata_plugin_types::HttpAccess;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
-use file_lifecycle::storage::{Storage, StorageError};
+use file_lifecycle::remote_read::RemoteRead;
 use sfsq::logs::{LogSource, LogsData, SfstCandidate, Source, WalTail, run};
 
 use super::adapter::{stream_required_params, to_result, window_secs};
@@ -132,114 +131,6 @@ fn build_files_response(tr: &TenantRegistries) -> FilesResponse {
         version: 1,
         status: 200,
         tenants,
-    }
-}
-
-/// The query path's handle to remote storage: a fetcher ([`OpendalStorage`]) and
-/// the local read-through [`FileCache`] that materializes evicted SFSTs back to
-/// disk. Present only when `remote_storage.enabled`.
-#[derive(Clone)]
-pub(crate) struct RemoteRead {
-    storage: file_lifecycle::storage::OpendalStorage,
-    cache: file_cache::FileCache,
-}
-
-impl RemoteRead {
-    pub(crate) fn new(
-        storage: file_lifecycle::storage::OpendalStorage,
-        cache: file_cache::FileCache,
-    ) -> Self {
-        Self { storage, cache }
-    }
-
-    /// Materialize remote-only catalog entries into local cache files and return
-    /// them as engine sources, plus the [`CachedFile`](file_cache::CachedFile) pin
-    /// guards the caller MUST hold for the query's duration (so the files are not
-    /// evicted mid-read). Per-entry fetch failures degrade (the entry is omitted).
-    /// Errors only on a query-wide cache condition (footprint over capacity, a
-    /// broken cache dir, or cancellation).
-    /// `progress` counts one unit per object actually downloaded (cache misses),
-    /// feeding the fetch phase of the function's progress bar. Hits are instant
-    /// and not counted; the caller sizes `total` to absorb that.
-    async fn fetch_candidates(
-        &self,
-        entries: Vec<otel_catalog::CatalogEntry>,
-        cancel: &CancellationToken,
-        progress: Arc<AtomicUsize>,
-    ) -> Result<
-        (
-            Vec<file_registry::SelectedFile>,
-            Vec<file_cache::CachedFile>,
-        ),
-        file_cache::CacheError,
-    > {
-        // filename → entry (carries the catalog summary + remote key + size).
-        let mut by_name: std::collections::HashMap<String, otel_catalog::CatalogEntry> =
-            std::collections::HashMap::with_capacity(entries.len());
-        let mut wants = Vec::with_capacity(entries.len());
-        for e in entries {
-            let filename = e.id.to_filename("sfst");
-            wants.push(file_cache::Want {
-                filename: filename.clone(),
-                size: e.size.as_u64(),
-            });
-            by_name.insert(filename, e);
-        }
-
-        // Fetch closure: map the cache filename back to its remote key and read
-        // the object. Clones the key out before the async block so it borrows
-        // nothing across the await.
-        let storage = self.storage.clone();
-        let keys: std::collections::HashMap<String, String> = by_name
-            .iter()
-            .map(|(name, e)| (name.clone(), e.remote_key.clone()))
-            .collect();
-        let files = self
-            .cache
-            .acquire(
-                &wants,
-                move |filename| {
-                    let storage = storage.clone();
-                    let progress = progress.clone();
-                    let key = keys.get(filename).cloned();
-                    async move {
-                        match key {
-                            Some(k) => {
-                                let bytes = storage
-                                    .read(&k)
-                                    .await
-                                    .map_err(|e| read_error_to_anyhow(&k, e))?;
-                                // One download done — advance the fetch-phase bar.
-                                progress.fetch_add(1, Ordering::Relaxed);
-                                Ok(bytes)
-                            }
-                            None => Err(anyhow::anyhow!("no remote key for cache entry")),
-                        }
-                    }
-                },
-                cancel,
-            )
-            .await?;
-
-        // Each cached file becomes a sealed-SFST source; its time/stream summary
-        // comes from the catalog entry (no need to re-open the file for it).
-        let mut sources = Vec::with_capacity(files.len());
-        for cf in &files {
-            let Some(e) = by_name.get(cf.filename()) else {
-                continue;
-            };
-            sources.push(file_registry::SelectedFile {
-                id: e.id,
-                summary: sfst::Summary {
-                    min_timestamp_s: e.min_timestamp_s,
-                    max_timestamp_s: e.max_timestamp_s,
-                    record_count: e.record_count,
-                    content_meta: e.content_meta.clone(),
-                },
-                path: cf.path().to_path_buf(),
-            });
-        }
-        Ok((sources, files))
     }
 }
 
@@ -499,41 +390,38 @@ impl FunctionHandler for OtelLogsHandler {
             wal_tails.extend(tails);
         }
 
-        // Progress spans two phases: the remote fetch (one unit per downloaded
-        // SFST) then the engine scan (one unit per source). Set `total` upfront —
+        // Progress spans two phases: the remote fetch (one unit per attempted
+        // download) then the engine scan (one unit per source). Set `total` upfront —
         // `remote_count` downloads + the eventual scan-source count (local sources
         // plus the fetched remotes) — so the fetch phase, which can be the slow
         // network-bound part, advances a real bar instead of sitting at the
         // indeterminate 1%. With no remote candidates this reduces to the scan
         // count, identical to before. `total` is an upper bound (cache hits and
-        // degraded fetches make `done` finish just under it); the bar caps at 99%
+        // failed downloads make `done` finish just under it); the bar caps at 99%
         // regardless and completion is signaled by the RESULT, so that is benign.
         let remote_count = remote_cands.len();
         let local_scan = sfst_candidates.len() + wal_tails.len();
         ctx.progress.set_total(local_scan + 2 * remote_count);
         let done = ctx.progress.done_counter();
 
-        // Fetch any remote-only SFSTs (evicted locally) back through the read
-        // cache and add them as sources. The returned pin guards MUST outlive the
-        // blocking query run below; the `_`-prefixed binding holds them (kept alive
-        // for their `Drop`, not read) until this function returns, after
-        // `spawn_blocking`. (If the call is cancelled and this future is dropped
-        // before the blocking task maps the files, a since-evicted source just
-        // degrades in the engine — acceptable, since a cancelled query's result is
-        // discarded anyway.) Per-entry fetch failures degrade inside
-        // `fetch_candidates`; query-wide failures surface as actionable errors.
-        let _remote_guards: Vec<file_cache::CachedFile> = if let Some(remote) = &self.remote
+        // Fetch any remote-only SFSTs (evicted locally) back through the
+        // download cache and add them as sources. The returned pins move into
+        // the blocking query run below, so the files stay in the cache until the
+        // engine is done with them, even if this call is cancelled meanwhile.
+        // Files that could not be downloaded are omitted (the logs wire has no
+        // partial status); query-wide failures surface as actionable errors.
+        let remote_pins: Vec<file_cache::CachedFile> = if let Some(remote) = &self.remote
             && !remote_cands.is_empty()
         {
             match remote
-                .fetch_candidates(remote_cands, &ctx.cancellation, done.clone())
+                .fetch(remote_cands, &ctx.cancellation, done.clone())
                 .await
             {
-                Ok((remote_sources, guards)) => {
+                Ok(fetched) => {
                     // Convert the neutral selected files to engine candidates at
                     // the boundary, same as the local sealed ones.
-                    sfst_candidates.extend(remote_sources.into_iter().map(SfstCandidate::from));
-                    guards
+                    sfst_candidates.extend(fetched.files.into_iter().map(SfstCandidate::from));
+                    fetched.pins
                 }
                 Err(file_cache::CacheError::Cancelled) => {
                     // The bridge usually discards a cancelled call's
@@ -605,6 +493,7 @@ impl FunctionHandler for OtelLogsHandler {
         let grid = query.grid();
         let histogram_field = query.histogram_field().to_owned();
         let mut result = match tokio::task::spawn_blocking(move || {
+            let _pins = remote_pins;
             to_result(run(sources, query, cancel, done), last)
         })
         .await
@@ -638,22 +527,6 @@ impl FunctionHandler for OtelLogsHandler {
 /// `default` stays nameable (unlike ingest's strict validation).
 fn resolve_query_tenant(raw: Option<&str>) -> TenantId {
     TenantId::resolve_query(raw)
-}
-
-/// Convert a remote-read failure into the `anyhow::Error` handed to the
-/// file-cache — which logs it verbatim with `{e:#}`.
-///
-/// MUST flatten through `StorageError`'s `Display`, never extract the raw
-/// inner error: `Display` renders the full source chain with URL query
-/// strings redacted (`file-lifecycle`'s `redact`), and a raw chain would put
-/// request credentials in the journal (AWS carries the STS web-identity JWT
-/// and request signatures in URL queries). Nothing is lost by flattening —
-/// `Display` already carries every chain level as text.
-fn read_error_to_anyhow(key: &str, e: StorageError) -> anyhow::Error {
-    match e {
-        StorageError::NotFound => anyhow::anyhow!("remote object not found: {key}"),
-        other => anyhow::anyhow!("remote read failed for {key}: {other}"),
-    }
 }
 
 #[cfg(test)]
