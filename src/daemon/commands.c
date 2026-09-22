@@ -971,6 +971,12 @@ static void connection_cb(uv_stream_t *server, int status)
     cmd_ctx = mallocz(sizeof(*cmd_ctx));
     cmd_ctx->idx = CMD_HELP;
     cmd_ctx->close_by_callback = false;
+#if defined(OS_WINDOWS)
+    // mallocz() does not zero. This gates the Administrators check in
+    // pipe_read_cb(), so an uninitialised non-zero byte here would skip
+    // authorization entirely.
+    cmd_ctx->client_authorized = false;
+#endif
     client = (uv_pipe_t *)cmd_ctx;
     ret = uv_pipe_init(server->loop, client, 1);
     if (ret) {

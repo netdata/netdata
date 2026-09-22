@@ -53,7 +53,7 @@ static bool nd_windows_directory_exists(const char *path) {
     return exists;
 }
 
-static char *nd_windows_temp_path_utf8(void) {
+static char *nd_windows_temp_path_utf8(size_t *utf8_length_out) {
     DWORD capacity = MAX_PATH;
     for (;;) {
         wchar_t *wide = mallocz((size_t)capacity * sizeof(*wide));
@@ -78,6 +78,7 @@ static char *nd_windows_temp_path_utf8(void) {
             }
             utf8[utf8_length] = '\0';
             freez(wide);
+            *utf8_length_out = (size_t)utf8_length;
             return utf8;
         }
         freez(wide);
@@ -187,9 +188,10 @@ void nd_windows_detect_prefix_and_override_paths(void) {
     // would otherwise abort the agent.  A per-user temporary location is
     // writable in both interactive and service contexts.
     if (!nd_windows_directory_exists(run_dir)) {
-        char *temp_path = nd_windows_temp_path_utf8();
+        size_t temp_path_length = 0;
+        char *temp_path = nd_windows_temp_path_utf8(&temp_path_length);
         if (temp_path) {
-            size_t fallback_size = strlen(temp_path) + sizeof("netdata/run");
+            size_t fallback_size = temp_path_length + sizeof("netdata/run");
             CLEAN_CHAR_P *fallback_parent = mallocz(fallback_size);
             CLEAN_CHAR_P *fallback = mallocz(fallback_size);
             snprintfz(fallback_parent, fallback_size, "%snetdata", temp_path);
