@@ -62,7 +62,8 @@ inline NetdataTestLogCapture &netdata_test_log_capture() {
 
 // DBENGINE_TEST_LOG, read once, for the A/B check that the sink stream and the nd_log stream are the same stream:
 //
-//   unset        what a normal run does - capture, and print a case's lines only when that case failed
+//   unset        what a normal run does - capture, and print a case's lines only when that case failed or ended in
+//                fatal(); a case that dies by a signal, or hangs, loses them, and is rerun with sink-echo to see them
 //   none         no sink is installed, so the engine logs the way it did before there was one
 //   sink-echo    the sink is installed and also writes each line to stderr as it arrives, in a form that can be
 //                compared against what the logger prints in a "none" run

@@ -46,6 +46,29 @@ class EngineLogListener : public ::testing::EmptyTestEventListener {
     }
 };
 
+// A case that dies never reaches OnTestEnd, so what it captured would die with it. fatal() is how the engine usually
+// dies, and libnetdata calls this on that path, on the dying thread, before the process ends. It tries the capture's
+// lock rather than waiting on it: the thread that holds it may be the one that cannot come back.
+extern "C" void netdata_test_print_capture_on_fatal(const char *filename, const char *function, const char *message,
+                                                    const char *errno_str, const char *stack_trace, long line) {
+    (void)filename; (void)function; (void)message; (void)errno_str; (void)stack_trace; (void)line;
+
+    const ::testing::TestInfo *info = ::testing::UnitTest::GetInstance()->current_test_info();
+    std::fprintf(stderr, "  fatal() in %s%s%s - what the engine logged during it:\n",
+                 info ? info->test_suite_name() : "no test", info ? "." : "", info ? info->name() : "");
+
+    NetdataTestLogCapture &capture = netdata_test_log_capture();
+    if (!capture.mutex.try_lock()) {
+        std::fprintf(stderr, "    (the capture is busy; rerun with DBENGINE_TEST_LOG=sink-echo)\n");
+        return;
+    }
+    std::fprintf(stderr, "%s", capture.text.c_str());
+    if (capture.truncated)
+        std::fprintf(stderr, "    ... and more, dropped at the %d byte ceiling\n", NETDATA_TEST_LOG_CAPTURE_MAX);
+    capture.mutex.unlock();
+    fflush(stderr);
+}
+
 // googletest ships a main of its own, but this suite cannot use it: two things have to be settled before the first
 // test touches the engine, and neither can be undone afterwards.
 int main(int argc, char **argv) {
@@ -72,5 +95,9 @@ int main(int argc, char **argv) {
     // with DBENGINE_TEST_LOG=none there is no sink and nothing is captured: the engine's lines are already on stderr
     if (netdata_test_log_mode() != NETDATA_TEST_LOG_NONE)
         ::testing::UnitTest::GetInstance()->listeners().Append(new EngineLogListener);
+
+    // sink-echo writes every line as it arrives already; only the capture needs rescuing from a fatal()
+    if (netdata_test_log_mode() == NETDATA_TEST_LOG_CAPTURE)
+        nd_log_register_fatal_hook_cb(netdata_test_print_capture_on_fatal);
     return RUN_ALL_TESTS();
 }
