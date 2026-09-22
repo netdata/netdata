@@ -325,14 +325,19 @@ done:
 // this will produce new versions as needed. We need this because we are about to send a
 // a snapshot so we can include the latest transition.
 //
-static void commit_alert_events(RRDHOST *host)
+// Returns true when it stopped on the pass cap with rows still queued, so the caller can re-arm the host:
+// RRDHOST_FLAG_ACLK_STREAM_ALERTS is cleared before this runs, and on the non-streaming/archived path nothing
+// else would set it again - an archived host generates no new transitions to re-arm it, so the remainder
+// would sit in the queue indefinitely.
+static bool commit_alert_events(RRDHOST *host)
 {
     sqlite3_stmt *res = NULL;
     sqlite3_stmt *res_version = NULL;
     sqlite3_stmt *res_delete = NULL;
+    bool more_queued = false;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_TO_DUMMY, &res))
-        return;
+        return false;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
@@ -378,13 +383,16 @@ static void commit_alert_events(RRDHOST *host)
         // come back full without making progress. That resolves itself - the next pass sees the newer
         // transition and consumes that - but do not spin the ACLK worker on it: stop after a bounded number of
         // passes and let the next tick continue, exactly as the push path does.
-    } while (consumed == ACLK_MAX_ALERT_UPDATES_N && ++passes < ACLK_COMMIT_MAX_PASSES);
+        more_queued = (consumed == ACLK_MAX_ALERT_UPDATES_N);
+
+    } while (more_queued && ++passes < ACLK_COMMIT_MAX_PASSES);
 
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
     SQLITE_FINALIZE(res_version);
     SQLITE_FINALIZE(res_delete);
+    return more_queued;
 }
 
 typedef enum {
@@ -776,12 +784,21 @@ done:
 // satisfied - the transition itself (health_log_detail), its alert (health_log), or its config (alert_hash).
 // RETURNING gives an exact count from the statement itself; sqlite3_changes() would be a separate read of a
 // per-connection counter that the health thread shares and can clobber between our step and our read.
+// The row set is bounded per call: SQLite materialises all RETURNING output during the first step, so an
+// unbounded DELETE would allocate in proportion to the whole backlog. Anything left waits for the next hour.
+// The LIMIT is deliberately unordered: every row it selects is deleted by this same statement, so a backlog
+// drains regardless of which rows each pass picks. An ORDER BY would buy determinism nobody needs at the cost
+// of a sort on an hourly path over a potentially large set.
+#define ACLK_QUEUE_REAP_MAX_ROWS 1000
+
 #define SQL_REAP_UNSENDABLE_QUEUE_ROWS                                                                                 \
-    "DELETE FROM aclk_queue WHERE date_created < UNIXEPOCH() - @age AND NOT EXISTS "                                   \
-    " (SELECT 1 FROM health_log hl, health_log_detail hld, alert_hash ah"                                              \
-    "   WHERE hl.health_log_id = aclk_queue.health_log_id AND hl.host_id = aclk_queue.host_id"                         \
-    "     AND hld.health_log_id = aclk_queue.health_log_id AND hld.unique_id = aclk_queue.unique_id"                   \
-    "     AND ah.hash_id = hl.config_hash_id)"                                                                         \
+    "DELETE FROM aclk_queue WHERE sequence_id IN"                                                                      \
+    " (SELECT q.sequence_id FROM aclk_queue q WHERE q.date_created < UNIXEPOCH() - @age AND NOT EXISTS"                 \
+    "   (SELECT 1 FROM health_log hl, health_log_detail hld, alert_hash ah"                                            \
+    "     WHERE hl.health_log_id = q.health_log_id AND hl.host_id = q.host_id"                                         \
+    "       AND hld.health_log_id = q.health_log_id AND hld.unique_id = q.unique_id"                                   \
+    "       AND ah.hash_id = hl.config_hash_id)"                                                                       \
+    "  LIMIT @limit)"                                                                                                  \
     " RETURNING sequence_id"
 
 static int aclk_queue_reap_unsendable(int64_t age_s)
@@ -794,10 +811,16 @@ static int aclk_queue_reap_unsendable(int64_t age_s)
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, age_s));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, ACLK_QUEUE_REAP_MAX_ROWS));
 
     param = 0;
-    while (sqlite3_step_monitored(res) == SQLITE_ROW)
+    int rc;
+    while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW)
         reaped++;
+
+    // without this the caller would advance next_reap_s on a failed delete and skip cleanup for an hour
+    if (rc != SQLITE_DONE)
+        error_report("Failed to reap unsendable alert submit queue rows, rc = %d", rc);
 
     if (reaped)
         nd_log(NDLS_DAEMON, NDLP_NOTICE, "ACLK: reaped %d alert submit queue rows whose transition no longer exists", reaped);
@@ -837,7 +860,8 @@ void aclk_push_alert_events_for_all_hosts(void)
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
         if (!aclk_host_config || !aclk_alert_streaming_enabled(aclk_host_config) || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
             (void)process_alert_pending_queue(host);
-            commit_alert_events(host);
+            if (commit_alert_events(host))
+                rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
             continue;
         }
 
@@ -847,7 +871,9 @@ void aclk_push_alert_events_for_all_hosts(void)
             if (snapshot_state == ACLK_ALERT_SNAPSHOT_PENDING)
                 continue;
             (void)process_alert_pending_queue(host);
-            commit_alert_events(host);
+            // the snapshot itself is rebuilt from the health log, not from what is still queued, so a capped
+            // drain cannot make it stale; the flag is already set on this path for the remainder
+            (void)commit_alert_events(host);
             rebuild_host_alert_version_table(host);
             send_alert_snapshot_to_cloud(host);
             aclk_host_config->snapshot_count++;
@@ -1334,6 +1360,18 @@ done:
     return count;
 }
 
+// A failed seed used to surface as a confusing queue-state mismatch three assertions later, so every
+// bind/step in the fixtures reports itself with its rc and the sqlite message.
+#define AQ_SQL(expr, what)                                                                                             \
+    do {                                                                                                               \
+        int _rc = (expr);                                                                                              \
+        if (_rc != SQLITE_OK && _rc != SQLITE_DONE && _rc != SQLITE_ROW) {                                             \
+            netdata_log_error(                                                                                         \
+                "ALERT QUEUE TEST: fixture step \"%s\" failed: rc=%d (%s)", what, _rc, sqlite3_errmsg(db_meta));       \
+            failures++;                                                                                                \
+        }                                                                                                              \
+    } while (0)
+
 #define AQ_CHECK(condition, fmt, ...)                                                                                  \
     do {                                                                                                               \
         if (!(condition)) {                                                                                            \
@@ -1381,7 +1419,8 @@ int alert_queue_unittest(void)
     (void)insert_alert_to_submit_queue(&host_id, health_log_id, sent_unique_id, RRDCALC_STATUS_CLEAR);
     AQ_CHECK(
         aq_test_queue(&host_id, &sequence_id, &unique_id) == 1 && unique_id == (int64_t)sent_unique_id,
-        "one row is queued, holding the transition to send");
+        "one row is queued, holding the transition to send (unique_id=%" PRId64 ", expected %u)",
+        unique_id, sent_unique_id);
 
     // the push reads and sends it; while it is in flight the alert transitions
     // again, and the insert re-points the very same row
@@ -1390,19 +1429,25 @@ int alert_queue_unittest(void)
     AQ_CHECK(
         aq_test_queue(&host_id, &re_pointed_sequence_id, &unique_id) == 1 &&
             unique_id == (int64_t)queued_during_send_unique_id && re_pointed_sequence_id == sequence_id,
-        "the newer transition re-points the same row, keeping its sequence_id");
+        "the newer transition re-points the same row, keeping its sequence_id "
+        "(unique_id=%" PRId64 " expected %u, sequence_id=%" PRId64 " expected %" PRId64 ")",
+        unique_id, queued_during_send_unique_id, re_pointed_sequence_id, sequence_id);
 
     // the push now removes what it sent
     (void)delete_alert_from_submit_queue(&host_id, sequence_id, sent_unique_id, &res_delete);
 
     // THE CONTRACT: only the transition that was sent may be removed
+    int rows = aq_test_queue(&host_id, NULL, &unique_id);
     AQ_CHECK(
-        aq_test_queue(&host_id, NULL, &unique_id) == 1 && unique_id == (int64_t)queued_during_send_unique_id,
-        "the transition queued during the send survives and is still pending");
+        rows == 1 && unique_id == (int64_t)queued_during_send_unique_id,
+        "the transition queued during the send survives and is still pending "
+        "(rows=%d, unique_id=%" PRId64 ", expected %u)",
+        rows, unique_id, queued_during_send_unique_id);
 
     // and the row does go away once its own transition has been sent
     (void)delete_alert_from_submit_queue(&host_id, sequence_id, queued_during_send_unique_id, &res_delete);
-    AQ_CHECK(aq_test_queue(&host_id, NULL, NULL) == 0, "the queue is empty once the newer transition is sent too");
+    rows = aq_test_queue(&host_id, NULL, NULL);
+    AQ_CHECK(rows == 0, "the queue is empty once the newer transition is sent too (rows=%d)", rows);
 
     // a row whose transition no longer exists can never be sent, so it must be reaped - but only once it is
     // old enough that we cannot be racing its insert
@@ -1434,35 +1479,40 @@ int alert_queue_unittest(void)
         for (int pass = 0; pass < 2; pass++) {
             if (!PREPARE_STATEMENT(db_meta, pending_insert, &ins))
                 break;
-            (void)sqlite3_bind_blob(ins, 1, &host_id, sizeof(host_id), SQLITE_STATIC);
-            (void)sqlite3_bind_int64(ins, 2, pass ? 3002 : 3001);
-            (void)sqlite3_step_monitored(ins);
+            AQ_SQL(sqlite3_bind_blob(ins, 1, &host_id, sizeof(host_id), SQLITE_STATIC), "pending seed host_id");
+            AQ_SQL(sqlite3_bind_int64(ins, 2, pass ? 3002 : 3001), "pending seed unique_id");
+            AQ_SQL(sqlite3_step_monitored(ins), "pending seed insert");
             SQLITE_FINALIZE(ins);
             ins = NULL;
         }
 
         sqlite3_stmt *sel = NULL;
         if (PREPARE_STATEMENT(db_meta, "SELECT rowid, unique_id FROM alert_queue WHERE host_id = @host_id", &sel)) {
-            (void)sqlite3_bind_blob(sel, 1, &host_id, sizeof(host_id), SQLITE_STATIC);
+            AQ_SQL(sqlite3_bind_blob(sel, 1, &host_id, sizeof(host_id), SQLITE_STATIC), "pending read host_id");
             if (sqlite3_step_monitored(sel) == SQLITE_ROW) {
                 rowid = sqlite3_column_int64(sel, 0);
                 pending_unique = sqlite3_column_int64(sel, 1);
             }
             SQLITE_FINALIZE(sel);
         }
-        AQ_CHECK(pending_unique == 3002, "pending queue: the newer transition re-points the same row");
+        AQ_CHECK(
+            pending_unique == 3002,
+            "pending queue: the newer transition re-points the same row (unique_id=%" PRId64 ", expected 3002)",
+            pending_unique);
 
         // drain the row as process_alert_pending_queue() would, naming the transition it read (the older one)
         delete_alert_from_pending_queue(&host_id, rowid, 3001);
 
         int64_t still = 0;
         if (PREPARE_STATEMENT(db_meta, "SELECT COUNT(*) FROM alert_queue WHERE host_id = @host_id", &sel)) {
-            (void)sqlite3_bind_blob(sel, 1, &host_id, sizeof(host_id), SQLITE_STATIC);
+            AQ_SQL(sqlite3_bind_blob(sel, 1, &host_id, sizeof(host_id), SQLITE_STATIC), "pending count host_id");
             if (sqlite3_step_monitored(sel) == SQLITE_ROW)
                 still = sqlite3_column_int64(sel, 0);
             SQLITE_FINALIZE(sel);
         }
-        AQ_CHECK(still == 1, "pending queue: the transition queued during the drain survives");
+        AQ_CHECK(
+            still == 1, "pending queue: the transition queued during the drain survives (rows=%" PRId64 ", expected 1)",
+            still);
         (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
     }
 
@@ -1482,8 +1532,8 @@ int alert_queue_unittest(void)
         // warn must be non-NULL: a config with neither warn nor crit is a variable config, and
         // insert_alert_to_submit_queue() deliberately never queues those
         if (PREPARE_STATEMENT(db_meta, "INSERT INTO alert_hash (hash_id, warn) VALUES (@hash, '$this > 1')", &st)) {
-            (void)sqlite3_bind_blob(st, 1, &config_hash, sizeof(config_hash), SQLITE_STATIC);
-            (void)sqlite3_step_monitored(st);
+            AQ_SQL(sqlite3_bind_blob(st, 1, &config_hash, sizeof(config_hash), SQLITE_STATIC), "alert_hash seed");
+            AQ_SQL(sqlite3_step_monitored(st), "alert_hash insert");
             SQLITE_FINALIZE(st);
             st = NULL;
         }
@@ -1493,10 +1543,10 @@ int alert_queue_unittest(void)
                     db_meta,
                     "INSERT INTO health_log (health_log_id, host_id, alarm_id, config_hash_id, name, chart)"
                     " VALUES (@id, @host_id, @id, @hash, 'alert', 'chart')", &st)) {
-                (void)sqlite3_bind_int64(st, 1, i);
-                (void)sqlite3_bind_blob(st, 2, &host_id, sizeof(host_id), SQLITE_STATIC);
-                (void)sqlite3_bind_blob(st, 3, &config_hash, sizeof(config_hash), SQLITE_STATIC);
-                (void)sqlite3_step_monitored(st);
+                AQ_SQL(sqlite3_bind_int64(st, 1, i), "health_log seed id");
+                AQ_SQL(sqlite3_bind_blob(st, 2, &host_id, sizeof(host_id), SQLITE_STATIC), "health_log seed host_id");
+                AQ_SQL(sqlite3_bind_blob(st, 3, &config_hash, sizeof(config_hash), SQLITE_STATIC), "health_log seed hash");
+                AQ_SQL(sqlite3_step_monitored(st), "health_log insert");
                 SQLITE_FINALIZE(st);
                 st = NULL;
             }
@@ -1505,9 +1555,9 @@ int alert_queue_unittest(void)
                     "INSERT INTO health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id,"
                     " updated_by_id, when_key, new_status, old_status) "
                     " VALUES (@id, @uid, @id, 1, 0, UNIXEPOCH(), 3, 1)", &st)) {
-                (void)sqlite3_bind_int64(st, 1, i);
-                (void)sqlite3_bind_int64(st, 2, 5000 + i);
-                (void)sqlite3_step_monitored(st);
+                AQ_SQL(sqlite3_bind_int64(st, 1, i), "health_log_detail seed id");
+                AQ_SQL(sqlite3_bind_int64(st, 2, 5000 + i), "health_log_detail seed unique_id");
+                AQ_SQL(sqlite3_step_monitored(st), "health_log_detail insert");
                 SQLITE_FINALIZE(st);
                 st = NULL;
             }
@@ -1517,7 +1567,7 @@ int alert_queue_unittest(void)
         AQ_CHECK(queued_rows == seed, "seeded %d queue rows (one batch is %d)", queued_rows, limit);
 
         if (PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_TO_PUSH, &st)) {
-            (void)sqlite3_bind_blob(st, 1, &host_id, sizeof(host_id), SQLITE_STATIC);
+            AQ_SQL(sqlite3_bind_blob(st, 1, &host_id, sizeof(host_id), SQLITE_STATIC), "push SELECT host_id");
             while (sqlite3_step_monitored(st) == SQLITE_ROW)
                 returned++;
             SQLITE_FINALIZE(st);
