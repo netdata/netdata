@@ -142,7 +142,7 @@ done:
 // - Cloud is already aware of the alert status
 // - The transition refers to a variable
 //
-static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, uint32_t unique_id, RRDCALC_STATUS status)
+static int insert_alert_to_submit_queue(nd_uuid_t *host_id, int64_t health_log_id, uint32_t unique_id, RRDCALC_STATUS status)
 {
     static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
@@ -152,7 +152,7 @@ static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, ui
         return 1;
     }
 
-    if (is_event_from_alert_variable_config(unique_id, &host->host_id.uuid))
+    if (is_event_from_alert_variable_config(unique_id, host_id))
         return 2;
 
     if (is_health_thread) {
@@ -167,7 +167,7 @@ static int insert_alert_to_submit_queue(RRDHOST *host, int64_t health_log_id, ui
     }
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, health_log_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (int64_t) unique_id));
 
@@ -186,32 +186,49 @@ done:
 }
 
 #define SQL_DELETE_QUEUE_ALERT_TO_CLOUD                                                                                \
-    "DELETE FROM aclk_queue WHERE host_id = @host_id AND sequence_id BETWEEN @seq1 AND @seq2"
+    "DELETE FROM aclk_queue WHERE host_id = @host_id AND sequence_id = @sequence_id AND unique_id = @unique_id"        \
+    " RETURNING sequence_id"
 
 //
-// Delete a range of alerts from the submit queue (after being sent to the the cloud)
+// Remove one alert from the submit queue, after that transition was sent to the cloud.
 //
-static int delete_alert_from_submit_queue(RRDHOST *host, int64_t first_seq_id, int64_t last_seq_id)
+// The unique_id is part of the predicate on purpose. The queue coalesces by re-pointing an existing row
+// (ON CONFLICT ... DO UPDATE SET unique_id=...), and DO UPDATE keeps sequence_id, so a transition queued
+// while this batch was in flight sits on a row we have already read and sent. Deleting by position alone
+// would destroy it unsent and leave the cloud on a status the agent has already left. Guarded this way, a
+// re-pointed row simply fails the predicate, survives, and goes out on the next pass.
+//
+// The caller owns the statement: this runs once per row sent, and re-preparing it each time would take
+// the global sqlite_spinlock in simple_prepare_statement() - and a full SQL parse - up to
+// ACLK_MAX_ALERT_UPDATES times per host per tick, on a lock every web, API and metadata thread contends on.
+// Returns true when the row was actually removed. A false means the row was re-pointed after we read it - the
+// guard did its job and the newer transition is still queued, which the caller must not mistake for "done".
+static bool delete_alert_from_submit_queue(nd_uuid_t *host_id, int64_t sequence_id, int64_t unique_id, sqlite3_stmt **res)
 {
-    sqlite3_stmt *res = NULL;
+    bool deleted = false;
 
-    if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_QUEUE_ALERT_TO_CLOUD, &res))
-        return -1;
+    if (!*res) {
+        if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_QUEUE_ALERT_TO_CLOUD, res))
+            return false;
+    }
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, first_seq_id));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, last_seq_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(*res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(*res, ++param, sequence_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(*res, ++param, unique_id));
 
     param = 0;
-    int rc = sqlite3_step_monitored(res);
-    if (rc != SQLITE_DONE)
+    // RETURNING: one row back means this exact transition was consumed, none means it was re-pointed
+    int rc = sqlite3_step_monitored(*res);
+    if (rc == SQLITE_ROW)
+        deleted = true;
+    else if (rc != SQLITE_DONE)
         error_report("Failed to delete submitted to ACLK");
 
 done:
-    REPORT_BIND_FAIL(res, param);
-    SQLITE_FINALIZE(res);
-    return 0;
+    REPORT_BIND_FAIL(*res, param);
+    SQLITE_RESET(*res);
+    return deleted;
 }
 
 int rrdcalc_status_to_proto_enum(RRDCALC_STATUS status)
@@ -303,53 +320,93 @@ done:
 #define SQL_SELECT_ALERT_TO_DUMMY                                                                                      \
     "SELECT aq.sequence_id, hld.unique_id, hld.when_key, hld.new_status, hld.health_log_id"                            \
     " FROM health_log hl, aclk_queue aq, alert_hash ah, health_log_detail hld"                                         \
-    " WHERE hld.unique_id = aq.unique_id AND hl.config_hash_id = ah.hash_id"                                           \
+    " WHERE hld.unique_id = aq.unique_id AND hld.health_log_id = aq.health_log_id"                                     \
+    " AND hl.config_hash_id = ah.hash_id"                                                                              \
     " AND hl.host_id = @host_id AND aq.host_id = hl.host_id AND hl.health_log_id = hld.health_log_id"                  \
-    " ORDER BY aq.sequence_id ASC"
+    " ORDER BY aq.sequence_id ASC LIMIT "ACLK_MAX_ALERT_UPDATES
+
+// how many batches one commit_alert_events() call may drain before yielding to the next tick
+#define ACLK_COMMIT_MAX_PASSES   10
 
 //
 // Check all queued alerts for a host and commit them as if they have been send to the cloud
 // this will produce new versions as needed. We need this because we are about to send a
 // a snapshot so we can include the latest transition.
 //
-static void commit_alert_events(RRDHOST *host)
+// Returns true when it stopped on the pass cap with rows still queued, so the caller can re-arm the host:
+// RRDHOST_FLAG_ACLK_STREAM_ALERTS is cleared before this runs, and on the non-streaming/archived path nothing
+// else would set it again - an archived host generates no new transitions to re-arm it, so the remainder
+// would sit in the queue indefinitely.
+static bool commit_alert_events(RRDHOST *host)
 {
     sqlite3_stmt *res = NULL;
     sqlite3_stmt *res_version = NULL;
+    sqlite3_stmt *res_delete = NULL;
+    bool more_queued = false;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_TO_DUMMY, &res))
-        return;
+        return false;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
-    int64_t first_sequence_id = 0;
-    int64_t last_sequence_id = 0;
+    // Same reason as the push path: the deletes happen after the statement is reset, never while this joined
+    // SELECT is being stepped. The LIMIT bounds one pass, and the pass repeats while it is full - each pass
+    // deletes what it committed, so the next one sees the rest and the loop terminates.
+    int64_t consumed_seq[ACLK_MAX_ALERT_UPDATES_N];
+    int64_t consumed_uid[ACLK_MAX_ALERT_UPDATES_N];
+    size_t consumed;
+    int passes = 0;
+    bool missed_delete = false;
 
     param = 0;
-    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+    do {
+        consumed = 0;
+        missed_delete = false;
 
-        last_sequence_id = sqlite3_column_int64(res, 0);
-        if (first_sequence_id == 0)
-            first_sequence_id = last_sequence_id;
+        while (sqlite3_step_monitored(res) == SQLITE_ROW) {
 
-        int64_t unique_id = sqlite3_column_int(res, 1);
-        int64_t version = sqlite3_column_int64(res, 2);
-        RRDCALC_STATUS status = (RRDCALC_STATUS)sqlite3_column_int(res, 3);
-        int64_t health_log_id = sqlite3_column_int64(res, 4);
+            int64_t sequence_id = sqlite3_column_int64(res, 0);
+            int64_t unique_id = sqlite3_column_int64(res, 1);
+            int64_t version = sqlite3_column_int64(res, 2);
+            RRDCALC_STATUS status = (RRDCALC_STATUS)sqlite3_column_int(res, 3);
+            int64_t health_log_id = sqlite3_column_int64(res, 4);
 
-        // Prepare the statement on the first time (res_version) then reuse it
-        // finalize when we are done
-        sql_update_alert_version(health_log_id, unique_id, status, version, &res_version);
-    }
+            // Prepare the statement on the first time (res_version) then reuse it
+            // finalize when we are done
+            sql_update_alert_version(health_log_id, unique_id, status, version, &res_version);
 
-    if (first_sequence_id)
-        delete_alert_from_submit_queue(host, first_sequence_id, last_sequence_id);
+            if (consumed < ACLK_MAX_ALERT_UPDATES_N) {
+                consumed_seq[consumed] = sequence_id;
+                consumed_uid[consumed] = unique_id;
+                consumed++;
+            }
+        }
+
+        SQLITE_RESET(res);
+
+        // same guard as the push path: consume exactly the transitions we committed
+        for (size_t i = 0; i < consumed; i++)
+            if (!delete_alert_from_submit_queue(&host->host_id.uuid, consumed_seq[i], consumed_uid[i], &res_delete))
+                missed_delete = true;
+
+        // A row re-pointed during the pass fails its guarded delete by design and stays queued, so a pass can
+        // come back full without making progress. That resolves itself - the next pass sees the newer
+        // transition and consumes that - but do not spin the ACLK worker on it: stop after a bounded number of
+        // passes and let the next tick continue, exactly as the push path does.
+        // A full batch means there is more to read. A delete that matched nothing means a row we just
+        // committed was re-pointed mid-pass and is still queued - both are remaining work, and on the
+        // non-streaming path nothing but our return value will re-arm this host.
+        more_queued = (consumed == ACLK_MAX_ALERT_UPDATES_N) || missed_delete;
+
+    } while (more_queued && ++passes < ACLK_COMMIT_MAX_PASSES);
 
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
     SQLITE_FINALIZE(res_version);
+    SQLITE_FINALIZE(res_delete);
+    return more_queued;
 }
 
 typedef enum {
@@ -482,11 +539,12 @@ void health_alarm_log_populate(
     " hld.old_status, hld.delay, hld.new_value, hld.old_value, hld.last_repeat, hl.chart_context, hld.transition_id,"  \
     " hld.alarm_event_id, hl.chart_name, hld.summary, hld.health_log_id, hld.when_key"                                 \
     " FROM health_log hl, aclk_queue aq, alert_hash ah, health_log_detail hld"                                         \
-    " WHERE hld.unique_id = aq.unique_id AND hl.config_hash_id = ah.hash_id"                                           \
+    " WHERE hld.unique_id = aq.unique_id AND hld.health_log_id = aq.health_log_id"                                     \
+    " AND hl.config_hash_id = ah.hash_id"                                                                              \
     " AND hl.host_id = @host_id AND aq.host_id = hl.host_id AND hl.health_log_id = hld.health_log_id"                  \
     " ORDER BY aq.sequence_id ASC LIMIT "ACLK_MAX_ALERT_UPDATES
 
-static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stmt **res_version)
+static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stmt **res_version, sqlite3_stmt **res_delete)
 {
     CLAIM_ID claim_id = claim_id_get();
 
@@ -498,6 +556,19 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
             return;
     }
 
+    // Deleting from aclk_queue while this SELECT is still being stepped would be relying on undefined
+    // behaviour: SQLite only guarantees that deleting the current or a prior row is safe for a SELECT over a
+    // SINGLE table, and this is a four-way join. What a joined SELECT does when the same connection modifies
+    // one of its tables mid-scan "depends on which release of SQLite is running, the schema of the database
+    // file, whether or not ANALYZE has been run, and the details of the query" (sqlite.org/isolation.html) -
+    // and a row skipped that way would be a transition that is never sent, which is the very bug this guard
+    // exists to prevent. So buffer what we consumed, reset the statement, then delete. One batch is bounded
+    // by the LIMIT, so the buffer is too. Declared before the first bind: `done:` runs this loop, so a
+    // SQLITE_BIND_FAIL goto must not be able to jump over the initialisation.
+    int64_t consumed_seq[ACLK_MAX_ALERT_UPDATES_N];
+    int64_t consumed_uid[ACLK_MAX_ALERT_UPDATES_N];
+    size_t consumed = 0;
+
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(*res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
@@ -508,8 +579,9 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
     alarm_log.node_id = node_id_str;
     alarm_log.claim_id = claim_id.str;
 
-    int64_t first_id = 0;
-    int64_t last_id = 0;
+    size_t sent = 0;
+    int64_t first_seq = 0, last_seq = 0;
+
 
     param = 0;
     RRDCALC_STATUS status;
@@ -524,28 +596,39 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
 
         aclk_host_config->alert_count++;
 
-        last_id = alarm_log.sequence_id;
-        if (first_id == 0)
-            first_id = last_id;
+        sent++;
+        if (!first_seq)
+            first_seq = alarm_log.sequence_id;
+        last_seq = alarm_log.sequence_id;
 
         // The statement to set the version will be compiled once and reset when done
-        // out caller will finalize the statement to release resources
+        // our caller will finalize the statement to release resources
+        //
+        // Ordered version-then-delete on purpose: cloud_status_matches() reads alert_version, so until it is
+        // updated a concurrent insert still sees the pre-send status. Deleting first would widen that window.
         sql_update_alert_version(alarm_log.health_log_id, alarm_log.unique_id, status, alarm_log.version, res_version);
+
+        // the rows are consumed after this statement is reset - see the comment on the buffer
+        if (consumed < ACLK_MAX_ALERT_UPDATES_N) {
+            consumed_seq[consumed] = alarm_log.sequence_id;
+            consumed_uid[consumed] = (int64_t)alarm_log.unique_id;
+            consumed++;
+        }
 
         destroy_alarm_log_entry(&alarm_log);
     }
 
-    if (first_id) {
+    if (sent) {
         nd_log(
             NDLS_ACCESS,
             NDLP_DEBUG,
-            "ACLK RES [%s (%s)]: ALERTS SENT from %lld - %lld",
+            "ACLK RES [%s (%s)]: ALERTS SENT %zu (seq span %lld - %lld)",
             node_id_str,
             rrdhost_hostname(host),
-            (long long)first_id,
-            (long long)last_id);
+            sent,
+            (long long)first_seq,
+            (long long)last_seq);
 
-        delete_alert_from_submit_queue(host, first_id, last_id);
         // Mark to do one more check
         rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
     }
@@ -553,11 +636,19 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
 done:
     REPORT_BIND_FAIL(*res, param);
     SQLITE_RESET(*res);
+
+    // the cursor is closed now, so these cannot perturb it
+    for (size_t i = 0; i < consumed; i++)
+        if (!delete_alert_from_submit_queue(&host->host_id.uuid, consumed_seq[i], consumed_uid[i], res_delete))
+            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 }
 
-#define SQL_DELETE_PROCESSED_ROWS "DELETE FROM alert_queue WHERE host_id = @host_id AND rowid = @row"
+// The unique_id guard is what makes this safe against the same re-pointing the submit queue does:
+// insert_alert_queue() coalesces with ON CONFLICT ... DO UPDATE SET status, unique_id, keeping the rowid.
+#define SQL_DELETE_PROCESSED_ROWS                                                                                      \
+    "DELETE FROM alert_queue WHERE host_id = @host_id AND rowid = @row AND unique_id = @unique_id"
 
-static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row)
+static void delete_alert_from_pending_queue(nd_uuid_t *host_id, int64_t row, int64_t unique_id)
 {
     static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
@@ -574,8 +665,9 @@ static void delete_alert_from_pending_queue(RRDHOST *host, int64_t row)
     }
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, row));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, unique_id));
 
     param = 0;
     int rc = sqlite3_step_monitored(res);
@@ -670,12 +762,12 @@ bool process_alert_pending_queue(RRDHOST *host)
 
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
         if (aclk_host_config) {
-            int ret = insert_alert_to_submit_queue(host, health_log_id, unique_id, new_status);
+            int ret = insert_alert_to_submit_queue(&host->host_id.uuid, health_log_id, unique_id, new_status);
             if (ret == 0)
                 added++;
         }
 
-        delete_alert_from_pending_queue(host, row);
+        delete_alert_from_pending_queue(&host->host_id.uuid, row, (int64_t)unique_id);
 
         count++;
     }
@@ -691,12 +783,106 @@ done:
     return added > 0;
 }
 
+// A submit-queue row is consumed by naming its exact transition, so a row whose transition no longer exists
+// can never be consumed: the push SELECT joins health_log_detail and simply does not return it. That happens
+// when health-log retention removes a superseded transition (SQL_CLEANUP_HEALTH_LOG_DETAIL deletes rows with
+// updated_by_id <> 0) that was still queued. The old range delete swept such rows incidentally; now they need
+// removing on purpose, or they accumulate for the lifetime of the database.
+//
+// The age guard is not a sendability timeout - an unsendable row is unsendable however long we wait, and a
+// legitimately pending row must survive an ACLK outage of any length. It only keeps us from racing a row that
+// was just inserted.
+#define ACLK_QUEUE_REAP_AGE_S    3600
+#define ACLK_QUEUE_REAP_EVERY_S  3600
+#define ACLK_QUEUE_REAP_RETRY_S  60
+
+// The predicate mirrors the push SELECT: a row is unsendable if ANY of the joins that query needs cannot be
+// satisfied - the transition itself (health_log_detail), its alert (health_log), or its config (alert_hash).
+// RETURNING gives an exact count from the statement itself; sqlite3_changes() would be a separate read of a
+// per-connection counter that the health thread shares and can clobber between our step and our read.
+// The row set is bounded per call: SQLite materialises all RETURNING output during the first step, so an
+// unbounded DELETE would allocate in proportion to the whole backlog. Anything left waits for the next hour.
+// The LIMIT is deliberately unordered: every row it selects is deleted by this same statement, so a backlog
+// drains regardless of which rows each pass picks. An ORDER BY would buy determinism nobody needs at the cost
+// of a sort on an hourly path over a potentially large set.
+#define ACLK_QUEUE_REAP_MAX_ROWS 1000
+
+#define SQL_REAP_UNSENDABLE_QUEUE_ROWS                                                                                 \
+    "DELETE FROM aclk_queue WHERE sequence_id IN"                                                                      \
+    " (SELECT q.sequence_id FROM aclk_queue q WHERE q.date_created < UNIXEPOCH() - @age AND NOT EXISTS"                 \
+    "   (SELECT 1 FROM health_log hl, health_log_detail hld, alert_hash ah"                                            \
+    "     WHERE hl.health_log_id = q.health_log_id AND hl.host_id = q.host_id"                                         \
+    "       AND hld.health_log_id = q.health_log_id AND hld.unique_id = q.unique_id"                                   \
+    "       AND ah.hash_id = hl.config_hash_id)"                                                                       \
+    "  LIMIT @limit)"                                                                                                  \
+    " RETURNING sequence_id"
+
+// Returns the number of rows reaped, or -1 if the reap could not be completed. The caller schedules the next
+// attempt from that: advancing the hourly timer after a failure would hide a broken cleanup for an hour.
+static int aclk_queue_reap_unsendable(int64_t age_s)
+{
+    sqlite3_stmt *res = NULL;
+    int reaped = 0;
+    bool failed = false;
+
+    if (!PREPARE_STATEMENT(db_meta, SQL_REAP_UNSENDABLE_QUEUE_ROWS, &res))
+        return -1;
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, age_s));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, ACLK_QUEUE_REAP_MAX_ROWS));
+
+    param = 0;
+    int rc;
+    while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW)
+        reaped++;
+
+    if (rc != SQLITE_DONE) {
+        error_report("Failed to reap unsendable alert submit queue rows, rc = %d", rc);
+        failed = true;
+    }
+
+    if (reaped)
+        nd_log(NDLS_DAEMON, NDLP_NOTICE, "ACLK: reaped %d alert submit queue rows whose transition no longer exists", reaped);
+
+done:
+    // param is non-zero here only when a bind failed, which is the other way this reap did not run
+    if (param)
+        failed = true;
+
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
+    return failed ? -1 : reaped;
+}
+
 void aclk_push_alert_events_for_all_hosts(void)
 {
     RRDHOST *host;
 
     sqlite3_stmt *res = NULL;               // used to scan pending alerts to send
     sqlite3_stmt *res_version = NULL;       // used to update the alert version
+    sqlite3_stmt *res_delete = NULL;        // used to consume each sent row
+
+    // one push runs at a time (aclk_sync_config.alert_push_running), but successive pushes are different
+    // threadpool workers, so read and write this gate atomically rather than relying on that ordering
+    static time_t next_reap_s = 0;
+    time_t now_s = now_realtime_sec();
+    time_t next_s = __atomic_load_n(&next_reap_s, __ATOMIC_RELAXED);
+    if (now_s >= next_s) {
+        time_t again_in_s = ACLK_QUEUE_REAP_EVERY_S;
+
+        // A failed reap must not buy the failure an hour of silence. Retry sooner instead - but not on the
+        // next tick: this worker runs every second, and a persistently failing reap would then hammer db_meta.
+        //
+        // This runs on the first deadline too. Skipping the first pass bought nothing: what keeps the reaper
+        // off a row that is merely waiting for connectivity is the age guard and the unjoinable predicate, not
+        // the pass number - so rows left unsendable by a previous run had to wait an hour for no reason.
+        if (aclk_queue_reap_unsendable(ACLK_QUEUE_REAP_AGE_S) < 0)
+            again_in_s = ACLK_QUEUE_REAP_RETRY_S;
+
+        __atomic_store_n(&next_reap_s, nd_time_t_add_saturating(now_s, again_in_s), __ATOMIC_RELAXED);
+    }
+
     dfe_start_reentrant(rrdhost_root_index, host) {
         if (!rrdhost_flag_check(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS) ||
             rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
@@ -707,7 +893,8 @@ void aclk_push_alert_events_for_all_hosts(void)
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
         if (!aclk_host_config || !aclk_alert_streaming_enabled(aclk_host_config) || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
             (void)process_alert_pending_queue(host);
-            commit_alert_events(host);
+            if (commit_alert_events(host))
+                rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
             continue;
         }
 
@@ -717,18 +904,21 @@ void aclk_push_alert_events_for_all_hosts(void)
             if (snapshot_state == ACLK_ALERT_SNAPSHOT_PENDING)
                 continue;
             (void)process_alert_pending_queue(host);
-            commit_alert_events(host);
+            // the snapshot itself is rebuilt from the health log, not from what is still queued, so a capped
+            // drain cannot make it stale; the flag is already set on this path for the remainder
+            (void)commit_alert_events(host);
             rebuild_host_alert_version_table(host);
             send_alert_snapshot_to_cloud(host);
             aclk_host_config->snapshot_count++;
             aclk_alert_snapshot_complete(aclk_host_config);
         }
         else
-            aclk_push_alert_event(host, &res, &res_version);
+            aclk_push_alert_event(host, &res, &res_version, &res_delete);
     }
     dfe_done(host);
     SQLITE_FINALIZE(res);
     SQLITE_FINALIZE(res_version);
+    SQLITE_FINALIZE(res_delete);
 }
 
 #define SQL_SELECT_ALERT_HASH_CLOUD "SELECT 1 FROM alert_hash_cloud WHERE hash_id = @hash_id"
@@ -1162,6 +1352,275 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
+}
+
+// ---------------------------------------------------------------------------
+// Unit test: netdata -W alertqueuetest
+//
+// The submit queue coalesces by re-pointing an existing row: the insert is
+// ON CONFLICT(host_id, health_log_id) DO UPDATE SET unique_id=..., and DO UPDATE
+// does not move sequence_id. So a transition that is queued while a batch is in
+// flight lands on a row the push has already read and sent. Whatever removes the
+// sent rows afterwards MUST therefore name the transition it actually sent, or it
+// destroys the newer one and the cloud keeps a status the agent has already left.
+
+static int aq_test_queue(nd_uuid_t *host_id, int64_t *sequence_id, int64_t *unique_id)
+{
+    sqlite3_stmt *res = NULL;
+    int count = 0;
+
+    if (!PREPARE_STATEMENT(
+            db_meta, "SELECT sequence_id, unique_id FROM aclk_queue WHERE host_id = @host_id ORDER BY sequence_id", &res))
+        return -1;
+
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_id, sizeof(*host_id), SQLITE_STATIC));
+
+    param = 0;
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        if (!count) {
+            if (sequence_id)
+                *sequence_id = sqlite3_column_int64(res, 0);
+            if (unique_id)
+                *unique_id = sqlite3_column_int64(res, 1);
+        }
+        count++;
+    }
+
+done:
+    REPORT_BIND_FAIL(res, param);
+    SQLITE_FINALIZE(res);
+    return count;
+}
+
+// A failed seed used to surface as a confusing queue-state mismatch three assertions later, so every
+// bind/step in the fixtures reports itself with its rc and the sqlite message.
+#define AQ_SQL(expr, what)                                                                                             \
+    do {                                                                                                               \
+        int _rc = (expr);                                                                                              \
+        if (_rc != SQLITE_OK && _rc != SQLITE_DONE && _rc != SQLITE_ROW) {                                             \
+            netdata_log_error(                                                                                         \
+                "ALERT QUEUE TEST: fixture step \"%s\" failed: rc=%d (%s)", what, _rc, sqlite3_errmsg(db_meta));       \
+            failures++;                                                                                                \
+        }                                                                                                              \
+    } while (0)
+
+#define AQ_CHECK(condition, fmt, ...)                                                                                  \
+    do {                                                                                                               \
+        if (!(condition)) {                                                                                            \
+            netdata_log_error("ALERT QUEUE TEST FAILED: " fmt, ##__VA_ARGS__);                                         \
+            failures++;                                                                                                \
+        }                                                                                                              \
+        else                                                                                                           \
+            netdata_log_info("ALERT QUEUE TEST ok: " fmt, ##__VA_ARGS__);                                              \
+    } while (0)
+
+int alert_queue_unittest(void)
+{
+    int failures = 0;
+
+    // -W options are parsed before any database is opened, so db_meta is NULL here and this test owns the
+    // sqlite lifecycle. The save/restore is kept for the case where that stops being true - but note that
+    // sql_init_meta_database() would then overwrite the global without closing what it replaced.
+    sqlite3 *saved_db_meta = db_meta;
+    bool owns_sqlite_lifecycle = !saved_db_meta;
+
+    if (sqlite_library_init())
+        return 1;
+
+    // the second argument is `memory`: this opens ":memory:" (sqlite_metadata.c), never the on-disk
+    // netdata-meta.db. That is what makes the unqualified DELETEs further down safe.
+    if (sql_init_meta_database(DB_CHECK_NONE, 1) != SQLITE_OK) {
+        sql_close_database(db_meta, "METADATA");
+        db_meta = saved_db_meta;
+        if (owns_sqlite_lifecycle)
+            sqlite_library_shutdown();
+        return 1;
+    }
+
+    nd_uuid_t host_id;
+    uuid_generate(host_id);
+
+    const int64_t health_log_id = 1;
+    const uint32_t sent_unique_id = 1001;
+    const uint32_t queued_during_send_unique_id = 1002;
+
+    int64_t sequence_id = 0, unique_id = 0;
+    sqlite3_stmt *res_delete = NULL;
+
+    // the health loop queues a transition
+    (void)insert_alert_to_submit_queue(&host_id, health_log_id, sent_unique_id, RRDCALC_STATUS_CLEAR);
+    AQ_CHECK(
+        aq_test_queue(&host_id, &sequence_id, &unique_id) == 1 && unique_id == (int64_t)sent_unique_id,
+        "one row is queued, holding the transition to send (unique_id=%" PRId64 ", expected %u)",
+        unique_id, sent_unique_id);
+
+    // the push reads and sends it; while it is in flight the alert transitions
+    // again, and the insert re-points the very same row
+    (void)insert_alert_to_submit_queue(&host_id, health_log_id, queued_during_send_unique_id, RRDCALC_STATUS_WARNING);
+    int64_t re_pointed_sequence_id = 0;
+    AQ_CHECK(
+        aq_test_queue(&host_id, &re_pointed_sequence_id, &unique_id) == 1 &&
+            unique_id == (int64_t)queued_during_send_unique_id && re_pointed_sequence_id == sequence_id,
+        "the newer transition re-points the same row, keeping its sequence_id "
+        "(unique_id=%" PRId64 " expected %u, sequence_id=%" PRId64 " expected %" PRId64 ")",
+        unique_id, queued_during_send_unique_id, re_pointed_sequence_id, sequence_id);
+
+    // the push now removes what it sent
+    (void)delete_alert_from_submit_queue(&host_id, sequence_id, sent_unique_id, &res_delete);
+
+    // THE CONTRACT: only the transition that was sent may be removed
+    int rows = aq_test_queue(&host_id, NULL, &unique_id);
+    AQ_CHECK(
+        rows == 1 && unique_id == (int64_t)queued_during_send_unique_id,
+        "the transition queued during the send survives and is still pending "
+        "(rows=%d, unique_id=%" PRId64 ", expected %u)",
+        rows, unique_id, queued_during_send_unique_id);
+
+    // and the row does go away once its own transition has been sent
+    (void)delete_alert_from_submit_queue(&host_id, sequence_id, queued_during_send_unique_id, &res_delete);
+    rows = aq_test_queue(&host_id, NULL, NULL);
+    AQ_CHECK(rows == 0, "the queue is empty once the newer transition is sent too (rows=%d)", rows);
+
+    // a row whose transition no longer exists can never be sent, so it must be reaped - but only once it is
+    // old enough that we cannot be racing its insert
+    (void)insert_alert_to_submit_queue(&host_id, health_log_id, 2001, RRDCALC_STATUS_CLEAR);
+    AQ_CHECK(aq_test_queue(&host_id, NULL, NULL) == 1, "an unsendable row is queued");
+    AQ_CHECK(
+        aclk_queue_reap_unsendable(ACLK_QUEUE_REAP_AGE_S) == 0 && aq_test_queue(&host_id, NULL, NULL) == 1,
+        "the reaper leaves a freshly inserted row alone");
+
+    (void)db_execute(db_meta, "UPDATE aclk_queue SET date_created = UNIXEPOCH() - 7200", NULL);
+    AQ_CHECK(
+        aclk_queue_reap_unsendable(ACLK_QUEUE_REAP_AGE_S) == 1 && aq_test_queue(&host_id, NULL, NULL) == 0,
+        "the reaper removes an aged row whose transition no longer exists");
+
+
+    // --- the pending queue (alert_queue) carries the same defect and the same guard. Its conflict key is
+    // (host_id, health_log_id, alarm_id), NOT the submit queue's key, so it needs its own case. The seeding
+    // INSERT mirrors SQL_INSERT_ALERT_PENDING_QUEUE in sqlite_health.c.
+    {
+        const char *pending_insert =
+            "INSERT INTO alert_queue (host_id, health_log_id, unique_id, alarm_id, status, date_scheduled)"
+            "  VALUES (@host_id, 7, @unique_id, 7, 3, UNIXEPOCH())"
+            " ON CONFLICT (host_id, health_log_id, alarm_id)"
+            " DO UPDATE SET status = excluded.status, unique_id = excluded.unique_id,"
+            " date_scheduled = MIN(date_scheduled, excluded.date_scheduled)";
+        sqlite3_stmt *ins = NULL;
+        int64_t rowid = 0, pending_unique = 0;
+
+        for (int pass = 0; pass < 2; pass++) {
+            if (!PREPARE_STATEMENT(db_meta, pending_insert, &ins))
+                break;
+            AQ_SQL(sqlite3_bind_blob(ins, 1, &host_id, sizeof(host_id), SQLITE_STATIC), "pending seed host_id");
+            AQ_SQL(sqlite3_bind_int64(ins, 2, pass ? 3002 : 3001), "pending seed unique_id");
+            AQ_SQL(sqlite3_step_monitored(ins), "pending seed insert");
+            SQLITE_FINALIZE(ins);
+            ins = NULL;
+        }
+
+        sqlite3_stmt *sel = NULL;
+        if (PREPARE_STATEMENT(db_meta, "SELECT rowid, unique_id FROM alert_queue WHERE host_id = @host_id", &sel)) {
+            AQ_SQL(sqlite3_bind_blob(sel, 1, &host_id, sizeof(host_id), SQLITE_STATIC), "pending read host_id");
+            if (sqlite3_step_monitored(sel) == SQLITE_ROW) {
+                rowid = sqlite3_column_int64(sel, 0);
+                pending_unique = sqlite3_column_int64(sel, 1);
+            }
+            SQLITE_FINALIZE(sel);
+        }
+        AQ_CHECK(
+            pending_unique == 3002,
+            "pending queue: the newer transition re-points the same row (unique_id=%" PRId64 ", expected 3002)",
+            pending_unique);
+
+        // drain the row as process_alert_pending_queue() would, naming the transition it read (the older one)
+        delete_alert_from_pending_queue(&host_id, rowid, 3001);
+
+        int64_t still = 0;
+        if (PREPARE_STATEMENT(db_meta, "SELECT COUNT(*) FROM alert_queue WHERE host_id = @host_id", &sel)) {
+            AQ_SQL(sqlite3_bind_blob(sel, 1, &host_id, sizeof(host_id), SQLITE_STATIC), "pending count host_id");
+            if (sqlite3_step_monitored(sel) == SQLITE_ROW)
+                still = sqlite3_column_int64(sel, 0);
+            SQLITE_FINALIZE(sel);
+        }
+        AQ_CHECK(
+            still == 1, "pending queue: the transition queued during the drain survives (rows=%" PRId64 ", expected 1)",
+            still);
+        (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
+    }
+
+    // --- the push SELECT must never hand back more than one batch, whatever is queued. This is the runtime
+    // assertion SOW-20260921-aclk-alert-push-rate-25 could not make for itself: nothing reaches
+    // aclk_push_alert_event() on an unclaimed agent, so the batch limit is only observable from here.
+    {
+        const int limit = atoi(ACLK_MAX_ALERT_UPDATES);
+        const int seed = limit + 7;
+        nd_uuid_t config_hash;
+        uuid_generate(config_hash);
+        sqlite3_stmt *st = NULL;
+        int queued_rows = 0, returned = 0;
+
+        (void)db_execute(db_meta, "DELETE FROM aclk_queue", NULL);
+
+        // warn must be non-NULL: a config with neither warn nor crit is a variable config, and
+        // insert_alert_to_submit_queue() deliberately never queues those
+        if (PREPARE_STATEMENT(db_meta, "INSERT INTO alert_hash (hash_id, warn) VALUES (@hash, '$this > 1')", &st)) {
+            AQ_SQL(sqlite3_bind_blob(st, 1, &config_hash, sizeof(config_hash), SQLITE_STATIC), "alert_hash seed");
+            AQ_SQL(sqlite3_step_monitored(st), "alert_hash insert");
+            SQLITE_FINALIZE(st);
+            st = NULL;
+        }
+
+        for (int i = 1; i <= seed; i++) {
+            if (PREPARE_STATEMENT(
+                    db_meta,
+                    "INSERT INTO health_log (health_log_id, host_id, alarm_id, config_hash_id, name, chart)"
+                    " VALUES (@id, @host_id, @id, @hash, 'alert', 'chart')", &st)) {
+                AQ_SQL(sqlite3_bind_int64(st, 1, i), "health_log seed id");
+                AQ_SQL(sqlite3_bind_blob(st, 2, &host_id, sizeof(host_id), SQLITE_STATIC), "health_log seed host_id");
+                AQ_SQL(sqlite3_bind_blob(st, 3, &config_hash, sizeof(config_hash), SQLITE_STATIC), "health_log seed hash");
+                AQ_SQL(sqlite3_step_monitored(st), "health_log insert");
+                SQLITE_FINALIZE(st);
+                st = NULL;
+            }
+            if (PREPARE_STATEMENT(
+                    db_meta,
+                    "INSERT INTO health_log_detail (health_log_id, unique_id, alarm_id, alarm_event_id,"
+                    " updated_by_id, when_key, new_status, old_status) "
+                    " VALUES (@id, @uid, @id, 1, 0, UNIXEPOCH(), 3, 1)", &st)) {
+                AQ_SQL(sqlite3_bind_int64(st, 1, i), "health_log_detail seed id");
+                AQ_SQL(sqlite3_bind_int64(st, 2, 5000 + i), "health_log_detail seed unique_id");
+                AQ_SQL(sqlite3_step_monitored(st), "health_log_detail insert");
+                SQLITE_FINALIZE(st);
+                st = NULL;
+            }
+            if (!insert_alert_to_submit_queue(&host_id, i, (uint32_t)(5000 + i), RRDCALC_STATUS_WARNING))
+                queued_rows++;
+        }
+        AQ_CHECK(queued_rows == seed, "seeded %d queue rows (one batch is %d)", queued_rows, limit);
+
+        if (PREPARE_STATEMENT(db_meta, SQL_SELECT_ALERT_TO_PUSH, &st)) {
+            AQ_SQL(sqlite3_bind_blob(st, 1, &host_id, sizeof(host_id), SQLITE_STATIC), "push SELECT host_id");
+            while (sqlite3_step_monitored(st) == SQLITE_ROW)
+                returned++;
+            SQLITE_FINALIZE(st);
+            st = NULL;
+        }
+        AQ_CHECK(
+            returned == limit,
+            "the push SELECT returns exactly one batch of %d with %d queued (got %d)", limit, seed, returned);
+
+        (void)db_execute(db_meta, "DELETE FROM aclk_queue", NULL);
+    }
+
+    SQLITE_FINALIZE(res_delete);
+    sql_close_database(db_meta, "METADATA");
+    db_meta = saved_db_meta;
+    if (owns_sqlite_lifecycle)
+        sqlite_library_shutdown();
+
+    netdata_log_info("ALERT QUEUE TEST: %d failure(s)", failures);
+    return failures ? 1 : 0;
 }
 
 // Start streaming alerts
