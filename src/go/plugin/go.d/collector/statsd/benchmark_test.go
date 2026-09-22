@@ -74,14 +74,25 @@ func BenchmarkMixedPublication(b *testing.B) {
 	}
 }
 
-// A rejected new identity at capacity scans for idle entries only when idle
-// expiry is enabled: O(max_series) per record then, O(1) when disabled.
+// A rejected new identity at capacity scans the O(max_series) entries only once
+// an entry without pending input can have expired; otherwise, and with idle
+// expiry disabled, rejection is O(1).
 func BenchmarkCapacityPressure(b *testing.B) {
-	for name, idle := range map[string]time.Duration{"idle expiry": 5 * time.Minute, "idle disabled": 0} {
+	for name, tc := range map[string]struct {
+		idle    time.Duration
+		pending bool
+	}{
+		"idle expiry":               {idle: 5 * time.Minute},
+		"idle expiry pending input": {idle: 5 * time.Minute, pending: true},
+		"idle disabled":             {},
+	} {
 		b.Run(name, func(b *testing.B) {
-			f := newCoreFixture(b, 1000, idle)
+			f := newCoreFixture(b, 1000, tc.idle)
 			f.ingest(b, mixedRecords(1000)...)
 			f.collect(b, false, false)
+			if tc.pending {
+				f.ingest(b, mixedRecords(1000)...)
+			}
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {

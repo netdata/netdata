@@ -210,7 +210,9 @@ replacement entry.
 Input work is proportional to record size, canonical label sorting and bounded estimator insertion, plus matching the
 original name against configured profiles that have rules or are not yet active, and running at most one pipeline.
 Profile work is fixed by trusted configuration and the record bound; there is no separate expansion guard. Expiry scans
-occur at collection and admission when an expired entry, type or capacity needs resolution. Per-name metadata aging
+occur at collection and at admission when an expired entry, type or capacity needs resolution. Admission scans only
+once the earliest entry without pending input can have expired, a bound every cut recomputes and each scan refreshes,
+so a new identity rejected at capacity costs O(1) otherwise. Per-name metadata aging
 is linear in retained declarations. Percentile query sorts at most 2,049 representatives and reuses one Collect-owned
 scratch. Native output/retention adds its existing cost. Benchmarks measure the complete path and simultaneous window
 ownership; these are not whole-process RSS or end-to-end storage guarantees.

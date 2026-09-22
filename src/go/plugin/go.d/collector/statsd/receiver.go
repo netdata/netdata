@@ -61,6 +61,12 @@ type receiver struct {
 	retention                metrix.DescriptorRetention
 	horizon, priorCutSuccess uint64
 
+	// retireAt is the earliest idle expiry of an entry without pending input, zero
+	// when there is none. Only a cut clears pending input, and it recomputes the
+	// bound; between cuts entries only gain input, so admission skips its idle scan
+	// until retireAt.
+	retireAt time.Time
+
 	// profiles are in precedence order. membership records the native profiles
 	// activated by admitted input; it only grows until restart.
 	profiles   []*profile
@@ -246,12 +252,28 @@ func (r *receiver) expired(e *series, now time.Time) bool {
 	return r.idle > 0 && now.Sub(e.lastInput) >= r.idle
 }
 
-// retireIdle removes expired entries without input awaiting handoff.
+// retireIdle removes expired entries without input awaiting handoff. It scans
+// only once the earliest such entry can have expired.
 func (r *receiver) retireIdle(now time.Time) {
+	if r.retireAt.IsZero() || now.Before(r.retireAt) {
+		return
+	}
+	r.retireAt = time.Time{}
 	for _, e := range r.entries {
-		if !e.pending && r.expired(e, now) {
+		switch {
+		case e.pending:
+		case r.expired(e, now):
 			r.remove(e)
+		default:
+			r.boundRetirement(e)
 		}
+	}
+}
+
+// boundRetirement lowers retireAt to the idle expiry of an entry without pending input.
+func (r *receiver) boundRetirement(e *series) {
+	if at := e.lastInput.Add(r.idle); r.retireAt.IsZero() || at.Before(r.retireAt) {
+		r.retireAt = at
 	}
 }
 

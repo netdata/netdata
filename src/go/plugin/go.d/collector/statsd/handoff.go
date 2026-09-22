@@ -43,6 +43,7 @@ func (r *receiver) cut(now time.Time, published int) (cutResult, error) {
 	// Incoming traffic must retain its metadata authority until this point.
 	r.reconcileMetadata()
 	batch := make([]measurement, 0, len(r.entries))
+	r.retireAt = time.Time{}
 	for _, e := range r.entries {
 		expired := r.expired(e, now)
 		if !expired || e.pending {
@@ -53,6 +54,8 @@ func (r *receiver) cut(now time.Time, published int) (cutResult, error) {
 		}
 		if expired {
 			r.remove(e)
+		} else if r.idle > 0 {
+			r.boundRetirement(e)
 		}
 	}
 	result := cutResult{
