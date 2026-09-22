@@ -136,9 +136,9 @@ static inline void check_and_fix_mrg_update_every(struct dbengine_collect_handle
     struct dbengine_engine *engine = mrg_metric_ctx(handle->metric)->engine;
 
     if(unlikely((uint32_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every_s(engine->main_mrg, handle->metric))) {
-        dbengine_internal_error(mrg_metric_ctx(handle->metric)->engine, true,
+        dbengine_internal_error(engine, true,
                                 "DBENGINE: collection handle has update every %u, but the metric registry has %u. Fixing it.",
-              (uint32_t)(handle->update_every_ut / USEC_PER_SEC),
+                                (uint32_t)(handle->update_every_ut / USEC_PER_SEC),
                                 mrg_metric_get_update_every_s(engine->main_mrg, handle->metric));
 
         if(unlikely(!handle->update_every_ut))
