@@ -1197,7 +1197,7 @@ async fn a_stream_filter_narrows_the_fetch_not_the_selector() {
         "selections": {"__streams": [other]},
     }))
     .unwrap();
-    let v = serde_json::to_value(&h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
+    let v = serde_json::to_value(h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
 
     assert_eq!(v["items"]["matched"], 0, "{v:#}");
     assert_eq!(
