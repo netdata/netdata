@@ -797,6 +797,17 @@ static bool stream_receiver_dequeue_senders(struct stream_thread *sth, struct re
     return true;
 }
 
+static void stream_receiver_overlong_line(struct stream_thread *sth, struct receiver_state *rpt, bool *removed) {
+    nd_log(NDLS_DAEMON, NDLP_ERR,
+           "STREAM RCV[%zu] '%s' [from [%s]:%s]: line is %zu bytes (max %zu). "
+           "Disconnecting the sender.",
+           sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
+           rpt->thread.line_buffer->len, (size_t)PLUGINSD_LINE_MAX);
+
+    stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_BUFFER_OVERFLOW);
+    *removed = true;
+}
+
 static ssize_t
 stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt, PARSER *parser, usec_t now_ut __maybe_unused, bool *removed) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
@@ -823,6 +834,13 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
                         // loop through all the complete lines found in the uncompressed buffer
 
                         while (buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
+                            // an overlong line must not reach the parser, and must be
+                            // detected before the parser resets the line buffer
+                            if(unlikely(stream_receiver_line_buffer_overflow(rpt->thread.line_buffer))) {
+                                stream_receiver_overlong_line(sth, rpt, removed);
+                                return -1;
+                            }
+
                             if (unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
                                 stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
                                 *removed = true;
@@ -831,6 +849,13 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
 
                             rpt->thread.line_buffer->len = 0;
                             rpt->thread.line_buffer->buffer[0] = '\0';
+                        }
+
+                        // a partial line can grow across decompressed buffers: check
+                        // before asking for the next one
+                        if(unlikely(stream_receiver_line_buffer_overflow(rpt->thread.line_buffer))) {
+                            stream_receiver_overlong_line(sth, rpt, removed);
+                            return -1;
                         }
                     }
                     else if (decompress_rc == DECOMPRESS_NEED_MORE_DATA)
@@ -857,18 +882,6 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
             *removed = true;
             return -1;
         }
-
-        if(unlikely(stream_receiver_line_buffer_overflow(rpt->thread.line_buffer))) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM RCV[%zu] '%s' [from [%s]:%s]: received %zu bytes without a newline (max %zu). "
-                   "Disconnecting the sender.",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
-                   rpt->thread.line_buffer->len, (size_t)PLUGINSD_LINE_MAX);
-
-            stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_BUFFER_OVERFLOW);
-            *removed = true;
-            return -1;
-        }
     }
     else {
         rc = receiver_read_uncompressed(rpt);
@@ -876,6 +889,13 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
             return rc;
 
         while(buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
+            // an overlong line must not reach the parser, and must be
+            // detected before the parser resets the line buffer
+            if(unlikely(stream_receiver_line_buffer_overflow(rpt->thread.line_buffer))) {
+                stream_receiver_overlong_line(sth, rpt, removed);
+                return -1;
+            }
+
             if(unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
                 stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
                 *removed = true;
@@ -886,15 +906,9 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
             rpt->thread.line_buffer->buffer[0] = '\0';
         }
 
+        // a line without a newline keeps accumulating across reads
         if(unlikely(stream_receiver_line_buffer_overflow(rpt->thread.line_buffer))) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM RCV[%zu] '%s' [from [%s]:%s]: received %zu bytes without a newline (max %zu). "
-                   "Disconnecting the sender.",
-                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
-                   rpt->thread.line_buffer->len, (size_t)PLUGINSD_LINE_MAX);
-
-            stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_BUFFER_OVERFLOW);
-            *removed = true;
+            stream_receiver_overlong_line(sth, rpt, removed);
             return -1;
         }
     }
