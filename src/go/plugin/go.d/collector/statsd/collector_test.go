@@ -6,11 +6,13 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 	"unsafe"
+	"weak"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -336,8 +338,7 @@ func TestRetainedStringsOwnStorage(t *testing.T) {
 		assert.False(t, start <= address && address < end, "%s retains the complete input record", name)
 	}
 	for id, e := range f.c.receiver.entries {
-		check("identity name", id.name)
-		check("identity labels", id.labels)
+		check("identity", id)
 		for _, label := range e.labels {
 			check("label key", label.Key)
 			check("label value", label.Value)
@@ -354,6 +355,44 @@ func TestRetainedStringsOwnStorage(t *testing.T) {
 	for name, binding := range f.c.receiver.bindings {
 		check("binding name", name)
 		check("binding type", string(binding.kind))
+	}
+}
+
+// TestIngestStorageRetainsNoRecord: the receiver's reusable record storage must
+// not keep an earlier record, or the datagram it was cut from, alive once a
+// smaller record follows, whether that record was admitted or rejected.
+func TestIngestStorageRetainsNoRecord(t *testing.T) {
+	for name, tc := range map[string]struct {
+		tags, suffix string
+		want         error
+	}{
+		"admitted":         {want: nil},
+		"parse rejected":   {suffix: "|@2", want: rejectRate},
+		"prepare rejected": {tags: ",z:a  b", want: rejectLabels},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newCoreFixture(t, 4, time.Minute)
+			large := func() weak.Pointer[byte] {
+				var b strings.Builder
+				b.WriteString("large:1|c|#")
+				for i := range 12 {
+					if i > 0 {
+						b.WriteByte(',')
+					}
+					fmt.Fprintf(&b, "k%d:%s", i, strings.Repeat("v", 700))
+				}
+				b.WriteString(tc.tags + tc.suffix)
+				// The record is a substring of a larger datagram-like text.
+				datagram := b.String() + "\nsmall:1|c"
+				line, _, _ := strings.Cut(datagram, "\n")
+				assert.Equal(t, tc.want, f.c.receiver.ingest(line, f.time))
+				return weak.Make(unsafe.StringData(datagram))
+			}()
+			f.ingest(t, "small:1|c|#a:b")
+			runtime.GC()
+			runtime.GC()
+			assert.Nil(t, large.Value(), "an earlier record is still reachable")
+		})
 	}
 }
 

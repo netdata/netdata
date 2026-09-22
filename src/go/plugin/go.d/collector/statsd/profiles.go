@@ -216,9 +216,10 @@ func (p *profile) owns(name string) bool {
 // must not contain the virtual __name__, so a sender label with that key stays
 // outside the relabel record, invisible to rules, and is restored unchanged.
 //
-// Label strings are substrings of the receive record. The reused input buffer
-// is cleared before returning; the pipeline's processors keep only the most
-// recent record per block, a bound fixed by configuration.
+// Label strings are substrings of the received datagram or TCP record. The
+// reused input buffer is cleared before returning; the pipeline's processors
+// keep only the most recent input per block, a bound fixed by configuration and
+// the record bound.
 func (p *profile) replace(r record) (record, error) {
 	var held *metrix.Label
 	for i, l := range r.labels {

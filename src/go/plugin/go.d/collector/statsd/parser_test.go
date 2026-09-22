@@ -63,7 +63,7 @@ func TestParseRecord(t *testing.T) {
 		}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			got, err := parseRecord(tc.line)
+			got, err := parseRecord(tc.line, nil)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
 		})
@@ -83,7 +83,7 @@ func TestRejectMalformedRecord(t *testing.T) {
 		"reserved job": "x:1|c|#_collect_job:x", "control": "x:1\x00|c", "invalid utf8": "x\xff:1|c",
 		"embedded newline": "x:1|c\nx:2|c", "embedded cr": "x:1|c\r", "space name": "x y:1|c",
 	} {
-		t.Run(name, func(t *testing.T) { _, err := parseRecord(line); require.Error(t, err) })
+		t.Run(name, func(t *testing.T) { _, err := parseRecord(line, nil); require.Error(t, err) })
 	}
 }
 
@@ -109,6 +109,8 @@ func TestFinalPreparation(t *testing.T) {
 					kind:   gauge,
 					labels: []metrix.Label{{Key: tc.key, Value: tc.value}},
 				},
+				nil,
+				nil,
 			)
 			if !tc.ok {
 				require.ErrorIs(t, err, rejectLabels)
@@ -134,6 +136,8 @@ func TestFinalPreparation(t *testing.T) {
 					kind:   gauge,
 					labels: []metrix.Label{{Key: "nd_title", Value: tc.value}},
 				},
+				nil,
+				nil,
 			)
 			if !tc.ok {
 				require.ErrorIs(t, err, rejectMetadata)
@@ -141,14 +145,14 @@ func TestFinalPreparation(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Empty(t, p.labels)
-			assert.Empty(t, p.labelKey)
+			assert.Equal(t, "metric\x00", string(p.id), "metadata is not identity")
 			assert.Equal(t, tc.value, p.metadata.title)
 		})
 	}
 	_, err := prepareRecord(record{
 		name:   "x",
 		labels: []metrix.Label{{Key: "nd_units", Value: "bytes"}},
-	})
+	}, nil, nil)
 	require.ErrorIs(t, err, rejectMetadata)
 }
 
@@ -184,9 +188,9 @@ func FuzzRecord(f *testing.F) {
 		f.Add(line)
 	}
 	f.Fuzz(func(t *testing.T, line string) {
-		r, err := parseRecord(line)
+		r, err := parseRecord(line, nil)
 		if err == nil {
-			_, _ = prepareRecord(r)
+			_, _ = prepareRecord(r, nil, nil)
 		}
 	})
 }

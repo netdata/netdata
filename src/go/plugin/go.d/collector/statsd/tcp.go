@@ -77,7 +77,7 @@ func (s *server) readTCP(conn net.Conn) {
 				s.receiver.reject(rejectOversize)
 				continue
 			}
-			s.ingest(line, s.now())
+			s.ingest(string(line), s.now())
 		case errors.Is(err, bufio.ErrBufferFull):
 			if !discarding {
 				discarding = true

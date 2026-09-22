@@ -77,6 +77,9 @@ The final label grammar preserves native Agent spelling:
   ASCII spaces or all-underscore text. Other printable punctuation is allowed; there is no separate byte quota.
 
 Accepted retained strings are cloned at admission, so substrings cannot retain complete receive or replacement buffers.
+UDP copies each datagram once and cuts records as substrings; TCP copies each record. Parsing and final preparation
+reuse fixed receiver-owned label and identity storage that is cleared after every record, so an admitted update of an
+existing identity allocates nothing.
 
 ## Profiles
 
