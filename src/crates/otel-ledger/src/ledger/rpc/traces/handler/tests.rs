@@ -1,6 +1,7 @@
 use super::*;
 use crate::ledger::rpc::traces::fixtures::{
-    install_sfst, install_wal, make_registries, otlp_req, otlp_req_svc,
+    install_sealed, install_sfst, install_wal, make_registries, otlp_req, otlp_req_svc,
+    sealed_traces,
 };
 use bridge::function::ProgressState;
 use file_lifecycle::registry::TenantRegistries;
@@ -137,6 +138,29 @@ async fn handler_with_fixture_wal() -> OtelTracesHandler {
     )
     .await;
     make_handler_over(registries)
+}
+
+#[tokio::test]
+async fn a_sealed_traces_fixture_serves_as_a_local_sealed_file() {
+    // The fixture is what the traces seal writes: its summary spans the
+    // spans' seconds and counts them, and the file answers a lookup alone.
+    let (summary, _) = sealed_traces(vec![otlp_req(0x11, 3, 1_000_000_000)]);
+    assert_eq!(
+        (summary.min_timestamp_s, summary.max_timestamp_s, summary.record_count),
+        (1, 1, 3)
+    );
+
+    let registries = make_registries();
+    install_sealed(&registries, "default", 1, vec![otlp_req(0x11, 3, 1_000_000_000)]).await;
+    let h = make_handler_over(registries);
+    let v = serde_json::to_value(
+        call_on(&h, json!({"trace": {"id": FIXTURE_TRACE_ID}}))
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(v["status"], json!({"complete": true}));
+    assert_eq!(v["items"]["returned"], 3);
 }
 
 #[tokio::test]

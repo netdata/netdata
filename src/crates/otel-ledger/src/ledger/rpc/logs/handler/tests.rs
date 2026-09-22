@@ -1035,8 +1035,7 @@ fn accepted_params_advertise_tenant() {
 // ── remote-read query path (evicted SFST fetched back from remote) ───────────
 
 /// Register a catalog entry for `id` (no local SFST) so a remote plan
-/// selects it; returns the catalog file's path. Mirrors the catalog-write
-/// fixture used in `query/tests.rs`.
+/// selects it; returns the catalog file's path.
 fn track_remote_catalog(
     tr: &mut TenantRegistries,
     tenant: &str,
@@ -1046,7 +1045,6 @@ fn track_remote_catalog(
     max_s: u32,
     size: u64,
 ) -> std::path::PathBuf {
-    use chrono::NaiveDate;
     let stream = ServiceStream::new("ns", "svc");
     // Production `build_catalog_entry` copies both id and stream from one SFST, so
     // the FileId's part_key always matches the stream's ns_hash. Enforce it on the fixture.
@@ -1055,7 +1053,6 @@ fn track_remote_catalog(
         stream.ns_hash(),
         "catalog fixture id.part_key must match its stream"
     );
-    let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     let entry = otel_catalog::CatalogEntry {
         id,
         remote_key: remote_key.to_string(),
@@ -1067,31 +1064,7 @@ fn track_remote_catalog(
         uploaded_at_ns: TimestampNs(0),
         remote_etag: None,
     };
-    let reg = tr.get_or_create(&TenantId::from(tenant));
-    let mut catalog = otel_catalog::Catalog::new(
-        TenantId::from(tenant),
-        date,
-        Identity::new(id.machine_id, id.instance_id),
-    );
-    catalog.add(entry);
-    let path =
-        reg.catalog_files
-            .file_path(date, Identity::new(id.machine_id, id.instance_id), id.seq, min_s, max_s);
-    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-    std::fs::write(&path, catalog.to_container_bytes().unwrap()).unwrap();
-    let csize = ByteSize(std::fs::metadata(&path).unwrap().len());
-    reg.catalog_files.track(
-        otel_catalog::File::new(
-            date,
-            Identity::new(id.machine_id, id.instance_id),
-            id.seq,
-            min_s,
-            max_s,
-            csize,
-        ),
-        path.clone(),
-    );
-    path
+    crate::test_helpers::track_catalog_entry(tr, tenant, entry)
 }
 
 fn make_handler_with_remote(tr: TenantRegistries, remote: RemoteRead) -> OtelLogsHandler {
