@@ -36,8 +36,9 @@ type record struct {
 }
 
 // parseRecord accepts one complete payload. Transport framing owns the record
-// size bound and removes LF/CRLF; there is no second byte quota here.
-func parseRecord(line string) (record, error) {
+// size bound and removes LF/CRLF; there is no second byte quota here. Parsed
+// labels are appended to tags[:0], so they may share the caller's storage.
+func parseRecord(line string, tags []metrix.Label) (record, error) {
 	r := record{
 		rate: 1,
 	}
@@ -104,7 +105,7 @@ func parseRecord(line string) (record, error) {
 			}
 			seenTags = true
 			var err error
-			r.labels, err = parseTags(field[1:])
+			r.labels, err = parseTags(field[1:], tags[:0])
 			if err != nil {
 				return r, err
 			}
@@ -122,8 +123,10 @@ func parseNumber(text string) (float64, error) {
 	if text == "" {
 		return 0, rejectValue
 	}
-	for _, c := range text {
-		if (c < '0' || c > '9') && !strings.ContainsRune("+-.eE", c) {
+	for i := range len(text) {
+		switch c := text[i]; {
+		case c >= '0' && c <= '9', c == '+', c == '-', c == '.', c == 'e', c == 'E':
+		default:
 			return 0, rejectValue
 		}
 	}
@@ -134,33 +137,67 @@ func parseNumber(text string) (float64, error) {
 	return v, nil
 }
 
-func parseTags(text string) ([]metrix.Label, error) {
-	values := make(map[string]string)
+// parseTags appends the tags, sorted by key, to labels. Identical repeats
+// collapse. A conflicting repeat rejects as labels, and takes precedence over a
+// later malformed tag, which the record never reaches. The storage behind labels
+// keeps no string beyond the result, so a caller clearing the result's length
+// retains nothing.
+func parseTags(text string, labels []metrix.Label) ([]metrix.Label, error) {
+	start, storage := len(labels), labels[len(labels):cap(labels)]
+	var err error
 	for tag := range strings.SplitSeq(text, ",") {
 		key, value, ok := strings.Cut(tag, ":")
 		if !ok || key == "" || value == "" {
-			return nil, rejectSyntax
+			err = rejectSyntax
+			break
 		}
 		if key == "_collect_job" {
-			return nil, rejectLabels
+			err = rejectLabels
+			break
 		}
-		if old, exists := values[key]; exists && old != value {
-			return nil, rejectLabels
-		}
-		values[key] = value
-	}
-	labels := make([]metrix.Label, 0, len(values))
-	for k, v := range values {
 		labels = append(labels, metrix.Label{
-			Key:   k,
-			Value: v,
+			Key:   key,
+			Value: value,
 		})
 	}
-	slices.SortFunc(labels, func(a, b metrix.Label) int { return strings.Compare(a.Key, b.Key) })
-	return labels, nil
+	tags := labels[start:]
+	slices.SortFunc(tags, func(a, b metrix.Label) int { return strings.Compare(a.Key, b.Key) })
+	n, conflict := 0, false
+	for _, l := range tags {
+		if n > 0 && tags[n-1].Key == l.Key {
+			conflict = conflict || tags[n-1].Value != l.Value
+			continue
+		}
+		tags[n] = l
+		n++
+	}
+	clear(tags[n:])
+	if cap(labels) > start+len(storage) {
+		clear(storage) // Outgrown: the tags now live in a new array.
+	}
+	labels = labels[:start+n]
+	if conflict {
+		return labels, rejectLabels
+	}
+	return labels, err
 }
 
+// validText reports valid UTF-8 without control characters. ASCII is checked
+// bytewise; the rest of a string from its first non-ASCII byte takes the rune path.
 func validText(s string) bool {
+	for i := range len(s) {
+		c := s[i]
+		if c >= utf8.RuneSelf {
+			return validUnicodeText(s[i:])
+		}
+		if c < ' ' || c == 0x7f {
+			return false
+		}
+	}
+	return true
+}
+
+func validUnicodeText(s string) bool {
 	if !utf8.ValidString(s) {
 		return false
 	}
@@ -172,8 +209,26 @@ func validText(s string) bool {
 	return true
 }
 
+// validName is validText excluding whitespace, ':' and '|'. ASCII whitespace is
+// space or a control character.
 func validName(s string) bool {
-	if s == "" || !validText(s) {
+	if s == "" {
+		return false
+	}
+	for i := range len(s) {
+		c := s[i]
+		if c >= utf8.RuneSelf {
+			return validUnicodeName(s[i:])
+		}
+		if c <= ' ' || c == 0x7f || c == ':' || c == '|' {
+			return false
+		}
+	}
+	return true
+}
+
+func validUnicodeName(s string) bool {
+	if !validUnicodeText(s) {
 		return false
 	}
 	for _, c := range s {

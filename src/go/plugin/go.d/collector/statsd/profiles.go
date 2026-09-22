@@ -215,11 +215,13 @@ func (p *profile) owns(name string) bool {
 // type, value, rate, gauge operation and member keep their meaning. Record.Labels
 // must not contain the virtual __name__, so a sender label with that key stays
 // outside the relabel record, invisible to rules, and is restored unchanged.
+// Replaced labels are appended to labels[:0], so they may share the caller's storage.
 //
-// Label strings are substrings of the receive record. The reused input buffer
-// is cleared before returning; the pipeline's processors keep only the most
-// recent record per block, a bound fixed by configuration.
-func (p *profile) replace(r record) (record, error) {
+// Label strings are substrings of the received datagram or buffered TCP records.
+// The reused input buffer is cleared once the output is read, so the pipeline's
+// processors keep only their results for the most recent input per block, a bound
+// fixed by configuration and the record bound.
+func (p *profile) replace(r record, labelsBuf []metrix.Label) (record, error) {
 	var held *metrix.Label
 	for i, l := range r.labels {
 		if l.Key == metricNameLabel {
@@ -231,26 +233,28 @@ func (p *profile) replace(r record) (record, error) {
 			Value: l.Value,
 		})
 	}
-	in := labels.New(p.input...)
-	clear(p.input)
-	p.input = p.input[:0]
+	// Record labels are sorted by key and unique, so the input is valid as it is.
 	out, drop := p.pipeline.Apply(relabel.Record{
 		Name:   r.name,
-		Labels: in,
+		Labels: labels.Labels(p.input),
 	})
+	replaced := labelsBuf[:0]
+	if !drop.Dropped() {
+		out.Labels.Range(func(l labels.Label) {
+			replaced = append(replaced, metrix.Label{
+				Key:   l.Name,
+				Value: l.Value,
+			})
+		})
+		if held != nil {
+			replaced = append(replaced, *held)
+		}
+	}
+	clear(p.input)
+	p.input = p.input[:0]
 	if drop.Dropped() {
 		// Replace-only rules drop only when the resulting name is invalid.
 		return r, rejectSyntax
-	}
-	replaced := make([]metrix.Label, 0, out.Labels.Len()+1)
-	out.Labels.Range(func(l labels.Label) {
-		replaced = append(replaced, metrix.Label{
-			Key:   l.Name,
-			Value: l.Value,
-		})
-	})
-	if held != nil {
-		replaced = append(replaced, *held)
 	}
 	r.name, r.labels = out.Name, replaced
 	return r, nil

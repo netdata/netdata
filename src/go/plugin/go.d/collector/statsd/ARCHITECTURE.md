@@ -77,6 +77,9 @@ The final label grammar preserves native Agent spelling:
   ASCII spaces or all-underscore text. Other printable punctuation is allowed; there is no separate byte quota.
 
 Accepted retained strings are cloned at admission, so substrings cannot retain complete receive or replacement buffers.
+UDP copies each datagram, and TCP each run of complete buffered records, once and cuts records as substrings. Parsing
+and final preparation reuse fixed receiver-owned label and identity storage that is cleared after every record, so an
+admitted update of an existing identity allocates nothing.
 
 ## Profiles
 
@@ -183,8 +186,10 @@ handoff; an expired gauge baseline cannot accept deltas. Retained counters/gauge
 start an empty window. An unstarted or stopped receiver cannot publish held values or claim an empty healthy interval.
 There is no extra expiry timer or sender-cadence inference.
 
-Only Collect constructs direct metrix snapshot handles for application metrics, inside the framework-opened cycle.
-No permanent Vec or handle map survives retirement. Generic autogen uses finite expiry of five successful cycles.
+Only Collect constructs direct metrix snapshot handles for application metrics, inside the framework-opened cycle of
+a series' first write. The series keeps them: every successful cycle writes every retained series, so their
+descriptors never go idle while the handles exist, and the handles end with the series. No Vec or handle map
+survives retirement. Generic autogen uses finite expiry of five successful cycles.
 
 The native TemplateSet holds the fixed diagnostics entry plus active profile entries in configured order. The cut
 captures membership atomically with its batch, so input activating a profile after a cut belongs to the next cycle
@@ -205,7 +210,9 @@ replacement entry.
 Input work is proportional to record size, canonical label sorting and bounded estimator insertion, plus matching the
 original name against configured profiles that have rules or are not yet active, and running at most one pipeline.
 Profile work is fixed by trusted configuration and the record bound; there is no separate expansion guard. Expiry scans
-occur at collection and admission when an expired entry, type or capacity needs resolution. Per-name metadata aging
+occur at collection and at admission when an expired entry, type or capacity needs resolution. Admission scans only
+once the earliest entry without pending input can have expired, a bound every cut recomputes and each scan refreshes,
+so a new identity rejected at capacity costs O(1) otherwise. Per-name metadata aging
 is linear in retained declarations. Percentile query sorts at most 2,049 representatives and reuses one Collect-owned
 scratch. Native output/retention adds its existing cost. Benchmarks measure the complete path and simultaneous window
 ownership; these are not whole-process RSS or end-to-end storage guarantees.

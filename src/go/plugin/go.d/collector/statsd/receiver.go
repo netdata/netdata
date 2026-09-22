@@ -10,9 +10,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
-// identity is a final name plus its canonical application labels.
-type identity struct{ name, labels string }
-
 type declarationKey struct {
 	name string
 	kind wireType
@@ -36,17 +33,19 @@ type typeBinding struct {
 	refs int
 }
 
-// series is one admitted identity. value holds counter and gauge state; ms, h
-// and s observations accumulate in window while spare awaits reuse after the
-// detached batch is released.
+// series is one admitted identity: a final name plus its canonical application
+// labels, keyed by id (see prepareRecord). value holds counter and gauge state;
+// ms, h and s observations accumulate in window while spare awaits reuse after
+// the detached batch is released.
 type series struct {
-	id            identity
+	id            string
 	meta          *declaration
 	labels        []metrix.Label
 	lastInput     time.Time
 	pending       bool
 	value         float64
 	window, spare *interval
+	out           *instruments // Collect-owned
 }
 
 // Receiver ownership is limited to maxSeries entries and one Collect-owned
@@ -56,11 +55,17 @@ type receiver struct {
 	running                  bool
 	capacity                 int
 	idle                     time.Duration
-	entries                  map[identity]*series
+	entries                  map[string]*series
 	bindings                 map[string]typeBinding
 	metadata                 map[declarationKey]*declaration
 	retention                metrix.DescriptorRetention
 	horizon, priorCutSuccess uint64
+
+	// retireAt is the earliest idle expiry of an entry without pending input, zero
+	// when there is none. Only a cut clears pending input, and it recomputes the
+	// bound; between cuts entries only gain input, so admission skips its idle scan
+	// until retireAt.
+	retireAt time.Time
 
 	// profiles are in precedence order. membership records the native profiles
 	// activated by admitted input; it only grows until restart.
@@ -71,6 +76,10 @@ type receiver struct {
 
 	accepted uint64
 	rejects  [len(rejectReasons)]uint64
+
+	// Record storage reused under the lock; records needing more grow on the heap.
+	tagBuf, replaceBuf, labelBuf [16]metrix.Label
+	idBuf                        [512]byte
 }
 
 // lifetime is the longest prepared chart or dimension expiry in successful cycles.
@@ -84,7 +93,7 @@ func newReceiver(
 	r := &receiver{
 		capacity:   capacity,
 		idle:       idle,
-		entries:    make(map[identity]*series),
+		entries:    make(map[string]*series),
 		bindings:   make(map[string]typeBinding),
 		metadata:   make(map[declarationKey]*declaration),
 		retention:  retention,
@@ -122,16 +131,25 @@ func (r *receiver) ingest(line string, now time.Time) error {
 	return err
 }
 
+// ingestLocked parses and prepares into receiver-owned storage and clears the
+// labels it wrote before returning, so the storage never retains a receive
+// record. Admission clones everything it keeps.
 func (r *receiver) ingestLocked(line string, now time.Time) error {
-	input, err := parseRecord(line)
+	input, err := parseRecord(line, r.tagBuf[:0])
+	defer clear(r.tagBuf[:min(len(input.labels), len(r.tagBuf))])
 	if err != nil {
 		return err
 	}
 	original := input.name
-	if input, err = r.preprocess(input); err != nil {
+	input, replaced, err := r.preprocess(input)
+	if replaced {
+		defer clear(r.replaceBuf[:min(len(input.labels), len(r.replaceBuf))])
+	}
+	if err != nil {
 		return err
 	}
-	p, err := prepareRecord(input)
+	p, err := prepareRecord(input, r.labelBuf[:0], r.idBuf[:0])
+	defer clear(r.labelBuf[:min(len(p.labels), len(r.labelBuf))])
 	if err != nil {
 		return err
 	}
@@ -143,14 +161,15 @@ func (r *receiver) ingestLocked(line string, now time.Time) error {
 }
 
 // preprocess runs the one replace pipeline chosen by the original name;
-// pipelines never chain.
-func (r *receiver) preprocess(input record) (record, error) {
+// pipelines never chain. replaced reports whether a pipeline ran.
+func (r *receiver) preprocess(input record) (_ record, replaced bool, _ error) {
 	for _, p := range r.profiles {
 		if p.owns(input.name) {
-			return p.replace(input)
+			input, err := p.replace(input, r.replaceBuf[:0])
+			return input, true, err
 		}
 	}
-	return input, nil
+	return input, false, nil
 }
 
 // activate adds every native profile whose root matches the original name of a
@@ -186,11 +205,10 @@ func (r *receiver) countRejection(reason rejection) {
 // admit requires the receiver lock and a fully prepared record. Every check
 // runs before any mutation, so a rejected record changes nothing.
 func (r *receiver) admit(p preparedRecord, now time.Time) error {
-	id := identity{p.name, p.labelKey}
-	e := r.entries[id]
+	e := r.entries[string(p.id)]
 	if r.expiryMayMatter(e, p.name, p.kind, now) {
 		r.retireIdle(now)
-		e = r.entries[id]
+		e = r.entries[string(p.id)]
 	}
 	if b, ok := r.bindings[p.name]; ok && b.kind != p.kind {
 		return rejectType
@@ -213,7 +231,7 @@ func (r *receiver) admit(p preparedRecord, now time.Time) error {
 		meta = r.declare(p)
 	}
 	if e == nil {
-		e = r.addSeries(id, meta, p)
+		e = r.addSeries(meta, p)
 	}
 	e.update(p.record, value, count, sum)
 	e.lastInput, e.pending = now, true
@@ -239,24 +257,41 @@ func (r *receiver) expired(e *series, now time.Time) bool {
 	return r.idle > 0 && now.Sub(e.lastInput) >= r.idle
 }
 
-// retireIdle removes expired entries without input awaiting handoff.
+// retireIdle removes expired entries without input awaiting handoff. It scans
+// only once the earliest such entry can have expired.
 func (r *receiver) retireIdle(now time.Time) {
+	if r.retireAt.IsZero() || now.Before(r.retireAt) {
+		return
+	}
+	r.retireAt = time.Time{}
 	for _, e := range r.entries {
-		if !e.pending && r.expired(e, now) {
+		switch {
+		case e.pending:
+		case r.expired(e, now):
 			r.remove(e)
+		default:
+			r.boundRetirement(e)
 		}
+	}
+}
+
+// boundRetirement lowers retireAt to the idle expiry of an entry without pending input.
+func (r *receiver) boundRetirement(e *series) {
+	if at := e.lastInput.Add(r.idle); r.retireAt.IsZero() || at.Before(r.retireAt) {
+		r.retireAt = at
 	}
 }
 
 func (r *receiver) remove(e *series) {
 	delete(r.entries, e.id)
 	e.meta.refs--
-	b := r.bindings[e.id.name]
+	name := e.meta.key.name
+	b := r.bindings[name]
 	b.refs--
 	if b.refs == 0 {
-		delete(r.bindings, e.id.name)
+		delete(r.bindings, name)
 	} else {
-		r.bindings[e.id.name] = b
+		r.bindings[name] = b
 	}
 }
 
@@ -274,10 +309,9 @@ func (r *receiver) declare(p preparedRecord) *declaration {
 }
 
 // addSeries admits a new identity and binds its name to the wire type.
-func (r *receiver) addSeries(id identity, meta *declaration, p preparedRecord) *series {
-	id.name = meta.key.name
+func (r *receiver) addSeries(meta *declaration, p preparedRecord) *series {
 	e := &series{
-		id:     id,
+		id:     string(p.id),
 		meta:   meta,
 		labels: make([]metrix.Label, len(p.labels)),
 	}
@@ -287,11 +321,11 @@ func (r *receiver) addSeries(id identity, meta *declaration, p preparedRecord) *
 			Value: strings.Clone(l.Value),
 		}
 	}
-	r.entries[id] = e
+	r.entries[e.id] = e
 	meta.refs++
-	b := r.bindings[id.name]
+	b := r.bindings[meta.key.name]
 	b.kind = p.kind
 	b.refs++
-	r.bindings[id.name] = b
+	r.bindings[meta.key.name] = b
 	return e
 }
