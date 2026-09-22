@@ -122,7 +122,12 @@ static FILE *registry_db_open_tmp_file(const char *filename) {
     else
         flags |= O_CREAT | O_EXCL;
 
+#if defined(OS_WINDOWS)
+    int fd = reuse ? nd_open_no_follow(filename, flags & ~O_NOFOLLOW, 0666) :
+                     open(filename, flags, 0666);
+#else
     int fd = open(filename, flags, 0666);
+#endif
     if(fd == -1)
         return NULL;
 

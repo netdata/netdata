@@ -10,27 +10,44 @@ static char *nd_env_native_path_list(const char *src) {
     if(!src)
         return strdupz("");
 
-    size_t len = strlen(src);
-    char *dst = strdupz(src);
-    size_t entry_start = 0;
-    for(size_t i = 0; i < len; i++) {
-        if(dst[i] == ';') {
-            entry_start = i + 1;
-            continue;
+    BUFFER *wb = buffer_create(0, NULL);
+    const char *entry_start = src;
+    bool first = true;
+
+    while(true) {
+        const char *separator = NULL;
+        for(const char *p = entry_start; *p; p++) {
+            if(*p == ';') {
+                separator = p;
+                break;
+            }
+
+            // A colon immediately after a drive letter belongs to C:/...;
+            // every other colon is an MSYS/POSIX list separator.
+            if(*p == ':' && !(p == entry_start + 1 && isalpha((unsigned char)entry_start[0]))) {
+                separator = p;
+                break;
+            }
         }
 
-        if(dst[i] != ':')
-            continue;
+        size_t entry_len = separator ? (size_t)(separator - entry_start) : strlen(entry_start);
+        CLEAN_CHAR_P *entry = strndupz(entry_start, entry_len);
+        char native[FILENAME_MAX + 1];
+        os_translate_path(native, entry, sizeof(native));
 
-        // Preserve the colon in a drive-qualified entry (C:/...), including
-        // entries after the first one. All other colons are MSYS separators.
-        if(i == entry_start + 1 && isalpha((unsigned char)dst[entry_start]))
-            continue;
+        if(!first)
+            buffer_strcat(wb, ";");
+        buffer_strcat(wb, native);
+        first = false;
 
-        dst[i] = ';';
-        entry_start = i + 1;
+        if(!separator)
+            break;
+        entry_start = separator + 1;
     }
-    return dst;
+
+    char *result = strdupz(buffer_tostring(wb));
+    buffer_free(wb);
+    return result;
 }
 #endif
 
@@ -91,6 +108,23 @@ static void nd_env_set_required(const char *name, const char *value) {
         fatal("Failed to publish required environment variable '%s'", name);
 }
 #endif
+
+// Publish a directory to the plugin environment. On Windows the value must be
+// the translated native path, because plugins hand it straight to Win32 file
+// APIs, and the write is fail-closed: a plugin that silently receives no
+// directory is worse than a startup failure.
+static void nd_env_publish_dir(const char *env, const char *dir) {
+    if (!env)
+        return;
+
+#if defined(OS_WINDOWS)
+    char native_dir[FILENAME_MAX + 1];
+    nd_env_normalize_dir_path(dir, native_dir, sizeof(native_dir));
+    nd_env_set_required(env, native_dir);
+#else
+    nd_setenv(env, dir, 1);
+#endif
+}
 
 #if defined(OS_WINDOWS)
 // mkdir -p for Windows native paths (C:/foo/bar/baz).
@@ -169,13 +203,7 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
     }
 
     if (dir_ok) {
-        if(env) {
-#if defined(OS_WINDOWS)
-            nd_env_set_required(env, native_dir);
-#else
-            nd_setenv(env, dir, 1);
-#endif
-        }
+        nd_env_publish_dir(env, dir);
         return;
     }
 
@@ -235,7 +263,10 @@ void set_environment_for_plugins_and_scripts(void) {
     nd_setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
     verify_required_directory("NETDATA_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
-    nd_setenv("NETDATA_USER_CONFIG_DIR", netdata_configured_user_config_dir, 1);
+    // Same directory as NETDATA_CONFIG_DIR above, so it needs no second
+    // existence check — but it must be published through the same path, or
+    // Windows plugins receive the untranslated POSIX form.
+    nd_env_publish_dir("NETDATA_USER_CONFIG_DIR", netdata_configured_user_config_dir);
     verify_required_directory("NETDATA_STOCK_CONFIG_DIR", netdata_configured_stock_config_dir, false, 0);
     verify_required_directory("NETDATA_STOCK_DATA_DIR", netdata_configured_stock_data_dir, false, 0);
     verify_required_directory("NETDATA_PLUGINS_DIR", netdata_configured_primary_plugins_dir, false, 0);

@@ -53,6 +53,9 @@ struct command_context {
     // If the uv_write fails to start, send_command_reply() closes the handle itself there and
     // then, so the flag staying set costs nothing - uv_is_closing() covers that case.
     bool close_by_callback;
+#if defined(OS_WINDOWS)
+    bool client_authorized;
+#endif
 
     uv_work_t work;
     uv_write_t write_req;
@@ -826,9 +829,31 @@ static void parse_commands(struct command_context *cmd_ctx)
     }
 }
 
+#if defined(OS_WINDOWS)
+static bool command_pipe_client_authorized(uv_pipe_t *client);
+#endif
+
 static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
 {
     struct command_context *cmd_ctx = (struct command_context *)client;
+
+#if defined(OS_WINDOWS)
+    // ImpersonateNamedPipeClient() requires a client message to have been
+    // received, so authorization cannot happen in connection_cb(). Verify the
+    // peer on the first read, before retaining or parsing any command bytes.
+    if (!cmd_ctx->client_authorized && (nread > 0 || nread == UV_EOF)) {
+        if (nread <= 0 || !command_pipe_client_authorized(&cmd_ctx->client)) {
+            netdata_log_error("COMMAND: rejected unauthorized Windows command-pipe client.");
+            (void)uv_read_stop(client);
+            if (buf && buf->len)
+                freez(buf->base);
+            uv_close((uv_handle_t *)client, pipe_close_cb);
+            --clients;
+            return;
+        }
+        cmd_ctx->client_authorized = true;
+    }
+#endif
 
     if (0 == nread) {
         netdata_log_info("%s: Zero bytes read by command pipe.", __func__);
@@ -866,6 +891,74 @@ static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
     buf->base = mallocz(suggested_size);
     buf->len = suggested_size;
 }
+
+#if defined(OS_WINDOWS)
+// Authorize the peer of an accepted command-pipe connection.
+//
+// Fail-closed: anything we cannot positively verify is rejected. Every failure
+// branch therefore reports its Win32 error, because the difference between "the
+// caller is not an administrator" and "we could not determine who the caller is"
+// is invisible from the outside and leads to opposite fixes.
+static bool command_pipe_client_authorized(uv_pipe_t *client) {
+    uv_os_fd_t raw_fd;
+    int rc = uv_fileno((const uv_handle_t *)client, &raw_fd);
+    if (rc != 0) {
+        netdata_log_error("COMMAND: cannot resolve the command-pipe handle to authorize its client: %s",
+                          uv_strerror(rc));
+        return false;
+    }
+
+    HANDLE pipe = (HANDLE)(intptr_t)raw_fd;
+    if (!ImpersonateNamedPipeClient(pipe)) {
+        DWORD error = GetLastError();
+        // ERROR_CANNOT_IMPERSONATE (1368) is the documented result when the
+        // server has not yet read a message from the client. If that is what
+        // this reports in practice, the check cannot stay in the accept path
+        // and has to move after the first read.
+        netdata_log_error("COMMAND: ImpersonateNamedPipeClient() failed with Win32 error %lu; "
+                          "rejecting the command-pipe client.", (unsigned long)error);
+        return false;
+    }
+
+    bool authorized = false;
+    HANDLE token = NULL;
+    PSID administrators = NULL;
+    SID_IDENTIFIER_AUTHORITY nt_authority = SECURITY_NT_AUTHORITY;
+
+    if (!OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, TRUE, &token)) {
+        netdata_log_error("COMMAND: OpenThreadToken() failed with Win32 error %lu while authorizing the "
+                          "command-pipe client.", (unsigned long)GetLastError());
+    }
+    else if (!AllocateAndInitializeSid(&nt_authority, 2,
+                                       SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS,
+                                       0, 0, 0, 0, 0, 0, &administrators)) {
+        netdata_log_error("COMMAND: AllocateAndInitializeSid() failed with Win32 error %lu while authorizing "
+                          "the command-pipe client.", (unsigned long)GetLastError());
+    }
+    else {
+        BOOL member = FALSE;
+        if (!CheckTokenMembership(token, administrators, &member))
+            netdata_log_error("COMMAND: CheckTokenMembership() failed with Win32 error %lu while authorizing "
+                              "the command-pipe client.", (unsigned long)GetLastError());
+        else if (!member)
+            netdata_log_error("COMMAND: the command-pipe client is not a member of the local Administrators "
+                              "group; rejecting it.");
+        else
+            authorized = true;
+    }
+
+    if (administrators)
+        FreeSid(administrators);
+    if (token)
+        CloseHandle(token);
+
+    if (!RevertToSelf())
+        fatal("COMMAND: RevertToSelf() failed with Win32 error %lu; the event loop thread is still "
+              "impersonating a command-pipe client.", (unsigned long)GetLastError());
+
+    return authorized;
+}
+#endif
 
 static void connection_cb(uv_stream_t *server, int status)
 {

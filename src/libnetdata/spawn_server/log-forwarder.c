@@ -374,33 +374,22 @@ static void log_forwarder_thread_func(void *arg) {
 
                 if(ok) {
                     DWORD wr = WaitForMultipleObjects((DWORD)nfds, handles, FALSE, (DWORD)timeout);
-                    if(wr == WAIT_TIMEOUT) {
-                        ret = 0;
-                        // Pipe handles do not reliably signal readability via
-                        // WaitForMultipleObjects; probe queued bytes as well.
-                        for(i = 0; i < nfds; i++) {
-                            DWORD avail = 0;
-                            if(!PeekNamedPipe(handles[i], NULL, 0, NULL, &avail, NULL))
-                                pfds[i].revents = POLLHUP;
-                            else if(avail > 0)
-                                pfds[i].revents = POLLIN;
-                            if(pfds[i].revents) ret++;
-                        }
+                    // Anonymous pipe handles do not reliably signal readability
+                    // through WaitForMultipleObjects. Always probe every pipe,
+                    // including WAIT_FAILED/WAIT_ABANDONED, so queued stderr is
+                    // drained even when the wait result is unusable.
+                    ret = 0;
+                    for(i = 0; i < nfds; i++) {
+                        DWORD avail = 0;
+                        if(!PeekNamedPipe(handles[i], NULL, 0, NULL, &avail, NULL))
+                            pfds[i].revents = POLLHUP;
+                        else if(avail > 0)
+                            pfds[i].revents = POLLIN;
+                        if(pfds[i].revents) ret++;
                     }
-                    else if(wr >= WAIT_OBJECT_0 && wr < WAIT_OBJECT_0 + (DWORD)nfds) {
-                        ret = 0;
-                        for(i = 0; i < nfds; i++) {
-                            DWORD avail = 0;
-                            if(!PeekNamedPipe(handles[i], NULL, 0, NULL, &avail, NULL))
-                                pfds[i].revents = POLLHUP;
-                            else if(avail > 0)
-                                pfds[i].revents = POLLIN;
-                            if(pfds[i].revents) ret++;
-                        }
-                    }
-                    else {
+
+                    if(wr == WAIT_FAILED || wr == WAIT_ABANDONED_0) {
                         Sleep((DWORD)timeout);
-                        ret = -1; // WAIT_FAILED or WAIT_ABANDONED
                     }
                 }
                 else {

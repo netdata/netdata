@@ -342,6 +342,7 @@ typedef uint32_t uid_t;
 #include <evntprov.h>
 #include <wbemidl.h>
 #include <sddl.h>
+#include <aclapi.h>
 // #include <winternl.h> // conflicts on STRING,
 
 // wincrypt.h (included via windows.h) defines macros that conflict with OpenSSL
@@ -530,8 +531,9 @@ static inline long sysconf(int name) {
 }
 #endif
 
-// ── O_NOFOLLOW ── absent from UCRT64; Windows has no symlink-follow prevention ─
-// Setting it to 0 keeps the bitmask intact without effect.
+// ── O_NOFOLLOW ── absent from UCRT64. Security-sensitive Windows opens use
+// nd_open_no_follow(), which applies FILE_FLAG_OPEN_REPARSE_POINT and rejects
+// reparse points; retain a zero compatibility value for generic POSIX flags.
 #ifndef O_NOFOLLOW
 #define O_NOFOLLOW 0
 #endif
@@ -942,7 +944,8 @@ typedef struct {
 #endif
 
 // ── lstat() ── POSIX, absent from UCRT64 ─────────────────────────────────────
-// Windows has no symlinks to follow; stat() and lstat() are semantically identical.
+// Keep the compatibility alias for ordinary metadata checks. Security-sensitive
+// opens must use nd_open_no_follow(), because stat() follows reparse points.
 #ifndef lstat
 #define lstat(path, buf) stat(path, buf)
 #endif
@@ -1026,6 +1029,11 @@ static inline int statvfs(const char *path, struct statvfs *buf) {
     buf->f_blocks = total_bytes.QuadPart;
     buf->f_bfree = total_free_bytes.QuadPart;
     buf->f_bavail = free_bytes.QuadPart;
+    // Windows does not expose POSIX inode counts.  Match the diskspace
+    // collector's unsupported-inodes sentinel instead of reporting zero.
+    buf->f_files = (uint64_t)-1;
+    buf->f_ffree = (uint64_t)-1;
+    buf->f_favail = (uint64_t)-1;
     buf->f_namemax = 255;
     return 0;
 }
@@ -1118,14 +1126,12 @@ static inline int sigaction(int signo __maybe_unused,
 
 // ── AT_FDCWD / utimensat() ── POSIX dir-relative timestamp update, absent from UCRT64 ─
 // machine-guid.c uses utimensat(AT_FDCWD, ...) to preserve file modification times.
-// Windows manages timestamps differently; stub returns success without modifying them.
+// Implemented in os.c: it needs path translation and the allocator, neither of which is
+// available this early in the include order.
 #ifndef AT_FDCWD
 #define AT_FDCWD  (-100)
 #endif
-static inline int utimensat(int dirfd __maybe_unused, const char *pathname __maybe_unused,
-                              const struct timespec times[2] __maybe_unused, int flags __maybe_unused) {
-    return 0;
-}
+int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);
 
 // ── fsync() ── POSIX file flush, absent from UCRT64 ──────────────────────────
 // UCRT64 provides _commit(fd) which flushes the OS write buffers for a CRT fd.
@@ -1134,10 +1140,9 @@ static inline int fsync(int fd) {
 }
 
 // ── fchmod() ── POSIX fd-based permission bits, absent from UCRT64 ───────────
-// Windows ACL permissions are not controlled via Unix mode bits; no-op.
-static inline int fchmod(int fd __maybe_unused, int mode __maybe_unused) {
-    return 0;
-}
+// Implemented in os.c: it applies an explicit, non-inheriting Windows ACL derived
+// from the POSIX mode. See nd_windows_sd_from_mode().
+int fchmod(int fd, int mode);
 
 // ── unsetenv() ── POSIX env removal, absent from UCRT64 headers ──────────────
 // SetEnvironmentVariableA with NULL removes the variable from the process env.

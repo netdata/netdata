@@ -3,7 +3,6 @@
 #include "daemon-shutdown.h"
 #include "daemon-service.h"
 #include "status-file.h"
-#include "status-file-io.h"
 #include "daemon/daemon-shutdown-watcher.h"
 #include "static_threads.h"
 #include "common.h"
@@ -432,11 +431,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     watcher_shutdown_end();
     watcher_thread_stop();
-
-    // Drain the deferred status-file publisher so the final snapshot is on
-    // disk before we exit. On POSIX this is a no-op because rename(2) is
-    // already async-signal-safe.
-    status_file_io_shutdown();
 
 #if defined(FSANITIZE_ADDRESS)
     fprintf(stderr, "\n");
