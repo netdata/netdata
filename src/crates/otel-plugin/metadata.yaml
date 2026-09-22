@@ -27,7 +27,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Receive OpenTelemetry metrics and logs over OTLP/gRPC from Collectors, SDKs, and instrumented applications. The plugin converts supported metrics into Netdata charts and indexes logs for exploration in the Logs tab.
+          Receive OpenTelemetry metrics, logs, and traces over OTLP/gRPC from Collectors, SDKs, and instrumented applications. The plugin converts supported metrics into Netdata charts, indexes logs for exploration in the Logs tab, and stores traces.
 
           The plugin accepts gauges, sums, explicit-bucket histograms, and summaries. It does not currently ingest exponential histograms. Monotonic cumulative and delta sums are rate-normalized; non-monotonic cumulative sums behave as gauges.
 
@@ -136,15 +136,15 @@ modules:
               default_value: 100
               required: false
             - name: base_dir
-              description: Absolute root directory for locally stored OpenTelemetry log data.
+              description: Absolute root directory for locally stored OpenTelemetry logs and traces.
               detailed_description: |
-                Retention limits govern retained indexed files. Write-ahead logs, catalogs, and remote-read cache can make total usage below this directory exceed `logs.retention.*.max_total_size`.
+                Retention limits govern retained indexed files. Write-ahead logs, catalogs, and the download cache for offloaded data (`<base_dir>/remote-read`) can make total usage below this directory exceed the `retention.*.max_total_size` limits.
               default_value: "/var/log/netdata/otel/v2"
               required: false
             - name: remote_storage.enabled
-              description: Upload retained OpenTelemetry log data to configured remote object storage.
+              description: Upload retained OpenTelemetry logs and traces to configured remote object storage.
               detailed_description: |
-                Sealed indexed files are uploaded in addition to being kept under local retention. When a query needs a remotely cataloged file that is no longer local, the plugin downloads it through the bounded remote-read cache.
+                Sealed indexed files are uploaded in addition to being kept under local retention. When a query needs a remotely cataloged file that is no longer local, the plugin downloads it into the bounded download cache shared by logs and traces. Each download may take 30 seconds plus one second per MiB, at most 5 minutes; a file that takes longer or cannot be served is left out (traces report the answer as partial). A query needing more data than the cache holds fails with a message to narrow its time range.
               default_value: false
               required: false
             - name: remote_storage.uri
@@ -154,13 +154,13 @@ modules:
               default_value: "fs:///var/log/netdata/otel/v2/remote"
               required: false
             - name: remote_storage.read_cache_max_size
-              description: Maximum local cache size for data fetched back from remote storage during queries.
+              description: Maximum size of the local download cache, shared by logs and traces, for data fetched back from remote storage during queries.
               default_value: "1GB"
               required: false
             - name: auth.enabled
-              description: Require the `X-Scope-OrgID` gRPC header to select a log tenant.
+              description: Require the `X-Scope-OrgID` gRPC header to select a tenant for logs and traces.
               detailed_description: |
-                This is tenant selection, not credential authentication. When disabled, logs use the `default` tenant. When enabled, trust the header only behind TLS or mutual TLS and suitable network controls. Metrics are not tenant-scoped.
+                This is tenant selection, not credential authentication. When disabled, logs and traces use the `default` tenant. When enabled, trust the header only behind TLS or mutual TLS and suitable network controls. Metrics are not tenant-scoped.
               default_value: false
               required: false
             - name: logs.rotation.default.max_file_size

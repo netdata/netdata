@@ -320,3 +320,65 @@ async fn progress_counts_the_downloads_beside_the_sources() {
     call_with(&h, trace_body(0x0C), &progress).await.unwrap();
     assert_eq!(progress.load(), (2, 3));
 }
+
+/// The windowed aggregate modes over the corpus window.
+fn aggregate_bodies() -> [serde_json::Value; 4] {
+    let window = |mode: &str, extra: serde_json::Value| {
+        let mut params = json!({"after": T_S, "before": T_S + 100});
+        params
+            .as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        json!({ mode: params })
+    };
+    [
+        window("overview", json!({"facets": true})),
+        window("slowest", json!({})),
+        window("attributes", json!({})),
+        window("attribute_values", json!({"key": "resource.service.name"})),
+    ]
+}
+
+#[tokio::test]
+async fn evicted_files_answer_the_aggregate_modes_as_local_files() {
+    let (local, _) = local_setup().await;
+    let (evicted, _remote, _) = evicted_setup(64 * MIB).await;
+
+    for body in aggregate_bodies() {
+        let from_local = call(&local, body.clone()).await.unwrap();
+        let from_remote = call(&evicted, body.clone()).await.unwrap();
+        assert_eq!(from_local["status"], json!({"complete": true}), "{body}");
+        assert_eq!(from_remote, from_local, "{body}");
+    }
+}
+
+#[tokio::test]
+async fn every_aggregate_mode_reports_a_failed_download() {
+    let (h, remote, [_, two]) = evicted_setup(64 * MIB).await;
+    remote.lose(&two);
+
+    for body in aggregate_bodies() {
+        let v = call(&h, body.clone()).await.unwrap();
+        assert_eq!(v["status"], json!({"partial": ["remote_unavailable"]}), "{body}");
+    }
+    // What the downloaded file holds is still served.
+    let v = call(&h, aggregate_bodies()[1].clone()).await.unwrap();
+    assert_eq!(traces_of(&v), ["0b", "0a"]);
+}
+
+#[tokio::test]
+async fn a_lost_file_outside_the_window_does_not_make_an_answer_partial() {
+    // File 2 (seconds 30-40) is lost; a window over file 1 alone does not
+    // need it.
+    let (h, remote, [_, two]) = evicted_setup(64 * MIB).await;
+    remote.lose(&two);
+
+    for mode in ["overview", "slowest", "attributes"] {
+        let body = json!({ mode: {"after": T_S + 5, "before": T_S + 25} });
+        let v = call(&h, body.clone()).await.unwrap();
+        assert_eq!(v["status"], json!({"complete": true}), "{body}");
+    }
+    let body = json!({"attribute_values": {"after": T_S + 5, "before": T_S + 25, "key": "resource.service.name"}});
+    let v = call(&h, body).await.unwrap();
+    assert_eq!(v["status"], json!({"complete": true}));
+}

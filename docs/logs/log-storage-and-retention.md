@@ -125,8 +125,8 @@ Retention applies to sealed indexed files, per tenant, oldest first, when any of
 | `logs.retention.default.max_age` | 7 days | Maximum age of an indexed file, measured on its newest entry |
 
 `max_total_size` is not a cap on the plugin's disk usage: active write-ahead logs (up to `max_file_size` per stream),
-catalogs, and the remote read cache are additional. Retention runs when a file is sealed; a tenant that stops sending
-gets one final pass when its last write-ahead log
+catalogs, and the download cache for offloaded data are additional. Retention runs when a file is sealed; a tenant
+that stops sending gets one final pass when its last write-ahead log
 seals on idle (within about 15 minutes), then keeps its remaining files until it sends again or the Agent restarts.
 
 Per-tenant sections inherit every field they omit from `default`. The section name is the tenant, which is the
@@ -154,12 +154,20 @@ the Agent. The full option list is in the [OpenTelemetry plugin reference](/src/
 ### Offloading to object storage
 
 With `remote_storage.enabled: true`, every sealed indexed file is also uploaded to `remote_storage.uri`, an `s3://` or
-`fs://` location. Uploading changes nothing locally: files stay under local retention, and a local file is not deleted
-by retention until its catalog entry confirms it is in the remote. When a query needs an offloaded file that is no
-longer
-local, the Agent downloads it through a cache bounded by `remote_storage.read_cache_max_size` (1GB), and the query
-waits for the download. A query whose files exceed the cache fails with a message to narrow the time window or stream
-filter.
+`fs://` location. The same applies to traces. Uploading changes nothing locally: files stay under local retention, and
+a local file is not deleted by retention until its catalog entry confirms it is in the remote. When a query needs an
+offloaded file that is no longer local, the Agent downloads it whole into a download cache at `<base_dir>/remote-read`,
+bounded by `remote_storage.read_cache_max_size` (1GB) and shared by logs and traces, then answers from it; repeated
+queries over the same files are served from the cache.
+
+- A query whose offloaded files exceed the cache fails with a message to narrow the time window or stream filter.
+- A download may take 30 seconds plus one second per MiB of the file, at most 5 minutes. A file that takes longer, or
+  that the remote cannot serve, is left out of the answer, and while the remote is failing the query skips its
+  remaining downloads instead of waiting for each. The Logs tab shows what could be read.
+- A query downloads its files one at a time, and the cache admits a query's files all at once: one wide query, of logs
+  or traces, makes other queries wait for room and can evict their cached files.
+- If the cache directory becomes unwritable, downloads fail as above and the plugin logs the write errors; a query that
+  needs room the cache cannot free fails with a message about the cache directory.
 
 ```yaml
 remote_storage:
@@ -188,6 +196,10 @@ remote_storage:
   a ceiling. Monitor free disk on the receiving node.
 - This is how long retention is made cheap: keep days locally with a small `max_age`, keep months or years in object
   storage, and query both from the same Logs tab.
+- Earlier versions kept a logs-only cache at `<base_dir>/logs/remote-read`. With offloading enabled, the Agent moves it
+  to `<base_dir>/remote-read` at startup; if it cannot be moved (for example, it is on another filesystem), its cached
+  files are deleted, since it is only a cache. With offloading disabled it is left untouched and can be deleted by
+  hand.
 
 ### Sizing the receiving node
 
@@ -196,9 +208,9 @@ multiply
 by the retention you want locally. For long retention there are two shapes: keep everything on local disk, sizing it
 as one day's index size × `max_age`, as the `audit` example above does with its 400 days; or keep `max_age` short
 (30 days, say), enable offloading, and size the object storage for one day's index size × the total retention you
-want reachable — older files are then fetched back from S3 through the read cache when queried. Add headroom for active
-write-ahead logs (`max_file_size` per stream) and for the
-read cache when offloading is enabled. Queries are bounded by their time range and by the Agent's function timeout, so
+want reachable — older files are then fetched back from S3 through the download cache when queried. Add headroom for
+active write-ahead logs (`max_file_size` per stream) and for the download cache when offloading is enabled; logs and
+traces share it. Queries are bounded by their time range and by the Agent's function timeout, so
 on large stores keep the
 default window and narrow it further before running a full-text search; see
 [Managing Logs](/docs/dashboards-and-charts/logs-tab.md#query-behavior-at-scale).

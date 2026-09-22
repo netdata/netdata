@@ -26,8 +26,22 @@ source are in [Logs Collection](/docs/opentelemetry/logs-collection.md), and ret
 
 ## Traces
 
-The endpoint accepts and stores OTLP traces, but a traces view is not yet available in the dashboards and the traces
-workflow is not yet documented. Stay tuned.
+The endpoint accepts and stores OTLP traces, with the same retention options as logs and the same optional offloading
+to object storage: trace files that local retention removed are downloaded back when a query needs them, through the
+download cache logs use ([Log Storage and Retention](/docs/logs/log-storage-and-retention.md#offloading-to-object-storage)).
+A traces view is not yet available in the dashboards and the traces workflow is not yet documented. Stay tuned.
+
+Known limits of reading traces back from object storage in this release:
+
+- A query that needs more offloaded data than the download cache holds fails with a message to narrow the time range
+  or raise `remote_storage.read_cache_max_size`. A search also reads up to 24 hours beyond each side of its window to
+  complete the traces it finds.
+- A trace opened without a time range covers everything kept, local and offloaded, so it fails once the offloaded
+  history exceeds the download cache.
+- A file that cannot be downloaded, or a catalog that cannot be read, makes the answer partial with the reason
+  `remote_unavailable`; one missing file in a search's range marks every trace summary as possibly incomplete and
+  empties searches that filter on the root service, root operation or trace duration. A downloaded file that turns
+  out unreadable is reported as a failed source (`source_failure`).
 
 ## Requirements
 
