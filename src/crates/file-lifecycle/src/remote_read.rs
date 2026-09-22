@@ -81,9 +81,10 @@ impl<S: Storage> RemoteRead<S> {
     }
 
     /// Materialize `entries` in the download cache. Entries naming the same
-    /// file are fetched once. `progress` ticks once per download attempted,
-    /// success or failure; a cache hit downloads nothing and does not tick, so
-    /// a caller sizing its total by `entries.len()` gets an upper bound.
+    /// file are fetched once. `progress` ticks once per planned download —
+    /// completed, failed, or skipped after an earlier failure; a cache hit
+    /// downloads nothing and does not tick, so a caller sizing its total by
+    /// `entries.len()` gets an upper bound.
     ///
     /// Per-entry failures are reported in [`RemoteFetch::failed`]. The only
     /// errors are query-wide: [`CacheError::TooLarge`] (the entries' total size

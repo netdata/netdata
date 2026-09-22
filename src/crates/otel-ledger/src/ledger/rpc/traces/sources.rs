@@ -179,10 +179,13 @@ impl TracesSourceSupplier {
     /// then downloaded once. A cancelled call returns no copies.
     ///
     /// Sets `progress`'s total before the downloads: the sources of the
-    /// DISTINCT ranges (every mode walks each with exactly one engine pass
-    /// that ticks once per source; search's window role shares the
-    /// completion range and does not tick) plus one unit per planned
-    /// download — an upper bound, as a cached file downloads nothing.
+    /// DISTINCT ranges (a mode walks each with one engine pass that ticks
+    /// once per source; search's window role shares the completion range and
+    /// does not tick) plus one unit per planned download — an upper bound, as
+    /// a cached file downloads nothing. One case undercounts: when the
+    /// Functions view's aggregate range happens to equal its completion
+    /// range, two passes tick over the one counted range, so `done` can
+    /// exceed the total.
     pub(crate) async fn capture_ranges(
         &self,
         tenant: &TenantId,

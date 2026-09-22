@@ -197,9 +197,12 @@ remote_storage:
 - This is how long retention is made cheap: keep days locally with a small `max_age`, keep months or years in object
   storage, and query both from the same Logs tab.
 - Earlier versions kept a logs-only cache at `<base_dir>/logs/remote-read`. With offloading enabled, the Agent moves it
-  to `<base_dir>/remote-read` at startup; if it cannot be moved (for example, it is on another filesystem), its cached
-  files are deleted, since it is only a cache. With offloading disabled it is left untouched and can be deleted by
-  hand.
+  to `<base_dir>/remote-read` at startup. If `<base_dir>/remote-read` already exists, or the move fails (for example,
+  the old folder is on another filesystem or is a mount point), the old folder's cached files are deleted instead,
+  since it is only a cache, and the folder is removed once empty; files the cache did not write are kept and logged. A
+  volume mounted at the old path is therefore no longer used: mount it at `<base_dir>/remote-read`. If the old path is
+  a symlink to a folder and `<base_dir>/remote-read` does not exist yet, the new path becomes a link to that folder;
+  any other old link is removed. With offloading disabled the old folder is left untouched and can be deleted by hand.
 
 ### Sizing the receiving node
 
