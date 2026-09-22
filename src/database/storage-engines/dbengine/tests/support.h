@@ -57,6 +57,30 @@ inline NetdataTestLogCapture &netdata_test_log_capture() {
     return capture;
 }
 
+// DBENGINE_TEST_LOG, read once, for the A/B check that the sink stream and the nd_log stream are the same stream:
+//
+//   unset        what a normal run does - capture, and print a case's lines only when that case failed
+//   none         no sink is installed, so the engine logs the way it did before there was one
+//   sink-echo    the sink is installed and also writes each line to stderr as it arrives, in a form that can be
+//                compared against what the logger prints in a "none" run
+//
+// It is here rather than in a throwaway build because the comparison is worth repeating: it is the one check that
+// says the no-sink arm and the sink arm carry the same lines, and it should still be runnable the next time
+// someone touches this layer.
+enum NetdataTestLogMode { NETDATA_TEST_LOG_CAPTURE, NETDATA_TEST_LOG_NONE, NETDATA_TEST_LOG_SINK_ECHO };
+
+inline NetdataTestLogMode netdata_test_log_mode() {
+    static const NetdataTestLogMode mode = [] {
+        const char *v = getenv("DBENGINE_TEST_LOG");
+        if (v && std::string(v) == "none")
+            return NETDATA_TEST_LOG_NONE;
+        if (v && std::string(v) == "sink-echo")
+            return NETDATA_TEST_LOG_SINK_ECHO;
+        return NETDATA_TEST_LOG_CAPTURE;
+    }();
+    return mode;
+}
+
 #define NETDATA_TEST_LOG_CAPTURE_MAX (1024 * 1024)
 
 extern "C" inline void netdata_test_log_sink(void *data, ND_LOG_FIELD_PRIORITY priority,
@@ -69,6 +93,9 @@ extern "C" inline void netdata_test_log_sink(void *data, ND_LOG_FIELD_PRIORITY p
 
     NetdataTestLogCapture *capture = static_cast<NetdataTestLogCapture *>(data);
     std::lock_guard<std::mutex> lock(capture->mutex);
+
+    if (netdata_test_log_mode() == NETDATA_TEST_LOG_SINK_ECHO)
+        std::fprintf(stderr, "SINK\t%s\t%s\n", nd_log_id2priority(priority), message);
 
     if (capture->text.size() >= NETDATA_TEST_LOG_CAPTURE_MAX) {
         capture->truncated = true;
@@ -108,8 +135,10 @@ inline struct dbengine_config netdata_test_config() {
     cfg.libuv_worker_threads = DBENGINE_TEST_UV_THREADS;
 
     // every engine in this binary is created from here, so every engine's diagnostics are captured
-    cfg.log_sink = netdata_test_log_sink;
-    cfg.log_sink_data = &netdata_test_log_capture();
+    if (netdata_test_log_mode() != NETDATA_TEST_LOG_NONE) {
+        cfg.log_sink = netdata_test_log_sink;
+        cfg.log_sink_data = &netdata_test_log_capture();
+    }
 
     return cfg;
 }
