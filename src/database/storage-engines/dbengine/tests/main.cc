@@ -24,17 +24,26 @@ class EngineLogListener : public ::testing::EmptyTestEventListener {
         if (info.result()->Passed())
             return;
 
-        NetdataTestLogCapture &capture = netdata_test_log_capture();
-        std::lock_guard<std::mutex> lock(capture.mutex);
+        // copied under the lock and printed outside it: an engine thread that logs while this runs should not
+        // wait on stderr, which is the very shape the sink contract tells embedders to avoid
+        std::string text;
+        bool truncated;
+        {
+            NetdataTestLogCapture &capture = netdata_test_log_capture();
+            std::lock_guard<std::mutex> lock(capture.mutex);
+            text = capture.text;
+            truncated = capture.truncated;
+        }
 
-        if (capture.text.empty()) {
+        if (text.empty()) {
             std::fprintf(stderr, "  the engine logged nothing during this test\n");
             return;
         }
 
-        std::fprintf(stderr, "  what the engine logged during this test:\n%s", capture.text.c_str());
-        if (capture.truncated)
-            std::fprintf(stderr, "    ... truncated at %d bytes\n", NETDATA_TEST_LOG_CAPTURE_MAX);
+        std::fprintf(stderr, "  what the engine logged during this test:\n%s", text.c_str());
+        if (truncated)
+            std::fprintf(stderr, "    ... and more, dropped at the %d byte ceiling\n",
+                         NETDATA_TEST_LOG_CAPTURE_MAX);
     }
 };
 

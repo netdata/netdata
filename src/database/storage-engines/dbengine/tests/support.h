@@ -52,9 +52,12 @@ struct NetdataTestLogCapture {
     bool truncated = false;
 };
 
+// Deliberately leaked rather than a plain function-local static. A case that fails its teardown assertion leaves
+// a retained engine whose configuration still points here, and a static would be destroyed at exit while that
+// engine is still reachable. One allocation, never freed, removes the whole class of question.
 inline NetdataTestLogCapture &netdata_test_log_capture() {
-    static NetdataTestLogCapture capture;
-    return capture;
+    static NetdataTestLogCapture *capture = new NetdataTestLogCapture();
+    return *capture;
 }
 
 // DBENGINE_TEST_LOG, read once, for the A/B check that the sink stream and the nd_log stream are the same stream:
@@ -86,18 +89,28 @@ inline NetdataTestLogMode netdata_test_log_mode() {
 extern "C" inline void netdata_test_log_sink(void *data, ND_LOG_FIELD_PRIORITY priority,
                                              const char *file, const char *function, unsigned long line,
                                              const char *fmt, va_list ap) {
-    char message[4096];
+    char message[8192];
     const int len = vsnprintf(message, sizeof(message), fmt, ap);
     if (len < 0)
         return;
 
+    // A truncated message would make the A/B comparison measure this buffer rather than the engine, so it says so
+    // instead of pretending. The longest line the suite produces today is 424 bytes.
+    const bool message_truncated = (size_t)len >= sizeof(message);
+
     NetdataTestLogCapture *capture = static_cast<NetdataTestLogCapture *>(data);
     std::lock_guard<std::mutex> lock(capture->mutex);
 
-    if (netdata_test_log_mode() == NETDATA_TEST_LOG_SINK_ECHO)
-        std::fprintf(stderr, "SINK\t%s\t%s\n", nd_log_id2priority(priority), message);
+    if (netdata_test_log_mode() == NETDATA_TEST_LOG_SINK_ECHO) {
+        // one line per message: the comparison is line oriented, so an embedded newline would desynchronise it
+        for (char *c = message; *c; c++)
+            if (*c == '\n')
+                *c = ' ';
+        std::fprintf(stderr, "SINK\t%s\t%s%s\n", nd_log_id2priority(priority), message,
+                     message_truncated ? " <TRUNCATED>" : "");
+    }
 
-    if (capture->text.size() >= NETDATA_TEST_LOG_CAPTURE_MAX) {
+    if (capture->text.size() + (size_t)len > NETDATA_TEST_LOG_CAPTURE_MAX) {
         capture->truncated = true;
         return;
     }

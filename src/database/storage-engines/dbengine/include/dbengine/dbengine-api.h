@@ -28,10 +28,10 @@ extern "C" {
 // STORAGE_INSTANCE is this very pointer, cast by the engine on either side, and the daemon only passes tiers
 // around and reaches them by number through dbengine_tier().
 //
-// Where the engine's diagnostics go is the embedder's to decide too: the log_sink of the configuration takes every
-// line the engine emits, and the engine's own default (NULL) is netdata's logger, which is what it has always
-// done. The full contract - the threads it is called from, the locks that may be held, and how long it must stay
-// callable after dbengine_destroy() - is at dbengine_log_fn in dbengine-config.h.
+// Where the engine's diagnostics go is the embedder's to decide too: the log_sink of the configuration takes the
+// lines the engine emits, and the engine's own default (NULL) is netdata's logger, which is what it has always
+// done. The full contract - the threads it is called from, the locks that may be held, what it does not receive,
+// and how long it must stay callable after dbengine_destroy() - is at dbengine_log_fn in dbengine-config.h.
 struct dbengine_tier;
 
 // the engine's tier by number, 0 to RRD_STORAGE_TIERS - 1: the tier that dbengine_tier_init() with that number
@@ -126,9 +126,10 @@ void dbengine_flush_all(DBENGINE_TIER *tier);
 // referenced, 0 when there were none; 0 for NULL.
 //
 // The configuration's log_sink is called during this, and again from whichever thread later releases the last of
-// whatever this call reported as still referenced. An embedder that frees the sink's data when dbengine_destroy()
-// returns has a use-after-free waiting for it unless the return value was 0: the sink must stay callable until a
-// call returns 0 (dbengine_log_fn, dbengine-config.h).
+// whatever kept the engine retained. Do not read the return value as permission to free the sink's data: it
+// counts registry metrics only, so it is 0 even when a cache this engine still points at holds referenced pages,
+// and that cache emits. The sink and its data must outlive every handle the embedder took from the engine and
+// the dbengine_destroy() that follows releasing them (dbengine_log_fn, dbengine-config.h).
 size_t dbengine_destroy(DBENGINE_ENGINE *engine);
 
 // the engine's resolved file descriptor budget (dbengine-config.h max_reserved_file_descriptors, with 0 resolved),

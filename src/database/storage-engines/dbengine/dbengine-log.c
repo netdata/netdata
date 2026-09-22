@@ -13,8 +13,7 @@ bool dbengine_log_has_sink(struct dbengine_engine *engine) {
 // after an engine verb is unaffected by whatever its sink does
 static void dbengine_log_to_sink(struct dbengine_engine *engine, ND_LOG_FIELD_PRIORITY priority,
                                  const char *file, const char *function, unsigned long line,
-                                 const char *fmt, va_list ap) {
-    int saved_errno = errno;
+                                 const char *fmt, va_list ap, int saved_errno) {
     engine->cfg.log_sink(engine->cfg.log_sink_data, priority, file, function, line, fmt, ap);
     errno = saved_errno;
 }
@@ -22,9 +21,11 @@ static void dbengine_log_to_sink(struct dbengine_engine *engine, ND_LOG_FIELD_PR
 void dbengine_log_emit(struct dbengine_engine *engine, ND_LOG_FIELD_PRIORITY priority,
                        const char *file, const char *function, unsigned long line,
                        const char *fmt, ...) {
+    int saved_errno = errno;
+
     va_list ap;
     va_start(ap, fmt);
-    dbengine_log_to_sink(engine, priority, file, function, line, fmt, ap);
+    dbengine_log_to_sink(engine, priority, file, function, line, fmt, ap, saved_errno);
     va_end(ap);
 }
 
@@ -39,6 +40,9 @@ void dbengine_log_emit(struct dbengine_engine *engine, ND_LOG_FIELD_PRIORITY pri
 void dbengine_log_emit_limit(struct dbengine_engine *engine, ERROR_LIMIT *erl, ND_LOG_FIELD_PRIORITY priority,
                              const char *file, const char *function, unsigned long line,
                              const char *fmt, ...) {
+    // captured here, where netdata_logger_with_limit() captures it: the sleep and the lock below can both set it
+    int saved_errno = errno;
+
     if(erl->sleep_ut)
         sleep_usec(erl->sleep_ut);
 
@@ -48,6 +52,7 @@ void dbengine_log_emit_limit(struct dbengine_engine *engine, ERROR_LIMIT *erl, N
     time_t now = now_boottime_sec();
     if(now - erl->last_logged < erl->log_every) {
         spinlock_unlock(&erl->spinlock);
+        errno = saved_errno;
         return;
     }
 
@@ -55,7 +60,7 @@ void dbengine_log_emit_limit(struct dbengine_engine *engine, ERROR_LIMIT *erl, N
 
     va_list ap;
     va_start(ap, fmt);
-    dbengine_log_to_sink(engine, priority, file, function, line, fmt, ap);
+    dbengine_log_to_sink(engine, priority, file, function, line, fmt, ap, saved_errno);
     va_end(ap);
 
     erl->last_logged = now;

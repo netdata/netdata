@@ -37,27 +37,45 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 // - Called with log_sink_data verbatim, a severity, the emission site inside the engine (the __FILE__,
 //   __FUNCTION__ and __LINE__ of the line that emitted, not of any wrapper), a printf format and its arguments as
 //   a va_list. Format and va_list are valid for the call and not after it; a sink that keeps the message formats
-//   its own copy, and one that reads the arguments twice va_copy()s first.
+//   its own copy, and one that reads the arguments twice va_copy()s first. Most formats carry no trailing
+//   newline; the handful the engine writes while tearing its caches down do, because without a sink they are an
+//   fprintf(stderr) and always have been. A sink that adds its own line ending should not assume either way.
 // - Called from any thread the engine uses - the caller's own thread inside a public verb, the engine's event
 //   loop, a libuv pool worker, a cache's eviction thread - and two calls may overlap. The sink serialises itself;
 //   the engine takes no lock for it.
-// - May be called with an engine lock held: a cache queue lock, a datafile users spinlock, a journalfile data
-//   spinlock. A sink MUST NOT call back into the engine, and MUST NOT block on anything an engine thread can wait
-//   for: a sink that blocks on a pool thread can hang the process for good, for the reason libuv_worker_threads
-//   below gives.
+// - May be called with any engine lock held. A cache queue lock, a datafile users spinlock, a journalfile data
+//   spinlock and a tier's datafile rwlock (held as a reader, while the engine walks a tier's datafile list) are
+//   the ones to picture, but the list is not exhaustive and is not meant to be: treat it as "a lock is held".
+//   A sink MUST NOT call back into the engine, and MUST NOT block on anything an engine thread can wait for: a
+//   sink that blocks while a lock is held stalls whatever that lock guards, and one that blocks on a pool thread
+//   can hang the process for good, for the reason libuv_worker_threads below gives.
+// - Receives the message and nothing netdata's logger adds around it. In particular the logger annotates a line
+//   on the daemon source with the caller's errno; a sink gets the format and the arguments only. It may read
+//   errno itself during the call - the save and restore below make that well defined.
 // - Must return. A sink that longjmp()s out, or ends the process, does it from wherever the engine happened to
 //   be: mid-way through a rate limiter's window update, inside a guarded read of a mapped journal, holding a
 //   cache queue lock. The engine has no way to finish what it was doing.
 // - The engine saves and restores errno around the call, so a caller that reads errno after an engine verb is
 //   unaffected by the sink.
-// - May be called after dbengine_shutdown(), from inside dbengine_destroy(), and - when dbengine_destroy()
-//   reported metrics or cache pages still referenced - from whichever thread later releases the last of them. The
-//   sink and its data must stay callable until a dbengine_destroy() has returned 0, not merely until one returned.
+// - May be called after dbengine_shutdown(), from inside dbengine_destroy(), and - when the engine was retained
+//   because something was still referenced - from whichever thread later releases the last of it. The sink and
+//   its data must stay callable until the embedder has released every handle it took from the engine (metric
+//   handles, collection and query handles, and anything holding a cache page) AND a dbengine_destroy() has run
+//   after that. The return value alone does not say when that is: it counts registry metrics only, so it can be
+//   0 while a cache the engine still points at holds referenced pages, and that cache can emit.
 // - Never called after the engine is freed, and never for what the engine cannot survive: fatal() and
 //   internal_fatal() end the process through netdata's logger whatever this field holds.
-// - Does not receive every line the engine's work produces. The process-wide page-data layer has no engine to
-//   reach, the engine's file and decompression primitives sit below the level where one is in hand, and a failed
-//   protected read of a mapped journal is reported by libnetdata's own recovery; those go to netdata's logger.
+// - Does not receive every line the engine's work produces, for two separate reasons.
+//
+//   Some lines have no engine to route through, and go to netdata's logger: the process-wide page-data layer,
+//   the engine's file and decompression primitives, which sit below the level where an engine is in hand, the
+//   public verbs that reject a NULL storage instance - which is exactly when there is no engine to ask - and a
+//   failed protected read of a mapped journal, which libnetdata's own recovery reports.
+//
+//   And some lines are dropped before the sink is reached, by the gate the emitting site has always had: a rate
+//   limited site emits at most once per its own window, a debug site emits only when the matching debug flag is
+//   set, and a build without internal checks compiles its internal-error sites out entirely. The sink decides
+//   what to do with what it is given; it does not see what the site itself did not emit.
 typedef void (*dbengine_log_fn)(
         void *data,                             // log_sink_data, verbatim
         ND_LOG_FIELD_PRIORITY priority,

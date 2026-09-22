@@ -27,7 +27,8 @@
 //   before anything else happens; the sink is handed every line and decides for itself. An embedder that wants the
 //   logger's thresholds implements them in the sink.
 //
-// What stays outside this layer, and why: the process-wide page-data allocators (page.c) have no engine to reach,
+// What stays outside this layer, and why: the process-wide page-data allocators (page.c) have no engine to reach
+// at the sites that report a bad page - pgd_init_arals() is the exception and takes one -
 // fatal() and internal_fatal() end the process rather than report to anyone, and the protected-read recovery in
 // libnetdata logs on the engine's behalf from its own code. dbengine-config.h's contract tells an embedder the
 // same thing.
@@ -36,7 +37,13 @@ struct dbengine_engine;
 
 // whether this engine's lines go to a sink; false for no engine and for an engine with none. Not inline on
 // purpose: it would need the engine's layout here, and this header is included by rrdengine.h, which defines it.
-// The cost is one call per line actually emitted - every macro below reaches it only after its own gate passed.
+//
+// The cost, stated honestly because the next reader will want it: one cross-TU call per emission *attempt*, not
+// per line emitted. Only dbengine_log_debug and dbengine_internal_error gate before it (on the debug flag and on
+// their condition); the other five reach it every time, including on an attempt a rate limiter is about to drop
+// and on one the logger's priority threshold would have dropped. No site in the engine is hot enough for that to
+// matter today - the ones that looked like candidates all sit behind an unlikely() failure test - but a site that
+// logged on a hot path would pay it.
 bool dbengine_log_has_sink(struct dbengine_engine *engine);
 
 // hand one line to the engine's sink. Only ever called when dbengine_log_has_sink() just said yes, so the sink is
