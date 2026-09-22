@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
+// These are the engine's file primitives, below the level where an engine is in hand: every caller has one
+// (datafile.c and journalfile.c reach them through ctx->engine), none of them passes it down. So their lines go to
+// the layer with no engine, which is the layer's fallback: netdata's logger, as before. dbengine-config.h's
+// contract names them among what a sink does not receive.
+
 int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size)
 {
     int ret;
@@ -14,12 +19,12 @@ int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size)
     fatal_assert(req.result == 0);
     s = req.ptr;
     if (!(s->st_mode & S_IFREG)) {
-        netdata_log_error("Not a regular file.\n");
+        dbengine_log_error(NULL, "Not a regular file.\n");
         uv_fs_req_cleanup(&req);
         return UV_EINVAL;
     }
     if (s->st_size < min_size) {
-        netdata_log_error("File length is too short.\n");
+        dbengine_log_error(NULL, "File length is too short.\n");
         uv_fs_req_cleanup(&req);
         return UV_EINVAL;
     }
@@ -56,16 +61,16 @@ int open_file_for_io(char *path, int flags, uv_file *file, int direct)
         fd = uv_fs_open(NULL, &req, path, current_flags, S_IRUSR | S_IWUSR, NULL);
         if (fd < 0) {
             if ((direct) && (UV_EINVAL == fd)) {
-                netdata_log_error("File \"%s\" does not support direct I/O, falling back to buffered I/O.", path);
+                dbengine_log_error(NULL, "File \"%s\" does not support direct I/O, falling back to buffered I/O.", path);
             } else {
-                netdata_log_error("Failed to open file \"%s\".", path);
+                dbengine_log_error(NULL, "Failed to open file \"%s\".", path);
                 --direct; /* break the loop */
             }
         } else {
             fatal_assert(req.result >= 0);
             *file = req.result;
 #ifdef __APPLE__
-            netdata_log_info("Disabling OS X caching for file \"%s\".", path);
+            dbengine_log_info(NULL, "Disabling OS X caching for file \"%s\".", path);
             fcntl(fd, F_NOCACHE, 1);
 #endif
             --direct; /* break the loop */

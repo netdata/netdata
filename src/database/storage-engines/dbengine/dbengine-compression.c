@@ -134,15 +134,15 @@ size_t dbengine_decompress(void *dst, void *src, size_t dst_size, size_t src_siz
 #ifdef ENABLE_LZ4
         case DBENGINE_COMPRESSION_LZ4: {
             if(unlikely(src_size > (size_t)INT_MAX || dst_size > (size_t)INT_MAX)) {
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "DBENGINE: LZ4 decompression sizes exceed API limits: src %zu, dst %zu, limit %d",
-                       src_size, dst_size, INT_MAX);
+                dbengine_log(NULL, NDLP_ERR,
+                             "DBENGINE: LZ4 decompression sizes exceed API limits: src %zu, dst %zu, limit %d",
+                             src_size, dst_size, INT_MAX);
                 return 0;
             }
 
             int rc = LZ4_decompress_safe(src, dst, (int)src_size, (int)dst_size);
             if(rc < 0) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "DBENGINE: LZ4 decompression error %d", rc);
+                dbengine_log(NULL, NDLP_ERR, "DBENGINE: LZ4 decompression error %d", rc);
                 rc = 0;
             }
 
@@ -155,8 +155,8 @@ size_t dbengine_decompress(void *dst, void *src, size_t dst_size, size_t src_siz
             size_t decompressed_size = ZSTD_decompress(dst, dst_size, src, src_size);
 
             if (ZSTD_isError(decompressed_size)) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "DBENGINE: ZSTD decompression error %s",
-                       ZSTD_getErrorName(decompressed_size));
+                dbengine_log(NULL, NDLP_ERR, "DBENGINE: ZSTD decompression error %s",
+                             ZSTD_getErrorName(decompressed_size));
 
                 decompressed_size = 0;
             }

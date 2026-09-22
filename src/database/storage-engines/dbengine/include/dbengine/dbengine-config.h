@@ -53,8 +53,8 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 // - Never called after the engine is freed, and never for what the engine cannot survive: fatal() and
 //   internal_fatal() end the process through netdata's logger whatever this field holds.
 // - Does not receive every line the engine's work produces. The process-wide page-data layer has no engine to
-//   reach, and a failed protected read of a mapped journal is reported by libnetdata's own recovery; those go to
-//   netdata's logger.
+//   reach, the engine's file and decompression primitives sit below the level where one is in hand, and a failed
+//   protected read of a mapped journal is reported by libnetdata's own recovery; those go to netdata's logger.
 typedef void (*dbengine_log_fn)(
         void *data,                             // log_sink_data, verbatim
         ND_LOG_FIELD_PRIORITY priority,

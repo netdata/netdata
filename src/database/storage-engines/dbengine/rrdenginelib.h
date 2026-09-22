@@ -35,22 +35,6 @@ static inline uint8_t check_bit(unsigned x, size_t pos)
     return !!(x & (1 << pos));
 }
 
-/* Starts from LSB. val is 0 or 1 */
-static inline void modify_bit(unsigned *x, unsigned pos, uint8_t val)
-{
-    switch(val) {
-    case 0:
-        *x &= ~(1U << pos);
-        break;
-    case 1:
-        *x |= 1U << pos;
-        break;
-    default:
-        netdata_log_error("modify_bit() called with invalid argument.");
-        break;
-    }
-}
-
 #define DBENGINE_PATH_MAX (FILENAME_MAX + 1)
 
 /* returns old *ptr value */
