@@ -6,12 +6,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	commonmodel "github.com/prometheus/common/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
-
-	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 )
 
 func TestConfig_UnmarshalYAML(t *testing.T) {
@@ -183,9 +180,9 @@ action: drop
 	proc, err := New([]Config{cfg})
 	require.NoError(t, err)
 
-	_, drop := proc.Apply(sample("drop_me", nil, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge))
+	_, drop := proc.Apply(sample("drop_me", nil))
 	assert.True(t, drop.Dropped())
-	_, keep := proc.Apply(sample("keep_me", nil, 1, prompkg.SampleKindScalar, commonmodel.MetricTypeGauge))
+	_, keep := proc.Apply(sample("keep_me", nil))
 	assert.False(t, keep.Dropped())
 }
 

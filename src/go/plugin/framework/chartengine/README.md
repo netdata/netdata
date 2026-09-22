@@ -228,6 +228,7 @@ If inferred dimensions are present without flattened reader metadata, `PreparePl
 |-------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
 | `CreateChartAction`     | Materialize chart instance (with chart metadata and labels)                                                                          |
 | `CreateDimensionAction` | Materialize dimension for a chart                                                                                                    |
+| `UpdateChartLabelsAction` | Re-emit chart metadata and replace chart labels                                                                                   |
 | `UpdateChartAction`     | Emit chart values for current cycle; unseen dims, and dims whose value is non-finite (NaN/Inf), become `IsEmpty=true` (gap, never 0) |
 | `RemoveDimensionAction` | Obsolete one dimension                                                                                                               |
 | `RemoveChartAction`     | Obsolete one chart                                                                                                                   |
@@ -235,8 +236,9 @@ If inferred dimensions are present without flattened reader metadata, `PreparePl
 `chartemit` normalizes emitted action order by phase:
 
 1. create chart/dimensions
-2. update values
-3. remove dimensions/charts
+2. update chart labels
+3. update values
+4. remove dimensions/charts
 
 ## Routing and Collision Rules
 
@@ -302,6 +304,7 @@ defaults preserve the same three states through inheritance.
   the resulting dimension metadata is otherwise unspecified.
 - A live metric identity must keep the same kind while its dimension is materialized. Kind changes are resolved for route
   planning, but an existing Netdata dimension keeps its creation-time wire algorithm until it expires and is recreated.
+  The expired-definition recovery rule below also applies when a rejected output plan delayed that recreation.
 
 Route-cache entries are immutable discovery results. Authored and successful autogen routes share the
 series-identity/revision cache. Autogen hits additionally validate current metric metadata (including its presence),
@@ -322,6 +325,23 @@ Default lifecycle policy when template omits lifecycle:
 | `expire_after_cycles`            | `5`            |
 | `dimensions.max_dims`            | `0` (disabled) |
 | `dimensions.expire_after_cycles` | `0`            |
+
+Metric collection can advance while output plans are aborted, leaving published definitions past their expiry.
+When an identity returns after it was eligible for expiry in an intervening cycle, the planner recreates its staged
+definition if its settings differ from the last committed emitted definition. Ordinary observations do not advance
+that definition baseline. Chart metadata re-emitted by label updates or dimension creation/removal does advance it:
+
+- Chart settings are title, units, family, context, type and priority. An expired chart also recreates when a returning
+  dimension's creation settings changed.
+- Dimension settings are the resolved algorithm, effective multiplier/divisor, hidden state and float/int mode.
+  An expired dimension under a live chart recreates independently; unchanged dimensions keep their definitions.
+- Unchanged definitions retain the existing recovery behavior. Returning exactly at the expiry boundary remains an
+  ordinary observation; continuous input with an expiry of one cycle does not recreate. Disabled expiry stays disabled.
+
+Recreation is transactional: abort retains the prior definition and a later plan retries. Definitions precede recovered
+values; only old identities absent from the final plan are marked obsolete. Chart labels retain their current membership
+and promotion rules. This uses ordinary Agent redefinition behavior and does not reset stored history or preserve a
+collector's lost counter baseline.
 
 ## Autogen Notes
 

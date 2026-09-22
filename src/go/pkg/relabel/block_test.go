@@ -8,8 +8,6 @@ import (
 	commonmodel "github.com/prometheus/common/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 )
 
 func TestNewPipeline_ValidatesBlocks(t *testing.T) {
@@ -89,11 +87,11 @@ func TestPipeline_ApplyUsesCurrentNameInBlockOrder(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	in := sample("app_requests_total", map[string]string{"method": "GET"}, 7, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter)
+	in := sample("app_requests_total", map[string]string{"method": "GET"})
 	want := sample("renamed_requests_total", map[string]string{
 		"method":    "GET",
 		"seen_name": "renamed_requests_total",
-	}, 7, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter)
+	})
 
 	got, drop := pipeline.Apply(in)
 	require.False(t, drop.Dropped())
@@ -155,7 +153,7 @@ func TestNewPipeline_OwnsRuleConfiguration(t *testing.T) {
 	require.NotSame(t, blocks[0].MetricRelabelConfigs[0].Regex.Regexp, pipeline.blocks[0].proc.cfgs[0].Regex.Regexp)
 
 	blocks[0].MetricRelabelConfigs[0].SourceLabels[0] = "changed"
-	in := sample("app_requests_total", map[string]string{"method": "GET"}, 7, prompkg.SampleKindScalar, commonmodel.MetricTypeCounter)
+	in := sample("app_requests_total", map[string]string{"method": "GET"})
 	got, drop := pipeline.Apply(in)
 	require.False(t, drop.Dropped())
 	assert.Equal(t, "GET", got.Labels.Get("verb"))

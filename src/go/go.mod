@@ -12,6 +12,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/monitor/query/azmetrics v1.3.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph v0.10.0
 	github.com/DATA-DOG/go-sqlmock v1.5.2
+	github.com/DataDog/sketches-go v1.4.8
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/PaloAltoNetworks/pango v0.10.2
 	github.com/Wing924/ltsv v0.4.0

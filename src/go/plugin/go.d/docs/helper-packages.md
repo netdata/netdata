@@ -23,6 +23,7 @@ already owns the behavior.
 | TLS config outside HTTP | `src/go/pkg/tlscfg` |
 | Configured credential-file reads | `src/go/pkg/credentialfile` |
 | Prometheus exposition parsing | `src/go/pkg/prometheus` |
+| Metric name/label replacement and filtering | [`src/go/pkg/relabel`](/src/go/pkg/relabel/README.md) |
 | User selector/matcher grammar | `src/go/pkg/matcher` |
 | Collector logging and log limiting | `src/go/logger` |
 | Function request/response helpers | `src/go/pkg/funcapi` |
@@ -142,6 +143,13 @@ Pass the HTTP client to `prometheus.New(client, request)` or
 `ScrapeSamples(ctx)` so cancellation reaches the bearer read as well as the HTTP request.
 
 Do not hand-roll text exposition parsing in a collector.
+
+## Metric Relabeling
+
+Use `pkg/relabel` for Prometheus-compatible transformations of metric names and labels. Its `Record` excludes
+values and types, which remain owned by the caller. Reuse a compiled `Processor` or name-matched `Pipeline`
+serially; retain collector-specific validation and typed-family integrity checks at the caller boundary.
+See the [shared relabel contract](/src/go/pkg/relabel/README.md) for ownership, drop behavior, and rule syntax.
 
 ## Selectors And Matchers
 
