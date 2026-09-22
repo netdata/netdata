@@ -18,16 +18,18 @@ ssize_t send_to_plugin(const char *txt, PARSER *parser, STREAM_TRAFFIC_TYPE type
 
 // Child-provided timestamps arrive as unsigned 64-bit strings and are cast to
 // time_t, so values >= 2^63 wrap to negative. Require positive epoch seconds.
+// The upper bound is compared with nd_time_t_add_compare() because a plain
+// wall_clock_time + tolerance can overflow when the wall clock is near time_t max.
 static ALWAYS_INLINE bool pluginsd_replay_timestamps_valid(time_t start_time, time_t end_time, time_t wall_clock_time, time_t tolerance) {
     return start_time > 0 && end_time > 0 &&
-           start_time < wall_clock_time + tolerance &&
-           end_time < wall_clock_time + tolerance &&
+           nd_time_t_add_compare(wall_clock_time, tolerance, start_time) > 0 &&
+           nd_time_t_add_compare(wall_clock_time, tolerance, end_time) > 0 &&
            start_time < end_time;
 }
 
 // Validate the sample time of a BEGIN2 sent by a child and sanitize the child
-// wall-clock: negative/zero values can only come from integer wrap-around and
-// are rejected; an unset wall-clock falls back to end_time.
+// wall-clock: non-positive values fall back to end_time, since they can only
+// come from integer wrap-around.
 static ALWAYS_INLINE bool pluginsd_begin_v2_times_valid(time_t end_time, time_t wall_clock_time, time_t *wall_clock_out) {
     if(end_time <= 0)
         return false;

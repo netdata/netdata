@@ -1733,6 +1733,10 @@ static int pluginsd_timestamps_unittest_replay(void) {
     time_t now = now_realtime_sec();
     time_t tolerance = 6;
 
+    // near time_t max, wall_clock_time + tolerance would overflow; the
+    // nd_time_t_add_compare() based check must still accept valid pairs
+    time_t time_max = nd_time_t_max();
+
     struct {
         time_t start, end, wall_clock, tolerance;
         bool valid;
@@ -1754,6 +1758,9 @@ static int pluginsd_timestamps_unittest_replay(void) {
         // valid replay pair
         { now - 1, now, now, tolerance, true, },
         { now - tolerance, now, now, tolerance, true, },
+        // near time_t max: no overflow in the upper-bound comparison
+        { time_max - 2, time_max - 1, time_max, tolerance, true, },
+        { time_max - 2, time_max - 1, time_max - 1, tolerance, true, },
     };
 
     for(size_t i = 0; i < _countof(cases); i++) {
