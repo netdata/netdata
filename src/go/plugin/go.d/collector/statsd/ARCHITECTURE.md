@@ -186,8 +186,10 @@ handoff; an expired gauge baseline cannot accept deltas. Retained counters/gauge
 start an empty window. An unstarted or stopped receiver cannot publish held values or claim an empty healthy interval.
 There is no extra expiry timer or sender-cadence inference.
 
-Only Collect constructs direct metrix snapshot handles for application metrics, inside the framework-opened cycle.
-No permanent Vec or handle map survives retirement. Generic autogen uses finite expiry of five successful cycles.
+Only Collect constructs direct metrix snapshot handles for application metrics, inside the framework-opened cycle of
+a series' first write. The series keeps them: every successful cycle writes every retained series, so their
+descriptors never go idle while the handles exist, and the handles end with the series. No Vec or handle map
+survives retirement. Generic autogen uses finite expiry of five successful cycles.
 
 The native TemplateSet holds the fixed diagnostics entry plus active profile entries in configured order. The cut
 captures membership atomically with its batch, so input activating a profile after a cut belongs to the next cycle

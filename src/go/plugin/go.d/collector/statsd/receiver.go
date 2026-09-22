@@ -45,6 +45,7 @@ type series struct {
 	pending       bool
 	value         float64
 	window, spare *interval
+	out           *instruments // Collect-owned
 }
 
 // Receiver ownership is limited to maxSeries entries and one Collect-owned

@@ -215,6 +215,26 @@ func TestDetachedBatchOwnership(t *testing.T) {
 	value(t, f.c, "ms.sum.latency", 100, nil)
 }
 
+// TestInstrumentsOutlastRetentionWindow: handles created at a series' first
+// write keep publishing across many descriptor retention windows and aborted
+// cycles, without redefining the charts, because every successful cycle writes
+// every retained series.
+func TestInstrumentsOutlastRetentionWindow(t *testing.T) {
+	f := newCoreFixture(t, 4, time.Hour, metrix.WithExpireAfterSuccessCycles(1), metrix.WithDescriptorGraceCycles(1))
+	f.ingest(t, "requests:2|c|#zone:a", "level:7|g", "latency:10|ms", "members:a|s")
+	require.Equal(t, 6, applicationCharts(f.collect(t, false, false)), "ms publishes values, count and sum charts")
+	for cycle := range 10 {
+		if cycle == 4 {
+			f.collect(t, true, false)
+		}
+		assert.Zero(t, applicationCharts(f.collect(t, false, false)), "cycle %d redefines charts", cycle)
+		value(t, f.c, "c.total.requests", 2, metrix.Labels{"zone": "a"})
+		value(t, f.c, "g.value.level", 7, nil)
+		value(t, f.c, "ms.count.latency", 0, nil)
+		value(t, f.c, "s.cardinality.members", 0, nil)
+	}
+}
+
 func TestAbortedIntervalsAreNotReplayed(t *testing.T) {
 	for name, metricAbort := range map[string]bool{"metric abort": true, "publication abort": false} {
 		t.Run(name, func(t *testing.T) {

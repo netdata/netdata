@@ -44,7 +44,8 @@ type Collector struct {
 	templates *chartengine.TemplateSet
 	published int // activated profile count captured in templates
 
-	scratch []percentileBin // Collect-owned, shared by all percentile queries
+	scratch []percentileBin                      // Collect-owned, shared by all percentile queries
+	values  [len(valueFields)]metrix.SampleValue // Collect-owned; staging copies each point
 
 	// Test seams.
 	now         func() time.Time
