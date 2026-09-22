@@ -1098,8 +1098,14 @@ static void epdl_extent_loading_error_log(struct dbengine_tier *ctx, EPDL *epdl,
     if(end_time_s)
         log_date(end_time_str, LOG_DATE_LENGTH, end_time_s);
 
+    // One window for the errors and a separate one for the debug caller ("unknown UUID", routine whenever an extent
+    // holds pages of metrics the registry has dropped). Shared, a debug line could spend the second an error needed:
+    // netdata's logger drops a debug line before its gate unless its threshold is debug, but a log sink sees every
+    // priority, so on the sink's side a CRC failure could be the line that went missing.
     nd_log_limit_static_global_var(erl, 1, 0);
-    dbengine_log_limit(ctx->engine, &erl, priority,
+    nd_log_limit_static_global_var(erl_debug, 1, 0);
+    ERROR_LIMIT *limit = (priority == NDLP_DEBUG) ? &erl_debug : &erl;
+    dbengine_log_limit(ctx->engine, limit, priority,
                 "DBENGINE: error while reading extent from datafile %u of tier %d, at offset %" PRIu64 " (%u bytes) "
                 "%s from %ld (%s) to %ld (%s) %s%s: "
                 "%s",
