@@ -62,9 +62,29 @@ func newPercentiles(limit int) *percentiles {
 	}
 }
 
-func down(v float64) float64 { return math.Nextafter(v, math.Inf(-1)) }
+// down and up step a finite value to the adjacent float64, as math.Nextafter
+// toward -Inf and +Inf does. Zero, of either sign, steps to the smallest subnormal.
+func down(v float64) float64 {
+	switch {
+	case v == 0:
+		return -0x1p-1074
+	case v > 0:
+		return math.Float64frombits(math.Float64bits(v) - 1)
+	default:
+		return math.Float64frombits(math.Float64bits(v) + 1)
+	}
+}
 
-func up(v float64) float64 { return math.Nextafter(v, math.Inf(1)) }
+func up(v float64) float64 {
+	switch {
+	case v == 0:
+		return 0x1p-1074
+	case v > 0:
+		return math.Float64frombits(math.Float64bits(v) + 1)
+	default:
+		return math.Float64frombits(math.Float64bits(v) - 1)
+	}
+}
 
 func (a *percentiles) fail(reason string) {
 	if a.reason == "" {
@@ -209,26 +229,29 @@ func (a *percentiles) query(scratch []percentileBin) ([2]float64, []percentileBi
 	// Each rounded normalized weight and its bin summation contributes at most
 	// gamma_n relative error. 4*n*u bounds both directions for n<=2^26.
 	delta := 4 * float64(a.n) * 0x1p-53
+	growth, shrink := up(1+delta), down(1-delta)
 	var totalLo, totalHi float64
 	for _, b := range scratch {
-		lo := down(b.count / up(1+delta))
-		hi := up(b.count / down(1-delta))
-		totalLo = down(totalLo + lo)
-		totalHi = up(totalHi + hi)
+		totalLo = down(totalLo + down(b.count/growth))
+		totalHi = up(totalHi + up(b.count/shrink))
+	}
+	var thresholdLo, thresholdHi [2]float64
+	for q := range result {
+		thresholdLo[q] = down(down(totalLo*float64(numer[q])) / float64(denom[q]))
+		thresholdHi[q] = up(up(totalHi*float64(numer[q])) / float64(denom[q]))
 	}
 	var prefixLo, prefixHi float64
 	for _, b := range scratch {
 		beforeHi := prefixHi
-		lo := down(b.count / up(1+delta))
-		hi := up(b.count / down(1-delta))
-		prefixLo = down(prefixLo + lo)
-		prefixHi = up(prefixHi + hi)
+		prefixLo = down(prefixLo + down(b.count/growth))
+		prefixHi = up(prefixHi + up(b.count/shrink))
 		for q := range result {
-			thresholdLo := down(down(totalLo*float64(numer[q])) / float64(denom[q]))
-			thresholdHi := up(up(totalHi*float64(numer[q])) / float64(denom[q]))
-			if math.IsNaN(result[q]) && beforeHi < thresholdLo && prefixLo >= thresholdHi {
+			if math.IsNaN(result[q]) && beforeHi < thresholdLo[q] && prefixLo >= thresholdHi[q] {
 				result[q] = b.value
 			}
+		}
+		if !math.IsNaN(result[0]) && !math.IsNaN(result[1]) {
+			break // Later bins cannot change a certified rank.
 		}
 	}
 	if math.IsNaN(result[0]) || math.IsNaN(result[1]) {
