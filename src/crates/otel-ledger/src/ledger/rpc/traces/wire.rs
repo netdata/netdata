@@ -560,12 +560,10 @@ pub struct TraceParams {
     pub span_cap: Option<usize>,
     /// Optional assembly bounds, unix seconds: only files whose
     /// summary range overlaps `[after, before)` are probed for the
-    /// trace's spans. Both-or-neither; `after < before`; width capped
-    /// at [`MAX_TRACE_BOUNDS_WIDTH_S`](super::adapter) — violations
-    /// are client errors (a clamp would ambiguously drop one end).
-    /// Absent = full retention, the only way to request it (an
-    /// explicit full range exceeds the cap). The response's `coverage`
-    /// declares the range actually used either way.
+    /// trace's spans. Both-or-neither; `after < before` — violations
+    /// are client errors. Any width is accepted. Absent = full
+    /// retention. The response's `coverage` declares the range actually
+    /// used either way.
     #[serde(default)]
     pub after: Option<u32>,
     #[serde(default)]

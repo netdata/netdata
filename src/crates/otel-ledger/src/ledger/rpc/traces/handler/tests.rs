@@ -231,18 +231,21 @@ async fn bounds_excluding_every_file_yield_a_complete_empty_trace() {
 }
 
 #[tokio::test]
-async fn trace_bounds_width_at_the_cap_is_accepted() {
+async fn trace_bounds_of_any_width_are_accepted() {
+    // No width cap: a range far wider than any UI formula is served and
+    // declared as asked.
     let h = handler_with_fixture_wal().await;
     let v = serde_json::to_value(
         call_on(
             &h,
-            json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 0, "before": 172_800}}),
+            json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 1, "before": 4_000_000_000_u32}}),
         )
         .await
         .unwrap(),
     )
     .unwrap();
-    assert_eq!(v["coverage"], json!({"after": 0, "before": 172_800}));
+    assert_eq!(v["coverage"], json!({"after": 1, "before": 4_000_000_000_u32}));
+    assert_eq!(v["status"], json!({"complete": true}));
     assert_eq!(v["items"]["returned"], 3);
 }
 
@@ -345,7 +348,7 @@ async fn semantically_invalid_trace_requests_are_clean_client_errors() {
             json!({"trace": {"id": FIXTURE_TRACE_ID, "span_cap": 65_537}}),
             "exceeds the maximum",
         ),
-        // Assembly bounds: both-or-neither, ordered, width-capped.
+        // Assembly bounds: both-or-neither, ordered.
         (
             json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 100}}),
             "both 'after' and 'before'",
@@ -361,10 +364,6 @@ async fn semantically_invalid_trace_requests_are_clean_client_errors() {
         (
             json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 100, "before": 100}}),
             "after 100 >= before 100",
-        ),
-        (
-            json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 0, "before": 172_901}}),
-            "exceeds the maximum 172800",
         ),
     ] {
         let err = call(body.clone()).await.expect_err("must be a client error");
