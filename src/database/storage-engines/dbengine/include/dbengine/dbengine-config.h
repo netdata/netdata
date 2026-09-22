@@ -31,8 +31,9 @@ typedef struct dbengine_engine DBENGINE_ENGINE;
 typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid);
 
 // Where the engine's diagnostics go (log_sink in the configuration below). NULL, the default, is the behaviour the
-// engine has always had: every line goes to netdata's logger on the daemon's source. A non-NULL sink takes them
-// instead, and none of those lines reach the logger.
+// engine has always had: each line goes where it always went - netdata's logger on the daemon's source for nearly
+// all of them, its debug source for the debug-flag lines, and stderr for the few written while the caches are torn
+// down. A non-NULL sink takes them instead, and none of those lines reach the logger or stderr.
 //
 // - Called with log_sink_data verbatim, a severity, the emission site inside the engine (the __FILE__,
 //   __FUNCTION__ and __LINE__ of the line that emitted, not of any wrapper), a printf format and its arguments as
@@ -77,7 +78,8 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 //   failed protected read of a mapped journal, which libnetdata's own recovery reports (see the next item).
 //
 //   And some lines are dropped before the sink is reached, by the gate the emitting site has always had: a rate
-//   limited site emits at most once per its own window, a debug site emits only when the matching debug flag is
+//   limited site emits once per its own window (a limiter shared by several threads can let a second line through
+//   when two of them reach it at the same moment), a debug site emits only when the matching debug flag is
 //   set, and a build without internal checks compiles its internal-error sites out entirely. The sink decides
 //   what to do with what it is given; it does not see what the site itself did not emit.
 // - May be called while the engine is inside a guarded read of a mapped journal. The guard recovers a fault only

@@ -7,11 +7,10 @@
 #include <string>
 
 // Prints what the engine said during a case, and only for a case that failed. A passing case says nothing, so the
-// run reads as a list of results; a failing one is followed by its own engine log, in its own order, with nothing
-// from any other case mixed into it.
+// run reads as a list of results; a failing one is followed by its own engine log, in its own order.
 //
-// The buffer is cleared when a case starts rather than when one ends, so that anything an engine thread writes
-// between two cases - a teardown finishing late - lands with the case that follows rather than being dropped.
+// The buffer is cleared when a case starts, so what an engine thread writes between two cases is dropped, and a
+// line a previous case's engine thread writes late - after the next case has started - lands with that next case.
 class EngineLogListener : public ::testing::EmptyTestEventListener {
     void OnTestStart(const ::testing::TestInfo &) override {
         NetdataTestLogCapture &capture = netdata_test_log_capture();

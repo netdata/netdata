@@ -1268,9 +1268,9 @@ void journalfile_v2_populate_retention_to_mrg(struct dbengine_tier *ctx, struct 
             else if (journalfile->v2.flags & JOURNALFILE_FLAG_METRIC_CRC_CHECK) {
                 journalfile->v2.flags &= ~JOURNALFILE_FLAG_METRIC_CRC_CHECK;
                 // Pass the verified mmap_size, not the header-controlled
-                // j2_header->journal_v2_file_size; the helper currently ignores the
-                // size argument (UNUSED) but the value at the call site should
-                // still reflect the trusted bound for clarity and future-proofing.
+                // j2_header->journal_v2_file_size: the helper bounds the metric
+                // list against the size it is given, so that size must be the
+                // trusted one.
                 if (journalfile_check_v2_metric_list(ctx->engine, data_start, mmap_size)) {
                     // needs rebuild
                     failed = true;
