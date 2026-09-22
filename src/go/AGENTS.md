@@ -121,6 +121,10 @@ every cycle.
   prove the change introduced no O(samples), O(retained), or O(n^2) regression.
 - Keep bench comments in sync with the code they measure, in the same change, with self-contained wording (no
   round or session references).
+- Attribute allocations with `-memprofile` and `-memprofilerate=1` (`pprof -sample_index=alloc_objects`). macOS CPU
+  profiles over-attribute runtime syscalls; read them with `-focus` on the benchmark body.
+- Verify reused or stack storage with `-gcflags=-m` and an allocation benchmark. Escape analysis is field-insensitive:
+  a buffer reachable through a struct whose other fields escape moves to the heap.
 
 ## Go Formatting
 
