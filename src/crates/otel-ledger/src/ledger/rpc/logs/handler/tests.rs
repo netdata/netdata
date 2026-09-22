@@ -1244,6 +1244,22 @@ async fn open_fifo_writer(path: &std::path::Path, deadline: std::time::Duration)
     }
 }
 
+/// On drop, open the FIFO at the path for writing and close it: a reader
+/// still blocked opening or reading it gets EOF instead of waiting forever.
+#[cfg(unix)]
+struct FifoUnblocker(std::path::PathBuf);
+
+#[cfg(unix)]
+impl Drop for FifoUnblocker {
+    fn drop(&mut self) {
+        use std::os::unix::fs::OpenOptionsExt;
+        let _ = std::fs::OpenOptions::new()
+            .write(true)
+            .custom_flags(libc::O_NONBLOCK)
+            .open(&self.0);
+    }
+}
+
 /// The logs query reads catalog files only after releasing the registry
 /// read lock. A catalog that blocks its reader (a FIFO not yet written) must
 /// not keep the write lock — which the ledger loop takes on every WAL event —
@@ -1292,6 +1308,9 @@ async fn catalogs_are_read_off_the_registry_lock() {
         let handler = Arc::clone(&handler);
         async move { handler.on_call(make_ctx("t1"), req).await }
     });
+    // Whatever happens below, a reader still blocked on the FIFO gets EOF
+    // when the test ends, so a failure cannot hang the runtime's shutdown.
+    let _unblock = FifoUnblocker(catalog.clone());
 
     // The query is now blocked reading the catalog.
     let deadline = std::time::Duration::from_secs(10);
@@ -1302,7 +1321,12 @@ async fn catalogs_are_read_off_the_registry_lock() {
     // Feed the catalog either way, so a failing run ends instead of hanging.
     writer.write_all(&catalog_bytes).unwrap();
     drop(writer);
-    let v = serde_json::to_value(query.await.unwrap().unwrap()).unwrap();
+    let answer = tokio::time::timeout(deadline, query)
+        .await
+        .expect("the query finishes once the catalog is fed")
+        .unwrap()
+        .unwrap();
+    let v = serde_json::to_value(answer).unwrap();
 
     assert!(
         write_lock.is_ok(),
@@ -1319,5 +1343,72 @@ async fn catalogs_are_read_off_the_registry_lock() {
     assert!(
         streams.iter().any(|o| o["name"] == "ns/svc"),
         "the catalog's stream must be listed: {v:#}"
+    );
+}
+
+/// A catalog that cannot be read is skipped by logs, whose wire has no
+/// partial status: the query answers, and the readable catalog's remote-only
+/// stream is still listed.
+#[tokio::test]
+async fn an_unreadable_catalog_is_skipped() {
+    let mut tr = make_tenant_registries();
+    let identity = Identity::new(
+        MachineId::new(Uuid::from_u128(0x11)).unwrap(),
+        InstanceId::new(Uuid::from_u128(0x22)).unwrap(),
+    );
+    let part_key = ServiceStream::new("ns", "svc").ns_hash();
+    let min_s = 1_700_000_000u32;
+    track_remote_catalog(
+        &mut tr,
+        "default",
+        FileId::new(identity, 0, 1, part_key),
+        "missing/1.sfst",
+        min_s,
+        min_s + 5,
+        10,
+    );
+    let corrupt = track_remote_catalog(
+        &mut tr,
+        "default",
+        FileId::new(identity, 0, 2, part_key),
+        "missing/2.sfst",
+        min_s,
+        min_s + 5,
+        10,
+    );
+    std::fs::write(&corrupt, b"not a catalog").unwrap();
+
+    let storage = file_lifecycle::storage::OpendalStorage::new(&format!(
+        "fs://{}",
+        tempfile::tempdir().unwrap().keep().display()
+    ))
+    .unwrap();
+    let cache =
+        file_cache::FileCache::open(tempfile::tempdir().unwrap().keep(), 64 * 1024 * 1024).unwrap();
+    let h = make_handler_with_remote(tr, RemoteRead::new(storage, cache));
+    let req: OtelLogsRequest = serde_json::from_slice(
+        format!(
+            r#"{{"info":false,"tenant":"default","after":{},"before":{}}}"#,
+            min_s - 10,
+            min_s + 100
+        )
+        .as_bytes(),
+    )
+    .unwrap();
+
+    let v = serde_json::to_value(h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
+
+    assert_eq!(v["status"], 200);
+    assert!(v.get("partial").is_none(), "{v:#}");
+    let streams = v["required_params"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == "__streams")
+        .and_then(|p| p["options"].as_array())
+        .expect("stream selector present");
+    assert!(
+        streams.iter().any(|o| o["name"] == "ns/svc"),
+        "the readable catalog's stream is listed: {v:#}"
     );
 }

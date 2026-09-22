@@ -368,6 +368,8 @@ impl FunctionHandler for OtelLogsHandler {
         // is logged and skipped: the logs wire has no partial status. Logs
         // plans without a size limit, so a too-large query is refused by the
         // download cache below, with its own message.
+        // A failed planning task is an error: answering without the remote
+        // data and the remote-only streams would be a silent gap.
         let (selector_catalog, remote_cands) = match remote_input {
             Some(input) => match tokio::task::spawn_blocking(move || input.plan()).await {
                 Ok(plan) => {
@@ -378,8 +380,9 @@ impl FunctionHandler for OtelLogsHandler {
                     (selector, fetch)
                 }
                 Err(e) => {
-                    tracing::warn!("otel-logs remote planning task failed: {e}");
-                    (Vec::new(), Vec::new())
+                    return Err(netdata_plugin_error::NetdataPluginError::FunctionHandler {
+                        message: format!("otel-logs remote planning task failed: {e}"),
+                    });
                 }
             },
             None => (Vec::new(), Vec::new()),

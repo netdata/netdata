@@ -544,9 +544,8 @@ impl Registry {
     /// hides a remote catalog entry whose data is already local; a remote plan
     /// computes it per range ([`Registry::remote_plan_input`]). Keyed by
     /// [`SeqKey`] so the mask hides a remote entry only when THIS identity holds
-    /// the local copy — a
-    /// remote entry of a prior instance / other machine at an equal seq is not
-    /// masked by a current-identity local file.
+    /// the local copy — a remote entry of a prior instance / other machine at an
+    /// equal seq is not masked by a current-identity local file.
     pub fn local_servable_seqs(&self, q: &file_registry::Query) -> HashSet<SeqKey> {
         self.sfst
             .candidates(q)
