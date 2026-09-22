@@ -400,6 +400,10 @@
 - Fix(go.d/mssql): separate Function timeouts and resolve deadlock targets ([#23976](https://github.com/netdata/netdata/issues/23976))
 - Regenerate integrations docs ([#23977](https://github.com/netdata/netdata/issues/23977))
 - Publish nightly build artifacts to a Cloudflare R2 bucket. ([#23712](https://github.com/netdata/netdata/issues/23712))
+- Refactor(go.d/mssql): isolate Functions behind dependency interface ([#23978](https://github.com/netdata/netdata/issues/23978))
+- Regenerate integrations docs ([#23979](https://github.com/netdata/netdata/issues/23979))
+- Feat(go.d/metrix): support unavailable snapshot MeasureSet fields ([#23980](https://github.com/netdata/netdata/issues/23980))
+- Feat(go.d): add readiness-aware collector runtime lifecycle ([#23982](https://github.com/netdata/netdata/issues/23982))
 
 ## [2.11.0] - 2026-08-12
 
