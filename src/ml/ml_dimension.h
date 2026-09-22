@@ -33,7 +33,9 @@ struct ml_dimension_t {
 bool
 ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists);
 
-bool ml_dimension_deserialize_kmeans(const char *json_str);
+// host is the RRDHOST the streaming connection that delivered this payload is authenticated for.
+// The payload's machine-guid must name that same host; see the implementation.
+bool ml_dimension_deserialize_kmeans(RRDHOST *host, const char *json_str);
 
 // Set dim's post-training state (mt/ts/suppression counters). Caller must hold
 // dim->slock. Used by both the successful-training path and the undersampled
@@ -50,13 +52,17 @@ public:
     DimensionLookupInfo(const char *MachineGuid, STRING *ChartId, STRING *DimensionId)
         : ChartId(ChartId), DimensionId(DimensionId)
     {
-        memcpy(this->MachineGuid.data(), MachineGuid, this->MachineGuid.size());
+        // bounded copy: the source is a caller-supplied C string and is not guaranteed to be
+        // GUID_LEN + 1 bytes long. Copying this->MachineGuid.size() unconditionally reads past a
+        // shorter source - reachable from the streaming ML_MODEL payload.
+        strncpyz(this->MachineGuid.data(), MachineGuid, GUID_LEN);
     }
 
     DimensionLookupInfo(const char *MachineGuid, const char *ChartId, const char *DimensionId)
         : ChartId(ChartId), DimensionId(DimensionId)
     {
-        memcpy(this->MachineGuid.data(), MachineGuid, this->MachineGuid.size());
+        // bounded copy, for the reason given in the ctor above
+        strncpyz(this->MachineGuid.data(), MachineGuid, GUID_LEN);
     }
 
     const char *machineGuid() const
