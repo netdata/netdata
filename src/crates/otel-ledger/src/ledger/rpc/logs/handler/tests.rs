@@ -1076,12 +1076,11 @@ fn make_handler_with_remote(tr: TenantRegistries, remote: RemoteRead) -> OtelLog
     )
 }
 
-/// End-to-end: a tenant whose only copy of an SFST is in remote object storage
-/// (no local SFST/WAL) still answers a query — the handler fetches the file back
-/// through the read cache and the engine serves all 6 logs. Uses a real
-/// `OpendalStorage` over an `fs://` backend (exercises the real `Storage::read`).
-#[tokio::test]
-async fn remote_only_sfst_is_fetched_and_served() {
+/// A handler whose tenant's only copy of one SFST (stream `ns/svc`, six
+/// records from `min_s`) is in remote object storage — no local SFST or WAL —
+/// and the download cache it reads through. Uses a real `OpendalStorage` over
+/// an `fs://` backend (exercises the real `Storage::read`).
+fn remote_only_handler(min_s: u32) -> (OtelLogsHandler, file_cache::FileCache) {
     let mut tr = make_tenant_registries();
 
     // Build a real SFST's bytes; do NOT install it locally. The FileId's ns_hash
@@ -1092,7 +1091,6 @@ async fn remote_only_sfst_is_fetched_and_served() {
         1,
         ServiceStream::new("ns", "svc").ns_hash(),
     );
-    let min_s = 1_700_000_000u32;
     let sfst_tmp = tempfile::NamedTempFile::new().unwrap();
     write_test_sfst(sfst_tmp.path(), min_s);
     let sfst_bytes = std::fs::read(sfst_tmp.path()).unwrap();
@@ -1119,7 +1117,29 @@ async fn remote_only_sfst_is_fetched_and_served() {
             .unwrap();
     let cache =
         file_cache::FileCache::open(tempfile::tempdir().unwrap().keep(), 64 * 1024 * 1024).unwrap();
-    let h = make_handler_with_remote(tr, RemoteRead::new(storage, cache));
+    let h = make_handler_with_remote(tr, RemoteRead::new(storage, cache.clone()));
+    (h, cache)
+}
+
+/// The stream selector's field, as the handler rendered it.
+fn stream_options(v: &Value) -> Vec<Value> {
+    v["required_params"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == "__streams")
+        .and_then(|p| p["options"].as_array())
+        .expect("stream selector present")
+        .clone()
+}
+
+/// End-to-end: a tenant whose only copy of an SFST is in remote object storage
+/// (no local SFST/WAL) still answers a query — the handler fetches the file back
+/// through the read cache and the engine serves all 6 logs.
+#[tokio::test]
+async fn remote_only_sfst_is_fetched_and_served() {
+    let min_s = 1_700_000_000u32;
+    let (h, _cache) = remote_only_handler(min_s);
 
     let req: OtelLogsRequest = serde_json::from_slice(
         format!(
@@ -1142,13 +1162,7 @@ async fn remote_only_sfst_is_fetched_and_served() {
     );
     // #5: the remote-only stream is advertised in the window-scoped selector
     // (its data is fetchable, so the user can filter to it).
-    let streams = v["required_params"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|p| p["id"] == "__streams")
-        .and_then(|p| p["options"].as_array())
-        .expect("stream selector present");
+    let streams = stream_options(&v);
     assert!(
         streams.iter().any(|o| o["name"] == "ns/svc"),
         "remote-only stream must appear in the selector: {v:#}"
@@ -1162,6 +1176,34 @@ async fn remote_only_sfst_is_fetched_and_served() {
     assert_eq!(
         done, 2,
         "fetch phase advanced done, then the scan completed it"
+    );
+}
+
+/// Remote planning covers two ranges: the selector's (every stream in the
+/// window) and the fetch's (the user's stream filter). A filter to another
+/// stream therefore downloads nothing, while the remote-only stream stays
+/// selectable.
+#[tokio::test]
+async fn a_stream_filter_narrows_the_fetch_not_the_selector() {
+    let min_s = 1_700_000_000u32;
+    let (h, cache) = remote_only_handler(min_s);
+    let other = format!("{:016x}", ServiceStream::new("ns", "other").ns_hash());
+
+    let req: OtelLogsRequest = serde_json::from_value(serde_json::json!({
+        "info": false,
+        "tenant": "default",
+        "after": min_s - 10,
+        "before": min_s + 100,
+        "selections": {"__streams": [other]},
+    }))
+    .unwrap();
+    let v = serde_json::to_value(&h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
+
+    assert_eq!(v["items"]["matched"], 0, "{v:#}");
+    assert_eq!(cache.file_count(), 0, "the filtered-out file is not downloaded");
+    assert!(
+        stream_options(&v).iter().any(|o| o["name"] == "ns/svc"),
+        "the remote-only stream stays in the selector: {v:#}"
     );
 }
 
