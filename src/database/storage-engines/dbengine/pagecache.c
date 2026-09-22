@@ -517,12 +517,6 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct dbengine_tier 
         char file_path[DBENGINE_PATH_MAX];
         journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
         // What the guarded read below found, reported after its frame is gone rather than under it.
-        //
-        // The carriers below are volatile for the reason this file's neighbour states at
-        // rrdengine.c update_metrics_first_time_s(): today every write to one is followed immediately by a
-        // goto or break that leaves the guarded block, so no write is ever followed by a mapped read that
-        // could jump - but that invariant is one edit away from being broken silently, and a value changed
-        // between sigsetjmp and siglongjmp is indeterminate after the jump unless it is volatile.
         // Not because a sink could be siglongjmped out of: the handler jumps only when the faulting address is
         // inside the registered mapping (protected-access.c, signal_protected_access_check), and no line the
         // engine emits hands the sink a pointer into it. The reason is the one the comment above
@@ -530,6 +524,11 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct dbengine_tier 
         // across the reporting, the releases and any nested protected read covers memory this code is no longer
         // walking, so an unrelated fault in that range is silently recovered as this read's SIGBUS, and the
         // nesting depth (capped at 8, fatal past it) is held longer than it needs to be.
+        //
+        // The carriers are volatile for the reason rrdengine.c update_metrics_first_time_s() gives for
+        // journal_access_failed: a value changed between the sigsetjmp and a siglongjmp is indeterminate after
+        // the jump unless it is volatile, and whether any write here is followed by a mapped read that could
+        // jump is a property of today's control flow rather than of the declaration.
         enum {
             JV2_NO_PROBLEM = 0,
             JV2_METRIC_LIST_OVERFLOWS_FILE,

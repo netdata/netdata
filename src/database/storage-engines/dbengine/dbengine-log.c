@@ -36,9 +36,11 @@ void dbengine_log_emit(struct dbengine_engine *engine, ND_LOG_FIELD_PRIORITY pri
 //
 // It differs from the original in three ways. Two are forced (dbengine-log.h says why): no single-threaded-child
 // lock elision, and no priority pre-filter. The third is deliberate: libnetdata captures errno only to annotate
-// the line and never writes it back, while this restores it on every path out, because the sink contract
-// promises a caller that its errno survives an engine verb. The sleep is kept although every dbengine call site
-// declares sleep_ut 0, so a site that ever sets one behaves as it would have on the old path.
+// the line and leaves it cleared once the line is written, while this restores it on every path out, because the
+// sink contract promises a caller that its errno survives an engine verb. What it does not carry over is
+// libnetdata's Windows GetLastError() capture: the contract promises errno and nothing else. The sleep is kept
+// although every dbengine call site declares sleep_ut 0, so a site that ever sets one behaves as it would have
+// on the old path.
 void dbengine_log_emit_limit(struct dbengine_engine *engine, ERROR_LIMIT *erl, ND_LOG_FIELD_PRIORITY priority,
                              const char *file, const char *function, unsigned long line,
                              const char *fmt, ...) {

@@ -1288,7 +1288,12 @@ static time_t find_uuid_first_time(
     volatile size_t binary_match = 0;
     volatile size_t not_matching_bsearches = 0;
 
-    bool agent_shutdown = false;
+    // agent_shutdown here, and any_matching and journal_access_failed in the loop, are written inside the guarded
+    // block below and read after it, so they are volatile for the same reason as the carriers there. The other
+    // two leave the block right after their write; any_matching does not - the walk keeps reading the mapping
+    // after setting it, so without volatile its value would be indeterminate on the recovery path, and only the
+    // journal_access_failed check below would stand between that value and the read after the block
+    volatile bool agent_shutdown = false;
     while (datafile) {
         size_t journal_v2_file_size = 0;
         struct journal_v2_header *j2_header = journalfile_v2_data_acquire_with_hint(
@@ -1298,16 +1303,12 @@ static time_t find_uuid_first_time(
             continue;
         }
 
-        bool any_matching = false;
-        bool journal_access_failed = false;
+        volatile bool any_matching = false;
+        volatile bool journal_access_failed = false;
 
         char file_path[DBENGINE_PATH_MAX];
         journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
         // What the guarded read below found, reported after its frame is gone rather than under it.
-        //
-        // The carriers below are volatile for the reason update_metrics_first_time_s() states three
-        // hundred lines down for journal_access_failed: today no write to one is followed by a mapped read
-        // that could jump, and a future edit could break that silently.
         // Not because a sink could be siglongjmped out of: the handler jumps only when the faulting address is
         // inside the registered mapping (protected-access.c, signal_protected_access_check), and no line the
         // engine emits hands the sink a pointer into it. The reason is the one the comment above
@@ -1316,7 +1317,13 @@ static time_t find_uuid_first_time(
         // walking, so an unrelated fault in that range is silently recovered as this read's SIGBUS, and the
         // nesting depth (capped at 8, fatal past it) is held longer than it needs to be.
         //
-        // The frame here had no inner scope at all, so it gains the one the comment below recommends for it.
+        // The frame here had no inner scope at all, so it gains the one update_metrics_first_time_s() below
+        // already has.
+        //
+        // The carriers are volatile for the reason that function gives for journal_access_failed: a value
+        // changed between the sigsetjmp and a siglongjmp is indeterminate after the jump unless it is volatile,
+        // and whether any write here is followed by a mapped read that could jump is a property of today's
+        // control flow rather than of the declaration.
         enum {
             JV2_NO_PROBLEM = 0,
             JV2_METRIC_LIST_SIZE_OVERFLOWS,

@@ -63,8 +63,8 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 //   handles, collection and query handles, anything holding a cache page, and the preload references
 //   dbengine_preload_release() drops) AND a dbengine_destroy() has run after that. The return value alone does
 //   not say when that is: it counts registry metrics only, so it can be 0 while a cache the engine still points
-//   at holds referenced pages, and that cache can emit. No verb reports retention, so "nothing retained" is not
-//   a state the embedder can observe - and an engine can be retained for a reason that is not the embedder's
+//   at holds referenced pages, and that cache can emit. Nothing else reports it either, so "nothing retained" is
+//   not a state the embedder can observe - and an engine can be retained for a reason that is not the embedder's
 //   doing. The rule an embedder can actually follow, and the one the engine's own test suite follows, is to give
 //   the sink and its data the lifetime of the process.
 // - Never called after the engine is freed, and never for what the engine cannot survive: fatal() and
