@@ -89,7 +89,7 @@ static ALWAYS_INLINE void time_and_count_add(struct dbengine_time_and_count *tc,
         uv_fs_t _req;                                                                                                  \
         (ret_var) = uv_fs_unlink(NULL, &(_req), (path), NULL);                                                         \
         if ((ret_var) < 0) {                                                                                           \
-            netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", (path), uv_strerror(ret_var));                     \
+            dbengine_log_error((ctx)->engine, "DBENGINE: uv_fs_unlink(\"%s\"): %s", (path), uv_strerror(ret_var));     \
             ctx_fs_error(ctx);                                                                                         \
         }                                                                                                              \
         uv_fs_req_cleanup(&(_req));                                                                                   \
@@ -100,7 +100,7 @@ static ALWAYS_INLINE void time_and_count_add(struct dbengine_time_and_count *tc,
         uv_fs_t _req;                                                                                                  \
         (ret_var) = uv_fs_close(NULL, &(_req), (file), NULL);                                                          \
         if ((ret_var) < 0) {                                                                                           \
-            netdata_log_error("DBENGINE: uv_fs_close(\"%s\"): %s", (path), uv_strerror(ret_var));                      \
+            dbengine_log_error((ctx)->engine, "DBENGINE: uv_fs_close(\"%s\"): %s", (path), uv_strerror(ret_var));      \
             ctx_fs_error(ctx);                                                                                         \
         }                                                                                                              \
         uv_fs_req_cleanup(&(_req));                                                                                    \
@@ -687,9 +687,9 @@ static inline bool dbengine_retention_samples_delta(
             update_every_s);
 
         nd_log_limit_static_global_var(erl, 60, 0);
-        nd_log_limit(
+        dbengine_log_limit(
+            ctx ? ctx->engine : NULL,
             &erl,
-            NDLS_DAEMON,
             NDLP_ERR,
             "DBENGINE: tier %d: invalid retention interval while %s (first=%ld, last=%ld, update_every=%u); not updating sample counter",
             tier,
@@ -730,9 +730,9 @@ static inline bool dbengine_atomic_uint64_sub_saturating(
                 value);
 
             nd_log_limit_static_global_var(erl, 60, 0);
-            nd_log_limit(
+            dbengine_log_limit(
+                ctx ? ctx->engine : NULL,
                 &erl,
-                NDLS_DAEMON,
                 NDLP_ERR,
                 "DBENGINE: tier %d: %s counter underflow while %s (current=%" PRIu64 ", subtract=%" PRIu64 "); saturating to zero",
                 tier,

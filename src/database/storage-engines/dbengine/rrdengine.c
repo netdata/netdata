@@ -55,11 +55,11 @@ void dbengine_async_wakeup(struct dbengine_engine *engine)
         netdata_mutex_lock(&dbengine_async_mutex);
         int rc = uv_async_send(&engine->async);
         if (rc)
-            nd_log_daemon(NDLP_ERR,"DBENGINE: wakeup async error = %d", rc);
+            dbengine_log(engine, NDLP_ERR,"DBENGINE: wakeup async error = %d", rc);
 
         netdata_mutex_unlock(&dbengine_async_mutex);
     } else {
-        nd_log_daemon(NDLP_WARNING,"DBENGINE: wakeup async handler is being reset");
+        dbengine_log(engine, NDLP_WARNING,"DBENGINE: wakeup async handler is being reset");
     }
 }
 #else
@@ -67,7 +67,7 @@ void dbengine_async_wakeup(struct dbengine_engine *engine)
 {
     int rc = uv_async_send(&engine->async);
     if (rc)
-        nd_log_daemon(NDLP_ERR,"DBENGINE: wakeup async error = %d", rc);
+        dbengine_log(engine, NDLP_ERR,"DBENGINE: wakeup async error = %d", rc);
 }
 #endif
 
@@ -161,7 +161,7 @@ static inline void check_and_schedule_db_rotation(struct dbengine_tier *ctx)
     }
 
     if (ctx->datafiles.pending_rotate) {
-        nd_log_daemon(NDLP_DEBUG, "DBENGINE: tier %d is already pending rotation", ctx->config.tier);
+        dbengine_log(ctx->engine, NDLP_DEBUG, "DBENGINE: tier %d is already pending rotation", ctx->config.tier);
         return;
     }
 
@@ -1196,10 +1196,10 @@ static void *extent_write_tp_worker(
 
         if (attempt == 0) {
             nd_log_limit_static_global_var(dbengine_rotate_erl, 10, 0);
-            nd_log_limit(&dbengine_rotate_erl, NDLS_DAEMON, NDLP_ERR,
-                         "DBENGINE: tier %d datafile %u write failed (%s) - "
-                         "rotating to a new datafile and retrying the extent, to prevent data loss",
-                         ctx->config.tier, datafile->fileno, uv_strerror(ret));
+            dbengine_log_limit(ctx->engine, &dbengine_rotate_erl, NDLP_ERR,
+                               "DBENGINE: tier %d datafile %u write failed (%s) - "
+                               "rotating to a new datafile and retrying the extent, to prevent data loss",
+                               ctx->config.tier, datafile->fileno, uv_strerror(ret));
 
             if (extent_move_to_new_datafile(ctx, xt_io_descr))
                 continue;
@@ -1214,9 +1214,9 @@ static void *extent_write_tp_worker(
         xt_io_descr->wal = NULL;
 
         nd_log_limit_static_global_var(dbengine_erl, 10, 0);
-        nd_log_limit(&dbengine_erl, NDLS_DAEMON, NDLP_ERR,
-                     "DBENGINE: tier %d datafile %u write failed (%s) - the extent is lost",
-                     ctx->config.tier, xt_io_descr->datafile->fileno, uv_strerror(ret));
+        dbengine_log_limit(ctx->engine, &dbengine_erl, NDLP_ERR,
+                           "DBENGINE: tier %d datafile %u write failed (%s) - the extent is lost",
+                           ctx->config.tier, xt_io_descr->datafile->fileno, uv_strerror(ret));
     }
 
     struct dbengine_datafile *datafile = xt_io_descr->datafile;
@@ -1303,97 +1303,119 @@ static time_t find_uuid_first_time(
 
         char file_path[DBENGINE_PATH_MAX];
         journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
-        PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "read");
-        if (no_signal_received) {
-            time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
+        // What the guarded read below found, reported after its frame is gone. The frame is torn down by a
+        // cleanup attribute at the end of the scope it sits in, so a line emitted while it is armed runs under a
+        // signal handler that siglongjmps out of whatever it interrupts - which for a log sink, the embedder's
+        // own code, may mean skipping a lock it holds. The braces end the frame before anything is written, and
+        // scope it to the mmap walk, the way update_metrics_first_time_s() below already scopes its own.
+        enum {
+            JV2_NO_PROBLEM = 0,
+            JV2_METRIC_LIST_SIZE_OVERFLOWS,
+            JV2_METRIC_LIST_OVERFLOWS_FILE,
+        } problem = JV2_NO_PROBLEM;
+        size_t problem_metric_count = 0, problem_metric_offset = 0, problem_list_size = 0, problem_file_size = 0;
+        {
+            PROTECTED_ACCESS_SETUP(datafile->journalfile->mmap.data, datafile->journalfile->mmap.size, file_path, "read");
+            if (no_signal_received) {
+                time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
 
-            // same as journalfile_v2_populate_retention_to_mrg(): a zero header
-            // start time means the journal has no metrics, not that its
-            // retention starts at the epoch
-            if (journal_start_time_s > 0 && journal_start_time_s < global_first_time_s)
-                global_first_time_s = journal_start_time_s;
+                // same as journalfile_v2_populate_retention_to_mrg(): a zero header
+                // start time means the journal has no metrics, not that its
+                // retention starts at the epoch
+                if (journal_start_time_s > 0 && journal_start_time_s < global_first_time_s)
+                    global_first_time_s = journal_start_time_s;
 
-            size_t metric_offset = j2_header->metric_offset;
-            size_t journal_metric_count = j2_header->metric_count;
-            size_t metric_list_size;
-            if (__builtin_mul_overflow(journal_metric_count, sizeof(struct journal_metric_list), &metric_list_size)) {
-                nd_log_daemon(NDLP_ERR,
-                              "DBENGINE: metric list size overflow in journalfile \"%s\" "
-                              "(metric_count=%zu, entry_size=%zu), skipping it",
-                              file_path, journal_metric_count, sizeof(struct journal_metric_list));
-                journal_access_failed = true;
-                goto release_journal;
-            }
-            if (metric_offset > journal_v2_file_size ||
-                metric_list_size > journal_v2_file_size - metric_offset) {
-                nd_log_daemon(NDLP_ERR,
-                              "DBENGINE: metric list exceeds journal file size in journalfile \"%s\" "
-                              "(metric_offset=%zu, list_size=%zu, file_size=%zu), skipping it",
-                              file_path, metric_offset, metric_list_size, journal_v2_file_size);
-                journal_access_failed = true;
-                goto release_journal;
-            }
+                size_t metric_offset = j2_header->metric_offset;
+                size_t journal_metric_count = j2_header->metric_count;
+                size_t metric_list_size;
+                if (__builtin_mul_overflow(journal_metric_count, sizeof(struct journal_metric_list), &metric_list_size)) {
+                    problem = JV2_METRIC_LIST_SIZE_OVERFLOWS;
+                    problem_metric_count = journal_metric_count;
+                    journal_access_failed = true;
+                    goto release_journal;
+                }
+                if (metric_offset > journal_v2_file_size ||
+                    metric_list_size > journal_v2_file_size - metric_offset) {
+                    problem = JV2_METRIC_LIST_OVERFLOWS_FILE;
+                    problem_metric_offset = metric_offset;
+                    problem_list_size = metric_list_size;
+                    problem_file_size = journal_v2_file_size;
+                    journal_access_failed = true;
+                    goto release_journal;
+                }
 
-            struct journal_metric_list *uuid_list =
-                (struct journal_metric_list *)((uint8_t *)j2_header + metric_offset);
-            struct uuid_first_time_s *uuid_original_entry;
+                struct journal_metric_list *uuid_list =
+                    (struct journal_metric_list *)((uint8_t *)j2_header + metric_offset);
+                struct uuid_first_time_s *uuid_original_entry;
 
-            size_t journal_search_start = 0; // Start of remaining search space
-            any_matching = false;
-            for (size_t index = 0; index < count; ++index) {
-                uuid_original_entry = &uuid_first_entry_list[index];
+                size_t journal_search_start = 0; // Start of remaining search space
+                any_matching = false;
+                for (size_t index = 0; index < count; ++index) {
+                    uuid_original_entry = &uuid_first_entry_list[index];
 
-                if (uuid_original_entry->df_matched > 3 || uuid_original_entry->pages_found > 5)
-                    continue;
-
-                any_matching = true;
-                if (journal_search_start >= journal_metric_count)
-                    break;
-
-                struct journal_metric_list *live_entry = &uuid_list[journal_search_start];
-                // Check if we avoid bsearch
-                if (journal_metric_uuid_compare(uuid_original_entry->uuid, live_entry->uuid) != 0) {
-                    live_entry = bsearch(
-                        uuid_original_entry->uuid,
-                        uuid_list + journal_search_start,
-                        journal_metric_count - journal_search_start,
-                        sizeof(*uuid_list),
-                        journal_metric_uuid_compare);
-
-                    if (!live_entry) {
-                        not_matching_bsearches++;
+                    if (uuid_original_entry->df_matched > 3 || uuid_original_entry->pages_found > 5)
                         continue;
+
+                    any_matching = true;
+                    if (journal_search_start >= journal_metric_count)
+                        break;
+
+                    struct journal_metric_list *live_entry = &uuid_list[journal_search_start];
+                    // Check if we avoid bsearch
+                    if (journal_metric_uuid_compare(uuid_original_entry->uuid, live_entry->uuid) != 0) {
+                        live_entry = bsearch(
+                            uuid_original_entry->uuid,
+                            uuid_list + journal_search_start,
+                            journal_metric_count - journal_search_start,
+                            sizeof(*uuid_list),
+                            journal_metric_uuid_compare);
+
+                        if (!live_entry) {
+                            not_matching_bsearches++;
+                            continue;
+                        }
+                    }
+
+                    size_t found_index = live_entry - uuid_list;
+                    journal_search_start = found_index + 1; // Next search starts after this match
+
+                    if (journal_search_start >= journal_metric_count)
+                        break;
+
+                    uuid_original_entry->pages_found += live_entry->entries;
+                    uuid_original_entry->df_matched++;
+
+                    time_t old_first_time_s = uuid_original_entry->first_time_s;
+                    time_t first_time_s = live_entry->delta_start_s + journal_start_time_s;
+                    uuid_original_entry->first_time_s = MIN(uuid_original_entry->first_time_s, first_time_s);
+
+                    if (uuid_original_entry->first_time_s != old_first_time_s)
+                        uuid_original_entry->df_index_oldest = uuid_original_entry->df_matched;
+
+                    binary_match++;
+
+                    if (unlikely(!ctx_is_available_for_queries(ctx))) {
+                        agent_shutdown = true;
+                        break;
                     }
                 }
-
-                size_t found_index = live_entry - uuid_list;
-                journal_search_start = found_index + 1; // Next search starts after this match
-
-                if (journal_search_start >= journal_metric_count)
-                    break;
-
-                uuid_original_entry->pages_found += live_entry->entries;
-                uuid_original_entry->df_matched++;
-
-                time_t old_first_time_s = uuid_original_entry->first_time_s;
-                time_t first_time_s = live_entry->delta_start_s + journal_start_time_s;
-                uuid_original_entry->first_time_s = MIN(uuid_original_entry->first_time_s, first_time_s);
-
-                if (uuid_original_entry->first_time_s != old_first_time_s)
-                    uuid_original_entry->df_index_oldest = uuid_original_entry->df_matched;
-
-                binary_match++;
-
-                if (unlikely(!ctx_is_available_for_queries(ctx))) {
-                    agent_shutdown = true;
-                    break;
-                }
+            } else {
+                journal_access_failed = true;
             }
-        } else {
-            journal_access_failed = true;
         }
-
 release_journal:
+
+        if(problem == JV2_METRIC_LIST_SIZE_OVERFLOWS)
+            dbengine_log(ctx->engine, NDLP_ERR,
+                         "DBENGINE: metric list size overflow in journalfile \"%s\" "
+                         "(metric_count=%zu, entry_size=%zu), skipping it",
+                         file_path, problem_metric_count, sizeof(struct journal_metric_list));
+        else if(problem == JV2_METRIC_LIST_OVERFLOWS_FILE)
+            dbengine_log(ctx->engine, NDLP_ERR,
+                         "DBENGINE: metric list exceeds journal file size in journalfile \"%s\" "
+                         "(metric_offset=%zu, list_size=%zu, file_size=%zu), skipping it",
+                         file_path, problem_metric_offset, problem_list_size, problem_file_size);
+
         journalfile_v2_data_release(datafile->journalfile);
 
         if (agent_shutdown) {
@@ -1466,7 +1488,7 @@ release_journal:
                 without_retention++;
         }
     }
-    internal_error(true,
+    dbengine_internal_error(ctx->engine, true,
          "DBENGINE: analyzed the retention of %zu rotated metrics of tier %d, "
          "did %zu jv2 matching binary searches (%zu not matching, %zu overflown) in %u journal files, "
          "%zu metrics with entries in open cache, "
@@ -1481,7 +1503,8 @@ release_journal:
          not_needed_bsearches,
          journalfile_count,
          open_cache_count,
-         df_index[0], df_index[1], df_index[2], df_index[3], df_index[4], df_index[5], df_index[6], df_index[7], df_index[8], df_index[9],
+         df_index[0], df_index[1], df_index[2], df_index[3], df_index[4], df_index[5], df_index[6], df_index[7],
+                            df_index[8], df_index[9],
          open_cache_gave_first_time_s,
          without_retention,
          without_metric
@@ -1544,6 +1567,10 @@ static void update_metrics_first_time_s(struct dbengine_tier *ctx, struct dbengi
     // find_uuid_first_time() (which registers its own frame), and the final
     // cleanup -- masking unrelated faults that might land in the mmap range
     // and inflating nesting depth unnecessarily.
+    // reported after the frame below is gone, never inside it: a sink faulting under the guard is siglongjmped
+    // out of, skipping its own cleanup
+    bool metric_list_overflows_file = false;
+    size_t overflow_metric_offset = 0, overflow_list_size = 0, overflow_file_size = 0;
     {
         PROTECTED_ACCESS_SETUP(journalfile->mmap.data, journalfile->mmap.size, file_path, "mrg-retention");
         if(no_signal_received) {
@@ -1561,10 +1588,10 @@ static void update_metrics_first_time_s(struct dbengine_tier *ctx, struct dbengi
                 __builtin_mul_overflow(count, sizeof(struct uuid_first_time_s), &entry_list_size) ||
                 metric_offset > journal_v2_file_size ||
                 metric_list_size > journal_v2_file_size - metric_offset) {
-                nd_log_daemon(NDLP_ERR,
-                              "DBENGINE: metric list exceeds journal file size in journalfile \"%s\" "
-                              "(metric_offset=%zu, list_size=%zu, file_size=%zu), skipping retention update",
-                              file_path, metric_offset, metric_list_size, journal_v2_file_size);
+                metric_list_overflows_file = true;
+                overflow_metric_offset = metric_offset;
+                overflow_list_size = metric_list_size;
+                overflow_file_size = journal_v2_file_size;
                 journal_access_failed = true;
             }
             else {
@@ -1601,7 +1628,13 @@ static void update_metrics_first_time_s(struct dbengine_tier *ctx, struct dbengi
         }
     }
 
-    netdata_log_info(
+    if(metric_list_overflows_file)
+        dbengine_log(ctx->engine, NDLP_ERR,
+                     "DBENGINE: metric list exceeds journal file size in journalfile \"%s\" "
+                     "(metric_offset=%zu, list_size=%zu, file_size=%zu), skipping retention update",
+                     file_path, overflow_metric_offset, overflow_list_size, overflow_file_size);
+
+    dbengine_log_info(ctx->engine,
         "DBENGINE: tier %d: recalculating retention for %zu metrics starting with datafile %u",
         ctx->config.tier,
         count,
@@ -1635,7 +1668,8 @@ static void update_metrics_first_time_s(struct dbengine_tier *ctx, struct dbengi
     if(worker)
         worker_is_busy(DBENGINE_WORKER_JOB_POPULATE_MRG);
 
-    netdata_log_info("DBENGINE: tier %d: updating metrics registry retention for %zu metrics", ctx->config.tier, added);
+    dbengine_log_info(ctx->engine, "DBENGINE: tier %d: updating metrics registry retention for %zu metrics",
+                      ctx->config.tier, added);
 
     size_t deleted_metrics = 0, zero_retention_referenced = 0, zero_disk_retention = 0, zero_disk_but_live = 0;
     for (size_t index = 0; index < added; ++index) {
@@ -1710,10 +1744,11 @@ static void update_metrics_first_time_s(struct dbengine_tier *ctx, struct dbengi
     if (!ctx_is_available_for_queries(ctx))
         goto done;
 
-    internal_error(zero_disk_retention,
-                   "DBENGINE: tier %d: deleted %zu metrics from metrics registry; %zu still had zero retention but were referenced "
-                   "(out of %zu total zero on-disk retention metrics, of which %zu have main cache retention)",
-                   ctx->config.tier, deleted_metrics, zero_retention_referenced, zero_disk_retention, zero_disk_but_live);
+    dbengine_internal_error(ctx->engine, zero_disk_retention,
+                            "DBENGINE: tier %d: deleted %zu metrics from metrics registry; %zu still had zero retention but were referenced "
+                            "(out of %zu total zero on-disk retention metrics, of which %zu have main cache retention)",
+                            ctx->config.tier, deleted_metrics, zero_retention_referenced, zero_disk_retention,
+                            zero_disk_but_live);
 
     if(global_first_time_s != LONG_MAX)
         __atomic_store_n(&ctx->atomic.first_time_s, global_first_time_s, __ATOMIC_RELAXED);
@@ -1753,10 +1788,10 @@ void datafile_delete(
                 // pending_deletion is already set, blocking new acquires.
                 // Bail out and let the next rotation cycle retry - lockers
                 // will drain over time since no new ones can be added.
-                netdata_log_error("DBENGINE: tier %u: " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL
-                                  " could not be acquired for deletion after %zu attempts (%u lockers remain)"
-                                  " - will retry on next rotation",
-                                  tier, datafile->tier, fileno, attempts, datafile->users.lockers);
+                dbengine_log_error(engine, "DBENGINE: tier %u: " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL
+                                   " could not be acquired for deletion after %zu attempts (%u lockers remain)"
+                                   " - will retry on next rotation",
+                                   tier, datafile->tier, fileno, attempts, datafile->users.lockers);
 
                 if(worker)
                     worker_is_idle();
@@ -1764,7 +1799,7 @@ void datafile_delete(
                 return;
             }
 
-            netdata_log_info("DBENGINE: tier %u: waiting for " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL
+            dbengine_log_info(engine, "DBENGINE: tier %u: waiting for " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL
                          " to be available for deletion, in use by %u users.",
                  tier, datafile->tier, fileno, datafile->users.lockers);
 
@@ -1784,8 +1819,9 @@ void datafile_delete(
 //    }
 
     __atomic_add_fetch(&engine->cache_efficiency_stats.datafile_deletion_started, 1, __ATOMIC_RELAXED);
-    netdata_log_info("DBENGINE: tier %u: deleting " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " to maintain %s.",
-                     tier, datafile->tier, fileno, disk_time ? "disk quota" : "time retention");
+    dbengine_log_info(engine,
+                      "DBENGINE: tier %u: deleting " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " to maintain %s.",
+                      tier, datafile->tier, fileno, disk_time ? "disk quota" : "time retention");
 
     if(worker)
         worker_is_busy(DBENGINE_WORKER_JOB_DATAFILE_DELETE);
@@ -1842,11 +1878,13 @@ void datafile_delete(
     bool exp_njfv2 = expected_journal_files & JOURNALFILE_DELETED_V2;
 
     if (del_ndf && del_njf && del_njfv2)
-        netdata_log_info("DBENGINE: tier %u: deleted " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf, .njfv2), reclaimed %s.",
-                         tier, datafile_tier, fileno, size_for_humans);
+        dbengine_log_info(engine,
+                          "DBENGINE: tier %u: deleted " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf, .njfv2), reclaimed %s.",
+                          tier, datafile_tier, fileno, size_for_humans);
     else if (del_ndf && del_njf && !exp_njfv2)
-        netdata_log_info("DBENGINE: tier %u: deleted " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf), reclaimed %s.",
-                         tier, datafile_tier, fileno, size_for_humans);
+        dbengine_log_info(engine,
+                          "DBENGINE: tier %u: deleted " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf), reclaimed %s.",
+                          tier, datafile_tier, fileno, size_for_humans);
     else if (del_ndf || del_njf || del_njfv2) {
         BUFFER *removed = buffer_create(0, NULL);
         BUFFER *failed = buffer_create(0, NULL);
@@ -1863,19 +1901,22 @@ void datafile_delete(
         if (exp_njfv2 && !del_njfv2) { buffer_strcat(failed, sep); buffer_strcat(failed, ".njfv2"); }
 
         if(buffer_strlen(failed))
-            netdata_log_error("DBENGINE: tier %u: partial delete of " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL
-                              " - removed: %s, failed: %s, reclaimed %s.",
-                              tier, datafile_tier, fileno,
-                              buffer_tostring(removed), buffer_tostring(failed), size_for_humans);
+            dbengine_log_error(engine,
+                               "DBENGINE: tier %u: partial delete of " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL
+                               " - removed: %s, failed: %s, reclaimed %s.",
+                               tier, datafile_tier, fileno,
+                               buffer_tostring(removed), buffer_tostring(failed), size_for_humans);
         else
-            netdata_log_info("DBENGINE: tier %u: deleted " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " (%s), reclaimed %s.",
-                             tier, datafile_tier, fileno, buffer_tostring(removed), size_for_humans);
+            dbengine_log_info(engine,
+                              "DBENGINE: tier %u: deleted " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " (%s), reclaimed %s.",
+                              tier, datafile_tier, fileno, buffer_tostring(removed), size_for_humans);
         buffer_free(removed);
         buffer_free(failed);
     }
     else
-        netdata_log_error("DBENGINE: tier %u: failed to delete " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " to maintain %s.",
-                          tier, datafile_tier, fileno, disk_time ? "disk quota" : "time retention");
+        dbengine_log_error(engine,
+                           "DBENGINE: tier %u: failed to delete " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " to maintain %s.",
+                           tier, datafile_tier, fileno, disk_time ? "disk quota" : "time retention");
 }
 
 static void *database_rotate_tp_worker(struct dbengine_engine *engine, struct dbengine_tier *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
@@ -2003,7 +2044,7 @@ static void *populate_mrg_tp_worker(
     netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
     if (total_datafiles == 0) {
-        nd_log_daemon(NDLP_WARNING, "DBENGINE: tier %d: no datafiles to populate MRG", tier);
+        dbengine_log(ctx->engine, NDLP_WARNING, "DBENGINE: tier %d: no datafiles to populate MRG", tier);
         worker_is_idle();
         return data;
     }
@@ -2039,9 +2080,10 @@ static void *populate_mrg_tp_worker(
                 // mark it done, so the rescan below does not count it again
                 datafile->populate_mrg.populated = true;
                 spinlock_unlock(&datafile->populate_mrg.spinlock);
-                nd_log_daemon(NDLP_INFO, "DBENGINE: tier %d: skipping " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL
-                                         " for MRG population, it is pending deletion",
-                              tier, datafile->tier, datafile->fileno);
+                dbengine_log(ctx->engine, NDLP_INFO,
+                             "DBENGINE: tier %d: skipping " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL
+                                        " for MRG population, it is pending deletion",
+                             tier, datafile->tier, datafile->fileno);
                 total_datafiles--;
                 datafile = NULL;
                 continue;
@@ -2068,7 +2110,7 @@ static void *populate_mrg_tp_worker(
         {
             nd_log_limit_static_thread_var(erl, 10, 0);
             size_t completed = __atomic_load_n(&populated_datafiles, __ATOMIC_RELAXED);
-            nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
+            dbengine_log_limit(ctx->engine, &erl, NDLP_INFO,
                 "DBENGINE: tier %d: MRG population completed: %.2f%% (%zu/%zu)",
                 tier, (completed * 100.0) / total_datafiles, completed, total_datafiles);
         }
@@ -2081,7 +2123,7 @@ static void *populate_mrg_tp_worker(
         if (pending) {
             nd_log_limit_static_thread_var(erl, 10, 0);
             size_t completed = __atomic_load_n(&populated_datafiles, __ATOMIC_RELAXED);
-            nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
+            dbengine_log_limit(ctx->engine, &erl, NDLP_INFO,
                 "DBENGINE: tier %d: MRG population completed: %.2f%% (%zu/%zu), waiting for %zu workers",
                 tier, (completed * 100.0) / total_datafiles, completed, total_datafiles, pending);
             sleep_usec(10 * USEC_PER_MS);
@@ -2104,7 +2146,7 @@ static void *ctx_shutdown_tp_worker(struct dbengine_engine *engine __maybe_unuse
             __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED)) {
         if(!logged) {
             logged = true;
-            netdata_log_info("DBENGINE: waiting for %zu inflight queries to finish to shutdown tier %d...",
+            dbengine_log_info(engine, "DBENGINE: waiting for %zu inflight queries to finish to shutdown tier %d...",
                  __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED), ctx->config.tier);
         }
         sleep_usec(1 * USEC_PER_MS);
@@ -2189,7 +2231,7 @@ void async_cb(uv_async_t *handle)
     struct dbengine_engine *engine = handle->data;
     engine->last_async_callback = uv_hrtime();
 
-    netdata_log_debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
+    dbengine_log_debug(engine, D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
 }
 
 static void async_closed_cb(uv_handle_t *handle)
@@ -2198,13 +2240,14 @@ static void async_closed_cb(uv_handle_t *handle)
 
     int ret = uv_async_init(handle->loop, &engine->async, async_cb);
     if (ret)
-        netdata_log_error("DBENGINE: reinitializing uv_async_init(): %s", uv_strerror(ret));
+        dbengine_log_error(engine, "DBENGINE: reinitializing uv_async_init(): %s", uv_strerror(ret));
     __atomic_store_n(&engine->async_ready, true, __ATOMIC_RELEASE);
 }
 #else
 void async_cb(uv_async_t *handle __maybe_unused)
 {
-    netdata_log_debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
+    dbengine_log_debug(handle->data, D_RRDENGINE, "%s called, active=%d.", __func__,
+                       uv_is_active((uv_handle_t *)handle));
 }
 #endif
 
@@ -2267,8 +2310,9 @@ static struct dbengine_datafile *release_and_aquire_next_datafile_for_indexing(s
             netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
             return datafile;
         }
-        nd_log_daemon(NDLP_INFO, "DBENGINE: tier %d: " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " cannot be locked for indexing after retries; skipping",
-                      ctx->config.tier, datafile->tier, datafile->fileno);
+        dbengine_log(ctx->engine, NDLP_INFO,
+                     "DBENGINE: tier %d: " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " cannot be locked for indexing after retries; skipping",
+                     ctx->config.tier, datafile->tier, datafile->fileno);
         datafile = get_next_datafile(datafile, NULL, true);
     }
     netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
@@ -2293,7 +2337,7 @@ static void *journal_v2_indexing_tp_worker(struct dbengine_engine *engine, struc
         spinlock_unlock(&datafile->writers.spinlock);
 
         if(!available) {
-            nd_log_daemon(NDLP_NOTICE,
+            dbengine_log(engine, NDLP_NOTICE,
                    "DBENGINE: tier %d: " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL
                    " needs to be indexed, but it has writers working on it - skipping it for now",
                    ctx->config.tier, datafile->tier, datafile->fileno);
@@ -2301,14 +2345,15 @@ static void *journal_v2_indexing_tp_worker(struct dbengine_engine *engine, struc
         }
 
         if (index_once && unlikely(dbengine_ctx_tier_cap_exceeded(ctx))) {
-            nd_log_daemon(
+            dbengine_log(engine,
                 NDLP_INFO, "DBENGINE: tier %d: reached quota limit, stopping journal indexing", ctx->config.tier);
             __atomic_store_n(&ctx->atomic.needs_indexing, true, __ATOMIC_RELAXED);
             datafile_release(datafile, DATAFILE_ACQUIRE_INDEXING);
             break;
         }
-        nd_log_daemon(NDLP_INFO, "DBENGINE: tier %d: " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " is ready to be indexed",
-                      ctx->config.tier, datafile->tier, datafile->fileno);
+        dbengine_log(engine, NDLP_INFO,
+                     "DBENGINE: tier %d: " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " is ready to be indexed",
+                     ctx->config.tier, datafile->tier, datafile->fileno);
 
         pgc_open_cache_to_journal_v2(
             engine->open_cache,
@@ -2332,9 +2377,9 @@ static void *journal_v2_indexing_tp_worker(struct dbengine_engine *engine, struc
 
     errno_clear();
     if(count)
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "DBENGINE: tier %d: journal indexing done; %u files processed",
-               ctx->config.tier, count);
+        dbengine_log(engine, NDLP_DEBUG,
+                     "DBENGINE: tier %d: journal indexing done; %u files processed",
+                     ctx->config.tier, count);
 
     worker_is_idle();
 
@@ -2574,7 +2619,7 @@ static int dbengine_spawn(struct dbengine_engine *engine) {
 
     ret = uv_loop_init(&engine->loop);
     if (ret) {
-        netdata_log_error("DBENGINE: uv_loop_init(): %s", uv_strerror(ret));
+        dbengine_log_error(engine, "DBENGINE: uv_loop_init(): %s", uv_strerror(ret));
         return ret;
     }
     engine->loop_open = true;
@@ -2582,7 +2627,7 @@ static int dbengine_spawn(struct dbengine_engine *engine) {
 
     ret = uv_async_init(&engine->loop, &engine->async, async_cb);
     if (ret) {
-        netdata_log_error("DBENGINE: uv_async_init(): %s", uv_strerror(ret));
+        dbengine_log_error(engine, "DBENGINE: uv_async_init(): %s", uv_strerror(ret));
         fatal_assert(0 == uv_loop_close(&engine->loop));
         engine->loop_open = false;
         return ret;
@@ -2594,14 +2639,14 @@ static int dbengine_spawn(struct dbengine_engine *engine) {
 
     ret = uv_timer_init(&engine->loop, &engine->timer);
     if (ret) {
-        netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
+        dbengine_log_error(engine, "DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
         dbengine_spawn_unwind(engine, false);
         return ret;
     }
 
     ret = uv_timer_init(&engine->loop, &engine->retention_timer);
     if (ret) {
-        netdata_log_error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
+        dbengine_log_error(engine, "DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
         dbengine_spawn_unwind(engine, true);
         return ret;
     }
@@ -2831,12 +2876,14 @@ void dbengine_event_loop(void* arg) {
 #if defined(OS_WINDOWS)
                     if (uv_hrtime() - engine->last_async_callback > 1000UL * NSEC_PER_MSEC) {
                         if (++engine->async_timeout_count > 30) {
-                            netdata_log_error("DBENGINE: async callback timeout detected, re-initializing the async handle");
+                            dbengine_log_error(engine,
+                                               "DBENGINE: async callback timeout detected, re-initializing the async handle");
                             __atomic_store_n(&engine->async_ready, false, __ATOMIC_RELEASE);
                             uv_close((uv_handle_t *)&engine->async, async_closed_cb);
                             engine->async_timeout_count = 0;
                         } else
-                            netdata_log_error("DBENGINE: async callback timeout detected count = %d", engine->async_timeout_count);
+                            dbengine_log_error(engine, "DBENGINE: async callback timeout detected count = %d",
+                                               engine->async_timeout_count);
                     }
 #endif
                     worker_dispatch_query_prep(engine, cmd, false);
@@ -2941,7 +2988,8 @@ void dbengine_event_loop(void* arg) {
                 case DBENGINE_OPCODE_CTX_QUIESCE: {
                     // a ctx will shutdown shortly
                     struct dbengine_tier *ctx = cmd.ctx;
-                    nd_log_daemon(NDLP_INFO, "DBENGINE: Tier %d is shutting down — query processing disabled", ctx->config.tier);
+                    dbengine_log(engine, NDLP_INFO, "DBENGINE: Tier %d is shutting down — query processing disabled",
+                                 ctx->config.tier);
                     __atomic_store_n(&ctx->quiesce.enabled, true, __ATOMIC_RELEASE);
                     break;
                 }
@@ -2986,7 +3034,7 @@ void dbengine_event_loop(void* arg) {
     freez(mlt);
     uv_sem_destroy(&sem);
 
-    nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down dbengine thread");
+    dbengine_log(engine, NDLP_DEBUG, "Shutting down dbengine thread");
     // what is left open (a handle still closing, a work request still on the thread pool) is finished by
     // dbengine_shutdown() once this thread was joined
     engine->loop_open = (0 != uv_loop_close(&engine->loop));
@@ -3013,9 +3061,9 @@ void dbengine_shutdown(struct dbengine_engine *engine)
 
     int rc = nd_thread_join(engine->thread);
     if (rc)
-        nd_log_daemon(NDLP_ERR, "DBENGINE: Failed to join thread, error %s", uv_err_name(rc));
+        dbengine_log(engine, NDLP_ERR, "DBENGINE: Failed to join thread, error %s", uv_err_name(rc));
     else
-        nd_log_daemon(NDLP_INFO, "DBENGINE: thread shutdown completed");
+        dbengine_log(engine, NDLP_INFO, "DBENGINE: thread shutdown completed");
 
     // a loop its thread could not close on the way out still has a handle closing, or a work request on the thread
     // pool (a flush or a cleanup the last timer tick dispatched). Running it here finishes them while everything they
