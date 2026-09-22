@@ -228,16 +228,21 @@ return the context error so the runtime aborts the cycle instead of committing a
 ## Metrics And Charts
 
 Metric instruments SHOULD be built once in `New()` when the metric surface is known. Use a typed collector metrics
-struct so write code is a value mapping, not repeated dynamic instrument lookup.
+struct so write code is a value mapping, not repeated dynamic instrument lookup. For input-defined metric names and
+churning labels, construct direct snapshot handles inside the collection cycle or retain them only with their owning
+series. A permanent Vec cache is unbounded; follow the descriptor-retention contract in
+`src/go/pkg/metrix/README.md#consumers-that-cache-per-name-state` for any per-name cache that survives cycles.
 
 Use the right instrument:
 
-- `SnapshotGaugeVec` for labeled current values; use scalar `SnapshotMeter.Gauge` only when the metric is intentionally
-  unlabeled;
+- `SnapshotGaugeVec` for labeled current values with a bounded, stable identity set; dynamic ingestion can use direct
+  labeled `SnapshotMeter.Gauge` handles with the ownership rules above;
 - `Counter.ObserveTotal()` for source counters;
 - `StateSet` SHOULD be used for fixed mutually exclusive states, such as connected vs disconnected or up vs down.
 
-`charts.yaml` is the chart contract. Every template MUST define:
+Use exactly one static `charts.yaml` provider or an immutable native TemplateSet provider as the chart contract.
+Native providers reuse their prepared pointer until content changes; see
+`src/go/plugin/framework/chartengine/README.md#named-active-template-sets`. Every static template MUST define:
 
 - `version: v1`;
 - `context_namespace`;
