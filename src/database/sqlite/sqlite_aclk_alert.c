@@ -315,7 +315,7 @@ done:
     " WHERE hld.unique_id = aq.unique_id AND hld.health_log_id = aq.health_log_id"                                     \
     " AND hl.config_hash_id = ah.hash_id"                                                                              \
     " AND hl.host_id = @host_id AND aq.host_id = hl.host_id AND hl.health_log_id = hld.health_log_id"                  \
-    " ORDER BY aq.sequence_id ASC"
+    " ORDER BY aq.sequence_id ASC LIMIT "ACLK_MAX_ALERT_UPDATES
 
 //
 // Check all queued alerts for a host and commit them as if they have been send to the cloud
@@ -334,22 +334,43 @@ static void commit_alert_events(RRDHOST *host)
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
+    // Same reason as the push path: the deletes happen after the statement is reset, never while this joined
+    // SELECT is being stepped. The LIMIT bounds one pass, and the pass repeats while it is full - each pass
+    // deletes what it committed, so the next one sees the rest and the loop terminates.
+    int64_t consumed_seq[ACLK_MAX_ALERT_UPDATES_N];
+    int64_t consumed_uid[ACLK_MAX_ALERT_UPDATES_N];
+    size_t consumed;
+
     param = 0;
-    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+    do {
+        consumed = 0;
 
-        int64_t sequence_id = sqlite3_column_int64(res, 0);
-        int64_t unique_id = sqlite3_column_int64(res, 1);
-        int64_t version = sqlite3_column_int64(res, 2);
-        RRDCALC_STATUS status = (RRDCALC_STATUS)sqlite3_column_int(res, 3);
-        int64_t health_log_id = sqlite3_column_int64(res, 4);
+        while (sqlite3_step_monitored(res) == SQLITE_ROW) {
 
-        // Prepare the statement on the first time (res_version) then reuse it
-        // finalize when we are done
-        sql_update_alert_version(health_log_id, unique_id, status, version, &res_version);
+            int64_t sequence_id = sqlite3_column_int64(res, 0);
+            int64_t unique_id = sqlite3_column_int64(res, 1);
+            int64_t version = sqlite3_column_int64(res, 2);
+            RRDCALC_STATUS status = (RRDCALC_STATUS)sqlite3_column_int(res, 3);
+            int64_t health_log_id = sqlite3_column_int64(res, 4);
 
-        // same guard as the push path: consume exactly the transition we committed
-        delete_alert_from_submit_queue(&host->host_id.uuid, sequence_id, unique_id, &res_delete);
-    }
+            // Prepare the statement on the first time (res_version) then reuse it
+            // finalize when we are done
+            sql_update_alert_version(health_log_id, unique_id, status, version, &res_version);
+
+            if (consumed < ACLK_MAX_ALERT_UPDATES_N) {
+                consumed_seq[consumed] = sequence_id;
+                consumed_uid[consumed] = unique_id;
+                consumed++;
+            }
+        }
+
+        SQLITE_RESET(res);
+
+        // same guard as the push path: consume exactly the transitions we committed
+        for (size_t i = 0; i < consumed; i++)
+            delete_alert_from_submit_queue(&host->host_id.uuid, consumed_seq[i], consumed_uid[i], &res_delete);
+
+    } while (consumed == ACLK_MAX_ALERT_UPDATES_N);
 
 done:
     REPORT_BIND_FAIL(res, param);
@@ -481,11 +502,6 @@ void health_alarm_log_populate(
     alarm_log->sequence_id = sqlite3_column_int64(res, SEQUENCE_ID);
 }
 
-// The loop below deletes each row as it is sent, while this statement is still being stepped. That is safe
-// because SQLite lets a cursor delete the row it has just visited - NOT because of the ORDER BY. Depending on
-// whether statistics exist, the plan is either a rowid-ordered "SCAN aq" with no sorter (sequence_id IS the
-// rowid, so the scan already satisfies the ORDER BY) or a materialised sorter. Both were checked empirically
-// against this schema, at 2/10/100/1000 rows: every row is returned exactly once and none is skipped.
 #define SQL_SELECT_ALERT_TO_PUSH                                                                                       \
     "SELECT aq.sequence_id, hld.unique_id, hld.alarm_id, hl.config_hash_id, hld.updated_by_id, hld.when_key,"          \
     " hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name,"    \
@@ -523,6 +539,18 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
     size_t sent = 0;
     int64_t first_seq = 0, last_seq = 0;
 
+    // Deleting from aclk_queue while this SELECT is still being stepped would be relying on undefined
+    // behaviour: SQLite only guarantees that deleting the current or a prior row is safe for a SELECT over a
+    // SINGLE table, and this is a four-way join. What a joined SELECT does when the same connection modifies
+    // one of its tables mid-scan "depends on which release of SQLite is running, the schema of the database
+    // file, whether or not ANALYZE has been run, and the details of the query" (sqlite.org/isolation.html) -
+    // and a row skipped that way would be a transition that is never sent, which is the very bug this guard
+    // exists to prevent. So buffer what we consumed, reset the statement, then delete. One batch is bounded
+    // by the LIMIT, so the buffer is too.
+    int64_t consumed_seq[ACLK_MAX_ALERT_UPDATES_N];
+    int64_t consumed_uid[ACLK_MAX_ALERT_UPDATES_N];
+    size_t consumed = 0;
+
     param = 0;
     RRDCALC_STATUS status;
     struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
@@ -547,7 +575,13 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
         // Ordered version-then-delete on purpose: cloud_status_matches() reads alert_version, so until it is
         // updated a concurrent insert still sees the pre-send status. Deleting first would widen that window.
         sql_update_alert_version(alarm_log.health_log_id, alarm_log.unique_id, status, alarm_log.version, res_version);
-        delete_alert_from_submit_queue(&host->host_id.uuid, alarm_log.sequence_id, (int64_t)alarm_log.unique_id, res_delete);
+
+        // the rows are consumed after this statement is reset - see the comment on the buffer
+        if (consumed < ACLK_MAX_ALERT_UPDATES_N) {
+            consumed_seq[consumed] = alarm_log.sequence_id;
+            consumed_uid[consumed] = (int64_t)alarm_log.unique_id;
+            consumed++;
+        }
 
         destroy_alarm_log_entry(&alarm_log);
     }
@@ -570,6 +604,10 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
 done:
     REPORT_BIND_FAIL(*res, param);
     SQLITE_RESET(*res);
+
+    // the cursor is closed now, so these cannot perturb it
+    for (size_t i = 0; i < consumed; i++)
+        delete_alert_from_submit_queue(&host->host_id.uuid, consumed_seq[i], consumed_uid[i], res_delete);
 }
 
 // The unique_id guard is what makes this safe against the same re-pointing the submit queue does:
