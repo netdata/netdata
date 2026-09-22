@@ -42,6 +42,7 @@ func referenceQuantile(input []weightedSample, num, den int64) float64 {
 	}
 	panic("no reference")
 }
+
 func checkPercentiles(t *testing.T, input []weightedSample, limit int) (available bool, reason string) {
 	t.Helper()
 	a := newPercentiles(limit)
@@ -69,6 +70,7 @@ func checkPercentiles(t *testing.T, input []weightedSample, limit int) (availabl
 	}
 	return true, ""
 }
+
 func TestPercentileContracts(t *testing.T) {
 	cases := map[string]struct {
 		input []weightedSample
@@ -100,6 +102,7 @@ func TestPercentileContracts(t *testing.T) {
 		})
 	}
 }
+
 func TestPercentileCoverage(t *testing.T) {
 	r := rand.New(rand.NewPCG(4, 9))
 	for _, mode := range []string{"unsampled", "fixed-.1", "fixed-.3", "mixed", "signed-mixed"} {
@@ -143,6 +146,7 @@ func TestPercentileCoverage(t *testing.T) {
 		}
 	}
 }
+
 func TestPercentileMappingBoundaries(t *testing.T) {
 	a := newPercentiles(1024)
 	available := 0
@@ -160,6 +164,7 @@ func TestPercentileMappingBoundaries(t *testing.T) {
 	}
 	t.Logf("certified mapping-boundary cases=%d", available)
 }
+
 func TestSpanBeforeMutationAndReset(t *testing.T) {
 	a := newPercentiles(128)
 	a.add(1, 1)
@@ -180,6 +185,7 @@ func TestSpanBeforeMutationAndReset(t *testing.T) {
 		t.Fatal(got, a.reason)
 	}
 }
+
 func BenchmarkInsert(b *testing.B) {
 	for _, mixed := range []bool{false, true} {
 		b.Run(fmt.Sprint(mixed), func(b *testing.B) {
@@ -201,6 +207,7 @@ func BenchmarkInsert(b *testing.B) {
 		})
 	}
 }
+
 func BenchmarkQuery(b *testing.B) {
 	for _, mixed := range []bool{false, true} {
 		b.Run(fmt.Sprint(mixed), func(b *testing.B) {
@@ -221,6 +228,7 @@ func BenchmarkQuery(b *testing.B) {
 		})
 	}
 }
+
 func TestExactLaneTransitions(t *testing.T) {
 	for _, order := range [][]float64{{.1, .2, .4}, {.4, .1, .2}, {.2, .4, .1}} {
 		input := []weightedSample{}
@@ -250,6 +258,7 @@ func TestExactLaneTransitions(t *testing.T) {
 		t.Fatal(why)
 	}
 }
+
 func TestWideCoverage(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

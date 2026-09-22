@@ -3,9 +3,7 @@
 package statsd
 
 import (
-	"bytes"
 	"context"
-	_ "embed"
 	"fmt"
 	"math"
 	"strings"
@@ -14,127 +12,11 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/pkg/relabel"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
-	"github.com/prometheus/prometheus/model/labels"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-//go:embed testdata/config.json
-var configJSON []byte
-
-//go:embed testdata/config.yaml
-var configYAML []byte
-
-func TestConfigurationSerialize(t *testing.T) {
-	c := New()
-	collecttest.TestConfigurationSerialize(t, c, configJSON, configYAML)
-	require.NoError(t, c.Init(context.Background()))
-	assert.Zero(t, c.receiver.idle) // Explicit zero survives New, decode, retrieval and Init.
-}
-
-type coreFixture struct {
-	c      *Collector
-	cycle  metrix.CycleController
-	source *collectorapi.ChartTemplateSource
-	engine *chartengine.Engine
-	time   time.Time
-}
-
-func newCoreFixture(t testing.TB, capacity int, idle time.Duration, opts ...metrix.CollectorStoreOption) *coreFixture {
-	t.Helper()
-	c := New()
-	c.MaxSeries = capacity
-	c.MetricIdleTimeout = confopt.Duration(idle)
-	if len(opts) > 0 {
-		c.store = metrix.NewCollectorStore(opts...)
-	}
-	f := &coreFixture{
-		c:    c,
-		time: time.Unix(1000, 0),
-	}
-	c.now = func() time.Time { return f.time }
-	require.NoError(t, c.Init(context.Background()))
-	require.NoError(t, c.Check(context.Background()))
-	managed, ok := metrix.AsCycleManagedStore(c.MetricStore())
-	require.True(t, ok)
-	f.cycle = managed.CycleController()
-	var err error
-	f.source, err = collectorapi.NewChartTemplateSource(c)
-	require.NoError(t, err)
-	_, err = f.source.Capture()
-	require.NoError(t, err)
-	f.engine, err = chartengine.New(chartengine.WithRuntimeStore(nil))
-	require.NoError(t, err)
-	c.receiver.start() // Test harness supplies operational readiness; socket Run is the next stage.
-	t.Cleanup(func() { c.Cleanup(context.Background()) })
-	return f
-}
-
-func (f *coreFixture) ingest(t testing.TB, lines ...string) {
-	t.Helper()
-	for _, line := range lines {
-		require.NoError(t, f.c.receiver.ingest(line, f.time), line)
-	}
-}
-
-func (f *coreFixture) collect(t testing.TB, metricAbort, outputAbort bool) string {
-	t.Helper()
-	f.cycle.BeginCycle()
-	require.NoError(t, f.c.Collect(context.Background()))
-	return f.finish(t, metricAbort, outputAbort)
-}
-
-func (f *coreFixture) finish(t testing.TB, metricAbort, outputAbort bool) string {
-	t.Helper()
-	captured, err := f.source.Capture()
-	require.NoError(t, err)
-	if metricAbort {
-		f.cycle.AbortCycle()
-		return ""
-	}
-	require.NoError(t, f.cycle.CommitCycleSuccess())
-	attempt, err := f.engine.PreparePlanWithOptions(
-		f.c.store.Read(metrix.ReadRaw(), metrix.ReadFlatten()),
-		chartengine.PlanOptions{
-			TemplateSet: captured,
-		},
-	)
-	require.NoError(t, err)
-	var buf bytes.Buffer
-	require.NoError(
-		t,
-		chartemit.ApplyPlan(
-			netdataapi.New(&buf),
-			attempt.Plan(),
-			chartemit.EmitEnv{
-				TypeID:      "statsd.test",
-				UpdateEvery: 1,
-				StoreFirst:  true,
-			},
-		),
-	)
-	if outputAbort {
-		attempt.Abort()
-		return ""
-	}
-	require.NoError(t, attempt.Commit())
-	return buf.String()
-}
-
-func value(t testing.TB, c *Collector, name string, want float64, ls metrix.Labels) {
-	t.Helper()
-	got, ok := c.store.Read().Value(name, ls)
-	require.True(t, ok, name)
-	assert.Equal(t, want, got, name)
-}
 
 func TestMeasurementsAndGenericCharts(t *testing.T) {
 	f := newCoreFixture(t, 20, time.Minute)
@@ -151,7 +33,10 @@ func TestMeasurementsAndGenericCharts(t *testing.T) {
 	value(t, f.c, "ms.sum.latency", 110, nil)
 	value(t, f.c, "h.count.difference", 3, nil)
 	value(t, f.c, "h.sum.difference", 0, nil)
-	for name, want := range map[string][]float64{"ms.values.latency": {10, 100, 55, 10, 100}, "h.values.difference": {-10, 20, 0, -10, 20}} {
+	for name, want := range map[string][]float64{
+		"ms.values.latency":   {10, 100, 55, 10, 100},
+		"h.values.difference": {-10, 20, 0, -10, 20},
+	} {
 		p, ok := f.c.store.Read().MeasureSet(name, nil)
 		require.True(t, ok)
 		require.Len(t, p.Values, 5)
@@ -160,7 +45,7 @@ func TestMeasurementsAndGenericCharts(t *testing.T) {
 			assert.InDelta(t, want[i], p.Values[i], math.Abs(want[i])*.01)
 		}
 	}
-	assert.Equal(t, 9, strings.Count(wire, "CHART "))
+	assert.Equal(t, 9, applicationCharts(wire))
 	assert.Contains(t, wire, "requests/s")
 	assert.Contains(t, wire, "incremental")
 	assert.Contains(t, wire, "CLABEL 'zone' 'a'")
@@ -311,8 +196,9 @@ func TestDetachedBatchOwnership(t *testing.T) {
 	f.ingest(t, "x:5|c", "latency:10|ms")
 	f.time = f.time.Add(time.Second)
 	f.cycle.BeginCycle()
-	batch, err := f.c.receiver.cut(f.time)
+	cut, err := f.c.receiver.cut(f.time, 0)
 	require.NoError(t, err)
+	batch := cut.batch
 	// New admission while the old batch is being published uses fresh receiver state.
 	f.ingest(t, "x:20|g", "latency:100|ms")
 	for _, m := range batch {
@@ -392,58 +278,13 @@ func TestMetadataRetentionAndRevival(t *testing.T) {
 	})
 }
 
-func TestProfileAliasPreparation(t *testing.T) {
-	// The shared replace API operates on names/labels only. Profile selection is
-	// deliberately outside this stage; the payload retains its gauge operation.
-	processor, err := relabel.New(
-		[]relabel.Config{
-			{Action: relabel.Replace, TargetLabel: "__name__", Replacement: "shared"},
-			{Action: relabel.Replace, TargetLabel: "measure_field", Replacement: ""},
-		},
-	)
-	require.NoError(t, err)
-	f := newCoreFixture(t, 1, time.Minute)
-	for _, line := range []string{"a:10|g|#measure_field:sender", "b:20|g", "a:+1|g"} {
-		r, err := parseRecord(line)
-		require.NoError(t, err)
-		ls := make([]string, 0, len(r.labels)*2)
-		for _, l := range r.labels {
-			ls = append(ls, l.Key, l.Value)
-		}
-		transformed, drop := processor.Apply(relabel.Record{
-			Name:   r.name,
-			Labels: labels.FromStrings(ls...),
-		})
-		require.False(t, drop.Dropped())
-		r.name = transformed.Name
-		r.labels = nil
-		transformed.Labels.Range(
-			func(l labels.Label) {
-				r.labels = append(r.labels, metrix.Label{
-					Key:   l.Name,
-					Value: l.Value,
-				})
-			},
-		)
-		p, err := prepareRecord(r)
-		require.NoError(t, err)
-		f.c.receiver.mu.Lock()
-		err = f.c.receiver.admit(p, f.time)
-		f.c.receiver.mu.Unlock()
-		require.NoError(t, err)
-	}
-	f.collect(t, false, false)
-	value(t, f.c, "g.value.shared", 21, nil)
-	assert.Len(t, f.c.receiver.entries, 1)
-}
-
 func TestFrameworkOutputLimitDoesNotRejectInput(t *testing.T) {
 	f := newCoreFixture(t, 2, time.Minute)
 	name := strings.Repeat("x", 1500)
 	f.ingest(t, name+":1|g", "short:2|g")
 	wire := f.collect(t, false, false)
 	value(t, f.c, "g.value."+name, 1, nil)
-	assert.Equal(t, 1, strings.Count(wire, "CHART "))
+	assert.Equal(t, 1, applicationCharts(wire))
 	assert.Contains(t, wire, "short")
 	assert.NotContains(t, wire, name)
 }
@@ -451,7 +292,9 @@ func TestFrameworkOutputLimitDoesNotRejectInput(t *testing.T) {
 func TestRecordBoundariesAndMetadata(t *testing.T) {
 	f := newCoreFixture(t, 4, time.Minute)
 	f.ingest(t, "requests:1|c|#route:日本 a.b,nd_unit:requests,nd_title:Accepted requests,nd_family:traffic")
-	for _, line := range []string{"requests:2x|c", "requests:2|g", "requests:2|c|#a:b,a:c", "requests:2|c|#nd_unit:bytes"} {
+	for _, line := range []string{
+		"requests:2x|c", "requests:2|g", "requests:2|c|#a:b,a:c", "requests:2|c|#nd_unit:bytes",
+	} {
 		require.Error(t, f.c.receiver.ingest(line, f.time), line)
 	}
 	f.ingest(t, "requests:2|c|#route:日本 a.b", "requests:4|c|#route:other,nd_unit:requests")
@@ -479,7 +322,8 @@ func TestRecordBoundariesAndMetadata(t *testing.T) {
 
 func TestRetainedStringsOwnStorage(t *testing.T) {
 	f := newCoreFixture(t, 1, time.Minute)
-	line := "members:" + strings.Repeat("member", 5000) + "|s|#pool:main,nd_unit:users,nd_title:Distinct users,nd_family:traffic"
+	tags := "|s|#pool:main,nd_unit:users,nd_title:Distinct users,nd_family:traffic"
+	line := "members:" + strings.Repeat("member", 5000) + tags
 	f.ingest(t, line)
 	start := uintptr(unsafe.Pointer(unsafe.StringData(line)))
 	end := start + uintptr(len(line))
@@ -529,10 +373,7 @@ func TestRetirementUnderChurn(t *testing.T) {
 		f.collect(t, false, false)
 	}
 	assert.Empty(t, f.c.receiver.metadata)
-	retained := 0
-	f.c.store.Read(metrix.ReadRaw(), metrix.ReadFlatten()).
-		ForEachSeries(func(_ string, _ metrix.LabelView, _ metrix.SampleValue) { retained++ })
-	assert.Zero(t, retained)
+	assert.Zero(t, applicationSeries(f.c))
 }
 
 func TestSetEstimate(t *testing.T) {
@@ -557,6 +398,7 @@ func TestSetEstimate(t *testing.T) {
 func TestCollectorLifecycle(t *testing.T) {
 	t.Run("no publication before readiness or after stop", func(t *testing.T) {
 		c := New()
+		c.Listeners = testListeners
 		require.NoError(t, c.Init(context.Background()))
 		require.NoError(t, c.Check(context.Background()))
 		require.ErrorIs(t, c.Collect(context.Background()), rejectUnavailable)
@@ -578,13 +420,6 @@ func TestCollectorLifecycle(t *testing.T) {
 		f.collect(t, false, false)
 		value(t, f.c, "ms.sum.x", 10, nil)
 	})
-	for name, config := range map[string]Config{"zero cap": {MaxSeries: 0}, "negative cap": {MaxSeries: -1}, "negative idle": {MaxSeries: 1, MetricIdleTimeout: -1}} {
-		t.Run(
-			name,
-			func(t *testing.T) { c := New(); c.Config = config; require.Error(t, c.Init(context.Background())) },
-		)
-	}
-
 }
 
 func TestConcurrentIngestionAndCollection(t *testing.T) {
@@ -614,4 +449,24 @@ func TestConcurrentIngestionAndCollection(t *testing.T) {
 			"worker": fmt.Sprint(i),
 		})
 	}
+}
+
+func TestCollectorLifecycleIdempotentCleanup(t *testing.T) {
+	c := New()
+	c.Listeners = []ListenerConfig{{Protocol: protocolTCP, Address: freeAddress(t)}}
+	c.profileDirs = nil
+	// Cleanup is safe before Init, after a failed Init and repeatedly.
+	c.Cleanup(context.Background())
+	bad := New()
+	bad.MaxSeries = 0
+	require.Error(t, bad.Init(context.Background()))
+	bad.Cleanup(context.Background())
+	require.NoError(t, c.Init(context.Background()))
+	c.Cleanup(context.Background())
+	c.Cleanup(context.Background())
+	// A canceled context before acquisition binds nothing and is a normal stop.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.NoError(t, c.Run(ctx, func() { t.Error("ready after cancellation") }))
+	requireFree(t, protocolTCP, c.Listeners[0].Address)
 }

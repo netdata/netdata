@@ -11,79 +11,81 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 )
 
-const defaultChartExpiry = 5
-
-// The package is deliberately unregistered until receiver/profile and operator
-// delivery stages are complete. These resource values remain provisional.
+// New returns a collector with provisional resource defaults. The collector is
+// not registered yet, and no listener is assigned by default.
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			MaxSeries:         1000,
-			MetricIdleTimeout: confopt.Duration(5 * time.Minute),
+			MaxSeries:         defaultMaxSeries,
+			MetricIdleTimeout: confopt.Duration(defaultMetricIdleTimeout),
+			MaxTCPConnections: defaultMaxTCPConnections,
 		},
-		store: metrix.NewCollectorStore(),
-		now:   time.Now,
+		store:       metrix.NewCollectorStore(),
+		now:         time.Now,
+		profileDirs: defaultProfileDirs(),
+		maxRecord:   maxRecordSize,
 	}
-}
-
-type Config struct {
-	UpdateEvery       int              `yaml:"update_every,omitempty" json:"update_every"`
-	MaxSeries         int              `yaml:"max_series"             json:"max_series"`
-	MetricIdleTimeout confopt.Duration `yaml:"metric_idle_timeout"    json:"metric_idle_timeout"`
 }
 
 type Collector struct {
 	collectorapi.Base
-	Config    `yaml:",inline" json:""`
-	store     metrix.CollectorStore
-	receiver  *receiver
+	Config `yaml:",inline" json:""`
+
+	store       metrix.CollectorStore
+	receiver    *receiver
+	diagnostics *diagnostics
+	profiles    []*profile
+
+	// templates is the published native set: diagnostics plus the profiles
+	// activated when it was built. Collect replaces it only when activation grows.
 	templates *chartengine.TemplateSet
-	now       func() time.Time
-	scratch   []percentileBin // Collect-owned, shared across all interval queries.
+	published int // activated profile count captured in templates
+
+	scratch []percentileBin // Collect-owned, shared by all percentile queries
+
+	// Test seams.
+	now         func() time.Time
+	profileDirs []profilecatalog.DirSpec
+	maxRecord   int
 }
 
-var _ collectorapi.CollectorV2 = (*Collector)(nil)
-var _ collectorapi.ChartTemplateSetProvider = (*Collector)(nil)
+var (
+	_ collectorapi.CollectorV2              = (*Collector)(nil)
+	_ collectorapi.CollectorV2Runner        = (*Collector)(nil)
+	_ collectorapi.ChartTemplateSetProvider = (*Collector)(nil)
+)
+
+var errNotInitialized = errors.New("collector is not initialized")
 
 func (c *Collector) Configuration() any { return c.Config }
 
+// Init validates configuration and prepares profiles, templates and receiver
+// state. It never acquires sockets: configuration tests run it while an
+// incumbent job owns the endpoints.
 func (c *Collector) Init(context.Context) error {
-	if c.MaxSeries <= 0 {
-		return errors.New("max_series must be positive")
-	}
-	if c.MetricIdleTimeout < 0 {
-		return errors.New("metric_idle_timeout must be nonnegative")
-	}
-	set, err := chartengine.NewTemplateSet(chartengine.TemplateSetSpec{
-		Policy: chartengine.EnginePolicy{
-			Autogen: &chartengine.AutogenPolicy{
-				Enabled:                  true,
-				ExpireAfterSuccessCycles: defaultChartExpiry,
-			},
-		},
-		FallbackContextNamespace: "statsd",
-	})
-	if err != nil {
+	if err := c.Config.validate(); err != nil {
 		return err
 	}
-	c.templates = set
-	c.receiver = newReceiver(
-		c.MaxSeries,
-		time.Duration(c.MetricIdleTimeout),
-		c.store.(metrix.DescriptorRetention),
-		defaultChartExpiry,
-	)
+	if err := c.initTemplates(); err != nil {
+		return err
+	}
+	c.initReceiver()
 	return nil
 }
 
 func (c *Collector) Check(context.Context) error {
 	if c.receiver == nil {
-		return errors.New("collector is not initialized")
+		return errNotInitialized
 	}
 	return nil
 }
+
+// Run binds every configured listener, then serves until cancellation or
+// permanent listener loss.
+func (c *Collector) Run(ctx context.Context, ready func()) error { return c.run(ctx, ready) }
 
 func (c *Collector) Collect(ctx context.Context) error { return c.collect(ctx) }
 
@@ -93,5 +95,6 @@ func (c *Collector) Cleanup(context.Context) {
 	}
 }
 
-func (c *Collector) MetricStore() metrix.CollectorStore         { return c.store }
+func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
+
 func (c *Collector) ChartTemplateSet() *chartengine.TemplateSet { return c.templates }

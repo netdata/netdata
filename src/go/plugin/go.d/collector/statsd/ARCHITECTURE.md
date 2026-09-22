@@ -1,9 +1,51 @@
-# StatsD measurement core
+# StatsD collector internals
 
-This package is an unregistered V2 collector under development. It currently provides complete-record ingestion,
-aggregation and generic native publication. Network framing, `Run` readiness, profiles and diagnostics are the next
-stage; registration, configuration forms, integration documentation and live Agent validation follow that stage.
-It does not select listener endpoints, default transports or enablement, and does not replace the existing C plugin yet.
+This V2 collector receives StatsD over UDP and TCP, applies explicitly selected native profiles, aggregates
+measurements and publishes generic native charts plus receiver diagnostics. It is not registered yet: configuration
+forms, integration documentation and live Agent validation are not delivered, there is no default listener, transport
+or enablement, and it does not replace the existing C plugin.
+
+## Source layout
+
+| File | Responsibility |
+|---|---|
+| `collector.go` | `New`, the `Collector` type and the collector interface methods |
+| `config.go`, `init.go` | Configuration, defaults and validation; Init helpers |
+| `server.go`, `udp.go`, `tcp.go` | `Run`: listener acquisition, lifecycle and failure handling; UDP and TCP framing |
+| `parser.go`, `prepare.go`, `rejections.go` | Record parsing, final label/metadata preparation, the rejection vocabulary |
+| `profiles.go` | Profile loading, validation, lifetimes and the replace adapter |
+| `receiver.go`, `handoff.go` | Ingest and admission under the receiver lock; the Collect handoff (`cut`/`release`) |
+| `aggregate.go`, `percentile.go` | Numeric updates and interval windows; certified weighted percentiles |
+| `collect.go`, `write_metrics.go` | Collect orchestration; application metric writes |
+| `chart_templates.go`, `charts.yaml`, `diagnostics.go` | Native template set composition; receiver diagnostics template and metrics |
+
+## Runtime and framing
+
+`listeners` lists required endpoints as `{protocol: udp|tcp, address: host:port}` with a numeric port. `Init` and
+`Check` validate configuration and load profiles without binding sockets, so a configuration test can run while an
+incumbent job owns the endpoints. `Run` binds every listener in order; any failure closes the listeners that attempt
+already bound and returns, leaving retries to the framework's configured startup retry. Readiness follows successful
+acquisition, not traffic. Cancellation stops admission, closes listeners and clients and joins every reader before
+`Run` returns.
+
+Socket errors reporting `Temporary()` (descriptor exhaustion, timeouts) back off 100 ms on the same bound socket; the
+Go runtime already retries interrupted calls and aborted connections. Any other listener error while the job is not
+stopping, including an unexpectedly closed socket, is permanent listener loss: admission stops, peers close and `Run`
+returns the error, so the framework revokes output. A reader panic takes the same path instead of crashing the plugin.
+There is no rebind loop or fallback address. A client disconnect or read error ends only that connection.
+
+One framer-owned bound, 64 KiB, limits a record payload excluding its terminator; there is no receive queue.
+
+- UDP: LF or CRLF ends a record and the datagram boundary ends its final record; a bare CR is content. Datagrams are
+  never joined. A datagram longer than the bound can only be a truncated read and is rejected whole before any record
+  is admitted.
+- TCP: every record needs LF or CRLF, including the last; a fragment at EOF is rejected. A record longer than the
+  bound is rejected once and discarded through its newline, then reading resumes. Each connection buffers at most one
+  bound plus its terminator.
+- `max_tcp_connections` caps simultaneous clients across the job's TCP listeners. A new client at capacity is closed
+  and counted as refused; established clients keep their slots however quiet they are. There is no idle-client timer.
+
+Empty lines are not records. Every other record is parsed independently, so malformed neighbors do not affect it.
 
 ## Input and identity
 
@@ -35,6 +77,46 @@ The final label grammar preserves native Agent spelling:
   ASCII spaces or all-underscore text. Other printable punctuation is allowed; there is no separate byte quota.
 
 Accepted retained strings are cloned at admission, so substrings cannot retain complete receive or replacement buffers.
+
+## Profiles
+
+`profiles` lists profile names in precedence order. Files `<name>.yaml` or `<name>.yml` are found through
+`profilecatalog` in the user configuration directories' `statsd.profiles/`; there is no stock catalog and no
+automatic eligibility. `Init` strictly decodes only the selected files, each a single YAML document, so an unrelated
+invalid file does not affect the job. Files are not watched: a changed profile applies when the job restarts.
+
+```yaml
+match: 'myapp.*'          # required; simple patterns over original StatsD names
+relabeling:               # optional; ordered blocks of replace-only rules
+  - match: 'myapp.pool.*.size'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'myapp\.pool\.([^.]+)\.size'
+        target_label: pool
+        replacement: '$1'
+      - target_label: __name__
+        replacement: myapp.pool.size
+template:                 # optional; one native chart template group
+  family: pools
+  metrics: [g.value.myapp.pool.size]
+  charts: [...]
+```
+
+A profile needs `relabeling`, `template` or both. Rules use the shared `pkg/relabel` replace semantics; other actions
+are rejected. `template` is a `charttpl` group whose selectors name final output metrics
+(`<type>.<role>.<encoded-final-name>`); its contexts use the `statsd` namespace and its entry ID is the profile name.
+
+- Preprocessing: the first profile in configured order whose root `match` and some block `match` accept the original
+  name owns the input. Only that pipeline runs; pipelines never chain. It changes the name and labels, never the wire
+  type, value, rate, gauge operation or member. Metadata tags are visible to it, so a rule may set, rename or remove
+  `nd_unit`, `nd_title`, `nd_family` or `measure_field` before final preparation. A rule producing an invalid name
+  rejects the record.
+- `__name__` addresses the metric name in rules. A sender tag with key `__name__` is an ordinary application label:
+  it stays outside the relabel record, invisible to rules, and is restored unchanged.
+- Activation: every profile with a template whose root `match` accepts the original name of a fully admitted record
+  becomes active. Rejected input activates nothing. Membership only grows until restart; silence does not deactivate.
+- Lifetimes: omitted chart and dimension expiry resolve to five successful cycles, authored positive values are kept,
+  and a `lifecycle.dimensions` block without a positive `expire_after_cycles` is rejected.
 
 ## Measurements
 
@@ -101,23 +183,52 @@ handoff; an expired gauge baseline cannot accept deltas. Retained counters/gauge
 start an empty window. An unstarted or stopped receiver cannot publish held values or claim an empty healthy interval.
 There is no extra expiry timer or sender-cadence inference.
 
-Only Collect constructs direct metrix snapshot handles, inside the framework-opened cycle. No permanent Vec or
-handle map survives retirement. The native TemplateSet pointer is stable and generic autogen uses finite expiry of
-five successful cycles. The framework captures that pointer before metric commit and owns output reconciliation.
+Only Collect constructs direct metrix snapshot handles for application metrics, inside the framework-opened cycle.
+No permanent Vec or handle map survives retirement. Generic autogen uses finite expiry of five successful cycles.
+
+The native TemplateSet holds the fixed diagnostics entry plus active profile entries in configured order. The cut
+captures membership atomically with its batch, so input activating a profile after a cut belongs to the next cycle
+together with its measurements. Collect builds a new set only when membership changed and otherwise keeps the same
+pointer; the framework captures it after Collect and before metric commit and owns output reconciliation. A failed
+cycle loses its interval but keeps activation, so the next successful publication creates the profile charts.
 
 Declarations retain receiver/batch references and one staged-cycle marker. A later Collect compares metrix's successful
 commit clock to resolve whether the previous write committed. Receive cannot infer failure from an unchanged clock
 while that cycle is still open. Unreferenced committed metadata retires after
 `H = max(DescriptorRetentionWindow, longest chart/dimension expiry + 1)` successful commits since its last write.
-Existing store expiry/grace remain 10/10, so the generic path has `H=20`. Uncommitted unreferenced declarations retire
-on reconciliation. This bounds retained cohorts by the accepted series cap and downstream lifetime, without a new
-metadata quota. Detached cleanup cannot remove a newly admitted replacement entry.
+The longest expiry covers generic autogen and every prepared profile chart and dimension. Existing store
+expiry/grace remain 10/10, so the generic path has `H=20`; a longer authored profile lifetime extends it.
+Uncommitted unreferenced declarations retire on reconciliation. This bounds retained cohorts by the accepted series
+cap and downstream lifetime, without a new metadata quota. Detached cleanup cannot remove a newly admitted
+replacement entry.
 
-Input work is proportional to record size, canonical label sorting and bounded estimator insertion. Expiry scans
+Input work is proportional to record size, canonical label sorting and bounded estimator insertion, plus matching the
+original name against configured profiles that have rules or are not yet active, and running at most one pipeline.
+Profile work is fixed by trusted configuration and the record bound; there is no separate expansion guard. Expiry scans
 occur at collection and admission when an expired entry, type or capacity needs resolution. Per-name metadata aging
 is linear in retained declarations. Percentile query sorts at most 2,049 representatives and reuses one Collect-owned
 scratch. Native output/retention adds its existing cost. Benchmarks measure the complete path and simultaneous window
 ownership; these are not whole-process RSS or end-to-end storage guarantees.
+
+## Diagnostics
+
+The fixed `_receiver` template entry publishes `statsd.receiver.*` charts from collector-owned metrics. They carry
+no input text, application names, tags or sender addresses; framework job status and duration remain the only
+collection-health charts.
+
+| Metric | Meaning |
+|---|---|
+| `receiver.bytes{transport}` | Cumulative bytes read per configured transport |
+| `receiver.updates` | Cumulative fully admitted records |
+| `receiver.rejections{reason}` | Cumulative rejections: `syntax`, `value`, `rate`, `labels`, `metadata`, `type_conflict`, `gauge_baseline`, `capacity`, `overflow`, `oversize`, `unterminated` |
+| `receiver.series`, `receiver.series_limit` | Retained identities after the cut and `max_series` |
+| `receiver.tcp_connections`, `receiver.tcp_connections_limit` | Open TCP clients and `max_tcp_connections`, TCP jobs only |
+| `receiver.tcp_connections_refused` | Cumulative clients closed at `max_tcp_connections`, TCP jobs only |
+| `receiver.percentiles_withheld{reason}` | Cumulative ms/h windows with observations whose percentiles were gapped: `numeric_domain`, `observation_bound`, `mapping_domain`, `mapping_error`, `span`, `ambiguous_rank` |
+
+Counters are cumulative, so the Agent computes rates. A quiet interval publishes zero rates, not a failure. Rank
+ambiguity is only known at query time and is counted before the window resets. Input arriving while the receiver
+is stopped is not published: a stopped receiver has no output.
 
 ## Native output and accepted limitations
 
@@ -140,4 +251,5 @@ statistics are full-shaped NaN MeasureSet fields, including completely empty win
 - Existing chartengine limits may omit an overlong autogenerated chart for otherwise valid admitted input. There is
   no collector-side full-ID preflight; accepted updates do not imply chart creation or Agent storage.
 
-Running-Agent storage and network behavior are not validated by this package's public framework tests.
+Socket, profile and framework-job tests cover reception through native protocol output. Running-Agent storage is not
+validated by this package's tests.

@@ -5,9 +5,13 @@ package statsd
 import (
 	"fmt"
 	"math"
+	"net"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 // No earlier Go StatsD implementation exists for a before/after baseline.
@@ -70,16 +74,22 @@ func BenchmarkMixedPublication(b *testing.B) {
 	}
 }
 
+// A rejected new identity at capacity scans for idle entries only when idle
+// expiry is enabled: O(max_series) per record then, O(1) when disabled.
 func BenchmarkCapacityPressure(b *testing.B) {
-	f := newCoreFixture(b, 1000, 5*time.Minute)
-	f.ingest(b, mixedRecords(1000)...)
-	f.collect(b, false, false)
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if err := f.c.receiver.ingest("additional:1|c", f.time); err != rejectCapacity {
-			b.Fatal(err)
-		}
+	for name, idle := range map[string]time.Duration{"idle expiry": 5 * time.Minute, "idle disabled": 0} {
+		b.Run(name, func(b *testing.B) {
+			f := newCoreFixture(b, 1000, idle)
+			f.ingest(b, mixedRecords(1000)...)
+			f.collect(b, false, false)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if err := f.c.receiver.ingest("additional:1|c", f.time); err != rejectCapacity {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }
 
@@ -112,10 +122,11 @@ func BenchmarkOwnershipEnvelope(b *testing.B) {
 				runtime.ReadMemStats(&before)
 				feed()
 				f.cycle.BeginCycle()
-				batch, err := f.c.receiver.cut(f.time)
+				cut, err := f.c.receiver.cut(f.time, 0)
 				if err != nil {
 					b.Fatal(err)
 				}
+				batch := cut.batch
 				feed()
 				runtime.GC()
 				runtime.ReadMemStats(&windows)
@@ -132,5 +143,137 @@ func BenchmarkOwnershipEnvelope(b *testing.B) {
 				runtime.KeepAlive(batch)
 			}
 		})
+	}
+}
+
+// Profile preprocessing on the ingest path: owner matching over configured
+// profiles, one replace pipeline and, until activation, root matching.
+func BenchmarkIngestProfiles(b *testing.B) {
+	for name, line := range map[string]string{
+		"replace owner": "svc.a.size:5|g|#region:eu",
+		"second owner":  "svc.other:2|c|@.5|#region:eu",
+		"no owner":      "plain:15|ms|#region:eu",
+	} {
+		b.Run(name, func(b *testing.B) {
+			f := newProfileFixture(b, testProfiles, "pools", "shadow", "app", "meta")
+			f.ingest(b, line)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if err := f.c.receiver.ingest(line, f.time); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+// Complete TCP path: socket read, framing, parsing, admission and aggregation.
+// Allocation counts include the server goroutines; ns/op is per record.
+func BenchmarkTCPReceive(b *testing.B) {
+	f := startRuntime(b, func(c *Collector) { c.MetricIdleTimeout = 0 })
+	lines := mixedRecords(1000)
+	conn := f.dialTCP(b)
+	var payload []byte
+	for _, line := range lines {
+		payload = append(payload, line...)
+		payload = append(payload, '\n')
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	sent := 0
+	for sent < b.N {
+		n := min(len(lines), b.N-sent)
+		chunk := payload
+		if n < len(lines) {
+			chunk = []byte(strings.Join(lines[:n], "\n") + "\n")
+		}
+		if _, err := conn.Write(chunk); err != nil {
+			b.Fatal(err)
+		}
+		sent += n
+	}
+	deadline := time.Now().Add(time.Minute)
+	for f.counts().accepted < uint64(b.N) {
+		if time.Now().After(deadline) {
+			b.Fatalf("accepted %d of %d", f.counts().accepted, b.N)
+		}
+		time.Sleep(50 * time.Microsecond)
+	}
+}
+
+// Normal mixed publication with profile entries active and one replace owner.
+func BenchmarkMixedPublicationProfiles(b *testing.B) {
+	f := newProfileFixture(b, testProfiles, "pools", "shadow", "app", "meta")
+	lines := mixedRecords(1000)
+	for i := range 100 {
+		lines[i] = fmt.Sprintf("svc.p%d.size:%d|g", i, i)
+	}
+	for range 3 {
+		f.ingest(b, lines...)
+		f.collect(b, false, false)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		for _, line := range lines {
+			if err := f.c.receiver.ingest(line, f.time); err != nil {
+				b.Fatal(err)
+			}
+		}
+		f.collect(b, false, false)
+	}
+}
+
+// Run with -benchtime=1x. Retained Go heap of a running receiver: listeners, a
+// full TCP client cap with per-connection framing buffers, active profiles,
+// mixed1000 receiving state and one publication. Not process RSS.
+func BenchmarkRuntimeEnvelope(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		runtime.GC()
+		var before, after runtime.MemStats
+		runtime.ReadMemStats(&before)
+		f := startRuntime(b, func(c *Collector) {
+			c.profileDirs = writeProfiles(b, testProfiles)
+			c.Profiles = []string{"pools", "shadow", "app", "meta"}
+		})
+		lines := mixedRecords(1000)
+		for j := range 100 {
+			lines[j] = fmt.Sprintf("svc.p%d.size:%d|g", j, j)
+		}
+		conns := make([]net.Conn, f.c.MaxTCPConnections)
+		for j := range conns {
+			conns[j] = f.dialTCP(b)
+		}
+		for j, line := range lines {
+			if _, err := fmt.Fprintln(conns[j%len(conns)], line); err != nil {
+				b.Fatal(err)
+			}
+		}
+		deadline := time.Now().Add(time.Minute)
+		for f.counts().accepted < uint64(len(lines)) {
+			if time.Now().After(deadline) {
+				b.Fatalf("accepted %d of %d", f.counts().accepted, len(lines))
+			}
+			time.Sleep(time.Millisecond)
+		}
+		f.collect(b, false, false)
+		for j, line := range lines {
+			if _, err := fmt.Fprintln(conns[j%len(conns)], line); err != nil {
+				b.Fatal(err)
+			}
+		}
+		for f.counts().accepted < uint64(2*len(lines)) {
+			if time.Now().After(deadline) {
+				b.Fatalf("accepted %d of %d", f.counts().accepted, 2*len(lines))
+			}
+			time.Sleep(time.Millisecond)
+		}
+		runtime.GC()
+		runtime.ReadMemStats(&after)
+		b.ReportMetric(float64(after.HeapAlloc-before.HeapAlloc)/1e6, "retained_MB")
+		b.ReportMetric(float64(f.c.diagnostics.tcpConnections.Load()), "tcp_clients")
+		runtime.KeepAlive(f)
+		require.NoError(b, f.stop(b))
 	}
 }

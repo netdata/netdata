@@ -10,7 +10,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
+// presentation is name-wide chart metadata from nd_unit, nd_title and nd_family.
 type presentation struct{ unit, title, family string }
+
+// preparedRecord is a record after final preparation: metadata extracted, labels
+// validated and sorted, and labelKey the canonical label identity.
 type preparedRecord struct {
 	record
 	metadata presentation
