@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
-// These are the engine's file primitives, below the level where an engine is in hand: every caller has one
-// (datafile.c and journalfile.c reach them through ctx->engine), none of them passes it down. So their lines go to
-// the layer with no engine, which is the layer's fallback: netdata's logger, as before. dbengine-config.h's
-// contract names them among what a sink does not receive.
+// The engine's file primitives. They take the engine their caller already holds, so what they report - a file that
+// cannot be opened is the only explanation a failed tier start gives - reaches that engine's log sink; a caller with
+// no engine passes NULL and the lines go to netdata's logger.
 
-int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size)
+int check_file_properties(struct dbengine_engine *engine, uv_file file, uint64_t *file_size, size_t min_size)
 {
     int ret;
     uv_fs_t req;
@@ -19,12 +18,12 @@ int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size)
     fatal_assert(req.result == 0);
     s = req.ptr;
     if (!(s->st_mode & S_IFREG)) {
-        dbengine_log_error(NULL, "Not a regular file.\n");
+        dbengine_log_error(engine, "Not a regular file.\n");
         uv_fs_req_cleanup(&req);
         return UV_EINVAL;
     }
     if (s->st_size < min_size) {
-        dbengine_log_error(NULL, "File length is too short.\n");
+        dbengine_log_error(engine, "File length is too short.\n");
         uv_fs_req_cleanup(&req);
         return UV_EINVAL;
     }
@@ -37,13 +36,14 @@ int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size)
 /**
  * Open file for I/O.
  *
+ * @param engine The engine whose log sink hears about a failure; NULL for netdata's logger.
  * @param path The full path of the file.
  * @param flags Same flags as the open() system call uses.
  * @param file On success sets (*file) to be the uv_file that was opened.
  * @param direct Tries to open a file in direct I/O mode when direct=1, falls back to buffered mode if not possible.
  * @return Returns UV error number that is < 0 on failure. 0 on success.
  */
-int open_file_for_io(char *path, int flags, uv_file *file, int direct)
+int open_file_for_io(struct dbengine_engine *engine, char *path, int flags, uv_file *file, int direct)
 {
     uv_fs_t req;
     int fd = -1, current_flags;
@@ -61,16 +61,17 @@ int open_file_for_io(char *path, int flags, uv_file *file, int direct)
         fd = uv_fs_open(NULL, &req, path, current_flags, S_IRUSR | S_IWUSR, NULL);
         if (fd < 0) {
             if ((direct) && (UV_EINVAL == fd)) {
-                dbengine_log_error(NULL, "File \"%s\" does not support direct I/O, falling back to buffered I/O.", path);
+                dbengine_log_error(engine, "File \"%s\" does not support direct I/O, falling back to buffered I/O.",
+                                   path);
             } else {
-                dbengine_log_error(NULL, "Failed to open file \"%s\".", path);
+                dbengine_log_error(engine, "Failed to open file \"%s\".", path);
                 --direct; /* break the loop */
             }
         } else {
             fatal_assert(req.result >= 0);
             *file = req.result;
 #ifdef __APPLE__
-            dbengine_log_info(NULL, "Disabling OS X caching for file \"%s\".", path);
+            dbengine_log_info(engine, "Disabling OS X caching for file \"%s\".", path);
             fcntl(fd, F_NOCACHE, 1);
 #endif
             --direct; /* break the loop */

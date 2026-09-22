@@ -40,7 +40,8 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 //   a va_list. Format and va_list are valid for the call and not after it; a sink that keeps the message formats
 //   its own copy, and one that reads the arguments twice va_copy()s first. Most formats carry no trailing
 //   newline; the handful the engine writes while tearing its caches down do, because without a sink they are an
-//   fprintf(stderr) and always have been. A sink that adds its own line ending should not assume either way.
+//   fprintf(stderr) and always have been, and so do the two a file check reports ("Not a regular file.", "File
+//   length is too short."). A sink that adds its own line ending should not assume either way.
 // - Called from any thread the engine uses - the caller's own thread inside a public verb, the engine's event
 //   loop, a libuv pool worker, a cache's eviction thread - and two calls may overlap. The sink serialises itself;
 //   the engine takes no lock for it.
@@ -72,8 +73,7 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 //   internal_fatal() end the process through netdata's logger whatever this field holds.
 // - Does not receive every line the engine's work produces, for two separate reasons.
 //
-//   Some lines have no engine to route through, and go to netdata's logger: the process-wide page-data layer,
-//   the engine's file and decompression primitives, which sit below the level where an engine is in hand, the
+//   Some lines have no engine to route through, and go to netdata's logger: the process-wide page-data layer, the
 //   public verbs that reject a NULL storage instance - which is exactly when there is no engine to ask - and a
 //   failed protected read of a mapped journal, which libnetdata's own recovery reports (see the next item).
 //

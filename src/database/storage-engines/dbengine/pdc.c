@@ -1204,7 +1204,7 @@ static bool epdl_populate_pages_from_extent_data(
             eb = extent_buffer_get(uncompressed_payload_length);
             uncompressed_buf = eb->data;
 
-            size_t bytes = dbengine_decompress(uncompressed_buf, data + payload_offset,
+            size_t bytes = dbengine_decompress(ctx->engine, uncompressed_buf, data + payload_offset,
                                                uncompressed_payload_length, payload_length,
                                                header->compression_algorithm);
 

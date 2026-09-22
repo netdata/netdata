@@ -252,7 +252,7 @@ int create_data_file(struct dbengine_datafile *datafile)
     char path[DBENGINE_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
-    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, ctx->engine->cfg.direct_io);
+    fd = open_file_for_io(ctx->engine, path, O_CREAT | O_RDWR | O_TRUNC, &file, ctx->engine->cfg.direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
@@ -336,7 +336,7 @@ static int load_data_file(struct dbengine_datafile *datafile)
     char path[DBENGINE_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
-    fd = open_file_for_io(path, O_RDWR, &file, ctx->engine->cfg.direct_io);
+    fd = open_file_for_io(ctx->engine, path, O_RDWR, &file, ctx->engine->cfg.direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
@@ -344,7 +344,7 @@ static int load_data_file(struct dbengine_datafile *datafile)
     
     dbengine_log(ctx->engine, NDLP_DEBUG, "DBENGINE: initializing data file \"%s\".", path);
 
-    ret = check_file_properties(file, &file_size, sizeof(struct dbengine_df_sb));
+    ret = check_file_properties(ctx->engine, file, &file_size, sizeof(struct dbengine_df_sb));
     if (ret)
         goto err_exit;
     file_size = ALIGN_BYTES_CEILING(file_size);

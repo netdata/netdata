@@ -716,7 +716,7 @@ int journalfile_create(struct dbengine_journalfile *journalfile, struct dbengine
     char path[DBENGINE_PATH_MAX];
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
-    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, ctx->engine->cfg.direct_io);
+    fd = open_file_for_io(ctx->engine, path, O_CREAT | O_RDWR | O_TRUNC, &file, ctx->engine->cfg.direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
@@ -1884,7 +1884,7 @@ int journalfile_load(struct dbengine_tier *ctx, struct dbengine_journalfile *jou
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
 
-    fd = open_file_for_io(path, O_RDWR, &file, ctx->engine->cfg.direct_io);
+    fd = open_file_for_io(ctx->engine, path, O_RDWR, &file, ctx->engine->cfg.direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
 
@@ -1894,7 +1894,7 @@ int journalfile_load(struct dbengine_tier *ctx, struct dbengine_journalfile *jou
         return fd;
     }
 
-    ret = check_file_properties(file, &file_size, sizeof(struct dbengine_df_sb));
+    ret = check_file_properties(ctx->engine, file, &file_size, sizeof(struct dbengine_df_sb));
     if (ret) {
         error = ret;
         goto cleanup;
