@@ -460,6 +460,15 @@ static void rrdhost_set_replication_parameters(RRDHOST *host, RRD_DB_MODE memory
     }
 }
 
+// strncpyz()'s third argument is the destination size MINUS ONE: it copies that many characters and
+// then writes the terminator, so passing the array size lets the terminator land one byte past the
+// end. The guid here is not length-checked before it arrives - the streaming handshake validates it
+// with uuid_parse_flexi(), which accepts a valid UUID followed by arbitrary bytes, and then stores
+// the original string - so a source longer than GUID_LEN is reachable input, not a theoretical one.
+void rrdhost_machine_guid_copy(char *dst, const char *guid) {
+    strncpyz(dst, guid, GUID_LEN);
+}
+
 RRDHOST *rrdhost_create(
         const char *hostname,
         const char *registry_hostname,
@@ -498,7 +507,7 @@ RRDHOST *rrdhost_create(
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
 
-    strncpyz(host->machine_guid, guid, GUID_LEN + 1);
+    rrdhost_machine_guid_copy(host->machine_guid, guid);
     rrdhost_stream_path_init(host);
     rrdhost_stream_parents_init(host);
 
