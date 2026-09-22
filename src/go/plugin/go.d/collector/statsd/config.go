@@ -6,9 +6,23 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"strconv"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+)
+
+// Provisional resource defaults.
+const (
+	defaultMaxSeries         = 1000
+	defaultMetricIdleTimeout = 5 * time.Minute
+	defaultMaxTCPConnections = 64
+)
+
+const (
+	protocolUDP = "udp"
+	protocolTCP = "tcp"
 )
 
 type Config struct {
@@ -25,6 +39,19 @@ type Config struct {
 type ListenerConfig struct {
 	Protocol string `yaml:"protocol" json:"protocol"`
 	Address  string `yaml:"address"  json:"address"`
+}
+
+// validate checks everything except profiles, which Init loads and validates.
+func (c Config) validate() error {
+	switch {
+	case c.MaxSeries <= 0:
+		return errors.New("max_series must be positive")
+	case c.MetricIdleTimeout < 0:
+		return errors.New("metric_idle_timeout must be nonnegative")
+	case c.MaxTCPConnections <= 0:
+		return errors.New("max_tcp_connections must be positive")
+	}
+	return validateListeners(c.Listeners)
 }
 
 func validateListeners(listeners []ListenerConfig) error {
@@ -49,4 +76,8 @@ func validateListeners(listeners []ListenerConfig) error {
 		seen[l] = true
 	}
 	return nil
+}
+
+func (c Config) hasListener(protocol string) bool {
+	return slices.ContainsFunc(c.Listeners, func(l ListenerConfig) bool { return l.Protocol == protocol })
 }

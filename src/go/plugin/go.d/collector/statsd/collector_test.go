@@ -3,9 +3,7 @@
 package statsd
 
 import (
-	"bytes"
 	"context"
-	_ "embed"
 	"fmt"
 	"math"
 	"strings"
@@ -14,170 +12,11 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-//go:embed testdata/config.json
-var configJSON []byte
-
-//go:embed testdata/config.yaml
-var configYAML []byte
-
-func TestConfigurationSerialize(t *testing.T) {
-	c := New()
-	collecttest.TestConfigurationSerialize(t, c, configJSON, configYAML)
-	c.profileDirs = testProfileDirs
-	require.NoError(t, c.Init(context.Background()))
-	assert.Zero(t, c.receiver.idle) // Explicit zero survives New, decode, retrieval and Init.
-}
-
-// testProfileDirs holds the profile named by the serialization fixtures.
-var testProfileDirs = []profilecatalog.DirSpec{{Path: "testdata/profiles"}}
-
-// testListeners is an explicit fixture endpoint. Init validates it; only Run binds.
-var testListeners = []ListenerConfig{{
-	Protocol: protocolUDP,
-	Address:  "127.0.0.1:18125",
-}}
-
-type coreFixture struct {
-	c      *Collector
-	cycle  metrix.CycleController
-	source *collectorapi.ChartTemplateSource
-	engine *chartengine.Engine
-	time   time.Time
-}
-
-func newCoreFixture(t testing.TB, capacity int, idle time.Duration, opts ...metrix.CollectorStoreOption) *coreFixture {
-	t.Helper()
-	c := New()
-	c.Listeners = testListeners
-	c.MaxSeries = capacity
-	c.MetricIdleTimeout = confopt.Duration(idle)
-	if len(opts) > 0 {
-		c.store = metrix.NewCollectorStore(opts...)
-	}
-	f := prepareFixture(t, c)
-	f.time = time.Unix(1000, 0)
-	c.now = func() time.Time { return f.time }
-	// Record-level tests drive the receiver directly. Run activates it after
-	// binding; socket framing and lifecycle are covered by the runtime tests.
-	c.receiver.start()
-	return f
-}
-
-// prepareFixture runs Init/Check and binds the real template capture, metric
-// cycle and native engine used by the framework's publication path.
-func prepareFixture(t testing.TB, c *Collector) *coreFixture {
-	t.Helper()
-	f := &coreFixture{
-		c: c,
-	}
-	require.NoError(t, c.Init(context.Background()))
-	require.NoError(t, c.Check(context.Background()))
-	managed, ok := metrix.AsCycleManagedStore(c.MetricStore())
-	require.True(t, ok)
-	f.cycle = managed.CycleController()
-	var err error
-	f.source, err = collectorapi.NewChartTemplateSource(c)
-	require.NoError(t, err)
-	_, err = f.source.Capture()
-	require.NoError(t, err)
-	f.engine, err = chartengine.New(chartengine.WithRuntimeStore(nil))
-	require.NoError(t, err)
-	t.Cleanup(func() { c.Cleanup(context.Background()) })
-	return f
-}
-
-func (f *coreFixture) ingest(t testing.TB, lines ...string) {
-	t.Helper()
-	for _, line := range lines {
-		require.NoError(t, f.c.receiver.ingest(line, f.time), line)
-	}
-}
-
-func (f *coreFixture) collect(t testing.TB, metricAbort, outputAbort bool) string {
-	t.Helper()
-	f.cycle.BeginCycle()
-	require.NoError(t, f.c.Collect(context.Background()))
-	return f.finish(t, metricAbort, outputAbort)
-}
-
-func (f *coreFixture) finish(t testing.TB, metricAbort, outputAbort bool) string {
-	t.Helper()
-	captured, err := f.source.Capture()
-	require.NoError(t, err)
-	if metricAbort {
-		f.cycle.AbortCycle()
-		return ""
-	}
-	require.NoError(t, f.cycle.CommitCycleSuccess())
-	attempt, err := f.engine.PreparePlanWithOptions(
-		f.c.store.Read(metrix.ReadRaw(), metrix.ReadFlatten()),
-		chartengine.PlanOptions{
-			TemplateSet: captured,
-		},
-	)
-	require.NoError(t, err)
-	var buf bytes.Buffer
-	require.NoError(
-		t,
-		chartemit.ApplyPlan(
-			netdataapi.New(&buf),
-			attempt.Plan(),
-			chartemit.EmitEnv{
-				TypeID:      "statsd.test",
-				UpdateEvery: 1,
-				StoreFirst:  true,
-			},
-		),
-	)
-	if outputAbort {
-		attempt.Abort()
-		return ""
-	}
-	require.NoError(t, attempt.Commit())
-	return buf.String()
-}
-
-// applicationCharts counts CHART definitions outside the fixed receiver diagnostics.
-func applicationCharts(wire string) int {
-	n := 0
-	for line := range strings.Lines(wire) {
-		if strings.HasPrefix(line, "CHART ") && !strings.Contains(line, "'statsd.receiver.") {
-			n++
-		}
-	}
-	return n
-}
-
-// applicationSeries counts retained store series outside the receiver diagnostics.
-func applicationSeries(c *Collector) int {
-	n := 0
-	c.store.Read(metrix.ReadRaw(), metrix.ReadFlatten()).
-		ForEachSeries(func(name string, _ metrix.LabelView, _ metrix.SampleValue) {
-			if !strings.HasPrefix(name, "receiver.") {
-				n++
-			}
-		})
-	return n
-}
-
-func value(t testing.TB, c *Collector, name string, want float64, ls metrix.Labels) {
-	t.Helper()
-	got, ok := c.store.Read().Value(name, ls)
-	require.True(t, ok, name)
-	assert.Equal(t, want, got, name)
-}
 
 func TestMeasurementsAndGenericCharts(t *testing.T) {
 	f := newCoreFixture(t, 20, time.Minute)
@@ -194,7 +33,10 @@ func TestMeasurementsAndGenericCharts(t *testing.T) {
 	value(t, f.c, "ms.sum.latency", 110, nil)
 	value(t, f.c, "h.count.difference", 3, nil)
 	value(t, f.c, "h.sum.difference", 0, nil)
-	for name, want := range map[string][]float64{"ms.values.latency": {10, 100, 55, 10, 100}, "h.values.difference": {-10, 20, 0, -10, 20}} {
+	for name, want := range map[string][]float64{
+		"ms.values.latency":   {10, 100, 55, 10, 100},
+		"h.values.difference": {-10, 20, 0, -10, 20},
+	} {
 		p, ok := f.c.store.Read().MeasureSet(name, nil)
 		require.True(t, ok)
 		require.Len(t, p.Values, 5)
@@ -450,7 +292,9 @@ func TestFrameworkOutputLimitDoesNotRejectInput(t *testing.T) {
 func TestRecordBoundariesAndMetadata(t *testing.T) {
 	f := newCoreFixture(t, 4, time.Minute)
 	f.ingest(t, "requests:1|c|#route:日本 a.b,nd_unit:requests,nd_title:Accepted requests,nd_family:traffic")
-	for _, line := range []string{"requests:2x|c", "requests:2|g", "requests:2|c|#a:b,a:c", "requests:2|c|#nd_unit:bytes"} {
+	for _, line := range []string{
+		"requests:2x|c", "requests:2|g", "requests:2|c|#a:b,a:c", "requests:2|c|#nd_unit:bytes",
+	} {
 		require.Error(t, f.c.receiver.ingest(line, f.time), line)
 	}
 	f.ingest(t, "requests:2|c|#route:日本 a.b", "requests:4|c|#route:other,nd_unit:requests")
@@ -478,7 +322,8 @@ func TestRecordBoundariesAndMetadata(t *testing.T) {
 
 func TestRetainedStringsOwnStorage(t *testing.T) {
 	f := newCoreFixture(t, 1, time.Minute)
-	line := "members:" + strings.Repeat("member", 5000) + "|s|#pool:main,nd_unit:users,nd_title:Distinct users,nd_family:traffic"
+	tags := "|s|#pool:main,nd_unit:users,nd_title:Distinct users,nd_family:traffic"
+	line := "members:" + strings.Repeat("member", 5000) + tags
 	f.ingest(t, line)
 	start := uintptr(unsafe.Pointer(unsafe.StringData(line)))
 	end := start + uintptr(len(line))
@@ -575,13 +420,6 @@ func TestCollectorLifecycle(t *testing.T) {
 		f.collect(t, false, false)
 		value(t, f.c, "ms.sum.x", 10, nil)
 	})
-	for name, config := range map[string]Config{"zero cap": {MaxSeries: 0}, "negative cap": {MaxSeries: -1}, "negative idle": {MaxSeries: 1, MetricIdleTimeout: -1}} {
-		t.Run(
-			name,
-			func(t *testing.T) { c := New(); c.Config = config; require.Error(t, c.Init(context.Background())) },
-		)
-	}
-
 }
 
 func TestConcurrentIngestionAndCollection(t *testing.T) {
@@ -611,4 +449,24 @@ func TestConcurrentIngestionAndCollection(t *testing.T) {
 			"worker": fmt.Sprint(i),
 		})
 	}
+}
+
+func TestCollectorLifecycleIdempotentCleanup(t *testing.T) {
+	c := New()
+	c.Listeners = []ListenerConfig{{Protocol: protocolTCP, Address: freeAddress(t)}}
+	c.profileDirs = nil
+	// Cleanup is safe before Init, after a failed Init and repeatedly.
+	c.Cleanup(context.Background())
+	bad := New()
+	bad.MaxSeries = 0
+	require.Error(t, bad.Init(context.Background()))
+	bad.Cleanup(context.Background())
+	require.NoError(t, c.Init(context.Background()))
+	c.Cleanup(context.Background())
+	c.Cleanup(context.Background())
+	// A canceled context before acquisition binds nothing and is a normal stop.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.NoError(t, c.Run(ctx, func() { t.Error("ready after cancellation") }))
+	requireFree(t, protocolTCP, c.Listeners[0].Address)
 }

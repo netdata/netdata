@@ -12,10 +12,12 @@ import (
 )
 
 // Numeric-domain bounds keep rank certification valid; these are not input quotas.
-const percentileBins = 1024
-const maxObservations = 1 << 26
-const minRate = 0x1p-128
-const maxExactUnits = 1 << 53
+const (
+	percentileBins  = 1024
+	maxObservations = 1 << 26
+	minRate         = 0x1p-128
+	maxExactUnits   = 1 << 53
+)
 
 // Percentile withholding reasons are a fixed diagnostic vocabulary.
 const (
@@ -33,6 +35,7 @@ var withheldReasons = [...]string{
 }
 
 type percentileBin struct{ value, count float64 }
+
 type percentiles struct {
 	mapping            *mapping.LogarithmicMapping
 	positive, negative *store.CollapsingLowestDenseStore
@@ -60,7 +63,9 @@ func newPercentiles(limit int) *percentiles {
 }
 
 func down(v float64) float64 { return math.Nextafter(v, math.Inf(-1)) }
-func up(v float64) float64   { return math.Nextafter(v, math.Inf(1)) }
+
+func up(v float64) float64 { return math.Nextafter(v, math.Inf(1)) }
+
 func (a *percentiles) fail(reason string) {
 	if a.reason == "" {
 		a.reason = reason
@@ -146,7 +151,9 @@ func (a *percentiles) add(value, rate float64) {
 	}
 	target.AddWithCount(index, z)
 }
+
 func finite(x float64) bool { return !math.IsNaN(x) && !math.IsInf(x, 0) }
+
 func (a *percentiles) reset() {
 	a.positive.Clear()
 	a.negative.Clear()
@@ -158,6 +165,7 @@ func (a *percentiles) reset() {
 	a.unitExp = 0
 	a.reason = ""
 }
+
 func (a *percentiles) query(scratch []percentileBin) ([2]float64, []percentileBin) {
 	result := [2]float64{math.NaN(), math.NaN()}
 	scratch = scratch[:0]

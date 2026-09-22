@@ -1,9 +1,23 @@
 # StatsD collector internals
 
-This package is an unregistered V2 collector under development. It provides UDP/TCP reception, framing, selected
-native profiles, aggregation, generic native publication and receiver diagnostics. Registration, configuration forms,
-integration documentation and live Agent validation belong to the delivery stage. There is no default listener,
-transport or enablement, and the package does not replace the existing C plugin yet.
+This V2 collector receives StatsD over UDP and TCP, applies explicitly selected native profiles, aggregates
+measurements and publishes generic native charts plus receiver diagnostics. It is not registered yet: configuration
+forms, integration documentation and live Agent validation are not delivered, there is no default listener, transport
+or enablement, and it does not replace the existing C plugin.
+
+## Source layout
+
+| File | Responsibility |
+|---|---|
+| `collector.go` | `New`, the `Collector` type and the collector interface methods |
+| `config.go`, `init.go` | Configuration, defaults and validation; Init helpers |
+| `server.go`, `udp.go`, `tcp.go` | `Run`: listener acquisition, lifecycle and failure handling; UDP and TCP framing |
+| `parser.go`, `prepare.go`, `rejections.go` | Record parsing, final label/metadata preparation, the rejection vocabulary |
+| `profiles.go` | Profile loading, validation, lifetimes and the replace adapter |
+| `receiver.go`, `handoff.go` | Ingest and admission under the receiver lock; the Collect handoff (`cut`/`release`) |
+| `aggregate.go`, `percentile.go` | Numeric updates and interval windows; certified weighted percentiles |
+| `collect.go`, `write_metrics.go` | Collect orchestration; application metric writes |
+| `chart_templates.go`, `charts.yaml`, `diagnostics.go` | Native template set composition; receiver diagnostics template and metrics |
 
 ## Runtime and framing
 
@@ -183,9 +197,9 @@ commit clock to resolve whether the previous write committed. Receive cannot inf
 while that cycle is still open. Unreferenced committed metadata retires after
 `H = max(DescriptorRetentionWindow, longest chart/dimension expiry + 1)` successful commits since its last write.
 The longest expiry covers generic autogen and every prepared profile chart and dimension. Existing store
-expiry/grace remain 10/10, so the generic path has `H=20`; a longer authored profile lifetime extends it. Uncommitted unreferenced declarations retire
-on reconciliation. This bounds retained cohorts by the accepted series cap and downstream lifetime, without a new
-metadata quota. Detached cleanup cannot remove a newly admitted replacement entry.
+expiry/grace remain 10/10, so the generic path has `H=20`; a longer authored profile lifetime extends it.
+Uncommitted unreferenced declarations retire on reconciliation. This bounds retained cohorts by the accepted series
+cap and downstream lifetime, without a new metadata quota. Detached cleanup cannot remove a newly admitted replacement entry.
 
 Input work is proportional to record size, canonical label sorting and bounded estimator insertion, plus matching the
 original name against configured profiles that have rules or are not yet active, and running at most one pipeline.

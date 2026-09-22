@@ -5,8 +5,6 @@ package statsd
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -16,171 +14,120 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// Profiles used by the receiver tests, in precedence order: pools owns
-// svc.*.size names, shadow owns the remaining svc.* names, app renders from the
-// shared final stream without preprocessing, and meta edits metadata and names.
-var testProfiles = map[string]string{
-	"pools": `
-match: 'svc.*'
-relabeling:
-  - match: 'svc.*.size'
-    metric_relabel_configs:
-      - source_labels: [__name__]
-        regex: 'svc\.([^.]+)\.size'
-        target_label: pool
-        replacement: '$1'
-      - source_labels: [__name__]
-        regex: 'svc\.[^.]+\.size'
-        target_label: __name__
-        replacement: svc.pool.size
-template:
-  family: pools
-  metrics:
-    - g.value.svc.pool.size
-  charts:
-    - title: Pool size
-      context: pools.size
-      units: items
-      instances:
-        by_labels: [pool]
-      dimensions:
-        - selector: g.value.svc.pool.size
-          name: size
-`,
-	"shadow": `
-match: 'svc.*'
-relabeling:
-  - match: '*'
-    metric_relabel_configs:
-      - target_label: shadow
-        replacement: 'yes'
-`,
-	"app": `
-match: 'svc.* app.*'
-template:
-  family: app
-  metrics:
-    - c.total.app.requests
-    - g.value.svc.pool.size
-  charts:
-    - title: Application requests
-      context: app.requests
-      units: requests/s
-      dimensions:
-        - selector: c.total.app.requests
-          name: requests
-    - title: Total pool size
-      context: app.pool_size
-      units: items
-      dimensions:
-        - selector: g.value.svc.pool.size
-          name: size
-`,
-	"meta": `
-match: 'meta.*'
-relabeling:
-  - match: 'meta.*'
-    metric_relabel_configs:
-      - target_label: nd_unit
-        replacement: bytes
-      - target_label: measure_field
-        replacement: ''
-      - source_labels: [__name__]
-        regex: 'meta\.alias\..+'
-        target_label: __name__
-        replacement: meta.alias
-      - source_labels: [__name__]
-        regex: 'meta\.empty'
-        target_label: __name__
-        replacement: ''
-      - source_labels: [__name__]
-        regex: 'meta\.typo'
-        target_label: nd_units
-        replacement: bytes
-`,
-}
-
-func writeProfiles(t testing.TB, files map[string]string) []profilecatalog.DirSpec {
-	t.Helper()
-	dir := t.TempDir()
-	for name, content := range files {
-		require.NoError(t, os.WriteFile(filepath.Join(dir, name+".yaml"), []byte(content), 0o600))
-	}
-	return []profilecatalog.DirSpec{{Path: dir}}
-}
-
-func newProfileFixture(t testing.TB, files map[string]string, names ...string) *coreFixture {
+// initProfiles runs Init with the given profile files and selected names.
+func initProfiles(t *testing.T, files map[string]string, names ...string) error {
 	t.Helper()
 	c := New()
 	c.Listeners = testListeners
 	c.profileDirs = writeProfiles(t, files)
 	c.Profiles = names
-	f := prepareFixture(t, c)
-	f.time = time.Unix(1000, 0)
-	c.now = func() time.Time { return f.time }
-	c.receiver.start()
-	return f
+	return c.Init(context.Background())
 }
 
-func entryIDs(c *Collector) []string {
-	var ids []string
-	for _, e := range c.ChartTemplateSet().Entries() {
-		ids = append(ids, e.ID)
-	}
-	return ids
+// appWithLifecycle adds a lifecycle block to the app profile's requests chart.
+func appWithLifecycle(lifecycle string) string {
+	return strings.Replace(testProfiles["app"], "      units: requests/s\n",
+		"      units: requests/s\n      lifecycle:\n"+strings.TrimPrefix(lifecycle, "\n")+"\n", 1)
 }
 
-func TestProfileConfigurationValidation(t *testing.T) {
-	valid := testProfiles["app"]
+func TestProfileSelectionValidation(t *testing.T) {
+	files := map[string]string{"app": testProfiles["app"], "broken": "{{{", "Bad-Name": testProfiles["app"]}
 	for name, tc := range map[string]struct {
-		files    map[string]string
-		profiles []string
-		wantErr  string
+		names   []string
+		wantErr string
 	}{
-		"unknown":            {map[string]string{"app": valid}, []string{"missing"}, `profile "missing" not found`},
-		"invalid name":       {map[string]string{"app": valid}, []string{"App"}, "must match"},
-		"listed twice":       {map[string]string{"app": valid}, []string{"app", "app"}, "more than once"},
-		"unknown field":      {map[string]string{"p": "match: '*'\napp: x\n" + "relabeling: []\n"}, []string{"p"}, "field app not found"},
-		"blank match":        {map[string]string{"p": "match: ' '\nrelabeling:\n  - match: '*'\n    metric_relabel_configs:\n      - target_label: a\n        replacement: b\n"}, []string{"p"}, "'match' is required"},
-		"missing match":      {map[string]string{"p": "relabeling:\n  - match: '*'\n    metric_relabel_configs:\n      - target_label: a\n        replacement: b\n"}, []string{"p"}, "'match' is required"},
-		"nothing to do":      {map[string]string{"p": "match: '*'\n"}, []string{"p"}, "at least one of"},
-		"drop action":        {map[string]string{"p": "match: '*'\nrelabeling:\n  - match: '*'\n    metric_relabel_configs:\n      - action: drop\n        source_labels: [a]\n        regex: b\n"}, []string{"p"}, "only replace"},
-		"lowercase action":   {map[string]string{"p": "match: '*'\nrelabeling:\n  - match: '*'\n    metric_relabel_configs:\n      - action: lowercase\n        source_labels: [a]\n        target_label: a\n"}, []string{"p"}, "only replace"},
-		"invalid regex":      {map[string]string{"p": "match: '*'\nrelabeling:\n  - match: '*'\n    metric_relabel_configs:\n      - source_labels: [a]\n        regex: '('\n        target_label: b\n"}, []string{"p"}, "error parsing regexp"},
-		"template no charts": {map[string]string{"p": "match: '*'\ntemplate:\n  family: x\n"}, []string{"p"}, "at least one chart"},
-		"disabled dimension expiry": {map[string]string{"p": strings.Replace(valid, "      units: requests/s\n",
-			"      units: requests/s\n      lifecycle:\n        dimensions:\n          max_dims: 3\n", 1)}, []string{"p"}, "must be positive"},
-		"invalid template": {map[string]string{"p": "match: '*'\ntemplate:\n  metrics: [a]\n  charts:\n    - title: A\n      context: a\n      units: x\n      dimensions:\n        - selector: undeclared\n"}, []string{"p"}, "'template'"},
+		"unknown":      {names: []string{"missing"}, wantErr: `profile "missing" not found`},
+		"invalid name": {names: []string{"App"}, wantErr: "must match"},
+		"listed twice": {names: []string{"app", "app"}, wantErr: "more than once"},
+		// Only selected files are decoded, so unrelated invalid files do not matter.
+		"unrelated invalid files": {names: []string{"app"}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			c := New()
-			c.Listeners = testListeners
-			c.profileDirs = writeProfiles(t, tc.files)
-			c.Profiles = tc.profiles
-			err := c.Init(context.Background())
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tc.wantErr)
+			if err := initProfiles(t, files, tc.names...); tc.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tc.wantErr)
+			}
 		})
 	}
-	t.Run("unrelated invalid file does not affect the job", func(t *testing.T) {
-		c := New()
-		c.Listeners = testListeners
-		c.profileDirs = writeProfiles(t, map[string]string{"app": valid, "broken": "{{{", "Bad-Name": valid})
-		c.Profiles = []string{"app"}
-		require.NoError(t, c.Init(context.Background()))
-	})
+}
+
+func TestProfileDocumentValidation(t *testing.T) {
+	const rule = `
+relabeling:
+  - match: '*'
+    metric_relabel_configs:
+      - target_label: a
+        replacement: b
+`
+	for name, tc := range map[string]struct {
+		doc, wantErr string
+	}{
+		"unknown field":      {doc: "match: '*'\napp: x" + rule, wantErr: "field app not found"},
+		"blank match":        {doc: "match: ' '" + rule, wantErr: "'match' is required"},
+		"missing match":      {doc: rule, wantErr: "'match' is required"},
+		"nothing to do":      {doc: "match: '*'", wantErr: "at least one of"},
+		"template no charts": {doc: "match: '*'\ntemplate:\n  family: x", wantErr: "at least one chart"},
+		"drop action": {doc: `
+match: '*'
+relabeling:
+  - match: '*'
+    metric_relabel_configs:
+      - action: drop
+        source_labels: [a]
+        regex: b
+`, wantErr: "only replace"},
+		"lowercase action": {doc: `
+match: '*'
+relabeling:
+  - match: '*'
+    metric_relabel_configs:
+      - action: lowercase
+        source_labels: [a]
+        target_label: a
+`, wantErr: "only replace"},
+		"invalid regex": {doc: `
+match: '*'
+relabeling:
+  - match: '*'
+    metric_relabel_configs:
+      - source_labels: [a]
+        regex: '('
+        target_label: b
+`, wantErr: "error parsing regexp"},
+		"invalid template": {doc: `
+match: '*'
+template:
+  metrics: [a]
+  charts:
+    - title: A
+      context: a
+      units: x
+      dimensions:
+        - selector: undeclared
+`, wantErr: "'template'"},
+		"disabled dimension expiry": {doc: appWithLifecycle(`
+        dimensions:
+          max_dims: 3`), wantErr: "must be positive"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.ErrorContains(t, initProfiles(t, map[string]string{"p": tc.doc}, "p"), tc.wantErr)
+		})
+	}
 }
 
 func TestProfileLifetimes(t *testing.T) {
-	authored := strings.Replace(testProfiles["app"], "      units: requests/s\n",
-		"      units: requests/s\n      lifecycle:\n        expire_after_cycles: 30\n        dimensions:\n          expire_after_cycles: 12\n", 1)
-	inherited := strings.Replace(testProfiles["app"], "      units: requests/s\n",
-		"      units: requests/s\n      lifecycle:\n        dimensions:\n          expire_after_cycles: 7\n", 1)
+	authored := appWithLifecycle(`
+        expire_after_cycles: 30
+        dimensions:
+          expire_after_cycles: 12`)
+	inherited := appWithLifecycle(`
+        dimensions:
+          expire_after_cycles: 7`)
 	for name, tc := range map[string]struct {
 		profile string
 		want    []charttpl.Lifecycle
@@ -228,13 +175,16 @@ func TestProfileLifetimes(t *testing.T) {
 
 func TestProfileReplaceAndIdentity(t *testing.T) {
 	f := newProfileFixture(t, testProfiles, "pools", "shadow", "app", "meta")
-	f.ingest(t,
-		"svc.a.size:10|g", "svc.b.size:20|g", "svc.a.size:+1|g", // Delta keeps its operation after renaming.
-		"svc.other:1|c|@.5",                                           // The second applicable owner runs; rate keeps its meaning.
-		"svc.q.size:3|g|#__name__:sender",                             // A sender __name__ label is invisible to rules and kept.
-		"meta.x:5|g|#measure_field:m,nd_unit:items",                   // Profile metadata overrides; reserved label removed.
-		"meta.alias.a:10|g", "meta.alias.b:20|g", "meta.alias.a:+1|g", // Same-type aliases combine.
-	)
+	// A delta keeps its operation after renaming.
+	f.ingest(t, "svc.a.size:10|g", "svc.b.size:20|g", "svc.a.size:+1|g")
+	// The second applicable owner runs; the rate keeps its meaning.
+	f.ingest(t, "svc.other:1|c|@.5")
+	// A sender __name__ label is invisible to rules and kept.
+	f.ingest(t, "svc.q.size:3|g|#__name__:sender")
+	// Profile metadata overrides the sender's; the reserved label is removed.
+	f.ingest(t, "meta.x:5|g|#measure_field:m,nd_unit:items")
+	// Same-type aliases combine.
+	f.ingest(t, "meta.alias.a:10|g", "meta.alias.b:20|g", "meta.alias.a:+1|g")
 	for line, want := range map[string]rejection{
 		"svc.c.size:1|c": rejectType,     // Type binding follows the final name.
 		"meta.empty:1|g": rejectSyntax,   // Replacement produced an invalid name.

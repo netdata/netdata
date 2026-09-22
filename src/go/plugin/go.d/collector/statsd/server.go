@@ -3,25 +3,22 @@
 package statsd
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"runtime/debug"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
 const (
-	protocolUDP = "udp"
-	protocolTCP = "tcp"
+	// maxRecordSize is the single framer-owned bound on one record payload,
+	// excluding its LF/CRLF terminator. It exceeds the largest UDP payload.
+	maxRecordSize = 64 << 10
 	// listenerErrorBackoff delays the next read or accept on a still-bound
 	// listener after a temporary socket error.
 	listenerErrorBackoff = 100 * time.Millisecond
@@ -49,6 +46,20 @@ type server struct {
 	failOnce sync.Once
 	failed   chan struct{}
 	err      error
+}
+
+func (c *Collector) run(ctx context.Context, ready func()) error {
+	if c.receiver == nil {
+		return errNotInitialized
+	}
+	if ctx.Err() != nil {
+		return nil
+	}
+	s, err := c.listen(ctx)
+	if err != nil {
+		return err
+	}
+	return c.serve(ctx, s, ready)
 }
 
 // listen acquires every configured listener. Any failure closes the listeners
@@ -88,20 +99,36 @@ func (c *Collector) listen(ctx context.Context) (*server, error) {
 	return s, nil
 }
 
+// serve owns an acquired server. Readiness follows successful acquisition, not
+// traffic. On cancellation or listener loss, admission stops before sockets
+// close, so a failed receiver cannot publish held or empty intervals.
+func (c *Collector) serve(ctx context.Context, s *server, ready func()) error {
+	c.receiver.start()
+	s.start()
+	ready()
+	select {
+	case <-ctx.Done():
+	case <-s.failed:
+	}
+	c.receiver.stop()
+	s.close()
+	return s.err
+}
+
 func (s *server) start() {
 	s.wg.Add(len(s.udp) + len(s.tcp))
 	for _, conn := range s.udp {
-		go s.run(func() { s.readUDP(conn) })
+		go s.guard(func() { s.readUDP(conn) })
 	}
 	for _, ln := range s.tcp {
-		go s.run(func() { s.acceptTCP(ln) })
+		go s.guard(func() { s.acceptTCP(ln) })
 	}
 }
 
-// run executes one reader for this job. The framework recovers panics only in
+// guard runs one reader for this job. The framework recovers panics only in
 // Run's goroutine, so a reader panic on untrusted input fails the receiver the
 // same way instead of crashing the plugin process.
-func (s *server) run(read func()) {
+func (s *server) guard(read func()) {
 	defer s.wg.Done()
 	defer func() {
 		if r := recover(); r != nil {
@@ -174,137 +201,10 @@ func (s *server) recoverable(err error, listener string) bool {
 	return false
 }
 
-func (s *server) readUDP(conn net.PacketConn) {
-	listener := "udp listener " + conn.LocalAddr().String()
-	buf := make([]byte, s.maxRecord+1)
-	for {
-		n, _, err := conn.ReadFrom(buf)
-		s.stats.udpBytes.Add(uint64(n))
-		if n > s.maxRecord {
-			// A datagram exceeds the record bound only when the read truncated it.
-			// Reject it whole instead of admitting a prefix; a truncating read may
-			// also report an error, but the socket remains usable.
-			s.receiver.reject(rejectOversize)
-			continue
-		}
-		if n > 0 {
-			s.datagram(buf[:n])
-		}
-		if err != nil && !s.recoverable(err, listener) {
-			return
-		}
-	}
-}
-
-// datagram frames one UDP payload. LF or CRLF ends a record, and the datagram
-// boundary also ends its final record. Datagrams are never joined.
-func (s *server) datagram(payload []byte) {
-	now := s.now()
-	for len(payload) > 0 {
-		line, rest, terminated := bytes.Cut(payload, []byte{'\n'})
-		if terminated {
-			line = bytes.TrimSuffix(line, []byte{'\r'})
-		}
-		s.record(line, now)
-		payload = rest
-	}
-}
-
-func (s *server) record(line []byte, now time.Time) {
-	// Empty lines are not records. Rejections are counted by the receiver.
+// ingest hands one framed record to the receiver, which counts rejections.
+// Empty lines are not records.
+func (s *server) ingest(line []byte, now time.Time) {
 	if len(line) > 0 {
 		_ = s.receiver.ingest(string(line), now)
 	}
-}
-
-func (s *server) acceptTCP(ln net.Listener) {
-	listener := "tcp listener " + ln.Addr().String()
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			if s.recoverable(err, listener) {
-				continue
-			}
-			return
-		}
-		if s.track(conn) {
-			go s.run(func() { s.readTCP(conn) })
-		}
-	}
-}
-
-// track admits a connection within the job-wide cap. Established clients keep
-// their slots however quiet they are; a new client at capacity is refused.
-func (s *server) track(conn net.Conn) bool {
-	s.mu.Lock()
-	closed := s.closed
-	admitted := !closed && len(s.conns) < s.maxConns
-	if admitted {
-		s.conns[conn] = struct{}{}
-		s.stats.tcpConnections.Store(int64(len(s.conns)))
-		s.wg.Add(1)
-	}
-	s.mu.Unlock()
-	if !admitted {
-		_ = conn.Close()
-		if !closed {
-			s.receiver.reject(rejectConnectionLimit)
-		}
-	}
-	return admitted
-}
-
-func (s *server) untrack(conn net.Conn) {
-	s.mu.Lock()
-	delete(s.conns, conn)
-	s.stats.tcpConnections.Store(int64(len(s.conns)))
-	s.mu.Unlock()
-	_ = conn.Close()
-}
-
-// readTCP frames one client stream. Every record needs LF or CRLF, including
-// the last: a fragment at EOF is rejected. A record over the bound is rejected
-// and discarded through its newline, then reading resumes. Read errors and
-// disconnects end only this connection.
-func (s *server) readTCP(conn net.Conn) {
-	defer s.untrack(conn)
-	r := bufio.NewReaderSize(byteCounter{conn, &s.stats.tcpBytes}, s.maxRecord+len("\r\n"))
-	discarding := false
-	for {
-		line, err := r.ReadSlice('\n')
-		switch {
-		case err == nil:
-			if discarding {
-				discarding = false
-				continue
-			}
-			line = bytes.TrimSuffix(line[:len(line)-1], []byte{'\r'})
-			if len(line) > s.maxRecord {
-				s.receiver.reject(rejectOversize)
-				continue
-			}
-			s.record(line, s.now())
-		case errors.Is(err, bufio.ErrBufferFull):
-			if !discarding {
-				discarding = true
-				s.receiver.reject(rejectOversize)
-			}
-		default:
-			if len(line) > 0 && !discarding {
-				s.receiver.reject(rejectUnterminated)
-			}
-			return
-		}
-	}
-}
-
-type byteCounter struct {
-	r     io.Reader
-	total *atomic.Uint64
-}
-
-func (c byteCounter) Read(p []byte) (int, error) {
-	n, err := c.r.Read(p)
-	c.total.Add(uint64(n))
-	return n, err
 }

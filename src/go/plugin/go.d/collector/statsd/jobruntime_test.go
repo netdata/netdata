@@ -70,7 +70,8 @@ func TestJobRuntimeEndToEnd(t *testing.T) {
 	udp, err := net.Dial(protocolUDP, addr)
 	require.NoError(t, err)
 	defer udp.Close()
-	_, err = udp.Write([]byte("requests:2|c|@.5|#zone:a\nlevel:10|g\nlatency:10|ms\ndifference:-5|h\nmembers:a|s\nsvc.a.size:7|g"))
+	datagram := "requests:2|c|@.5|#zone:a\nlevel:10|g\nlatency:10|ms\ndifference:-5|h\nmembers:a|s\nsvc.a.size:7|g"
+	_, err = udp.Write([]byte(datagram))
 	require.NoError(t, err)
 	tcp, err := net.Dial(protocolTCP, addr)
 	require.NoError(t, err)

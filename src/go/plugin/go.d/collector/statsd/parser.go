@@ -12,6 +12,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
+// wireType is the StatsD type token. Parsing returns these canonical constants,
+// so retained state never holds a substring of the receive record.
 type wireType string
 
 const (
@@ -22,36 +24,8 @@ const (
 	set       wireType = "s"
 )
 
-// rejection values are bounded diagnostic reasons, never input text.
-type rejection string
-
-func (r rejection) Error() string { return string(r) }
-
-const (
-	rejectSyntax      rejection = "syntax"
-	rejectValue       rejection = "value"
-	rejectRate        rejection = "rate"
-	rejectLabels      rejection = "labels"
-	rejectMetadata    rejection = "metadata"
-	rejectType        rejection = "type_conflict"
-	rejectBaseline    rejection = "gauge_baseline"
-	rejectCapacity    rejection = "capacity"
-	rejectOverflow    rejection = "overflow"
-	rejectUnavailable rejection = "receiver_unavailable"
-
-	// Framing and connection rejections, counted before record parsing.
-	rejectOversize        rejection = "oversize"
-	rejectUnterminated    rejection = "unterminated"
-	rejectConnectionLimit rejection = "tcp_connection_limit"
-)
-
-// rejectReasons is the published rejection vocabulary. Input refused while the
-// receiver is unavailable is not published: a stopped receiver has no output.
-var rejectReasons = [...]rejection{
-	rejectSyntax, rejectValue, rejectRate, rejectLabels, rejectMetadata, rejectType, rejectBaseline,
-	rejectCapacity, rejectOverflow, rejectOversize, rejectUnterminated, rejectConnectionLimit,
-}
-
+// record is one parsed line. value is the numeric payload of c/g/ms/h, member
+// the set payload; delta marks a signed gauge update.
 type record struct {
 	name        string
 	kind        wireType

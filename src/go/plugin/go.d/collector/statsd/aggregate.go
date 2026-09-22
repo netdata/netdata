@@ -21,6 +21,15 @@ func (w *interval) reset() {
 	}
 }
 
+// cardinality is the distinct-member estimate of a set interval; an interval
+// without accepted members is exactly zero.
+func (w *interval) cardinality() float64 {
+	if w == nil || w.count == 0 {
+		return 0
+	}
+	return float64(w.members.Estimate())
+}
+
 // prospectiveUpdate checks every basic result before admission or mutation.
 func prospectiveUpdate(r record, e *series) (value, count, sum float64, err error) {
 	switch r.kind {

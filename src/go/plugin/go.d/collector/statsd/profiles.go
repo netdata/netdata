@@ -24,8 +24,7 @@ import (
 )
 
 const (
-	profilesDirName  = "statsd.profiles"
-	contextNamespace = "statsd"
+	profilesDirName = "statsd.profiles"
 	// metricNameLabel is the relabel package's virtual label for Record.Name.
 	metricNameLabel = "__name__"
 )
@@ -64,7 +63,7 @@ func defaultProfileDirs() []profilecatalog.DirSpec {
 
 // loadProfiles resolves the configured names in order. Only selected files
 // are decoded, so an unrelated invalid file cannot affect this job.
-func loadProfiles(dirs []profilecatalog.DirSpec, names []string, policy chartengine.EnginePolicy, log *logger.Logger) ([]*profile, error) {
+func loadProfiles(dirs []profilecatalog.DirSpec, names []string, log *logger.Logger) ([]*profile, error) {
 	if len(names) == 0 {
 		return nil, nil
 	}
@@ -95,7 +94,7 @@ func loadProfiles(dirs []profilecatalog.DirSpec, names []string, policy charteng
 		if err != nil {
 			return nil, fmt.Errorf("profile %q: %w", name, err)
 		}
-		p, err := newProfile(name, data, policy)
+		p, err := newProfile(name, data)
 		if err != nil {
 			return nil, fmt.Errorf("profile %q: %w", name, err)
 		}
@@ -104,7 +103,7 @@ func loadProfiles(dirs []profilecatalog.DirSpec, names []string, policy charteng
 	return profiles, nil
 }
 
-func newProfile(name string, data []byte, policy chartengine.EnginePolicy) (*profile, error) {
+func newProfile(name string, data []byte) (*profile, error) {
 	var doc profileDocument
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
@@ -128,7 +127,8 @@ func newProfile(name string, data []byte, policy chartengine.EnginePolicy) (*pro
 	for i, block := range doc.Relabeling {
 		for j, rule := range block.MetricRelabelConfigs {
 			if action := rule.WithDefaults().Action; action != relabel.Replace {
-				return nil, fmt.Errorf("relabeling[%d].metric_relabel_configs[%d]: action %q is not supported; only replace", i, j, action)
+				return nil, fmt.Errorf(
+					"relabeling[%d].metric_relabel_configs[%d]: action %q is not supported; only replace", i, j, action)
 			}
 		}
 	}
@@ -144,9 +144,11 @@ func newProfile(name string, data []byte, policy chartengine.EnginePolicy) (*pro
 			return nil, errors.New("'template' must contain at least one chart")
 		}
 		p.groups = []charttpl.Group{group}
+		// Entry IDs namespace chart templates, so an entry valid alone is valid
+		// with any other active entries.
 		if _, err := chartengine.NewTemplateSet(chartengine.TemplateSetSpec{
 			Entries:                  []chartengine.TemplateEntry{p.entry()},
-			Policy:                   policy,
+			Policy:                   enginePolicy(),
 			FallbackContextNamespace: contextNamespace,
 		}); err != nil {
 			return nil, fmt.Errorf("'template': %w", err)
@@ -196,8 +198,8 @@ func (p *profile) entry() chartengine.TemplateEntry {
 	}
 }
 
-// replaces reports whether this profile owns preprocessing for an original name.
-func (p *profile) replaces(name string) bool {
+// owns reports whether this profile's pipeline preprocesses an original name.
+func (p *profile) owns(name string) bool {
 	return p.pipeline != nil && p.root.MatchString(name) && p.pipeline.Matches(name)
 }
 
@@ -244,15 +246,4 @@ func (p *profile) replace(r record) (record, error) {
 	}
 	r.name, r.labels = out.Name, replaced
 	return r, nil
-}
-
-// profileEntries returns the native entries of active profiles in configured order.
-func profileEntries(profiles []*profile, active []bool) []chartengine.TemplateEntry {
-	var entries []chartengine.TemplateEntry
-	for i, p := range profiles {
-		if p.groups != nil && i < len(active) && active[i] {
-			entries = append(entries, p.entry())
-		}
-	}
-	return entries
 }
