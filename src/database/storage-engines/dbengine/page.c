@@ -285,7 +285,7 @@ int aral_size_sort_compare(const void *a, const void *b) {
     return (size_a > size_b) - (size_a < size_b);
 }
 
-void pgd_init_arals(const struct dbengine_allocator_config *cfg) {
+void pgd_init_arals(struct dbengine_engine *engine, const struct dbengine_allocator_config *cfg) {
     spinlock_lock(&pgd_arals_spinlock);
 
     if(pgd_arals_initialized) {
@@ -294,14 +294,14 @@ void pgd_init_arals(const struct dbengine_allocator_config *cfg) {
         if(cfg->partitions != pgd_arals_config.partitions ||
            cfg->arals_for_large_pages != pgd_arals_config.arals_for_large_pages ||
            cfg->compression_statistics != pgd_arals_config.compression_statistics)
-            nd_log(NDLS_DAEMON, NDLP_NOTICE,
-                   "DBENGINE: the page allocators are already configured (partitions %zu, large pages %s, "
-                   "compression statistics %s); the new settings (partitions %zu, large pages %s, compression "
-                   "statistics %s) are ignored",
-                   pgd_arals_config.partitions, pgd_arals_config.arals_for_large_pages ? "yes" : "no",
-                   pgd_arals_config.compression_statistics ? "yes" : "no",
-                   cfg->partitions, cfg->arals_for_large_pages ? "yes" : "no",
-                   cfg->compression_statistics ? "yes" : "no");
+            dbengine_log(engine, NDLP_NOTICE,
+                         "DBENGINE: the page allocators are already configured (partitions %zu, large pages %s, "
+                         "compression statistics %s); the new settings (partitions %zu, large pages %s, compression "
+                         "statistics %s) are ignored",
+                         pgd_arals_config.partitions, pgd_arals_config.arals_for_large_pages ? "yes" : "no",
+                         pgd_arals_config.compression_statistics ? "yes" : "no",
+                         cfg->partitions, cfg->arals_for_large_pages ? "yes" : "no",
+                         cfg->compression_statistics ? "yes" : "no");
 
         spinlock_unlock(&pgd_arals_spinlock);
         return;
@@ -449,7 +449,7 @@ int dbengine_allocator_unittest(const struct dbengine_config *cfg) {
     if(!first.partitions)
         first.partitions = cfg->cpus ? cfg->cpus : os_get_system_cpus();
 
-    pgd_init_arals(&first);
+    pgd_init_arals(NULL, &first);
 
     size_t partitions = pgd_alloc_globals.partitions;
     size_t count = aral_sizes_count;
@@ -461,7 +461,7 @@ int dbengine_allocator_unittest(const struct dbengine_config *cfg) {
     second.arals_for_large_pages = !first.arals_for_large_pages;
     second.compression_statistics = !first.compression_statistics;
 
-    pgd_init_arals(&second);
+    pgd_init_arals(NULL, &second);
 
     if(pgd_alloc_globals.partitions != partitions || aral_sizes_count != count || arals != table ||
        pgd_alloc_globals.aral_pgd[0] != pgd0 ||

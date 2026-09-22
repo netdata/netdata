@@ -2537,7 +2537,7 @@ static void timer_per_sec_cb(uv_timer_t *handle)
 }
 
 static void dbengine_initialize_structures(struct dbengine_engine *engine) {
-    pgd_init_arals(&engine->cfg.allocator);
+    pgd_init_arals(engine, &engine->cfg.allocator);
     pgc_and_mrg_initialize(engine);
 
     pdc_init();
