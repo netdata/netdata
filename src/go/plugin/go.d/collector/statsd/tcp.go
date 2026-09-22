@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"strings"
 	"sync/atomic"
 )
 
@@ -72,12 +73,7 @@ func (s *server) readTCP(conn net.Conn) {
 				discarding = false
 				continue
 			}
-			line = bytes.TrimSuffix(line[:len(line)-1], []byte{'\r'})
-			if len(line) > s.maxRecord {
-				s.receiver.reject(rejectOversize)
-				continue
-			}
-			s.ingest(string(line), s.now())
+			s.records(r, line)
 		case errors.Is(err, bufio.ErrBufferFull):
 			if !discarding {
 				discarding = true
@@ -89,6 +85,30 @@ func (s *server) readTCP(conn net.Conn) {
 			}
 			return
 		}
+	}
+}
+
+// records ingests the complete record just read and every further complete
+// record already buffered, copied once so records are substrings of a string the
+// connection buffer does not own. Every record here has its LF terminator.
+func (s *server) records(r *bufio.Reader, line []byte) {
+	var b strings.Builder
+	more, _ := r.Peek(r.Buffered())
+	n := bytes.LastIndexByte(more, '\n') + 1
+	b.Grow(len(line) + n)
+	b.Write(line)
+	b.Write(more[:n])
+	_, _ = r.Discard(n)
+	now := s.now()
+	for text := b.String(); text != ""; {
+		record, rest, _ := strings.Cut(text, "\n")
+		record = strings.TrimSuffix(record, "\r")
+		if len(record) > s.maxRecord {
+			s.receiver.reject(rejectOversize)
+		} else {
+			s.ingest(record, now)
+		}
+		text = rest
 	}
 }
 
