@@ -54,8 +54,9 @@
 //!
 //! Engine contracts mirrored from the siblings: sources process in
 //! `SourceId` order; a failed source is a
-//! [`SourceFailure`](PartialReason::SourceFailure) (the rest still
-//! count); cancellation is polled up front and between sources
+//! [`SourceFailure`](PartialReason::SourceFailure) and an unavailable
+//! one a [`RemoteUnavailable`](PartialReason::RemoteUnavailable) (the
+//! rest still count); cancellation is polled up front and between sources
 //! (all-or-empty); an OWN visited budget terminates with the
 //! deterministic prefix and
 //! [`OverviewCeiling`](PartialReason::OverviewCeiling). The budget

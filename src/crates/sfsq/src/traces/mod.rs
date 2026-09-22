@@ -12,9 +12,11 @@
 //!
 //! - **No silent degradation.** A source that fails to map or decode is
 //!   reported through the query-level [`QueryStatus`] (a
-//!   [`SourceFailure`](PartialReason::SourceFailure) reason), never
-//!   silently skipped: a trace is an exact object, and "some spans were
-//!   quietly missing" is corruption from the consumer's point of view.
+//!   [`SourceFailure`](PartialReason::SourceFailure) reason), and one
+//!   whose bytes could not be obtained at all ([`TraceSource::Unavailable`])
+//!   as [`RemoteUnavailable`](PartialReason::RemoteUnavailable); neither
+//!   is silently skipped: a trace is an exact object, and "some spans
+//!   were quietly missing" is corruption from the consumer's point of view.
 //! - **Validated source identity.** Every source carries a
 //!   caller-supplied opaque [`SourceId`]; WAL-derived sources also carry
 //!   [`WalCoverage`]. Duplicates and overlapping WAL ranges are rejected
@@ -58,8 +60,8 @@ pub use search::{
     SearchSources, TraceSummary, search,
 };
 pub use sources::{
-    SourceId, SourceSetError, TraceSfstCandidate, TraceSource, TraceWalTail, WalCoverage,
-    validate_sources,
+    SourceId, SourceSetError, TraceSfstCandidate, TraceSource, TraceUnavailable, TraceWalTail,
+    WalCoverage, validate_sources,
 };
 pub use status::{PartialReason, QueryStatus, StatusBuilder};
 pub use attributes::{

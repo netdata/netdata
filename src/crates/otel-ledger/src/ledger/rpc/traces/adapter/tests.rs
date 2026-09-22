@@ -495,6 +495,27 @@ fn partial_full_page_ends_the_walk_with_the_status_saying_why() {
 }
 
 #[test]
+fn remote_unavailable_full_page_ends_the_walk() {
+    // A source that could not be downloaded may hold better-ranked
+    // traces: the page is not a stable prefix, so no cursor, and the
+    // status names the reason.
+    let mut b = sfsq::traces::StatusBuilder::new();
+    b.add(sfsq::traces::PartialReason::RemoteUnavailable);
+    let data = SearchData {
+        traces: vec![summary(1, 300), summary(2, 200)],
+        status: b.finish(),
+        field_kinds: FieldKinds::default(),
+    };
+    let r = to_search_result(data, 2, None, WIN, WIN_COVERAGE);
+    assert_eq!(r.items.returned, 2, "the page itself is full");
+    assert!(r.anchor.is_none());
+    assert_eq!(
+        serde_json::to_value(&r.status).unwrap(),
+        json!({"partial": ["remote_unavailable"]})
+    );
+}
+
+#[test]
 fn work_ceiling_partial_reaches_the_wire() {
     let mut b = sfsq::traces::StatusBuilder::new();
     b.add(sfsq::traces::PartialReason::WorkCeiling);

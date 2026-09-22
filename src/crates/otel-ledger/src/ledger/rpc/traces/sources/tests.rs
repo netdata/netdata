@@ -39,10 +39,7 @@ fn wal_id(seq: u64) -> String {
 fn source_ids(sources: &[TraceSource]) -> Vec<String> {
     sources
         .iter()
-        .map(|s| match s {
-            TraceSource::Sfst(c) => c.source_id.as_str().to_string(),
-            TraceSource::Tail(t) => t.source_id.as_str().to_string(),
-        })
+        .map(|s| s.source_id().as_str().to_string())
         .collect()
 }
 
@@ -308,6 +305,7 @@ async fn source_ids_do_not_depend_on_the_directory() {
                 .filter_map(|s| match s {
                     TraceSource::Sfst(c) => c.coverage.as_ref().map(|c| Arc::clone(&c.wal_id)),
                     TraceSource::Tail(t) => Some(Arc::clone(&t.coverage.wal_id)),
+                    TraceSource::Unavailable(_) => None,
                 })
                 .collect()
         })

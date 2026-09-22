@@ -658,7 +658,8 @@
                   "cancelled",
                   "overview_ceiling",
                   "rollup_absent",
-                  "slowest_ceiling"
+                  "slowest_ceiling",
+                  "remote_unavailable"
                 ]
               }
             }

@@ -19,7 +19,9 @@ use opentelemetry_proto::tonic::resource::v1::Resource;
 use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Status};
 
 use sfsq::Source;
-use sfsq::traces::{SourceId, TraceSfstCandidate, TraceSource, TraceWalTail, WalCoverage};
+use sfsq::traces::{
+    SourceId, TraceSfstCandidate, TraceSource, TraceUnavailable, TraceWalTail, WalCoverage,
+};
 
 pub const TRACE: [u8; 16] = [0xABu8; 16];
 
@@ -309,6 +311,36 @@ pub fn tail_source(wal_path: &Path, id: &str) -> TraceSource {
             wal_id: wal_path.display().to_string().into(),
             range,
         },
+    })
+}
+
+/// A source whose bytes could not be obtained (a failed remote
+/// download), known to span `[min_s, max_s]` from its catalog summary.
+pub fn unavailable_source(id: &str, min_s: u32, max_s: u32) -> TraceSource {
+    TraceSource::Unavailable(TraceUnavailable {
+        source_id: SourceId::new(id.to_string()),
+        summary: sfst::Summary {
+            min_timestamp_s: min_s,
+            max_timestamp_s: max_s,
+            record_count: 1,
+            content_meta: Vec::new(),
+        },
+    })
+}
+
+/// A sealed source whose file is gone (a local file deleted before it
+/// was opened): its bytes fail to map.
+pub fn missing_source(dir: &Path, id: &str, min_s: u32, max_s: u32) -> TraceSource {
+    TraceSource::Sfst(TraceSfstCandidate {
+        source_id: SourceId::new(id.to_string()),
+        summary: sfst::Summary {
+            min_timestamp_s: min_s,
+            max_timestamp_s: max_s,
+            record_count: 1,
+            content_meta: Vec::new(),
+        },
+        source: Source::File(dir.join(format!("{id}-missing.sfst"))),
+        coverage: None,
     })
 }
 

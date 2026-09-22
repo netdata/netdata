@@ -306,7 +306,8 @@ pub struct TraceSummary {
     pub matched_spans: Vec<sfst::TraceSpan>,
     /// `false` when this trace's assembly was capped or degraded (span
     /// cap hit, a source failed during its merge, or a completion source
-    /// failed to open at all) — its summary numbers may undercount.
+    /// failed to open or was unavailable) — its summary numbers may
+    /// undercount.
     pub exact: bool,
 }
 
@@ -538,8 +539,9 @@ pub fn search(
     let window_ids: HashSet<&SourceId> =
         sources.window.iter().map(TraceSource::source_id).collect();
 
-    // Any completion source that fails to open degrades EVERY assembly
-    // (spans that may live there are missing), so no summary is exact.
+    // Any completion source that fails to open or is unavailable
+    // degrades EVERY assembly (spans that may live there are missing),
+    // so no summary is exact.
     let mut degraded_assembly = false;
     let mut mapped_sfsts: Vec<(crate::source::Mapped, &TraceSource)> = Vec::new();
     let mut tails: Vec<(SourceId, TraceWalScan)> = Vec::new();
@@ -564,6 +566,13 @@ pub fn search(
                     degraded_assembly = true;
                 }
             },
+            // The completion set is not pruned by summary, so an
+            // unavailable source — window role or slack — may hold
+            // spans of any candidate.
+            TraceSource::Unavailable(_) => {
+                status.add(PartialReason::RemoteUnavailable);
+                degraded_assembly = true;
+            }
         }
         progress.fetch_add(1, Ordering::Relaxed);
     }
@@ -725,11 +734,12 @@ pub fn search(
     // ── The trace-level pre-assembly gate (see the gate module) ──────
     // Engaged only when a prunable trace-level condition exists, the
     // candidate set is not pinned (a `trace:id =` lookup must always
-    // assemble), and no completion source failed during setup (every
-    // assembly is already degraded then — trace-level evaluation
-    // excludes all candidates as indeterminate, so there is nothing
-    // left to prune toward). Tail provenance is collected EAGERLY here
-    // — ids only, before `merged` takes its `&mut` tail borrows.
+    // assemble), and no completion source failed or was unavailable
+    // during setup (every assembly is already degraded then —
+    // trace-level evaluation excludes all candidates as indeterminate,
+    // so there is nothing left to prune toward). Tail provenance is
+    // collected EAGERLY here — ids only, before `merged` takes its
+    // `&mut` tail borrows.
     let mut gate = match &trace_level_eval {
         Some(tl)
             if query.gate_enabled

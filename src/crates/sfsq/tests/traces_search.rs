@@ -17,14 +17,16 @@
 
 mod common;
 
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio_util::sync::CancellationToken;
 
 use common::{
-    SpanSpec, kv_str, memory_source, req_with, sealed_source, sp, tail_source, write_wal,
+    SpanSpec, kv_str, memory_source, missing_source, req_with, sealed_source, sp, tail_source,
+    unavailable_source, write_wal,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use sfsq::traces::{
@@ -1510,4 +1512,115 @@ fn tail_only_search_matches_the_sealed_answer() {
         ]
     });
     assert_eq!(norm(&run(tails, q())), norm(&run(sealed, q())));
+}
+
+/// An unavailable completion source reports its own reason beside a
+/// missing file's; the reachable data still answers but no summary is
+/// exact (the missing bytes may hold spans of any candidate). Alone, it
+/// is never Complete and never a source failure.
+#[test]
+fn unavailable_sources_are_reported_and_degrade_every_summary() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal_early = write_wal(dir.path(), early_requests(), "early");
+    let progress = Arc::new(AtomicUsize::new(0));
+    let data = search(
+        both_roles(|| {
+            vec![
+                sealed_source(dir.path(), &wal_early, "early"),
+                missing_source(dir.path(), "missing", 1_000, 1_100),
+                unavailable_source("remote", 1_000, 1_100),
+            ]
+        }),
+        SearchQuery::new(Predicate::all()),
+        CancellationToken::new(),
+        Arc::clone(&progress),
+    )
+    .unwrap();
+    assert_eq!(ids(&data), vec![hex(6), hex(4), hex(2), hex(1), hex(3)]);
+    assert!(data.traces.iter().all(|t| !t.exact));
+    assert_eq!(
+        data.status,
+        QueryStatus::Partial(BTreeSet::from([
+            PartialReason::SourceFailure,
+            PartialReason::RemoteUnavailable,
+        ]))
+    );
+    assert_eq!(progress.load(Ordering::Relaxed), 3, "one tick per completion source");
+
+    let only = run(
+        both_roles(|| vec![unavailable_source("remote", 1_000, 1_100)]),
+        SearchQuery::new(Predicate::all()),
+    );
+    assert!(only.traces.is_empty());
+    assert_eq!(
+        only.status,
+        QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]))
+    );
+}
+
+/// An unavailable source outside the match window but inside the
+/// completion slack still matters: it may hold out-of-window spans of a
+/// matched trace, so the reason is reported and no summary is exact.
+#[test]
+fn an_unavailable_source_in_the_completion_slack_makes_every_summary_inexact() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal_early = write_wal(dir.path(), early_requests(), "early");
+    let data = run(
+        SearchSources {
+            window: vec![sealed_source(dir.path(), &wal_early, "early")],
+            completion: vec![
+                sealed_source(dir.path(), &wal_early, "early"),
+                unavailable_source("remote-slack", 5_000, 6_000),
+            ],
+        },
+        SearchQuery::new(Predicate::all())
+            .window(TimeWindow::new((800 * NS) as i64, (1_400 * NS) as i64).unwrap()),
+    );
+    assert!(!data.traces.is_empty());
+    assert!(data.traces.iter().all(|t| !t.exact));
+    assert_eq!(
+        data.status,
+        QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]))
+    );
+}
+
+/// Trace-level conditions need an exact assembly; with an unavailable
+/// source in the snapshot every candidate is indeterminate and excluded
+/// (never guessed), and the reason says why the list is empty.
+#[test]
+fn an_unavailable_source_makes_trace_level_candidates_indeterminate() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc")];
+    let reqs = vec![req_with(svc, None, &[
+        span_in(9, 0x91, 0, 100 * NS, "root-9"),
+        span_in(8, 0x81, 0, 400 * NS, "root-8"),
+    ])];
+    let wal = write_wal(dir.path(), reqs, "tristate");
+    let root_name = || {
+        SearchQuery::new(pred(vec![builtin(
+            BuiltinField::RootName,
+            CompareOp::Regex,
+            vec![text("root-.*")],
+        )]))
+    };
+    let whole = run(
+        both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]),
+        root_name(),
+    );
+    assert_eq!(ids(&whole), vec![hex(8), hex(9)]);
+
+    let degraded = run(
+        both_roles(|| {
+            vec![
+                sealed_source(dir.path(), &wal, "one"),
+                unavailable_source("remote", 0, 1_000),
+            ]
+        }),
+        root_name(),
+    );
+    assert!(degraded.traces.is_empty());
+    assert_eq!(
+        degraded.status,
+        QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]))
+    );
 }

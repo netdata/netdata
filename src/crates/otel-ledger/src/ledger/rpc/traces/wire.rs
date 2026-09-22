@@ -1188,6 +1188,7 @@ pub enum PartialReasonWire {
     OverviewCeiling,
     RollupAbsent,
     SlowestCeiling,
+    RemoteUnavailable,
 }
 
 impl From<PartialReason> for PartialReasonWire {
@@ -1200,6 +1201,7 @@ impl From<PartialReason> for PartialReasonWire {
             PartialReason::OverviewCeiling => PartialReasonWire::OverviewCeiling,
             PartialReason::RollupAbsent => PartialReasonWire::RollupAbsent,
             PartialReason::SlowestCeiling => PartialReasonWire::SlowestCeiling,
+            PartialReason::RemoteUnavailable => PartialReasonWire::RemoteUnavailable,
         }
     }
 }
