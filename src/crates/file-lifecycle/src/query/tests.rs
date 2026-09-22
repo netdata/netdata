@@ -133,10 +133,7 @@ fn remote_only_returns_catalog_only_entries() {
     track_remote(&mut reg, 1, 100, 200);
     track_remote(&mut reg, 2, 300, 400);
 
-    assert_eq!(
-        seqs(&remote_only(&reg, &full_range_query())),
-        vec![1, 2]
-    );
+    assert_eq!(seqs(&remote_only(&reg, &full_range_query())), vec![1, 2]);
 }
 
 #[test]
@@ -349,7 +346,9 @@ fn track_catalog(
     for e in entries {
         catalog.add(e);
     }
-    let path = reg.catalog_files.file_path(date, ident(), max_seq, min_s, max_s);
+    let path = reg
+        .catalog_files
+        .file_path(date, ident(), max_seq, min_s, max_s);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(&path, catalog.to_container_bytes().unwrap()).unwrap();
     let size = ByteSize(std::fs::metadata(&path).unwrap().len());
@@ -423,10 +422,14 @@ fn local_copies_mask_their_own_identity_only() {
 #[test]
 fn the_union_holds_each_file_once() {
     let mut reg = make_registry();
-    track_catalog(&mut reg, 2, vec![
-        remote_entry(ident(), 1, 100, 200, 1),
-        remote_entry(ident(), 2, 300, 400, 1),
-    ]);
+    track_catalog(
+        &mut reg,
+        2,
+        vec![
+            remote_entry(ident(), 1, 100, 200, 1),
+            remote_entry(ident(), 2, 300, 400, 1),
+        ],
+    );
 
     let plan = plan(&reg, &[window(0, 350), window(150, 500)], None).unwrap();
 
@@ -438,10 +441,14 @@ fn the_union_holds_each_file_once() {
 fn a_seq_cataloged_twice_is_planned_once_per_range() {
     let mut reg = make_registry();
     track_catalog(&mut reg, 1, vec![remote_entry(ident(), 1, 100, 200, 1)]);
-    track_catalog(&mut reg, 2, vec![
-        remote_entry(ident(), 1, 100, 200, 1),
-        remote_entry(ident(), 2, 150, 250, 1),
-    ]);
+    track_catalog(
+        &mut reg,
+        2,
+        vec![
+            remote_entry(ident(), 1, 100, 200, 1),
+            remote_entry(ident(), 2, 150, 250, 1),
+        ],
+    );
 
     let plan = plan(&reg, &[window(0, 300), window(0, 180)], None).unwrap();
 
@@ -453,7 +460,11 @@ fn a_seq_cataloged_twice_is_planned_once_per_range() {
 fn planning_stops_the_moment_the_union_exceeds_the_capacity() {
     let mut reg = make_registry();
     for seq in 1..=3 {
-        track_catalog(&mut reg, seq, vec![remote_entry(ident(), seq, 100, 200, 10)]);
+        track_catalog(
+            &mut reg,
+            seq,
+            vec![remote_entry(ident(), seq, 100, 200, 10)],
+        );
     }
     let all = [full_range_query()];
 
@@ -535,7 +546,10 @@ fn an_unknown_tenant_plans_nothing() {
     );
 
     let plan = registries
-        .remote_plan_input(&TenantId::from("nobody"), &[full_range_query(), window(0, 10)])
+        .remote_plan_input(
+            &TenantId::from("nobody"),
+            &[full_range_query(), window(0, 10)],
+        )
         .plan_within(0)
         .unwrap();
 

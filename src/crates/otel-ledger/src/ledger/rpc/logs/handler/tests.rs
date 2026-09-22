@@ -1200,7 +1200,11 @@ async fn a_stream_filter_narrows_the_fetch_not_the_selector() {
     let v = serde_json::to_value(&h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
 
     assert_eq!(v["items"]["matched"], 0, "{v:#}");
-    assert_eq!(cache.file_count(), 0, "the filtered-out file is not downloaded");
+    assert_eq!(
+        cache.file_count(),
+        0,
+        "the filtered-out file is not downloaded"
+    );
     assert!(
         stream_options(&v).iter().any(|o| o["name"] == "ns/svc"),
         "the remote-only stream stays in the selector: {v:#}"
@@ -1265,13 +1269,24 @@ async fn catalogs_are_read_off_the_registry_lock() {
     use std::io::Write;
     let mut tr = make_tenant_registries();
     let id = FileId::new(
-        Identity::new(MachineId::new(Uuid::from_u128(0x11)).unwrap(), InstanceId::new(Uuid::from_u128(0x22)).unwrap()),
+        Identity::new(
+            MachineId::new(Uuid::from_u128(0x11)).unwrap(),
+            InstanceId::new(Uuid::from_u128(0x22)).unwrap(),
+        ),
         0,
         1,
         ServiceStream::new("ns", "svc").ns_hash(),
     );
     let min_s = 1_700_000_000u32;
-    let catalog = track_remote_catalog(&mut tr, "default", id, "missing/object.sfst", min_s, min_s + 5, 10);
+    let catalog = track_remote_catalog(
+        &mut tr,
+        "default",
+        id,
+        "missing/object.sfst",
+        min_s,
+        min_s + 5,
+        10,
+    );
     let catalog_bytes = std::fs::read(&catalog).unwrap();
     std::fs::remove_file(&catalog).unwrap();
     crate::test_helpers::mkfifo(&catalog);

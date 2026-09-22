@@ -485,7 +485,10 @@ fn every_partial_reason_wire_name_is_pinned() {
 fn every_partial_reason_is_in_the_published_schema() {
     // The published Functions schema closes the reason list; a wire name
     // missing there makes a valid response fail schema validation.
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../plugins.d/FUNCTION_UI_SCHEMA.json");
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../plugins.d/FUNCTION_UI_SCHEMA.json"
+    );
     let schema: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     let published: Vec<&str> = schema["definitions"]["traces_status"]["oneOf"]
@@ -499,7 +502,10 @@ fn every_partial_reason_is_in_the_published_schema() {
     for reason in every_partial_reason() {
         let wire = serde_json::to_value(PartialReasonWire::from(reason)).unwrap();
         let name = wire.as_str().unwrap();
-        assert!(published.contains(&name), "{name} is not in {path}: {published:?}");
+        assert!(
+            published.contains(&name),
+            "{name} is not in {path}: {published:?}"
+        );
     }
 }
 

@@ -134,9 +134,7 @@ impl<S: Storage> RemoteRead<S> {
                         (&self.storage, &storage_failed, &progress);
                     async move {
                         let result = match object {
-                            Some((key, size)) => {
-                                download(storage, key, size, storage_failed).await
-                            }
+                            Some((key, size)) => download(storage, key, size, storage_failed).await,
                             None => Err(anyhow::anyhow!("no remote key for cache entry")),
                         };
                         progress.fetch_add(1, Ordering::Relaxed);
@@ -375,7 +373,10 @@ fn remove_old_cache(old: &Path) {
         return;
     }
     match std::fs::remove_dir(old) {
-        Ok(()) => tracing::info!("remote-read cache migration: removed the old cache {}", old.display()),
+        Ok(()) => tracing::info!(
+            "remote-read cache migration: removed the old cache {}",
+            old.display()
+        ),
         Err(e) => tracing::warn!(
             "remote-read cache migration: cannot remove {}: {e}",
             old.display()

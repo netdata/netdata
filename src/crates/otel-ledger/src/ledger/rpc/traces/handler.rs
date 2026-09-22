@@ -47,13 +47,13 @@ use super::adapter::{
     to_slowest_result, to_trace_result, validate_trace_bounds,
 };
 use super::sources::{Capture, CaptureError, TracesSourceSupplier};
-use file_lifecycle::remote_read::RemoteRead;
 use super::wire::{
     AttributeValuesParams, AttributesParams, CoverageWire, FunctionsParams,
     FunctionsTracesResponse, InfoResponse, OVERVIEW_SCOPE_SELECTION, OVERVIEW_SCOPE_WINDOW,
     OtelTracesRequest, OtelTracesResponse, OverviewParams, SearchParams, SearchResult,
     SlowestParams, TraceParams, TracesMode,
 };
+use file_lifecycle::remote_read::RemoteRead;
 
 /// Shorthand for the handler-level error every failure path maps to.
 fn handler_err(message: String) -> netdata_plugin_error::NetdataPluginError {
@@ -129,7 +129,8 @@ impl OtelTracesHandler {
     /// included (so the lookup fails as too large once that history
     /// exceeds the download cache) — a trace is an exact object whose spans
     /// straddle files (WAL rotation is content-agnostic), and only the
-    /// caller knows how much slack its anchor deserves. Present bounds prune the capture file-granularly
+    /// caller knows how much slack its anchor deserves. Present bounds
+    /// prune the capture file-granularly
     /// (a file overlapping the bounds is probed whole). Either way the
     /// response DECLARES the range used (`coverage`) — spans beyond it
     /// are unknown, never silently dropped: the declaration is the

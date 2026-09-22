@@ -116,7 +116,9 @@ impl PluginConfig {
     /// `{base_dir}/logs/remote-read`; migrated to
     /// [`read_cache_dir`](Self::read_cache_dir) at startup.
     pub fn legacy_read_cache_dir(&self) -> PathBuf {
-        self.base_dir.join(Signal::Logs.segment()).join("remote-read")
+        self.base_dir
+            .join(Signal::Logs.segment())
+            .join("remote-read")
     }
 
     /// Canonical location of the signal-neutral seq high-water file. Lives under

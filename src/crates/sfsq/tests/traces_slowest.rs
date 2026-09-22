@@ -16,9 +16,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio_util::sync::CancellationToken;
 
-use common::{
-    missing_source, req, sp, sealed_source, tail_source, unavailable_source, write_wal,
-};
+use common::{missing_source, req, sealed_source, sp, tail_source, unavailable_source, write_wal};
 use sfsq::traces::{
     PartialReason, QueryStatus, SLOWEST_LIMIT_MAX, SlowestData, SlowestQuery,
     SlowestRequestError, TimeWindow, TraceSource, slowest,
@@ -436,7 +434,10 @@ fn unavailable_sources_are_reported_while_the_rest_rank() {
     );
     assert_eq!(progress.load(Ordering::Relaxed), 3, "one tick per source");
 
-    let only = run(vec![unavailable_source("remote", 0, 20)], SlowestQuery::new(window()));
+    let only = run(
+        vec![unavailable_source("remote", 0, 20)],
+        SlowestQuery::new(window()),
+    );
     assert!(only.traces.is_empty());
     assert_eq!(
         only.status,

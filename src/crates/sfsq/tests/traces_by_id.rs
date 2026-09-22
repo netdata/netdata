@@ -16,13 +16,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio_util::sync::CancellationToken;
 
 use common::{
-    SpanSpec, TRACE, kv_double, kv_int, kv_str, memory_source, missing_source, req,
-    sealed_source, sp, tail_source, unavailable_source, write_wal,
+    SpanSpec, TRACE, kv_double, kv_int, kv_str, memory_source, missing_source, req, sealed_source,
+    sp, tail_source, unavailable_source, write_wal,
 };
 use sfsq::Source;
 use sfsq::traces::{
-    PartialReason, QueryStatus, SourceId, TraceQuery, TraceSfstCandidate, TraceSource,
-    WalCoverage, trace_by_id,
+    PartialReason, QueryStatus, SourceId, TraceQuery, TraceSfstCandidate, TraceSource, WalCoverage,
+    trace_by_id,
 };
 
 fn run(sources: Vec<TraceSource>) -> sfsq::traces::TraceData {

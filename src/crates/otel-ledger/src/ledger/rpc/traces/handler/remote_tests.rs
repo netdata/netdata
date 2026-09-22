@@ -48,7 +48,10 @@ fn handler(registries: Arc<RwLock<TenantRegistries>>, remote: &TestRemote) -> Ot
     )
 }
 
-async fn call(h: &OtelTracesHandler, body: serde_json::Value) -> netdata_plugin_error::Result<serde_json::Value> {
+async fn call(
+    h: &OtelTracesHandler,
+    body: serde_json::Value,
+) -> netdata_plugin_error::Result<serde_json::Value> {
     call_with(h, body, &ProgressState::new()).await
 }
 
@@ -152,8 +155,17 @@ async fn a_failed_download_is_reported_and_leaves_search_inexact() {
     let v = call(&h, search_body(2)).await.unwrap();
     assert_eq!(v["status"], partial);
     assert_eq!(traces_of(&v), ["0b", "0a"]);
-    assert!(v["traces"].as_array().unwrap().iter().all(|t| t["exact"] == false));
-    assert!(v.get("anchor").is_none(), "a partial page has no next cursor");
+    assert!(
+        v["traces"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|t| t["exact"] == false)
+    );
+    assert!(
+        v.get("anchor").is_none(),
+        "a partial page has no next cursor"
+    );
 
     // The Functions view: the page and its aggregate both say so.
     let v = call(&h, functions_body(2)).await.unwrap();
@@ -184,7 +196,9 @@ async fn a_query_too_large_for_the_download_cache_is_a_hard_error() {
         let err = call(&h, body.clone()).await.unwrap_err().to_string();
         assert!(
             err.contains("more than 100 B of remote trace data")
-                && err.contains("narrow the time range or raise `remote_storage.read_cache_max_size`"),
+                && err.contains(
+                    "narrow the time range or raise `remote_storage.read_cache_max_size`"
+                ),
             "{body}: {err}"
         );
     }
@@ -223,7 +237,10 @@ async fn a_cache_that_cannot_evict_is_a_hard_error() {
     // Bounded lookups: each plans only its own file.
     let first = json!({"trace": {"id": trace_id(0x0A), "after": T_S + 5, "before": T_S + 25}});
     let second = json!({"trace": {"id": trace_id(0x0C), "after": T_S + 28, "before": T_S + 45}});
-    assert_eq!(call(&h, first).await.unwrap()["status"], json!({"complete": true}));
+    assert_eq!(
+        call(&h, first).await.unwrap()["status"],
+        json!({"complete": true})
+    );
 
     // The cached first file becomes a directory the cache cannot unlink,
     // for root too (unlike a permission change).
@@ -231,7 +248,10 @@ async fn a_cache_that_cannot_evict_is_a_hard_error() {
     std::fs::remove_file(&cached).unwrap();
     std::fs::create_dir(&cached).unwrap();
     let err = call(&h, second).await.unwrap_err().to_string();
-    assert!(err.contains("download cache directory is unwritable"), "{err}");
+    assert!(
+        err.contains("download cache directory is unwritable"),
+        "{err}"
+    );
 }
 
 #[tokio::test]
@@ -349,7 +369,11 @@ async fn every_aggregate_mode_reports_a_failed_download() {
 
     for body in aggregate_bodies() {
         let v = call(&h, body.clone()).await.unwrap();
-        assert_eq!(v["status"], json!({"partial": ["remote_unavailable"]}), "{body}");
+        assert_eq!(
+            v["status"],
+            json!({"partial": ["remote_unavailable"]}),
+            "{body}"
+        );
     }
     // What the downloaded file holds is still served.
     let v = call(&h, aggregate_bodies()[1].clone()).await.unwrap();
@@ -399,7 +423,10 @@ async fn an_unreadable_catalog_in_the_completion_slack_spares_the_aggregate() {
     let h = handler(registries, &remote);
 
     let v = call(&h, functions_body(20)).await.unwrap();
-    assert_eq!(v["data"]["status"], json!({"partial": ["remote_unavailable"]}));
+    assert_eq!(
+        v["data"]["status"],
+        json!({"partial": ["remote_unavailable"]})
+    );
     assert_eq!(v["data"]["overview"]["status"], json!({"complete": true}));
     assert_eq!(v["data"]["overview"]["totals"]["traces"], 4);
 }

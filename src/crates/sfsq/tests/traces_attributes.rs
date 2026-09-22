@@ -707,14 +707,22 @@ fn unavailable_sources_are_reported_and_the_rest_served() {
     assert_eq!(progress.load(Ordering::Relaxed), 3, "one tick per source");
 
     let progress = Arc::new(AtomicUsize::new(0));
-    let vals = attribute_values(mixed(), k(), CancellationToken::new(), Arc::clone(&progress))
-        .unwrap();
+    let vals = attribute_values(
+        mixed(),
+        k(),
+        CancellationToken::new(),
+        Arc::clone(&progress),
+    )
+    .unwrap();
     assert_eq!(value_strings(&vals), ["v"]);
     assert_eq!(vals.status, both);
     assert_eq!(progress.load(Ordering::Relaxed), 3, "one tick per source");
 
     let alone = || vec![unavailable_source("remote", 0, 10)];
-    assert_eq!(names(alone(), AttributeNamesQuery::new()).status, only_remote);
+    assert_eq!(
+        names(alone(), AttributeNamesQuery::new()).status,
+        only_remote
+    );
     let vals = values(alone(), k());
     assert!(vals.values.is_empty());
     assert_eq!(vals.status, only_remote);
@@ -733,7 +741,10 @@ fn window_prunes_unavailable_sources_by_their_summary() {
     let only_remote = QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]));
 
     assert_eq!(values(remote(), k().window(inside)).status, only_remote);
-    assert_eq!(values(remote(), k().window(outside)).status, QueryStatus::Complete);
+    assert_eq!(
+        values(remote(), k().window(outside)).status,
+        QueryStatus::Complete
+    );
     assert_eq!(
         names(remote(), AttributeNamesQuery::new().window(inside)).status,
         only_remote

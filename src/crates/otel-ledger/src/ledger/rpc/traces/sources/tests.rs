@@ -1,8 +1,8 @@
 use super::*;
-use bridge::function::ProgressState;
 use crate::ledger::rpc::traces::fixtures::{
     TestRemote, install_sfst, install_wal, make_registries, otlp_req, test_file_id,
 };
+use bridge::function::ProgressState;
 
 // These tests cover `capture` end to end at the registry boundary —
 // registry state in, engine sources out. The sealed-file tests need no
@@ -49,7 +49,13 @@ fn source_ids(sources: &[TraceSource]) -> Vec<String> {
 async fn empty_registries_yield_empty_copies() {
     let supplier = make_supplier();
     let sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 2, &CancellationToken::new(), &ProgressState::new())
+        .capture(
+            &TenantId::from("default"),
+            0..u32::MAX,
+            2,
+            &CancellationToken::new(),
+            &ProgressState::new(),
+        )
         .await
         .unwrap()
         .sets;
@@ -63,7 +69,13 @@ async fn sealed_file_maps_to_an_identity_named_file_source() {
     let path = install_sfst(&supplier.registries, "default", 1, 1000, 1005).await;
 
     let mut sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+        .capture(
+            &TenantId::from("default"),
+            0..u32::MAX,
+            1,
+            &CancellationToken::new(),
+            &ProgressState::new(),
+        )
         .await
         .unwrap()
         .sets;
@@ -95,7 +107,13 @@ async fn copies_are_structurally_identical() {
     install_sfst(&supplier.registries, "default", 2, 2000, 2005).await;
 
     let sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 2, &CancellationToken::new(), &ProgressState::new())
+        .capture(
+            &TenantId::from("default"),
+            0..u32::MAX,
+            2,
+            &CancellationToken::new(),
+            &ProgressState::new(),
+        )
         .await
         .unwrap()
         .sets;
@@ -111,7 +129,13 @@ async fn window_pruning_is_file_granular() {
     install_sfst(&supplier.registries, "default", 2, 5000, 5005).await;
 
     let mut sets = supplier
-        .capture(&TenantId::from("default"), 900..2000, 1, &CancellationToken::new(), &ProgressState::new())
+        .capture(
+            &TenantId::from("default"),
+            900..2000,
+            1,
+            &CancellationToken::new(),
+            &ProgressState::new(),
+        )
         .await
         .unwrap()
         .sets;
@@ -143,7 +167,13 @@ async fn wal_resolves_to_chunks_and_a_tail() {
     .await;
 
     let mut sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+        .capture(
+            &TenantId::from("default"),
+            0..u32::MAX,
+            1,
+            &CancellationToken::new(),
+            &ProgressState::new(),
+        )
         .await
         .unwrap()
         .sets;
@@ -186,7 +216,13 @@ async fn wal_below_min_entries_is_all_tail() {
     .await;
 
     let mut sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+        .capture(
+            &TenantId::from("default"),
+            0..u32::MAX,
+            1,
+            &CancellationToken::new(),
+            &ProgressState::new(),
+        )
         .await
         .unwrap()
         .sets;
@@ -225,7 +261,13 @@ async fn corrupt_wal_is_refused_whole_but_sealed_files_still_serve() {
     }
 
     let mut sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+        .capture(
+            &TenantId::from("default"),
+            0..u32::MAX,
+            1,
+            &CancellationToken::new(),
+            &ProgressState::new(),
+        )
         .await
         .unwrap()
         .sets;
@@ -249,7 +291,13 @@ async fn cancelled_capture_with_a_wal_returns_empty_and_caches_nothing() {
     let cancel = CancellationToken::new();
     cancel.cancel();
     let sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &cancel, &ProgressState::new())
+        .capture(
+            &TenantId::from("default"),
+            0..u32::MAX,
+            1,
+            &cancel,
+            &ProgressState::new(),
+        )
         .await
         .unwrap()
         .sets;
@@ -265,7 +313,13 @@ async fn cancelled_capture_returns_empty() {
     let cancel = CancellationToken::new();
     cancel.cancel();
     let sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 2, &cancel, &ProgressState::new())
+        .capture(
+            &TenantId::from("default"),
+            0..u32::MAX,
+            2,
+            &cancel,
+            &ProgressState::new(),
+        )
         .await
         .unwrap()
         .sets;
@@ -278,7 +332,13 @@ async fn capture_is_tenant_scoped() {
     install_sfst(&supplier.registries, "tenant-a", 1, 1000, 1005).await;
 
     let mut sets = supplier
-        .capture(&TenantId::from("tenant-b"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+        .capture(
+            &TenantId::from("tenant-b"),
+            0..u32::MAX,
+            1,
+            &CancellationToken::new(),
+            &ProgressState::new(),
+        )
         .await
         .unwrap()
         .sets;
@@ -311,7 +371,13 @@ async fn source_ids_do_not_depend_on_the_directory() {
         )
         .await;
         let mut sets = supplier
-            .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+            .capture(
+                &TenantId::from("default"),
+                0..u32::MAX,
+                1,
+                &CancellationToken::new(),
+                &ProgressState::new(),
+            )
             .await
             .unwrap()
             .sets;
@@ -349,7 +415,13 @@ async fn chunk_ids_order_numerically() {
     install_wal(&supplier.registries, "default", 1, reqs).await;
 
     let mut sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+        .capture(
+            &TenantId::from("default"),
+            0..u32::MAX,
+            1,
+            &CancellationToken::new(),
+            &ProgressState::new(),
+        )
         .await
         .unwrap()
         .sets;
@@ -420,21 +492,37 @@ async fn too_large_fails_before_any_download_or_chunk_build() {
         &registries,
         "default",
         9,
-        vec![otlp_req(0x11, 3, 1_000_000_000), otlp_req(0x22, 3, 2_000_000_000)],
+        vec![
+            otlp_req(0x11, 3, 1_000_000_000),
+            otlp_req(0x22, 3, 2_000_000_000),
+        ],
     )
     .await;
     let supplier = remote_supplier(registries, &remote);
     let progress = ProgressState::new();
 
     let err = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &progress)
+        .capture(
+            &TenantId::from("default"),
+            0..u32::MAX,
+            1,
+            &CancellationToken::new(),
+            &progress,
+        )
         .await
         .err()
         .expect("too large");
 
-    assert!(matches!(err, CaptureError::TooLarge { capacity: 100, .. }), "{err:?}");
+    assert!(
+        matches!(err, CaptureError::TooLarge { capacity: 100, .. }),
+        "{err:?}"
+    );
     assert_eq!(remote.cache.file_count(), 0, "nothing downloaded");
-    assert_eq!(progress.load(), (0, 0), "no total set: the capture stopped at planning");
+    assert_eq!(
+        progress.load(),
+        (0, 0),
+        "no total set: the capture stopped at planning"
+    );
     let probe = supplier
         .chunk_cache
         .get_or_build(test_file_id(9).seq, 0, async {
@@ -462,7 +550,13 @@ async fn a_cancelled_capture_downloads_nothing() {
     cancel.cancel();
 
     let capture = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &cancel, &ProgressState::new())
+        .capture(
+            &TenantId::from("default"),
+            0..u32::MAX,
+            1,
+            &cancel,
+            &ProgressState::new(),
+        )
         .await
         .unwrap();
 
@@ -492,13 +586,21 @@ async fn remote_sources_are_named_like_local_sealed_files() {
     let supplier = remote_supplier(registries, &remote);
 
     let mut capture = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new(), &ProgressState::new())
+        .capture(
+            &TenantId::from("default"),
+            0..u32::MAX,
+            1,
+            &CancellationToken::new(),
+            &ProgressState::new(),
+        )
         .await
         .unwrap();
     let sources = capture.sets.pop().unwrap();
 
     assert_eq!(source_ids(&sources), [sfst_id(1), sfst_id(2)]);
-    assert!(matches!(&sources[0], TraceSource::Sfst(c) if matches!(&c.source, sfsq::Source::File(p) if p.starts_with(&remote.cache_dir))));
+    assert!(
+        matches!(&sources[0], TraceSource::Sfst(c) if matches!(&c.source, sfsq::Source::File(p) if p.starts_with(&remote.cache_dir)))
+    );
     assert!(matches!(&sources[1], TraceSource::Unavailable(_)));
     assert_eq!(capture.pins.len(), 1);
 }

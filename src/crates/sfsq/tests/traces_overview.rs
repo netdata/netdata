@@ -1040,7 +1040,6 @@ fn filtered_grid_agrees_with_search_on_a_canonical_corpus() {
     }
 }
 
-
 /// An unavailable source reports its own reason beside a missing file's
 /// while the healthy source still counts; alone, it is never Complete
 /// and never a source failure.
@@ -1060,7 +1059,11 @@ fn unavailable_sources_are_reported_while_the_rest_count() {
         Arc::clone(&progress),
     )
     .unwrap();
-    assert_eq!(data.cells, expected_cells(), "the healthy source still counts");
+    assert_eq!(
+        data.cells,
+        expected_cells(),
+        "the healthy source still counts"
+    );
     assert_eq!(data.total_traces, 3);
     assert_eq!(
         data.status,
@@ -1071,7 +1074,10 @@ fn unavailable_sources_are_reported_while_the_rest_count() {
     );
     assert_eq!(progress.load(Ordering::Relaxed), 3, "one tick per source");
 
-    let only = run(vec![unavailable_source("remote", 0, 10)], OverviewQuery::new(grid()));
+    let only = run(
+        vec![unavailable_source("remote", 0, 10)],
+        OverviewQuery::new(grid()),
+    );
     assert_eq!(only.total_traces, 0);
     assert_eq!(
         only.status,

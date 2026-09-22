@@ -1545,7 +1545,11 @@ fn unavailable_sources_are_reported_and_degrade_every_summary() {
             PartialReason::RemoteUnavailable,
         ]))
     );
-    assert_eq!(progress.load(Ordering::Relaxed), 3, "one tick per completion source");
+    assert_eq!(
+        progress.load(Ordering::Relaxed),
+        3,
+        "one tick per completion source"
+    );
 
     let only = run(
         both_roles(|| vec![unavailable_source("remote", 1_000, 1_100)]),
@@ -1591,10 +1595,14 @@ fn an_unavailable_source_in_the_completion_slack_makes_every_summary_inexact() {
 fn an_unavailable_source_makes_trace_level_candidates_indeterminate() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "svc")];
-    let reqs = vec![req_with(svc, None, &[
-        span_in(9, 0x91, 0, 100 * NS, "root-9"),
-        span_in(8, 0x81, 0, 400 * NS, "root-8"),
-    ])];
+    let reqs = vec![req_with(
+        svc,
+        None,
+        &[
+            span_in(9, 0x91, 0, 100 * NS, "root-9"),
+            span_in(8, 0x81, 0, 400 * NS, "root-8"),
+        ],
+    )];
     let wal = write_wal(dir.path(), reqs, "tristate");
     let root_name = || {
         SearchQuery::new(pred(vec![builtin(

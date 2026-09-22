@@ -73,7 +73,11 @@ fn download_deadline_scales_with_size_and_is_capped() {
         (10 * 1024 * MIB, 300),
     ];
     for (size, secs) in cases {
-        assert_eq!(download_deadline(size), Duration::from_secs(secs), "size {size}");
+        assert_eq!(
+            download_deadline(size),
+            Duration::from_secs(secs),
+            "size {size}"
+        );
     }
 }
 
@@ -96,7 +100,10 @@ async fn downloads_become_sealed_files_with_catalog_summaries() {
             content_meta: b"meta".to_vec(),
         }
     );
-    assert_eq!(first.path.file_name().unwrap().to_str().unwrap(), filename(1));
+    assert_eq!(
+        first.path.file_name().unwrap().to_str().unwrap(),
+        filename(1)
+    );
     assert_eq!(std::fs::read(&first.path).unwrap(), vec![1u8; 10]);
 }
 
@@ -134,12 +141,15 @@ async fn a_storage_error_fails_the_rest_of_the_call() {
         .insert("key-1".to_string(), MockReadError::Other);
     let reads = Arc::clone(&storage.read_calls);
     let remote = remote(storage, MIB);
-    let (fetched, progress) =
-        fetch(&remote, vec![entry(1, 10), entry(2, 10), entry(3, 10)]).await;
+    let (fetched, progress) = fetch(&remote, vec![entry(1, 10), entry(2, 10), entry(3, 10)]).await;
 
     assert!(fetched.files.is_empty());
     assert_eq!(failed_seqs(&fetched), [1, 2, 3]);
-    assert_eq!(reads.load(Ordering::Relaxed), 1, "the rest are skipped unread");
+    assert_eq!(
+        reads.load(Ordering::Relaxed),
+        1,
+        "the rest are skipped unread"
+    );
     assert_eq!(progress, 3, "failures and skips tick too");
 }
 
@@ -181,8 +191,16 @@ async fn a_timed_out_download_fails_the_rest_of_the_call() {
 
     assert!(fetched.files.is_empty());
     assert_eq!(failed_seqs(&fetched), [1, 2]);
-    assert_eq!(started.elapsed(), Duration::from_secs(31), "the 10-byte deadline");
-    assert_eq!(reads.load(Ordering::Relaxed), 1, "the rest are skipped unread");
+    assert_eq!(
+        started.elapsed(),
+        Duration::from_secs(31),
+        "the 10-byte deadline"
+    );
+    assert_eq!(
+        reads.load(Ordering::Relaxed),
+        1,
+        "the rest are skipped unread"
+    );
     assert_eq!(progress, 2);
 }
 
@@ -360,7 +378,11 @@ fn files_the_cache_did_not_write_are_kept() {
     let l = layout();
     dir_with(
         &l.old,
-        &[(&filename(1), b"old"), ("notes.txt", b"operator"), ("y.tmp", b"torn")],
+        &[
+            (&filename(1), b"old"),
+            ("notes.txt", b"operator"),
+            ("y.tmp", b"torn"),
+        ],
     );
     std::fs::create_dir(l.old.join("sub")).unwrap();
     dir_with(&l.new, &[]);
@@ -403,7 +425,11 @@ fn any_other_old_link_is_removed_alone() {
     migrate_read_cache(&l.old, &l.new);
 
     assert!(!exists(&l.old));
-    assert_eq!(names_in(target.path()), [filename(1)], "the target is untouched");
+    assert_eq!(
+        names_in(target.path()),
+        [filename(1)],
+        "the target is untouched"
+    );
     assert_eq!(names_in(&l.new), [filename(2)]);
 
     // Dangling.

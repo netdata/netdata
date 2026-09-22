@@ -812,7 +812,9 @@ mod tests {
 
     /// Paths `files_overlapping` yields for `q`.
     fn overlapping(reg: &Registry, q: &Query) -> Vec<PathBuf> {
-        reg.files_overlapping(q).map(|(path, _)| path.clone()).collect()
+        reg.files_overlapping(q)
+            .map(|(path, _)| path.clone())
+            .collect()
     }
 
     #[test]
@@ -835,7 +837,10 @@ mod tests {
             time_range: 0..1000,
             partition_keys: vec![opaque_part_key("prod", "api")],
         };
-        assert_eq!(seqs(read_entries(&path, &api_only).unwrap().unwrap()), vec![1, 2]);
+        assert_eq!(
+            seqs(read_entries(&path, &api_only).unwrap().unwrap()),
+            vec![1, 2]
+        );
     }
 
     #[test]
@@ -845,7 +850,10 @@ mod tests {
         let early = write_catalog_file(&mut reg, 10, vec![entry_at(1, 100, 200, "ns", "a")]);
         let late = write_catalog_file(&mut reg, 20, vec![entry_at(2, 300, 400, "ns", "a")]);
 
-        assert_eq!(overlapping(&reg, &window(0, 1000)), vec![early.clone(), late]);
+        assert_eq!(
+            overlapping(&reg, &window(0, 1000)),
+            vec![early.clone(), late]
+        );
         assert_eq!(overlapping(&reg, &window(0, 250)), vec![early]);
         assert!(overlapping(&reg, &window(500, 600)).is_empty());
         let empty = Registry::new(tmp.path(), TenantId::from(TENANT));

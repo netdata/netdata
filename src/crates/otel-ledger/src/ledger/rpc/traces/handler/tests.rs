@@ -11,7 +11,12 @@ use tokio_util::sync::CancellationToken;
 fn make_handler_over(registries: Arc<RwLock<TenantRegistries>>) -> OtelTracesHandler {
     // Small min_entries so the WAL fixtures split into chunks + tail —
     // the end-to-end tests then cross the chunk-build path for real.
-    OtelTracesHandler::new(registries, Arc::new(ChunkCache::new(64 * 1024 * 1024)), 4, None)
+    OtelTracesHandler::new(
+        registries,
+        Arc::new(ChunkCache::new(64 * 1024 * 1024)),
+        4,
+        None,
+    )
 }
 
 fn make_handler() -> OtelTracesHandler {
@@ -146,12 +151,22 @@ async fn a_sealed_traces_fixture_serves_as_a_local_sealed_file() {
     // spans' seconds and counts them, and the file answers a lookup alone.
     let (summary, _) = sealed_traces(vec![otlp_req(0x11, 3, 1_000_000_000)]);
     assert_eq!(
-        (summary.min_timestamp_s, summary.max_timestamp_s, summary.record_count),
+        (
+            summary.min_timestamp_s,
+            summary.max_timestamp_s,
+            summary.record_count
+        ),
         (1, 1, 3)
     );
 
     let registries = make_registries();
-    install_sealed(&registries, "default", 1, vec![otlp_req(0x11, 3, 1_000_000_000)]).await;
+    install_sealed(
+        &registries,
+        "default",
+        1,
+        vec![otlp_req(0x11, 3, 1_000_000_000)],
+    )
+    .await;
     let h = make_handler_over(registries);
     let v = serde_json::to_value(
         call_on(&h, json!({"trace": {"id": FIXTURE_TRACE_ID}}))
@@ -268,7 +283,10 @@ async fn trace_bounds_of_any_width_are_accepted() {
         .unwrap(),
     )
     .unwrap();
-    assert_eq!(v["coverage"], json!({"after": 1, "before": 4_000_000_000_u32}));
+    assert_eq!(
+        v["coverage"],
+        json!({"after": 1, "before": 4_000_000_000_u32})
+    );
     assert_eq!(v["status"], json!({"complete": true}));
     assert_eq!(v["items"]["returned"], 3);
 }
@@ -1130,7 +1148,10 @@ async fn every_mode_sets_its_progress_total_and_completes_it() {
         as_mode(mode, body)
     };
     for (body, expected) in [
-        (json!({"trace": {"id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"}}), (2, 2)),
+        (
+            json!({"trace": {"id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"}}),
+            (2, 2),
+        ),
         (windowed("search", json!({})), (2, 2)),
         (functions_body(2), (4, 4)),
         (windowed("overview", json!({})), (2, 2)),
