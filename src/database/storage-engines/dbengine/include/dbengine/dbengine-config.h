@@ -74,27 +74,29 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 //   Some lines have no engine to route through, and go to netdata's logger: the process-wide page-data layer,
 //   the engine's file and decompression primitives, which sit below the level where an engine is in hand, the
 //   public verbs that reject a NULL storage instance - which is exactly when there is no engine to ask - and a
-//   failed protected read of a mapped journal, which libnetdata's own recovery reports.
-//
-//   That recovery is the host's to provide. Reading a mapped journal that turns out to be truncated or unreadable
-//   raises SIGBUS or SIGSEGV, and the engine survives it only if the process's handler for those signals calls
-//   libnetdata's signal_protected_access_check() first, as the daemon's does (nd_initialize_signals()). With no
-//   such handler the fault terminates the process, on a damaged file the engine would otherwise have skipped.
-//   With one, the report of the recovered fault is libnetdata's and goes to netdata's logger; for some guarded
-//   reads it is the only report there is, so a sink may hear nothing about a journal the engine skipped.
-//
-//   The engine does call the sink while such a guard is armed. The guard recovers a fault only at an address
-//   inside the range it registered, so two rules keep a sink out of that recovery, and a new emission site or a
-//   new guarded read must keep both: no line the sink receives points into a mapped journal - a site formats a
-//   value out of a mapping rather than passing a pointer into one - and the sink is never called while a guard is
-//   armed over a range the engine has released, because the release can unmap the journal and whatever later
-//   occupies that range could be the sink's own memory. With both held, a sink that faults on its own memory
-//   faults exactly as it would with no guard armed; it is never diverted into the engine's recovery path.
+//   failed protected read of a mapped journal, which libnetdata's own recovery reports (see the next item).
 //
 //   And some lines are dropped before the sink is reached, by the gate the emitting site has always had: a rate
 //   limited site emits at most once per its own window, a debug site emits only when the matching debug flag is
 //   set, and a build without internal checks compiles its internal-error sites out entirely. The sink decides
 //   what to do with what it is given; it does not see what the site itself did not emit.
+// - May be called while the engine is inside a guarded read of a mapped journal. The guard recovers a fault only
+//   at an address inside the range it registered, so two rules keep a sink out of that recovery, and a new
+//   emission site or a new guarded read must keep both: no line the sink receives points into a mapped journal -
+//   a site formats a value out of a mapping rather than passing a pointer into one - and the sink is never called
+//   while a guard is armed over a range the engine has unmapped, because whatever later occupies that range could
+//   be the sink's own memory. (An unmap that fails leaves the range mapped, and its failure is reported while the
+//   guard is still armed.) With both held, a sink that faults on its own memory faults exactly as it would with no
+//   guard armed; it is never diverted into the engine's recovery path.
+//
+//   The recovery itself is the host's to provide. Reading a mapped journal that turns out to be truncated or
+//   unreadable raises SIGBUS or SIGSEGV, and the engine survives it only if the process's handler for those
+//   signals is installed with SA_SIGINFO and calls libnetdata's signal_protected_access_check() first, as the
+//   daemon's does (nd_initialize_signals()). With no handler at all the fault terminates the process, on a damaged
+//   file the engine would otherwise have skipped or rebuilt; a handler that does not make that call gets no
+//   recovery either, and what follows is up to it. When a fault is recovered, the report of it is libnetdata's and
+//   goes to netdata's logger; for some guarded reads it is the only report there is, so a sink may hear nothing
+//   about a journal the engine skipped.
 typedef void (*dbengine_log_fn)(
         void *data,                             // log_sink_data, verbatim
         ND_LOG_FIELD_PRIORITY priority,

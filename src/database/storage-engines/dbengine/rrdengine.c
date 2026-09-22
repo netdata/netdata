@@ -1288,9 +1288,9 @@ static time_t find_uuid_first_time(
     volatile size_t binary_match = 0;
     volatile size_t not_matching_bsearches = 0;
 
-    // Written inside the guarded block below and read after it. any_matching is the one a jump can actually
-    // leave indeterminate - the walk keeps reading the mapping after setting it - and only the
-    // journal_access_failed check below keeps that value from being read. agent_shutdown and
+    // Written inside the guarded block below and read after it. any_matching is the one a jump could leave
+    // indeterminate without volatile - the walk keeps reading the mapping after setting it - though only on a
+    // path where the journal_access_failed check below keeps the value from being read. agent_shutdown and
     // journal_access_failed are set just before the walk stops, or after the jump; they are marked so the three
     // read alike, which also clears gcc's -Wclobbered on any_matching and journal_access_failed.
     volatile bool agent_shutdown = false;
