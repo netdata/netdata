@@ -779,6 +779,7 @@ done:
 // was just inserted.
 #define ACLK_QUEUE_REAP_AGE_S    3600
 #define ACLK_QUEUE_REAP_EVERY_S  3600
+#define ACLK_QUEUE_REAP_RETRY_S  60
 
 // The predicate mirrors the push SELECT: a row is unsendable if ANY of the joins that query needs cannot be
 // satisfied - the transition itself (health_log_detail), its alert (health_log), or its config (alert_hash).
@@ -801,13 +802,16 @@ done:
     "  LIMIT @limit)"                                                                                                  \
     " RETURNING sequence_id"
 
+// Returns the number of rows reaped, or -1 if the reap could not be completed. The caller schedules the next
+// attempt from that: advancing the hourly timer after a failure would hide a broken cleanup for an hour.
 static int aclk_queue_reap_unsendable(int64_t age_s)
 {
     sqlite3_stmt *res = NULL;
     int reaped = 0;
+    bool failed = false;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_REAP_UNSENDABLE_QUEUE_ROWS, &res))
-        return 0;
+        return -1;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, age_s));
@@ -818,17 +822,22 @@ static int aclk_queue_reap_unsendable(int64_t age_s)
     while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW)
         reaped++;
 
-    // without this the caller would advance next_reap_s on a failed delete and skip cleanup for an hour
-    if (rc != SQLITE_DONE)
+    if (rc != SQLITE_DONE) {
         error_report("Failed to reap unsendable alert submit queue rows, rc = %d", rc);
+        failed = true;
+    }
 
     if (reaped)
         nd_log(NDLS_DAEMON, NDLP_NOTICE, "ACLK: reaped %d alert submit queue rows whose transition no longer exists", reaped);
 
 done:
+    // param is non-zero here only when a bind failed, which is the other way this reap did not run
+    if (param)
+        failed = true;
+
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
-    return reaped;
+    return failed ? -1 : reaped;
 }
 
 void aclk_push_alert_events_for_all_hosts(void)
@@ -845,9 +854,14 @@ void aclk_push_alert_events_for_all_hosts(void)
     time_t now_s = now_realtime_sec();
     time_t next_s = __atomic_load_n(&next_reap_s, __ATOMIC_RELAXED);
     if (now_s >= next_s) {
-        if (next_s)
-            (void)aclk_queue_reap_unsendable(ACLK_QUEUE_REAP_AGE_S);
-        __atomic_store_n(&next_reap_s, nd_time_t_add_saturating(now_s, ACLK_QUEUE_REAP_EVERY_S), __ATOMIC_RELAXED);
+        time_t again_in_s = ACLK_QUEUE_REAP_EVERY_S;
+
+        // A failed reap must not buy the failure an hour of silence. Retry sooner instead - but not on the
+        // next tick: this worker runs every second, and a persistently failing reap would then hammer db_meta.
+        if (next_s && aclk_queue_reap_unsendable(ACLK_QUEUE_REAP_AGE_S) < 0)
+            again_in_s = ACLK_QUEUE_REAP_RETRY_S;
+
+        __atomic_store_n(&next_reap_s, nd_time_t_add_saturating(now_s, again_in_s), __ATOMIC_RELAXED);
     }
 
     dfe_start_reentrant(rrdhost_root_index, host) {
