@@ -276,32 +276,36 @@ This guide walks through the thought process of designing metrics for a new coll
 
 #### Step 2: Organize into Families
 
-**Decision**: Flat structure (\<10 families) or Tree structure (\>10 families)?
+**Decision**: flat (one level of families) or tree (families with sub-families)? Choose the shape operators
+navigate best; the examples below show shapes, not size thresholds.
 
 **PostgreSQL - Flat Structure**:
 ```
-connections
-queries  
-databases
-tables
-replication
+Connections
+Queries
+Databases
+Tables
+Replication
 ```
 
 **WebSphere - Tree Structure**:
 ```
-jvm/memory
-jvm/gc
-jvm/threads
-web/servlets
-web/sessions
-connections/jdbc
-connections/jms
+JVM/Memory
+JVM/GC
+JVM/Threads
+Web/Servlets
+Web/Sessions
+Connections/JDBC
+Connections/JMS
 ```
 
 **Rules**:
-- No family can have both charts and subfamilies
-- Use "overview" only for metrics that don't fit subfamilies
-- Each leaf should have 3+ charts to justify existence
+- Name every level in the words an operator searches for; an innermost family may hold a single chart when its name
+  is that word, because clicking a family is cheaper than scrolling a long one.
+- Keep the tree scannable when a top-level family is expanded and keep granularity consistent within it.
+- A family may hold charts and subfamilies when the subfamily is an explicit jump (`Drives` with `Drives/NVMe`).
+- An "Overview" family holds the whole-system view operators check first; it is not a bucket for metrics that fit
+  nowhere else, which get their own family.
 
 #### Step 3: Validate Metric Belonging and Instance Consistency
 
@@ -312,7 +316,7 @@ For each family/subfamily:
 3. **Identify the instance type** for each metric
 4. **Ensure 90%+ share the same instance definition**
 
-**Example - web/servlets**:
+**Example - Web/Servlets**:
 ```
 ✓ servlet.requests      → Instance: each servlet
 ✓ servlet.response_time → Instance: each servlet  
@@ -383,7 +387,7 @@ For each context, verify:
 #### Complete Example: PostgreSQL Tables Section
 
 ```
-Family: tables
+Family: Tables
 
 1. postgres.table.count
    Instance: server
@@ -413,8 +417,8 @@ Family: tables
 
 #### Final Checklist
 
-- [ ] Each family represents a major functional area
-- [ ] Navigation structure is intuitive (\<10 flat, \>10 tree)
+- [ ] Each top-level family is a major functional area; every level is named in the words an operator searches for
+- [ ] Navigation structure is intuitive when a top-level family is expanded
 - [ ] All metrics in a family are about the same topic
 - [ ] Each context has consistent instance types
 - [ ] All instances in a context have identical dimensions

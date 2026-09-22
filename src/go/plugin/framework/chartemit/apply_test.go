@@ -167,7 +167,7 @@ CHART 'collector.job.svc.errors_total-method=GET' '' 'Metric "svc.errors_total"'
 CLABEL 'method' 'GET' '1'
 CLABEL '_collect_job' 'job01' '1'
 CLABEL_COMMIT
-DIMENSION 'svc.errors_total' 'svc.errors_total' 'incremental' '1' '1' ''
+DIMENSION 'svc.errors_total' 'svc.errors_total' 'incremental' '1' '1' 'type=int'
 BEGIN 'collector.job.svc.errors_total-method=GET'
 SET 'svc.errors_total' = 10
 END
@@ -234,7 +234,7 @@ func TestApplyPlanUsesIntegerSETForNonFloatUpdates(t *testing.T) {
 CHART 'collector.job.runtime_jobs' '' 'Runtime jobs' 'jobs' 'Runtime' 'runtime.jobs' 'line' '0' '1' '' 'go.d.plugin' 'runtime'
 CLABEL '_collect_job' 'job01' '1'
 CLABEL_COMMIT
-DIMENSION 'total' 'total' 'absolute' '1' '1' ''
+DIMENSION 'total' 'total' 'absolute' '1' '1' 'type=int'
 BEGIN 'collector.job.runtime_jobs' 1
 SET 'total' = 7
 END
@@ -339,7 +339,7 @@ func TestApplyPlanDimensionOnlyCreatePreservesExistingLabels(t *testing.T) {
 	assert.Equal(t, `HOST ''
 
 CHART 'collector.job.dimension_only_chart' '' 'Dimension-only chart' '1' 'Runtime' 'runtime.dimension_only' 'line' '0' '1' '' 'go.d.plugin' 'runtime'
-DIMENSION 'value' 'value' 'absolute' '1' '1' ''
+DIMENSION 'value' 'value' 'absolute' '1' '1' 'type=int'
 `, out)
 	assert.NotContains(t, out, "CLABEL")
 }
@@ -409,7 +409,7 @@ CLABEL 'instance' 'localhost ' '2'
 CLABEL 'label' 'value ' '1'
 CLABEL '_collect_job' 'job01 ' '1'
 CLABEL_COMMIT
-DIMENSION 'dimname' 'dimname' 'absolute' '1' '1' ''
+DIMENSION 'dimname' 'dimname' 'absolute' '1' '1' 'type=int'
 BEGIN 'collector.job.chartid' 1
 SET 'dimname' = 5
 END

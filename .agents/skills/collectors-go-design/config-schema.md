@@ -224,7 +224,9 @@ seconds.`.
   the schema `required` list.
 - `collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")` checks tabs and
   descriptions in both directions: every documented option exists in the schema with the same description, and every
-  visible top-level property is documented. Nested option names resolve through `properties`, `dependencies`
+  visible top-level property is documented. A form without tabs skips the tab checks and requires no `group` on any
+  option. `AssertConfigSchemaMatchesMetadataWith(..., collecttest.ConfigSchemaCheck{Defaults: true})` also compares
+  `default_value` with the schema `default` (booleans as `yes`/`no`); opt in once the collector's defaults agree. Nested option names resolve through `properties`, `dependencies`
   branches, `allOf`, `$ref`, and array items written as `rules[].query.period`; keys of a free map
   (`additionalProperties`) are not documented as options. The call is opt-in because most collectors predate the
   alignment rule and would fail it today; `cloudwatch`, `ceph`, `s3check`, and `azure_monitor` are the worked examples.

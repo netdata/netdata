@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
+
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -592,9 +594,9 @@ func newBlockingStopManagedJob() *blockingStopManagedJob {
 	}
 }
 
-func (job *blockingStopManagedJob) StartManaged(ready chan<- struct{}) {
+func (job *blockingStopManagedJob) StartManaged(run *jobruntime.ManagedRun) {
 	close(job.started)
-	close(ready)
+	run.Ready()
 	<-job.stopped
 }
 

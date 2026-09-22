@@ -179,7 +179,7 @@ Every item collected maps to a recurring support ask. That mapping is the
 | claim state (`claimed_id` only) | claim id is the identifier support needs to find the node in Cloud; a non-persisted `cloud.d` across restarts is a known Freshdesk root cause |
 | db disk usage per tier + sqlite sizes | retention questions ("why do I only have N days") are answered by tier sizes vs configured limits |
 | dyncfg files (sanitized) | jobs created via UI live here, not in `/etc/netdata` — invisible in classic config collection |
-| go.d job statuses, health silencers | which collector jobs exist/fail; why alerts are silent |
+| python.d job statuses, health silencers | which python.d jobs exist/fail; why alerts are silent. **go.d job state is NOT here** — go.d moved it into dyncfg, so it is captured live in `07-runtime/dyncfg-tree.json` and is unavailable when the agent's API is down |
 
 ### `07-runtime/` — live agent state (only when API responds)
 
@@ -190,6 +190,7 @@ Every item collected maps to a recurring support ask. That mapping is the
 | `/api/v3/stream_info`, `/api/v1/aclk` | streaming and cloud-connection diagnostics |
 | active alerts + alert instances | alert tickets are the single biggest Freshdesk theme |
 | `/api/v1/functions`, `/api/v1/ml_info` | which plugins expose what; ML state |
+| **`/api/v3/config?action=tree`** (dyncfg tree) | the authoritative collector job state: every go.d and scripts.d job with its status, plus service discovery, vnodes, secret stores and alert prototypes. The dyncfg statuses are `accepted`, `running`, `failed`, `disabled`, `orphan`, `incomplete` and `none` (`src/libnetdata/inicfg/dyncfg.h`) — a `disabled` or `orphan` job is a state, not a collection fault. go.d stopped writing job state to disk when its job manager moved to a single-owner command kernel, so this endpoint is the only place a bundle can capture it. **`/api/v3/info` answers with no access check but this endpoint sits behind the dyncfg ACL**, so a bearer-protected agent yields a reachable API and an unavailable tree; the bundle cannot authenticate, because bearer token filenames are themselves live tokens and are never collected. When the capture was attempted and failed, the file holds a JSON marker on both platforms — the same treatment `perflib.json` gets — stating that it is NOT evidence that no jobs exist. The POSIX marker also embeds the observed capture error; the PowerShell helper deletes the response on failure, so there is nothing left to embed and its marker carries the explanation only. A capture the global deadline skipped before it was attempted is different again: it leaves no file and no manifest row at all, so read its absence through the deadline rather than as a refusal. The marker does not assert a cause: a refusal, a timeout, a transport error, an HTTP failure and an exceeded deadline all look alike at that point. Large installs can exceed the 2 MiB API cap; the capture then holds the standard withheld-body marker rather than a truncated tree |
 | `netdata -W buildinfo` + `buildinfojson` | required by the bug template; the paths section proves which config dirs the binary uses; works with the daemon **down** |
 | `netdata -W cmakecache` | authoritative record of how the agent was built (compiler flags, enabled/disabled plugins, configured paths) — a superset of buildinfo; pinpoints build-time causes (a disabled plugin, a custom flag) that buildinfo alone can miss |
 | `netdata -W perflibdump -perflibfile` (Windows) | performance-library counter/instance metadata — the most common Windows support class is perflib-related (e.g. PerflibSMB); collected as a file so a large dump is not truncated, and sanitized like any other file. Reads `HKEY_PERFORMANCE_DATA`, so it needs an elevated session and can be slower than other commands: the collector pre-checks elevation, uses a 30s timeout floor, and never drops it silently — when it cannot run, `perflib.json` holds a JSON marker stating why (not elevated, timed out, or an access error) so support sees the reason instead of a missing file |
@@ -217,6 +218,8 @@ confinement, and packagers use **ACLs**. None of that shows in an `ls -la`.
 
 | item | why |
 |---|---|
+| **agent user and groups** (`09-permissions/netdata-user.txt`) | journal and device access commonly rests on one of three mechanisms — a file capability on the plugin, membership of the journal group by the agent user, or an ACL on the journal directory — on top of ordinary mode bits and any MAC policy, both of which the other rows cover. The capability sweep covers the first; this covers the second. Without it a host relying on group membership is indistinguishable from a broken one |
+| **journal directories** (`/var/log/journal`, `/run/log/journal`, in `netdata-paths.txt`) | the third mechanism. On a default systemd host these are `root:systemd-journal` with an ACL, and an ACL is invisible to `ls` — so this is the permission evidence for journal access, complemented by the opt-in plugin debug capture below, which shows what the plugin actually reported. A recurring `systemd-journal.plugin` support class |
 | **`plugins.d`**: mode, ownership, setuid/setgid bits and per-file **capabilities** (`getcap`) | a dropped capability or lost setuid bit is a top cause of "this collector shows no data" — a stock install has seven capability-bearing plugins (`apps.plugin`, `debugfs.plugin`, `go.d.plugin`, `network-viewer.plugin`, `perf.plugin`, `slabinfo.plugin`, `systemd-journal.plugin`) and several setuid ones |
 | all netdata paths (config dir, `netdata.conf`, `stream.conf`, `ssl/`, log/lib/cache dirs, `plugins.d`, the binary): mode, owner, **extended attributes**, **security context**, **ACLs**, non-default ext2/3/4 file flags | an immutable (`i`) flag on a state directory silently blocks the agent's own writes, and an SELinux mislabel fails collectors with nothing in the agent log |
 | Windows: ACLs with inheritance state, protected-ACL detection, integrity labels, alternate data streams | a `Zone.Identifier` stream marks a file downloaded-and-blocked; a protected (inheritance-disabled) ACL is a common post-restore breakage |
@@ -246,6 +249,37 @@ These are excluded by design. **Do not add them.**
   values already captured in explicitly requested raw SNMP diagnostic files
 - anything outside netdata's own scope (no full system journals, no other
   services' logs, no packet captures)
+
+## Requested plugin debug (opt-in)
+
+`--include-plugin-debug` is the **only** option that executes a collector, which is why it is opt-in
+and off by default: the design contract above promises the tool is read-only.
+
+It runs `systemd-journal.plugin debug` as the agent's own user (via `runuser`, falling back to `su`)
+and captures **stderr only** into `09-permissions/plugin-debug-systemd-journal.txt`.
+
+Stdout is discarded deliberately: debug mode issues a `last:200 ... __logs_sources:all` query and
+writes those journal records to stdout, so collecting it would pull other services' logs into the
+bundle — which "What is NEVER collected" forbids. The permission failure this option exists for is
+reported on stderr, which is also what the maintainer recipe it replaces tells customers to read.
+
+Running as the invoking root user would prove nothing about the agent's access, so the artifact
+records which user it actually ran as, and says plainly when impersonation was not possible. The
+agent user is resolved to a name first, because `ps` prints a bare uid for a containerised agent and
+neither `runuser` nor `su` can impersonate a uid with no local account. The run carries its own
+`timeout` around the plugin rather than relying on the wrapper being reaped, because debug mode gives
+itself a 600s stop and the portable watchdog only kills direct children. Where `timeout` does not
+exist (notably macOS) the capture says so and only the best-effort watchdog applies, so the bound is
+not guaranteed there. Output is sanitized and
+manifest-tracked like every other capture.
+
+It exists because this plugin's failures are overwhelmingly permission failures, and its stderr names
+the reason directly — the permission artifacts above show what the agent *has*, this shows what the
+plugin *did*. Support previously had to hand customers a manual debug and `strace` recipe and receive
+loose files by email; this keeps the evidence inside the sanitized, capped bundle.
+
+Only this plugin is included. Extending the set is deliberate, not automatic: every addition executes
+more code on a customer's machine.
 
 ## Raw SNMP evidence
 

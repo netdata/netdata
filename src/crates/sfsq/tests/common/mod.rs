@@ -255,6 +255,19 @@ pub fn sealed_source(dir: &Path, wal_path: &Path, id: &str) -> TraceSource {
     sealed_source_at(&out, id)
 }
 
+/// Flip the first payload byte of chunk `id` inside a sealed SFST — a
+/// CRC mismatch, the cheapest "corrupt in any way".
+pub fn corrupt_chunk(path: &Path, id: [u8; 4]) {
+    let mut bytes = std::fs::read(path).unwrap();
+    let offset = {
+        let container = chunk_file::container::Container::open(&bytes, b"SFST", 1).unwrap();
+        let meta = container.chunk_meta(id).expect("chunk present");
+        usize::try_from(meta.offset).unwrap()
+    };
+    bytes[offset] ^= 0xFF;
+    std::fs::write(path, &bytes).unwrap();
+}
+
 /// A sealed-file source over an ALREADY-WRITTEN `.sfst` — for suites
 /// that doctor the sealed bytes (chunk corruption/removal) and must not
 /// re-seal over their surgery when building the source vectors.

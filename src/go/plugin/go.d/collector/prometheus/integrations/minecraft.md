@@ -167,7 +167,7 @@ fallback_type:
 A list of job-owned relabeling blocks, applied after `selector` and before profile selection. Each block
 applies a list of Prometheus `metric_relabel_configs` rules to the metrics whose name matches `match`.
 Profiles may own the same block format for exporter normalization after selection. See the
-[relabeling reference](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/relabel/README.md) for
+[relabeling reference](https://github.com/netdata/netdata/blob/master/src/go/pkg/relabel/README.md) for
 the full action set and more examples.
 
 - `match`: Netdata simple patterns matched against the full metric name — including any

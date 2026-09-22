@@ -33,6 +33,11 @@ func prepareChart(env EmitEnv, chartID string, meta chartengine.ChartMeta, obsol
 	opts := ""
 	if obsolete {
 		opts = "obsolete"
+		if env.StoreFirst {
+			opts = "obsolete store_first"
+		}
+	} else if env.StoreFirst {
+		opts = "store_first"
 	}
 	return netdataapi.ChartOpts{
 		TypeID:      sanitizeWireID(env.TypeID),

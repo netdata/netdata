@@ -16,6 +16,9 @@ discovery. It does not own a dispatcher, worker pool, scheduler, invocation ledg
 The active Job Manager generation owns routing, UID admission, cancellation, deadlines, ordering, task execution,
 terminal-once behavior, and runtime metrics. Those responsibilities live under `plugin/agent/jobmgr`.
 
+Collector method declarations, raw input versus response passthrough, and managed job-scoped metadata are documented
+in [`pkg/funcapi`](../../../pkg/funcapi/README.md).
+
 ## Input ownership
 
 `InputCapsule` owns only the payload currently being parsed. A complete call is transferred to `Consumer`; a partial

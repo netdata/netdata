@@ -301,11 +301,11 @@ func (f *funcTopQueries) buildQueryRequest(ctx context.Context, statement string
 	}
 	reqCfg.Headers["Content-Type"] = "application/x-www-form-urlencoded"
 
-	req, err := web.NewHTTPRequest(reqCfg)
+	req, err := web.NewHTTPRequest(ctx, reqCfg)
 	if err != nil {
 		return nil, err
 	}
-	return req.WithContext(ctx), nil
+	return req, nil
 }
 
 func (f *funcTopQueries) buildRow(r topQueriesRequestData) topQueriesRow {

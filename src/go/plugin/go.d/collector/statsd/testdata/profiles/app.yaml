@@ -1,0 +1,12 @@
+match: 'app.*'
+template:
+  family: app
+  metrics:
+    - c.total.app.requests
+  charts:
+    - title: Application requests
+      context: app.requests
+      units: requests/s
+      dimensions:
+        - selector: c.total.app.requests
+          name: requests

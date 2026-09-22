@@ -240,8 +240,12 @@ constructor defaults versus conditional branches, and which schema tests carry w
 `.agents/skills/collectors-go-design/operator-surface.md`; writing `config_schema.json` itself (text channels,
 tabs, widgets, secrets, standard option wording, the repo-wide rule tests) is owned by its sibling `config-schema.md`.
 
-Credentials use the `${env:}/${file:}/${cmd:}/${store:}` indirection; see `src/collectors/SECRETS.md`. Privileged
-operations route through `src/collectors/utils/ndsudo.c`.
+Collector secret-reference source authority, per-pipeline discovery trust, literal application and DynCfg adoption
+are owned by
+`src/go/plugin/agent/jobmgr/ARCHITECTURE.md#secrets`; operator guidance is generated from
+`integrations/gen_doc_secrets_page.py`. Discovery value serialization guidance is owned by
+`integrations/gen_doc_service_discovery_page.py` (`config_template` and `troubleshooting`). Privileged operations route
+through `src/collectors/utils/ndsudo.c`.
 
 ### 2.7 Generated artifacts are not source
 
@@ -298,7 +302,10 @@ question*. Use labels for instance and context annotations. Pick the right chart
 `src/plugins.d/README.md`).
 
 Common bugs: `absolute` on a counter (counters are `incremental`); `line` when `stacked` is the right shape (CPU states,
-disk-time breakdown). Reuse shared metric definitions from `src/collectors/common-contexts/` for C plugins.
+disk-time breakdown). Reuse shared metric definitions from `src/collectors/common-contexts/` for C plugins that
+describe the Agent host; a collector polling a remote target keeps its own contexts and uses a vnode for placement
+(§1.9). Writing a go.d V2 `charts.yaml` (defaults, families, ordering, statesets, labels, shared contexts, tests) is
+owned by `.agents/skills/collectors-go-framework-v2/chart-template.md`.
 
 ### 3.2 Mechanisms per ingestion path
 
@@ -309,8 +316,12 @@ them; for SNMP, extend a profile rather than hardcode OIDs, and for Prometheus p
 
 ### 3.3 Chart priorities
 
-Chart priorities (`priority` field in C, `Priority` in Go) drive UI ordering. C plugins follow conventions in
-`src/collectors/all.h`. Don't pick priorities arbitrarily; mirror an adjacent collector's range.
+Chart priorities drive UI ordering; equal-priority charts follow their names in the dashboard (dashboard behavior,
+not owned by this repository). C plugins follow
+`src/collectors/all.h`; go.d V1 charts step from `collectorapi.Priority`; go.d V2 templates optionally set
+`chart_defaults.priority` on top-level sections only, from the same engine default
+(`.agents/skills/collectors-go-framework-v2/chart-template.md#ordering`). Don't pick values arbitrarily; mirror an
+adjacent collector of the same kind.
 
 ## 4. Production-quality criteria & pre-PR checklist
 
@@ -432,7 +443,7 @@ than copying go.d wiring or applying the new-go.d V2 mandate to it.
 | statsd synthetic_charts | operator-curated dashboards | `src/collectors/statsd.plugin/README.md#synthetic-statsd-charts` |
 | Prometheus mapping | generic exposition scrape and authored profiles | `src/go/plugin/go.d/collector/prometheus/profile-format.md`, `src/go/plugin/go.d/collector/prometheus/` source; generated README is an operator output |
 | Prometheus profile format | curated exporter dashboards + autogen fallback selectors | `src/go/plugin/go.d/collector/prometheus/profile-format.md` |
-| Prometheus metric relabeling | rewriting scraped metric names/labels | `src/go/plugin/go.d/collector/prometheus/relabel/README.md` |
+| Prometheus metric relabeling | rewriting scraped metric names/labels | `src/go/pkg/relabel/README.md` |
 | log2journal | parsing application logs into the journal | `src/collectors/log2journal/log2journal.d/` |
 | Auto-discovery rules | adding service-detection rules | `src/go/plugin/go.d/config/go.d/sd/{net_listeners,docker,snmp,http}.conf` |
 | Topology library | topology producers in Go | `src/go/pkg/topology/v1` |

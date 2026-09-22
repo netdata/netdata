@@ -350,6 +350,27 @@ fn windowed_mode_objects_carry_their_own_window() {
     assert_eq!((p.after, p.before), (0, 0));
 }
 
+/// The standalone grid takes the page's `selections` grammar and
+/// nothing else of the page's filters: the duration bounds are unknown
+/// fields here (the grid never applies them).
+#[test]
+fn overview_params_take_selections_but_no_duration_bounds() {
+    let TracesMode::Overview(p) =
+        req(json!({"overview": {"selections": {"name": ["GET", "POST"]}}})).mode
+    else {
+        panic!("overview mode expected");
+    };
+    assert_eq!(p.selections["name"], vec!["GET", "POST"]);
+    let TracesMode::Overview(p) = req(json!({"overview": {}})).mode else {
+        panic!("overview mode expected");
+    };
+    assert!(p.selections.is_empty());
+    for field in ["min_trace_duration_ns", "max_trace_duration_ns", "min_duration_ns"] {
+        let msg = req_err(json!({"overview": {field: 1}}));
+        assert!(msg.contains("unknown field"), "{field}: {msg}");
+    }
+}
+
 #[test]
 fn tenant_rides_beside_any_mode() {
     let r = req(json!({"search": {}, "tenant": "t1"}));

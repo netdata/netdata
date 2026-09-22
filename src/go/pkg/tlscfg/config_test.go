@@ -15,11 +15,14 @@ import (
 	"testing"
 	"time"
 
+	"context"
+
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile/testutil"
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewTLSConfig(t *testing.T) {
+func TestTLSConfig(t *testing.T) {
 	certPEM, keyPEM := newTestKeyPair(t)
 	tooLarge := make([]byte, safefile.MaxSize+1)
 	caAtLimit := padToLimit(t, certPEM)
@@ -101,7 +104,7 @@ func TestNewTLSConfig(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			cfg, err := NewTLSConfig(tc.config(t))
+			cfg, err := newTLSConfig(context.Background(), tc.config(t), testutil.New().Read)
 
 			if len(tc.wantErrs) > 0 {
 				require.Error(t, err)

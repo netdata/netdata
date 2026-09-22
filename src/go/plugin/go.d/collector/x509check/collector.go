@@ -44,11 +44,11 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode            string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery      int              `yaml:"update_every,omitempty" json:"update_every"`
-	Source           string           `yaml:"source" json:"source"`
-	Timeout          confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	CheckFullChain   bool             `yaml:"check_full_chain" json:"check_full_chain"`
+	Vnode            string           `yaml:"vnode,omitempty"         json:"vnode"`
+	UpdateEvery      int              `yaml:"update_every,omitempty"  json:"update_every"`
+	Source           string           `yaml:"source"                  json:"source"`
+	Timeout          confopt.Duration `yaml:"timeout,omitempty"       json:"timeout"`
+	CheckFullChain   bool             `yaml:"check_full_chain"        json:"check_full_chain"`
 	CheckRevocation  bool             `yaml:"check_revocation_status" json:"check_revocation_status"`
 	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
@@ -68,12 +68,12 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
 
-	prov, err := c.initProvider()
+	prov, err := c.initProvider(ctx)
 	if err != nil {
 		return fmt.Errorf("certificate provider init: %v", err)
 	}

@@ -606,7 +606,7 @@ flowchart TD
      the authority cut returns. The worker later drains output leases and performs detach/cleanup outside the authority
      lock. A later stopped/retired cut never overwrites an earlier structural failure.
    - Start eligibility and retirement arbitrate under the process owner. The worker rechecks that decision after receiving
-     the start request, so a ready channel send cannot launch `StartManaged` after containment has won.
+     the start request, so sending it cannot launch `StartManaged` after containment has won.
    - Once output and permit acceptance wins and start remains eligible, the managed loop starts.
    - The resource transaction owns this successor until installation acknowledgement. An apply failure aborts it when
      possible, or returns the still-live retained generation to the kernel for fail-closed ownership.
@@ -632,6 +632,32 @@ flowchart TD
      terminal chart-obsoletion frames only after the managed loop and Function handlers physically quiesce.
    - The `job-runtime` identity stays occupied through cleanup, so a same-job successor cannot start before those
      terminal frames complete.
+
+### Collector runtime readiness and terminal outcomes
+
+The optional V2 `Run(ctx, ready) error` hook acquires resources after runtime promotion, which requires predecessor
+physical release. `ManagedRun` serializes readiness, startup error, cancellation and timeout; only accepted readiness
+starts collection and running availability. Non-Runner V1/V2 jobs signal readiness directly. Job Manager starts a separate
+startup timer in the owner's `Start`, using `jobmgr.DefaultProcessAttemptFuse` for its two-minute duration. Runtime
+admission has already stopped the preparation fuse; neither timer limits the successfully started runtime lifetime.
+
+A typed `runtimeStartupFailure` carries the collector outcome through the existing source-specific activation
+fallback: discovery, DynCfg update/enable/restart, accepted activation and secret-dependent restart commit Failed,
+return their operational response and use the existing configured retry policy. Uncoded startup errors use response
+code 503; stock configurations remain visible as Failed after successful detection followed by runtime acquisition
+failure. Existing plain-stock removal for unsuccessful Init/Check detection is unchanged. A recovered collector `Run`
+panic or unexpected nil return is non-retryable. Positive classification must survive secret redaction without
+absorbing a joined structural or cleanup error. Operational outcomes do not become errors from the process-owned
+worker; physical cleanup still does.
+
+After accepted readiness, unexpected return atomically revokes new output admission before logging or joining the
+managed loop. The owner submits a response-free command on the job's existing lane with its exact resource generation.
+The command commits Failed and detaches that generation, without scheduling a retry; a stale command is a no-op.
+Submission does not wait for reconciliation, because finalization itself waits for detachment. Successful pending
+installation stays valid when terminal failure arrives before acknowledgement. Existing admitted writes drain
+normally, and no collector cleanup runs until both Run and Collect have physically exited. A recovered collector panic
+is restartable after clean release; independent ownership, lifecycle or cleanup failure still quarantines the process
+identity.
 
 ### Activation failure classification
 
@@ -716,6 +742,26 @@ Secrets keep credentials out of collector configs. A config value can carry a **
   Manager).
 - `${env:...}`, `${file:...}`, `${cmd:...}` — resolved from the plugin process's own environment variables, files, or
   command output.
+
+`policy.SecretReferencesAllowed` permits references for `stock`, `user`, and `dyncfg` collector sources. A discovered
+source requires the strict boolean `__trust_discovered_targets__` stamp. The discovery pipeline overwrites that stamp
+on every rendered job using its own `trust_discovered_targets` option (default false); rendered content cannot grant
+itself authority. It also stamps `__discovery_pipeline_id__` from the manager-owned pipeline key, independently of
+target source text. Enabled discovered trust and its pipeline ID participate in `confgroup.Config.Hash` so changing
+the setting or trusted owner reconciles jobs even when their other values are unchanged. Absent/false trust stamps
+preserve the default hash. Cloning and graph payload serialization preserve both stamps.
+When opting out makes a literal field invalid, discovery commits the replacement as failed and removes the old
+trusted runtime and its dependencies only if both configs carry the same nonempty pipeline ID. Invalid proposals
+from a different or unidentified pipeline retain ordinary rejection behavior, preserving the trusted incumbent.
+Rejected discovered candidates are scoped by pipeline ID too, so a competing candidate's rejection cannot suppress
+a later opt-out from the actual owner, even when their untrusted hashes match.
+
+`joboutput/config_factory.go` and `secrets/dependency.go` enforce the same policy before resolving or indexing
+references. Untrusted discovered, empty, and unknown sources keep every string literal, including malformed reference
+syntax, and create no SecretStore dependencies. Their application still uses the resolver's bounded literal clone.
+The pipeline option does not resolve discovery connection credentials.
+DynCfg adoption re-stamps the complete submitted configuration as `dyncfg`, enabling reference resolution throughout
+that payload. Operators must review the whole configuration when adopting a discovered job.
 
 Resolution happens only in memory, only when a job is built. The key property is that it is **atomic — all references
 resolve, or none do**. Picture a notary: photocopy the whole document, list every blank, check out the referenced

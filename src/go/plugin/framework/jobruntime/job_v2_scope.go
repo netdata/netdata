@@ -50,14 +50,7 @@ func (j *JobV2) newScopeEngine() (*chartengine.Engine, error) {
 	if j.runtimeAggregator != nil {
 		opts = append(opts, chartengine.WithRuntimeSampleObserver(j.runtimeAggregator.Observe))
 	}
-	engine, err := chartengine.New(opts...)
-	if err != nil {
-		return nil, err
-	}
-	if err := engine.LoadYAML(j.chartTemplateYAML, j.chartTemplateRevision); err != nil {
-		return nil, err
-	}
-	return engine, nil
+	return chartengine.New(opts...)
 }
 
 func (j *JobV2) liveScopeSet() map[string]metrix.HostScope {

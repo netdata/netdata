@@ -169,6 +169,12 @@
           "snmp"
         ]
       },
+      "trust_discovered_targets": {
+        "title": "Trust discovered targets",
+        "description": "Allow secret references in generated collector jobs, including target-controlled values that can make Netdata read files, run commands, or fetch stored secrets. Off by default; enable only if you control and trust every discoverable target and accept the risk of exposing resolved values to it.",
+        "type": "boolean",
+        "default": false
+      },
       "services": {
         "title": "Service rules",
         "description": "Rules that turn discovered SNMP devices into data collection jobs.",
@@ -215,7 +221,8 @@
         {
           "title": "Base",
           "fields": [
-            "discoverer"
+            "discoverer",
+            "trust_discovered_targets"
           ]
         },
         {
@@ -280,6 +287,9 @@
         }
       },
       "ui:help": "- Match discovered SNMP devices and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a device matches, a data collection job is created.\n- The **default service rule** is sufficient for most cases. It creates an SNMP data collection job for each discovered device and handles both SNMPv2 and SNMPv3."
+    },
+    "trust_discovered_targets": {
+      "ui:help": "Service rules can copy `${env:...}`, `${file:...}`, `${cmd:...}` or `${store:...}` from target-controlled inputs into job fields. Netdata resolves those references with the secret providers' permissions, and a collector may send the resulting value to the target as a credential or other request field. One untrusted target can abuse this; enabling the option accepts that risk for the whole pipeline.\n\nWith stock SNMP rules, device-reported system information is used only in the job name; it does not supply credential fields. To use references in generated-job credentials, write them explicitly in your service rules. Enabling this option alone does not replace the literal credentials copied by stock rules.\n\nDevices control system information exposed to service rules. Review custom rules as well as the devices you scan. Discovery still requires literal SNMP credentials.\n\nDisabled by default: references remain literal. This option does not resolve the discoverer's own connection credentials."
     }
   }
 }

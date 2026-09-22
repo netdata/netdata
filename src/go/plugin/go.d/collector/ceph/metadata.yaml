@@ -390,7 +390,7 @@ modules:
               chart_type: line
               dimensions: [{name: active}, {name: standby}]
             - name: ceph.cluster_object_gateways_count
-              description: Ceph Cluster Object Gateways
+              description: Ceph Cluster Object Gateways (RGW)
               unit: gateways
               chart_type: line
               dimensions: [{name: object}]
@@ -415,7 +415,7 @@ modules:
               chart_type: stacked
               dimensions: [{name: avail}, {name: used}]
             - name: ceph.cluster_objects_count
-              description: Ceph Cluster Logical Objects
+              description: Ceph Cluster Objects
               unit: objects
               chart_type: line
               dimensions: [{name: objects}]
@@ -440,7 +440,7 @@ modules:
               chart_type: line
               dimensions: [{name: pgs}]
             - name: ceph.cluster_pgs_by_status_count
-              description: Ceph Cluster Placement Groups by Compatibility Category
+              description: Ceph Cluster Placement Groups by Status
               unit: pgs
               chart_type: stacked
               dimensions: [{name: clean}, {name: working}, {name: warning}, {name: unknown}]
@@ -450,12 +450,12 @@ modules:
               chart_type: line
               dimensions: [{name: per_osd}]
             - name: ceph.cluster_client_io
-              description: Ceph Cluster Client I/O
+              description: Ceph Cluster Client IO
               unit: bytes/s
               chart_type: area
               dimensions: [{name: read}, {name: written}]
             - name: ceph.cluster_client_iops
-              description: Ceph Cluster Client Operations
+              description: Ceph Cluster Client IOPS
               unit: ops/s
               chart_type: line
               dimensions: [{name: read}, {name: write}]
@@ -494,12 +494,12 @@ modules:
               chart_type: stacked
               dimensions: [{name: avail}, {name: used}]
             - name: ceph.osd_io
-              description: Ceph OSD I/O Rate
+              description: Ceph OSD IO
               unit: bytes/s
               chart_type: area
               dimensions: [{name: read}, {name: written}]
             - name: ceph.osd_iops
-              description: Ceph OSD Operation Rate
+              description: Ceph OSD IOPS
               unit: ops/s
               chart_type: line
               dimensions: [{name: read}, {name: write}]
@@ -534,12 +534,12 @@ modules:
               chart_type: line
               dimensions: [{name: objects}]
             - name: ceph.pool_io
-              description: Ceph Pool I/O Rate
+              description: Ceph Pool IO
               unit: bytes/s
               chart_type: area
               dimensions: [{name: read}, {name: written}]
             - name: ceph.pool_iops
-              description: Ceph Pool Operation Rate
+              description: Ceph Pool IOPS
               unit: ops/s
               chart_type: line
               dimensions: [{name: read}, {name: write}]

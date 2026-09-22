@@ -10,6 +10,7 @@ import (
 
 type engineState struct {
 	cfg          engineConfig
+	templateSet  *TemplateSet
 	program      *program.Program
 	matchIndex   matchIndex
 	routeCache   *routeCache

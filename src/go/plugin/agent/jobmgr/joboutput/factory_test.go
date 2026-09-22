@@ -1846,5 +1846,5 @@ func factoryTestConfig(functionOnly bool) confgroup.Config {
 		"name":          "job",
 		"update_every":  1,
 		"function_only": functionOnly,
-	}
+	}.SetSourceType(confgroup.TypeUser)
 }

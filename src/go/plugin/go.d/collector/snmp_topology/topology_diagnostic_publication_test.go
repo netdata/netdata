@@ -59,7 +59,7 @@ func TestTopologyDiagnosticHookPublishesOnlyAcceptedProvider(t *testing.T) {
 		require.NoError(t, c.Init(ctx))
 		runCtx, stop := context.WithCancel(ctx)
 		done := make(chan error, 1)
-		go func() { done <- c.Run(runCtx) }()
+		go func() { done <- c.Run(runCtx, func() {}) }()
 		require.Eventually(t, func() bool {
 			generation := c.topologyRegistry.acquireGeneration()
 			return generation != nil && generation.sequence > 0

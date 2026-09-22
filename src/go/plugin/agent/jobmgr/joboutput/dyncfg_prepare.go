@@ -275,6 +275,14 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 	failedPostimage := postimage
 	failedPostimage.Status = dyncfg.StatusFailed.String()
 	failedCleanup := dcjc.updateCleanup(target, request, oldConfig, failedPostimage, dyncfg.StatusFailed)
+	failurePlan := probeFailurePlan{
+		postimage:        failedPostimage,
+		failedCleanup:    failedCleanup,
+		removedCleanup:   dcjc.configDeleteCleanup(dcjc.configID(target.module, target.name)),
+		result:           autoDetectionFailureResultFunc(200, "config update failed: %v"),
+		afterApply:       dcjc.scheduleRetryAfterApply(config),
+		removePlainStock: config.SourceType() == confgroup.TypeStock,
+	}
 	if probeFailure != nil {
 		return dcjc.prepareProbeFailure(
 			scope,
@@ -282,14 +290,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			permit,
 			autoDetectionRetryToken{},
 			probeFailure,
-			probeFailurePlan{
-				postimage:        failedPostimage,
-				failedCleanup:    failedCleanup,
-				removedCleanup:   dcjc.configDeleteCleanup(dcjc.configID(target.module, target.name)),
-				result:           autoDetectionFailureResultFunc(200, "config update failed: %v"),
-				afterApply:       dcjc.scheduleRetryAfterApply(config),
-				removePlainStock: config.SourceType() == confgroup.TypeStock,
-			},
+			failurePlan,
 		)
 	}
 	return dcjc.prepareMutationWithActivationFallbacks(
@@ -320,6 +321,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			cleanup:    failedCleanup,
 			afterApply: dcjc.retrySettlement(scope.ID, autoDetectionRetryToken{}),
 		},
+		failurePlan,
 	)
 }
 
@@ -518,6 +520,14 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 	}
 	postimage := graphConfig(record, dyncfg.StatusRunning)
 	failedPostimage := graphConfig(record, dyncfg.StatusFailed)
+	failurePlan := probeFailurePlan{
+		postimage:        failedPostimage,
+		failedCleanup:    dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusFailed),
+		removedCleanup:   dcjc.configDeleteCleanup(dcjc.externalID(target.resourceID)),
+		result:           autoDetectionFailureResultFunc(autoDetectionFailureCode, failureMessage),
+		afterApply:       dcjc.scheduleRetryAfterApply(config),
+		removePlainStock: config.SourceType() == confgroup.TypeStock,
+	}
 	if probeFailure != nil {
 		return dcjc.prepareProbeFailure(
 			scope,
@@ -525,14 +535,7 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 			permit,
 			autoDetectionRetryToken{},
 			probeFailure,
-			probeFailurePlan{
-				postimage:        failedPostimage,
-				failedCleanup:    dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusFailed),
-				removedCleanup:   dcjc.configDeleteCleanup(dcjc.externalID(target.resourceID)),
-				result:           autoDetectionFailureResultFunc(autoDetectionFailureCode, failureMessage),
-				afterApply:       dcjc.scheduleRetryAfterApply(config),
-				removePlainStock: config.SourceType() == confgroup.TypeStock,
-			},
+			failurePlan,
 		)
 	}
 	return dcjc.prepareMutationWithActivationFallbacks(
@@ -563,6 +566,7 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 			cleanup:    dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusFailed),
 			afterApply: dcjc.retrySettlement(scope.ID, autoDetectionRetryToken{}),
 		},
+		failurePlan,
 	)
 }
 

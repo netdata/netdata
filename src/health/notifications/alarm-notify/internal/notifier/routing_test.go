@@ -10,12 +10,12 @@ import (
 )
 
 func TestSelectDestinations(t *testing.T) {
-	cfg := Config{
-		Destinations: map[string]Destination{
-			"primary":  {},
-			"shared":   {},
-			"database": {},
-			"fallback": {},
+	cfg := Plan{
+		Destinations: map[string]Sender{
+			"primary":  nil,
+			"shared":   nil,
+			"database": nil,
+			"fallback": nil,
 		},
 		Routing: Routing{
 			Default: []string{"fallback", "shared"},
@@ -70,7 +70,7 @@ func TestSelectDestinations(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			got, err := selectDestinations(cfg, test.destination, test.roles)
+			got, err := cfg.Select(test.destination, test.roles)
 			if test.err != "" {
 				require.ErrorContains(t, err, test.err)
 				assert.Nil(t, got)

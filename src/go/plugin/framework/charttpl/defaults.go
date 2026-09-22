@@ -4,6 +4,17 @@ package charttpl
 
 import "slices"
 
+// NormalizeGroups returns an owned, default-applied and validated native group tree.
+// It uses the same inheritance rules as YAML decoding without a serialization round-trip.
+func NormalizeGroups(groups []Group) ([]Group, error) {
+	spec := &Spec{Version: VersionV1, Groups: cloneSlice(groups, Group.Clone)}
+	applyDefaults(spec)
+	if _, err := Validate(spec); err != nil {
+		return nil, err
+	}
+	return spec.Groups, nil
+}
+
 const (
 	defaultChartType = "line"
 )

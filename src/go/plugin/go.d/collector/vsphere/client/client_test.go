@@ -121,7 +121,7 @@ func TestNew_LogsOutOnContainerViewFailure(t *testing.T) {
 	}
 	defer func() { createContainerView = origCreateContainerView }()
 
-	client, err := New(Config{
+	client, err := New(context.Background(), Config{
 		URL:       srv.URL.String(),
 		User:      "admin",
 		Password:  "password",
@@ -188,7 +188,7 @@ func prepareClient(t *testing.T) (client *Client, teardown func()) {
 }
 
 func newClient(t *testing.T, vCenterURL *url.URL) *Client {
-	client, err := New(Config{
+	client, err := New(context.Background(), Config{
 		URL:       vCenterURL.String(),
 		User:      "admin",
 		Password:  "password",
