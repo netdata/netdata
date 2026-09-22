@@ -78,9 +78,8 @@ The final label grammar preserves native Agent spelling:
 
 Accepted retained strings are cloned at admission, so substrings cannot retain complete receive or replacement buffers.
 UDP copies each datagram, and TCP each run of complete buffered records, once and cuts records as substrings. Parsing
-and final preparation
-reuse fixed receiver-owned label and identity storage that is cleared after every record, so an admitted update of an
-existing identity allocates nothing.
+and final preparation reuse fixed receiver-owned label and identity storage that is cleared after every record, so an
+admitted update of an existing identity allocates nothing.
 
 ## Profiles
 
