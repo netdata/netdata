@@ -78,8 +78,8 @@ type receiver struct {
 	rejects  [len(rejectReasons)]uint64
 
 	// Record storage reused under the lock; records needing more grow on the heap.
-	tagBuf, labelBuf [16]metrix.Label
-	idBuf            [512]byte
+	tagBuf, replaceBuf, labelBuf [16]metrix.Label
+	idBuf                        [512]byte
 }
 
 // lifetime is the longest prepared chart or dimension expiry in successful cycles.
@@ -141,7 +141,11 @@ func (r *receiver) ingestLocked(line string, now time.Time) error {
 		return err
 	}
 	original := input.name
-	if input, err = r.preprocess(input); err != nil {
+	input, replaced, err := r.preprocess(input)
+	if replaced {
+		defer clear(r.replaceBuf[:min(len(input.labels), len(r.replaceBuf))])
+	}
+	if err != nil {
 		return err
 	}
 	p, err := prepareRecord(input, r.labelBuf[:0], r.idBuf[:0])
@@ -157,14 +161,15 @@ func (r *receiver) ingestLocked(line string, now time.Time) error {
 }
 
 // preprocess runs the one replace pipeline chosen by the original name;
-// pipelines never chain.
-func (r *receiver) preprocess(input record) (record, error) {
+// pipelines never chain. replaced reports whether a pipeline ran.
+func (r *receiver) preprocess(input record) (_ record, replaced bool, _ error) {
 	for _, p := range r.profiles {
 		if p.owns(input.name) {
-			return p.replace(input)
+			input, err := p.replace(input, r.replaceBuf[:0])
+			return input, true, err
 		}
 	}
-	return input, nil
+	return input, false, nil
 }
 
 // activate adds every native profile whose root matches the original name of a
