@@ -45,6 +45,9 @@ typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid)
 //   spinlock. A sink MUST NOT call back into the engine, and MUST NOT block on anything an engine thread can wait
 //   for: a sink that blocks on a pool thread can hang the process for good, for the reason libuv_worker_threads
 //   below gives.
+// - Must return. A sink that longjmp()s out, or ends the process, does it from wherever the engine happened to
+//   be: mid-way through a rate limiter's window update, inside a guarded read of a mapped journal, holding a
+//   cache queue lock. The engine has no way to finish what it was doing.
 // - The engine saves and restores errno around the call, so a caller that reads errno after an engine verb is
 //   unaffected by the sink.
 // - May be called after dbengine_shutdown(), from inside dbengine_destroy(), and - when dbengine_destroy()

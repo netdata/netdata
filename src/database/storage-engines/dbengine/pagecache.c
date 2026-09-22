@@ -516,11 +516,15 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct dbengine_tier 
 
         char file_path[DBENGINE_PATH_MAX];
         journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
-        // What the guarded read found, reported after it ends rather than inside it. The frame the
-        // PROTECTED_ACCESS_SETUP below installs is torn down by a cleanup attribute, so it stays armed until the
-        // end of the scope it sits in: anything emitted while it is armed runs under a signal handler that
-        // siglongjmps out of whatever it interrupts, skipping that code's own cleanup. A log sink is the
-        // embedder's code and may take a lock, so it is not run there - the braces below end the frame first.
+        // What the guarded read below found, reported after its frame is gone rather than under it.
+        //
+        // Not because a sink could be siglongjmped out of: the handler jumps only when the faulting address is
+        // inside the registered mapping (protected-access.c, signal_protected_access_check), and no line the
+        // engine emits hands the sink a pointer into it. The reason is the one the comment above
+        // update_metrics_first_time_s() already gives for scoping a frame tightly - a frame that stays armed
+        // across the reporting, the releases and any nested protected read covers memory this code is no longer
+        // walking, so an unrelated fault in that range is silently recovered as this read's SIGBUS, and the
+        // nesting depth (capped at 8, fatal past it) is held longer than it needs to be.
         enum {
             JV2_NO_PROBLEM = 0,
             JV2_METRIC_LIST_OVERFLOWS_FILE,

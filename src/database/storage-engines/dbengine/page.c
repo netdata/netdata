@@ -290,20 +290,30 @@ void pgd_init_arals(struct dbengine_engine *engine, const struct dbengine_alloca
 
     if(pgd_arals_initialized) {
         // the layer is shared: the first engine's settings stand, a later engine that asked for something else
-        // is told so (the size classes also depend on the compile-time tier page sizes, which never differ)
-        if(cfg->partitions != pgd_arals_config.partitions ||
-           cfg->arals_for_large_pages != pgd_arals_config.arals_for_large_pages ||
-           cfg->compression_statistics != pgd_arals_config.compression_statistics)
+        // is told so (the size classes also depend on the compile-time tier page sizes, which never differ).
+        //
+        // Said after the unlock, not under it. This spinlock is process-wide and shared by every engine, and the
+        // line goes to the embedder's sink: a sink that blocked here would block every engine in the process, not
+        // just this one. The settings are read into locals first - they are fixed once the layer is initialized,
+        // so what is printed is what was compared.
+        const struct dbengine_allocator_config in_force = pgd_arals_config;
+        const bool differs =
+            cfg->partitions != in_force.partitions ||
+            cfg->arals_for_large_pages != in_force.arals_for_large_pages ||
+            cfg->compression_statistics != in_force.compression_statistics;
+
+        spinlock_unlock(&pgd_arals_spinlock);
+
+        if(differs)
             dbengine_log(engine, NDLP_NOTICE,
                          "DBENGINE: the page allocators are already configured (partitions %zu, large pages %s, "
                          "compression statistics %s); the new settings (partitions %zu, large pages %s, compression "
                          "statistics %s) are ignored",
-                         pgd_arals_config.partitions, pgd_arals_config.arals_for_large_pages ? "yes" : "no",
-                         pgd_arals_config.compression_statistics ? "yes" : "no",
+                         in_force.partitions, in_force.arals_for_large_pages ? "yes" : "no",
+                         in_force.compression_statistics ? "yes" : "no",
                          cfg->partitions, cfg->arals_for_large_pages ? "yes" : "no",
                          cfg->compression_statistics ? "yes" : "no");
 
-        spinlock_unlock(&pgd_arals_spinlock);
         return;
     }
 

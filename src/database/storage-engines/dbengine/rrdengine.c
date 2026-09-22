@@ -1303,11 +1303,17 @@ static time_t find_uuid_first_time(
 
         char file_path[DBENGINE_PATH_MAX];
         journalfile_v2_generate_path(datafile, file_path, sizeof(file_path));
-        // What the guarded read below found, reported after its frame is gone. The frame is torn down by a
-        // cleanup attribute at the end of the scope it sits in, so a line emitted while it is armed runs under a
-        // signal handler that siglongjmps out of whatever it interrupts - which for a log sink, the embedder's
-        // own code, may mean skipping a lock it holds. The braces end the frame before anything is written, and
-        // scope it to the mmap walk, the way update_metrics_first_time_s() below already scopes its own.
+        // What the guarded read below found, reported after its frame is gone rather than under it.
+        //
+        // Not because a sink could be siglongjmped out of: the handler jumps only when the faulting address is
+        // inside the registered mapping (protected-access.c, signal_protected_access_check), and no line the
+        // engine emits hands the sink a pointer into it. The reason is the one the comment above
+        // update_metrics_first_time_s() already gives for scoping a frame tightly - a frame that stays armed
+        // across the reporting, the releases and any nested protected read covers memory this code is no longer
+        // walking, so an unrelated fault in that range is silently recovered as this read's SIGBUS, and the
+        // nesting depth (capped at 8, fatal past it) is held longer than it needs to be.
+        //
+        // The frame here had no inner scope at all, so it gains the one the comment below recommends for it.
         enum {
             JV2_NO_PROBLEM = 0,
             JV2_METRIC_LIST_SIZE_OVERFLOWS,
@@ -1567,8 +1573,8 @@ static void update_metrics_first_time_s(struct dbengine_tier *ctx, struct dbengi
     // find_uuid_first_time() (which registers its own frame), and the final
     // cleanup -- masking unrelated faults that might land in the mmap range
     // and inflating nesting depth unnecessarily.
-    // reported after the frame below is gone, never inside it: a sink faulting under the guard is siglongjmped
-    // out of, skipping its own cleanup
+    // reported after the frame below is gone rather than under it, for the reason the comment below already
+    // gives for scoping the frame tightly: an armed frame covers memory this code has stopped walking
     bool metric_list_overflows_file = false;
     size_t overflow_metric_offset = 0, overflow_list_size = 0, overflow_file_size = 0;
     {
