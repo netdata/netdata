@@ -14,7 +14,11 @@
 #include <unistd.h>
 
 #include <cerrno>
+#include <cstdarg>
+#include <cstdio>
+#include <cstring>
 #include <cstdlib>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -29,6 +33,67 @@
 // runs, and netdata_test_config() puts the same number in the configuration.
 #define DBENGINE_TEST_UV_THREADS (16)
 
+// Where every engine in this binary sends its diagnostics, and why that is not the process's log.
+//
+// A case that passes says nothing; a case that fails wants everything the engine said while it ran. Left on
+// netdata's logger those two are the same stream, interleaved with every other case's, and the suite prints some
+// four hundred lines per run that nobody reads until the one run that matters, when they are no longer
+// distinguishable. The sink separates them: the lines are buffered here and the listener in main.cc prints a
+// case's buffer only when that case failed.
+//
+// What the sink may do is fixed by the contract at dbengine_log_fn (dbengine-config.h), and it is narrow: called
+// from any engine thread, possibly with an engine lock held, possibly after dbengine_destroy() has been asked to
+// run. So it formats into its own buffer, takes one mutex of its own, appends, and returns - it calls nothing in
+// the engine and waits for nothing an engine thread could be waiting for. The buffer has a ceiling because a case
+// that loops while logging should not take the runner's memory with it.
+struct NetdataTestLogCapture {
+    std::mutex mutex;
+    std::string text;
+    bool truncated = false;
+};
+
+inline NetdataTestLogCapture &netdata_test_log_capture() {
+    static NetdataTestLogCapture capture;
+    return capture;
+}
+
+#define NETDATA_TEST_LOG_CAPTURE_MAX (1024 * 1024)
+
+extern "C" inline void netdata_test_log_sink(void *data, ND_LOG_FIELD_PRIORITY priority,
+                                             const char *file, const char *function, unsigned long line,
+                                             const char *fmt, va_list ap) {
+    char message[4096];
+    const int len = vsnprintf(message, sizeof(message), fmt, ap);
+    if (len < 0)
+        return;
+
+    NetdataTestLogCapture *capture = static_cast<NetdataTestLogCapture *>(data);
+    std::lock_guard<std::mutex> lock(capture->mutex);
+
+    if (capture->text.size() >= NETDATA_TEST_LOG_CAPTURE_MAX) {
+        capture->truncated = true;
+        return;
+    }
+
+    // __FILE__ is whatever absolute path the build used; the tail from src/ is shorter and still locates the line
+    const char *shown = file ? file : "?";
+    if (const char *src = strstr(shown, "/src/"))
+        shown = src + 5;
+
+    capture->text += "    [";
+    capture->text += nd_log_id2priority(priority);
+    capture->text += "] ";
+    capture->text += shown;
+    capture->text += ":";
+    capture->text += std::to_string(line);
+    capture->text += " ";
+    capture->text += function ? function : "?";
+    capture->text += "(): ";
+    capture->text += message;
+    if (capture->text.empty() || capture->text.back() != '\n')
+        capture->text += "\n";
+}
+
 // The page allocator layer is process-wide and one-shot: the first engine in a process fixes its partitions and
 // size classes, and a later engine asking for different ones is logged and ignored. A suite that let two
 // configurations exist would get either a false red or a false green depending on the order its cases ran in. It is
@@ -41,6 +106,10 @@ inline struct dbengine_config netdata_test_config() {
     cfg.cpus = 2;
     cfg.allocator.partitions = 2;
     cfg.libuv_worker_threads = DBENGINE_TEST_UV_THREADS;
+
+    // every engine in this binary is created from here, so every engine's diagnostics are captured
+    cfg.log_sink = netdata_test_log_sink;
+    cfg.log_sink_data = &netdata_test_log_capture();
 
     return cfg;
 }
