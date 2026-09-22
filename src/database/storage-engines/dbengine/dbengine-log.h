@@ -9,8 +9,8 @@
 //
 // Every line the engine emits goes through a macro here, and every macro takes the engine that is emitting it as
 // its first argument. Where the line then goes is the engine's configuration's business (log_sink,
-// dbengine-config.h): with no sink - the default, and what the engine has always done - it goes to netdata's
-// logger; with a sink it goes there instead, and not to the logger.
+// dbengine-config.h): with no sink - the default - it goes where it went before this layer existed (netdata's
+// logger; stderr for the teardown narration); with a sink it goes there instead.
 //
 // The branch is at the call site, deliberately. Each macro expands to the sink test, the sink call, and *the exact
 // call that stood at that site before this layer existed*, unchanged, as the other arm. So "with no sink the engine
@@ -26,6 +26,8 @@
 // - The sink has no priority filter either. netdata's logger drops a line below the source's configured minimum
 //   before anything else happens; the sink is handed every line and decides for itself. An embedder that wants the
 //   logger's thresholds implements them in the sink.
+// - The sink has no per-source flood limit. netdata's logger caps how many lines a source writes per period; the
+//   sink gets every line a site's own rate limit lets through.
 //
 // What stays outside this layer, and why: the process-wide page-data allocators (page.c) have no engine to reach
 // at the sites that report a bad page - pgd_init_arals() is the exception and takes one -
@@ -40,7 +42,7 @@ struct dbengine_engine;
 //
 // The cost, stated honestly because the next reader will want it: one cross-TU call per emission *attempt*, not
 // per line emitted. Only dbengine_log_debug and dbengine_internal_error gate before it (on the debug flag and on
-// their condition); the other five reach it every time, including on an attempt a rate limiter is about to drop
+// their condition); the other six reach it every time, including on an attempt a rate limiter is about to drop
 // and on one the logger's priority threshold would have dropped. No site in the engine is hot enough for that to
 // matter today - the ones that looked like candidates all sit behind an unlikely() failure test - but a site that
 // logged on a hot path would pay it.
@@ -58,7 +60,8 @@ void dbengine_log_emit_limit(struct dbengine_engine *engine, ERROR_LIMIT *erl, N
                              const char *file, const char *function, unsigned long line,
                              const char *fmt, ...) PRINTFLIKE(7, 8);
 
-// The families. The engine expression is evaluated once, and only when the family's own gate has passed.
+// The families. The engine expression is evaluated once: by dbengine_log_debug and dbengine_internal_error only when
+// their own gate has passed, by the others on every attempt.
 
 #define dbengine_log_error(engine, args...) do {                                                    \
         struct dbengine_engine *_dbengine_log_e = (engine);                                         \

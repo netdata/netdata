@@ -2,8 +2,8 @@
 
 #include "rrdengine.h"
 
-// The sink arm of the macros in dbengine-log.h. Everything here runs only for an engine that has a sink: the
-// no-sink arm never reaches this file, it is libnetdata's own call, made at the site.
+// The sink arm of the macros in dbengine-log.h. dbengine_log_has_sink() runs on every attempt, sink or not; the rest
+// runs only for an engine that has one - the no-sink arm is libnetdata's own call, made at the site.
 
 bool dbengine_log_has_sink(struct dbengine_engine *engine) {
     return engine && engine->cfg.log_sink;

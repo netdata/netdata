@@ -30,75 +30,61 @@ typedef struct dbengine_engine DBENGINE_ENGINE;
 // inside dbengine_create()), so it names the tier and the engine resolves it.
 typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid);
 
-// Where the engine's diagnostics go (log_sink in the configuration below). NULL, the default, is the behaviour the
-// engine has always had: each line goes where it always went - netdata's logger on the daemon's source for nearly
-// all of them, its debug source for the debug-flag lines, and stderr for the few written while the caches are torn
-// down. A non-NULL sink takes them instead, and none of those lines reach the logger or stderr.
+// Where the engine's diagnostics go (log_sink in the configuration below). With NULL, the default, each line keeps
+// the route it had before there was a sink: netdata's logger on the daemon source, its debug source for the
+// debug-flag lines, stderr for the teardown narration. With a sink, those lines go to the sink and not there.
 //
-// - Called with log_sink_data verbatim, a severity, the emission site inside the engine (the __FILE__,
-//   __FUNCTION__ and __LINE__ of the line that emitted, not of any wrapper), a printf format and its arguments as
-//   a va_list. Format and va_list are valid for the call and not after it; a sink that keeps the message formats
-//   its own copy, and one that reads the arguments twice va_copy()s first. Most formats carry no trailing
-//   newline; the handful the engine writes while tearing its caches down do, because without a sink they are an
-//   fprintf(stderr) and always have been, and so do the two a file check reports ("Not a regular file.", "File
-//   length is too short."). A sink that adds its own line ending should not assume either way.
-// - Called from any thread the engine uses - the caller's own thread inside a public verb, the engine's event
-//   loop, a libuv pool worker, a cache's eviction thread - and two calls may overlap. The sink serialises itself;
-//   the engine takes no lock for it.
-// - May be called with any engine lock held. A cache queue lock, a datafile users spinlock, a journalfile data
-//   spinlock and a tier's datafile rwlock (held as a reader, while the engine walks a tier's datafile list) are
-//   the ones to picture, but the list is not exhaustive and is not meant to be: treat it as "a lock is held".
-//   A sink MUST NOT call back into the engine, and MUST NOT block on anything an engine thread can wait for: a
-//   sink that blocks while a lock is held stalls whatever that lock guards, and one that blocks on a pool thread
-//   can hang the process for good, for the reason libuv_worker_threads below gives.
-// - Receives the message and nothing netdata's logger adds around it. In particular the logger annotates a line
-//   on the daemon source with the caller's errno; a sink gets the format and the arguments only. It may read
-//   errno itself during the call - the save and restore below make that well defined.
-// - Must return. A sink that longjmp()s out, or ends the process, does it from wherever the engine happened to
-//   be: mid-way through a rate limiter's window update, inside a guarded read of a mapped journal, holding a
-//   cache queue lock. The engine has no way to finish what it was doing.
-// - The engine saves and restores errno around the call, so a caller that reads errno after an engine verb is
-//   unaffected by the sink.
-// - May be called after dbengine_shutdown(), from inside dbengine_destroy(), and - when the engine was retained
-//   because something was still referenced - from whichever thread later releases the last of it. The sink and
-//   its data must stay callable until the embedder has released every handle it took from the engine (metric
-//   handles, collection and query handles, anything holding a cache page, and the preload references
-//   dbengine_preload_release() drops) AND a dbengine_destroy() has run after that. The return value alone does
-//   not say when that is: it counts registry metrics only, so it can be 0 while a cache the engine still points
-//   at holds referenced pages, and that cache can emit. Nothing else reports it either, so "nothing retained" is
-//   not a state the embedder can observe - and an engine can be retained for a reason that is not the embedder's
-//   doing. The rule an embedder can actually follow, and the one the engine's own test suite follows, is to give
-//   the sink and its data the lifetime of the process.
-// - Never called after the engine is freed, and never for what the engine cannot survive: fatal() and
-//   internal_fatal() end the process through netdata's logger whatever this field holds.
-// - Does not receive every line the engine's work produces, for two separate reasons.
+// What the sink receives
+// - log_sink_data verbatim; a severity (NDLP_ERR, NDLP_WARNING, NDLP_NOTICE, NDLP_INFO or NDLP_DEBUG); the __FILE__,
+//   __FUNCTION__ and __LINE__ of the engine line that emitted; a printf format and its va_list. Both are valid only
+//   during the call: copy the message to keep it, va_copy() to read the arguments twice.
+// - The message only, nothing netdata's logger adds (such as its errno annotation). errno during the call is the
+//   emitting site's; the engine restores the caller's errno after the sink returns.
+// - Most formats end without a newline; the teardown narration and two file-check lines ("Not a regular file.",
+//   "File length is too short.") end with one.
 //
-//   Some lines have no engine to route through, and go to netdata's logger: the process-wide page-data layer, the
-//   public verbs that reject a NULL storage instance - which is exactly when there is no engine to ask - and a
-//   failed protected read of a mapped journal, which libnetdata's own recovery reports (see the next item).
+// When and where it is called
+// - From any engine thread - a caller's thread inside a public verb, the event loop, a libuv pool worker, a cache's
+//   eviction thread - and calls may overlap. The sink serialises itself; the engine takes no lock for it.
+// - With any engine lock possibly held: a cache queue lock, a datafile or journalfile spinlock, a tier's datafile
+//   rwlock. The list is not exhaustive.
+// - After dbengine_shutdown(), inside dbengine_destroy(), and, for an engine that destroy left retained, from
+//   whichever thread later releases the last reference.
+// - While a guarded read of a mapped journal is armed. The guard recovers a fault only at an address inside the
+//   range it registered, and the engine keeps two rules that a new emission site or guarded read must keep too: no
+//   line the sink receives points into a mapped journal (a site formats a value out of a mapping), and the sink is
+//   never called while a guard is armed over a range the engine has unmapped (a failed unmap leaves the range
+//   mapped, and is reported under its guard). A sink that faults on its own memory faults as it would unguarded.
 //
-//   And some lines are dropped before the sink is reached, by the gate the emitting site has always had: a rate
-//   limited site emits once per its own window (a limiter shared by several threads can let a second line through
-//   when two of them reach it at the same moment), a debug site emits only when the matching debug flag is
-//   set, and a build without internal checks compiles its internal-error sites out entirely. The sink decides
-//   what to do with what it is given; it does not see what the site itself did not emit.
-// - May be called while the engine is inside a guarded read of a mapped journal. The guard recovers a fault only
-//   at an address inside the range it registered, so two rules keep a sink out of that recovery, and a new
-//   emission site or a new guarded read must keep both: no line the sink receives points into a mapped journal -
-//   a site formats a value out of a mapping rather than passing a pointer into one - and the sink is never called
-//   while a guard is armed over a range the engine has unmapped, because whatever later occupies that range could
-//   be the sink's own memory. (An unmap that fails leaves the range mapped, and its failure is reported while the
-//   guard is still armed.) With both held, a sink that faults on its own memory faults exactly as it would with no
-//   guard armed; it is never diverted into the engine's recovery path.
+// What the sink MUST NOT do
+// - Call into any engine in the process.
+// - Block on anything an engine thread may wait for. Blocking with an engine lock held stalls what that lock
+//   guards; blocking a pool thread can hang the process (libuv_worker_threads below).
+// - Take a lock that any thread may hold while it calls into an engine: that thread and the engine thread calling
+//   the sink can deadlock. Its locks are leaf locks.
+// - Fail to return: no longjmp(), exit() or C++ exception out of it. The engine is mid-operation - inside a rate
+//   limiter's update or a guarded read, holding a lock - and cannot finish.
 //
-//   The recovery itself is the host's to provide. Reading a mapped journal that turns out to be truncated or
-//   unreadable raises SIGBUS or SIGSEGV, and the engine survives it only if the process's handler for those
-//   signals is installed with SA_SIGINFO and calls libnetdata's signal_protected_access_check() first, as the
-//   daemon's does (nd_initialize_signals()). With no handler at all the fault terminates the process, on a damaged
-//   file the engine would otherwise have skipped or rebuilt; a handler that does not make that call gets no
-//   recovery either, and what follows is up to it. When a fault is recovered, the report of it is libnetdata's and
-//   goes to netdata's logger; for some guarded reads it is the only report there is, so a sink may hear nothing
-//   about a journal the engine skipped.
+// What never reaches the sink
+// - Lines with no engine to route through, which go to netdata's logger: the process-wide page-data layer, the
+//   public verbs that reject a NULL storage instance, and what libnetdata logs itself while the engine calls it -
+//   a fault it recovered in a guarded read (for some reads the only report of a journal the engine then skips) and
+//   the failures of its file-mapping and madvise() helpers.
+// - fatal() and internal_fatal(), which end the process through netdata's logger.
+// - Lines a site's own gate drops. A debug site emits only in a build with internal checks, and only while
+//   libnetdata's process-wide debug_flags asks for it; an internal-error site only in a build with internal checks.
+//   A rate-limited site emits once per its window, and the window belongs to the call site for the whole process
+//   (or, for a thread-local limiter, the thread), not to an engine: one engine's line can use the window another
+//   engine's same line needed, and two threads reaching a shared limiter together can both get through.
+//
+// How long it must live
+// - Until every handle taken from the engine is released (metric, collection and query handles, anything holding a
+//   cache page, the preload references dbengine_preload_release() drops) and one dbengine_destroy() has run after
+//   that; destroy is called once. Its return value does not mark that point: it counts registry metrics only, and
+//   an engine can stay retained for reasons that are not the embedder's. In practice, give the sink and its data
+//   the lifetime of the process - in C++, storage that is never destroyed, since static destructors run at exit
+//   while a retained engine's threads may still call the sink.
+// - It is never called after the engine is freed.
 typedef void (*dbengine_log_fn)(
         void *data,                             // log_sink_data, verbatim
         ND_LOG_FIELD_PRIORITY priority,
@@ -193,8 +179,8 @@ struct dbengine_config {
                                                 // knows through add(), so the registry is populated in one pass instead
                                                 // of metric by metric as the journals are read; returns the count
 
-    dbengine_log_fn log_sink;                   // where this engine's diagnostics go; NULL = netdata's logger, as
-                                                // it has always been. The contract is at dbengine_log_fn above
+    dbengine_log_fn log_sink;                   // where this engine's diagnostics go; NULL keeps each line on its
+                                                // original route. The contract is at dbengine_log_fn above
     void *log_sink_data;                        // handed to log_sink unchanged; the engine never reads it
 };
 
@@ -279,6 +265,12 @@ struct dbengine_tier_config {
 // when default_update_every_s is negative. Returns the engine, or NULL, with the reason logged: the libuv error
 // that stopped the loop from coming up (nothing is left behind, as if never called). Another engine, live,
 // stopped or retained, is no obstacle: each has its tiers of its own.
+//
+// A mapped journal that turns out to be truncated or unreadable raises SIGBUS or SIGSEGV while the engine reads it,
+// and the engine recovers - skipping or rebuilding that file - only if the process's handler for those signals is
+// installed with SA_SIGINFO and calls libnetdata's signal_protected_access_check() first, as the daemon's does
+// (nd_initialize_signals()). With no handler the fault terminates the process; a handler that does not make that
+// call gets no recovery either.
 DBENGINE_ENGINE *dbengine_create(const struct dbengine_config *cfg);
 
 // Release the references preload_metrics() left on the registry, once every tier has come up (after the last

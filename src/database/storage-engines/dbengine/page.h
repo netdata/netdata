@@ -25,7 +25,7 @@ typedef struct pgd PGD;
 #define PGD_EMPTY (PGD *)(-1)
 
 // the engine is only for the one line this can emit - the layer itself is process-wide and belongs to no
-// engine. NULL from the callers that have none (the allocator self-test, the page test's main)
+// engine. NULL from the callers that have none (the allocator self-test and the layer's unit tests)
 void pgd_init_arals(struct dbengine_engine *engine, const struct dbengine_allocator_config *cfg);
 uintptr_t dbengine_allocator_layer_fingerprint(void);
 

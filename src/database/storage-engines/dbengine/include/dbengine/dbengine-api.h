@@ -29,9 +29,10 @@ extern "C" {
 // around and reaches them by number through dbengine_tier().
 //
 // Where the engine's diagnostics go is the embedder's to decide too: the log_sink of the configuration takes the
-// lines the engine emits, and the engine's own default (NULL) is netdata's logger, which is what it has always
-// done. The full contract - the threads it is called from, the locks that may be held, what it does not receive,
-// and how long it must stay callable after dbengine_destroy() - is at dbengine_log_fn in dbengine-config.h.
+// lines the engine emits, and with none (NULL) each line keeps its original route - netdata's logger, stderr for the
+// teardown narration. The full contract - the threads it is called from, the locks that may be held, what it does
+// not receive, and how long it must stay callable after dbengine_destroy() - is at dbengine_log_fn in
+// dbengine-config.h.
 struct dbengine_tier;
 
 // the engine's tier by number, 0 to RRD_STORAGE_TIERS - 1: the tier that dbengine_tier_init() with that number
