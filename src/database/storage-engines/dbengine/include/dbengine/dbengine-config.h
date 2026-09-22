@@ -30,6 +30,37 @@ typedef struct dbengine_engine DBENGINE_ENGINE;
 // inside dbengine_create()), so it names the tier and the engine resolves it.
 typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid);
 
+// Where the engine's diagnostics go (log_sink in the configuration below). NULL, the default, is the behaviour the
+// engine has always had: every line goes to netdata's logger on the daemon's source. A non-NULL sink takes them
+// instead, and none of those lines reach the logger.
+//
+// - Called with log_sink_data verbatim, a severity, the emission site inside the engine (the __FILE__,
+//   __FUNCTION__ and __LINE__ of the line that emitted, not of any wrapper), a printf format and its arguments as
+//   a va_list. Format and va_list are valid for the call and not after it; a sink that keeps the message formats
+//   its own copy, and one that reads the arguments twice va_copy()s first.
+// - Called from any thread the engine uses - the caller's own thread inside a public verb, the engine's event
+//   loop, a libuv pool worker, a cache's eviction thread - and two calls may overlap. The sink serialises itself;
+//   the engine takes no lock for it.
+// - May be called with an engine lock held: a cache queue lock, a datafile users spinlock, a journalfile data
+//   spinlock. A sink MUST NOT call back into the engine, and MUST NOT block on anything an engine thread can wait
+//   for: a sink that blocks on a pool thread can hang the process for good, for the reason libuv_worker_threads
+//   below gives.
+// - The engine saves and restores errno around the call, so a caller that reads errno after an engine verb is
+//   unaffected by the sink.
+// - May be called after dbengine_shutdown(), from inside dbengine_destroy(), and - when dbengine_destroy()
+//   reported metrics or cache pages still referenced - from whichever thread later releases the last of them. The
+//   sink and its data must stay callable until a dbengine_destroy() has returned 0, not merely until one returned.
+// - Never called after the engine is freed, and never for what the engine cannot survive: fatal() and
+//   internal_fatal() end the process through netdata's logger whatever this field holds.
+// - Does not receive every line the engine's work produces. The process-wide page-data layer has no engine to
+//   reach, and a failed protected read of a mapped journal is reported by libnetdata's own recovery; those go to
+//   netdata's logger.
+typedef void (*dbengine_log_fn)(
+        void *data,                             // log_sink_data, verbatim
+        ND_LOG_FIELD_PRIORITY priority,
+        const char *file, const char *function, unsigned long line,
+        const char *fmt, va_list ap);
+
 // The storage engine's configuration.
 //
 // Whoever embeds the engine (the daemon; a test) fills one of these from its own sources and
@@ -117,6 +148,10 @@ struct dbengine_config {
                                                 // tier loads its journals: feed every metric uuid the embedder already
                                                 // knows through add(), so the registry is populated in one pass instead
                                                 // of metric by metric as the journals are read; returns the count
+
+    dbengine_log_fn log_sink;                   // where this engine's diagnostics go; NULL = netdata's logger, as
+                                                // it has always been. The contract is at dbengine_log_fn above
+    void *log_sink_data;                        // handed to log_sink unchanged; the engine never reads it
 };
 
 #define DBENGINE_DEFAULT_PAGES_PER_EXTENT (109)
@@ -165,6 +200,8 @@ struct dbengine_config {
     .reserved_libuv_worker_threads = 0,                         \
     .on_db_rotation = NULL,                                     \
     .preload_metrics = NULL,                                    \
+    .log_sink = NULL,                                           \
+    .log_sink_data = NULL,                                      \
 }
 
 // the same defaults as a value, for a caller that cannot use the initialiser (one that fills the struct at run
