@@ -265,3 +265,196 @@ fn read_errors_reach_the_cache_log_redacted() {
     let nf = read_error_to_anyhow("v2/logs/x.sfst", StorageError::NotFound);
     assert!(format!("{nf:#}").contains("remote object not found"));
 }
+
+// ── migrate_read_cache ──────────────────────────────────────────────
+
+/// A base dir with the old (`logs/remote-read`) and new (`remote-read`)
+/// cache locations; neither exists yet.
+struct Layout {
+    _base: tempfile::TempDir,
+    old: PathBuf,
+    new: PathBuf,
+}
+
+fn layout() -> Layout {
+    let base = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(base.path().join("logs")).unwrap();
+    Layout {
+        old: base.path().join("logs").join("remote-read"),
+        new: base.path().join("remote-read"),
+        _base: base,
+    }
+}
+
+/// A directory holding `files` (name, bytes).
+fn dir_with(dir: &Path, files: &[(&str, &[u8])]) {
+    std::fs::create_dir_all(dir).unwrap();
+    for (name, bytes) in files {
+        std::fs::write(dir.join(name), bytes).unwrap();
+    }
+}
+
+/// Sorted names directly inside `dir`.
+fn names_in(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    names
+}
+
+fn exists(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok()
+}
+
+#[test]
+fn the_old_cache_is_moved_to_the_new_location() {
+    let l = layout();
+    dir_with(&l.old, &[(&filename(1), b"one")]);
+
+    migrate_read_cache(&l.old, &l.new);
+
+    assert!(!exists(&l.old));
+    assert_eq!(names_in(&l.new), [filename(1)]);
+    assert_eq!(std::fs::read(l.new.join(filename(1))).unwrap(), b"one");
+}
+
+#[test]
+fn an_absent_old_cache_changes_nothing() {
+    let l = layout();
+
+    migrate_read_cache(&l.old, &l.new);
+
+    assert!(!exists(&l.old));
+    assert!(!exists(&l.new));
+}
+
+#[test]
+fn an_old_cache_beside_a_new_one_is_emptied_and_removed() {
+    let l = layout();
+    dir_with(&l.old, &[(&filename(1), b"old"), ("x.sfst.tmp", b"torn")]);
+    dir_with(&l.new, &[(&filename(2), b"new")]);
+
+    migrate_read_cache(&l.old, &l.new);
+
+    assert!(!exists(&l.old));
+    assert_eq!(names_in(&l.new), [filename(2)]);
+}
+
+#[test]
+fn a_failed_move_removes_the_old_cache() {
+    let l = layout();
+    dir_with(&l.old, &[(&filename(1), b"old")]);
+
+    migrate_read_cache_with(&l.old, &l.new, |_, _| {
+        Err(io::Error::from(io::ErrorKind::CrossesDevices))
+    });
+
+    assert!(!exists(&l.old));
+    assert!(!exists(&l.new), "the cache creates it when it opens");
+}
+
+#[test]
+fn files_the_cache_did_not_write_are_kept() {
+    let l = layout();
+    dir_with(
+        &l.old,
+        &[(&filename(1), b"old"), ("notes.txt", b"operator"), ("y.tmp", b"torn")],
+    );
+    std::fs::create_dir(l.old.join("sub")).unwrap();
+    dir_with(&l.new, &[]);
+
+    migrate_read_cache(&l.old, &l.new);
+
+    assert_eq!(names_in(&l.old), ["notes.txt", "sub"]);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_linked_old_cache_keeps_pointing_at_its_directory() {
+    let l = layout();
+    let target = tempfile::tempdir().unwrap();
+    dir_with(target.path(), &[(&filename(1), b"one")]);
+    // A relative link: moving it as-is would change what it points to.
+    let relative = pathdiff(target.path(), l.old.parent().unwrap());
+    std::os::unix::fs::symlink(&relative, &l.old).unwrap();
+
+    migrate_read_cache(&l.old, &l.new);
+
+    assert!(!exists(&l.old));
+    assert_eq!(
+        std::fs::read_link(&l.new).unwrap(),
+        std::fs::canonicalize(target.path()).unwrap()
+    );
+    assert_eq!(names_in(&l.new), [filename(1)]);
+}
+
+#[cfg(unix)]
+#[test]
+fn any_other_old_link_is_removed_alone() {
+    // Beside an existing new cache.
+    let l = layout();
+    let target = tempfile::tempdir().unwrap();
+    dir_with(target.path(), &[(&filename(1), b"one")]);
+    std::os::unix::fs::symlink(target.path(), &l.old).unwrap();
+    dir_with(&l.new, &[(&filename(2), b"new")]);
+
+    migrate_read_cache(&l.old, &l.new);
+
+    assert!(!exists(&l.old));
+    assert_eq!(names_in(target.path()), [filename(1)], "the target is untouched");
+    assert_eq!(names_in(&l.new), [filename(2)]);
+
+    // Dangling.
+    let l = layout();
+    std::os::unix::fs::symlink(l.old.parent().unwrap().join("gone"), &l.old).unwrap();
+
+    migrate_read_cache(&l.old, &l.new);
+
+    assert!(!exists(&l.old));
+    assert!(!exists(&l.new));
+}
+
+#[test]
+fn an_old_cache_that_is_not_a_directory_is_left() {
+    let l = layout();
+    std::fs::write(&l.old, b"not a directory").unwrap();
+
+    migrate_read_cache(&l.old, &l.new);
+
+    assert_eq!(std::fs::read(&l.old).unwrap(), b"not a directory");
+    assert!(!exists(&l.new));
+}
+
+#[test]
+fn a_moved_cache_reopens_with_its_files_and_without_torn_writes() {
+    let l = layout();
+    dir_with(&l.old, &[(&filename(1), b"one"), ("z.tmp", b"torn")]);
+
+    migrate_read_cache(&l.old, &l.new);
+    let cache = FileCache::open(&l.new, MIB).unwrap();
+
+    assert!(cache.is_cached(&filename(1)));
+    assert_eq!(names_in(&l.new), [filename(1)]);
+}
+
+/// `path` relative to `base` (both absolute; `base` has no symlinks).
+#[cfg(unix)]
+fn pathdiff(path: &Path, base: &Path) -> PathBuf {
+    let path = std::fs::canonicalize(path).unwrap();
+    let base = std::fs::canonicalize(base).unwrap();
+    let common = path
+        .components()
+        .zip(base.components())
+        .take_while(|(a, b)| a == b)
+        .count();
+    let mut out = PathBuf::new();
+    for _ in base.components().skip(common) {
+        out.push("..");
+    }
+    for part in path.components().skip(common) {
+        out.push(part);
+    }
+    out
+}

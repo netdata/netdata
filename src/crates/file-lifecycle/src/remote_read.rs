@@ -14,8 +14,13 @@
 //! instead of each waiting out its own deadline; an absent object fails alone.
 //! An object another query is already downloading is awaited until that query
 //! finishes with it (bounded by its own deadline and the cache's retry limit).
+//!
+//! One download cache serves every signal. [`migrate_read_cache`] moves the
+//! logs-only cache earlier versions kept to the shared location at startup.
 
 use std::collections::{HashMap, HashSet};
+use std::io;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
@@ -210,6 +215,175 @@ fn read_error_to_anyhow(key: &str, e: StorageError) -> anyhow::Error {
     match e {
         StorageError::NotFound => anyhow::anyhow!("remote object not found: {key}"),
         other => anyhow::anyhow!("remote read failed for {key}: {other}"),
+    }
+}
+
+/// Move the download cache an earlier version kept at `old` (the logs-only
+/// `{base_dir}/logs/remote-read`) to `new` (the shared `{base_dir}/remote-read`),
+/// before the cache at `new` is opened. Never fails: every problem is logged
+/// and the cache starts from whatever `new` holds (it is only a cache).
+///
+/// - `old` absent: nothing to do.
+/// - `old` a symlink to a directory and `new` absent: `new` becomes a symlink to
+///   the directory `old` resolves to (the disk the operator chose; moving a
+///   relative link would change its target) and the old link is removed. Any
+///   other symlink: only the link is removed.
+/// - `old` not a directory: logged and left.
+/// - `new` absent: `old` is renamed to `new`.
+/// - `new` present, or the rename failed (another filesystem, permissions, a
+///   mount point): `old`'s cached files and interrupted writes are removed,
+///   then `old` itself when empty; anything else is logged and left.
+pub fn migrate_read_cache(old: &Path, new: &Path) {
+    migrate_read_cache_with(old, new, |from, to| std::fs::rename(from, to));
+}
+
+fn migrate_read_cache_with(
+    old: &Path,
+    new: &Path,
+    rename: impl Fn(&Path, &Path) -> io::Result<()>,
+) {
+    let old_meta = match std::fs::symlink_metadata(old) {
+        Ok(meta) => meta,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return,
+        Err(e) => {
+            tracing::warn!(
+                "remote-read cache migration: cannot inspect {}: {e}; left in place",
+                old.display()
+            );
+            return;
+        }
+    };
+    // Anything other than a clean "absent" counts as present: never rename
+    // over something that may exist.
+    let new_absent = matches!(
+        std::fs::symlink_metadata(new),
+        Err(e) if e.kind() == io::ErrorKind::NotFound
+    );
+    if old_meta.file_type().is_symlink() {
+        migrate_symlink(old, new, new_absent);
+        return;
+    }
+    if !old_meta.is_dir() {
+        tracing::warn!(
+            "remote-read cache migration: {} is not a directory; left in place",
+            old.display()
+        );
+        return;
+    }
+    if new_absent {
+        match rename(old, new) {
+            Ok(()) => {
+                tracing::info!(
+                    "remote-read cache moved from {} to {}",
+                    old.display(),
+                    new.display()
+                );
+                return;
+            }
+            Err(e) => tracing::warn!(
+                "remote-read cache migration: cannot move {} to {}: {e}; removing the old cache",
+                old.display(),
+                new.display()
+            ),
+        }
+    }
+    remove_old_cache(old);
+}
+
+/// The old cache location is a symlink: keep pointing at the operator's
+/// directory from the new location when possible, and drop the old link.
+fn migrate_symlink(old: &Path, new: &Path, new_absent: bool) {
+    let target = std::fs::canonicalize(old);
+    #[cfg(unix)]
+    if new_absent
+        && let Ok(target) = &target
+        && target.is_dir()
+    {
+        match std::os::unix::fs::symlink(target, new) {
+            Ok(()) => {
+                if let Err(e) = std::fs::remove_file(old) {
+                    tracing::warn!(
+                        "remote-read cache migration: cannot remove the old link {}: {e}",
+                        old.display()
+                    );
+                }
+                tracing::info!(
+                    "remote-read cache link moved from {} to {} (pointing to {})",
+                    old.display(),
+                    new.display(),
+                    target.display()
+                );
+                return;
+            }
+            Err(e) => tracing::warn!(
+                "remote-read cache migration: cannot create {} as a link to {}: {e}",
+                new.display(),
+                target.display()
+            ),
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = new_absent;
+    let target = match &target {
+        Ok(target) => target.display().to_string(),
+        Err(e) => format!("an unresolvable target ({e})"),
+    };
+    match std::fs::remove_file(old) {
+        Ok(()) => tracing::info!(
+            "remote-read cache migration: removed the old link {} (it pointed to {target})",
+            old.display()
+        ),
+        Err(e) => tracing::warn!(
+            "remote-read cache migration: cannot remove the old link {} (pointing to {target}): {e}",
+            old.display()
+        ),
+    }
+}
+
+/// Remove the old cache's own files — cached downloads and interrupted
+/// writes — then the directory if nothing else is in it.
+fn remove_old_cache(old: &Path) {
+    let entries = match std::fs::read_dir(old) {
+        Ok(entries) => entries,
+        Err(e) => {
+            tracing::warn!(
+                "remote-read cache migration: cannot read {}: {e}; left in place",
+                old.display()
+            );
+            return;
+        }
+    };
+    let mut kept: Vec<PathBuf> = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_cache_file = entry.file_type().is_ok_and(|t| t.is_file())
+            && (file_registry::durable::is_tmp(&path)
+                || file_registry::FileDir::parse(&path, SFST_EXT).is_some());
+        if !is_cache_file {
+            kept.push(path);
+            continue;
+        }
+        if let Err(e) = std::fs::remove_file(&path) {
+            tracing::warn!(
+                "remote-read cache migration: cannot remove {}: {e}",
+                path.display()
+            );
+            kept.push(path);
+        }
+    }
+    if !kept.is_empty() {
+        tracing::warn!(
+            "remote-read cache migration: left {} in place; it holds entries the cache did not write: {kept:?}",
+            old.display()
+        );
+        return;
+    }
+    match std::fs::remove_dir(old) {
+        Ok(()) => tracing::info!("remote-read cache migration: removed the old cache {}", old.display()),
+        Err(e) => tracing::warn!(
+            "remote-read cache migration: cannot remove {}: {e}",
+            old.display()
+        ),
     }
 }
 

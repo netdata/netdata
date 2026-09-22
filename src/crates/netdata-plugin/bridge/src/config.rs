@@ -19,20 +19,20 @@ use crate::signals::Signal;
 /// Each worker reads the fields it needs.
 ///
 /// Directory layout is derived, not configured per signal: one mandatory
-/// [`base_dir`](Self::base_dir) roots everything, and each signal's WAL, index,
-/// catalog, and remote-read cache live under `{base_dir}/{signal}/...`
-/// (see [`lifecycle_for`](Self::lifecycle_for)). Remote storage and tenant auth
-/// are global (one policy for the process); only rotation/retention/crc tuning
-/// is per signal.
+/// [`base_dir`](Self::base_dir) roots everything, and each signal's WAL, index
+/// and catalog live under `{base_dir}/{signal}/...` (see
+/// [`lifecycle_for`](Self::lifecycle_for)). Remote storage, its download cache
+/// and tenant auth are global (one policy for the process); only
+/// rotation/retention/crc tuning is per signal.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PluginConfig {
     pub endpoint: EndpointConfig,
     pub metrics: MetricsConfig,
     /// Single mandatory root for all signal storage. The plugin derives each
-    /// signal's subtree as `{base_dir}/{signal}/{wal,index,catalog}` plus the
-    /// per-signal remote-read cache `{base_dir}/{signal}/remote-read`;
-    /// cross-signal state (the seq high-water file) lives under
+    /// signal's subtree as `{base_dir}/{signal}/{wal,index,catalog}`; the
+    /// download cache shared by every signal is `{base_dir}/remote-read`, and
+    /// other cross-signal state (the seq high-water file) lives under
     /// `{base_dir}/shared/`.
     pub base_dir: PathBuf,
     /// Remote object storage — global across signals (one on/off + one
@@ -103,8 +103,20 @@ impl PluginConfig {
                 rotation_period: tuning.catalog.rotation_period,
             },
             ingest: tuning.ingest.clone(),
-            read_cache_dir: root.join("remote-read"),
         }
+    }
+
+    /// The download cache every signal reads remote files back through:
+    /// `{base_dir}/remote-read`. Used only when remote storage is enabled.
+    pub fn read_cache_dir(&self) -> PathBuf {
+        self.base_dir.join("remote-read")
+    }
+
+    /// Where earlier versions kept the (then logs-only) download cache,
+    /// `{base_dir}/logs/remote-read`; migrated to
+    /// [`read_cache_dir`](Self::read_cache_dir) at startup.
+    pub fn legacy_read_cache_dir(&self) -> PathBuf {
+        self.base_dir.join(Signal::Logs.segment()).join("remote-read")
     }
 
     /// Canonical location of the signal-neutral seq high-water file. Lives under
@@ -331,16 +343,12 @@ pub struct LifecycleConfig {
     /// Ingestion time-bounds (P3): the ingestor enforces them per record; the
     /// ledger derives its reconcile LIST window from `ingest.max_age`.
     pub ingest: IngestConfig,
-    /// Derived local directory for this signal's remote-read cache
-    /// (`{base_dir}/{signal}/remote-read`). Used only when the shell has remote
-    /// storage enabled.
-    pub read_cache_dir: PathBuf,
 }
 
-/// Remote object storage configuration. Global across signals: one on/off and
-/// one backend for the whole process. The per-signal remote-read cache
-/// directory is derived (`{base_dir}/{signal}/remote-read`), not configured here
-/// (see [`LifecycleConfig::read_cache_dir`]).
+/// Remote object storage configuration. Global across signals: one on/off, one
+/// backend and one download cache for the whole process. The cache directory is
+/// derived (`{base_dir}/remote-read`), not configured here (see
+/// [`PluginConfig::read_cache_dir`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteStorageConfig {
@@ -350,7 +358,8 @@ pub struct RemoteStorageConfig {
     /// OpenDAL URI for the remote storage backend.
     /// Examples: "fs:///tmp/otel-remote", "s3://bucket/?region=us-east-1"
     pub uri: String,
-    /// Hard byte cap for the remote-read cache on disk. Default 1 GB.
+    /// Hard byte cap for the download cache on disk, shared by every signal.
+    /// Default 1 GB.
     #[serde(default = "default_read_cache_max_size")]
     pub read_cache_max_size: ByteSize,
     /// Per-operation timeout for the required startup catalog diff-sync (each
@@ -954,10 +963,6 @@ traces:
             logs.catalog.dir,
             PathBuf::from("/var/lib/netdata/otel/logs/catalog")
         );
-        assert_eq!(
-            logs.read_cache_dir,
-            PathBuf::from("/var/lib/netdata/otel/logs/remote-read")
-        );
         // Tuning carried from the logs section.
         assert!(!logs.wal.compression_enabled);
         assert_eq!(logs.catalog.rotation_count, 7);
@@ -969,13 +974,22 @@ traces:
             traces.wal.dir,
             PathBuf::from("/var/lib/netdata/otel/traces/wal")
         );
-        assert_eq!(
-            traces.read_cache_dir,
-            PathBuf::from("/var/lib/netdata/otel/traces/remote-read")
-        );
         // Per-signal tuning is the traces section, not logs'.
         let traces_rot = traces.wal.rotation.resolve("default");
         assert_eq!(traces_rot.max_entries, 1000);
+    }
+
+    #[test]
+    fn the_download_cache_is_shared_and_its_legacy_location_derived() {
+        let c = full_config();
+        assert_eq!(
+            c.read_cache_dir(),
+            PathBuf::from("/var/lib/netdata/otel/remote-read")
+        );
+        assert_eq!(
+            c.legacy_read_cache_dir(),
+            PathBuf::from("/var/lib/netdata/otel/logs/remote-read")
+        );
     }
 
     #[test]
