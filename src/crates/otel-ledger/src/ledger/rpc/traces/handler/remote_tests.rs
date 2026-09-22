@@ -191,33 +191,22 @@ async fn a_query_too_large_for_the_download_cache_is_a_hard_error() {
     assert_eq!(remote.cache.file_count(), 0, "nothing was downloaded");
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn an_unwritable_cache_directory_degrades_each_download() {
-    use std::os::unix::fs::PermissionsExt;
-    // SAFETY: geteuid has no preconditions.
-    if unsafe { libc::geteuid() } == 0 {
-        return; // root writes through directory permissions
-    }
     let (h, remote, _) = evicted_setup(64 * MIB).await;
-    std::fs::set_permissions(&remote.cache_dir, std::fs::Permissions::from_mode(0o500)).unwrap();
+    // The cache path stops being a directory: every write into it fails,
+    // for root too (unlike a permission change).
+    std::fs::remove_dir(&remote.cache_dir).unwrap();
+    std::fs::write(&remote.cache_dir, b"not a directory").unwrap();
 
-    let v = call(&h, trace_body(0x0B)).await;
+    let v = call(&h, trace_body(0x0B)).await.unwrap();
 
-    std::fs::set_permissions(&remote.cache_dir, std::fs::Permissions::from_mode(0o700)).unwrap();
-    let v = v.unwrap();
     assert_eq!(v["status"], json!({"partial": ["remote_unavailable"]}));
     assert_eq!(v["items"]["returned"], 0);
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn a_cache_that_cannot_evict_is_a_hard_error() {
-    use std::os::unix::fs::PermissionsExt;
-    // SAFETY: geteuid has no preconditions.
-    if unsafe { libc::geteuid() } == 0 {
-        return; // root unlinks through directory permissions
-    }
     let (_, mut remote, [one, two]) = evicted_setup(64 * MIB).await;
     // Room for either file, not both: the second lookup must evict the first.
     let (a, b) = (one.entry.size.as_u64(), two.entry.size.as_u64());
@@ -236,11 +225,12 @@ async fn a_cache_that_cannot_evict_is_a_hard_error() {
     let second = json!({"trace": {"id": trace_id(0x0C), "after": T_S + 28, "before": T_S + 45}});
     assert_eq!(call(&h, first).await.unwrap()["status"], json!({"complete": true}));
 
-    std::fs::set_permissions(&remote.cache_dir, std::fs::Permissions::from_mode(0o500)).unwrap();
-    let err = call(&h, second).await;
-    std::fs::set_permissions(&remote.cache_dir, std::fs::Permissions::from_mode(0o700)).unwrap();
-
-    let err = err.unwrap_err().to_string();
+    // The cached first file becomes a directory the cache cannot unlink,
+    // for root too (unlike a permission change).
+    let cached = remote.cache_dir.join(one.entry.id.to_filename("sfst"));
+    std::fs::remove_file(&cached).unwrap();
+    std::fs::create_dir(&cached).unwrap();
+    let err = call(&h, second).await.unwrap_err().to_string();
     assert!(err.contains("download cache directory is unwritable"), "{err}");
 }
 
