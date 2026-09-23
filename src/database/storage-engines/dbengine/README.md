@@ -224,7 +224,10 @@ compiles the engine as one unit. The public headers:
 - **`dbengine-workers.h`**: the engine's jobs occupy the first block of the shared libuv pool's job id space; an
   embedder numbers its own jobs from `DBENGINE_WORKER_JOB_MAX`. Pool-thread setup is `libuv_worker_thread_init()` in
   libnetdata.
-- **`dbengine-tests.h`**: the self-tests and benchmarks the daemon offers as command-line modes.
+- **`dbengine-tests.h`**: the self-tests and benchmarks the daemon offers as command-line modes, and
+  `dbengine_flush_all_wait()`, the test-facing flush that returns once every write of the tier's pages has finished
+  (a failed write shows only in the tier's I/O error counter; the googletest suite's scale cases rest on it and check
+  that counter; the header says why it is not public yet).
 
 Tests: `mrg-unittest.c`, `page_test.cc` and `rrdengineapi-unittest.c` live here and use engine headers only; the
 daemon-side tests (`src/database/dbengine-unittest.c`, `src/database/dbengine-stresstest.c`) drive the engine through

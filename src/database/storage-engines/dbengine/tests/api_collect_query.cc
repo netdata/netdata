@@ -2,7 +2,6 @@
 
 #include "support.h"
 
-#include <string>
 #include <vector>
 
 // The collect and query path, through the public surface only: a metric is created, points are stored into it, and
@@ -19,108 +18,9 @@
 
 namespace {
 
-// One engine with tier 0 up and ready, torn down in the order the contract requires. Every case in this file needs
-// the same thing, and needs it on a directory of its own.
-class CollectQueryTest : public ::testing::Test {
-protected:
-    void SetUp() override {
-        ASSERT_TRUE(scratch_.valid()) << "could not make a scratch directory";
-
-        const struct dbengine_config cfg = netdata_test_config();
-
-        engine_ = dbengine_create(&cfg);
-        ASSERT_NE(engine_, nullptr) << "the engine did not come up";
-
-        struct dbengine_tier_config tc = {};
-        tc.tier = 0;
-        tc.dbfiles_path = scratch_.c_str();
-        tc.disk_space_mb = 0;
-        tc.max_retention_s = 0;
-        tc.page_type = DBENGINE_PAGE_TYPE_GORILLA_32BIT;
-        tc.grouping = 1;
-
-        ASSERT_EQ(dbengine_tier_init(engine_, &tc), 0) << "the tier did not come up";
-
-        tier_ = dbengine_tier(engine_, 0);
-        ASSERT_NE(tier_, nullptr);
-
-        // Nothing may be collected or queried until the tier's registry load is done.
-        dbengine_readiness_wait(tier_);
-
-        si_ = reinterpret_cast<STORAGE_INSTANCE *>(tier_);
-    }
-
-    void TearDown() override {
-        if (!engine_)
-            return;
-
-        if (dbengine_tier_is_active(tier_))
-            dbengine_tier_exit(tier_);
-
-        dbengine_shutdown(engine_);
-        EXPECT_EQ(dbengine_destroy(engine_), 0u) << "metrics stayed referenced across the destroy";
-        engine_ = nullptr;
-    }
-
-    // A metric nobody else in the process shares: uuid map ids are unique for the map's lifetime and it is never
-    // reset, so a fresh uuid per case keeps the cases independent of each other.
-    UUIDMAP_ID make_metric_id() {
-        nd_uuid_t uuid;
-        uuid_generate(uuid);
-        return uuidmap_create(uuid);
-    }
-
-    DBENGINE_ENGINE *engine_ = nullptr;
-    DBENGINE_TIER *tier_ = nullptr;
-    STORAGE_INSTANCE *si_ = nullptr;
-
-private:
-    Scratch scratch_;
-};
-
-struct Point {
-    time_t start_time_s;
-    time_t end_time_s;
-    NETDATA_DOUBLE value;
-};
-
-void store_point(STORAGE_COLLECT_HANDLE *sch, time_t end_time_s, NETDATA_DOUBLE value) {
-    dbengine_store_next(sch, static_cast<usec_t>(end_time_s) * USEC_PER_SEC, value, value, value, 1, 0,
-                        SN_DEFAULT_FLAGS);
-}
-
-// Reads the whole query and returns what it gave, rather than asserting inside the loop: a case that expected three
-// points and got two should say so once, with both lists in hand.
-std::vector<STORAGE_POINT> query_all(STORAGE_METRIC_HANDLE *smh, time_t start_time_s, time_t end_time_s) {
-    std::vector<STORAGE_POINT> points;
-
-    struct storage_engine_query_handle seqh = {};
-    dbengine_query_init(smh, &seqh, start_time_s, end_time_s, STORAGE_PRIORITY_SYNCHRONOUS);
-
-    // Bounded: a query that never reports itself finished is a failure, not a reason to spin.
-    const size_t safety = 64;
-    while (points.size() < safety && !dbengine_query_is_finished(&seqh))
-        points.push_back(dbengine_query_next(&seqh));
-
-    EXPECT_TRUE(dbengine_query_is_finished(&seqh)) << "the query did not finish within " << safety << " points";
-
-    dbengine_query_finalize(&seqh);
-    return points;
-}
-
-void expect_point(const STORAGE_POINT &sp, const Point &expected) {
-    SCOPED_TRACE(static_cast<long long>(expected.end_time_s));
-
-    EXPECT_EQ(sp.start_time_s, expected.start_time_s);
-    EXPECT_EQ(sp.end_time_s, expected.end_time_s);
-    EXPECT_DOUBLE_EQ(sp.min, expected.value);
-    EXPECT_DOUBLE_EQ(sp.max, expected.value);
-    EXPECT_DOUBLE_EQ(sp.sum, expected.value);
-    EXPECT_EQ(sp.count, 1u);
-    EXPECT_EQ(sp.anomaly_count, 0u);
-    EXPECT_EQ(sp.flags, SN_DEFAULT_FLAGS);
-    EXPECT_FALSE(storage_point_is_gap(sp));
-}
+// Every case here needs one engine with tier 0 up, on a directory of its own, and nothing more than the shared
+// fixture gives.
+class CollectQueryTest : public EngineFixture {};
 
 const time_t BASE_TIME = 200000000;
 

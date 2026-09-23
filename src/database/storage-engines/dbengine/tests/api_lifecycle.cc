@@ -189,6 +189,32 @@ TEST(TierInit, RefusesATierOnAStoppedEngine) {
     EXPECT_EQ(dbengine_destroy(engine), 0u);
 }
 
+TEST(EngineLifecycle, AWaitingFlushIsRefusedOnceTheEngineIsStopped) {
+    const struct dbengine_config cfg = netdata_test_config();
+    const Scratch scratch;
+    ASSERT_TRUE(scratch.valid()) << "could not make a scratch directory";
+
+    DBENGINE_ENGINE *engine = dbengine_create(&cfg);
+    ASSERT_NE(engine, nullptr);
+
+    const struct dbengine_tier_config tc = tier_config(scratch);
+    ASSERT_EQ(dbengine_tier_init(engine, &tc), 0);
+    DBENGINE_TIER *tier = dbengine_tier(engine, 0);
+    dbengine_readiness_wait(tier);
+
+    // While the engine serves, the wait returns true; there was nothing to write, and that is not a refusal.
+    EXPECT_TRUE(dbengine_flush_all_wait(tier));
+
+    dbengine_tier_exit(tier);
+    dbengine_shutdown(engine);
+
+    // A stopped engine runs no command, so a flush that waited on one would wait forever: it is refused instead,
+    // and the refusal is what the caller sees rather than a hang.
+    EXPECT_FALSE(dbengine_flush_all_wait(tier));
+
+    EXPECT_EQ(dbengine_destroy(engine), 0u);
+}
+
 TEST(TierInit, RefusesAPathWithNoRoomForTheFileNames) {
     const struct dbengine_config cfg = netdata_test_config();
 

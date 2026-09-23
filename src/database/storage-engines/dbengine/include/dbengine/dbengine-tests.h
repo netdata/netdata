@@ -40,6 +40,31 @@ int dbengine_engine_lifecycle_unittest(const struct dbengine_config *cfg, const 
 int dbengine_allocator_unittest(const struct dbengine_config *cfg);
 int dbengine_zero_page_cadence_unittest(DBENGINE_ENGINE *engine, STORAGE_INSTANCE *si);
 
+// dbengine_flush_all() (dbengine-api.h) that waits: returns true once every page of the tier that was hot or dirty
+// when the call was made, and every extent any flusher had in flight, has finished - written with its journal
+// record, or dropped because its write failed and the retry on a new datafile failed too. true does not tell the
+// two apart: the engine logs a dropped extent and counts every failed write in the tier's I/O error counter (entry
+// 28 of dbengine_get_stats()), so a caller that must know nothing was lost checks that the counter did not move
+// across the call. dbengine_tier_exit() waits the same way and promises no more. false, having queued nothing, for
+// a NULL tier or an engine that is not serving (before dbengine_create() finished, or once dbengine_shutdown()
+// started).
+//
+// Those are the only refusals: a tier that is exiting or has exited is not checked (the same holds for the
+// fire-and-forget verbs), so the caller keeps this to a tier that is up, as dbengine_tier_exit() does its own
+// flush and wait.
+//
+// The caller owns collector quiescence: dbengine_store_flush() or dbengine_store_finalize() on its handles first.
+// The engine does not check, a live collector's page races the flush, and on a tier still being collected into
+// the wait has no bound. Pages made hot after the call are not covered. On a tier that has not been quiesced the
+// written extents' metadata reaches the open cache too; after dbengine_quiesce() the engine skips the open cache
+// and the indexing flag on purpose (the daemon's shutdown shape). It waits on a pool thread that itself waits for
+// the extent writes in the same pool: dbengine-config.h (libuv_worker_threads) says what that costs.
+//
+// Test-facing for now: the daemon's shutdown approximates this by polling the cache queues after the
+// fire-and-forget verbs (daemon-shutdown.c), and if that wait is ever made exact this is the verb to graduate to
+// dbengine-api.h; until then no embedder contract depends on it.
+bool dbengine_flush_all_wait(DBENGINE_TIER *tier);
+
 #ifdef __cplusplus
 }
 #endif
