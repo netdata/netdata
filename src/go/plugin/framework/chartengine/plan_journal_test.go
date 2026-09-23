@@ -328,6 +328,37 @@ func TestPlanJournalCommittedChartUndoesThisBuild(t *testing.T) {
 	assert.Equal(t, []string{"d2", "d3"}, slices.Sorted(maps.Keys(chart.dimensions)))
 }
 
+func TestPlanJournalCommittedChartSeesRecordsAfterEarlierLookups(t *testing.T) {
+	state := newMaterializedState()
+	a, _ := state.ensureChart(nil, "a", "tpl.a", program.ChartMeta{
+		Title: "A",
+	}, program.LifecyclePolicy{})
+	b, _ := state.ensureChart(nil, "b", "tpl.b", program.ChartMeta{
+		Title: "B",
+	}, program.LifecyclePolicy{})
+	b.ensureDimension(nil, "b1", dimensionState{
+		order:  1,
+		static: true,
+	})
+
+	j := new(newPlanJournal(11, journalSizing{}))
+	state.ensureChart(j, "a", "tpl.a", program.ChartMeta{
+		Title: "A2",
+	}, program.LifecyclePolicy{})
+	assert.Equal(t, "A", j.committedChart(a).meta.Title)
+
+	// Records appended after the first lookup are found by later ones.
+	state.ensureChart(j, "b", "tpl.b", program.ChartMeta{
+		Title: "B2",
+	}, program.LifecyclePolicy{})
+	b.removeDimension(j, "b1")
+	committed := j.committedChart(b)
+	assert.Equal(t, "B", committed.meta.Title)
+	assert.Equal(t, []string{"b1"}, slices.Sorted(maps.Keys(committed.dimensions)))
+	assert.Empty(t, b.dimensions)
+	assert.Equal(t, "A", j.committedChart(a).meta.Title)
+}
+
 const cardinalitySpikeTemplateYAML = `
 version: v1
 groups:

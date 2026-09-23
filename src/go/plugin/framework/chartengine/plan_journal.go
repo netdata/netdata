@@ -2,6 +2,8 @@
 
 package chartengine
 
+import "slices"
+
 // planJournal lets a plan build mutate the committed materialized state in place.
 //
 // The first write of a committed object in a build records its committed value;
@@ -20,6 +22,18 @@ type planJournal struct {
 	dims      []dimUndo
 	entries   []entryUndo
 	seqs      []seqUndo
+
+	// byChart indexes chart and dimension-map records by chart for committedChart. It
+	// is built on first use and extended with the records appended since.
+	byChart        map[*materializedChartState]*chartRecords
+	indexedCharts  int
+	indexedDimMaps int
+}
+
+// chartRecords locates one chart's records in the journal.
+type chartRecords struct {
+	header int   // index in charts of the chart's oldest header record, or -1
+	dims   []int // indexes in dimMaps of the chart's records, oldest first
 }
 
 // Map records mark deletions (del) so a commit can count them per map.
@@ -273,6 +287,34 @@ func (j *planJournal) compactAfterCommit(state *materializedState) {
 	}
 }
 
+// chartRecords returns the records of chart, indexing records appended since the
+// last call, so a build that looks up many charts stays linear in its journal.
+func (j *planJournal) chartRecords(chart *materializedChartState) *chartRecords {
+	if j.byChart == nil {
+		j.byChart = make(map[*materializedChartState]*chartRecords)
+	}
+	of := func(c *materializedChartState) *chartRecords {
+		recs := j.byChart[c]
+		if recs == nil {
+			recs = &chartRecords{
+				header: -1,
+			}
+			j.byChart[c] = recs
+		}
+		return recs
+	}
+	for ; j.indexedCharts < len(j.charts); j.indexedCharts++ {
+		if recs := of(j.charts[j.indexedCharts].chart); recs.header < 0 {
+			recs.header = j.indexedCharts
+		}
+	}
+	for ; j.indexedDimMaps < len(j.dimMaps); j.indexedDimMaps++ {
+		recs := of(j.dimMaps[j.indexedDimMaps].chart)
+		recs.dims = append(recs.dims, j.indexedDimMaps)
+	}
+	return j.byChart[chart]
+}
+
 func needsCompaction(live, deletes int) bool {
 	return deletes >= compactMinDeletes && deletes > live
 }
@@ -294,17 +336,16 @@ func (j *planJournal) committedChart(chart *materializedChartState) *materialize
 		return chart
 	}
 	out := *chart
-	for i := len(j.charts) - 1; i >= 0; i-- {
-		if j.charts[i].chart == chart {
-			out = j.charts[i].old
-		}
+	recs := j.chartRecords(chart)
+	if recs == nil {
+		return &out
+	}
+	if recs.header >= 0 {
+		out = j.charts[recs.header].old
 	}
 	var membership map[string]*materializedDimensionState
-	for i := len(j.dimMaps) - 1; i >= 0; i-- {
+	for _, i := range slices.Backward(recs.dims) {
 		rec := j.dimMaps[i]
-		if rec.chart != chart {
-			continue
-		}
 		if membership == nil {
 			membership = make(map[string]*materializedDimensionState)
 		}
