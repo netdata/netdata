@@ -253,6 +253,42 @@ For string-heavy columns, prefer `string_ref` with `dictionary: "strings"` and
 integer values. This is how production socket evidence reached about 22 raw
 bytes per socket evidence row in the measured corpus.
 
+For direct scalar columns with `aggregation: "set"`, `type` describes each
+member: `bool`, `int`, `uint`, `float`, `string`, `timestamp`, `duration`, `ip`,
+or `mac`. A cell may contain a scalar or a one-dimensional array of that type,
+including an empty array. The same column can contain scalar identity cells
+and set-valued attributes for different actor types; aggregators preserve key
+values rather than wrapping them into sets. Keep the column type, role, unit,
+and presentation metadata when emitting an aggregate.
+
+Every set member follows the ordinary scalar type and `nullable` checks. Null
+cells and null members require `nullable: true`; nested arrays, objects, and
+wrong-typed members are rejected without coercion. In Go builders, use `[]any`
+for sets. A nil slice serializes as null and follows nullability; a non-nil
+empty slice represents an empty set. These rules apply after decoding any of
+the three column codecs.
+
+Numeric cells and set members must be finite. Types `int` and `uint` require
+integral values, and `uint` also requires a nonnegative value. Go validation
+accepts `int`, `int64`, `uint64`, `float64`, and `json.Number`, including the
+full native `uint64` range; numeric cells are not narrowed to machine-sized
+row or dictionary indexes. Validation preserves the supplied value.
+
+`json.Number` must contain a valid JSON numeric literal. For `int` and `uint`,
+it must use integer-form syntax (no fraction or exponent), fitting `int64`
+when negative or `uint64` when nonnegative. For `float` and `duration`, it must
+parse as a finite `float64`. Callers using the default JSON decoder retain its
+`float64` precision limits; validation does not recover digits already rounded
+during decoding.
+
+Set aggregation does not turn reference cells into arrays of references:
+`string_ref`, `ip_ref`, and `mac_ref` still carry one global dictionary index,
+and row-reference columns still carry one row index. A global dictionary entry
+may contain a set where its existing dictionary contract permits arrays.
+Non-set scalar columns and explicit `array`/`json` columns retain their existing
+validation rules. JSON Schema checks the generic wire shape; the topology Go
+builder and semantic validator also check the typed-set member contract.
+
 Use column type `json` only for actor/custom detail cells that must preserve
 nested producer-owned data, such as SNMP port `neighbors` or `vlans`. Do not
 use `json` for high-cardinality relationship evidence when a typed scalar,
