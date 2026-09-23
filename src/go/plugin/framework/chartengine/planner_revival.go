@@ -28,9 +28,10 @@ func needsChartRevival(previous *materializedChartState, current *chartState, se
 // Record their final metadata in the staged state, so Abort preserves the prior
 // published definition. Create/label actions use the same current chart metadata;
 // removals are emitted last and may carry older metadata from cap enforcement.
-func (s *materializedState) recordEmittedChartDefinitions(actions []EngineAction) {
+func (s *materializedState) recordEmittedChartDefinitions(j *planJournal, actions []EngineAction) {
 	remember := func(id string, meta program.ChartMeta) {
-		if chart := s.charts[id]; chart != nil {
+		if chart := s.charts[id]; chart != nil && chart.emittedMeta != meta {
+			j.touchChart(chart)
 			chart.emittedMeta = meta
 		}
 	}

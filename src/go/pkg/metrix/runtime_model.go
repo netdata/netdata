@@ -16,6 +16,10 @@ type runtimeStoreBackend struct {
 	compaction            runtimeCompactionPolicy
 	writesSinceCompaction uint64
 	now                   func() time.Time
+	// batch is the unpublished overlay collecting writes of an open WriteBatch;
+	// batchSeries sizes the next batch's map from the previous batch.
+	batch       *readSnapshot
+	batchSeries int
 }
 
 type runtimeWriteView struct {

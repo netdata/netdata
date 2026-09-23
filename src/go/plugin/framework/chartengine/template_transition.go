@@ -33,7 +33,8 @@ func (e *Engine) prepareTemplateTransition(opts PlanOptions) (*Engine, *template
 		return e, nil, nil, nil
 	}
 	// Copy the state value, not the engine's mutex. Shared program data is immutable;
-	// materialized state is copied by buildPlan before any mutation.
+	// the view shares committed materialized state, which buildPlan stages in place and
+	// records in the attempt's journal.
 	view := &Engine{
 		state: e.state,
 	}

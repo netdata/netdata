@@ -114,7 +114,7 @@ attempt only after complete output admission; abort preserves the previously com
 contracts. `Load` and `Compile` still expect defaults already applied; active-set transitions do not call destructive Load.
 
 The unchanged-snapshot path adds constant bookkeeping to the existing planner. Changed snapshots compare template
-content and filter retained charts once, then clone retained lifecycle state through the ordinary planner. Retirement
+content and filter retained charts once, then stage retained lifecycle state through the ordinary planner. Retirement
 comparison visits only replaced or transferred chart identities and their dimensions. Programs/indexes are shared
 between scopes; mutable route caches and lifecycle state remain scope-owned.
 
@@ -412,6 +412,10 @@ Notes:
 | `ChartEngine/Lifecycle`   | removal counters by scope/reason                               |
 | `ChartEngine/Plan`        | gauges for chart instances/inferred dimensions                 |
 
+`WithRuntimeSampleObserver` also hands each build's samples to a callback; jobs that aggregate across engines pass
+`WithRuntimeStore(nil)` and a `RuntimeAggregator`'s `Observe`. The aggregator flushes its rollup into a runtime store
+once per cycle; when the store implements `metrix.RuntimeBatchWriter`, a flush publishes one snapshot.
+
 ## Engine State
 
 | Area               | Design                                                                                                                                      |
@@ -420,6 +424,7 @@ Notes:
 | Engine state       | Serialized under `Engine.mu` for load/build transitions                                                                                     |
 | Route cache        | Series identity + revision keyed authored/autogen discovery; autogen validates current metadata and kinds; retained by successful sequence, pruned on each build                                               |
 | Materialized state | Tracks existing chart/dimension instances for incremental create/update/remove decisions; persists across cycles; direct Load resets it, active sets preserve unchanged entries |
+| Attempt staging    | A build stages lifecycle changes in the materialized state in place and records the committed values it overwrites in the attempt's journal; Commit keeps the changes, Abort (or a failed build) replays the journal, so later plans only ever start from committed state. After a commit, a chart, dimension or scratch map whose deletions since its last rebuild exceed its live size is rebuilt, so capacity follows live cardinality after a spike |
 | Determinism        | Sorted chart IDs and inferred dimensions provide stable action ordering                                                                     |
 
 ## Performance Validation
@@ -427,6 +432,14 @@ Notes:
 Steady collector-mode benchmarks must advance the successful collection sequence. Replanning a previously committed
 sequence intentionally deduplicates its updates, so a repeated-snapshot benchmark must instead use runtime planner mode.
 Benchmarks should verify emitted chart/dimension counts and values after warmup.
+
+Planning work is O(scanned series + retained charts); allocations follow what changed and the plan output. An
+unchanged chart allocates only its boxed update action: per-build chart state and update values come from blocks sized
+by the previous build, and the abort journal records only sequence stamps and scratch values of observed charts
+(transient per attempt). New or changed charts, labels and dimensions additionally allocate their definitions. Each
+plan also pays a small constant setup (build context and its maps and blocks, the attempt with its inline journal, one
+callback per series pass). `TestAutogenWarmPlanAllocationEnvelope` guards the steady envelope and
+`TestPlanAbortRestoresCommittedState` the abort contract.
 
 `BenchmarkAutogenMixedChurn` measures a bounded population with stable, partially replaced, or fully replaced
 identities; `BenchmarkCollectExpiryRemovals` covers stable, partial, and mass expiry across chart/dimension shapes.

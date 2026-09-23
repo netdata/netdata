@@ -307,6 +307,9 @@ type Regexp struct {
 // goroutine-safe.
 type Processor struct {
 	cfgs []Config
+	// replacePlans holds, per rule, what a replace rule evaluates without the
+	// regexp engine.
+	replacePlans []replacePlan
 
 	builder  *labels.Builder
 	join     strings.Builder
@@ -317,6 +320,37 @@ type Processor struct {
 	currentNameScheme commonmodel.ValidationScheme
 	labelsChanged     bool
 	nameChanged       bool
+	// matchAllIndexes backs the submatch indexes of a default-regex match.
+	matchAllIndexes [4]int
+}
+
+// replacePlan records the parts of a replace rule that need no regexp
+// evaluation. Each shortcut yields exactly what the general path computes.
+type replacePlan struct {
+	// constantTarget: target_label references no capture group, so it expands
+	// to itself.
+	constantTarget bool
+	// matchAll: the regex is the default "(.*)", anchored and dot-all, so it
+	// matches every value with capture 1 spanning the whole value.
+	matchAll bool
+	// identity: matchAll with replacement "$1" or "${1}", which expands to the
+	// value itself.
+	identity bool
+}
+
+// defaultRegexSource is the compiled source of the default "(.*)" regex.
+var defaultRegexSource = defaultConfig.Regex.Regexp.String()
+
+func newReplacePlan(cfg Config) replacePlan {
+	if cfg.Action != Replace {
+		return replacePlan{}
+	}
+	matchAll := cfg.Regex.Regexp != nil && cfg.Regex.Regexp.String() == defaultRegexSource
+	return replacePlan{
+		constantTarget: !varInRegexTemplate(cfg.TargetLabel),
+		matchAll:       matchAll,
+		identity:       matchAll && (cfg.Replacement == "$1" || cfg.Replacement == "${1}"),
+	}
 }
 
 // New validates and compiles the rules into a Processor.
@@ -326,9 +360,14 @@ func New(cfgs []Config) (*Processor, error) {
 		return nil, err
 	}
 
+	plans := make([]replacePlan, len(compiled))
+	for i, cfg := range compiled {
+		plans[i] = newReplacePlan(cfg)
+	}
 	return &Processor{
-		cfgs:    compiled,
-		builder: labels.NewBuilder(nil),
+		cfgs:         compiled,
+		replacePlans: plans,
+		builder:      labels.NewBuilder(nil),
 	}, nil
 }
 
@@ -569,7 +608,7 @@ func (p *Processor) applyConfig(cfg *Config, idx int) (bool, bool, DropInfo) {
 		}
 		return true, true, DropInfo{}
 	case Replace:
-		return true, p.applyReplace(cfg, val), DropInfo{}
+		return true, p.applyReplace(cfg, p.replacePlans[idx], val), DropInfo{}
 	case Lowercase:
 		p.setLabel(cfg.TargetLabel, strings.ToLower(val), cfg.NameScheme)
 	case Uppercase:
@@ -612,7 +651,7 @@ func (p *Processor) applyConfig(cfg *Config, idx int) (bool, bool, DropInfo) {
 	return true, true, DropInfo{}
 }
 
-func (p *Processor) applyReplace(cfg *Config, val string) bool {
+func (p *Processor) applyReplace(cfg *Config, plan replacePlan, val string) bool {
 	if val == "" &&
 		cfg.Regex.String() == defaultConfig.Regex.String() &&
 		!varInRegexTemplate(cfg.TargetLabel) &&
@@ -621,17 +660,31 @@ func (p *Processor) applyReplace(cfg *Config, val string) bool {
 		return true
 	}
 
-	indexes := cfg.Regex.FindStringSubmatchIndex(val)
-	if indexes == nil {
+	var indexes []int
+	if plan.matchAll {
+		p.matchAllIndexes = [4]int{0, len(val), 0, len(val)}
+		indexes = p.matchAllIndexes[:]
+	} else if indexes = cfg.Regex.FindStringSubmatchIndex(val); indexes == nil {
 		return false
 	}
 
-	p.buf = cfg.Regex.ExpandString(p.buf[:0], cfg.TargetLabel, val, indexes)
-	target := string(p.buf)
+	target := cfg.TargetLabel
+	if !plan.constantTarget {
+		p.buf = cfg.Regex.ExpandString(p.buf[:0], cfg.TargetLabel, val, indexes)
+		target = string(p.buf)
+	}
 	if !cfg.NameScheme.IsValidLabelName(target) {
 		return true
 	}
 
+	if plan.identity {
+		if val == "" {
+			p.delLabel(target)
+			return true
+		}
+		p.setLabel(target, val, cfg.NameScheme)
+		return true
+	}
 	p.buf = cfg.Regex.ExpandString(p.buf[:0], cfg.Replacement, val, indexes)
 	if len(p.buf) == 0 {
 		p.delLabel(target)
@@ -650,7 +703,14 @@ func (p *Processor) joinSourceLabels(sourceLabels []string, separator string) st
 		return p.getLabel(sourceLabels[0])
 	}
 
+	// Size the value exactly: it may be kept as a label value, and one allocation
+	// covers the whole join.
+	size := len(separator) * (len(sourceLabels) - 1)
+	for _, name := range sourceLabels {
+		size += len(p.getLabel(name))
+	}
 	p.join.Reset()
+	p.join.Grow(size)
 	for i, name := range sourceLabels {
 		if i > 0 {
 			p.join.WriteString(separator)
