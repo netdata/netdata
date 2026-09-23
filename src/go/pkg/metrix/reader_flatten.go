@@ -8,18 +8,24 @@ import (
 
 func flattenSnapshot(src *readSnapshot) *readSnapshot {
 	series := snapshotSeriesView(src)
-	dst := &readSnapshot{
-		collectMeta: src.collectMeta,
-		series:      make(map[string]*committedSeries, len(series)),
-	}
 
-	// Size every structured family first so all children share exactly-sized blocks.
+	// Size every structured family first so all children share exactly-sized blocks,
+	// and the series map holds the scalars and every child without growing.
 	var b flattenBlock
 	var need flattenSize
+	scalars := 0
 	for _, s := range series {
-		if s.desc != nil && !isScalarKind(s.desc.kind) {
+		switch {
+		case s.desc == nil:
+		case isScalarKind(s.desc.kind):
+			scalars++
+		default:
 			need.add(b.size(s))
 		}
+	}
+	dst := &readSnapshot{
+		collectMeta: src.collectMeta,
+		series:      make(map[string]*committedSeries, scalars+need.children),
 	}
 	b.init(dst, need)
 	for _, s := range series {
