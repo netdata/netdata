@@ -202,7 +202,8 @@ compiles the engine as one unit. The public headers:
 
 - **`dbengine-api.h`**: the metric, collection and query operations behind the storage-engine vtable; the tier
   lifecycle (`dbengine_tier_init()`, which takes the engine, `dbengine_readiness_wait()`, `dbengine_tier_exit()`,
-  `dbengine_tier_is_active()`), the engine's (`dbengine_shutdown()` as the counterpart of `dbengine_create()` below,
+  `dbengine_tier_is_active()`, and `dbengine_tier()` to reach one of the engine's tiers by number), the engine's
+  (`dbengine_shutdown()` as the counterpart of `dbengine_create()` below,
   and `dbengine_destroy()` for a leak-checking exit); what the embedder reads about a tier
   (retention limit, disk space, metrics, samples, first time); `dbengine_dir_has_datafiles()` to learn, before any tier
   is up, whether a directory holds data; and **work**: `dbengine_enq_work()` runs a function on the engine's worker

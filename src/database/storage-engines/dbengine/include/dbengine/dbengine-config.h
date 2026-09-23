@@ -12,15 +12,21 @@ extern "C" {
 struct dbengine_tier;
 typedef struct dbengine_tier DBENGINE_TIER;
 
-// The engine: what the tiers share (the event loop, the caches, the metrics registry, the configuration, the
-// counters). Opaque outside the engine; made by dbengine_create(), stopped by dbengine_shutdown(), and released by
-// dbengine_destroy() when no reference on a cache page or a registry metric remains (dbengine-api.h).
+// The engine: its tiers and what they share (the event loop, the caches, the metrics registry, the configuration,
+// the counters). Opaque outside the engine; made by dbengine_create(), stopped by dbengine_shutdown(), and released
+// by dbengine_destroy() when no reference on a cache page or a registry metric remains (dbengine-api.h). A process
+// may hold several. What they share is process-wide by design: the page allocator layer below and the tier page
+// sizes it is built from, the page-details and extent-buffer allocators (dbengine-stats.h names them), the libuv
+// thread pool, and the process's file-descriptor limit, which each engine budgets against on its own. Calls to
+// dbengine_create() and dbengine_destroy() are not thread-safe against one another: the embedder serialises them.
 struct dbengine_engine;
 typedef struct dbengine_engine DBENGINE_ENGINE;
 
-// Receives one metric the embedder already knows, on the tier it belongs to; passed to preload_metrics() by
-// the engine.
-typedef void (*dbengine_preload_add_fn)(void *mrg, DBENGINE_TIER *tier, nd_uuid_t *uuid);
+// Receives one metric the embedder already knows, with the number of the tier it belongs to (the tier a
+// dbengine_tier_init() with that number brings up; a number the engine does not have is fatal); passed to
+// preload_metrics() by the engine. The embedder holds no engine while it runs (preload_metrics() is called from
+// inside dbengine_create()), so it names the tier and the engine resolves it.
+typedef void (*dbengine_preload_add_fn)(void *mrg, size_t tier, nd_uuid_t *uuid);
 
 // The storage engine's configuration.
 //
@@ -139,8 +145,8 @@ struct dbengine_tier_config {
 // thread, and start taking work. The only way up; tiers come after it. Fatal when the libuv pool is not larger
 // than the threads reserved for the embedder, when pages_per_extent exceeds what the extent format holds, or
 // when default_update_every_s is negative. Returns the engine, or NULL, with the reason logged: the libuv error
-// that stopped the loop from coming up (nothing is left behind, as if never called), or an engine that still owns
-// the daemon's static tiers (until its dbengine_destroy() released them).
+// that stopped the loop from coming up (nothing is left behind, as if never called). Another engine, live,
+// stopped or retained, is no obstacle: each has its tiers of its own.
 DBENGINE_ENGINE *dbengine_create(const struct dbengine_config *cfg);
 
 // Release the references preload_metrics() left on the registry, once every tier has come up (after the last

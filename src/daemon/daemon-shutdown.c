@@ -106,9 +106,11 @@ static void dbengine_tier_exit_background(void *ptr) {
 // the engine's own active flag is the truth about which tiers are up
 static void dbengine_quiesce_all()
 {
-    for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-        if (dbengine_tier_is_active(dbengine_multidb_tiers[tier]))
-            dbengine_quiesce(dbengine_multidb_tiers[tier]);
+    for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+        DBENGINE_TIER *t = dbengine_tier(netdata_conf_dbengine_engine, tier);
+        if (dbengine_tier_is_active(t))
+            dbengine_quiesce(t);
+    }
 }
 
 static void dbengine_flush_everything_and_wait(bool wait_flush, bool wait_collectors, bool dirty_only) {
@@ -119,13 +121,14 @@ static void dbengine_flush_everything_and_wait(bool wait_flush, bool wait_collec
 
     nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE %s dirty pages...", dirty_only ? "only" : "hot &");
     for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
-        if (!dbengine_tier_is_active(dbengine_multidb_tiers[tier]))
+        DBENGINE_TIER *t = dbengine_tier(netdata_conf_dbengine_engine, tier);
+        if (!dbengine_tier_is_active(t))
             continue;
 
         if (dirty_only)
-            dbengine_flush_dirty(dbengine_multidb_tiers[tier]);
+            dbengine_flush_dirty(t);
         else
-            dbengine_flush_all(dbengine_multidb_tiers[tier]);
+            dbengine_flush_all(t);
     }
 
     struct dbengine_cache_stats pgc_main_stats;
@@ -140,9 +143,11 @@ static void dbengine_flush_everything_and_wait(bool wait_flush, bool wait_collec
         size_t count = 50;
         while (running && count) {
             running = 0;
-            for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-                if (dbengine_tier_is_active(dbengine_multidb_tiers[tier]))
-                    running += dbengine_collectors_running(dbengine_multidb_tiers[tier]);
+            for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+                DBENGINE_TIER *t = dbengine_tier(netdata_conf_dbengine_engine, tier);
+                if (dbengine_tier_is_active(t))
+                    running += dbengine_collectors_running(t);
+            }
 
             if (running) {
                 nd_log_limit_static_thread_var(erl, 1, 100 * USEC_PER_MS);
@@ -309,7 +314,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     // remembered before any tier exits (exiting clears the engine's active flag), for the exit and the finalize loops
     bool dbengine_tier_up[RRD_STORAGE_TIERS];
     for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-        dbengine_tier_up[tier] = dbengine_enabled && dbengine_tier_is_active(dbengine_multidb_tiers[tier]);
+        dbengine_tier_up[tier] = dbengine_enabled && dbengine_tier_is_active(dbengine_tier(netdata_conf_dbengine_engine, tier));
 #endif
 
     if (abnormal) {
@@ -333,7 +338,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
             ND_THREAD *th[RRD_STORAGE_TIERS] = { 0 };
             for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
                 if (dbengine_tier_up[tier])
-                    th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_DEFAULT, dbengine_tier_exit_background, dbengine_multidb_tiers[tier]);
+                    th[tier] = nd_thread_create("rrdeng-exit", NETDATA_THREAD_OPTION_DEFAULT, dbengine_tier_exit_background, dbengine_tier(netdata_conf_dbengine_engine, tier));
 
             for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
                 if (th[tier])

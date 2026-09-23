@@ -159,6 +159,11 @@ const struct dbengine_config *netdata_conf_dbengine_resolved(void) {
 
 void netdata_conf_dbengine_apply(void) {
 #ifdef ENABLE_DBENGINE
+    // once per process, and the daemon says so itself: its readers hold this one handle, and pulse registers the
+    // engine's allocator statistics once, so a second engine would be neither reachable nor accounted for
+    if(netdata_conf_dbengine_engine)
+        fatal("DBENGINE: the daemon's engine is already up, netdata_conf_dbengine_apply() is called once per process");
+
     netdata_conf_dbengine_engine = dbengine_create(netdata_conf_dbengine_resolved());
     if(!netdata_conf_dbengine_engine)
         fatal("DBENGINE: the engine did not come up, see the errors logged above");
@@ -355,9 +360,11 @@ void netdata_conf_dbengine_init(const char *hostname) {
 
     // every tier that came up, including one above a tier that failed: the engine runs and rotates it,
     // so its registry load is awaited like the others
-    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-        if(dbengine_tier_is_active(dbengine_multidb_tiers[tier]))
-            dbengine_readiness_wait(dbengine_multidb_tiers[tier]);
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+        DBENGINE_TIER *t = dbengine_tier(netdata_conf_dbengine_engine, tier);
+        if(dbengine_tier_is_active(t))
+            dbengine_readiness_wait(t);
+    }
 
 
     dbengine_enabled = true;

@@ -246,12 +246,22 @@ static struct {
 };
 
 void extent_buffer_init(void) {
-    size_t max_extent_uncompressed = MAX_EXTENT_UNCOMPRESSED_SIZE;
-    size_t max_size = (size_t)LZ4_compressBound(MAX_EXTENT_UNCOMPRESSED_SIZE);
-    if(max_size < max_extent_uncompressed)
-        max_size = max_extent_uncompressed;
+    // once per process, by the first engine to spawn, like the descriptor allocators above: the value is a constant
+    // of the format, but an engine's extent paths read it unlocked, and a later engine's spawn must not store it
+    // under them
+    static bool initialized = false;
 
-    extent_buffer_globals.max_size = max_size;
+    spinlock_lock(&pdc_globals_spinlock);
+    if(!initialized) {
+        size_t max_extent_uncompressed = MAX_EXTENT_UNCOMPRESSED_SIZE;
+        size_t max_size = (size_t)LZ4_compressBound(MAX_EXTENT_UNCOMPRESSED_SIZE);
+        if(max_size < max_extent_uncompressed)
+            max_size = max_extent_uncompressed;
+
+        extent_buffer_globals.max_size = max_size;
+        initialized = true;
+    }
+    spinlock_unlock(&pdc_globals_spinlock);
 }
 
 void extent_buffer_cleanup1(void) {

@@ -3,9 +3,14 @@
 #include "mrg-internals.h"
 
 ALWAYS_INLINE
-static void mrg_metric_prepopulate(void *mrg_ptr, struct dbengine_tier *ctx, nd_uuid_t *uuid) {
+static void mrg_metric_prepopulate(void *mrg_ptr, size_t tier, nd_uuid_t *uuid) {
     MRG *mrg = mrg_ptr;
     struct dbengine_engine *engine = mrg->engine;
+
+    struct dbengine_tier *ctx = dbengine_tier(engine, tier);
+    if(unlikely(!ctx))
+        fatal("DBENGINE: the preload names tier %zu, which the engine does not have", tier);
+
     MRG_ENTRY entry = {
         .uuid = uuid,
         .section = (Word_t)ctx,    // the registry sections are the tiers

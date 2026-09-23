@@ -60,18 +60,18 @@ void dbengine_retention_statistics(bool extended __maybe_unused) {
         //       get_used_disk_space is used to determine if database cleanup (file rotation should happen)
         //                           and adds to the disk space used the desired file size of the active
         //                           datafile
-        uint64_t disk_space = dbengine_get_used_disk_space(dbengine_multidb_tiers[tier]);
+        uint64_t disk_space = dbengine_get_used_disk_space(dbengine_tier(netdata_conf_dbengine_engine, tier));
         //uint64_t disk_space = storage_engine_disk_space_used(eng->seb, localhost->db[tier].si);
 
         uint64_t config_disk_space = storage_engine_disk_space_max(eng->seb, localhost->db[tier].si);
         if (!config_disk_space) {
-            config_disk_space = dbengine_get_directory_free_bytes_space(dbengine_multidb_tiers[tier]);
+            config_disk_space = dbengine_get_directory_free_bytes_space(dbengine_tier(netdata_conf_dbengine_engine, tier));
             config_disk_space += disk_space;
         }
 
         collected_number disk_percentage = (collected_number) (config_disk_space ? 100 * disk_space / config_disk_space : 0);
 
-        time_t max_retention_s = dbengine_max_retention_s(dbengine_multidb_tiers[tier]);
+        time_t max_retention_s = dbengine_max_retention_s(dbengine_tier(netdata_conf_dbengine_engine, tier));
         collected_number retention_percentage = (collected_number)max_retention_s ?
                                                     100 * retention / max_retention_s :
                                                     0;

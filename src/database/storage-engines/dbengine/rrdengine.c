@@ -26,10 +26,6 @@ static inline struct dbengine_cmd dbengine_deq_cmd(struct dbengine_engine *engin
 static inline void worker_dispatch_extent_read(struct dbengine_engine *engine, struct dbengine_cmd cmd, bool from_worker);
 static inline void worker_dispatch_query_prep(struct dbengine_engine *engine, struct dbengine_cmd cmd, bool from_worker);
 
-// serialises the creation of engines: the claim on the daemon's static tiers is made under it. The release, in
-// dbengine_destroy(), relies on the embedder owning the engine from one thread, as the daemon does
-static SPINLOCK dbengine_create_spinlock = SPINLOCK_INITIALIZER;
-
 DBENGINE_LIFECYCLE_STATE dbengine_engine_lifecycle_state(struct dbengine_engine *engine) {
     spinlock_lock(&engine->lifecycle.spinlock);
     DBENGINE_LIFECYCLE_STATE state = engine->lifecycle.stopped ? DBENGINE_LIFECYCLE_STOPPED :
@@ -388,10 +384,11 @@ ALWAYS_INLINE void dbengine_query_handle_release(struct dbengine_engine *engine,
 // ----------------------------------------------------------------------------
 // WAL cache
 
-static size_t dbengine_active_tiers(void) {
+// this engine's tiers that are up
+static size_t dbengine_active_tiers(struct dbengine_engine *engine) {
     size_t active = 0;
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-        if(dbengine_tier_is_active(dbengine_multidb_tiers[tier]))
+        if(dbengine_tier_is_active(&engine->tiers[tier]))
             active++;
     return active;
 }
@@ -402,7 +399,7 @@ static void wal_cleanup1(struct dbengine_engine *engine) {
     if(!spinlock_trylock(&engine->wal.guarded.spinlock))
         return;
 
-    if(engine->wal.guarded.available_items && engine->wal.guarded.available > dbengine_active_tiers()) {
+    if(engine->wal.guarded.available_items && engine->wal.guarded.available > dbengine_active_tiers(engine)) {
         wal = engine->wal.guarded.available_items;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(engine->wal.guarded.available_items, wal, cache.prev, cache.next);
         engine->wal.guarded.available--;
@@ -2434,6 +2431,9 @@ uint64_t dbengine_get_used_disk_space_unsafe(struct dbengine_tier *ctx)
 
 uint64_t dbengine_get_used_disk_space(struct dbengine_tier *ctx)
 {
+    if(!ctx)
+        return 0;
+
     netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
     uint64_t estimated_disk_space = dbengine_get_used_disk_space_unsafe(ctx);
     netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
@@ -2483,12 +2483,14 @@ bool dbengine_ctx_tier_cap_exceeded(struct dbengine_tier *ctx)
     return false;
 }
 
-static void retention_timer_cb(uv_timer_t *handle __maybe_unused)
+static void retention_timer_cb(uv_timer_t *handle)
 {
+    struct dbengine_engine *engine = handle->data;
+
     worker_is_busy(DBENGINE_RETENTION_TIMER_CB);
 
     for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
-        struct dbengine_tier *ctx = dbengine_multidb_tiers[tier];
+        struct dbengine_tier *ctx = &engine->tiers[tier];
         if (!dbengine_tier_is_active(ctx))
             continue;
         check_and_schedule_db_rotation(ctx);
@@ -2544,8 +2546,8 @@ static void dbengine_spawn_unwind(struct dbengine_engine *engine, bool timer_ope
     engine->loop_open = false;
 }
 
-// the loop, its handles, the structures and the thread; with the process lock held. A failed step closes what
-// came before it and leaves the engine not spawned, so dbengine_create() reports the error and frees it
+// the loop, its handles, the structures and the thread. A failed step closes what came before it and leaves the
+// engine not spawned, so dbengine_create() reports the error and frees it
 static int dbengine_spawn(struct dbengine_engine *engine) {
     int ret;
 
@@ -2613,6 +2615,12 @@ struct dbengine_engine *dbengine_engine_alloc(const struct dbengine_config *cfg)
     spinlock_init(&engine->wal.guarded.spinlock);
     netdata_mutex_init(&engine->datafile_write_mutex);
 
+    // every tier knows its engine from here on: the registry preload, run by the spawn, resolves tiers through it
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+        dbengine_tier_reset(&engine->tiers[tier]);
+        engine->tiers[tier].engine = engine;
+    }
+
     return engine;
 }
 
@@ -2641,6 +2649,11 @@ void dbengine_engine_free(struct dbengine_engine *engine) {
         freez(wal);
     }
 
+    // the tiers go with the engine; their locks are initialised (by the alloc at least, by the last reset otherwise)
+    // and nothing holds them any more
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
+        netdata_rwlock_destroy(&engine->tiers[tier].datafiles.rwlock);
+
     netdata_mutex_destroy(&engine->datafile_write_mutex);
     freez(engine);
 }
@@ -2649,39 +2662,17 @@ struct dbengine_engine *dbengine_create(const struct dbengine_config *cfg) {
     if(!cfg)
         fatal("DBENGINE: dbengine_create() called without a configuration");
 
-    spinlock_lock(&dbengine_create_spinlock);
+    // the configuration is resolved into the engine first: the caches and the allocators read it as they come up,
+    // and the tiers, the engine's own, know it before the spawn loads the registry through them. Nothing of the
+    // process is claimed: another engine, live, stopped or retained, is no obstacle
+    struct dbengine_engine *engine = dbengine_engine_alloc(cfg);
 
-    struct dbengine_engine *engine = NULL;
-
-    // the daemon's static tiers are the tier list of the engine that owns them (until the list moves into the
-    // engine); one that a live engine, a stopped one or a retained one still points at is not free to be claimed:
-    // dbengine_destroy() is what releases them, and a new engine can be made after it
-    bool tiers_free = true;
-    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-        if(dbengine_multidb_tiers[tier]->engine)
-            tiers_free = false;
-
-    if(!tiers_free)
-        netdata_log_error("DBENGINE: the static tiers already belong to an engine, a second one cannot be made");
-
-    else {
-        // the configuration is resolved into the engine first: the caches and the allocators read it as they come
-        // up. Every tier knows its engine before the spawn, which loads the registry through them
-        engine = dbengine_engine_alloc(cfg);
-        for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-            dbengine_multidb_tiers[tier]->engine = engine;
-
-        if(dbengine_spawn(engine)) {
-            for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-                dbengine_multidb_tiers[tier]->engine = NULL;
-
-            // the spawn failed before its caches existed: nothing but the object and its locks
-            dbengine_engine_free(engine);
-            engine = NULL;
-        }
+    if(dbengine_spawn(engine)) {
+        // the spawn failed before its caches existed: nothing but the object, its tiers and their locks
+        dbengine_engine_free(engine);
+        return NULL;
     }
 
-    spinlock_unlock(&dbengine_create_spinlock);
     return engine;
 }
 
@@ -2707,6 +2698,9 @@ static inline void worker_dispatch_query_prep(struct dbengine_engine *engine, st
 
 uint64_t dbengine_get_directory_free_bytes_space(struct dbengine_tier *ctx)
 {
+    if(!ctx)
+        return 0;
+
     uint64_t free_bytes = 0;
     OS_SYSTEM_DISK_SPACE space = os_disk_space(ctx->config.dbfiles_path);
     free_bytes = OS_SYSTEM_DISK_SPACE_OK(space) ? space.free_bytes : 0;

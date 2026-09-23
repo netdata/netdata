@@ -8,7 +8,7 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 }
 #else
 static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
-    struct dbengine_size_stats stats = dbengine_get_size_stats(dbengine_multidb_tiers[tier]);
+    struct dbengine_size_stats stats = dbengine_get_size_stats(dbengine_tier(netdata_conf_dbengine_engine, tier));
 
     buffer_sprintf(wb,
                    "\n\t\t\"default_granularity_secs\":%zu"
