@@ -124,7 +124,8 @@ Where:
 - `transaction_id` is the same ID received in the original command
 - `http_status_code` is the standard HTTP response code:
     - `200`: Success (DYNCFG_RESP_RUNNING) - Configuration accepted and running
-    - `202`: Accepted (DYNCFG_RESP_ACCEPTED) - Configuration accepted but not running yet
+    - `202`: Accepted (DYNCFG_RESP_ACCEPTED) - Configuration accepted but not running: still starting, or adopted
+      and failed (the status frame says which)
     - `298`: Accepted but disabled (DYNCFG_RESP_ACCEPTED_DISABLED)
     - `299`: Accepted but restart required (DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
     - `400`: Bad request - Invalid configuration
@@ -132,6 +133,17 @@ Where:
     - `500`: Internal server error
 - `content_type` is typically "application/json"
 - `expiration` is the absolute timestamp (unix epoch) for result expiration
+
+For `add`, `update`, `enable`, `disable` and `remove`, whether a user sent them or Netdata echoed a saved
+configuration, the response code is the adoption decision. Netdata saves the change only on a 2xx response and
+replays saved configurations every time the plugin starts:
+
+- A plugin MUST answer 2xx only when it now holds the requested configuration and state.
+- A plugin MUST leave its state unchanged when it answers any other code; otherwise the next plugin start restores
+  the configuration Netdata kept.
+- Report the health of an adopted configuration, such as a job that failed to start, with `CONFIG <id> STATUS`, not
+  with the response code.
+- `test` and `restart` are not saved; their codes only report the outcome.
 
 The result data depends on the command:
 

@@ -106,13 +106,17 @@ DynCfg uses HTTP-like codes verified against
 | Code | Meaning |
 |---|---|
 | 200 | Running -- accepted and active |
-| 202 | Accepted -- queued, not yet running |
+| 202 | Accepted -- saved, not running: still starting, or adopted and failed (check `status`) |
 | 298 | Accepted but disabled |
 | 299 | Accepted but restart required |
 | 400 | Bad request / invalid configuration |
 | 404 | Configuration id not found |
 | 500 | Internal error |
 | 501 | Action not implemented for this object |
+
+For `add`, `update`, `enable`, `disable` and `remove`, the Agent saves the change only on a 2xx reply; any other code
+means it kept the previous configuration. A job that was adopted but failed to start answers 202 and shows `failed` in
+its status.
 
 ---
 

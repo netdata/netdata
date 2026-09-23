@@ -19,9 +19,9 @@ does not release physical ownership: `Run` must return before collector cleanup 
 a same-job successor can acquire the runtime identity.
 
 A normal startup error uses the existing configured autodetection retry cadence and tries. Runtime acquisition failures
-retain a Failed configuration, including stock jobs, and default to response code 503 when the collector supplies no
-code. A startup error classified with `collectorapi.PermanentError`, unexpected early nil return and recovered `Run`
-panic are non-retrying failures. Unexpected return after readiness, including nil, immediately cuts new ordinary output
+retain a Failed configuration, including stock jobs; `RunFailure` reports the collector's class and whether startup may
+be retried, and Job Manager chooses any DynCfg reply from them. A startup error classified with
+`collectorapi.PermanentError`, unexpected early nil return and recovered `Run` panic are non-retrying failures. Unexpected return after readiness, including nil, immediately cuts new ordinary output
 and running availability, then reconciles the exact generation to Failed without automatic retry. If the failure races
 with installation, successful startup still installs and its terminal event removes that generation. Stale events cannot
 remove its successor. Already-admitted output may finish; terminal observation does not wait for a blocked `Collect` or
