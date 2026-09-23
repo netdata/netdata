@@ -38,6 +38,7 @@ protected:
 const size_t STAT_BYTES_BEFORE_COMPRESSION = 11;
 const size_t STAT_BYTES_AFTER_COMPRESSION = 12;
 const size_t STAT_IO_WRITE_REQUESTS = 16;
+const size_t STAT_IO_ERRORS = 28;
 
 const time_t BASE_TIME = 200000000;
 const size_t METRICS = 4;
@@ -79,11 +80,14 @@ TEST_F(ScaleExtentsTest, AWaitedFlushPutsEveryPageOnDisk) {
     // dirty queue, so both queues are empty; and every page made is on disk, which is visible as the number of
     // write requests the tier issued: with two pages per extent, N pages take at least N/2 extents, and each
     // extent is written by a request of its own (its journal record by another). A competing flusher's batch that
-    // had not reached the disk yet would leave the count short, which is what the wait exists to prevent.
+    // had not reached the disk yet would leave the count short, which is what the wait exists to prevent. The wait
+    // also ends on an extent whose write failed and was dropped, which only the I/O error counter shows, and the
+    // floor on write requests is too loose to notice a few missing extents: no write may have failed.
     const struct dbengine_cache_stats cache_after = main_cache_stats();
     unsigned long long tier_after[DBENGINE_STATS_COUNT] = {};
     tier_stats(tier_after);
 
+    EXPECT_EQ(tier_after[STAT_IO_ERRORS], tier_before[STAT_IO_ERRORS]) << "a write failed, so pages may be lost";
     EXPECT_EQ(cache_after.queues[DBENGINE_CACHE_QUEUE_HOT].entries, 0u) << "pages stayed hot after the flush";
     EXPECT_EQ(cache_after.queues[DBENGINE_CACHE_QUEUE_DIRTY].entries, 0u) << "pages stayed dirty after the flush";
 

@@ -1903,8 +1903,8 @@ static void *flush_all_hot_and_dirty_pages_of_section_tp_worker(struct dbengine_
     // Only a caller that waits (dbengine_flush_all_wait()) hands a completion in; the fire-and-forget verb does
     // not, and for it nothing below runs. The flush above wrote the pages it found dirty, but a competing flusher
     // may have taken a batch of this tier's pages before it looked: that batch counts itself in
-    // extents_currently_being_flushed under the dirty lock before the pages leave the queue, and is counted out
-    // only once its extent and journal record are on disk. Waiting for zero here is what makes "on disk" true for
+    // extents_currently_being_flushed under the dirty lock before the pages leave the queue, and is counted out once
+    // its write has finished, written or dropped after a failed retry (counted in io_errors). Waiting for zero covers
     // every page that was hot or dirty when the caller asked, the same wait ctx_shutdown_tp_worker() makes.
     if(completion) {
         while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED))

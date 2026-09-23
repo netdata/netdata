@@ -110,6 +110,7 @@ protected:
 
 const size_t STAT_DATAFILE_CREATIONS = 23;
 const size_t STAT_DATAFILE_DELETIONS = 24;
+const size_t STAT_IO_ERRORS = 28;
 
 const time_t BASE_TIME = 200000000;
 
@@ -137,6 +138,8 @@ TEST_F(ScaleRotationTest, TheOldestDatafileIsDeletedAndTheSurvivorsAreReadAfterA
     // waits for the flush, so each round adds one extent per metric to the current datafile. A point's value is
     // its offset from BASE_TIME, so any point read back can be checked from its timestamp alone.
     unsigned long long stats[DBENGINE_STATS_COUNT] = {};
+    tier_stats(stats);
+    const unsigned long long io_errors_before = stats[STAT_IO_ERRORS];
     time_t last_time = BASE_TIME;
     size_t pages_written = 0;
     do {
@@ -154,6 +157,9 @@ TEST_F(ScaleRotationTest, TheOldestDatafileIsDeletedAndTheSurvivorsAreReadAfterA
     } while (stats[STAT_DATAFILE_CREATIONS] < 3 && pages_written < MAX_PAGES);
 
     ASSERT_GE(stats[STAT_DATAFILE_CREATIONS], 3u) << "no third datafile after " << pages_written << " pages";
+    // Each wait also ends on an extent whose write failed and was dropped (a failed write also moves the tier to a
+    // new datafile); only the I/O error counter tells.
+    EXPECT_EQ(stats[STAT_IO_ERRORS], io_errors_before) << "a write failed while the datafiles were filled";
 
     // The collectors are done and the case holds no metric: the settle below waits for the registry to report no
     // references, and these would be some.

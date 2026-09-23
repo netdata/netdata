@@ -29,6 +29,12 @@ protected:
         return stats[23];
     }
 
+    unsigned long long io_errors() {
+        unsigned long long stats[DBENGINE_STATS_COUNT] = {};
+        dbengine_get_stats(tier_, stats);
+        return stats[28];
+    }
+
     void expect_every_point(STORAGE_METRIC_HANDLE *smh, size_t m, time_t base, STORAGE_PRIORITY priority) {
         const std::vector<STORAGE_POINT> got = query_all(smh, base + 1, base + static_cast<time_t>(POINTS_PER_METRIC),
                                                          priority, 2048);
@@ -51,6 +57,7 @@ TEST_F(ScaleRestartTest, WrittenDataSurvivesARestartAndIsReadFromDisk) {
     // Recent, so the last datafile is left as written at the reload (see the file comment), and in the past by
     // more than the points span, so nothing is collected into the future.
     const time_t base = now_realtime_sec() - 3000;
+    const unsigned long long io_errors_before = io_errors();
 
     std::vector<UUIDMAP_ID> ids;
     STORAGE_METRICS_GROUP *smg = dbengine_metrics_group_get();
@@ -77,8 +84,10 @@ TEST_F(ScaleRestartTest, WrittenDataSurvivesARestartAndIsReadFromDisk) {
 
     // The daemon's shutdown order: the pages to disk while the tier still serves (a flush after the quiesce skips
     // the open cache, and this case wants the open cache filled by the reload the way a normal exit leaves it),
-    // then no more queries, then the tier and the engine down. The destroy must find nothing referenced.
+    // then no more queries, then the tier and the engine down. The destroy must find nothing referenced. The wait
+    // also ends on an extent whose write failed and was dropped; only the I/O error counter tells.
     ASSERT_TRUE(dbengine_flush_all_wait(tier_));
+    EXPECT_EQ(io_errors(), io_errors_before) << "a write failed before the restart, so pages may be lost";
     dbengine_quiesce(tier_);
     take_down();
     ASSERT_FALSE(HasFatalFailure());
