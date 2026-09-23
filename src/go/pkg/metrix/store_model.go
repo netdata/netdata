@@ -3,6 +3,7 @@
 package metrix
 
 import (
+	"maps"
 	"sync"
 	"sync/atomic"
 )
@@ -84,6 +85,43 @@ type readSnapshot struct {
 	runtimeBase *readSnapshot
 	// runtimeDepth tracks overlay chain depth for runtime compaction heuristics.
 	runtimeDepth int
+	// runtimeOne holds a runtime overlay's only series, keyed by runtimeOneKey, so a
+	// single write publishes no map. series is nil while it is set.
+	runtimeOneKey string
+	runtimeOne    *committedSeries
+}
+
+// ownSeries returns the series this snapshot itself holds for key, excluding its base.
+func (s *readSnapshot) ownSeries(key string) (*committedSeries, bool) {
+	if s.runtimeOne != nil {
+		if s.runtimeOneKey == key {
+			return s.runtimeOne, true
+		}
+		return nil, false
+	}
+	series, ok := s.series[key]
+	return series, ok
+}
+
+// putOwnSeries stores series under key, keeping a single-series overlay inline.
+func (s *readSnapshot) putOwnSeries(key string, series *committedSeries) {
+	switch {
+	case s.series != nil:
+		s.series[key] = series
+	case s.runtimeOne == nil || s.runtimeOneKey == key:
+		s.runtimeOneKey, s.runtimeOne = key, series
+	default:
+		s.series = map[string]*committedSeries{s.runtimeOneKey: s.runtimeOne, key: series}
+		s.runtimeOneKey, s.runtimeOne = "", nil
+	}
+}
+
+func (s *readSnapshot) copyOwnSeries(dst map[string]*committedSeries) {
+	if s.runtimeOne != nil {
+		dst[s.runtimeOneKey] = s.runtimeOne
+		return
+	}
+	maps.Copy(dst, s.series)
 }
 
 type collectorSnapshotState struct {

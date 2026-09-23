@@ -120,7 +120,10 @@ A `CollectorStore` write only exists inside a cycle. The job runtime drives the 
 | Failure | `AbortCycle` discards all staged writes and staged registrations — the committed state is untouched. |
 
 `RuntimeStore` has **no cycle API**: writes commit immediately, each producing a new overlay snapshot, and it is
-**stateful-only** (snapshot-mode registration returns an error; calling snapshot record methods panics).
+**stateful-only** (snapshot-mode registration returns an error; calling snapshot record methods panics). A producer
+that records many series at once can use the optional `RuntimeBatchWriter` (type assertion): writes made during
+`WriteBatch(fn)` are published together as one snapshot when `fn` returns or panics, and readers see none of them
+earlier. The chartengine runtime aggregator publishes each job cycle's rollup this way.
 
 ## Metric Identity: Names, Series, and Descriptors
 
@@ -507,7 +510,7 @@ For a complete collector integration pattern (cycle management, error handling),
 | Collector commit | Staged frame → descriptor resolution → retention → single canonical pass → publish, all success-path; abort discards staged state. |
 | Descriptor resolution | Observed authorities per name are grouped in a fingerprint-indexed map (no cap); one canonical descriptor per accepted name. |
 | Descriptor eviction | One O(descriptor-universe) sweep at commit, after retention; `instrumentZeroSince` tracks idle-since on the successful-commit clock. |
-| Runtime commit | Overlay/compaction strategy with its own retention pruning. |
+| Runtime commit | Overlay/compaction strategy with its own retention pruning; a single-write overlay holds its series inline, and a batch publishes one overlay for all its writes. |
 | Collector read projection | One failure-safe lazy flattened projection per exact published snapshot; concurrent first users synchronize on one complete build. |
 | Iteration | Immutable per-scope name indexes and pre-sorted names; scoped traversal is independent of foreign-scope series. |
 | Identity | Canonical metric+labels key with a stable `SeriesIdentity` hash. |

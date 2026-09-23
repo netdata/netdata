@@ -16,6 +16,15 @@ type RuntimeStore interface {
 	Write() RuntimeWriter
 }
 
+// RuntimeBatchWriter is an OPTIONAL RuntimeStore capability (type assertion; not part of
+// RuntimeStore, so existing implementations and fakes keep compiling). Writes made while
+// fn runs are published together as one snapshot when fn returns (or panics); readers do
+// not see any of them earlier. Writes from other goroutines during the batch join it. A
+// nested WriteBatch joins the outer batch. Outside a batch, writes still commit immediately.
+type RuntimeBatchWriter interface {
+	WriteBatch(fn func())
+}
+
 // DescriptorRetention is an OPTIONAL interface a CollectorStore may implement to expose how
 // long it keeps a descriptor and the clock that lifetime is measured in. A consumer that
 // caches per-name state keyed off metrix descriptors (e.g. the prometheus writer) obtains it
