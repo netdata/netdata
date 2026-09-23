@@ -703,7 +703,14 @@ func (p *Processor) joinSourceLabels(sourceLabels []string, separator string) st
 		return p.getLabel(sourceLabels[0])
 	}
 
+	// Size the value exactly: it may be kept as a label value, and one allocation
+	// covers the whole join.
+	size := len(separator) * (len(sourceLabels) - 1)
+	for _, name := range sourceLabels {
+		size += len(p.getLabel(name))
+	}
 	p.join.Reset()
+	p.join.Grow(size)
 	for i, name := range sourceLabels {
 		if i > 0 {
 			p.join.WriteString(separator)
