@@ -127,8 +127,9 @@ func TestAdoptedUpdateWithBusyRuntimeStartsOnceTheRuntimeReleases(t *testing.T) 
 		controller.scheduler.StopBackgroundWorkers()
 		require.NoError(t, controller.scheduler.WaitBackgroundWorkers(context.Background()))
 	})
+	attempts := controller.factory.config.Attempts
 	controller.factory.config.Attempts = attemptFailureTestAuthority{
-		delegate:  controller.factory.config.Attempts,
+		delegate:  attempts,
 		namespace: jobmgr.ProcessAttemptJobRuntime,
 		err:       jobmgr.ErrProcessAttemptBusy,
 	}
@@ -184,9 +185,28 @@ func TestAdoptedUpdateWithBusyRuntimeStartsOnceTheRuntimeReleases(t *testing.T) 
 	// The previous runtime is already gone, so the pending start is submitted
 	// at once; it reconciles the adopted config on the job's lane.
 	commands.waitForSubmissions(t, 1)
-	submitted, _, _ := commands.snapshot()
+	submitted, plans, _ := commands.snapshot()
 	require.Equal(t, "internal/jobs/pending", submitted[0].Route)
 	require.Equal(t, config.FullName(), submitted[0].LaneKey)
+
+	// Once the identity is free, the pending start installs the adopted config.
+	controller.factory.config.Attempts = attempts
+	pendingScope := lifecycle.ResourceTransactionScope{
+		ID:        config.FullName(),
+		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 3},
+	}
+	pendingPermit, _ := issueTestJobPermit(t, config.FullName(), 3)
+	pending, err := plans[0].Transaction.Prepare(context.Background(), nil, pendingScope, pendingPermit)
+	require.NoError(t, err)
+	started, err := pending.Apply(context.Background())
+	require.NoError(t, err)
+	_, _, running := started.Ownership()
+	t.Cleanup(func() { stopRuntimeTestResource(t, running) })
+	require.NotNil(t, running)
+	record, exists = graph.Lookup(config.FullName())
+	require.True(t, exists)
+	require.Equal(t, dyncfg.StatusRunning.String(), record.Status)
+	require.Contains(t, record.Payload(), "replacement")
 }
 
 func TestRolledBackTransactionAnswersUnavailable(t *testing.T) {

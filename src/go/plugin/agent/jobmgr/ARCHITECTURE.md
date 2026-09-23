@@ -292,8 +292,9 @@ it adds no scheduler, worker, per-task heap object, or population scan.
   cancellation or deadline that arrives meanwhile does not replace the applied result: answering `499`/`504` for an
   applied change would make the Netdata daemon drop a change the plugin already made. The daemon keeps waiting for the
   reply after a cancellation, but stops one second after the deadline, so an Apply that ends later loses its reply.
-  Apply waits stay short for that reason: waiting for a previous job runtime to release is bounded by the request
-  deadline (`lifecycle.ApplyDeadline`), and collector `Run` readiness is expected to be prompt. `kernel.go`
+  Apply waits stay short for that reason: waiting for a previous job runtime to release is bounded by the supersession
+  grace and by the request deadline (`lifecycle.ApplyDeadline`), and collector `Run` readiness is expected to be
+  prompt. `kernel.go`
   (`completeResourceTransactionTask`).
 
 ## Process Containment
@@ -385,9 +386,9 @@ Who admits, and who does not:
   contention and apply it after the identity releases.
 - Other **synchronous** DynCfg requests are rejected, not retained, when busy or contained work is found before the
   incumbent is touched. Once an adopted change has stopped the incumbent and the previous runtime is still busy, the
-  change is kept pending until that identity releases (see [DynCfg reply contract](#dyncfg-reply-contract)). An
-  applied accepted-job ENABLE is asynchronous instead: it returns `202`, and a run-owned activation worker retains
-  authority through the later terminal transaction. Cancellation prevents queued service-discovery mutations from starting; it
+  change is kept pending until that identity releases (see [DynCfg reply contract](#dyncfg-reply-contract)). An applied
+  accepted-job ENABLE is asynchronous instead: it returns `202`, and a run-owned activation worker retains authority
+  through the later terminal transaction. Cancellation prevents queued service-discovery mutations from starting; it
   does not roll back work that already began while its request context was live.
 
 ### No process-wide slot limit
@@ -528,7 +529,8 @@ Two different guarantees apply during replacement:
   transient construction failure or probe failure retires the incumbent and commits the source-specific `Failed` or
   removed outcome.
 - **A DynCfg command changes state only when it adopts the request.** A preparation failure keeps the incumbent unless
-  the command adopts it as `Failed` because the plugin will retry it; see [DynCfg reply contract](#dyncfg-reply-contract).
+  the command adopts it as `Failed` because the plugin will retry it; see [DynCfg reply
+  contract](#dyncfg-reply-contract).
 
 A proposal rejected before it establishes desired state, or an attempt that cannot start because its physical identity
 is still busy, leaves the incumbent unchanged. Persistent sources retain only their latest desired retry; an ordinary
@@ -656,14 +658,13 @@ starts collection and running availability. Non-Runner V1/V2 jobs signal readine
 startup timer in the owner's `Start`, using `jobmgr.DefaultProcessAttemptFuse` for its two-minute duration. Runtime
 admission has already stopped the preparation fuse; neither timer limits the successfully started runtime lifetime.
 
-A typed `runtimeStartupFailure` carries the collector outcome through the existing source-specific activation
-fallback: discovery, DynCfg update/enable/restart, accepted activation and secret-dependent restart commit Failed and
-use the existing configured retry policy; the DynCfg reply follows the
-[DynCfg reply contract](#dyncfg-reply-contract). Stock configurations remain visible as Failed after successful
-detection followed by runtime acquisition failure. Existing plain-stock removal for unsuccessful Init/Check detection is unchanged. A recovered collector `Run`
-panic or unexpected nil return is non-retryable. Positive classification must survive secret redaction without
-absorbing a joined structural or cleanup error. Operational outcomes do not become errors from the process-owned
-worker; physical cleanup still does.
+A typed `runtimeStartupFailure` carries the collector outcome through the existing source-specific activation fallback:
+discovery, DynCfg update/enable/restart, accepted activation and secret-dependent restart commit Failed and use the
+existing configured retry policy; the DynCfg reply follows the [DynCfg reply contract](#dyncfg-reply-contract). Stock
+configurations remain visible as Failed after successful detection followed by runtime acquisition failure. Existing
+plain-stock removal for unsuccessful Init/Check detection is unchanged. A recovered collector `Run` panic or unexpected
+nil return is non-retryable. Positive classification must survive secret redaction without absorbing a joined structural
+or cleanup error. Operational outcomes do not become errors from the process-owned worker; physical cleanup still does.
 
 After accepted readiness, unexpected return atomically revokes new output admission before logging or joining the
 managed loop. The owner submits a response-free command on the job's existing lane with its exact resource generation.
@@ -711,16 +712,17 @@ collector-job `config` Function is therefore built in `joboutput/dyncfg_reply.go
   framework never retries (an unclassified `Init` error, a post-check failure or a recovered panic) is therefore
   rejected.
 - **Failures after the incumbent stopped** (the runtime identity is busy or quarantined, or `Run` startup fails) are
-  adopted as `Failed` (`202`). A busy runtime keeps the adopted config pending until the identity releases; the wait
-  for it is bounded by the request deadline.
+  adopted as `Failed`: `update` and `enable` answer `202`, `restart` its failure code. A busy runtime keeps the adopted
+  config pending until the identity releases; the wait for it is bounded by the request deadline.
 - **Validate-only commands.** `add` and `update` of a disabled job reject an invalid configuration (`400`) and a busy
   validation (`503`). A dependency that is not ready (a missing vnode, an unavailable secret provider) is adopted by
   `update` of a disabled job, which only stores the payload, and by `add` when its background activation will retry
   it; otherwise it answers `503`. Job names are validated as the daemon sent them.
 - **Not saved.** `restart` answers 2xx only when a new job generation runs; any other outcome answers the failure's
-  code. A restart of a running job rejects every failure found before stopping it; a restart of a failed job follows
-  the rule above for what it changes (a failure the plugin retries is adopted and the job stays `Failed`). `test` answers `422` for a permanent or unclassified collector failure,
-  `503` for a temporary one and `400` for an invalid configuration.
+  code. A restart of a running job rejects every failure found before stopping it; a restart of a failed job follows the
+  rule above for what it changes (a failure the plugin retries is adopted and the job stays `Failed`). `test` answers
+  `422` for a permanent or unclassified collector failure, `503` for a temporary one or when its attempt is busy, stale,
+  superseded, timed out or quarantined, and `400` for an invalid configuration.
 - **Run retirement.** A change rolled back by run retirement before its graph commit answers `503` without a status
   frame; the successor run is rebuilt from the daemon's replay.
 

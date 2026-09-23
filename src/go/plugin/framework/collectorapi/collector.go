@@ -47,8 +47,9 @@ type CollectorV1 interface {
 // every autodetection_retry seconds (never when it is 0, the framework
 // default) and an Init error is never retried. PermanentError (never retried)
 // and TemporaryError (retried per autodetection_retry) classify either; the Job
-// Manager derives retries and DynCfg replies from the class. A classified
-// failure keeps a failed stock job listed instead of removed.
+// Manager derives retries and DynCfg replies from the class and
+// autodetection_retry. A classified failure keeps a failed stock job listed
+// instead of removed.
 type CollectorV2 interface {
 	Init(context.Context) error
 	Check(context.Context) error
