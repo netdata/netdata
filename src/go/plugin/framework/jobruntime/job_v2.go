@@ -94,6 +94,7 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 	if j.cleanupOut == nil {
 		j.cleanupOut = j.out
 	}
+	j.selfMetrics = newJobSelfMetrics(j.pluginName, j.moduleName, j.name, j.fullName, j.updateEvery, j.labels)
 
 	log := logger.New().With(jobLoggerAttrs(j.ModuleName(), j.Name(), cfg.Source)...)
 	j.Logger = log
@@ -142,8 +143,9 @@ type JobV2 struct {
 	runtimeStore          metrix.RuntimeStore
 	runtimeAggregator     *chartengine.RuntimeAggregator
 
-	prevRun time.Time
-	retries atomic.Int64
+	prevRun     time.Time
+	retries     atomic.Int64
+	selfMetrics jobSelfMetrics
 
 	vnodeMu               sync.RWMutex
 	vnode                 vnodes.VirtualNode
@@ -290,6 +292,7 @@ func (j *JobV2) CleanupRejected() {
 }
 
 func (j *JobV2) cleanup(emit bool) {
+	defer j.selfMetrics.clear()
 	j.buf.Reset()
 	snapshots := j.captureScopeCleanupSnapshots()
 	j.unregisterRuntimeComponent()
@@ -329,6 +332,11 @@ func (j *JobV2) cleanup(emit bool) {
 		}
 		j.buf.Reset()
 	}
+	j.selfMetrics.cleanup(j.api)
+	if err := commitJobOutput(j.cleanupOut, j.buf.Bytes()); err != nil {
+		j.Warningf("self-metrics cleanup output failed: %v", err)
+	}
+	j.buf.Reset()
 	j.releaseAllScopeRegistryOwners()
 	j.clearAllScopeStateAfterCleanup()
 }
@@ -580,6 +588,7 @@ func (j *JobV2) runOnce() {
 	j.prevRun = curTime
 
 	prepared, ok := j.collectAndEmit(sinceLastRun)
+	elapsed := int64(durationTo(time.Since(curTime), time.Millisecond))
 	if ok && !j.panicked.Load() {
 		if err := j.finishPreparedEmission(prepared); err != nil {
 			j.Warningf("finalize emission failed: %v", err)
@@ -592,6 +601,13 @@ func (j *JobV2) runOnce() {
 		j.retries.Add(1)
 	}
 	j.buf.Reset()
+	if !j.panicked.Load() {
+		self := j.selfMetrics.prepare(j.api, sinceLastRun, elapsed, ok, false)
+		if err := commitJobOutputTransaction(j.out, j.buf.Bytes(), self); err != nil {
+			j.Warningf("self-metrics output failed: %v", err)
+		}
+		j.buf.Reset()
+	}
 }
 
 func (j *JobV2) flushRuntimeAggregator() {

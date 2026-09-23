@@ -669,7 +669,8 @@ END`, chartengine.Priority))
 						require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 						job.runOnce()
-						assert.Empty(t, output.String())
+						assertOnlySelfMetrics(t, output.String())
+						assert.Contains(t, output.String(), "SET 'failed' = 1")
 						job.runOnce()
 
 						assert.Contains(t, output.String(), "CHART 'module_job.workers_busy'")
@@ -678,7 +679,7 @@ END`, chartengine.Priority))
 				}
 			},
 		},
-		"collect error aborts cycle and emits nothing": {
+		"collect error aborts cycle and emits failed status": {
 			run: func(t *testing.T) {
 				store := metrix.NewCollectorStore()
 				mod := &mockModuleV2{
@@ -694,7 +695,7 @@ END`, chartengine.Priority))
 				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 				job.runOnce()
 
-				assert.Equal(t, "", out.String())
+				assertOnlySelfMetrics(t, out.String())
 				assert.Equal(t, metrix.CollectStatusFailed, store.Read(metrix.ReadRaw()).CollectMeta().LastAttemptStatus)
 			},
 		},
@@ -1372,7 +1373,7 @@ HOST_DEFINE_END
 HOST 'node-guid'
 
 CHART 'module_job.workers_busy'`)
-	assert.NotContains(t, wire, "HOST ''")
+	assertSelfChartsLocal(t, wire)
 
 	out.Reset()
 	current = 2
@@ -1752,7 +1753,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 
 				job.runOnce()
 
-				assert.Empty(t, out.String())
+				assertOnlySelfMetrics(t, out.String())
 				assert.Equal(t, []vnoderegistry.Owner{vnoderegistry.Owner("other")}, registry.Owners("node-guid"))
 			},
 		},
@@ -1994,7 +1995,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 
 				job.runOnce()
 
-				assert.Empty(t, out.String())
+				assertOnlySelfMetrics(t, out.String())
 				assert.Empty(t, registry.Owners("node-guid"))
 			},
 		},
@@ -2032,7 +2033,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
-				assert.Equal(t, "", out.String())
+				assertOnlySelfMetrics(t, out.String())
 				assert.Equal(t, 0, registry.Len())
 
 				emitValue = true
@@ -2064,7 +2065,7 @@ func TestJobV2VnodeRegistryScenarios(t *testing.T) {
 				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
-				assert.Equal(t, "", out.String())
+				assertOnlySelfMetrics(t, out.String())
 				assert.Nil(t, job.scopeStates[defaultHostScopeKey])
 
 				emitValue = true
@@ -2251,7 +2252,7 @@ CHART 'module_job.workers_busy'`)
 				require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 				job.runOnce()
-				assert.Empty(t, out.String())
+				assertOnlySelfMetrics(t, out.String())
 				assert.Empty(t, registry.Owners("guid-a"))
 				require.NotNil(t, job.scopeStates["scope-a"])
 				assert.Empty(t, job.scopeStates["scope-a"].host.cleanupCharts)
@@ -2259,7 +2260,7 @@ CHART 'module_job.workers_busy'`)
 				emitScope = false
 				job.runOnce()
 
-				assert.Empty(t, out.String())
+				assertOnlySelfMetrics(t, out.String())
 				assert.Empty(t, registry.Owners("guid-a"))
 				assert.Nil(t, job.scopeStates["scope-a"])
 			},
@@ -2505,7 +2506,7 @@ func TestJobV2CleanupUsesLastSuccessfulHostAfterFailedHostSwitch(t *testing.T) {
 		MetadataRevision: 2,
 	})
 	job.runOnce()
-	assert.Equal(t, "", out.String())
+	assertOnlySelfMetrics(t, out.String())
 
 	job.Cleanup()
 
@@ -2559,11 +2560,11 @@ func TestJobV2CleanupUsesLastSuccessfulVnodeForStaleSuppressionAfterFailedHostSw
 		MetadataRevision: 2,
 	})
 	job.runOnce()
-	require.Empty(t, out.String())
+	assertOnlySelfMetrics(t, out.String())
 
 	job.Cleanup()
 
-	assert.Empty(t, out.String())
+	assertOnlySelfMetrics(t, out.String())
 	assert.Empty(t, job.scopeStates)
 }
 
@@ -2609,14 +2610,14 @@ func TestJobV2EmptyHostSwitchDoesNotKeepReloadingEngine(t *testing.T) {
 		MetadataRevision: 2,
 	})
 	job.runOnce()
-	assert.Equal(t, "", out.String())
+	assertOnlySelfMetrics(t, out.String())
 	require.Equal(t, 1, mod.templateCalls)
 	require.Equal(t, jobV2HostRef{kind: jobV2HostVnode, guid: "node-guid-b"}, requireDefaultScopeState(t, job).host.engineHost)
 	require.Equal(t, jobV2HostRef{kind: jobV2HostVnode, guid: "node-guid-a"}, requireDefaultScopeState(t, job).host.cleanupOwner)
 
 	out.Reset()
 	job.runOnce()
-	assert.Equal(t, "", out.String())
+	assertOnlySelfMetrics(t, out.String())
 	assert.Equal(t, 1, mod.templateCalls)
 	assert.Equal(t, jobV2HostRef{kind: jobV2HostVnode, guid: "node-guid-b"}, requireDefaultScopeState(t, job).host.engineHost)
 	assert.Equal(t, jobV2HostRef{kind: jobV2HostVnode, guid: "node-guid-a"}, requireDefaultScopeState(t, job).host.cleanupOwner)
@@ -2663,7 +2664,7 @@ func TestJobV2CleanupDoesNotSuppressGlobalCleanupForDifferentStaleVnode(t *testi
 		MetadataRevision: 2,
 	})
 	job.runOnce()
-	assert.Equal(t, "", out.String())
+	assertOnlySelfMetrics(t, out.String())
 
 	job.Cleanup()
 
@@ -2709,7 +2710,7 @@ func TestJobV2CleanupUsesPreModuleCleanupSnapshotForStaleSuppression(t *testing.
 
 	job.Cleanup()
 
-	assert.Equal(t, "", out.String())
+	assertOnlySelfMetrics(t, out.String())
 	assert.True(t, mod.cleaned)
 }
 
