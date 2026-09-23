@@ -40,10 +40,11 @@ Known limits of reading traces back from object storage in this release:
   history exceeds the download cache.
 - A file that cannot be downloaded, or a catalog that cannot be read, makes the answer partial with the reason
   `remote_unavailable`; one missing file in a search's range marks every trace summary as possibly incomplete and
-  empties searches that filter on the root service, root operation or trace duration. A downloaded file that turns
-  out unreadable is reported as a failed source (`source_failure`).
+  empties searches that filter on the root service, root operation or trace duration. A file that downloads intact
+  but cannot be read is reported as a failed source (`source_failure`).
 - Files are downloaded one at a time, each within its own time limit. While the remote is down, each file waits out
-  its limit in turn, so a query over many offloaded files can take minutes.
+  its limit in turn (a file that another query is already downloading can cost up to about three limits), so a query
+  over many offloaded files can take minutes.
 
 ## Requirements
 
