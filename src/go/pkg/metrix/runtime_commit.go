@@ -2,6 +2,8 @@
 
 package metrix
 
+import "slices"
+
 func (r *runtimeStoreBackend) commitRuntimeWrite(apply func(old, next *readSnapshot, seq uint64, nowUnixNano int64)) {
 	r.core.mu.Lock()
 	defer r.core.mu.Unlock()
@@ -78,6 +80,8 @@ type runtimeMutableSeriesState struct {
 	series   *committedSeries
 	previous *committedSeries
 	expired  bool
+	// owned marks a series the pending overlay already holds: a batch wrote it before.
+	owned bool
 }
 
 func (r *runtimeStoreBackend) runtimeEnsureSeriesMutable(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor, nowUnixNano int64) *committedSeries {
@@ -85,10 +89,37 @@ func (r *runtimeStoreBackend) runtimeEnsureSeriesMutable(old, next *readSnapshot
 	return state.series
 }
 
-func (r *runtimeStoreBackend) runtimeEnsureHistogramSeriesMutable(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor, nowUnixNano int64) *committedSeries {
-	state := r.runtimeEnsureSeriesMutableWithClone(old, next, key, name, hostScopeKey, hostScope, labels, labelsKey, desc, nowUnixNano, committedSeriesCloneHistogramMutation)
-	if state.previous != nil {
+func (r *runtimeStoreBackend) runtimeEnsureHistogramSeriesMutable(
+	old, next *readSnapshot,
+	key, name, hostScopeKey string,
+	hostScope HostScope,
+	labels []Label,
+	labelsKey string,
+	desc *instrumentDescriptor,
+	nowUnixNano int64,
+) *committedSeries {
+	state := r.runtimeEnsureSeriesMutableWithClone(
+		old,
+		next,
+		key,
+		name,
+		hostScopeKey,
+		hostScope,
+		labels,
+		labelsKey,
+		desc,
+		nowUnixNano,
+		committedSeriesCloneHistogramMutation,
+	)
+	switch {
+	case state.previous != nil:
 		rememberHistogramPreviousFrom(state.series, state.previous, desc)
+	case state.owned:
+		// The previous state an immediate write would see is the series' own. The write
+		// updates its buckets in place, so previous keeps a copy.
+		previous := *state.series
+		previous.histogramCumulative = slices.Clone(previous.histogramCumulative)
+		rememberHistogramPreviousFrom(state.series, &previous, desc)
 	}
 	return state.series
 }
@@ -130,7 +161,10 @@ func (r *runtimeStoreBackend) runtimeEnsureSeriesMutableWithClone(
 ) runtimeMutableSeriesState {
 	if series, ok := next.ownSeries(key); ok && series != nil {
 		ensureSeriesMeta(series.desc, &series.meta)
-		return runtimeMutableSeriesState{series: series}
+		return runtimeMutableSeriesState{
+			series: series,
+			owned:  true,
+		}
 	}
 	if existing, ok := lookupSnapshotSeries(old, key); ok {
 		if r.runtimeSeriesExpired(existing, nowUnixNano) {

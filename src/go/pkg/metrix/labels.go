@@ -79,7 +79,6 @@ func appendCanonicalLabel(dst []Label, key *strings.Builder, base []Label, extra
 	}
 	inserted := false
 	for _, label := range base {
-
 		if !inserted && extra.Key <= label.Key {
 			dst = appendLabelKeyed(dst, key, extra)
 			inserted = true

@@ -9,17 +9,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// runtimeBatchWorkload writes counters, gauges and a summary, including repeated
-// writes of one series, through a fresh runtime store.
+// runtimeBatchWorkload writes counters, gauges, a summary and a histogram, including
+// repeated writes of one series, through a fresh runtime store.
 func runtimeBatchWorkload(store RuntimeStore) {
 	meter := store.Write().StatefulMeter("rt")
 	requests := meter.Counter("requests_total")
 	depth := meter.Gauge("queue_depth")
 	latency := meter.Summary("latency_seconds", WithSummaryQuantiles(0.5, 0.9))
+	sizes := meter.Histogram("size_bytes", WithHistogramBounds(1, 10))
 	for i := range 3 {
 		requests.Add(2)
 		depth.Set(SampleValue(10 + i))
 		latency.Observe(SampleValue(i) / 10)
+		sizes.Observe(SampleValue(i * 4))
 	}
 }
 
@@ -30,18 +32,30 @@ func runtimeSeriesState(t *testing.T, store RuntimeStore) map[string]any {
 	require.True(t, ok)
 	summary, ok := reader.Summary("rt.latency_seconds", nil)
 	require.True(t, ok)
+	sizes, ok := reader.Histogram("rt.size_bytes", nil)
+	require.True(t, ok)
+	flatReader := store.Read(ReadRaw(), ReadFlatten())
 	flat := map[string]SampleValue{}
-	store.Read(ReadRaw(), ReadFlatten()).ForEachSeries(func(name string, labels LabelView, v SampleValue) {
+	flatDeltas := map[string]SampleValue{}
+	flatReader.ForEachSeries(func(name string, labels LabelView, v SampleValue) {
 		key := name
 		if q, ok := labels.Get(SummaryQuantileLabel); ok {
 			key += "{" + q + "}"
 		}
+		if le, ok := labels.Get(HistogramBucketLabel); ok {
+			key += "{" + le + "}"
+		}
 		flat[key] = v
+		if d, ok := flatReader.Delta(name, labels.CloneMap()); ok {
+			flatDeltas[key] = d
+		}
 	})
 	return map[string]any{
-		"requests_delta": delta,
-		"summary":        summary,
-		"flattened":      flat,
+		"requests_delta":   delta,
+		"summary":          summary,
+		"histogram":        sizes,
+		"flattened":        flat,
+		"flattened_deltas": flatDeltas,
 	}
 }
 
