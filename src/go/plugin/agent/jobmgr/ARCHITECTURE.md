@@ -705,11 +705,11 @@ collector-job `config` Function is therefore built in `joboutput/dyncfg_reply.go
   as `Failed` (including a plain stock job removed after its detection failed). A command whose state already holds
   answers the same codes without changing anything.
 - **Failures before the incumbent is touched** (`update` of a running or failed job, `enable` of a disabled or failed
-  job, `restart` of a failed job) are rejected unless the plugin will retry them: an invalid configuration answers
-  `400`, a permanent or unclassified collector failure `422`, a temporary failure or a busy, stale, superseded,
-  timed-out or quarantined job identity `503`. A failure the configured autodetection retry will retry is adopted as
-  `Failed` (`202`). A failure the framework never retries (an unclassified `Init` error, a post-check failure or a
-  recovered panic) is therefore rejected.
+  job) are rejected unless the plugin will retry them: an invalid configuration answers `400`, a permanent or
+  unclassified collector failure `422`, a temporary failure or a busy, stale, superseded, timed-out or quarantined job
+  identity `503`. A failure the configured autodetection retry will retry is adopted as `Failed` (`202`). A failure the
+  framework never retries (an unclassified `Init` error, a post-check failure or a recovered panic) is therefore
+  rejected.
 - **Failures after the incumbent stopped** (the runtime identity is busy or quarantined, or `Run` startup fails) are
   adopted as `Failed` (`202`). A busy runtime keeps the adopted config pending until the identity releases; the wait
   for it is bounded by the request deadline.
@@ -717,8 +717,9 @@ collector-job `config` Function is therefore built in `joboutput/dyncfg_reply.go
   validation (`503`). A dependency that is not ready (a missing vnode, an unavailable secret provider) is adopted by
   `update` of a disabled job, which only stores the payload, and by `add` when its background activation will retry
   it; otherwise it answers `503`. Job names are validated as the daemon sent them.
-- **Not saved.** `restart` answers 2xx only when a new job generation runs, and a restart of a running job rejects
-  every failure found before stopping it. `test` answers `422` for a permanent or unclassified collector failure,
+- **Not saved.** `restart` answers 2xx only when a new job generation runs; any other outcome answers the failure's
+  code. A restart of a running job rejects every failure found before stopping it; a restart of a failed job follows
+  the rule above for what it changes (a failure the plugin retries is adopted and the job stays `Failed`). `test` answers `422` for a permanent or unclassified collector failure,
   `503` for a temporary one and `400` for an invalid configuration.
 - **Run retirement.** A change rolled back by run retirement before its graph commit answers `503` without a status
   frame; the successor run is rebuilt from the daemon's replay.

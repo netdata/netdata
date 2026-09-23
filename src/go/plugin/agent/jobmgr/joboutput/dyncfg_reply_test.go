@@ -188,3 +188,141 @@ func TestAdoptedUpdateWithBusyRuntimeStartsOnceTheRuntimeReleases(t *testing.T) 
 	require.Equal(t, "internal/jobs/pending", submitted[0].Route)
 	require.Equal(t, config.FullName(), submitted[0].LaneKey)
 }
+
+func TestRolledBackTransactionAnswersUnavailable(t *testing.T) {
+	tests := map[string]struct {
+		reply jobReply
+		want  int
+	}{
+		"command": {
+			reply: adoptedReply(dyncfg.CommandUpdate, dyncfg.StatusRunning, jobFailure{}),
+			want:  503,
+		},
+		"response-free work": {
+			reply: internalReply(),
+			want:  204,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			identity := lifecycle.ResourceIdentity{ID: "job", Generation: 1}
+			graph, err := dyncfg.NewGraph(nil)
+			require.NoError(t, err)
+			postimage := dyncfg.GraphConfig{ID: identity.ID, Module: "module", Name: "job", Status: dyncfg.StatusRunning.String()}
+			mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{ID: identity.ID, Config: &postimage}})
+			require.NoError(t, err)
+			var events []string
+			transaction, err := PrepareResourceTransaction(ResourceTransactionSpec{
+				Scope:       lifecycle.ResourceTransactionScope{ID: identity.ID, Successor: identity},
+				Disposition: lifecycle.ResourceTransactionInstalled,
+				Successor: &transactionTestPreparedResource{
+					identity:  identity,
+					events:    &events,
+					acceptErr: jobmgr.ErrProcessAttemptRetired,
+				},
+				Graph:            graph,
+				Mutation:         mutation,
+				MutationPrepared: true,
+				Cleanup:          func() error { return nil },
+				reply:            &test.reply,
+			})
+			require.NoError(t, err)
+
+			applied, err := transaction.Apply(context.Background())
+			require.NoError(t, err)
+			// Run retirement rolled the change back, so the reply cannot claim it.
+			require.Equal(t, test.want, applied.ResultStatus())
+			_, exists := graph.Lookup(identity.ID)
+			require.False(t, exists)
+		})
+	}
+}
+
+func TestAdoptedUpdateAnswersWithinTheRequestDeadline(t *testing.T) {
+	controller, graph, supervisor, output, state := newDynCfgJobTestHarness(t)
+	useV2CheckFailureCollector(controller, state, nil)
+	controller.factory.config.Attempts = blockingRuntimeTestAuthority{delegate: controller.factory.config.Attempts}
+
+	config := factoryTestConfig(false)
+	config.SetSourceType(confgroup.TypeDyncfg)
+	config.SetSource("user=test")
+	config.SetProvider(confgroup.TypeDyncfg)
+	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
+	var events []string
+	scope := lifecycle.ResourceTransactionScope{
+		ID:        config.FullName(),
+		Current:   lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1},
+		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 2},
+	}
+	current := &transactionTestReadyResource{identity: scope.Current, prefix: "current", events: &events}
+	request := DynCfgJobRequest{
+		Args:         []string{"go.d:collector:module:job", string(dyncfg.CommandUpdate)},
+		Payload:      []byte(`{"option_str":"replacement"}`),
+		ContentType:  "application/json",
+		CallerSource: "user=test",
+		HasPayload:   true,
+	}
+	deadline := time.Now().Add(200 * time.Millisecond)
+	plan, err := lifecycle.NewResourceTransactionPermitTaskPlan(
+		lifecycle.SourceFunction,
+		deadline,
+		lifecycle.TransactionTaskPhases,
+		current,
+		scope,
+		lifecycle.NewJobLongLivedPlan(),
+		func(
+			ctx context.Context,
+			current lifecycle.ReadyResource,
+			taskScope lifecycle.ResourceTransactionScope,
+			permit lifecycle.LongLivedPermit,
+		) (lifecycle.PreparedResourceTransaction, error) {
+			return controller.Prepare(ctx, request, current, taskScope, permit)
+		},
+	)
+	require.NoError(t, err)
+
+	// The previous runtime never releases; only the request deadline ends the wait.
+	applyAndEncodeDynCfgJobTestTask(t, supervisor, plan, scope, "update-within-deadline")
+	require.Less(t, time.Since(deadline), time.Second)
+	require.Contains(t, output.String(), "FUNCTION_RESULT_BEGIN update-within-deadline 202 application/json")
+	record, exists := graph.Lookup(config.FullName())
+	require.True(t, exists)
+	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+}
+
+// blockingRuntimeTestAuthority keeps the job runtime identity busy and never
+// sees the previous runtime release.
+type blockingRuntimeTestAuthority struct {
+	delegate jobmgr.ProcessAttemptAuthority
+}
+
+func (a blockingRuntimeTestAuthority) StartProcessAttempt(
+	ctx context.Context,
+	plan jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	if plan.Identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
+		return nil, jobmgr.ErrProcessAttemptBusy
+	}
+	return a.delegate.StartProcessAttempt(ctx, plan)
+}
+
+func (a blockingRuntimeTestAuthority) SupersedeProcessAttempt(
+	ctx context.Context,
+	identity jobmgr.ProcessAttemptIdentity,
+) error {
+	if identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	return a.delegate.SupersedeProcessAttempt(ctx, identity)
+}
+
+func (a blockingRuntimeTestAuthority) CutProcessAttempt(identity jobmgr.ProcessAttemptIdentity, cause error) bool {
+	return a.delegate.CutProcessAttempt(identity, cause)
+}
+
+func (a blockingRuntimeTestAuthority) ProcessAttemptReleased(
+	identity jobmgr.ProcessAttemptIdentity,
+) (<-chan struct{}, bool) {
+	return a.delegate.ProcessAttemptReleased(identity)
+}
