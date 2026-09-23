@@ -134,36 +134,6 @@ static inline void mrg_stats_judy_mem(MRG *mrg, size_t partition, int64_t judy_m
     __atomic_add_fetch(&mrg->index[partition].stats.size, judy_mem, __ATOMIC_RELAXED);
 }
 
-static inline void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const char *msg) {
-    struct dbengine_tier *ctx = (struct dbengine_tier *)metric->section;
-
-    nd_uuid_t uuid;
-    uuidmap_uuid(metric->uuid, uuid);
-    char uuid_txt[UUID_STR_LEN];
-    uuid_unparse_lower(uuid, uuid_txt);
-    nd_log(NDLS_DAEMON, NDLP_ERR,
-           "METRIC: %s on %s at tier %d, refcount %d, partition %u, "
-           "retention [%ld - %ld (hot), %ld (clean)], update every %"PRIu32
-#ifdef NETDATA_INTERNAL_CHECKS
-           ", writer pid %d "
-#endif
-           " --- PLEASE OPEN A GITHUB ISSUE TO REPORT THIS LOG LINE TO NETDATA --- ",
-           msg,
-           uuid_txt,
-           ctx->config.tier,
-           metric->refcount,
-           metric->partition,
-           metric->first_time_s,
-           metric->latest_time_s_hot,
-           metric->latest_time_s_clean,
-           metric->latest_update_every_s
-#ifdef NETDATA_INTERNAL_CHECKS
-           , (int)metric->writer
-#endif
-    );
-}
-
-
 ALWAYS_INLINE
 static time_t mrg_metric_get_first_time_s_smart(MRG *mrg __maybe_unused, METRIC *metric) {
     time_t first_time_s = __atomic_load_n(&metric->first_time_s, __ATOMIC_RELAXED);

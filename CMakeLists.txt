@@ -1981,6 +1981,8 @@ if(ENABLE_DBENGINE)
             src/database/storage-engines/dbengine/dbengine-compression.c
             src/database/storage-engines/dbengine/dbengine-compression.h
             src/database/storage-engines/dbengine/dbengine-config.c
+            src/database/storage-engines/dbengine/dbengine-log.c
+            src/database/storage-engines/dbengine/dbengine-log.h
     )
 endif()
 
@@ -3764,10 +3766,12 @@ if(ENABLE_DBENGINE)
                 src/database/storage-engines/dbengine/tests/api_scale_restart.cc
                 src/database/storage-engines/dbengine/tests/api_scale_rotation.cc
                 src/database/storage-engines/dbengine/tests/api_scale_tiers.cc
+                src/database/storage-engines/dbengine/tests/api_log_sink.cc
                 src/database/storage-engines/dbengine/tests/internal_compression.cc
                 src/database/storage-engines/dbengine/tests/internal_pgc.cc
                 src/database/storage-engines/dbengine/tests/internal_pgd.cc
-                src/database/storage-engines/dbengine/tests/internal_mrg.cc)
+                src/database/storage-engines/dbengine/tests/internal_mrg.cc
+                src/database/storage-engines/dbengine/tests/internal_log_sink.cc)
         target_link_libraries(dbengine-test PRIVATE dbengine GTest::gtest)
 
         # The API tests are supposed to reach the engine only through its public headers, and nothing in the build

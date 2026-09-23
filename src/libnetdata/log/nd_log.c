@@ -460,22 +460,9 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
     if (source != NDLS_DEBUG && priority > nd_log.sources[source].min_priority)
         return;
 
-    if(erl->sleep_ut)
-        sleep_usec(erl->sleep_ut);
-
-    if(!nd_log.single_threaded_child)
-        spinlock_lock(&erl->spinlock);
-
-    erl->count++;
-    time_t now = now_boottime_sec();
-    if(now - erl->last_logged < erl->log_every) {
-        if(!nd_log.single_threaded_child)
-            spinlock_unlock(&erl->spinlock);
+    time_t now;
+    if(!nd_log_limit_admit(erl, &now))
         return;
-    }
-
-    if(!nd_log.single_threaded_child)
-        spinlock_unlock(&erl->spinlock);
 
     va_list args;
     va_start(args, fmt);
@@ -483,6 +470,27 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
             source == NDLS_DAEMON || source == NDLS_COLLECTORS,
             saved_errno, saved_winerror, fmt, args);
     va_end(args);
+    nd_log_limit_emitted(erl, now);
+}
+
+bool nd_log_limit_admit(ERROR_LIMIT *erl, time_t *now) {
+    if(erl->sleep_ut)
+        sleep_usec(erl->sleep_ut);
+
+    if(!nd_log.single_threaded_child)
+        spinlock_lock(&erl->spinlock);
+
+    erl->count++;
+    *now = now_boottime_sec();
+    bool admitted = !(*now - erl->last_logged < erl->log_every);
+
+    if(!nd_log.single_threaded_child)
+        spinlock_unlock(&erl->spinlock);
+
+    return admitted;
+}
+
+void nd_log_limit_emitted(ERROR_LIMIT *erl, time_t now) {
     erl->last_logged = now;
     erl->count = 0;
 }

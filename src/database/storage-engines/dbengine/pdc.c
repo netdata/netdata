@@ -772,7 +772,7 @@ void collect_page_flags_to_buffer(BUFFER *wb, DBENGINE_COLLECT_PAGE_FLAGS flags)
         buffer_strcat(wb, "RETENTION_RECORDED ");
 }
 
-ALWAYS_INLINE VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct dbengine_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error) {
+ALWAYS_INLINE VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(struct dbengine_engine *engine, const struct dbengine_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error) {
     time_t start_time_s = (time_t) (descr->start_time_ut / USEC_PER_SEC);
 
     time_t end_time_s = 0;
@@ -794,6 +794,7 @@ ALWAYS_INLINE VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct 
     }
 
     return validate_page(
+            engine,
             (nd_uuid_t *)descr->uuid,
             start_time_s,
             end_time_s,
@@ -807,7 +808,8 @@ ALWAYS_INLINE VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct 
             "loaded", 0);
 }
 
-static void validate_page_log(nd_uuid_t *uuid,
+static void validate_page_log(struct dbengine_engine *engine,
+                              nd_uuid_t *uuid,
                               time_t start_time_s,
                               time_t end_time_s,
                               uint32_t update_every_s,
@@ -832,14 +834,15 @@ static void validate_page_log(nd_uuid_t *uuid,
 
     if(!vd.is_valid) {
 #ifdef NETDATA_INTERNAL_CHECKS
-        internal_error(true,
+        dbengine_internal_error(engine, true,
 #else
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
+        dbengine_log_limit(engine, &erl, NDLP_ERR,
 #endif
                        "DBENGINE: metric '%s' %s invalid page of type %u "
                        "from %ld to %ld (now %ld), update every %u, page length %zu, entries %zu (flags: %s)",
                        uuid_str, msg, (unsigned)vd.type,
-                       (long)vd.start_time_s, (long)vd.end_time_s, (long)now_s, (unsigned)vd.update_every_s, (size_t)vd.page_length, (size_t)vd.entries, wb?buffer_tostring(wb):""
+                       (long)vd.start_time_s, (long)vd.end_time_s, (long)now_s, (unsigned)vd.update_every_s,
+                           (size_t)vd.page_length, (size_t)vd.entries, wb?buffer_tostring(wb):""
         );
     }
     else {
@@ -884,15 +887,16 @@ static void validate_page_log(nd_uuid_t *uuid,
         buffer_strcat(log, (now_s && vd.end_time_s <= now_s) ? "" : "future end time, ");
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        internal_error(true, "%s", buffer_tostring(log));
+        dbengine_internal_error(engine, true, "%s", buffer_tostring(log));
 #else
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR, "%s", buffer_tostring(log));
+        dbengine_log_limit(engine, &erl, NDLP_ERR, "%s", buffer_tostring(log));
 #endif
     }
 }
 
 ALWAYS_INLINE
 VALIDATED_PAGE_DESCRIPTOR validate_page(
+        struct dbengine_engine *engine,
         nd_uuid_t *uuid,
         time_t start_time_s,
         time_t end_time_s,
@@ -1002,7 +1006,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
     }
 
     if(unlikely(!vd.is_valid || updated))
-        validate_page_log(uuid, start_time_s, end_time_s, update_every_s, page_length, entries, now_s, msg, flags, vd);
+        validate_page_log(engine, uuid, start_time_s, end_time_s, update_every_s, page_length, entries, now_s, msg, flags, vd);
 
     return vd;
 }
@@ -1094,8 +1098,14 @@ static void epdl_extent_loading_error_log(struct dbengine_tier *ctx, EPDL *epdl,
     if(end_time_s)
         log_date(end_time_str, LOG_DATE_LENGTH, end_time_s);
 
+    // One window for the errors and a separate one for the debug caller ("unknown UUID", routine whenever an extent
+    // holds pages of metrics the registry has dropped). Shared, a debug line could spend the second an error needed:
+    // netdata's logger drops a debug line before its gate unless its threshold is debug, but a log sink sees every
+    // priority, so on the sink's side a CRC failure could be the line that went missing.
     nd_log_limit_static_global_var(erl, 1, 0);
-    nd_log_limit(&erl, NDLS_DAEMON, priority,
+    nd_log_limit_static_global_var(erl_debug, 1, 0);
+    ERROR_LIMIT *limit = (priority == NDLP_DEBUG) ? &erl_debug : &erl;
+    dbengine_log_limit(ctx->engine, limit, priority,
                 "DBENGINE: error while reading extent from datafile %u of tier %d, at offset %" PRIu64 " (%u bytes) "
                 "%s from %ld (%s) to %ld (%s) %s%s: "
                 "%s",
@@ -1194,7 +1204,7 @@ static bool epdl_populate_pages_from_extent_data(
             eb = extent_buffer_get(uncompressed_payload_length);
             uncompressed_buf = eb->data;
 
-            size_t bytes = dbengine_decompress(uncompressed_buf, data + payload_offset,
+            size_t bytes = dbengine_decompress(ctx->engine, uncompressed_buf, data + payload_offset,
                                                uncompressed_payload_length, payload_length,
                                                header->compression_algorithm);
 
@@ -1245,7 +1255,7 @@ static bool epdl_populate_pages_from_extent_data(
             continue;
 
         VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(
-                &header->descr[i], now_s,
+                ctx->engine, &header->descr[i], now_s,
                 (pd_list) ? pd_list->update_every_s : 0,
                 have_read_error);
 
@@ -1405,9 +1415,9 @@ static inline void *datafile_extent_read(struct dbengine_tier *ctx, uv_file file
 {
     if (unlikely(!dbengine_valid_extent_disk_size(size_bytes))) {
         nd_log_limit_static_global_var(erl, 1, 0);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                     "DBENGINE: refusing to read extent at offset %" PRIu64 " with invalid size %u",
-                     BLOCK_TO_OFFSET(block), size_bytes);
+        dbengine_log_limit(ctx->engine, &erl, NDLP_ERR,
+                           "DBENGINE: refusing to read extent at offset %" PRIu64 " with invalid size %u",
+                           BLOCK_TO_OFFSET(block), size_bytes);
         ctx_io_error(ctx);
         return NULL;
     }

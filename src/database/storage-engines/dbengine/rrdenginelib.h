@@ -7,6 +7,7 @@
 
 /* Forward declarations */
 struct dbengine_tier;
+struct dbengine_engine;
 
 #define ALIGN_BYTES_FLOOR(x) (((x) / DBENGINE_BLOCK_SIZE) * DBENGINE_BLOCK_SIZE)
 #define ALIGN_BYTES_CEILING(x) ((((x) + DBENGINE_BLOCK_SIZE - 1) / DBENGINE_BLOCK_SIZE) * DBENGINE_BLOCK_SIZE)
@@ -33,22 +34,6 @@ static inline int find_first_zero(unsigned x)
 static inline uint8_t check_bit(unsigned x, size_t pos)
 {
     return !!(x & (1 << pos));
-}
-
-/* Starts from LSB. val is 0 or 1 */
-static inline void modify_bit(unsigned *x, unsigned pos, uint8_t val)
-{
-    switch(val) {
-    case 0:
-        *x &= ~(1U << pos);
-        break;
-    case 1:
-        *x |= 1U << pos;
-        break;
-    default:
-        netdata_log_error("modify_bit() called with invalid argument.");
-        break;
-    }
 }
 
 #define DBENGINE_PATH_MAX (FILENAME_MAX + 1)
@@ -78,15 +63,7 @@ static inline void crc32set(void *crcp, uLong crc)
     memcpy(crcp, &store_crc, sizeof(store_crc));
 }
 
-int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size);
-int open_file_for_io(char *path, int flags, uv_file *file, int direct);
-static inline int open_file_direct_io(char *path, int flags, uv_file *file)
-{
-    return open_file_for_io(path, flags, file, 1);
-}
-static inline int open_file_buffered_io(char *path, int flags, uv_file *file)
-{
-    return open_file_for_io(path, flags, file, 0);
-}
+int check_file_properties(struct dbengine_engine *engine, uv_file file, uint64_t *file_size, size_t min_size);
+int open_file_for_io(struct dbengine_engine *engine, char *path, int flags, uv_file *file, int direct);
 
 #endif /* NETDATA_RRDENGINELIB_H */

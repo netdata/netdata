@@ -479,7 +479,7 @@ int dbengine_page_test(const struct dbengine_config *cfg, int argc, char *argv[]
         .nominal_page_size_cb = NULL,
     };
     PGC *dummy_cache = pgc_create(&dummy_cfg);
-    pgd_init_arals(&resolved.allocator);
+    pgd_init_arals(nullptr, &resolved.allocator);
 
     ::testing::InitGoogleTest(&argc, argv);
     int rc = RUN_ALL_TESTS();

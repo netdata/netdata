@@ -146,7 +146,7 @@ TEST(Compression, RoundTripsAPayload) {
 
         std::vector<uint8_t> restored(original.size());
         const size_t restored_size =
-            dbengine_decompress(restored.data(), buffer.data(), restored.size(), compressed_size, algorithm);
+            dbengine_decompress(nullptr, restored.data(), buffer.data(), restored.size(), compressed_size, algorithm);
 
         EXPECT_EQ(restored_size, original.size());
         EXPECT_EQ(restored, original) << "the payload did not survive the round trip";
@@ -197,7 +197,8 @@ TEST(Compression, AnIncompressiblePayloadIsLeftAlone) {
         }
 
         std::vector<uint8_t> restored(original.size());
-        EXPECT_EQ(dbengine_decompress(restored.data(), buffer.data(), restored.size(), compressed_size, algorithm),
+        EXPECT_EQ(dbengine_decompress(nullptr, restored.data(), buffer.data(), restored.size(), compressed_size,
+                                      algorithm),
                   original.size());
         EXPECT_EQ(restored, original);
     }
@@ -246,7 +247,8 @@ TEST(Compression, ASinglePageOfDataRoundTrips) {
         ASSERT_GT(compressed_size, 0u) << "a repetitive page did not compress, so there is nothing to decompress";
 
         std::vector<uint8_t> restored(original.size());
-        EXPECT_EQ(dbengine_decompress(restored.data(), buffer.data(), restored.size(), compressed_size, algorithm),
+        EXPECT_EQ(dbengine_decompress(nullptr, restored.data(), buffer.data(), restored.size(), compressed_size,
+                                      algorithm),
                   original.size());
         EXPECT_EQ(restored, original);
     }

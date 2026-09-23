@@ -477,6 +477,8 @@ static int engine_config_unittest(const struct dbengine_config *cfg, const char 
     CHECK_DEFAULT(reserved_libuv_worker_threads);
     CHECK_DEFAULT(on_db_rotation);
     CHECK_DEFAULT(preload_metrics);
+    CHECK_DEFAULT(log_sink);
+    CHECK_DEFAULT(log_sink_data);
 #undef CHECK_DEFAULT
 
     if(mkdir(dir, 0700) != 0 && errno != EEXIST) {

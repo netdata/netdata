@@ -41,8 +41,9 @@ void mrg_metric_prepopulate_cleanup(MRG *mrg) {
     METRIC_FREE(&engine->preload.acquired, mrg_release_cb, mrg);
 
     if(engine->preload.counter || engine->preload.deleted)
-        nd_log(NDLS_DAEMON, NDLP_INFO, "MRG DUMP: Prepopulated %zu metrics, released %zu, deleted %zu",
-               engine->preload.counter, engine->preload.counter - engine->preload.deleted, engine->preload.deleted);
+        dbengine_log(engine, NDLP_INFO, "MRG DUMP: Prepopulated %zu metrics, released %zu, deleted %zu",
+                     engine->preload.counter, engine->preload.counter - engine->preload.deleted,
+                     engine->preload.deleted);
 
     engine->preload.counter = 0;
 }

@@ -29,6 +29,7 @@
 #include <Judy.h>
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-config.h"
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-workers.h"
+#include "database/storage-engines/dbengine/dbengine-log.h"
 
 // the 0-means-default fields of *cfg become concrete values, so the engine never has to re-check them
 void dbengine_config_resolve(struct dbengine_config *cfg);
@@ -88,7 +89,7 @@ static ALWAYS_INLINE void time_and_count_add(struct dbengine_time_and_count *tc,
         uv_fs_t _req;                                                                                                  \
         (ret_var) = uv_fs_unlink(NULL, &(_req), (path), NULL);                                                         \
         if ((ret_var) < 0) {                                                                                           \
-            netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", (path), uv_strerror(ret_var));                     \
+            dbengine_log_error((ctx)->engine, "DBENGINE: uv_fs_unlink(\"%s\"): %s", (path), uv_strerror(ret_var));     \
             ctx_fs_error(ctx);                                                                                         \
         }                                                                                                              \
         uv_fs_req_cleanup(&(_req));                                                                                   \
@@ -99,7 +100,7 @@ static ALWAYS_INLINE void time_and_count_add(struct dbengine_time_and_count *tc,
         uv_fs_t _req;                                                                                                  \
         (ret_var) = uv_fs_close(NULL, &(_req), (file), NULL);                                                          \
         if ((ret_var) < 0) {                                                                                           \
-            netdata_log_error("DBENGINE: uv_fs_close(\"%s\"): %s", (path), uv_strerror(ret_var));                      \
+            dbengine_log_error((ctx)->engine, "DBENGINE: uv_fs_close(\"%s\"): %s", (path), uv_strerror(ret_var));      \
             ctx_fs_error(ctx);                                                                                         \
         }                                                                                                              \
         uv_fs_req_cleanup(&(_req));                                                                                    \
@@ -686,9 +687,9 @@ static inline bool dbengine_retention_samples_delta(
             update_every_s);
 
         nd_log_limit_static_global_var(erl, 60, 0);
-        nd_log_limit(
+        dbengine_log_limit(
+            ctx ? ctx->engine : NULL,
             &erl,
-            NDLS_DAEMON,
             NDLP_ERR,
             "DBENGINE: tier %d: invalid retention interval while %s (first=%ld, last=%ld, update_every=%u); not updating sample counter",
             tier,
@@ -729,9 +730,9 @@ static inline bool dbengine_atomic_uint64_sub_saturating(
                 value);
 
             nd_log_limit_static_global_var(erl, 60, 0);
-            nd_log_limit(
+            dbengine_log_limit(
+                ctx ? ctx->engine : NULL,
                 &erl,
-                NDLS_DAEMON,
                 NDLP_ERR,
                 "DBENGINE: tier %d: %s counter underflow while %s (current=%" PRIu64 ", subtract=%" PRIu64 "); saturating to zero",
                 tier,
@@ -815,7 +816,8 @@ typedef struct validated_page_descriptor {
 #define page_entries_by_size(page_length_in_bytes, point_size_in_bytes) \
         ((page_length_in_bytes) / (point_size_in_bytes))
 
-VALIDATED_PAGE_DESCRIPTOR validate_page(nd_uuid_t *uuid,
+VALIDATED_PAGE_DESCRIPTOR validate_page(struct dbengine_engine *engine,
+                                        nd_uuid_t *uuid,
                                         time_t start_time_s,
                                         time_t end_time_s,
                                         uint32_t update_every_s,
@@ -827,7 +829,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(nd_uuid_t *uuid,
                                         bool have_read_error,
                                         const char *msg,
                                         DBENGINE_COLLECT_PAGE_FLAGS flags);
-VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct dbengine_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error);
+VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(struct dbengine_engine *engine, const struct dbengine_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error);
 void collect_page_flags_to_buffer(BUFFER *wb, DBENGINE_COLLECT_PAGE_FLAGS flags);
 
 typedef enum {

@@ -285,25 +285,35 @@ int aral_size_sort_compare(const void *a, const void *b) {
     return (size_a > size_b) - (size_a < size_b);
 }
 
-void pgd_init_arals(const struct dbengine_allocator_config *cfg) {
+void pgd_init_arals(struct dbengine_engine *engine, const struct dbengine_allocator_config *cfg) {
     spinlock_lock(&pgd_arals_spinlock);
 
     if(pgd_arals_initialized) {
         // the layer is shared: the first engine's settings stand, a later engine that asked for something else
-        // is told so (the size classes also depend on the compile-time tier page sizes, which never differ)
-        if(cfg->partitions != pgd_arals_config.partitions ||
-           cfg->arals_for_large_pages != pgd_arals_config.arals_for_large_pages ||
-           cfg->compression_statistics != pgd_arals_config.compression_statistics)
-            nd_log(NDLS_DAEMON, NDLP_NOTICE,
-                   "DBENGINE: the page allocators are already configured (partitions %zu, large pages %s, "
-                   "compression statistics %s); the new settings (partitions %zu, large pages %s, compression "
-                   "statistics %s) are ignored",
-                   pgd_arals_config.partitions, pgd_arals_config.arals_for_large_pages ? "yes" : "no",
-                   pgd_arals_config.compression_statistics ? "yes" : "no",
-                   cfg->partitions, cfg->arals_for_large_pages ? "yes" : "no",
-                   cfg->compression_statistics ? "yes" : "no");
+        // is told so (the size classes also depend on the compile-time tier page sizes, which never differ).
+        //
+        // Said after the unlock, not under it. This spinlock is process-wide and shared by every engine, and the
+        // line goes to the embedder's sink: a sink that blocked here would block every engine in the process, not
+        // just this one. The settings are read into locals first - they are fixed once the layer is initialized,
+        // so what is printed is what was compared.
+        const struct dbengine_allocator_config in_force = pgd_arals_config;
+        const bool differs =
+            cfg->partitions != in_force.partitions ||
+            cfg->arals_for_large_pages != in_force.arals_for_large_pages ||
+            cfg->compression_statistics != in_force.compression_statistics;
 
         spinlock_unlock(&pgd_arals_spinlock);
+
+        if(differs)
+            dbengine_log(engine, NDLP_NOTICE,
+                         "DBENGINE: the page allocators are already configured (partitions %zu, large pages %s, "
+                         "compression statistics %s); the new settings (partitions %zu, large pages %s, compression "
+                         "statistics %s) are ignored",
+                         in_force.partitions, in_force.arals_for_large_pages ? "yes" : "no",
+                         in_force.compression_statistics ? "yes" : "no",
+                         cfg->partitions, cfg->arals_for_large_pages ? "yes" : "no",
+                         cfg->compression_statistics ? "yes" : "no");
+
         return;
     }
 
@@ -449,7 +459,7 @@ int dbengine_allocator_unittest(const struct dbengine_config *cfg) {
     if(!first.partitions)
         first.partitions = cfg->cpus ? cfg->cpus : os_get_system_cpus();
 
-    pgd_init_arals(&first);
+    pgd_init_arals(NULL, &first);
 
     size_t partitions = pgd_alloc_globals.partitions;
     size_t count = aral_sizes_count;
@@ -461,7 +471,7 @@ int dbengine_allocator_unittest(const struct dbengine_config *cfg) {
     second.arals_for_large_pages = !first.arals_for_large_pages;
     second.compression_statistics = !first.compression_statistics;
 
-    pgd_init_arals(&second);
+    pgd_init_arals(NULL, &second);
 
     if(pgd_alloc_globals.partitions != partitions || aral_sizes_count != count || arals != table ||
        pgd_alloc_globals.aral_pgd[0] != pgd0 ||
@@ -585,6 +595,13 @@ ALWAYS_INLINE void dbengine_extent_free(void *extent, size_t size) {
 
 // ----------------------------------------------------------------------------
 // management api
+
+// The log calls from here down stay on netdata's logger rather than going through dbengine-log.h, and that is
+// deliberate: a page has no engine. This layer is process-wide, shared by every engine in the process, and these
+// sites are handed a PGD or a page type - reaching an engine from them would mean a parameter on pgd_free(),
+// pgdc_get_next_point() and their neighbours, for arms that fire only on a page the engine could not have made.
+// pgd_init_arals() is the exception, and it takes one. dbengine-config.h's contract tells an embedder that these
+// lines do not reach its sink.
 
 ALWAYS_INLINE PGD *pgd_create(uint8_t type, uint32_t slots) {
 

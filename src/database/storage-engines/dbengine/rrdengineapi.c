@@ -136,8 +136,10 @@ static inline void check_and_fix_mrg_update_every(struct dbengine_collect_handle
     struct dbengine_engine *engine = mrg_metric_ctx(handle->metric)->engine;
 
     if(unlikely((uint32_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every_s(engine->main_mrg, handle->metric))) {
-        internal_error(true, "DBENGINE: collection handle has update every %u, but the metric registry has %u. Fixing it.",
-              (uint32_t)(handle->update_every_ut / USEC_PER_SEC), mrg_metric_get_update_every_s(engine->main_mrg, handle->metric));
+        dbengine_internal_error(engine, true,
+                                "DBENGINE: collection handle has update every %u, but the metric registry has %u. Fixing it.",
+                                (uint32_t)(handle->update_every_ut / USEC_PER_SEC),
+                                mrg_metric_get_update_every_s(engine->main_mrg, handle->metric));
 
         if(unlikely(!handle->update_every_ut))
             handle->update_every_ut = (usec_t)mrg_metric_get_update_every_s(engine->main_mrg, handle->metric) * USEC_PER_SEC;
@@ -165,6 +167,7 @@ static inline bool check_completed_page_consistency(struct dbengine_collect_hand
         handle->page_flags |= DBENGINE_PAGE_COMPLETED_IN_FUTURE;
 
     VALIDATED_PAGE_DESCRIPTOR vd = validate_page(
+            ctx->engine,
             uuid,
             start_time_s,
             end_time_s,
@@ -200,7 +203,9 @@ STORAGE_COLLECT_HANDLE *dbengine_store_init(STORAGE_METRIC_HANDLE *smh, uint32_t
         is_1st_metric_writer = false;
         char uuid[UUID_STR_LEN + 1];
         uuid_unparse(*mrg_metric_uuid(engine->main_mrg, metric), uuid);
-        netdata_log_error("DBENGINE: metric '%s' is already collected and should not be collected twice - expect gaps on the charts", uuid);
+        dbengine_log_error(engine,
+                           "DBENGINE: metric '%s' is already collected and should not be collected twice - expect gaps on the charts",
+                           uuid);
     }
     if(is_1st_metric_writer)
         options = DBENGINE_1ST_METRIC_WRITER;
@@ -327,10 +332,10 @@ static void dbengine_store_metric_create_new_page(struct dbengine_collect_handle
         uuid_unparse(*mrg_metric_uuid(engine->main_mrg, handle->metric), uuid);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        internal_error(true,
+        dbengine_internal_error(engine, true,
 #else
         nd_log_limit_static_global_var(erl, 1, 0);
-        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+        dbengine_log_limit(engine, &erl, NDLP_WARNING,
 #endif
                     "DBENGINE: metric '%s' new page from %ld to %ld, update every %u, has a conflict in main cache "
                     "with existing %s%s page from %ld to %ld, update every %u - "
@@ -508,7 +513,7 @@ static void store_metric_next_error_log(struct dbengine_collect_handle *handle _
     }
 
     nd_log_limit_static_global_var(erl, 1, 0);
-    nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
+    dbengine_log_limit(engine, &erl, NDLP_NOTICE,
                 "DBENGINE: metric '%s' collected point at %ld, %s last collection at %ld, "
                 "update every %ld, %s page from %ld to %ld, position %u (of %u), flags: %s",
                 uuid,
@@ -936,7 +941,7 @@ ALWAYS_INLINE time_t dbengine_oldest_time_s(STORAGE_METRIC_HANDLE *smh) {
 bool dbengine_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s) {
     struct dbengine_tier *ctx = (struct dbengine_tier *)si;
     if (unlikely(!ctx)) {
-        netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
+        dbengine_log_error(NULL, "DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
         return false;
     }
 
@@ -955,7 +960,7 @@ bool dbengine_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid
 bool dbengine_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t *first_entry_s, time_t *last_entry_s) {
     struct dbengine_tier *ctx = (struct dbengine_tier *)si;
     if (unlikely(!ctx)) {
-        netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
+        dbengine_log_error(NULL, "DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
         return false;
     }
 
@@ -974,7 +979,7 @@ bool dbengine_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t
 void dbengine_metric_retention_delete_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id) {
     struct dbengine_tier *ctx = (struct dbengine_tier *)si;
     if (unlikely(!ctx)) {
-        netdata_log_error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
+        dbengine_log_error(NULL, "DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
         return;
     }
 
@@ -1093,7 +1098,9 @@ static void dbengine_populate_mrg(struct dbengine_tier *ctx)
 
     ssize_t cpus = (ssize_t)ctx->engine->cfg.cpus;
 
-    netdata_log_info("DBENGINE: tier %d: populating retention to MRG from %zu journal files, using a shared pool of %zd threads...", ctx->config.tier, datafiles, cpus);
+    dbengine_log_info(ctx->engine,
+                      "DBENGINE: tier %d: populating retention to MRG from %zu journal files, using a shared pool of %zd threads...",
+                      ctx->config.tier, datafiles, cpus);
 
     completion_init(&ctx->loading.load_mrg);
     dbengine_enq_cmd(
@@ -1124,14 +1131,14 @@ void dbengine_readiness_wait(struct dbengine_tier *ctx) {
     // Preserve the caller's errno while avoiding stale errno values in this informational readiness log.
     int saved_errno = errno;
     errno_clear();
-    netdata_log_info("DBENGINE: tier %d: ready for data collection and queries", ctx->config.tier);
+    dbengine_log_info(ctx->engine, "DBENGINE: tier %d: ready for data collection and queries", ctx->config.tier);
     errno = saved_errno;
 }
 
 // a malformed configuration is a programming error, fatal; a path longer than DBENGINE_DBFILES_PATH_MAX is refused,
 // with UV_ENAMETOOLONG (a path that overflowed the tier was silently truncated before, after the file descriptors
 // had been reserved; one that fit but left no room for the file names truncated those)
-static int dbengine_tier_config_validate(const struct dbengine_tier_config *tc) {
+static int dbengine_tier_config_validate(struct dbengine_engine *engine, const struct dbengine_tier_config *tc) {
     if(tc->tier >= RRD_STORAGE_TIERS)
         fatal("DBENGINE: tier %zu does not exist (the engine has %d tiers)", tc->tier, RRD_STORAGE_TIERS);
 
@@ -1149,8 +1156,9 @@ static int dbengine_tier_config_validate(const struct dbengine_tier_config *tc) 
         fatal("DBENGINE: tier %zu has a grouping of 0", tc->tier);
 
     if(strnlen(tc->dbfiles_path, DBENGINE_DBFILES_PATH_MAX + 1) > DBENGINE_DBFILES_PATH_MAX) {
-        netdata_log_error("DBENGINE: tier %zu: the datafiles path is longer than %d characters, the tier cannot be initialized",
-                          tc->tier, (int)DBENGINE_DBFILES_PATH_MAX);
+        dbengine_log_error(engine,
+                           "DBENGINE: tier %zu: the datafiles path is longer than %d characters, the tier cannot be initialized",
+                           tc->tier, (int)DBENGINE_DBFILES_PATH_MAX);
         return UV_ENAMETOOLONG;
     }
 
@@ -1162,7 +1170,7 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
     // the configuration first (a malformed one is a programming error, fatal whatever the engine's state; an
     // over-long path is refused), then the engine and the tier, all before anything is written: a refused init
     // must leave the tier as it found it
-    int rc = dbengine_tier_config_validate(tc);
+    int rc = dbengine_tier_config_validate(engine, tc);
     if(rc)
         return rc;
 
@@ -1174,7 +1182,8 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
             fatal("DBENGINE: dbengine_tier_init() for tier %zu called on an engine that is not up", tc->tier);
 
         case DBENGINE_LIFECYCLE_STOPPED:
-            netdata_log_error("DBENGINE: tier %zu: the engine was shut down, the tier cannot be initialized", tc->tier);
+            dbengine_log_error(engine, "DBENGINE: tier %zu: the engine was shut down, the tier cannot be initialized",
+                               tc->tier);
             return UV_EIO;
 
         case DBENGINE_LIFECYCLE_RUNNING:
@@ -1189,12 +1198,14 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
     struct dbengine_tier *ctx = dbengine_tier(engine, tier);
 
     if(__atomic_load_n(&ctx->atomic.active, __ATOMIC_ACQUIRE)) {
-        netdata_log_error("DBENGINE: tier %zu is already up, the tier cannot be initialized again", tier);
+        dbengine_log_error(engine, "DBENGINE: tier %zu is already up, the tier cannot be initialized again", tier);
         return UV_EALREADY;
     }
 
     if(__atomic_load_n(&ctx->atomic.came_up, __ATOMIC_ACQUIRE)) {
-        netdata_log_error("DBENGINE: tier %zu came up and exited, it cannot be initialized again on this engine", tier);
+        dbengine_log_error(engine,
+                           "DBENGINE: tier %zu came up and exited, it cannot be initialized again on this engine",
+                           tier);
         return UV_EIO;
     }
 
@@ -1205,7 +1216,7 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
     dbengine_stats_t reserved = __atomic_load_n(&engine->global_stats.dbengine_reserved_file_descriptors, __ATOMIC_RELAXED);
     do {
         if (reserved + DBENGINE_FD_BUDGET_PER_TIER > engine->cfg.max_reserved_file_descriptors) {
-            netdata_log_error(
+            dbengine_log_error(engine,
                 "DBENGINE: tier %zu: the file descriptor budget has no room for the tier (%zu of %zu reserved, %d needed), the tier cannot be initialized",
                 tier, (size_t)reserved, engine->cfg.max_reserved_file_descriptors, DBENGINE_FD_BUDGET_PER_TIER);
 
@@ -1267,17 +1278,17 @@ size_t dbengine_destroy(struct dbengine_engine *engine) {
     // destroy says so), and a late release must still find it. Such a cache outlives the main cache it sizes
     // itself from; its callback (pagecache.c) falls back to its floor once the main cache is gone.
     if(engine->extent_cache) {
-        fprintf(stderr, "Destroying extent cache (PGC)...\n");
+        dbengine_progress(engine, "Destroying extent cache (PGC)...\n");
         if(pgc_destroy(engine->extent_cache, false))
             engine->extent_cache = NULL;
     }
     if(engine->open_cache) {
-        fprintf(stderr, "Destroying open cache (PGC)...\n");
+        dbengine_progress(engine, "Destroying open cache (PGC)...\n");
         if(pgc_destroy(engine->open_cache, false))
             engine->open_cache = NULL;
     }
     if(engine->main_cache) {
-        fprintf(stderr, "Destroying main cache (PGC)...\n");
+        dbengine_progress(engine, "Destroying main cache (PGC)...\n");
         // the pointer goes before the cache: the thread that kept a follower cache allocated was not joined, and
         // its sizing callback (pagecache.c) reads the pointer from that thread. Cleared first, a reader that comes
         // after finds nothing rather than a cache being freed; a reader that loaded the pointer just before is
@@ -1294,7 +1305,7 @@ size_t dbengine_destroy(struct dbengine_engine *engine) {
 
     size_t metrics_referenced = 0;
     if(engine->main_mrg) {
-        fprintf(stderr, "Destroying metrics registry (MRG)...\n");
+        dbengine_progress(engine, "Destroying metrics registry (MRG)...\n");
         metrics_referenced = mrg_destroy(engine->main_mrg);
         if(!metrics_referenced)
             engine->main_mrg = NULL;
@@ -1307,7 +1318,7 @@ size_t dbengine_destroy(struct dbengine_engine *engine) {
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
         struct dbengine_tier *ctx = &engine->tiers[tier];
         if(ctx->datafiles.JudyL) {
-            fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
+            dbengine_progress(engine, "Finalizing data files for tier %zu...\n", tier);
             finalize_rrd_files(ctx);
         }
     }
@@ -1420,7 +1431,8 @@ int dbengine_tier_exit(struct dbengine_tier *ctx) {
     size_t count = 10;
     while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && count) {
         if(!logged) {
-            netdata_log_info("DBENGINE: waiting for collectors to finish on tier %d...", ctx->config.tier);
+            dbengine_log_info(ctx->engine, "DBENGINE: waiting for collectors to finish on tier %d...",
+                              ctx->config.tier);
             logged = true;
         }
         sleep_usec(100 * USEC_PER_MS);
@@ -1619,9 +1631,9 @@ struct dbengine_size_stats dbengine_get_size_stats(struct dbengine_tier *ctx) {
 
     stats.currently_collected_metrics = __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
 
-    internal_error(stats.metrics_pages != stats.extents_pages + stats.currently_collected_metrics,
-                   "DBENGINE: metrics pages is %zu, but extents pages is %zu and API consumers is %zu",
-                   stats.metrics_pages, stats.extents_pages, stats.currently_collected_metrics);
+    dbengine_internal_error(ctx->engine, stats.metrics_pages != stats.extents_pages + stats.currently_collected_metrics,
+                            "DBENGINE: metrics pages is %zu, but extents pages is %zu and API consumers is %zu",
+                            stats.metrics_pages, stats.extents_pages, stats.currently_collected_metrics);
 
     stats.disk_space = ctx_current_disk_space_get(ctx);
     stats.max_disk_space = ctx->config.max_disk_space;

@@ -22,7 +22,7 @@ class PgdTest : public ::testing::Test {
 protected:
     void SetUp() override {
         const struct dbengine_config cfg = netdata_test_config();
-        pgd_init_arals(&cfg.allocator);
+        pgd_init_arals(nullptr, &cfg.allocator);
     }
 
     static void append(PGD *pg, uint32_t slot, NETDATA_DOUBLE value) {
@@ -186,7 +186,7 @@ TEST_F(PgdTest, TheAllocatorLayerKeepsWhatItWasFirstGiven) {
     other.allocator.partitions = netdata_test_config().allocator.partitions + 3;
 
     const uint32_t fingerprint_before = static_cast<uint32_t>(dbengine_allocator_layer_fingerprint());
-    pgd_init_arals(&other.allocator);
+    pgd_init_arals(nullptr, &other.allocator);
     const uint32_t fingerprint_after = static_cast<uint32_t>(dbengine_allocator_layer_fingerprint());
 
     EXPECT_EQ(fingerprint_before, fingerprint_after)

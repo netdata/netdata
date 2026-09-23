@@ -134,8 +134,9 @@ bool datafile_acquire_for_deletion(struct dbengine_datafile *df)
     spinlock_tracked_unlock(&df->users.spinlock);
 
     if(marked_pending)
-        netdata_log_info("DBENGINE: tier %d: " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " is pending deletion",
-                         datafile_ctx(df)->config.tier, df->tier, df->fileno);
+        dbengine_log_info(datafile_ctx(df)->engine,
+                          "DBENGINE: tier %d: " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " is pending deletion",
+                          datafile_ctx(df)->config.tier, df->tier, df->fileno);
 
     if(can_be_deleted)
         return true;
@@ -160,8 +161,10 @@ bool datafile_acquire_for_deletion(struct dbengine_datafile *df)
     if(!writers_running && !flushed_to_open_running) {
         if(df->users.available) {
             df->users.available = false;
-            netdata_log_info("DBENGINE: tier %d: " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " entered deletion phase-2 (new users blocked)",
-                             datafile_ctx(df)->config.tier, df->tier, df->fileno);
+            dbengine_log_info(
+                datafile_ctx(df)->engine,
+                "DBENGINE: tier %d: " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " entered deletion phase-2 (new users blocked)",
+                datafile_ctx(df)->config.tier, df->tier, df->fileno);
         }
 
         if(!df->users.lockers)
@@ -170,21 +173,23 @@ bool datafile_acquire_for_deletion(struct dbengine_datafile *df)
     }
 
     if(!can_be_deleted)
-        internal_error(true, "DBENGINE: datafile %u of tier %d pending deletion has %u lockers "
-                             "(oc:%u, pd:%u, rt:%u, ix:%u, ml:%u), writers %zu/%zu, open-cache clean/hot %zu/%zu "
-                             "(scanned in %"PRIu64" usecs)",
-                       df->fileno, datafile_ctx(df)->config.tier,
-                       df->users.lockers,
-                       df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
-                       df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
-                       df->users.lockers_by_reason[DATAFILE_ACQUIRE_RETENTION],
-                       df->users.lockers_by_reason[DATAFILE_ACQUIRE_INDEXING],
-                       df->users.lockers_by_reason[DATAFILE_ACQUIRE_MRG_LOAD],
-                       writers_running,
-                       flushed_to_open_running,
-                       clean_pages_in_open_cache,
-                       hot_pages_in_open_cache,
-                       time_to_scan_ut);
+        dbengine_internal_error(
+            datafile_ctx(df)->engine, true,
+            "DBENGINE: datafile %u of tier %d pending deletion has %u lockers "
+            "(oc:%u, pd:%u, rt:%u, ix:%u, ml:%u), writers %zu/%zu, open-cache clean/hot %zu/%zu "
+            "(scanned in %"PRIu64" usecs)",
+            df->fileno, datafile_ctx(df)->config.tier,
+            df->users.lockers,
+            df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
+            df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
+            df->users.lockers_by_reason[DATAFILE_ACQUIRE_RETENTION],
+            df->users.lockers_by_reason[DATAFILE_ACQUIRE_INDEXING],
+            df->users.lockers_by_reason[DATAFILE_ACQUIRE_MRG_LOAD],
+            writers_running,
+            flushed_to_open_running,
+            clean_pages_in_open_cache,
+            hot_pages_in_open_cache,
+            time_to_scan_ut);
 
     spinlock_tracked_unlock(&df->users.spinlock);
 
@@ -247,7 +252,7 @@ int create_data_file(struct dbengine_datafile *datafile)
     char path[DBENGINE_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
-    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, ctx->engine->cfg.direct_io);
+    fd = open_file_for_io(ctx->engine, path, O_CREAT | O_RDWR | O_TRUNC, &file, ctx->engine->cfg.direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
@@ -279,7 +284,7 @@ int create_data_file(struct dbengine_datafile *datafile)
         (void) destroy_data_file_unsafe(datafile);
         ctx_io_error(ctx);
         nd_log_limit_static_global_var(dbengine_erl, 10, 0);
-        nd_log_limit(&dbengine_erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: Failed to create datafile %s", path);
+        dbengine_log_limit(ctx->engine, &dbengine_erl, NDLP_ERR, "DBENGINE: Failed to create datafile %s", path);
         return ret;
     }
 
@@ -290,7 +295,7 @@ int create_data_file(struct dbengine_datafile *datafile)
     return 0;
 }
 
-static int check_data_file_superblock(uv_file file)
+static int check_data_file_superblock(struct dbengine_engine *engine, uv_file file)
 {
     int ret;
     struct dbengine_df_sb *superblock = NULL;
@@ -302,7 +307,7 @@ static int check_data_file_superblock(uv_file file)
 
     ret = uv_fs_read(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
-        netdata_log_error("DBENGINE: uv_fs_read: %s", uv_strerror(ret));
+        dbengine_log_error(engine, "DBENGINE: uv_fs_read: %s", uv_strerror(ret));
         uv_fs_req_cleanup(&req);
         goto error;
     }
@@ -312,7 +317,7 @@ static int check_data_file_superblock(uv_file file)
     if (strncmp(superblock->magic_number, DBENGINE_DF_MAGIC, DBENGINE_MAGIC_SZ) ||
         strncmp(superblock->version, DBENGINE_DF_VER, DBENGINE_VER_SZ) ||
         superblock->tier != 1) {
-        netdata_log_error("DBENGINE: file has invalid superblock.");
+        dbengine_log_error(engine, "DBENGINE: file has invalid superblock.");
         ret = UV_EINVAL;
     } else {
         ret = 0;
@@ -331,20 +336,20 @@ static int load_data_file(struct dbengine_datafile *datafile)
     char path[DBENGINE_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
-    fd = open_file_for_io(path, O_RDWR, &file, ctx->engine->cfg.direct_io);
+    fd = open_file_for_io(ctx->engine, path, O_RDWR, &file, ctx->engine->cfg.direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
     }
     
-    nd_log_daemon(NDLP_DEBUG, "DBENGINE: initializing data file \"%s\".", path);
+    dbengine_log(ctx->engine, NDLP_DEBUG, "DBENGINE: initializing data file \"%s\".", path);
 
-    ret = check_file_properties(file, &file_size, sizeof(struct dbengine_df_sb));
+    ret = check_file_properties(ctx->engine, file, &file_size, sizeof(struct dbengine_df_sb));
     if (ret)
         goto err_exit;
     file_size = ALIGN_BYTES_CEILING(file_size);
 
-    ret = check_data_file_superblock(file);
+    ret = check_data_file_superblock(ctx->engine, file);
     if (ret)
         goto err_exit;
 
@@ -353,7 +358,8 @@ static int load_data_file(struct dbengine_datafile *datafile)
     datafile->file = file;
     datafile->pos = file_size;
 
-    nd_log_daemon(NDLP_DEBUG, "DBENGINE: data file \"%s\" initialized (size:%" PRIu64 ").", path, file_size);
+    dbengine_log(ctx->engine,
+                 NDLP_DEBUG, "DBENGINE: data file \"%s\" initialized (size:%" PRIu64 ").", path, file_size);
 
     return 0;
 
@@ -415,11 +421,12 @@ static int scan_data_files(struct dbengine_tier *ctx)
     if (ret < 0) {
         fatal_assert(req.result < 0);
         uv_fs_req_cleanup(&req);
-        netdata_log_error("DBENGINE: uv_fs_scandir(%s): %s", ctx->config.dbfiles_path, uv_strerror(ret));
+        dbengine_log_error(ctx->engine, "DBENGINE: uv_fs_scandir(%s): %s", ctx->config.dbfiles_path, uv_strerror(ret));
         ctx_fs_error(ctx);
         return ret;
     }
-    netdata_log_info("DBENGINE: tier %d: found %d files in path %s", ctx->config.tier, ret, ctx->config.dbfiles_path);
+    dbengine_log_info(ctx->engine,
+                      "DBENGINE: tier %d: found %d files in path %s", ctx->config.tier, ret, ctx->config.dbfiles_path);
 
     Pvoid_t datafiles_JudyL = NULL;
     Pvoid_t journafile_JudyL = NULL;
@@ -456,7 +463,8 @@ static int scan_data_files(struct dbengine_tier *ctx)
         }
 
         if (unknown_file)
-            nd_log_daemon(NDLP_WARNING, "Unknown file detected : \"%s/%s\"", ctx->config.dbfiles_path, dent.name);
+            dbengine_log(ctx->engine,
+                         NDLP_WARNING, "Unknown file detected : \"%s/%s\"", ctx->config.dbfiles_path, dent.name);
     }
     uv_fs_req_cleanup(&req);
 
@@ -466,7 +474,8 @@ static int scan_data_files(struct dbengine_tier *ctx)
     }
 
     if (matched_files == MAX_DATAFILES)
-        netdata_log_error("DBENGINE: warning: hit maximum database engine file limit of %d files", MAX_DATAFILES);
+        dbengine_log_error(ctx->engine,
+                           "DBENGINE: warning: hit maximum database engine file limit of %d files", MAX_DATAFILES);
 
     qsort(datafiles, matched_files, sizeof(*datafiles), scan_data_files_cmp);
 
@@ -492,7 +501,8 @@ static int scan_data_files(struct dbengine_tier *ctx)
 
                 UNLINK_FILE(ctx, path, ret);
                 if (ret == 0) {
-                    netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);
+                    dbengine_log_info(ctx->engine,
+                                      "DBENGINE: deleting journal file without matching data file: %s", path);
                     __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
                     deleted_journals++;
                 }
@@ -507,7 +517,8 @@ static int scan_data_files(struct dbengine_tier *ctx)
 
                 UNLINK_FILE(ctx, path, ret);
                 if (ret == 0) {
-                    netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);
+                    dbengine_log_info(ctx->engine,
+                                      "DBENGINE: deleting journal file without matching data file: %s", path);
                     __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
                     deleted_journals++;
                 }
@@ -515,14 +526,16 @@ static int scan_data_files(struct dbengine_tier *ctx)
         }
 
         if (deleted_journals)
-            netdata_log_info("DBENGINE: deleted %zu journal files without matching data files", deleted_journals);
+            dbengine_log_info(ctx->engine,
+                              "DBENGINE: deleted %zu journal files without matching data files", deleted_journals);
     }
 
     (void) JudyLFreeArray(&journafile_JudyL, NULL);
     (void) JudyLFreeArray(&datafiles_JudyL, NULL);
 
 
-    netdata_log_info("DBENGINE: tier %d: loading %d data/journal files...", ctx->config.tier, matched_files);
+    dbengine_log_info(ctx->engine,
+                      "DBENGINE: tier %d: loading %d data/journal files...", ctx->config.tier, matched_files);
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
         uint8_t must_delete_pair = 0;
 
@@ -542,16 +555,16 @@ static int scan_data_files(struct dbengine_tier *ctx)
         if (must_delete_pair) {
             char path[DBENGINE_PATH_MAX];
 
-            netdata_log_error("DBENGINE: deleting invalid data and journal file pair.");
+            dbengine_log_error(ctx->engine, "DBENGINE: deleting invalid data and journal file pair.");
             ret = journalfile_unlink(journalfile);
             if (!ret) {
                 journalfile_v1_generate_path(datafile, path, sizeof(path));
-                netdata_log_info("DBENGINE: deleted journal file \"%s\".", path);
+                dbengine_log_info(ctx->engine, "DBENGINE: deleted journal file \"%s\".", path);
             }
             ret = unlink_data_file(datafile);
             if (!ret) {
                 generate_datafilepath(datafile, path, sizeof(path));
-                netdata_log_info("DBENGINE: deleted data file \"%s\".", path);
+                dbengine_log_info(ctx->engine, "DBENGINE: deleted data file \"%s\".", path);
             }
             freez(journalfile);
             freez(datafile);
@@ -579,9 +592,9 @@ int create_new_datafile_pair(struct dbengine_tier *ctx)
     unsigned fileno = ctx_last_fileno_get(ctx) + 1;
     int ret;
 
-    nd_log(NDLS_DAEMON, NDLP_DEBUG,
-           "DBENGINE: creating new data and journal files in path \"%s\"",
-           ctx->config.dbfiles_path);
+    dbengine_log(ctx->engine, NDLP_DEBUG,
+                 "DBENGINE: creating new data and journal files in path \"%s\"",
+                 ctx->config.dbfiles_path);
 
     datafile = datafile_alloc_and_init(ctx, 1, fileno);
     ret = create_data_file(datafile);
@@ -593,9 +606,9 @@ int create_new_datafile_pair(struct dbengine_tier *ctx)
     if (ret)
         goto error_after_journalfile;
 
-    nd_log(NDLS_DAEMON, NDLP_INFO,
-           "DBENGINE: tier %d: created " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf).",
-           ctx->config.tier, datafile->tier, datafile->fileno);
+    dbengine_log(ctx->engine, NDLP_INFO,
+                 "DBENGINE: tier %d: created " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf).",
+                 ctx->config.tier, datafile->tier, datafile->fileno);
 
     ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
     datafile_list_insert(ctx, datafile);
@@ -621,14 +634,17 @@ int init_data_files(struct dbengine_tier *ctx)
 
     ret = scan_data_files(ctx);
     if (ret < 0) {
-        netdata_log_error("DBENGINE: failed to scan path \"%s\".", ctx->config.dbfiles_path);
+        dbengine_log_error(ctx->engine, "DBENGINE: failed to scan path \"%s\".", ctx->config.dbfiles_path);
         return ret;
     } else if (0 == ret) {
-        netdata_log_info("DBENGINE: data files not found, creating in path \"%s\".", ctx->config.dbfiles_path);
+        dbengine_log_info(ctx->engine,
+                          "DBENGINE: data files not found, creating in path \"%s\".", ctx->config.dbfiles_path);
         ctx->atomic.last_fileno = 0;
         ret = create_new_datafile_pair(ctx);
         if (ret) {
-            netdata_log_error("DBENGINE: failed to create data and journal files in path \"%s\".", ctx->config.dbfiles_path);
+            dbengine_log_error(ctx->engine,
+                               "DBENGINE: failed to create data and journal files in path \"%s\".",
+                               ctx->config.dbfiles_path);
             return ret;
         }
     }
@@ -650,7 +666,8 @@ void cleanup_datafile_epdl_structures(struct dbengine_datafile *datafile)
     Pvoid_t *PValue;
     while ((PValue = JudyLFirstThenNext(datafile->extent_epdl.epdl_per_extent, &idx, &first))) {
         EPDL_EXTENT *e = *PValue;
-        internal_error(e->base, "DBENGINE: unexpected active EPDLs during datafile cleanup");
+        dbengine_internal_error(datafile_ctx(datafile)->engine,
+                                e->base, "DBENGINE: unexpected active EPDLs during datafile cleanup");
         epdl_extent_release(e);
         *PValue = NULL;
     }
@@ -667,7 +684,7 @@ void finalize_data_files(struct dbengine_tier *ctx)
 
     while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED)) {
         if(!logged) {
-            netdata_log_info("Waiting for inflight flush to finish on tier %d...", ctx->config.tier);
+            dbengine_log_info(ctx->engine, "Waiting for inflight flush to finish on tier %d...", ctx->config.tier);
             logged = true;
         }
         sleep_usec(100 * USEC_PER_MS);
@@ -686,7 +703,9 @@ void finalize_data_files(struct dbengine_tier *ctx)
         size_t iterations = 10;
         while(!(acquired = datafile_acquire_for_deletion(datafile)) && --iterations > 0) {
             if(!logged) {
-                netdata_log_info("Waiting to acquire data file %u of tier %d to close it...", datafile->fileno, ctx->config.tier);
+                dbengine_log_info(ctx->engine,
+                                  "Waiting to acquire data file %u of tier %d to close it...", datafile->fileno,
+                                  ctx->config.tier);
                 logged = true;
             }
             sleep_usec(100 * USEC_PER_MS);
@@ -695,8 +714,9 @@ void finalize_data_files(struct dbengine_tier *ctx)
         if(!acquired) {
             // users still hold lockers on this datafile - closing and freeing it
             // would be a use-after-free for them; leaking it at shutdown is safer
-            netdata_log_error("Cannot acquire data file %u of tier %d to close it - it is still in use - skipping it.",
-                              datafile->fileno, ctx->config.tier);
+            dbengine_log_error(ctx->engine,
+                               "Cannot acquire data file %u of tier %d to close it - it is still in use - skipping it.",
+                               datafile->fileno, ctx->config.tier);
             continue;
         }
 
@@ -711,7 +731,9 @@ void finalize_data_files(struct dbengine_tier *ctx)
                 spinlock_unlock(&datafile->writers.spinlock);
                 netdata_rwlock_wrunlock(&ctx->datafiles.rwlock);
                 if(!logged) {
-                    netdata_log_info("Waiting for writers to data file %u of tier %d to finish...", datafile->fileno, ctx->config.tier);
+                    dbengine_log_info(ctx->engine,
+                                      "Waiting for writers to data file %u of tier %d to finish...", datafile->fileno,
+                                      ctx->config.tier);
                     logged = true;
                 }
                 sleep_usec(100 * USEC_PER_MS);
