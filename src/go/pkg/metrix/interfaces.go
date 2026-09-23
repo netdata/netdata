@@ -19,10 +19,11 @@ type RuntimeStore interface {
 // RuntimeBatchWriter is an OPTIONAL RuntimeStore capability (type assertion; not part of
 // RuntimeStore, so existing implementations and fakes keep compiling). Writes made while
 // fn runs are published together as one snapshot when fn returns (or panics); readers do
-// not see any of them earlier. A store has one batch at a time: writes from other
-// goroutines during it join it, and so does a WriteBatch that starts while it runs, nested
-// or from another goroutine, whose writes are published when the running batch ends.
-// Outside a batch, writes still commit immediately.
+// not see any of them earlier. A store has one batch at a time and it belongs to the
+// goroutine that opened it: writes from anywhere join it while it is open, and a
+// WriteBatch that starts meanwhile (nested, or from another goroutine) just runs its fn,
+// so that fn's writes after the open batch ends commit immediately. Outside a batch,
+// writes still commit immediately.
 type RuntimeBatchWriter interface {
 	WriteBatch(fn func())
 }

@@ -123,8 +123,9 @@ A `CollectorStore` write only exists inside a cycle. The job runtime drives the 
 **stateful-only** (snapshot-mode registration returns an error; calling snapshot record methods panics). A producer
 that records many series at once can use the optional `RuntimeBatchWriter` (type assertion): writes made during
 `WriteBatch(fn)` are published together as one snapshot when `fn` returns or panics, and readers see none of them
-earlier. A store has one batch at a time: other writers during it, including a nested or concurrent `WriteBatch`, join
-it. The chartengine runtime aggregator publishes each job cycle's rollup this way.
+earlier. A store has one batch at a time, owned by the goroutine that opened it: any write made while it is open joins
+it, and a nested or concurrent `WriteBatch` only runs its `fn`, whose writes after the batch ends commit immediately.
+The chartengine runtime aggregator publishes each job cycle's rollup this way.
 
 ## Metric Identity: Names, Series, and Descriptors
 
