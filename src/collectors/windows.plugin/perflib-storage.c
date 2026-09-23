@@ -16,6 +16,7 @@
 struct logical_disk {
     usec_t last_collected;
     bool collected_metadata;
+    bool mount_point_source;
     usec_t metadata_retry_after;
     usec_t space_failed_since;
 
@@ -109,6 +110,7 @@ static void logical_disk_cleanup(struct logical_disk *d)
     d->filesystem = NULL;
 
     d->collected_metadata = false;
+    d->mount_point_source = false;
     d->metadata_retry_after = 0;
     d->space_failed_since = 0;
 
@@ -191,8 +193,11 @@ static void dict_physical_disk_delete_cb(const DICTIONARY_ITEM *item __maybe_unu
 }
 
 #define VOLUME_SPACE_WORKER_COUNT 4
+#define VOLUME_SPACE_WORKER_SLOT_COUNT (VOLUME_SPACE_WORKER_COUNT * 2)
 #define VOLUME_SPACE_QUERY_TIMEOUT_UT (10 * USEC_PER_SEC)
 #define MOUNT_POINTS_WORKER_COUNT 2
+#define MOUNT_POINTS_WORKER_SLOT_COUNT (MOUNT_POINTS_WORKER_COUNT * 2)
+#define ND_MOUNT_PATH_MAX 1024
 #define MOUNT_POINTS_QUERY_TIMEOUT_UT (10 * USEC_PER_SEC)
 
 static DICTIONARY *logicalDisks = NULL, *physicalDisks = NULL;
@@ -208,6 +213,7 @@ static usec_t volume_space_last_cancel_log_ut = 0;
 static SIMPLE_PATTERN *excluded_logical_disk_paths = NULL;
 
 struct volume_space_result {
+    uint64_t generation;
     bool success;
     uint64_t total_bytes;
     uint64_t free_bytes;
@@ -229,22 +235,29 @@ static DICTIONARY *volume_space_request = NULL;
 static DICTIONARY *volume_space_results = NULL;
 static bool volume_space_worker_stop = false;
 static bool mount_points_worker_stop = false;
-static ND_THREAD *volume_space_threads[VOLUME_SPACE_WORKER_COUNT] = {0};
-static HANDLE volume_space_worker_handles[VOLUME_SPACE_WORKER_COUNT] = {0};
-static volatile LONG volume_space_worker_finished[VOLUME_SPACE_WORKER_COUNT] = {0};
-static bool volume_space_worker_busy[VOLUME_SPACE_WORKER_COUNT] = {0};
-static bool volume_space_worker_cancel_requested[VOLUME_SPACE_WORKER_COUNT] = {0};
-static usec_t volume_space_worker_started_ut[VOLUME_SPACE_WORKER_COUNT] = {0};
+static ND_THREAD *volume_space_threads[VOLUME_SPACE_WORKER_SLOT_COUNT] = {0};
+static HANDLE volume_space_worker_handles[VOLUME_SPACE_WORKER_SLOT_COUNT] = {0};
+static volatile LONG volume_space_worker_finished[VOLUME_SPACE_WORKER_SLOT_COUNT] = {0};
+static bool volume_space_worker_busy[VOLUME_SPACE_WORKER_SLOT_COUNT] = {0};
+static bool volume_space_worker_retired[VOLUME_SPACE_WORKER_SLOT_COUNT] = {0};
+static bool volume_space_worker_cancel_requested[VOLUME_SPACE_WORKER_SLOT_COUNT] = {0};
+static usec_t volume_space_worker_started_ut[VOLUME_SPACE_WORKER_SLOT_COUNT] = {0};
+static bool volume_space_worker_metadata[VOLUME_SPACE_WORKER_SLOT_COUNT] = {0};
+static uint64_t volume_space_worker_generation[VOLUME_SPACE_WORKER_SLOT_COUNT] = {0};
+static char volume_space_worker_target[VOLUME_SPACE_WORKER_SLOT_COUNT][ND_MOUNT_PATH_MAX] = {{0}};
 static DICTIONARY *volume_space_inflight = NULL;
+static DICTIONARY *volume_space_latest_generation = NULL;
+static uint64_t volume_space_next_generation = 0;
 struct mount_points_snapshot;
-static ND_THREAD *mount_points_threads[MOUNT_POINTS_WORKER_COUNT] = {0};
-static HANDLE mount_points_worker_handles[MOUNT_POINTS_WORKER_COUNT] = {0};
-static volatile LONG mount_points_worker_finished[MOUNT_POINTS_WORKER_COUNT] = {0};
-static bool mount_points_worker_busy[MOUNT_POINTS_WORKER_COUNT] = {0};
-static bool mount_points_worker_cancel_requested[MOUNT_POINTS_WORKER_COUNT] = {0};
-static usec_t mount_points_worker_started_ut[MOUNT_POINTS_WORKER_COUNT] = {0};
-static struct mount_points_snapshot *mount_points_worker_results[MOUNT_POINTS_WORKER_COUNT] = {0};
-static uint64_t mount_points_worker_result_generation[MOUNT_POINTS_WORKER_COUNT] = {0};
+static ND_THREAD *mount_points_threads[MOUNT_POINTS_WORKER_SLOT_COUNT] = {0};
+static HANDLE mount_points_worker_handles[MOUNT_POINTS_WORKER_SLOT_COUNT] = {0};
+static volatile LONG mount_points_worker_finished[MOUNT_POINTS_WORKER_SLOT_COUNT] = {0};
+static bool mount_points_worker_busy[MOUNT_POINTS_WORKER_SLOT_COUNT] = {0};
+static bool mount_points_worker_retired[MOUNT_POINTS_WORKER_SLOT_COUNT] = {0};
+static bool mount_points_worker_cancel_requested[MOUNT_POINTS_WORKER_SLOT_COUNT] = {0};
+static usec_t mount_points_worker_started_ut[MOUNT_POINTS_WORKER_SLOT_COUNT] = {0};
+static struct mount_points_snapshot *mount_points_worker_results[MOUNT_POINTS_WORKER_SLOT_COUNT] = {0};
+static uint64_t mount_points_worker_result_generation[MOUNT_POINTS_WORKER_SLOT_COUNT] = {0};
 static size_t mount_points_pending_requests = 0;
 static uint64_t mount_points_next_generation = 0;
 static uint64_t mount_points_published_generation = 0;
@@ -280,13 +293,25 @@ static void mount_points_worker(void *ptr);
 static void mount_points_cancel_expired(void);
 static void mount_points_collect_results(void);
 static bool mount_points_contains(DICTIONARY *paths, const char *name);
+static bool uncertain_mount_point_active(const char *name, usec_t now_ut);
 static STRING *getFileSystemType(struct logical_disk *d, const char *diskName);
 static bool logical_disk_metadata_due(const struct logical_disk *d, usec_t now_ut);
+static bool volume_space_start_worker(size_t worker_id);
+static bool mount_points_start_worker(size_t worker_id);
+
+static void uncertain_mount_point_add(DICTIONARY *paths, const char *name, usec_t now_ut)
+{
+    if (!paths || !name || !*name)
+        return;
+
+    if (!dictionary_get(paths, name))
+        dictionary_set(paths, name, &now_ut, sizeof(now_ut));
+}
 
 static void volume_space_cancel_io(void *data)
 {
     size_t worker_id = (size_t)(uintptr_t)data;
-    if (worker_id >= VOLUME_SPACE_WORKER_COUNT)
+    if (worker_id >= VOLUME_SPACE_WORKER_SLOT_COUNT)
         return;
 
     netdata_mutex_lock(&volume_space_mutex);
@@ -299,7 +324,7 @@ static void volume_space_cancel_io(void *data)
 static void mount_points_cancel_io(void *data)
 {
     size_t worker_id = (size_t)(uintptr_t)data;
-    if (worker_id >= MOUNT_POINTS_WORKER_COUNT)
+    if (worker_id >= MOUNT_POINTS_WORKER_SLOT_COUNT)
         return;
 
     netdata_mutex_lock(&volume_space_mutex);
@@ -307,6 +332,42 @@ static void mount_points_cancel_io(void *data)
     if (handle)
         CancelSynchronousIo(handle);
     netdata_mutex_unlock(&volume_space_mutex);
+}
+
+static bool volume_space_start_worker(size_t worker_id)
+{
+    if (worker_id >= VOLUME_SPACE_WORKER_SLOT_COUNT)
+        return false;
+
+    InterlockedExchange(&volume_space_worker_finished[worker_id], 0);
+    volume_space_worker_retired[worker_id] = false;
+    volume_space_threads[worker_id] = nd_thread_create(
+        "WIN[PerflibStorage space]", NETDATA_THREAD_OPTION_DEFAULT, volume_space_worker, (void *)(uintptr_t)worker_id);
+    if (!volume_space_threads[worker_id]) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create PerflibStorage volume-space worker %zu", worker_id);
+        return false;
+    }
+
+    nd_thread_set_manual_join(volume_space_threads[worker_id]);
+    return true;
+}
+
+static bool mount_points_start_worker(size_t worker_id)
+{
+    if (worker_id >= MOUNT_POINTS_WORKER_SLOT_COUNT)
+        return false;
+
+    InterlockedExchange(&mount_points_worker_finished[worker_id], 0);
+    mount_points_worker_retired[worker_id] = false;
+    mount_points_threads[worker_id] = nd_thread_create(
+        "WIN[PerflibStorage discovery]", NETDATA_THREAD_OPTION_DEFAULT, mount_points_worker, (void *)(uintptr_t)worker_id);
+    if (!mount_points_threads[worker_id]) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create PerflibStorage discovery worker %zu", worker_id);
+        return false;
+    }
+
+    nd_thread_set_manual_join(mount_points_threads[worker_id]);
+    return true;
 }
 
 static void initialize(void)
@@ -334,7 +395,8 @@ static void initialize(void)
     mountPoints = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     deviceMountPaths = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     mountPointVolumeIds = dictionary_create(DICT_OPTION_SINGLE_THREADED);
-    uncertainMountPoints = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    uncertainMountPoints = dictionary_create_advanced(
+        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE, NULL, sizeof(usec_t));
     excludedDeviceNames = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     mountPointsRefreshedUT = 0;
     mountPointsEvictionSafe = false;
@@ -347,24 +409,25 @@ static void initialize(void)
     netdata_cond_init(&volume_space_cond);
     volume_space_worker_stop = false;
     mount_points_worker_stop = false;
-    volume_space_inflight = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    volume_space_inflight = dictionary_create_advanced(
+        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE, NULL, sizeof(size_t));
+    volume_space_latest_generation = dictionary_create_advanced(
+        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE, NULL, sizeof(uint64_t));
     memset(volume_space_worker_handles, 0, sizeof(volume_space_worker_handles));
     memset(volume_space_worker_busy, 0, sizeof(volume_space_worker_busy));
+    memset(volume_space_worker_retired, 0, sizeof(volume_space_worker_retired));
     memset(volume_space_worker_cancel_requested, 0, sizeof(volume_space_worker_cancel_requested));
     memset(volume_space_worker_started_ut, 0, sizeof(volume_space_worker_started_ut));
+    memset(volume_space_worker_metadata, 0, sizeof(volume_space_worker_metadata));
+    memset(volume_space_worker_generation, 0, sizeof(volume_space_worker_generation));
+    memset(volume_space_worker_target, 0, sizeof(volume_space_worker_target));
+    volume_space_next_generation = 0;
     // A pool runs with however many workers it got. Stopping the pool because one thread could not
     // be created would also disable the workers that started successfully.
     size_t volume_space_workers_created = 0;
     for (size_t i = 0; i < VOLUME_SPACE_WORKER_COUNT; i++) {
-        InterlockedExchange(&volume_space_worker_finished[i], 0);
-        volume_space_threads[i] = nd_thread_create(
-            "WIN[PerflibStorage space]", NETDATA_THREAD_OPTION_DEFAULT, volume_space_worker, (void *)(uintptr_t)i);
-        if (!volume_space_threads[i]) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create PerflibStorage volume-space worker %zu", i);
-            continue;
-        }
-        nd_thread_set_manual_join(volume_space_threads[i]);
-        volume_space_workers_created++;
+        if (volume_space_start_worker(i))
+            volume_space_workers_created++;
     }
     if (!volume_space_workers_created)
         volume_space_worker_stop = true;
@@ -376,6 +439,7 @@ static void initialize(void)
 
     memset(mount_points_worker_handles, 0, sizeof(mount_points_worker_handles));
     memset(mount_points_worker_busy, 0, sizeof(mount_points_worker_busy));
+    memset(mount_points_worker_retired, 0, sizeof(mount_points_worker_retired));
     memset(mount_points_worker_cancel_requested, 0, sizeof(mount_points_worker_cancel_requested));
     memset(mount_points_worker_started_ut, 0, sizeof(mount_points_worker_started_ut));
     memset(mount_points_worker_results, 0, sizeof(mount_points_worker_results));
@@ -385,15 +449,8 @@ static void initialize(void)
     mount_points_published_generation = 0;
     size_t mount_points_workers_created = 0;
     for (size_t i = 0; i < MOUNT_POINTS_WORKER_COUNT; i++) {
-        InterlockedExchange(&mount_points_worker_finished[i], 0);
-        mount_points_threads[i] = nd_thread_create(
-            "WIN[PerflibStorage discovery]", NETDATA_THREAD_OPTION_DEFAULT, mount_points_worker, (void *)(uintptr_t)i);
-        if (!mount_points_threads[i]) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot create PerflibStorage discovery worker %zu", i);
-            continue;
-        }
-        nd_thread_set_manual_join(mount_points_threads[i]);
-        mount_points_workers_created++;
+        if (mount_points_start_worker(i))
+            mount_points_workers_created++;
     }
     if (!mount_points_workers_created)
         mount_points_worker_stop = true;
@@ -416,13 +473,11 @@ static void initialize(void)
 // So we keep our own registry of mount paths, refreshed on an interval, and use it both to resolve
 // perflib device names and to publish the volumes perflib never lists.
 
-// Long enough for the extended-length paths Windows accepts, in UTF-8 bytes.
-#define ND_MOUNT_PATH_MAX 1024
-
 // Volumes and CSVs do not come and go often; rescanning every collection would be pure syscall cost.
 #define MOUNT_POINTS_REFRESH_EVERY_UT (60 * USEC_PER_SEC)
 #define METADATA_RETRY_EVERY_UT (60 * USEC_PER_SEC)
 #define SPACE_FAILURE_GRACE_UT (3 * MOUNT_POINTS_REFRESH_EVERY_UT)
+#define UNCERTAIN_MOUNT_POINT_GRACE_UT (3 * MOUNT_POINTS_REFRESH_EVERY_UT)
 #define VOLUME_SPACE_SHUTDOWN_TIMEOUT_MS 5000
 
 // Canonical form of a mount path: no trailing backslash, so "C:\" and "C:" are the same instance.
@@ -577,17 +632,27 @@ static void volume_space_worker(void *ptr __maybe_unused)
         bool metadata = false;
         bool have_target = false;
         netdata_mutex_lock(&volume_space_mutex);
-        while (!volume_space_worker_stop && (!volume_space_request || !dictionary_entries(volume_space_request)))
+        while (!volume_space_worker_stop && !volume_space_worker_retired[worker_id] &&
+               (!volume_space_request || !dictionary_entries(volume_space_request)))
             netdata_cond_wait(&volume_space_cond, &volume_space_mutex);
 
-        if (!volume_space_worker_stop && volume_space_request) {
+        if (!volume_space_worker_stop && !volume_space_worker_retired[worker_id] && volume_space_request) {
             struct volume_space_request *request_value;
             dfe_start_write(volume_space_request, request_value)
             {
                 snprintfz(name, sizeof(name), "%s", request_value_dfe.name);
                 metadata = request_value->metadata;
                 dictionary_del(volume_space_request, request_value_dfe.name);
-                dictionary_set(volume_space_inflight, name, NULL, 0);
+                size_t owner = worker_id + 1;
+                dictionary_set(volume_space_inflight, name, &owner, sizeof(owner));
+                volume_space_worker_generation[worker_id] = ++volume_space_next_generation;
+                dictionary_set(
+                    volume_space_latest_generation,
+                    name,
+                    &volume_space_worker_generation[worker_id],
+                    sizeof(uint64_t));
+                snprintfz(volume_space_worker_target[worker_id], sizeof(volume_space_worker_target[worker_id]), "%s", name);
+                volume_space_worker_metadata[worker_id] = metadata;
                 have_target = true;
                 break;
             }
@@ -598,8 +663,9 @@ static void volume_space_worker(void *ptr __maybe_unused)
             }
         }
         bool stopping = volume_space_worker_stop;
+        bool retired_now = volume_space_worker_retired[worker_id];
         netdata_mutex_unlock(&volume_space_mutex);
-        if (stopping)
+        if (stopping || retired_now)
             break;
         if (!have_target)
             continue;
@@ -611,6 +677,7 @@ static void volume_space_worker(void *ptr __maybe_unused)
         netdata_mutex_unlock(&volume_space_mutex);
 
         struct volume_space_result value = {0};
+        value.generation = volume_space_worker_generation[worker_id];
         value.success = volume_space(name, &value.total_bytes, &value.free_bytes);
 
         netdata_mutex_lock(&volume_space_mutex);
@@ -634,13 +701,25 @@ static void volume_space_worker(void *ptr __maybe_unused)
 
         netdata_mutex_lock(&volume_space_mutex);
         bool cancelled = volume_space_worker_cancel_requested[worker_id] || volume_space_worker_stop;
-        dictionary_del(volume_space_inflight, name);
+        size_t owner = worker_id + 1;
+        size_t *current_owner = dictionary_get(volume_space_inflight, name);
+        bool result_superseded = current_owner && *current_owner != owner;
+        if (current_owner && *current_owner == owner)
+            dictionary_del(volume_space_inflight, name);
         volume_space_worker_busy[worker_id] = false;
         volume_space_worker_started_ut[worker_id] = 0;
-        if (space_query_cancelled && !stopping) {
-            // volume_space() already reports failure for an aborted query, so the sample is left as
-            // it came back: zeroing it here would discard a query that completed just before the
-            // cancel flag was raised.
+        bool retired = volume_space_worker_retired[worker_id];
+        volume_space_worker_target[worker_id][0] = '\0';
+        if (stopping) {
+            netdata_mutex_unlock(&volume_space_mutex);
+            break;
+        }
+        if (space_query_cancelled) {
+            // A cancelled query is a failed sample. Publishing it arms the normal grace-period
+            // eviction path instead of making cancellation indistinguishable from no result.
+            // A retired worker still publishes before leaving, otherwise the timeout it just hit
+            // would be silent and the volume would gap forever instead of ageing out.
+            value.success = false;
             usec_t now_ut = now_monotonic_usec();
             if (!volume_space_last_cancel_log_ut ||
                 now_ut - volume_space_last_cancel_log_ut >= 60 * USEC_PER_SEC) {
@@ -652,10 +731,6 @@ static void volume_space_worker(void *ptr __maybe_unused)
                     name);
             }
         }
-        else if (stopping) {
-            netdata_mutex_unlock(&volume_space_mutex);
-            continue;
-        }
         if (cancelled) {
             // Metadata is optional. A cancellation during that lookup must not discard a
             // successful space sample or publish partially updated labels.
@@ -666,12 +741,21 @@ static void volume_space_worker(void *ptr __maybe_unused)
             value.readonly = false;
             value.filesystem[0] = '\0';
         }
-        if (!volume_space_results)
-            volume_space_results = dictionary_create_advanced(
-                DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
-        dictionary_set(volume_space_results, name, &value, sizeof(value));
+        if (!result_superseded) {
+            if (!volume_space_results)
+                volume_space_results = dictionary_create_advanced(
+                    DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
+            uint64_t *latest = dictionary_get(volume_space_latest_generation, name);
+            struct volume_space_result *previous = dictionary_get(volume_space_results, name);
+            if (latest && *latest == value.generation && (!previous || previous->generation <= value.generation))
+                dictionary_set(volume_space_results, name, &value, sizeof(value));
+        }
         netdata_cond_broadcast(&volume_space_cond);
         netdata_mutex_unlock(&volume_space_mutex);
+
+        // quarantined: the sample above is published, now leave the slot to its replacement
+        if (retired)
+            break;
     }
 
     SetThreadErrorMode(previous_error_mode, NULL);
@@ -679,22 +763,99 @@ static void volume_space_worker(void *ptr __maybe_unused)
     InterlockedExchange(&volume_space_worker_finished[worker_id], 1);
 }
 
+// A retired worker holds its slot only while its Windows call is still live. Once the thread has
+// actually exited - which is the normal outcome whenever CancelSynchronousIo() succeeds - the slot
+// must return to the pool. Without this, every timeout permanently shrinks the pool, so a single
+// slow volume eventually leaves no worker at all.
+static void volume_space_reclaim_retired(void)
+{
+    for (size_t i = 0; i < VOLUME_SPACE_WORKER_SLOT_COUNT; i++) {
+        netdata_mutex_lock(&volume_space_mutex);
+        bool reclaim = volume_space_threads[i] && volume_space_worker_retired[i] &&
+                       InterlockedCompareExchange(&volume_space_worker_finished[i], 1, 1);
+        netdata_mutex_unlock(&volume_space_mutex);
+        if (!reclaim)
+            continue;
+
+        if (nd_thread_join(volume_space_threads[i]))
+            continue;
+
+        netdata_mutex_lock(&volume_space_mutex);
+        if (volume_space_worker_handles[i]) {
+            CloseHandle(volume_space_worker_handles[i]);
+            volume_space_worker_handles[i] = NULL;
+        }
+        volume_space_threads[i] = NULL;
+        volume_space_worker_retired[i] = false;
+        volume_space_worker_busy[i] = false;
+        volume_space_worker_cancel_requested[i] = false;
+        volume_space_worker_started_ut[i] = 0;
+        volume_space_worker_target[i][0] = '\0';
+        volume_space_worker_metadata[i] = false;
+        volume_space_worker_generation[i] = 0;
+        size_t live = 0;
+        for (size_t j = 0; j < VOLUME_SPACE_WORKER_SLOT_COUNT; j++)
+            if (volume_space_threads[j] && !volume_space_worker_retired[j])
+                live++;
+        netdata_mutex_unlock(&volume_space_mutex);
+
+        // restore the configured width when retirement left the pool short of workers
+        if (live < VOLUME_SPACE_WORKER_COUNT)
+            volume_space_start_worker(i);
+    }
+}
+
 static void volume_space_cancel_expired(void)
 {
+    volume_space_reclaim_retired();
     usec_t now_ut = now_monotonic_usec();
+    size_t replacements[VOLUME_SPACE_WORKER_SLOT_COUNT] = {0};
+    size_t replacements_count = 0;
 
     netdata_mutex_lock(&volume_space_mutex);
-    for (size_t i = 0; i < VOLUME_SPACE_WORKER_COUNT; i++) {
-        if (!volume_space_worker_busy[i] || !volume_space_worker_started_ut[i] ||
+    for (size_t i = 0; i < VOLUME_SPACE_WORKER_SLOT_COUNT; i++) {
+        if (volume_space_worker_retired[i] || !volume_space_worker_busy[i] || !volume_space_worker_started_ut[i] ||
             now_ut - volume_space_worker_started_ut[i] < VOLUME_SPACE_QUERY_TIMEOUT_UT)
             continue;
 
         volume_space_worker_cancel_requested[i] = true;
         HANDLE handle = volume_space_worker_handles[i];
-        if (handle)
-            CancelSynchronousIo(handle);
+        if (handle && !CancelSynchronousIo(handle))
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_WARNING,
+                "PerflibStorage could not cancel volume-space worker %zu (error: %lu); quarantining it",
+                i,
+                GetLastError());
+
+        volume_space_worker_retired[i] = true;
+        if (volume_space_worker_target[i][0]) {
+            size_t owner = i + 1;
+            size_t *current_owner = dictionary_get(volume_space_inflight, volume_space_worker_target[i]);
+            if (current_owner && *current_owner == owner) {
+                struct volume_space_request request_value = { .metadata = volume_space_worker_metadata[i] };
+                dictionary_del(volume_space_inflight, volume_space_worker_target[i]);
+                if (!volume_space_request)
+                    volume_space_request = dictionary_create_advanced(
+                        DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_request));
+                dictionary_set(volume_space_request, volume_space_worker_target[i], &request_value, sizeof(request_value));
+            }
+        }
+        for (size_t j = 0; j < VOLUME_SPACE_WORKER_SLOT_COUNT; j++) {
+            bool already_reserved = false;
+            for (size_t k = 0; k < replacements_count; k++)
+                if (replacements[k] == j)
+                    already_reserved = true;
+            if (!volume_space_threads[j] && !already_reserved) {
+                replacements[replacements_count++] = j;
+                break;
+            }
+        }
     }
     netdata_mutex_unlock(&volume_space_mutex);
+
+    for (size_t i = 0; i < replacements_count; i++)
+        volume_space_start_worker(replacements[i]);
 }
 
 static void volume_space_add_target(DICTIONARY *request, const char *name, usec_t now_ut)
@@ -710,8 +871,8 @@ static void volume_space_submit(DICTIONARY *extra_targets, usec_t now_ut)
         DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_request));
 
     bool workers_available = false;
-    for (size_t i = 0; i < VOLUME_SPACE_WORKER_COUNT; i++) {
-        if (volume_space_threads[i]) {
+    for (size_t i = 0; i < VOLUME_SPACE_WORKER_SLOT_COUNT; i++) {
+        if (volume_space_threads[i] && !volume_space_worker_retired[i]) {
             workers_available = true;
             break;
         }
@@ -1078,7 +1239,7 @@ static struct mount_points_scan_status mount_points_scan_cluster_storage(
             // Without the volume identity this path cannot be deduplicated safely. Keep it
             // uncertain for this refresh, but do not freeze eviction for unrelated volumes.
             complete = false;
-            dictionary_set(uncertain_paths, path, NULL, 0);
+            uncertain_mount_point_add(uncertain_paths, path, now_monotonic_usec());
             continue;
         }
 
@@ -1165,7 +1326,8 @@ static struct mount_points_snapshot *mount_points_scan_with_ops(const struct mou
     snapshot->excluded_devices = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     snapshot->volume_ids = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     snapshot->failed_volume_ids = dictionary_create(DICT_OPTION_SINGLE_THREADED);
-    snapshot->uncertain_paths = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    snapshot->uncertain_paths = dictionary_create_advanced(
+        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE, NULL, sizeof(usec_t));
     snapshot->device_mapping_complete = true;
     snapshot->volumes = ops->scan_volumes(
         snapshot->paths,
@@ -1209,11 +1371,11 @@ static void mount_points_worker(void *ptr __maybe_unused)
 
     while (true) {
         netdata_mutex_lock(&volume_space_mutex);
-        while (!mount_points_worker_stop &&
+        while (!mount_points_worker_stop && !mount_points_worker_retired[worker_id] &&
                (!mount_points_pending_requests || mount_points_worker_results[worker_id]))
             netdata_cond_wait(&volume_space_cond, &volume_space_mutex);
 
-        if (mount_points_worker_stop) {
+        if (mount_points_worker_stop || mount_points_worker_retired[worker_id]) {
             netdata_mutex_unlock(&volume_space_mutex);
             break;
         }
@@ -1233,7 +1395,7 @@ static void mount_points_worker(void *ptr __maybe_unused)
         mount_points_worker_busy[worker_id] = false;
         mount_points_worker_started_ut[worker_id] = 0;
         struct mount_points_snapshot *discard = NULL;
-        if (stopping || mount_points_worker_results[worker_id])
+        if (stopping || mount_points_worker_retired[worker_id] || mount_points_worker_results[worker_id])
             discard = snapshot;
         else {
             if (cancelled) {
@@ -1269,6 +1431,7 @@ static void mount_points_worker(void *ptr __maybe_unused)
 // the device map would flip to their bare HarddiskVolumeN name and back a minute later.
 static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot)
 {
+    usec_t now_ut = now_monotonic_usec();
     DICTIONARY *paths = snapshot->paths;
     DICTIONARY *discovered_paths = paths;
     DICTIONARY *devices = snapshot->devices;
@@ -1281,7 +1444,8 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
     bool discovery_ok = volumes.eviction_safe && cluster.eviction_safe;
     deviceMappingIncomplete = !snapshot->device_mapping_complete;
     DICTIONARY *previous_volume_ids = mountPointVolumeIds;
-    DICTIONARY *uncertain_paths = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    DICTIONARY *uncertain_paths = dictionary_create_advanced(
+        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE, NULL, sizeof(usec_t));
 
     if (!discovery_ok || dictionary_entries(failed_volume_ids) || dictionary_entries(scan_uncertain_paths)) {
         if (!mountPointsDiscoveryWarningActive) {
@@ -1304,7 +1468,7 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
             {
                 if (old_volume_id && dictionary_get(failed_volume_ids, old_volume_id))
                     if (!mount_points_contains(discovered_paths, old_volume_id_dfe.name))
-                        dictionary_set(uncertain_paths, old_volume_id_dfe.name, NULL, 0);
+                        uncertain_mount_point_add(uncertain_paths, old_volume_id_dfe.name, now_ut);
             }
             dfe_done(old_volume_id);
         }
@@ -1313,7 +1477,8 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
             dfe_start_read(uncertainMountPoints, value)
             {
                 if (!mount_points_contains(discovered_paths, value_dfe.name))
-                    dictionary_set(uncertain_paths, value_dfe.name, NULL, 0);
+                    if (value && *(usec_t *)value && now_ut - *(usec_t *)value < UNCERTAIN_MOUNT_POINT_GRACE_UT)
+                        uncertain_mount_point_add(uncertain_paths, value_dfe.name, *(usec_t *)value);
             }
             dfe_done(value);
         }
@@ -1322,7 +1487,10 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
             dfe_start_read(scan_uncertain_paths, value)
             {
                 if (!mount_points_contains(discovered_paths, value_dfe.name))
-                    dictionary_set(uncertain_paths, value_dfe.name, NULL, 0);
+                    uncertain_mount_point_add(
+                        uncertain_paths,
+                        value_dfe.name,
+                        value && *(usec_t *)value ? *(usec_t *)value : now_ut);
             }
             dfe_done(value);
         }
@@ -1334,6 +1502,9 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
             dfe_start_read(mountPoints, value)
             {
                 bool retain = !discovery_ok;
+                bool old_uncertain = uncertainMountPoints && dictionary_get(uncertainMountPoints, value_dfe.name);
+                if (retain && old_uncertain && !uncertain_mount_point_active(value_dfe.name, now_ut))
+                    retain = false;
                 const char *old_volume_id = previous_volume_ids
                                                 ? dictionary_get(previous_volume_ids, value_dfe.name)
                                                 : NULL;
@@ -1341,30 +1512,13 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
                     retain = true;
                 if (!retain && scan_uncertain_paths && dictionary_get(scan_uncertain_paths, value_dfe.name))
                     retain = true;
-                if (!retain && uncertainMountPoints && dictionary_get(uncertainMountPoints, value_dfe.name))
+                if (!retain && uncertain_mount_point_active(value_dfe.name, now_ut))
                     retain = true;
                 if (retain)
                     dictionary_set(paths, value_dfe.name, NULL, 0);
             }
             dfe_done(value);
         }
-        if (deviceMountPaths) {
-            dfe_start_read(deviceMountPaths, value)
-            {
-                if (value && !dictionary_get(devices, value_dfe.name))
-                    dictionary_set(devices, value_dfe.name, value, strlen(value) + 1);
-            }
-            dfe_done(value);
-        }
-        if (excludedDeviceNames) {
-            dfe_start_read(excludedDeviceNames, value)
-            {
-                if (value && !dictionary_get(excluded_devices, value_dfe.name))
-                    dictionary_set(excluded_devices, value_dfe.name, value, strlen(value) + 1);
-            }
-            dfe_done(value);
-        }
-
         // Carry a previous identity forward only for a path that survived into this registry,
         // otherwise every path ever seen keeps a row for as long as the scans stay incomplete.
         void *volume_id;
@@ -1376,6 +1530,26 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
                         dictionary_set(volume_ids, volume_id_dfe.name, volume_id, strlen(volume_id) + 1);
             }
             dfe_done(volume_id);
+        }
+
+        // A device number can be reused after a volume is removed. Carry a previous mapping only
+        // when its path is still present and has a known volume identity in this snapshot.
+        if (deviceMountPaths && snapshot->device_mapping_complete) {
+            dfe_start_read(deviceMountPaths, value)
+            {
+                if (value && mount_points_contains(paths, value) && dictionary_get(volume_ids, value) &&
+                    !dictionary_get(devices, value_dfe.name))
+                    dictionary_set(devices, value_dfe.name, value, strlen(value) + 1);
+            }
+            dfe_done(value);
+        }
+        if (excludedDeviceNames) {
+            dfe_start_read(excludedDeviceNames, value)
+            {
+                if (value && !dictionary_get(excluded_devices, value_dfe.name))
+                    dictionary_set(excluded_devices, value_dfe.name, value, strlen(value) + 1);
+            }
+            dfe_done(value);
         }
 
         dictionary_destroy(mountPoints);
@@ -1441,31 +1615,98 @@ static void mount_points_refresh_with_ops(usec_t now_ut, const struct mount_poin
     mount_points_publish_snapshot(mount_points_scan_with_ops(ops));
 }
 
+// See volume_space_reclaim_retired(): a quarantined discovery slot is returned to the pool as soon
+// as its thread exits, so a timeout does not permanently reduce discovery capacity.
+static void mount_points_reclaim_retired(void)
+{
+    for (size_t i = 0; i < MOUNT_POINTS_WORKER_SLOT_COUNT; i++) {
+        netdata_mutex_lock(&volume_space_mutex);
+        bool reclaim = mount_points_threads[i] && mount_points_worker_retired[i] &&
+                       !mount_points_worker_results[i] &&
+                       InterlockedCompareExchange(&mount_points_worker_finished[i], 1, 1);
+        netdata_mutex_unlock(&volume_space_mutex);
+        if (!reclaim)
+            continue;
+
+        if (nd_thread_join(mount_points_threads[i]))
+            continue;
+
+        netdata_mutex_lock(&volume_space_mutex);
+        if (mount_points_worker_handles[i]) {
+            CloseHandle(mount_points_worker_handles[i]);
+            mount_points_worker_handles[i] = NULL;
+        }
+        mount_points_threads[i] = NULL;
+        mount_points_worker_retired[i] = false;
+        mount_points_worker_busy[i] = false;
+        mount_points_worker_cancel_requested[i] = false;
+        mount_points_worker_started_ut[i] = 0;
+        size_t live = 0;
+        for (size_t j = 0; j < MOUNT_POINTS_WORKER_SLOT_COUNT; j++)
+            if (mount_points_threads[j] && !mount_points_worker_retired[j])
+                live++;
+        netdata_mutex_unlock(&volume_space_mutex);
+
+        if (live < MOUNT_POINTS_WORKER_COUNT)
+            mount_points_start_worker(i);
+    }
+}
+
 static void mount_points_cancel_expired(void)
 {
+    mount_points_reclaim_retired();
     usec_t now_ut = now_monotonic_usec();
+    size_t replacements[MOUNT_POINTS_WORKER_SLOT_COUNT] = {0};
+    size_t replacements_count = 0;
 
     netdata_mutex_lock(&volume_space_mutex);
-    for (size_t i = 0; i < MOUNT_POINTS_WORKER_COUNT; i++) {
-        if (!mount_points_worker_busy[i] || !mount_points_worker_started_ut[i] ||
+    for (size_t i = 0; i < MOUNT_POINTS_WORKER_SLOT_COUNT; i++) {
+        if (mount_points_worker_retired[i] || !mount_points_worker_busy[i] || !mount_points_worker_started_ut[i] ||
             now_ut - mount_points_worker_started_ut[i] < MOUNT_POINTS_QUERY_TIMEOUT_UT)
             continue;
 
         mount_points_worker_cancel_requested[i] = true;
         HANDLE handle = mount_points_worker_handles[i];
-        if (handle)
-            CancelSynchronousIo(handle);
+        if (handle && !CancelSynchronousIo(handle))
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_WARNING,
+                "PerflibStorage could not cancel discovery worker %zu (error: %lu); quarantining it",
+                i,
+                GetLastError());
+
+        mount_points_worker_retired[i] = true;
+        for (size_t j = 0; j < MOUNT_POINTS_WORKER_SLOT_COUNT; j++) {
+            bool already_reserved = false;
+            for (size_t k = 0; k < replacements_count; k++)
+                if (replacements[k] == j)
+                    already_reserved = true;
+            if (!mount_points_threads[j] && !already_reserved) {
+                replacements[replacements_count++] = j;
+                mount_points_pending_requests++;
+                break;
+            }
+        }
     }
     netdata_mutex_unlock(&volume_space_mutex);
+
+    for (size_t i = 0; i < replacements_count; i++) {
+        if (!mount_points_start_worker(replacements[i])) {
+            netdata_mutex_lock(&volume_space_mutex);
+            if (mount_points_pending_requests)
+                mount_points_pending_requests--;
+            netdata_mutex_unlock(&volume_space_mutex);
+        }
+    }
 }
 
 static void mount_points_collect_results(void)
 {
-    struct mount_points_snapshot *snapshots[MOUNT_POINTS_WORKER_COUNT] = {0};
-    uint64_t generations[MOUNT_POINTS_WORKER_COUNT] = {0};
+    struct mount_points_snapshot *snapshots[MOUNT_POINTS_WORKER_SLOT_COUNT] = {0};
+    uint64_t generations[MOUNT_POINTS_WORKER_SLOT_COUNT] = {0};
 
     netdata_mutex_lock(&volume_space_mutex);
-    for (size_t i = 0; i < MOUNT_POINTS_WORKER_COUNT; i++) {
+    for (size_t i = 0; i < MOUNT_POINTS_WORKER_SLOT_COUNT; i++) {
         snapshots[i] = mount_points_worker_results[i];
         generations[i] = mount_points_worker_result_generation[i];
         mount_points_worker_results[i] = NULL;
@@ -1474,21 +1715,21 @@ static void mount_points_collect_results(void)
     netdata_cond_broadcast(&volume_space_cond);
     netdata_mutex_unlock(&volume_space_mutex);
 
-    size_t selected = MOUNT_POINTS_WORKER_COUNT;
-    for (size_t i = 0; i < MOUNT_POINTS_WORKER_COUNT; i++) {
+    size_t selected = MOUNT_POINTS_WORKER_SLOT_COUNT;
+    for (size_t i = 0; i < MOUNT_POINTS_WORKER_SLOT_COUNT; i++) {
         if (!snapshots[i])
             continue;
-        if (selected == MOUNT_POINTS_WORKER_COUNT || generations[i] > generations[selected])
+        if (selected == MOUNT_POINTS_WORKER_SLOT_COUNT || generations[i] > generations[selected])
             selected = i;
     }
 
-    for (size_t i = 0; i < MOUNT_POINTS_WORKER_COUNT; i++) {
+    for (size_t i = 0; i < MOUNT_POINTS_WORKER_SLOT_COUNT; i++) {
         if (i == selected || !snapshots[i])
             continue;
         mount_points_snapshot_destroy(snapshots[i]);
     }
 
-    if (selected != MOUNT_POINTS_WORKER_COUNT) {
+    if (selected != MOUNT_POINTS_WORKER_SLOT_COUNT) {
         if (generations[selected] > mount_points_published_generation) {
             mount_points_publish_snapshot(snapshots[selected]);
             mount_points_published_generation = generations[selected];
@@ -1505,8 +1746,10 @@ static void mount_points_refresh(usec_t now_ut)
 
     netdata_mutex_lock(&volume_space_mutex);
     size_t active = mount_points_pending_requests;
-    for (size_t i = 0; i < MOUNT_POINTS_WORKER_COUNT; i++) {
-        if (mount_points_worker_busy[i] || mount_points_worker_results[i])
+    for (size_t i = 0; i < MOUNT_POINTS_WORKER_SLOT_COUNT; i++) {
+        // a quarantined worker is not capacity: its busy flag never clears while its call is wedged,
+        // and counting it would block every future refresh even with idle replacements available
+        if ((mount_points_worker_busy[i] && !mount_points_worker_retired[i]) || mount_points_worker_results[i])
             active++;
     }
 
@@ -1850,17 +2093,32 @@ static bool mount_points_contains(DICTIONARY *paths, const char *name)
     return true;
 }
 
+static bool uncertain_mount_point_active(const char *name, usec_t now_ut)
+{
+    if (!uncertainMountPoints)
+        return false;
+
+    usec_t *since = dictionary_get(uncertainMountPoints, name);
+    return since && *since && now_ut >= *since && now_ut - *since < UNCERTAIN_MOUNT_POINT_GRACE_UT;
+}
+
 static bool logical_disk_collected_this_cycle(const struct logical_disk *d, usec_t now_ut)
 {
     return d && d->last_collected == now_ut;
 }
 
-static bool logical_disk_should_evict(const struct logical_disk *d, const char *name, usec_t now_ut)
+static bool logical_disk_should_evict(
+    const struct logical_disk *d, const char *name, usec_t now_ut, bool logical_collected)
 {
     if (!d || d->last_collected >= now_ut)
         return false;
 
-    if (uncertainMountPoints && mount_points_contains(uncertainMountPoints, name))
+    // A Perflib-only chart has no trustworthy producer during a failed LogicalDisk pass. A
+    // mount-point chart remains independently governed by discovery and its Win32 space query.
+    if (!logical_collected && !d->mount_point_source)
+        return false;
+
+    if (uncertain_mount_point_active(name, now_ut))
         return false;
 
     if (mountPoints && mount_points_contains(mountPoints, name))
@@ -1894,10 +2152,13 @@ static bool do_mount_points(DICTIONARY *results, int update_every, usec_t now_ut
             continue;
 
         struct logical_disk *d = dictionary_get(logicalDisks, name);
-        if (logical_disk_collected_this_cycle(d, now_ut))
+        if (logical_disk_collected_this_cycle(d, now_ut)) {
+            d->mount_point_source = true;
             continue;
+        }
 
         d = dictionary_set(logicalDisks, name, NULL, sizeof(*d));
+        d->mount_point_source = true;
         d->space_failed_since = 0;
 
         logical_disk_apply_metadata(d, result, now_ut);
@@ -1913,14 +2174,14 @@ static bool do_mount_points(DICTIONARY *results, int update_every, usec_t now_ut
     return true;
 }
 
-// Evict entries absent from a reliable discovery boundary. Entries associated with a volume whose
-// individual query failed remain protected until that volume can be resolved again.
-static void logical_disk_evict_stale(usec_t now_ut)
+// Evict entries absent from a reliable discovery boundary. Perflib-only entries also require a
+// successful LogicalDisk pass; mount-point entries have an independent Win32 producer.
+static void logical_disk_evict_stale(usec_t now_ut, bool logical_collected)
 {
     struct logical_disk *d;
     dfe_start_write(logicalDisks, d)
     {
-        if (logical_disk_should_evict(d, d_dfe.name, now_ut))
+        if (logical_disk_should_evict(d, d_dfe.name, now_ut, logical_collected))
             dictionary_del(logicalDisks, d_dfe.name);
     }
     dfe_done(d);
@@ -2188,7 +2449,7 @@ static struct mount_points_scan_status mount_points_unittest_scan_csv_junction(
 {
     mount_points_unittest_csv_scans++;
     dictionary_set(paths, "C:\\ClusterStorage\\Volume2", NULL, 0);
-    dictionary_set(uncertain_paths, "C:\\ClusterStorage\\Volume1", NULL, 0);
+    uncertain_mount_point_add(uncertain_paths, "C:\\ClusterStorage\\Volume1", now_monotonic_usec());
     return (struct mount_points_scan_status){ .started = true, .complete = false, .eviction_safe = true };
 }
 
@@ -2303,7 +2564,8 @@ static int mount_points_unittest_run(void)
     mountPoints = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     deviceMountPaths = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     mountPointVolumeIds = dictionary_create(DICT_OPTION_SINGLE_THREADED);
-    uncertainMountPoints = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    uncertainMountPoints = dictionary_create_advanced(
+        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE, NULL, sizeof(usec_t));
     excludedDeviceNames = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     mountPointsRefreshedUT = 0;
     mountPointsPrimed = false;
@@ -2321,7 +2583,7 @@ static int mount_points_unittest_run(void)
     now_ut += MOUNT_POINTS_REFRESH_EVERY_UT;
     mount_points_refresh_with_ops(now_ut, &mount_points_unittest_ops_volumes_fail);
     errors += mount_points_unittest_expect(
-        "a failed volume scan must retain the uncertain previous entry", dictionary_entries(mountPoints) == 3);
+        "a failed volume scan must retain the uncertain previous entry", dictionary_entries(mountPoints) == 4);
     errors += mount_points_unittest_expect(
         "a failed volume scan must retain partial discoveries", mount_points_unittest_has(mountPoints, "E:"));
     errors += mount_points_unittest_expect(
@@ -2434,7 +2696,7 @@ static int mount_points_query_failure_unittest_run(void)
     errors += mount_points_unittest_expect("the first failure is retained", disk->space_failed_since == 2);
     errors += mount_points_unittest_expect(
         "a transient failure does not evict the volume",
-        !logical_disk_should_evict(disk, "C:\\ClusterStorage\\Volume1", 2));
+        !logical_disk_should_evict(disk, "C:\\ClusterStorage\\Volume1", 2, true));
 
     results = dictionary_create_advanced(
         DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
@@ -2454,7 +2716,7 @@ static int mount_points_query_failure_unittest_run(void)
     dictionary_destroy(results);
     errors += mount_points_unittest_expect(
         "a persistent failure becomes evictable",
-        logical_disk_should_evict(disk, "C:\\ClusterStorage\\Volume1", 2 + SPACE_FAILURE_GRACE_UT));
+        logical_disk_should_evict(disk, "C:\\ClusterStorage\\Volume1", 2 + SPACE_FAILURE_GRACE_UT, true));
 
     dictionary_destroy(mountPoints);
     dictionary_destroy(logicalDisks);
@@ -2826,10 +3088,11 @@ int do_PerflibStorage(int update_every, usec_t dt __maybe_unused)
 
     // A missing registry object is a transient collection failure; returning success keeps this
     // module enabled while the next cycle retries the query.
+    bool logical_collected = false;
     if (logical_id != PERFLIB_REGISTRY_NAME_NOT_FOUND) {
         PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(logical_id);
         if (pDataBlock)
-            do_logical_disk(pDataBlock, update_every, now_ut);
+            logical_collected = do_logical_disk(pDataBlock, update_every, now_ut);
     }
 
     volume_space_submit(volume_space_extra_targets, now_ut);
@@ -2841,7 +3104,7 @@ int do_PerflibStorage(int update_every, usec_t dt __maybe_unused)
     // Discovery, not the slow query batch, determines whether an instance disappeared. A blocked
     // volume query must not prevent cleanup of a path removed from the current mount snapshot.
     if (mountPointsEvictionSafe)
-        logical_disk_evict_stale(now_ut);
+        logical_disk_evict_stale(now_ut, logical_collected);
 
     if (physical_id != PERFLIB_REGISTRY_NAME_NOT_FOUND) {
         PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(physical_id);
@@ -2935,11 +3198,11 @@ void do_PerflibStorage_cleanup(void)
     netdata_cond_broadcast(&volume_space_cond);
     netdata_mutex_unlock(&volume_space_mutex);
 
-    for (size_t i = 0; i < VOLUME_SPACE_WORKER_COUNT; i++)
+    for (size_t i = 0; i < VOLUME_SPACE_WORKER_SLOT_COUNT; i++)
         if (volume_space_threads[i])
             nd_thread_signal_cancel(volume_space_threads[i]);
 
-    for (size_t i = 0; i < MOUNT_POINTS_WORKER_COUNT; i++)
+    for (size_t i = 0; i < MOUNT_POINTS_WORKER_SLOT_COUNT; i++)
         if (mount_points_threads[i])
             nd_thread_signal_cancel(mount_points_threads[i]);
 
@@ -2947,7 +3210,7 @@ void do_PerflibStorage_cleanup(void)
             volume_space_threads,
             volume_space_worker_handles,
             volume_space_worker_finished,
-            VOLUME_SPACE_WORKER_COUNT,
+            VOLUME_SPACE_WORKER_SLOT_COUNT,
             "volume-space"))
         return;
 
@@ -2955,7 +3218,7 @@ void do_PerflibStorage_cleanup(void)
             mount_points_threads,
             mount_points_worker_handles,
             mount_points_worker_finished,
-            MOUNT_POINTS_WORKER_COUNT,
+            MOUNT_POINTS_WORKER_SLOT_COUNT,
             "discovery"))
         return;
 
@@ -2966,7 +3229,9 @@ void do_PerflibStorage_cleanup(void)
     volume_space_results = NULL;
     dictionary_destroy(volume_space_inflight);
     volume_space_inflight = NULL;
-    for (size_t i = 0; i < MOUNT_POINTS_WORKER_COUNT; i++) {
+    dictionary_destroy(volume_space_latest_generation);
+    volume_space_latest_generation = NULL;
+    for (size_t i = 0; i < MOUNT_POINTS_WORKER_SLOT_COUNT; i++) {
         mount_points_snapshot_destroy(mount_points_worker_results[i]);
         mount_points_worker_results[i] = NULL;
     }
