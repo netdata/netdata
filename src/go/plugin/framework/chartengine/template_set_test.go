@@ -5,6 +5,7 @@ package chartengine
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/stretchr/testify/assert"
@@ -110,9 +111,105 @@ func TestTemplateSetIdentityAndLayout(t *testing.T) {
 	x, y := first.program.Charts()[0], reordered.program.Charts()[1]
 	assert.Equal(t, x.TemplateID, y.TemplateID)
 	assert.Equal(t, "g0.c0", x.LocalTemplateID)
-	assert.Equal(t, "g0.c0", x.RoutingOrder)
-	assert.Equal(t, "g1.c0", y.RoutingOrder)
-	assert.Equal(t, "g10.2.c1", templateRoutingOrder("g1.2.c1", 9))
+	assert.Equal(t, 0, x.RoutingRank)
+	assert.Equal(t, 1, y.RoutingRank)
+}
+
+func TestTemplateSetChartTemplateIDAt(t *testing.T) {
+	nested := nativeEntry("nested", "outer", "requests")
+	nested.Groups[0].Groups = []charttpl.Group{{
+		Family: "Inner",
+		Charts: []charttpl.Chart{{
+			ID:         "inner",
+			Title:      "Inner",
+			Context:    "inner",
+			Units:      "requests",
+			Dimensions: []charttpl.Dimension{{Selector: "requests", Name: "value"}},
+		}},
+	}}
+	native := testTemplateSet(t, nativeEntry("first", "first", "requests"), nested)
+	document, err := NewTemplateSetYAML([]byte(validTemplateYAML()))
+	require.NoError(t, err)
+	prepared, err := PrepareTemplateSet(native, WithEnginePolicy(EnginePolicy{
+		Autogen: &AutogenPolicy{
+			Enabled: true,
+		},
+	}))
+	require.NoError(t, err)
+
+	tests := map[string]struct {
+		set        *TemplateSet
+		entryID    string
+		groupPath  []int
+		chartIndex int
+		wantID     string
+		wantOK     bool
+	}{
+		"native first entry":   {set: native, entryID: "first", groupPath: []int{0}, wantID: "5:first/g0.c0", wantOK: true},
+		"native nested chart":  {set: native, entryID: "nested", groupPath: []int{0, 0}, wantID: "6:nested/g0.0.c0", wantOK: true},
+		"prepared native":      {set: prepared, entryID: "nested", groupPath: []int{0}, wantID: "6:nested/g0.c0", wantOK: true},
+		"document entry":       {set: document, entryID: document.Entries()[0].ID, groupPath: []int{0}, wantID: "g0.c0", wantOK: true},
+		"unknown entry":        {set: native, entryID: "missing", groupPath: []int{0}},
+		"document as native":   {set: native, entryID: document.Entries()[0].ID, groupPath: []int{0}},
+		"absent chart":         {set: native, entryID: "first", groupPath: []int{0}, chartIndex: 1},
+		"absent group":         {set: native, entryID: "first", groupPath: []int{1}},
+		"other entry's path":   {set: native, entryID: "first", groupPath: []int{0, 0}},
+		"negative chart index": {set: native, entryID: "first", groupPath: []int{0}, chartIndex: -1},
+		"empty group path":     {set: native, entryID: "first"},
+		"nil set":              {entryID: "first", groupPath: []int{0}},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			id, ok := tc.set.ChartTemplateIDAt(tc.entryID, tc.groupPath, tc.chartIndex)
+			assert.Equal(t, tc.wantOK, ok)
+			assert.Equal(t, tc.wantID, id)
+		})
+	}
+}
+
+func TestTemplateSetChartTemplateIDAtMatchesPlan(t *testing.T) {
+	e, err := New(WithRuntimeStore(nil))
+	require.NoError(t, err)
+	store := metrix.NewCollectorStore()
+	set := testTemplateSet(t, nativeEntry("idle", "idle", "inactive"), nativeEntry("profile", "requests", "requests"))
+	attempt := templateAttempt(t, e, store, set, map[string]float64{"requests": 1})
+	created := findCreateChartAction(attempt.Plan())
+	require.NotNil(t, created)
+	require.NoError(t, attempt.Commit())
+
+	id, ok := set.ChartTemplateIDAt("profile", []int{0}, 0)
+	require.True(t, ok)
+	assert.Equal(t, created.ChartTemplateID, id)
+}
+
+func TestTemplateSetFallbackContextNamespace(t *testing.T) {
+	native, err := NewTemplateSet(TemplateSetSpec{
+		FallbackContextNamespace: " prometheus.app ",
+	})
+	require.NoError(t, err)
+	document, err := NewTemplateSetYAML([]byte("context_namespace: mysql\n" + validTemplateYAML()))
+	require.NoError(t, err)
+	prepared, err := PrepareTemplateSet(native, WithEnginePolicy(EnginePolicy{
+		Autogen: &AutogenPolicy{
+			Enabled: true,
+		},
+	}))
+	require.NoError(t, err)
+
+	tests := map[string]struct {
+		set  *TemplateSet
+		want string
+	}{
+		"native":   {set: native, want: "prometheus.app"},
+		"prepared": {set: prepared, want: "prometheus.app"},
+		"document": {set: document, want: "mysql"},
+		"nil":      {},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, tc.set.FallbackContextNamespace())
+		})
+	}
 }
 
 func TestTemplateSetPolicyBinding(t *testing.T) {

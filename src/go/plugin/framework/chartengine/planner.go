@@ -208,6 +208,7 @@ type planBuildContext struct {
 	retired          map[string]*materializedChartState
 	journal          *planJournal
 	scan             planSeriesScan
+	collisions       chartIDCollisions
 
 	planRouteStats
 }
@@ -363,6 +364,7 @@ func (e *Engine) buildPlan(
 	sample.actionRemoveDimension = actionCounts.actionRemoveDimension
 	sample.actionRemoveChart = actionCounts.actionRemoveChart
 	sample.buildSuccess = true
+	e.warnChartIDCollisions(ctx)
 	e.state.hints.chartsByID = len(ctx.chartsByID)
 	e.state.hints.seenInfer = len(ctx.seenInfer)
 	e.state.hints.actions = len(out.Actions)
@@ -689,6 +691,9 @@ func (ctx *planBuildContext) accumulateRoute(
 		} else {
 			// Cross-template rendered-id collision.
 			// Existing owner keeps chart-id ownership.
+			if !route.Autogen {
+				ctx.collisions.add(route.ChartID, cs.templateID, route.ChartTemplateID)
+			}
 			if ctx.routeObserver != nil {
 				ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
 					Decision:                PlanRouteCollisionRejected,
@@ -717,6 +722,9 @@ func (ctx *planBuildContext) accumulateRoute(
 			} else {
 				// Cross-template rendered-id collision.
 				// Existing owner keeps chart-id ownership.
+				if !route.Autogen {
+					ctx.collisions.add(route.ChartID, ownerTemplateID, route.ChartTemplateID)
+				}
 				if ctx.routeObserver != nil {
 					ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
 						Decision:                PlanRouteCollisionRejected,
