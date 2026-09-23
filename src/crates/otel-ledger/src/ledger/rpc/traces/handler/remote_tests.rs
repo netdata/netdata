@@ -174,6 +174,26 @@ async fn a_failed_download_is_reported_and_leaves_search_inexact() {
 }
 
 #[tokio::test]
+async fn a_storage_error_costs_only_its_own_file() {
+    // File 1 downloads first and fails with a storage error, not as a missing
+    // object; file 2 is still downloaded and served.
+    let registries = make_registries();
+    let remote = TestRemote::new(64 * MIB);
+    remote
+        .refused(&registries, "default", test_identity(), 1, file_one())
+        .await;
+    remote
+        .evicted(&registries, "default", test_identity(), 2, file_two())
+        .await;
+    let h = handler(registries, &remote);
+
+    let v = call(&h, search_body(20)).await.unwrap();
+    assert_eq!(v["status"], json!({"partial": ["remote_unavailable"]}));
+    assert_eq!(traces_of(&v), ["0e", "0c"]);
+    assert_eq!(remote.cache.file_count(), 1, "file 2 was downloaded");
+}
+
+#[tokio::test]
 async fn an_unreadable_catalog_is_reported() {
     let (h, _remote, [one, _]) = evicted_setup(64 * MIB).await;
     std::fs::write(&one.catalog, b"not a catalog").unwrap();

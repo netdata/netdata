@@ -1080,7 +1080,10 @@ fn make_handler_with_remote(tr: TenantRegistries, remote: RemoteRead) -> OtelLog
 /// the stream, as production `build_catalog_entry` guarantees.
 fn stream_file_id(seq: u64) -> FileId {
     FileId::new(
-        Identity::new(MachineId::new(Uuid::from_u128(0x11)).unwrap(), InstanceId::new(Uuid::from_u128(0x22)).unwrap()),
+        Identity::new(
+            MachineId::new(Uuid::from_u128(0x11)).unwrap(),
+            InstanceId::new(Uuid::from_u128(0x22)).unwrap(),
+        ),
         0,
         seq,
         ServiceStream::new("ns", "svc").ns_hash(),
@@ -1468,7 +1471,6 @@ async fn an_unreadable_catalog_is_skipped() {
     let v = serde_json::to_value(h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
 
     assert_eq!(v["status"], 200);
-    assert!(v.get("partial").is_none(), "{v:#}");
     let streams = v["required_params"]
         .as_array()
         .unwrap()

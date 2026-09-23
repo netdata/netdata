@@ -325,12 +325,45 @@ impl TestRemote {
         seq: u64,
         reqs: Vec<ExportTraceServiceRequest>,
     ) -> Evicted {
+        self.catalog(registries, tenant, identity, seq, reqs, true)
+            .await
+    }
+
+    /// Like [`evicted`](Self::evicted), but cataloged under a directory-style
+    /// key: the storage client refuses to read it at once, with a storage
+    /// error rather than as a missing object.
+    pub(crate) async fn refused(
+        &self,
+        registries: &Arc<RwLock<TenantRegistries>>,
+        tenant: &str,
+        identity: file_registry::Identity,
+        seq: u64,
+        reqs: Vec<ExportTraceServiceRequest>,
+    ) -> Evicted {
+        self.catalog(registries, tenant, identity, seq, reqs, false)
+            .await
+    }
+
+    async fn catalog(
+        &self,
+        registries: &Arc<RwLock<TenantRegistries>>,
+        tenant: &str,
+        identity: file_registry::Identity,
+        seq: u64,
+        reqs: Vec<ExportTraceServiceRequest>,
+        readable: bool,
+    ) -> Evicted {
         let (summary, bytes) = sealed_traces(reqs);
         let id = FileId::new(identity, 1, seq, 7);
-        let remote_key = format!("traces/{}", id.to_filename("sfst"));
-        let object = self.objects.join(&remote_key);
-        std::fs::create_dir_all(object.parent().unwrap()).unwrap();
-        std::fs::write(&object, &bytes).unwrap();
+        let remote_key = if readable {
+            let key = format!("traces/{}", id.to_filename("sfst"));
+            let object = self.objects.join(&key);
+            std::fs::create_dir_all(object.parent().unwrap()).unwrap();
+            std::fs::write(&object, &bytes).unwrap();
+            key
+        } else {
+            format!("traces/{}/", id.to_filename("sfst"))
+        };
         let entry = otel_catalog::CatalogEntry {
             id,
             remote_key,
