@@ -505,7 +505,12 @@ func TestRuntimeStartupFailureUsesEveryActivationPath(t *testing.T) {
 			require.NoError(t, err, "startup failure must remain an operational result on every path")
 			_, _, current = applied.Ownership()
 			require.Nil(t, current)
-			if path == "enable" || path == "restart" || path == "update" {
+			// The incumbent is already stopped when startup fails: enable and
+			// update are adopted as Failed; restart reports the failure.
+			switch path {
+			case "enable", "update":
+				require.Equal(t, 202, applied.ResultStatus())
+			case "restart":
 				require.Equal(t, 503, applied.ResultStatus())
 			}
 			if secretState != nil {

@@ -440,7 +440,8 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 	if err := validateGraphResourcePair(record, exists, current, scope); err != nil {
 		return nil, err
 	}
-	result := mustDynCfgMessage(204, "")
+	result := noResponseResult()
+	reply := internalReply()
 	if !dcjc.scheduler.accepted.isCurrent(scope.ID, attempt.token) ||
 		!exists || record.Status != dyncfg.StatusAccepted.String() {
 		return dcjc.noop(scope, current, permit, result)
@@ -470,7 +471,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 		postimage:      failedPostimage,
 		failedCleanup:  dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
 		removedCleanup: dcjc.configDeleteCleanup(dcjc.externalID(scope.ID)),
-		result:         func(*autoDetectionFailure) lifecycle.SealedResult { return result },
+		reply:          internalFailureReply,
 		afterApply: composeProbeFailureAfterApply(
 			dcjc.scheduleRetryAfterApply(config),
 			attempt.markApplied(),
@@ -495,13 +496,12 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 		successor,
 		lifecycle.ResourceTransactionInstalled,
 		&runningPostimage,
-		result,
+		reply,
 		dcjc.configStatusCleanup(scope.ID, dyncfg.StatusRunning),
 		autoDetectionRetryToken{},
 		attempt.markApplied(),
 		activationFallbackPlan{
 			postimage: &failedPostimage,
-			result:    result,
 			cleanup:   dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
 			afterApply: composeAfterApply(
 				func() { dcjc.scheduleAutoDetectionRetry(config, busyFailure) },
@@ -510,7 +510,6 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 		},
 		activationFallbackPlan{
 			postimage:  &failedPostimage,
-			result:     result,
 			cleanup:    dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
 			afterApply: attempt.markApplied(),
 		},
@@ -529,7 +528,8 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 	if err == nil {
 		return nil, errors.New("job output: accepted activation has no candidate outcome")
 	}
-	result := mustDynCfgMessage(204, "")
+	result := noResponseResult()
+	reply := internalReply()
 	if errors.Is(err, jobmgr.ErrProcessAttemptRetired) ||
 		errors.Is(err, jobmgr.ErrProcessAttemptStopped) ||
 		errors.Is(err, context.Canceled) {
@@ -550,7 +550,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 			permit,
 			resourceRemovalDisposition(current),
 			&failedPostimage,
-			result,
+			reply,
 			dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
 			autoDetectionRetryToken{},
 			attempt.markApplied(),
@@ -566,7 +566,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 			permit,
 			resourceRemovalDisposition(current),
 			&failedPostimage,
-			result,
+			reply,
 			dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
 			autoDetectionRetryToken{},
 			composeAfterApply(func() { dcjc.scheduleAutoDetectionRetry(config, failure) }, attempt.markApplied()),

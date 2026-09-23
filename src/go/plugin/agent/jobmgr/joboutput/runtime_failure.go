@@ -52,7 +52,7 @@ func (dcjc *DynCfgJobController) planRuntimeFailure(identity lifecycle.ResourceI
 		Transaction: &jobmgr.ResourceTransactionPlan{
 			ID: identity.ID,
 			Prepare: func(_ context.Context, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {
-				result := mustDynCfgMessage(204, "")
+				result := noResponseResult()
 				if current == nil || scope.Current != identity {
 					return dcjc.noop(scope, current, permit, result)
 				}
@@ -65,7 +65,7 @@ func (dcjc *DynCfgJobController) planRuntimeFailure(identity lifecycle.ResourceI
 				diagnostic.Reason = failure.Reason()
 				return dcjc.prepareMutationWithRetryAfterApply(
 					scope, current, nil, permit, lifecycle.ResourceTransactionRemoved,
-					&postimage, result, dcjc.configStatusCleanup(identity.ID, dyncfg.StatusFailed),
+					&postimage, internalReply(), dcjc.configStatusCleanup(identity.ID, dyncfg.StatusFailed),
 					autoDetectionRetryToken{}, nil, diagnostic,
 				)
 			},

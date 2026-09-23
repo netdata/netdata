@@ -37,19 +37,6 @@ func (adf *autoDetectionFailure) keepsFailedStockListed() bool {
 	return adf.class != collectorapi.LifecycleErrorUnclassified
 }
 
-// legacyReplyCode is the DynCfg code a classified or runtime failure answered
-// with before the reply was derived from the command outcome.
-func (adf *autoDetectionFailure) legacyReplyCode() (int, bool) {
-	switch {
-	case adf.class == collectorapi.LifecycleErrorPermanent:
-		return 422, true
-	case adf.class == collectorapi.LifecycleErrorTemporary, adf.runtime:
-		return 503, true
-	default:
-		return 0, false
-	}
-}
-
 func (adf *autoDetectionFailure) Error() string {
 	return adf.cause.Error()
 }

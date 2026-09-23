@@ -154,7 +154,8 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 	if err := validateGraphResourcePair(record, exists, current, scope); err != nil {
 		return nil, err
 	}
-	result := mustDynCfgMessage(204, "")
+	result := noResponseResult()
+	reply := internalReply()
 	if change.pending.version != 0 &&
 		(!dcjc.scheduler.pending.isCurrent(scope.ID, change.pending) ||
 			change.pending.uid != change.Config.UID()) {
@@ -227,7 +228,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			lifecycle.LongLivedPermit{},
 			resourceRemovalDisposition(current),
 			nil,
-			result,
+			reply,
 			dcjc.configDeleteCleanup(dcjc.configID(change.Config.Module(), change.Config.Name())),
 			change.retry,
 			dcjc.pendingDesiredSettlement(change.Config, change.pending),
@@ -270,7 +271,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			lifecycle.LongLivedPermit{},
 			resourceRemovalDisposition(current),
 			&postimage,
-			result,
+			reply,
 			cleanup,
 			change.retry,
 			dcjc.pendingDesiredSettlement(change.Config, change.pending),
@@ -325,7 +326,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 				permit,
 				resourceRemovalDisposition(current),
 				&failedPostimage,
-				result,
+				reply,
 				dcjc.configCreateCleanup(
 					failedPostimage,
 					change.Config.SourceType(),
@@ -367,7 +368,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 				permit,
 				resourceRemovalDisposition(current),
 				&failedPostimage,
-				result,
+				reply,
 				dcjc.configCreateCleanup(
 					failedPostimage,
 					change.Config.SourceType(),
@@ -396,7 +397,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 				permit,
 				resourceRemovalDisposition(current),
 				&failedPostimage,
-				result,
+				reply,
 				dcjc.configCreateCleanup(
 					failedPostimage,
 					change.Config.SourceType(),
@@ -429,9 +430,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		removedCleanup: dcjc.configDeleteCleanup(
 			dcjc.configID(change.Config.Module(), change.Config.Name()),
 		),
-		result: func(*autoDetectionFailure) lifecycle.SealedResult {
-			return result
-		},
+		reply: internalFailureReply,
 		afterApply: func(failure *autoDetectionFailure) {
 			dcjc.scheduleAutoDetectionRetry(change.Config, failure)
 			if pendingSettlement != nil {
@@ -462,13 +461,12 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		successor,
 		resourceInstallationDisposition(current),
 		&postimage,
-		result,
+		reply,
 		cleanup,
 		change.retry,
 		dcjc.pendingDesiredSettlement(change.Config, change.pending),
 		activationFallbackPlan{
 			postimage: &failedPostimage,
-			result:    result,
 			cleanup:   failedCleanup,
 			afterApply: composeAfterApply(
 				settlement,
@@ -481,7 +479,6 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		},
 		activationFallbackPlan{
 			postimage:  &failedPostimage,
-			result:     result,
 			cleanup:    failedCleanup,
 			afterApply: settlement,
 		},

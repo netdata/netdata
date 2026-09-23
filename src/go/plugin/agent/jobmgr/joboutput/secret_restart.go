@@ -126,7 +126,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStop(id string) (jobmgr.Work
 				}
 				record, exists := dcjc.graph.Lookup(id)
 				if !exists || record.Status != dyncfg.StatusRunning.String() {
-					return dcjc.noop(scope, current, lifecycle.LongLivedPermit{}, mustDynCfgMessage(204, ""))
+					return dcjc.noop(scope, current, lifecycle.LongLivedPermit{}, noResponseResult())
 				}
 				if current == nil || !scope.Current.Valid() {
 					return nil, errors.New("job output: running dependent has no current resource")
@@ -139,7 +139,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStop(id string) (jobmgr.Work
 					lifecycle.LongLivedPermit{},
 					lifecycle.ResourceTransactionRemoved,
 					&postimage,
-					mustDynCfgMessage(204, ""),
+					internalReply(),
 					dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
 					autoDetectionRetryToken{},
 					state.markStopped,
@@ -204,7 +204,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 				}
 				record, exists := dcjc.graph.Lookup(id)
 				if !exists {
-					return dcjc.noop(scope, nil, permit, mustDynCfgMessage(204, ""))
+					return dcjc.noop(scope, nil, permit, noResponseResult())
 				}
 				cloned, cloneErr := graphRecordConfig(record)
 				if cloneErr != nil {
@@ -240,7 +240,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 						permit,
 						lifecycle.ResourceTransactionUnchanged,
 						&postimage,
-						mustDynCfgMessage(204, ""),
+						internalReply(),
 						dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
 						autoDetectionRetryToken{},
 						composeAfterApply(
@@ -258,9 +258,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 					postimage:      failedPostimage,
 					failedCleanup:  dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
 					removedCleanup: dcjc.configDeleteCleanup(dcjc.externalID(id)),
-					result: func(*autoDetectionFailure) lifecycle.SealedResult {
-						return mustDynCfgMessage(204, "")
-					},
+					reply:          internalFailureReply,
 					afterApply: func(failure *autoDetectionFailure) {
 						state.setError(failure.cause)
 						dcjc.scheduleAutoDetectionRetry(cloned, failure)
@@ -283,13 +281,12 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 					successor,
 					lifecycle.ResourceTransactionInstalled,
 					&postimage,
-					mustDynCfgMessage(204, ""),
+					internalReply(),
 					dcjc.configStatusCleanup(id, dyncfg.StatusRunning),
 					autoDetectionRetryToken{},
 					nil,
 					activationFallbackPlan{
 						postimage: &failedPostimage,
-						result:    mustDynCfgMessage(204, ""),
 						cleanup:   dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
 						afterApply: composeAfterApply(
 							func() {
@@ -300,7 +297,6 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 					},
 					activationFallbackPlan{
 						postimage: &failedPostimage,
-						result:    mustDynCfgMessage(204, ""),
 						cleanup:   dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
 						afterApply: func() {
 							state.setError(jobmgr.ErrProcessAttemptQuarantined)

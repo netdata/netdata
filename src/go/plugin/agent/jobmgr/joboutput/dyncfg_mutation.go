@@ -5,7 +5,6 @@ package joboutput
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -21,7 +20,7 @@ func (dcjc *DynCfgJobController) prepareMutation(
 	unusedPermit lifecycle.LongLivedPermit,
 	disposition lifecycle.ResourceTransactionDisposition,
 	postimage *dyncfg.GraphConfig,
-	result lifecycle.SealedResult,
+	reply jobReply,
 	cleanup lifecycle.TaskCleanup,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	return dcjc.prepareMutationWithRetry(
@@ -31,7 +30,7 @@ func (dcjc *DynCfgJobController) prepareMutation(
 		unusedPermit,
 		disposition,
 		postimage,
-		result,
+		reply,
 		cleanup,
 		autoDetectionRetryToken{},
 	)
@@ -44,7 +43,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetry(
 	unusedPermit lifecycle.LongLivedPermit,
 	disposition lifecycle.ResourceTransactionDisposition,
 	postimage *dyncfg.GraphConfig,
-	result lifecycle.SealedResult,
+	reply jobReply,
 	cleanup lifecycle.TaskCleanup,
 	retry autoDetectionRetryToken,
 ) (lifecycle.PreparedResourceTransaction, error) {
@@ -55,7 +54,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetry(
 		unusedPermit,
 		disposition,
 		postimage,
-		result,
+		reply,
 		cleanup,
 		retry,
 		nil,
@@ -69,7 +68,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApply(
 	unusedPermit lifecycle.LongLivedPermit,
 	disposition lifecycle.ResourceTransactionDisposition,
 	postimage *dyncfg.GraphConfig,
-	result lifecycle.SealedResult,
+	reply jobReply,
 	cleanup lifecycle.TaskCleanup,
 	retry autoDetectionRetryToken,
 	afterApply func(),
@@ -87,7 +86,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApply(
 		unusedPermit,
 		disposition,
 		postimage,
-		result,
+		reply,
 		cleanup,
 		retry,
 		afterApply,
@@ -105,7 +104,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 	unusedPermit lifecycle.LongLivedPermit,
 	disposition lifecycle.ResourceTransactionDisposition,
 	postimage *dyncfg.GraphConfig,
-	result lifecycle.SealedResult,
+	reply jobReply,
 	cleanup lifecycle.TaskCleanup,
 	retry autoDetectionRetryToken,
 	afterApply func(),
@@ -152,16 +151,17 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 					ActivationStartupFallback:     startupFallback,
 					ActivationBusyFallback:        busyFallback,
 					ActivationQuarantinedFallback: quarantinedFallback,
-					Result:                        result,
 					Cleanup:                       cleanup,
+					reply:                         &reply,
 				},
 			)
 		}
+		// The graph already holds the adopted postimage.
 		return dcjc.noopWithAfterApply(
 			scope,
 			current,
 			unusedPermit,
-			result,
+			reply.seal(transactionOutcome{}),
 			afterApply,
 			cleanup,
 		)
@@ -187,8 +187,8 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 			ActivationStartupFallback:     startupFallback,
 			ActivationBusyFallback:        busyFallback,
 			ActivationQuarantinedFallback: quarantinedFallback,
-			Result:                        result,
 			Cleanup:                       cleanup,
+			reply:                         &reply,
 		},
 	)
 }
@@ -196,7 +196,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 func (dcjc *DynCfgJobController) newActivationFallback(
 	id string,
 	postimage *dyncfg.GraphConfig,
-	result lifecycle.SealedResult,
+	replyFailure jobFailure,
 	cleanup lifecycle.TaskCleanup,
 	afterApply func(),
 	jobConfigSnapshot collectorapi.JobConfigLifecycleSnapshot,
@@ -237,14 +237,14 @@ func (dcjc *DynCfgJobController) newActivationFallback(
 		},
 		AfterGraphReconcile: dependencyCommit,
 		AfterApply:          afterApply,
-		Result:              result,
 		Cleanup:             cleanup,
+		failure:             replyFailure,
 	}, nil
 }
 
 type activationFallbackPlan struct {
 	postimage  *dyncfg.GraphConfig
-	result     lifecycle.SealedResult
+	failure    jobFailure // why the adopted change ends Failed; unused for internal work
 	cleanup    lifecycle.TaskCleanup
 	afterApply func()
 }
@@ -255,7 +255,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 	successor lifecycle.PreparedResource,
 	disposition lifecycle.ResourceTransactionDisposition,
 	postimage *dyncfg.GraphConfig,
-	result lifecycle.SealedResult,
+	reply jobReply,
 	cleanup lifecycle.TaskCleanup,
 	retry autoDetectionRetryToken,
 	afterApply func(),
@@ -267,7 +267,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 	busyFallback, err := dcjc.newActivationFallback(
 		scope.ID,
 		busy.postimage,
-		busy.result,
+		busy.failure,
 		busy.cleanup,
 		busy.afterApply,
 		jobConfig.snapshot,
@@ -279,7 +279,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 	quarantinedFallback, err := dcjc.newActivationFallback(
 		scope.ID,
 		quarantined.postimage,
-		quarantined.result,
+		quarantined.failure,
 		quarantined.cleanup,
 		quarantined.afterApply,
 		jobConfig.snapshot,
@@ -295,7 +295,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 		lifecycle.LongLivedPermit{},
 		disposition,
 		postimage,
-		result,
+		reply,
 		cleanup,
 		retry,
 		afterApply,
@@ -310,15 +310,11 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 			failure := typed.failure
 			postimage := &startup.postimage
 			cleanup := startup.failedCleanup
-			result := lifecycle.SealedResult{}
-			if startup.result != nil {
-				result = startup.result(failure)
-			}
 			afterApply := dcjc.retrySettlement(scope.ID, retry)
 			if startup.afterApply != nil {
 				afterApply = composeAfterApply(afterApply, func() { startup.afterApply(failure) })
 			}
-			return dcjc.newActivationFallback(scope.ID, postimage, result, cleanup, afterApply,
+			return dcjc.newActivationFallback(scope.ID, postimage, startup.reply(failure).failure, cleanup, afterApply,
 				failure.jobConfigLifecycle, failure.diagnosticFailure)
 		},
 	)
@@ -368,7 +364,7 @@ func (dcjc *DynCfgJobController) prepareTransientConstructionFailure(
 	current lifecycle.ReadyResource,
 	permit lifecycle.LongLivedPermit,
 	postimage dyncfg.GraphConfig,
-	result lifecycle.SealedResult,
+	reply jobReply,
 	cleanup lifecycle.TaskCleanup,
 	retry autoDetectionRetryToken,
 	config confgroup.Config,
@@ -382,7 +378,7 @@ func (dcjc *DynCfgJobController) prepareTransientConstructionFailure(
 		permit,
 		resourceRemovalDisposition(current),
 		&postimage,
-		result,
+		reply,
 		cleanup,
 		retry,
 		func() {
@@ -406,14 +402,12 @@ func (dcjc *DynCfgJobController) prepareProbeFailure(
 	removed := plan.removePlainStock && !failure.keepsFailedStockListed()
 	var postimage *dyncfg.GraphConfig
 	cleanup := plan.failedCleanup
+	reply := plan.reply(failure)
 	if removed {
 		cleanup = plan.removedCleanup
+		reply.status = ""
 	} else {
 		postimage = &plan.postimage
-	}
-	result := lifecycle.SealedResult{}
-	if plan.result != nil {
-		result = plan.result(failure)
 	}
 	var afterApply func()
 	if plan.afterApply != nil {
@@ -428,7 +422,7 @@ func (dcjc *DynCfgJobController) prepareProbeFailure(
 		permit,
 		resourceRemovalDisposition(current),
 		postimage,
-		result,
+		reply,
 		cleanup,
 		retry,
 		afterApply,
@@ -446,28 +440,17 @@ func (dcjc *DynCfgJobController) prepareProbeFailure(
 // probeFailurePlan supplies failure handling for preparation and runtime startup.
 // Plain-stock removal applies only to preparation failures.
 type probeFailurePlan struct {
-	postimage        dyncfg.GraphConfig                                 // graph postimage to commit as StatusFailed
-	failedCleanup    lifecycle.TaskCleanup                              // protocol cleanup for the failed status
-	removedCleanup   lifecycle.TaskCleanup                              // preparation only: cleanup when a plain stock job is removed
-	result           func(*autoDetectionFailure) lifecycle.SealedResult // builds the dyncfg response from the failure
-	afterApply       func(*autoDetectionFailure)                        // side effect (retry scheduling) after apply
-	removePlainStock bool                                               // preparation only: remove a stock job on a non-coded failure
+	postimage        dyncfg.GraphConfig                   // graph postimage to commit as StatusFailed
+	failedCleanup    lifecycle.TaskCleanup                // protocol cleanup for the failed status
+	removedCleanup   lifecycle.TaskCleanup                // preparation only: cleanup when a plain stock job is removed
+	reply            func(*autoDetectionFailure) jobReply // reply intent of the adopted failure
+	afterApply       func(*autoDetectionFailure)          // side effect (retry scheduling) after apply
+	removePlainStock bool                                 // preparation only: remove a stock job on an unclassified failure
 }
 
-// autoDetectionFailureResultFunc builds a probeFailurePlan.result closure
-// with a fixed default code and message; a classified or runtime failure
-// overrides the default code.
-func autoDetectionFailureResultFunc(
-	defaultCode int,
-	message string,
-) func(*autoDetectionFailure) lifecycle.SealedResult {
-	return func(failure *autoDetectionFailure) lifecycle.SealedResult {
-		code := defaultCode
-		if legacy, ok := failure.legacyReplyCode(); ok {
-			code = legacy
-		}
-		return mustDynCfgMessage(code, fmt.Sprintf(message, failure.cause))
-	}
+// internalFailureReply is the probeFailurePlan.reply of response-free work.
+func internalFailureReply(*autoDetectionFailure) jobReply {
+	return internalReply()
 }
 
 // scheduleRetryAfterApply adapts scheduleAutoDetectionRetry into a

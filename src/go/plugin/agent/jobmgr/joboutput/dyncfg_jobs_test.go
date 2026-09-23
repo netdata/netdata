@@ -571,6 +571,7 @@ func TestManualDynCfgAutoDetectionFailureResponseContracts(t *testing.T) {
 		status          dyncfg.Status
 		collectorV2     bool
 		checkErr        error
+		retry           int
 		current         bool
 		payload         []byte
 		wantCode        int
@@ -578,47 +579,70 @@ func TestManualDynCfgAutoDetectionFailureResponseContracts(t *testing.T) {
 		wantDisposition lifecycle.ResourceTransactionDisposition
 		wantMessage     string
 	}{
-		"v2 enable ordinary failure preserves legacy success response": {
+		"v2 enable unclassified failure without retry is rejected": {
 			command:         dyncfg.CommandEnable,
 			status:          dyncfg.StatusDisabled,
 			collectorV2:     true,
 			checkErr:        errors.New("check failed"),
-			wantCode:        200,
+			wantCode:        422,
 			wantCleanup:     1,
 			wantDisposition: lifecycle.ResourceTransactionUnchanged,
 			wantMessage:     "job enable failed: check failed",
 		},
-		"v2 enable permanent error reports its code": {
+		"v2 enable unclassified failure with retry is adopted as failed": {
+			command:         dyncfg.CommandEnable,
+			status:          dyncfg.StatusDisabled,
+			collectorV2:     true,
+			checkErr:        errors.New("check failed"),
+			retry:           1,
+			wantCode:        202,
+			wantCleanup:     1,
+			wantDisposition: lifecycle.ResourceTransactionUnchanged,
+			wantMessage:     "job enable failed: check failed",
+		},
+		"v2 enable permanent error is rejected despite retry": {
 			command:         dyncfg.CommandEnable,
 			status:          dyncfg.StatusDisabled,
 			collectorV2:     true,
 			checkErr:        collectorapi.PermanentError(errors.New("unknown profile")),
+			retry:           1,
 			wantCode:        422,
 			wantCleanup:     1,
 			wantDisposition: lifecycle.ResourceTransactionUnchanged,
 			wantMessage:     "job enable failed: unknown profile",
 		},
-		"enable ordinary failure preserves legacy success response": {
+		"enable unclassified failure without retry is rejected": {
 			command:         dyncfg.CommandEnable,
 			status:          dyncfg.StatusDisabled,
 			checkErr:        errors.New("check failed"),
-			wantCode:        200,
+			wantCode:        422,
 			wantCleanup:     1,
 			wantDisposition: lifecycle.ResourceTransactionUnchanged,
 			wantMessage:     "job enable failed: check failed",
 		},
-		"update ordinary failure preserves legacy success response": {
+		"update unclassified failure without retry keeps the running job": {
 			command:         dyncfg.CommandUpdate,
 			status:          dyncfg.StatusRunning,
 			checkErr:        errors.New("check failed"),
 			current:         true,
 			payload:         []byte(`{"option":"replacement"}`),
-			wantCode:        200,
+			wantCode:        422,
+			wantCleanup:     1,
+			wantDisposition: lifecycle.ResourceTransactionUnchanged,
+			wantMessage:     "config update failed: check failed",
+		},
+		"update unclassified failure with retry is adopted as failed": {
+			command:         dyncfg.CommandUpdate,
+			status:          dyncfg.StatusRunning,
+			checkErr:        errors.New("check failed"),
+			current:         true,
+			payload:         []byte(`{"option":"replacement","autodetection_retry":1}`),
+			wantCode:        202,
 			wantCleanup:     1,
 			wantDisposition: lifecycle.ResourceTransactionRemoved,
 			wantMessage:     "config update failed: check failed",
 		},
-		"restart ordinary failure remains unprocessable": {
+		"restart of a failed job without retry is rejected": {
 			command:         dyncfg.CommandRestart,
 			status:          dyncfg.StatusFailed,
 			checkErr:        errors.New("check failed"),
@@ -642,6 +666,9 @@ func TestManualDynCfgAutoDetectionFailureResponseContracts(t *testing.T) {
 			}
 
 			config := factoryTestConfig(false)
+			if test.retry > 0 {
+				config.Set("autodetection_retry", test.retry)
+			}
 			config.SetSourceType(confgroup.TypeDyncfg)
 			config.SetSource("user=test")
 			config.SetProvider(confgroup.TypeDyncfg)
@@ -710,7 +737,13 @@ func TestManualDynCfgAutoDetectionFailureResponseContracts(t *testing.T) {
 			uid := strings.ReplaceAll(name, " ", "-")
 			disposition, active := applyAndEncodeDynCfgJobTestTask(t, supervisor, plan, scope, uid)
 			require.Equal(t, test.wantDisposition, disposition)
-			require.Nil(t, active)
+			if test.current && disposition == lifecycle.ResourceTransactionUnchanged {
+				// A rejected command keeps the running job untouched.
+				require.Same(t, current, active)
+				require.Empty(t, events)
+			} else {
+				require.Nil(t, active)
+			}
 
 			wire := output.String()
 			require.Contains(t, wire, fmt.Sprintf("FUNCTION_RESULT_BEGIN %s %d application/json", uid, test.wantCode))
@@ -741,7 +774,7 @@ func requireDynCfgJobTemplateParents(t *testing.T, wire string) {
 	}
 }
 
-func TestDynCfgCommandsCommitFailedForQuarantinedCandidateIdentity(t *testing.T) {
+func TestDynCfgCommandsRejectQuarantinedCandidateIdentity(t *testing.T) {
 	type prepareCommand func(
 		context.Context,
 		*DynCfgJobController,
@@ -859,9 +892,12 @@ func TestDynCfgCommandsCommitFailedForQuarantinedCandidateIdentity(t *testing.T)
 			require.Nil(t, current)
 			require.Equal(t, 503, applied.ResultStatus())
 
-			record, exists = graph.Lookup(config.FullName())
+			after, exists := graph.Lookup(config.FullName())
 			require.True(t, exists)
-			require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+			// Quarantine is found before the incumbent is touched: the command
+			// is rejected and the record keeps its status and payload.
+			require.Equal(t, record.Status, after.Status)
+			require.Equal(t, record.Payload(), after.Payload())
 			require.EqualValues(t, lifecycle.LongLivedCensus{}, permitTasks.LongLivedCensus())
 			attempts, ok := controller.factory.config.Attempts.(*containment.Authority)
 			require.True(t, ok)
@@ -1184,12 +1220,14 @@ func TestV2CheckErrorClassificationControlsAutoDetectionRetry(t *testing.T) {
 	}
 }
 
-func TestV2DynCfgTestCommandReportsClassifiedCheckErrorsAsUnprocessable(t *testing.T) {
+func TestV2DynCfgTestCommandReportsCheckErrorClasses(t *testing.T) {
 	tests := map[string]struct {
 		checkErr error
+		wantCode int
 	}{
-		"permanent error": {checkErr: collectorapi.PermanentError(errors.New("unknown profile"))},
-		"temporary error": {checkErr: collectorapi.TemporaryError(errors.New("dependency not ready"))},
+		"permanent error": {checkErr: collectorapi.PermanentError(errors.New("unknown profile")), wantCode: 422},
+		"temporary error": {checkErr: collectorapi.TemporaryError(errors.New("dependency not ready")), wantCode: 503},
+		"unclassified":    {checkErr: errors.New("endpoint unreachable"), wantCode: 422},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -1204,7 +1242,7 @@ func TestV2DynCfgTestCommandReportsClassifiedCheckErrorsAsUnprocessable(t *testi
 				HasPayload:   true,
 			})
 			require.NoError(t, err)
-			require.Equal(t, mustDynCfgMessage(422, "job output: collector check: "+test.checkErr.Error()), result)
+			require.Equal(t, mustDynCfgMessage(test.wantCode, "job output: collector check: "+test.checkErr.Error()), result)
 		})
 	}
 }
@@ -1601,7 +1639,7 @@ func TestRunningUpdateRejectsStaleStoreCandidateAndPreservesIncumbent(t *testing
 	require.EqualValues(t, 1, state.collectorCleanup)
 }
 
-func TestRunningUpdateCommitsFailedWhenInstalledRuntimeRemainsBusy(t *testing.T) {
+func TestRunningUpdateAdoptsFailedWhenInstalledRuntimeRemainsBusy(t *testing.T) {
 	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
 	delegate := controller.factory.config.Attempts.(*containment.Authority)
 	controller.factory.config.Attempts = runtimeBusyTestAuthority{
@@ -1670,7 +1708,8 @@ func TestRunningUpdateCommitsFailedWhenInstalledRuntimeRemainsBusy(t *testing.T)
 	_, disposition, active := applied.Ownership()
 	require.Equal(t, lifecycle.ResourceTransactionRemoved, disposition)
 	require.Nil(t, active)
-	require.Equal(t, 503, applied.ResultStatus())
+	// The incumbent is already stopped, so the update is adopted as Failed.
+	require.Equal(t, 202, applied.ResultStatus())
 	record, exists = graph.Lookup(config.FullName())
 	require.True(t, exists)
 	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
@@ -1965,7 +2004,7 @@ func TestPrepareMutationLeavesUnusedPermitForTaskSupervisor(t *testing.T) {
 			Module: "module",
 			Name:   "job",
 		},
-		mustDynCfgMessage(200, ""),
+		internalReply(),
 		func() error { return nil },
 	)
 	require.Nil(t, transaction)
@@ -2000,7 +2039,7 @@ func TestPrepareMutationRollsBackAfterTransactionValidationFailure(t *testing.T)
 			Module: "module",
 			Name:   "job",
 		},
-		mustDynCfgMessage(200, ""),
+		internalReply(),
 		func() error { return nil },
 	)
 	require.Nil(t, transaction)
@@ -2218,7 +2257,7 @@ func TestFailedAutoDetectionPublishesConfigLifecycleOnlyAfterGraphCommit(t *test
 		lifecycle.LongLivedPermit{},
 		lifecycle.ResourceTransactionUnchanged,
 		nil,
-		mustDynCfgMessage(200, ""),
+		internalReply(),
 		func() error { return nil },
 	)
 	require.NoError(t, err)

@@ -316,10 +316,7 @@ func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
 	}
 	_, admitted, err := start()
 	if errors.Is(err, jobmgr.ErrProcessAttemptBusy) {
-		// Resource apply deliberately excludes task cancellation so it cannot
-		// abandon an atomic graph transition. Until a successor exists, the
-		// candidate attempt is the process-owned stop signal for supersession.
-		err = attempts.SupersedeProcessAttempt(candidateCtx, runtimeIdentity)
+		err = supersedeWithinRequest(ctx, candidateCtx, attempts, runtimeIdentity)
 		if err == nil {
 			_, admitted, err = start()
 		}
@@ -347,6 +344,30 @@ func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
 	}
 	sjo.mu.Unlock()
 	return errors.Join(structuralErr, retirementErr)
+}
+
+// supersedeWithinRequest waits for the previous runtime to release. Resource
+// apply deliberately excludes task cancellation so it cannot abandon an atomic
+// graph transition; until a successor exists, the candidate attempt is the
+// process-owned stop signal. A request deadline also bounds the wait, so the
+// busy fallback answers while the caller still waits for the reply.
+func supersedeWithinRequest(
+	ctx context.Context,
+	candidateCtx context.Context,
+	attempts jobmgr.ProcessAttemptAuthority,
+	identity jobmgr.ProcessAttemptIdentity,
+) error {
+	deadline, ok := lifecycle.ApplyDeadline(ctx)
+	if !ok {
+		return attempts.SupersedeProcessAttempt(candidateCtx, identity)
+	}
+	bounded, cancel := context.WithDeadline(candidateCtx, deadline)
+	defer cancel()
+	err := attempts.SupersedeProcessAttempt(bounded, identity)
+	if err != nil && context.Cause(candidateCtx) == nil && errors.Is(err, context.DeadlineExceeded) {
+		return jobmgr.ErrProcessAttemptBusy
+	}
+	return err
 }
 
 func (sjo *stagedJobOwner) failPromotion(promotionErr error) error {
