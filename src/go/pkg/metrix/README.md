@@ -260,9 +260,13 @@ The `Reader` interface exposes typed getters (`Value/Delta/Histogram/Summary/Sta
 - A successful commit and a failed/aborted attempt each publish a new exact snapshot, so freshness metadata and cached
   projections cannot cross the boundary.
 - Scalar gauge/counter series are shared with the canonical snapshot because committed series are immutable. Structured
-  families allocate their synthetic flattened series once per snapshot.
-- Raw and flattened readers use immutable per-scope name indexes. Scoped lookup and iteration therefore depend on that
-  scope's series, not on peer-scope cardinality.
+  families' synthetic series are built once per snapshot into shared series, descriptor and label blocks; each family
+  allocates one text buffer for its children's names, label keys and series keys, and bucket/quantile label values
+  come from the descriptor. A projection therefore allocates O(1) per structured family, not per synthetic series.
+- Text is per family, not per snapshot: consumers keep series IDs and label values across snapshots (chartengine route
+  caches, dimension names), so a retained ID pins only its own family's text.
+- Raw and flattened readers use immutable per-scope name indexes, built by one sort of the scalar series by scope, name
+  and labels key. Scoped lookup and iteration therefore depend on that scope's series, not on peer-scope cardinality.
 
 `RuntimeStore` deliberately keeps per-read flattening because its immediate-write overlay snapshots have a different
 lifetime and reuse profile. It still uses the same deterministic reader indexes within each read.

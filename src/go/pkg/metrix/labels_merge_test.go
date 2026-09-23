@@ -4,12 +4,13 @@ package metrix
 
 import (
 	"maps"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestMergeCanonicalLabelMatchesCanonicalizeLabels(t *testing.T) {
+func TestAppendCanonicalLabelMatchesCanonicalizeLabels(t *testing.T) {
 	tests := map[string]struct {
 		base  map[string]string
 		extra Label
@@ -49,8 +50,14 @@ func TestMergeCanonicalLabelMatchesCanonicalizeLabels(t *testing.T) {
 			require.NoError(t, err)
 			before := append([]Label(nil), base...)
 
-			gotLabels, gotKey, err := mergeCanonicalLabel(base, tc.extra)
-			require.NoError(t, err)
+			prefix := []Label{{Key: "prior", Value: "kept"}}
+			var key strings.Builder
+			key.WriteString("prior-key")
+			appended, ok := appendCanonicalLabel(prefix, &key, base, tc.extra)
+			require.True(t, ok)
+			require.Equal(t, prefix, appended[:len(prefix)], "append changed the existing destination")
+			gotLabels := appended[len(prefix):]
+			gotKey := strings.TrimPrefix(key.String(), "prior-key")
 
 			reference := make(map[string]string, len(tc.base)+1)
 			maps.Copy(reference, tc.base)
@@ -60,17 +67,17 @@ func TestMergeCanonicalLabelMatchesCanonicalizeLabels(t *testing.T) {
 
 			require.Equal(t, wantLabels, gotLabels)
 			require.Equal(t, wantKey, gotKey)
-			require.Equal(t, before, base, "merge mutated canonical source labels")
+			require.Equal(t, before, base, "append mutated canonical source labels")
 		})
 	}
 }
 
-func TestMergeCanonicalLabelRejectsEmptyKey(t *testing.T) {
-	labels, key, err := mergeCanonicalLabel(
-		[]Label{{Key: "a", Value: "value"}},
-		Label{Value: "invalid"},
-	)
-	require.ErrorIs(t, err, errInvalidLabelKey)
+func TestAppendCanonicalLabelRejectsEmptyKey(t *testing.T) {
+	var key strings.Builder
+	labels, ok := appendCanonicalLabel(nil, &key, []Label{{Key: "a", Value: "value"}}, Label{
+		Value: "invalid",
+	})
+	require.False(t, ok)
 	require.Nil(t, labels)
-	require.Empty(t, key)
+	require.Empty(t, key.String())
 }
