@@ -155,7 +155,7 @@ enum PERFLIB_PRIO {
     PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_CURRENT_PHYSICAL_THREADS,
     PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_CURRENT_RECOGNIZED_THREADS,
     PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_RECOGNIZED_THREADS,
-    // Reserved to preserve priorities after removing the non-upstream peak metric.
+    // Reserved to preserve priorities after removing the queue length peak chart from this collector.
     PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_QUEUE_LENGTH_PEAK,
     PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_CONTENTIONS,
 

@@ -439,6 +439,11 @@ static void dict_net_framework_processes_delete_cb(
 
 static inline struct net_framework_instances *netframework_process_get(const char *name)
 {
+    // Known limitation, accepted: Perflib may suffix duplicate names (for example, w3wp#1), but suffixes are
+    // assigned per counter object and can change as processes start or stop. Same-named processes can therefore
+    // still collapse into this one entry and interleave their samples. Instance UniqueID is unavailable in the
+    // available dumps, and only .NET CLR Memory exposes a process ID, so there is no reliable cross-object
+    // discriminator. This limitation is documented under the integration's limits.
     struct net_framework_instances *p = dictionary_set(processes, name, NULL, sizeof(*p));
     p->last_collected = netframework_now_ut;
     return p;
@@ -679,6 +684,9 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                     update_every,
                     RRDSET_TYPE_LINE);
 
+                // Perflib types this cumulative ".NET CLR" total as PERF_COUNTER_RAWCOUNT because PerfMon shows
+                // the raw number. It only grows, so this chart deliberately uses an incremental algorithm to show a
+                // rate; deriving the algorithm from the counter type would chart an ever-climbing accumulator.
                 p->rd_clrinterop_marshalling =
                     rrddim_add(p->st_clrinterop_marshalling, "marshallings", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 

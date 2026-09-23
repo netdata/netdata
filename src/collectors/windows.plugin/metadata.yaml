@@ -2518,7 +2518,13 @@ modules:
           description: |
             The collector automatically detects all of the metrics, no further configuration is required.
         limits:
-          description: ""
+          description: |
+            Charts are keyed by the Perflib instance name. Windows may add a suffix such as `#1` when multiple
+            processes share an executable name, but those suffixes are assigned per counter object and can change as
+            processes start or stop. Consequently, same-named processes can still share chart state and interleave
+            samples, making rate dimensions for those names unreliable. Only the .NET CLR Memory object exposes a
+            process ID; it may report `0` before the process has completed its first garbage collection, so it cannot
+            universally separate the other CLR objects. Processes with unique names are unaffected.
         performance_impact:
           description: ""
     setup:
