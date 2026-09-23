@@ -177,6 +177,7 @@ type chartState struct {
 	entries      map[string]*dimBuildEntry
 	// entriesOwner is the materialized chart whose scratch map entries is, if any.
 	entriesOwner    *materializedChartState
+	unownedDeletes  int // cap deletions from entries while it has no owner
 	observedCount   int
 	currentBuildSeq uint64
 }
@@ -222,21 +223,14 @@ func isHistogramBucketSeries(meta metrix.SeriesMeta) bool {
 
 // buildPlan runs with the owning engine locked, possibly against a private
 // candidate view. It stages lifecycle changes in the materialized state in place,
-// recording committed values in journal; a build that fails or panics rolls them
-// back before returning, and the attempt owns the journal otherwise.
+// recording committed values in journal. Until an attempt is reserved for the
+// result, PreparePlanWithOptions rolls the journal back on any exit, so a build that
+// fails or panics leaves committed state unchanged.
 func (e *Engine) buildPlan(
 	reader metrix.Reader,
 	retired map[string]*materializedChartState,
 	journal *planJournal,
 ) (Plan, materializedState, bool, error) {
-	// A build that does not return a prepared plan, including one interrupted by a panic,
-	// leaves committed state as it found it.
-	prepared := false
-	defer func() {
-		if !prepared {
-			journal.rollback()
-		}
-	}()
 	out := Plan{
 		Actions:            make([]EngineAction, 0, e.state.hints.actions),
 		InferredDimensions: make([]InferredDimension, 0, e.state.hints.seenInfer),
@@ -374,7 +368,6 @@ func (e *Engine) buildPlan(
 	e.state.hints.actions = len(out.Actions)
 	e.state.hints.values = len(ctx.values)
 
-	prepared = true
 	return out, staged, true, nil
 }
 
@@ -640,6 +633,16 @@ func (ctx *planBuildContext) newChartState() *chartState {
 		return &ctx.chartStates[len(ctx.chartStates)-1]
 	}
 	return new(chartState)
+}
+
+// adoptedScratchEntries returns the scratch map the chart takes from this build: a map
+// the build created and a cap then trimmed heavily is rebuilt at its live size.
+func (cs *chartState) adoptedScratchEntries() map[string]*dimBuildEntry {
+	if cs.entriesOwner == nil && needsCompaction(len(cs.entries), cs.unownedDeletes) {
+		cs.entries = rebuildMap(cs.entries)
+		cs.unownedDeletes = 0
+	}
+	return cs.entries
 }
 
 func (ctx *planBuildContext) chartOwner(chartID string) (string, bool) {
@@ -1017,7 +1020,7 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 			ChartID: cs.chartID,
 			Values:  values[start:len(values):len(values)],
 		})
-		matChart.storeScratchEntries(ctx.journal, cs.entries, cs.entriesOwner)
+		matChart.storeScratchEntries(ctx.journal, cs.adoptedScratchEntries(), cs.entriesOwner)
 		matChart.pruneScratchEntries(ctx.journal, cs.currentBuildSeq)
 	}
 	return nil

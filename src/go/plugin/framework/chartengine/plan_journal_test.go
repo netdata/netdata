@@ -442,53 +442,115 @@ func TestMaterializedMapsFollowCardinalityDown(t *testing.T) {
 	assert.Less(t, int(fanout.scratchDeletes), compactMinDeletes)
 }
 
-// TestPlanBuildPanicLeavesCommittedState checks that a build interrupted by a panic after it
-// staged changes restores committed state, so an engine a caller keeps using after recovering
-// plans exactly like one that never panicked.
+// TestPlanBuildPanicLeavesCommittedState checks that a plan interrupted by a panic after its
+// build staged changes restores committed state, so an engine a caller keeps using after
+// recovering plans exactly like one that never panicked.
 func TestPlanBuildPanicLeavesCommittedState(t *testing.T) {
-	armed, accepted := false, 0
-	observer := func(d PlanRouteDiagnostic) {
-		if armed && d.Decision == PlanRouteAccepted {
-			if accepted++; accepted == 3 {
-				panic("route observer")
+	tests := map[string]struct {
+		// option returns an engine option that panics once armed.
+		option func(armed *bool) Option
+	}{
+		"route observer during the series scan": {
+			option: func(armed *bool) Option {
+				accepted := 0
+				return WithPlanRouteDiagnosticObserver(func(d PlanRouteDiagnostic) {
+					if *armed && d.Decision == PlanRouteAccepted {
+						if accepted++; accepted == 3 {
+							panic("route observer")
+						}
+					}
+				})
+			},
+		},
+		"sample observer after a successful build": {
+			option: func(armed *bool) Option {
+				return WithRuntimeSampleObserver(func(PlanRuntimeSample) {
+					if *armed {
+						panic("sample observer")
+					}
+				})
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			armed := false
+			panicking, err := New(WithRuntimeStore(nil), test.option(&armed))
+			require.NoError(t, err)
+			twin, err := New(WithRuntimeStore(nil), test.option(new(bool)))
+			require.NoError(t, err)
+			for _, e := range []*Engine{panicking, twin} {
+				require.NoError(t, e.LoadYAML([]byte(cardinalitySpikeTemplateYAML), 1))
+			}
+			store := metrix.NewCollectorStore()
+			cc := mustCycleController(t, store)
+			vec := store.Write().SnapshotMeter("svc").Vec("id").Gauge("m")
+			collect := func(ids ...int) metrix.Reader {
+				cc.BeginCycle()
+				for _, id := range ids {
+					vec.WithLabelValues(fmt.Sprint(id)).Observe(metrix.SampleValue(id))
+				}
+				require.NoError(t, cc.CommitCycleSuccess())
+				return store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
+			}
+
+			reader := collect(0, 1, 2)
+			for _, e := range []*Engine{panicking, twin} {
+				_, err := prepareAndCommitPlan(e, reader)
+				require.NoError(t, err)
+			}
+
+			reader = collect(1, 2, 3, 4)
+			before := snapshotMaterialized(panicking.state.materialized)
+			armed = true
+			require.Panics(t, func() { _, _ = panicking.PreparePlan(reader) })
+			armed = false
+			require.Equal(t, before, snapshotMaterialized(panicking.state.materialized), "panic left staged state")
+
+			want, err := prepareAndCommitPlan(twin, reader)
+			require.NoError(t, err)
+			got, err := prepareAndCommitPlan(panicking, reader)
+			require.NoError(t, err)
+			assert.Equal(t, want, got)
+		})
+	}
+}
+
+func TestChartStateAdoptedScratchEntries(t *testing.T) {
+	build := func(inserted, deleted int, owner *materializedChartState) *chartState {
+		cs := &chartState{
+			entries:      make(map[string]*dimBuildEntry),
+			entriesOwner: owner,
+		}
+		for i := range inserted {
+			cs.entries[fmt.Sprint(i)] = &dimBuildEntry{}
+		}
+		for i := range deleted {
+			delete(cs.entries, fmt.Sprint(i))
+			if owner == nil {
+				cs.unownedDeletes++
 			}
 		}
+		return cs
 	}
-	panicking, err := New(WithRuntimeStore(nil), WithPlanRouteDiagnosticObserver(observer))
-	require.NoError(t, err)
-	twin, err := New(WithRuntimeStore(nil), WithPlanRouteDiagnosticObserver(func(PlanRouteDiagnostic) {}))
-	require.NoError(t, err)
-	for _, e := range []*Engine{panicking, twin} {
-		require.NoError(t, e.LoadYAML([]byte(cardinalitySpikeTemplateYAML), 1))
+	mapID := func(m any) unsafe.Pointer { return reflect.ValueOf(m).UnsafePointer() }
+	tests := map[string]struct {
+		cs      *chartState
+		rebuilt bool
+	}{
+		"new map trimmed below its deletions is rebuilt": {cs: build(1000, 990, nil), rebuilt: true},
+		"new map with few deletions is kept":             {cs: build(100, 10, nil)},
+		"new map mostly kept is kept":                    {cs: build(1000, 400, nil)},
+		"a chart's own map is left to commit compaction": {cs: build(1000, 990, &materializedChartState{})},
 	}
-	store := metrix.NewCollectorStore()
-	cc := mustCycleController(t, store)
-	vec := store.Write().SnapshotMeter("svc").Vec("id").Gauge("m")
-	collect := func(ids ...int) metrix.Reader {
-		cc.BeginCycle()
-		for _, id := range ids {
-			vec.WithLabelValues(fmt.Sprint(id)).Observe(metrix.SampleValue(id))
-		}
-		require.NoError(t, cc.CommitCycleSuccess())
-		return store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			before := mapID(test.cs.entries)
+			want := maps.Clone(test.cs.entries)
+			got := test.cs.adoptedScratchEntries()
+			assert.Equal(t, want, got)
+			assert.Equal(t, test.rebuilt, mapID(got) != before)
+		})
 	}
-
-	reader := collect(0, 1, 2)
-	for _, e := range []*Engine{panicking, twin} {
-		_, err := prepareAndCommitPlan(e, reader)
-		require.NoError(t, err)
-	}
-
-	reader = collect(1, 2, 3, 4)
-	before := snapshotMaterialized(panicking.state.materialized)
-	armed = true
-	require.Panics(t, func() { _, _ = panicking.PreparePlan(reader) })
-	armed = false
-	require.Equal(t, before, snapshotMaterialized(panicking.state.materialized), "panic left staged state")
-
-	want, err := prepareAndCommitPlan(twin, reader)
-	require.NoError(t, err)
-	got, err := prepareAndCommitPlan(panicking, reader)
-	require.NoError(t, err)
-	assert.Equal(t, want, got)
 }

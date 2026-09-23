@@ -139,6 +139,13 @@ func (e *Engine) PreparePlanWithOptions(reader metrix.Reader, opts PlanOptions) 
 		journal: newPlanJournal(e.state.buildToken, e.state.hints.journal),
 	}
 	journal := &state.journal
+	// Until the attempt is reserved nothing owns the staged changes, so any exit
+	// before then, including a panic, rolls them back.
+	defer func() {
+		if !state.reserved {
+			journal.rollback()
+		}
+	}()
 	plan, materialized, prepared, err := view.buildPlan(reader, retired, journal)
 	view.state.hints.journal = journal.sizing()
 	if view != e {

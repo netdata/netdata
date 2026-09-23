@@ -337,6 +337,9 @@ func enforceDimensionCapsWithObserver(
 					})
 				}
 				j.deleteEntry(cs.entriesOwner, cs.entries, name)
+				if cs.entriesOwner == nil {
+					cs.unownedDeletes++
+				}
 				cs.observedCount--
 				overflow--
 			}
