@@ -53,7 +53,19 @@ start_netdata() {
 # idempotent: fail() and the EXIT trap call it again, and a stale PID may have been reused
 stop_netdata() {
     [ -n "$NETDATAPID" ] || return 0
-    kill "$NETDATAPID" 2>/dev/null; wait "$NETDATAPID" 2>/dev/null
+    kill "$NETDATAPID" 2>/dev/null
+
+    # netdata aborts a hung shutdown itself after 135s; SIGKILL only if SIGTERM was never acted on
+    for _ in $(seq 750); do
+        kill -0 "$NETDATAPID" 2>/dev/null || break
+        sleep 0.2
+    done
+    if kill -0 "$NETDATAPID" 2>/dev/null; then
+        echo -e "${RED}netdata did not exit 150s after SIGTERM, killing it ${NOCOLOR}"
+        kill -9 "$NETDATAPID" 2>/dev/null
+    fi
+
+    wait "$NETDATAPID" 2>/dev/null
     NETDATAPID=""
 }
 
