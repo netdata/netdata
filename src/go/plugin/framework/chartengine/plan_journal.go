@@ -71,8 +71,10 @@ type journalSizing struct {
 	seqs    int
 }
 
-func newPlanJournal(token uint64, sizing journalSizing) *planJournal {
-	j := &planJournal{token: token}
+func newPlanJournal(token uint64, sizing journalSizing) planJournal {
+	j := planJournal{
+		token: token,
+	}
 	if sizing.entries > 0 {
 		j.entries = make([]entryUndo, 0, sizing.entries)
 	}

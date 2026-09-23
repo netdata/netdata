@@ -26,7 +26,7 @@ type planAttemptState struct {
 	engine       *Engine
 	plan         Plan
 	materialized materializedState
-	journal      *planJournal
+	journal      planJournal // inline, so an attempt and its journal are one allocation
 	transition   *templateTransition
 	epoch        uint64
 	commitSeq    uint64
@@ -56,7 +56,7 @@ func (a PlanAttempt) Commit() error {
 	reserved := a.state.reserved
 	engine := a.state.engine
 	materialized := a.state.materialized
-	journal := a.state.journal
+	journal := &a.state.journal
 	transition := a.state.transition
 	epoch := a.state.epoch
 	commitSeq := a.state.commitSeq
@@ -85,7 +85,7 @@ func (a PlanAttempt) Abort() {
 	a.state.finished = true
 	reserved := a.state.reserved
 	engine := a.state.engine
-	journal := a.state.journal
+	journal := &a.state.journal
 	attemptID := a.state.attemptID
 	a.state.mu.Unlock()
 
@@ -93,29 +93,6 @@ func (a PlanAttempt) Abort() {
 		return
 	}
 	engine.abortAttempt(journal, attemptID)
-}
-
-func newPreparedAttempt(
-	engine *Engine,
-	plan Plan,
-	materialized materializedState,
-	journal *planJournal,
-	epoch uint64,
-	commitSeq uint64,
-	attemptID uint64,
-) PlanAttempt {
-	return PlanAttempt{
-		state: &planAttemptState{
-			engine:       engine,
-			plan:         plan,
-			materialized: materialized,
-			journal:      journal,
-			epoch:        epoch,
-			commitSeq:    commitSeq,
-			attemptID:    attemptID,
-			reserved:     true,
-		},
-	}
 }
 
 func newNoopAttempt(plan Plan) PlanAttempt {
@@ -158,7 +135,10 @@ func (e *Engine) PreparePlanWithOptions(reader metrix.Reader, opts PlanOptions) 
 		return PlanAttempt{}, err
 	}
 	e.state.buildToken++
-	journal := newPlanJournal(e.state.buildToken, e.state.hints.journal)
+	state := &planAttemptState{
+		journal: newPlanJournal(e.state.buildToken, e.state.hints.journal),
+	}
+	journal := &state.journal
 	plan, materialized, prepared, err := view.buildPlan(reader, retired, journal)
 	view.state.hints.journal = journal.sizing()
 	if view != e {
@@ -176,9 +156,17 @@ func (e *Engine) PreparePlanWithOptions(reader metrix.Reader, opts PlanOptions) 
 	}
 	attemptID := e.nextAttemptIDLocked()
 	e.state.outstanding = attemptID
-	attempt := newPreparedAttempt(e, plan, materialized, journal, e.state.engineEpoch, e.state.commitSeq, attemptID)
-	attempt.state.transition = transition
-	return attempt, nil
+	state.engine = e
+	state.plan = plan
+	state.materialized = materialized
+	state.transition = transition
+	state.epoch = e.state.engineEpoch
+	state.commitSeq = e.state.commitSeq
+	state.attemptID = attemptID
+	state.reserved = true
+	return PlanAttempt{
+		state: state,
+	}, nil
 }
 
 func (e *Engine) nextAttemptIDLocked() uint64 {

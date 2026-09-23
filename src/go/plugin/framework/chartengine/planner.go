@@ -206,6 +206,7 @@ type planBuildContext struct {
 	materializedByID map[string]*materializedChartState
 	retired          map[string]*materializedChartState
 	journal          *planJournal
+	scan             planSeriesScan
 
 	planRouteStats
 }
@@ -414,7 +415,10 @@ func (e *Engine) preparePlanBuildContext(
 		e.state.matchIndex = index
 	}
 	chartsCap := max(e.state.hints.chartsByID, len(materialized.charts))
-	seenInferCap := e.state.hints.seenInfer
+	var seenInfer map[inferredDimensionKey]struct{}
+	if hint := e.state.hints.seenInfer; hint > 0 {
+		seenInfer = make(map[inferredDimensionKey]struct{}, hint)
+	}
 	return &planBuildContext{
 		out:               out,
 		reader:            reader,
@@ -426,7 +430,7 @@ func (e *Engine) preparePlanBuildContext(
 		routeObserver:     e.state.templateSet.diagnosticObserver(e.state.cfg.routeObserver),
 		index:             index,
 		flat:              reader,
-		seenInfer:         make(map[inferredDimensionKey]struct{}, seenInferCap),
+		seenInfer:         seenInfer,
 		chartsByID:        make(map[string]*chartState, chartsCap),
 		chartStates:       make([]chartState, 0, e.state.hints.chartsByID),
 		values:            make([]UpdateDimensionValue, 0, e.state.hints.values),
@@ -439,168 +443,187 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 	return e.forEachPlanSeriesRoute(ctx, false)
 }
 
+// planSeriesScan is the state of one pass over the reader's series. It lives in the
+// build context, so a pass allocates only its callback.
+type planSeriesScan struct {
+	engine       *Engine
+	replayLabels bool
+	buildSeq     uint64
+	err          error
+	view         labelSliceView
+}
+
 func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool) error {
-	var firstErr error
-	buildSeq := ctx.collectMeta.LastSuccessSeq
-	trackStats := !replayLabels
-	process := func(
-		identity metrix.SeriesIdentity,
-		meta metrix.SeriesMeta,
-		name string,
-		labels metrix.LabelView,
-		v metrix.SampleValue,
-	) {
-		if trackStats {
-			ctx.seriesScanned++
-		}
-		if firstErr != nil {
-			return
-		}
-		if e.state.cfg.seriesSelection == seriesSelectionLastSuccessOnly &&
-			meta.LastSeenSuccessSeq != ctx.collectMeta.LastSuccessSeq {
-			if trackStats {
-				ctx.seriesFilteredBySeq++
-				if ctx.routeCacheEnabled {
-					ctx.cache.MarkSeenIfPresent(identity, buildSeq)
-				}
-				if ctx.routeObserver != nil {
-					ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
-						Decision:       PlanRouteSeriesFilteredBySequence,
-						SeriesIdentity: identity,
-						MetricName:     name,
-					})
-				}
-			}
-			return
-		}
-		if selector := e.state.cfg.selector; selector != nil && !selector.Matches(name, labels) {
-			if trackStats {
-				ctx.seriesFilteredBySel++
-				if ctx.routeCacheEnabled {
-					ctx.cache.MarkSeenIfPresent(identity, buildSeq)
-				}
-				if ctx.routeObserver != nil {
-					ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
-						Decision:       PlanRouteSeriesFilteredBySelector,
-						SeriesIdentity: identity,
-						MetricName:     name,
-					})
-				}
-			}
-			return
-		}
+	ctx.scan = planSeriesScan{
+		engine:       e,
+		replayLabels: replayLabels,
+		buildSeq:     ctx.collectMeta.LastSuccessSeq,
+	}
+	if rawIter, ok := ctx.flat.(metrix.SeriesIdentityRawIterator); ok {
+		rawIter.ForEachSeriesIdentityRaw(ctx.visitRawPlanSeries)
+	} else {
+		ctx.flat.ForEachSeriesIdentity(ctx.visitPlanSeries)
+	}
+	err := ctx.scan.err
+	ctx.scan = planSeriesScan{}
+	return err
+}
 
-		observer := ctx.routeObserver
-		if !trackStats {
-			observer = nil
-		}
-		routes, hit, err := e.resolveSeriesRoutes(
-			ctx.cache,
-			ctx.routeCacheEnabled,
-			observer,
-			identity,
-			name,
-			labels,
-			meta,
-			ctx.reader,
-			ctx.index,
-			ctx.prog.Revision(),
-			buildSeq,
-		)
-		if err != nil {
-			firstErr = err
-			return
-		}
-		if trackStats && ctx.routeCacheEnabled {
-			if hit {
-				ctx.routeCacheHits++
-			} else {
-				ctx.routeCacheMisses++
-			}
-		}
-		if len(routes) > 0 && routes[0].Autogen && !routes[0].autogenGuard.valid(ctx.reader, meta) {
-			routes = nil
-			// Release obsolete discovery even if autogen rebuilding is rejected.
+func (ctx *planBuildContext) visitRawPlanSeries(
+	identity metrix.SeriesIdentity,
+	meta metrix.SeriesMeta,
+	name string,
+	labels []metrix.Label,
+	v metrix.SampleValue,
+) {
+	ctx.scan.view.items = labels
+	ctx.visitPlanSeries(identity, meta, name, &ctx.scan.view, v)
+}
+
+func (ctx *planBuildContext) visitPlanSeries(
+	identity metrix.SeriesIdentity,
+	meta metrix.SeriesMeta,
+	name string,
+	labels metrix.LabelView,
+	v metrix.SampleValue,
+) {
+	e := ctx.scan.engine
+	if !ctx.scan.replayLabels {
+		ctx.seriesScanned++
+	}
+	if ctx.scan.err != nil {
+		return
+	}
+	if e.state.cfg.seriesSelection == seriesSelectionLastSuccessOnly &&
+		meta.LastSeenSuccessSeq != ctx.collectMeta.LastSuccessSeq {
+		if !ctx.scan.replayLabels {
+			ctx.seriesFilteredBySeq++
 			if ctx.routeCacheEnabled {
-				ctx.cache.Store(identity, ctx.prog.Revision(), buildSeq, nil)
+				ctx.cache.MarkSeenIfPresent(identity, ctx.scan.buildSeq)
+			}
+			if ctx.routeObserver != nil {
+				ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+					Decision:       PlanRouteSeriesFilteredBySequence,
+					SeriesIdentity: identity,
+					MetricName:     name,
+				})
 			}
 		}
-		if len(routes) == 0 {
-			autoRoutes, ok, reason, ruleIndex, err := e.resolveAutogenRouteWithReason(ctx.reader, name, labels, meta)
-			if err != nil {
-				firstErr = err
-				return
+		return
+	}
+	if selector := e.state.cfg.selector; selector != nil && !selector.Matches(name, labels) {
+		if !ctx.scan.replayLabels {
+			ctx.seriesFilteredBySel++
+			if ctx.routeCacheEnabled {
+				ctx.cache.MarkSeenIfPresent(identity, ctx.scan.buildSeq)
 			}
-			if ok {
-				routes = autoRoutes
-				if ctx.routeCacheEnabled {
-					ctx.cache.Store(identity, ctx.prog.Revision(), buildSeq, routes)
-				}
-				if trackStats {
-					ctx.seriesAutogenMatched++
-					ctx.seriesMatched++
-				}
-			} else {
-				if trackStats {
-					ctx.seriesUnmatched++
-					if ctx.routeObserver != nil {
-						ruleScope := ""
-						if ruleIndex >= 0 && ruleIndex < len(e.state.cfg.autogen.Rules) {
-							ruleScope = e.state.cfg.autogen.Rules[ruleIndex].Scope
-						}
-						ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
-							Decision:         PlanRouteUnmatched,
-							Reason:           reason,
-							SeriesIdentity:   identity,
-							MetricName:       name,
-							MetricFamilyName: diagnosticMetricFamilyName(name, labels, meta),
-							AutogenRuleIndex: ruleIndex,
-							AutogenRuleScope: ruleScope,
-						})
-					}
-				}
-				return
+			if ctx.routeObserver != nil {
+				ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+					Decision:       PlanRouteSeriesFilteredBySelector,
+					SeriesIdentity: identity,
+					MetricName:     name,
+				})
 			}
-		} else if trackStats {
-			if routes[0].Autogen {
-				ctx.seriesAutogenMatched++
-			}
-			ctx.seriesMatched++
 		}
+		return
+	}
 
-		for _, route := range routes {
-			if replayLabels {
-				chart := ctx.chartsByID[route.ChartID]
-				if chart == nil || chart.templateID != route.ChartTemplateID || !chart.labelTracker.needsReplay() {
-					continue
+	observer := ctx.routeObserver
+	if ctx.scan.replayLabels {
+		observer = nil
+	}
+	routes, hit, err := e.resolveSeriesRoutes(
+		ctx.cache,
+		ctx.routeCacheEnabled,
+		observer,
+		identity,
+		name,
+		labels,
+		meta,
+		ctx.reader,
+		ctx.index,
+		ctx.prog.Revision(),
+		ctx.scan.buildSeq,
+	)
+	if err != nil {
+		ctx.scan.err = err
+		return
+	}
+	if !ctx.scan.replayLabels && ctx.routeCacheEnabled {
+		if hit {
+			ctx.routeCacheHits++
+		} else {
+			ctx.routeCacheMisses++
+		}
+	}
+	if len(routes) > 0 && routes[0].Autogen && !routes[0].autogenGuard.valid(ctx.reader, meta) {
+		routes = nil
+		// Release obsolete discovery even if autogen rebuilding is rejected.
+		if ctx.routeCacheEnabled {
+			ctx.cache.Store(identity, ctx.prog.Revision(), ctx.scan.buildSeq, nil)
+		}
+	}
+	if len(routes) == 0 {
+		autoRoutes, ok, reason, ruleIndex, err := e.resolveAutogenRouteWithReason(ctx.reader, name, labels, meta)
+		if err != nil {
+			ctx.scan.err = err
+			return
+		}
+		if ok {
+			routes = autoRoutes
+			if ctx.routeCacheEnabled {
+				ctx.cache.Store(identity, ctx.prog.Revision(), ctx.scan.buildSeq, routes)
+			}
+			if !ctx.scan.replayLabels {
+				ctx.seriesAutogenMatched++
+				ctx.seriesMatched++
+			}
+		} else {
+			if !ctx.scan.replayLabels {
+				ctx.seriesUnmatched++
+				if ctx.routeObserver != nil {
+					ruleScope := ""
+					if ruleIndex >= 0 && ruleIndex < len(e.state.cfg.autogen.Rules) {
+						ruleScope = e.state.cfg.autogen.Rules[ruleIndex].Scope
+					}
+					ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+						Decision:         PlanRouteUnmatched,
+						Reason:           reason,
+						SeriesIdentity:   identity,
+						MetricName:       name,
+						MetricFamilyName: diagnosticMetricFamilyName(name, labels, meta),
+						AutogenRuleIndex: ruleIndex,
+						AutogenRuleScope: ruleScope,
+					})
 				}
-				if err := chart.labelTracker.observeReplay(labels, route.DimensionKeyLabel); err != nil {
-					firstErr = err
-					return
-				}
+			}
+			return
+		}
+	} else if !ctx.scan.replayLabels {
+		if routes[0].Autogen {
+			ctx.seriesAutogenMatched++
+		}
+		ctx.seriesMatched++
+	}
+
+	for _, route := range routes {
+		if ctx.scan.replayLabels {
+			chart := ctx.chartsByID[route.ChartID]
+			if chart == nil || chart.templateID != route.ChartTemplateID || !chart.labelTracker.needsReplay() {
 				continue
 			}
-			route = finalizeRouteAlgorithm(route, meta.Kind)
-			if err := ctx.accumulateRoute(ctx.index, route, identity, name, meta, labels, v); err != nil {
-				firstErr = err
+			if err := chart.labelTracker.observeReplay(labels, route.DimensionKeyLabel); err != nil {
+				ctx.scan.err = err
 				return
 			}
+			continue
+		}
+		route = finalizeRouteAlgorithm(route, meta.Kind)
+		if err := ctx.accumulateRoute(ctx.index, route, identity, name, meta, labels, v); err != nil {
+			ctx.scan.err = err
+			return
 		}
 	}
-
-	if rawIter, ok := ctx.flat.(metrix.SeriesIdentityRawIterator); ok {
-		view := &labelSliceView{}
-		rawIter.ForEachSeriesIdentityRaw(func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels []metrix.Label, v metrix.SampleValue) {
-			view.items = labels
-			process(identity, meta, name, view, v)
-		})
-		return firstErr
-	}
-
-	ctx.flat.ForEachSeriesIdentity(func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels metrix.LabelView, v metrix.SampleValue) {
-		process(identity, meta, name, labels, v)
-	})
-	return firstErr
 }
 
 // newChartState returns zeroed chart state from the build block while it has room.
@@ -793,6 +816,9 @@ func (ctx *planBuildContext) accumulateRoute(
 			name:            route.DimensionName,
 		}
 		if _, exists := ctx.seenInfer[key]; !exists {
+			if ctx.seenInfer == nil {
+				ctx.seenInfer = make(map[inferredDimensionKey]struct{})
+			}
 			ctx.seenInfer[key] = struct{}{}
 			ctx.out.InferredDimensions = append(ctx.out.InferredDimensions, InferredDimension{
 				ChartTemplateID: route.ChartTemplateID,

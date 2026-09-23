@@ -276,7 +276,7 @@ func TestPlanJournalRollbackRestoresEveryRecordKind(t *testing.T) {
 	other.lastSeenSuccessSeq = 3
 	before := snapshotMaterialized(state)
 
-	j := newPlanJournal(9, journalSizing{})
+	j := new(newPlanJournal(9, journalSizing{}))
 	j.setChartSeen(chart, 5)
 	j.setDimSeen(d1, 5)
 	chart.ensureDimension(j, "d2", dimensionState{order: 7})
@@ -309,12 +309,12 @@ func TestPlanJournalCommittedChartUndoesThisBuild(t *testing.T) {
 	d1, _ := chart.ensureDimension(nil, "d1", dimensionState{order: 1, static: true})
 	chart.ensureDimension(nil, "d2", dimensionState{order: 2, static: true})
 
-	untouched := newPlanJournal(9, journalSizing{})
+	untouched := new(newPlanJournal(9, journalSizing{}))
 	committed := untouched.committedChart(chart)
 	assert.Equal(t, chart.meta, committed.meta)
 	assert.Equal(t, chart.dimensions, committed.dimensions)
 
-	j := newPlanJournal(10, journalSizing{})
+	j := new(newPlanJournal(10, journalSizing{}))
 	chart.removeDimension(j, "d1")
 	chart.ensureDimension(j, "d3", dimensionState{order: 3, static: true})
 	state.ensureChart(j, "a", "tpl.a", program.ChartMeta{Title: "A2"}, program.LifecyclePolicy{})

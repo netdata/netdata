@@ -174,7 +174,7 @@ groups:
 				b.ResetTimer()
 				for i := range b.N {
 					// Expiry stages removals in the committed state, as a plan build does.
-					journal := newPlanJournal(uint64(i+1), journalSizing{})
+					journal := new(newPlanJournal(uint64(i+1), journalSizing{}))
 					dims, charts := collectExpiryRemovals(current, &state, journal)
 					b.StopTimer()
 					if len(dims) != wantDims || len(charts) != wantCharts {

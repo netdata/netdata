@@ -198,7 +198,7 @@ func TestAutogenWarmPlanAllocationEnvelope(t *testing.T) {
 			// Planning stages lifecycle state in place, so an unchanged chart allocates only
 			// its boxed update action; the constant covers per-plan setup. It also excludes
 			// rebuilding O(series) autogen strings/routes on every hit.
-			assert.LessOrEqual(t, allocs, float64(n+32))
+			assert.LessOrEqual(t, allocs, float64(n+18))
 		})
 	}
 }
