@@ -460,6 +460,33 @@ static void rrdhost_set_replication_parameters(RRDHOST *host, RRD_DB_MODE memory
     }
 }
 
+// strncpyz()'s third argument is the destination size MINUS ONE: it copies that many characters and
+// then writes the terminator, so passing the array size lets the terminator land one byte past the
+// end. The streaming handshake refuses longer guids (rrdhost_machine_guid_is_valid()), but
+// rrdhost_create() has other callers, so the bound must hold for any input.
+void rrdhost_machine_guid_copy(char *dst, const char *guid) {
+    strncpyz(dst, guid, GUID_LEN);
+}
+
+// The streaming receiver looks hosts up by the guid string the child sent, while the host is indexed
+// by its stored copy, which holds at most GUID_LEN characters - so a longer guid creates a host that
+// its own reconnects can never find - and the suffixed string would still parse to the same binary
+// host_id as the plain one. uuid_parse_flexi() stops once it has 16 bytes and ignores what follows,
+// so after it succeeds we check that it consumed the whole string: a success means it read 32 hex
+// digits plus 0 or 4 hyphens, so the string must be exactly the 32-digit compact spelling, or the
+// canonical 8-4-4-4-12 one (hyphens anywhere else could hide 4 trailing bytes after a compact UUID).
+bool rrdhost_machine_guid_is_valid(const char *guid) {
+    nd_uuid_t uuid;
+    if (!guid || uuid_parse_flexi(guid, uuid) != 0)
+        return false;
+
+    size_t len = strnlen(guid, GUID_LEN + 1);
+    if (len == 32)
+        return true;
+
+    return len == GUID_LEN && guid[8] == '-' && guid[13] == '-' && guid[18] == '-' && guid[23] == '-';
+}
+
 RRDHOST *rrdhost_create(
         const char *hostname,
         const char *registry_hostname,
@@ -498,7 +525,7 @@ RRDHOST *rrdhost_create(
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
 
-    strncpyz(host->machine_guid, guid, GUID_LEN + 1);
+    rrdhost_machine_guid_copy(host->machine_guid, guid);
     rrdhost_stream_path_init(host);
     rrdhost_stream_parents_init(host);
 

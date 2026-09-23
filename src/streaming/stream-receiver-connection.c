@@ -524,7 +524,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
             return stream_receiver_response_permission_denied(w);
         }
 
-        if (regenerate_guid(rpt->machine_guid, buf) == -1) {
+        if (!rrdhost_machine_guid_is_valid(rpt->machine_guid)) {
             stream_receiver_log_status(
                 rpt,
                 "rejecting streaming connection; machine UUID is not a valid UUID",
