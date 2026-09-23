@@ -170,6 +170,17 @@ live in helper methods, preferably in `init.go`, so the public method reads as t
 a cheap auth/connectivity probe, not a full collection. `Collect()` MUST run the real write path through `metrix`.
 `Cleanup()` closes idle connections and forwards Function cleanup.
 
+An `Init()` or `Check()` error fails the job. Unclassified, an `Init()` error disables autodetection retries and a
+`Check()` error is retried per `autodetection_retry`. Classify the error when that default is wrong:
+
+- `collectorapi.ConfigError(err)`: a configuration problem that retrying cannot fix, such as an invalid option or an
+  unknown named profile. The job is never retried and DynCfg reports code 422.
+- `collectorapi.TemporaryError(err)`: a condition that may clear on its own, such as a port in use. The job keeps the
+  `autodetection_retry` schedule, even from `Init()`, and DynCfg reports code 503.
+
+A classified failure keeps a failed stock job listed in DynCfg instead of removing it. Leave the expected absence of a
+service at a stock endpoint unclassified.
+
 ## Config
 
 Config SHOULD stay small and operator-oriented:

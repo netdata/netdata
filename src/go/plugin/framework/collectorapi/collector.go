@@ -13,12 +13,12 @@ import (
 
 // CollectorV1 is an interface that represents a module.
 type CollectorV1 interface {
-	// Init does initialization.
-	// If it returns error, the job will be disabled.
+	// Init does initialization. An error fails the job; retries follow the
+	// CollectorV2 rules.
 	Init(context.Context) error
 
-	// Check is called after Init.
-	// If it returns error, the job will be disabled.
+	// Check is called after Init. An error fails the job; retries follow the
+	// CollectorV2 rules.
 	Check(context.Context) error
 
 	// Charts returns the chart definition.
@@ -42,6 +42,12 @@ type CollectorV1 interface {
 // Collectors implementing this interface:
 //   - write metrics into CollectorStore during Collect(),
 //   - provide exactly one chart capability for metric jobs: static YAML or a native set.
+//
+// An Init or Check error fails the job. Unclassified, an Init error disables
+// autodetection retries and a Check error is retried per autodetection_retry.
+// ConfigError (never retried) and TemporaryError (retried per
+// autodetection_retry) classify either; a classified error also sets the
+// DynCfg response code and keeps a failed stock job listed instead of removed.
 type CollectorV2 interface {
 	Init(context.Context) error
 	Check(context.Context) error
