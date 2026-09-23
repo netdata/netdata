@@ -30,9 +30,21 @@
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-config.h"
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-workers.h"
 
-// the process-wide configuration, copied once by dbengine_init() and read-only afterwards
+// the process-wide configuration, copied by dbengine_init() before the engine comes up and read-only while it is up
 extern struct dbengine_config dbengine_cfg;
-bool dbengine_initialized(void);
+
+// resolve cfg's 0-means-default fields and make it the engine's configuration, without bringing anything up: the
+// way in for the tests that need only the configuration (a page cache, the page allocators). Never while the
+// engine is up: nothing guards it, dbengine_init() is the only caller that checks the lifecycle first
+void dbengine_config_set(const struct dbengine_config *cfg);
+
+// where the engine is in its one-way life: never brought up, running, or shut down
+typedef enum {
+    DBENGINE_LIFECYCLE_DOWN,
+    DBENGINE_LIFECYCLE_RUNNING,
+    DBENGINE_LIFECYCLE_STOPPED,
+} DBENGINE_LIFECYCLE_STATE;
+DBENGINE_LIFECYCLE_STATE dbengine_lifecycle_state(void);
 
 #define DBENGINE_FD_BUDGET_PER_TIER (50)
 
@@ -468,6 +480,10 @@ struct dbengine_tier {
         PAD64(uint64_t) transaction_id;                    // the transaction id of the next extent flushing
 
         PAD64(bool) active;                                // set by a successful dbengine_tier_init(), cleared by dbengine_tier_exit()
+        PAD64(bool) came_up;                               // set on a successful init, just before active; never cleared by
+                                                           // dbengine_tier_exit(): a tier that
+                                                           // exited keeps its datafiles attached until dbengine_destroy() finalizes
+                                                           // them and initialize_tier() resets the slot, so it cannot come up again
         PAD64(bool) mrg_populated;                         // set when the metrics registry has been loaded from every journal
         PAD64(bool) migration_to_v2_running;
         PAD64(bool) now_deleting_files;
@@ -616,14 +632,6 @@ static inline bool dbengine_atomic_uint64_sub_saturating(
     }
 }
 
-static inline void dbengine_reset_accounting_if_fresh(struct dbengine_tier *ctx, bool freshly_initialized_ctx) {
-    if(!freshly_initialized_ctx)
-        return;
-
-    ctx->atomic.metrics = 0;
-    ctx->atomic.samples = 0;
-}
-
 #define ctx_last_fileno_get(ctx) __atomic_load_n(&(ctx)->atomic.last_fileno, __ATOMIC_RELAXED)
 #define ctx_last_fileno_increment(ctx) __atomic_add_fetch(&(ctx)->atomic.last_fileno, 1, __ATOMIC_RELAXED)
 
@@ -642,7 +650,6 @@ static inline void ctx_last_flush_fileno_set(struct dbengine_tier *ctx, unsigned
 
 bool dbengine_ctx_tier_cap_exceeded(struct dbengine_tier *ctx);
 int init_rrd_files(struct dbengine_tier *ctx);
-bool dbengine_spawn(struct dbengine_tier *ctx);
 void dbengine_event_loop(void *arg);
 
 typedef void (*enqueue_callback_t)(struct dbengine_cmd *cmd);

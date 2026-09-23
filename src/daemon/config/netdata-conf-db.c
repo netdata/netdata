@@ -109,7 +109,7 @@ struct dbengine_initialization {
 
 void netdata_conf_dbengine_tier_init(void *ptr) {
     struct dbengine_initialization *dbi = ptr;
-    dbi->ret = dbengine_tier_init(NULL, &dbi->config);
+    dbi->ret = dbengine_tier_init(&dbi->config);
 }
 
 RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
@@ -136,8 +136,8 @@ RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
 }
 #endif
 
-void netdata_conf_dbengine_apply(void) {
 #ifdef ENABLE_DBENGINE
+const struct dbengine_config *netdata_conf_dbengine_resolved(void) {
     // settings the daemon resolves elsewhere, and on some paths (the unit tests) never from netdata.conf:
     // snapshot them at the moment the engine needs them
     netdata_conf_dbengine.cpus = netdata_conf_cpus();
@@ -150,7 +150,15 @@ void netdata_conf_dbengine_apply(void) {
     netdata_conf_dbengine.on_db_rotation = rrdcontext_db_rotation;
     netdata_conf_dbengine.preload_metrics = populate_metrics_from_database;
 
-    dbengine_init(&netdata_conf_dbengine);
+    return &netdata_conf_dbengine;
+}
+#endif
+
+void netdata_conf_dbengine_apply(void) {
+#ifdef ENABLE_DBENGINE
+    int ret = dbengine_init(netdata_conf_dbengine_resolved());
+    if(ret)
+        fatal("DBENGINE: the engine did not come up: %s", uv_strerror(ret));
 #endif
 }
 
@@ -212,9 +220,6 @@ void netdata_conf_dbengine_init(const char *hostname) {
         inicfg_set_number(&netdata_config, CONFIG_SECTION_DB, "dbengine pages per extent", netdata_conf_dbengine.pages_per_extent);
     }
 
-    // the process-wide configuration is complete: hand it to the engine before any tier starts
-    netdata_conf_dbengine_apply();
-
     nd_profile.storage_tiers = inicfg_get_number(&netdata_config, CONFIG_SECTION_DB, "storage tiers", nd_profile.storage_tiers);
     if(nd_profile.storage_tiers < 1) {
         nd_log(NDLS_DAEMON, NDLP_WARNING, "At least 1 storage tier is required. Assuming 1.");
@@ -275,6 +280,10 @@ void netdata_conf_dbengine_init(const char *hostname) {
 #endif
 
     struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
+
+    // the process-wide configuration is complete and the tier count is final (the engine's registry preload
+    // counts the configured tiers): bring the engine up, then the tiers
+    netdata_conf_dbengine_apply();
 
     size_t created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];

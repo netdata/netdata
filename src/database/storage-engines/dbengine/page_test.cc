@@ -449,9 +449,10 @@ TEST(PGD, RejectCorruptGorillaDiskNbits) {
     pgd_free(pg_collector);
 }
 
-int dbengine_page_test(int argc, char *argv[])
+int dbengine_page_test(const struct dbengine_config *cfg, int argc, char *argv[])
 {
     // Dummy/necessary initialization stuff
+    dbengine_config_set(cfg);
     PGC *dummy_cache = pgc_create("pgd-tests-cache", 32 * 1024 * 1024, NULL, 64, NULL, NULL,
                                   10, 10, 1000, 10, PGC_OPTIONS_NONE, 1, 11);
     pgd_init_arals();
@@ -466,8 +467,9 @@ int dbengine_page_test(int argc, char *argv[])
 
 #else // HAVE_GTEST
 
-int dbengine_page_test(int argc, char *argv[])
+int dbengine_page_test(const struct dbengine_config *cfg, int argc, char *argv[])
 {
+    (void) cfg;
     (void) argc;
     (void) argv;
     fprintf(stderr, "Can not run PGD tests because the agent was not build with support for google tests.\n");

@@ -1129,18 +1129,38 @@ static void dbengine_tier_config_validate(const struct dbengine_tier_config *tc)
         fatal("DBENGINE: tier %zu has a grouping of 0", tc->tier);
 }
 
-int dbengine_tier_init(struct dbengine_tier **ctxp, const struct dbengine_tier_config *tc)
+int dbengine_tier_init(const struct dbengine_tier_config *tc)
 {
-    struct dbengine_tier *ctx;
     uint32_t max_open_files;
-    bool freshly_initialized_ctx = false;
 
-    if(!dbengine_initialized())
-        fatal("DBENGINE: dbengine_tier_init() for tier %zu called before dbengine_init()", tc->tier);
-
+    // the configuration first (a bad one is a programming error, fatal whatever the engine's state), then the
+    // engine and the tier, all before anything is written: a refused init must leave the static tier as it found it
     dbengine_tier_config_validate(tc);
+
+    switch(dbengine_lifecycle_state()) {
+        case DBENGINE_LIFECYCLE_DOWN:
+            fatal("DBENGINE: dbengine_tier_init() for tier %zu called before dbengine_init()", tc->tier);
+
+        case DBENGINE_LIFECYCLE_STOPPED:
+            netdata_log_error("DBENGINE: tier %zu: the engine was shut down, the tier cannot be initialized", tc->tier);
+            return UV_EIO;
+
+        case DBENGINE_LIFECYCLE_RUNNING:
+            break;
+    }
+
     size_t tier = tc->tier;
     unsigned disk_space_mb = tc->disk_space_mb;
+
+    if(__atomic_load_n(&dbengine_multidb_tiers[tier]->atomic.active, __ATOMIC_ACQUIRE)) {
+        netdata_log_error("DBENGINE: tier %zu is already up, the tier cannot be initialized again", tier);
+        return UV_EALREADY;
+    }
+
+    if(__atomic_load_n(&dbengine_multidb_tiers[tier]->atomic.came_up, __ATOMIC_ACQUIRE)) {
+        netdata_log_error("DBENGINE: tier %zu came up and exited, it cannot be initialized again in this process", tier);
+        return UV_EIO;
+    }
 
     max_open_files = rlimit_nofile.rlim_cur / 4;
 
@@ -1157,13 +1177,7 @@ int dbengine_tier_init(struct dbengine_tier **ctxp, const struct dbengine_tier_c
         return UV_EMFILE;
     }
 
-    if(ctxp) {
-        *ctxp = ctx = mallocz(sizeof(*ctx));
-        initialize_tier(ctx);
-        freshly_initialized_ctx = true;
-    }
-    else
-        ctx = dbengine_multidb_tiers[tier];
+    struct dbengine_tier *ctx = dbengine_multidb_tiers[tier];
 
     ctx->config.tier = (int)tier;
     ctx->config.page_type = tc->page_type;
@@ -1184,24 +1198,14 @@ int dbengine_tier_init(struct dbengine_tier **ctxp, const struct dbengine_tier_c
     ctx->quiesce.enabled = false;
 
     ctx->atomic.first_time_s = LONG_MAX;
-    // The static multidb tiers may already have MRG prepopulation accounting from the first dbengine_spawn().
-    dbengine_reset_accounting_if_fresh(ctx, freshly_initialized_ctx);
 
-    if (!dbengine_spawn(ctx))
-        netdata_log_error("DBENGINE: tier %zu: the engine is not running and could not be started, the tier cannot be initialized",
-                          (size_t)tc->tier);
-    else if (!init_rrd_files(ctx)) {
+    if (!init_rrd_files(ctx)) {
         // success - we run this ctx too
         __atomic_store_n(&ctx->atomic.mrg_populated, false, __ATOMIC_RELEASE);
+        __atomic_store_n(&ctx->atomic.came_up, true, __ATOMIC_RELEASE);
         __atomic_store_n(&ctx->atomic.active, true, __ATOMIC_RELEASE);
         dbengine_populate_mrg(ctx);
         return 0;
-    }
-
-    if (ctxp) {
-        // the ctx was allocated above for this caller; hand nothing back
-        freez(ctx);
-        *ctxp = NULL;
     }
 
     rrd_stat_atomic_add(&global_stats.dbengine_reserved_file_descriptors, -DBENGINE_FD_BUDGET_PER_TIER);
@@ -1338,12 +1342,6 @@ int dbengine_tier_exit(struct dbengine_tier *ctx) {
 
     completion_wait_for(&completion);
     completion_destroy(&completion);
-
-    // the static multidb tiers are never freed; anything else was allocated by
-    // dbengine_tier_init() for its caller (ctxp != NULL) and is released here
-    int tier = ctx->config.tier;
-    if(tier < 0 || tier >= RRD_STORAGE_TIERS || dbengine_multidb_tiers[tier] != ctx)
-        freez(ctx);
 
     rrd_stat_atomic_add(&global_stats.dbengine_reserved_file_descriptors, -DBENGINE_FD_BUDGET_PER_TIER);
     return 0;
