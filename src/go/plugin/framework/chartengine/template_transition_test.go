@@ -4,6 +4,7 @@ package chartengine
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -308,25 +309,141 @@ func TestTemplateSetDiagnosticProvenance(t *testing.T) {
 	assert.True(t, restricted)
 }
 
-func TestTemplateSetVirtualDocumentPrecedence(t *testing.T) {
-	entries := []TemplateEntry{{ID: "base", Groups: []charttpl.Group{{Family: "Base"}}}}
-	for i := 1; i <= 10; i++ {
-		metric := "inactive"
-		if i >= 9 {
-			metric = "requests"
+// collisionEntries returns one entry per ID; the listed colliding IDs render the
+// same "shared" chart from the "requests" series and are titled by their ID.
+func collisionEntries(ids []string, colliding ...string) []TemplateEntry {
+	entries := make([]TemplateEntry, 0, len(ids))
+	for _, id := range ids {
+		entry := nativeEntry(id, id, "inactive")
+		if slices.Contains(colliding, id) {
+			entry = nativeEntry(id, "shared", "requests")
 		}
-		entry := nativeEntry(fmt.Sprintf("profile%d", i), "shared", metric)
-		entry.Groups[0].Charts[0].Title = entry.ID
+		entry.Groups[0].Charts[0].Title = id
 		entries = append(entries, entry)
 	}
+	return entries
+}
+
+func numberedIDs(prefix string, n int) []string {
+	ids := make([]string, n)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("%s%d", prefix, i)
+	}
+	return ids
+}
+
+// collisionWinner plans one fresh cycle with no incumbent and returns the title
+// of the chart created for the contested chart ID.
+func collisionWinner(t *testing.T, set *TemplateSet) string {
+	t.Helper()
 	e, err := New(WithRuntimeStore(nil))
 	require.NoError(t, err)
 	store := metrix.NewCollectorStore()
-	attempt := templateAttempt(t, e, store, testTemplateSet(t, entries...), map[string]float64{"requests": 1})
+	attempt := templateAttempt(t, e, store, set, map[string]float64{"requests": 1})
 	chart := findCreateChartAction(attempt.Plan())
 	require.NotNil(t, chart)
-	assert.Equal(t, "profile10", chart.Meta.Title, "g10 precedes g9 lexically, as in the virtual document")
 	require.NoError(t, attempt.Commit())
+	return chart.Meta.Title
+}
+
+func TestTemplateSetCollisionPrecedenceFollowsCompileOrder(t *testing.T) {
+	sharedChart := func(title string) charttpl.Chart {
+		return charttpl.Chart{
+			ID:         "shared",
+			Title:      title,
+			Context:    "shared",
+			Units:      "requests",
+			Dimensions: []charttpl.Dimension{{Selector: "requests", Name: "value"}},
+		}
+	}
+	nestedEntry := TemplateEntry{
+		ID: "nested",
+		Groups: []charttpl.Group{{
+			Family:  "Parent",
+			Metrics: []string{"requests"},
+			Charts:  []charttpl.Chart{sharedChart("parent")},
+			Groups:  []charttpl.Group{{Family: "Child", Charts: []charttpl.Chart{sharedChart("child")}}},
+		}},
+	}
+	manyCharts := TemplateEntry{
+		ID:     "many",
+		Groups: []charttpl.Group{{Family: "Many", Metrics: []string{"requests", "inactive"}}},
+	}
+	for i := range 11 {
+		chart := sharedChart(fmt.Sprintf("chart%d", i))
+		if i != 2 && i != 10 {
+			chart.ID, chart.Context = chart.Title, chart.Title
+			chart.Dimensions[0].Selector = "inactive"
+		}
+		manyCharts.Groups[0].Charts = append(manyCharts.Groups[0].Charts, chart)
+	}
+	withoutLead := append([]string{"p0", "a"}, append(numberedIDs("p", 9)[2:], "b")...)
+
+	tests := map[string]struct {
+		entries []TemplateEntry
+		want    string
+	}{
+		"earlier entry beats a double-digit position": {
+			entries: collisionEntries(numberedIDs("profile", 11), "profile2", "profile10"),
+			want:    "profile2",
+		},
+		"unrelated entry order is stable": {
+			entries: collisionEntries(withoutLead, "a", "b"),
+			want:    "a",
+		},
+		"inserting an unrelated entry keeps the winner": {
+			entries: collisionEntries(append([]string{"lead"}, withoutLead...), "a", "b"),
+			want:    "a",
+		},
+		"group charts precede nested groups": {
+			entries: []TemplateEntry{nestedEntry},
+			want:    "parent",
+		},
+		"authored chart order within a group": {
+			entries: []TemplateEntry{manyCharts},
+			want:    "chart2",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, collisionWinner(t, testTemplateSet(t, tc.entries...)))
+		})
+	}
+}
+
+// Compile order ranks the routes of one series. Different series contend in scan
+// order, so the series with the first metric name claims the chart whatever the
+// entry order.
+func TestTemplateSetCrossSeriesCollisionFollowsScanOrder(t *testing.T) {
+	first, second := nativeEntry("first", "shared", "zzz"), nativeEntry("second", "shared", "aaa")
+	first.Groups[0].Charts[0].Title = first.ID
+	second.Groups[0].Charts[0].Title = second.ID
+	e, err := New(WithRuntimeStore(nil))
+	require.NoError(t, err)
+	store := metrix.NewCollectorStore()
+	attempt := templateAttempt(t, e, store, testTemplateSet(t, first, second), map[string]float64{"zzz": 1, "aaa": 1})
+	chart := findCreateChartAction(attempt.Plan())
+	require.NotNil(t, chart)
+	require.NoError(t, attempt.Commit())
+
+	assert.Equal(t, "second", chart.Meta.Title)
+}
+
+// YAML documents are shipped collector contracts: their unowned collisions keep
+// comparing positional template IDs as strings.
+func TestTemplateSetDocumentCollisionPrecedenceIsLexical(t *testing.T) {
+	spec := charttpl.Spec{
+		Version: charttpl.VersionV1,
+	}
+	for _, entry := range collisionEntries(numberedIDs("group", 11), "group2", "group10") {
+		spec.Groups = append(spec.Groups, entry.Groups[0])
+	}
+	data, err := spec.MarshalTemplate()
+	require.NoError(t, err)
+	set, err := NewTemplateSetYAML([]byte(data))
+	require.NoError(t, err)
+
+	assert.Equal(t, "group10", collisionWinner(t, set), "g10.c0 sorts before g2.c0")
 }
 
 func TestTemplateTransferDoesNotInheritOutgoingDimensionCapIncumbents(t *testing.T) {

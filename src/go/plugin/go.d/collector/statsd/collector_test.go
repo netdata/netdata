@@ -6,11 +6,13 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 	"unsafe"
+	"weak"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -180,6 +182,55 @@ func TestIdleCapacityAndTypeTransitions(t *testing.T) {
 		f.ingest(t, "x:1|c|#a:two")
 		assert.Len(t, f.c.receiver.entries, 2)
 	})
+	t.Run("expired entry frees slot at admission", func(t *testing.T) {
+		f := newCoreFixture(t, 1, 10*time.Second)
+		f.ingest(t, "x:5|c")
+		f.collect(t, false, false)
+		f.time = f.time.Add(9 * time.Second)
+		require.ErrorIs(t, f.c.receiver.ingest("y:1|c", f.time), rejectCapacity)
+		f.time = f.time.Add(time.Second)
+		f.ingest(t, "y:1|c")
+		assert.Len(t, f.c.receiver.entries, 1)
+	})
+	t.Run("input after the cut defers retirement", func(t *testing.T) {
+		f := newCoreFixture(t, 2, 10*time.Second)
+		f.ingest(t, "x:5|c", "z:1|c")
+		f.collect(t, false, false)
+		f.time = f.time.Add(5 * time.Second)
+		f.ingest(t, "x:1|c")
+		f.time = f.time.Add(5 * time.Second)
+		f.ingest(t, "y:1|c") // z expired and retires; x has pending input.
+		require.ErrorIs(t, f.c.receiver.ingest("w:1|c", f.time), rejectCapacity)
+		f.collect(t, false, false)
+		value(t, f.c, "c.total.x", 6, nil)
+		f.time = f.time.Add(5 * time.Second)
+		f.ingest(t, "w:1|c") // x, last written 10 seconds ago, retires at admission.
+		assert.Len(t, f.c.receiver.entries, 2)
+	})
+	t.Run("later expiry after an admission retirement", func(t *testing.T) {
+		f := newCoreFixture(t, 2, 10*time.Second)
+		f.ingest(t, "a:1|c")
+		f.collect(t, false, false)
+		f.time = f.time.Add(3 * time.Second)
+		f.ingest(t, "b:1|c")
+		f.collect(t, false, false)
+		f.time = f.time.Add(7 * time.Second)
+		f.ingest(t, "c:1|c") // a retires; b expires three seconds later.
+		f.time = f.time.Add(3 * time.Second)
+		f.ingest(t, "d:1|c")
+		assert.Len(t, f.c.receiver.entries, 2)
+	})
+	t.Run("expired binding frees name for another type", func(t *testing.T) {
+		f := newCoreFixture(t, 2, 10*time.Second)
+		f.ingest(t, "x:5|c|#a:one")
+		f.collect(t, false, false)
+		f.time = f.time.Add(9 * time.Second)
+		require.ErrorIs(t, f.c.receiver.ingest("x:1|g|#a:two", f.time), rejectType)
+		f.time = f.time.Add(time.Second)
+		f.ingest(t, "x:1|g|#a:two") // A new identity; its name's binding retires.
+		f.collect(t, false, false)
+		value(t, f.c, "g.value.x", 1, metrix.Labels{"a": "two"})
+	})
 	t.Run("disabled idle retains slot", func(t *testing.T) {
 		f := newCoreFixture(t, 1, 0)
 		f.ingest(t, "x:10|g")
@@ -211,6 +262,26 @@ func TestDetachedBatchOwnership(t *testing.T) {
 	f.collect(t, false, false)
 	value(t, f.c, "g.value.x", 20, nil)
 	value(t, f.c, "ms.sum.latency", 100, nil)
+}
+
+// TestInstrumentsOutlastRetentionWindow: handles created at a series' first
+// write keep publishing across many descriptor retention windows and aborted
+// cycles, without redefining the charts, because every successful cycle writes
+// every retained series.
+func TestInstrumentsOutlastRetentionWindow(t *testing.T) {
+	f := newCoreFixture(t, 4, time.Hour, metrix.WithExpireAfterSuccessCycles(1), metrix.WithDescriptorGraceCycles(1))
+	f.ingest(t, "requests:2|c|#zone:a", "level:7|g", "latency:10|ms", "members:a|s")
+	require.Equal(t, 6, applicationCharts(f.collect(t, false, false)), "ms publishes values, count and sum charts")
+	for cycle := range 10 {
+		if cycle == 4 {
+			f.collect(t, true, false)
+		}
+		assert.Zero(t, applicationCharts(f.collect(t, false, false)), "cycle %d redefines charts", cycle)
+		value(t, f.c, "c.total.requests", 2, metrix.Labels{"zone": "a"})
+		value(t, f.c, "g.value.level", 7, nil)
+		value(t, f.c, "ms.count.latency", 0, nil)
+		value(t, f.c, "s.cardinality.members", 0, nil)
+	}
 }
 
 func TestAbortedIntervalsAreNotReplayed(t *testing.T) {
@@ -336,8 +407,7 @@ func TestRetainedStringsOwnStorage(t *testing.T) {
 		assert.False(t, start <= address && address < end, "%s retains the complete input record", name)
 	}
 	for id, e := range f.c.receiver.entries {
-		check("identity name", id.name)
-		check("identity labels", id.labels)
+		check("identity", id)
 		for _, label := range e.labels {
 			check("label key", label.Key)
 			check("label value", label.Value)
@@ -354,6 +424,56 @@ func TestRetainedStringsOwnStorage(t *testing.T) {
 	for name, binding := range f.c.receiver.bindings {
 		check("binding name", name)
 		check("binding type", string(binding.kind))
+	}
+}
+
+// TestIngestStorageRetainsNoRecord: the receiver's reusable record storage must
+// not keep an earlier record, or the datagram it was cut from, alive once a
+// smaller record follows, whether that record was admitted or rejected and
+// whether its repeated tags collapsed.
+func TestIngestStorageRetainsNoRecord(t *testing.T) {
+	value := strings.Repeat("v", 700)
+	tags := func(keys ...string) string {
+		parts := make([]string, len(keys))
+		for i, key := range keys {
+			parts[i] = key + ":" + value
+		}
+		return strings.Join(parts, ",")
+	}
+	var distinct, identical []string
+	for i := range 12 {
+		distinct = append(distinct, fmt.Sprintf("k%d", i))
+	}
+	for range 17 {
+		identical = append(identical, "k")
+	}
+	for name, tc := range map[string]struct {
+		tags string
+		want error
+	}{
+		"admitted":           {tags: tags(distinct...)},
+		"parse rejected":     {tags: tags(distinct...) + "|@2", want: rejectRate},
+		"prepare rejected":   {tags: tags(distinct...) + ",z:a  b", want: rejectLabels},
+		"repeats collapse":   {tags: tags("a", "a", "b", "b", "c", "c")},
+		"many repeats":       {tags: tags(identical...)},
+		"repeats rejected":   {tags: tags("a", "a", "b", "b") + ",z:a  b", want: rejectLabels},
+		"repeats then field": {tags: tags("a", "a", "b", "b") + "|@2", want: rejectRate},
+		"repeat conflict":    {tags: tags("a", "a", "b", "b") + ",a:w", want: rejectLabels},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newCoreFixture(t, 4, time.Minute)
+			large := func() weak.Pointer[byte] {
+				// The record is a substring of a larger datagram-like text.
+				datagram := "large:1|c|#" + tc.tags + "\nsmall:1|c"
+				line, _, _ := strings.Cut(datagram, "\n")
+				assert.Equal(t, tc.want, f.c.receiver.ingest(line, f.time))
+				return weak.Make(unsafe.StringData(datagram))
+			}()
+			f.ingest(t, "small:1|c|#a:b")
+			runtime.GC()
+			runtime.GC()
+			assert.Nil(t, large.Value(), "an earlier record is still reachable")
+		})
 	}
 }
 

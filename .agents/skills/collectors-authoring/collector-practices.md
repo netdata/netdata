@@ -397,12 +397,14 @@ the finished collector MUST NOT run through a V1-to-V2 bridge.
 V2 imports: `github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi` and `.../pkg/metrix`. The
 `CollectorV2` interface lives at `src/go/plugin/framework/collectorapi/collector.go`.
 
-`Init()` prepares the job; non-retryable initialization errors disable autodetection, while errors explicitly marked
-retryable can retain configured retry eligibility. `Check()` is the cheap detection probe; retries depend on job
-policy. `Collect()` is the scheduled hot path. Cleanup belongs to the orderly runtime teardown, including the optional
-V2 runner's shutdown ordering. Exact behavior is in `src/go/plugin/framework/jobruntime/job_v1.go`,
-`src/go/plugin/framework/jobruntime/job_v2.go`, `src/go/plugin/framework/jobruntime/job_common.go` and
-`src/go/plugin/framework/dyncfg/handler.go`; public lifecycle requirements are in
+`Init()` prepares the job and `Check()` is the cheap detection probe. By default, a Check error is retried every
+`autodetection_retry` seconds (never when it is 0, the framework default) and an Init error is never retried;
+`collectorapi.PermanentError` (never retried) and `collectorapi.TemporaryError` (configured retry) classify either.
+`Collect()` is the scheduled hot path. Cleanup belongs to the orderly runtime teardown, including the optional V2
+runner's shutdown ordering. Exact behavior is in
+`src/go/plugin/framework/jobruntime/job_v1.go`, `src/go/plugin/framework/jobruntime/job_v2.go`,
+`src/go/plugin/framework/jobruntime/job_common.go` and `src/go/plugin/agent/jobmgr/joboutput/generation.go`
+(`autoDetectionFailureFor`); public lifecycle requirements are in
 `src/go/plugin/go.d/docs/how-to-write-a-collector.md#registration-and-lifecycle`.
 
 A collector can compile without being registered or enabled. Runtime imports and configuration are distinct from
@@ -411,7 +413,6 @@ checklist. IBM uses its own framework and imports in `src/go/cmd/ibmdplugin/main
 than copying go.d wiring or applying the new-go.d V2 mandate to it.
 
 **Don't:**
-- write new go.d modules against V1
 - add modules to `charts.d.plugin` or `python.d.plugin`
 - assume go.d needs `go generate`; inspect actual directives rather than copying the IBM procedure
 - add new third-party Go modules or system-library dependencies casually — they ship to every Netdata install; check

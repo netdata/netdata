@@ -5,6 +5,7 @@ package chartengine
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/stretchr/testify/assert"
@@ -110,9 +111,119 @@ func TestTemplateSetIdentityAndLayout(t *testing.T) {
 	x, y := first.program.Charts()[0], reordered.program.Charts()[1]
 	assert.Equal(t, x.TemplateID, y.TemplateID)
 	assert.Equal(t, "g0.c0", x.LocalTemplateID)
-	assert.Equal(t, "g0.c0", x.RoutingOrder)
-	assert.Equal(t, "g1.c0", y.RoutingOrder)
-	assert.Equal(t, "g10.2.c1", templateRoutingOrder("g1.2.c1", 9))
+}
+
+// createdTemplateIDs plans one cycle against set and maps each created chart ID
+// to the template ID the plan reports for it.
+func createdTemplateIDs(t *testing.T, set *TemplateSet, values map[string]float64) map[string]string {
+	t.Helper()
+	e, err := New(WithRuntimeStore(nil))
+	require.NoError(t, err)
+	attempt := templateAttempt(t, e, metrix.NewCollectorStore(), set, values)
+	out := make(map[string]string)
+	for _, action := range attempt.Plan().Actions {
+		if create, ok := action.(CreateChartAction); ok {
+			out[create.ChartID] = create.ChartTemplateID
+		}
+	}
+	require.NoError(t, attempt.Commit())
+	return out
+}
+
+func TestTemplateSetChartTemplateIDAt(t *testing.T) {
+	nested := nativeEntry("nested", "outer", "requests")
+	nested.Groups[0].Groups = []charttpl.Group{{
+		Family: "Inner",
+		Charts: []charttpl.Chart{{
+			ID:         "inner",
+			Title:      "Inner",
+			Context:    "inner",
+			Units:      "requests",
+			Dimensions: []charttpl.Dimension{{Selector: "requests", Name: "value"}},
+		}},
+	}}
+	native := testTemplateSet(t, nativeEntry("first", "first", "requests"), nested)
+	document, err := NewTemplateSetYAML([]byte(validTemplateYAML()))
+	require.NoError(t, err)
+	prepared, err := PrepareTemplateSet(native, WithEnginePolicy(EnginePolicy{
+		Autogen: &AutogenPolicy{
+			Enabled: true,
+		},
+	}))
+	require.NoError(t, err)
+
+	created := map[*TemplateSet]map[string]string{
+		native:   createdTemplateIDs(t, native, map[string]float64{"requests": 1}),
+		prepared: createdTemplateIDs(t, prepared, map[string]float64{"requests": 1}),
+		document: createdTemplateIDs(t, document, map[string]float64{"mysql_queries_total": 1}),
+	}
+
+	tests := map[string]struct {
+		set        *TemplateSet
+		entryID    string
+		groupPath  []int
+		chartIndex int
+		// wantChart is the created chart whose planned template ID the lookup
+		// must return; empty expects no match.
+		wantChart string
+	}{
+		"native entry":         {set: native, entryID: "first", groupPath: []int{0}, wantChart: "first"},
+		"native nested chart":  {set: native, entryID: "nested", groupPath: []int{0, 0}, wantChart: "inner"},
+		"prepared native":      {set: prepared, entryID: "nested", groupPath: []int{0}, wantChart: "outer"},
+		"document entry":       {set: document, entryID: document.Entries()[0].ID, groupPath: []int{0}, wantChart: "queries_total"},
+		"unknown entry":        {set: native, entryID: "missing", groupPath: []int{0}},
+		"document as native":   {set: native, entryID: document.Entries()[0].ID, groupPath: []int{0}},
+		"absent chart":         {set: native, entryID: "first", groupPath: []int{0}, chartIndex: 1},
+		"absent group":         {set: native, entryID: "first", groupPath: []int{1}},
+		"other entry's path":   {set: native, entryID: "first", groupPath: []int{0, 0}},
+		"negative chart index": {set: native, entryID: "first", groupPath: []int{0}, chartIndex: -1},
+		"empty group path":     {set: native, entryID: "first"},
+		"nil set":              {entryID: "first", groupPath: []int{0}},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			id, ok := tc.set.ChartTemplateIDAt(tc.entryID, tc.groupPath, tc.chartIndex)
+			if tc.wantChart == "" {
+				assert.False(t, ok)
+				assert.Empty(t, id)
+				return
+			}
+			require.True(t, ok)
+			want, planned := created[tc.set][tc.wantChart]
+			require.Truef(t, planned, "chart %q must be created", tc.wantChart)
+			assert.Equal(t, want, id)
+		})
+	}
+}
+
+func TestTemplateSetFallbackContextNamespace(t *testing.T) {
+	native, err := NewTemplateSet(TemplateSetSpec{
+		FallbackContextNamespace: " prometheus.app ",
+	})
+	require.NoError(t, err)
+	document, err := NewTemplateSetYAML([]byte("context_namespace: mysql\n" + validTemplateYAML()))
+	require.NoError(t, err)
+	prepared, err := PrepareTemplateSet(native, WithEnginePolicy(EnginePolicy{
+		Autogen: &AutogenPolicy{
+			Enabled: true,
+		},
+	}))
+	require.NoError(t, err)
+
+	tests := map[string]struct {
+		set  *TemplateSet
+		want string
+	}{
+		"native":   {set: native, want: "prometheus.app"},
+		"prepared": {set: prepared, want: "prometheus.app"},
+		"document": {set: document, want: "mysql"},
+		"nil":      {},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, tc.set.FallbackContextNamespace())
+		})
+	}
 }
 
 func TestTemplateSetPolicyBinding(t *testing.T) {

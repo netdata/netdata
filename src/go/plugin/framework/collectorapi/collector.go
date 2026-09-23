@@ -13,12 +13,12 @@ import (
 
 // CollectorV1 is an interface that represents a module.
 type CollectorV1 interface {
-	// Init does initialization.
-	// If it returns error, the job will be disabled.
+	// Init does initialization. An error fails the job; retries follow the
+	// CollectorV2 rules.
 	Init(context.Context) error
 
-	// Check is called after Init.
-	// If it returns error, the job will be disabled.
+	// Check is called after Init. An error fails the job; retries follow the
+	// CollectorV2 rules.
 	Check(context.Context) error
 
 	// Charts returns the chart definition.
@@ -42,6 +42,13 @@ type CollectorV1 interface {
 // Collectors implementing this interface:
 //   - write metrics into CollectorStore during Collect(),
 //   - provide exactly one chart capability for metric jobs: static YAML or a native set.
+//
+// An Init or Check error fails the job. By default, a Check error is retried
+// every autodetection_retry seconds (never when it is 0, the framework
+// default) and an Init error is never retried. PermanentError (never retried)
+// and TemporaryError (retried per autodetection_retry) classify either and set
+// the DynCfg response code. A classified failure keeps a failed stock job
+// listed instead of removed.
 type CollectorV2 interface {
 	Init(context.Context) error
 	Check(context.Context) error
@@ -78,7 +85,8 @@ type ChartTemplateSetProvider interface {
 // prerequisites succeed and Collect can safely run; no packet or poll is required.
 // Duplicate/late ready calls are ignored. Run must return promptly on cancellation.
 // Unexpected return (including nil) fails the job. Before readiness, ordinary
-// failures use configured startup retries; after readiness recovery needs restart.
+// failures use configured startup retries and a PermanentError none; after
+// readiness recovery needs restart.
 type CollectorV2Runner interface {
 	Run(ctx context.Context, ready func()) error
 }

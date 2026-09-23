@@ -4,8 +4,12 @@ package metrix
 
 import (
 	"maps"
+	"runtime"
 	"testing"
+	"unsafe"
+	"weak"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -136,6 +140,11 @@ func TestFlattenSnapshotAllocationEnvelope(t *testing.T) {
 		require.LessOrEqualf(t, high, low*2, "%dx cardinality grew scalar allocations from %.0f to %.0f", cardinalityRate, low, high)
 	})
 
+	// Children of a snapshot share its series, descriptor and label blocks; each
+	// structured family allocates only its own text. Limits allow one allocation per
+	// family plus one of slack per source, and a per-snapshot constant for the
+	// blocks, maps and index.
+	const perSnapshotAllocs = 64
 	tests := map[string]struct {
 		store               func(testing.TB, int) CollectorStore
 		wantSeriesPerSource int
@@ -146,42 +155,42 @@ func TestFlattenSnapshotAllocationEnvelope(t *testing.T) {
 				return benchmarkCommittedMixedStore(tb, totalSeries)
 			},
 			wantSeriesPerSource: 15,
-			maxAllocsPerSource:  100,
+			maxAllocsPerSource:  5, // four structured families per source
 		},
 		"histogram with eight labels": {
 			store: func(tb testing.TB, totalSeries int) CollectorStore {
 				return benchmarkCommittedHistogramStore(tb, totalSeries, 8)
 			},
 			wantSeriesPerSource: 15,
-			maxAllocsPerSource:  140,
+			maxAllocsPerSource:  2,
 		},
 		"summary with eight labels and quantiles": {
 			store: func(tb testing.TB, totalSeries int) CollectorStore {
 				return benchmarkCommittedSummaryStore(tb, totalSeries, 8, 8)
 			},
 			wantSeriesPerSource: 10,
-			maxAllocsPerSource:  105,
+			maxAllocsPerSource:  2,
 		},
 		"stateset with eight labels and states": {
 			store: func(tb testing.TB, totalSeries int) CollectorStore {
 				return benchmarkCommittedStateSetStore(tb, totalSeries, 8, 8)
 			},
 			wantSeriesPerSource: 8,
-			maxAllocsPerSource:  85,
+			maxAllocsPerSource:  2,
 		},
 		"measureset gauge with eight labels and fields": {
 			store: func(tb testing.TB, totalSeries int) CollectorStore {
 				return benchmarkCommittedMeasureSetStore(tb, totalSeries, 8, 8, MeasureSetSemanticsGauge)
 			},
 			wantSeriesPerSource: 8,
-			maxAllocsPerSource:  105,
+			maxAllocsPerSource:  2,
 		},
 		"measureset counter with eight labels and fields": {
 			store: func(tb testing.TB, totalSeries int) CollectorStore {
 				return benchmarkCommittedMeasureSetStore(tb, totalSeries, 8, 8, MeasureSetSemanticsCounter)
 			},
 			wantSeriesPerSource: 8,
-			maxAllocsPerSource:  105,
+			maxAllocsPerSource:  2,
 		},
 	}
 
@@ -198,8 +207,8 @@ func TestFlattenSnapshotAllocationEnvelope(t *testing.T) {
 				tc.wantSeriesPerSource*highCardinality,
 			)
 
-			lowLimit := tc.maxAllocsPerSource * lowCardinality
-			highLimit := tc.maxAllocsPerSource * highCardinality
+			lowLimit := tc.maxAllocsPerSource*lowCardinality + perSnapshotAllocs
+			highLimit := tc.maxAllocsPerSource*highCardinality + perSnapshotAllocs
 			require.LessOrEqualf(t, low, lowLimit, "low-cardinality allocations %.0f exceed limit %.0f", low, lowLimit)
 			require.LessOrEqualf(t, high, highLimit, "high-cardinality allocations %.0f exceed limit %.0f", high, highLimit)
 			require.LessOrEqualf(
@@ -279,4 +288,43 @@ func labelsWith(base map[string]string, key, value string) map[string]string {
 	maps.Copy(labels, base)
 	labels[key] = value
 	return labels
+}
+
+// Consumers keep flattened series IDs and label values across snapshots (chartengine
+// route caches and dimension names), so a retained ID may pin only its own family's
+// text, never other families of the same projection.
+func TestFlattenedSeriesIDRetainsOnlyItsFamilyText(t *testing.T) {
+	store := NewCollectorStore()
+	cycle := cycleController(t, store)
+	vec := store.Write().SnapshotMeter("svc").Vec("id").Histogram("latency", WithHistogramBounds(1))
+	point := HistogramPoint{
+		Count:   2,
+		Sum:     1,
+		Buckets: []BucketPoint{{UpperBound: 1, CumulativeCount: 1}},
+	}
+	cycle.BeginCycle()
+	vec.WithLabelValues("kept").ObservePoint(point)
+	vec.WithLabelValues("other").ObservePoint(point)
+	require.NoError(t, cycle.CommitCycleSuccess())
+
+	flat := flattenSnapshot(store.(*storeView).core.snapshot.Load())
+	keptID := requireFlattenedSeries(
+		t,
+		flat,
+		"svc.latency_bucket",
+		map[string]string{"id": "kept", HistogramBucketLabel: "1"},
+	).id
+	otherKey := requireFlattenedSeries(
+		t,
+		flat,
+		"svc.latency_bucket",
+		map[string]string{"id": "other", HistogramBucketLabel: "1"},
+	).key
+	otherText := weak.Make(unsafe.StringData(otherKey))
+	flat, otherKey = nil, ""
+
+	runtime.GC()
+	runtime.GC()
+	assert.Nil(t, otherText.Value(), "a retained series ID kept another family's text alive")
+	runtime.KeepAlive(keptID)
 }

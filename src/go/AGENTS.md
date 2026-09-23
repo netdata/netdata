@@ -112,8 +112,10 @@ a plausible future problem is not a requirement.
 metrix commit/collect, per-sample/per-write, and per-cycle code are hot paths: they run for every collector on
 every cycle.
 
-- Before/after REQUIRED: a hot-path change MUST include before/after `go test -bench` numbers (use `git stash` for the
-  "before" baseline), not just "tests pass".
+- Before/after REQUIRED: a hot-path change MUST include before/after `go test -bench` numbers, not just "tests pass".
+  Build the "before" test binaries at the base commit (`go test -c`), run them alternately with the new ones
+  (`-count 6`), and compare with `benchstat`. Do not use `git stash` for the baseline: the stash is shared across
+  worktrees and sessions.
 - Allocation count is the gate: assert allocs stay within the intended envelope (for example a sparse commit stays
   ~O(touched), never O(retained)). `ns/op` is a dev-machine trend indicator, NOT a CI gate; label it as such inline
   and never record a personal name in the file.
@@ -121,6 +123,14 @@ every cycle.
   prove the change introduced no O(samples), O(retained), or O(n^2) regression.
 - Keep bench comments in sync with the code they measure, in the same change, with self-contained wording (no
   round or session references).
+- Attribute allocations with `-memprofile` and `-memprofilerate=1` (`pprof -sample_index=alloc_objects`). macOS CPU
+  profiles over-attribute runtime syscalls; read them with `-focus` on the benchmark body.
+- Verify reused or stack storage with `-gcflags=-m` and an allocation benchmark. Escape analysis is field-insensitive:
+  a buffer reachable through a struct whose other fields escape moves to the heap.
+- An interface call the compiler cannot devirtualize makes its arguments escape: a callback passed to it escapes with
+  every variable it captures, and a pointer handed to it (an option applying itself to `*config`) moves its target to
+  the heap. Confirm with `-gcflags=-m` first; then keep per-pass state in an object already on the heap, or resolve
+  option values by type switch.
 
 ## Go Formatting
 

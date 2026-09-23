@@ -240,6 +240,6 @@ void rrd2rrdr_set_timestamps(RRDR *r) {
 
     internal_fatal(r->t[0] != first_point_end_time, "QUERY: wrong first timestamp in the query");
     internal_error(r->t[points_wanted - 1] != before_wanted,
-                   "QUERY: wrong last timestamp in the query, expected %ld, found %ld",
-                   before_wanted, r->t[points_wanted - 1]);
+                   "QUERY: wrong last timestamp in the query, expected %" PRId64 ", found %" PRId64,
+                   (int64_t)before_wanted, (int64_t)r->t[points_wanted - 1]);
 }

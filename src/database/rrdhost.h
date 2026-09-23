@@ -494,6 +494,13 @@ RRDHOST *rrdhost_find_by_node_id(const char *node_id);
 // the lifetime argument, that constraint, and why this is not keyed on node_id
 bool rrdhost_apply_by_machine_guid(const char *machine_guid, void (*cb)(RRDHOST *host, void *data), void *data, bool may_block);
 
+// Copies a machine-guid into a GUID_LEN + 1 byte destination, truncating anything longer.
+// Exposed for rrdhost_machine_guid_unittest().
+void rrdhost_machine_guid_copy(char *dst, const char *guid);
+
+// True when a streamed machine-guid is a UUID that fits in RRDHOST.machine_guid unchanged.
+bool rrdhost_machine_guid_is_valid(const char *guid);
+
 #ifdef RRDHOST_INTERNALS
 RRDHOST *rrdhost_create(
     const char *hostname,

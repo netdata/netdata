@@ -166,6 +166,9 @@ type JobV2 struct {
 	buf        *bytes.Buffer
 	api        *netdataapi.API
 
+	// lastOutputBytes sizes the next cycle's scope output block.
+	lastOutputBytes int
+
 	stopCtrl stopController
 
 	runtimeService             runtimecomp.Service
@@ -634,23 +637,19 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 	}
 	cycleOpen = false
 
-	liveSet := j.liveScopeSet()
-	workSet := j.scopeWorkSet(liveSet)
-	for _, scopeKey := range sortedScopeKeys(workSet) {
-		scope := workSet[scopeKey]
-		_, live := liveSet[scopeKey]
-		if !live {
-			if state := j.scopeStates[scopeKey]; state != nil {
-				scope = state.scope
-			}
-		}
-		scopePrepared, scopeOK := j.prepareScopeEmission(scope, live, sinceLastRun, candidate)
+	work := j.scopeWork()
+	prepared.scopes = make([]jobV2PreparedScopeEmission, 0, len(work))
+	// Scope outputs share one block per cycle; each scope's output is capped at its own end.
+	outputs := make([]byte, 0, j.lastOutputBytes)
+	for _, item := range work {
+		scopePrepared, scopeOK := j.prepareScopeEmission(item.scope, item.live, sinceLastRun, candidate, &outputs)
 		if !scopeOK {
 			prepared.scopeFailure = true
 			continue
 		}
 		prepared.scopes = append(prepared.scopes, scopePrepared)
 	}
+	j.lastOutputBytes = len(outputs)
 	j.Debugf("v2 scope count: %d", len(j.scopeStates))
 	if len(prepared.scopes) == 0 && prepared.scopeFailure {
 		return prepared, false
@@ -702,6 +701,7 @@ func (j *JobV2) prepareScopeEmission(
 	live bool,
 	sinceLastRun int,
 	candidate *chartengine.TemplateSet,
+	outputs *[]byte,
 ) (prepared jobV2PreparedScopeEmission, ok bool) {
 	var attempt chartengine.PlanAttempt
 	var decision jobV2EmissionDecision
@@ -763,7 +763,9 @@ func (j *JobV2) prepareScopeEmission(
 		j.Warningf("apply plan for host scope %q failed: %v", state.scopeKey, err)
 		return jobV2PreparedScopeEmission{}, false
 	}
-	output := append([]byte(nil), j.buf.Bytes()...)
+	start := len(*outputs)
+	*outputs = append(*outputs, j.buf.Bytes()...)
+	output := (*outputs)[start:len(*outputs):len(*outputs)]
 	j.buf.Reset()
 
 	prepared = jobV2PreparedScopeEmission{

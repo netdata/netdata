@@ -95,6 +95,9 @@ func TestRuntimeStartupFailureIsOperationalAndKeepsConfiguredRetry(t *testing.T)
 	}{
 		{"error retry enabled", func(context.Context, func()) error { return errors.New("listen 127.0.0.1:8125: address in use") }, 7, true},
 		{"error retry disabled", func(context.Context, func()) error { return errors.New("bind failed") }, 0, false},
+		{"permanent error", func(context.Context, func()) error {
+			return collectorapi.PermanentError(errors.New("invalid listen address"))
+		}, 7, false},
 		{"unexpected nil", func(context.Context, func()) error { return nil }, 7, false},
 		{"recovered panic", func(context.Context, func()) error { panic("bind panic") }, 7, false},
 	} {
@@ -526,9 +529,11 @@ func TestRuntimeStartupFailureDoesNotHideCleanupPanic(t *testing.T) {
 	cfg := factoryTestConfig(false)
 	require.Nil(t, runtimeTestApply(t, prepareRuntimeTestChange(t, controller, cfg, nil, 1)))
 	attempts := controller.factory.config.Attempts.(*containment.Authority)
-	require.Eventually(t, func() bool { return attempts.Census().Quarantined == 1 }, time.Second, time.Millisecond)
 	// No output/generation resource remains, but the process identity stays quarantined.
-	require.Zero(t, attempts.Census().Active)
+	// The candidate attempt releases asynchronously after handing off to the runtime attempt.
+	require.Eventually(t, func() bool {
+		return attempts.Census() == (containment.Census{Quarantined: 1})
+	}, time.Second, time.Millisecond)
 }
 
 // Pause after the real admission commits, before the candidate worker can use it.

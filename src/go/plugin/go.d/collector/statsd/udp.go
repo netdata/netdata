@@ -3,8 +3,8 @@
 package statsd
 
 import (
-	"bytes"
 	"net"
+	"strings"
 )
 
 // readUDP reads datagrams until the listener closes or fails permanently.
@@ -30,15 +30,16 @@ func (s *server) readUDP(conn net.PacketConn, listener string) {
 }
 
 // datagram frames one UDP payload. LF or CRLF ends a record, and the datagram
-// boundary also ends its final record. Datagrams are never joined.
+// boundary also ends its final record. Datagrams are never joined. The payload is
+// copied once, so records are substrings of a string the receive buffer does not own.
 func (s *server) datagram(payload []byte) {
 	now := s.now()
-	for len(payload) > 0 {
-		line, rest, terminated := bytes.Cut(payload, []byte{'\n'})
+	for text := string(payload); len(text) > 0; {
+		line, rest, terminated := strings.Cut(text, "\n")
 		if terminated {
-			line = bytes.TrimSuffix(line, []byte{'\r'})
+			line = strings.TrimSuffix(line, "\r")
 		}
 		s.ingest(line, now)
-		payload = rest
+		text = rest
 	}
 }

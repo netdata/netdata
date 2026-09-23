@@ -209,8 +209,8 @@ func (s *server) recoverable(err error, listener string) bool {
 
 // ingest hands one framed record to the receiver, which counts rejections.
 // Empty lines are not records.
-func (s *server) ingest(line []byte, now time.Time) {
-	if len(line) > 0 {
-		_ = s.receiver.ingest(string(line), now)
+func (s *server) ingest(line string, now time.Time) {
+	if line != "" {
+		_ = s.receiver.ingest(line, now)
 	}
 }

@@ -49,9 +49,9 @@ static inline void storage_point_check(size_t region, size_t chart, size_t dim, 
     if(roundndd(expected) != roundndd(sp.sum)) {
         if(*value_errors < DIMS * 2) {
             fprintf(stderr, " >>> DBENGINE: VALUE DOES NOT MATCH: "
-                            "region %zu, chart %zu, dimension %zu, point %zu, time %ld: "
+                            "region %zu, chart %zu, dimension %zu, point %zu, time %" PRId64 ": "
                             "expected %lld, found %f\n",
-                    region, chart, dim, point, now, expected, sp.sum);
+                    region, chart, dim, point, (int64_t)now, expected, sp.sum);
         }
 
         (*value_errors)++;
@@ -60,9 +60,9 @@ static inline void storage_point_check(size_t region, size_t chart, size_t dim, 
     if(sp.start_time_s > now || sp.end_time_s < now) {
         if(*time_errors < DIMS * 2) {
             fprintf(stderr, " >>> DBENGINE: TIMESTAMP DOES NOT MATCH: "
-                            "region %zu, chart %zu, dimension %zu, point %zu, timestamp %ld: "
-                            "expected %ld, found %ld - %ld\n",
-                    region, chart, dim, point, now, now, sp.start_time_s, sp.end_time_s);
+                            "region %zu, chart %zu, dimension %zu, point %zu, timestamp %" PRId64 ": "
+                            "expected %" PRId64 ", found %" PRId64 " - %" PRId64 "\n",
+                    region, chart, dim, point, (int64_t)now, (int64_t)now, (int64_t)sp.start_time_s, (int64_t)sp.end_time_s);
         }
 
         (*time_errors)++;
@@ -71,9 +71,9 @@ static inline void storage_point_check(size_t region, size_t chart, size_t dim, 
     if(update_every != sp.end_time_s - sp.start_time_s) {
         if(*update_every_errors < DIMS * 2) {
             fprintf(stderr, " >>> DBENGINE: UPDATE EVERY DOES NOT MATCH: "
-                            "region %zu, chart %zu, dimension %zu, point %zu, timestamp %ld: "
-                            "expected %ld, found %ld\n",
-                    region, chart, dim, point, now, update_every, sp.end_time_s - sp.start_time_s);
+                            "region %zu, chart %zu, dimension %zu, point %zu, timestamp %" PRId64 ": "
+                            "expected %" PRId64 ", found %" PRId64 "\n",
+                    region, chart, dim, point, (int64_t)now, (int64_t)update_every, (int64_t)(sp.end_time_s - sp.start_time_s));
         }
 
         (*update_every_errors)++;
@@ -182,8 +182,8 @@ static time_t test_dbengine_create_metrics(
 
     time_t update_every = REGION_UPDATE_EVERY[current_region];
     fprintf(stderr, "DBENGINE Single Region Write  to "
-                    "region %zu, from %ld to %ld, with update every %ld...\n",
-            current_region, time_start, time_start + POINTS_PER_REGION * update_every, update_every);
+                    "region %zu, from %" PRId64 " to %" PRId64 ", with update every %" PRId64 "...\n",
+            current_region, (int64_t)time_start, (int64_t)(time_start + POINTS_PER_REGION * update_every), (int64_t)update_every);
 
     // for the database to save the metrics at the right time, we need to set
     // the last data collection time to be just before the first data collection.
@@ -231,8 +231,8 @@ static size_t test_dbengine_check_metrics(
 
     time_t update_every = REGION_UPDATE_EVERY[current_region];
     fprintf(stderr, "DBENGINE Single Region Read from "
-                    "region %zu, from %ld to %ld, with update every %ld...\n",
-            current_region, time_start, time_end, update_every);
+                    "region %zu, from %" PRId64 " to %" PRId64 ", with update every %" PRId64 "...\n",
+            current_region, (int64_t)time_start, (int64_t)time_end, (int64_t)update_every);
 
     // initialize all queries
     struct storage_engine_query_handle handles[CHARTS * DIMS] = { 0 };
@@ -290,8 +290,8 @@ static size_t dbengine_test_rrdr_single_region(
 
     time_t update_every = REGION_UPDATE_EVERY[current_region];
     fprintf(stderr, "RRDR Single Region Test on "
-                    "region %zu, start time %lld, end time %lld, update every %ld, on %d dimensions...\n",
-            current_region, (long long)time_start, (long long)time_end, update_every, CHARTS * DIMS);
+                    "region %zu, start time %lld, end time %lld, update every %lld, on %d dimensions...\n",
+            current_region, (long long)time_start, (long long)time_end, (long long)update_every, CHARTS * DIMS);
 
     size_t errors = 0, value_errors = 0, time_errors = 0, update_every_errors = 0;
     long points = (time_end - time_start) / update_every;
@@ -397,14 +397,14 @@ static size_t test_dbengine_burst_retention_case(
     rrdeng_metric_retention_by_id(host->db[0].si, rd->uuid, &first, &last);
 
     if(first != expected_first) {
-        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' first_entry is %ld, expected %ld\n",
-                id, first, expected_first);
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' first_entry is %" PRId64 ", expected %" PRId64 "\n",
+                id, (int64_t)first, (int64_t)expected_first);
         errors++;
     }
 
     if(last != expected_last) {
-        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' last_entry is %ld, expected %ld\n",
-                id, last, expected_last);
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' last_entry is %" PRId64 ", expected %" PRId64 "\n",
+                id, (int64_t)last, (int64_t)expected_last);
         errors++;
     }
 
@@ -415,8 +415,8 @@ static size_t test_dbengine_burst_retention_case(
 
     if(first2 != first || last2 != last) {
         fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' retention is not stable across reads: "
-                        "%ld - %ld, then %ld - %ld\n",
-                id, first, last, first2, last2);
+                        "%" PRId64 " - %" PRId64 ", then %" PRId64 " - %" PRId64 "\n",
+                id, (int64_t)first, (int64_t)last, (int64_t)first2, (int64_t)last2);
         errors++;
     }
 
