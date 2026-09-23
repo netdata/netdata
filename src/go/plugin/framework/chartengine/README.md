@@ -43,7 +43,7 @@ For `CollectorV2` collectors, the runtime integration expects:
 | `WithEnginePolicy(...)`                             | Configure selector + autogen behavior                                                                                                                                   |
 | `WithRuntimeStore(...)`                             | Override/disable self-metrics store                                                                                                                                     |
 | `WithSeriesSelectionAllVisible()`                   | Process all visible series instead of filtering to latest successful collect cycle. Intended for runtime/internal stores that commit immediately (no cycle boundaries). |
-| `WithEmitTypeIDBudgetPrefix(...)`                   | Set the effective type-id prefix used by autogen budget checks                                                                                                          |
+| `WithEmitTypeIDBudgetPrefix(...)`                   | Set the effective type-id prefix used by autogen budget checks and collision-warning rate limiting                                                                      |
 | `WithRuntimePlannerMode(...)`                       | Enable runtime planner mode with no-write-tick semantics, for jobs/tests that drive planning directly from runtime metrics instead of collect-cycle boundaries.         |
 | `WithPlanRouteDiagnosticObserver(...)`              | Stream complete, synchronous route facts for one plan attempt; intended for validation and tests                                                                        |
 | `ChartTemplateIDAt(...)`                            | Correlate an authored chart position with the compiler-assigned template identity used by route facts                                                                   |
@@ -259,7 +259,7 @@ The following rules apply when routing conflicts arise:
 | Duplicate dimension observations within build | First observed dimension metadata wins; values use the chart's configured reducer            |
 
 > [!WARNING]
-> Cross-template chart ID collisions lose data: conflicting authored series are dropped. Each job logs at most one warning per hour naming the dropped series-route count, the chart, its owner and the rejected template. Give every chart a unique rendered ID (`id` or `context`). Which template owns a new contested chart follows [Named Active Template Sets](#named-active-template-sets): compile-order precedence among one series' routes, scan order across series.
+> Cross-template chart ID collisions lose data: conflicting authored series are dropped. At most one warning per hour is logged per chart type-ID namespace (`WithEmitTypeIDBudgetPrefix`), so once per job across its host scopes and once per runtime metrics component, naming the dropped series-route count, the chart, its owner and the rejected template. Give every chart a unique rendered ID (`id` or `context`). Which template owns a new contested chart follows [Named Active Template Sets](#named-active-template-sets): compile-order precedence among one series' routes, scan order across series.
 
 Authored charts can set one reducer for all their dimensions. Supported values are `sum` (default), `min`, `max`, and
 `avg`. Reduction is scoped to one successful plan build and happens before multiplier/divisor and

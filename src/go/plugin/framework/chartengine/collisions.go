@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	// chartIDCollisionLogKey rate-limits collision warnings per job logger.
-	chartIDCollisionLogKey    = "chartengine:chart-id-collision"
+	// chartIDCollisionLogKey prefixes the rate-limit key of collision warnings.
+	chartIDCollisionLogKey    = "chartengine:chart-id-collision:"
 	chartIDCollisionLogPeriod = time.Hour
 )
 
@@ -38,7 +38,11 @@ func (e *Engine) warnChartIDCollisions(ctx *planBuildContext) {
 	if c.routes == 0 || e == nil || e.state.log == nil {
 		return
 	}
-	e.state.log.Limit(chartIDCollisionLogKey, 1, chartIDCollisionLogPeriod).Warningf(
+	// Engines may share a logger's limiter. Keying by the chart type-ID namespace
+	// gives a job one warning period across its host scopes, while runtime
+	// components that share a logger keep separate periods.
+	key := chartIDCollisionLogKey + e.state.cfg.autogenTypeID
+	e.state.log.Limit(key, 1, chartIDCollisionLogPeriod).Warningf(
 		"chartengine: dropped %d series route(s) to charts owned by another template (chart '%s' owned by %s, rejected %s); give each chart a unique id or context",
 		c.routes,
 		c.chartID,

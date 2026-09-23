@@ -89,6 +89,39 @@ func TestChartIDCollisionWarning(t *testing.T) {
 	}
 }
 
+// Engines can share one logger and its rate limiter: a job's host-scope engines
+// do, and so do runtime metrics components. The warning period is per chart type
+// ID namespace, so one job warns once across its scopes while components do not
+// suppress each other.
+func TestChartIDCollisionWarningScope(t *testing.T) {
+	tests := map[string]struct {
+		typeIDs  []string
+		warnings int
+	}{
+		"engines of one job":        {typeIDs: []string{"module_job", "module_job"}, warnings: 1},
+		"engines of two namespaces": {typeIDs: []string{"netdata.component_a", "netdata.component_b"}, warnings: 2},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var logs bytes.Buffer
+			shared := logger.NewWithWriter(&logs)
+			set := testTemplateSet(t, collisionEntries([]string{"a", "b"}, "a", "b")...)
+			for i, typeID := range tc.typeIDs {
+				e, err := New(
+					WithRuntimeStore(nil),
+					WithEmitTypeIDBudgetPrefix(typeID),
+					WithLogger(shared.With("engine", i)),
+				)
+				require.NoError(t, err)
+				attempt := templateAttempt(t, e, metrix.NewCollectorStore(), set, map[string]float64{"requests": 1})
+				require.NoError(t, attempt.Commit())
+			}
+
+			assert.Equal(t, tc.warnings, strings.Count(logs.String(), chartIDCollisionWarning))
+		})
+	}
+}
+
 // Authored charts displacing automatic ones, and automatic routes losing to an
 // authored owner, are the intended "template wins" rule, not collisions to report.
 func TestChartIDCollisionWarningIgnoresAutogen(t *testing.T) {
