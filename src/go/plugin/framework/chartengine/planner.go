@@ -222,13 +222,21 @@ func isHistogramBucketSeries(meta metrix.SeriesMeta) bool {
 
 // buildPlan runs with the owning engine locked, possibly against a private
 // candidate view. It stages lifecycle changes in the materialized state in place,
-// recording committed values in journal; a failed build rolls them back before
-// returning, and the attempt owns the journal otherwise.
+// recording committed values in journal; a build that fails or panics rolls them
+// back before returning, and the attempt owns the journal otherwise.
 func (e *Engine) buildPlan(
 	reader metrix.Reader,
 	retired map[string]*materializedChartState,
 	journal *planJournal,
 ) (Plan, materializedState, bool, error) {
+	// A build that does not return a prepared plan, including one interrupted by a panic,
+	// leaves committed state as it found it.
+	prepared := false
+	defer func() {
+		if !prepared {
+			journal.rollback()
+		}
+	}()
 	out := Plan{
 		Actions:            make([]EngineAction, 0, e.state.hints.actions),
 		InferredDimensions: make([]InferredDimension, 0, e.state.hints.seenInfer),
@@ -288,7 +296,6 @@ func (e *Engine) buildPlan(
 	sample.phaseValidateSeconds = time.Since(phaseStartedAt).Seconds()
 	phaseStartedAt = time.Now()
 	if err := e.scanPlanSeries(ctx); err != nil {
-		journal.rollback()
 		sample.phaseScanSeconds = time.Since(phaseStartedAt).Seconds()
 		sample.buildErr = true
 		e.logWarningf("chartengine build scan failed: %v", err)
@@ -327,7 +334,6 @@ func (e *Engine) buildPlan(
 	}
 	phaseStartedAt = time.Now()
 	if err := e.materializePlanCharts(ctx); err != nil {
-		journal.rollback()
 		sample.phaseMaterializeSeconds = time.Since(phaseStartedAt).Seconds()
 		sample.buildErr = true
 		e.logWarningf("chartengine build materialization failed: %v", err)
@@ -368,6 +374,7 @@ func (e *Engine) buildPlan(
 	e.state.hints.actions = len(out.Actions)
 	e.state.hints.values = len(ctx.values)
 
+	prepared = true
 	return out, staged, true, nil
 }
 

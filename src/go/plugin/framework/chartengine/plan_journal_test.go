@@ -410,3 +410,54 @@ func TestMaterializedMapsFollowCardinalityDown(t *testing.T) {
 	assert.Less(t, int(fanout.dimDeletes), compactMinDeletes)
 	assert.Less(t, int(fanout.scratchDeletes), compactMinDeletes)
 }
+
+// TestPlanBuildPanicLeavesCommittedState checks that a build interrupted by a panic after it
+// staged changes restores committed state, so an engine a caller keeps using after recovering
+// plans exactly like one that never panicked.
+func TestPlanBuildPanicLeavesCommittedState(t *testing.T) {
+	armed, accepted := false, 0
+	observer := func(d PlanRouteDiagnostic) {
+		if armed && d.Decision == PlanRouteAccepted {
+			if accepted++; accepted == 3 {
+				panic("route observer")
+			}
+		}
+	}
+	panicking, err := New(WithRuntimeStore(nil), WithPlanRouteDiagnosticObserver(observer))
+	require.NoError(t, err)
+	twin, err := New(WithRuntimeStore(nil), WithPlanRouteDiagnosticObserver(func(PlanRouteDiagnostic) {}))
+	require.NoError(t, err)
+	for _, e := range []*Engine{panicking, twin} {
+		require.NoError(t, e.LoadYAML([]byte(cardinalitySpikeTemplateYAML), 1))
+	}
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	vec := store.Write().SnapshotMeter("svc").Vec("id").Gauge("m")
+	collect := func(ids ...int) metrix.Reader {
+		cc.BeginCycle()
+		for _, id := range ids {
+			vec.WithLabelValues(fmt.Sprint(id)).Observe(metrix.SampleValue(id))
+		}
+		require.NoError(t, cc.CommitCycleSuccess())
+		return store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
+	}
+
+	reader := collect(0, 1, 2)
+	for _, e := range []*Engine{panicking, twin} {
+		_, err := prepareAndCommitPlan(e, reader)
+		require.NoError(t, err)
+	}
+
+	reader = collect(1, 2, 3, 4)
+	before := snapshotMaterialized(panicking.state.materialized)
+	armed = true
+	require.Panics(t, func() { _, _ = panicking.PreparePlan(reader) })
+	armed = false
+	require.Equal(t, before, snapshotMaterialized(panicking.state.materialized), "panic left staged state")
+
+	want, err := prepareAndCommitPlan(twin, reader)
+	require.NoError(t, err)
+	got, err := prepareAndCommitPlan(panicking, reader)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+}
