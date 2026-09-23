@@ -1066,12 +1066,12 @@ static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *
     nd_log_limit_static_global_var(erl, 1, 0);
     nd_log_limit(&erl, NDLS_DAEMON, priority,
                 "DBENGINE: error while reading extent from datafile %u of tier %d, at offset %" PRIu64 " (%u bytes) "
-                "%s from %ld (%s) to %ld (%s) %s%s: "
+                "%s from %" PRId64 " (%s) to %" PRId64 " (%s) %s%s: "
                 "%s",
                 epdl->datafile->fileno, ctx->config.tier,
                 BLOCK_TO_OFFSET(epdl->extent_block), epdl->extent_size,
                 used_epdl ? "to extract page (PD)" : used_descr ? "expected page (DESCR)" : "part of a query (PDC)",
-                start_time_s, start_time_str, end_time_s, end_time_str,
+                (int64_t)start_time_s, start_time_str, (int64_t)end_time_s, end_time_str,
                 used_epdl || used_descr ? " of metric " : "",
                 used_epdl || used_descr ? uuid : "",
                 msg);

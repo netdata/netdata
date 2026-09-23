@@ -1662,7 +1662,7 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     if(!data_start) {
         if(fd_v2 != -1)
             close(fd_v2);
-        nd_log_daemon(NDLP_WARNING, "DBENGINE: Failed to allocate %"PRIu64" bytes of memory for journal file \"%s\". Will retry later", total_file_size, path);
+        nd_log_daemon(NDLP_WARNING, "DBENGINE: Failed to allocate %zu bytes of memory for journal file \"%s\". Will retry later", total_file_size, path);
         return false;
     }
 
