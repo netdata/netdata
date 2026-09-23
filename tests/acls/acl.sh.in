@@ -28,6 +28,11 @@ fail() {
 }
 
 start_netdata() {
+    # a foreign listener on 19999 would pass the readiness check and receive the tests
+    if (: > /dev/tcp/127.0.0.1/19999) 2>/dev/null; then
+        fail "port 19999 is already in use"
+    fi
+
     "$NETDATA_BIN" -c "$1" -D &
     NETDATAPID=$!
 
