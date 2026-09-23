@@ -498,6 +498,9 @@ bool rrdhost_apply_by_machine_guid(const char *machine_guid, void (*cb)(RRDHOST 
 // Exposed for rrdhost_machine_guid_unittest().
 void rrdhost_machine_guid_copy(char *dst, const char *guid);
 
+// True when a streamed machine-guid is a UUID that fits in RRDHOST.machine_guid unchanged.
+bool rrdhost_machine_guid_is_valid(const char *guid);
+
 #ifdef RRDHOST_INTERNALS
 RRDHOST *rrdhost_create(
     const char *hostname,
