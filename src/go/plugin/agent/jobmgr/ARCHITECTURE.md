@@ -287,6 +287,13 @@ it adds no scheduler, worker, per-task heap object, or population scan.
   containment cut because late output and mutation cannot escape the process-owned attempt boundary. The physical
   worker may still finish state private to that attempt; the boundary prevents publication, re-entry, or reuse until
   physical release.
+- **A resource transaction that applied answers with its own result.** Cancellation or a deadline before Apply disposes
+  the prepared transaction with state unchanged and answers `499`/`504`. Once Apply starts it is not interrupted, and a
+  cancellation or deadline that arrives meanwhile does not replace the applied result: answering `499`/`504` for an
+  applied change would make the Netdata daemon drop a change the plugin already made. The daemon keeps waiting for the
+  reply after a cancellation, but stops one second after the deadline, so an Apply that ends later loses its reply.
+  Apply waits stay short for that reason: runtime-identity supersession has a two-second grace and collector `Run`
+  readiness is expected to be prompt. `kernel.go` (`completeResourceTransactionTask`).
 
 ## Process Containment
 
