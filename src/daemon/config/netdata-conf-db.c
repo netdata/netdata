@@ -10,9 +10,9 @@ bool dbengine_enabled = false; // will become true if and when dbengine is initi
 bool dbengine_datafiles_present = false; // detected at startup, regardless of the configured memory mode
 #ifdef ENABLE_DBENGINE
 struct dbengine_config netdata_conf_dbengine = DBENGINE_CONFIG_DEFAULTS;
-static uint8_t dbengine_tier0_page_type = RRDENG_PAGE_TYPE_GORILLA_32BIT;
-int default_rrdeng_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
-int default_multidb_disk_quota_mb = RRDENG_DEFAULT_TIER_DISK_SPACE_MB;
+static uint8_t dbengine_tier0_page_type = DBENGINE_PAGE_TYPE_GORILLA_32BIT;
+int default_dbengine_disk_quota_mb = DBENGINE_DEFAULT_TIER_DISK_SPACE_MB;
+int default_multidb_disk_quota_mb = DBENGINE_DEFAULT_TIER_DISK_SPACE_MB;
 bool new_dbengine_defaults = false;
 bool legacy_multihost_db_space = false;
 #endif
@@ -49,11 +49,11 @@ static void netdata_conf_dbengine_pre_logs(void) {
 
     const char *page_type = inicfg_get(&netdata_config, CONFIG_SECTION_DB, "dbengine page type", "gorilla");
     if (strcmp(page_type, "gorilla") == 0)
-        dbengine_tier0_page_type = RRDENG_PAGE_TYPE_GORILLA_32BIT;
+        dbengine_tier0_page_type = DBENGINE_PAGE_TYPE_GORILLA_32BIT;
     else if (strcmp(page_type, "raw") == 0)
-        dbengine_tier0_page_type = RRDENG_PAGE_TYPE_ARRAY_32BIT;
+        dbengine_tier0_page_type = DBENGINE_PAGE_TYPE_ARRAY_32BIT;
     else {
-        dbengine_tier0_page_type = RRDENG_PAGE_TYPE_ARRAY_32BIT;
+        dbengine_tier0_page_type = DBENGINE_PAGE_TYPE_ARRAY_32BIT;
         netdata_log_error("Invalid dbengine page type ''%s' given. Defaulting to 'raw'.", page_type);
     }
 
@@ -70,9 +70,9 @@ static void netdata_conf_dbengine_pre_logs(void) {
         inicfg_set_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine extent cache size", extent_cache_mb);
     }
 
-    if(page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
-        netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
-        page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+    if(page_cache_mb < DBENGINE_MIN_PAGE_CACHE_SIZE_MB) {
+        netdata_log_error("Invalid page cache size %d given. Defaulting to %d.", page_cache_mb, DBENGINE_MIN_PAGE_CACHE_SIZE_MB);
+        page_cache_mb = DBENGINE_MIN_PAGE_CACHE_SIZE_MB;
         inicfg_set_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine page cache size", page_cache_mb);
     }
 
@@ -90,10 +90,10 @@ static void netdata_conf_dbengine_pre_logs(void) {
 #ifdef ENABLE_DBENGINE
 uint8_t netdata_conf_dbengine_page_type(size_t tier) {
     // only tier 0 is configurable; the higher tiers hold aggregates, which one page type stores
-    return tier ? RRDENG_PAGE_TYPE_ARRAY_TIER1 : dbengine_tier0_page_type;
+    return tier ? DBENGINE_PAGE_TYPE_ARRAY_TIER1 : dbengine_tier0_page_type;
 }
 
-void netdata_conf_dbengine_tier_config(size_t tier, struct rrdeng_tier_config *out) {
+void netdata_conf_dbengine_tier_config(size_t tier, struct dbengine_tier_config *out) {
     memset(out, 0, sizeof(*out));
     out->tier = tier;
     out->page_type = netdata_conf_dbengine_page_type(tier);
@@ -103,13 +103,13 @@ void netdata_conf_dbengine_tier_config(size_t tier, struct rrdeng_tier_config *o
 struct dbengine_initialization {
     ND_THREAD *thread;
     char path[FILENAME_MAX + 1];
-    struct rrdeng_tier_config config;
+    struct dbengine_tier_config config;
     int ret;
 };
 
-void dbengine_tier_init(void *ptr) {
+void netdata_conf_dbengine_tier_init(void *ptr) {
     struct dbengine_initialization *dbi = ptr;
-    dbi->ret = rrdeng_init(NULL, &dbi->config);
+    dbi->ret = dbengine_tier_init(NULL, &dbi->config);
 }
 
 RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
@@ -259,10 +259,10 @@ void netdata_conf_dbengine_init(const char *hostname) {
         storage_tiers_grouping_iterations[tier] = grouping_iterations;
     }
 
-    default_multidb_disk_quota_mb = (int) inicfg_get_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 0 retention size", RRDENG_DEFAULT_TIER_DISK_SPACE_MB);
-    if(default_multidb_disk_quota_mb && default_multidb_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
-        netdata_log_error("Invalid disk space %d for tier 0 given. Defaulting to %d.", default_multidb_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
-        default_multidb_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+    default_multidb_disk_quota_mb = (int) inicfg_get_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 0 retention size", DBENGINE_DEFAULT_TIER_DISK_SPACE_MB);
+    if(default_multidb_disk_quota_mb && default_multidb_disk_quota_mb < DBENGINE_MIN_DISK_SPACE_MB) {
+        netdata_log_error("Invalid disk space %d for tier 0 given. Defaulting to %d.", default_multidb_disk_quota_mb, DBENGINE_MIN_DISK_SPACE_MB);
+        default_multidb_disk_quota_mb = DBENGINE_MIN_DISK_SPACE_MB;
         inicfg_set_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 0 retention size", default_multidb_disk_quota_mb);
     }
 
@@ -292,7 +292,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
             continue;
         }
 
-        int disk_space_mb = tier ? RRDENG_DEFAULT_TIER_DISK_SPACE_MB : default_multidb_disk_quota_mb;
+        int disk_space_mb = tier ? DBENGINE_DEFAULT_TIER_DISK_SPACE_MB : default_multidb_disk_quota_mb;
         snprintfz(dbengineconfig, sizeof(dbengineconfig) - 1, "dbengine tier %zu retention size", tier);
         disk_space_mb = inicfg_get_size_mb(&netdata_config, CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
 
@@ -311,10 +311,10 @@ void netdata_conf_dbengine_init(const char *hostname) {
         if(parallel_initialization) {
             char tag[NETDATA_THREAD_TAG_MAX + 1];
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "DBENGINIT[%zu]", tier);
-            tiers_init[tier].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, dbengine_tier_init, &tiers_init[tier]);
+            tiers_init[tier].thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, netdata_conf_dbengine_tier_init, &tiers_init[tier]);
         }
         else
-            dbengine_tier_init(&tiers_init[tier]);
+            netdata_conf_dbengine_tier_init(&tiers_init[tier]);
     }
 
     for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
@@ -344,8 +344,8 @@ void netdata_conf_dbengine_init(const char *hostname) {
     // every tier that came up, including one above a tier that failed: the engine runs and rotates it,
     // so its registry load is awaited like the others
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
-        if(rrdeng_ctx_is_active(multidb_ctx[tier]))
-            rrdeng_readiness_wait(multidb_ctx[tier]);
+        if(dbengine_tier_is_active(dbengine_multidb_tiers[tier]))
+            dbengine_readiness_wait(dbengine_multidb_tiers[tier]);
 
 
     dbengine_enabled = true;
@@ -425,7 +425,7 @@ void netdata_conf_section_db(void) {
         else
             snprintfz(dbenginepath, sizeof(dbenginepath) - 1, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
 
-        dbengine_datafiles_present = rrdeng_datafiles_present(dbenginepath);
+        dbengine_datafiles_present = dbengine_dir_has_datafiles(dbenginepath);
     }
 #endif
 

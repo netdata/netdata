@@ -4,10 +4,10 @@
 #include "rrdengine.h"
 #include "database/storage-engines/dbengine/include/dbengine/dbengine-tests.h"
 
-// Global dummy rrdengine_instances for tests
-static struct rrdengine_instance test_ctx_0 = {0};
-static struct rrdengine_instance test_ctx_1 = {0};
-static struct rrdengine_instance test_ctx_tier[4] = { 0 }; // For stress test tiers
+// Global dummy tiers for tests
+static struct dbengine_tier test_ctx_0 = {0};
+static struct dbengine_tier test_ctx_1 = {0};
+static struct dbengine_tier test_ctx_tier[4] = { 0 }; // For stress test tiers
 
 static int mrg_allocation_alignment_unittest(MRG *mrg) {
     if((uintptr_t)mrg % _Alignof(MRG) == 0)
@@ -63,7 +63,7 @@ static void mrg_stress(void *ptr) {
 }
 
 static int mrg_unittest_expect_samples_delta(
-    struct rrdengine_instance *ctx,
+    struct dbengine_tier *ctx,
     time_t first_time_s,
     time_t last_time_s,
     uint32_t update_every_s,
@@ -72,7 +72,7 @@ static int mrg_unittest_expect_samples_delta(
     const char *name)
 {
     uint64_t samples = UINT64_MAX;
-    bool rc = rrdeng_retention_samples_delta(ctx, first_time_s, last_time_s, update_every_s, name, &samples);
+    bool rc = dbengine_retention_samples_delta(ctx, first_time_s, last_time_s, update_every_s, name, &samples);
 
     if(rc == expected_rc && samples == expected_samples)
         return 0;
@@ -89,7 +89,7 @@ static int mrg_unittest_expect_samples_delta(
 }
 
 static int mrg_unittest_expect_counter_sub(
-    struct rrdengine_instance *ctx,
+    struct dbengine_tier *ctx,
     uint64_t initial,
     uint64_t decrement,
     bool expected_rc,
@@ -97,7 +97,7 @@ static int mrg_unittest_expect_counter_sub(
     const char *name)
 {
     uint64_t counter = initial;
-    bool rc = rrdeng_atomic_uint64_sub_saturating(ctx, &counter, decrement, "unittest", name);
+    bool rc = dbengine_atomic_uint64_sub_saturating(ctx, &counter, decrement, "unittest", name);
 
     if(rc == expected_rc && counter == expected_value)
         return 0;
@@ -115,7 +115,7 @@ static int mrg_unittest_expect_counter_sub(
 
 static int dbengine_accounting_helpers_unittest(void) {
     int errors = 0;
-    struct rrdengine_instance ctx = {0};
+    struct dbengine_tier ctx = {0};
     ctx.config.tier = 1;
 
     errors += mrg_unittest_expect_samples_delta(&ctx, 10, 70, 10, true, 6, "normal positive interval");
@@ -136,7 +136,7 @@ static int dbengine_accounting_helpers_unittest(void) {
 
     ctx.atomic.metrics = 11;
     ctx.atomic.samples = 22;
-    rrdeng_reset_accounting_if_fresh(&ctx, false);
+    dbengine_reset_accounting_if_fresh(&ctx, false);
     if(ctx.atomic.metrics != 11 || ctx.atomic.samples != 22) {
         fprintf(stderr,
                 "DBENGINE METRIC: global-context accounting reset policy failed, expected 11/22 got %"PRIu64"/%"PRIu64"\n",
@@ -145,7 +145,7 @@ static int dbengine_accounting_helpers_unittest(void) {
         errors++;
     }
 
-    rrdeng_reset_accounting_if_fresh(&ctx, true);
+    dbengine_reset_accounting_if_fresh(&ctx, true);
     if(ctx.atomic.metrics != 0 || ctx.atomic.samples != 0) {
         fprintf(stderr,
                 "DBENGINE METRIC: fresh-context accounting reset policy failed, expected 0/0 got %"PRIu64"/%"PRIu64"\n",
@@ -248,7 +248,7 @@ static int mrg_entries_acquired_counter_unittest(MRG *mrg) {
     nd_uuid_t uuid;
     uuid_generate(uuid);
 
-    struct mrg_statistics baseline;
+    struct dbengine_metrics_registry_stats baseline;
     mrg_get_statistics(mrg, &baseline);
 
     MRG_ENTRY entry = {
@@ -266,7 +266,7 @@ static int mrg_entries_acquired_counter_unittest(MRG *mrg) {
         return 1;
     }
 
-    struct mrg_statistics stats;
+    struct dbengine_metrics_registry_stats stats;
     mrg_get_statistics(mrg, &stats);
     if(stats.entries != baseline.entries + 1 ||
        stats.entries_acquired != baseline.entries_acquired + 1 ||
@@ -1550,7 +1550,7 @@ cleanup_early:
 #define JV2_TMPDIR_TEMPLATE "/netdata-jv2-writer-XXXXXX"
 
 // Longest name journalfile_v2_generate_path() appends to dbfiles_path:
-// "/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 is ~31 bytes.
+// "/" WALFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2 is ~31 bytes.
 // Round up generously - being wrong here means a silently truncated journal path.
 #define JV2_JOURNAL_NAME_MAX 64
 
@@ -1587,7 +1587,7 @@ static bool jv2_tmpdir_is_usable(const char *dir, size_t dst_size) {
 
     const size_t len = strlen(dir);
     const size_t needed = len + sizeof(JV2_TMPDIR_TEMPLATE) + JV2_JOURNAL_NAME_MAX;
-    if(needed > dst_size || needed > RRDENG_PATH_MAX || needed > FILENAME_MAX)
+    if(needed > dst_size || needed > DBENGINE_PATH_MAX || needed > FILENAME_MAX)
         return false;
 
     for(size_t i = 0; i < len; i++) {
@@ -1666,7 +1666,7 @@ static int mrg_jv2_real_writer_unittest(void) {
     // A zeroed fixture is NOT enough: activation validates the datafile and takes
     // locks that must be constructed, not merely zeroed. Mirror what production does.
     //
-    //   - initialize_single_ctx() (rrdengineapi.c) builds the two ctx locks. It is
+    //   - initialize_tier() (rrdengineapi.c) builds the two tier locks. It is
     //     static, so they are constructed here: njfv2idx.spinlock is taken by
     //     njfv2idx_add(), which journalfile_v2_data_set() calls on activation.
     //   - datafile_alloc_and_init() (datafile.c) stamps DATAFILE_MAGIC and builds the
@@ -1677,14 +1677,14 @@ static int mrg_jv2_real_writer_unittest(void) {
     //     hand-rolled: it builds data_spinlock (taken by journalfile_v2_data_set()),
     //     builds unsafe.spinlock (read by journalfile_current_size()), sets
     //     mmap.fd = -1, and links itself to the datafile.
-    struct rrdengine_instance ctx;
+    struct dbengine_tier ctx;
     memset(&ctx, 0, sizeof(ctx));
     ctx.config.tier = 0;
     strncpyz(ctx.config.dbfiles_path, dbpath, sizeof(ctx.config.dbfiles_path) - 1);
     fatal_assert(0 == netdata_rwlock_init(&ctx.datafiles.rwlock));
     rw_spinlock_init(&ctx.njfv2idx.spinlock);
 
-    struct rrdengine_datafile datafile;
+    struct dbengine_datafile datafile;
     memset(&datafile, 0, sizeof(datafile));
     datafile.tier = 1;              // datafile_alloc_and_init() asserts exactly this
     datafile.fileno = TEST_FILENO;
@@ -1696,7 +1696,7 @@ static int mrg_jv2_real_writer_unittest(void) {
     spinlock_init(&datafile.writers.spinlock);
     rw_spinlock_init(&datafile.extent_epdl.spinlock);
 
-    struct rrdengine_journalfile *journalfile = journalfile_alloc_and_init(&datafile);
+    struct dbengine_journalfile *journalfile = journalfile_alloc_and_init(&datafile);
 
     const Word_t section = (Word_t)&ctx;
 
@@ -1908,7 +1908,7 @@ static int mrg_jv2_same_uuid_grouped_once_unittest(void) {
     return errors;
 }
 
-int mrg_unittest(void) {
+int dbengine_metrics_registry_unittest(void) {
     int errors = dbengine_accounting_helpers_unittest();
     errors += mrg_destroy_referenced_metric_unittest();
     errors += mrg_stale_peeked_id_unittest();
@@ -2054,7 +2054,7 @@ int mrg_unittest(void) {
 
     usec_t ended_ut = now_monotonic_usec();
 
-    struct mrg_statistics stats;
+    struct dbengine_metrics_registry_stats stats;
     mrg_get_statistics(mrg, &stats);
 
     fprintf(stderr, "DBENGINE METRIC: did %zu additions, %zu duplicate additions, "
@@ -2076,7 +2076,7 @@ int mrg_unittest(void) {
                      stats.deletions, stats.deletions + stats.delete_misses);
 
     // Phase 3: Measure final statistics
-    struct mrg_statistics final_stats;
+    struct dbengine_metrics_registry_stats final_stats;
     mrg_get_statistics(mrg, &final_stats);
     fprintf(stderr, "DBENGINE METRIC: final MRG state - %zu entries, %zd acquired\n",
                      final_stats.entries, final_stats.entries_acquired);
@@ -2298,7 +2298,7 @@ static void mrg_bench_print_summary(const mrg_bench_summary_stats_t *summary) {
     fprintf(stderr, "\n");
 }
 
-int mrg_retention_benchmark(void) {
+int dbengine_metrics_registry_retention_benchmark(void) {
     mrg_bench_summary_stats_t summary = {0};
 
     // Use mrg_create_for_unittest() to avoid loading from database

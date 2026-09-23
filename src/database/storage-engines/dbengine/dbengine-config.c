@@ -2,6 +2,13 @@
 
 #include "rrdengine.h"
 
+// the smallest libuv pool the engine assumes when the embedder does not say
+#if defined(ENV32BIT)
+#define DBENGINE_CONFIG_DEFAULT_WORKER_THREADS (8)
+#else
+#define DBENGINE_CONFIG_DEFAULT_WORKER_THREADS (16)
+#endif
+
 // Written once by dbengine_init(), before any tier exists; read-only afterwards.
 struct dbengine_config dbengine_cfg = DBENGINE_CONFIG_DEFAULTS;
 static bool dbengine_cfg_initialized = false;

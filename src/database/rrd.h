@@ -39,10 +39,6 @@ typedef struct alarm_entry ALARM_ENTRY;
 typedef struct rrdvar_acquired RRDVAR_ACQUIRED;
 typedef struct rrdcalc_acquired RRDCALC_ACQUIRED;
 
-#ifdef ENABLE_DBENGINE
-struct rrdengine_instance;
-#endif
-
 // --------------------------------------------------------------------------------------------------------------------
 
 #define UPDATE_EVERY_MIN 1
@@ -108,7 +104,7 @@ static inline uint32_t get_uint32_id() {
 #include "contexts/rrdcontext.h"
 #include "nrpc/nrpc.h"
 #ifdef ENABLE_DBENGINE
-#include "database/storage-engines/dbengine/include/dbengine/rrdengineapi.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-api.h"
 #endif
 #include "sqlite/sqlite_functions.h"
 #include "sqlite/sqlite_context.h"

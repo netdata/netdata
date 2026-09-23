@@ -10,7 +10,7 @@ void sync_uv_file_data(uv_file file)
 }
 #endif
 
-void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
+void datafile_list_insert(struct dbengine_tier *ctx, struct dbengine_datafile *datafile)
 {
     netdata_rwlock_wrlock(&ctx->datafiles.rwlock);
     Pvoid_t *Pvalue = JudyLIns(&ctx->datafiles.JudyL, (Word_t ) datafile->fileno, PJE0);
@@ -28,17 +28,17 @@ void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_dataf
     netdata_rwlock_wrunlock(&ctx->datafiles.rwlock);
 }
 
-void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
+void datafile_list_delete_unsafe(struct dbengine_tier *ctx, struct dbengine_datafile *datafile)
 {
     (void) JudyLDel(&ctx->datafiles.JudyL, (Word_t)datafile->fileno, PJE0);
 }
 
 
-static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_instance *ctx, unsigned tier, unsigned fileno)
+static struct dbengine_datafile *datafile_alloc_and_init(struct dbengine_tier *ctx, unsigned tier, unsigned fileno)
 {
     fatal_assert(tier == 1);
 
-    struct rrdengine_datafile *datafile = callocz(1, sizeof(struct rrdengine_datafile));
+    struct dbengine_datafile *datafile = callocz(1, sizeof(struct dbengine_datafile));
 
     datafile->tier = tier;
     datafile->fileno = fileno;
@@ -56,7 +56,7 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
     return datafile;
 }
 
-ALWAYS_INLINE bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason)
+ALWAYS_INLINE bool datafile_acquire(struct dbengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason)
 {
     bool ret = false;
 
@@ -92,7 +92,7 @@ ALWAYS_INLINE bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQU
     return ret;
 }
 
-void datafile_release_with_trace(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason, const char *func) {
+void datafile_release_with_trace(struct dbengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason, const char *func) {
     spinlock_tracked_lock(&df->users.spinlock);
     if(!df->users.lockers)
         fatal("DBENGINE DATAFILE: cannot release datafile %u of tier %u - it is not acquired, called from %s() with reason %u",
@@ -103,7 +103,7 @@ void datafile_release_with_trace(struct rrdengine_datafile *df, DATAFILE_ACQUIRE
     spinlock_tracked_unlock(&df->users.spinlock);
 }
 
-bool datafile_acquire_for_deletion(struct rrdengine_datafile *df)
+bool datafile_acquire_for_deletion(struct dbengine_datafile *df)
 {
     bool can_be_deleted = false;
     bool marked_pending = false;
@@ -134,7 +134,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df)
     spinlock_tracked_unlock(&df->users.spinlock);
 
     if(marked_pending)
-        netdata_log_info("DBENGINE: tier %d: " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " is pending deletion",
+        netdata_log_info("DBENGINE: tier %d: " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " is pending deletion",
                          datafile_ctx(df)->config.tier, df->tier, df->fileno);
 
     if(can_be_deleted)
@@ -159,7 +159,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df)
     if(!writers_running && !flushed_to_open_running) {
         if(df->users.available) {
             df->users.available = false;
-            netdata_log_info("DBENGINE: tier %d: " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " entered deletion phase-2 (new users blocked)",
+            netdata_log_info("DBENGINE: tier %d: " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " entered deletion phase-2 (new users blocked)",
                              datafile_ctx(df)->config.tier, df->tier, df->fileno);
         }
 
@@ -190,27 +190,27 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df)
     return can_be_deleted;
 }
 
-void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
+void generate_datafilepath(struct dbengine_datafile *datafile, char *str, size_t maxlen)
 {
-    (void) snprintfz(str, maxlen - 1, "%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
+    (void) snprintfz(str, maxlen - 1, "%s/" DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
                     datafile_ctx(datafile)->config.dbfiles_path, datafile->tier, datafile->fileno);
 }
 
-int close_data_file(struct rrdengine_datafile *datafile)
+int close_data_file(struct dbengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     int ret;
-    char path[RRDENG_PATH_MAX];
+    char path[DBENGINE_PATH_MAX];
     generate_datafilepath(datafile, path, sizeof(path));
     CLOSE_FILE(ctx, path, datafile->file, ret);
     return ret;
 }
 
-int unlink_data_file(struct rrdengine_datafile *datafile)
+int unlink_data_file(struct dbengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     int ret;
-    char path[RRDENG_PATH_MAX];
+    char path[DBENGINE_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
 
@@ -221,11 +221,11 @@ int unlink_data_file(struct rrdengine_datafile *datafile)
     return ret;
 }
 
-int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
+int destroy_data_file_unsafe(struct dbengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     int ret;
-    char path[RRDENG_PATH_MAX];
+    char path[DBENGINE_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
 
@@ -235,15 +235,15 @@ int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
     return ret;
 }
 
-int create_data_file(struct rrdengine_datafile *datafile)
+int create_data_file(struct dbengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     uv_fs_t req;
     uv_file file;
     int ret, fd;
-    struct rrdeng_df_sb *superblock = NULL;
+    struct dbengine_df_sb *superblock = NULL;
     uv_buf_t iov;
-    char path[RRDENG_PATH_MAX];
+    char path[DBENGINE_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
     fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, dbengine_cfg.direct_io);
@@ -255,8 +255,8 @@ int create_data_file(struct rrdengine_datafile *datafile)
 
     (void)posix_memalignz((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     memset(superblock, 0, sizeof(*superblock));
-    (void) strncpy(superblock->magic_number, RRDENG_DF_MAGIC, RRDENG_MAGIC_SZ);
-    (void) strncpy(superblock->version, RRDENG_DF_VER, RRDENG_VER_SZ);
+    (void) strncpy(superblock->magic_number, DBENGINE_DF_MAGIC, DBENGINE_MAGIC_SZ);
+    (void) strncpy(superblock->version, DBENGINE_DF_VER, DBENGINE_VER_SZ);
     superblock->tier = 1;
 
     iov = uv_buf_init((void *)superblock, sizeof(*superblock));
@@ -292,7 +292,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
 static int check_data_file_superblock(uv_file file)
 {
     int ret;
-    struct rrdeng_df_sb *superblock = NULL;
+    struct dbengine_df_sb *superblock = NULL;
     uv_buf_t iov;
     uv_fs_t req;
 
@@ -308,8 +308,8 @@ static int check_data_file_superblock(uv_file file)
     fatal_assert(req.result >= 0);
     uv_fs_req_cleanup(&req);
 
-    if (strncmp(superblock->magic_number, RRDENG_DF_MAGIC, RRDENG_MAGIC_SZ) ||
-        strncmp(superblock->version, RRDENG_DF_VER, RRDENG_VER_SZ) ||
+    if (strncmp(superblock->magic_number, DBENGINE_DF_MAGIC, DBENGINE_MAGIC_SZ) ||
+        strncmp(superblock->version, DBENGINE_DF_VER, DBENGINE_VER_SZ) ||
         superblock->tier != 1) {
         netdata_log_error("DBENGINE: file has invalid superblock.");
         ret = UV_EINVAL;
@@ -321,13 +321,13 @@ static int check_data_file_superblock(uv_file file)
     return ret;
 }
 
-static int load_data_file(struct rrdengine_datafile *datafile)
+static int load_data_file(struct dbengine_datafile *datafile)
 {
-    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    struct dbengine_tier *ctx = datafile_ctx(datafile);
     uv_file file;
     int ret, fd, error;
     uint64_t file_size;
-    char path[RRDENG_PATH_MAX];
+    char path[DBENGINE_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
     fd = open_file_for_io(path, O_RDWR, &file, dbengine_cfg.direct_io);
@@ -338,7 +338,7 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     
     nd_log_daemon(NDLP_DEBUG, "DBENGINE: initializing data file \"%s\".", path);
 
-    ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
+    ret = check_file_properties(file, &file_size, sizeof(struct dbengine_df_sb));
     if (ret)
         goto err_exit;
     file_size = ALIGN_BYTES_CEILING(file_size);
@@ -347,7 +347,7 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     if (ret)
         goto err_exit;
 
-    ctx_io_read_op_bytes(ctx, sizeof(struct rrdeng_df_sb));
+    ctx_io_read_op_bytes(ctx, sizeof(struct dbengine_df_sb));
 
     datafile->file = file;
     datafile->pos = file_size;
@@ -364,24 +364,24 @@ err_exit:
 
 static int scan_data_files_cmp(const void *a, const void *b)
 {
-    struct rrdengine_datafile *file1, *file2;
-    char path1[RRDENG_PATH_MAX], path2[RRDENG_PATH_MAX];
+    struct dbengine_datafile *file1, *file2;
+    char path1[DBENGINE_PATH_MAX], path2[DBENGINE_PATH_MAX];
 
-    file1 = *(struct rrdengine_datafile **)a;
-    file2 = *(struct rrdengine_datafile **)b;
+    file1 = *(struct dbengine_datafile **)a;
+    file2 = *(struct dbengine_datafile **)b;
     generate_datafilepath(file1, path1, sizeof(path1));
     generate_datafilepath(file2, path2, sizeof(path2));
     return strcmp(path1, path2);
 }
 
 // the one place a directory entry is recognised as a datafile: both the scan that loads a tier
-// and the embedder's probe (rrdeng_datafiles_present) must agree on what counts as persisted data
+// and the embedder's probe (dbengine_dir_has_datafiles) must agree on what counts as persisted data
 static bool datafile_name_parse(const char *name, unsigned *tier, unsigned *fileno)
 {
-    return sscanf(name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, tier, fileno) == 2;
+    return sscanf(name, DATAFILE_PREFIX DBENGINE_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, tier, fileno) == 2;
 }
 
-bool rrdeng_datafiles_present(const char *dbfiles_path)
+bool dbengine_dir_has_datafiles(const char *dbfiles_path)
 {
     DIR *dir = opendir(dbfiles_path);
     if (!dir)
@@ -401,14 +401,14 @@ bool rrdeng_datafiles_present(const char *dbfiles_path)
 }
 
 /* Returns number of datafiles that were loaded or < 0 on error */
-static int scan_data_files(struct rrdengine_instance *ctx)
+static int scan_data_files(struct dbengine_tier *ctx)
 {
     int ret, matched_files, failed_to_load, i;
     unsigned tier, fileno;
     uv_fs_t req;
     uv_dirent_t dent;
-    struct rrdengine_datafile **datafiles, *datafile;
-    struct rrdengine_journalfile *journalfile;
+    struct dbengine_datafile **datafiles, *datafile;
+    struct dbengine_journalfile *journalfile;
 
     ret = uv_fs_scandir(NULL, &req, ctx->config.dbfiles_path, 0, NULL);
     if (ret < 0) {
@@ -436,16 +436,16 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         }
 
         // Check for journal v1 or v2
-        char expected_name[RRDENG_PATH_MAX];
-        ret = sscanf(dent.name, WALFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL WALFILE_EXTENSION, &tier, &fileno);
+        char expected_name[DBENGINE_PATH_MAX];
+        ret = sscanf(dent.name, WALFILE_PREFIX DBENGINE_FILE_NUMBER_SCAN_TMPL WALFILE_EXTENSION, &tier, &fileno);
         bool unknown_file = true;
         if (2 == ret) {
-            (void) snprintfz(expected_name, sizeof(expected_name), WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
+            (void) snprintfz(expected_name, sizeof(expected_name), WALFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
                             1U, fileno);
 
             unknown_file = (strcmp(dent.name, expected_name) != 0);
             if (unknown_file) {
-                (void) snprintfz(expected_name, sizeof(expected_name), WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2,
+                (void) snprintfz(expected_name, sizeof(expected_name), WALFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2,
                                 1U, fileno);
                 unknown_file = (strcmp(dent.name, expected_name) != 0);
             }
@@ -479,12 +479,12 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         Pvoid_t *PValue;
         size_t deleted_journals = 0;
         while ((PValue = JudyLFirstThenNext(journafile_JudyL, &idx, &first_then_next))) {
-            char path[RRDENG_PATH_MAX];
+            char path[DBENGINE_PATH_MAX];
             if (unlikely(!JudyLGet(datafiles_JudyL, (Word_t)idx, PJE0))) {
                 (void)snprintfz(
                     path,
                     sizeof(path),
-                    "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
+                    "%s/" WALFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
                     datafile_ctx(datafile)->config.dbfiles_path,
                     1U,
                     (unsigned)idx);
@@ -499,7 +499,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                 (void)snprintfz(
                     path,
                     sizeof(path),
-                    "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2,
+                    "%s/" WALFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2,
                     datafile_ctx(datafile)->config.dbfiles_path,
                     1U,
                     (unsigned)idx);
@@ -539,7 +539,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         }
 
         if (must_delete_pair) {
-            char path[RRDENG_PATH_MAX];
+            char path[DBENGINE_PATH_MAX];
 
             netdata_log_error("DBENGINE: deleting invalid data and journal file pair.");
             ret = journalfile_unlink(journalfile);
@@ -569,12 +569,12 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 }
 
 /* Creates a datafile and a journalfile pair */
-int create_new_datafile_pair(struct rrdengine_instance *ctx)
+int create_new_datafile_pair(struct dbengine_tier *ctx)
 {
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_creation_started, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&dbengine_cache_efficiency_stats.datafile_creation_started, 1, __ATOMIC_RELAXED);
 
-    struct rrdengine_datafile *datafile;
-    struct rrdengine_journalfile *journalfile;
+    struct dbengine_datafile *datafile;
+    struct dbengine_journalfile *journalfile;
     unsigned fileno = ctx_last_fileno_get(ctx) + 1;
     int ret;
 
@@ -593,7 +593,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
         goto error_after_journalfile;
 
     nd_log(NDLS_DAEMON, NDLP_INFO,
-           "DBENGINE: tier %d: created " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf).",
+           "DBENGINE: tier %d: created " DATAFILE_PREFIX DBENGINE_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf).",
            ctx->config.tier, datafile->tier, datafile->fileno);
 
     ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
@@ -614,7 +614,7 @@ error_after_datafile:
 /* Page cache must already be initialized.
  * Return 0 on success.
  */
-int init_data_files(struct rrdengine_instance *ctx)
+int init_data_files(struct dbengine_tier *ctx)
 {
     int ret;
 
@@ -641,7 +641,7 @@ int init_data_files(struct rrdengine_instance *ctx)
     return 0;
 }
 
-void cleanup_datafile_epdl_structures(struct rrdengine_datafile *datafile)
+void cleanup_datafile_epdl_structures(struct dbengine_datafile *datafile)
 {
     rw_spinlock_write_lock(&datafile->extent_epdl.spinlock);
     bool first = true;
@@ -657,7 +657,7 @@ void cleanup_datafile_epdl_structures(struct rrdengine_datafile *datafile)
     rw_spinlock_write_unlock(&datafile->extent_epdl.spinlock);
 }
 
-void finalize_data_files(struct rrdengine_instance *ctx)
+void finalize_data_files(struct dbengine_tier *ctx)
 {
     bool logged = false;
 
@@ -677,8 +677,8 @@ void finalize_data_files(struct rrdengine_instance *ctx)
     Word_t Index = 0;
 
     while ((PValue = JudyLFirstThenNext(ctx->datafiles.JudyL, &Index, &first_then_next))) {
-        struct rrdengine_datafile *datafile = *PValue;
-        struct rrdengine_journalfile *journalfile = datafile->journalfile;
+        struct dbengine_datafile *datafile = *PValue;
+        struct dbengine_journalfile *journalfile = datafile->journalfile;
 
         logged = false;
         bool acquired = false;

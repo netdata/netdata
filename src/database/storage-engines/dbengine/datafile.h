@@ -6,9 +6,9 @@
 #include "rrdengine.h"
 
 /* Forward declarations */
-struct rrdengine_datafile;
-struct rrdengine_journalfile;
-struct rrdengine_instance;
+struct dbengine_datafile;
+struct dbengine_journalfile;
+struct dbengine_tier;
 
 #define DATAFILE_PREFIX "datafile-"
 #define DATAFILE_EXTENSION ".ndf"
@@ -45,7 +45,7 @@ void epdl_extent_release(EPDL_EXTENT *e);
 #define DATAFILE_MAGIC 0xDA7AF11E
 
 /* only one event loop is supported for now */
-struct rrdengine_datafile {
+struct dbengine_datafile {
     uint32_t magic1;
 
     unsigned tier;
@@ -53,8 +53,8 @@ struct rrdengine_datafile {
     uv_file file;
     uint64_t pos;
     netdata_rwlock_t extent_rwlock;
-    struct rrdengine_instance *ctx;
-    struct rrdengine_journalfile *journalfile;
+    struct dbengine_tier *ctx;
+    struct dbengine_journalfile *journalfile;
 
     struct {
         SPINLOCK spinlock;
@@ -87,25 +87,25 @@ struct rrdengine_datafile {
     uint32_t magic2;
 };
 
-bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
-void datafile_release_with_trace(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason, const char *func);
+bool datafile_acquire(struct dbengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
+void datafile_release_with_trace(struct dbengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason, const char *func);
 #define datafile_release(df, reason) datafile_release_with_trace(df, reason, __FUNCTION__)
-bool datafile_acquire_for_deletion(struct rrdengine_datafile *df);
+bool datafile_acquire_for_deletion(struct dbengine_datafile *df);
 
-void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
-void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
-void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
-int close_data_file(struct rrdengine_datafile *datafile);
-int unlink_data_file(struct rrdengine_datafile *datafile);
-int destroy_data_file_unsafe(struct rrdengine_datafile *datafile);
-int create_data_file(struct rrdengine_datafile *datafile);
-int create_new_datafile_pair(struct rrdengine_instance *ctx);
-int init_data_files(struct rrdengine_instance *ctx);
-void finalize_data_files(struct rrdengine_instance *ctx);
-void cleanup_datafile_epdl_structures(struct rrdengine_datafile *datafile);
+void datafile_list_insert(struct dbengine_tier *ctx, struct dbengine_datafile *datafile);
+void datafile_list_delete_unsafe(struct dbengine_tier *ctx, struct dbengine_datafile *datafile);
+void generate_datafilepath(struct dbengine_datafile *datafile, char *str, size_t maxlen);
+int close_data_file(struct dbengine_datafile *datafile);
+int unlink_data_file(struct dbengine_datafile *datafile);
+int destroy_data_file_unsafe(struct dbengine_datafile *datafile);
+int create_data_file(struct dbengine_datafile *datafile);
+int create_new_datafile_pair(struct dbengine_tier *ctx);
+int init_data_files(struct dbengine_tier *ctx);
+void finalize_data_files(struct dbengine_tier *ctx);
+void cleanup_datafile_epdl_structures(struct dbengine_datafile *datafile);
 
 NEVERNULL ALWAYS_INLINE
-static struct rrdengine_instance *datafile_ctx(struct rrdengine_datafile *datafile) {
+static struct dbengine_tier *datafile_ctx(struct dbengine_datafile *datafile) {
     if(unlikely(!datafile->ctx))
         fatal("DBENGINE: datafile %u of tier %u has no ctx", datafile->fileno, datafile->tier);
 

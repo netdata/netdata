@@ -3,7 +3,7 @@
 #include "rrd.h"
 #include "storage-engines/storage-engine.h"
 #include "rrddim-collection.h"
-#include "storage-engines/ram/rrddim_mem.h"
+#include "storage-engines/ram/ram.h"
 
 void rrddim_metadata_updated(RRDDIM *rd) {
     rrdcontext_updated_rrddim(rd);
@@ -46,7 +46,7 @@ static void rrddim_reinitialize_collection(RRDDIM *rd) {
     for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         if (!rd->tiers[tier].sch)
             rd->tiers[tier].sch =
-                storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
+                storage_engine_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
     }
 }
 
@@ -137,7 +137,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
                 rd->tiers[tier].last_completed_point_flush_modulo = rrddim_collection_modulo(st, tier_update_every);
 
                 rd->tiers[tier].sch =
-                        storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, tier_update_every, rd->rrdset->smg[tier]);
+                        storage_engine_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, tier_update_every, rd->rrdset->smg[tier]);
 
                 initialized++;
             }
@@ -236,8 +236,8 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         spinlock_lock(&rd->tiers[tier].spinlock);
         if(rd->tiers[tier].smh) {
             STORAGE_ENGINE *eng = host->db[tier].eng;
-            if(rd->tiers[tier].seb == STORAGE_ENGINE_BACKEND_RRDDIM)
-                db_data_lifetime_transferred |= rrddim_metric_release_from_rrddim(rd->tiers[tier].smh, rd);
+            if(rd->tiers[tier].seb == STORAGE_ENGINE_BACKEND_RAM)
+                db_data_lifetime_transferred |= ram_metric_release_from_rrddim(rd->tiers[tier].smh, rd);
             else
                 eng->api.metric_release(rd->tiers[tier].smh);
             rd->tiers[tier].smh = NULL;
