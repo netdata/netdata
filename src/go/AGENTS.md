@@ -125,6 +125,9 @@ every cycle.
   profiles over-attribute runtime syscalls; read them with `-focus` on the benchmark body.
 - Verify reused or stack storage with `-gcflags=-m` and an allocation benchmark. Escape analysis is field-insensitive:
   a buffer reachable through a struct whose other fields escape moves to the heap.
+- Interface calls make their arguments escape: a callback passed to an interface method escapes with every variable it
+  captures, and a pointer handed to one (an option applying itself to `*config`) moves its target to the heap. Keep
+  per-pass state in an object already on the heap and resolve option values by type switch.
 
 ## Go Formatting
 
