@@ -507,8 +507,8 @@ For a complete collector integration pattern (cycle management, error handling),
 | Area | Implementation pattern |
 |------|------------------------|
 | Snapshot publish | Read snapshots are immutable and atomically swapped. |
-| Collector commit | Staged frame → descriptor resolution → retention → single canonical pass → publish, all success-path; abort discards staged state. |
-| Descriptor resolution | Observed authorities per name are grouped in a fingerprint-indexed map (no cap); one canonical descriptor per accepted name. |
+| Collector commit | Staged frame → descriptor resolution → retention → single canonical pass → publish, all success-path; abort discards staged state. The frame allocates a staging map on the first write of its kind. |
+| Descriptor resolution | Observed authorities per name are grouped in a value-typed map sized by the cycle's writes; the first authority is inline and further ones are fingerprint-indexed (no cap); one canonical descriptor per accepted name. |
 | Descriptor eviction | One O(descriptor-universe) sweep at commit, after retention; `instrumentZeroSince` tracks idle-since on the successful-commit clock. |
 | Runtime commit | Overlay/compaction strategy with its own retention pruning; a single-write overlay holds its series inline, and a batch publishes one overlay for all its writes. |
 | Collector read projection | One failure-safe lazy flattened projection per exact published snapshot; concurrent first users synchronize on one complete build. |

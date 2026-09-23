@@ -165,6 +165,15 @@ type cycleFrame struct {
 	recordedConflict map[sameKeyConflictID][]*instrumentDescriptor
 }
 
+// stageEntry stores v in a frame map, creating the map on the kind's first write so a
+// cycle allocates only the maps it uses.
+func stageEntry[V any](m *map[string]V, key string, v V) {
+	if *m == nil {
+		*m = make(map[string]V)
+	}
+	(*m)[key] = v
+}
+
 type storeCore struct {
 	mu sync.RWMutex
 
