@@ -15,6 +15,28 @@ static const char *status_file_io_fallback_dirs[] = {
 static bool status_file_io_obsolete_removed = false;
 static _Alignas(8) uint64_t status_file_io_tmp_attempt_counter = 0;
 
+static int status_file_io_unlink(const char *path) {
+#if defined(OS_WINDOWS)
+    wchar_t *native_path = os_translate_msys_to_windows_pathW(path);
+    if (!native_path) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    BOOL removed = DeleteFileW(native_path);
+    DWORD error = removed ? ERROR_SUCCESS : GetLastError();
+    freez(native_path);
+    if (!removed) {
+        errno = (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND) ? ENOENT :
+                (error == ERROR_ACCESS_DENIED || error == ERROR_SHARING_VIOLATION) ? EACCES : EIO;
+        return -1;
+    }
+    return 0;
+#else
+    return unlink(path);
+#endif
+}
+
 _Static_assert(__atomic_always_lock_free(sizeof(status_file_io_obsolete_removed),
                                          &status_file_io_obsolete_removed),
                "signal-safe status cleanup state must be lock-free");
@@ -70,7 +92,7 @@ static void status_file_io_remove_obsolete(const char *protected_dir, const char
             len = strcatz(dst, len, "/", sizeof(dst));
         len = strcatz(dst, len, filename, sizeof(dst));
 
-        unlink(dst);
+        status_file_io_unlink(dst);
     }
 
     errno_clear();
@@ -210,7 +232,7 @@ static bool status_file_io_save_this(const char *directory, const char *filename
                 continue; /* Retry if interrupted by signal */
 
             close(fd);
-            unlink(temp);  /* Remove the temp file */
+            status_file_io_unlink(temp);  /* Remove the temp file */
             return false;
         }
 
@@ -220,7 +242,7 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     /* Fsync to ensure data is written to disk */
     if (fsync(fd) == -1) {
         close(fd);
-        unlink(temp);
+        status_file_io_unlink(temp);
         return false;
     }
 
@@ -233,28 +255,35 @@ static bool status_file_io_save_this(const char *directory, const char *filename
 #endif
                ) != 0) {
         close(fd);
-        unlink(temp);
+        status_file_io_unlink(temp);
         return false;
     }
 
     /* Close file */
     if (close(fd) == -1) {
-        unlink(temp);
+        status_file_io_unlink(temp);
         return false;
     }
 
     /* Rename temp file to target file */
 #if defined(OS_WINDOWS)
-    // Windows does not install the POSIX deadly-signal handler, so this
-    // synchronous replacement is safe and preserves the actual rename result.
-    if (!MoveFileExA(temp, final,
+    // UCRT open/unlink and Win32 publication must all address the same native
+    // paths; translate the complete names, including configured directory prefixes.
+    wchar_t *native_temp = os_translate_msys_to_windows_pathW(temp);
+    wchar_t *native_final = os_translate_msys_to_windows_pathW(final);
+    if (!native_temp || !native_final ||
+        !MoveFileExW(native_temp, native_final,
                      MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-        unlink(temp);
+        freez(native_temp);
+        freez(native_final);
+        status_file_io_unlink(temp);
         return false;
     }
+    freez(native_temp);
+    freez(native_final);
 #else
     if (rename(temp, final) != 0) {
-        unlink(temp);
+        status_file_io_unlink(temp);
         return false;
     }
 #endif

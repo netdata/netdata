@@ -25,27 +25,30 @@ static void debug_flags_initialize(void) {
 }
 
 #if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
-// Returns true when 'value' is an auto-generated default log file path: any
-// absolute path ending in /<source_name>.log.  These were written by builds
-// that pre-dated Windows Event Log support and should be upgraded to WEL/ETW.
-// User paths that use a different filename are not matched and are preserved.
+// Upgrade only the exact legacy path generated from the configured log
+// directory. A filename suffix alone cannot distinguish a default from an
+// explicit user-selected path such as C:/custom/debug.log.
 static bool nd_log_is_default_file_path(const char *value, const char *source_name) {
-    if (!value || !*value)
+    if (!value || !*value || !netdata_configured_log_dir || !source_name)
         return false;
 
-    char expected[64];
-    snprintfz(expected, sizeof(expected) - 1, "/%s.log", source_name);
+    size_t dir_len = strlen(netdata_configured_log_dir);
+    char expected[FILENAME_MAX + 1];
+    snprintfz(expected, sizeof(expected) - 1, "%s%s%s.log", netdata_configured_log_dir,
+              dir_len && (netdata_configured_log_dir[dir_len - 1] == '/' ||
+                          netdata_configured_log_dir[dir_len - 1] == '\\') ? "" : "/",
+              source_name);
 
-    size_t vlen = strlen(value);
-    size_t elen = strlen(expected);
-    // Only migrate paths that explicitly identify a filesystem location.
-    // A relative filename such as "daemon.log" is a valid user choice and
-    // must not be redirected merely because its basename matches a default.
-    bool absolute = value[0] == '/' || value[0] == '\\' ||
-                    (isalpha((unsigned char)value[0]) && value[1] == ':');
-    if (!absolute)
-        return false;
-    return vlen >= elen && strcmp(value + vlen - elen, expected) == 0;
+    char normalized_value[FILENAME_MAX + 1];
+    char normalized_expected[FILENAME_MAX + 1];
+    os_translate_path(normalized_value, value, sizeof(normalized_value));
+    os_translate_path(normalized_expected, expected, sizeof(normalized_expected));
+    for (char *p = normalized_value; *p; p++)
+        if (*p == '\\') *p = '/';
+    for (char *p = normalized_expected; *p; p++)
+        if (*p == '\\') *p = '/';
+
+    return strcasecmp(normalized_value, normalized_expected) == 0;
 }
 #endif
 

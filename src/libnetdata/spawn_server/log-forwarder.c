@@ -391,6 +391,11 @@ static void log_forwarder_thread_func(void *arg) {
                     if(wr == WAIT_FAILED || wr == WAIT_ABANDONED_0) {
                         Sleep((DWORD)timeout);
                     }
+                    else if(ret == 0 && wr != WAIT_TIMEOUT) {
+                        // A signalled anonymous pipe can still have no bytes
+                        // available to PeekNamedPipe(); avoid a tight retry loop.
+                        Sleep(10);
+                    }
                 }
                 else {
                     ret = poll(pfds, (nfds_t)nfds, timeout); // invalid handle — fall through

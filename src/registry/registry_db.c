@@ -160,6 +160,7 @@ static FILE *registry_db_open_tmp_file(const char *filename) {
         return NULL;
     }
 
+#if !defined(OS_WINDOWS)
     if(reuse) {
         // O_NONBLOCK protects validation from FIFO races; the returned stream must retain fopen() semantics.
         int status_flags = fcntl(fd, F_GETFL);
@@ -170,6 +171,7 @@ static FILE *registry_db_open_tmp_file(const char *filename) {
             return NULL;
         }
     }
+#endif
 
     FILE *fp = fdopen(fd, "w");
     if(!fp) {

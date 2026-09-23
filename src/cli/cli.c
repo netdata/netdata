@@ -210,7 +210,61 @@ int main(int argc, char **argv)
     req.data = buffer_create(128, NULL);
 
     const char *pipename = daemon_pipename();
+
+#if defined(OS_WINDOWS)
+    // libuv's Windows client open does not expose SQOS flags. Open natively so
+    // the server receives identification-only access to this process token.
+    int wide_len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pipename, -1, NULL, 0);
+    if (!wide_len) {
+        fprintf(stderr, "Invalid UTF-8 in command-pipe path (Win32 error %lu).\n",
+                (unsigned long)GetLastError());
+        close_client_pipe();
+        uv_run(loop, UV_RUN_DEFAULT);
+        buffer_free(req.data);
+        return exit_status;
+    }
+
+    wchar_t *wide_pipename = malloc((size_t)wide_len * sizeof(*wide_pipename));
+    if (!wide_pipename || !MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                                pipename, -1, wide_pipename, wide_len)) {
+        fprintf(stderr, "Cannot convert command-pipe path to UTF-16.\n");
+        free(wide_pipename);
+        close_client_pipe();
+        uv_run(loop, UV_RUN_DEFAULT);
+        buffer_free(req.data);
+        return exit_status;
+    }
+
+    HANDLE pipe_handle = INVALID_HANDLE_VALUE;
+    DWORD pipe_error = ERROR_SUCCESS;
+    for (unsigned attempt = 0; attempt < 10; ++attempt) {
+        pipe_handle = CreateFileW(wide_pipename, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
+                                  FILE_FLAG_OVERLAPPED | SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION,
+                                  NULL);
+        if (pipe_handle != INVALID_HANDLE_VALUE)
+            break;
+
+        pipe_error = GetLastError();
+        if (pipe_error != ERROR_PIPE_BUSY || !WaitNamedPipeW(wide_pipename, 1000))
+            break;
+    }
+    free(wide_pipename);
+
+    if (pipe_handle == INVALID_HANDLE_VALUE) {
+        connect_cb(&req, uv_translate_sys_error((int)pipe_error));
+    }
+    else {
+        ret = uv_pipe_open(&client_pipe, (uv_file)pipe_handle);
+        if (ret) {
+            CloseHandle(pipe_handle);
+            connect_cb(&req, ret);
+        }
+        else
+            connect_cb(&req, 0);
+    }
+#else
     uv_pipe_connect(&req, &client_pipe, pipename, connect_cb);
+#endif
 
     uv_run(loop, UV_RUN_DEFAULT);
 

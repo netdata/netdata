@@ -533,6 +533,7 @@ int netdata_main(int argc, char **argv) {
                             if (aclk_timeout_unittest() + https_client_timeout_unittest() +
                                 mqtt_wss_client_timeout_unittest()) return 1;
 #ifdef OS_WINDOWS
+                            if (command_pipe_security_unittest()) return 1;
                             if (os_windows_path_translation_unittest()) return 1;
                             if (unit_test_windows_os_version()) return 1;
                             if (unit_test_windows_virt_normalize()) return 1;

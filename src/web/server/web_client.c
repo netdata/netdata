@@ -1572,6 +1572,8 @@ bool web_client_resume_startup_wait(struct web_client *w) {
     if(!web_client_startup_gate()) {
         char path[FILENAME_MAX + 1];
         strncpyz(path, buffer_tostring(w->url_path_decoded), FILENAME_MAX);
+        // The first pass already consumed any version prefix in this URL.
+        web_client_flag_clear(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION);
         w->response.code = (short)web_client_process_url(localhost, w, path);
     }
     else

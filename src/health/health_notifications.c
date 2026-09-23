@@ -22,6 +22,9 @@ struct health_raised_summary {
 };
 
 #if defined(OS_WINDOWS)
+static SPINLOCK legacy_notifier_warning_lock = SPINLOCK_INITIALIZER;
+static usec_t legacy_notifier_warning_last_ut = 0;
+
 static bool health_exec_is_legacy_alarm_notify_script(const char *exec) {
     if(!exec || !*exec)
         return false;
@@ -33,6 +36,24 @@ static bool health_exec_is_legacy_alarm_notify_script(const char *exec) {
     }
 
     return !strcasecmp(basename, "alarm-notify.sh");
+}
+
+static void health_log_legacy_notifier_disabled(const char *chart, const char *name) {
+    const usec_t now = now_monotonic_usec();
+    bool should_log = false;
+
+    spinlock_lock(&legacy_notifier_warning_lock);
+    if (!legacy_notifier_warning_last_ut ||
+        now - legacy_notifier_warning_last_ut >= 60 * 60 * USEC_PER_SEC) {
+        legacy_notifier_warning_last_ut = now;
+        should_log = true;
+    }
+    spinlock_unlock(&legacy_notifier_warning_lock);
+
+    if (should_log)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Health is not sending notification for alarm '%s.%s' because alarm-notify.sh is disabled on Windows",
+               chart, name);
 }
 #endif
 
@@ -474,9 +495,7 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
     // The legacy notifier is a shell script and Windows installations do not provide
     // a supported shell runtime. Native executables remain available for explicit use.
     if(health_exec_is_legacy_alarm_notify_script(exec)) {
-        netdata_log_debug(D_HEALTH,
-                          "Health not sending notification for alarm '%s.%s' (alarm-notify.sh is disabled on Windows)",
-                          ae_chart_id(ae), ae_name(ae));
+        health_log_legacy_notifier_disabled(ae_chart_id(ae), ae_name(ae));
         goto done;
     }
 #endif

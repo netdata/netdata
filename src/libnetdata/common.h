@@ -1168,7 +1168,35 @@ void srandom(unsigned int seed);
 static inline int link(const char *oldpath, const char *newpath) {
     if (CreateHardLinkA(newpath, oldpath, NULL))
         return 0;
-    errno = EACCES;
+
+    switch (GetLastError()) {
+        case ERROR_FILE_NOT_FOUND:
+        case ERROR_PATH_NOT_FOUND:
+            errno = ENOENT;
+            break;
+        case ERROR_ACCESS_DENIED:
+            errno = EACCES;
+            break;
+        case ERROR_ALREADY_EXISTS:
+        case ERROR_FILE_EXISTS:
+            errno = EEXIST;
+            break;
+        case ERROR_NOT_SAME_DEVICE:
+            errno = EXDEV;
+            break;
+        case ERROR_TOO_MANY_LINKS:
+            errno = EMLINK;
+            break;
+        case ERROR_INVALID_FUNCTION:
+            errno = EPERM;
+            break;
+        case ERROR_INVALID_PARAMETER:
+            errno = EINVAL;
+            break;
+        default:
+            errno = EIO;
+            break;
+    }
     return -1;
 }
 

@@ -2675,9 +2675,14 @@ if(OS_WINDOWS)
                 set(WEVT_GEN_BIN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_mc_generate")
 
                 set(WEVT_BUILD_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_compile.sh")
-                find_program(WEVT_BASH_EXECUTABLE NAMES bash.exe bash)
+                unset(WEVT_BASH_EXECUTABLE CACHE)
+                find_program(WEVT_BASH_EXECUTABLE NAMES bash.exe bash
+                             HINTS "$ENV{MSYS2_ROOT}/usr/bin"
+                                   "C:/msys64/usr/bin"
+                                   "$ENV{ChocolateyToolsLocation}/msys64/usr/bin"
+                             NO_DEFAULT_PATH)
                 if(NOT WEVT_BASH_EXECUTABLE)
-                        message(FATAL_ERROR "bash is required to generate Windows ETW resources")
+                        message(FATAL_ERROR "MSYS2 bash is required to generate Windows ETW resources")
                 endif()
 
                 set(WEVT_MC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.mc")

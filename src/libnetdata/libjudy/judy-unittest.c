@@ -4,7 +4,7 @@
 
 #define JUDY_TEST(condition, message) do {                                               \
         if (!(condition)) {                                                               \
-            fprintf(stderr, "judy unittest FAILED: %s (%s:%d)\\n",                    \
+            fprintf(stderr, "judy unittest FAILED: %s (%s:%d)\n",                     \
                     (message), __FUNCTION__, __LINE__);                                  \
             errors++;                                                                     \
         }                                                                                 \
@@ -116,15 +116,15 @@ cleanup:
 int judy_unittest(void) {
     int errors = 0;
 
-    fprintf(stderr, "\\nrunning Judy unittest\\n");
+    fprintf(stderr, "\nrunning Judy unittest\n");
 
     for (size_t repetition = 0; repetition < JUDY_TEST_REPETITIONS; repetition++)
         errors += judy_unittest_cycle();
 
     if (errors)
-        fprintf(stderr, "Judy unittest: %d ERROR(S)\\n", errors);
+        fprintf(stderr, "Judy unittest: %d ERROR(S)\n", errors);
     else
-        fprintf(stderr, "Judy unittest: OK\\n");
+        fprintf(stderr, "Judy unittest: OK\n");
 
     return errors;
 }

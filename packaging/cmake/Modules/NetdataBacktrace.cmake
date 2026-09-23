@@ -20,14 +20,12 @@ function(netdata_bundle_libbacktrace)
         # bash, but make.exe is an MSYS2 binary that handles POSIX paths and shell
         # commands in Makefiles natively and can be invoked directly by cmake.
         if(OS_WINDOWS)
+                unset(BASH_EXECUTABLE CACHE)
                 find_program(BASH_EXECUTABLE NAMES bash.exe bash
                              HINTS "$ENV{MSYS2_ROOT}/usr/bin"
                                    "C:/msys64/usr/bin"
                                    "$ENV{ChocolateyToolsLocation}/msys64/usr/bin"
                              NO_DEFAULT_PATH)
-                if(NOT BASH_EXECUTABLE)
-                        find_program(BASH_EXECUTABLE NAMES bash.exe bash)
-                endif()
                 if(NOT BASH_EXECUTABLE)
                         message(FATAL_ERROR "MSYS2 bash not found; install it under MSYS2/usr/bin")
                 endif()
@@ -38,9 +36,9 @@ function(netdata_bundle_libbacktrace)
                         message(FATAL_ERROR "MSYS2 make not found next to the selected bash")
                 endif()
                 set(_bt_configure_cmd ${BASH_EXECUTABLE} -c
-                        "PATH='/ucrt64/bin:${_BT_MSYS_BIN}':\$PATH '${libbacktrace_SOURCE_DIR}/configure' --prefix='${libbacktrace_INSTALL_DIR}' --enable-static")
+                        "PATH='/ucrt64/bin:/usr/bin':\$PATH '${libbacktrace_SOURCE_DIR}/configure' --prefix='${libbacktrace_INSTALL_DIR}' --enable-static")
                 set(_bt_build_cmd ${BASH_EXECUTABLE} -c
-                        "PATH='/ucrt64/bin:${_BT_MSYS_BIN}':\$PATH MAKEFLAGS= '${_BT_MAKE_EXECUTABLE}' install")
+                        "PATH='/ucrt64/bin:/usr/bin':\$PATH MAKEFLAGS= '${_BT_MAKE_EXECUTABLE}' install")
         else()
                 set(_BT_MAKE_EXECUTABLE make)
                 set(_bt_configure_cmd "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static)

@@ -97,7 +97,7 @@ static ALWAYS_INLINE UUIDMAP_ID uuidmap_id_by_uuid_locked(const nd_uuid_t uuid, 
     if(unlikely(PValue == PJERR))
         fatal("UUIDMAP: corrupted JudyHS array");
 
-    return (PValue && *PValue) ? *(UUIDMAP_ID *)PValue : 0;
+    return (PValue && *PValue) ? (UUIDMAP_ID)(uintptr_t)*PValue : 0;
 }
 
 static inline UUIDMAP_ID uuidmap_acquire_by_uuid(const nd_uuid_t uuid) {
