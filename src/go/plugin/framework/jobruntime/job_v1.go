@@ -239,7 +239,7 @@ func (j *Job) autoDetection(ctx context.Context) (err error) {
 	}
 
 	if rawErr := j.init(ctx); rawErr != nil {
-		if !isRetryableError(rawErr) {
+		if !keepsInitRetry(rawErr) {
 			j.disableAutoDetection()
 		}
 		err = sanitizeLifecycleError(j.lifecycleErrorSanitizer, rawErr)

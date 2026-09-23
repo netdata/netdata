@@ -2,6 +2,21 @@
 
 package collectorapi
 
+// LifecycleErrorClass is a collector's classification of an Init, Check or
+// CollectorV2Runner.Run error. The Job Manager derives retries, stock-job
+// listing and DynCfg replies from it.
+type LifecycleErrorClass uint8
+
+const (
+	// LifecycleErrorUnclassified is an error carrying neither class; the
+	// framework defaults apply.
+	LifecycleErrorUnclassified LifecycleErrorClass = iota
+	// LifecycleErrorPermanent marks an error returned through PermanentError.
+	LifecycleErrorPermanent
+	// LifecycleErrorTemporary marks an error returned through TemporaryError.
+	LifecycleErrorTemporary
+)
+
 // PermanentError classifies an Init or Check error as permanent: retrying the
 // same configuration cannot succeed, as with an invalid option or an unknown
 // named profile. The job fails without autodetection retries, whatever
@@ -13,7 +28,7 @@ func PermanentError(err error) error {
 	if err == nil {
 		return nil
 	}
-	return &lifecycleError{err: err, code: 422}
+	return &lifecycleError{err: err, class: LifecycleErrorPermanent}
 }
 
 // TemporaryError classifies an Init or Check error as a failure that may clear
@@ -26,18 +41,55 @@ func TemporaryError(err error) error {
 	if err == nil {
 		return nil
 	}
-	return &lifecycleError{err: err, code: 503, retryable: true}
+	return &lifecycleError{err: err, class: LifecycleErrorTemporary}
 }
 
-// lifecycleError carries the markers the Job Manager reads through
-// dyncfg.CodedError and dyncfg.RetryableError.
+// ClassifyLifecycleError returns the class of err. A permanent classification
+// anywhere in the error tree wins over a temporary one, because retrying
+// cannot fix the permanent part.
+func ClassifyLifecycleError(err error) LifecycleErrorClass {
+	class := LifecycleErrorUnclassified
+	walkErrorTree(err, func(err error) bool {
+		classified, ok := err.(*lifecycleError)
+		if !ok {
+			return true
+		}
+		if classified.class == LifecycleErrorPermanent {
+			class = LifecycleErrorPermanent
+			return false
+		}
+		class = classified.class
+		return true
+	})
+	return class
+}
+
+// walkErrorTree visits err and its wrapped errors depth-first until visit
+// returns false.
+func walkErrorTree(err error, visit func(error) bool) bool {
+	if err == nil {
+		return true
+	}
+	if !visit(err) {
+		return false
+	}
+	switch wrapped := err.(type) {
+	case interface{ Unwrap() error }:
+		return walkErrorTree(wrapped.Unwrap(), visit)
+	case interface{ Unwrap() []error }:
+		for _, child := range wrapped.Unwrap() {
+			if !walkErrorTree(child, visit) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 type lifecycleError struct {
-	err       error
-	code      int
-	retryable bool
+	err   error
+	class LifecycleErrorClass
 }
 
-func (e *lifecycleError) Error() string         { return e.err.Error() }
-func (e *lifecycleError) Unwrap() error         { return e.err }
-func (e *lifecycleError) DyncfgCode() int       { return e.code }
-func (e *lifecycleError) DyncfgRetryable() bool { return e.retryable }
+func (e *lifecycleError) Error() string { return e.err.Error() }
+func (e *lifecycleError) Unwrap() error { return e.err }

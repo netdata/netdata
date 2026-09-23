@@ -21,6 +21,9 @@ func (e *runtimeStartupFailure) Unwrap() error { return e.failure }
 
 func runtimeFailureFor(resources ConstructedJob, err *jobruntime.RunFailure, stage string) *autoDetectionFailure {
 	failure := autoDetectionFailureFor(resources, err)
+	failure.class = err.Class()
+	failure.retry = failure.retry && err.Retryable()
+	failure.runtime = true
 	failure.diagnosticFailure = jobConfigFailure(err, stage)
 	failure.diagnosticFailure.Reason = err.Reason()
 	failure.jobConfigLifecycle = resources.jobConfigSnapshot

@@ -11,7 +11,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 )
 
@@ -26,9 +25,29 @@ type autoDetectionFailure struct {
 	cause              error
 	retry              bool
 	retryAfter         int
-	coded              bool
-	code               int
+	class              collectorapi.LifecycleErrorClass // collector classification of the failure
+	runtime            bool                             // Run startup failed after the incumbent was stopped
 	jobConfigLifecycle collectorapi.JobConfigLifecycleSnapshot
+}
+
+// keepsFailedStockListed reports whether a failed plain stock job stays listed
+// instead of being removed: the collector classified the failure, so it is not
+// the expected absence of a service at a stock endpoint.
+func (adf *autoDetectionFailure) keepsFailedStockListed() bool {
+	return adf.class != collectorapi.LifecycleErrorUnclassified
+}
+
+// legacyReplyCode is the DynCfg code a classified or runtime failure answered
+// with before the reply was derived from the command outcome.
+func (adf *autoDetectionFailure) legacyReplyCode() (int, bool) {
+	switch {
+	case adf.class == collectorapi.LifecycleErrorPermanent:
+		return 422, true
+	case adf.class == collectorapi.LifecycleErrorTemporary, adf.runtime:
+		return 503, true
+	default:
+		return 0, false
+	}
 }
 
 func (adf *autoDetectionFailure) Error() string {
@@ -387,12 +406,9 @@ func autoDetectionFailureFor(constructed ConstructedJob, err error) *autoDetecti
 	if constructed.autoDetectionEvery != nil {
 		failure.retryAfter = constructed.autoDetectionEvery()
 	}
-	if coded, ok := errors.AsType[dyncfg.CodedError](err); ok {
-		failure.coded = true
-		failure.code = coded.DyncfgCode()
-		if !dyncfg.IsRetryableError(err) {
-			failure.retry = false
-		}
+	failure.class = collectorapi.ClassifyLifecycleError(err)
+	if failure.class == collectorapi.LifecycleErrorPermanent {
+		failure.retry = false
 	}
 	return failure
 }

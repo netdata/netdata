@@ -607,17 +607,6 @@ func TestManualDynCfgAutoDetectionFailureResponseContracts(t *testing.T) {
 			wantDisposition: lifecycle.ResourceTransactionUnchanged,
 			wantMessage:     "job enable failed: check failed",
 		},
-		"enable coded failure overrides default response": {
-			command: dyncfg.CommandEnable,
-			status:  dyncfg.StatusDisabled,
-			checkErr: dynCfgCodedAutoDetectionError{
-				code: 409,
-			},
-			wantCode:        409,
-			wantCleanup:     1,
-			wantDisposition: lifecycle.ResourceTransactionUnchanged,
-			wantMessage:     "job enable failed: coded check failed",
-		},
 		"update ordinary failure preserves legacy success response": {
 			command:         dyncfg.CommandUpdate,
 			status:          dyncfg.StatusRunning,
@@ -750,18 +739,6 @@ func requireDynCfgJobTemplateParents(t *testing.T, wire string) {
 			require.True(t, exists, "job config ID %q was emitted without its template parent", fields[1])
 		}
 	}
-}
-
-type dynCfgCodedAutoDetectionError struct {
-	code int
-}
-
-func (err dynCfgCodedAutoDetectionError) Error() string {
-	return "coded check failed"
-}
-
-func (err dynCfgCodedAutoDetectionError) DyncfgCode() int {
-	return err.code
 }
 
 func TestDynCfgCommandsCommitFailedForQuarantinedCandidateIdentity(t *testing.T) {
@@ -1073,7 +1050,7 @@ func TestNonRetryableAutoDetectionFailureSettlesExistingRetry(t *testing.T) {
 	creator := controller.modules["module"]
 	creator.Create = func() collectorapi.CollectorV1 {
 		return state.module(func(context.Context) error {
-			return nonRetryableAutoDetectionError{}
+			return collectorapi.PermanentError(errors.New("non-retryable autodetection failure"))
 		}, false)
 	}
 	controller.modules["module"] = creator
@@ -1754,16 +1731,6 @@ func (rbta runtimeBusyTestAuthority) ProcessAttemptReleased(
 	identity jobmgr.ProcessAttemptIdentity,
 ) (<-chan struct{}, bool) {
 	return rbta.delegate.ProcessAttemptReleased(identity)
-}
-
-type nonRetryableAutoDetectionError struct{}
-
-func (nonRetryableAutoDetectionError) Error() string {
-	return "non-retryable autodetection failure"
-}
-
-func (nonRetryableAutoDetectionError) DyncfgCode() int {
-	return 422
 }
 
 func TestManualNoChangeRemovalSettlesAutoDetectionRetry(t *testing.T) {

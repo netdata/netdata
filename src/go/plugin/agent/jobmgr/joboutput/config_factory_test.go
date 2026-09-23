@@ -17,7 +17,6 @@ import (
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
 )
 
@@ -410,39 +409,32 @@ func TestConfigModuleFactoryRedactsCollectorInternalLogsAfterResolution(t *testi
 	require.Contains(t, logs.String(), "redacted")
 }
 
-type sensitiveCodedRetryableError struct{}
-
-func (sensitiveCodedRetryableError) Error() string         { return "resolved-sensitive-fixture" }
-func (sensitiveCodedRetryableError) DyncfgCode() int       { return 429 }
-func (sensitiveCodedRetryableError) DyncfgRetryable() bool { return true }
-
-type sensitiveCodedProcessControlError struct {
-	cause error
-}
-
-func (err *sensitiveCodedProcessControlError) Error() string         { return "resolved-sensitive-control" }
-func (err *sensitiveCodedProcessControlError) Unwrap() error         { return err.cause }
-func (err *sensitiveCodedProcessControlError) DyncfgCode() int       { return 429 }
-func (err *sensitiveCodedProcessControlError) DyncfgRetryable() bool { return true }
-
 func TestResolvedLifecycleRedactionPreservesControlClassifications(t *testing.T) {
-	err := lifecycle.RetainOwnership(errors.Join(
-		lifecycle.ErrTaskPanic,
-		context.Canceled,
-		sensitiveCodedRetryableError{},
-	))
+	tests := map[string]struct {
+		classify func(error) error
+		want     collectorapi.LifecycleErrorClass
+	}{
+		"permanent": {classify: collectorapi.PermanentError, want: collectorapi.LifecycleErrorPermanent},
+		"temporary": {classify: collectorapi.TemporaryError, want: collectorapi.LifecycleErrorTemporary},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := lifecycle.RetainOwnership(errors.Join(
+				lifecycle.ErrTaskPanic,
+				context.Canceled,
+				test.classify(errors.New("resolved-sensitive-fixture")),
+			))
 
-	redacted := redactResolvedLifecycleError(err)
+			redacted := redactResolvedLifecycleError(err)
 
-	require.NotContains(t, redacted.Error(), "resolved-sensitive-fixture")
-	require.Contains(t, redacted.Error(), "redacted")
-	require.ErrorIs(t, redacted, lifecycle.ErrTaskPanic)
-	require.ErrorIs(t, redacted, context.Canceled)
-	require.True(t, lifecycle.OwnershipRetained(redacted))
-	require.True(t, dyncfg.IsRetryableError(redacted))
-	coded, ok := errors.AsType[dyncfg.CodedError](redacted)
-	require.True(t, ok)
-	require.Equal(t, 429, coded.DyncfgCode())
+			require.NotContains(t, redacted.Error(), "resolved-sensitive-fixture")
+			require.Contains(t, redacted.Error(), "redacted")
+			require.ErrorIs(t, redacted, lifecycle.ErrTaskPanic)
+			require.ErrorIs(t, redacted, context.Canceled)
+			require.True(t, lifecycle.OwnershipRetained(redacted))
+			require.Equal(t, test.want, collectorapi.ClassifyLifecycleError(redacted))
+		})
+	}
 }
 
 func TestResolvedLifecycleRedactionPreservesPureProcessControlTrees(t *testing.T) {
@@ -503,9 +495,9 @@ func TestResolvedLifecycleRedactionRejectsMixedProcessControlTree(t *testing.T) 
 }
 
 func TestResolvedLifecycleRedactionComposesProcessControlMetadata(t *testing.T) {
-	err := lifecycle.RetainOwnership(&sensitiveCodedProcessControlError{
-		cause: jobmgr.ErrProcessAttemptStopped,
-	})
+	err := lifecycle.RetainOwnership(collectorapi.TemporaryError(
+		fmt.Errorf("resolved-sensitive-control: %w", jobmgr.ErrProcessAttemptStopped),
+	))
 
 	redacted := redactResolvedLifecycleError(err)
 
@@ -518,10 +510,7 @@ func TestResolvedLifecycleRedactionComposesProcessControlMetadata(t *testing.T) 
 		jobmgr.ErrProcessAttemptStopped,
 	))
 	require.True(t, lifecycle.OwnershipRetained(redacted))
-	require.True(t, dyncfg.IsRetryableError(redacted))
-	coded, ok := errors.AsType[dyncfg.CodedError](redacted)
-	require.True(t, ok)
-	require.Equal(t, 429, coded.DyncfgCode())
+	require.Equal(t, collectorapi.LifecycleErrorTemporary, collectorapi.ClassifyLifecycleError(redacted))
 }
 
 type sensitiveConfigFactoryScope struct {

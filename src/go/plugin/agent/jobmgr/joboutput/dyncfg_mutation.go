@@ -403,7 +403,7 @@ func (dcjc *DynCfgJobController) prepareProbeFailure(
 	if failure == nil {
 		return nil, errors.New("job output: nil probe failure")
 	}
-	removed := plan.removePlainStock && !failure.coded
+	removed := plan.removePlainStock && !failure.keepsFailedStockListed()
 	var postimage *dyncfg.GraphConfig
 	cleanup := plan.failedCleanup
 	if removed {
@@ -455,16 +455,16 @@ type probeFailurePlan struct {
 }
 
 // autoDetectionFailureResultFunc builds a probeFailurePlan.result closure
-// with a fixed default code and message; the failure's own code overrides the
-// default when present.
+// with a fixed default code and message; a classified or runtime failure
+// overrides the default code.
 func autoDetectionFailureResultFunc(
 	defaultCode int,
 	message string,
 ) func(*autoDetectionFailure) lifecycle.SealedResult {
 	return func(failure *autoDetectionFailure) lifecycle.SealedResult {
 		code := defaultCode
-		if failure.coded {
-			code = failure.code
+		if legacy, ok := failure.legacyReplyCode(); ok {
+			code = legacy
 		}
 		return mustDynCfgMessage(code, fmt.Sprintf(message, failure.cause))
 	}
