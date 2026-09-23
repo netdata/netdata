@@ -525,12 +525,19 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     nd_sentry_fini();
     curl_global_cleanup();
+#if defined(OS_WINDOWS)
+    if (!abnormal)
+        nd_windows_signal_shutdown_complete();
+#endif
     exit(abnormal ? 1 : 0);
 #else
     if(abnormal)
         _exit(1);
     else {
         curl_global_cleanup();
+#if defined(OS_WINDOWS)
+        nd_windows_signal_shutdown_complete();
+#endif
         exit(0);
     }
 #endif

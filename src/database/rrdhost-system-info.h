@@ -123,6 +123,9 @@ void rrdhost_system_info_to_json_object_fields(BUFFER *wb, struct rrdhost_system
 
 bool get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds);
 void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_system_info *b);
+// Copy only WMI-refined fields so a delayed refresh cannot overwrite unrelated metadata updates.
+void rrdhost_system_info_copy_virtualization(struct rrdhost_system_info *dst,
+                                            const struct rrdhost_system_info *src);
 
 bool localhost_is_docker();
 

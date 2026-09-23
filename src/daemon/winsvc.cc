@@ -43,6 +43,13 @@ static bool ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD d
     svc_status_lock_ensure_init();
     EnterCriticalSection(&svc_status_lock);
 
+    // A late heartbeat must never move the service back to STOP_PENDING after
+    // the timeout path has published STOPPED.
+    if (svc_status.dwCurrentState == SERVICE_STOPPED && dwCurrentState != SERVICE_STOPPED) {
+        LeaveCriticalSection(&svc_status_lock);
+        return true;
+    }
+
     svc_status.dwCurrentState = dwCurrentState;
     svc_status.dwWin32ExitCode = dwWin32ExitCode;
     svc_status.dwWaitHint = dwWaitHint;
@@ -314,17 +321,19 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
 
 static bool update_path() {
     const char *old_path = getenv("PATH");
+    char native_system_bin[FILENAME_MAX + 1];
+    os_translate_path(native_system_bin, "/usr/bin", sizeof(native_system_bin));
 
     if (!old_path) {
-        if (setenv("PATH", "/usr/bin", 1) != 0)
+        if (setenv("PATH", native_system_bin, 1) != 0)
             return false;
 
         return true;
     }
 
-    size_t new_path_length = strlen(old_path) + strlen("/usr/bin") + 2;
+    size_t new_path_length = strlen(old_path) + strlen(native_system_bin) + 2;
     char *new_path = (char *) callocz(new_path_length, sizeof(char));
-    snprintfz(new_path, new_path_length, "/usr/bin:%s", old_path);
+    snprintfz(new_path, new_path_length, "%s;%s", native_system_bin, old_path);
 
     if (setenv("PATH", new_path, 1) != 0) {
         freez(new_path);

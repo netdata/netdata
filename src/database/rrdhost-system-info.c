@@ -20,6 +20,17 @@ void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_syst
         SWAP(*a, *b);
 }
 
+void rrdhost_system_info_copy_virtualization(struct rrdhost_system_info *dst,
+                                             const struct rrdhost_system_info *src) {
+    if(!dst || !src)
+        return;
+
+    freez(dst->virtualization);
+    dst->virtualization = system_info_strdupz(src->virtualization);
+    freez(dst->virt_detection);
+    dst->virt_detection = system_info_strdupz(src->virt_detection);
+}
+
 // ----------------------------------------------------------------------------
 // RRDHOST - set system info from environment variables
 // system_info fields must be heap allocated or NULL

@@ -55,6 +55,101 @@ typedef void (*SIGNAL_SIGACTION)(int, siginfo_t *, void *);
 static SIGNAL_HANDLER original_handlers[NSIG] = {0};
 static SIGNAL_SIGACTION original_sigactions[NSIG] = {0};
 
+#if defined(OS_WINDOWS)
+static HANDLE windows_console_signal_event = NULL;
+static HANDLE windows_console_shutdown_complete_event = NULL;
+static bool windows_console_handler_registered = false;
+
+static DWORD windows_console_shutdown_timeout_ms(DWORD control_type) {
+    UINT parameter;
+    DWORD fallback_timeout;
+
+    switch (control_type) {
+        case CTRL_CLOSE_EVENT:
+            parameter = SPI_GETHUNGAPPTIMEOUT;
+            fallback_timeout = 5000;
+            break;
+        case CTRL_SHUTDOWN_EVENT:
+            parameter = SPI_GETWAITTOKILLSERVICETIMEOUT;
+            fallback_timeout = 20000;
+            break;
+        default:
+            return 0;
+    }
+
+    DWORD timeout = fallback_timeout;
+    if (!SystemParametersInfoW(parameter, 0, &timeout, 0) || !timeout)
+        timeout = fallback_timeout;
+
+    // Keep the wait finite even if a local policy sets an extreme value, and
+    // return before the system's own termination deadline.
+    if (timeout > 120000)
+        timeout = 120000;
+    DWORD safety_margin = timeout / 10;
+    if (safety_margin < 100)
+        safety_margin = 100;
+    return timeout > safety_margin ? timeout - safety_margin : 1;
+}
+
+// Queues the signal and wakes nd_process_signals(), which performs the actual
+// cleanup outside this callback.
+//
+// Ctrl+C/Break can return after queuing because the process remains active.
+// Close/shutdown callbacks wait for teardown completion, bounded by the
+// applicable Windows shutdown timeout, before returning to the OS. Logoff is
+// delegated to the service-aware default handler so a user logoff cannot stop
+// the service.
+static BOOL WINAPI windows_console_control_handler(DWORD control_type) {
+    int signo;
+    bool wait_for_shutdown = false;
+    switch (control_type) {
+        case CTRL_C_EVENT:
+            signo = SIGINT;
+            break;
+        case CTRL_BREAK_EVENT:
+            signo = SIGQUIT;
+            break;
+        case CTRL_CLOSE_EVENT:
+            signo = SIGTERM;
+            wait_for_shutdown = true;
+            break;
+        case CTRL_LOGOFF_EVENT:
+            // Services must remain running when an interactive user logs off.
+            // Let Windows' service-aware default handler process this event.
+            return FALSE;
+        case CTRL_SHUTDOWN_EVENT:
+            signo = SIGTERM;
+            wait_for_shutdown = true;
+            break;
+        default:
+            return FALSE;
+    }
+
+    // Without both events, the signal loop cannot be woken and the close-class
+    // callback cannot confirm completion. Leave termination to Windows.
+    if (wait_for_shutdown &&
+        (!windows_console_signal_event || !windows_console_shutdown_complete_event))
+        return FALSE;
+
+    for (size_t i = 0; i < _countof(signals_waiting); i++) {
+        if (signals_waiting[i].signo == signo) {
+            __atomic_fetch_add(&signals_waiting[i].count, 1, __ATOMIC_RELAXED);
+            break;
+        }
+    }
+
+    if (windows_console_signal_event)
+        SetEvent(windows_console_signal_event);
+
+    if (wait_for_shutdown) {
+        WaitForSingleObject(windows_console_shutdown_complete_event,
+                            windows_console_shutdown_timeout_ms(control_type));
+    }
+
+    return TRUE;
+}
+#endif
+
 static inline bool signal_number_supported(int signo) {
     return signo >= 0 && signo < NSIG;
 }
@@ -205,6 +300,18 @@ void nd_cleanup_deadly_signals(void) {
 void nd_initialize_signals(bool chain_existing) {
 #if defined(OS_WINDOWS)
     (void)chain_existing;
+    if (!windows_console_signal_event)
+        windows_console_signal_event = CreateEvent(NULL, FALSE, FALSE, NULL);
+    if (!windows_console_shutdown_complete_event)
+        windows_console_shutdown_complete_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+    if (!windows_console_handler_registered) {
+        if (SetConsoleCtrlHandler(windows_console_control_handler, TRUE))
+            windows_console_handler_registered = true;
+        else
+            fprintf(stderr, "SIGNAL: Failed to register Windows console control handler (error %lu)\n",
+                    (unsigned long)GetLastError());
+    }
     return;
 #else
     signals_block_all_except_deadly();
@@ -253,6 +360,13 @@ void nd_initialize_signals(bool chain_existing) {
     }
 #endif
 }
+
+#if defined(OS_WINDOWS)
+void nd_windows_signal_shutdown_complete(void) {
+    if (windows_console_shutdown_complete_event)
+        SetEvent(windows_console_shutdown_complete_event);
+}
+#endif
 
 NEVER_INLINE
 static void process_triggered_signals(void) {
@@ -348,7 +462,14 @@ void nd_process_signals(void) {
             last_update_mt += save_every_ut;
         }
 
+#if defined(OS_WINDOWS)
+        if (windows_console_signal_event)
+            WaitForSingleObject(windows_console_signal_event, 13 * MSEC_PER_SEC + 379);
+        else
+            Sleep(13 * MSEC_PER_SEC + 379);
+#else
         if(poll(NULL, 0, 13 * MSEC_PER_SEC + 379) < 0) { ; }
+#endif
 
         process_triggered_signals();
     }

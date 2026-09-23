@@ -1472,7 +1472,9 @@ int netdata_main(int argc, char **argv) {
         netdata_windows_get_wmi_system_info(windows_system_info);
 
         spinlock_lock(&localhost->rrdhost_update_lock);
-        rrdhost_system_info_swap(localhost->system_info, windows_system_info);
+        // WMI only refines virtualization. Merge those fields into the current
+        // object instead of swapping the stale snapshot over concurrent updates.
+        rrdhost_system_info_copy_virtualization(localhost->system_info, windows_system_info);
         rrdhost_flag_set(localhost, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
         spinlock_unlock(&localhost->rrdhost_update_lock);
 
