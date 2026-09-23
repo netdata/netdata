@@ -66,27 +66,27 @@ struct rrddim_tier {
 // --------------------------------------------------------------------------------------------------------------------
 // DATA COLLECTION STORAGE OPS
 
-static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
+static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_ENGINE_BACKEND seb __maybe_unused) {
     internal_fatal(!is_valid_backend(seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return dbengine_metrics_group_get(si, uuid);
+        return dbengine_metrics_group_get();
 #endif
-    return ram_metrics_group_get(si, uuid);
+    return ram_metrics_group_get();
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static inline void storage_engine_metrics_group_release(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg) {
+static inline void storage_engine_metrics_group_release(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_METRICS_GROUP *smg) {
     internal_fatal(!is_valid_backend(seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        dbengine_metrics_group_release(si, smg);
+        dbengine_metrics_group_release(smg);
     else
 #endif
-        ram_metrics_group_release(si, smg);
+        ram_metrics_group_release(smg);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

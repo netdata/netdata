@@ -66,8 +66,6 @@ void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    RRDHOST *host = st->rrdhost;
-
     rrdset_flag_set(st, RRDSET_FLAG_COLLECTION_FINISHED);
 
     if(dimensions_too) {
@@ -82,7 +80,7 @@ void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
         if(!eng) continue;
 
         if(st->smg[tier]) {
-            storage_engine_metrics_group_release(eng->seb, host->db[tier].si, st->smg[tier]);
+            storage_engine_metrics_group_release(eng->seb, st->smg[tier]);
             st->smg[tier] = NULL;
         }
     }

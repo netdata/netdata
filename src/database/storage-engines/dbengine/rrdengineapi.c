@@ -48,14 +48,14 @@ static inline bool dbengine_page_alignment_release(struct pg_alignment *pa) {
 }
 
 // charts call this
-STORAGE_METRICS_GROUP *dbengine_metrics_group_get(STORAGE_INSTANCE *si __maybe_unused, nd_uuid_t *uuid __maybe_unused) {
+STORAGE_METRICS_GROUP *dbengine_metrics_group_get(void) {
     struct pg_alignment *pa = callocz(1, sizeof(struct pg_alignment));
     dbengine_page_alignment_acquire(pa);
     return (STORAGE_METRICS_GROUP *)pa;
 }
 
 // charts call this
-void dbengine_metrics_group_release(STORAGE_INSTANCE *si __maybe_unused, STORAGE_METRICS_GROUP *smg) {
+void dbengine_metrics_group_release(STORAGE_METRICS_GROUP *smg) {
     if(unlikely(!smg)) return;
 
     struct pg_alignment *pa = (struct pg_alignment *)smg;
@@ -1114,6 +1114,10 @@ void dbengine_readiness_wait(struct dbengine_tier *ctx) {
     completion_wait_for(&ctx->loading.load_mrg);
     completion_destroy(&ctx->loading.load_mrg);
 
+    // a tier that came up with no data reports the moment it became ready as its first time, so the retention the
+    // readers derive from dbengine_global_first_time_s() (rrd-retention.c, pulse-db-dbengine-retention.c) counts
+    // from then; the sentinel is what a tier holds while no journal has given it a first time (the loaders lower it
+    // as they go), and only a tier whose load found none still holds it here
     if(__atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED) == LONG_MAX)
         __atomic_store_n(&ctx->atomic.first_time_s, now_realtime_sec(), __ATOMIC_RELAXED);
 
@@ -1124,10 +1128,10 @@ void dbengine_readiness_wait(struct dbengine_tier *ctx) {
     errno = saved_errno;
 }
 
-/*
- * Returns 0 on success, negative on error
- */
-static void dbengine_tier_config_validate(const struct dbengine_tier_config *tc) {
+// a malformed configuration is a programming error, fatal; a path longer than DBENGINE_DBFILES_PATH_MAX is refused,
+// with UV_ENAMETOOLONG (a path that overflowed the tier was silently truncated before, after the file descriptors
+// had been reserved; one that fit but left no room for the file names truncated those)
+static int dbengine_tier_config_validate(const struct dbengine_tier_config *tc) {
     if(tc->tier >= RRD_STORAGE_TIERS)
         fatal("DBENGINE: tier %zu does not exist (the engine has %d tiers)", tc->tier, RRD_STORAGE_TIERS);
 
@@ -1143,15 +1147,24 @@ static void dbengine_tier_config_validate(const struct dbengine_tier_config *tc)
 
     if(!tc->grouping)
         fatal("DBENGINE: tier %zu has a grouping of 0", tc->tier);
+
+    if(strnlen(tc->dbfiles_path, DBENGINE_DBFILES_PATH_MAX + 1) > DBENGINE_DBFILES_PATH_MAX) {
+        netdata_log_error("DBENGINE: tier %zu: the datafiles path is longer than %d characters, the tier cannot be initialized",
+                          tc->tier, (int)DBENGINE_DBFILES_PATH_MAX);
+        return UV_ENAMETOOLONG;
+    }
+
+    return 0;
 }
 
 int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tier_config *tc)
 {
-    uint32_t max_open_files;
-
-    // the configuration first (a bad one is a programming error, fatal whatever the engine's state), then the
-    // engine and the tier, all before anything is written: a refused init must leave the tier as it found it
-    dbengine_tier_config_validate(tc);
+    // the configuration first (a malformed one is a programming error, fatal whatever the engine's state; an
+    // over-long path is refused), then the engine and the tier, all before anything is written: a refused init
+    // must leave the tier as it found it
+    int rc = dbengine_tier_config_validate(tc);
+    if(rc)
+        return rc;
 
     if(!engine)
         fatal("DBENGINE: dbengine_tier_init() for tier %zu called without an engine", tc->tier);
@@ -1185,20 +1198,23 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
         return UV_EIO;
     }
 
-    max_open_files = rlimit_nofile.rlim_cur / 4;
+    // reserve DBENGINE_FD_BUDGET_PER_TIER file descriptors for this tier, out of the engine's resolved budget. The
+    // check and the reservation are one atomic step: tiers coming up in parallel (the daemon brings them up on a
+    // thread each when it has the cpus for it) can neither take the engine past its budget nor refuse one another
+    // while one of them fits
+    dbengine_stats_t reserved = __atomic_load_n(&engine->global_stats.dbengine_reserved_file_descriptors, __ATOMIC_RELAXED);
+    do {
+        if (reserved + DBENGINE_FD_BUDGET_PER_TIER > engine->cfg.max_reserved_file_descriptors) {
+            netdata_log_error(
+                "DBENGINE: tier %zu: the file descriptor budget has no room for the tier (%zu of %zu reserved, %d needed), the tier cannot be initialized",
+                tier, (size_t)reserved, engine->cfg.max_reserved_file_descriptors, DBENGINE_FD_BUDGET_PER_TIER);
 
-    /* reserve DBENGINE_FD_BUDGET_PER_TIER file descriptors for this tier */
-    rrd_stat_atomic_add(&engine->global_stats.dbengine_reserved_file_descriptors, DBENGINE_FD_BUDGET_PER_TIER);
-    if (engine->global_stats.dbengine_reserved_file_descriptors > max_open_files) {
-        netdata_log_error(
-            "Exceeded the budget of available file descriptors (%u/%u), cannot create new dbengine tier.",
-            (unsigned)engine->global_stats.dbengine_reserved_file_descriptors,
-            (unsigned)max_open_files);
-
-        rrd_stat_atomic_add(&engine->global_stats.global_fs_errors, 1);
-        rrd_stat_atomic_add(&engine->global_stats.dbengine_reserved_file_descriptors, -DBENGINE_FD_BUDGET_PER_TIER);
-        return UV_EMFILE;
-    }
+            rrd_stat_atomic_add(&engine->global_stats.global_fs_errors, 1);
+            return UV_EMFILE;
+        }
+    } while(!__atomic_compare_exchange_n(&engine->global_stats.dbengine_reserved_file_descriptors, &reserved,
+                                         reserved + DBENGINE_FD_BUDGET_PER_TIER, false,
+                                         __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 
     ctx->config.tier = (int)tier;
     ctx->config.page_type = tc->page_type;
@@ -1231,6 +1247,13 @@ int dbengine_tier_init(struct dbengine_engine *engine, const struct dbengine_tie
 
     rrd_stat_atomic_add(&engine->global_stats.dbengine_reserved_file_descriptors, -DBENGINE_FD_BUDGET_PER_TIER);
     return UV_EIO;
+}
+
+size_t dbengine_max_reserved_file_descriptors(struct dbengine_engine *engine) {
+    if(!engine)
+        return 0;
+
+    return engine->cfg.max_reserved_file_descriptors;
 }
 
 size_t dbengine_destroy(struct dbengine_engine *engine) {

@@ -75,6 +75,8 @@ time_t dbengine_query_align_to_optimal_before(struct storage_engine_query_handle
 // dbengine_destroy() finalizes them). An invalid tc is fatal before any of those checks (a programming error,
 // whatever the state). The directory is the embedder's to keep exclusive: nothing refuses a second tier, of this
 // engine or of another, on a directory a tier already runs on, and two tiers writing one directory corrupt it.
+// A dbfiles_path longer than DBENGINE_DBFILES_PATH_MAX (dbengine-config.h) is refused with UV_ENAMETOOLONG before
+// any of those checks, and a tier that would take the engine past its max_reserved_file_descriptors with UV_EMFILE.
 // Those refusals leave the tier untouched; an init that fails opening the datafiles returns
 // UV_EIO with the tier's configuration already written. Two inits of the same tier must not overlap, nothing
 // serialises them. A tier init and the shutdown must not overlap either: the check is made when the tier starts,
@@ -85,6 +87,10 @@ int dbengine_tier_init(DBENGINE_ENGINE *engine, const struct dbengine_tier_confi
 // wait until the tier's registry load is done: once, after a dbengine_tier_init() that returned 0; NULL returns at once
 void dbengine_readiness_wait(DBENGINE_TIER *tier);
 
+// take the tier down: once, after a dbengine_tier_init() that returned 0 and before dbengine_shutdown() (it needs
+// the live loop); the tier's file descriptor reservation is released here (its datafiles stay attached until
+// dbengine_destroy() finalizes them). Never on a tier that did not come up, and never twice: each call releases a
+// reservation, and one that was never made unbalances the engine's budget. NULL returns at once
 int dbengine_tier_exit(DBENGINE_TIER *tier);
 
 // a tier that came up and has not been shut down (dbengine_tier_exit() clears it first); the engine's
@@ -115,13 +121,21 @@ void dbengine_flush_all(DBENGINE_TIER *tier);
 // referenced, 0 when there were none; 0 for NULL.
 size_t dbengine_destroy(DBENGINE_ENGINE *engine);
 
+// the engine's resolved file descriptor budget (dbengine-config.h max_reserved_file_descriptors, with 0 resolved),
+// what each tier's reservation is checked against; 0 for NULL
+size_t dbengine_max_reserved_file_descriptors(DBENGINE_ENGINE *engine);
+
 // what the embedder reads about the tiers
 time_t dbengine_max_retention_s(DBENGINE_TIER *tier);   // the tier's configured time limit; 0 = none
 uint64_t dbengine_disk_space_max(STORAGE_INSTANCE *si);             // the tier's configured disk quota; 0 = none
 uint64_t dbengine_disk_space_used(STORAGE_INSTANCE *si);
 uint64_t dbengine_metrics(STORAGE_INSTANCE *si);
 uint64_t dbengine_samples(STORAGE_INSTANCE *si);
-time_t dbengine_global_first_time_s(STORAGE_INSTANCE *si);          // 0 while the tier holds no data
+// the oldest time the tier holds data for: 0 while no journal has given it one yet, the oldest found so far while
+// its registry loads (only final once dbengine_readiness_wait() returned for it), and for a tier that came up
+// empty the moment it became ready, so such a tier's retention (what the embedder derives from this) counts from
+// then
+time_t dbengine_global_first_time_s(STORAGE_INSTANCE *si);
 uint64_t dbengine_get_used_disk_space(DBENGINE_TIER *tier);
 uint64_t dbengine_get_directory_free_bytes_space(DBENGINE_TIER *tier);
 
@@ -129,8 +143,12 @@ bool dbengine_metric_retention_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id, time_t
 bool dbengine_metric_retention_by_uuid(STORAGE_INSTANCE *si, nd_uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s);
 void dbengine_metric_retention_delete_by_id(STORAGE_INSTANCE *si, UUIDMAP_ID id);
 
-extern STORAGE_METRICS_GROUP *dbengine_metrics_group_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
-extern void dbengine_metrics_group_release(STORAGE_INSTANCE *si, STORAGE_METRICS_GROUP *smg);
+// a chart's metrics group: the page alignment its dimensions share (its address seeds the page size every metric
+// of the chart is given, so their pages cut at the same points in time). It is bound to no tier and holds nothing
+// of the chart; the caller hands it to dbengine_store_init() for each of the chart's metrics and releases it when
+// the chart goes
+STORAGE_METRICS_GROUP *dbengine_metrics_group_get(void);
+void dbengine_metrics_group_release(STORAGE_METRICS_GROUP *smg);
 
 // work the embedder wants run on the engine's worker pool, next to the engine's own jobs. The caller owns the
 // request and its completion (init before, destroy after); the engine runs fn(data) on a worker and marks the

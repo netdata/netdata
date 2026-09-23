@@ -17,8 +17,10 @@ typedef struct dbengine_tier DBENGINE_TIER;
 // by dbengine_destroy() when no reference on a cache page or a registry metric remains (dbengine-api.h). A process
 // may hold several. What they share is process-wide by design: the page allocator layer below and the tier page
 // sizes it is built from, the page-details and extent-buffer allocators (dbengine-stats.h names them), the libuv
-// thread pool, and the process's file-descriptor limit, which each engine budgets against on its own. Calls to
-// dbengine_create() and dbengine_destroy() are not thread-safe against one another: the embedder serialises them.
+// worker pool (sized by the embedder, never by the engine: libuv_worker_threads below says what that means and
+// what a wrong size does), and the process's file-descriptor limit, which each engine budgets against on its own.
+// Calls to dbengine_create() and dbengine_destroy() are not thread-safe against one another: the embedder
+// serialises them. That is all the serialisation is for; it has no bearing on the pool.
 struct dbengine_engine;
 typedef struct dbengine_engine DBENGINE_ENGINE;
 
@@ -64,11 +66,46 @@ struct dbengine_config {
     unsigned pages_per_extent;                  // [db] dbengine pages per extent; 0 = default, > MAX_PAGES_PER_EXTENT is fatal
     bool journal_integrity_check;               // [db] dbengine enable journal integrity check
     time_t journal_v2_unmount_time_s;           // [db] dbengine journal v2 unmount time
+    size_t max_reserved_file_descriptors;       // the file descriptors this engine may reserve for its tiers, a
+                                                // fixed number per tier (dbengine_tier_init() returns UV_EMFILE when
+                                                // one more would exceed it); 0 = a quarter of the process's soft
+                                                // RLIMIT_NOFILE as libnetdata read it (rlimit_nofile), taken once when
+                                                // dbengine_create() resolves the configuration. Per engine: several
+                                                // engines each budget on their own against the one process table
 
     // runtime
     time_t default_update_every_s;              // used for a metric whose own update_every is unknown; 0 = 1, < 0 is fatal
-    int libuv_worker_threads;                   // size of the libuv thread pool the engine dispatches work into;
-                                                // 0 = the engine's compiled default
+
+    // The libuv worker pool. There is one per process, and libuv sizes it once, at the process's first use of it,
+    // from the UV_THREADPOOL_SIZE environment variable (4 threads when unset); nothing resizes it afterwards. The
+    // engine dispatches every piece of work it takes off its event loop into it: extent writes and reads, flushes,
+    // the registry loads of a tier coming up, journal indexing, datafile rotation, query preparation (a query at
+    // STORAGE_PRIORITY_SYNCHRONOUS runs its preparation and its reads on the caller's own thread and never touches
+    // the pool; one at STORAGE_PRIORITY_SYNCHRONOUS_FIRST prepares and reads its first extent there and queues the
+    // rest). The engine neither
+    // sizes the pool nor can read its size: libuv_worker_threads is what the embedder tells it the size is, and it
+    // must equal the real one, so the embedder sets UV_THREADPOOL_SIZE to the same number before the process first
+    // touches the pool (the daemon does, from the variable it hands here: netdata-conf-global.c). The engine counts
+    // the work it has in flight against that figure: once no more than reserved_libuv_worker_threads are left it
+    // dispatches only its own internal-priority work (queries and extent reads wait), so that the embedder's own
+    // uv_queue_work() calls find a thread. Its internal-priority work is never held back by the count, so the
+    // reservation is best effort: it keeps the engine's lower-priority work off those threads, and nothing keeps
+    // its flushes, loads and rotations off them.
+    //
+    // Why the figure must be right: two of the engine's own work items wait, on the pool thread they hold, for a
+    // work item they queued behind them (a flush waits for its extent write, pagecache.c; a tier's registry load
+    // waits for the per-datafile loaders it queued, rrdengine.c), and both run at the internal priority the count
+    // never holds back. On a pool smaller than libuv_worker_threads every thread can end up held by a waiting
+    // parent whose child can never run, and the process hangs, silently and for good. With the two figures equal
+    // the daemon is safe by its usual numbers, not by a rule the engine enforces: it asks for a pool of cpus x 6
+    // threads against roughly cpus + 2 x tiers such parents, but a memory cap or the "libuv worker threads"
+    // setting (netdata-conf-global.c) can bring the pool down to its floor (16; 8 on a 32-bit build) while the
+    // flush parents it can have stay capped by cpus (pgc_max_flushers()), so a many-cpu host with a floor-sized
+    // pool is exposed as well. The rule the engine's work items should keep, and these two do not yet: no work
+    // item waits for another work item while it holds a pool thread.
+    int libuv_worker_threads;                   // the pool's size, as the embedder set it; 0 = the engine's compiled
+                                                // default (16; 8 on a 32-bit build), which is then the number the
+                                                // embedder must have set UV_THREADPOOL_SIZE to
     int reserved_libuv_worker_threads;          // pool threads the engine must leave free for the embedder's own work
 
     // services the embedder may provide; NULL = not provided
@@ -103,7 +140,7 @@ struct dbengine_config {
 
 // The compiled defaults: the baseline a caller adjusts before dbengine_create(), which resolves the
 // 0-means-default fields (cpus, allocator.partitions, default_update_every_s, pages_per_extent,
-// libuv_worker_threads) to concrete values.
+// libuv_worker_threads, max_reserved_file_descriptors) to concrete values.
 #define DBENGINE_CONFIG_DEFAULTS {                              \
     .page_cache_mb = DBENGINE_CONFIG_DEFAULT_PAGE_CACHE_MB,     \
     .extent_cache_mb = 0,                                       \
@@ -120,6 +157,7 @@ struct dbengine_config {
     .pages_per_extent = DBENGINE_DEFAULT_PAGES_PER_EXTENT,      \
     .journal_integrity_check = false,                           \
     .journal_v2_unmount_time_s = 120,                           \
+    .max_reserved_file_descriptors = 0,                         \
     .default_update_every_s = 1,                                \
     .libuv_worker_threads = 0,                                  \
     .reserved_libuv_worker_threads = 0,                         \
@@ -127,10 +165,21 @@ struct dbengine_config {
     .preload_metrics = NULL,                                    \
 }
 
+// the same defaults as a value, for a caller that cannot use the initialiser (one that fills the struct at run
+// time, or from another language)
+struct dbengine_config dbengine_config_defaults(void);
+
 // One tier's configuration, handed to dbengine_tier_init(); the engine copies what it needs.
+// the longest dbfiles_path a tier takes: the engine appends the names of its datafiles and journals (at most 31
+// characters, "/journalfile-<tier>-<number>.njfv2") to it in buffers of FILENAME_MAX + 1, so a path that leaves
+// them no room is refused by dbengine_tier_init() (UV_ENAMETOOLONG) rather than silently truncated; 64 is the room
+// kept
+#define DBENGINE_DBFILES_PATH_MAX (FILENAME_MAX - 64)
+
 struct dbengine_tier_config {
     size_t tier;                                // 0 is the tier collectors write to; higher tiers aggregate the one below
-    const char *dbfiles_path;                   // directory of this tier's datafiles and journals
+    const char *dbfiles_path;                   // directory of this tier's datafiles and journals; at most
+                                                // DBENGINE_DBFILES_PATH_MAX characters
     unsigned disk_space_mb;                     // 0 = no disk quota
     time_t max_retention_s;                     // 0 = no time limit
     uint8_t page_type;                          // tier 0: DBENGINE_PAGE_TYPE_GORILLA_32BIT or
@@ -140,7 +189,7 @@ struct dbengine_tier_config {
 };
 
 // Bring an engine up: copy cfg into it, resolving the 0-means-default fields (cpus, default_update_every_s,
-// pages_per_extent, libuv_worker_threads), then create the event loop, the caches, the metrics registry (which
+// pages_per_extent, libuv_worker_threads, max_reserved_file_descriptors), then create the event loop, the caches, the metrics registry (which
 // preloads through cfg->preload_metrics, so the embedder's tier count must be final by now) and the engine's
 // thread, and start taking work. The only way up; tiers come after it. Fatal when the libuv pool is not larger
 // than the threads reserved for the embedder, when pages_per_extent exceeds what the extent format holds, or

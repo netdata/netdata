@@ -601,13 +601,8 @@ static int opentsdb_http_unittest_case(
 static int opentsdb_number_unittest(void) {
     int errors = 0;
 
-#ifdef NETDATA_WITH_LONG_DOUBLE
-    const NETDATA_DOUBLE minimum_normal = LDBL_MIN;
-    const NETDATA_DOUBLE minimum_subnormal = nextafterl(0.0L, 1.0L);
-#else
     const NETDATA_DOUBLE minimum_normal = DBL_MIN;
     const NETDATA_DOUBLE minimum_subnormal = nextafter(0.0, 1.0);
-#endif
     const struct {
         const char *description;
         NETDATA_DOUBLE value;

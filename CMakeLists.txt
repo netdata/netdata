@@ -3703,7 +3703,24 @@ endif()
 
 if(ENABLE_DBENGINE)
     add_library(dbengine OBJECT ${DBENGINE_FILES})
-    target_link_libraries(dbengine PUBLIC libnetdata)
+
+    # The libraries the engine calls itself: libuv (the event loop, the file I/O, the worker pool), lz4 and zstd
+    # (extent compression), zlib (the journal checksums), Judy (the registry and cache indexes). libnetdata carries
+    # every one of them PUBLIC already, so the daemon's link line does not change; they are named here so that the
+    # target states what its sources use, and a consumer that takes the engine's objects with their CMake usage
+    # requirements links them whether or not it links libnetdata the same way. Everything else the engine needs
+    # (sqlite, json-c, OpenSSL, systemd, curl) it needs only through libnetdata.
+    target_link_libraries(dbengine PUBLIC
+            libnetdata
+            judy
+            ${LIBUV_LDFLAGS}
+            ${LIBLZ4_LDFLAGS}
+            ${LIBZSTD_LDFLAGS})
+    if(OS_MACOS)
+        target_link_libraries(dbengine PUBLIC ZLIB::ZLIB)
+    else()
+        target_link_libraries(dbengine PUBLIC ${ZLIB_LDFLAGS})
+    endif()
 endif()
 
 add_executable(netdata
