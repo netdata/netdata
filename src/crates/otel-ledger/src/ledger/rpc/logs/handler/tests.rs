@@ -1076,42 +1076,55 @@ fn make_handler_with_remote(tr: TenantRegistries, remote: RemoteRead) -> OtelLog
     )
 }
 
-/// A handler whose tenant's only copy of one SFST (stream `ns/svc`, six
-/// records from `min_s`) is in remote object storage — no local SFST or WAL —
-/// and the download cache it reads through. Uses a real `OpendalStorage` over
-/// an `fs://` backend (exercises the real `Storage::read`).
-fn remote_only_handler(min_s: u32) -> (OtelLogsHandler, file_cache::FileCache) {
-    let mut tr = make_tenant_registries();
-
-    // Build a real SFST's bytes; do NOT install it locally. The FileId's ns_hash
-    // matches the stream (as production `build_catalog_entry` guarantees).
-    let id = FileId::new(
+/// The id of stream `ns/svc`'s file of sequence `seq`; its ns_hash matches
+/// the stream, as production `build_catalog_entry` guarantees.
+fn stream_file_id(seq: u64) -> FileId {
+    FileId::new(
         Identity::new(MachineId::new(Uuid::from_u128(0x11)).unwrap(), InstanceId::new(Uuid::from_u128(0x22)).unwrap()),
         0,
-        1,
+        seq,
         ServiceStream::new("ns", "svc").ns_hash(),
-    );
+    )
+}
+
+/// Store a real SFST (stream `ns/svc`, six records from `min_s`) under
+/// `remote_dir` as the object of seq `seq` and catalog it — a file only the
+/// remote holds, with no local SFST or WAL. Returns the object's path.
+fn place_remote_sfst(
+    tr: &mut TenantRegistries,
+    remote_dir: &std::path::Path,
+    seq: u64,
+    min_s: u32,
+) -> std::path::PathBuf {
     let sfst_tmp = tempfile::NamedTempFile::new().unwrap();
     write_test_sfst(sfst_tmp.path(), min_s);
     let sfst_bytes = std::fs::read(sfst_tmp.path()).unwrap();
 
-    // Place the object in an fs:// remote backend at its catalog remote_key.
-    let remote_dir = tempfile::tempdir().unwrap().keep();
-    let remote_key = "v2/logs/tenants/default/sfst/seq1.sfst";
-    let obj_path = remote_dir.join(remote_key);
+    let remote_key = format!("v2/logs/tenants/default/sfst/seq{seq}.sfst");
+    let obj_path = remote_dir.join(&remote_key);
     std::fs::create_dir_all(obj_path.parent().unwrap()).unwrap();
     std::fs::write(&obj_path, &sfst_bytes).unwrap();
 
     track_remote_catalog(
-        &mut tr,
+        tr,
         "default",
-        id,
-        remote_key,
+        stream_file_id(seq),
+        &remote_key,
         min_s,
         min_s + 5,
         sfst_bytes.len() as u64,
     );
+    obj_path
+}
 
+/// A handler over `tr` reading `remote_dir` through a fresh download cache,
+/// returned too so a test can see what was downloaded. Uses a real
+/// `OpendalStorage` over an `fs://` backend (exercises the real
+/// `Storage::read`).
+fn handler_over_remote(
+    tr: TenantRegistries,
+    remote_dir: &std::path::Path,
+) -> (OtelLogsHandler, file_cache::FileCache) {
     let storage =
         file_lifecycle::storage::OpendalStorage::new(&format!("fs://{}", remote_dir.display()))
             .unwrap();
@@ -1119,6 +1132,15 @@ fn remote_only_handler(min_s: u32) -> (OtelLogsHandler, file_cache::FileCache) {
         file_cache::FileCache::open(tempfile::tempdir().unwrap().keep(), 64 * 1024 * 1024).unwrap();
     let h = make_handler_with_remote(tr, RemoteRead::new(storage, cache.clone()));
     (h, cache)
+}
+
+/// A handler whose tenant's only copy of one SFST (stream `ns/svc`, six
+/// records from `min_s`) is in remote object storage, and its download cache.
+fn remote_only_handler(min_s: u32) -> (OtelLogsHandler, file_cache::FileCache) {
+    let mut tr = make_tenant_registries();
+    let remote_dir = tempfile::tempdir().unwrap().keep();
+    place_remote_sfst(&mut tr, &remote_dir, 1, min_s);
+    handler_over_remote(tr, &remote_dir)
 }
 
 /// The stream selector's field, as the handler rendered it.
@@ -1209,6 +1231,43 @@ async fn a_stream_filter_narrows_the_fetch_not_the_selector() {
         stream_options(&v).iter().any(|o| o["name"] == "ns/svc"),
         "the remote-only stream stays in the selector: {v:#}"
     );
+}
+
+/// Every remote file gets its own download attempt: one whose read fails —
+/// for a reason other than a missing object — is left out alone, and the
+/// query still answers from the files after it.
+#[tokio::test]
+async fn a_failed_download_does_not_hide_the_other_remote_files() {
+    let min_s = 1_700_000_000u32;
+    let mut tr = make_tenant_registries();
+    let remote_dir = tempfile::tempdir().unwrap().keep();
+    // Seq 1 downloads first and fails with a storage error, not as a missing
+    // object: its catalog names a directory-style key, which the storage
+    // client refuses at once, without retries.
+    let broken_key = "v2/logs/tenants/default/sfst/seq1/";
+    track_remote_catalog(
+        &mut tr,
+        "default",
+        stream_file_id(1),
+        broken_key,
+        min_s,
+        min_s + 5,
+        10,
+    );
+    place_remote_sfst(&mut tr, &remote_dir, 2, min_s + 10);
+    let (h, cache) = handler_over_remote(tr, &remote_dir);
+
+    let req: OtelLogsRequest = serde_json::from_value(serde_json::json!({
+        "info": false,
+        "tenant": "default",
+        "after": min_s - 10,
+        "before": min_s + 100,
+    }))
+    .unwrap();
+    let v = serde_json::to_value(h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
+
+    assert_eq!(v["items"]["matched"], 6, "seq 2 is still served: {v:#}");
+    assert_eq!(cache.file_count(), 1, "only seq 2 was downloaded");
 }
 
 /// When the remote object cannot be read, the query degrades gracefully (no

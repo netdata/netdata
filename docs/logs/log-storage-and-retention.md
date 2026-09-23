@@ -162,8 +162,9 @@ queries over the same files are served from the cache.
 
 - A query whose offloaded files exceed the cache fails with a message to narrow the time window or stream filter.
 - A download may take 30 seconds plus one second per MiB of the file, at most 5 minutes. A file that takes longer, or
-  that the remote cannot serve, is left out of the answer, and while the remote is failing the query skips its
-  remaining downloads instead of waiting for each. The Logs tab shows what could be read.
+  that the remote cannot serve, is left out of the answer, and the query still reads its other files; the Logs tab
+  shows what could be read. While the remote is down, each file waits out its own limit in turn, so a query over many
+  offloaded files can take minutes.
 - A query downloads its files one at a time, and the cache admits a query's files all at once: one wide query, of logs
   or traces, makes other queries wait for room and can evict their cached files.
 - If the cache directory becomes unwritable, downloads fail as above and the plugin logs the write errors; a query that

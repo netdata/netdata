@@ -9,9 +9,8 @@
 //! Downloads are sequential (the cache fetches one object at a time) and each
 //! runs under its own deadline ([`download_deadline`]): the storage client's
 //! retry layer alone can spend minutes on one object, and a query should not
-//! wait that out. A deadline or a non-`NotFound` storage error means remote
-//! storage is struggling, so the call's remaining downloads are skipped at once
-//! instead of each waiting out its own deadline; an absent object fails alone.
+//! wait that out. Every object gets its own attempt: a failure of any kind
+//! costs only that object, so the query still answers from the others.
 //! An object another query is already downloading is awaited until that query
 //! finishes with it (bounded by its own deadline and the cache's retry limit).
 //!
@@ -22,7 +21,7 @@ use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use file_cache::{CacheError, CachedFile, FileCache, Want};
@@ -53,8 +52,7 @@ pub struct RemoteFetch {
     /// their catalog summaries, in the order they were requested.
     pub files: Vec<SelectedFile>,
     /// The requested entries that could not be obtained: the download failed,
-    /// timed out, was skipped after an earlier failure in the same call, or
-    /// could not be stored in the cache. In request order.
+    /// timed out, or could not be stored in the cache. In request order.
     pub failed: Vec<CatalogEntry>,
     /// Pins keeping `files` in the cache. Hold them until every file has been
     /// read; dropping them lets the cache evict the files.
@@ -81,10 +79,9 @@ impl<S: Storage> RemoteRead<S> {
     }
 
     /// Materialize `entries` in the download cache. Entries naming the same
-    /// file are fetched once. `progress` ticks once per planned download —
-    /// completed, failed, or skipped after an earlier failure; a cache hit
-    /// downloads nothing and does not tick, so a caller sizing its total by
-    /// `entries.len()` gets an upper bound.
+    /// file are fetched once. `progress` ticks once per planned download,
+    /// completed or failed; a cache hit downloads nothing and does not tick, so
+    /// a caller sizing its total by `entries.len()` gets an upper bound.
     ///
     /// Per-entry failures are reported in [`RemoteFetch::failed`]. The only
     /// errors are query-wide: [`CacheError::TooLarge`] (the entries' total size
@@ -121,20 +118,16 @@ impl<S: Storage> RemoteRead<S> {
             })
             .collect();
 
-        // Set by the first download that timed out or hit a storage error; every
-        // later download of this call is then skipped.
-        let storage_failed = AtomicBool::new(false);
         let pins = self
             .cache
             .acquire(
                 &wants,
                 |filename| {
                     let object = objects.get(filename).copied();
-                    let (storage, storage_failed, progress) =
-                        (&self.storage, &storage_failed, &progress);
+                    let (storage, progress) = (&self.storage, &progress);
                     async move {
                         let result = match object {
-                            Some((key, size)) => download(storage, key, size, storage_failed).await,
+                            Some((key, size)) => download(storage, key, size).await,
                             None => Err(anyhow::anyhow!("no remote key for cache entry")),
                         };
                         progress.fetch_add(1, Ordering::Relaxed);
@@ -167,32 +160,16 @@ impl<S: Storage> RemoteRead<S> {
     }
 }
 
-/// Download one object under its deadline, or skip it when an earlier
-/// download of the same call already found remote storage failing.
-async fn download<S: Storage>(
-    storage: &S,
-    key: &str,
-    size: u64,
-    storage_failed: &AtomicBool,
-) -> anyhow::Result<Vec<u8>> {
-    if storage_failed.load(Ordering::Relaxed) {
-        anyhow::bail!("remote read of {key} skipped: an earlier download of this query failed");
-    }
+/// Download one object under its deadline.
+async fn download<S: Storage>(storage: &S, key: &str, size: u64) -> anyhow::Result<Vec<u8>> {
     let deadline = download_deadline(size);
     match tokio::time::timeout(deadline, storage.read(key)).await {
         Ok(Ok(bytes)) => Ok(bytes),
-        Ok(Err(StorageError::NotFound)) => Err(read_error_to_anyhow(key, StorageError::NotFound)),
-        Ok(Err(e)) => {
-            storage_failed.store(true, Ordering::Relaxed);
-            Err(read_error_to_anyhow(key, e))
-        }
-        Err(_) => {
-            storage_failed.store(true, Ordering::Relaxed);
-            Err(anyhow::anyhow!(
-                "remote read of {key} timed out after {} s",
-                deadline.as_secs()
-            ))
-        }
+        Ok(Err(e)) => Err(read_error_to_anyhow(key, e)),
+        Err(_) => Err(anyhow::anyhow!(
+            "remote read of {key} timed out after {} s",
+            deadline.as_secs()
+        )),
     }
 }
 

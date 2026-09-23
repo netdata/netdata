@@ -42,6 +42,8 @@ Known limits of reading traces back from object storage in this release:
   `remote_unavailable`; one missing file in a search's range marks every trace summary as possibly incomplete and
   empties searches that filter on the root service, root operation or trace duration. A downloaded file that turns
   out unreadable is reported as a failed source (`source_failure`).
+- Files are downloaded one at a time, each within its own time limit. While the remote is down, each file waits out
+  its limit in turn, so a query over many offloaded files can take minutes.
 
 ## Requirements
 

@@ -134,39 +134,27 @@ async fn duplicate_entries_are_fetched_once() {
 }
 
 #[tokio::test]
-async fn a_storage_error_fails_the_rest_of_the_call() {
-    let mut storage = storage_with(&[(1, 10), (2, 10), (3, 10)]);
-    storage
-        .read_key_errors
-        .insert("key-1".to_string(), MockReadError::Other);
-    let reads = Arc::clone(&storage.read_calls);
-    let remote = remote(storage, MIB);
-    let (fetched, progress) = fetch(&remote, vec![entry(1, 10), entry(2, 10), entry(3, 10)]).await;
+async fn a_failed_download_costs_only_its_own_file() {
+    for (label, error) in [
+        ("not found", MockReadError::NotFound),
+        ("storage error", MockReadError::Other),
+    ] {
+        let mut storage = storage_with(&[(2, 10), (3, 10)]);
+        storage.read_key_errors.insert("key-1".to_string(), error);
+        let reads = Arc::clone(&storage.read_calls);
+        let remote = remote(storage, MIB);
+        let (fetched, progress) =
+            fetch(&remote, vec![entry(1, 10), entry(2, 10), entry(3, 10)]).await;
 
-    assert!(fetched.files.is_empty());
-    assert_eq!(failed_seqs(&fetched), [1, 2, 3]);
-    assert_eq!(
-        reads.load(Ordering::Relaxed),
-        1,
-        "the rest are skipped unread"
-    );
-    assert_eq!(progress, 3, "failures and skips tick too");
-}
-
-#[tokio::test]
-async fn a_missing_object_fails_alone() {
-    let mut storage = storage_with(&[(2, 10)]);
-    storage
-        .read_key_errors
-        .insert("key-1".to_string(), MockReadError::NotFound);
-    let reads = Arc::clone(&storage.read_calls);
-    let remote = remote(storage, MIB);
-    let (fetched, progress) = fetch(&remote, vec![entry(1, 10), entry(2, 10)]).await;
-
-    assert_eq!(fetched_seqs(&fetched), [2]);
-    assert_eq!(failed_seqs(&fetched), [1]);
-    assert_eq!(reads.load(Ordering::Relaxed), 2);
-    assert_eq!(progress, 2);
+        assert_eq!(fetched_seqs(&fetched), [2, 3], "{label}");
+        assert_eq!(failed_seqs(&fetched), [1], "{label}");
+        assert_eq!(
+            reads.load(Ordering::Relaxed),
+            3,
+            "{label}: every object is read"
+        );
+        assert_eq!(progress, 3, "{label}: failures tick too");
+    }
 }
 
 #[tokio::test]
@@ -179,7 +167,7 @@ async fn a_wrong_size_object_is_failed() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn a_timed_out_download_fails_the_rest_of_the_call() {
+async fn a_timed_out_download_costs_only_its_own_file() {
     let mut storage = storage_with(&[(1, 10), (2, 10)]);
     storage
         .read_delays
@@ -189,18 +177,14 @@ async fn a_timed_out_download_fails_the_rest_of_the_call() {
     let started = tokio::time::Instant::now();
     let (fetched, progress) = fetch(&remote, vec![entry(1, 10), entry(2, 10)]).await;
 
-    assert!(fetched.files.is_empty());
-    assert_eq!(failed_seqs(&fetched), [1, 2]);
+    assert_eq!(fetched_seqs(&fetched), [2]);
+    assert_eq!(failed_seqs(&fetched), [1]);
     assert_eq!(
         started.elapsed(),
         Duration::from_secs(31),
-        "the 10-byte deadline"
+        "the 10-byte deadline, then the next download"
     );
-    assert_eq!(
-        reads.load(Ordering::Relaxed),
-        1,
-        "the rest are skipped unread"
-    );
+    assert_eq!(reads.load(Ordering::Relaxed), 2, "every object is read");
     assert_eq!(progress, 2);
 }
 
