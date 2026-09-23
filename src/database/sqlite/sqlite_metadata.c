@@ -1318,10 +1318,12 @@ static bool dimension_can_be_deleted(nd_uuid_t *dim_uuid __maybe_unused, sqlite3
 {
 #ifdef ENABLE_DBENGINE
     if(dbengine_enabled && dim_uuid) {
+        // Every tier slot, not the configured count: that count stops at the first tier that failed to start,
+        // while a tier above it is up, rotating, and holding the longest retention there is - data a later
+        // restart would serve. A tier that never came up simply has nothing to report. No active-flag gate
+        // either: this runs during shutdown too, after the tiers exited, and their retention must still count.
         bool no_retention = true;
-        for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
-            if (!multidb_ctx[tier])
-                continue;
+        for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
             time_t first_time_t = 0, last_time_t = 0;
             if (rrdeng_metric_retention_by_uuid((void *) multidb_ctx[tier], dim_uuid, &first_time_t, &last_time_t)) {
                 if (first_time_t > 0) {
@@ -2253,7 +2255,7 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
 
 #ifdef ENABLE_DBENGINE
 #define GET_UUID_LIST  "SELECT dim_id FROM dimension"
-size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, Word_t section, nd_uuid_t *uuid))
+size_t populate_metrics_from_database(void *mrg, dbengine_preload_add_fn add)
 {
     sqlite3_stmt *res = NULL;
     sqlite3 *local_meta_db = NULL;
@@ -2282,12 +2284,9 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
         if (!sqlite3_column_uuid_copy(res, 0, uuid))
             continue;
 
-        for (size_t tier = 0; tier < nd_profile.storage_tiers ; tier++) {
-            if (unlikely(!multidb_ctx[tier]))
-                continue;
-
-            populate_cb(mrg, (Word_t)multidb_ctx[tier], &uuid);
-        }
+        // the configured count is right here: this runs inside the first rrdeng_init(), before any tier could fail
+        for (size_t tier = 0; tier < nd_profile.storage_tiers ; tier++)
+            add(mrg, multidb_ctx[tier], &uuid);
         count++;
     }
 

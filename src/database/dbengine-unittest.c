@@ -6,6 +6,8 @@
 
 #ifdef ENABLE_DBENGINE
 
+#include "database/engine/include/dbengine/dbengine-tests.h"
+
 #define CHARTS 64
 #define DIMS 16 // CHARTS * DIMS dimensions
 #define REGIONS 11
@@ -589,67 +591,6 @@ static size_t test_dbengine_long_collection_cadence(RRDHOST *host) {
     return errors;
 }
 
-static size_t test_dbengine_zero_page_cadence_is_repaired(RRDHOST *host) {
-    const time_t t = START_TIMESTAMP + 4250000;
-    RRDDIM *rd = dbengine_cadence_test_create_metric(host, "dbengine-zero-page-cadence", 10);
-    if(!rd)
-        return 1;
-
-    unittest_storage_engine_store_change_collection_frequency(rd->tiers[0].sch, 0);
-    dbengine_cadence_test_store_point(rd, t + 100, 1);
-    dbengine_cadence_test_store_point(rd, t + 110, 2);
-
-    size_t errors = 0;
-    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)rd->tiers[0].sch;
-    if(!handle->pgc_page || pgc_page_data(handle->pgc_page) == PGD_EMPTY ||
-       pgd_slots_used(pgc_page_data(handle->pgc_page)) != 2 ||
-       pgc_page_start_time_s(handle->pgc_page) != t + 100 ||
-       pgc_page_end_time_s(handle->pgc_page) != t + 110 ||
-       pgc_page_update_every_s(handle->pgc_page) != 0) {
-        fprintf(stderr,
-                " >>> DBENGINE: zero-page-cadence fixture did not retain a nonempty 0-second page\n");
-        errors++;
-        goto cleanup;
-    }
-
-    const DBENGINE_CADENCE_EXPECTED_POINT expected[] = {
-        { t + 90,  t + 100, 1 },
-        { t + 100, t + 110, 2 },
-    };
-
-    size_t invalid_before =
-        rrdeng_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
-    errors += dbengine_cadence_test_query_points(
-        rd, t + 100, t + 110, expected, _countof(expected), "zero-page-cadence-first");
-    size_t invalid_after_first =
-        rrdeng_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
-
-    if(invalid_after_first != invalid_before + 1 ||
-       pgc_page_update_every_s(handle->pgc_page) != 10) {
-        fprintf(stderr,
-                " >>> DBENGINE: zero page cadence repairs=%zu cadence=%u, expected 1 and 10\n",
-                invalid_after_first - invalid_before,
-                pgc_page_update_every_s(handle->pgc_page));
-        errors++;
-    }
-
-    errors += dbengine_cadence_test_query_points(
-        rd, t + 100, t + 110, expected, _countof(expected), "zero-page-cadence-repeat");
-    size_t invalid_after_repeat =
-        rrdeng_get_cache_efficiency_stats().pages_invalid_update_every_fixed;
-
-    if(invalid_after_repeat != invalid_after_first) {
-        fprintf(stderr,
-                " >>> DBENGINE: repeated zero-page-cadence query reported %zu repairs, expected 0\n",
-                invalid_after_repeat - invalid_after_first);
-        errors++;
-    }
-
-cleanup:
-    unittest_storage_engine_store_flush(rd->tiers[0].sch);
-    return errors;
-}
-
 int test_dbengine(void) {
     // provide enough threads to dbengine
     setenv("UV_THREADPOOL_SIZE", "48", 1);
@@ -658,6 +599,9 @@ int test_dbengine(void) {
 
     nd_log_limits_unlimited();
     fprintf(stderr, "\nRunning DB-engine test\n");
+
+    // before any tier is up: the caches do not exist yet, which is the state this check needs
+    errors += (size_t)rrdeng_cache_floor_unittest();
 
     default_rrd_memory_mode = RRD_DB_MODE_DBENGINE;
     fprintf(stderr, "Initializing localhost with hostname 'unittest-dbengine'");
@@ -707,7 +651,7 @@ int test_dbengine(void) {
     }
 
     errors += test_dbengine_long_collection_cadence(host);
-    errors += test_dbengine_zero_page_cadence_is_repaired(host);
+    errors += (size_t)rrdeng_zero_page_cadence_unittest(host->db[0].si);
 
     // prevent closing the database before the test is finished
     sleep(5);
@@ -716,7 +660,7 @@ int test_dbengine(void) {
     rrdeng_quiesce((struct rrdengine_instance *)host->db[0].si);
     rrdeng_flush_all((struct rrdengine_instance *)host->db[0].si);
     rrdeng_exit((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
+    dbengine_shutdown();
     rrd_wrunlock();
 
     return (int)(errors + value_errors + time_errors);

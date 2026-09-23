@@ -3,9 +3,7 @@
 #define DBENGINE_CACHE_H
 
 #include "datafile.h"
-
-// CACHE COMPILE TIME CONFIGURATION
-// #define PGC_COUNT_POINTS_COLLECTED 1
+#include "database/engine/include/dbengine/dbengine-stats.h"
 
 typedef struct pgc PGC;
 typedef struct pgc_page PGC_PAGE;
@@ -32,135 +30,6 @@ typedef struct pgc_entry {
     uint8_t *custom_data;
 } PGC_ENTRY;
 
-struct pgc_size_histogram_entry {
-    size_t upto;
-    size_t count;
-};
-
-#define PGC_SIZE_HISTOGRAM_ENTRIES 15
-#define PGC_QUEUE_HOT   0
-#define PGC_QUEUE_DIRTY 1
-#define PGC_QUEUE_CLEAN 2
-
-struct pgc_size_histogram {
-    struct pgc_size_histogram_entry array[PGC_SIZE_HISTOGRAM_ENTRIES];
-};
-
-struct pgc_queue_statistics {
-    struct pgc_size_histogram size_histogram;
-
-    PAD64(size_t) entries;
-    PAD64(int64_t) size;
-
-    PAD64(size_t) max_entries;
-    PAD64(int64_t) max_size;
-
-    PAD64(size_t) added_entries;
-    PAD64(int64_t) added_size;
-
-    PAD64(size_t) removed_entries;
-    PAD64(int64_t) removed_size;
-};
-
-struct pgc_statistics {
-    PAD64(int64_t) wanted_cache_size;
-    PAD64(int64_t) current_cache_size;
-
-    // ----------------------------------------------------------------------------------------------------------------
-    // volume
-
-    PAD64(size_t) entries;                 // all the entries (includes clean, dirty, hot)
-    PAD64(int64_t) size;                   // all the entries (includes clean, dirty, hot)
-
-    PAD64(size_t) referenced_entries;      // all the entries currently referenced
-    PAD64(int64_t) referenced_size;        // all the entries currently referenced
-
-    PAD64(size_t) added_entries;
-    PAD64(int64_t) added_size;
-
-    PAD64(size_t) removed_entries;
-    PAD64(int64_t) removed_size;
-
-#ifdef PGC_COUNT_POINTS_COLLECTED
-    PAD64(size_t) points_collected;
-#endif
-
-    // ----------------------------------------------------------------------------------------------------------------
-    // migrations
-
-    PAD64(size_t) evicting_entries;
-    PAD64(int64_t) evicting_size;
-
-    PAD64(size_t) flushing_entries;
-    PAD64(int64_t) flushing_size;
-
-    PAD64(size_t) hot2dirty_entries;
-    PAD64(int64_t) hot2dirty_size;
-
-    PAD64(size_t) hot_empty_pages_evicted_immediately;
-    PAD64(size_t) hot_empty_pages_evicted_later;
-
-    // ----------------------------------------------------------------------------------------------------------------
-    // workload
-
-    PAD64(size_t) acquires;
-    PAD64(size_t) releases;
-
-    PAD64(size_t) acquires_for_deletion;
-
-    PAD64(size_t) searches_exact;
-    PAD64(size_t) searches_exact_hits;
-    PAD64(size_t) searches_exact_misses;
-
-    PAD64(size_t) searches_closest;
-    PAD64(size_t) searches_closest_hits;
-    PAD64(size_t) searches_closest_misses;
-
-    PAD64(size_t) flushes_completed;
-    PAD64(int64_t) flushes_completed_size;
-    PAD64(int64_t) flushes_cancelled_size;
-
-    // ----------------------------------------------------------------------------------------------------------------
-    // critical events
-
-    PAD64(size_t) events_cache_under_severe_pressure;
-    PAD64(size_t) events_cache_needs_space_aggressively;
-    PAD64(size_t) events_flush_critical;
-
-    // ----------------------------------------------------------------------------------------------------------------
-    // worker threads
-
-    PAD64(size_t) p2_workers_search;
-    PAD64(size_t) p2_workers_add;
-    PAD64(size_t) p0_workers_evict; // priority 0, we always need this when inline evictions are enabled
-    PAD64(size_t) p2_workers_flush;
-    PAD64(size_t) p2_workers_jv2_flush;
-    PAD64(size_t) p2_workers_hot2dirty;
-
-    // ----------------------------------------------------------------------------------------------------------------
-    // waste events
-
-    // waste events - spins
-    PAD64(size_t) p2_waste_insert_spins;
-    PAD64(size_t) p2_waste_evict_useless_spins;
-
-    // waste events - eviction
-    PAD64(size_t) p2_waste_evict_relocated;
-    PAD64(size_t) p2_waste_evict_thread_signals;
-    PAD64(size_t) p2_waste_evictions_inline_on_add;
-    PAD64(size_t) p2_waste_evictions_inline_on_release;
-
-    // waste events - flushing
-    PAD64(size_t) p2_waste_flush_on_add;
-    PAD64(size_t) p2_waste_flush_on_release;
-    PAD64(size_t) p2_waste_flushes_cancelled;
-
-    // ----------------------------------------------------------------------------------------------------------------
-    // per queue statistics
-
-    struct pgc_queue_statistics queues[3];
-};
-
 typedef void (*free_clean_page_callback)(PGC *cache, PGC_ENTRY entry);
 typedef void (*save_dirty_page_callback)(PGC *cache, PGC_ENTRY *entries_array, PGC_PAGE **pages_array, size_t entries);
 typedef void (*save_dirty_init_callback)(PGC *cache, Word_t section);
@@ -174,7 +43,8 @@ PGC *pgc_create(const char *name,
                 PGC_OPTIONS options, size_t partitions, size_t additional_bytes_per_page);
 
 // destroy the cache
-void pgc_destroy(PGC *cache, bool flush);
+// false when the cache stays allocated: pages are still referenced (or there is no cache)
+bool pgc_destroy(PGC *cache, bool flush);
 
 #define PGC_SECTION_ALL ((Word_t)0)
 void pgc_flush_dirty_pages(PGC *cache, Word_t section);

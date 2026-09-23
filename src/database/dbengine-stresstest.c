@@ -197,7 +197,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)host->db[0].si;
     rrdeng_quiesce(ctx);
     rrdeng_exit(ctx);
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
+    dbengine_shutdown();
     host->db[0].si = NULL;
 
     // free the host we generated into, not localhost
@@ -465,7 +465,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     rrd_wrlock();
     rrdeng_quiesce((struct rrdengine_instance *)host->db[0].si);
     rrdeng_exit((struct rrdengine_instance *)host->db[0].si);
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_SHUTDOWN_EVLOOP, NULL, NULL, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
+    dbengine_shutdown();
     host->db[0].si = NULL;
     rrdhost_free___while_having_rrd_wrlock(host);
     rrd_wrunlock();

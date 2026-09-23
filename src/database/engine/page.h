@@ -8,6 +8,7 @@ extern "C" {
 #endif
 
 #include "libnetdata/libnetdata.h"
+#include "database/engine/include/dbengine/dbengine-stats.h"
 
 typedef struct pgd_cursor {
     struct pgd *pgd;
@@ -39,7 +40,6 @@ uint32_t pgd_capacity(PGD *pg);
 uint32_t pgd_disk_footprint(PGD *pg);
 
 struct aral_statistics *pgd_aral_stats(void);
-size_t pgd_padding_bytes(void);
 
 void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size);
 

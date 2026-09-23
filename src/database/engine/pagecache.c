@@ -1148,13 +1148,21 @@ void pgc_open_add_hot_page(
 }
 
 int64_t dynamic_open_cache_size(void) {
-    int64_t main_wanted_cache_size = pgc_get_wanted_cache_size(main_cache);
+    // a cache that dbengine_destroy() had to leave allocated is still asked for space by whoever releases its
+    // pages, and by the finalization of its datafiles, after the main cache was freed: it then sizes itself from
+    // its floor. One read of the global, so the NULL check and the two uses below cannot disagree; the store that
+    // clears it happens after every engine thread was joined, so nothing races it.
+    PGC *mc = main_cache;
+    if(!mc)
+        return OPEN_CACHE_MIN_SIZE;
+
+    int64_t main_wanted_cache_size = pgc_get_wanted_cache_size(mc);
     int64_t target_size = main_wanted_cache_size / 100 * 5;
 
-    if(target_size < 2 * 1024 * 1024)
-        target_size = 2 * 1024 * 1024;
+    if(target_size < OPEN_CACHE_MIN_SIZE)
+        target_size = OPEN_CACHE_MIN_SIZE;
 
-    int64_t main_current_cache_size = pgc_get_current_cache_size(main_cache);
+    int64_t main_current_cache_size = pgc_get_current_cache_size(mc);
 
     int64_t main_free_cache_size = (main_wanted_cache_size > main_current_cache_size) ?
                                       main_wanted_cache_size - main_current_cache_size : 0;
@@ -1163,13 +1171,19 @@ int64_t dynamic_open_cache_size(void) {
 }
 
 int64_t dynamic_extent_cache_size(void) {
-    int64_t main_wanted_cache_size = pgc_get_wanted_cache_size(main_cache);
+    // as for the open cache: a retained extent cache outlives the main cache too, though only a late page
+    // release reaches it (datafile finalization never asks the extent cache for anything)
+    PGC *mc = main_cache;
+    if(!mc)
+        return EXTENT_CACHE_MIN_SIZE;
+
+    int64_t main_wanted_cache_size = pgc_get_wanted_cache_size(mc);
     int64_t target_size = main_wanted_cache_size / 100 * 30;
 
-    if(target_size < 5 * 1024 * 1024)
-        target_size = 5 * 1024 * 1024;
+    if(target_size < EXTENT_CACHE_MIN_SIZE)
+        target_size = EXTENT_CACHE_MIN_SIZE;
 
-    int64_t main_current_cache_size = pgc_get_current_cache_size(main_cache);
+    int64_t main_current_cache_size = pgc_get_current_cache_size(mc);
 
     int64_t main_free_cache_size = (main_wanted_cache_size > main_current_cache_size) ?
                                       main_wanted_cache_size - main_current_cache_size : 0;
@@ -1190,8 +1204,8 @@ void pgc_and_mrg_initialize(void)
     size_t open_cache_size = 0;
     size_t extent_cache_size = (target_cache_size / 100) * 30;
 
-    if(extent_cache_size < 5 * 1024 * 1024) {
-        extent_cache_size = 5 * 1024 * 1024;
+    if(extent_cache_size < EXTENT_CACHE_MIN_SIZE) {
+        extent_cache_size = EXTENT_CACHE_MIN_SIZE;
         main_cache_size = target_cache_size - extent_cache_size;
     }
 

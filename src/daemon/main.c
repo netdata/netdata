@@ -8,7 +8,9 @@
 #include "web/api/queries/backfill.h"
 #include "web/mcp/mcp.h"
 
-#include "database/engine/page_test.h"
+#ifdef ENABLE_DBENGINE
+#include "database/engine/include/dbengine/dbengine-tests.h"
+#endif
 #include "database/rrdset-slots.h"
 #include <curl/curl.h>
 
@@ -220,8 +222,6 @@ int mqtt_ng_unittest(void);
 int aclk_timeout_unittest(void);
 int https_client_timeout_unittest(void);
 int mqtt_wss_client_timeout_unittest(void);
-int pgc_unittest(void);
-int mrg_unittest(void);
 int pluginsd_parser_unittest(void);
 int websocket_compression_unittest(void);
 int web_client_request_size_unittest(void);
@@ -1437,7 +1437,7 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("mrg cleanup");
 
 #ifdef ENABLE_DBENGINE
-    mrg_metric_prepopulate_cleanup(main_mrg);
+    dbengine_preload_release();
 #endif
 
     // ----------------------------------------------------------------------------------------------------------------

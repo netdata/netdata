@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// The plain types shared by the storage-engine vtable and the engines that implement it.
-// This header depends on libnetdata only, so an engine can include it without seeing the
-// rest of the daemon; RRDDIM is only forward-declared here for the vtable, and everything that
-// needs the RRDHOST/RRDSET/RRDDIM definitions stays in storage-engine.h.
+// The plain types shared by the storage-engine vtable and the engines that implement it: the vocabulary an
+// engine's public API is written in. It lives in libnetdata, beside storage-point.h, so that vocabulary is neither
+// the daemon's nor any one engine's; RRDDIM is only forward-declared here for the vtable, and everything that needs
+// the RRDHOST/RRDSET/RRDDIM definitions stays in the daemon's storage-engine.h.
 
 #ifndef NETDATA_STORAGE_ENGINE_TYPES_H
 #define NETDATA_STORAGE_ENGINE_TYPES_H
 
-#include "libnetdata/libnetdata.h"
+#include <time.h>
 
 typedef struct rrddim RRDDIM;
 

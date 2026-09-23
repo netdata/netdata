@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "database/engine/rrddiskprotocol.h"
+#include "rrddiskprotocol.h"
 #include "rrdengine.h"
 #include "dbengine-compression.h"
 
@@ -1022,11 +1022,6 @@ time_t rrdeng_global_first_time_s(STORAGE_INSTANCE *si) {
     return t;
 }
 
-size_t rrdeng_currently_collected_metrics(STORAGE_INSTANCE *si) {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
-    return __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
-}
-
 /*
  * Gathers Database Engine statistics.
  * Careful when modifying this function.
@@ -1192,7 +1187,10 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_confi
     // Global contexts may already have MRG prepopulation accounting from the first DBEngine spawn.
     rrdeng_reset_accounting_if_fresh(ctx, freshly_initialized_ctx);
 
-    if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
+    if (!rrdeng_dbengine_spawn(ctx))
+        netdata_log_error("DBENGINE: tier %zu: the engine is not running and could not be started, the tier cannot be initialized",
+                          (size_t)tc->tier);
+    else if (!init_rrd_files(ctx)) {
         // success - we run this ctx too
         __atomic_store_n(&ctx->atomic.mrg_populated, false, __ATOMIC_RELEASE);
         __atomic_store_n(&ctx->atomic.active, true, __ATOMIC_RELEASE);
@@ -1208,6 +1206,95 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const struct rrdeng_tier_confi
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return UV_EIO;
+}
+
+size_t dbengine_destroy(void) {
+    // destroying the open and extent caches asks their sizing callbacks, which read the main cache, so they go
+    // first; pages carry METRIC pointers, so the registry goes after the caches; an open cache page holds a
+    // reference on its datafile, released when the page is freed, so the datafiles are finalized after the open
+    // cache. A global is cleared only when its object was freed: one with live references stays allocated (its
+    // destroy says so), and a late release must still find it. Such a cache outlives the main cache it sizes
+    // itself from; its callback (pagecache.c) falls back to its floor once the main cache is gone.
+    if(extent_cache) {
+        fprintf(stderr, "Destroying extent cache (PGC)...\n");
+        if(pgc_destroy(extent_cache, false))
+            extent_cache = NULL;
+    }
+    if(open_cache) {
+        fprintf(stderr, "Destroying open cache (PGC)...\n");
+        if(pgc_destroy(open_cache, false))
+            open_cache = NULL;
+    }
+    if(main_cache) {
+        fprintf(stderr, "Destroying main cache (PGC)...\n");
+        if(pgc_destroy(main_cache, false))
+            main_cache = NULL;
+    }
+
+    size_t metrics_referenced = 0;
+    if(main_mrg) {
+        fprintf(stderr, "Destroying metrics registry (MRG)...\n");
+        metrics_referenced = mrg_destroy(main_mrg);
+        if(!metrics_referenced)
+            main_mrg = NULL;
+    }
+
+    for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
+        struct rrdengine_instance *ctx = multidb_ctx[tier];
+        if(ctx->datafiles.JudyL) {
+            fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
+            finalize_rrd_files(ctx);
+        }
+        // back to the constructor's state. The lock is destroyed first: re-initialising a live rwlock is undefined
+        // and leaks what the platform allocated for it; every slot's lock is initialised (by the constructor at
+        // least) and nothing holds it any more. The memset stays: it drops the pointers to any datafile the
+        // finalization had to skip, so a leak checker reports them instead of seeing them reachable from here.
+        netdata_rwlock_destroy(&ctx->datafiles.rwlock);
+        initialize_single_ctx(ctx);
+    }
+
+    return metrics_referenced;
+}
+
+void dbengine_preload_release(void) {
+    if(main_mrg)
+        mrg_metric_prepopulate_cleanup(main_mrg);
+}
+
+bool rrdeng_get_cache_statistics(RRDENG_CACHE which, struct pgc_statistics *out) {
+    PGC *cache = NULL;
+    switch(which) {
+        case RRDENG_CACHE_MAIN:   cache = main_cache;   break;
+        case RRDENG_CACHE_OPEN:   cache = open_cache;   break;
+        case RRDENG_CACHE_EXTENT: cache = extent_cache; break;
+    }
+    if(!cache) {
+        memset(out, 0, sizeof(*out));
+        return false;
+    }
+    *out = pgc_get_statistics(cache);
+    return true;
+}
+
+size_t rrdeng_pages_pending_flush(void) {
+    return main_cache ? pgc_hot_and_dirty_entries(main_cache) : 0;
+}
+
+bool rrdeng_get_mrg_statistics(struct mrg_statistics *out) {
+    if(!main_mrg) {
+        memset(out, 0, sizeof(*out));
+        return false;
+    }
+    mrg_get_statistics(main_mrg, out);
+    return true;
+}
+
+bool rrdeng_ctx_is_active(struct rrdengine_instance *ctx) {
+    return __atomic_load_n(&ctx->atomic.active, __ATOMIC_ACQUIRE);
+}
+
+time_t rrdeng_max_retention_s(struct rrdengine_instance *ctx) {
+    return ctx->config.max_retention_s;
 }
 
 size_t rrdeng_active_tiers(void) {

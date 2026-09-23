@@ -8,7 +8,7 @@
 // job ids are indices into per-thread worker utilization tables that every user of the libuv threadpool
 // shares; the storage engine owns the first block, the daemon's own jobs follow it
 #ifdef ENABLE_DBENGINE
-#include "database/engine/dbengine-workers.h"
+#include "database/engine/include/dbengine/dbengine-workers.h"
 #define UV_EVENT_JOB_FIRST RRDENG_WORKER_JOB_MAX
 #else
 #define UV_EVENT_JOB_FIRST 1
