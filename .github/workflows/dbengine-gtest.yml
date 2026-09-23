@@ -1,0 +1,205 @@
+---
+# Runs the dbengine googletest suite, plain and under AddressSanitizer.
+#
+# This is deliberately not part of tests.yml. That job installs the whole agent to run `netdata -W unittest`, which
+# is the right shape for the legacy in-binary suite and the wrong shape for a target that is built by name in
+# minutes. It also would not build this target at all.
+name: DBEngine Tests
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/dbengine-gtest.yml'
+      - 'CMakeLists.txt'
+      - 'packaging/cmake/Modules/**'
+      - 'src/database/storage-engines/**'
+      - 'src/libnetdata/**'
+  pull_request:
+    paths:
+      - '.github/workflows/dbengine-gtest.yml'
+      - 'CMakeLists.txt'
+      - 'packaging/cmake/Modules/**'
+      - 'src/database/storage-engines/**'
+      - 'src/libnetdata/**'
+
+concurrency:
+  group: dbengine-gtest-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  TEST_TARGETS: >-
+    dbengine-test
+  # A googletest binary whose filter matches nothing exits 0 while running no tests, so an exit code alone cannot
+  # tell a passing suite from one that never ran. Every leg asserts the number of cases that actually reported a
+  # result, and this is the floor it checks against. Raise it as the suite grows.
+  MIN_TEST_CASES: 81
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build pkg-config flex bison g++ \
+            libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
+            liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
+            libjson-c-dev libyaml-dev libmnl-dev zlib1g-dev uuid-dev \
+            libprotobuf-dev protobuf-compiler
+
+      - name: Check the API tests reach only the engine's public headers
+        run: src/database/storage-engines/dbengine/tests/check-public-includes.sh
+
+      - name: Configure
+        run: |
+          # The scripts plugin is off because it makes a Go toolchain a hard requirement of configuring, and this
+          # job builds one C++ test binary that has nothing to do with Go. Leaving it on fails the configure on any
+          # runner whose Go is older than the tree asks for.
+          cmake -S . -B build -G Ninja \
+            -DENABLE_GTEST=On \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DENABLE_PLUGIN_GO=OFF \
+            -DENABLE_PLUGIN_SCRIPTS=Off \
+            -DENABLE_PLUGIN_XENSTAT=OFF \
+            -DENABLE_PLUGIN_FREEIPMI=Off \
+            -DENABLE_PLUGIN_CUPS=Off \
+            -DENABLE_PLUGIN_NFACCT=Off \
+            -DENABLE_PLUGIN_OTEL=Off \
+            -DENABLE_PLUGIN_OTEL_SIGNAL_VIEWER=Off \
+            -DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=Off \
+            -DENABLE_EXPORTER_MONGODB=Off \
+            -DENABLE_BUNDLED_PROTOBUF=Off
+
+      - name: Build test binaries
+        run: echo "${TEST_TARGETS}" | xargs ninja -C build
+
+      - name: Run test binaries
+        run: |
+          set -euo pipefail
+          for t in ${TEST_TARGETS}; do
+            bin="$(find build -name "$t" -type f -executable | head -n 1)"
+            if [ -z "$bin" ]; then
+              echo "::error::test binary $t not found"
+              exit 1
+            fi
+            echo "--- running $t"
+            # The status is captured rather than allowed to end the step, because set -e would exit here and the
+            # count check below - the one that exists for a binary which ran nothing or stalled - would never print
+            # its diagnostic. Both are reported, then the run's own status decides the step.
+            status=0
+            timeout 300 "$bin" | tee "/tmp/$t.log" || status=$?
+            cases="$(grep -cE '^\[       OK \]' "/tmp/$t.log" || true)"
+            if [ "$cases" -lt "${MIN_TEST_CASES}" ]; then
+              echo "::error::$t reported $cases passing cases, expected at least ${MIN_TEST_CASES}"
+              exit 1
+            fi
+            if [ "$status" -ne 0 ]; then
+              echo "::error::$t exited with status $status after reporting $cases passing cases"
+              exit "$status"
+            fi
+            echo "--- $t OK ($cases cases)"
+          done
+
+      - name: Check the suite links without the daemon
+        run: |
+          set -euo pipefail
+          bin="$(find build -name dbengine-test -type f -executable | head -n 1)"
+          # Defined symbols, not undefined ones. An undefined daemon symbol cannot reach this step: it would have
+          # failed the link in the step above. Daemon code that did get linked in would be *defined* here, which is
+          # the case worth looking for - the engine having grown a dependency on its embedder, or daemon sources
+          # having been added to the target to make something compile.
+          if nm --defined-only "$bin" | grep -qE '\b(rrdhost|rrdset|rrddim|pulse|netdata_conf|analytics)_[a-z_]+'; then
+            echo "::error::dbengine-test contains daemon symbols"
+            nm --defined-only "$bin" | grep -E '\b(rrdhost|rrdset|rrddim|pulse|netdata_conf|analytics)_[a-z_]+'
+            exit 1
+          fi
+
+  asan-tests:
+    name: Unit Tests (ASAN)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build pkg-config flex bison g++ \
+            libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
+            liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
+            libjson-c-dev libyaml-dev libmnl-dev zlib1g-dev uuid-dev \
+            libprotobuf-dev protobuf-compiler
+
+      - name: Configure
+        run: |
+          # ENABLE_ADDRESS_SANITIZER adds the sanitizer flags AND defines FSANITIZE_ADDRESS, which is what makes
+          # libnetdata's pooled allocators fall back to plain malloc/free. Setting the flags by hand instruments the
+          # build but leaves the pools intact, so ASan cannot see a use-after-free inside ARAL, the dictionary
+          # allocators, STRING or onewayalloc - it would report clean while checking very little.
+          # NETDATA_INTERNAL_CHECKS is what turns the engine's internal_fatal() checks on, and a developer's build
+          # has them on. Without it here the suite would be exercised in CI under weaker checks than the build it is
+          # written against, and a case that trips one of them would pass CI and fail on a desk.
+          cmake -S . -B build -G Ninja \
+            -DENABLE_GTEST=On \
+            -DENABLE_ADDRESS_SANITIZER=On \
+            -DCMAKE_C_FLAGS="-DNETDATA_INTERNAL_CHECKS=1" \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DENABLE_PLUGIN_GO=OFF \
+            -DENABLE_PLUGIN_SCRIPTS=Off \
+            -DENABLE_PLUGIN_XENSTAT=OFF \
+            -DENABLE_PLUGIN_FREEIPMI=Off \
+            -DENABLE_PLUGIN_CUPS=Off \
+            -DENABLE_PLUGIN_NFACCT=Off \
+            -DENABLE_PLUGIN_OTEL=Off \
+            -DENABLE_PLUGIN_OTEL_SIGNAL_VIEWER=Off \
+            -DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=Off \
+            -DENABLE_EXPORTER_MONGODB=Off \
+            -DENABLE_BUNDLED_PROTOBUF=Off
+
+      - name: Build test binaries
+        run: echo "${TEST_TARGETS}" | xargs ninja -C build
+
+      - name: Run test binaries under ASAN
+        run: |
+          set -euo pipefail
+          # Use-after-free and overflows are what this leg is for. Leak detection stays off: the engine keeps a
+          # large amount of process-lifetime state on purpose - the page allocator layer, the cache section
+          # allocator, the page-details allocators, the uuid map, the worker registry - none of which is freed at
+          # exit, so LSAN at process exit reports residue rather than findings. The contract that matters is
+          # checked directly instead: dbengine_destroy() returns the metrics still referenced, and the lifecycle
+          # cases assert it is zero.
+          export ASAN_OPTIONS="detect_leaks=0:abort_on_error=1"
+          for t in ${TEST_TARGETS}; do
+            bin="$(find build -name "$t" -type f -executable | head -n 1)"
+            if [ -z "$bin" ]; then
+              echo "::error::test binary $t not found"
+              exit 1
+            fi
+            echo "--- running $t (ASAN)"
+            status=0
+            timeout 600 "$bin" | tee "/tmp/$t.log" || status=$?
+            cases="$(grep -cE '^\[       OK \]' "/tmp/$t.log" || true)"
+            if [ "$cases" -lt "${MIN_TEST_CASES}" ]; then
+              echo "::error::$t reported $cases passing cases, expected at least ${MIN_TEST_CASES}"
+              exit 1
+            fi
+            if [ "$status" -ne 0 ]; then
+              echo "::error::$t exited with status $status after reporting $cases passing cases"
+              exit "$status"
+            fi
+            echo "--- $t OK ($cases cases)"
+          done

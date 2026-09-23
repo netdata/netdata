@@ -270,6 +270,13 @@ option(ENABLE_BUNDLED_JSONC "Force use of a vendored copy of JSON-C" False)
 option(ENABLE_BUNDLED_YAML "Force use of a vendored copy of libyaml" False)
 option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
 
+# Testing
+#
+# Developer-only. Builds the googletest-based test executables, which have no install rule, and fetches googletest to
+# do it. Off by default: a normal build must neither reach the network nor gain a target.
+option(ENABLE_GTEST "Build the googletest-based test executables (developer-only, fetches googletest)" False)
+mark_as_advanced(ENABLE_GTEST)
+
 # Experimental features
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
 mark_as_advanced(ENABLE_WEBRTC)
@@ -634,12 +641,24 @@ if(ENABLE_SENTRY)
         include(NetdataSentry)
 endif()
 
+# Included only when enabled, and only when something will actually use it. Every googletest target in this tree is
+# a dbengine one and none of them builds on Windows (the suite uses mkdtemp, dirent and a POSIX shell script), so
+# fetching googletest in those configurations would download and build a dependency for a target that is never
+# created. Widen this when a suite outside dbengine, or one that builds on Windows, appears.
+if(ENABLE_GTEST AND ENABLE_DBENGINE AND NOT OS_WINDOWS)
+        include(NetdataGTest)
+endif()
+
 #
 # Checks from custom modules
 #
 
 netdata_detect_jsonc()
 netdata_detect_libyaml()
+
+if(ENABLE_GTEST AND ENABLE_DBENGINE AND NOT OS_WINDOWS)
+        netdata_bundle_gtest()
+endif()
 
 if(ENABLE_LEGACY_EBPF_PROGRAMS)
         netdata_fetch_legacy_ebpf_code()
@@ -3720,6 +3739,50 @@ if(ENABLE_DBENGINE)
         target_link_libraries(dbengine PUBLIC ZLIB::ZLIB)
     else()
         target_link_libraries(dbengine PUBLIC ${ZLIB_LDFLAGS})
+    endif()
+
+    # NOT OS_WINDOWS because the suite is POSIX: it makes its scratch directories with mkdtemp, walks them with
+    # dirent, and its include check is a shell script. Turning the option on for a native Windows build would fail
+    # before anything compiled.
+    if(ENABLE_GTEST AND NOT OS_WINDOWS)
+        # The engine's googletest suite. ENABLE_GTEST is the opt-in and it is off by default, so an ordinary build
+        # has no such target at all; when it is on, the suite builds with everything else rather than waiting to be
+        # asked for by name, because a test that has to be remembered is a test that rots. It carries no install
+        # rule either way, so no package can contain it.
+        #
+        # It takes the engine through the dbengine target rather than through its objects, so it inherits the usage
+        # requirements the target states - which is the same link an embedder outside this tree would make, and the
+        # reason this binary doubles as a check that the engine still links without the daemon.
+        add_executable(dbengine-test
+                src/database/storage-engines/dbengine/tests/main.cc
+                src/database/storage-engines/dbengine/tests/support.h
+                src/database/storage-engines/dbengine/tests/api_null_engine.cc
+                src/database/storage-engines/dbengine/tests/api_lifecycle.cc
+                src/database/storage-engines/dbengine/tests/api_collect_query.cc
+                src/database/storage-engines/dbengine/tests/internal_compression.cc
+                src/database/storage-engines/dbengine/tests/internal_pgc.cc
+                src/database/storage-engines/dbengine/tests/internal_pgd.cc
+                src/database/storage-engines/dbengine/tests/internal_mrg.cc)
+        target_link_libraries(dbengine-test PRIVATE dbengine GTest::gtest)
+
+        # The API tests are supposed to reach the engine only through its public headers, and nothing in the build
+        # can tell: libnetdata exports the whole src tree, so a private or daemon header compiles from there without
+        # complaint. The check runs as part of building the suite rather than only in CI, so that the developer who
+        # would add such an include is the one who hears about it.
+        add_custom_target(dbengine-test-includes
+                COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/database/storage-engines/dbengine/tests/check-public-includes.sh
+                COMMENT "Checking the dbengine API tests include only public headers"
+                VERBATIM)
+        add_dependencies(dbengine-test dbengine-test-includes)
+
+        # Running the suite is a build target of its own rather than a test registration: this tree has no CTest
+        # anywhere, and adding enable_testing() here would imply a harness that does not exist. USES_TERMINAL so the
+        # cases report as they run instead of arriving in one block when it is over.
+        add_custom_target(dbengine-test-run
+                COMMAND dbengine-test
+                DEPENDS dbengine-test
+                COMMENT "Running the dbengine test suite"
+                USES_TERMINAL)
     endif()
 endif()
 
