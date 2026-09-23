@@ -170,8 +170,9 @@ live in helper methods, preferably in `init.go`, so the public method reads as t
 a cheap auth/connectivity probe, not a full collection. `Collect()` MUST run the real write path through `metrix`.
 `Cleanup()` closes idle connections and forwards Function cleanup.
 
-An `Init()` or `Check()` error fails the job. Unclassified, an `Init()` error disables autodetection retries and a
-`Check()` error is retried per `autodetection_retry`. Classify the error when that default is wrong:
+An `Init()` or `Check()` error fails the job. By default, a `Check()` error is retried every `autodetection_retry`
+seconds (never when it is 0, the framework default) and an `Init()` error is never retried. Classify the error when that
+default is wrong:
 
 - `collectorapi.PermanentError(err)`: a failure that retrying the same configuration cannot fix, such as an invalid
   option or an unknown named profile. The job is never retried.

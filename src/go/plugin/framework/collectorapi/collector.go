@@ -43,11 +43,12 @@ type CollectorV1 interface {
 //   - write metrics into CollectorStore during Collect(),
 //   - provide exactly one chart capability for metric jobs: static YAML or a native set.
 //
-// An Init or Check error fails the job. Unclassified, an Init error disables
-// autodetection retries and a Check error is retried per autodetection_retry.
-// PermanentError (never retried) and TemporaryError (retried per
-// autodetection_retry) classify either and set the DynCfg response code. A
-// classified failure keeps a failed stock job listed instead of removed.
+// An Init or Check error fails the job. By default, a Check error is retried
+// every autodetection_retry seconds (never when it is 0, the framework
+// default) and an Init error is never retried. PermanentError (never retried)
+// and TemporaryError (retried per autodetection_retry) classify either and set
+// the DynCfg response code. A classified failure keeps a failed stock job
+// listed instead of removed.
 type CollectorV2 interface {
 	Init(context.Context) error
 	Check(context.Context) error

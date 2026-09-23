@@ -397,10 +397,11 @@ the finished collector MUST NOT run through a V1-to-V2 bridge.
 V2 imports: `github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi` and `.../pkg/metrix`. The
 `CollectorV2` interface lives at `src/go/plugin/framework/collectorapi/collector.go`.
 
-`Init()` prepares the job and `Check()` is the cheap detection probe. Unclassified, an Init error disables
-autodetection and a Check error retries per `autodetection_retry`; `collectorapi.PermanentError` (never retried) and
-`collectorapi.TemporaryError` (configured retry) classify either. `Collect()` is the scheduled hot path. Cleanup
-belongs to the orderly runtime teardown, including the optional V2 runner's shutdown ordering. Exact behavior is in
+`Init()` prepares the job and `Check()` is the cheap detection probe. By default, a Check error is retried every
+`autodetection_retry` seconds (never when it is 0, the framework default) and an Init error is never retried;
+`collectorapi.PermanentError` (never retried) and `collectorapi.TemporaryError` (configured retry) classify either.
+`Collect()` is the scheduled hot path. Cleanup belongs to the orderly runtime teardown, including the optional V2
+runner's shutdown ordering. Exact behavior is in
 `src/go/plugin/framework/jobruntime/job_v1.go`, `src/go/plugin/framework/jobruntime/job_v2.go`,
 `src/go/plugin/framework/jobruntime/job_common.go` and `src/go/plugin/agent/jobmgr/joboutput/generation.go`
 (`autoDetectionFailureFor`); public lifecycle requirements are in
