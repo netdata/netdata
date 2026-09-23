@@ -403,14 +403,14 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
 #endif
-                    "DBENGINE: metric '%s' new page from %ld to %ld, update every %u, has a conflict in main cache "
-                    "with existing %s%s page from %ld to %ld, update every %u - "
+                    "DBENGINE: metric '%s' new page from %" PRId64 " to %" PRId64 ", update every %u, has a conflict in main cache "
+                    "with existing %s%s page from %" PRId64 " to %" PRId64 ", update every %u - "
                     "is it collected more than once?",
                     uuid,
-                    page_entry.start_time_s, page_entry.end_time_s, page_entry.update_every_s,
+                    (int64_t)page_entry.start_time_s, (int64_t)page_entry.end_time_s, page_entry.update_every_s,
                     pgc_is_page_hot(pgc_page) ? "hot" : "not-hot",
                     pgc_page_data(pgc_page) == PGD_EMPTY ? " gap" : "",
-                    pgc_page_start_time_s(pgc_page), pgc_page_end_time_s(pgc_page), pgc_page_update_every_s(pgc_page)
+                    (int64_t)pgc_page_start_time_s(pgc_page), (int64_t)pgc_page_end_time_s(pgc_page), pgc_page_update_every_s(pgc_page)
               );
 
         pgc_page_release(main_cache, pgc_page);
@@ -576,16 +576,16 @@ static void store_metric_next_error_log(struct rrdeng_collect_handle *handle __m
 
     nd_log_limit_static_global_var(erl, 1, 0);
     nd_log_limit(&erl, NDLS_DAEMON, NDLP_NOTICE,
-                "DBENGINE: metric '%s' collected point at %ld, %s last collection at %ld, "
-                "update every %ld, %s page from %ld to %ld, position %u (of %u), flags: %s",
+                "DBENGINE: metric '%s' collected point at %" PRId64 ", %s last collection at %" PRId64 ", "
+                "update every %" PRId64 ", %s page from %" PRId64 " to %" PRId64 ", position %u (of %u), flags: %s",
                 uuid,
-                point_in_time_s,
+                (int64_t)point_in_time_s,
                 msg,
-                (time_t)(handle->page_end_time_ut / USEC_PER_SEC),
-                (time_t)(handle->update_every_ut / USEC_PER_SEC),
+                (int64_t)(handle->page_end_time_ut / USEC_PER_SEC),
+                (int64_t)(handle->update_every_ut / USEC_PER_SEC),
                 handle->pgc_page ? "current" : "*LAST*",
-                (time_t)(handle->page_start_time_ut / USEC_PER_SEC),
-                (time_t)(handle->page_end_time_ut / USEC_PER_SEC),
+                (int64_t)(handle->page_start_time_ut / USEC_PER_SEC),
+                (int64_t)(handle->page_end_time_ut / USEC_PER_SEC),
                 handle->page_position, handle->page_entries_max,
                 wb ? buffer_tostring(wb) : ""
                 );

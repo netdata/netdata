@@ -620,11 +620,11 @@ static int query_plan_unittest_expect_best_tier(
 
     for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
         fprintf(stderr,
-                " tier %zu: first %ld, last %ld, update_every %ld, weight %ld\n",
+                " tier %zu: first %" PRId64 ", last %" PRId64 ", update_every %" PRId64 ", weight %ld\n",
                 tier,
-                qm->tiers[tier].db_first_time_s,
-                qm->tiers[tier].db_last_time_s,
-                qm->tiers[tier].db_update_every_s,
+                (int64_t)qm->tiers[tier].db_first_time_s,
+                (int64_t)qm->tiers[tier].db_last_time_s,
+                (int64_t)qm->tiers[tier].db_update_every_s,
                 qm->tiers[tier].weight);
 
     return 1;
@@ -670,10 +670,10 @@ static int query_plan_unittest_expect_plan(
             continue;
 
         fprintf(stderr,
-                "FAILED query plan entries: %s, entry %zu expected tier %zu after %ld before %ld, got tier %zu after %ld before %ld\n",
+                "FAILED query plan entries: %s, entry %zu expected tier %zu after %" PRId64 " before %" PRId64 ", got tier %zu after %" PRId64 " before %" PRId64 "\n",
                 name, i,
-                expected[i].tier, expected[i].after, expected[i].before,
-                qm->plan.array[i].tier, qm->plan.array[i].after, qm->plan.array[i].before);
+                expected[i].tier, (int64_t)expected[i].after, (int64_t)expected[i].before,
+                qm->plan.array[i].tier, (int64_t)qm->plan.array[i].after, (int64_t)qm->plan.array[i].before);
         return 1;
     }
 
@@ -701,8 +701,8 @@ static int query_plan_unittest_expect_update_every(QUERY_TARGET *qt, size_t tier
     }
 
     fprintf(stderr,
-            "FAILED query plan selected-tier natural update_every: expected %ld, got %ld\n",
-            expected, got);
+            "FAILED query plan selected-tier natural update_every: expected %" PRId64 ", got %" PRId64 "\n",
+            (int64_t)expected, (int64_t)got);
 
     return 1;
 }

@@ -62,10 +62,10 @@ static void ml_config_migrate() {
     
     // Write new configuration values
     char window_str[32];
-    snprintf(window_str, sizeof(window_str), "%ldh", training_window / 3600);
+    snprintf(window_str, sizeof(window_str), "%" PRId64 "h", (int64_t)(training_window / 3600));
     inicfg_set(&netdata_config, config_section_ml, "training window", window_str);
     
-    snprintf(window_str, sizeof(window_str), "%ldm", min_training_window / 60);
+    snprintf(window_str, sizeof(window_str), "%" PRId64 "m", (int64_t)(min_training_window / 60));
     inicfg_set(&netdata_config, config_section_ml, "min training window", window_str);
     
     inicfg_set_number(&netdata_config, config_section_ml, "max training vectors", max_training_vectors);
@@ -91,8 +91,8 @@ static void ml_config_migrate() {
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
            "ML configuration migrated from sample-based to time-based:");
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
-           "  Training window: %ld seconds (%ld hours) - was %u samples at %ld second intervals",
-           training_window, training_window / 3600, old_max_train_samples, global_update_every);
+           "  Training window: %" PRId64 " seconds (%" PRId64 " hours) - was %u samples at %" PRId64 " second intervals",
+           (int64_t)training_window, (int64_t)(training_window / 3600), old_max_train_samples, (int64_t)global_update_every);
     nd_log(NDLS_DAEMON, NDLP_NOTICE,
            "  Target training vectors: %zu - calculated from smoothing and sampling",
            max_training_vectors);
@@ -199,7 +199,7 @@ void ml_config_load(ml_config_t *cfg) {
      */
 
     if (min_training_window >= training_window) {
-        netdata_log_error("invalid min/max training window found (%ld >= %ld)", min_training_window, training_window);
+        netdata_log_error("invalid min/max training window found (%" PRId64 " >= %" PRId64 ")", (int64_t)min_training_window, (int64_t)training_window);
 
         min_training_window = 1 * 3600;
         training_window = 6 * 3600;
