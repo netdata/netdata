@@ -588,11 +588,11 @@ func TestManualDynCfgAutoDetectionFailureResponseContracts(t *testing.T) {
 			wantDisposition: lifecycle.ResourceTransactionUnchanged,
 			wantMessage:     "job enable failed: check failed",
 		},
-		"v2 enable config error reports configuration code": {
+		"v2 enable permanent error reports its code": {
 			command:         dyncfg.CommandEnable,
 			status:          dyncfg.StatusDisabled,
 			collectorV2:     true,
-			checkErr:        collectorapi.ConfigError(errors.New("unknown profile")),
+			checkErr:        collectorapi.PermanentError(errors.New("unknown profile")),
 			wantCode:        422,
 			wantCleanup:     1,
 			wantDisposition: lifecycle.ResourceTransactionUnchanged,
@@ -1158,9 +1158,9 @@ func TestV2CheckErrorClassificationControlsAutoDetectionRetry(t *testing.T) {
 			checkErr:   errors.New("endpoint unreachable"),
 			want:       outcome{Listed: true, Status: failed, Retry: true},
 		},
-		"config error stops retry": {
+		"permanent error stops retry": {
 			sourceType: confgroup.TypeUser,
-			checkErr:   collectorapi.ConfigError(errors.New("unknown profile")),
+			checkErr:   collectorapi.PermanentError(errors.New("unknown profile")),
 			want:       outcome{Listed: true, Status: failed, Retry: false},
 		},
 		"temporary error keeps configured retry": {
@@ -1168,9 +1168,9 @@ func TestV2CheckErrorClassificationControlsAutoDetectionRetry(t *testing.T) {
 			checkErr:   collectorapi.TemporaryError(errors.New("port in use")),
 			want:       outcome{Listed: true, Status: failed, Retry: true},
 		},
-		"discovered config error stops retry": {
+		"discovered permanent error stops retry": {
 			sourceType: confgroup.TypeDiscovered,
-			checkErr:   collectorapi.ConfigError(errors.New("unknown profile")),
+			checkErr:   collectorapi.PermanentError(errors.New("unknown profile")),
 			want:       outcome{Listed: true, Status: failed, Retry: false},
 		},
 		"stock unclassified error removes the job": {
@@ -1178,9 +1178,9 @@ func TestV2CheckErrorClassificationControlsAutoDetectionRetry(t *testing.T) {
 			checkErr:   errors.New("endpoint unreachable"),
 			want:       outcome{Listed: false, Retry: true},
 		},
-		"stock config error keeps the job listed": {
+		"stock permanent error keeps the job listed": {
 			sourceType: confgroup.TypeStock,
-			checkErr:   collectorapi.ConfigError(errors.New("unknown profile")),
+			checkErr:   collectorapi.PermanentError(errors.New("unknown profile")),
 			want:       outcome{Listed: true, Status: failed, Retry: false},
 		},
 	}
@@ -1211,7 +1211,7 @@ func TestV2DynCfgTestCommandReportsClassifiedCheckErrorsAsUnprocessable(t *testi
 	tests := map[string]struct {
 		checkErr error
 	}{
-		"config error":    {checkErr: collectorapi.ConfigError(errors.New("unknown profile"))},
+		"permanent error": {checkErr: collectorapi.PermanentError(errors.New("unknown profile"))},
 		"temporary error": {checkErr: collectorapi.TemporaryError(errors.New("dependency not ready"))},
 	}
 	for name, test := range tests {

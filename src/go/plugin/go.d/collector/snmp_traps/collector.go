@@ -35,7 +35,7 @@ func (c *Collector) Configuration() any {
 func (c *Collector) Init(ctx context.Context) error {
 	validated, err := validateConfig(c.Config)
 	if err != nil {
-		return collectorapi.ConfigError(err)
+		return collectorapi.PermanentError(err)
 	}
 	c.warnCatchAllTrustedRelays(validated.trustedRelays)
 
@@ -52,7 +52,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	}); err != nil {
 		switch jobruntime.KindOf(err) {
 		case jobruntime.ErrorConfig:
-			return collectorapi.ConfigError(err)
+			return collectorapi.PermanentError(err)
 		default:
 			return collectorapi.TemporaryError(err)
 		}

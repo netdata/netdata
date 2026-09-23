@@ -152,12 +152,12 @@ Readiness MUST NOT wait for a first packet or remote observation. `Init()` and `
 validation while an incumbent may own the endpoint; DynCfg `test` never calls `Run()`.
 
 The framework waits for readiness before collecting. Startup errors follow the existing configured autodetection retry
-policy; a `collectorapi.ConfigError`, unexpected nil return and recovered panic do not retry. Unexpected return after readiness makes the job Failed
-and requires an explicit restart. The implementation MUST return promptly after `ctx.Done()` and SHOULD make in-flight
-I/O cancellation-aware where the library permits. Cleanup waits for `Run()` to return. See the
+policy; a `collectorapi.PermanentError`, unexpected nil return and recovered panic do not retry. Unexpected return after
+readiness makes the job Failed and requires an explicit restart. The implementation MUST return promptly after
+`ctx.Done()` and SHOULD make in-flight I/O cancellation-aware where the library permits. Cleanup waits for `Run()` to
+return. See the
 [runtime readiness contract](/src/go/plugin/framework/jobruntime/README.md#runtime-readiness-and-termination) for
-startup
-timeout, cancellation, output fencing and physical ownership semantics.
+startup timeout, cancellation, output fencing and physical ownership semantics.
 
 V2 collectors that need the Agent's existing first-sample storage behavior MAY set `StoreFirst: true` directly in
 their `collectorapi.Creator` registration. This fixed collector-wide setting applies to every collector chart,
@@ -173,8 +173,8 @@ a cheap auth/connectivity probe, not a full collection. `Collect()` MUST run the
 An `Init()` or `Check()` error fails the job. Unclassified, an `Init()` error disables autodetection retries and a
 `Check()` error is retried per `autodetection_retry`. Classify the error when that default is wrong:
 
-- `collectorapi.ConfigError(err)`: a configuration problem that retrying cannot fix, such as an invalid option or an
-  unknown named profile. The job is never retried.
+- `collectorapi.PermanentError(err)`: a failure that retrying the same configuration cannot fix, such as an invalid
+  option or an unknown named profile. The job is never retried.
 - `collectorapi.TemporaryError(err)`: a condition that may clear on its own, such as a dependency that is not ready
   yet. The job keeps the `autodetection_retry` schedule, even from `Init()`.
 

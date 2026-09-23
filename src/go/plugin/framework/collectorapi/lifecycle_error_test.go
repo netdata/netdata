@@ -23,8 +23,8 @@ func TestLifecycleErrorClassification(t *testing.T) {
 		classify func(error) error
 		want     classification
 	}{
-		"config error is coded 422 and not retryable": {
-			classify: ConfigError,
+		"permanent error is coded 422 and not retryable": {
+			classify: PermanentError,
 			want: classification{
 				Message:   "check: unknown profile",
 				Cause:     true,

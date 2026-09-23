@@ -2,14 +2,14 @@
 
 package collectorapi
 
-// ConfigError classifies an Init or Check error as a configuration failure
-// that retrying cannot fix, such as an invalid option or an unknown named
-// profile. The job fails without autodetection retries, whatever
+// PermanentError classifies an Init or Check error as permanent: retrying the
+// same configuration cannot succeed, as with an invalid option or an unknown
+// named profile. The job fails without autodetection retries, whatever
 // autodetection_retry says, and DynCfg commands that report the result answer
-// 422. A CollectorV2Runner.Run startup error classified this way is not retried
-// either.
+// 422. A CollectorV2Runner.Run startup error classified this way is not
+// retried either.
 // It returns nil for a nil err.
-func ConfigError(err error) error {
+func PermanentError(err error) error {
 	if err == nil {
 		return nil
 	}
