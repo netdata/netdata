@@ -15,7 +15,8 @@ import (
 //
 // Hot-path commands append into the writer's available buffer when it has one
 // (bytes.Buffer, bufio.Writer), otherwise into a scratch buffer reused across
-// commands, so formatting does not allocate per command.
+// commands, so formatting does not allocate per command. That state makes an API
+// unsafe for concurrent use; give each goroutine its own.
 type API struct {
 	io.Writer
 	scratch []byte
