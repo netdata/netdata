@@ -569,6 +569,7 @@ func TestManualDynCfgAutoDetectionFailureResponseContracts(t *testing.T) {
 	tests := map[string]struct {
 		command         dyncfg.Command
 		status          dyncfg.Status
+		collectorV2     bool
 		checkErr        error
 		current         bool
 		payload         []byte
@@ -577,6 +578,26 @@ func TestManualDynCfgAutoDetectionFailureResponseContracts(t *testing.T) {
 		wantDisposition lifecycle.ResourceTransactionDisposition
 		wantMessage     string
 	}{
+		"v2 enable ordinary failure preserves legacy success response": {
+			command:         dyncfg.CommandEnable,
+			status:          dyncfg.StatusDisabled,
+			collectorV2:     true,
+			checkErr:        errors.New("check failed"),
+			wantCode:        200,
+			wantCleanup:     1,
+			wantDisposition: lifecycle.ResourceTransactionUnchanged,
+			wantMessage:     "job enable failed: check failed",
+		},
+		"v2 enable permanent error reports its code": {
+			command:         dyncfg.CommandEnable,
+			status:          dyncfg.StatusDisabled,
+			collectorV2:     true,
+			checkErr:        collectorapi.PermanentError(errors.New("unknown profile")),
+			wantCode:        422,
+			wantCleanup:     1,
+			wantDisposition: lifecycle.ResourceTransactionUnchanged,
+			wantMessage:     "job enable failed: unknown profile",
+		},
 		"enable ordinary failure preserves legacy success response": {
 			command:         dyncfg.CommandEnable,
 			status:          dyncfg.StatusDisabled,
@@ -621,11 +642,15 @@ func TestManualDynCfgAutoDetectionFailureResponseContracts(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			controller, graph, supervisor, output, state := newDynCfgJobTestHarness(t)
-			creator := controller.modules["module"]
-			creator.Create = func() collectorapi.CollectorV1 {
-				return state.module(func(context.Context) error { return test.checkErr }, false)
+			if test.collectorV2 {
+				useV2CheckFailureCollector(controller, state, test.checkErr)
+			} else {
+				creator := controller.modules["module"]
+				creator.Create = func() collectorapi.CollectorV1 {
+					return state.module(func(context.Context) error { return test.checkErr }, false)
+				}
+				controller.modules["module"] = creator
 			}
-			controller.modules["module"] = creator
 
 			config := factoryTestConfig(false)
 			config.SetSourceType(confgroup.TypeDyncfg)
@@ -1114,6 +1139,112 @@ func TestNonRetryableAutoDetectionFailureSettlesExistingRetry(t *testing.T) {
 	require.True(t, exists)
 	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+}
+
+func TestV2CheckErrorClassificationControlsAutoDetectionRetry(t *testing.T) {
+	type outcome struct {
+		Listed bool
+		Status string
+		Retry  bool
+	}
+	failed := dyncfg.StatusFailed.String()
+	tests := map[string]struct {
+		sourceType string
+		checkErr   error
+		want       outcome
+	}{
+		"unclassified error keeps configured retry": {
+			sourceType: confgroup.TypeUser,
+			checkErr:   errors.New("endpoint unreachable"),
+			want:       outcome{Listed: true, Status: failed, Retry: true},
+		},
+		"permanent error stops retry": {
+			sourceType: confgroup.TypeUser,
+			checkErr:   collectorapi.PermanentError(errors.New("unknown profile")),
+			want:       outcome{Listed: true, Status: failed, Retry: false},
+		},
+		"temporary error keeps configured retry": {
+			sourceType: confgroup.TypeUser,
+			checkErr:   collectorapi.TemporaryError(errors.New("port in use")),
+			want:       outcome{Listed: true, Status: failed, Retry: true},
+		},
+		"discovered permanent error stops retry": {
+			sourceType: confgroup.TypeDiscovered,
+			checkErr:   collectorapi.PermanentError(errors.New("unknown profile")),
+			want:       outcome{Listed: true, Status: failed, Retry: false},
+		},
+		"stock unclassified error removes the job": {
+			sourceType: confgroup.TypeStock,
+			checkErr:   errors.New("endpoint unreachable"),
+			want:       outcome{Listed: false, Retry: true},
+		},
+		"stock permanent error keeps the job listed": {
+			sourceType: confgroup.TypeStock,
+			checkErr:   collectorapi.PermanentError(errors.New("unknown profile")),
+			want:       outcome{Listed: true, Status: failed, Retry: false},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+			useV2CheckFailureCollector(controller, state, fmt.Errorf("check: %w", test.checkErr))
+			config := factoryTestConfig(false).Set("autodetection_retry", 7)
+			config.SetSourceType(test.sourceType)
+			config.SetSource("source")
+			config.SetProvider("provider")
+
+			current := runtimeTestApply(t, prepareRuntimeTestChange(t, controller, config, nil, 1))
+			require.Nil(t, current)
+
+			record, listed := graph.Lookup(config.FullName())
+			require.Equal(t, test.want, outcome{
+				Listed: listed,
+				Status: record.Status,
+				Retry:  runtimeTestHasRetry(controller, config.FullName()),
+			})
+			requireFactoryAttemptsIdle(t, controller.factory)
+		})
+	}
+}
+
+func TestV2DynCfgTestCommandReportsClassifiedCheckErrorsAsUnprocessable(t *testing.T) {
+	tests := map[string]struct {
+		checkErr error
+	}{
+		"permanent error": {checkErr: collectorapi.PermanentError(errors.New("unknown profile"))},
+		"temporary error": {checkErr: collectorapi.TemporaryError(errors.New("dependency not ready"))},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			controller, _, _, _, state := newDynCfgJobTestHarness(t)
+			useV2CheckFailureCollector(controller, state, test.checkErr)
+
+			result, err := controller.Handle(context.Background(), DynCfgJobRequest{
+				Args:         []string{"go.d:collector:module", string(dyncfg.CommandTest), "job"},
+				Payload:      []byte(`{"option_str":"value","option_int":1}`),
+				ContentType:  "application/json",
+				CallerSource: "user=test",
+				HasPayload:   true,
+			})
+			require.NoError(t, err)
+			require.Equal(t, mustDynCfgMessage(422, "job output: collector check: "+test.checkErr.Error()), result)
+		})
+	}
+}
+
+// useV2CheckFailureCollector registers a V2 test collector whose Check returns checkErr.
+func useV2CheckFailureCollector(controller *DynCfgJobController, state *factoryTestState, checkErr error) {
+	creator := controller.modules["module"]
+	creator.Create = nil
+	creator.CreateV2 = func() collectorapi.CollectorV2 {
+		return &factoryTestV2{
+			state:    state,
+			store:    metrix.NewCollectorStore(),
+			template: factoryTestChartTemplate,
+			checkErr: checkErr,
+		}
+	}
+	controller.modules["module"] = creator
 }
 
 func TestDiscoveredSecretReferenceRemainsLiteralAndDoesNotScheduleRetry(t *testing.T) {

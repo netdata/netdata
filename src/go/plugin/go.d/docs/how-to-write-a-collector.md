@@ -152,12 +152,12 @@ Readiness MUST NOT wait for a first packet or remote observation. `Init()` and `
 validation while an incumbent may own the endpoint; DynCfg `test` never calls `Run()`.
 
 The framework waits for readiness before collecting. Startup errors follow the existing configured autodetection retry
-policy; unexpected nil return and recovered panic do not retry. Unexpected return after readiness makes the job Failed
-and requires an explicit restart. The implementation MUST return promptly after `ctx.Done()` and SHOULD make in-flight
-I/O cancellation-aware where the library permits. Cleanup waits for `Run()` to return. See the
+policy; a `collectorapi.PermanentError`, unexpected nil return and recovered panic do not retry. Unexpected return after
+readiness makes the job Failed and requires an explicit restart. The implementation MUST return promptly after
+`ctx.Done()` and SHOULD make in-flight I/O cancellation-aware where the library permits. Cleanup waits for `Run()` to
+return. See the
 [runtime readiness contract](/src/go/plugin/framework/jobruntime/README.md#runtime-readiness-and-termination) for
-startup
-timeout, cancellation, output fencing and physical ownership semantics.
+startup timeout, cancellation, output fencing and physical ownership semantics.
 
 V2 collectors that need the Agent's existing first-sample storage behavior MAY set `StoreFirst: true` directly in
 their `collectorapi.Creator` registration. This fixed collector-wide setting applies to every collector chart,
@@ -169,6 +169,20 @@ or preserve counter baselines across restarts. See
 live in helper methods, preferably in `init.go`, so the public method reads as the lifecycle sequence. `Check()` MUST be
 a cheap auth/connectivity probe, not a full collection. `Collect()` MUST run the real write path through `metrix`.
 `Cleanup()` closes idle connections and forwards Function cleanup.
+
+An `Init()` or `Check()` error fails the job. By default, a `Check()` error is retried every `autodetection_retry`
+seconds (never when it is 0, the framework default) and an `Init()` error is never retried. Classify the error when that
+default is wrong:
+
+- `collectorapi.PermanentError(err)`: a failure that retrying the same configuration cannot fix, such as an invalid
+  option or an unknown named profile. The job is never retried.
+- `collectorapi.TemporaryError(err)`: a condition that may clear on its own, such as a dependency that is not ready
+  yet. The job keeps the `autodetection_retry` schedule, even from `Init()`.
+
+DynCfg `enable` of a disabled or failed job, `update` and `restart` answer with the classified code (422 or 503).
+`test` answers 422 for any failure; `add` and `enable` of an accepted job answer 202 and report the failure through the
+job status. A classified failure keeps a failed stock job listed in DynCfg instead of removing it. Leave the expected
+absence of a service at a stock endpoint unclassified.
 
 ## Config
 
