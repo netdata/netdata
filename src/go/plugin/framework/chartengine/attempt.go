@@ -26,6 +26,7 @@ type planAttemptState struct {
 	engine       *Engine
 	plan         Plan
 	materialized materializedState
+	journal      *planJournal
 	transition   *templateTransition
 	epoch        uint64
 	commitSeq    uint64
@@ -55,6 +56,7 @@ func (a PlanAttempt) Commit() error {
 	reserved := a.state.reserved
 	engine := a.state.engine
 	materialized := a.state.materialized
+	journal := a.state.journal
 	transition := a.state.transition
 	epoch := a.state.epoch
 	commitSeq := a.state.commitSeq
@@ -67,7 +69,7 @@ func (a PlanAttempt) Commit() error {
 	if engine == nil {
 		return fmt.Errorf("chartengine: nil engine on commit")
 	}
-	return engine.commitAttempt(materialized, transition, epoch, commitSeq, attemptID)
+	return engine.commitAttempt(materialized, journal, transition, epoch, commitSeq, attemptID)
 }
 
 func (a PlanAttempt) Abort() {
@@ -83,19 +85,21 @@ func (a PlanAttempt) Abort() {
 	a.state.finished = true
 	reserved := a.state.reserved
 	engine := a.state.engine
+	journal := a.state.journal
 	attemptID := a.state.attemptID
 	a.state.mu.Unlock()
 
 	if !reserved || engine == nil {
 		return
 	}
-	engine.abortAttempt(attemptID)
+	engine.abortAttempt(journal, attemptID)
 }
 
 func newPreparedAttempt(
 	engine *Engine,
 	plan Plan,
 	materialized materializedState,
+	journal *planJournal,
 	epoch uint64,
 	commitSeq uint64,
 	attemptID uint64,
@@ -105,6 +109,7 @@ func newPreparedAttempt(
 			engine:       engine,
 			plan:         plan,
 			materialized: materialized,
+			journal:      journal,
 			epoch:        epoch,
 			commitSeq:    commitSeq,
 			attemptID:    attemptID,
@@ -152,7 +157,10 @@ func (e *Engine) PreparePlanWithOptions(reader metrix.Reader, opts PlanOptions) 
 	if err != nil {
 		return PlanAttempt{}, err
 	}
-	plan, materialized, prepared, err := view.buildPlan(reader, retired)
+	e.state.buildToken++
+	journal := newPlanJournal(e.state.buildToken, e.state.hints.journal)
+	plan, materialized, prepared, err := view.buildPlan(reader, retired, journal)
+	view.state.hints.journal = journal.sizing()
 	if view != e {
 		// Attempt diagnostics describe builds, including aborted builds. They are
 		// independent of the committed presentation and its candidate program.
@@ -168,7 +176,7 @@ func (e *Engine) PreparePlanWithOptions(reader metrix.Reader, opts PlanOptions) 
 	}
 	attemptID := e.nextAttemptIDLocked()
 	e.state.outstanding = attemptID
-	attempt := newPreparedAttempt(e, plan, materialized, e.state.engineEpoch, e.state.commitSeq, attemptID)
+	attempt := newPreparedAttempt(e, plan, materialized, journal, e.state.engineEpoch, e.state.commitSeq, attemptID)
 	attempt.state.transition = transition
 	return attempt, nil
 }
@@ -181,17 +189,25 @@ func (e *Engine) nextAttemptIDLocked() uint64 {
 	return e.state.nextAttempt
 }
 
-func (e *Engine) commitAttempt(materialized materializedState, transition *templateTransition, epoch, commitSeq, attemptID uint64) error {
+func (e *Engine) commitAttempt(
+	materialized materializedState,
+	journal *planJournal,
+	transition *templateTransition,
+	epoch, commitSeq, attemptID uint64,
+) error {
 	if e == nil {
 		return fmt.Errorf("chartengine: nil engine")
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	// Load and ResetMaterialized replace the staged state and clear outstanding,
+	// so a stale attempt has nothing left to roll back.
 	if e.state.outstanding != attemptID || e.state.outstanding == 0 {
 		return ErrStalePlanAttempt
 	}
 	if e.state.engineEpoch != epoch || e.state.commitSeq != commitSeq {
+		journal.rollback()
 		e.state.outstanding = 0
 		return ErrStalePlanAttempt
 	}
@@ -205,12 +221,13 @@ func (e *Engine) commitAttempt(materialized materializedState, transition *templ
 	return nil
 }
 
-func (e *Engine) abortAttempt(attemptID uint64) {
+func (e *Engine) abortAttempt(journal *planJournal, attemptID uint64) {
 	if e == nil {
 		return
 	}
 	e.mu.Lock()
 	if e.state.outstanding == attemptID {
+		journal.rollback()
 		e.state.outstanding = 0
 	}
 	e.mu.Unlock()
