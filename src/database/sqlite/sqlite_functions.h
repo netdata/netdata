@@ -178,6 +178,5 @@ void sqlite_library_shutdown(void);
 void sql_close_database(sqlite3 *database, const char *database_name);
 void sql_close_thread_db_safe(sqlite3 **database);
 void sqlite_close_databases(void);
-uint64_t get_total_database_space(void);
 int sqlite_release_memory(int bytes);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

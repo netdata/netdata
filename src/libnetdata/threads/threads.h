@@ -95,6 +95,11 @@ void nd_thread_register_cleanup(nd_thread_cleanup_fn fn);
 
 #define ND_THREAD_TAG_MAX 15
 void uv_thread_set_name_np(const char* name);
+
+// once-per-thread setup of a libuv threadpool worker: blocks the non-deadly signals, registers the
+// thread with worker utilization as "LIBUV" and names it UV_WORKER[n]. Every user of the pool calls
+// it before registering its own job names; idempotent per thread.
+void libuv_worker_thread_init(void);
 void webrtc_set_thread_name(void);
 
 #ifdef NETDATA_INTERNAL_CHECKS

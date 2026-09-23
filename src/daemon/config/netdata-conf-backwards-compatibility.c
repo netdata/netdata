@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "netdata-conf-backwards-compatibility.h"
-#include "database/engine/rrdengineapi.h"
+#include "netdata-conf-db.h"
 
 void netdata_conf_backwards_compatibility(void) {
     FUNCTION_RUN_ONCE();

@@ -157,6 +157,27 @@ void nd_thread_tag_set(const char *tag) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+void libuv_worker_thread_init(void) {
+    static __thread bool initialized = false;
+    if(likely(initialized))
+        return;
+    initialized = true;
+
+    signals_block_all_except_deadly();
+
+    worker_register("LIBUV");
+
+    // make sure we have the right thread id
+    gettid_uncached();
+
+    static int workers = 0;
+    int worker_id = __atomic_add_fetch(&workers, 1, __ATOMIC_RELAXED);
+
+    char buf[NETDATA_THREAD_TAG_MAX + 1];
+    snprintfz(buf, NETDATA_THREAD_TAG_MAX, "UV_WORKER[%d]", worker_id);
+    uv_thread_set_name_np(buf);
+}
+
 void uv_thread_set_name_np(const char *name) {
     static __thread bool libuv_name_set = false;
 
