@@ -9,7 +9,7 @@
 #include "web/mcp/mcp.h"
 
 #ifdef ENABLE_DBENGINE
-#include "database/engine/include/dbengine/dbengine-tests.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-tests.h"
 #endif
 #include "database/rrdset-slots.h"
 #include <curl/curl.h>

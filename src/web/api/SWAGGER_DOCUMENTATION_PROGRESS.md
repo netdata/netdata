@@ -4366,7 +4366,7 @@ This endpoint accepts no parameters.
 **Source Code Locations:**
 - Registration: `src/web/api/web_api_v1.c:196-204`
 - Implementation: `src/web/api/v1/api_v1_dbengine.c:73-96`
-- Data Structure: `src/database/engine/rrdengineapi.h:88-136`
+- Data Structure: `src/database/storage-engines/dbengine/include/dbengine/dbengine-stats.h`
 
 **Security Configuration:**
 - ACL: `HTTP_ACL_NODES`

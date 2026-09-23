@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "database/rrd.h"
 #include "rrddim_mem.h"
 #include "Judy.h"
 

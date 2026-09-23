@@ -8,7 +8,7 @@ extern "C" {
 #endif
 
 #include "libnetdata/libnetdata.h"
-#include "database/engine/include/dbengine/dbengine-stats.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-stats.h"
 
 typedef struct pgd_cursor {
     struct pgd *pgd;

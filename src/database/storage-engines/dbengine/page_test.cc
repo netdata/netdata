@@ -1,5 +1,5 @@
 #include "page.h"
-#include "database/engine/include/dbengine/dbengine-tests.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-tests.h"
 
 #ifdef HAVE_GTEST
 

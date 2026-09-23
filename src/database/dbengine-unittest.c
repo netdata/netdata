@@ -6,7 +6,7 @@
 
 #ifdef ENABLE_DBENGINE
 
-#include "database/engine/include/dbengine/dbengine-tests.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-tests.h"
 
 #define CHARTS 64
 #define DIMS 16 // CHARTS * DIMS dimensions

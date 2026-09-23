@@ -1280,7 +1280,7 @@ sidebar:
           description: Integrate plugins and modules with Netdata Dynamic Configuration using JSON Schema, validation, persistence, and generated UI forms.
       - meta:
           label: Database Engine
-          edit_url: https://github.com/netdata/netdata/edit/master/src/database/engine/README.md
+          edit_url: https://github.com/netdata/netdata/edit/master/src/database/storage-engines/dbengine/README.md
       - meta:
           label: Contributing
           edit_url: https://github.com/netdata/.github/edit/main/CONTRIBUTING.md

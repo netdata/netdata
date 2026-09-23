@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdengine.h"
-#include "database/engine/include/dbengine/dbengine-tests.h"
+#include "database/storage-engines/dbengine/include/dbengine/dbengine-tests.h"
 
 // Tests of the collect/query path that need to see the engine's own objects: the daemon-side test drivers reach
 // the engine only through its public headers, so a check on the page a collect handle holds lives here.
