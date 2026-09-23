@@ -149,9 +149,15 @@ TEST(EngineLogSink, EachEngineHearsOnlyItsOwnLines) {
     ASSERT_TRUE(scratch_a.valid());
     ASSERT_TRUE(scratch_b.valid());
 
-    DBENGINE_ENGINE *a = bring_up(config_with(recorder_a), scratch_a);
+    // Both engines run a tier at once on the process's one pool, so each is told half of it and the two claims add
+    // up to the pool, as support.h requires of the figure.
+    struct dbengine_config cfg_a = config_with(recorder_a);
+    struct dbengine_config cfg_b = config_with(recorder_b);
+    cfg_a.libuv_worker_threads = cfg_b.libuv_worker_threads = DBENGINE_TEST_UV_THREADS / 2;
+
+    DBENGINE_ENGINE *a = bring_up(cfg_a, scratch_a);
     ASSERT_NE(a, nullptr);
-    DBENGINE_ENGINE *b = bring_up(config_with(recorder_b), scratch_b);
+    DBENGINE_ENGINE *b = bring_up(cfg_b, scratch_b);
     if (!b) {
         take_down(a);
         FAIL() << "engine B did not come up";
