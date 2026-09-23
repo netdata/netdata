@@ -1826,6 +1826,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrdfunctions-inline.c
         src/database/rrdfunctions-inline.h
         src/database/rrdhost.c
+        src/database/rrdhost-unittest.c
         src/database/rrdlabels.c
         src/database/rrdlabels-aggregated.c
         src/database/rrdlabels-aggregated.h
