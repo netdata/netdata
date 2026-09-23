@@ -85,11 +85,13 @@ metadata and defaults, local chart paths, group structure, declared metrics and 
 mathematical equivalence between differently written selectors. A changed entry is replaced as a whole: all its old
 reservations are released, observed charts recreate, quiet siblings retire, and Go expiry bookkeeping restarts.
 
-Ownership is independent of routing precedence. For unowned collisions, native sets rank candidates by compile order:
-entry order, then depth-first authored order within the entry, where a group's charts precede its nested groups. Adding
-or removing an entry never changes the relative order of two others. YAML documents keep comparing positional
-`g<path>.c<index>` IDs as strings. Reordering can change future unowned winners but preserves current active and quiet
-incumbents. Authored charts retain precedence over fallback. Replacement retirement compares
+Ownership is independent of routing precedence. When one series routes to several templates that render the same
+unowned chart ID, native sets rank those routes by compile order: entry order, then depth-first authored order within
+the entry, where a group's charts precede its nested groups. Adding or removing an entry never changes the relative order
+of two others. YAML documents keep comparing positional `g<path>.c<index>` IDs as strings. Across different series, the
+first series in scan order (metric name, then series) claims a new chart, and an existing owner keeps it. Reordering can
+change future unowned winners but preserves current active and quiet incumbents. Authored charts retain precedence over
+fallback. Replacement retirement compares
 old public identities with final survivors; a surviving chart or dimension is never also marked obsolete, and dimension
 retirement headers use the surviving chart's metadata. Existing Agent redefinition, history, counter and context behavior
 applies; this API makes no stronger continuity guarantee for changed definitions.
@@ -257,7 +259,7 @@ The following rules apply when routing conflicts arise:
 | Duplicate dimension observations within build | First observed dimension metadata wins; values use the chart's configured reducer            |
 
 > [!WARNING]
-> Cross-template chart ID collisions lose data: conflicting authored series are dropped. Each job logs at most one warning per hour naming the dropped series-route count, the chart, its owner and the rejected template. Give every chart a unique rendered ID (`id` or `context`); which template owns a new contested chart follows the precedence in [Named Active Template Sets](#named-active-template-sets).
+> Cross-template chart ID collisions lose data: conflicting authored series are dropped. Each job logs at most one warning per hour naming the dropped series-route count, the chart, its owner and the rejected template. Give every chart a unique rendered ID (`id` or `context`). Which template owns a new contested chart follows [Named Active Template Sets](#named-active-template-sets): compile-order precedence among one series' routes, scan order across series.
 
 Authored charts can set one reducer for all their dimensions. Supported values are `sum` (default), `min`, `max`, and
 `avg`. Reduction is scoped to one successful plan build and happens before multiplier/divisor and

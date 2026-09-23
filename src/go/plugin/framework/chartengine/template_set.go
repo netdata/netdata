@@ -24,9 +24,10 @@ type TemplateEntry struct {
 	AutogenRules     []charttpl.EngineAutogenRule
 }
 
-// TemplateSetSpec describes the complete desired set. Entry order determines
-// precedence for unowned collisions, but does not determine entry identity.
-// Policy and FallbackContextNamespace are fixed for a running collector job.
+// TemplateSetSpec describes the complete desired set. Entry order ranks the
+// routes one series has to the same unowned chart ID, but does not determine
+// entry identity. Policy and FallbackContextNamespace are fixed for a running
+// collector job.
 type TemplateSetSpec struct {
 	Entries                  []TemplateEntry
 	Policy                   EnginePolicy
@@ -195,8 +196,8 @@ func (s *TemplateSet) ChartTemplateIDAt(entryID string, groupPath []int, chartIn
 	return id, true
 }
 
-// FallbackContextNamespace returns the normalized context namespace of
-// automatic charts. Like GlobalPolicy, it is fixed for a running job.
+// FallbackContextNamespace returns the context namespace automatic charts use.
+// Like GlobalPolicy, it is fixed for a running job.
 func (s *TemplateSet) FallbackContextNamespace() string {
 	if s == nil {
 		return ""

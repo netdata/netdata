@@ -411,6 +411,24 @@ func TestTemplateSetCollisionPrecedenceFollowsCompileOrder(t *testing.T) {
 	}
 }
 
+// Compile order ranks the routes of one series. Different series contend in scan
+// order, so the series with the first metric name claims the chart whatever the
+// entry order.
+func TestTemplateSetCrossSeriesCollisionFollowsScanOrder(t *testing.T) {
+	first, second := nativeEntry("first", "shared", "zzz"), nativeEntry("second", "shared", "aaa")
+	first.Groups[0].Charts[0].Title = first.ID
+	second.Groups[0].Charts[0].Title = second.ID
+	e, err := New(WithRuntimeStore(nil))
+	require.NoError(t, err)
+	store := metrix.NewCollectorStore()
+	attempt := templateAttempt(t, e, store, testTemplateSet(t, first, second), map[string]float64{"zzz": 1, "aaa": 1})
+	chart := findCreateChartAction(attempt.Plan())
+	require.NotNil(t, chart)
+	require.NoError(t, attempt.Commit())
+
+	assert.Equal(t, "second", chart.Meta.Title)
+}
+
 // YAML documents are shipped collector contracts: their unowned collisions keep
 // comparing positional template IDs as strings.
 func TestTemplateSetDocumentCollisionPrecedenceIsLexical(t *testing.T) {

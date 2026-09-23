@@ -31,14 +31,15 @@ func (c *chartIDCollisions) add(chartID, ownerTemplateID, rejectedTemplateID str
 
 // warnChartIDCollisions reports a successful build's rejected authored routes.
 // The owner keeps the chart; the warning names both templates so the author
-// can give each chart a distinct ID.
+// can give each chart a distinct ID. Like other build diagnostics, it describes
+// the build, so an attempt aborted later has still reported its collisions.
 func (e *Engine) warnChartIDCollisions(ctx *planBuildContext) {
 	c := ctx.collisions
 	if c.routes == 0 || e == nil || e.state.log == nil {
 		return
 	}
 	e.state.log.Limit(chartIDCollisionLogKey, 1, chartIDCollisionLogPeriod).Warningf(
-		"chartengine: dropped %d series routes to charts owned by another template (chart '%s' owned by %s, rejected %s); give each chart a unique id or context",
+		"chartengine: dropped %d series route(s) to charts owned by another template (chart '%s' owned by %s, rejected %s); give each chart a unique id or context",
 		c.routes,
 		c.chartID,
 		describeChartTemplate(ctx.index, c.owner),
