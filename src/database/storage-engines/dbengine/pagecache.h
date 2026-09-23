@@ -5,24 +5,26 @@
 
 #include "rrdengine.h"
 
-extern struct mrg *main_mrg;
-extern struct pgc *main_cache;
-extern struct pgc *open_cache;
-extern struct pgc *extent_cache;
+struct pgc;
 
 // the least the open and extent caches size themselves to, whatever the main cache reports, and what they
 // settle on once the main cache is gone; the extent floor is also the least the engine reserves for it at start
 #define OPEN_CACHE_MIN_SIZE   (2 * 1024 * 1024)
 #define EXTENT_CACHE_MIN_SIZE (5 * 1024 * 1024)
-int64_t dynamic_open_cache_size(void);
-int64_t dynamic_extent_cache_size(void);
+// the share of the main cache's wanted size each of them follows
+#define OPEN_CACHE_PERCENT    (5)
+#define EXTENT_CACHE_PERCENT  (30)
+int64_t dynamic_open_cache_size(struct pgc *cache);
+int64_t dynamic_extent_cache_size(struct pgc *cache);
+
+// what a cache that sizes itself from the main cache wants: `percent` of what the main cache wants plus the main
+// cache's unused space, never below `floor_size`; `floor_size` alone when there is no main cache
+int64_t dbengine_follower_cache_size(struct pgc *main_cache_or_null, int64_t percent, int64_t floor_size);
 
 /* Forward declarations */
 struct dbengine_tier;
 
 #define INVALID_TIME (0)
-
-extern struct dbengine_cache_efficiency_stats dbengine_cache_efficiency_stats;
 
 struct page_descr_with_data {
     UUIDMAP_ID uuid_id;
@@ -51,7 +53,7 @@ void dbengine_prep_wait(struct page_details_control *pdc);
 void dbengine_prep_query(struct page_details_control *pdc, bool worker);
 void pg_cache_preload(struct dbengine_query_handle *handle);
 struct pgc_page *pg_cache_lookup_next(struct dbengine_tier *ctx, struct page_details_control *pdc, time_t now_s, uint32_t last_update_every_s, size_t *entries);
-void pgc_and_mrg_initialize(void);
+void pgc_and_mrg_initialize(struct dbengine_engine *engine);
 
 void pgc_open_add_hot_page(
     Word_t section,

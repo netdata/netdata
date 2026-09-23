@@ -9,16 +9,15 @@
 #define DBENGINE_CONFIG_DEFAULT_WORKER_THREADS (16)
 #endif
 
-// Written before the engine comes up, by dbengine_init() or (for the tests that need only the configuration) by
-// dbengine_config_set(); read-only while the engine is up.
-struct dbengine_config dbengine_cfg = DBENGINE_CONFIG_DEFAULTS;
-
-// the 0-means-default fields become concrete values here, so the engine never has to re-check them
-static void dbengine_config_resolve(struct dbengine_config *cfg) {
+void dbengine_config_resolve(struct dbengine_config *cfg) {
     if(!cfg->cpus)
         cfg->cpus = os_get_system_cpus();
     if(cfg->cpus < 1)
         cfg->cpus = 1;
+
+    // the allocator layer partitions by the first engine's cpus unless told otherwise
+    if(!cfg->allocator.partitions)
+        cfg->allocator.partitions = cfg->cpus;
 
     if(!cfg->default_update_every_s)
         cfg->default_update_every_s = 1;
@@ -43,14 +42,4 @@ static void dbengine_config_resolve(struct dbengine_config *cfg) {
     if(cfg->reserved_libuv_worker_threads < 0 || cfg->libuv_worker_threads <= cfg->reserved_libuv_worker_threads)
         fatal("DBENGINE: a libuv worker pool of %d threads is too small (%d are reserved)",
               cfg->libuv_worker_threads, cfg->reserved_libuv_worker_threads);
-}
-
-void dbengine_config_set(const struct dbengine_config *cfg) {
-    if(!cfg)
-        fatal("DBENGINE: the engine was given no configuration");
-
-    struct dbengine_config resolved = *cfg;
-    dbengine_config_resolve(&resolved);
-
-    dbengine_cfg = resolved;
 }

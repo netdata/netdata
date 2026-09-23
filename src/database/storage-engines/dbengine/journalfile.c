@@ -42,7 +42,7 @@ int journalfile_v1_extent_write(struct dbengine_tier *ctx, struct dbengine_dataf
     ctx_io_write_op_bytes(ctx, wal->buf_size);
 
 done:
-    wal_release(wal);
+    wal_release(ctx->engine, wal);
     worker_is_idle();
     return ret;
 }
@@ -276,7 +276,7 @@ static struct journal_v2_header *journalfile_v2_mounted_data_get(struct dbengine
             ctx_fs_error(datafile_ctx(journalfile->datafile));
         }
         else {
-            __atomic_add_fetch(&dbengine_cache_efficiency_stats.journal_v2_mapped, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&datafile_ctx(journalfile->datafile)->engine->cache_efficiency_stats.journal_v2_mapped, 1, __ATOMIC_RELAXED);
 
             madvise_dontfork(journalfile->mmap.data, journalfile->mmap.size);
             madvise_dontdump(journalfile->mmap.data, journalfile->mmap.size);
@@ -330,7 +330,7 @@ static bool journalfile_v2_mounted_data_unmount(struct dbengine_journalfile *jou
                 ctx_fs_error(datafile_ctx(journalfile->datafile));
             }
             else {
-                __atomic_add_fetch(&dbengine_cache_efficiency_stats.journal_v2_unmapped, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&datafile_ctx(journalfile->datafile)->engine->cache_efficiency_stats.journal_v2_unmapped, 1, __ATOMIC_RELAXED);
                 journalfile->mmap.data = NULL;
                 journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_MOUNTED;
             }
@@ -346,12 +346,12 @@ static bool journalfile_v2_mounted_data_unmount(struct dbengine_journalfile *jou
     return unmounted;
 }
 
-void journalfile_v2_data_unmount_cleanup(time_t now_s) {
+void journalfile_v2_data_unmount_cleanup(struct dbengine_engine *engine, time_t now_s) {
     // DO NOT WAIT ON ANY LOCK!!!
 
     for(size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++) {
         struct dbengine_tier *ctx = dbengine_multidb_tiers[tier];
-        if(!dbengine_tier_is_active(ctx)) continue;
+        if(ctx->engine != engine || !dbengine_tier_is_active(ctx)) continue;
 
         struct dbengine_datafile *datafile;
         if(netdata_rwlock_tryrdlock(&ctx->datafiles.rwlock) != 0)
@@ -380,7 +380,7 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
                     journalfile->v2.not_needed_since_s = now_s;
 
                 else if (
-                    dbengine_cfg.journal_v2_unmount_time_s && now_s - journalfile->v2.not_needed_since_s >= dbengine_cfg.journal_v2_unmount_time_s)
+                    engine->cfg.journal_v2_unmount_time_s && now_s - journalfile->v2.not_needed_since_s >= engine->cfg.journal_v2_unmount_time_s)
                     // enough time has passed since we last needed this journal
                     unmount = true;
             }
@@ -714,7 +714,7 @@ int journalfile_create(struct dbengine_journalfile *journalfile, struct dbengine
     char path[DBENGINE_PATH_MAX];
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
-    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, dbengine_cfg.direct_io);
+    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, ctx->engine->cfg.direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
@@ -821,17 +821,17 @@ static void journalfile_restore_extent_metadata(struct dbengine_tier *ctx, struc
         }
 
         temp_id = (nd_uuid_t *)jf_metric_data->descr[i].uuid;
-        METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, temp_id, (Word_t)ctx);
+        METRIC *metric = mrg_metric_get_and_acquire_by_uuid(ctx->engine->main_mrg, temp_id, (Word_t)ctx);
 
         struct dbengine_extent_page_descr *descr = &jf_metric_data->descr[i];
         VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(
                 descr, now_s,
-                (metric) ? mrg_metric_get_update_every_s(main_mrg, metric) : 0,
+                (metric) ? mrg_metric_get_update_every_s(ctx->engine->main_mrg, metric) : 0,
                 false);
 
         if(!vd.is_valid) {
             if(metric)
-                mrg_metric_release(main_mrg, metric);
+                mrg_metric_release(ctx->engine->main_mrg, metric);
 
             continue;
         }
@@ -847,7 +847,7 @@ static void journalfile_restore_extent_metadata(struct dbengine_tier *ctx, struc
             };
 
             bool added;
-            metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
+            metric = mrg_metric_add_and_acquire(ctx->engine->main_mrg, entry, &added);
             if(added)
                 update_metric_time = false;
 
@@ -856,15 +856,15 @@ static void journalfile_restore_extent_metadata(struct dbengine_tier *ctx, struc
                 __atomic_add_fetch(&ctx->atomic.samples, samples, __ATOMIC_RELAXED);
             }
         }
-        Word_t metric_id = mrg_metric_id(main_mrg, metric);
+        Word_t metric_id = mrg_metric_id(ctx->engine->main_mrg, metric);
 
         if (update_metric_time)
-            mrg_metric_expand_retention(main_mrg, metric, vd.start_time_s, vd.end_time_s, vd.update_every_s);
+            mrg_metric_expand_retention(ctx->engine->main_mrg, metric, vd.start_time_s, vd.end_time_s, vd.update_every_s);
 
         pgc_open_add_hot_page(
             (Word_t)ctx,
             metric_id,
-            mrg_metric_uuidmap_id(main_mrg, metric),
+            mrg_metric_uuidmap_id(ctx->engine->main_mrg, metric),
             vd.start_time_s,
             vd.end_time_s,
             vd.update_every_s,
@@ -875,7 +875,7 @@ static void journalfile_restore_extent_metadata(struct dbengine_tier *ctx, struc
         extent_first_time_s = MIN(extent_first_time_s, vd.start_time_s);
         extent_last_time_s = MAX(extent_last_time_s, vd.end_time_s);
 
-        mrg_metric_release(main_mrg, metric);
+        mrg_metric_release(ctx->engine->main_mrg, metric);
     }
 
     journalfile->v2.first_time_s = extent_first_time_s;
@@ -1073,7 +1073,7 @@ static int journalfile_check_v2_metric_list(void *data_start, size_t file_size)
 //   2 Force rebuild
 //   3 skip
 
-static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size, size_t journal_v1_file_size)
+static int journalfile_v2_validate(struct dbengine_tier *ctx, void *data_start, size_t journal_v2_file_size, size_t journal_v1_file_size)
 {
     int rc;
     uLong crc;
@@ -1111,7 +1111,7 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     rc = journalfile_check_v2_extent_list(data_start, journal_v2_file_size);
     if (rc) return 1;
 
-    if (!dbengine_cfg.journal_integrity_check)
+    if (!ctx->engine->cfg.journal_integrity_check)
         return 0;
 
     rc = journalfile_check_v2_metric_list(data_start, journal_v2_file_size);
@@ -1282,7 +1282,7 @@ void journalfile_v2_populate_retention_to_mrg(struct dbengine_tier *ctx, struct 
                 uint32_t update_every_s = metric->update_every_s;
 
                 mrg_update_metric_retention_and_granularity_by_uuid(
-                    main_mrg,
+                    ctx->engine->main_mrg,
                     (Word_t)ctx,
                     &local_uuid,
                     start_time_s,
@@ -1405,7 +1405,7 @@ int journalfile_v2_load(struct dbengine_tier *ctx, struct dbengine_journalfile *
     int rc = 0;
     PROTECTED_ACCESS_SETUP(data_start, journal_v2_file_size, path_v2, "validate");
     if(no_signal_received) {
-        rc = journalfile_v2_validate(data_start, journal_v2_file_size, journal_v1_file_size);
+        rc = journalfile_v2_validate(ctx, data_start, journal_v2_file_size, journal_v1_file_size);
     }
     else {
         rc = 2;
@@ -1450,7 +1450,7 @@ int journalfile_v2_load(struct dbengine_tier *ctx, struct dbengine_journalfile *
 
     // Initialize the journal file to be able to access the data
 
-    if (!dbengine_cfg.journal_integrity_check)
+    if (!ctx->engine->cfg.journal_integrity_check)
         journalfile->v2.flags |= JOURNALFILE_FLAG_METRIC_CRC_CHECK;
 
     journalfile_v2_data_set(journalfile, fd, data_start, journal_v2_file_size);
@@ -1858,7 +1858,7 @@ int journalfile_load(struct dbengine_tier *ctx, struct dbengine_journalfile *jou
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
 
-    fd = open_file_for_io(path, O_RDWR, &file, dbengine_cfg.direct_io);
+    fd = open_file_for_io(path, O_RDWR, &file, ctx->engine->cfg.direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
 
@@ -1911,7 +1911,7 @@ int journalfile_load(struct dbengine_tier *ctx, struct dbengine_journalfile *jou
     }
 
     pgc_open_cache_to_journal_v2(
-        open_cache,
+        ctx->engine->open_cache,
         (Word_t)ctx,
         (int)datafile->fileno,
         ctx->config.page_type,

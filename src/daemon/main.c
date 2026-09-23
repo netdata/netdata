@@ -1433,7 +1433,7 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("mrg cleanup");
 
 #ifdef ENABLE_DBENGINE
-    dbengine_preload_release();
+    dbengine_preload_release(netdata_conf_dbengine_engine);
 #endif
 
     // ----------------------------------------------------------------------------------------------------------------

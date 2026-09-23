@@ -2284,7 +2284,7 @@ size_t populate_metrics_from_database(void *mrg, dbengine_preload_add_fn add)
         if (!sqlite3_column_uuid_copy(res, 0, uuid))
             continue;
 
-        // the configured count is right here: this runs inside dbengine_init(), which the daemon calls after it
+        // the configured count is right here: this runs inside dbengine_create(), which the daemon calls after it
         // read the tier count and before any tier could fail
         for (size_t tier = 0; tier < nd_profile.storage_tiers ; tier++)
             add(mrg, dbengine_multidb_tiers[tier], &uuid);

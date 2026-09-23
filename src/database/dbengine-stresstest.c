@@ -161,13 +161,13 @@ void generate_dbengine_dataset(unsigned history_seconds)
     host = dbengine_rrdhost_find_or_create("dbengine-dataset");
     if (NULL == host) {
         // the engine is up with no tier: stop it, as the success path does at the end
-        dbengine_shutdown();
+        dbengine_shutdown(netdata_conf_dbengine_engine);
         return;
     }
 
     // the engine preloaded into this tier the metrics of the previous run it found in the metadata database;
     // release them as netdata_main() does once its tiers are up, so the test starts on a clean tier
-    dbengine_preload_release();
+    dbengine_preload_release(netdata_conf_dbengine_engine);
 
     thread_info = mallocz(sizeof(*thread_info) * DSET_CHARTS);
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
@@ -208,7 +208,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
     DBENGINE_TIER *tier = (DBENGINE_TIER *)host->db[0].si;
     dbengine_quiesce(tier);
     dbengine_tier_exit(tier);
-    dbengine_shutdown();
+    dbengine_shutdown(netdata_conf_dbengine_engine);
     host->db[0].si = NULL;
 
     // free the host we generated into, not localhost
@@ -378,13 +378,13 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     host = dbengine_rrdhost_find_or_create("dbengine-stress-test");
     if (NULL == host) {
         // the engine is up with no tier: stop it, as the success path does at the end
-        dbengine_shutdown();
+        dbengine_shutdown(netdata_conf_dbengine_engine);
         return;
     }
 
     // the engine preloaded into this tier the metrics of the previous run it found in the metadata database;
     // release them as netdata_main() does once its tiers are up, so the test starts on a clean tier
-    dbengine_preload_release();
+    dbengine_preload_release(netdata_conf_dbengine_engine);
 
     chart_threads = mallocz(sizeof(*chart_threads) * DSET_CHARTS);
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
@@ -485,7 +485,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     rrd_wrlock();
     dbengine_quiesce((DBENGINE_TIER *)host->db[0].si);
     dbengine_tier_exit((DBENGINE_TIER *)host->db[0].si);
-    dbengine_shutdown();
+    dbengine_shutdown(netdata_conf_dbengine_engine);
     host->db[0].si = NULL;
     rrdhost_free___while_having_rrd_wrlock(host);
     rrd_wrunlock();

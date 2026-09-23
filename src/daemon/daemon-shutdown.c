@@ -114,7 +114,7 @@ static void dbengine_quiesce_all()
 static void dbengine_flush_everything_and_wait(bool wait_flush, bool wait_collectors, bool dirty_only) {
     static size_t starting_size_to_flush = 0;
 
-    if(!dbengine_pages_pending_flush())
+    if(!dbengine_pages_pending_flush(netdata_conf_dbengine_engine))
         return;
 
     nd_log(NDLS_DAEMON, NDLP_INFO, "Flushing DBENGINE %s dirty pages...", dirty_only ? "only" : "hot &");
@@ -129,7 +129,7 @@ static void dbengine_flush_everything_and_wait(bool wait_flush, bool wait_collec
     }
 
     struct dbengine_cache_stats pgc_main_stats;
-    dbengine_get_cache_stats(DBENGINE_CACHE_MAIN, &pgc_main_stats);
+    dbengine_get_cache_stats(netdata_conf_dbengine_engine, DBENGINE_CACHE_MAIN, &pgc_main_stats);
     size_t size_to_flush = pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_HOT].size + pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_DIRTY].size;
     size_t entries_to_flush = pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_HOT].entries + pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_DIRTY].entries;
     if(size_to_flush > starting_size_to_flush || !starting_size_to_flush)
@@ -156,7 +156,7 @@ static void dbengine_flush_everything_and_wait(bool wait_flush, bool wait_collec
         return;
 
     for(size_t iterations = 0; true ;iterations++) {
-        dbengine_get_cache_stats(DBENGINE_CACHE_MAIN, &pgc_main_stats);
+        dbengine_get_cache_stats(netdata_conf_dbengine_engine, DBENGINE_CACHE_MAIN, &pgc_main_stats);
         size_to_flush = pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_HOT].size + pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_DIRTY].size;
         entries_to_flush = pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_HOT].entries + pgc_main_stats.queues[DBENGINE_CACHE_QUEUE_DIRTY].entries;
         if(!starting_size_to_flush || size_to_flush > starting_size_to_flush)
@@ -338,15 +338,16 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
             for (size_t tier = 0; tier < RRD_STORAGE_TIERS; tier++)
                 if (th[tier])
                     nd_thread_join(th[tier]);
-
-            dbengine_shutdown();
-            watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
         else {
-            // Skip these steps
+            // Skip this step
             watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
-            watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
+
+        // the engine stops whenever there is one, also when the exit came before the tiers were announced
+        // (dbengine_enabled): its destroy below would otherwise free an engine whose loop is running
+        dbengine_shutdown(netdata_conf_dbengine_engine);
+        watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
 #else
         // Skip these steps
         watcher_step_complete(WATCHER_STEP_ID_WAIT_FOR_DBENGINE_COLLECTORS_TO_FINISH);
@@ -469,7 +470,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     // the engine's own teardown, only once the normal path above stopped every tier and the engine's loop;
     // an abnormal exit skipped both, and destroying the caches under a live loop would be a second crash
     if(!abnormal) {
-        size_t metrics_referenced = dbengine_destroy();
+        size_t metrics_referenced = dbengine_destroy(netdata_conf_dbengine_engine);
+        netdata_conf_dbengine_engine = NULL;
         if(metrics_referenced)
             fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n", metrics_referenced);
     }

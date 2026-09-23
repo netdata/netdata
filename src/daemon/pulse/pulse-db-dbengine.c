@@ -645,21 +645,21 @@ void pulse_dbengine_do(bool extended) {
     static struct dbengine_metrics_registry_stats mrg_stats = {}, mrg_stats_old = {}; (void)mrg_stats_old;
 
     pgc_main_stats_old = pgc_main_stats;
-    bool have_main_cache = dbengine_get_cache_stats(DBENGINE_CACHE_MAIN, &pgc_main_stats);
+    bool have_main_cache = dbengine_get_cache_stats(netdata_conf_dbengine_engine, DBENGINE_CACHE_MAIN, &pgc_main_stats);
 
     pgc_open_stats_old = pgc_open_stats;
-    dbengine_get_cache_stats(DBENGINE_CACHE_OPEN, &pgc_open_stats);
+    dbengine_get_cache_stats(netdata_conf_dbengine_engine, DBENGINE_CACHE_OPEN, &pgc_open_stats);
 
     pgc_extent_stats_old = pgc_extent_stats;
-    dbengine_get_cache_stats(DBENGINE_CACHE_EXTENT, &pgc_extent_stats);
+    dbengine_get_cache_stats(netdata_conf_dbengine_engine, DBENGINE_CACHE_EXTENT, &pgc_extent_stats);
 
     cache_efficiency_stats_old = cache_efficiency_stats;
-    cache_efficiency_stats = dbengine_get_cache_efficiency_stats();
+    cache_efficiency_stats = dbengine_get_cache_efficiency_stats(netdata_conf_dbengine_engine);
 
     mrg_stats_old = mrg_stats;
-    bool have_mrg = dbengine_get_metrics_registry_stats(&mrg_stats);
+    bool have_mrg = dbengine_get_metrics_registry_stats(netdata_conf_dbengine_engine, &mrg_stats);
 
-    struct dbengine_buffer_sizes dbmem = dbengine_get_memory_sizes();
+    struct dbengine_buffer_sizes dbmem = dbengine_get_memory_sizes(netdata_conf_dbengine_engine);
 
     int64_t buffers_total_size = (int64_t)dbmem.xt_buf + (int64_t)dbmem.wal;
 

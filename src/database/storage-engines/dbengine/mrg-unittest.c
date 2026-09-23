@@ -850,7 +850,46 @@ static void jv2_stale_metric_save_dirty_cb(
     PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused,
     PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused) { ; }
 
-static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
+// The jv2 tests drive engine code with hand-made tiers and a registry of their own: the code reaches the registry
+// and the configuration through the tier's engine, so the tier gets a throw-away one, with no event loop and no
+// caches, holding the test registry for the duration of the test.
+static void mrg_test_engine_attach(struct dbengine_tier *ctx, const struct dbengine_config *cfg, MRG *mrg) {
+    struct dbengine_engine *engine = dbengine_engine_alloc(cfg);
+    engine->main_mrg = mrg;
+    ctx->engine = engine;
+}
+
+static void mrg_test_engine_detach(struct dbengine_tier *ctx) {
+    struct dbengine_engine *engine = ctx->engine;
+    ctx->engine = NULL;
+    dbengine_engine_free(engine);
+}
+
+// the open-cache stand-in the jv2 tests write through: one partition, an extent_io_data per page, no engine
+static PGC *jv2_test_cache_create(const struct dbengine_config *cfg, const char *name) {
+    struct pgc_config cache_cfg = {
+        .name = name,
+        .clean_size_bytes = 32 * 1024 * 1024,
+        .free_clean_cb = jv2_stale_metric_free_clean_cb,
+        .max_dirty_pages_per_flush = 64,
+        .save_init_cb = NULL,
+        .save_dirty_cb = jv2_stale_metric_save_dirty_cb,
+        .max_pages_per_inline_eviction = 10,
+        .max_inline_evictors = 10,
+        .max_skip_pages_per_inline_eviction = 1000,
+        .max_flushes_inline = 10,
+        .options = PGC_OPTIONS_DEFAULT,
+        .partitions = 1,
+        .additional_bytes_per_page = sizeof(struct extent_io_data),
+        .statistics = cfg->cache_statistics,
+        .use_all_ram = cfg->use_all_ram_for_caches,
+        .out_of_memory_protection_bytes = cfg->out_of_memory_protection_bytes,
+        .cpus = cfg->cpus,
+    };
+    return pgc_create(&cache_cfg);
+}
+
+static int mrg_jv2_stale_metric_not_dereferenced_unittest(const struct dbengine_config *cfg) {
 #if defined(FSANITIZE_ADDRESS)
     fprintf(stderr, "\nTesting jv2 does not dereference a stale METRIC... SKIPPED (FSANITIZE_ADDRESS)\n");
     return 0;
@@ -866,17 +905,10 @@ static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
 
     MRG *mrg = mrg_create_for_unittest();
 
-    // pgc_open_cache_to_journal_v2() resolves metrics through the global
-    // main_mrg, so point it at our test MRG for the duration.
-    MRG *saved_main_mrg = main_mrg;
-    main_mrg = mrg;
+    // pgc_open_cache_to_journal_v2() resolves metrics through the tier's engine
+    mrg_test_engine_attach(&test_ctx_0, cfg, mrg);
 
-    PGC *cache = pgc_create(
-        "jv2-stale-metric-test",
-        32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
-        64, NULL, jv2_stale_metric_save_dirty_cb,
-        10, 10, 1000, 10,
-        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+    PGC *cache = jv2_test_cache_create(cfg, "jv2-stale-metric-test");
 
     // 1. a real metric, with no retention so it is deletable on release
     nd_uuid_t victim;
@@ -893,7 +925,7 @@ static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
     if(!metric) {
         fprintf(stderr, "ERROR: cannot add the victim metric\n");
         pgc_destroy(cache, false);
-        main_mrg = saved_main_mrg;
+        mrg_test_engine_detach(&test_ctx_0);
         (void)mrg_destroy(mrg);
         return 1;
     }
@@ -911,7 +943,7 @@ static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
     if(!mrg_metric_release_and_delete(mrg, metric)) {
         fprintf(stderr, "ERROR: the victim metric was not deleted\n");
         pgc_destroy(cache, false);
-        main_mrg = saved_main_mrg;
+        mrg_test_engine_detach(&test_ctx_0);
         (void)mrg_destroy(mrg);
         return 1;
     }
@@ -957,7 +989,7 @@ static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
         fprintf(stderr, "ERROR: cannot add the hot page carrying the stale metric_id\n");
         if(page) pgc_page_release(cache, page);
         pgc_destroy(cache, false);
-        main_mrg = saved_main_mrg;
+        mrg_test_engine_detach(&test_ctx_0);
         (void)mrg_destroy(mrg);
         return 1;
     }
@@ -1033,7 +1065,7 @@ static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
     __atomic_store_n(&stale->refcount, overlay_refcount_before, __ATOMIC_RELAXED);
     __atomic_store_n(&stale->uuid, overlay_uuid_before, __ATOMIC_RELAXED);
 
-    main_mrg = saved_main_mrg;
+    mrg_test_engine_detach(&test_ctx_0);
 
     size_t referenced = mrg_destroy(mrg);
     if(referenced) {
@@ -1344,7 +1376,7 @@ static int jv2_make_two_pointers_one_uuid(MRG *mrg, Word_t section, struct jv2_t
 // are indexed. IDENTICAL start times => the two pages collide inside the single
 // uuid group, and exactly one of them must be kept.
 static int mrg_jv2_same_uuid_grouped_once_check(
-    const char *label, time_t start_old, time_t start_new,
+    const struct dbengine_config *cfg, const char *label, time_t start_old, time_t start_new,
     time_t end_old, time_t end_new, size_t expected_pages,
     time_t expected_end_time_s, size_t expected_extents, bool callback_success) {
     fprintf(stderr, "\nTesting jv2 groups one uuid once, %s (deterministic)...\n", label);
@@ -1354,15 +1386,9 @@ static int mrg_jv2_same_uuid_grouped_once_check(
     const Word_t section = (Word_t)&test_ctx_0;
 
     MRG *mrg = mrg_create_for_unittest();
-    MRG *saved_main_mrg = main_mrg;
-    main_mrg = mrg;
+    mrg_test_engine_attach(&test_ctx_0, cfg, mrg);
 
-    PGC *cache = pgc_create(
-        "jv2-same-uuid-test",
-        32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
-        64, NULL, jv2_stale_metric_save_dirty_cb,
-        10, 10, 1000, 10,
-        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+    PGC *cache = jv2_test_cache_create(cfg, "jv2-same-uuid-test");
 
     // declared before the goto below, so jumping to cleanup cannot skip an
     // initialization and leave the teardown reading indeterminate values
@@ -1510,7 +1536,7 @@ static int mrg_jv2_same_uuid_grouped_once_check(
 cleanup_early:
     pgc_destroy(cache, false);
     if(pinned) uuidmap_free(pinned);
-    main_mrg = saved_main_mrg;
+    mrg_test_engine_detach(&test_ctx_0);
 
     size_t referenced = mrg_destroy(mrg);
     if(referenced) {
@@ -1627,7 +1653,7 @@ static bool jv2_make_tmpdir(char *dst, size_t dst_size) {
 // The collision is the interesting input: two pages of one uuid at one start time on
 // two different extents, so the writer must emit exactly one metric, one page and one
 // extent, with the surviving page's descriptor pointing at a valid extent.
-static int mrg_jv2_real_writer_unittest(void) {
+static int mrg_jv2_real_writer_unittest(const struct dbengine_config *cfg) {
     fprintf(stderr, "\nTesting jv2 real writer publishes and reloads (deterministic)...\n");
     int errors = 0;
 
@@ -1681,15 +1707,9 @@ static int mrg_jv2_real_writer_unittest(void) {
     const Word_t section = (Word_t)&ctx;
 
     MRG *mrg = mrg_create_for_unittest();
-    MRG *saved_main_mrg = main_mrg;
-    main_mrg = mrg;
+    mrg_test_engine_attach(&ctx, cfg, mrg);
 
-    PGC *cache = pgc_create(
-        "jv2-real-writer-test",
-        32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
-        64, NULL, jv2_stale_metric_save_dirty_cb,
-        10, 10, 1000, 10,
-        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+    PGC *cache = jv2_test_cache_create(cfg, "jv2-real-writer-test");
 
     // everything the cleanup path can touch, and everything the gotos below jump
     // over, is declared and initialized up front
@@ -1813,7 +1833,6 @@ cleanup:
 
     pgc_destroy(cache, false);
     jv2_two_pointers_undo(mrg, &tp);
-    main_mrg = saved_main_mrg;
 
     size_t referenced = mrg_destroy(mrg);
     if(referenced) {
@@ -1827,6 +1846,9 @@ cleanup:
     if(published)
         journalfile_close(journalfile, &datafile);
     freez(journalfile);
+
+    // the close above still reads the tier's engine
+    mrg_test_engine_detach(&ctx);
 
     netdata_rwlock_destroy(&datafile.extent_rwlock);
     netdata_rwlock_destroy(&ctx.datafiles.rwlock);
@@ -1846,10 +1868,10 @@ cleanup:
     return errors;
 }
 
-static int mrg_jv2_same_uuid_grouped_once_unittest(void) {
+static int mrg_jv2_same_uuid_grouped_once_unittest(const struct dbengine_config *cfg) {
     // distinct start times: one group, both pages kept
     int errors = mrg_jv2_same_uuid_grouped_once_check(
-        "distinct start times", 100, 300, 200, 400, 2, 0, 2, false);
+        cfg, "distinct start times", 100, 300, 200, 400, 2, 0, 2, false);
 
     // Identical start times: the two pages of the same uuid collide inside the
     // group. Before this was handled, the second page hit
@@ -1874,30 +1896,28 @@ static int mrg_jv2_same_uuid_grouped_once_unittest(void) {
     // survivors renumbered; when it comes first the loser is rejected before it ever
     // creates an extent.
     errors += mrg_jv2_same_uuid_grouped_once_check(
-        "colliding start times, longer page second", 100, 100, 200, 400, 1, 400, 1, false);
+        cfg, "colliding start times, longer page second", 100, 100, 200, 400, 1, 400, 1, false);
     errors += mrg_jv2_same_uuid_grouped_once_check(
-        "colliding start times, longer page first", 100, 100, 400, 200, 1, 400, 1, false);
+        cfg, "colliding start times, longer page first", 100, 100, 400, 200, 1, 400, 1, false);
 
     // Same collision, but the callback now reports success, so the indexer really
     // publishes the journal and has to dispose of the page it dropped. A dropped
     // page left hot would hold its DATAFILE_ACQUIRE_OPEN_CACHE reference forever
     // and its datafile could never be deleted.
     errors += mrg_jv2_same_uuid_grouped_once_check(
-        "colliding start times, journal published", 100, 100, 200, 400, 1, 400, 1, true);
+        cfg, "colliding start times, journal published", 100, 100, 200, 400, 1, 400, 1, true);
 
     return errors;
 }
 
 int dbengine_metrics_registry_unittest(const struct dbengine_config *cfg) {
-    dbengine_config_set(cfg);
-
     int errors = dbengine_accounting_helpers_unittest();
     errors += mrg_destroy_referenced_metric_unittest();
     errors += mrg_stale_peeked_id_unittest();
     errors += mrg_stale_metric_pointer_unittest();
-    errors += mrg_jv2_stale_metric_not_dereferenced_unittest();
-    errors += mrg_jv2_same_uuid_grouped_once_unittest();
-    errors += mrg_jv2_real_writer_unittest();
+    errors += mrg_jv2_stale_metric_not_dereferenced_unittest(cfg);
+    errors += mrg_jv2_same_uuid_grouped_once_unittest(cfg);
+    errors += mrg_jv2_real_writer_unittest(cfg);
     errors += mrg_uuid_lookup_delete_race_unittest();
 
     // Use mrg_create_for_unittest to avoid pre-loaded metrics that block deletion
