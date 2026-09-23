@@ -412,6 +412,10 @@ Notes:
 | `ChartEngine/Lifecycle`   | removal counters by scope/reason                               |
 | `ChartEngine/Plan`        | gauges for chart instances/inferred dimensions                 |
 
+`WithRuntimeSampleObserver` also hands each build's samples to a callback; jobs that aggregate across engines pass
+`WithRuntimeStore(nil)` and a `RuntimeAggregator`'s `Observe`. The aggregator flushes its rollup into a runtime store
+once per cycle; when the store implements `metrix.RuntimeBatchWriter`, a flush publishes one snapshot.
+
 ## Engine State
 
 | Area               | Design                                                                                                                                      |
@@ -432,9 +436,10 @@ Benchmarks should verify emitted chart/dimension counts and values after warmup.
 Planning work is O(scanned series + retained charts); allocations follow what changed and the plan output. An
 unchanged chart allocates only its boxed update action: per-build chart state and update values come from blocks sized
 by the previous build, and the abort journal records only sequence stamps and scratch values of observed charts
-(transient per attempt). New or changed charts, labels and dimensions additionally allocate their definitions.
-`TestAutogenWarmPlanAllocationEnvelope` guards the steady envelope and `TestPlanAbortRestoresCommittedState` the abort
-contract.
+(transient per attempt). New or changed charts, labels and dimensions additionally allocate their definitions. Each
+plan also pays a small constant setup (build context and its maps and blocks, the attempt with its inline journal, one
+callback per series pass). `TestAutogenWarmPlanAllocationEnvelope` guards the steady envelope and
+`TestPlanAbortRestoresCommittedState` the abort contract.
 
 `BenchmarkAutogenMixedChurn` measures a bounded population with stable, partially replaced, or fully replaced
 identities; `BenchmarkCollectExpiryRemovals` covers stable, partial, and mass expiry across chart/dimension shapes.
