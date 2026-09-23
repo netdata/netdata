@@ -480,7 +480,7 @@ bool rrdhost_machine_guid_is_valid(const char *guid) {
     if (!guid || uuid_parse_flexi(guid, uuid) != 0)
         return false;
 
-    size_t len = strlen(guid);
+    size_t len = strnlen(guid, GUID_LEN + 1);
     if (len == 32)
         return true;
 
