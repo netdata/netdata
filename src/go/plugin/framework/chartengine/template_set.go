@@ -24,9 +24,10 @@ type TemplateEntry struct {
 	AutogenRules     []charttpl.EngineAutogenRule
 }
 
-// TemplateSetSpec describes the complete desired set. Entry order determines
-// precedence for unowned collisions, but does not determine entry identity.
-// Policy and FallbackContextNamespace are fixed for a running collector job.
+// TemplateSetSpec describes the complete desired set. Entry order ranks the
+// routes one series has to the same unowned chart ID, but does not determine
+// entry identity. Policy and FallbackContextNamespace are fixed for a running
+// collector job.
 type TemplateSetSpec struct {
 	Entries                  []TemplateEntry
 	Policy                   EnginePolicy
@@ -106,7 +107,6 @@ func compileTemplateSet(entries []TemplateEntry, global templateGlobalPolicy, po
 	c := compiler{
 		metricsSet: make(map[string]struct{}),
 	}
-	rootOffset := 0
 	for _, input := range entries {
 		if strings.TrimSpace(input.ID) == "" {
 			return nil, fmt.Errorf("chartengine: template entry ID is required")
@@ -147,11 +147,11 @@ func compileTemplateSet(entries []TemplateEntry, global templateGlobalPolicy, po
 			if !legacy {
 				chart.EntryID = entry.ID
 				chart.LocalTemplateID = chart.TemplateID
-				chart.RoutingOrder = templateRoutingOrder(chart.TemplateID, rootOffset)
-				chart.TemplateID = strconv.Itoa(len(entry.ID)) + ":" + entry.ID + "/" + chart.LocalTemplateID
+				// Compile order across the set: entry order, then depth-first authored order.
+				chart.RoutingRank = i
+				chart.TemplateID = entryTemplateID(entry.ID, chart.LocalTemplateID)
 			}
 		}
-		rootOffset += len(entry.Groups)
 		set.entryByID[entry.ID] = len(set.entries)
 		set.entries = append(set.entries, entry)
 	}
@@ -165,10 +165,44 @@ func compileTemplateSet(entries []TemplateEntry, global templateGlobalPolicy, po
 	return set, nil
 }
 
-func templateRoutingOrder(localID string, rootOffset int) string {
-	end := strings.IndexByte(localID, '.')
-	root, _ := strconv.Atoi(localID[1:end]) // compiler-generated path
-	return "g" + strconv.Itoa(root+rootOffset) + localID[end:]
+// entryTemplateID qualifies a local chart ID with its length-prefixed entry ID,
+// so distinct entries never produce the same compiled template ID.
+func entryTemplateID(entryID, localID string) string {
+	return strconv.Itoa(len(entryID)) + ":" + entryID + "/" + localID
+}
+
+// ChartTemplateIDAt returns the compiled template ID that plans and route facts
+// report for the authored chart at groupPath/chartIndex inside entry entryID.
+// Paths are local to the entry's groups. A YAML document set has one entry,
+// named by Entries, whose IDs are the document's positional IDs. It reports
+// false when the entry or chart position does not exist in this set.
+func (s *TemplateSet) ChartTemplateIDAt(entryID string, groupPath []int, chartIndex int) (string, bool) {
+	if s == nil {
+		return "", false
+	}
+	if _, ok := s.entryByID[entryID]; !ok {
+		return "", false
+	}
+	id, ok := ChartTemplateIDAt(groupPath, chartIndex)
+	if !ok {
+		return "", false
+	}
+	if !s.legacy {
+		id = entryTemplateID(entryID, id)
+	}
+	if _, ok := s.index.chartsByID[id]; !ok {
+		return "", false
+	}
+	return id, true
+}
+
+// FallbackContextNamespace returns the context namespace automatic charts use.
+// Like GlobalPolicy, it is fixed for a running job.
+func (s *TemplateSet) FallbackContextNamespace() string {
+	if s == nil {
+		return ""
+	}
+	return s.global.namespace
 }
 
 func cloneTemplateGroups(groups []charttpl.Group) []charttpl.Group {

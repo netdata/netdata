@@ -37,12 +37,13 @@ For `CollectorV2` collectors, the runtime integration expects:
 | `PrepareTemplateSet(set, opts...)` | Bind fixed global job overrides without recompiling entries |
 | `PreparePlanWithOptions(reader, PlanOptions{...})` | Stage a desired set and optional host reset with the plan |
 | `TemplateSet.Entries()` / `GlobalPolicy()` | Inspect detached definitions and effective global policy |
+| `TemplateSet.ChartTemplateIDAt(entryID, path, i)` / `FallbackContextNamespace()` | Resolve an entry chart position to the template ID plans and route facts report; read the fixed automatic-chart namespace |
 | `PreparePlan(reader)`                               | Build deterministic action plan from reader snapshot and return an explicit attempt                                                                                     |
 | `RuntimeStore()`                                    | Access chartengine internal runtime metrics store                                                                                                                       |
 | `WithEnginePolicy(...)`                             | Configure selector + autogen behavior                                                                                                                                   |
 | `WithRuntimeStore(...)`                             | Override/disable self-metrics store                                                                                                                                     |
 | `WithSeriesSelectionAllVisible()`                   | Process all visible series instead of filtering to latest successful collect cycle. Intended for runtime/internal stores that commit immediately (no cycle boundaries). |
-| `WithEmitTypeIDBudgetPrefix(...)`                   | Set the effective type-id prefix used by autogen budget checks                                                                                                          |
+| `WithEmitTypeIDBudgetPrefix(...)`                   | Set the effective type-id prefix used by autogen budget checks and collision-warning rate limiting                                                                      |
 | `WithRuntimePlannerMode(...)`                       | Enable runtime planner mode with no-write-tick semantics, for jobs/tests that drive planning directly from runtime metrics instead of collect-cycle boundaries.         |
 | `WithPlanRouteDiagnosticObserver(...)`              | Stream complete, synchronous route facts for one plan attempt; intended for validation and tests                                                                        |
 | `ChartTemplateIDAt(...)`                            | Correlate an authored chart position with the compiler-assigned template identity used by route facts                                                                   |
@@ -84,9 +85,13 @@ metadata and defaults, local chart paths, group structure, declared metrics and 
 mathematical equivalence between differently written selectors. A changed entry is replaced as a whole: all its old
 reservations are released, observed charts recreate, quiet siblings retire, and Go expiry bookkeeping restarts.
 
-Ownership is independent of routing precedence. For unowned collisions, native entry order acts like concatenated root
-groups with the existing lexical `g<path>.c<index>` comparison. Reordering can change future unowned winners but preserves
-current active and quiet incumbents. Authored charts retain precedence over fallback. Replacement retirement compares
+Ownership is independent of routing precedence. When one series routes to several templates that render the same
+unowned chart ID, native sets rank those routes by compile order: entry order, then depth-first authored order within
+the entry, where a group's charts precede its nested groups. Adding or removing an entry never changes the relative order
+of two others. YAML documents keep comparing positional `g<path>.c<index>` IDs as strings. Across different series, the
+first series in scan order (metric name, then series) claims a new chart, and an existing owner keeps it. Reordering can
+change future unowned winners but preserves current active and quiet incumbents. Authored charts retain precedence over
+fallback. Replacement retirement compares
 old public identities with final survivors; a surviving chart or dimension is never also marked obsolete, and dimension
 retirement headers use the surviving chart's metadata. Existing Agent redefinition, history, counter and context behavior
 applies; this API makes no stronger continuity guarantee for changed definitions.
@@ -203,9 +208,11 @@ autogen displacement, collisions, lifecycle rejection, and unmatched series.
   expose the effective context, family, units, algorithm, aggregation, presentation, series kind, scale, and label-promotion
   policy. They do not include the full input label set; a rendered chart or dynamic dimension name can itself be derived
   from label values and must be handled accordingly by consumers.
-- `ChartTemplateIDAt` correlates legacy document facts with a decoded template's group/chart position. Named sets
-  additionally expose `TemplateEntryID` and `LocalChartTemplateID`, corresponding fields for an existing collision owner,
-  and entry/local provenance for rejected autogen rules. Consumers need not parse encoded ownership strings.
+- `TemplateSet.ChartTemplateIDAt` resolves an entry's group/chart position to the template ID that plan actions and facts
+  report, for named sets and the YAML singleton entry alike; the package `ChartTemplateIDAt` does the same for a decoded
+  document. Named-set facts additionally expose `TemplateEntryID` and `LocalChartTemplateID`, corresponding fields for an
+  existing collision owner, and entry/local provenance for rejected autogen rules. Consumers need not parse encoded
+  ownership strings.
 
 `ResolveInstanceLabelPolicy` is the corresponding read-only inspection helper for `instances.by_labels` and
 `instances.optional_by_labels`. It returns the runtime-normalized required keys, optional keys, exclusions, and include-all
@@ -248,11 +255,11 @@ The following rules apply when routing conflicts arise:
 | Rule                                          | Behavior                                                                                       |
 |-----------------------------------------------|------------------------------------------------------------------------------------------------|
 | Template vs autogen chart ID collision        | Template wins; autogen chart is replaced                                                       |
-| Cross-template chart ID collision             | Existing owner keeps ownership; subsequent series are **silently ignored** (see warning below) |
+| Cross-template chart ID collision             | Existing owner keeps ownership; subsequent series are **dropped** (see warning below)          |
 | Duplicate dimension observations within build | First observed dimension metadata wins; values use the chart's configured reducer            |
 
 > [!WARNING]
-> Cross-template chart ID collisions cause silent data loss — conflicting series are dropped with no error and no log entry. If metrics are missing, check for duplicate rendered chart IDs across template groups.
+> Cross-template chart ID collisions lose data: conflicting authored series are dropped. At most one warning per hour is logged per chart type-ID namespace (`WithEmitTypeIDBudgetPrefix`), so once per job across its host scopes and once per runtime metrics component, naming the dropped series-route count, the chart, its owner and the rejected template. Give every chart a unique rendered ID (`id` or `context`). Which template owns a new contested chart follows [Named Active Template Sets](#named-active-template-sets): compile-order precedence among one series' routes, scan order across series.
 
 Authored charts can set one reducer for all their dimensions. Supported values are `sum` (default), `min`, `max`, and
 `avg`. Reduction is scoped to one successful plan build and happens before multiplier/divisor and
