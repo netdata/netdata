@@ -797,120 +797,133 @@ static bool stream_receiver_dequeue_senders(struct stream_thread *sth, struct re
     return true;
 }
 
-static void stream_receiver_overlong_line(struct stream_thread *sth, struct receiver_state *rpt, bool *removed) {
+static void stream_receiver_overlong_line(
+    struct stream_thread *sth, struct receiver_state *rpt, bool *removed) {
+
     nd_log(NDLS_DAEMON, NDLP_ERR,
            "STREAM RCV[%zu] '%s' [from [%s]:%s]: line is %zu bytes (max %zu). "
            "Disconnecting the sender.",
            sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
            rpt->thread.line_buffer->len, (size_t)PLUGINSD_LINE_MAX);
 
-    stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_BUFFER_OVERFLOW);
     *removed = true;
+    stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_BUFFER_OVERFLOW);
+}
+
+static bool stream_receiver_process_lines(
+    struct stream_thread *sth, struct receiver_state *rpt,
+    PARSER *parser, bool *removed) {
+
+    for(;;) {
+        bool overflow = false;
+        bool complete = stream_receiver_next_line_checked(
+            &rpt->thread.uncompressed,
+            rpt->thread.line_buffer,
+            &overflow);
+
+        if(unlikely(overflow)) {
+            stream_receiver_overlong_line(sth, rpt, removed);
+            return false;
+        }
+
+        if(!complete)
+            return true;
+
+        if(unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
+            stream_receiver_remove(
+                sth,
+                rpt,
+                STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
+            *removed = true;
+            return false;
+        }
+
+        buffer_flush(rpt->thread.line_buffer);
+    }
 }
 
 static ssize_t
-stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt, PARSER *parser, usec_t now_ut __maybe_unused, bool *removed) {
-    internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
+stream_receive_and_process(
+    struct stream_thread *sth,
+    struct receiver_state *rpt,
+    PARSER *parser,
+    usec_t now_ut __maybe_unused,
+    bool *removed) {
+
+    internal_fatal(
+        sth->tid != gettid_cached(),
+        "Function %s() should only be used by the dispatcher thread",
+        __FUNCTION__);
+
     *removed = false;
 
     ssize_t rc;
+
     if(rpt->thread.compressed.enabled) {
         rc = receiver_read_compressed(rpt);
         if(unlikely(rc <= 0))
             return rc;
 
-        while(!nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING) && !receiver_should_stop(rpt)) {
+        while(!nd_thread_signaled_to_cancel() &&
+              service_running(SERVICE_STREAMING) &&
+              !receiver_should_stop(rpt)) {
+
             worker_is_busy(WORKER_STREAM_JOB_DECOMPRESS);
 
-            // feed the decompressor with the new data we just read
-            decompressor_status_t feed_rc = receiver_feed_decompressor(rpt);
+            decompressor_status_t feed_rc =
+                receiver_feed_decompressor(rpt);
 
             if(likely(feed_rc == DECOMPRESS_OK)) {
-                while (true) {
-                    // feed our uncompressed data buffer with new data
-                    decompressor_status_t decompress_rc = receiver_get_decompressed(rpt);
+                while(true) {
+                    decompressor_status_t decompress_rc =
+                        receiver_get_decompressed(rpt);
 
-                    if (likely(decompress_rc == DECOMPRESS_OK)) {
-                        // loop through all the complete lines found in the uncompressed buffer
-
-                        while (buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
-                            // an overlong line must not reach the parser, and must be
-                            // detected before the parser resets the line buffer
-                            if(unlikely(stream_receiver_line_buffer_overflow(rpt->thread.line_buffer))) {
-                                stream_receiver_overlong_line(sth, rpt, removed);
-                                return -1;
-                            }
-
-                            if (unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
-                                stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
-                                *removed = true;
-                                return -1;
-                            }
-
-                            rpt->thread.line_buffer->len = 0;
-                            rpt->thread.line_buffer->buffer[0] = '\0';
-                        }
-
-                        // a partial line can grow across decompressed buffers: check
-                        // before asking for the next one
-                        if(unlikely(stream_receiver_line_buffer_overflow(rpt->thread.line_buffer))) {
-                            stream_receiver_overlong_line(sth, rpt, removed);
+                    if(likely(decompress_rc == DECOMPRESS_OK)) {
+                        if(unlikely(!stream_receiver_process_lines(
+                                sth, rpt, parser, removed)))
                             return -1;
-                        }
                     }
-                    else if (decompress_rc == DECOMPRESS_NEED_MORE_DATA)
+                    else if(decompress_rc == DECOMPRESS_NEED_MORE_DATA)
                         break;
-
                     else {
-                        stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DECOMPRESSION_FAILED);
+                        stream_receiver_remove(
+                            sth,
+                            rpt,
+                            STREAM_HANDSHAKE_RCV_DECOMPRESSION_FAILED);
                         *removed = true;
                         return -1;
                     }
                 }
             }
-            else if (feed_rc == DECOMPRESS_NEED_MORE_DATA)
+            else if(feed_rc == DECOMPRESS_NEED_MORE_DATA)
                 break;
             else {
-                stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DECOMPRESSION_FAILED);
+                stream_receiver_remove(
+                    sth,
+                    rpt,
+                    STREAM_HANDSHAKE_RCV_DECOMPRESSION_FAILED);
                 *removed = true;
                 return -1;
             }
         }
 
         if(receiver_should_stop(rpt)) {
-            stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP);
+            stream_receiver_remove(
+                sth,
+                rpt,
+                STREAM_HANDSHAKE_DISCONNECT_SIGNALED_TO_STOP);
             *removed = true;
             return -1;
         }
     }
     else {
         rc = receiver_read_uncompressed(rpt);
-        if(rc <= 0)
+        if(unlikely(rc <= 0))
             return rc;
 
-        while(buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
-            // an overlong line must not reach the parser, and must be
-            // detected before the parser resets the line buffer
-            if(unlikely(stream_receiver_line_buffer_overflow(rpt->thread.line_buffer))) {
-                stream_receiver_overlong_line(sth, rpt, removed);
-                return -1;
-            }
-
-            if(unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
-                stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
-                *removed = true;
-                return -1;
-            }
-
-            rpt->thread.line_buffer->len = 0;
-            rpt->thread.line_buffer->buffer[0] = '\0';
-        }
-
-        // a line without a newline keeps accumulating across reads
-        if(unlikely(stream_receiver_line_buffer_overflow(rpt->thread.line_buffer))) {
-            stream_receiver_overlong_line(sth, rpt, removed);
+        if(unlikely(!stream_receiver_process_lines(
+                sth, rpt, parser, removed)))
             return -1;
-        }
     }
 
     return rc;
