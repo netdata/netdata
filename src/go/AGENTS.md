@@ -112,8 +112,10 @@ a plausible future problem is not a requirement.
 metrix commit/collect, per-sample/per-write, and per-cycle code are hot paths: they run for every collector on
 every cycle.
 
-- Before/after REQUIRED: a hot-path change MUST include before/after `go test -bench` numbers (use `git stash` for the
-  "before" baseline), not just "tests pass".
+- Before/after REQUIRED: a hot-path change MUST include before/after `go test -bench` numbers, not just "tests pass".
+  Build the "before" test binaries at the base commit (`go test -c`), run them alternately with the new ones
+  (`-count 6`), and compare with `benchstat`. Do not use `git stash` for the baseline: the stash is shared across
+  worktrees and sessions.
 - Allocation count is the gate: assert allocs stay within the intended envelope (for example a sparse commit stays
   ~O(touched), never O(retained)). `ns/op` is a dev-machine trend indicator, NOT a CI gate; label it as such inline
   and never record a personal name in the file.
