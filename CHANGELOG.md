@@ -404,6 +404,19 @@
 - Regenerate integrations docs ([#23979](https://github.com/netdata/netdata/issues/23979))
 - Feat(go.d/metrix): support unavailable snapshot MeasureSet fields ([#23980](https://github.com/netdata/netdata/issues/23980))
 - Feat(go.d): add readiness-aware collector runtime lifecycle ([#23982](https://github.com/netdata/netdata/issues/23982))
+- Validate topology search labels and aggregation memberships ([#23788](https://github.com/netdata/netdata/issues/23788))
+- Fix(go.d/chartengine): recreate changed definitions after expired revival ([#23984](https://github.com/netdata/netdata/issues/23984))
+- Refactor(go.d): extract shared relabel processing ([#23985](https://github.com/netdata/netdata/issues/23985))
+- Regenerate integrations docs ([#23986](https://github.com/netdata/netdata/issues/23986))
+- Feat(go.d): add StatsD measurement core ([#23987](https://github.com/netdata/netdata/issues/23987))
+- Test(go.d): wait for failed status output in readiness test ([#23989](https://github.com/netdata/netdata/issues/23989))
+- Logging and error-handling fixes for nightly artifact uploads. ([#23990](https://github.com/netdata/netdata/issues/23990))
+- Fix ACLK alert queue transition loss during concurrent updates ([#23983](https://github.com/netdata/netdata/issues/23983))
+- Fix(ml): bind streamed models to the authenticated host ([#23988](https://github.com/netdata/netdata/issues/23988))
+- Feat(go.d): add StatsD receiver runtime and profiles ([#23992](https://github.com/netdata/netdata/issues/23992))
+- Build(deps): bump github.com/bmatcuk/doublestar/v4 from 4.10.0 to 4.10.1 in /src/go ([#23994](https://github.com/netdata/netdata/issues/23994))
+- Build(deps): bump github.com/aws/smithy-go from 1.28.1 to 1.28.2 in /src/go ([#23993](https://github.com/netdata/netdata/issues/23993))
+- Perf(go.d/statsd): remove per-record ingest allocations and cut publication cost ([#23995](https://github.com/netdata/netdata/issues/23995))
 
 ## [2.11.0] - 2026-08-12
 
