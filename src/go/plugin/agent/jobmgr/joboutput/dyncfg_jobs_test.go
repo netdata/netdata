@@ -642,22 +642,15 @@ func TestManualDynCfgAutoDetectionFailureResponseContracts(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			controller, graph, supervisor, output, state := newDynCfgJobTestHarness(t)
-			creator := controller.modules["module"]
-			creator.Create = func() collectorapi.CollectorV1 {
-				return state.module(func(context.Context) error { return test.checkErr }, false)
-			}
 			if test.collectorV2 {
-				creator.Create = nil
-				creator.CreateV2 = func() collectorapi.CollectorV2 {
-					return &factoryTestV2{
-						state:    state,
-						store:    metrix.NewCollectorStore(),
-						template: factoryTestChartTemplate,
-						checkErr: test.checkErr,
-					}
+				useV2CheckFailureCollector(controller, state, test.checkErr)
+			} else {
+				creator := controller.modules["module"]
+				creator.Create = func() collectorapi.CollectorV1 {
+					return state.module(func(context.Context) error { return test.checkErr }, false)
 				}
+				controller.modules["module"] = creator
 			}
-			controller.modules["module"] = creator
 
 			config := factoryTestConfig(false)
 			config.SetSourceType(confgroup.TypeDyncfg)
@@ -1194,17 +1187,7 @@ func TestV2CheckErrorClassificationControlsAutoDetectionRetry(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			controller, graph, _, _, state := newDynCfgJobTestHarness(t)
-			creator := controller.modules["module"]
-			creator.Create = nil
-			creator.CreateV2 = func() collectorapi.CollectorV2 {
-				return &factoryTestV2{
-					state:    state,
-					store:    metrix.NewCollectorStore(),
-					template: factoryTestChartTemplate,
-					checkErr: fmt.Errorf("check: %w", test.checkErr),
-				}
-			}
-			controller.modules["module"] = creator
+			useV2CheckFailureCollector(controller, state, fmt.Errorf("check: %w", test.checkErr))
 			config := factoryTestConfig(false).Set("autodetection_retry", 7)
 			config.SetSourceType(test.sourceType)
 			config.SetSource("source")
@@ -1222,6 +1205,46 @@ func TestV2CheckErrorClassificationControlsAutoDetectionRetry(t *testing.T) {
 			requireFactoryAttemptsIdle(t, controller.factory)
 		})
 	}
+}
+
+func TestV2DynCfgTestCommandReportsClassifiedCheckErrorsAsUnprocessable(t *testing.T) {
+	tests := map[string]struct {
+		checkErr error
+	}{
+		"config error":    {checkErr: collectorapi.ConfigError(errors.New("unknown profile"))},
+		"temporary error": {checkErr: collectorapi.TemporaryError(errors.New("dependency not ready"))},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			controller, _, _, _, state := newDynCfgJobTestHarness(t)
+			useV2CheckFailureCollector(controller, state, test.checkErr)
+
+			result, err := controller.Handle(context.Background(), DynCfgJobRequest{
+				Args:         []string{"go.d:collector:module", string(dyncfg.CommandTest), "job"},
+				Payload:      []byte(`{"option_str":"value","option_int":1}`),
+				ContentType:  "application/json",
+				CallerSource: "user=test",
+				HasPayload:   true,
+			})
+			require.NoError(t, err)
+			require.Equal(t, mustDynCfgMessage(422, "job output: collector check: "+test.checkErr.Error()), result)
+		})
+	}
+}
+
+// useV2CheckFailureCollector registers a V2 test collector whose Check returns checkErr.
+func useV2CheckFailureCollector(controller *DynCfgJobController, state *factoryTestState, checkErr error) {
+	creator := controller.modules["module"]
+	creator.Create = nil
+	creator.CreateV2 = func() collectorapi.CollectorV2 {
+		return &factoryTestV2{
+			state:    state,
+			store:    metrix.NewCollectorStore(),
+			template: factoryTestChartTemplate,
+			checkErr: checkErr,
+		}
+	}
+	controller.modules["module"] = creator
 }
 
 func TestDiscoveredSecretReferenceRemainsLiteralAndDoesNotScheduleRetry(t *testing.T) {

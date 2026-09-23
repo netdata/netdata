@@ -5,7 +5,9 @@ package collectorapi
 // ConfigError classifies an Init or Check error as a configuration failure
 // that retrying cannot fix, such as an invalid option or an unknown named
 // profile. The job fails without autodetection retries, whatever
-// autodetection_retry says, and DynCfg reports code 422.
+// autodetection_retry says, and DynCfg commands that report the result answer
+// 422. A CollectorV2Runner.Run startup error classified this way is not retried
+// either.
 // It returns nil for a nil err.
 func ConfigError(err error) error {
 	if err == nil {
@@ -15,9 +17,10 @@ func ConfigError(err error) error {
 }
 
 // TemporaryError classifies an Init or Check error as a failure that may clear
-// on its own, such as a port in use. The job keeps the configured
-// autodetection_retry, which an unclassified Init error would disable, and
-// DynCfg reports code 503.
+// on its own, such as a dependency that is not ready yet. The job keeps the
+// configured autodetection_retry, which an unclassified Init error would
+// disable. DynCfg enable, update and restart answer 503 when they report the
+// result; test answers 422 for any failure.
 // It returns nil for a nil err.
 func TemporaryError(err error) error {
 	if err == nil {

@@ -46,8 +46,8 @@ type CollectorV1 interface {
 // An Init or Check error fails the job. Unclassified, an Init error disables
 // autodetection retries and a Check error is retried per autodetection_retry.
 // ConfigError (never retried) and TemporaryError (retried per
-// autodetection_retry) classify either; a classified error also sets the
-// DynCfg response code and keeps a failed stock job listed instead of removed.
+// autodetection_retry) classify either and set the DynCfg response code. A
+// classified failure keeps a failed stock job listed instead of removed.
 type CollectorV2 interface {
 	Init(context.Context) error
 	Check(context.Context) error
@@ -84,7 +84,8 @@ type ChartTemplateSetProvider interface {
 // prerequisites succeed and Collect can safely run; no packet or poll is required.
 // Duplicate/late ready calls are ignored. Run must return promptly on cancellation.
 // Unexpected return (including nil) fails the job. Before readiness, ordinary
-// failures use configured startup retries; after readiness recovery needs restart.
+// failures use configured startup retries and a ConfigError none; after
+// readiness recovery needs restart.
 type CollectorV2Runner interface {
 	Run(ctx context.Context, ready func()) error
 }

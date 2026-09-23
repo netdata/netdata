@@ -95,6 +95,9 @@ func TestRuntimeStartupFailureIsOperationalAndKeepsConfiguredRetry(t *testing.T)
 	}{
 		{"error retry enabled", func(context.Context, func()) error { return errors.New("listen 127.0.0.1:8125: address in use") }, 7, true},
 		{"error retry disabled", func(context.Context, func()) error { return errors.New("bind failed") }, 0, false},
+		{"config error", func(context.Context, func()) error {
+			return collectorapi.ConfigError(errors.New("invalid listen address"))
+		}, 7, false},
 		{"unexpected nil", func(context.Context, func()) error { return nil }, 7, false},
 		{"recovered panic", func(context.Context, func()) error { panic("bind panic") }, 7, false},
 	} {

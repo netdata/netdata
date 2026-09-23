@@ -152,7 +152,7 @@ Readiness MUST NOT wait for a first packet or remote observation. `Init()` and `
 validation while an incumbent may own the endpoint; DynCfg `test` never calls `Run()`.
 
 The framework waits for readiness before collecting. Startup errors follow the existing configured autodetection retry
-policy; unexpected nil return and recovered panic do not retry. Unexpected return after readiness makes the job Failed
+policy; a `collectorapi.ConfigError`, unexpected nil return and recovered panic do not retry. Unexpected return after readiness makes the job Failed
 and requires an explicit restart. The implementation MUST return promptly after `ctx.Done()` and SHOULD make in-flight
 I/O cancellation-aware where the library permits. Cleanup waits for `Run()` to return. See the
 [runtime readiness contract](/src/go/plugin/framework/jobruntime/README.md#runtime-readiness-and-termination) for
@@ -174,12 +174,14 @@ An `Init()` or `Check()` error fails the job. Unclassified, an `Init()` error di
 `Check()` error is retried per `autodetection_retry`. Classify the error when that default is wrong:
 
 - `collectorapi.ConfigError(err)`: a configuration problem that retrying cannot fix, such as an invalid option or an
-  unknown named profile. The job is never retried and DynCfg reports code 422.
-- `collectorapi.TemporaryError(err)`: a condition that may clear on its own, such as a port in use. The job keeps the
-  `autodetection_retry` schedule, even from `Init()`, and DynCfg reports code 503.
+  unknown named profile. The job is never retried.
+- `collectorapi.TemporaryError(err)`: a condition that may clear on its own, such as a dependency that is not ready
+  yet. The job keeps the `autodetection_retry` schedule, even from `Init()`.
 
-A classified failure keeps a failed stock job listed in DynCfg instead of removing it. Leave the expected absence of a
-service at a stock endpoint unclassified.
+DynCfg `enable` of a disabled or failed job, `update` and `restart` answer with the classified code (422 or 503).
+`test` answers 422 for any failure; `add` and `enable` of an accepted job answer 202 and report the failure through the
+job status. A classified failure keeps a failed stock job listed in DynCfg instead of removing it. Leave the expected
+absence of a service at a stock endpoint unclassified.
 
 ## Config
 
