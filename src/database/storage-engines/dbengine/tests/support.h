@@ -43,8 +43,8 @@
 //
 // What the sink may do is fixed by the contract at dbengine_log_fn (dbengine-config.h), and it is narrow: called
 // from any engine thread, possibly with an engine lock held, possibly after dbengine_destroy() has been asked to
-// run. So it formats into its own buffer, takes one mutex of its own, appends, and returns - it calls nothing in
-// the engine and waits for nothing an engine thread could be waiting for. The buffer has a ceiling because a case
+// run. So it formats into its own buffer, takes one mutex of its own only to append, and returns - it calls nothing
+// in the engine and waits for nothing an engine thread could be waiting for. The buffer has a ceiling because a case
 // that loops while logging should not take the runner's memory with it.
 struct NetdataTestLogCapture {
     std::mutex mutex;
@@ -100,9 +100,8 @@ extern "C" inline void netdata_test_log_sink(void *data, ND_LOG_FIELD_PRIORITY p
     // The longest line the suite produces today is 424 bytes.
     const bool message_truncated = (size_t)len >= sizeof(message);
 
-    NetdataTestLogCapture *capture = static_cast<NetdataTestLogCapture *>(data);
-    std::lock_guard<std::mutex> lock(capture->mutex);
-
+    // Written before the mutex is taken: a slow stderr then holds up only the thread writing to it, not every engine
+    // thread that logs meanwhile.
     if (netdata_test_log_mode() == NETDATA_TEST_LOG_SINK_ECHO) {
         // one line per message: whatever reads this line by line - a diff against a "none" run, a grep - would be
         // thrown by an embedded newline
@@ -112,6 +111,9 @@ extern "C" inline void netdata_test_log_sink(void *data, ND_LOG_FIELD_PRIORITY p
         std::fprintf(stderr, "SINK\t%s\t%s%s\n", nd_log_id2priority(priority), message,
                      message_truncated ? " <TRUNCATED>" : "");
     }
+
+    NetdataTestLogCapture *capture = static_cast<NetdataTestLogCapture *>(data);
+    std::lock_guard<std::mutex> lock(capture->mutex);
 
     // once a line has been dropped at the ceiling, later ones are dropped too: a shorter line that still fitted would
     // leave a hole in the middle of a log that reads as complete up to the "... and more" footer
