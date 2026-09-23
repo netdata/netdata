@@ -30,7 +30,7 @@ bool stream_sender_send_rrdset_definition(BUFFER *wb, RRDSET *st) {
     bool replication_progress = false;
 
     // properly set the name for the remote end to parse it
-    char *name = "";
+    const char *name = "";
     if(likely(st->name)) {
         if(unlikely(st->id != st->name)) {
             // they differ

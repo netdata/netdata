@@ -327,7 +327,7 @@ short int websocket_handle_handshake(struct web_client *w) {
     // Check for max_frame_size parameter in the URL query string
     if (w->url_query_string_decoded && buffer_strlen(w->url_query_string_decoded) > 0) {
         const char *query = buffer_tostring(w->url_query_string_decoded);
-        char *max_frame_size_str = strstr(query, "max_frame_size=");
+        const char *max_frame_size_str = strstr(query, "max_frame_size=");
         
         if (max_frame_size_str) {
             max_frame_size_str += strlen("max_frame_size=");
@@ -354,7 +354,7 @@ short int websocket_handle_handshake(struct web_client *w) {
             // Backward-compatibility fallback for older MCP websocket clients.
             // Preferred path is Authorization: Bearer, but we intentionally keep
             // ?api_key= support to avoid breaking existing client integrations.
-            char *api_key_str = strstr(query, "api_key=");
+            const char *api_key_str = strstr(query, "api_key=");
             if (api_key_str) {
                 if (!websocket_mcp_query_api_key_compat_notice_logged) {
                     websocket_mcp_query_api_key_compat_notice_logged = true;

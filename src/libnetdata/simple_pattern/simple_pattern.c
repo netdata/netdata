@@ -207,7 +207,7 @@ static int sp_strncmp(const char *s1, const char *s2, size_t n, bool case_sensit
 }
 
 ALWAYS_INLINE
-static char *sp_strstr(const char *haystack, const char *needle, bool case_sensitive) {
+static const char *sp_strstr(const char *haystack, const char *needle, bool case_sensitive) {
     if(case_sensitive)
         return strstr(haystack, needle);
 
@@ -216,7 +216,7 @@ static char *sp_strstr(const char *haystack, const char *needle, bool case_sensi
 
 ALWAYS_INLINE
 static bool match_pattern(struct simple_pattern *m, const char *str, size_t len, char *wildcarded, size_t *wildcarded_size) {
-    char *s;
+    const char *s;
 
     bool loop = true;
     while(loop && m->len <= len) {
