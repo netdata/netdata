@@ -204,6 +204,7 @@ func (e *Engine) commitAttempt(
 		transition.install(&e.state)
 	}
 	e.state.materialized = materialized
+	journal.compactAfterCommit(&e.state.materialized)
 	e.state.commitSeq++
 	e.state.outstanding = 0
 	return nil

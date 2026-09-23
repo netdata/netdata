@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"math/rand/v2"
+	"reflect"
 	"slices"
 	"testing"
 	"unsafe"
@@ -325,4 +326,87 @@ func TestPlanJournalCommittedChartUndoesThisBuild(t *testing.T) {
 	assert.Same(t, d1, committed.dimensions["d1"])
 	assert.Equal(t, "A2", chart.meta.Title)
 	assert.Equal(t, []string{"d2", "d3"}, slices.Sorted(maps.Keys(chart.dimensions)))
+}
+
+const cardinalitySpikeTemplateYAML = `
+version: v1
+groups:
+  - family: Spike
+    metrics:
+      - svc.m
+    charts:
+      - id: per_id
+        title: Per id
+        context: per_id
+        units: x
+        instances:
+          by_labels: [id]
+        lifecycle:
+          expire_after_cycles: 1
+        dimensions:
+          - selector: svc.m
+            name: value
+      - id: fanout
+        title: Fanout
+        context: fanout
+        units: x
+        lifecycle:
+          dimensions:
+            expire_after_cycles: 1
+        dimensions:
+          - selector: svc.m
+            name_from_label: id
+`
+
+// TestMaterializedMapsFollowCardinalityDown checks that once a cardinality spike expires, the
+// committed chart, dimension and scratch maps are rebuilt at their live size. Staging edits the
+// committed maps in place and Go maps keep their capacity after deletions, so without rebuilds
+// an engine would hold its peak capacity for its lifetime.
+func TestMaterializedMapsFollowCardinalityDown(t *testing.T) {
+	const peak, low = 1000, 10
+	engine, err := New(WithRuntimeStore(nil))
+	require.NoError(t, err)
+	require.NoError(t, engine.LoadYAML([]byte(cardinalitySpikeTemplateYAML), 1))
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	vec := store.Write().SnapshotMeter("svc").Vec("id").Gauge("m")
+	cycle := func(n int) {
+		cc.BeginCycle()
+		for i := range n {
+			vec.WithLabelValues(fmt.Sprint(i)).Observe(1)
+		}
+		require.NoError(t, cc.CommitCycleSuccess())
+		_, err := prepareAndCommitPlan(engine, store.Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+		require.NoError(t, err)
+	}
+	fanoutChart := func() *materializedChartState {
+		for _, chart := range engine.state.materialized.charts {
+			if len(chart.scratchEntries) > 0 && chart.lifecycle.Dimensions.ExpireAfterCycles > 0 {
+				return chart
+			}
+		}
+		t.Fatal("fanout chart not materialized")
+		return nil
+	}
+	mapID := func(m any) unsafe.Pointer { return reflect.ValueOf(m).UnsafePointer() }
+
+	cycle(peak)
+	state := &engine.state.materialized
+	fanout := fanoutChart()
+	require.Len(t, state.charts, peak+1)
+	require.Len(t, fanout.dimensions, peak)
+	peakCharts, peakDims, peakScratch := mapID(state.charts), mapID(fanout.dimensions), mapID(fanout.scratchEntries)
+
+	for range 5 {
+		cycle(low)
+	}
+	require.Len(t, state.charts, low+1)
+	require.Same(t, fanout, fanoutChart())
+	require.Len(t, fanout.dimensions, low)
+	assert.NotEqual(t, peakCharts, mapID(state.charts), "chart map kept its peak capacity")
+	assert.NotEqual(t, peakDims, mapID(fanout.dimensions), "dimension map kept its peak capacity")
+	assert.NotEqual(t, peakScratch, mapID(fanout.scratchEntries), "scratch map kept its peak capacity")
+	assert.Less(t, state.chartDeletes, compactMinDeletes)
+	assert.Less(t, int(fanout.dimDeletes), compactMinDeletes)
+	assert.Less(t, int(fanout.scratchDeletes), compactMinDeletes)
 }

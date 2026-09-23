@@ -336,7 +336,7 @@ func enforceDimensionCapsWithObserver(
 						DimensionName:   name,
 					})
 				}
-				j.deleteEntry(cs.entries, name)
+				j.deleteEntry(cs.entriesOwner, cs.entries, name)
 				cs.observedCount--
 				overflow--
 			}

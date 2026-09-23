@@ -22,19 +22,23 @@ type planJournal struct {
 	seqs      []seqUndo
 }
 
+// Map records mark deletions (del) so a commit can count them per map.
 type chartMapUndo struct {
 	m   map[string]*materializedChartState
 	id  string
 	old *materializedChartState
 	had bool
+	del bool
 }
 
-// dimMapUndo keys on the owning chart: a chart's dimension map is never replaced.
+// dimMapUndo keys on the owning chart: a chart's dimension map is never replaced
+// during a build.
 type dimMapUndo struct {
 	chart *materializedChartState
 	name  string
 	old   *materializedDimensionState
 	had   bool
+	del   bool
 }
 
 type entryMapUndo struct {
@@ -42,6 +46,9 @@ type entryMapUndo struct {
 	name string
 	old  *dimBuildEntry
 	had  bool
+	del  bool
+	// owner is the chart whose scratch map m is, if any.
+	owner *materializedChartState
 }
 
 type chartUndo struct {
@@ -159,7 +166,13 @@ func (j *planJournal) deleteChart(m map[string]*materializedChartState, id strin
 		return
 	}
 	if j != nil {
-		j.chartMaps = append(j.chartMaps, chartMapUndo{m: m, id: id, old: old, had: true})
+		j.chartMaps = append(j.chartMaps, chartMapUndo{
+			m:   m,
+			id:  id,
+			old: old,
+			had: true,
+			del: true,
+		})
 	}
 	delete(m, id)
 }
@@ -179,7 +192,13 @@ func (j *planJournal) deleteDim(chart *materializedChartState, name string) {
 		return
 	}
 	if j != nil {
-		j.dimMaps = append(j.dimMaps, dimMapUndo{chart: chart, name: name, old: old, had: true})
+		j.dimMaps = append(j.dimMaps, dimMapUndo{
+			chart: chart,
+			name:  name,
+			old:   old,
+			had:   true,
+			del:   true,
+		})
 	}
 	delete(chart.dimensions, name)
 }
@@ -193,15 +212,77 @@ func (j *planJournal) putEntry(m map[string]*dimBuildEntry, name string, entry *
 	m[name] = entry
 }
 
-func (j *planJournal) deleteEntry(m map[string]*dimBuildEntry, name string) {
+func (j *planJournal) deleteEntry(owner *materializedChartState, m map[string]*dimBuildEntry, name string) {
 	old, had := m[name]
 	if !had {
 		return
 	}
 	if j != nil {
-		j.entryMaps = append(j.entryMaps, entryMapUndo{m: m, name: name, old: old, had: true})
+		j.entryMaps = append(j.entryMaps, entryMapUndo{
+			m:     m,
+			name:  name,
+			old:   old,
+			had:   true,
+			del:   true,
+			owner: owner,
+		})
 	}
 	delete(m, name)
+}
+
+// compactMinDeletes is how many deletions a materialized map absorbs before it can be
+// rebuilt, so small or slowly churning maps are left alone.
+const compactMinDeletes = 64
+
+// compactAfterCommit runs once this build is committed and can no longer roll back.
+// Go maps keep their capacity after deletions and staging reuses the committed maps,
+// so a map whose deletions since its last rebuild exceed its live size is rebuilt at
+// its live size: capacity follows live cardinality within a constant factor. Work is
+// O(journal) plus amortized O(1) per deletion.
+func (j *planJournal) compactAfterCommit(state *materializedState) {
+	for _, rec := range j.chartMaps {
+		if rec.del {
+			state.chartDeletes++
+		}
+	}
+	if needsCompaction(len(state.charts), state.chartDeletes) {
+		state.charts = rebuildMap(state.charts)
+		state.chartDeletes = 0
+	}
+	for _, rec := range j.dimMaps {
+		if rec.del {
+			rec.chart.dimDeletes++
+		}
+	}
+	for _, rec := range j.dimMaps {
+		if c := rec.chart; rec.del && needsCompaction(len(c.dimensions), int(c.dimDeletes)) {
+			c.dimensions = rebuildMap(c.dimensions)
+			c.dimDeletes = 0
+		}
+	}
+	for _, rec := range j.entryMaps {
+		if rec.del && rec.owner != nil {
+			rec.owner.scratchDeletes++
+		}
+	}
+	for _, rec := range j.entryMaps {
+		if c := rec.owner; rec.del && c != nil && needsCompaction(len(c.scratchEntries), int(c.scratchDeletes)) {
+			c.scratchEntries = rebuildMap(c.scratchEntries)
+			c.scratchDeletes = 0
+		}
+	}
+}
+
+func needsCompaction(live, deletes int) bool {
+	return deletes >= compactMinDeletes && deletes > live
+}
+
+func rebuildMap[V any](m map[string]V) map[string]V {
+	out := make(map[string]V, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
 }
 
 // committedChart returns the committed definition of a chart this build may already

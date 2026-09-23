@@ -424,7 +424,7 @@ once per cycle; when the store implements `metrix.RuntimeBatchWriter`, a flush p
 | Engine state       | Serialized under `Engine.mu` for load/build transitions                                                                                     |
 | Route cache        | Series identity + revision keyed authored/autogen discovery; autogen validates current metadata and kinds; retained by successful sequence, pruned on each build                                               |
 | Materialized state | Tracks existing chart/dimension instances for incremental create/update/remove decisions; persists across cycles; direct Load resets it, active sets preserve unchanged entries |
-| Attempt staging    | A build stages lifecycle changes in the materialized state in place and records the committed values it overwrites in the attempt's journal; Commit keeps the changes, Abort (or a failed build) replays the journal, so later plans only ever start from committed state |
+| Attempt staging    | A build stages lifecycle changes in the materialized state in place and records the committed values it overwrites in the attempt's journal; Commit keeps the changes, Abort (or a failed build) replays the journal, so later plans only ever start from committed state. After a commit, a chart, dimension or scratch map whose deletions since its last rebuild exceed its live size is rebuilt, so capacity follows live cardinality after a spike |
 | Determinism        | Sorted chart IDs and inferred dimensions provide stable action ordering                                                                     |
 
 ## Performance Validation

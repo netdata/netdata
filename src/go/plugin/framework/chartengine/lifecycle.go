@@ -9,6 +9,8 @@ import (
 // materializedState tracks engine-owned chart lifecycle across successful cycles.
 type materializedState struct {
 	charts map[string]*materializedChartState
+	// chartDeletes counts deletions from charts since the map was last rebuilt.
+	chartDeletes int
 }
 
 // materializedChartState tracks one materialized chart instance.
@@ -24,6 +26,10 @@ type materializedChartState struct {
 	scratchEntries     map[string]*dimBuildEntry
 	// journalToken marks the build that created or already recorded this chart.
 	journalToken uint64
+	// dimDeletes and scratchDeletes count deletions from dimensions and scratchEntries
+	// since each map was last rebuilt.
+	dimDeletes     int32
+	scratchDeletes int32
 }
 
 // materializedChartPresentation uses copy-on-write for ordered dimensions,
@@ -175,7 +181,7 @@ func (c *materializedChartState) pruneScratchEntries(j *planJournal, currentSeq 
 	}
 	for name, entry := range c.scratchEntries {
 		if entry == nil {
-			j.deleteEntry(c.scratchEntries, name)
+			j.deleteEntry(c, c.scratchEntries, name)
 			continue
 		}
 		if entry.seenSeq == currentSeq {
@@ -184,7 +190,7 @@ func (c *materializedChartState) pruneScratchEntries(j *planJournal, currentSeq 
 		if _, keep := c.dimensions[name]; keep {
 			continue
 		}
-		j.deleteEntry(c.scratchEntries, name)
+		j.deleteEntry(c, c.scratchEntries, name)
 	}
 }
 
