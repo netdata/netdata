@@ -200,7 +200,7 @@ bool rrdmetric_update_retention(RRDMETRIC *rm) {
         min_first_time_t = 0;
 
     if(min_first_time_t > max_last_time_t) {
-        internal_error(true, "RRDMETRIC: retention of '%s' is flipped, first_time_t = %ld, last_time_t = %ld", string2str(rm->id), min_first_time_t, max_last_time_t);
+        internal_error(true, "RRDMETRIC: retention of '%s' is flipped, first_time_t = %" PRId64 ", last_time_t = %" PRId64, string2str(rm->id), (int64_t)min_first_time_t, (int64_t)max_last_time_t);
         SWAP(min_first_time_t, max_last_time_t);
     }
 
@@ -955,7 +955,7 @@ bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_
     if(unlikely(id_changed || title_changed || units_changed || family_changed || chart_type_changed || priority_changed || first_time_changed || last_time_changed || deleted_changed)) {
 
         internal_error(LOG_TRANSITIONS,
-                       "RRDCONTEXT: %s NEW VERSION '%s'%s of host '%s', version %"PRIu64", title '%s'%s, units '%s'%s, family '%s'%s, chart type '%s'%s, priority %u%s, first_time_t %ld%s, last_time_t %ld%s, deleted '%s'%s, (queued for %llu ms, expected %llu ms)",
+                       "RRDCONTEXT: %s NEW VERSION '%s'%s of host '%s', version %"PRIu64", title '%s'%s, units '%s'%s, family '%s'%s, chart type '%s'%s, priority %u%s, first_time_t %" PRId64 "%s, last_time_t %" PRId64 "%s, deleted '%s'%s, (queued for %llu ms, expected %llu ms)",
                        sending?"SENDING":"QUEUE",
                        string2str(rc->id), id_changed ? " (CHANGED)" : "",
                        rrdhost_hostname(rc->rrdhost),
@@ -965,8 +965,8 @@ bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_
                        string2str(rc->family), family_changed ? " (CHANGED)" : "",
                        rrdset_type_name(rc->chart_type), chart_type_changed ? " (CHANGED)" : "",
                        rc->priority, priority_changed ? " (CHANGED)" : "",
-                       rc->first_time_s, first_time_changed ? " (CHANGED)" : "",
-                       (flags & RRD_FLAG_COLLECTED) ? 0 : rc->last_time_s, last_time_changed ? " (CHANGED)" : "",
+                       (int64_t)rc->first_time_s, first_time_changed ? " (CHANGED)" : "",
+                       (int64_t)((flags & RRD_FLAG_COLLECTED) ? 0 : rc->last_time_s), last_time_changed ? " (CHANGED)" : "",
                        (flags & RRD_FLAG_DELETED) ? "true" : "false", deleted_changed ? " (CHANGED)" : "",
                        sending ? (now_realtime_usec() - rc->queue.queued_ut) / USEC_PER_MS : 0,
                        sending ? (rc->queue.scheduled_dispatch_ut - rc->queue.queued_ut) / USEC_PER_MS : 0

@@ -154,15 +154,15 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
         internal_error(
                 (!st->replay.start_streaming && (end_time < st->replay.after || start_time > st->replay.before)),
-                "REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %ld to %ld, which does not match our request (%ld to %ld).",
-                rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time, st->replay.after, st->replay.before);
+                "REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %" PRId64 " to %" PRId64 ", which does not match our request (%" PRId64 " to %" PRId64 ").",
+                rrdhost_hostname(st->rrdhost), rrdset_id(st), (int64_t)start_time, (int64_t)end_time, (int64_t)st->replay.after, (int64_t)st->replay.before);
 
         internal_error(
                 true,
-                "REPLAY: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %ld to %ld, child wall clock is %ld (%s), had requested %ld to %ld",
+                "REPLAY: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %" PRId64 " to %" PRId64 ", child wall clock is %" PRId64 " (%s), had requested %" PRId64 " to %" PRId64,
                 rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                start_time, end_time, wall_clock_time, wall_clock_comes_from_child ? "from child" : "parent time",
-                st->replay.after, st->replay.before);
+                (int64_t)start_time, (int64_t)end_time, (int64_t)wall_clock_time, wall_clock_comes_from_child ? "from child" : "parent time",
+                (int64_t)st->replay.after, (int64_t)st->replay.before);
 #endif
 
         if(start_time && end_time && start_time < wall_clock_time + tolerance && end_time < wall_clock_time + tolerance && start_time < end_time) {
@@ -195,11 +195,11 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN
-               " from %ld to %ld, but timestamps are invalid "
-               "(now is %ld [%s], tolerance %ld). Ignoring " PLUGINSD_KEYWORD_REPLAY_SET,
-               rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time,
-               wall_clock_time, wall_clock_comes_from_child ? "child wall clock" : "parent wall clock",
-               tolerance);
+               " from %" PRId64 " to %" PRId64 ", but timestamps are invalid "
+               "(now is %" PRId64 " [%s], tolerance %" PRId64 "). Ignoring " PLUGINSD_KEYWORD_REPLAY_SET,
+               rrdhost_hostname(st->rrdhost), rrdset_id(st), (int64_t)start_time, (int64_t)end_time,
+               (int64_t)wall_clock_time, wall_clock_comes_from_child ? "child wall clock" : "parent wall clock",
+               (int64_t)tolerance);
     }
 
     // the child sends an RBEGIN without any parameters initially
@@ -248,9 +248,9 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARS
         
         nd_log(NDLS_DAEMON, NDLP_ERR, 
             "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s/dim:%s' got a %s with "
-            "invalid timestamps %ld to %ld from a %s. Disabling it.",
+            "invalid timestamps %" PRId64 " to %" PRId64 " from a %s. Disabling it.",
             rrdhost_hostname(host), rrdset_id(st), dimension, PLUGINSD_KEYWORD_REPLAY_SET,
-            parser->user.replay.start_time, parser->user.replay.end_time, PLUGINSD_KEYWORD_REPLAY_BEGIN);
+            (int64_t)parser->user.replay.start_time, (int64_t)parser->user.replay.end_time, PLUGINSD_KEYWORD_REPLAY_BEGIN);
         
         return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
     }

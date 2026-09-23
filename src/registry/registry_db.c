@@ -191,8 +191,8 @@ int registry_db_save(void) {
                                      3600; // Cap at 1 hour
         
         if((now - registry.last_save_failure) < backoff_seconds) {
-            netdata_log_debug(D_REGISTRY, "REGISTRY: skipping save due to backoff (failed %d times, waiting %ld seconds)", 
-                             registry.consecutive_save_failures, backoff_seconds);
+            netdata_log_debug(D_REGISTRY, "REGISTRY: skipping save due to backoff (failed %d times, waiting %" PRId64 " seconds)", 
+                             registry.consecutive_save_failures, (int64_t)backoff_seconds);
             return -3;
         }
     }

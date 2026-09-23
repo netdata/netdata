@@ -356,7 +356,7 @@ void mongodb_connector_worker(void *instance_p)
                 netdata_log_error(
                     "EXPORTING: failed to write data to the database '%s'. "
                     "Willing to write %zu bytes, wrote %zu bytes.",
-                    instance->config.destination, data_size, 0UL);
+                    instance->config.destination, data_size, (size_t)0);
 
                 stats->transmission_failures++;
                 stats->data_lost_events++;

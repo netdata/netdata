@@ -141,7 +141,7 @@ static inline void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const cha
     uuid_unparse_lower(uuid, uuid_txt);
     nd_log(NDLS_DAEMON, NDLP_ERR,
            "METRIC: %s on %s at tier %d, refcount %d, partition %u, "
-           "retention [%ld - %ld (hot), %ld (clean)], update every %"PRIu32
+           "retention [%" PRId64 " - %" PRId64 " (hot), %" PRId64 " (clean)], update every %"PRIu32
 #ifdef NETDATA_INTERNAL_CHECKS
            ", writer pid %d "
 #endif
@@ -151,9 +151,9 @@ static inline void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const cha
            ctx->config.tier,
            metric->refcount,
            metric->partition,
-           metric->first_time_s,
-           metric->latest_time_s_hot,
-           metric->latest_time_s_clean,
+           (int64_t)metric->first_time_s,
+           (int64_t)metric->latest_time_s_hot,
+           (int64_t)metric->latest_time_s_clean,
            metric->latest_update_every_s
 #ifdef NETDATA_INTERNAL_CHECKS
            , (int)metric->writer
