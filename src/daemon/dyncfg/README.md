@@ -115,8 +115,14 @@ When implementing a callback function, always return the appropriate response co
 
 For `add`, `update`, `enable`, `disable` and `remove`, the response code is the adoption decision: DynCfg saves the
 change only on a 2xx response and replays saved configurations when the plugin starts. A 2xx MUST mean the plugin now
-holds the requested configuration, and any other code MUST mean nothing changed. Report the health of an adopted
-configuration, such as a job that failed to start, through its status, not the response code.
+holds the requested configuration. A completed plugin rejection MUST preserve the previous configuration and enabled
+intent. Report the health of an adopted configuration, such as a job that failed to start, through its status, not the
+response code.
+
+Timeouts, lost replies, crashes, and structural failures after a transition can leave the outcome indeterminate.
+An error on those paths does not prove rejection. The daemon persists the successful reply it observes; a plugin
+`get` result is not evidence of daemon persistence. See [the plugin protocol](../../plugins.d/DYNCFG.md#3-process-commands-and-respond)
+for the mutation response contract.
 
 ### Source Types
 

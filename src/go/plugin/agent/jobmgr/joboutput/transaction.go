@@ -422,8 +422,11 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 			return lifecycle.AppliedResourceTransaction{},
 				errors.New("job output: accepted transaction successor is nil")
 		}
-		if err := current.Publish(); err != nil {
-			return lifecycle.AppliedResourceTransaction{}, err
+		generation, starting := current.(*JobGeneration)
+		if !starting || generation.State() != JobActivating {
+			if err := current.Publish(); err != nil {
+				return lifecycle.AppliedResourceTransaction{}, err
+			}
 		}
 		if pendingInstallation != nil {
 			if err := pendingInstallation.reserveInstallation(); err != nil {

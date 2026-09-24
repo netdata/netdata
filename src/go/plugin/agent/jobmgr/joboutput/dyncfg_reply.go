@@ -195,9 +195,13 @@ func (r jobReply) seal(outcome transactionOutcome) lifecycle.SealedResult {
 // adoptedResult answers a command whose requested state the job graph holds.
 // Persisted commands answer 2xx: 200 for running, disabled and removed jobs,
 // 202 for accepted and failed ones. restart is not persisted and answers 200
-// only when the restarted job runs.
+// only when the restarted job runs. Accepted is internal admission state; the
+// outer restart handler waits for its exact activation before answering.
 func adoptedResult(command dyncfg.Command, status dyncfg.Status, failure jobFailure) lifecycle.SealedResult {
 	if command == dyncfg.CommandRestart {
+		if status == dyncfg.StatusAccepted {
+			return noResponseResult()
+		}
 		if status == dyncfg.StatusRunning {
 			return messageResult(200, "")
 		}

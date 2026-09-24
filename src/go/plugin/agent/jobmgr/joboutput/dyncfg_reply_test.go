@@ -4,7 +4,6 @@ package joboutput
 
 import (
 	"context"
-	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -18,7 +17,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -60,78 +58,22 @@ func TestDynCfgJobResultsHaveOneOwner(t *testing.T) {
 	}
 }
 
-func TestSupersedeWithinRequestBoundsTheWait(t *testing.T) {
-	identity := jobAttemptIdentity(jobmgr.ProcessAttemptJobRuntime, "module_job")
-	cancelled, cancel := context.WithCancel(context.Background())
-	cancel()
-	tests := map[string]struct {
-		ctx          context.Context
-		candidateCtx context.Context
-		wantErr      error
-		wantDeadline bool
-	}{
-		"request deadline turns a slow release into busy": {
-			ctx:          lifecycle.WithApplyDeadline(context.Background(), time.Now().Add(10*time.Millisecond)),
-			candidateCtx: context.Background(),
-			wantErr:      jobmgr.ErrProcessAttemptBusy,
-			wantDeadline: true,
-		},
-		"a cut candidate keeps its cause": {
-			ctx:          lifecycle.WithApplyDeadline(context.Background(), time.Now().Add(time.Hour)),
-			candidateCtx: cancelled,
-			wantErr:      context.Canceled,
-			wantDeadline: true,
-		},
-		"work without a request waits for the supersession grace": {
-			ctx:          context.Background(),
-			candidateCtx: cancelled,
-			wantErr:      context.Canceled,
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			authority := &blockingSupersessionAuthority{}
-			err := supersedeWithinRequest(test.ctx, test.candidateCtx, authority, identity)
-			require.ErrorIs(t, err, test.wantErr)
-			if errors.Is(test.wantErr, jobmgr.ErrProcessAttemptBusy) {
-				require.NotErrorIs(t, err, context.DeadlineExceeded)
-			}
-			assert.Equal(t, test.wantDeadline, authority.hadDeadline)
-		})
-	}
-}
-
-// blockingSupersessionAuthority never sees the previous runtime release.
-type blockingSupersessionAuthority struct {
-	jobmgr.ProcessAttemptAuthority
-	hadDeadline bool
-}
-
-func (a *blockingSupersessionAuthority) SupersedeProcessAttempt(
-	ctx context.Context,
-	_ jobmgr.ProcessAttemptIdentity,
-) error {
-	_, a.hadDeadline = ctx.Deadline()
-	<-ctx.Done()
-	return ctx.Err()
-}
-
 func TestAdoptedUpdateWithBusyRuntimeStartsOnceTheRuntimeReleases(t *testing.T) {
 	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
 	useV2CheckFailureCollector(controller, state, nil)
-	commands := &autoDetectionRetryTestCommands{}
+	commands := &activationTestCommands{queue: make(chan activationTestSubmission, 8), stop: make(chan struct{})}
 	require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(err error) {
 		t.Errorf("background worker failed: %v", err)
 	}))
 	t.Cleanup(func() {
+		close(commands.stop)
 		controller.scheduler.StopBackgroundWorkers()
 		require.NoError(t, controller.scheduler.WaitBackgroundWorkers(context.Background()))
 	})
-	attempts := controller.factory.config.Attempts
-	controller.factory.config.Attempts = attemptFailureTestAuthority{
-		delegate:  attempts,
-		namespace: jobmgr.ProcessAttemptJobRuntime,
-		err:       jobmgr.ErrProcessAttemptBusy,
+	release := make(chan struct{})
+	controller.factory.config.Attempts = releaseBusyRuntimeAuthority{
+		ProcessAttemptAuthority: controller.factory.config.Attempts,
+		release:                 release,
 	}
 
 	config := factoryTestConfig(false)
@@ -180,29 +122,16 @@ func TestAdoptedUpdateWithBusyRuntimeStartsOnceTheRuntimeReleases(t *testing.T) 
 	require.Equal(t, 202, applied.ResultStatus())
 	record, exists = graph.Lookup(config.FullName())
 	require.True(t, exists)
-	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+	require.Equal(t, dyncfg.StatusAccepted.String(), record.Status)
 
-	// The previous runtime is already gone, so the pending start is submitted
-	// at once; it reconciles the adopted config on the job's lane.
-	commands.waitForSubmissions(t, 1)
-	submitted, plans, _ := commands.snapshot()
-	require.Equal(t, "internal/jobs/pending", submitted[0].Route)
-	require.Equal(t, config.FullName(), submitted[0].LaneKey)
-
-	// Once the identity is free, the pending start installs the adopted config.
-	controller.factory.config.Attempts = attempts
-	pendingScope := lifecycle.ResourceTransactionScope{
-		ID:        config.FullName(),
-		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 3},
-	}
-	pendingPermit, _ := issueTestJobPermit(t, config.FullName(), 3)
-	pending, err := plans[0].Transaction.Prepare(context.Background(), nil, pendingScope, pendingPermit)
-	require.NoError(t, err)
-	started, err := pending.Apply(context.Background())
-	require.NoError(t, err)
-	_, _, running := started.Ownership()
+	// The release signal admits one staged attempt under the accepted config.
+	close(release)
+	call := commands.next(t, "internal/jobs/accepted-activation")
+	require.Equal(t, config.FullName(), call.request.LaneKey)
+	running := applyActivationTestSubmission(t, call, nil, 3)
 	t.Cleanup(func() { stopRuntimeTestResource(t, running) })
 	require.NotNil(t, running)
+	running = applyActivationTestSubmission(t, commands.next(t, "internal/jobs/runtime-ready"), running, 0)
 	record, exists = graph.Lookup(config.FullName())
 	require.True(t, exists)
 	require.Equal(t, dyncfg.StatusRunning.String(), record.Status)
@@ -301,13 +230,13 @@ func TestAdoptedUpdateAnswersWithinTheRequestDeadline(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// The previous runtime never releases; only the request deadline ends the wait.
+	// A busy previous runtime must not keep acceptance waiting for its deadline.
 	applyAndEncodeDynCfgJobTestTask(t, supervisor, plan, scope, "update-within-deadline")
-	require.Less(t, time.Since(deadline), time.Second)
+	require.True(t, time.Now().Before(deadline), "acceptance must finish before the request deadline")
 	require.Contains(t, output.String(), "FUNCTION_RESULT_BEGIN update-within-deadline 202 application/json")
 	record, exists := graph.Lookup(config.FullName())
 	require.True(t, exists)
-	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+	require.Equal(t, dyncfg.StatusAccepted.String(), record.Status)
 }
 
 // blockingRuntimeTestAuthority keeps the job runtime identity busy and never
@@ -345,4 +274,31 @@ func (a blockingRuntimeTestAuthority) ProcessAttemptReleased(
 	identity jobmgr.ProcessAttemptIdentity,
 ) (<-chan struct{}, bool) {
 	return a.delegate.ProcessAttemptReleased(identity)
+}
+
+// The same authority owns the busy interval and its physical-release signal.
+type releaseBusyRuntimeAuthority struct {
+	jobmgr.ProcessAttemptAuthority
+	release <-chan struct{}
+}
+
+func (a releaseBusyRuntimeAuthority) StartProcessAttempt(ctx context.Context, plan jobmgr.ProcessAttemptPlan) (jobmgr.ProcessAttempt, error) {
+	if plan.Identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
+		select {
+		case <-a.release:
+		default:
+			return nil, jobmgr.ErrProcessAttemptBusy
+		}
+	}
+	return a.ProcessAttemptAuthority.StartProcessAttempt(ctx, plan)
+}
+func (a releaseBusyRuntimeAuthority) ProcessAttemptReleased(identity jobmgr.ProcessAttemptIdentity) (<-chan struct{}, bool) {
+	if identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
+		select {
+		case <-a.release:
+		default:
+			return a.release, true
+		}
+	}
+	return a.ProcessAttemptAuthority.ProcessAttemptReleased(identity)
 }

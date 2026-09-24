@@ -9,6 +9,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
@@ -67,6 +68,9 @@ func redactResolvedLifecycleError(err error) error {
 	}
 	var resolveErr *secretresolver.AtomicResolveError
 	if errors.As(err, &resolveErr) {
+		if resolveErr.Kind == secretresolver.AtomicErrorScope && errors.Is(err, secretstore.ErrStoreNotFound) {
+			safe = errors.Join(safe, secretstore.ErrStoreNotFound)
+		}
 		safe = &secretresolver.AtomicResolveError{Kind: resolveErr.Kind, Cause: safe}
 	}
 	switch collectorapi.ClassifyLifecycleError(err) {

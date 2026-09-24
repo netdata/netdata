@@ -83,6 +83,7 @@ func TestProcessOwnedJobRetirementDoesNotWaitForPhysicalStop(t *testing.T) {
 		processOwner: owner,
 	}
 	require.NoError(t, generation.Start(context.Background()))
+	require.NoError(t, generation.AwaitReady(t.Context()))
 	require.NoError(t, generation.Publish())
 	require.NoError(t, generation.reserveInstallation())
 	require.NoError(t, generation.acknowledgeInstallation())

@@ -50,19 +50,21 @@ type JobDependencyIndex interface {
 // DynCfgJobController prepares collector configuration graph/resource
 // transactions. CommandKernel remains the only current-job authority.
 type DynCfgJobController struct {
-	generation    uint64                    // owning run generation
-	pluginName    string                    // owning plugin
-	prefix        string                    // "<plugin>:collector:" ID prefix
-	path          string                    // "/collectors/<plugin>/jobs" config path
-	modules       collectorapi.Registry     // collector registry
-	defaults      confgroup.Registry        // per-module config defaults
-	factory       *Factory                  // job construction factory
-	configModules *ConfigModuleFactory      // short-lived config-probe factory
-	graph         *dyncfg.Graph             // dyncfg graph authority
-	frames        *lifecycle.FrameOwner     // protocol frame sink
-	dependencies  JobDependencyIndex        // secret-dependency index (optional)
-	diagnostics   jobmgr.DiagnosticObserver // operational log sink
-	scheduler     *Scheduler                // tick + retry scheduler
+	generation       uint64                    // owning run generation
+	pluginName       string                    // owning plugin
+	prefix           string                    // "<plugin>:collector:" ID prefix
+	path             string                    // "/collectors/<plugin>/jobs" config path
+	modules          collectorapi.Registry     // collector registry
+	defaults         confgroup.Registry        // per-module config defaults
+	factory          *Factory                  // job construction factory
+	configModules    *ConfigModuleFactory      // short-lived config-probe factory
+	graph            *dyncfg.Graph             // dyncfg graph authority
+	frames           *lifecycle.FrameOwner     // protocol frame sink
+	dependencies     JobDependencyIndex        // secret-dependency index (optional)
+	diagnostics      jobmgr.DiagnosticObserver // operational log sink
+	commands         jobmgr.PreparedCommandPort
+	restartObservers restartObservers
+	scheduler        *Scheduler // tick + retry scheduler
 }
 
 func NewDynCfgJobController(config DynCfgJobControllerConfig) (*DynCfgJobController, error) {
@@ -100,6 +102,7 @@ func (dcjc *DynCfgJobController) BindBackgroundWorkers(
 	if dcjc == nil || dcjc.scheduler == nil {
 		return errors.New("job output: invalid background worker controller")
 	}
+	dcjc.scheduler.accepted.retire = dcjc.retireActivationRestart
 	if err := dcjc.scheduler.accepted.bind(
 		dcjc.factory,
 		commands,
@@ -119,6 +122,7 @@ func (dcjc *DynCfgJobController) BindBackgroundWorkers(
 		dcjc.scheduler.accepted.stopWorker()
 		return err
 	}
+	dcjc.commands = commands
 	dcjc.bindRuntimeFailures(commands, run, failure)
 	return nil
 }
@@ -149,6 +153,8 @@ func (dcjc *DynCfgJobController) Handle(
 		return rejectedResult(failure.failure), nil
 	}
 	switch target.command {
+	case dyncfg.CommandRestart:
+		return dcjc.restart(ctx, request, target)
 	case dyncfg.CommandSchema:
 		if target.creator.JobConfigSchema == "" {
 			return rejectedResult(jobFailure{
@@ -322,7 +328,8 @@ func validateGraphResourcePair(
 		return nil
 	}
 	running := record.Status == dyncfg.StatusRunning.String()
-	if running != (current != nil) {
+	starting := record.Status == dyncfg.StatusAccepted.String()
+	if running && current == nil || current != nil && !running && !starting {
 		return errors.New("job output: DynCfg status differs from current-job slot")
 	}
 	return nil

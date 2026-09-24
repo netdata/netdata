@@ -11,6 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"gopkg.in/yaml.v2"
 )
 
 func (dcjc *DynCfgJobController) prepareMutation(
@@ -75,7 +76,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApply(
 	failures ...collectorapi.JobConfigFailure,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	jobConfig := preparedJobConfigLifecycleState(successor)
-	if len(failures) != 0 && postimage != nil && postimage.Status == dyncfg.StatusFailed.String() {
+	if len(failures) != 0 && postimage != nil && (postimage.Status == dyncfg.StatusFailed.String() || postimage.Status == dyncfg.StatusAccepted.String()) {
 		jobConfig.identity = dcjc.postimageJobConfigLifecycleGraphState(postimage).identity
 		jobConfig.failure = failures[0]
 	}
@@ -113,6 +114,17 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 	quarantinedFallback *ResourceActivationFallback,
 	startupFallback func(error) (*ResourceActivationFallback, error),
 ) (lifecycle.PreparedResourceTransaction, error) {
+	if successor != nil && postimage != nil && postimage.Status == dyncfg.StatusAccepted.String() {
+		var config confgroup.Config
+		if err := yaml.Unmarshal(postimage.Payload, &config); err != nil {
+			return nil, err
+		}
+		spec, err := newAcceptedActivationSpec(config)
+		if err != nil {
+			return nil, err
+		}
+		afterApply = composeAfterApply(afterApply, func() { dcjc.scheduler.accepted.trackInstalled(spec) })
+	}
 	jobConfigReconcile := dcjc.prepareJobConfigLifecycleReconcile(scope.ID, postimage, jobConfig)
 	afterApply = composeAfterApply(dcjc.retrySettlement(scope.ID, retry), afterApply)
 	acceptedAfterApply, err := dcjc.acceptedActivationAfterApply(scope.ID, postimage)
@@ -138,7 +150,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 	mutation, err := dcjc.graph.PrepareMutation([]dyncfg.GraphChange{{ID: scope.ID, Config: postimage}})
 	if errors.Is(err, dyncfg.ErrGraphNoChange) {
 		afterApply = composeAfterApply(afterApply, jobConfigReconcile)
-		if successor != nil {
+		if successor != nil || disposition == lifecycle.ResourceTransactionRemoved {
 			return dcjc.prepareResourceTransaction(
 				ResourceTransactionSpec{
 					Scope:                         scope,
@@ -334,6 +346,17 @@ func (dcjc *DynCfgJobController) retrySettlement(id string, token autoDetectionR
 func (dcjc *DynCfgJobController) prepareResourceTransaction(
 	spec ResourceTransactionSpec,
 ) (lifecycle.PreparedResourceTransaction, error) {
+	if spec.Current != nil && (spec.Disposition == lifecycle.ResourceTransactionRemoved || spec.Disposition == lifecycle.ResourceTransactionReplaced) {
+		identity := spec.Current.Identity()
+		retire := func() { dcjc.retireRestart(identity) }
+		spec.AfterApply = composeAfterApply(spec.AfterApply, retire)
+		if fallback := spec.ActivationBusyFallback; fallback != nil {
+			fallback.AfterApply = composeAfterApply(fallback.AfterApply, retire)
+		}
+		if fallback := spec.ActivationQuarantinedFallback; fallback != nil {
+			fallback.AfterApply = composeAfterApply(fallback.AfterApply, retire)
+		}
+	}
 	transaction, err := PrepareResourceTransaction(spec)
 	if err == nil {
 		return transaction, nil

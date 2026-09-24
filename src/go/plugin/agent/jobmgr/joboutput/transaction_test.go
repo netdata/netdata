@@ -622,6 +622,9 @@ func applyTargetRetirementTransaction(
 		processOwner: owner,
 	}
 	require.NoError(t, generation.Start(context.Background()))
+	// Exercise retirement during publication of an already-ready resource.
+	// Start only initiates activation; ordinary starting jobs publish later.
+	require.NoError(t, generation.AwaitReady(t.Context()))
 
 	graph, err := dyncfg.NewGraph(nil)
 	require.NoError(t, err)

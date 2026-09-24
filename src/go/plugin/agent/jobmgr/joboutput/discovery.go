@@ -18,24 +18,62 @@ import (
 const DynCfgJobGraphClaim = jobmgr.DynCfgJobGraphClaim
 
 type DiscoveredJobChange struct {
-	Config  confgroup.Config        // discovered job configuration
-	Status  dyncfg.Status           // target graph status (Accepted / Running)
-	Remove  bool                    // remove the job rather than install it
-	Restart bool                    // force a running job to re-prepare
-	retry   autoDetectionRetryToken // auto-detection retry token (zero = not a retry)
-	pending pendingJobToken         // latest-pending token (zero = ordinary change)
+	Config  confgroup.Config // discovered job configuration
+	Status  dyncfg.Status    // target graph status (Accepted / Running)
+	Remove  bool             // remove the job rather than install it
+	Restart bool             // force a running job to re-prepare
+	pending pendingJobToken  // latest-pending token (zero = ordinary change)
 }
 
 func (dcjc *DynCfgJobController) planAutoDetectionRetry(
 	config confgroup.Config,
 	token autoDetectionRetryToken,
 ) (jobmgr.WorkPlan, error) {
-	return dcjc.PlanDiscovered(DiscoveredJobChange{
-		Config:  config,
-		Status:  dyncfg.StatusRunning,
-		Restart: true,
-		retry:   token,
-	})
+	if dcjc == nil || config == nil {
+		return jobmgr.WorkPlan{}, errors.New("job output: invalid activation retry")
+	}
+	return jobmgr.WorkPlan{
+		Claims: []string{DynCfgJobGraphClaim}, NoResponse: true,
+		Transaction: &jobmgr.ResourceTransactionPlan{
+			ID: config.FullName(),
+			Prepare: func(_ context.Context, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {
+				settle := dcjc.retrySettlement(scope.ID, token)
+				record, exists := dcjc.graph.Lookup(scope.ID)
+				if !dcjc.scheduler.retries.isCurrent(scope.ID, token) || current != nil {
+					return dcjc.noopWithAfterApply(scope, current, permit, noResponseResult(), settle)
+				}
+				committed := config
+				if exists {
+					var err error
+					committed, err = graphRecordConfig(record)
+					if err != nil {
+						return nil, err
+					}
+					if record.Status != dyncfg.StatusFailed.String() || committed.UID() != token.uid {
+						return dcjc.noopWithAfterApply(scope, current, permit, noResponseResult(), settle)
+					}
+				} else if config.SourceType() != confgroup.TypeStock {
+					return dcjc.noopWithAfterApply(scope, current, permit, noResponseResult(), settle)
+				}
+				spec, err := newAcceptedActivationSpec(committed)
+				if err != nil {
+					return nil, err
+				}
+				payload, err := yaml.Marshal(committed)
+				if err != nil {
+					return nil, err
+				}
+				postimage := dyncfg.GraphConfig{ID: scope.ID, Module: committed.Module(), Name: committed.Name(), Status: dyncfg.StatusAccepted.String(), Payload: payload}
+				cleanup := dcjc.configStatusCleanup(scope.ID, dyncfg.StatusAccepted)
+				if !exists {
+					cleanup = dcjc.configCreateCleanup(postimage, committed.SourceType(), committed.Source(), dcjc.configType(dcjc.modules[committed.Module()]))
+				}
+				return dcjc.prepareMutationWithRetryAfterApply(scope, current, nil, permit, lifecycle.ResourceTransactionUnchanged,
+					&postimage, internalReply(), cleanup, token,
+					func() { dcjc.scheduler.accepted.arm(spec) })
+			},
+		},
+	}, nil
 }
 
 func (dcjc *DynCfgJobController) planPendingJob(
@@ -138,18 +176,12 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 	resultErr error,
 ) {
 	defer func() {
-		if resultErr != nil && change.retry.generation != 0 {
-			dcjc.scheduler.retries.cancelToken(scope.ID, change.retry)
-		}
 		if resultErr != nil && change.pending.version != 0 {
 			dcjc.scheduler.pending.settle(scope.ID, change.pending)
 		}
 	}()
 	pendingSettlement := dcjc.pendingSettlement(scope.ID, change.pending)
-	settlement := composeAfterApply(
-		dcjc.retrySettlement(scope.ID, change.retry),
-		pendingSettlement,
-	)
+	settlement := pendingSettlement
 	record, exists := dcjc.graph.Lookup(scope.ID)
 	if err := validateGraphResourcePair(record, exists, current, scope); err != nil {
 		return nil, err
@@ -160,33 +192,6 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		(!dcjc.scheduler.pending.isCurrent(scope.ID, change.pending) ||
 			change.pending.uid != change.Config.UID()) {
 		return dcjc.noopWithAfterApply(scope, current, permit, result, settlement)
-	}
-	// A child deadline can race with successful terminal settlement. Pending
-	// work retained after removal must not restart a job the child restored.
-	if change.pending.requireAbsent &&
-		(current != nil || !exists || record.Status != dyncfg.StatusFailed.String()) {
-		return dcjc.noopWithAfterApply(scope, current, permit, result, settlement)
-	}
-	if change.retry.generation != 0 {
-		currentToken := dcjc.scheduler.retries.isCurrent(scope.ID, change.retry)
-		validRecord := true
-		if exists {
-			config, err := graphRecordConfig(record)
-			validRecord = err == nil &&
-				record.Status == dyncfg.StatusFailed.String() &&
-				config.UID() == change.retry.uid
-		} else {
-			validRecord = change.Config.SourceType() == confgroup.TypeStock
-		}
-		if !currentToken || !validRecord {
-			return dcjc.noopWithAfterApply(
-				scope,
-				current,
-				permit,
-				result,
-				settlement,
-			)
-		}
 	}
 	var incumbent confgroup.Config
 	if exists {
@@ -209,6 +214,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		)
 	}
 	if change.Remove {
+		settlement = composeAfterApply(settlement, func() { dcjc.scheduler.retries.cancelConfig(scope.ID, change.Config.UID()) })
 		if !exists || incumbent.UID() != change.Config.UID() {
 			return dcjc.noopWithAfterApply(
 				scope,
@@ -230,7 +236,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			nil,
 			reply,
 			dcjc.configDeleteCleanup(dcjc.configID(change.Config.Module(), change.Config.Name())),
-			change.retry,
+			autoDetectionRetryToken{},
 			dcjc.pendingDesiredSettlement(change.Config, change.pending),
 		)
 	}
@@ -273,14 +279,16 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			&postimage,
 			reply,
 			cleanup,
-			change.retry,
+			autoDetectionRetryToken{},
 			dcjc.pendingDesiredSettlement(change.Config, change.pending),
 		)
 	}
 	if exists &&
-		record.Status == dyncfg.StatusRunning.String() &&
+		(record.Status == dyncfg.StatusRunning.String() || record.Status == dyncfg.StatusAccepted.String() && current != nil) &&
 		record.Payload() == string(payload) &&
 		!change.Restart {
+		postimage.Status = record.Status
+		cleanup = dcjc.configCreateCleanup(postimage, change.Config.SourceType(), change.Config.Source(), dcjc.configType(dcjc.modules[change.Config.Module()]))
 		return dcjc.noopWithAfterApply(
 			scope,
 			current,
@@ -302,6 +310,9 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 	if err := activation.err; err != nil {
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
+		}
+		if activationWaitsForDependency(change.Config, err) {
+			return dcjc.prepareDiscoveredActivationWait(change, current, scope, permit, postimage, pendingSettlement, err, 0)
 		}
 		switch activation.kind {
 		case activationFailureQuarantined, activationFailureProposal:
@@ -333,7 +344,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 					change.Config.Source(),
 					dcjc.configType(dcjc.modules[change.Config.Module()]),
 				),
-				change.retry,
+				autoDetectionRetryToken{},
 				pendingSettlement,
 				jobConfigFailure(err, "activation"),
 			)
@@ -359,33 +370,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		case activationFailureSuperseded:
 			return dcjc.noopWithAfterApply(scope, current, permit, result, settlement)
 		case activationFailureDeadline:
-			failedPostimage := postimage
-			failedPostimage.Status = dyncfg.StatusFailed.String()
-			return dcjc.prepareMutationWithRetryAfterApply(
-				scope,
-				current,
-				nil,
-				permit,
-				resourceRemovalDisposition(current),
-				&failedPostimage,
-				reply,
-				dcjc.configCreateCleanup(
-					failedPostimage,
-					change.Config.SourceType(),
-					change.Config.Source(),
-					dcjc.configType(dcjc.modules[change.Config.Module()]),
-				),
-				change.retry,
-				composeAfterApply(
-					pendingSettlement,
-					dcjc.retainAbsentPendingAfterApply(
-						change.Config,
-						jobmgr.ProcessAttemptJob,
-						change.Config.UID(),
-					),
-				),
-				jobConfigFailure(err, "activation"),
-			)
+			return dcjc.prepareDiscoveredActivationWait(change, current, scope, permit, postimage, pendingSettlement, err, jobmgr.ProcessAttemptJob)
 		case activationFailureTransient:
 			failedPostimage := postimage
 			failedPostimage.Status = dyncfg.StatusFailed.String()
@@ -404,7 +389,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 					change.Config.Source(),
 					dcjc.configType(dcjc.modules[change.Config.Module()]),
 				),
-				change.retry,
+				autoDetectionRetryToken{},
 				composeAfterApply(
 					pendingSettlement,
 					func() {
@@ -440,11 +425,14 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		removePlainStock: change.Config.SourceType() == confgroup.TypeStock,
 	}
 	if probeFailure != nil {
+		if activationWaitsForDependency(change.Config, probeFailure) {
+			return dcjc.prepareDiscoveredActivationWait(change, current, scope, permit, postimage, pendingSettlement, probeFailure, 0)
+		}
 		return dcjc.prepareProbeFailure(
 			scope,
 			current,
 			permit,
-			change.retry,
+			autoDetectionRetryToken{},
 			probeFailure,
 			failurePlan,
 		)
@@ -455,6 +443,12 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		change.Config.Source(),
 		dcjc.configType(dcjc.modules[change.Config.Module()]),
 	)
+	postimage.Status = dyncfg.StatusAccepted.String()
+	cleanup = dcjc.configCreateCleanup(postimage, change.Config.SourceType(), change.Config.Source(), dcjc.configType(dcjc.modules[change.Config.Module()]))
+	activate, err := dcjc.activateAfterRelease(change.Config, jobmgr.ProcessAttemptJobRuntime)
+	if err != nil {
+		return nil, err
+	}
 	return dcjc.prepareMutationWithActivationFallbacks(
 		scope,
 		current,
@@ -463,18 +457,14 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		&postimage,
 		reply,
 		cleanup,
-		change.retry,
+		autoDetectionRetryToken{},
 		dcjc.pendingDesiredSettlement(change.Config, change.pending),
 		activationFallbackPlan{
-			postimage: &failedPostimage,
-			cleanup:   failedCleanup,
+			postimage: &postimage,
+			cleanup:   cleanup,
 			afterApply: composeAfterApply(
 				settlement,
-				dcjc.retainAbsentPendingAfterApply(
-					change.Config,
-					jobmgr.ProcessAttemptJobRuntime,
-					change.Config.UID(),
-				),
+				activate,
 			),
 		},
 		activationFallbackPlan{
@@ -484,4 +474,29 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		},
 		failurePlan,
 	)
+}
+
+func (dcjc *DynCfgJobController) prepareDiscoveredActivationWait(
+	change DiscoveredJobChange,
+	current lifecycle.ReadyResource,
+	scope lifecycle.ResourceTransactionScope,
+	permit lifecycle.LongLivedPermit,
+	postimage dyncfg.GraphConfig,
+	settle func(),
+	cause error,
+	namespace jobmgr.ProcessAttemptNamespace,
+) (lifecycle.PreparedResourceTransaction, error) {
+	spec, err := newAcceptedActivationSpec(change.Config)
+	if err != nil {
+		return nil, err
+	}
+	activate := func() { dcjc.scheduler.accepted.arm(spec) }
+	if namespace != 0 {
+		activate = func() { dcjc.scheduler.accepted.armAfterRelease(spec, dcjc.activationRelease(scope.ID, namespace)) }
+	}
+	postimage.Status = dyncfg.StatusAccepted.String()
+	return dcjc.prepareMutationWithRetryAfterApply(scope, current, nil, permit,
+		resourceRemovalDisposition(current), &postimage, internalReply(),
+		dcjc.configCreateCleanup(postimage, change.Config.SourceType(), change.Config.Source(), dcjc.configType(dcjc.modules[change.Config.Module()])),
+		autoDetectionRetryToken{}, composeAfterApply(settle, activate), jobConfigFailure(cause, "activation"))
 }

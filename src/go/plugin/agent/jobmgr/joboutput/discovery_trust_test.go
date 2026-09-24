@@ -42,6 +42,7 @@ func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 			controller.modules["module"] = creator
 			dependencies := jobsecrets.NewSecretDependencyIndex()
 			controller.dependencies = dependencies
+			commands := runtimeTestNotifications(t, controller)
 			store := &factoryTestAtomicScope{value: "1s"}
 			store.current.Store(true)
 			var acquisitions int
@@ -74,6 +75,7 @@ func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 			_, disposition, current := applied.Ownership()
 			require.Equal(t, lifecycle.ResourceTransactionInstalled, disposition)
 			require.NotNil(t, current)
+			current = runtimeTestApplyNotification(t, runtimeTestNotificationPlan(t, commands, "internal/jobs/runtime-ready"), current)
 			t.Cleanup(func() {
 				if current != nil {
 					require.NoError(t, current.Stop(context.Background()))

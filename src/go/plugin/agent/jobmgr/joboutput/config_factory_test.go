@@ -111,7 +111,7 @@ func TestConfigModuleFactoryRedactsResolvedValuesFromDecodeErrors(t *testing.T) 
 	config := factoryTestConfig(false)
 	config["option_int"] = "${fixture:value}"
 
-	err = factory.Validate(context.Background(), config)
+	err = factory.Test(context.Background(), config)
 	require.Error(t, err)
 	require.NotContains(t, err.Error(), resolvedFixture)
 	require.True(t, strings.Contains(err.Error(), "resolved") && strings.Contains(err.Error(), "redacted"))
@@ -200,7 +200,11 @@ func TestConfigModuleFactorySecretReferenceSourcePolicy(t *testing.T) {
 					}
 					require.NoError(t, err)
 					require.Equal(t, test.value, config.Get("option_str"))
-					if test.resolve {
+					if operation == "validate" && test.resolve {
+						require.Empty(t, option())
+						require.Empty(t, providerCalls)
+						require.Zero(t, scopeCalls)
+					} else if test.resolve {
 						require.Equal(t, "env-resolved|file-resolved|cmd-resolved|store-resolved", option())
 						require.Equal(t, map[string]int{"env": 1, "file": 1, "cmd": 1}, providerCalls)
 						require.Equal(t, 1, scopeCalls)
@@ -307,7 +311,7 @@ func TestConfigModuleFactoryRedactsReferenceResolutionFailures(t *testing.T) {
 			config["option_str"] = test.reference
 			config["option_int"] = 1
 
-			err = factory.Validate(context.Background(), config)
+			err = factory.Test(context.Background(), config)
 			require.Error(t, err)
 			require.NotContains(t, err.Error(), resolverSensitive)
 			require.NotContains(t, err.Error(), cleanupSensitive)

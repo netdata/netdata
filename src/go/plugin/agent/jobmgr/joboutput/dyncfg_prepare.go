@@ -53,11 +53,7 @@ func (dcjc *DynCfgJobController) prepareAdd(
 		if !ok {
 			return nil, err
 		}
-		// A dependency that is not ready does not invalidate the payload: the
-		// job is accepted when its background activation retries the failure.
-		if rejection.class != failureTemporary || config.AutoDetectionRetry() <= 0 {
-			return dcjc.reject(scope, current, permit, rejection)
-		}
+		return dcjc.reject(scope, current, permit, rejection)
 	}
 	payload, err := yaml.Marshal(config)
 	if err != nil {
@@ -121,7 +117,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 		return dcjc.reject(scope, current, permit, failure.failure)
 	}
 	status := dyncfg.Status(record.Status)
-	if status == dyncfg.StatusAccepted {
+	if status == dyncfg.StatusAccepted && current == nil && !dcjc.scheduler.accepted.enabled(scope.ID) {
 		return dcjc.rejectKeeping(scope, current, permit, jobFailure{
 			class:   failureForbidden,
 			message: "updating is not allowed in 'accepted' state.",
@@ -163,11 +159,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			if !ok {
 				return nil, err
 			}
-			// A disabled job only stores the payload; a dependency that is not
-			// ready is the concern of a later enable.
-			if rejection.class != failureTemporary {
-				return dcjc.rejectKeeping(scope, current, permit, rejection, status)
-			}
+			return dcjc.rejectKeeping(scope, current, permit, rejection, status)
 		}
 		return dcjc.prepareMutation(
 			scope,
@@ -186,7 +178,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 		config:         config,
 		postimage:      postimage,
 		disposition:    resourceInstallationDisposition(current),
-		adoptsFailures: true,
+		adoptsFailures: false,
 		cleanup: func(postimage dyncfg.GraphConfig, status dyncfg.Status) lifecycle.TaskCleanup {
 			return dcjc.updateCleanup(target, request, oldConfig, postimage, status)
 		},
@@ -216,20 +208,27 @@ func (dcjc *DynCfgJobController) prepareEnable(
 	if status == dyncfg.StatusRunning {
 		return dcjc.satisfy(scope, current, permit, status, nil)
 	}
-	if status == dyncfg.StatusAccepted {
-		config, err := graphRecordConfig(record)
-		if err != nil {
-			return nil, err
-		}
-		spec, err := newAcceptedActivationSpec(config)
-		if err != nil {
-			return nil, err
-		}
-		return dcjc.satisfy(scope, current, permit, status, func() {
-			dcjc.scheduler.accepted.arm(spec)
-		})
+	config, err := graphRecordConfig(record)
+	if err != nil {
+		return nil, err
 	}
-	return dcjc.prepareRunningTransition(ctx, dyncfg.CommandEnable, target, record, current, scope, permit)
+	spec, err := newAcceptedActivationSpec(config)
+	if err != nil {
+		return nil, err
+	}
+	activate := func() { dcjc.scheduler.accepted.arm(spec) }
+	if status == dyncfg.StatusAccepted {
+		if current != nil {
+			activate = nil // The installed generation already owns startup.
+		}
+		return dcjc.satisfy(scope, current, permit, status, activate)
+	}
+	postimage := graphConfig(record, dyncfg.StatusAccepted)
+	return dcjc.prepareMutationWithRetryAfterApply(
+		scope, current, nil, permit, resourceRemovalDisposition(current), &postimage,
+		adoptedReply(dyncfg.CommandEnable, dyncfg.StatusAccepted, jobFailure{}),
+		dcjc.configStatusCleanup(scope.ID, dyncfg.StatusAccepted), autoDetectionRetryToken{}, activate,
+	)
 }
 
 func (dcjc *DynCfgJobController) prepareRestart(
@@ -251,14 +250,12 @@ func (dcjc *DynCfgJobController) prepareRestart(
 			message: fmt.Sprintf("restarting is not allowed in '%s' state.", status),
 		}, status)
 	}
-	return dcjc.prepareRunningTransition(ctx, dyncfg.CommandRestart, target, record, current, scope, permit)
+	return dcjc.prepareStoredRestart(ctx, target, record, current, scope, permit)
 }
 
-// prepareRunningTransition starts the stored configuration for enable and
-// restart.
-func (dcjc *DynCfgJobController) prepareRunningTransition(
+// prepareStoredRestart probes the stored configuration before replacing its runtime.
+func (dcjc *DynCfgJobController) prepareStoredRestart(
 	ctx context.Context,
-	command dyncfg.Command,
 	target dynCfgTarget,
 	record dyncfg.GraphRecord,
 	current lifecycle.ReadyResource,
@@ -273,20 +270,17 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 		busy:        "job activation is busy; retry the command.",
 		deadline:    "job activation timed out; retry the command.",
 		quarantined: "job activation is unavailable until the plugin restarts.",
-		failed:      "job enable failed: %v",
-	}
-	if command == dyncfg.CommandRestart {
-		messages.failed = "config restart failed: %v"
+		failed:      "config restart failed: %v",
 	}
 	return dcjc.prepareCandidate(ctx, candidateCommand{
-		command:     command,
+		command:     dyncfg.CommandRestart,
 		record:      record,
 		config:      config,
 		postimage:   graphConfig(record, dyncfg.StatusRunning),
 		disposition: resourceInstallationDisposition(current),
 		// restart is not saved by the daemon and adopts nothing: it keeps a
 		// running job whenever the fresh start fails before stopping it.
-		adoptsFailures: command != dyncfg.CommandRestart || current == nil,
+		adoptsFailures: current == nil,
 		cleanup: func(_ dyncfg.GraphConfig, status dyncfg.Status) lifecycle.TaskCleanup {
 			return dcjc.configStatusCleanup(target.resourceID, status)
 		},
@@ -317,9 +311,9 @@ type candidateMessages struct {
 }
 
 // prepareCandidate prepares and probes the candidate while the incumbent keeps
-// running. A failure found there is adopted only when the plugin will retry it
-// (and the command adopts failures); every other failure is rejected with the
-// graph and the incumbent unchanged. Failures after the incumbent is stopped
+// running. UPDATE rejects every preflight failure. RESTART of an already failed
+// job may retain its operational retry policy; rejected edits preserve the graph
+// and incumbent. Failures after the incumbent is stopped
 // are adopted through the install fallbacks.
 func (dcjc *DynCfgJobController) prepareCandidate(
 	ctx context.Context,
@@ -385,28 +379,32 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 		}
 		return dcjc.prepareProbeFailure(scope, current, permit, autoDetectionRetryToken{}, probeFailure, failurePlan)
 	}
-	runningPostimage := cmd.postimage
-	runningPostimage.Status = dyncfg.StatusRunning.String()
+	acceptedPostimage := cmd.postimage
+	acceptedPostimage.Status = dyncfg.StatusAccepted.String()
+	activate, err := dcjc.activateAfterRelease(cmd.config, jobmgr.ProcessAttemptJobRuntime)
+	if err != nil {
+		return nil, err
+	}
 	return dcjc.prepareMutationWithActivationFallbacks(
 		scope,
 		current,
 		successor,
 		cmd.disposition,
-		&runningPostimage,
-		adoptedReply(cmd.command, dyncfg.StatusRunning, jobFailure{}),
-		cmd.cleanup(runningPostimage, dyncfg.StatusRunning),
+		&acceptedPostimage,
+		adoptedReply(cmd.command, dyncfg.StatusAccepted, jobFailure{}),
+		cmd.cleanup(acceptedPostimage, dyncfg.StatusAccepted),
 		autoDetectionRetryToken{},
 		nil,
 		activationFallbackPlan{
-			postimage: &failedPostimage,
+			postimage: &acceptedPostimage,
 			failure: jobFailure{
 				class:   failureUnavailable,
 				message: "the job starts once its previous instance stops.",
 			},
-			cleanup: failedCleanup,
+			cleanup: cmd.cleanup(acceptedPostimage, dyncfg.StatusAccepted),
 			afterApply: composeAfterApply(
 				dcjc.retrySettlement(scope.ID, autoDetectionRetryToken{}),
-				dcjc.retainAbsentPendingAfterApply(cmd.config, jobmgr.ProcessAttemptJobRuntime, cmd.config.UID()),
+				activate,
 			),
 		},
 		activationFallbackPlan{

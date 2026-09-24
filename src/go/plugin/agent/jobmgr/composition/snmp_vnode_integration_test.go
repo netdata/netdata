@@ -323,7 +323,7 @@ func TestSNMPLegacyLocalVnodeDynCfgRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	_, err = fmt.Fprintf(writer, "FUNCTION_PAYLOAD local-save 30 \"config go.d:collector:snmp:local update\" 0xFFFF \"user=test\" application/json\n%s\nFUNCTION_PAYLOAD_END\n", payload)
 	require.NoError(t, err)
-	output.waitContains(t, "FUNCTION_RESULT_BEGIN local-save 200 application/json")
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN local-save 202 application/json")
 	require.Eventually(t, func() bool {
 		entries := store.Entries()
 		return len(entries) == 1 && entries[0].Info.VnodeHostname == "local-router" && entries[0].Info.VnodeGUID == "6e17cd2c-0518-4e94-965b-d25673decb21" && entries[0].Info.VnodeLabels["site"] == "after"

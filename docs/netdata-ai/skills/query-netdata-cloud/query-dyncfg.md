@@ -106,7 +106,7 @@ DynCfg uses HTTP-like codes verified against
 | Code | Meaning |
 |---|---|
 | 200 | Running -- accepted and active |
-| 202 | Accepted -- saved, not running: still starting, or adopted and failed (check `status`) |
+| 202 | Accepted -- configuration accepted; check `status` for current health |
 | 298 | Accepted but disabled |
 | 299 | Accepted but restart required |
 | 400 | Bad request / invalid configuration |
@@ -114,9 +114,8 @@ DynCfg uses HTTP-like codes verified against
 | 500 | Internal error |
 | 501 | Action not implemented for this object |
 
-For `add`, `update`, `enable`, `disable` and `remove`, the Agent saves the change only on a 2xx reply; any other code
-means it kept the previous configuration. A job that was adopted but failed to start answers 202 and shows `failed` in
-its status.
+For mutation replies, rejection versus indeterminate transport outcomes, and Go collector acceptance before runtime
+readiness, use `src/plugins.d/DYNCFG.md#3-process-commands-and-respond`.
 
 ---
 
