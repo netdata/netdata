@@ -417,6 +417,13 @@
 - Build(deps): bump github.com/bmatcuk/doublestar/v4 from 4.10.0 to 4.10.1 in /src/go ([#23994](https://github.com/netdata/netdata/issues/23994))
 - Build(deps): bump github.com/aws/smithy-go from 1.28.1 to 1.28.2 in /src/go ([#23993](https://github.com/netdata/netdata/issues/23993))
 - Perf(go.d/statsd): remove per-record ingest allocations and cut publication cost ([#23995](https://github.com/netdata/netdata/issues/23995))
+- Validate typed set cells in topology scalar columns ([#23803](https://github.com/netdata/netdata/issues/23803))
+- Perf(go.d/framework): cut V2 publication path allocations ([#23996](https://github.com/netdata/netdata/issues/23996))
+- Test(go.d/jobmgr): fix flaky runtime cleanup panic quarantine test ([#23999](https://github.com/netdata/netdata/issues/23999))
+- Feat(go.d/chartengine): template set chart ID lookup, compile-order collision precedence and collision warning ([#24002](https://github.com/netdata/netdata/issues/24002))
+- Feat(go.d/collectorapi): add PermanentError and TemporaryError lifecycle error classification ([#24004](https://github.com/netdata/netdata/issues/24004))
+- Fix(database): prevent machine GUID copy from writing past RRDHOST buffer ([#23991](https://github.com/netdata/netdata/issues/23991))
+- Fix 64-bit timestamp formatting on 32-bit targets ([#23997](https://github.com/netdata/netdata/issues/23997))
 
 ## [2.11.0] - 2026-08-12
 
