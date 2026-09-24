@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0524
+# Next unused error code: F0526
 
 # ======================================================================
 # Constants
@@ -910,6 +910,40 @@ get_redirect() {
   fi
 
   fatal "${ERROR_F0003}" F0003
+}
+
+verify_manifest() {
+  dir="${1}"
+  old_pwd="${PWD}"
+  cd "${dir}" || fatal "Failed to change current working directory to ${dir}." F000A
+
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would verify integrity of downloaded files."
+  else
+    progress "Verifying integrity of downloaded files."
+
+    if [ -r "./sha256sums.txt" ]; then
+      files="$(awk '{print $2}' | tr -d '*')"
+      failed=0
+      for f in ${files} ; do
+        if [ -r "${f}" ]; then
+          csum="$(grep -E "${f}\$" ./sha256sums.txt | awk '{print $1}')"
+          if ! echo "${csum} *${f}" | safe_sha256sum -c -; then
+            failed="$((failed + 1))"
+            warning "Invalid checksum for ${dir}/${f}, expected: ${csum}, actual $(safe_sha256sum "${file}" | awk '{print $1}')"
+          fi
+        fi
+      done
+
+      if [ "${failed}" -gt 0 ]; then
+        fatal "${failed} files failed checksum verification, see warnings for details on the failed files.\n${BADCACHE_MSG}" F0525
+      fi
+    else
+      fatal "No sha256sums.txt file found, unable to verify files in ${dir}" F0524
+    fi
+  fi
+
+  cd "${old_pwd}" || fatal "Failed to change current working old_pwdectory to ${old_pwd}." F000A
 }
 
 safe_sha256sum() {
@@ -2109,16 +2143,7 @@ try_static_install() {
     fatal "Unable to fetch checksums to verify static build archive. ${BADNET_MSG}." F0206
   fi
 
-  if [ "${DRY_RUN}" -eq 1 ]; then
-    progress "Would validate SHA256 checksum of downloaded static build archive."
-  else
-    if [ -z "${INSTALL_VERSION}" ]; then
-      if ! grep "${netdata_agent}" ./sha256sum.txt | safe_sha256sum -c - > /dev/null 2>&1; then
-        bad_sums_report="$(report_bad_sha256sum "${netdata_agent}" "./sha256sum.txt")"
-        fatal "Static binary checksum validation failed.\n${bad_sums_report}\n${BADCACHE_MSG}." F0207
-      fi
-    fi
-  fi
+  verify_manifest ./
 
   if [ "${INTERACTIVE}" -eq 0 ]; then
     opts="${opts} --accept"
@@ -2296,14 +2321,7 @@ try_build_install() {
     fatal "Failed to download checksums for source tarball verification. ${BADNET_MSG}." F000C
   fi
 
-  if [ "${DRY_RUN}" -eq 1 ]; then
-    progress "Would validate SHA256 checksum of downloaded source archive."
-  else
-    if ! grep "${archive_name}" ./sha256sum.txt | safe_sha256sum -c - > /dev/null 2>&1; then
-      bad_sums_report="$(report_bad_sha256sum "${archive_name}" ./sha256sum.txt)"
-      fatal "Tarball checksum validation failed.\n${bad_sums_report}\n${BADCACHE_MSG}." F0005
-    fi
-  fi
+  verify_manifest ./
 
   run sh -c '${0} "${1}" | tar -xf - -C "${2}"' "${decompress}" "${archive_name}" "${tmpdir}"
   rm -rf "${archive_name}" > /dev/null 2>&1
@@ -2396,25 +2414,7 @@ prepare_offline_install_source() {
     mv sha256sums.tmp sha256sums.txt
   fi
 
-  if [ "${DRY_RUN}" -ne 1 ]; then
-    progress "Verifying checksums."
-
-    failed_files=""
-    while IFS= read -r file; do
-      [ -n "${file}" ] || continue
-      if ! grep -e "${file}" sha256sums.txt | safe_sha256sum -c -; then
-        failed_files="${failed_files}\n${file}\n$(report_bad_sha256sum "${file}" sha256sums.txt)"
-      fi
-    done <<EOF
-$(find . -name '*.gz.run')
-EOF
-
-    if [ -n "${failed_files}" ]; then
-      fatal "Checksums for offline install files are incorrect.\n${failed_files}\n${BADCACHE_MSG}." F0507
-    fi
-  else
-    progress "Would verify SHA256 checksums of downloaded installation files."
-  fi
+  verify_manifest ./
 
   if [ "${DRY_RUN}" -ne 1 ]; then
     progress "Preparing install script."
