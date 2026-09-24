@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,32 +20,59 @@ func TestSecretDependentStopQuiescesEnabledIntent(t *testing.T) {
 	for name, test := range map[string]struct {
 		status    dyncfg.Status
 		installed bool
-		enabled   bool
 		stop      bool
 	}{
-		"running":  {dyncfg.StatusRunning, true, false, true},
-		"starting": {dyncfg.StatusAccepted, true, true, true},
-		"waiting":  {dyncfg.StatusAccepted, false, true, true},
-		"passive":  {dyncfg.StatusAccepted, false, false, false},
-		"disabled": {dyncfg.StatusDisabled, false, false, false},
-		"failed":   {dyncfg.StatusFailed, false, false, false},
+		"running":  {dyncfg.StatusRunning, true, true},
+		"starting": {dyncfg.StatusAccepted, true, true},
+		"waiting":  {dyncfg.StatusAccepted, false, true},
+		"passive":  {dyncfg.StatusAccepted, false, false},
+		"disabled": {dyncfg.StatusDisabled, false, false},
+		"failed":   {dyncfg.StatusFailed, false, false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-			commands := bindSecretRestartTestWorkers(t, controller)
+			commands := bindHandoffTestWorkers(t, controller)
+			configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
+				return &runtimeTestCollector{run: func(ctx context.Context, ready func()) error {
+					if name == "running" {
+						ready()
+					}
+					<-ctx.Done()
+					return ctx.Err()
+				}}
+			})
 			config := factoryTestConfig(false).SetSourceType(confgroup.TypeDyncfg)
-			seedDynCfgJobGraphRecord(t, graph, config, test.status)
-			spec, err := newAcceptedActivationSpec(config)
-			require.NoError(t, err)
-			if test.enabled {
-				controller.scheduler.accepted.pause(spec)
-			}
-			scope := lifecycle.ResourceTransactionScope{ID: config.FullName()}
 			var current lifecycle.ReadyResource
-			var events []string
-			if test.installed {
-				scope.Current = lifecycle.ResourceIdentity{ID: scope.ID, Generation: 1}
-				current = &transactionTestReadyResource{identity: scope.Current, prefix: "current", events: &events}
+			t.Cleanup(func() { stopRuntimeTestResource(t, current) })
+			if test.stop {
+				if name == "waiting" {
+					config.Set("vnode", "missing")
+					controller.factory.config.Vnode = func(string) (jobruntime.VnodeSnapshot, bool) {
+						return jobruntime.VnodeSnapshot{}, false
+					}
+				}
+				seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusDisabled)
+				applyAcceptedEnableForTest(t, controller, graph, config, 1)
+				current = applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 2)
+				if test.installed {
+					require.NotNil(t, current)
+				} else {
+					require.Nil(t, current)
+				}
+				if name == "running" {
+					current = applyActivationTestSubmission(t, commands.next(t, "internal/jobs/runtime-ready"), current, 0)
+				} else {
+					require.True(t, controller.ActivationEnabled(config.FullName()))
+				}
+			} else {
+				seedDynCfgJobGraphRecord(t, graph, config, test.status)
+			}
+			record, exists := graph.Lookup(config.FullName())
+			require.True(t, exists)
+			require.Equal(t, test.status.String(), record.Status)
+			scope := lifecycle.ResourceTransactionScope{ID: config.FullName()}
+			if current != nil {
+				scope.Current = current.Identity()
 			}
 			work, stopped, err := controller.PlanSecretDependentStop(scope.ID)
 			require.NoError(t, err)
@@ -56,11 +84,12 @@ func TestSecretDependentStopQuiescesEnabledIntent(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, test.stop, didStop)
 			_, disposition, resource := applied.Ownership()
+			current = resource
 			require.Nil(t, resource)
 			if test.installed {
 				require.Equal(t, lifecycle.ResourceTransactionRemoved, disposition)
 			}
-			record, exists := graph.Lookup(scope.ID)
+			record, exists = graph.Lookup(scope.ID)
 			require.True(t, exists)
 			if test.stop {
 				require.Equal(t, dyncfg.StatusAccepted.String(), record.Status)
@@ -69,7 +98,7 @@ func TestSecretDependentStopQuiescesEnabledIntent(t *testing.T) {
 				require.Equal(t, test.status.String(), record.Status)
 				require.False(t, controller.ActivationEnabled(scope.ID))
 			}
-			commands.waitForSubmissions(t, 0)
+			requireNoHandoffActivation(t, commands)
 		})
 	}
 }

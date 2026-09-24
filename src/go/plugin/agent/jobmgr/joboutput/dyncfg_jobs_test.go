@@ -370,6 +370,7 @@ func TestDynCfgAddCollisionIsReplayUpsert(t *testing.T) {
 func TestDynCfgAdoptionTransfersSecretAuthorityForFullPayload(t *testing.T) {
 	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
 	notifications := runtimeTestNotifications(t, controller)
+	activations := runtimeTestBindActivations(t, controller)
 	creator := controller.modules["module"]
 	creator.Create = func() collectorapi.CollectorV1 {
 		module := state.module(nil, false)
@@ -426,7 +427,9 @@ func TestDynCfgAdoptionTransfersSecretAuthorityForFullPayload(t *testing.T) {
 	applied, err := transaction.Apply(context.Background())
 	require.NoError(t, err)
 	_, disposition, active := applied.Ownership()
-	require.Equal(t, lifecycle.ResourceTransactionReplaced, disposition)
+	require.Equal(t, lifecycle.ResourceTransactionRemoved, disposition)
+	require.Nil(t, active)
+	active = runtimeTestApplyActivation(t, activations, discovered.FullName(), 3)
 	require.NotNil(t, active)
 	require.Equal(t, 202, applied.ResultStatus())
 	active = runtimeTestApplyNotification(t, runtimeTestNotificationPlan(t, notifications, "internal/jobs/runtime-ready"), active)
@@ -1300,7 +1303,7 @@ func TestV2CheckErrorClassificationControlsAutoDetectionRetry(t *testing.T) {
 			config.SetSource("source")
 			config.SetProvider("provider")
 
-			current := runtimeTestApply(t, prepareRuntimeTestChange(t, controller, config, nil, 1))
+			current := runtimeTestApply(t, prepareRuntimeTestAdoption(t, controller, config, nil, 1))
 			require.Nil(t, current)
 
 			record, listed := graph.Lookup(config.FullName())
@@ -1367,8 +1370,8 @@ func TestDiscoveredSecretReferenceRemainsLiteralAndDoesNotScheduleRetry(t *testi
 	}
 	controller.modules["module"] = creator
 	installFailingFixtureResolver(t, controller)
-	commands := &autoDetectionRetryTestCommands{}
-	require.NoError(t, controller.BindBackgroundWorkers(commands, 1, func(error) {}))
+	commands := runtimeTestNotifications(t, controller)
+	activations := runtimeTestBindActivations(t, controller)
 
 	config := factoryTestConfig(false)
 	config.Set("option_str", "${fixture:value}")
@@ -1400,7 +1403,9 @@ func TestDiscoveredSecretReferenceRemainsLiteralAndDoesNotScheduleRetry(t *testi
 	applied, err := transaction.Apply(context.Background())
 	require.NoError(t, err)
 	_, disposition, current := applied.Ownership()
-	require.Equal(t, lifecycle.ResourceTransactionInstalled, disposition)
+	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+	require.Nil(t, current)
+	current = runtimeTestApplyActivation(t, activations, config.FullName(), 2)
 	require.NotNil(t, current)
 
 	current = runtimeTestApplyNotification(t, runtimeTestNotificationPlan(t, commands, "internal/jobs/runtime-ready"), current)
@@ -1424,6 +1429,7 @@ func TestDiscoveredSecretReferenceRemainsLiteralAndDoesNotScheduleRetry(t *testi
 func TestDiscoveredSecretReferenceRemainsLiteralInV2Construction(t *testing.T) {
 	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
 	notifications := runtimeTestNotifications(t, controller)
+	activations := runtimeTestBindActivations(t, controller)
 	creator := controller.modules["module"]
 	creator.Create = nil
 	creator.CreateV2 = func() collectorapi.CollectorV2 {
@@ -1462,7 +1468,9 @@ func TestDiscoveredSecretReferenceRemainsLiteralInV2Construction(t *testing.T) {
 	applied, err := transaction.Apply(context.Background())
 	require.NoError(t, err)
 	_, disposition, current := applied.Ownership()
-	require.Equal(t, lifecycle.ResourceTransactionInstalled, disposition)
+	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+	require.Nil(t, current)
+	current = runtimeTestApplyActivation(t, activations, config.FullName(), 2)
 	require.NotNil(t, current)
 
 	current = runtimeTestApplyNotification(t, runtimeTestNotificationPlan(t, notifications, "internal/jobs/runtime-ready"), current)
@@ -1830,11 +1838,8 @@ func TestRunningUpdateAcceptsAndWaitsForBusyRuntimeRelease(t *testing.T) {
 	require.Equal(t, dyncfg.StatusAccepted.String(), record.Status)
 	require.Contains(t, record.Payload(), "replacement")
 	require.Equal(t, []string{"current-stop", "current-finalize"}, events)
-	require.Eventually(t, func() bool {
-		return tasks.LongLivedCensus() == (lifecycle.LongLivedCensus{}) &&
-			delegate.Census() == (containment.Census{})
-	}, time.Second, time.Millisecond)
-	require.EqualValues(t, 1, state.collectorCleanup)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+	require.EqualValues(t, 0, state.collectorCleanup, "checked candidate remains owned while waiting")
 	require.True(t, controller.ActivationEnabled(config.FullName()))
 	select {
 	case call := <-commands.queue:
@@ -1929,7 +1934,7 @@ func TestDiscoveredRemovalSettlesOnlyMatchingRetryWithoutGraphRecord(t *testing.
 			controller.modules["module"] = creator
 			config := factoryTestConfig(false).SetSourceType(confgroup.TypeStock).
 				SetSource("stock").SetProvider("stock").Set("autodetection_retry", 1)
-			require.Nil(t, runtimeTestApply(t, prepareRuntimeTestChange(t, controller, config, nil, 1)))
+			require.Nil(t, runtimeTestApply(t, prepareRuntimeTestAdoption(t, controller, config, nil, 1)))
 			_, exists := graph.Lookup(config.FullName())
 			require.False(t, exists)
 			require.True(t, runtimeTestHasRetry(controller, config.FullName()))
@@ -1969,7 +1974,7 @@ func TestPlainStockRetryAcceptsBeforeReactivatingRemovedFailedRecord(t *testing.
 	controller.modules["module"] = creator
 	commands := dynCfgTestActivationCommands(t, controller)
 	config := factoryTestConfig(false).SetSourceType(confgroup.TypeStock).SetSource("stock").SetProvider("stock").Set("autodetection_retry", 1)
-	require.Nil(t, runtimeTestApply(t, prepareRuntimeTestChange(t, controller, config, nil, 1)))
+	require.Nil(t, runtimeTestApply(t, prepareRuntimeTestAdoption(t, controller, config, nil, 1)))
 	_, exists := graph.Lookup(config.FullName())
 	require.False(t, exists)
 	require.True(t, runtimeTestHasRetry(controller, config.FullName()))
@@ -2008,7 +2013,7 @@ func TestRetryActivationPermanentFailureStopsRetry(t *testing.T) {
 	controller.modules["module"] = creator
 	commands := dynCfgTestActivationCommands(t, controller)
 	config := factoryTestConfig(false).SetSourceType(confgroup.TypeUser).SetSource("file=test").SetProvider("file").Set("autodetection_retry", 1)
-	require.Nil(t, runtimeTestApply(t, prepareRuntimeTestChange(t, controller, config, nil, 1)))
+	require.Nil(t, runtimeTestApply(t, prepareRuntimeTestAdoption(t, controller, config, nil, 1)))
 	require.True(t, runtimeTestHasRetry(controller, config.FullName()))
 	permanent.Store(true)
 	require.NoError(t, controller.scheduler.Tick(t.Context(), 0))

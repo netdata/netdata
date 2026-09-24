@@ -94,7 +94,6 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApply(
 		jobConfig,
 		nil,
 		nil,
-		nil,
 	)
 }
 
@@ -112,7 +111,6 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 	jobConfig preparedJobConfigLifecycle,
 	busyFallback *ResourceActivationFallback,
 	quarantinedFallback *ResourceActivationFallback,
-	startupFallback func(error) (*ResourceActivationFallback, error),
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if successor != nil && postimage != nil && postimage.Status == dyncfg.StatusAccepted.String() {
 		var config confgroup.Config
@@ -157,10 +155,10 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 					Disposition:                   disposition,
 					Current:                       current,
 					Successor:                     successor,
+					UnusedPermit:                  unusedPermit,
 					Graph:                         dcjc.graph,
 					AfterGraphCommit:              dependencyCommit,
 					AfterApply:                    afterApply,
-					ActivationStartupFallback:     startupFallback,
 					ActivationBusyFallback:        busyFallback,
 					ActivationQuarantinedFallback: quarantinedFallback,
 					Cleanup:                       cleanup,
@@ -196,7 +194,6 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 			MutationPrepared:              true,
 			AfterGraphCommit:              dependencyCommit,
 			AfterApply:                    afterApply,
-			ActivationStartupFallback:     startupFallback,
 			ActivationBusyFallback:        busyFallback,
 			ActivationQuarantinedFallback: quarantinedFallback,
 			Cleanup:                       cleanup,
@@ -273,7 +270,6 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 	afterApply func(),
 	busy activationFallbackPlan,
 	quarantined activationFallbackPlan,
-	startup probeFailurePlan,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	jobConfig := preparedJobConfigLifecycleState(successor)
 	busyFallback, err := dcjc.newActivationFallback(
@@ -314,21 +310,6 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 		jobConfig,
 		busyFallback,
 		quarantinedFallback,
-		func(err error) (*ResourceActivationFallback, error) {
-			typed, ok := onlyRuntimeStartupFailure(err)
-			if !ok {
-				return nil, errors.New("job output: invalid startup failure classification")
-			}
-			failure := typed.failure
-			postimage := &startup.postimage
-			cleanup := startup.failedCleanup
-			afterApply := dcjc.retrySettlement(scope.ID, retry)
-			if startup.afterApply != nil {
-				afterApply = composeAfterApply(afterApply, func() { startup.afterApply(failure) })
-			}
-			return dcjc.newActivationFallback(scope.ID, postimage, startup.reply(failure).failure, cleanup, afterApply,
-				failure.jobConfigLifecycle, failure.diagnosticFailure)
-		},
 	)
 }
 
@@ -456,12 +437,10 @@ func (dcjc *DynCfgJobController) prepareProbeFailure(
 		},
 		nil,
 		nil,
-		nil,
 	)
 }
 
-// probeFailurePlan supplies failure handling for preparation and runtime startup.
-// Plain-stock removal applies only to preparation failures.
+// probeFailurePlan supplies source-specific preparation failure handling.
 type probeFailurePlan struct {
 	postimage        dyncfg.GraphConfig                   // graph postimage to commit as StatusFailed
 	failedCleanup    lifecycle.TaskCleanup                // protocol cleanup for the failed status

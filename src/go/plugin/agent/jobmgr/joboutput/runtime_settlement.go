@@ -71,10 +71,30 @@ func (t *runtimeSettlementTransaction) Dispose(context.Context) (lifecycle.Ready
 	return t.current, nil
 }
 
-func (t *runtimeSettlementTransaction) Apply(ctx context.Context) (lifecycle.AppliedResourceTransaction, error) {
+func (t *runtimeSettlementTransaction) Apply(ctx context.Context) (applied lifecycle.AppliedResourceTransaction, resultErr error) {
 	if err := t.take(); err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
+	delegated := false
+	defer func() {
+		if delegated || resultErr == nil {
+			return
+		}
+		// Until Apply is delegated, the graph is uncommitted and this
+		// transaction still owns current, including after partial publication.
+		unchanged, ownershipErr := lifecycle.NewAppliedResourceTransaction(
+			t.scope, lifecycle.ResourceTransactionUnchanged, t.current, noResponseResult(), func() error { return nil },
+		)
+		if ownershipErr == nil {
+			applied = unchanged
+		}
+		expectedRetirement := jobmgr.ContainsOnlyErrorLeaves(resultErr, jobmgr.ErrProcessAttemptRetired, jobmgr.ErrProcessAttemptStopped)
+		resultErr = errors.Join(resultErr, ownershipErr)
+		if expectedRetirement && ownershipErr == nil {
+			// Run retirement will detach and finalize the returned generation.
+			resultErr = nil
+		}
+	}()
 	dcjc := t.controller
 	record, exists := dcjc.graph.Lookup(t.scope.ID)
 	if !exists || (record.Status != dyncfg.StatusAccepted.String() && record.Status != dyncfg.StatusRunning.String()) {
@@ -132,10 +152,11 @@ func (t *runtimeSettlementTransaction) Apply(ctx context.Context) (lifecycle.App
 	prepared, err := dcjc.prepareMutationWithRetryAfterApplyAndFallback(
 		t.scope, t.current, nil, lifecycle.LongLivedPermit{}, disposition, &postimage, internalReply(),
 		dcjc.configStatusCleanup(t.scope.ID, status), autoDetectionRetryToken{}, afterApply,
-		jobConfig, nil, nil, nil,
+		jobConfig, nil, nil,
 	)
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
+	delegated = true
 	return prepared.Apply(ctx)
 }

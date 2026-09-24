@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -177,7 +176,6 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 		record:         record,
 		config:         config,
 		postimage:      postimage,
-		disposition:    resourceInstallationDisposition(current),
 		adoptsFailures: false,
 		cleanup: func(postimage dyncfg.GraphConfig, status dyncfg.Status) lifecycle.TaskCleanup {
 			return dcjc.updateCleanup(target, request, oldConfig, postimage, status)
@@ -273,11 +271,10 @@ func (dcjc *DynCfgJobController) prepareStoredRestart(
 		failed:      "config restart failed: %v",
 	}
 	return dcjc.prepareCandidate(ctx, candidateCommand{
-		command:     dyncfg.CommandRestart,
-		record:      record,
-		config:      config,
-		postimage:   graphConfig(record, dyncfg.StatusRunning),
-		disposition: resourceInstallationDisposition(current),
+		command:   dyncfg.CommandRestart,
+		record:    record,
+		config:    config,
+		postimage: graphConfig(record, dyncfg.StatusRunning),
 		// restart is not saved by the daemon and adopts nothing: it keeps a
 		// running job whenever the fresh start fails before stopping it.
 		adoptsFailures: current == nil,
@@ -296,7 +293,6 @@ type candidateCommand struct {
 	record         dyncfg.GraphRecord                                            // preimage
 	config         confgroup.Config                                              // configuration to start
 	postimage      dyncfg.GraphConfig                                            // record for config; the status is set per outcome
-	disposition    lifecycle.ResourceTransactionDisposition                      // resource change when the candidate installs
 	adoptsFailures bool                                                          // whether a failure the plugin retries is adopted
 	cleanup        func(dyncfg.GraphConfig, dyncfg.Status) lifecycle.TaskCleanup // protocol frame for an adopted postimage
 	removedCleanup lifecycle.TaskCleanup                                         // protocol frame when a plain stock job is removed
@@ -313,8 +309,8 @@ type candidateMessages struct {
 // prepareCandidate prepares and probes the candidate while the incumbent keeps
 // running. UPDATE rejects every preflight failure. RESTART of an already failed
 // job may retain its operational retry policy; rejected edits preserve the graph
-// and incumbent. Failures after the incumbent is stopped
-// are adopted through the install fallbacks.
+// and incumbent. A successful candidate transfers to accepted activation;
+// installation then waits for predecessor release outside the mutation lane.
 func (dcjc *DynCfgJobController) prepareCandidate(
 	ctx context.Context,
 	cmd candidateCommand,
@@ -327,7 +323,7 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 	failedPostimage.Status = dyncfg.StatusFailed.String()
 	failedCleanup := cmd.cleanup(failedPostimage, dyncfg.StatusFailed)
 
-	successor, probeFailure, activation := dcjc.prepareContainedJob(ctx, cmd.config, scope.Successor, permit)
+	stage, probeFailure, activation := dcjc.prepareContainedCandidate(ctx, cmd.config)
 	if err := activation.err; err != nil {
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
@@ -381,42 +377,10 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 	}
 	acceptedPostimage := cmd.postimage
 	acceptedPostimage.Status = dyncfg.StatusAccepted.String()
-	activate, err := dcjc.activateAfterRelease(cmd.config, jobmgr.ProcessAttemptJobRuntime)
-	if err != nil {
-		return nil, err
-	}
-	return dcjc.prepareMutationWithActivationFallbacks(
-		scope,
-		current,
-		successor,
-		cmd.disposition,
-		&acceptedPostimage,
+	return dcjc.prepareCandidateAdoption(
+		scope, current, permit, stage, cmd.config, &acceptedPostimage,
 		adoptedReply(cmd.command, dyncfg.StatusAccepted, jobFailure{}),
-		cmd.cleanup(acceptedPostimage, dyncfg.StatusAccepted),
-		autoDetectionRetryToken{},
-		nil,
-		activationFallbackPlan{
-			postimage: &acceptedPostimage,
-			failure: jobFailure{
-				class:   failureUnavailable,
-				message: "the job starts once its previous instance stops.",
-			},
-			cleanup: cmd.cleanup(acceptedPostimage, dyncfg.StatusAccepted),
-			afterApply: composeAfterApply(
-				dcjc.retrySettlement(scope.ID, autoDetectionRetryToken{}),
-				activate,
-			),
-		},
-		activationFallbackPlan{
-			postimage: &failedPostimage,
-			failure: jobFailure{
-				class:   failureUnavailable,
-				message: "the job cannot start until the plugin restarts.",
-			},
-			cleanup:    failedCleanup,
-			afterApply: dcjc.retrySettlement(scope.ID, autoDetectionRetryToken{}),
-		},
-		failurePlan,
+		cmd.cleanup(acceptedPostimage, dyncfg.StatusAccepted), nil,
 	)
 }
 

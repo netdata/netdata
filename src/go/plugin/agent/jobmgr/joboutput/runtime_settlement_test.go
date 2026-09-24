@@ -111,7 +111,7 @@ func TestRuntimeSettlementRejectsStaleReadinessAfterReplacement(t *testing.T) {
 	require.Same(t, next, runtimeTestApplyNotification(t, stale, next))
 	record, _ := graph.Lookup(cfg.FullName())
 	require.Equal(t, dyncfg.StatusRunning.String(), record.Status)
-	require.Equal(t, uint64(2), next.Identity().Generation)
+	require.Equal(t, uint64(4), next.Identity().Generation)
 	stopRuntimeTestResource(t, next)
 	requireFactoryAttemptsIdle(t, controller.factory)
 }
@@ -177,23 +177,4 @@ func TestDiscoveredReplayPreservesStartingStatus(t *testing.T) {
 	require.Empty(t, controller.scheduler.jobs)
 	require.NotContains(t, output.String(), "create running", "replayed discovery must not announce readiness")
 	require.NotContains(t, output.String(), "status running")
-}
-
-// Manual transaction tests hold the activation acknowledgement until their
-// captured plan has applied, matching the production command-port ordering.
-type runtimeSettlementAcknowledgementCommands struct {
-	*autoDetectionRetryTestCommands
-	release chan struct{}
-}
-
-func (c *runtimeSettlementAcknowledgementCommands) SubmitPreparedAndWait(ctx context.Context, request jobmgr.Request, plan jobmgr.WorkPlan) error {
-	if err := c.submit(request, plan, true); err != nil {
-		return err
-	}
-	select {
-	case <-c.release:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }

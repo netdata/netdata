@@ -976,7 +976,10 @@ func (pjc *preparedJobCandidate) publish(result stagedJobResult) {
 	})
 }
 
-func (pjc *preparedJobCandidate) take() (stagedJobResult, error) {
+// inspect validates a completed candidate without transferring ownership. A
+// retained result can have been cut by a later preflight or invalidated by a
+// Store change while it waited for its predecessor to release the runtime.
+func (pjc *preparedJobCandidate) inspect() (stagedJobResult, error) {
 	if pjc == nil {
 		return stagedJobResult{}, errors.New("job output: nil candidate stage")
 	}
@@ -986,12 +989,46 @@ func (pjc *preparedJobCandidate) take() (stagedJobResult, error) {
 		return stagedJobResult{}, errors.New("job output: candidate stage is not ready")
 	}
 	pjc.mu.Lock()
+	if !pjc.settled || pjc.taken || pjc.released {
+		pjc.mu.Unlock()
+		return stagedJobResult{}, errors.New("job output: candidate stage already consumed")
+	}
+	result := pjc.result
+	pjc.mu.Unlock()
+	if result.err != nil || result.failure != nil {
+		return result, result.err
+	}
+	if result.owner == nil {
+		return stagedJobResult{}, errors.New("job output: candidate has no owner")
+	}
+	result.owner.mu.Lock()
+	var cause error
+	switch {
+	case result.owner.retiring:
+		cause = result.owner.retirementErrorLocked("job output: candidate retired")
+	case result.owner.candidateCtx == nil:
+		cause = errors.New("job output: candidate no longer owns preparation")
+	default:
+		cause = context.Cause(result.owner.candidateCtx)
+	}
+	result.owner.mu.Unlock()
+	if cause != nil {
+		return stagedJobResult{}, cause
+	}
+	return result, validateStoreSnapshot(result.storeSnapshot)
+}
+
+func (pjc *preparedJobCandidate) take() (stagedJobResult, error) {
+	result, err := pjc.inspect()
+	if err != nil {
+		return stagedJobResult{}, err
+	}
+	pjc.mu.Lock()
 	defer pjc.mu.Unlock()
-	if !pjc.settled || pjc.taken {
+	if pjc.taken || pjc.released {
 		return stagedJobResult{}, errors.New("job output: candidate stage already consumed")
 	}
 	pjc.taken = true
-	result := pjc.result
 	pjc.result = stagedJobResult{}
 	return result, nil
 }
@@ -1010,10 +1047,6 @@ func (f *Factory) prepareCandidate(
 	}
 	if result.err != nil || result.failure != nil {
 		return PreparedJob{}, result.failure, result.err
-	}
-	if err := validateStoreSnapshot(result.storeSnapshot); err != nil {
-		result.owner.Reject()
-		return PreparedJob{}, nil, err
 	}
 	prepared, err := prepareCandidateJob(
 		identity,
@@ -1043,23 +1076,25 @@ func validateStoreSnapshot(snapshot secretresolver.AtomicScopeSnapshot) (err err
 	return nil
 }
 
-func (dcjc *DynCfgJobController) prepareContainedJob(
+func (dcjc *DynCfgJobController) prepareContainedCandidate(
 	ctx context.Context,
 	config confgroup.Config,
-	identity lifecycle.ResourceIdentity,
-	permit lifecycle.LongLivedPermit,
-) (PreparedJob, *autoDetectionFailure, activationFailure) {
+) (*preparedJobCandidate, *autoDetectionFailure, activationFailure) {
 	if dcjc == nil || dcjc.factory == nil {
-		return PreparedJob{}, nil, classifyActivationError(errors.New("job output: invalid contained job preparation"))
+		return nil, nil, classifyActivationError(errors.New("job output: invalid contained job preparation"))
 	}
 	stage, err := dcjc.factory.newCandidate(config)
 	if err != nil {
-		return PreparedJob{}, nil, classifyActivationError(err)
+		return nil, nil, classifyActivationError(err)
 	}
-	defer stage.Release()
 	if err := dcjc.factory.awaitCandidate(ctx, stage); err != nil {
-		return PreparedJob{}, nil, classifyActivationError(err)
+		stage.Release()
+		return nil, nil, classifyActivationError(err)
 	}
-	prepared, probeFailure, err := dcjc.factory.prepareCandidate(identity, permit, stage)
-	return prepared, probeFailure, classifyActivationError(err)
+	result, err := stage.inspect()
+	if err != nil || result.failure != nil {
+		stage.Release()
+		return nil, result.failure, classifyActivationError(err)
+	}
+	return stage, nil, activationFailure{}
 }

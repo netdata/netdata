@@ -571,30 +571,7 @@ func (ctx taskChildContext) Err() error {
 	return context.Canceled
 }
 
-type applyDeadlineKey struct{}
-
-// WithApplyDeadline records the deadline of the request a task serves.
-// Resource transaction Apply runs without cancellation, so the deadline is
-// carried as a value: Apply uses it to bound waits on other owners and still
-// reply in time.
-func WithApplyDeadline(ctx context.Context, deadline time.Time) context.Context {
-	return context.WithValue(ctx, applyDeadlineKey{}, deadline)
-}
-
-// ApplyDeadline returns the deadline recorded by WithApplyDeadline.
-func ApplyDeadline(ctx context.Context) (time.Time, bool) {
-	deadline, ok := ctx.Value(applyDeadlineKey{}).(time.Time)
-	return deadline, ok
-}
-
 func newTaskChildContext(parent context.Context, deadline time.Time) (context.Context, context.CancelCauseFunc) {
-	effective := deadline
-	if parentDeadline, ok := parent.Deadline(); ok && (effective.IsZero() || parentDeadline.Before(effective)) {
-		effective = parentDeadline
-	}
-	if !effective.IsZero() {
-		parent = WithApplyDeadline(parent, effective)
-	}
 	ctx, cancel := context.WithCancelCause(parent)
 	if deadline.IsZero() {
 		return ctx, cancel

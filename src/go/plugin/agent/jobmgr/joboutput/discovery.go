@@ -301,12 +301,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			cleanup,
 		)
 	}
-	successor, probeFailure, activation := dcjc.prepareContainedJob(
-		ctx,
-		change.Config,
-		scope.Successor,
-		permit,
-	)
+	stage, probeFailure, activation := dcjc.prepareContainedCandidate(ctx, change.Config)
 	if err := activation.err; err != nil {
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
@@ -437,42 +432,11 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			failurePlan,
 		)
 	}
-	failedCleanup := dcjc.configCreateCleanup(
-		failedPostimage,
-		change.Config.SourceType(),
-		change.Config.Source(),
-		dcjc.configType(dcjc.modules[change.Config.Module()]),
-	)
 	postimage.Status = dyncfg.StatusAccepted.String()
 	cleanup = dcjc.configCreateCleanup(postimage, change.Config.SourceType(), change.Config.Source(), dcjc.configType(dcjc.modules[change.Config.Module()]))
-	activate, err := dcjc.activateAfterRelease(change.Config, jobmgr.ProcessAttemptJobRuntime)
-	if err != nil {
-		return nil, err
-	}
-	return dcjc.prepareMutationWithActivationFallbacks(
-		scope,
-		current,
-		successor,
-		resourceInstallationDisposition(current),
-		&postimage,
-		reply,
-		cleanup,
-		autoDetectionRetryToken{},
+	return dcjc.prepareCandidateAdoption(
+		scope, current, permit, stage, change.Config, &postimage, reply, cleanup,
 		dcjc.pendingDesiredSettlement(change.Config, change.pending),
-		activationFallbackPlan{
-			postimage: &postimage,
-			cleanup:   cleanup,
-			afterApply: composeAfterApply(
-				settlement,
-				activate,
-			),
-		},
-		activationFallbackPlan{
-			postimage:  &failedPostimage,
-			cleanup:    failedCleanup,
-			afterApply: settlement,
-		},
-		failurePlan,
 	)
 }
 

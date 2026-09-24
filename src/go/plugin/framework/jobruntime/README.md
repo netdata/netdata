@@ -13,8 +13,8 @@ depend on observation data.
 
 `ManagedRun` settles startup exactly once. Accepted readiness enables collection and running availability; duplicate
 or late callbacks cannot revive canceled or failed startup. Job Manager bounds logical startup waiting with a
-separate timer using the process-attempt fuse's default two-minute duration. This timer starts when runtime startup is
-requested and applies only before readiness, not to the successful runtime lifetime. Timeout cancels the attempt but
+separate timer using the process-attempt fuse's default two-minute duration. The process-owned worker starts this timer immediately
+before launching the managed loop; it applies only before readiness, not to the successful runtime lifetime. Timeout cancels the attempt but
 does not release physical ownership: `Run` must return before collector cleanup begins, and cleanup must finish before
 a same-job successor can acquire the runtime identity.
 

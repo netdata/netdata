@@ -602,11 +602,13 @@ flowchart TD
      already matches. A runtime is passed only when readiness commits Running; failed candidates leave no runtime reference behind. Replacement/removal reconciles
      the prior incarnation from the graph preimage. Hook panic is fail-open and cannot change candidate, graph, or
      cleanup behavior. This is a latest-state projection, not an event bus or retry history.
-4. **Reserve and retire** — only a timely successful candidate is wrapped in an inactive run permit. Replacement then
-   fences the incumbent's ordinary output and detaches its run projections immediately; its physical managed loop,
-   `Stop`, Function drain, and collector cleanup remain process-owned until they return.
-5. **Promote, attach, and start** — the candidate acquires the separate `job-runtime` identity only after logical
-   retirement. Candidate `Init`/`Check` may overlap the incumbent, but two installed runtimes for one job cannot.
+4. **Accept and retire** — a successful preflight candidate remains process-owned while a short transaction commits
+   Accepted and transfers it to accepted activation. Replacement fences the incumbent's ordinary output and detaches
+   its run projections immediately; its physical managed loop, `Stop`, Function drain, and collector cleanup remain
+   process-owned until they return. An aborted acceptance releases its candidate without replacing the incumbent.
+5. **Promote, attach, and start** — accepted activation waits for the predecessor's physical release, then binds its
+   retained candidate to a fresh resource generation and permit. Ordinary replacement does not repeat `Init`/`Check`.
+   Candidate probing may overlap the incumbent, but two installed runtimes for one job cannot.
    - Promotion publishes its owner transition before entering the attempt authority, then releases the owner lock for
      runtime-identity start and admission. This removes the reverse edge against the authority's synchronous
      containment callback. Successful admission transfers process ownership even when containment wins before promotion
@@ -627,8 +629,12 @@ flowchart TD
    - Once output and permit acceptance wins and start remains eligible, the managed loop starts.
    - The resource transaction owns this successor until installation acknowledgement. An apply failure aborts it when
      possible, or returns the still-live retained generation to the kernel for fail-closed ownership.
-   - If the old runtime is still occupied, promotion reports busy immediately. Accepted activation retains the
-     desired configuration and waits for physical release before rebuilding a candidate.
+   - A retained candidate is checked again for process cancellation and Store generation validity before binding.
+     A later preflight may invalidate it even if that later edit is rejected; the still-current accepted activation
+     rebuilds from its committed configuration. Disable, remove, replacement and shutdown release retained candidates.
+   - If runtime acquisition still reports contention, activation keeps the desired configuration and waits for release.
+     A fresh prepared handoff always replaces an older activation token, including same-UID installed markers that
+     have no worker. Repeated ENABLE coalesces only with an owner that can still perform activation.
 
    Rotation interacts with this step deliberately. Rotation cuts run-target attempts *before* draining the run, so a
    non-cooperative startup cannot consume the reload budget:
@@ -654,9 +660,10 @@ flowchart TD
 
 The optional V2 `Run(ctx, ready) error` hook acquires resources after runtime promotion, which requires predecessor
 physical release. `ManagedRun` serializes readiness, startup error, cancellation and timeout; only accepted readiness
-starts collection and running availability. Non-Runner V1/V2 jobs signal readiness directly. Job Manager starts a separate
-startup timer in the owner's `Start`, using `jobmgr.DefaultProcessAttemptFuse` for its two-minute duration. Runtime
-admission has already stopped the preparation fuse; neither timer limits the successfully started runtime lifetime.
+starts collection and running availability. Non-Runner V1/V2 jobs signal readiness directly. The process-owned
+`stagedJobOwner.finish` worker starts a separate startup timer when it receives the managed-run start request, using
+`jobmgr.DefaultProcessAttemptFuse` for its two-minute duration. Runtime admission has already stopped the preparation
+fuse; neither timer limits the successfully started runtime lifetime.
 
 `AcceptStart` initiates startup and installs an Activating generation under an `accepted` graph record. Its exact
 readiness notification queues a short transaction that rechecks the live outcome, publishes scheduler/Functions only
@@ -692,8 +699,10 @@ carry the collector's class (`collectorapi.ClassifyLifecycleError`) and retry me
 
 ### DynCfg reply contract
 
-The daemon persists `add`, `update`, `enable`, `disable` and `remove` on a completed 2xx reply and replays saved
-configuration when the plugin restarts. `joboutput/dyncfg_reply.go` owns collector-job result construction.
+The daemon updates saved configuration or enabledness for user `add`, `update`, `enable` and `disable` commands
+on a completed 2xx reply; successful `remove` deletes the saved configuration. It replays saved configuration when
+the plugin restarts. Echo replies update status or record rejection without replacing the saved payload.
+`joboutput/dyncfg_reply.go` owns collector-job result construction.
 
 - **Completed mutation outcomes.** A 2xx means the plugin accepted the requested state. A completed rejection preserves
   the incumbent, payload, and recovery. A lost reply or structural failure can leave the outcome indeterminate; plugin
@@ -716,7 +725,7 @@ configuration when the plugin restarts. `joboutput/dyncfg_reply.go` owns collect
   receipt; a later retry cannot satisfy it. Caller timeout/cancellation detaches observation without undoing adoption.
 - **Retirement.** A mutation rolled back before graph commit returns `503`; unapplied work cannot claim acceptance.
 
-Health is reported through CONFIG status and lifecycle diagnostics. `TestDynCfgJobRepliesStateAdoption` covers persisted
+Health is reported through CONFIG status and lifecycle diagnostics. `TestDynCfgJobRepliesStateAdoption` covers plugin
 mutation outcomes; composition RESTART tests exercise the outer reply, blocked startup, concurrent disable, cancellation,
 and deadlines through the actual kernel.
 
@@ -767,14 +776,15 @@ Job Manager orchestrates both collector contracts identically; only the runtime 
 
 ### Autodetection retries
 
-Retries are deliberately cheap. There is **no timer or goroutine per job**. Instead, one per-run map + heap +
-dispatcher owns all pending retries (`joboutput/autodetection_retry.go`, `joboutput/scheduler.go`):
+Timed retry scheduling uses one per-run map, heap and dispatcher, with no timer or goroutine per retry entry
+(`joboutput/autodetection_retry.go`, `joboutput/scheduler.go`):
 
 - The process's 1-second tick advances a **logical clock**.
-- When an entry is due, the single run-owned dispatcher resubmits it as a restart through the ordinary command port —
-  fire-and-forget — and keeps authority over that config/retry token until the resulting transaction settles.
-- A busy identity coalesces into one pending retry. Success, replacement, disable, removal, or shutdown invalidates or
-  replaces the token.
+- When an entry is due, the dispatcher submits a short transaction that rechecks the committed config and retry token,
+  changes the graph to `accepted`, and arms accepted activation after commit (`joboutput/discovery.go`). It retains
+  retry-token authority until that transaction settles.
+- Accepted activation owns subsequent construction, dependency waits and physical-release waits. Success, replacement,
+  disable, removal or shutdown settles or revokes the corresponding retry and activation authority.
 
 ## Secrets
 

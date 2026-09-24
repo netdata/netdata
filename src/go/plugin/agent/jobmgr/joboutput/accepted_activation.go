@@ -148,12 +148,12 @@ func (aai *acceptedActivationIndex) arm(spec acceptedActivationSpec) {
 }
 
 func (aai *acceptedActivationIndex) armAfterRelease(spec acceptedActivationSpec, release <-chan struct{}) {
-	aai.armWithGate(spec, release, nil)
+	aai.armWithGate(spec, release, nil, nil)
 }
 
 func (aai *acceptedActivationIndex) pause(spec acceptedActivationSpec) {
 	gate := make(chan struct{})
-	aai.armWithGate(spec, gate, gate)
+	aai.armWithGate(spec, gate, gate, nil)
 }
 
 func (aai *acceptedActivationIndex) resumeFor(id string) func() {
@@ -170,7 +170,9 @@ func (aai *acceptedActivationIndex) resumeFor(id string) func() {
 	}
 }
 
-func (aai *acceptedActivationIndex) armWithGate(spec acceptedActivationSpec, release <-chan struct{}, resume chan struct{}) {
+// armWithGate consumes stage, including when registration is no longer possible.
+func (aai *acceptedActivationIndex) armWithGate(spec acceptedActivationSpec, release <-chan struct{}, resume chan struct{}, stage *preparedJobCandidate) {
+	defer func() { stage.Release() }()
 	if aai == nil || spec.config == nil || spec.config.FullName() == "" || spec.config.UID() == "" {
 		return
 	}
@@ -180,7 +182,7 @@ func (aai *acceptedActivationIndex) armWithGate(spec acceptedActivationSpec, rel
 		aai.mu.Unlock()
 		return
 	}
-	if current := aai.entries[id]; current != nil && current.token.uid == spec.config.UID() && resume == nil {
+	if current := aai.entries[id]; current != nil && current.state != acceptedActivationInstalled && current.token.uid == spec.config.UID() && resume == nil && stage == nil {
 		aai.mu.Unlock()
 		return
 	}
@@ -198,6 +200,7 @@ func (aai *acceptedActivationIndex) armWithGate(spec acceptedActivationSpec, rel
 			uid:        spec.config.UID(),
 		},
 		state:   acceptedActivationStaging,
+		stage:   stage,
 		cancel:  make(chan struct{}),
 		wake:    make(chan struct{}, 1),
 		release: release,
@@ -205,6 +208,7 @@ func (aai *acceptedActivationIndex) armWithGate(spec acceptedActivationSpec, rel
 	}
 	previous := aai.detachLocked(id)
 	aai.entries[id] = entry
+	stage = nil // the entry now owns the retained candidate
 	aai.dependencies.replace(id, spec.dependencies, entry.wake)
 	aai.wg.Add(1)
 	aai.mu.Unlock()
@@ -314,8 +318,17 @@ func (dcjc *DynCfgJobController) NotifyDependencyChanged(kind, name string) {
 }
 
 func (aai *acceptedActivationIndex) runAttempt(id string, entry *acceptedActivationEntry, sequence uint64) bool {
-	stage, stageErr := aai.factory.newCandidate(entry.spec.config)
-
+	aai.mu.Lock()
+	if aai.closed || aai.failed || aai.entries[id] != entry || entry.state != acceptedActivationStaging {
+		aai.mu.Unlock()
+		return false
+	}
+	stage := entry.stage
+	aai.mu.Unlock()
+	var stageErr error
+	if stage == nil {
+		stage, stageErr = aai.factory.newCandidate(entry.spec.config)
+	}
 	aai.mu.Lock()
 	if aai.closed || aai.failed || aai.entries[id] != entry || entry.state != acceptedActivationStaging {
 		aai.mu.Unlock()
@@ -689,7 +702,6 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 				dcjc.completeActivationRestart(attempt.token, rejectedResult(jobFailure{class: failureUnavailable, message: "the job cannot start until the plugin restarts."}))
 			}, attempt.markApplied()),
 		},
-		failurePlan,
 	)
 }
 
@@ -771,16 +783,6 @@ func (dcjc *DynCfgJobController) activationRelease(id string, namespace jobmgr.P
 	released := make(chan struct{})
 	close(released)
 	return released
-}
-
-func (dcjc *DynCfgJobController) activateAfterRelease(config confgroup.Config, namespace jobmgr.ProcessAttemptNamespace) (func(), error) {
-	spec, err := newAcceptedActivationSpec(config)
-	if err != nil {
-		return nil, err
-	}
-	return func() {
-		dcjc.scheduler.accepted.armAfterRelease(spec, dcjc.activationRelease(config.FullName(), namespace))
-	}, nil
 }
 
 func (dcjc *DynCfgJobController) prepareAcceptedActivationWait(

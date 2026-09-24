@@ -35,26 +35,20 @@ const (
 	injectJobBusy
 	injectJobDeadline
 	injectJobQuarantined
-	injectRuntimeBusy        // after the incumbent is stopped
-	injectRuntimeQuarantined // after the incumbent is stopped
-	injectStartupFailure     // after the incumbent is stopped
 	injectV1CheckUnclassified
 	injectInitPermanent
 	injectInitTemporary
 	injectJobSuperseded
 )
 
-func (ai adoptionInjection) afterIncumbentStops() bool {
-	return ai == injectRuntimeBusy || ai == injectRuntimeQuarantined || ai == injectStartupFailure
-}
-
-// TestDynCfgJobRepliesStateAdoption drives collector-job DynCfg commands
+// TestDynCfgJobMutationAdoptionAndRestartPreflight drives collector-job DynCfg commands
 // through the production Prepare, Apply and encode path and checks the reply
 // contract on every row: the daemon saves add, update, enable, disable and
 // remove on 2xx only, so a 2xx means the graph holds the requested state and a
 // non-2xx means the record, the incumbent, the retries and the registrations
-// are unchanged. restart is not saved: it answers 2xx only when a job runs.
-func TestDynCfgJobRepliesStateAdoption(t *testing.T) {
+// are unchanged. RESTART rows cover preflight rejection only; composition tests
+// exercise its external reply after the separate activation receipt settles.
+func TestDynCfgJobMutationAdoptionAndRestartPreflight(t *testing.T) {
 	tests := map[string]struct {
 		command  dyncfg.Command
 		status   dyncfg.Status // preimage record status; empty = no record
@@ -81,9 +75,6 @@ func TestDynCfgJobRepliesStateAdoption(t *testing.T) {
 		"update running with a quarantined job":        {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectJobQuarantined, wantCode: 503},
 		"update running with a missing vnode":          {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectMissingVnode, wantCode: 503},
 		"update running with a retried missing vnode":  {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectMissingVnode, retry: 1, wantCode: 503},
-		"update running with a busy runtime":           {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectRuntimeBusy, wantCode: 202},
-		"update running with a quarantined runtime":    {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectRuntimeQuarantined, wantCode: 202},
-		"update running with a startup failure":        {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectStartupFailure, wantCode: 202},
 		"update running stock succeeds":                {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, source: confgroup.TypeStock, wantCode: 202},
 		"update running stock with a permanent error":  {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, source: confgroup.TypeStock, inject: injectCheckPermanent, wantCode: 422},
 		"update running user succeeds":                 {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, source: confgroup.TypeUser, wantCode: 202},
@@ -104,7 +95,6 @@ func TestDynCfgJobRepliesStateAdoption(t *testing.T) {
 		"enable disabled with a retried check":         {command: dyncfg.CommandEnable, status: dyncfg.StatusDisabled, inject: injectCheckUnclassified, retry: 1, wantCode: 202},
 		"enable disabled with a permanent error":       {command: dyncfg.CommandEnable, status: dyncfg.StatusDisabled, inject: injectCheckPermanent, retry: 1, wantCode: 202},
 		"enable disabled with a stored invalid config": {command: dyncfg.CommandEnable, status: dyncfg.StatusDisabled, inject: injectInvalidPayload, wantCode: 202},
-		"enable disabled with a busy runtime":          {command: dyncfg.CommandEnable, status: dyncfg.StatusDisabled, inject: injectRuntimeBusy, wantCode: 202},
 		"enable disabled v1 with a check failure":      {command: dyncfg.CommandEnable, status: dyncfg.StatusDisabled, inject: injectV1CheckUnclassified, wantCode: 202},
 		"enable disabled v1 with a retried check":      {command: dyncfg.CommandEnable, status: dyncfg.StatusDisabled, inject: injectV1CheckUnclassified, retry: 1, wantCode: 202},
 		"enable disabled stock with a retried check":   {command: dyncfg.CommandEnable, status: dyncfg.StatusDisabled, source: confgroup.TypeStock, inject: injectCheckUnclassified, retry: 1, wantCode: 202},
@@ -113,7 +103,6 @@ func TestDynCfgJobRepliesStateAdoption(t *testing.T) {
 		"enable accepted":                              {command: dyncfg.CommandEnable, status: dyncfg.StatusAccepted, wantCode: 202},
 		"restart running with a retried check":         {command: dyncfg.CommandRestart, status: dyncfg.StatusRunning, inject: injectCheckUnclassified, retry: 1, wantCode: 422},
 		"restart running with a retried temporary":     {command: dyncfg.CommandRestart, status: dyncfg.StatusRunning, inject: injectCheckTemporary, retry: 1, wantCode: 503},
-		"restart running with a busy runtime":          {command: dyncfg.CommandRestart, status: dyncfg.StatusRunning, inject: injectRuntimeBusy, wantCode: 503},
 		"restart failed with a retried check":          {command: dyncfg.CommandRestart, status: dyncfg.StatusFailed, inject: injectCheckUnclassified, retry: 1, wantCode: 422},
 		"restart disabled":                             {command: dyncfg.CommandRestart, status: dyncfg.StatusDisabled, wantCode: 405},
 		"disable running":                              {command: dyncfg.CommandDisable, status: dyncfg.StatusRunning, wantCode: 200},
@@ -221,7 +210,7 @@ func TestDynCfgJobRepliesStateAdoption(t *testing.T) {
 			// restart is not saved, but a restart of a running job that fails
 			// before stopping it must still keep everything.
 			restartKeeps := test.command == dyncfg.CommandRestart && !adopted &&
-				preimage.Status == dyncfg.StatusRunning.String() && !test.inject.afterIncumbentStops()
+				preimage.Status == dyncfg.StatusRunning.String()
 			switch {
 			case persisted && adopted:
 				requireAdoptionHoldsRequest(t, controller, test.command, request, preimage, preimageExists, record, exists)
@@ -232,10 +221,8 @@ func TestDynCfgJobRepliesStateAdoption(t *testing.T) {
 				}
 				if exists && record.Status == dyncfg.StatusFailed.String() {
 					require.Equal(t, 202, code, "an adopted failure answers 202")
-					if !test.inject.afterIncumbentStops() {
-						require.True(t, runtimeTestHasRetry(controller, stored.FullName()),
-							"an adopted preparation failure is retried")
-					}
+					require.True(t, runtimeTestHasRetry(controller, stored.FullName()),
+						"an adopted preparation failure is retried")
 				}
 			case persisted, restartKeeps:
 				require.Equal(t, preimageExists, exists, "a rejection keeps the record")
@@ -348,14 +335,6 @@ func configureAdoptionTestCollector(controller *DynCfgJobController, state *fact
 		controller.modules["module"] = creator
 		return
 	}
-	if inject == injectStartupFailure {
-		configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
-			return &runtimeTestCollector{
-				run: func(context.Context, func()) error { return errors.New("listen: address in use") },
-			}
-		})
-		return
-	}
 	var checkErr error
 	switch inject {
 	case injectCheckUnclassified:
@@ -399,10 +378,6 @@ func injectAdoptionAttemptFailure(controller *DynCfgJobController, inject adopti
 		namespace, err = jobmgr.ProcessAttemptJob, jobmgr.ErrProcessAttemptQuarantined
 	case injectJobSuperseded:
 		namespace, err = jobmgr.ProcessAttemptJob, jobmgr.ErrProcessAttemptSuperseded
-	case injectRuntimeBusy:
-		namespace, err = jobmgr.ProcessAttemptJobRuntime, jobmgr.ErrProcessAttemptBusy
-	case injectRuntimeQuarantined:
-		namespace, err = jobmgr.ProcessAttemptJobRuntime, jobmgr.ErrProcessAttemptQuarantined
 	default:
 		return
 	}

@@ -20,9 +20,10 @@ const (
 // PermanentError classifies an Init or Check error as permanent: retrying the
 // same configuration cannot succeed, as with an invalid option or an unknown
 // named profile. The job fails without autodetection retries, whatever
-// autodetection_retry says, and a DynCfg update or enable that meets it is
-// rejected (422) with the running job kept. A CollectorV2Runner.Run startup
-// error classified this way is not retried either.
+// autodetection_retry says. DynCfg update preflight rejects it (422), preserving
+// the incumbent. Enable accepts intent before probing and reports a later
+// failure through job status. A CollectorV2Runner.Run startup error classified
+// this way is not retried either.
 // It returns nil for a nil err.
 func PermanentError(err error) error {
 	if err == nil {
@@ -34,9 +35,9 @@ func PermanentError(err error) error {
 // TemporaryError classifies an Init or Check error as a failure that may clear
 // on its own, such as a dependency that is not ready yet. The job keeps the
 // configured autodetection_retry, which an unclassified Init error would
-// disable. A DynCfg update or enable adopts the configuration as failed (202)
-// when autodetection_retry will retry it and rejects it (503) otherwise;
-// test answers 503.
+// disable. DynCfg update preflight rejects it (503), preserving the incumbent
+// regardless of autodetection_retry; test also answers 503. Enable accepts
+// intent before probing and reports a later failure through job status.
 // It returns nil for a nil err.
 func TemporaryError(err error) error {
 	if err == nil {

@@ -50,7 +50,65 @@ func configureRuntimeTestCollector(controller *DynCfgJobController, create func(
 	controller.modules["module"] = creator
 }
 
-func prepareRuntimeTestChange(t *testing.T, controller *DynCfgJobController, cfg confgroup.Config, current lifecycle.ReadyResource, generation uint64) lifecycle.PreparedResourceTransaction {
+// runtimeTestBindActivations runs the actual accepted owner while tests retain
+// control of each submitted transaction and its terminal acknowledgement.
+func runtimeTestBindActivations(t *testing.T, controller *DynCfgJobController) *activationTestCommands {
+	t.Helper()
+	index := controller.scheduler.accepted
+	index.mu.Lock()
+	bound, existing := index.bound, index.commands
+	index.mu.Unlock()
+	if bound {
+		commands, ok := existing.(*activationTestCommands)
+		require.True(t, ok, "runtime fixture needs the controlled activation command port")
+		return commands
+	}
+	commands := &activationTestCommands{queue: make(chan activationTestSubmission, 8), stop: make(chan struct{})}
+	require.NoError(t, index.bind(controller.factory, commands, controller.planAcceptedActivation, 9, func(err error) { t.Errorf("activation dispatch: %v", err) }))
+	t.Cleanup(func() {
+		close(commands.stop)
+		index.stopWorker()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		require.NoError(t, index.wait(ctx))
+	})
+	return commands
+}
+
+type runtimeTestActivationTransaction struct {
+	lifecycle.PreparedResourceTransaction
+	ack chan error
+}
+
+func (transaction *runtimeTestActivationTransaction) Apply(ctx context.Context) (lifecycle.AppliedResourceTransaction, error) {
+	applied, err := transaction.PreparedResourceTransaction.Apply(ctx)
+	transaction.ack <- err
+	return applied, err
+}
+
+func (transaction *runtimeTestActivationTransaction) Dispose(ctx context.Context) (lifecycle.ReadyResource, error) {
+	current, err := transaction.PreparedResourceTransaction.Dispose(ctx)
+	transaction.ack <- err
+	return current, err
+}
+
+func runtimeTestPrepareActivation(t *testing.T, commands *activationTestCommands, id string, generation uint64) lifecycle.PreparedResourceTransaction {
+	t.Helper()
+	call := commands.next(t, "internal/jobs/accepted-activation")
+	require.Equal(t, id, call.plan.Transaction.ID)
+	permit, _ := issueTestJobPermit(t, id, generation)
+	scope := lifecycle.ResourceTransactionScope{ID: id, Successor: lifecycle.ResourceIdentity{ID: id, Generation: generation}}
+	prepared, err := call.plan.Transaction.Prepare(t.Context(), nil, scope, permit)
+	require.NoError(t, err)
+	return &runtimeTestActivationTransaction{PreparedResourceTransaction: prepared, ack: call.ack}
+}
+
+func runtimeTestApplyActivation(t *testing.T, commands *activationTestCommands, id string, generation uint64) lifecycle.ReadyResource {
+	t.Helper()
+	return runtimeTestApply(t, runtimeTestPrepareActivation(t, commands, id, generation))
+}
+
+func prepareRuntimeTestAdoption(t *testing.T, controller *DynCfgJobController, cfg confgroup.Config, current lifecycle.ReadyResource, generation uint64) lifecycle.PreparedResourceTransaction {
 	t.Helper()
 	plan, err := controller.PlanDiscovered(DiscoveredJobChange{Config: cfg, Status: dyncfg.StatusRunning, Restart: true})
 	require.NoError(t, err)
@@ -62,6 +120,15 @@ func prepareRuntimeTestChange(t *testing.T, controller *DynCfgJobController, cfg
 	prepared, err := plan.Transaction.Prepare(t.Context(), current, scope, permit)
 	require.NoError(t, err)
 	return prepared
+}
+
+// Each logical fixture change uses separate adoption and activation generations.
+// Acceptance is applied before returning the real installation transaction.
+func prepareRuntimeTestChange(t *testing.T, controller *DynCfgJobController, cfg confgroup.Config, current lifecycle.ReadyResource, generation uint64) lifecycle.PreparedResourceTransaction {
+	t.Helper()
+	commands := runtimeTestBindActivations(t, controller)
+	require.Nil(t, runtimeTestApply(t, prepareRuntimeTestAdoption(t, controller, cfg, current, 2*generation-1)))
+	return runtimeTestPrepareActivation(t, commands, cfg.FullName(), 2*generation)
 }
 
 func runtimeTestApply(t *testing.T, prepared lifecycle.PreparedResourceTransaction) lifecycle.ReadyResource {
@@ -221,7 +288,8 @@ func TestRuntimeReplacementWaitsForPhysicalCleanupAndConfigTestDoesNotRun(t *tes
 	current := runtimeTestStartAndSettle(t, controller, cfg, nil, 1)
 	require.NotNil(t, current)
 	require.NoError(t, controller.configModules.Test(t.Context(), cfg), "configuration test must not bind the active endpoint")
-	prepared := prepareRuntimeTestChange(t, controller, cfg, current, 2)
+	commands := runtimeTestBindActivations(t, controller)
+	prepared := prepareRuntimeTestAdoption(t, controller, cfg, current, 3)
 	type result struct {
 		applied lifecycle.AppliedResourceTransaction
 		err     error
@@ -248,10 +316,12 @@ func TestRuntimeReplacementWaitsForPhysicalCleanupAndConfigTestDoesNotRun(t *tes
 	require.NoError(t, resultValue.err)
 	_, _, next := resultValue.applied.Ownership()
 	require.Nil(t, next, "busy physical identity keeps the replacement pending")
-	requireFactoryAttemptsIdle(t, controller.factory)
-	next = runtimeTestStartAndSettle(t, controller, cfg, nil, 3)
+	notifications := runtimeTestNotifications(t, controller)
+	next = runtimeTestApplyActivation(t, commands, cfg.FullName(), 4)
+	next = runtimeTestApplyNotification(t, runtimeTestNotificationPlan(t, notifications, "internal/jobs/runtime-ready"), next)
 	require.NotNil(t, next)
-	require.Equal(t, uint64(3), next.Identity().Generation)
+	require.Equal(t, uint64(4), next.Identity().Generation)
+	require.EqualValues(t, 3, creates.Load(), "replacement must reuse its checked candidate after the separate configuration test")
 	stopRuntimeTestResource(t, next)
 	requireFactoryAttemptsIdle(t, controller.factory)
 }
@@ -332,8 +402,9 @@ func TestRuntimeReadyThenFailedBeforeInstallationReconcilesExactGeneration(t *te
 				}}
 			})
 			cfg := factoryTestConfig(false).Set("autodetection_retry", 1)
-			prepared := prepareRuntimeTestChange(t, controller, cfg, nil, 1).(*PreparedResourceTransaction)
-			prepared.spec.Successor = pauseAcceptedRuntime{PreparedResource: prepared.spec.Successor, afterReady: func() {
+			prepared := prepareRuntimeTestChange(t, controller, cfg, nil, 1).(*runtimeTestActivationTransaction)
+			installation := prepared.PreparedResourceTransaction.(*PreparedResourceTransaction)
+			installation.spec.Successor = pauseAcceptedRuntime{PreparedResource: installation.spec.Successor, afterReady: func() {
 				close(failRun)
 				runtimeTestNotificationPlan(t, commands, "internal/jobs/runtime-failure")
 			}}
@@ -478,18 +549,13 @@ func TestRuntimeStartupFailureUsesEveryActivationPath(t *testing.T) {
 			configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
 				return &runtimeTestCollector{run: func(context.Context, func()) error { return errors.New("listen 127.0.0.1:8125: bind failed") }}
 			})
-			commands := &runtimeSettlementAcknowledgementCommands{autoDetectionRetryTestCommands: &autoDetectionRetryTestCommands{}, release: make(chan struct{})}
-			require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(err error) { t.Errorf("worker failed: %v", err) }))
-			t.Cleanup(func() {
-				close(commands.release)
-				controller.scheduler.StopBackgroundWorkers()
-				require.NoError(t, controller.scheduler.WaitBackgroundWorkers(context.Background()))
-			})
-			scope := lifecycle.ResourceTransactionScope{ID: cfg.FullName(), Successor: lifecycle.ResourceIdentity{ID: cfg.FullName(), Generation: 2}}
+			activations := runtimeTestBindActivations(t, controller)
+			commands := runtimeTestNotifications(t, controller)
+			scope := lifecycle.ResourceTransactionScope{ID: cfg.FullName(), Successor: lifecycle.ResourceIdentity{ID: cfg.FullName(), Generation: 3}}
 			if current != nil {
 				scope.Current = current.Identity()
 			}
-			permit, _ := issueTestJobPermit(t, cfg.FullName(), 2)
+			permit, _ := issueTestJobPermit(t, cfg.FullName(), 3)
 			var prepared lifecycle.PreparedResourceTransaction
 			var err error
 			if path == "secret" {
@@ -526,15 +592,10 @@ func TestRuntimeStartupFailureUsesEveryActivationPath(t *testing.T) {
 				if released, present := controller.factory.config.Attempts.ProcessAttemptReleased(jobAttemptIdentity(jobmgr.ProcessAttemptJobRuntime, cfg.FullName())); present {
 					requireTestSignal(t, released, "predecessor did not release its physical identity")
 				}
-				plan := runtimeTestNotificationPlan(t, commands.autoDetectionRetryTestCommands, "internal/jobs/accepted-activation")
-				scope = lifecycle.ResourceTransactionScope{ID: cfg.FullName(), Successor: lifecycle.ResourceIdentity{ID: cfg.FullName(), Generation: 3}}
-				permit, _ = issueTestJobPermit(t, cfg.FullName(), 3)
-				prepared, err = plan.Transaction.Prepare(t.Context(), nil, scope, permit)
-				require.NoError(t, err)
-				current = runtimeTestApply(t, prepared)
+				current = runtimeTestApplyActivation(t, activations, cfg.FullName(), 4)
 			}
 			require.NotNil(t, current, "runtime initiation installs a starting generation")
-			plan := runtimeTestNotificationPlan(t, commands.autoDetectionRetryTestCommands, "internal/jobs/runtime-ready")
+			plan := runtimeTestNotificationPlan(t, commands, "internal/jobs/runtime-ready")
 			require.Nil(t, runtimeTestApplyNotification(t, plan, current))
 			record, _ := graph.Lookup(cfg.FullName())
 			require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
