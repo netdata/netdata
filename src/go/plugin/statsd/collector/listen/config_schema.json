@@ -1,0 +1,154 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "StatsD collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "How often to retry binding the listeners when the job fails to start, in seconds. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "listeners": {
+        "title": "Listeners",
+        "description": "Local endpoints that receive StatsD metrics. Every listener must bind for the job to start.",
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "title": "Listener",
+          "type": "object",
+          "properties": {
+            "protocol": {
+              "title": "Protocol",
+              "description": "Transport to receive StatsD metrics on.",
+              "type": "string",
+              "enum": [
+                "udp",
+                "tcp"
+              ]
+            },
+            "address": {
+              "title": "Address",
+              "description": "Local address to listen on, as `host:port` with a numeric port.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "protocol",
+            "address"
+          ]
+        },
+        "uniqueItems": true
+      },
+      "profiles": {
+        "title": "Profiles",
+        "description": "Names of the profiles to apply, in precedence order. Leave empty to show every metric on automatic charts only.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Profile name",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "uniqueItems": true
+      },
+      "max_series": {
+        "title": "Series limit",
+        "description": "Maximum number of distinct metrics, counting each label combination separately. New metrics above the limit are rejected; existing ones keep updating.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1000
+      },
+      "metric_idle_timeout": {
+        "title": "Metric idle timeout",
+        "description": "How long a metric may receive no updates before it is removed, in seconds. Zero keeps idle metrics until the job restarts.",
+        "type": "number",
+        "minimum": 0,
+        "default": 300
+      },
+      "max_tcp_connections": {
+        "title": "TCP connection limit",
+        "description": "Maximum number of simultaneous TCP clients across the job's TCP listeners. New clients above the limit are disconnected.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 64
+      }
+    },
+    "required": [
+      "listeners"
+    ]
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "autodetection_retry",
+            "listeners"
+          ]
+        },
+        {
+          "title": "Profiles",
+          "fields": [
+            "profiles"
+          ]
+        },
+        {
+          "title": "Limits",
+          "fields": [
+            "max_series",
+            "metric_idle_timeout",
+            "max_tcp_connections"
+          ]
+        }
+      ]
+    },
+    "listeners": {
+      "ui:listFlavour": "list",
+      "ui:help": "UDP and TCP listeners may use the same port. Over TCP, every metric line must end with a newline, including the last one.",
+      "items": {
+        "protocol": {
+          "ui:widget": "radio",
+          "ui:options": {
+            "inline": true,
+            "enumNames": [
+              "UDP",
+              "TCP"
+            ]
+          }
+        },
+        "address": {
+          "ui:placeholder": "127.0.0.1:8126",
+          "ui:help": "Use `127.0.0.1` to accept metrics from this host only. Leave the host empty (`:8126`) to listen on all interfaces."
+        }
+      }
+    },
+    "profiles": {
+      "ui:listFlavour": "list",
+      "ui:help": "A profile renames or relabels matching metrics and defines charts for them. Each name refers to a `<name>.yaml` (or `.yml`) file in the `statsd.profiles/` directory of the plugin's configuration directory, for example `/etc/netdata/statsd/statsd.profiles/`. Profiles are read when the job starts.",
+      "items": {
+        "ui:placeholder": "myapp"
+      }
+    },
+    "max_series": {
+      "ui:help": "Rejected updates appear as `capacity` on the StatsD rejected input chart. Idle metrics count toward the limit until the metric idle timeout removes them."
+    },
+    "max_tcp_connections": {
+      "ui:help": "Refused clients appear on the StatsD refused TCP connections chart. A connected client keeps its slot even while it sends nothing."
+    }
+  }
+}
