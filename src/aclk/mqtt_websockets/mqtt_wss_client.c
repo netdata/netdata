@@ -20,6 +20,11 @@
 
 #if defined(OS_WINDOWS)
 typedef SOCKET mqtt_wss_wakeup_fd_t;
+static ERROR_LIMIT mqtt_wss_wakeup_error_erl = {
+    .spinlock = SPINLOCK_INITIALIZER,
+    .log_every = 60,
+    .last_logged = -60, // Make the first failure visible immediately.
+};
 #else
 typedef int mqtt_wss_wakeup_fd_t;
 #endif
@@ -893,7 +898,16 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
 static void mqtt_wss_wakeup(mqtt_wss_client client)
 {
 #if defined(OS_WINDOWS)
-    (void)send(client->write_notif_pipe[PIPE_WRITE_END], " ", 1, 0);
+    int sent = send(client->write_notif_pipe[PIPE_WRITE_END], " ", 1, 0);
+    if (sent == 1)
+        return;
+
+    int error = sent == SOCKET_ERROR ? WSAGetLastError() : WSAECONNRESET;
+    // A full nonblocking socket already has a pending wakeup; other errors
+    // mean the service loop may not observe newly queued work promptly.
+    if (error != WSAEWOULDBLOCK)
+        nd_log_limit(&mqtt_wss_wakeup_error_erl, NDLS_ACLK, NDLP_WARNING,
+                     "ACLK: wakeup socket send failed with Winsock error %d", error);
 #else
     if(write(client->write_notif_pipe[PIPE_WRITE_END], " ", 1) <= 0) { ; }
 #endif
@@ -904,7 +918,14 @@ char throwaway[THROWAWAY_BUF_SIZE];
 static void util_clear_pipe(mqtt_wss_wakeup_fd_t fd)
 {
 #if defined(OS_WINDOWS)
-    (void)recv(fd, throwaway, THROWAWAY_BUF_SIZE, 0);
+    int received = recv(fd, throwaway, THROWAWAY_BUF_SIZE, 0);
+    if (received > 0)
+        return;
+
+    int error = received == SOCKET_ERROR ? WSAGetLastError() : WSAECONNRESET;
+    if (error != WSAEWOULDBLOCK)
+        nd_log_limit(&mqtt_wss_wakeup_error_erl, NDLS_ACLK, NDLP_WARNING,
+                     "ACLK: wakeup socket receive failed with Winsock error %d", error);
 #else
     if(read(fd, throwaway, THROWAWAY_BUF_SIZE) <= 0)  { ; }
 #endif

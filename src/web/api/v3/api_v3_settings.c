@@ -278,7 +278,7 @@ static inline int settings_put(struct web_client *w, char *file) {
     char filename[FILENAME_MAX];
     settings_filename(filename, file, NULL);
 
-    bool renamed = rename(tmp_filename, filename) == 0;
+    bool renamed = os_rename(tmp_filename, filename) == 0;
     if(!renamed)
         unlink(tmp_filename);
 

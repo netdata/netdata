@@ -964,7 +964,14 @@ int main(int argc, char **argv) {
         }
 #endif
 
+#if defined(OS_WINDOWS)
+        if (unlikely(fflush(stdout) == EOF)) {
+            netdata_mutex_unlock(&apps_and_stdout_mutex);
+            fatal("Cannot write to Netdata on stdout");
+        }
+#else
         fflush(stdout);
+#endif
 
         debug_log("done Loop No %zu", global_iterations_counter);
     }

@@ -268,7 +268,7 @@ void dyncfg_file_load(const char *d_name) {
     snprintf(fixed_filename, sizeof(fixed_filename), "%s/%s.dyncfg", dyncfg_globals.dir, fixed_id);
 
     if(strcmp(filename, fixed_filename) != 0) {
-        if(rename(filename, fixed_filename) != 0)
+        if(os_rename(filename, fixed_filename) != 0)
             nd_log(NDLS_DAEMON, NDLP_ERR,
                 "DYNCFG: cannot rename file '%s' into '%s'. Saving a new configuraton may not overwrite the old one.",
                 filename, fixed_filename);

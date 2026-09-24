@@ -1176,10 +1176,18 @@ static void command_pipe_queue_drain_to_loop(void) {
             freez(cmd_ctx);
             continue;
         }
-        ret = uv_pipe_open(&cmd_ctx->client, (uv_file)pipe);
+        uv_file pipe_fd = uv_open_osfhandle((uv_os_fd_t)pipe);
+        if (pipe_fd < 0) {
+            netdata_log_error("uv_open_osfhandle() for accepted Windows pipe failed");
+            CloseHandle(pipe);
+            uv_close((uv_handle_t *)&cmd_ctx->client, pipe_close_cb);
+            continue;
+        }
+
+        ret = uv_pipe_open(&cmd_ctx->client, pipe_fd);
         if (ret) {
             netdata_log_error("uv_pipe_open() for accepted Windows pipe: %s", uv_strerror(ret));
-            CloseHandle(pipe);
+            close(pipe_fd);
             uv_close((uv_handle_t *)&cmd_ctx->client, pipe_close_cb);
             continue;
         }

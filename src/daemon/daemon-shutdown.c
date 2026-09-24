@@ -514,6 +514,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     fprintf(stderr, "All done, exiting...\n");
 #endif
 
+#if defined(OS_WINDOWS)
+    if (!abnormal)
+        nd_log_stop_windows_async();
+#endif
+
     if(!exit_when_done) {
         curl_global_cleanup();
         return;

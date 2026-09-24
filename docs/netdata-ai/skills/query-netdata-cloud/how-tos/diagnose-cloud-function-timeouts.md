@@ -16,8 +16,11 @@ How can an operator distinguish a slow Windows Function from an ACLK/Cloud trans
    elapsed time for the direct call:
 
    ```bash
-   source docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh
+   REPO_ROOT="$(git rev-parse --show-toplevel)"
+   source "$REPO_ROOT/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
    agents_load_env
+   AUDIT_DIR="$REPO_ROOT/.local/audits/query-netdata-agents"
+   mkdir -p "$AUDIT_DIR"
    if [[ -z "${AGENT_URL:-}" ]]; then
        AGENT_TARGET="${AGENT_HOST:-127.0.0.1}"
        case "$AGENT_TARGET" in
@@ -31,21 +34,20 @@ How can an operator distinguish a slow Windows Function from an ACLK/Cloud trans
    AGENT_TARGET="${AGENT_TARGET#https://}"
    AGENT_TARGET="${AGENT_TARGET%%/*}"
 
-   mkdir -p .local/audits/query-netdata-agents
    # Resolve/cache Cloud credentials outside the measured interval.
    agents_call_function --via agent --node "$NODE_UUID" --host "$AGENT_TARGET" \
-     --machine-guid "$MACHINE_GUID" --function netdata-metrics-cardinality \
+     --machine-guid "$MACHINE_GUID" --function 'netdata-metrics-cardinality%20info' \
      --body '{"info":true}' >/dev/null 2>&1 || true
    direct_start="$(date +%s%N)"
    direct_rc=0
    agents_call_function --via agent --node "$NODE_UUID" --host "$AGENT_TARGET" \
-     --machine-guid "$MACHINE_GUID" --function netdata-metrics-cardinality \
+     --machine-guid "$MACHINE_GUID" --function 'netdata-metrics-cardinality%20info' \
      --body '{"info":true}' \
-     > .local/audits/query-netdata-agents/function-timeout-direct.json || direct_rc=$?
+     > "$AUDIT_DIR/function-timeout-direct.json" || direct_rc=$?
    direct_elapsed="$(awk -v s="$direct_start" -v e="$(date +%s%N)" 'BEGIN { printf "%.3f", (e-s)/1000000000 }')"
-   if [[ "$direct_rc" -eq 0 ]] && jq -e . .local/audits/query-netdata-agents/function-timeout-direct.json >/dev/null 2>&1; then
+   if [[ "$direct_rc" -eq 0 ]] && jq -e . "$AUDIT_DIR/function-timeout-direct.json" >/dev/null 2>&1; then
        jq --arg elapsed "${direct_elapsed}s" '{status: (.status // null), total: $elapsed}' \
-         .local/audits/query-netdata-agents/function-timeout-direct.json
+         "$AUDIT_DIR/function-timeout-direct.json"
    else
        jq -n --arg elapsed "${direct_elapsed}s" --arg rc "$direct_rc" \
          '{status: null, total: $elapsed, transport_error: $rc}'
@@ -55,15 +57,14 @@ How can an operator distinguish a slow Windows Function from an ACLK/Cloud trans
 2. Load the token-safe Cloud wrapper and run the same Function request. The wrapper emits only the response body:
 
    ```bash
-   mkdir -p .local/audits/query-netdata-agents
-   # Reuse AGENT_TARGET and the credentials loaded above.
+   # Run this block in the same shell session as Step 1 to reuse the target and credentials.
    cloud_rc=0
    agents_call_function --via cloud --node "$NODE_UUID" \
-     --function netdata-metrics-cardinality --body '{"info":true}' \
-     > .local/audits/query-netdata-agents/function-timeout-cloud.json || cloud_rc=$?
-   if [[ "$cloud_rc" -eq 0 ]] && jq -e . .local/audits/query-netdata-agents/function-timeout-cloud.json >/dev/null 2>&1; then
+     --function 'netdata-metrics-cardinality%20info' --body '{"info":true}' \
+     > "$AUDIT_DIR/function-timeout-cloud.json" || cloud_rc=$?
+   if [[ "$cloud_rc" -eq 0 ]] && jq -e . "$AUDIT_DIR/function-timeout-cloud.json" >/dev/null 2>&1; then
        jq '{status, type, errorMessage, errorMsgKey, errorCode}' \
-         .local/audits/query-netdata-agents/function-timeout-cloud.json
+         "$AUDIT_DIR/function-timeout-cloud.json"
    else
        jq -n --arg rc "$cloud_rc" '{status: null, transport_error: $rc}'
    fi

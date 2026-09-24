@@ -673,13 +673,13 @@ static inline int getgrgid_r(gid_t gid __maybe_unused,
 #endif
 
 // ── WIFEXITED / WEXITSTATUS / WIFSIGNALED / WTERMSIG ── sys/wait.h absent ───
-// On Windows, processes exit normally (no POSIX signal killing).
-// _pclose / waitpid return the exit code directly.
+// The Windows spawn server encodes normal exit values in bits 8-15 and mapped
+// exception signals in bits 0-7; decode that representation like wait status.
 #ifndef WIFEXITED
-#define WIFEXITED(status)    (1)
-#define WEXITSTATUS(status)  ((status) & 0xFF)
-#define WIFSIGNALED(status)  (0)
-#define WTERMSIG(status)     (0)
+#define WIFEXITED(status)    (((status) & 0xFF) == 0)
+#define WEXITSTATUS(status)  (((status) >> 8) & 0xFF)
+#define WIFSIGNALED(status)  (((status) & 0xFF) != 0)
+#define WTERMSIG(status)     ((status) & 0xFF)
 #endif
 
 // ── POSIX signal numbers absent from UCRT64 ──────────────────────────────────
@@ -1205,6 +1205,7 @@ static inline int link(const char *oldpath, const char *newpath) {
 // Return entry type portably; UCRT64 has no dirent::d_type member.
 #if defined(OS_WINDOWS)
 char *os_translate_msys_to_windows_path(const char *src);
+wchar_t *os_translate_msys_to_windows_pathW(const char *src);
 void freez(void *ptr);
 #endif
 static inline unsigned char nd_dirent_type(const char *directory, const struct dirent *entry) {
@@ -1221,8 +1222,8 @@ static inline unsigned char nd_dirent_type(const char *directory, const struct d
         return DT_UNKNOWN;
 
     // readdir() receives MSYS-style paths; Win32 APIs require native paths.
-    char *native_path = os_translate_msys_to_windows_path(path);
-    DWORD attrs = native_path ? GetFileAttributesA(native_path) : INVALID_FILE_ATTRIBUTES;
+    wchar_t *native_path = os_translate_msys_to_windows_pathW(path);
+    DWORD attrs = native_path ? GetFileAttributesW(native_path) : INVALID_FILE_ATTRIBUTES;
     freez(native_path);
     if (attrs == INVALID_FILE_ATTRIBUTES)
         return DT_UNKNOWN;

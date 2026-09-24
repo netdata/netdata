@@ -156,6 +156,51 @@ wchar_t *os_translate_msys_to_windows_pathW(const char *src) {
     return converted_path;
 }
 
+int os_rename(const char *oldpath, const char *newpath) {
+    wchar_t *oldpath_w = os_translate_msys_to_windows_pathW(oldpath);
+    wchar_t *newpath_w = os_translate_msys_to_windows_pathW(newpath);
+    if (!oldpath_w || !newpath_w) {
+        freez(oldpath_w);
+        freez(newpath_w);
+        errno = EINVAL;
+        return -1;
+    }
+
+    BOOL moved = MoveFileExW(oldpath_w, newpath_w,
+                             MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+    DWORD error = moved ? ERROR_SUCCESS : GetLastError();
+    freez(oldpath_w);
+    freez(newpath_w);
+
+    if (moved)
+        return 0;
+
+    switch (error) {
+        case ERROR_FILE_NOT_FOUND:
+        case ERROR_PATH_NOT_FOUND:
+            errno = ENOENT;
+            break;
+        case ERROR_ACCESS_DENIED:
+        case ERROR_SHARING_VIOLATION:
+            errno = EACCES;
+            break;
+        case ERROR_ALREADY_EXISTS:
+        case ERROR_FILE_EXISTS:
+            errno = EEXIST;
+            break;
+        case ERROR_NOT_SAME_DEVICE:
+            errno = EXDEV;
+            break;
+        case ERROR_INVALID_PARAMETER:
+            errno = EINVAL;
+            break;
+        default:
+            errno = EIO;
+            break;
+    }
+    return -1;
+}
+
 // Build a protected (non-inheriting) security descriptor from a POSIX mode.
 //
 // SYSTEM and the local Administrators group always keep full access, so the
@@ -318,8 +363,8 @@ int nd_open_no_follow(const char *path, int flags, int mode) {
         return -1;
     }
 
-    if (flags & O_CLOEXEC)
-        SetHandleInformation((HANDLE)_get_osfhandle(fd), HANDLE_FLAG_INHERIT, 0);
+    // CreateFileW receives either an explicit non-inheritable SECURITY_ATTRIBUTES
+    // or NULL; both produce a handle that is not inheritable.
 
     return fd;
 }

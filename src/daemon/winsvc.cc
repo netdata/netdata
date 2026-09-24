@@ -45,7 +45,7 @@ static bool ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD d
 
     // A late heartbeat must never move the service back to STOP_PENDING after
     // the timeout path has published STOPPED.
-    if (svc_status.dwCurrentState == SERVICE_STOPPED && dwCurrentState != SERVICE_STOPPED) {
+    if (svc_status.dwCurrentState == SERVICE_STOPPED) {
         LeaveCriticalSection(&svc_status_lock);
         return true;
     }
@@ -192,8 +192,6 @@ static NORETURN void call_netdata_cleanup(void *arg)
     // to the SCM first so the service is not recorded as crashed.
     nd_register_shutdown_timeout_cb(svc_report_stopped_before_abort);
     netdata_exit_gracefully(reason, false);
-    // Drain the WEL/ETW async writer before the process exits so no log entries are lost.
-    nd_log_stop_windows_async();
     // Cleanup completed normally — no longer need the abort callback.
     nd_register_shutdown_timeout_cb(NULL);
 

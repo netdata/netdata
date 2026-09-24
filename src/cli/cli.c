@@ -254,13 +254,22 @@ int main(int argc, char **argv)
         connect_cb(&req, uv_translate_sys_error((int)pipe_error));
     }
     else {
-        ret = uv_pipe_open(&client_pipe, (uv_file)pipe_handle);
-        if (ret) {
+        uv_file pipe_fd = uv_open_osfhandle((uv_os_fd_t)pipe_handle);
+        if (pipe_fd < 0) {
+            int saved_errno = errno;
+            fprintf(stderr, "Cannot convert command-pipe handle to a libuv descriptor.\n");
             CloseHandle(pipe_handle);
-            connect_cb(&req, ret);
+            connect_cb(&req, uv_translate_sys_error(saved_errno));
         }
-        else
-            connect_cb(&req, 0);
+        else {
+            ret = uv_pipe_open(&client_pipe, pipe_fd);
+            if (ret) {
+                close(pipe_fd);
+                connect_cb(&req, ret);
+            }
+            else
+                connect_cb(&req, 0);
+        }
     }
 #else
     uv_pipe_connect(&req, &client_pipe, pipename, connect_cb);

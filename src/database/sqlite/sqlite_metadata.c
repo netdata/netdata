@@ -804,7 +804,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
         if (rc == 0) {
             char new_sqlite_database[FILENAME_MAX + 1];
             snprintfz(new_sqlite_database, sizeof(new_sqlite_database) - 1, "%s/netdata-meta.bad", netdata_configured_cache_dir);
-            rc = rename(sqlite_database, new_sqlite_database);
+            rc = os_rename(sqlite_database, new_sqlite_database);
             if (rc)
                 error_report("Failed to rename %s to %s", sqlite_database, new_sqlite_database);
         }

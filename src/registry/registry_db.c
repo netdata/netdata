@@ -312,7 +312,7 @@ int registry_db_save(void) {
     else {
         netdata_log_debug(D_REGISTRY, "REGISTRY: renaming temporary old db '%s' to old db '%s'", old_tmp_filename,
                           old_filename);
-        if(rename(old_tmp_filename, old_filename) == -1) {
+        if(os_rename(old_tmp_filename, old_filename) == -1) {
             netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Saving registry DB failed!", old_tmp_filename,
                               old_filename);
             unlink(old_tmp_filename);
@@ -329,7 +329,7 @@ int registry_db_save(void) {
 
     // Publish the new DB atomically. If rename fails, the active DB remains untouched.
     netdata_log_debug(D_REGISTRY, "REGISTRY: renaming tmp db '%s' to active db '%s'", tmp_filename, registry.db_filename);
-    if(rename(tmp_filename, registry.db_filename) == -1) {
+    if(os_rename(tmp_filename, registry.db_filename) == -1) {
         netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Saving registry DB failed!", tmp_filename,
                           registry.db_filename);
         unlink(tmp_filename);

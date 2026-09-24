@@ -70,10 +70,15 @@ wchar_t *os_translate_msys_to_windows_pathW(const char *src);
 // Open a file without following Windows reparse points (the Windows equivalent
 // of POSIX O_NOFOLLOW). The returned descriptor uses the CRT open semantics.
 int nd_open_no_follow(const char *path, int flags, int mode);
+// POSIX-style rename semantics, including replacement of an existing target.
+int os_rename(const char *oldpath, const char *newpath);
 int os_windows_path_translation_unittest(void);
 // Returns newly allocated POSIX-style storage; caller must free.
 char *os_translate_windows_to_msys_path(const char *src);
 #else
+static inline int os_rename(const char *oldpath, const char *newpath) {
+    return rename(oldpath, newpath);
+}
 // No translation needed on non-Windows; copy src into dst for consistent semantics.
 static inline char *os_translate_path(char *dst, const char *src, size_t dst_size) {
     if (!dst || !dst_size)
