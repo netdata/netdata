@@ -25,7 +25,7 @@ type configuredStore struct {
 	store      Store
 }
 
-// ValidateStructure checks available fields and reference syntax without
+// ValidateStructure checks available fields and supported reference syntax without
 // acquiring credentials or invoking provider initialization.
 func (store *SecretStore) ValidateStructure(catalog *CreatorCatalog, cfg Config) error {
 	if store == nil || catalog == nil {
@@ -34,9 +34,19 @@ func (store *SecretStore) ValidateStructure(catalog *CreatorCatalog, cfg Config)
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
-	value, _, err := store.resolver.CloneForValidation(cfg.ProviderPayload())
+	payload := cfg.ProviderPayload()
+	value, hasReferences, err := store.resolver.CloneForValidation(payload)
 	if err != nil {
 		return err
+	}
+	if hasReferences {
+		keys, err := secretresolver.StoreReferences(payload)
+		if err != nil {
+			return err
+		}
+		if len(keys) != 0 {
+			return fmt.Errorf("secretstore: Store references are not supported in provider configuration")
+		}
 	}
 	provider, ok := catalog.New(cfg.Kind())
 	if !ok || provider.Configuration() == nil {

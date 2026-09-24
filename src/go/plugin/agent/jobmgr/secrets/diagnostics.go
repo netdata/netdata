@@ -116,6 +116,6 @@ func (c *Controller) observeActivationFailure(key string, err error) {
 		Resource:   secretResourceID(key),
 		State:      dyncfg.StatusFailed.String(),
 		Generation: c.epoch,
-		Err:        errors.New(secretFailureMessage(msgSecretStoreValidationFailed, err)),
+		Err:        errors.New(secretFailureMessage(msgSecretStoreActivationFailed, err)),
 	})
 }

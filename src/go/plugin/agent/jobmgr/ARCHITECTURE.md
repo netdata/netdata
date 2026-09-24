@@ -865,9 +865,11 @@ fresh Store epoch, but the process owns that epoch's preparations, generations, 
 (`composition/secret_epoch.go`).
 
 1. **Separate acceptance from acquisition.** With no live generation, ADD checks available field types and reference
-   syntax without external acquisition, publishes `202` and an `Accepted` config, then starts its exact accepted owner.
-   Initial file configs use the same publication gate; startup does not wait for provider acquisition. Different Store
-   identities can acquire concurrently, and GET, REMOVE and replay remain available while accepted work is pending.
+   syntax without external acquisition, rejects unsupported Store-to-Store references, publishes `202` and an `Accepted`
+   config, then starts its exact accepted owner. Initial file configs use the same publication gate. Their structural
+   publication completes before process ingress is attached; startup does not wait for provider acquisition.
+   Different Store identities can acquire concurrently, and GET, REMOVE and replay remain available while accepted
+   work is pending.
    The owner prepares outside the kernel resource lane, then submits a short completion transaction. Successful
    acquisition publishes `Running`; operational failure publishes `Failed` with a redacted diagnostic and retains the
    accepted raw config for explicit retry. Ordinary environment/provider failures do not start polling.
@@ -876,15 +878,19 @@ fresh Store epoch, but the process owns that epoch's preparations, generations, 
    UPDATE of a pending DynCfg Store joins its current accepted acquisition with 202; it starts no second attempt.
    A concurrent completion to Running satisfies that same request with 200. UPDATE after Failed still preflights,
    including unchanged payloads. Exact raw payload and current ownership are checked before coalescing.
-   Invalid or busy preflight preserves
-   accepted config, generation and pending work; it never retains the rejected candidate. A successful replacement
-   commits its prepared generation by compare-and-swap. Both the predecessor accepted revision and Store generation
-   are rechecked, including transitions where the generation remains zero. Candidate preparation cannot cancel an
-   accepted owner. Accepted replacement/removal cancels only its exact old owner; stale completion cannot reinstall
+   Invalid or busy preflight preserves accepted config, generation and pending work; it never retains the rejected
+   candidate. A successful replacement commits its prepared generation by compare-and-swap. The predecessor accepted
+   revision and Store generation are both rechecked, including transitions where the generation remains zero.
+   Candidate preparation cannot cancel an accepted owner. Accepted replacement/removal cancels only its exact old
+   owner; stale completion cannot reinstall
    it or fall back to an obsolete file config. Busy accepted acquisition retries on physical/generation release.
+   A containment deadline also leaves the Store `Accepted`; it waits for the cut attempt's physical release before
+   retrying, so a permanently stuck attempt cannot produce overlapping acquisitions.
 
-   GET returns raw provider payload with unresolved references and without Store identity/source metadata. Same-content
-   file-to-DynCfg edits still convert ownership; raw content equality is not proof of resolved credential equality.
+   GET returns raw provider payload with unresolved references and without Store identity/source metadata. Authored
+   representations such as duration strings remain unchanged rather than being normalized through provider types.
+   Same-content file-to-DynCfg edits still convert ownership; raw content equality is not proof of resolved
+   credential equality.
    Initial, wire and retry commands share the exact named Store resource identity, including `kind == name`.
    `secrets/commands.go`, `secrets/initial.go`, `secrets/pending.go`, `secrets/store_stage.go`.
    - A DynCfg `test` creates the same temporary configured Store but never publishes it. If the Store implements
@@ -955,7 +961,8 @@ flowchart LR
 ```
 
 A replacement Store reply confirms its own committed change and dependent resume admission, without waiting for
-collector health. A no-live ADD reply confirms accepted raw intent; its acquisition outcome follows asynchronously. The change remains committed if a later activation fails. Missing named dependencies and physical retirement
+collector health. A no-live ADD reply confirms accepted raw intent; its acquisition outcome follows asynchronously.
+The change remains committed if a later activation fails. Missing named dependencies and physical retirement
 leave the job `Accepted` until their event wakes its exact activation token. Operational construction or startup
 failure publishes `Failed` and follows the collector's retry policy. A later disable, removal, replacement, or run stop
 revokes the token and retry. A resume captured before that revocation cannot resurrect the job. Invalid proposals and

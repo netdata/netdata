@@ -29,6 +29,7 @@ func TestAcceptedStoreFailureDiagnosticsPreserveOnlyPublicDetail(t *testing.T) {
 		require.Len(t, events, 1)
 		require.Equal(t, jobmgr.DiagnosticWarning, events[0].Level)
 		require.Equal(t, "failed", events[0].State)
+		require.Contains(t, events[0].Err.Error(), "Secretstore activation failed")
 		require.NotContains(t, events[0].Err.Error(), "private credential")
 		if public {
 			require.Contains(t, events[0].Err.Error(), "credential unavailable")

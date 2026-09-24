@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -105,6 +106,33 @@ func TestSecretAdmissionPreservesRawReferences(t *testing.T) {
 	p.call("add-references", "config go.d:secretstore:vault add main", payload, 202)
 	require.JSONEq(t, payload, p.call("get-references", "config go.d:secretstore:vault:main get", "", 200))
 	require.NotContains(t, p.output.String(), "CONFIG go.d:secretstore:vault:invalid create")
+}
+
+func TestSecretAdmissionRejectsStoreReferencesWithoutAdoption(t *testing.T) {
+	var acquisitions atomic.Int32
+	p := newSecretAdoptionProcess(t, secretstore.Creator{
+		Kind:   secretstore.KindVault,
+		Schema: `{}`,
+		Create: func() secretstore.Store {
+			return &adoptionTestStore{
+				observe: func() { acquisitions.Add(1) },
+			}
+		},
+	}, nil)
+	const payload = `{"value":"candidate","nested":{"token":"${store:vault:other:key}"}}`
+	p.call("reject-store-reference", "config go.d:secretstore:vault add invalid", payload, 400)
+	p.call("get-rejected-store", "config go.d:secretstore:vault:invalid get", "", 404)
+	require.NotContains(t, p.output.String(), "CONFIG go.d:secretstore:vault:invalid create")
+	require.Zero(t, acquisitions.Load())
+	p.call("add-incumbent", "config go.d:secretstore:vault add main", `{"value":"incumbent"}`, 202)
+	p.output.waitContains(t, "CONFIG go.d:secretstore:vault:main create running job")
+	p.call("reject-store-update", "config go.d:secretstore:vault:main update", payload, 400)
+	require.JSONEq(
+		t,
+		`{"value":"incumbent"}`,
+		p.call("get-incumbent", "config go.d:secretstore:vault:main get", "", 200),
+	)
+	require.EqualValues(t, 1, acquisitions.Load(), "rejected payload started another acquisition")
 }
 
 func TestSecretMalformedInitialConfigRemainsReadable(t *testing.T) {

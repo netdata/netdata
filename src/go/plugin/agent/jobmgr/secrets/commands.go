@@ -33,6 +33,7 @@ const (
 	msgSecretStoreNotConfigured    = "The specified secretstore '%s' is not configured."
 	msgInvalidSecretStoreConfig    = "Invalid secretstore configuration."
 	msgSecretStoreValidationFailed = "Secretstore configuration validation failed."
+	msgSecretStoreActivationFailed = "Secretstore activation failed."
 	msgSecretStoreTestFailed       = "Secretstore operational test failed."
 	msgSecretStoreTestUnsupported  = "Configuration is valid; an operational result is unavailable for this secretstore configuration."
 )
@@ -505,7 +506,7 @@ func (c *Controller) prepareStoreMutation(
 				c.clearPendingThrough(config.ExposedKey(), materialized.desiredVersion)
 				c.observeActivationFailure(config.ExposedKey(), prepareErr)
 			}
-			spec.result = mustSecretMessage(202, secretFailureMessage(msgSecretStoreValidationFailed, prepareErr))
+			spec.result = mustSecretMessage(202, secretFailureMessage(msgSecretStoreActivationFailed, prepareErr))
 			entry.status = dyncfg.StatusFailed
 			spec.cleanup = c.configCreateCleanup(entry)
 			spec.entry = &entry
