@@ -129,6 +129,15 @@ jobs:
 5. Fill in the backend-specific settings.
 6. Save the secretstore and use its `${store:<kind>:<name>:<operand>}` reference in collector configs.
 
+A new secretstore is accepted before provider initialization finishes. `Accepted` means its configuration is retained;
+`Running` means initialization succeeded. If initialization fails, the store becomes `Failed` and its configuration
+remains available to inspect and edit. After correcting credentials or backend settings, save an update to retry.
+Netdata does not periodically retry ordinary provider failures.
+
+Updates validate the proposed configuration before replacing the accepted one. A rejected or busy update leaves the
+previous configuration in place, including any initialization already in progress. Readback preserves secret references
+such as `${env:...}`; it does not return their resolved values.
+
 #### Configuration Files
 
 Each secretstore backend has its own file under `/etc/netdata/go.d/ss/`:
@@ -188,9 +197,9 @@ Use the backend README for provider-specific authentication, operand rules, conf
 ## How It Works
 
 - Secrets are resolved each time a collector job starts or restarts.
-- If a secret cannot be resolved, the collector job will fail to start and log an error.
-- Updating a secretstore automatically restarts running and failed collector jobs that use it so they pick up the new credentials.
-- Accepted or disabled jobs keep their state and use the updated secretstore the next time they start.
+- Enabled collector jobs wait in `Accepted` while a named secretstore is unavailable. Other secret-resolution failures prevent startup and are reported as errors.
+- Updating a secretstore resumes running and enabled Accepted collector jobs that use it so they pick up the new credentials. Saving the store does not wait for those collectors to become healthy.
+- Passive, disabled, and failed jobs keep their state and use the updated secretstore when they next start.
 - If a secretstore change applies successfully but some dependent collector restarts fail, Netdata reports those restart failures.
 
 ## Security Notes

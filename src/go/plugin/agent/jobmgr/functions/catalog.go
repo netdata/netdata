@@ -109,6 +109,8 @@ type ResourcePolicy struct {
 	Argument    uint16
 	Prefix      string
 	ScopePrefix string
+	// Named resources never collapse a name that equals its kind/module.
+	named bool
 	// An observer command may submit its own resource transaction, then wait
 	// without retaining that transaction's serialization lane.
 	CommandArgument    uint16
@@ -130,6 +132,13 @@ func ScopedDynCfgJobResource(index uint16, prefix, scopePrefix string) ResourceP
 		Prefix:      prefix,
 		ScopePrefix: scopePrefix,
 	}
+}
+
+// ScopedDynCfgNamedResource keeps template and named-object identities distinct.
+func ScopedDynCfgNamedResource(index uint16, prefix, scopePrefix string) ResourcePolicy {
+	policy := ScopedDynCfgJobResource(index, prefix, scopePrefix)
+	policy.named = true
+	return policy
 }
 
 func (rp ResourcePolicy) validate() error {
@@ -181,6 +190,9 @@ func resolveDynCfgJobResource(policy ResourcePolicy, arguments []string) string 
 	if replaced, isAdd := addCommandJobName(arguments); isAdd {
 		name = replaced
 		hasName = name != ""
+	}
+	if policy.named {
+		return jobmgr.DynCfgNamedResourceID("", module, name)
 	}
 	if !hasName || name == module {
 		return module

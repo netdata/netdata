@@ -4,6 +4,7 @@ package secrets
 
 import (
 	"context"
+	"errors"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -104,4 +105,17 @@ func secretMutationCommand(command dyncfg.Command) bool {
 	default:
 		return false
 	}
+}
+
+// Accepted acquisition has no caller response in which to report its failure.
+// Preserve only static provider-approved detail at the diagnostic boundary.
+func (c *Controller) observeActivationFailure(key string, err error) {
+	jobmgr.ObserveDiagnostic(c.diagnostics, jobmgr.DiagnosticEvent{
+		Level:      jobmgr.DiagnosticWarning,
+		Name:       "secretstore activation failed",
+		Resource:   secretResourceID(key),
+		State:      dyncfg.StatusFailed.String(),
+		Generation: c.epoch,
+		Err:        errors.New(secretFailureMessage(msgSecretStoreValidationFailed, err)),
+	})
 }

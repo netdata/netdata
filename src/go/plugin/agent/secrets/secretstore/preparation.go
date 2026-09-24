@@ -25,6 +25,34 @@ type configuredStore struct {
 	store      Store
 }
 
+// ValidateStructure checks available fields and reference syntax without
+// acquiring credentials or invoking provider initialization.
+func (store *SecretStore) ValidateStructure(catalog *CreatorCatalog, cfg Config) error {
+	if store == nil || catalog == nil {
+		return fmt.Errorf("secretstore: invalid structural validation")
+	}
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
+	value, _, err := store.resolver.CloneForValidation(cfg.ProviderPayload())
+	if err != nil {
+		return err
+	}
+	provider, ok := catalog.New(cfg.Kind())
+	if !ok || provider.Configuration() == nil {
+		return fmt.Errorf("secretstore: provider configuration unavailable")
+	}
+	data, err := yaml.Marshal(value)
+	if err != nil {
+		return err
+	}
+	if err := yaml.Unmarshal(data, provider.Configuration()); err != nil {
+		return err
+	}
+	_, err = cfg.PayloadJSON()
+	return err
+}
+
 func configureStore(
 	ctx context.Context,
 	resolver *secretresolver.AtomicResolver,
