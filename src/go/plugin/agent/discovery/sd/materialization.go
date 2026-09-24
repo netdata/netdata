@@ -41,7 +41,10 @@ func newResourceError(phase resourceErrorPhase, cause error) error {
 	if cause == nil {
 		return nil
 	}
-	return &resourceError{cause: cause, phase: phase}
+	return &resourceError{
+		cause: cause,
+		phase: phase,
+	}
 }
 
 func (err *resourceError) Error() string {
@@ -129,7 +132,10 @@ func runMaterialization[T any](
 			_ jobmgr.ProcessAttemptAdmission,
 		) error {
 			value, workErr := work(attemptCtx)
-			resultCh <- materializationResult[T]{value: value, err: workErr}
+			resultCh <- materializationResult[T]{
+				value: value,
+				err:   workErr,
+			}
 			return workErr
 		},
 	})
@@ -155,7 +161,10 @@ func classifyMaterializationError(
 		errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
 		errors.Is(err, jobmgr.ErrProcessAttemptSuperseded) ||
 		errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
-		return &materializationError{cause: err, identity: identity}
+		return &materializationError{
+			cause:    err,
+			identity: identity,
+		}
 	}
 	return err
 }
@@ -275,11 +284,13 @@ func (d *ServiceDiscovery) preparePipeline(
 		return nil, errors.New("service discovery: invalid pipeline materialization")
 	}
 	identity := pipelineMaterializationIdentity(config)
+	// UPDATE preflight cannot revoke an incumbent activation. Accepted desired
+	// replacements already cancel the previous slot's preparation context.
 	return runMaterialization(
 		ctx,
 		d,
 		identity.Key,
-		true,
+		false,
 		func(context.Context) (sdPipeline, error) {
 			pipelineConfig, err := config.ToPipelineConfig(d.configDefaults)
 			if err != nil {

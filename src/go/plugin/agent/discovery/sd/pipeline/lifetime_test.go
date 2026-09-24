@@ -55,3 +55,70 @@ func TestPipelineRunJoinsCancelledDiscoverer(t *testing.T) {
 		}
 	})
 }
+
+func TestPipelinePanicCancelsAndJoinsDiscoverer(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		canceled, release, exited := make(chan struct{}), make(chan struct{}), make(chan struct{})
+		discoverer := accumulatorDiscoverer(func(ctx context.Context, out chan<- []model.TargetGroup) {
+			defer close(exited)
+			out <- []model.TargetGroup{newMockTargetGroup("source", "target")}
+			<-ctx.Done()
+			close(canceled)
+			<-release
+			out <- []model.TargetGroup{newMockTargetGroup("final")}
+		})
+		p, err := New(Config{
+			Name: "panic",
+			Discoverer: DiscovererPayload{
+				Kind:   "test",
+				Config: []byte(`{}`),
+			},
+			Services: []ServiceRuleConfig{{ID: "test", Match: "true", ConfigTemplate: "- null"}},
+		}, func(DiscovererPayload, string) ([]model.Discoverer, error) {
+			return []model.Discoverer{discoverer}, nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		recovered := make(chan any, 1)
+		go func() {
+			defer func() { recovered <- recover() }()
+			p.Run(ctx, make(chan []*confgroup.Group))
+		}()
+		synctest.Wait()
+		time.Sleep(3 * time.Second)
+		synctest.Wait()
+		select {
+		case <-canceled:
+		default:
+			t.Error("panic did not cancel the discoverer")
+		}
+		var panicValue any
+		select {
+		case panicValue = <-recovered:
+			t.Error("panic escaped while the discoverer was still alive")
+		default:
+		}
+		// Also release the original failure path so a failing test leaves no child behind.
+		cancel()
+		close(release)
+		synctest.Wait()
+		if panicValue == nil {
+			select {
+			case panicValue = <-recovered:
+			default:
+				t.Error("pipeline did not finish after child release")
+			}
+		}
+		if panicValue == nil {
+			t.Error("fixture did not trigger the rendered-template panic")
+		}
+		select {
+		case <-exited:
+		default:
+			t.Error("pipeline did not join the discoverer")
+		}
+	})
+}

@@ -259,56 +259,6 @@ func TestHandler_WaitForDecision_MismatchedCommandKeepsWait(t *testing.T) {
 	assert.False(t, h.WaitingForDecision())
 }
 
-func TestHandler_NextWaitDecision_Command(t *testing.T) {
-	cb := &mockCallbacks{}
-	h := newTestHandler(cb)
-
-	cfg := testConfig{
-		uid:        "uid-job1",
-		key:        "job1",
-		sourceType: "stock",
-		source:     "mod/job1",
-	}
-	h.exposed.Add(&Entry[testConfig]{
-		Cfg:    cfg,
-		Status: StatusAccepted,
-	})
-	h.WaitForDecision(cfg)
-
-	ch := make(chan Function, 1)
-	fn := newTestFn("test:job1", "enable", "", nil)
-	ch <- fn
-
-	got, ok := h.NextWaitDecision(context.Background(), ch)
-	require.True(t, ok)
-	assert.Equal(t, fn.UID(), got.UID())
-}
-
-func TestHandler_NextWaitDecision_ContextCancel(t *testing.T) {
-	cb := &mockCallbacks{}
-	h := newTestHandler(cb)
-
-	cfg := testConfig{
-		uid:        "uid-job1",
-		key:        "job1",
-		sourceType: "stock",
-		source:     "mod/job1",
-	}
-	h.exposed.Add(&Entry[testConfig]{
-		Cfg:    cfg,
-		Status: StatusAccepted,
-	})
-	h.WaitForDecision(cfg)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	ch := make(chan Function)
-	_, ok := h.NextWaitDecision(ctx, ch)
-	assert.False(t, ok)
-	assert.True(t, h.WaitingForDecision())
-}
-
 func TestHandler_AddDiscoveredConfig_TracksSeenAndExposed(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)

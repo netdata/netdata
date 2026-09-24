@@ -126,6 +126,7 @@ func (p *Pipeline) Test(ctx context.Context) (bool, error) {
 func (p *Pipeline) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	p.Info("instance is started")
 	defer p.Info("instance is stopped")
+	ctx, cancel := context.WithCancel(ctx)
 
 	p.accum.discoverers = p.discoverers
 
@@ -133,12 +134,16 @@ func (p *Pipeline) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	done := make(chan struct{})
 
 	go func() { defer close(done); p.accum.run(ctx, updates) }()
+	defer func() {
+		// Panic recovery belongs to the runtime owner. Its reservation may only
+		// release after all children exit, including during panic unwinding.
+		cancel()
+		<-done
+	}()
 
 	for {
 		select {
 		case <-ctx.Done():
-			// Completion releases physical ownership, so every child must have exited.
-			<-done
 			return
 		case <-done:
 			return

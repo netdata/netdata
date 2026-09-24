@@ -3,7 +3,6 @@
 package dyncfg
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -115,15 +114,6 @@ func (wg *waitGate[C]) waitingForDecision() bool {
 	return waiting
 }
 
-func (wg *waitGate[C]) nextDecision(ctx context.Context, dyncfgCh <-chan Function) (Function, bool) {
-	select {
-	case <-ctx.Done():
-		return Function{}, false
-	case fn := <-dyncfgCh:
-		return fn, true
-	}
-}
-
 func (wg *waitGate[C]) currentKey() string {
 	wg.mu.RLock()
 	key := wg.key
@@ -206,11 +196,6 @@ func (h *Handler[C]) WaitForDecision(cfg C) {
 // for a matching enable/disable command.
 func (h *Handler[C]) WaitingForDecision() bool {
 	return h.waitGate.waitingForDecision()
-}
-
-// NextWaitDecision blocks until a dyncfg command arrives or ctx is canceled.
-func (h *Handler[C]) NextWaitDecision(ctx context.Context, dyncfgCh <-chan Function) (Function, bool) {
-	return h.waitGate.nextDecision(ctx, dyncfgCh)
 }
 
 // SyncDecision updates wait-state based on the incoming command.

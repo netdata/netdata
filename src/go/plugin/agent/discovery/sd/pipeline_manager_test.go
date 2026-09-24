@@ -689,3 +689,75 @@ func TestWaitingMaterializationRetainsOnlyLatestDesired(t *testing.T) {
 	waitSignal(t, started)
 	require.Equal(t, int32(2), constructed.Load())
 }
+
+func TestUnacceptedUpdatePreservesPendingEnableConstruction(t *testing.T) {
+	for _, cancelUpdate := range []bool{false, true} {
+		t.Run(fmt.Sprintf("cancel-before-apply=%t", cancelUpdate), func(t *testing.T) {
+			entered, release, started := make(chan struct{}), make(chan struct{}), make(chan struct{})
+			defer func() {
+				select {
+				case <-release:
+				default:
+					close(release)
+				}
+			}()
+			var constructions atomic.Int32
+			d, _, _, _ := newActorDiscovery(t, Config{}, func(pipeline.Config) (sdPipeline, error) {
+				constructions.Add(1)
+				close(entered)
+				<-release
+				return &controlledPipeline{
+					started: started,
+				}, nil
+			})
+			cfg, err := newSDConfigFromYAML(
+				prepareConfigFile("origin", "job").content,
+				"origin",
+				confgroup.TypeDyncfg,
+				pipelineKey(testDiscovererTypeNetListeners, "job"),
+			)
+			require.NoError(t, err)
+			d.handler.AddDiscoveredConfig(cfg, dyncfg.StatusDisabled)
+			enabled := applyTestCommand(t, d, actorFunction(d, t.Context(), "job", "enable"))
+			require.Equal(t, 202, enabled.Result.Code)
+			waitSignal(t, entered)
+			expected, ok := d.exposed.LookupByKey(cfg.ExposedKey())
+			require.True(t, ok)
+			require.Equal(t, dyncfg.StatusAccepted, expected.Status)
+			require.True(t, expected.Enabled)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			update := dyncfg.NewFunction(
+				ctx,
+				functions.Function{
+					UID:    "update",
+					Args:   []string{d.dyncfgJobID(testDiscovererTypeNetListeners, "job"), "update"},
+					Source: "test",
+					Payload: []byte(
+						`{"name":"job","discoverer":{"net_listeners":{"interval":"9s"}},"services":[{"id":"replacement","match":"true"}]}`,
+					),
+				},
+			)
+			prepared, err := d.prepareDyncfgCommand(update)
+			require.NoError(t, err)
+			if cancelUpdate {
+				cancel()
+			}
+			applied, err := prepared.Apply(ctx)
+			if cancelUpdate {
+				require.ErrorIs(t, err, context.Canceled)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, 503, applied.Result.Code)
+				applied.Published()
+			}
+			close(release)
+			waitSignal(t, started)
+			require.Eventually(t, func() bool {
+				entry, ok := d.exposed.LookupByKey(cfg.ExposedKey())
+				return ok && entry.Status == dyncfg.StatusRunning && entry.Cfg.Hash() == cfg.Hash()
+			}, time.Second, time.Millisecond)
+			require.Equal(t, int32(1), constructions.Load())
+		})
+	}
+}
