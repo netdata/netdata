@@ -180,6 +180,110 @@ func TestStoreAdmissionCannotReplaceGenerationInstalledAfterStaging(t *testing.T
 	require.Equal(t, "first", current.config["value"])
 }
 
+func TestIdenticalStoreUpdateRechecksAcquisitionCompletion(t *testing.T) {
+	for _, value := range []string{"ready", "provider-failure-one", "replaced"} {
+		t.Run(value, func(t *testing.T) {
+			controller, store := newSecretControllerTestHarness(t, nil)
+			require.NoError(t, controller.Bind(restartTestJobs{}))
+			require.NoError(t, controller.PublishInitial(t.Context(), &initialStoreTestCommands{
+				publishTemplates: controller.templateCleanup(),
+			}))
+			t.Cleanup(func() {
+				require.NoError(t, controller.CloseProjection())
+				require.NoError(t, store.Close(context.Background()))
+			})
+			first, target := stageAdoptionEdit(t, controller, "add", value)
+			applyAdoptionEdit(t, controller, first, target, 202)
+			entry, ok := controller.entry(target.key)
+			require.True(t, ok)
+			duplicate, duplicateTarget := stageAdoptionEdit(t, controller, "update", value)
+			require.Zero(t, store.Census().Preparations, "coalesced UPDATE prepared another generation")
+			if value == "replaced" {
+				newer, newerTarget := stageAdoptionEdit(t, controller, "add", "newer")
+				applyAdoptionEdit(t, controller, newer, newerTarget, 202)
+				applyAdoptionEdit(t, controller, duplicate, duplicateTarget, 503)
+				latest, ok := controller.entry(target.key)
+				require.True(t, ok)
+				require.Equal(t, "newer", latest.config["value"])
+				return
+			}
+
+			activation, err := controller.operations.prepare(storeOperationSpec{
+				target:          target,
+				config:          entry.config,
+				mode:            storeOperationMutation,
+				desiredVersion:  entry.version,
+				acceptedVersion: entry.version,
+			})
+			require.NoError(t, err)
+			defer activation.Release()
+			activation.Start()
+			requireStoreOperationReady(t, activation)
+			id := secretResourceID(target.key)
+			scope := lifecycle.ResourceTransactionScope{
+				ID: id,
+				Successor: lifecycle.ResourceIdentity{
+					ID:         id,
+					Generation: 1,
+				},
+			}
+			prepared, err := controller.preparePendingAttempt(
+				entry.config,
+				entry.version,
+				nil,
+				scope,
+				lifecycle.LongLivedPermit{},
+				activation,
+			)
+			require.NoError(t, err)
+			applied, err := prepared.Apply(t.Context())
+			require.NoError(t, err)
+			_, _, current := applied.Ownership()
+			want := 503 // A Failed completion must not apply an unprepared candidate.
+			if current != nil {
+				defer func() { require.NoError(t, current.Finalize()) }()
+				scope.Current = current.Identity()
+				want = 200
+			}
+			scope.Successor.Generation = 2
+			prepared, err = controller.prepareUpdate(scope, current, duplicateTarget, duplicate)
+			require.NoError(t, err)
+			applied, err = prepared.Apply(t.Context())
+			require.NoError(t, err)
+			require.Equal(t, want, applied.ResultStatus())
+			latest, ok := controller.entry(target.key)
+			require.True(t, ok)
+			require.Equal(t, entry.version, latest.version)
+			require.Equal(t, value, latest.config["value"])
+		})
+	}
+}
+
+func TestIdenticalStoreUpdateAbortsPreflightOvertakenByAcceptance(t *testing.T) {
+	controller, store := newSecretControllerTestHarness(t, nil)
+	require.NoError(t, controller.Bind(restartTestJobs{}))
+	require.NoError(t, controller.PublishInitial(t.Context(), &initialStoreTestCommands{
+		publishTemplates: controller.templateCleanup(),
+	}))
+	t.Cleanup(func() {
+		require.NoError(t, controller.CloseProjection())
+		require.NoError(t, store.Close(context.Background()))
+	})
+	first, target := stageAdoptionEdit(t, controller, "add", "first")
+	applyAdoptionEdit(t, controller, first, target, 202)
+	candidate, candidateTarget := stageAdoptionEdit(t, controller, "update", "replacement")
+	require.EqualValues(t, 1, store.Census().Preparations)
+	latest, latestTarget := stageAdoptionEdit(t, controller, "add", "replacement")
+	applyAdoptionEdit(t, controller, latest, latestTarget, 202)
+	applyAdoptionEdit(t, controller, candidate, candidateTarget, 202)
+	require.Zero(t, store.Census().Preparations, "coalescing leaked unused preflight ownership")
+	entry, ok := controller.entry(target.key)
+	require.True(t, ok)
+	require.Equal(t, "replacement", entry.config["value"])
+	require.True(t, controller.pendingAcceptedVersion(target.key, entry.version))
+	require.Zero(t, store.Generation(target.key))
+}
+
 func TestStoreAcceptedOwnerRequiresSuccessfulCurrentPublication(t *testing.T) {
 	for _, outcome := range []string{"blocked", "failed", "superseded"} {
 		t.Run(outcome, func(t *testing.T) {

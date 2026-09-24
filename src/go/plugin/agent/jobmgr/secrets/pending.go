@@ -10,6 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
@@ -38,6 +39,29 @@ func (c *Controller) acceptedVersion(key string) uint64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.entries[key].version
+}
+
+func (c *Controller) pendingAcceptedConfig(key string) secretstore.Config {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	entry := c.entries[key]
+	if !c.pendingAcceptedLocked(key, entry) {
+		return nil
+	}
+	return cloneSecretConfig(entry.config)
+}
+
+func (c *Controller) pendingAcceptedVersion(key string, version uint64) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	entry := c.entries[key]
+	return entry.version == version && c.pendingAcceptedLocked(key, entry)
+}
+
+func (c *Controller) pendingAcceptedLocked(key string, entry secretEntry) bool {
+	state := c.pending[key]
+	return entry.status == dyncfg.StatusAccepted && entry.config.SourceType() == confgroup.TypeDyncfg &&
+		state != nil && state.version == entry.version && state.ctx.Err() == nil
 }
 
 // retainPending installs dormant accepted work, or records its next release

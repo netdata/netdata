@@ -20,6 +20,15 @@ import (
 )
 
 func TestSecretInitialAcquisitionDoesNotBlockCommands(t *testing.T) {
+	for _, value := range []string{"replacement", "public-failure"} {
+		t.Run(value, func(t *testing.T) {
+			testSecretInitialAcquisitionDoesNotBlockCommands(t, value)
+		})
+	}
+}
+
+func testSecretInitialAcquisitionDoesNotBlockCommands(t *testing.T, value string) {
+	t.Helper()
 	gate := newProcessBlockingStoreGate()
 	defer gate.release()
 	entered := make(chan context.Context, 1)
@@ -51,17 +60,25 @@ func TestSecretInitialAcquisitionDoesNotBlockCommands(t *testing.T) {
 	p.call("remove-file", "config go.d:secretstore:vault:main remove", "", 405)
 	p.call("invalid-update", "config go.d:secretstore:vault:main update", `{"value":{}}`, 400)
 	require.NoError(t, acquisition.Err(), "rejected commands canceled accepted acquisition")
-	p.call("replay", "config go.d:secretstore:vault add main", `{"value":"public-failure"}`, 202)
+	p.call("replay", "config go.d:secretstore:vault add main", fmt.Sprintf(`{"value":%q}`, value), 202)
 	p.output.waitContains(t, "CONFIG go.d:secretstore:vault:main create accepted job")
 	// The daemon can replay saved intent from both template ADD and the
-	// file registration's UPDATE. Busy UPDATE must not revoke the accepted ADD.
-	p.call("replay-update", "config go.d:secretstore:vault:main update", `{"value":"public-failure"}`, 503)
+	// file registration's UPDATE. Identical pending UPDATE joins the accepted ADD.
+	p.call("replay-update", "config go.d:secretstore:vault:main update", fmt.Sprintf(`{"value":%q}`, value), 202)
 	gate.release()
-	p.output.waitContains(t, "CONFIG go.d:secretstore:vault:main create failed job")
+	status := "running"
+	if value == "public-failure" {
+		status = "failed"
+	}
+	p.output.waitContains(t, "CONFIG go.d:secretstore:vault:main create "+status+" job")
 	body := p.call("get-replay", "config go.d:secretstore:vault:main get", "", 200)
-	require.JSONEq(t, `{"value":"public-failure"}`, body)
-	require.NotContains(t, p.output.String(), "CONFIG go.d:secretstore:vault:main create running job",
-		"obsolete file acquisition became fallback after replacement failure")
+	require.JSONEq(t, fmt.Sprintf(`{"value":%q}`, value), body)
+	if status == "failed" {
+		require.NotContains(t, p.output.String(), "CONFIG go.d:secretstore:vault:main create running job",
+			"obsolete file acquisition became fallback after replacement failure")
+	} else {
+		require.Equal(t, 1, strings.Count(p.output.String(), "CONFIG go.d:secretstore:vault:main create running job"))
+	}
 }
 
 func TestSecretFailedUpdatePreservesAcceptedConfig(t *testing.T) {
@@ -72,6 +89,7 @@ func TestSecretFailedUpdatePreservesAcceptedConfig(t *testing.T) {
 	}, nil)
 	p.call("add-failed", "config go.d:secretstore:vault add main", `{"value":"public-failure"}`, 202)
 	p.output.waitContains(t, "CONFIG go.d:secretstore:vault:main create failed job")
+	p.call("retry-same-failed", "config go.d:secretstore:vault:main update", `{"value":"public-failure"}`, 400)
 	p.call("update-failed", "config go.d:secretstore:vault:main update", `{"value":"backend-sensitive-detail"}`, 400)
 	require.JSONEq(t, `{"value":"public-failure"}`,
 		p.call("get-failed", "config go.d:secretstore:vault:main get", "", 200))
@@ -143,7 +161,7 @@ func TestSecretAcceptedAddPublishesBeforeAcquisition(t *testing.T) {
 			}
 		},
 	}, nil)
-	p.call("add-blocked", "config go.d:secretstore:vault add main", `{"value":"blocked"}`, 202)
+	p.call("add-blocked", "config go.d:secretstore:vault add main", `{"value":"blocked","options":{"number":1}}`, 202)
 	var atStart string
 	select {
 	case atStart = <-observed:
@@ -154,7 +172,22 @@ func TestSecretAcceptedAddPublishesBeforeAcquisition(t *testing.T) {
 	accepted := strings.Index(atStart, "CONFIG go.d:secretstore:vault:main create accepted job")
 	require.NotEqual(t, -1, result)
 	require.Greater(t, accepted, result)
-	require.JSONEq(t, `{"value":"blocked"}`, p.call("get-blocked", "config go.d:secretstore:vault:main get", "", 200))
+	require.JSONEq(
+		t,
+		`{"value":"blocked","options":{"number":1}}`,
+		p.call("get-blocked", "config go.d:secretstore:vault:main get", "", 200),
+	)
+	p.call(
+		"duplicate-pending",
+		"config go.d:secretstore:vault:main update",
+		`{"value":"blocked","options":{"number":1}}`,
+		202,
+	)
+	select {
+	case <-observed:
+		t.Fatal("identical pending update acquired another provider")
+	default:
+	}
 	p.call("remove-blocked", "config go.d:secretstore:vault:main remove", "", 200)
 	gate.release()
 	p.call("get-removed", "config go.d:secretstore:vault:main get", "", 404)

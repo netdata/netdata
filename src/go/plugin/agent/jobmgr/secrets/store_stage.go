@@ -61,6 +61,7 @@ type storeOperationSpec struct {
 	target          secretTarget
 	input           CommandInput
 	config          secretstore.Config
+	coalesceConfig  secretstore.Config
 	expected        uint64
 	mode            storeOperationMode
 	validationOnly  bool
@@ -81,6 +82,7 @@ type storeOperationResult struct {
 	operational     bool
 	retryable       bool
 	removal         bool
+	coalesced       bool
 }
 
 // preparedMutationOwner keeps a prepared mutation abortable until a prepared
@@ -299,6 +301,16 @@ func (pso *PreparedStoreOperation) start() {
 			})
 			return
 		}
+	}
+	if pso.spec.coalesceConfig != nil && sameSecretPayload(config, pso.spec.coalesceConfig) {
+		_ = pso.publish(storeOperationResult{
+			config:          config,
+			expected:        pso.spec.expected,
+			coalesced:       true,
+			desiredVersion:  pso.spec.desiredVersion,
+			acceptedVersion: pso.spec.acceptedVersion,
+		})
+		return
 	}
 	if pso.spec.mode == storeOperationAdmission ||
 		pso.spec.mode == storeOperationMutation && pso.spec.input.HasPayload {

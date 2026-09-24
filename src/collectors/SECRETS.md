@@ -135,7 +135,9 @@ remains available to inspect and edit. After correcting credentials or backend s
 Netdata does not periodically retry ordinary provider failures.
 
 Updates validate the proposed configuration before replacing the accepted one. A rejected or busy update leaves the
-previous configuration in place, including any initialization already in progress. Readback preserves secret references
+previous configuration in place, including any initialization already in progress. Saving the identical configuration
+while it is initializing shares that attempt. Saving after `Failed` retries validation and initialization.
+Readback preserves secret references
 such as `${env:...}`; it does not return their resolved values.
 
 #### Configuration Files

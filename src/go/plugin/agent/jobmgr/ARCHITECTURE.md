@@ -872,7 +872,11 @@ fresh Store epoch, but the process owns that epoch's preparations, generations, 
    acquisition publishes `Running`; operational failure publishes `Failed` with a redacted diagnostic and retains the
    accepted raw config for explicit retry. Ordinary environment/provider failures do not start polling.
 
-   UPDATE in every state, and ADD over a live generation, prepare before adoption. Invalid or busy preflight preserves
+   UPDATE of changed intent in every state, and ADD over a live generation, prepare before adoption. An identical
+   UPDATE of a pending DynCfg Store joins its current accepted acquisition with 202; it starts no second attempt.
+   A concurrent completion to Running satisfies that same request with 200. UPDATE after Failed still preflights,
+   including unchanged payloads. Exact raw payload and current ownership are checked before coalescing.
+   Invalid or busy preflight preserves
    accepted config, generation and pending work; it never retains the rejected candidate. A successful replacement
    commits its prepared generation by compare-and-swap. Both the predecessor accepted revision and Store generation
    are rechecked, including transitions where the generation remains zero. Candidate preparation cannot cancel an

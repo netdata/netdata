@@ -3,6 +3,7 @@
 package secrets
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"strconv"
@@ -68,6 +69,7 @@ func (c *Controller) Stage(input CommandInput) (*PreparedStoreOperation, error) 
 		if _, ok := c.entry(target.key); !ok {
 			return c.operations.immediate(storeOperationResult{}), nil
 		}
+		spec.coalesceConfig = c.pendingAcceptedConfig(target.key)
 		spec.mode = storeOperationMutation
 		spec.expected = c.store.Generation(target.key)
 		spec.acceptedVersion = c.acceptedVersion(target.key)
@@ -276,6 +278,20 @@ func (c *Controller) prepareEdit(
 	if result.config == nil {
 		return c.noopMessage(scope, current, 400, msgInvalidSecretStoreConfig)
 	}
+	// Replay can race acceptance or acquisition completion. Identical current
+	// intent needs no adoption; an unused preflight mutation is still aborted.
+	if !add && exists && entry.config.SourceType() == confgroup.TypeDyncfg &&
+		sameSecretPayload(entry.config, result.config) {
+		if entry.status == dyncfg.StatusRunning {
+			return c.noopMessage(scope, current, 200, "")
+		}
+		if c.pendingAcceptedVersion(target.key, entry.version) {
+			return c.noopMessage(scope, current, 202, "")
+		}
+	}
+	if result.coalesced {
+		return c.noopMessage(scope, current, 503, "Secretstore changed while configuration was prepared.")
+	}
 	expected := c.store.Generation(target.key)
 	if expected != 0 {
 		if !exists || current == nil || !scope.Current.Valid() {
@@ -298,6 +314,17 @@ func (c *Controller) prepareEdit(
 		return c.noopMessage(scope, current, 503, "Secretstore configuration is still busy.")
 	}
 	return c.prepareStoreMutation(scope, current, operation, false)
+}
+
+// JSON normalizes nested YAML maps and numeric decoding differences without
+// resolving references or discarding payload fields from the equality check.
+func sameSecretPayload(a, b secretstore.Config) bool {
+	left, err := a.PayloadJSON()
+	if err != nil {
+		return false
+	}
+	right, err := b.PayloadJSON()
+	return err == nil && bytes.Equal(left, right)
 }
 
 // prepareAccepted publishes raw intent before starting its exact activation owner.
