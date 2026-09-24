@@ -1010,7 +1010,7 @@ flowchart TD
     Secrets{"Secret refs<br/>present?"}
     Resolve("Pin Store generations<br/>resolve cloned config")
     Check("Collector Init + Check<br/>private candidate state")
-    Fresh{"No Store refs, or pinned<br/>generations still current?"}
+    Fresh{"Store generations and vnode<br/>incarnation still current?"}
     Settle("Commit graph + dependency index<br/>then attach live vnode lookup")
     Run("Activating job<br/>Running after readiness")
 

@@ -14,9 +14,11 @@ existing framework boundary for vnode design work. This maintainer document is n
   Configured overrides are applied to raw metadata on every update, so removing an override needs no acquisition.
   Each record has an incarnation that survives config, credential and metadata edits but changes after removal and
   re-creation. Snapshot copies preserve it separately from configuration and metadata revisions.
-- DynCfg ADD, TEST and USERCONFIG validate the name received by the vnode handler without rewriting it. Allowed
-  names contain ASCII letters, digits, dots, underscores and hyphens. USERCONFIG keeps its `test` fallback when no name
-  is supplied and formats configuration without adopting it. Shared Function ingress decoding is a separate boundary.
+- DynCfg ADD, TEST and USERCONFIG validate the name received by the vnode handler without rewriting it. Names MUST pass
+  `JobNameRuleAllowDots`: whitespace, ASCII control characters, colons, equals signs, quotes and backslashes are rejected.
+  Other protocol-safe characters, including dots and non-space Unicode, remain allowed. USERCONFIG keeps its `test`
+  fallback when no name is supplied and formats configuration without adopting it. Shared Function ingress decoding
+  is a separate boundary.
   A rejected mutation MUST preserve the authored record, acquisition worker and dependent jobs.
 - Each run owns independent acquisition workers. The go.d entrypoint injects the concrete SNMP adapter; generic
   composition MUST NOT import collectors. Plugins without the adapter omit the mode from their form and filter

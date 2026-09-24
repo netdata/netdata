@@ -61,7 +61,7 @@ func TestVNodeCommandsValidateUnmodifiedNames(t *testing.T) {
 }
 
 func TestProcessVNodeNameRoundTrip(t *testing.T) {
-	for _, name := range []string{"db:one", "db.one", "db_one", "db-one", "vnode"} {
+	for _, name := range []string{"db:one", "db.one", "db_one", "db-one", "vnode", "db+one", "db-α"} {
 		t.Run(name, func(t *testing.T) {
 			reader, writer := io.Pipe()
 			output := newProcessSynchronizedBuffer()
@@ -379,7 +379,7 @@ func TestVNodeArrivalStartsOnlyEnabledJobsWithoutOperationalRetry(t *testing.T) 
 }
 
 func TestVNodeUserConfigPreservesNamesAndFormattingFallback(t *testing.T) {
-	for _, name := range []string{"absent", "", "db.one", "db_one", "db-one", "vnode"} {
+	for _, name := range []string{"absent", "", "db.one", "db_one", "db-one", "vnode", "db+one", "db-α"} {
 		t.Run(name, func(t *testing.T) {
 			binding, configured := newTestVNodeBinding(t, confgroup.TypeUser, nil)
 			before := configured.Entries()

@@ -196,7 +196,7 @@ In the Netdata UI, open the node's dynamic configuration view and look for the *
 
 :::
 
-The go.d GUI form selects `static` or `snmp` mode. The resource name entered when creating a vnode is its stable reference name. Use ASCII letters, digits, dots, underscores, and hyphens. Spaces and colons are invalid. Static mode uses these fields:
+The go.d GUI form selects `static` or `snmp` mode. The resource name entered when creating a vnode is its stable reference name. For names that are easy to reuse in configuration, prefer ASCII letters, digits, dots, underscores, and hyphens. Spaces and colons are invalid. Static mode uses these fields:
 
 | Field      | Required in the GUI | Description                                                                                                                         |
 |------------|---------------------|-------------------------------------------------------------------------------------------------------------------------------------|
