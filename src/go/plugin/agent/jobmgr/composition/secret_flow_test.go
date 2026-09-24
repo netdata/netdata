@@ -561,6 +561,10 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 	}()
 	output.waitContains(t, "CONFIG go.d:secretstore:vault create accepted template")
 
+	client := &secretAdoptionProcess{
+		t:       t,
+		process: process,
+	}
 	steps := []struct {
 		uid     string
 		command string
@@ -598,6 +602,9 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 		},
 	}
 	for _, step := range steps {
+		// Responses and Running frames precede physical release of the Store attempt.
+		// Wait so contention cannot mask the next step's validation result.
+		client.waitStoreAttemptReleased("vault:main")
 		if step.payload == "" {
 
 			_, writeStringErr := io.WriteString(
