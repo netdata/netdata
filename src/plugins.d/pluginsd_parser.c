@@ -333,7 +333,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     pluginsd_host_define_cleanup(parser);
 
     if(labels_changed)
-        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
+        rrdhost_labels_changed(host);
 
     parser->user.host = host;
     pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, NULL);
@@ -346,7 +346,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     else
         schedule_node_state_update(host, 100);
 
-    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
+    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_UPDATE);
     uint32_t *Pvalue = (uint32_t *) JudyLIns(&parser->user.vnodes.JudyL, (Word_t) host, PJE0);
     if (Pvalue != PJERR)
         *Pvalue = (uint32_t) (now_realtime_sec() - VNODE_BASE_EPOCH);
@@ -829,9 +829,8 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
     if(!rrdlabels_exist(host->rrdlabels, "_hostname"))
         labels_changed |= rrdlabels_add_changed(host->rrdlabels, "_hostname", string2str(host->hostname), RRDLABEL_SRC_AUTO);
 
-    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
     if(labels_changed)
-        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
+        rrdhost_labels_changed(host);
 
     rrdlabels_destroy(parser->user.new_host_labels);
     parser->user.new_host_labels = NULL;
