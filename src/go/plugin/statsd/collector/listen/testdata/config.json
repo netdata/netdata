@@ -1,5 +1,6 @@
 {
   "update_every": 2,
+  "autodetection_retry": 5,
   "listeners": [
     {
       "protocol": "udp",

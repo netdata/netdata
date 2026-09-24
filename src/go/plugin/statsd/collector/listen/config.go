@@ -26,12 +26,13 @@ const (
 )
 
 type Config struct {
-	UpdateEvery       int              `yaml:"update_every,omitempty" json:"update_every"`
-	Listeners         []ListenerConfig `yaml:"listeners"              json:"listeners"`
-	Profiles          []string         `yaml:"profiles,omitempty"     json:"profiles"`
-	MaxSeries         int              `yaml:"max_series"             json:"max_series"`
-	MetricIdleTimeout confopt.Duration `yaml:"metric_idle_timeout"    json:"metric_idle_timeout"`
-	MaxTCPConnections int              `yaml:"max_tcp_connections"    json:"max_tcp_connections"`
+	UpdateEvery        int              `yaml:"update_every,omitempty"        json:"update_every"`
+	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
+	Listeners          []ListenerConfig `yaml:"listeners"                     json:"listeners"`
+	Profiles           []string         `yaml:"profiles,omitempty"            json:"profiles"`
+	MaxSeries          int              `yaml:"max_series"                    json:"max_series"`
+	MetricIdleTimeout  confopt.Duration `yaml:"metric_idle_timeout"           json:"metric_idle_timeout"`
+	MaxTCPConnections  int              `yaml:"max_tcp_connections"           json:"max_tcp_connections"`
 }
 
 // ListenerConfig is one required endpoint. Address is host:port; every

@@ -4,6 +4,7 @@ package listen
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"time"
 
@@ -14,11 +15,15 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 )
 
+//go:embed config_schema.json
+var configSchema string
+
 func init() {
 	collectorapi.Register("listen", collectorapi.Creator{
-		CreateV2:   func() collectorapi.CollectorV2 { return New() },
-		Config:     func() any { return &Config{} },
-		StoreFirst: true,
+		JobConfigSchema: configSchema,
+		CreateV2:        func() collectorapi.CollectorV2 { return New() },
+		Config:          func() any { return &Config{} },
+		StoreFirst:      true,
 	})
 }
 

@@ -3,17 +3,18 @@
 This V2 collector receives StatsD over UDP and TCP, applies explicitly selected native profiles, aggregates
 measurements and publishes generic native charts plus receiver diagnostics. It runs as the `listen` module of the
 standalone Go `statsd.plugin` (`src/go/cmd/statsdplugin`), which source builds include only with
-`ENABLE_PLUGIN_STATSD`. Configuration forms, integration documentation and packaging are not delivered, there is no
-default listener, transport or enablement, and it does not replace the existing C plugin.
+`ENABLE_PLUGIN_STATSD`. Integration documentation and packaging are not delivered, there is no default listener,
+transport or enablement, and it does not replace the existing C plugin.
 
-Jobs are read from `statsd/listen.conf` and profiles from `statsd/statsd.profiles/` under the user config directory.
+Jobs are read from `statsd/listen.conf` or configured through DynCfg (`config_schema.json` is the form), and profiles
+from `statsd/statsd.profiles/` under the user config directory.
 
 ## Source layout
 
 | File | Responsibility |
 |---|---|
 | `collector.go` | `New`, the `Collector` type and the collector interface methods |
-| `config.go`, `init.go` | Configuration, defaults and validation; Init helpers |
+| `config.go`, `init.go`, `config_schema.json` | Configuration, defaults and validation; Init helpers; the DynCfg form |
 | `server.go`, `udp.go`, `tcp.go` | `Run`: listener acquisition, lifecycle and failure handling; UDP and TCP framing |
 | `parser.go`, `prepare.go`, `rejections.go` | Record parsing, final label/metadata preparation, the rejection vocabulary |
 | `profiles.go` | Profile loading, validation, lifetimes and the replace adapter |
