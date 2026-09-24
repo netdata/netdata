@@ -42,7 +42,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Trigger Full Cloud Regression
-        uses: aurelien-baudet/workflow-dispatch@v2
+        uses: aurelien-baudet/workflow-dispatch@v4
         with:
           repo: netdata/test-automation
           ref: refs/heads/master
@@ -57,7 +57,7 @@ jobs:
           wait-for-completion: false
 
       - name: Trigger Agent Parent/Child with Cloud Integration tests
-        uses: aurelien-baudet/workflow-dispatch@v2
+        uses: aurelien-baudet/workflow-dispatch@v4
         with:
           repo: netdata/test-automation
           ref: refs/heads/master
