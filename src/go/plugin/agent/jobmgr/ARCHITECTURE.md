@@ -1270,7 +1270,9 @@ The rotation is an acknowledged sequence (`composition/process.go`, `retireForSu
 
 1. **Seal the old Store epoch**, so no new old-run mutation can commit.
 2. **Cut every process attempt targeting the retiring run.** Their callers settle immediately; their physical workers
-   stay process-owned.
+   stay process-owned. A discovery reconciliation can observe this cut before its inherited pipeline is cancelled.
+   The decision index leaves pure process-retirement results unacknowledged and keeps discovery alive until cancellation;
+   mixed errors and independent failures from other jobs in the batch remain failures. This also applies to termination.
 3. **Seal stdin ingress** and arm the run shutdown budget from the remaining caller-owned rotation deadline before
    stopping the run.
 4. **Drain run-owned work** — tasks, claims, permits, retries, Function publications, and projections — then drain
