@@ -214,9 +214,9 @@ func qw(s string) string {
 	return "'" + s + "'"
 }
 
-// DimensionNamed buffers a DIMENSION line with an explicit name
-// (distinct from the id) — the match-ids/match-names surface.
-func (c *Conn) DimensionNamed(id, name, algorithm string, mul, div int) {
+// DimensionNamedWithOptions buffers a DIMENSION line with an explicit name
+// (distinct from the id) and options — the match-ids/match-names surface.
+func (c *Conn) DimensionNamedWithOptions(id, name, algorithm string, mul, div int, options string) {
 	if algorithm == "" {
 		algorithm = "absolute"
 	}
@@ -226,12 +226,18 @@ func (c *Conn) DimensionNamed(id, name, algorithm string, mul, div int) {
 	if div == 0 {
 		div = 1
 	}
-	c.Linef("DIMENSION %s %s %s %d %d ''", qw(id), qw(name), algorithm, mul, div)
+	c.Linef("DIMENSION %s %s %s %d %d %s", qw(id), qw(name), algorithm, mul, div, qw(options))
+}
+
+// DimensionNamed buffers a DIMENSION line with an explicit name
+// (distinct from the id) — the match-ids/match-names surface.
+func (c *Conn) DimensionNamed(id, name, algorithm string, mul, div int) {
+	c.DimensionNamedWithOptions(id, name, algorithm, mul, div, "")
 }
 
 // Dimension buffers a DIMENSION line for the current chart scope.
 func (c *Conn) Dimension(id, algorithm string, mul, div int) {
-	c.DimensionNamed(id, "", algorithm, mul, div)
+	c.DimensionNamedWithOptions(id, "", algorithm, mul, div, "")
 }
 
 // CLabel buffers one chart label (RRDLABEL_SRC_CONFIG) for the current
