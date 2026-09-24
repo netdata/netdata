@@ -296,10 +296,8 @@ static void socket_destroy_links(struct netdata_ebpf_socket_runtime *rt)
 }
 
 /* -------------------------------------------------------------------------
- * Attach — kprobe / kretprobe
- * All three socket binary flavors (base, buffer, arena) use kprobe-style
- * program sections exclusively.  Program names confirmed via readelf -s on
- * pnetdata_ebpf_socket{,_buffer,_arena}.*.o — identical across all flavors.
+ * Attach legacy kprobe objects. CORE objects use libbpf's auto-attach path
+ * for their configured fentry/fexit programs.
  * ---------------------------------------------------------------------- */
 
 struct socket_kprobe_target {
@@ -360,6 +358,42 @@ static int socket_attach_kprobes(struct netdata_ebpf_socket_runtime *rt)
     }
 
     /* All programs absent from the BPF object is a hard failure. */
+    return rt->nlinks == 0 ? -1 : 0;
+}
+
+static int socket_attach_trampolines(struct netdata_ebpf_socket_runtime *rt)
+{
+    size_t capacity = 0;
+    struct bpf_program *prog;
+    bpf_object__for_each_program(prog, rt->obj)
+    {
+        if (bpf_program__autoload(prog))
+            capacity++;
+    }
+
+    if (!capacity)
+        return -1;
+
+    rt->links = callocz(capacity, sizeof(*rt->links));
+    if (!rt->links)
+        return -1;
+
+    bpf_object__for_each_program(prog, rt->obj)
+    {
+        if (!bpf_program__autoload(prog))
+            continue;
+
+        struct bpf_link *link = bpf_program__attach(prog);
+        if (!link || libbpf_get_error(link)) {
+            fprintf(stderr, "ebpf-go: attach socket CORE program %s failed (errno %d)\n",
+                    bpf_program__name(prog), errno);
+            socket_destroy_links(rt);
+            return -1;
+        }
+
+        rt->links[rt->nlinks++] = link;
+    }
+
     return rt->nlinks == 0 ? -1 : 0;
 }
 
@@ -717,8 +751,9 @@ int netdata_socket_runtime_attach(struct netdata_ebpf_socket_runtime *rt)
     if (rt->links)
         socket_destroy_links(rt);
 
-    /* All socket binary flavors use kprobe-style sections; attach identically
-     * for both legacy and CO-RE modes. */
+    if (rt->kind == NETDATA_SOCKET_RUNTIME_CORE)
+        return socket_attach_trampolines(rt);
+
     return socket_attach_kprobes(rt);
 }
 

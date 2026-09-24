@@ -88,6 +88,7 @@ static void ebpf_process_disable_probe(struct process_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_release_task_probe, false);
     bpf_program__set_autoload(obj->progs.netdata_do_fork_probe, false);
     bpf_program__set_autoload(obj->progs.netdata_kernel_clone_probe, false);
+    bpf_program__set_autoload(obj->progs.netdata_wake_up_new_task_probe, false);
 }
 
 static void ebpf_disable_tracepoints(struct process_bpf *obj)
@@ -128,17 +129,6 @@ static inline void ebpf_disable_clone3(struct process_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_clone3_fexit, false);
 }
 
-static inline void ebpf_adjust_process_fork(struct process_bpf *obj)
-{
-    if (running_on_kernel <= NETDATA_EBPF_KERNEL_6_16) {
-        bpf_program__set_autoload(obj->progs.netdata_tracepoint_sched_process_fork, true);
-        bpf_program__set_autoload(obj->progs.netdata_tracepoint_sched_process_fork_v2, false);
-    } else {
-        bpf_program__set_autoload(obj->progs.netdata_tracepoint_sched_process_fork_v2, true);
-        bpf_program__set_autoload(obj->progs.netdata_tracepoint_sched_process_fork, false);
-    }
-}
-
 /**
  * Mount Attach Probe
  *
@@ -156,7 +146,13 @@ static inline int process_attach_kprobe_target(struct process_bpf *obj)
     if (ret)
         goto endakt;
 
-    if (running_on_kernel < NETDATA_EBPF_KERNEL_5_9_16) {
+    obj->links.netdata_wake_up_new_task_probe = bpf_program__attach_kprobe(
+        obj->progs.netdata_wake_up_new_task_probe, false, "wake_up_new_task");
+    ret = libbpf_get_error(obj->links.netdata_wake_up_new_task_probe);
+    if (ret)
+        goto endakt;
+
+    if (running_on_kernel <= NETDATA_EBPF_KERNEL_5_9_16) {
         obj->links.netdata_do_fork_probe =
             bpf_program__attach_kprobe(obj->progs.netdata_do_fork_probe, false, process_targets[PROCESS_SYS_FORK].name);
         ret = libbpf_get_error(obj->links.netdata_do_fork_probe);
@@ -204,6 +200,7 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
     } else if (mode == EBPF_LOAD_PROBE || mode == EBPF_LOAD_RETPROBE) {
         ebpf_disable_tracepoints(obj);
         ebpf_disable_trampoline(obj);
+        bpf_program__set_autoload(obj->progs.netdata_sched_process_fork_btf, false);
 
         bpf_program__set_autoload(
             (running_on_kernel <= NETDATA_EBPF_KERNEL_5_9_16) ? obj->progs.netdata_kernel_clone_probe :
@@ -218,14 +215,13 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
         ebpf_disable_clone3(obj);
     }
 
-    ebpf_adjust_process_fork(obj);
-
     int ret = process_bpf__load(obj);
     if (ret) {
         return ret;
     }
 
-    ret = (mode == EBPF_LOAD_TRAMPOLINE) ? process_bpf__attach(obj) : process_attach_kprobe_target(obj);
+    ret = (mode == EBPF_LOAD_PROBE || mode == EBPF_LOAD_RETPROBE) ? process_attach_kprobe_target(obj) :
+                                                                    process_bpf__attach(obj);
     if (!ret) {
         ebpf_process_set_hash_tables(obj);
 

@@ -7,6 +7,9 @@
 #include "ebpf.h"
 #include "ebpf_disk.h"
 #include "libbpf_api/ebpf_library.h"
+#ifdef LIBBPF_MAJOR_VERSION
+#include <bpf/btf.h>
+#endif
 
 struct config disk_config = APPCONFIG_INITIALIZER;
 
@@ -83,6 +86,18 @@ static inline void ebpf_disk_set_hash_table(struct disk_bpf *obj)
  */
 static inline int ebpf_disk_load_and_attach(struct disk_bpf *obj)
 {
+    const char *section = bpf_program__section_name(obj->progs.netdata_blk_complete_request);
+    if (section && strncmp(section, "fentry/", 7) == 0) {
+        struct btf *kernel_btf = btf__load_vmlinux_btf();
+        int complete_id = kernel_btf ?
+            btf__find_by_name_kind(kernel_btf, "blk_complete_request", BTF_KIND_FUNC) : -1;
+
+        if (complete_id < 0)
+            bpf_program__set_autoload(obj->progs.netdata_blk_complete_request, false);
+
+        btf__free(kernel_btf);
+    }
+
     int ret = disk_bpf__load(obj);
     if (ret) {
         return ret;
