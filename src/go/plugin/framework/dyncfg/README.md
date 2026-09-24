@@ -53,10 +53,17 @@ acceptance transfers cleanup responsibility to the component, including when
 later activation or publication fails. `Enable` follows the same no-mutation-on-error
 rule. Component callbacks own actual physical lifetimes beyond acknowledgment.
 
+`ParseAndValidate` and `PrepareUpdate` turn callback errors into ordinary DynCfg
+rejection results, honoring valid `CodedError` overrides. `Enable` and
+`PreparedActivation.Accept` perform adoption only. Their errors propagate
+through `Apply` to the managed caller as ownership failures for fail-closed
+handling; they do not produce ordinary DynCfg rejection results.
+
 The direct `Cmd*` wrappers are synchronous conveniences for standalone callers
 and tests. They publish through `Output`, which cannot report write failures, and
 then invoke `Published`; they do not provide the managed fail-closed publication
-guarantee. Production managed Function calls, including daemon echoes, use the
+guarantee. Raw `Prepare` or `Apply` errors produce a 500 reply in these wrappers.
+Production managed Function calls, including daemon echoes, use the
 prepared boundary so the composition layer owns framing and failure.
 
 ## Cache and status ownership

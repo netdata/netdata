@@ -48,7 +48,9 @@ type Callbacks[C Config] interface {
 	ConfigType(cfg C) ConfigType
 }
 
-// CodedError allows callbacks to override the default response code.
+// CodedError overrides the response code when a callback error becomes a rejection.
+// Handler uses it for ParseAndValidate and PrepareUpdate. Apply errors propagate
+// to the managed caller without a result, regardless of CodedError.
 type CodedError interface {
 	error
 	DyncfgCode() int
