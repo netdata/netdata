@@ -97,7 +97,8 @@ DynCfg uses HTTP-like response codes to indicate the status of operations. These
 #### Success Codes (2xx)
 
 - **DYNCFG_RESP_RUNNING (200)**: Configuration was accepted and is currently running
-- **DYNCFG_RESP_ACCEPTED (202)**: Configuration was accepted but not yet running
+- **DYNCFG_RESP_ACCEPTED (202)**: Configuration was accepted but is not running: it is still starting, or it was
+  adopted and failed; the configuration status says which
 - **DYNCFG_RESP_ACCEPTED_DISABLED (298)**: Configuration was accepted but is currently disabled
 - **DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED (299)**: Configuration was accepted but requires a restart to apply
 
@@ -111,6 +112,17 @@ Standard HTTP error codes are used, including:
 - **HTTP_RESP_NOT_IMPLEMENTED (501)**: The requested operation is not implemented
 
 When implementing a callback function, always return the appropriate response code to indicate the status of the operation. The DynCfg system uses these codes to determine how to handle the configuration and what to display to the user.
+
+For `add`, `update`, `enable`, `disable` and `remove`, the response code is the adoption decision: DynCfg saves the
+change only on a 2xx response and replays saved configurations when the plugin starts. A 2xx MUST mean the plugin now
+holds the requested configuration. A completed plugin rejection MUST preserve the previous configuration and enabled
+intent. Report the health of an adopted configuration, such as a job that failed to start, through its status, not the
+response code.
+
+Timeouts, lost replies, crashes, and structural failures after a transition can leave the outcome indeterminate.
+An error on those paths does not prove rejection. The daemon persists the successful reply it observes; a plugin
+`get` result is not evidence of daemon persistence. See [the plugin protocol](../../plugins.d/DYNCFG.md#3-process-commands-and-respond)
+for the mutation response contract.
 
 ### Source Types
 

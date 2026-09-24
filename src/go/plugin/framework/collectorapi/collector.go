@@ -46,9 +46,10 @@ type CollectorV1 interface {
 // An Init or Check error fails the job. By default, a Check error is retried
 // every autodetection_retry seconds (never when it is 0, the framework
 // default) and an Init error is never retried. PermanentError (never retried)
-// and TemporaryError (retried per autodetection_retry) classify either and set
-// the DynCfg response code. A classified failure keeps a failed stock job
-// listed instead of removed.
+// and TemporaryError (retried per autodetection_retry) classify either. DynCfg
+// update rejects failed preflight regardless of retry policy; enable accepts
+// intent before probing and reports a later failure through job status.
+// A classified failure keeps a failed stock job listed instead of removed.
 type CollectorV2 interface {
 	Init(context.Context) error
 	Check(context.Context) error

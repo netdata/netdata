@@ -109,6 +109,10 @@ type ResourcePolicy struct {
 	Argument    uint16
 	Prefix      string
 	ScopePrefix string
+	// An observer command may submit its own resource transaction, then wait
+	// without retaining that transaction's serialization lane.
+	CommandArgument    uint16
+	IndependentCommand string
 }
 
 // DynCfgJobResource derives a collector job resource from DynCfg arguments.
@@ -135,7 +139,9 @@ func (rp ResourcePolicy) validate() error {
 	if rp.Prefix == "" ||
 		len(rp.Prefix)+len(rp.ScopePrefix) >
 			maximumDeclarationMetadataBytes ||
-		strings.TrimSpace(rp.ScopePrefix) != rp.ScopePrefix {
+		strings.TrimSpace(rp.ScopePrefix) != rp.ScopePrefix ||
+		len(rp.IndependentCommand) > maximumDeclarationMetadataBytes ||
+		strings.TrimSpace(rp.IndependentCommand) != rp.IndependentCommand {
 		return errors.New("jobmgr Function catalog: invalid resource policy")
 	}
 	return nil
@@ -143,6 +149,10 @@ func (rp ResourcePolicy) validate() error {
 
 func (rp ResourcePolicy) resolve(arguments []string) string {
 	if rp == (ResourcePolicy{}) {
+		return ""
+	}
+	if rp.IndependentCommand != "" && int(rp.CommandArgument) < len(arguments) &&
+		strings.EqualFold(arguments[rp.CommandArgument], rp.IndependentCommand) {
 		return ""
 	}
 	resourceID := resolveDynCfgJobResource(rp, arguments)
@@ -511,6 +521,17 @@ func validateDeclaration(declaration Declaration) error {
 	}
 	if declaration.Transaction != nil && declaration.Resource == (ResourcePolicy{}) {
 		return errors.New("jobmgr Function catalog: transaction has no resource policy")
+	}
+	if transaction := declaration.Transaction; transaction != nil &&
+		declaration.Resource.IndependentCommand != "" {
+		if declaration.Resource.CommandArgument != transaction.CommandArgument {
+			return errors.New("jobmgr Function catalog: independent and transaction command arguments differ")
+		}
+		for _, command := range transaction.Commands {
+			if strings.EqualFold(command.Name, declaration.Resource.IndependentCommand) {
+				return errors.New("jobmgr Function catalog: transaction cannot use an independent invocation lane")
+			}
+		}
 	}
 	return declaration.Resource.validate()
 }

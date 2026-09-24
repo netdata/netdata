@@ -179,10 +179,13 @@ default is wrong:
 - `collectorapi.TemporaryError(err)`: a condition that may clear on its own, such as a dependency that is not ready
   yet. The job keeps the `autodetection_retry` schedule, even from `Init()`.
 
-DynCfg `enable` of a disabled or failed job, `update` and `restart` answer with the classified code (422 or 503).
-`test` answers 422 for any failure; `add` and `enable` of an accepted job answer 202 and report the failure through the
-job status. A classified failure keeps a failed stock job listed in DynCfg instead of removing it. Leave the expected
-absence of a service at a stock endpoint unclassified.
+DynCfg `update` rejects every failed preflight regardless of `autodetection_retry`, preserving the incumbent:
+`422` for a permanent or unclassified collector failure, `503` for a temporary one. Successful replacement preflight
+returns `202` before runtime startup completes. Non-running `enable` accepts intent with `202` before probing;
+later failures are reported through job status and use the retry policy above. `add` is passive until enabled.
+A classified failure keeps a failed stock job listed in DynCfg instead of removing it. Leave the expected absence of a
+service at a stock endpoint unclassified. For all command outcomes, including `restart` and `test`, see
+[the Job Manager reply contract](/src/go/plugin/agent/jobmgr/ARCHITECTURE.md#dyncfg-reply-contract).
 
 ## Config
 

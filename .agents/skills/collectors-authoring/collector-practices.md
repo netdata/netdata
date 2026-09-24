@@ -400,11 +400,13 @@ V2 imports: `github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi
 `Init()` prepares the job and `Check()` is the cheap detection probe. By default, a Check error is retried every
 `autodetection_retry` seconds (never when it is 0, the framework default) and an Init error is never retried;
 `collectorapi.PermanentError` (never retried) and `collectorapi.TemporaryError` (configured retry) classify either.
+DynCfg command acceptance is owned by `src/go/plugin/agent/jobmgr/ARCHITECTURE.md#dyncfg-reply-contract`.
 `Collect()` is the scheduled hot path. Cleanup belongs to the orderly runtime teardown, including the optional V2
 runner's shutdown ordering. Exact behavior is in
 `src/go/plugin/framework/jobruntime/job_v1.go`, `src/go/plugin/framework/jobruntime/job_v2.go`,
-`src/go/plugin/framework/jobruntime/job_common.go` and `src/go/plugin/agent/jobmgr/joboutput/generation.go`
-(`autoDetectionFailureFor`); public lifecycle requirements are in
+`src/go/plugin/framework/jobruntime/job_common.go`, `src/go/plugin/agent/jobmgr/joboutput/generation.go`
+(`autoDetectionFailureFor`) and `src/go/plugin/agent/jobmgr/joboutput/dyncfg_reply.go` (DynCfg replies); public
+lifecycle requirements are in
 `src/go/plugin/go.d/docs/how-to-write-a-collector.md#registration-and-lifecycle`.
 
 A collector can compile without being registered or enabled. Runtime imports and configuration are distinct from

@@ -111,6 +111,8 @@ func (cmf *ConfigModuleFactory) Test(ctx context.Context, config confgroup.Confi
 	return nil
 }
 
+// Validate checks the available configuration fields without resolving secrets
+// or acquiring dependencies. Reference values are checked during activation.
 func (cmf *ConfigModuleFactory) Validate(ctx context.Context, config confgroup.Config) (err error) {
 	if ctx == nil || config == nil {
 		return errors.New("job output: invalid config-module validation")
@@ -122,9 +124,30 @@ func (cmf *ConfigModuleFactory) Validate(ctx context.Context, config confgroup.C
 	defer func() {
 		err = errors.Join(err, probe.cleanup(context.WithoutCancel(ctx)))
 	}()
-	redactLifecycle, err := cmf.applyResolved(ctx, config, probe.module)
-	probe.redact = redactLifecycle
-	return err
+	defer func() { err = withJobConfigFailure(err, "configuration", "") }()
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = withJobConfigFailure(invalidJobConfiguration(errors.New(
+				"job output: applying configuration panicked",
+			)), "configuration", "panic")
+		}
+		if probe.redact {
+			err = redactResolvedLifecycleError(err)
+		}
+	}()
+	var value any
+	if policy.SecretReferencesAllowed(config) {
+		value, probe.redact, err = cmf.config.Resolver.CloneForValidation(map[string]any(config))
+	} else {
+		value, err = secretresolver.CloneLiteral(map[string]any(config))
+	}
+	if err != nil {
+		return err
+	}
+	if probe.redact && probe.module.GetBase() != nil {
+		probe.module.GetBase().Logger = cmf.moduleLogger(config, true)
+	}
+	return applyConfigModuleValue(value, probe.module, probe.redact)
 }
 
 func (cmf *ConfigModuleFactory) construct(module string) (probe constructedConfigModule, err error) {
@@ -237,28 +260,35 @@ func (cmf *ConfigModuleFactory) applyResolvedInternal(
 			configured.GetBase().Logger = cmf.moduleLogger(config, true)
 		}
 	}
-	payload, err := yaml.Marshal(resolved)
+	if err := applyConfigModuleValue(resolved, module, hasReferences); err != nil {
+		return hasReferences, nil, err
+	}
+	return hasReferences, snapshot, nil
+}
+
+func applyConfigModuleValue(value any, module any, hasReferences bool) error {
+	payload, err := yaml.Marshal(value)
 	if err != nil {
-		return false, nil, invalidJobConfiguration(
-			fmt.Errorf("job output: marshaling resolved configuration: %w", err),
+		return invalidJobConfiguration(
+			fmt.Errorf("job output: marshaling configuration: %w", err),
 		)
 	}
 	if len(payload) > secretresolver.MaximumAtomicResolvedBytes {
-		return false, nil, invalidJobConfiguration(
+		return invalidJobConfiguration(
 			withJobConfigFailure(errors.New("job output: serialized configuration exceeds maximum size"), "configuration", "result_limit"),
 		)
 	}
 	if err := yaml.Unmarshal(payload, module); err != nil {
 		if hasReferences {
-			return true, nil, invalidJobConfiguration(
+			return invalidJobConfiguration(
 				errors.New("job output: applying resolved configuration failed; details redacted"),
 			)
 		}
-		return false, nil, invalidJobConfiguration(
-			fmt.Errorf("job output: applying resolved configuration: %w", err),
+		return invalidJobConfiguration(
+			fmt.Errorf("job output: applying configuration: %w", err),
 		)
 	}
-	return hasReferences, snapshot, nil
+	return nil
 }
 
 func (cmf *ConfigModuleFactory) moduleLogger(config confgroup.Config, redact bool) *logger.Logger {

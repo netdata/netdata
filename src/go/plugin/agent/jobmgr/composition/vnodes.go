@@ -29,14 +29,15 @@ import (
 const vnodeBootResourceID = "\x00jobmgr-vnode-boot"
 
 type vnodeBinding struct {
-	epoch       uint64                             // run generation
-	pluginName  string                             // owning plugin name
-	frames      *lifecycle.FrameOwner              // protocol frame sink
-	config      *agentdiscovery.VNodeConfiguration // configured-vnode authority it mutates
-	graph       *dyncfg.Graph                      // dyncfg graph for vnode config entries
-	diagnostics jobmgr.DiagnosticObserver          // operational log sink
-	acquirer    vnodes.SNMPAcquirer
-	acquisition vnodeAcquisition
+	epoch             uint64                             // run generation
+	pluginName        string                             // owning plugin name
+	frames            *lifecycle.FrameOwner              // protocol frame sink
+	config            *agentdiscovery.VNodeConfiguration // configured-vnode authority it mutates
+	graph             *dyncfg.Graph                      // dyncfg graph for vnode config entries
+	diagnostics       jobmgr.DiagnosticObserver          // operational log sink
+	acquirer          vnodes.SNMPAcquirer
+	acquisition       vnodeAcquisition
+	dependencyChanged func(string) // nonblocking post-commit named-vnode notification
 }
 
 func newVNodeBinding(
@@ -481,6 +482,9 @@ func (vb *vnodeBinding) configCreateCleanup(vnode *vnodes.Config) lifecycle.Task
 	return func() error {
 		err := vb.protocolCleanup(func(api *netdataapi.API) error { return vb.configCreateVNodeJob(api, vnode) })()
 		vb.syncAcquisition(vnode.Name)
+		if vb.dependencyChanged != nil {
+			vb.dependencyChanged(vnode.Name)
+		}
 		return err
 	}
 }

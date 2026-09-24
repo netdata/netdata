@@ -181,6 +181,11 @@ func newRunGeneration(
 			Dependencies: dependencies,
 			Initial:      config.Secrets.Initial,
 			Diagnostics:  config.Diagnostics,
+			DependencyChanged: func(key string) {
+				if controller := dynCfgBinding.controller.Load(); controller != nil {
+					controller.NotifyDependencyChanged("secretstore", key)
+				}
+			},
 		},
 	)
 	if err != nil {
@@ -281,6 +286,10 @@ func newRunGeneration(
 	}
 	if err := dynCfgBinding.bind(dynCfgJobs); err != nil {
 		return nil, err
+	}
+	dependencies.SetActivationEnabled(dynCfgJobs.ActivationEnabled)
+	vnodeBinding.dependencyChanged = func(name string) {
+		dynCfgJobs.NotifyDependencyChanged("vnode", name)
 	}
 	kernel, err := jobmgr.NewCommandKernel(
 		run,
