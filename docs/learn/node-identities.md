@@ -241,7 +241,11 @@ jobs:
     url: http://203.0.113.10:9182/metrics
 ```
 
-The `vnode` value must exactly match the vnode reference name. For static YAML definitions, use `hostname`; for SNMP YAML definitions, use the required `name`. For GUI definitions, use the resource name assigned when creating the vnode. An unknown name or an SNMP vnode awaiting its first usable identity leaves an enabled job waiting. Creating the vnode or acquiring its first usable identity wakes that job even when `autodetection_retry` is zero. Passive registrations and disabled jobs stay inactive until enabled.
+The `vnode` value must exactly match the vnode reference name. For static YAML definitions, use `hostname`; for SNMP YAML definitions, use the required `name`. For GUI definitions, use the resource name assigned when creating the vnode.
+
+When an enabled job starts with an unknown vnode name or an SNMP vnode awaiting its first usable identity, it waits for that dependency. Creating the vnode or acquiring its first usable identity wakes the job even when `autodetection_retry` is zero. Passive registrations and disabled jobs stay inactive until enabled.
+
+Editing an enabled job through dynamic configuration is different: an edit that references an unknown or not-yet-identified vnode is rejected, leaving the previous configuration and any running job unchanged. Create the vnode and, for SNMP, wait for identity acquisition before applying the edit. A disabled job can save such a reference and wait for it when enabled.
 
 Several jobs can reference the same vnode. Its configured hostname and host labels govern output to its GUID within that plugin process, including collector-generated scopes using the same GUID. Job labels remain chart labels. Removing an unreferenced configured vnode lets generated contributors resume using their own host metadata.
 
