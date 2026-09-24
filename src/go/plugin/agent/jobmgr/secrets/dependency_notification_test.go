@@ -4,7 +4,6 @@ package secrets
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -31,20 +30,32 @@ func TestStoreDependencyNotificationFollowsSuccessfulCommit(t *testing.T) {
 			if action == "provider failure" {
 				value = "provider-failure-one"
 			}
-			input := CommandInput{
-				Args:        []string{"go.d:secretstore:vault", "add", "main"},
-				Payload:     []byte(fmt.Sprintf(`{"value":%q}`, value)),
-				ContentType: "application/json", HasPayload: true,
-			}
-			stage, err := controller.Stage(input)
+			stage, err := controller.operations.prepare(storeOperationSpec{
+				target: secretTarget{
+					key: "vault:main",
+				},
+				config: secretTestConfig("dyncfg", value),
+				mode:   storeOperationMutation,
+			})
 			require.NoError(t, err)
 			defer stage.Release()
 			stage.Start()
 			requireStoreOperationReady(t, stage)
 			id := secretResourceID("vault:main")
-			transaction, err := controller.PrepareStaged(t.Context(), input, nil,
-				lifecycle.ResourceTransactionScope{ID: id, Successor: lifecycle.ResourceIdentity{ID: id, Generation: 1}},
-				lifecycle.LongLivedPermit{}, stage)
+			operation, err := takeStoreOperation(stage)
+			require.NoError(t, err)
+			transaction, err := controller.prepareStoreMutation(
+				lifecycle.ResourceTransactionScope{
+					ID: id,
+					Successor: lifecycle.ResourceIdentity{
+						ID:         id,
+						Generation: 1,
+					},
+				},
+				nil,
+				operation,
+				true,
+			)
 			require.NoError(t, err)
 			require.Empty(t, notified, "preparation must not notify dependents")
 			if action == "dispose" {

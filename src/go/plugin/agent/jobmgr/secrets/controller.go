@@ -60,15 +60,16 @@ type Controller struct {
 	commands          jobmgr.PreparedCommandPort  // run-owned internal retry ingress
 	projectionCtx     context.Context             // canceled when the run projection closes
 	closeContext      context.CancelFunc
-	pending           map[string]*pendingStoreState // latest persistent desired config by Store key
+	pending           map[string]*pendingStoreState // exact accepted acquisition owner by Store key
 	nextDesired       uint64                        // desired-config ordering
 	nextRetry         uint64                        // internal retry UID ordering
 	commandsReady     bool                          // templates are visible and commands may execute
 }
 
 type secretEntry struct {
-	config secretstore.Config // the store's config
-	status dyncfg.Status      // dyncfg status (running / failed)
+	config  secretstore.Config // the store's config
+	status  dyncfg.Status      // accepted / running / failed
+	version uint64             // exact accepted revision, independent of Store generation
 }
 
 func NewController(config ControllerConfig) (*Controller, error) {
@@ -326,8 +327,9 @@ func (c *Controller) commitEntry(key string, entry *secretEntry) {
 		delete(c.entries, key)
 	} else {
 		c.entries[key] = secretEntry{
-			config: cloneSecretConfig(entry.config),
-			status: entry.status,
+			config:  cloneSecretConfig(entry.config),
+			status:  entry.status,
+			version: entry.version,
 		}
 	}
 	c.mu.Unlock()
@@ -483,7 +485,7 @@ func secretResourceID(key string) string {
 	if err != nil {
 		return ""
 	}
-	return "secretstore:" + string(kind) + "_" + name
+	return jobmgr.DynCfgNamedResourceID("secretstore:", string(kind), name)
 }
 
 func selectInitialConfigs(configs []secretstore.Config) []secretstore.Config {

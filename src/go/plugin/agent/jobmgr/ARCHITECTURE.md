@@ -248,7 +248,7 @@ Which mechanism each command surface uses:
 | Command surface | Mechanism | Declared in |
 | --- | --- | --- |
 | SecretStore DynCfg `add` / `update` / `test` / `remove` | Pre-claim stage | `composition/secret_adapter.go` |
-| Retained pending SecretStore retry | Pre-claim stage | `secrets/pending.go` |
+| Accepted SecretStore acquisition | Outside the resource lane; short completion transaction | `secrets/pending.go` |
 | Collector UPDATE and RESTART preflight | Claim yield on `dyncfg:jobs`; RESTART observation uses an independent invocation lane | `composition/dyncfg.go`, `joboutput/dyncfg_restart.go` |
 | Collector ADD, disabled UPDATE, ENABLE, DISABLE and REMOVE | Short transaction; ENABLE arms accepted activation | `joboutput/dyncfg_prepare.go` |
 | Discovered job reconciliation | Claim yield on `dyncfg:jobs` | `joboutput/discovery.go` |
@@ -382,8 +382,9 @@ Who admits, and who does not:
 - The authority retains the worker and everything it owns until its complete cleanup returns, or until the plugin
   process exits.
 - **Persistent** file/discovery state keeps only its latest desired replacement and retries after identity release.
-- SecretStore add/update requests, including DynCfg, retain only their latest desired config after retryable
-  contention and apply it after the identity releases.
+- SecretStore ADD with no live generation acknowledges raw accepted intent before acquisition. Only accepted
+  acquisition waits for physical or generation release. UPDATE and ADD over a live generation reject busy preflight;
+  rejected candidates are never retained for later application.
 - Interactive UPDATE rejects failed preflight while preserving the incumbent. Once accepted, UPDATE and ENABLE
   return `202` without waiting for runtime readiness or predecessor physical cleanup. The accepted activation owner
   retains enabled intent through dependency and identity-release waits. RESTART observes its exact accepted activation
@@ -863,13 +864,35 @@ Backing stores are managed live over DynCfg (`add` / `update` / `remove`). The s
 fresh Store epoch, but the process owns that epoch's preparations, generations, and reader scopes
 (`composition/secret_epoch.go`).
 
-1. **Prepare outside publication.** Provider construction, configuration, and `Init` always run as a process-owned
-   contained attempt, never inside the transaction that publishes the result. Only *where* that attempt is driven
-   differs — at startup every initial Store starts its own attempt up front and the controller waits for all of them
-   at one aggregate barrier before submitting any publish command (`secrets/initial.go`), while DynCfg commands and
-   retained retries drive it as a pre-claim stage so the command holds no claim while it prepares
-   (`secrets/store_stage.go`, `secrets/pending.go`). The prepared generation is then committed by compare-and-swap
-   against the expected generation.
+1. **Separate acceptance from acquisition.** With no live generation, ADD checks available field types and reference
+   syntax without external acquisition, rejects unsupported Store-to-Store references, publishes `202` and an `Accepted`
+   config, then starts its exact accepted owner. Initial file configs use the same publication gate. Their structural
+   publication completes before process ingress is attached; startup does not wait for provider acquisition.
+   Different Store identities can acquire concurrently, and GET, REMOVE and replay remain available while accepted
+   work is pending.
+   The owner prepares outside the kernel resource lane, then submits a short completion transaction. Successful
+   acquisition publishes `Running`; operational failure publishes `Failed` with a redacted diagnostic and retains the
+   accepted raw config for explicit retry. Ordinary environment/provider failures do not start polling.
+
+   UPDATE of changed intent in every state, and ADD over a live generation, prepare before adoption. An identical
+   UPDATE of a pending DynCfg Store joins its current accepted acquisition with 202; it starts no second attempt.
+   A concurrent completion to Running satisfies that same request with 200. UPDATE after Failed still preflights,
+   including unchanged payloads. Exact raw payload and current ownership are checked before coalescing.
+   Invalid or busy preflight preserves accepted config, generation and pending work; it never retains the rejected
+   candidate. A successful replacement commits its prepared generation by compare-and-swap. The predecessor accepted
+   revision and Store generation are both rechecked, including transitions where the generation remains zero.
+   Candidate preparation cannot cancel an accepted owner. Accepted replacement/removal cancels only its exact old
+   owner; stale completion cannot reinstall
+   it or fall back to an obsolete file config. Busy accepted acquisition retries on physical/generation release.
+   A containment deadline also leaves the Store `Accepted`; it waits for the cut attempt's physical release before
+   retrying, so a permanently stuck attempt cannot produce overlapping acquisitions.
+
+   GET returns raw provider payload with unresolved references and without Store identity/source metadata. Authored
+   representations such as duration strings remain unchanged rather than being normalized through provider types.
+   Same-content file-to-DynCfg edits still convert ownership; raw content equality is not proof of resolved
+   credential equality.
+   Initial, wire and retry commands share the exact named Store resource identity, including `kind == name`.
+   `secrets/commands.go`, `secrets/initial.go`, `secrets/pending.go`, `secrets/store_stage.go`.
    - A DynCfg `test` creates the same temporary configured Store but never publishes it. If the Store implements
      `dyncfg.Testable`, its context-aware operational check runs inside the test's config-hash-specific contained
      attempt. The shared Store Test boundary rejects caller cancellation before temporary construction and makes its
@@ -904,8 +927,8 @@ fresh Store epoch, but the process owns that epoch's preparations, generations, 
    construction and startup run later under the accepted activation owner. Physical retirement can finish after
    the Store command returns. `secrets/restart.go`, `secrets/transaction.go`, `joboutput/secret_restart.go`.
 3. **Retire the old generation last.** The superseded generation is retired only after its last reader scope drains,
-   so an in-flight resolution never sees credentials vanish mid-read. A same-key mutation that encounters retirement
-   waits on that key's mutation-readiness signal before retrying; it does not poll or use a timer.
+   so an in-flight resolution never sees credentials vanish mid-read. Accepted acquisition waits on that key's
+   mutation-readiness signal before retrying; rejection-capable commands return busy without retaining the proposal.
 4. **Seal on reload.** Reload seals the old epoch before retiring its run. Sealing rejects new scopes and late
    mutation commits, while already-pinned immutable generations remain readable. The old epoch closes after its exact
    retained-state census drains; it does not enter or dirty the retired run's census.
@@ -937,8 +960,9 @@ flowchart LR
     class Running,Waiting,Failed,Restore job;
 ```
 
-The Store reply confirms its own committed change and dependent resume admission, without waiting for collector
-health. The change remains committed if a later activation fails. Missing named dependencies and physical retirement
+A replacement Store reply confirms its own committed change and dependent resume admission, without waiting for
+collector health. A no-live ADD reply confirms accepted raw intent; its acquisition outcome follows asynchronously.
+The change remains committed if a later activation fails. Missing named dependencies and physical retirement
 leave the job `Accepted` until their event wakes its exact activation token. Operational construction or startup
 failure publishes `Failed` and follows the collector's retry policy. A later disable, removal, replacement, or run stop
 revokes the token and retry. A resume captured before that revocation cannot resurrect the job. Invalid proposals and

@@ -172,7 +172,7 @@ func TestProcessCoreTerminateInterruptsInitialStartup(t *testing.T) {
 	close(release)
 }
 
-func TestProcessCoreTerminateInterruptsSuccessorStartup(t *testing.T) {
+func TestProcessCoreRestartAndTerminateDoNotWaitForSuccessorStore(t *testing.T) {
 	process, entered, release := newStartupControlTestProcess(t, 2)
 	controls := newTestProcessControls(2)
 	done := make(chan error, 1)
@@ -184,6 +184,12 @@ func TestProcessCoreTerminateInterruptsSuccessorStartup(t *testing.T) {
 	restart := testProcessControl()
 	controls.sendRestart(restart)
 	require.EqualValues(t, 2, waitStartupControlStore(t, entered))
+	select {
+	case err := <-restart.result:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "restart waited for successor Store acquisition")
+	}
 
 	terminate := testProcessControl()
 	controls.sendTerminate(terminate)
@@ -193,7 +199,6 @@ func TestProcessCoreTerminateInterruptsSuccessorStartup(t *testing.T) {
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "termination waited behind successor startup")
 	}
-	require.ErrorIs(t, <-restart.result, ErrProcessStopped)
 	require.NoError(t, <-done)
 	close(release)
 }

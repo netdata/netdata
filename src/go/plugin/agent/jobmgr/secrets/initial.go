@@ -10,7 +10,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
 // The leading NUL reserves an internal-only identity that cannot collide with
@@ -37,62 +36,17 @@ func (c *Controller) PublishInitial(ctx context.Context, commands jobmgr.Prepare
 	if err := c.publishTemplates(ctx, commands); err != nil {
 		return err
 	}
-	stages := make([]*PreparedStoreOperation, len(initial))
-	defer func() {
-		for _, stage := range stages {
-			stage.Release()
-		}
-	}()
 	for index, config := range initial {
-		desiredVersion, err := c.allocateDesiredVersion()
+		plan, err := c.planInitial(config)
 		if err != nil {
 			return err
 		}
-		target := secretTarget{
-			key:     config.ExposedKey(),
-			kind:    config.Kind(),
-			name:    config.Name(),
-			command: dyncfg.CommandAdd,
-		}
-		stage, err := c.operations.prepare(storeOperationSpec{
-			target:         target,
-			config:         config,
-			expected:       c.store.Generation(target.key),
-			mode:           storeOperationMutation,
-			supersede:      true,
-			desiredVersion: desiredVersion,
-		})
-		if err != nil {
-			return err
-		}
-		stages[index] = stage
-		stage.Start()
-	}
-	for _, stage := range stages {
-		select {
-		case <-stage.Ready():
-		case <-ctx.Done():
-			for _, pending := range stages {
-				pending.Cancel(context.Cause(ctx))
-			}
-			return context.Cause(ctx)
-		}
-	}
-	for index, config := range initial {
-		plan, err := c.planInitial(config, stages[index])
-		if err != nil {
-			return err
-		}
-		if err := commands.SubmitPreparedAndWait(
-			ctx,
-			jobmgr.Request{
-				UID:     fmt.Sprintf("jobmgr-secrets-%d-%d", c.epoch, index+1),
-				LaneKey: secretResourceID(config.ExposedKey()),
-				Source:  lifecycle.SourceJobManager,
-				Route:   "internal/secrets/publish",
-			},
-			plan,
-		); err != nil {
+		if err := commands.SubmitPreparedAndWait(ctx, jobmgr.Request{
+			UID:     fmt.Sprintf("jobmgr-secrets-%d-%d", c.epoch, index+1),
+			LaneKey: secretResourceID(config.ExposedKey()),
+			Source:  lifecycle.SourceJobManager,
+			Route:   "internal/secrets/publish",
+		}, plan); err != nil {
 			return err
 		}
 	}
@@ -143,64 +97,36 @@ func (c *Controller) publishTemplates(ctx context.Context, commands jobmgr.Prepa
 	)
 }
 
-func (c *Controller) planInitial(
-	config secretstore.Config,
-	stage *PreparedStoreOperation,
-) (jobmgr.WorkPlan, error) {
+func (c *Controller) planInitial(config secretstore.Config) (jobmgr.WorkPlan, error) {
+	version, err := c.allocateDesiredVersion()
+	if err != nil {
+		return jobmgr.WorkPlan{}, err
+	}
+	structuralErr := c.store.ValidateStructure(c.creators, config)
 	key := config.ExposedKey()
 	resourceID := secretResourceID(key)
 	return jobmgr.WorkPlan{
 		Claims:     []string{SecretGraphClaim},
 		NoResponse: true,
 		Transaction: &jobmgr.ResourceTransactionPlan{
-			ID:                resourceID,
-			AllocateSuccessor: true,
-			Prepare: func(
-				ctx context.Context,
-				current lifecycle.ReadyResource,
-				scope lifecycle.ResourceTransactionScope,
-				permit lifecycle.LongLivedPermit,
-			) (
-				transaction lifecycle.PreparedResourceTransaction,
-				resultErr error,
-			) {
-				if scope.ID != resourceID {
-					return nil, errors.New("jobmgr secrets: initial Store scope differs")
+			ID: resourceID,
+			Prepare: func(ctx context.Context, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope,
+				permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {
+				if scope.ID != resourceID || permit.Valid() {
+					return nil, errors.New("jobmgr secrets: invalid initial Store scope")
 				}
-				if existing, ok := c.entry(key); ok {
-					existingPriority := existing.config.SourceTypePriority()
-					nextPriority := config.SourceTypePriority()
-					if existingPriority > nextPriority ||
-						existingPriority == nextPriority &&
-							existing.status ==
-								dyncfg.StatusRunning {
-						return c.noop(
-							scope,
-							current,
-							mustSecretMessage(204, ""),
-							nil,
-							c.configCreateCleanup(existing),
-						)
-					}
+				if existing, ok := c.entry(key); ok &&
+					existing.config.SourceTypePriority() >= config.SourceTypePriority() {
+					return c.noop(scope, current, mustSecretMessage(204, ""), nil, nil)
 				}
-				operation, err := takeStoreOperation(stage)
-				if err != nil {
-					return nil, err
+				if current != nil || c.store.Generation(key) != 0 {
+					return nil, errors.New("jobmgr secrets: initial publication found a live Store")
 				}
-				defer operation.releaseUntransferred(&transaction, &resultErr)
-				materialized := operation.result
-				expected := c.store.Generation(key)
-				if materialized.expected != expected {
-					materialized.retryable = true
-					materialized.err = errors.New(
-						"jobmgr secrets: initial Store changed while preparation was staged",
-					)
-					return c.prepareRetryableResult(scope, current, materialized, expected == 0)
-				}
-				if materialized.retryable {
-					return c.prepareRetryableResult(scope, current, materialized, expected == 0)
-				}
-				return c.prepareStoreMutation(scope, current, operation, true)
+				return c.prepareAccepted(scope, current, storeOperationResult{
+					config:         config,
+					desiredVersion: version,
+					err:            structuralErr,
+				})
 			},
 		},
 		CooperativeCancel:   true,
@@ -219,10 +145,7 @@ func (c *Controller) CloseProjection() error {
 	c.commands = nil
 	for key, state := range c.pending {
 		delete(c.pending, key)
-		select {
-		case state.update <- struct{}{}:
-		default:
-		}
+		state.cancel()
 	}
 	c.mu.Unlock()
 	if closeContext != nil {
