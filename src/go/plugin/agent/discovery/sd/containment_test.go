@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
@@ -198,6 +199,20 @@ func TestPipelineConstructionIsContainedPerPipelineIdentity(t *testing.T) {
 	_, err = discovery.preparePipeline(context.Background(), blocked)
 	var busy *materializationError
 	require.ErrorAs(t, err, &busy)
+	// A new epoch still cannot re-enter the same physically retained constructor.
+	nextRun, err := NewServiceDiscovery(Config{
+		Epoch:       2,
+		Attempts:    attempts,
+		PluginName:  "test",
+		Discoverers: discovery.discoverers,
+	})
+	require.NoError(t, err)
+	_, err = nextRun.preparePipeline(t.Context(), blocked)
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptBusy)
+	// Changed inputs under the same logical name are a different candidate.
+	replacement, err := nextRun.preparePipeline(t.Context(), configFor("blocked", false))
+	require.NoError(t, err)
+	require.NotNil(t, replacement)
 
 	healthy, err := discovery.preparePipeline(
 		context.Background(),

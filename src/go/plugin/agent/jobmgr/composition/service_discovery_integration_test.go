@@ -105,6 +105,10 @@ func TestServiceDiscoveryPreflightDoesNotBlockOtherCommands(t *testing.T) {
 			case <-time.After(time.Second):
 				t.Fatal("preflight not entered")
 			}
+			for _, read := range []string{"get", "schema"} {
+				submit(read+"-b", []string{"go.d:sd:fixture:b", read}, "")
+				result(read+"-b", 200)
+			}
 			submit("disable-b", []string{"go.d:sd:fixture:b", "disable"}, "")
 			result("disable-b", 200)
 			select {

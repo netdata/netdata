@@ -77,7 +77,7 @@ func TestServiceDiscoveryBindingCapturesReadOnlyResult(t *testing.T) {
 					ContentType: "application/json",
 				})
 			},
-			wantError: "result UID differs from invocation",
+			wantError: "result outside invocation",
 		},
 		"handler panic": {
 			emit: func(*serviceDiscoveryBinding) {
@@ -289,6 +289,103 @@ func TestServiceDiscoveryCooperativeCancellationDoesNotQuarantineProductionInvoc
 		},
 	)
 	require.EqualValues(t, 1, retryCalls)
+}
+
+func TestServiceDiscoveryCanceledReadRetainsOnlyItsResource(t *testing.T) {
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
+	attempts := binding.attempts.(*containment.Authority)
+	entered, release := make(chan struct{}), make(chan struct{})
+	released := false
+	t.Cleanup(func() {
+		if !released {
+			close(release)
+		}
+	})
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	settled := make(chan error, 1)
+	go func() {
+		_, _, err := binding.invokeContained(
+			ctx,
+			"job-a",
+			frameworkfunctions.Function{
+				UID: "old-a",
+			},
+			func(context.Context) {
+				close(entered)
+				<-release
+				binding.FunctionResult(
+					dyncfg.Result{
+						UID:         "old-a",
+						Code:        200,
+						ContentType: "application/json",
+						Payload:     `{"owner":"old-a"}`,
+					},
+				)
+			},
+		)
+		settled <- err
+	}()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("read did not enter")
+	}
+	cancel()
+	select {
+	case err := <-settled:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("read cancellation did not settle")
+	}
+	read := func(resource, uid string, want int, wantCalled bool) {
+		t.Helper()
+		called := false
+		result, cleanup, err := binding.invokeContained(
+			t.Context(),
+			resource,
+			frameworkfunctions.Function{
+				UID: uid,
+			},
+			func(context.Context) {
+				called = true
+				binding.FunctionResult(
+					dyncfg.Result{
+						UID:         uid,
+						Code:        200,
+						ContentType: "application/json",
+						Payload:     `{"owner":"` + uid + `"}`,
+					},
+				)
+			},
+		)
+		require.NoError(t, err)
+		require.Equal(t, wantCalled, called)
+		require.NoError(t, cleanup())
+		frame, err := lifecycle.PrepareFrame(uid, result, 1)
+		require.NoError(t, err)
+		var wire bytes.Buffer
+		writer, err := lifecycle.NewFrameOwner(&wire)
+		require.NoError(t, err)
+		require.NoError(t, writer.Commit(frame))
+		require.Contains(t, wire.String(), fmt.Sprintf("FUNCTION_RESULT_BEGIN %s %d ", uid, want))
+		if wantCalled {
+			require.Contains(t, wire.String(), `{"owner":"`+uid+`"}`)
+		}
+	}
+	read("job-a", "blocked-a", 503, false)
+	read("job-b", "independent-b", 200, true)
+	close(release)
+	released = true
+	require.Eventually(
+		t,
+		func() bool { return attempts.Census() == (containment.Census{}) },
+		time.Second,
+		time.Millisecond,
+	)
+	read("job-a", "new-a", 200, true)
 }
 
 func TestServiceDiscoveryRetirementReturnsConfigLocalUnavailableResult(t *testing.T) {

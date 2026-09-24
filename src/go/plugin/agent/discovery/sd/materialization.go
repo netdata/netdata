@@ -284,8 +284,8 @@ func (d *ServiceDiscovery) preparePipeline(
 		return nil, errors.New("service discovery: invalid pipeline materialization")
 	}
 	identity := pipelineMaterializationIdentity(config)
-	// UPDATE preflight cannot revoke an incumbent activation. Accepted desired
-	// replacements already cancel the previous slot's preparation context.
+	// Different constructor inputs can prepare independently without revoking an
+	// incumbent. Repeated identical work remains excluded until physical return.
 	return runMaterialization(
 		ctx,
 		d,
@@ -304,7 +304,9 @@ func (d *ServiceDiscovery) preparePipeline(
 func pipelineMaterializationIdentity(config sdConfig) jobmgr.ProcessAttemptIdentity {
 	key := ""
 	if config != nil {
-		key = materializationIdentity("pipeline", []byte(config.ExposedKey()))
+		key = materializationIdentity("pipeline",
+			[]byte(config.ExposedKey()), []byte(config.PipelineKey()),
+			[]byte(config.SourceType()), []byte(config.Source()), config.DataJSON())
 	}
 	return jobmgr.ProcessAttemptIdentity{
 		Namespace: jobmgr.ProcessAttemptServiceDiscovery,

@@ -117,6 +117,38 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 	}
 }
 
+// A saved DynCfg job can be replayed after its same-named file is registered.
+func TestServiceDiscoveryReplayTransfersPendingDecision(t *testing.T) {
+	for _, command := range []string{"enable", "disable", "remove"} {
+		t.Run(command, func(t *testing.T) {
+			d, configs, cancel, done := newWaitTestServiceDiscovery(t)
+			defer stopWaitTestServiceDiscovery(t, d, cancel, done)
+			configs <- prepareConfigFile("/etc/netdata/sd.d/job.conf", "job")
+			require.Eventually(t, d.handler.WaitingForDecision, time.Second, time.Millisecond)
+			add := dyncfg.NewFunction(t.Context(), functions.Function{
+				UID:    "replayed-add",
+				Args:   []string{d.dyncfgTemplateID(testDiscovererTypeNetListeners), "add", "job"},
+				Source: "user=test",
+				Payload: []byte(
+					`{"name":"job","discoverer":{"net_listeners":{}},"services":[{"id":"restored","match":"true"}]}`,
+				),
+			})
+			require.Equal(t, 202, applyTestCommand(t, d, add).Result.Code)
+			require.True(t, d.handler.WaitingForDecision(), "ADD stays passive until a decision")
+			want := 200
+			if command == "enable" {
+				want = 202
+			}
+			require.Equal(t, want, applyTestCommand(t, d, actorFunction(d, t.Context(), "job", command)).Result.Code)
+			select {
+			case configs <- prepareConfigFile("/etc/netdata/sd.d/next.conf", "next"):
+			case <-time.After(time.Second):
+				t.Fatal("file discovery still blocked after replay adoption and decision")
+			}
+		})
+	}
+}
+
 func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile, context.CancelFunc, <-chan struct{}) {
 	t.Helper()
 

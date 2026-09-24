@@ -26,23 +26,21 @@ var errServiceDiscoveryNoTerminalResult = errors.New(
 )
 
 type serviceDiscoveryBinding struct {
-	mu sync.Mutex // guards registration, active read invocation and dirty state
+	mu sync.Mutex // guards registration, read invocations and dirty state
 
 	pluginName  string // owning plugin name
 	epoch       uint64 // run generation
-	attemptKey  string // one physical invocation owner per binding
 	attempts    jobmgr.ProcessAttemptAuthority
-	frames      *lifecycle.FrameOwner       // the one wire frame writer
-	diagnostics jobmgr.DiagnosticObserver   // operational log sink
-	handler     frameworkfunctions.Handler  // the registered service-discovery handler
-	preparer    dyncfg.CommandPreparer      // mutation preparation, without adoption
-	active      *serviceDiscoveryInvocation // current synchronous invocation
-	registered  bool                        // the SD Function is registered
-	dirty       error                       // sticky error (unexpected registration)
+	frames      *lifecycle.FrameOwner                  // the one wire frame writer
+	diagnostics jobmgr.DiagnosticObserver              // operational log sink
+	handler     frameworkfunctions.Handler             // the registered service-discovery handler
+	preparer    dyncfg.CommandPreparer                 // mutation preparation, without adoption
+	invocations map[string]*serviceDiscoveryInvocation // physical handlers, keyed by UID
+	registered  bool                                   // the SD Function is registered
+	dirty       error                                  // sticky error (unexpected registration)
 }
 
 type serviceDiscoveryInvocation struct {
-	uid    string
 	result *dyncfg.Result
 	err    error
 }
@@ -68,13 +66,9 @@ func newServiceDiscoveryBinding(
 		return nil, errors.New("jobmgr composition: invalid service discovery binding")
 	}
 	return &serviceDiscoveryBinding{
-		pluginName: pluginName,
-		epoch:      epoch,
-		attemptKey: jobmgr.ProcessAttemptIdentityKey(
-			"service-discovery-binding",
-			fmt.Sprintf("%d", epoch),
-			pluginName,
-		),
+		pluginName:  pluginName,
+		epoch:       epoch,
+		invocations: make(map[string]*serviceDiscoveryInvocation),
 		attempts:    attempts,
 		frames:      frames,
 		diagnostics: diagnostics,
@@ -488,7 +482,7 @@ func (sdb *serviceDiscoveryBinding) invokeContained(
 	attempt, err := sdb.attempts.StartProcessAttempt(ctx, jobmgr.ProcessAttemptPlan{
 		Identity: jobmgr.ProcessAttemptIdentity{
 			Namespace: jobmgr.ProcessAttemptServiceDiscovery,
-			Key:       sdb.attemptKey,
+			Key:       jobmgr.ProcessAttemptIdentityKey("service-discovery-read", sdb.pluginName, resource),
 			Resource:  serviceDiscoveryDiagnosticResource(resource),
 		},
 		Target: sdb.epoch,
@@ -584,35 +578,33 @@ func (sdb *serviceDiscoveryBinding) invoke(
 		return lifecycle.SealedResult{}, nil, errors.New("jobmgr composition: invalid service discovery invocation")
 	}
 
-	invocation := &serviceDiscoveryInvocation{
-		uid: uid,
-	}
+	invocation := &serviceDiscoveryInvocation{}
 	sdb.mu.Lock()
 	if sdb.dirty != nil {
 		err := sdb.dirty
 		sdb.mu.Unlock()
 		return lifecycle.SealedResult{}, nil, err
 	}
-	if sdb.active != nil {
+	if sdb.invocations[uid] != nil {
 		sdb.mu.Unlock()
 		return lifecycle.SealedResult{}, nil, errors.New(
-			"jobmgr composition: concurrent service discovery invocation escaped containment",
+			"jobmgr composition: duplicate service discovery invocation UID",
 		)
 	}
-	sdb.active = invocation
+	sdb.invocations[uid] = invocation
 	sdb.mu.Unlock()
 
 	callErr := callServiceDiscoveryHandler(call)
 
 	sdb.mu.Lock()
-	if sdb.active != invocation {
+	if sdb.invocations[uid] != invocation {
 		sdb.mu.Unlock()
 		return lifecycle.SealedResult{}, nil,
 			errors.Join(callErr, errors.New("jobmgr composition: service discovery invocation changed"))
 	}
-	sdb.active = nil
+	delete(sdb.invocations, uid)
 	result := invocation.result
-	invocationErr := invocation.err
+	invocationErr := errors.Join(invocation.err, sdb.dirty)
 	sdb.mu.Unlock()
 
 	if err := errors.Join(callErr, invocationErr); err != nil {
@@ -642,25 +634,19 @@ func (sdb *serviceDiscoveryBinding) FunctionResult(result dyncfg.Result) {
 	sdb.mu.Lock()
 	defer sdb.mu.Unlock()
 
-	if sdb.active == nil {
+	invocation := sdb.invocations[result.UID]
+	if invocation == nil {
 		sdb.setDirtyLocked(errors.New("jobmgr composition: service discovery result outside invocation"))
 		return
 	}
-	if sdb.active.result != nil {
-		sdb.active.err = errors.Join(
-			sdb.active.err,
+	if invocation.result != nil {
+		invocation.err = errors.Join(
+			invocation.err,
 			errors.New("jobmgr composition: service discovery handler produced multiple results"),
 		)
 		return
 	}
-	if result.UID != sdb.active.uid {
-		sdb.active.err = errors.Join(
-			sdb.active.err,
-			errors.New("jobmgr composition: service discovery result UID differs from invocation"),
-		)
-		return
-	}
-	sdb.active.result = &result
+	invocation.result = &result
 }
 
 func (sdb *serviceDiscoveryBinding) ConfigCreate(opts netdataapi.ConfigOpts) {

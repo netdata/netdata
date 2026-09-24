@@ -54,11 +54,10 @@ type pipelineSlot struct {
 	expires                       time.Time
 }
 type pipelineRuntime struct {
-	token   pipelineToken
-	live    bool
-	cancel  context.CancelFunc
-	attempt jobmgr.ProcessAttempt
-	done    chan struct{}
+	token  pipelineToken
+	live   bool
+	cancel context.CancelFunc
+	done   chan struct{}
 }
 type pipelineOutput struct {
 	group *confgroup.Group
@@ -70,26 +69,28 @@ type pipelineOutput struct {
 // Opaque work and physical joins belong to process attempts, never this lock.
 type PipelineManager struct {
 	*logger.Logger
-	mux       sync.Mutex
-	ctx       context.Context
-	epoch     uint64
-	plugin    string
-	attempts  jobmgr.ProcessAttemptAuthority
-	prepare   func(context.Context, sdConfig) (sdPipeline, error)
-	events    chan pipelineEvent
-	pipelines map[string]*pipelineSlot
-	logical   map[string]*pipelineSlot
-	sequence  uint64
-	output    map[string][]pipelineOutput
+	mux        sync.Mutex
+	ctx        context.Context
+	epoch      uint64
+	plugin     string
+	attempts   jobmgr.ProcessAttemptAuthority
+	prepare    func(context.Context, sdConfig) (sdPipeline, error)
+	events     chan pipelineEvent
+	pipelines  map[string]*pipelineSlot
+	logical    map[string]*pipelineSlot // desired logical owners
+	incumbents map[string]*pipelineSlot // live runtimes/snapshots, including retained old names
+	sequence   uint64
+	output     map[string][]pipelineOutput
 }
 
 func NewPipelineManager(log *logger.Logger) *PipelineManager {
 	return &PipelineManager{
-		Logger:    log,
-		events:    make(chan pipelineEvent),
-		pipelines: make(map[string]*pipelineSlot),
-		logical:   make(map[string]*pipelineSlot),
-		output:    make(map[string][]pipelineOutput),
+		Logger:     log,
+		events:     make(chan pipelineEvent),
+		pipelines:  make(map[string]*pipelineSlot),
+		logical:    make(map[string]*pipelineSlot),
+		incumbents: make(map[string]*pipelineSlot),
+		output:     make(map[string][]pipelineOutput),
 	}
 }
 func (m *PipelineManager) bind(d *ServiceDiscovery) {
@@ -124,6 +125,11 @@ func (m *PipelineManager) enable(cfg sdConfig, prepared sdPipeline, old sdConfig
 		}
 		m.retireLocked(previous, false)
 		delete(m.pipelines, previous.token.key)
+	}
+	if incumbent := m.incumbents[cfg.ExposedKey()]; incumbent != nil && incumbent != slot {
+		// A failed/pending rename may still own this name physically while its
+		// slot desires another name. Retire only that incumbent, not its successor.
+		m.retireLocked(incumbent, false)
 	}
 	if slot.cancel != nil {
 		slot.cancel()
@@ -311,8 +317,8 @@ func (m *PipelineManager) advanceLocked(slot *pipelineSlot) {
 		})
 		return
 	}
-	owner.attempt = attempt
 	slot.current = owner
+	m.incumbents[owner.token.exposed] = slot
 	go func() {
 		<-attempt.Released()
 		close(owner.done)
@@ -425,10 +431,23 @@ func (m *PipelineManager) handle(event pipelineEvent) (sdConfig, dyncfg.Status) 
 			if group == nil {
 				continue
 			}
-			slot.sources[group.Source] = struct{}{}
 			delete(slot.pending, group.Source)
-			m.queueLocked(group, event.owner)
+			if len(group.Configs) == 0 {
+				delete(slot.sources, group.Source)
+				// The accepted removal must survive retirement of its former owner.
+				m.queueLocked(group, nil)
+			} else {
+				slot.sources[group.Source] = struct{}{}
+				m.queueLocked(group, event.owner)
+			}
 		}
+		return nil, ""
+	}
+	if event.kind == pipelineFailed && event.owner != nil && slot.current == event.owner && event.owner.live &&
+		slot.token != event.token {
+		// A retained incumbent can fail while a different desired revision is
+		// preparing. Its sources must retire without changing the successor's health.
+		m.retireLocked(slot, false)
 		return nil, ""
 	}
 	if slot.token != event.token || slot.ctx.Err() != nil {
@@ -476,11 +495,11 @@ func (m *PipelineManager) handle(event pipelineEvent) (sdConfig, dyncfg.Status) 
 }
 func (m *PipelineManager) retireLocked(slot *pipelineSlot, grace bool) {
 	if slot.current != nil {
+		if m.incumbents[slot.current.token.exposed] == slot {
+			delete(m.incumbents, slot.current.token.exposed)
+		}
 		slot.current.live = false
 		slot.current.cancel()
-		if slot.current.attempt != nil {
-			slot.current.attempt.Cut(context.Canceled)
-		}
 	}
 	if grace {
 		for source := range slot.sources {

@@ -137,6 +137,15 @@ func (wg *waitGate[C]) clearIfMatch(key string) {
 	}
 }
 
+func (wg *waitGate[C]) replace(oldCfg, newCfg C) {
+	oldKey, newKey := wg.keyFor(oldCfg), wg.keyFor(newCfg)
+	wg.mu.Lock()
+	defer wg.mu.Unlock()
+	if wg.key != "" && wg.key == oldKey {
+		wg.key = newKey
+	}
+}
+
 func NewHandler[C Config](opts HandlerOpts[C]) *Handler[C] {
 	return &Handler[C]{
 		api:            opts.API,

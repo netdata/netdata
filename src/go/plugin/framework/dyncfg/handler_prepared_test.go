@@ -177,6 +177,60 @@ func TestPreparedUpdate_UnacceptedOwnership(t *testing.T) {
 	}
 }
 
+func TestPreparedAddPreservesUnrelatedOrUnacceptedDecision(t *testing.T) {
+	for _, mode := range []string{"unrelated", "rejected", "canceled"} {
+		t.Run(mode, func(t *testing.T) {
+			cb := &mockCallbacks{}
+			h := newTestHandler(cb)
+			waiting := testConfig{
+				uid:        "file:job1",
+				key:        "job1",
+				sourceType: "user",
+				source:     "file1",
+			}
+			h.AddDiscoveredConfig(waiting, StatusAccepted)
+			h.AddDiscoveredConfig(
+				testConfig{
+					uid:        "file:job2",
+					key:        "job2",
+					sourceType: "user",
+					source:     "file2",
+				},
+				StatusAccepted,
+			)
+			h.WaitForDecision(waiting)
+			name := "job1"
+			if mode == "unrelated" {
+				name = "job2"
+			}
+			if mode == "rejected" {
+				cb.parseAndValidateFn = func(Function, string) (testConfig, error) { return testConfig{}, errors.New("invalid config") }
+			}
+			prepared, err := h.Prepare(newTestFn("test:"+name, "add", name, []byte(`{}`)))
+			require.NoError(t, err)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if mode == "canceled" {
+				cancel()
+			}
+			applied, err := prepared.Apply(ctx)
+			if mode == "canceled" {
+				require.ErrorIs(t, err, context.Canceled)
+			} else {
+				require.NoError(t, err)
+				want := 202
+				if mode == "rejected" {
+					want = 400
+				}
+				assert.Equal(t, want, applied.Result.Code)
+			}
+			assert.True(t, h.WaitingForDecision())
+			h.SyncDecision(newTestFn("test:job1", "disable", "", nil))
+			assert.False(t, h.WaitingForDecision(), "the original decision must still own the gate")
+		})
+	}
+}
+
 func TestPreparedUpdate_PreflightDoesNotHoldStateOwner(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)

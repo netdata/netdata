@@ -146,6 +146,8 @@ func (h *Handler[C]) Prepare(fn Function) (PreparedCommand, error) {
 		case CommandAdd:
 			if expected != nil {
 				h.cb.Stop(expected.Cfg)
+				// Replay may replace a waiting file config with a different origin key.
+				h.waitGate.replace(expected.Cfg, next)
 				if expected.Cfg.SourceType() == "dyncfg" {
 					h.seen.Remove(expected.Cfg)
 				}
@@ -196,6 +198,7 @@ func (h *Handler[C]) Prepare(fn Function) (PreparedCommand, error) {
 			return h.statusResult(fn, entry.Cfg, entry.Status, 200), nil
 		case CommandRemove:
 			h.cb.Stop(expected.Cfg)
+			h.waitGate.clearIfMatch(h.waitGate.keyFor(expected.Cfg))
 			h.seen.Remove(expected.Cfg)
 			h.exposed.Remove(expected.Cfg)
 			result := handlerCommandResult(fn, 200, "")

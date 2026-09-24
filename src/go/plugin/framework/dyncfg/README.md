@@ -53,9 +53,11 @@ acceptance transfers cleanup responsibility to the component, including when
 later activation or publication fails. `Enable` follows the same no-mutation-on-error
 rule. Component callbacks own actual physical lifetimes beyond acknowledgment.
 
-The direct `Cmd*` wrappers use these same phases and publish through the supplied
-`Output`. They are intended for standalone and internal echo use; managed Function
-calls use the prepared boundary so the composition layer owns framing and failure.
+The direct `Cmd*` wrappers are synchronous conveniences for standalone callers
+and tests. They publish through `Output`, which cannot report write failures, and
+then invoke `Published`; they do not provide the managed fail-closed publication
+guarantee. Production managed Function calls, including daemon echoes, use the
+prepared boundary so the composition layer owns framing and failure.
 
 ## Cache and status ownership
 
@@ -74,3 +76,8 @@ must not update the exposed status or forward discovered output.
 The seen cache retains underlying file configurations when a DynCfg replacement
 is adopted, preserving later source selection. Rejected preparation leaves both
 the exact exposed entry and seen-cache contents unchanged.
+
+Accepted ADD transfers a pending ENABLE/DISABLE decision to the replacement
+configuration, including when replay changes a file-origin key to a DynCfg key.
+Removing that replacement releases the wait. Unrelated commands and rejected
+preparation do not change the pending decision.

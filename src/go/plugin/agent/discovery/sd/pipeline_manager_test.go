@@ -650,23 +650,39 @@ func TestUpdateGraceRetainsSourcesAndRemovesOnlyMissingAfterExpiry(t *testing.T)
 }
 
 func TestWaitingMaterializationRetainsOnlyLatestDesired(t *testing.T) {
-	entered, release, started := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	entered, intermediateEntered := make(chan struct{}), make(chan struct{})
+	release, intermediateRelease := make(chan struct{}), make(chan struct{})
+	started, staleStarted := make(chan struct{}), make(chan struct{}, 2)
+	initialReturned, intermediateReturned := make(chan struct{}), make(chan struct{})
 	defer func() {
 		select {
 		case <-release:
 		default:
 			close(release)
 		}
+		select {
+		case <-intermediateRelease:
+		default:
+			close(intermediateRelease)
+		}
 	}()
-	var constructed atomic.Int32
 	d, configs, _, _ := newActorDiscovery(t, Config{}, func(cfg pipeline.Config) (sdPipeline, error) {
-		switch constructed.Add(1) {
-		case 1:
+		switch cfg.Services[0].ID {
+		case "test-rule":
 			close(entered)
 			<-release
-			return &controlledPipeline{}, nil
+			defer close(initialReturned)
+			return &recordingStartPipeline{
+				started: staleStarted,
+			}, nil
+		case "intermediate":
+			close(intermediateEntered)
+			<-intermediateRelease
+			defer close(intermediateReturned)
+			return &recordingStartPipeline{
+				started: staleStarted,
+			}, nil
 		default:
-			require.Equal(t, "latest", cfg.Services[0].ID)
 			return &controlledPipeline{
 				started: started,
 			}, nil
@@ -678,16 +694,29 @@ func TestWaitingMaterializationRetainsOnlyLatestDesired(t *testing.T) {
 	next := initial
 	next.content = bytes.ReplaceAll(initial.content, []byte("id: test-rule"), []byte("id: intermediate"))
 	configs <- next
+	waitSignal(t, intermediateEntered)
 	latest := initial
 	latest.content = bytes.ReplaceAll(initial.content, []byte("id: test-rule"), []byte("id: latest"))
 	configs <- latest
+	waitSignal(t, started)
+	close(release)
+	close(intermediateRelease)
+	waitSignal(t, initialReturned)
+	waitSignal(t, intermediateReturned)
 	require.Eventually(t, func() bool {
 		entry, ok := d.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job")
-		return ok && bytes.Contains(entry.Cfg.DataJSON(), []byte("latest"))
+		return ok && entry.Status == dyncfg.StatusRunning && bytes.Contains(entry.Cfg.DataJSON(), []byte("latest"))
 	}, time.Second, time.Millisecond)
-	close(release)
-	waitSignal(t, started)
-	require.Equal(t, int32(2), constructed.Load())
+	require.Never(t, func() bool { return len(staleStarted) > 0 }, 50*time.Millisecond, time.Millisecond)
+}
+
+// Records any actual runtime entry, independently of the manager's desired state.
+type recordingStartPipeline struct{ started chan<- struct{} }
+
+func (*recordingStartPipeline) Test(context.Context) (bool, error) { return false, nil }
+func (p *recordingStartPipeline) Run(ctx context.Context, _ chan<- []*confgroup.Group) {
+	p.started <- struct{}{}
+	<-ctx.Done()
 }
 
 func TestUnacceptedUpdatePreservesPendingEnableConstruction(t *testing.T) {
@@ -702,8 +731,17 @@ func TestUnacceptedUpdatePreservesPendingEnableConstruction(t *testing.T) {
 				}
 			}()
 			var constructions atomic.Int32
-			d, _, _, _ := newActorDiscovery(t, Config{}, func(pipeline.Config) (sdPipeline, error) {
+			candidateStarted := make(chan struct{})
+			d, _, _, _ := newActorDiscovery(t, Config{}, func(cfg pipeline.Config) (sdPipeline, error) {
 				constructions.Add(1)
+				if cfg.Services[0].ID == "replacement" {
+					if !cancelUpdate {
+						return nil, errors.New("replacement construction rejected")
+					}
+					return &controlledPipeline{
+						started: candidateStarted,
+					}, nil
+				}
 				close(entered)
 				<-release
 				return &controlledPipeline{
@@ -748,7 +786,7 @@ func TestUnacceptedUpdatePreservesPendingEnableConstruction(t *testing.T) {
 				require.ErrorIs(t, err, context.Canceled)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, 503, applied.Result.Code)
+				require.Equal(t, 422, applied.Result.Code)
 				applied.Published()
 			}
 			close(release)
@@ -757,7 +795,12 @@ func TestUnacceptedUpdatePreservesPendingEnableConstruction(t *testing.T) {
 				entry, ok := d.exposed.LookupByKey(cfg.ExposedKey())
 				return ok && entry.Status == dyncfg.StatusRunning && entry.Cfg.Hash() == cfg.Hash()
 			}, time.Second, time.Millisecond)
-			require.Equal(t, int32(1), constructions.Load())
+			require.Equal(t, int32(2), constructions.Load())
+			select {
+			case <-candidateStarted:
+				t.Fatal("unaccepted candidate ran")
+			default:
+			}
 		})
 	}
 }
