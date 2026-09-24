@@ -717,17 +717,17 @@ the plugin restarts. Echo replies update status or record rejection without repl
   current runtime and returns `200`.
 - **ENABLE.** Running is already satisfied (`200`). Other stored configurations accept enabled intent (`202`) through
   a short transaction. Construction, readiness and resulting health settle afterward. Repeated ENABLE coalesces.
-- **Other mutations.** Disabled UPDATE, DISABLE and REMOVE return `200` when applied. A quarantined runtime discovered
-  after an accepted UPDATE remains a truthful accepted mutation (`202`) with failed status and diagnostic information.
+- **Other mutations.** Disabled UPDATE, DISABLE and REMOVE return `200` when applied. Runtime quarantine discovered
+  after an accepted UPDATE is reported through later failed status and diagnostics; the mutation reply remains `202`.
 - **Informative commands.** TEST preserves its validation/error codes. RESTART runs a response-free resource transaction
   from an independent Function invocation lane, then observes the exact activation token and installed generation. It
   returns `200` only after readiness/publication commits, or the classified failure. Stop/replacement invalidates the
   receipt; a later retry cannot satisfy it. Caller timeout/cancellation detaches observation without undoing adoption.
 - **Retirement.** A mutation rolled back before graph commit returns `503`; unapplied work cannot claim acceptance.
 
-Health is reported through CONFIG status and lifecycle diagnostics. `TestDynCfgJobRepliesStateAdoption` covers plugin
-mutation outcomes; composition RESTART tests exercise the outer reply, blocked startup, concurrent disable, cancellation,
-and deadlines through the actual kernel.
+Health is reported through CONFIG status and lifecycle diagnostics. `TestDynCfgJobMutationAdoptionAndRestartPreflight`
+covers plugin mutation outcomes; composition RESTART tests exercise the outer reply, blocked startup, concurrent disable,
+cancellation, and deadlines through the actual kernel.
 
 ### Accepted-job activation
 
