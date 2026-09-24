@@ -704,7 +704,8 @@ configuration when the plugin restarts. `joboutput/dyncfg_reply.go` owns collect
 - **Interactive UPDATE.** Every failed preflight rejects regardless of `autodetection_retry`: invalid configuration is
   `400`, permanent/unclassified collector failure `422`, and temporary or unavailable work `503`. Successful preflight
   permits replacement and returns `202` with `accepted`; predecessor physical cleanup and new runtime readiness do not
-  hold the reply. The accepted replacement has no incumbent fallback.
+  hold the reply. The accepted replacement has no incumbent fallback. An identical running DynCfg payload retains its
+  current runtime and returns `200`.
 - **ENABLE.** Running is already satisfied (`200`). Other stored configurations accept enabled intent (`202`) through
   a short transaction. Construction, readiness and resulting health settle afterward. Repeated ENABLE coalesces.
 - **Other mutations.** Disabled UPDATE, DISABLE and REMOVE return `200` when applied. A quarantined runtime discovered

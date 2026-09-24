@@ -20,8 +20,9 @@ a same-job successor can acquire the runtime identity.
 
 A normal startup error uses the existing configured autodetection retry cadence and tries. Runtime acquisition failures
 retain a Failed configuration, including stock jobs; `RunFailure` reports the collector's class and whether startup may
-be retried. UPDATE and non-running ENABLE acknowledge accepted configuration with 202 before this runtime outcome;
-Job Manager publishes later health separately. RESTART observes the exact activation outside the mutation lane.
+be retried. UPDATE that accepts a replacement for activation and non-running ENABLE acknowledge configuration with
+202 before this runtime outcome; Job Manager publishes later health separately. RESTART observes the exact activation
+outside the mutation lane.
 Logical stop revokes output and Function admission promptly; physical cleanup still waits for their admitted work.
 A startup error classified with
 `collectorapi.PermanentError`, unexpected early nil return and recovered `Run` panic are non-retrying failures. Unexpected return after readiness, including nil, immediately cuts new ordinary output
