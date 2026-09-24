@@ -44,7 +44,7 @@ func TestJobRuntimeEndToEnd(t *testing.T) {
 	c.Profiles = []string{"pools", "app"}
 	out := &syncBuffer{}
 	job := jobruntime.NewJobV2(jobruntime.JobV2Config{
-		PluginName:  "statsd.d",
+		PluginName:  "statsd",
 		Name:        "local",
 		ModuleName:  "listen",
 		FullName:    "listen_local",

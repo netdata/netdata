@@ -225,8 +225,8 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-ibm       Explicitly disable the IBM ecosystem monitoring plugin.
   --enable-plugin-scripts    Enable the scripts.d plugin. Default: Enabled when possible.
   --disable-plugin-scripts   Explicitly disable the scripts.d plugin.
-  --enable-plugin-statsd     Enable the experimental Go StatsD plugin (statsd.d). Default: disabled.
-  --disable-plugin-statsd    Explicitly disable the Go StatsD plugin (statsd.d).
+  --enable-plugin-statsd     Enable the experimental Go StatsD plugin. Default: disabled.
+  --disable-plugin-statsd    Explicitly disable the Go StatsD plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
                              and its dependencies are available.
   --disable-exporting-kinesis Explicitly disable AWS Kinesis exporting connector.
@@ -585,7 +585,7 @@ if [ "${NEED_GO_TOOLCHAIN}" -eq 1 ]; then
   . "${NETDATA_SOURCE_DIR}/packaging/check-for-go-toolchain.sh"
 
   if ! ensure_go_toolchain; then
-    warning "Go ${GOLANG_MIN_VERSION} needed to build Go-based plugins (go.d, scripts.d, statsd.d, IBM), but could not find or install a usable toolchain: ${GOLANG_FAILURE_REASON}. Disabling those components."
+    warning "Go ${GOLANG_MIN_VERSION} needed to build Go-based plugins (go.d, scripts.d, Go StatsD, IBM), but could not find or install a usable toolchain: ${GOLANG_FAILURE_REASON}. Disabling those components."
     ENABLE_GO=0
     ENABLE_IBM=0
     ENABLE_SCRIPTS=0

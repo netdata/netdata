@@ -2,14 +2,11 @@
 
 This V2 collector receives StatsD over UDP and TCP, applies explicitly selected native profiles, aggregates
 measurements and publishes generic native charts plus receiver diagnostics. It runs as the `listen` module of the
-standalone `statsd.d.plugin` (`src/go/cmd/statsddplugin`), which source builds include only with
+standalone Go `statsd.plugin` (`src/go/cmd/statsdplugin`), which source builds include only with
 `ENABLE_PLUGIN_STATSD`. Configuration forms, integration documentation and packaging are not delivered, there is no
 default listener, transport or enablement, and it does not replace the existing C plugin.
 
-Jobs are read from `statsd.d/listen.conf` and profiles from `statsd.d/statsd.profiles/` under the user config
-directory. The C plugin also reads `statsd.d/`: it parses every `*.conf` there as an application file and logs errors
-for the YAML lines of `listen.conf`. The two plugins cannot share a listener endpoint, and the C plugin binds
-`localhost:8125` over UDP and TCP by default.
+Jobs are read from `statsd/listen.conf` and profiles from `statsd/statsd.profiles/` under the user config directory.
 
 ## Source layout
 

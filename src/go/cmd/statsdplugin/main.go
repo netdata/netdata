@@ -22,12 +22,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	_ "github.com/netdata/netdata/go/plugins/plugin/statsd.d/collector/listen"
+	_ "github.com/netdata/netdata/go/plugins/plugin/statsd/collector/listen"
 	"go.uber.org/automaxprocs/maxprocs"
 )
 
 func init() {
-	executable.Name = "statsd.d"
+	executable.Name = "statsd"
 	if v := os.Getenv("TZ"); strings.HasPrefix(v, ":") {
 		_ = os.Unsetenv("TZ")
 	}
@@ -56,8 +56,6 @@ func main() {
 	}
 	isTerminal := terminal.IsTerminal()
 
-	// Jobs come from listen.conf; watching statsd.d/*.conf by default would
-	// also parse the C statsd plugin's application files in the same directory.
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,
 		PluginConfigDir:           pluginconfig.ConfigDir(),
