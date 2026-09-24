@@ -166,7 +166,7 @@ func (vb *vnodeBinding) prepareAdd(
 			nil,
 		)
 	}
-	name := vnodeJobName(input.Args[2])
+	name := input.Args[2]
 	if name == "" {
 		return vb.noop(scope, mustDynCfgMessage(400, "Missing vnode name."), nil)
 	}
@@ -310,7 +310,10 @@ func (vb *vnodeBinding) userConfig(input functionadapter.HandlerInput) (lifecycl
 	}
 	name := "test"
 	if len(input.Args) >= 3 {
-		if requested := vnodeJobName(input.Args[2]); requested != "" {
+		if requested := input.Args[2]; requested != "" {
+			if err := dyncfg.JobNameRuleAllowDots(requested); err != nil {
+				return dynCfgMessage(400, fmt.Sprintf("Unacceptable vnode name '%s': %v.", requested, err))
+			}
 			name = requested
 		}
 	}
@@ -326,7 +329,7 @@ func (vb *vnodeBinding) test(input functionadapter.HandlerInput) (lifecycle.Seal
 	if len(input.Args) < 3 {
 		return dynCfgMessage(400, fmt.Sprintf("missing required arguments: need 3, got %d", len(input.Args)))
 	}
-	name := vnodeJobName(input.Args[2])
+	name := input.Args[2]
 	next, failure := vb.parseVNode(input, name)
 	if failure != nil {
 		return *failure, nil
@@ -698,10 +701,6 @@ func (pvt *preparedVNodeTransaction) take() (
 
 func vnodeCommand(input functionadapter.HandlerInput) dyncfg.Command {
 	return dyncfg.CommandFromArgs(input.Args)
-}
-
-func vnodeJobName(value string) string {
-	return dyncfg.NormalizeJobName(value)
 }
 
 func normalizeVNode(vnode *vnodes.Config, name string, source string) {

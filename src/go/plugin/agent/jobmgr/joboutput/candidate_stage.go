@@ -29,13 +29,14 @@ type stagedJobResult struct {
 type preparedJobCandidate struct {
 	mu sync.Mutex
 
-	factory  *Factory
-	attempts jobmgr.ProcessAttemptAuthority
-	identity jobmgr.ProcessAttemptIdentity
-	target   uint64
-	config   confgroup.Config
-	attempt  jobmgr.ProcessAttempt
-	result   stagedJobResult
+	factory      *Factory
+	attempts     jobmgr.ProcessAttemptAuthority
+	identity     jobmgr.ProcessAttemptIdentity
+	target       uint64
+	config       confgroup.Config
+	attempt      jobmgr.ProcessAttempt
+	result       stagedJobResult
+	vnodeCurrent func() bool
 
 	ctx      context.Context
 	cancel   context.CancelCauseFunc
@@ -704,8 +705,15 @@ func (f *Factory) newCandidate(
 	detached.Scheduler = nil
 	detached.Observer = nil
 	detached.Attempts = nil
+	var vnodeCurrent func() bool
 	if vnode.Vnode != nil {
 		name := config.Vnode()
+		lookup := f.config.Vnode
+		incarnation := vnode.Incarnation
+		vnodeCurrent = func() bool {
+			current, ok := lookup(name)
+			return ok && current.Vnode != nil && current.Incarnation == incarnation
+		}
 		detached.Vnode = func(candidate string) (jobruntime.VnodeSnapshot, bool) {
 			return vnode, candidate == name
 		}
@@ -721,13 +729,14 @@ func (f *Factory) newCandidate(
 			startupTimeout: f.startupTimeout,
 			runtimeStaging: f.config.Runtime != nil,
 		},
-		attempts: f.config.Attempts,
-		identity: jobAttemptIdentity(jobmgr.ProcessAttemptJob, config.FullName()),
-		target:   f.config.Epoch,
-		config:   config,
-		ctx:      ctx,
-		cancel:   cancel,
-		ready:    make(chan struct{}),
+		attempts:     f.config.Attempts,
+		vnodeCurrent: vnodeCurrent,
+		identity:     jobAttemptIdentity(jobmgr.ProcessAttemptJob, config.FullName()),
+		target:       f.config.Epoch,
+		config:       config,
+		ctx:          ctx,
+		cancel:       cancel,
+		ready:        make(chan struct{}),
 	}, nil
 }
 
@@ -978,7 +987,8 @@ func (pjc *preparedJobCandidate) publish(result stagedJobResult) {
 
 // inspect validates a completed candidate without transferring ownership. A
 // retained result can have been cut by a later preflight or invalidated by a
-// Store change while it waited for its predecessor to release the runtime.
+// Store change or vnode removal while it waited for its predecessor to release
+// the runtime. Ordinary vnode edits remain valid and catch up after attachment.
 func (pjc *preparedJobCandidate) inspect() (stagedJobResult, error) {
 	if pjc == nil {
 		return stagedJobResult{}, errors.New("job output: nil candidate stage")
@@ -1014,6 +1024,11 @@ func (pjc *preparedJobCandidate) inspect() (stagedJobResult, error) {
 	result.owner.mu.Unlock()
 	if cause != nil {
 		return stagedJobResult{}, cause
+	}
+	if pjc.vnodeCurrent != nil && !pjc.vnodeCurrent() {
+		return stagedJobResult{}, transientJobConstruction(withJobConfigFailure(
+			errors.New("job output: configured vnode removed or replaced during preparation"), "vnode", "missing_vnode",
+		))
 	}
 	return result, validateStoreSnapshot(result.storeSnapshot)
 }

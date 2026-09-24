@@ -13,8 +13,11 @@ type VnodeLookup func(name string) (VnodeSnapshot, bool)
 //
 // Revision changes on every stored vnode commit. MetadataRevision changes only
 // when runtime-visible HOSTINFO/HOST_DEFINE metadata changes.
+// Incarnation identifies the record's lifetime within its configuration owner;
+// edits preserve it, while removal and re-creation allocate a new value.
 type VnodeSnapshot struct {
 	Vnode            *vnodes.VirtualNode
+	Incarnation      uint64
 	Revision         uint64
 	MetadataRevision uint64
 }
@@ -26,6 +29,7 @@ func (s VnodeSnapshot) Copy() VnodeSnapshot {
 	}
 	return VnodeSnapshot{
 		Vnode:            vnode,
+		Incarnation:      s.Incarnation,
 		Revision:         s.Revision,
 		MetadataRevision: s.MetadataRevision,
 	}

@@ -1059,7 +1059,8 @@ flowchart TD
 - A named configured vnode must exist when the candidate is built. Interactive UPDATE rejects a missing vnode;
   passive admission does not look it up. Enabled accepted activation waits for it independently of retry policy.
 - The candidate uses a private, revisioned vnode snapshot during `Init` and `Check`. Only a successfully installed job
-  switches that lookup to the live vnode authority.
+  switches that lookup to the live vnode authority. Adoption checks that the same vnode incarnation still exists;
+  removal and re-creation invalidate it even when the replacement's metadata and revisions are identical.
 - Updating a vnode does **not** restart its jobs. Running jobs adopt a newer revision at their runtime refresh point
   and re-emit host metadata when needed.
 - Committing a previously missing vnode wakes affected accepted activations. Passive registrations remain passive.
@@ -1087,6 +1088,8 @@ sequenceDiagram
     J->>C: Init and Check with private staging
     V-->>V: A newer vnode revision may commit
     C-->>J: Ready
+    J->>V: Validate vnode incarnation
+    V-->>J: Same record lifetime
     J->>K: Validate generation proof
     K-->>J: Current
     J->>R: Install and attach live vnode lookup
@@ -1103,6 +1106,8 @@ Consequences:
 - A vnode update alone does not restart the job or re-resolve secrets.
 - A vnode update during `Check` is not lost: the candidate sees its staged snapshot while detached, then the installed
   runtime catches up through the live revisioned lookup.
+- Removing or recreating a vnode during `Check` invalidates the candidate. Interactive UPDATE preserves the incumbent
+  and rejects; discovery accepts the desired configuration and waits or rebuilds through accepted activation.
 - If either dependency cannot be prepared, no half-resolved or half-attached candidate becomes live.
 
 `joboutput/config_factory.go`, `joboutput/runtime_staging.go`, `secrets/dependency.go`, `secrets/restart.go`,

@@ -196,7 +196,7 @@ In the Netdata UI, open the node's dynamic configuration view and look for the *
 
 :::
 
-The go.d GUI form selects `static` or `snmp` mode. The resource name entered when creating a vnode is its stable reference name. Static mode uses these fields:
+The go.d GUI form selects `static` or `snmp` mode. The resource name entered when creating a vnode is its stable reference name. Use ASCII letters, digits, dots, underscores, and hyphens. Spaces and colons are invalid. Static mode uses these fields:
 
 | Field      | Required in the GUI | Description                                                                                                                         |
 |------------|---------------------|-------------------------------------------------------------------------------------------------------------------------------------|
@@ -241,7 +241,7 @@ jobs:
     url: http://203.0.113.10:9182/metrics
 ```
 
-The `vnode` value must exactly match the vnode reference name. For static YAML definitions, use `hostname`; for SNMP YAML definitions, use the required `name`. For GUI definitions, use the resource name assigned when creating the vnode. An unknown name or an SNMP vnode awaiting its first usable identity prevents the job from starting; configured detection retries can start it once the identity is available.
+The `vnode` value must exactly match the vnode reference name. For static YAML definitions, use `hostname`; for SNMP YAML definitions, use the required `name`. For GUI definitions, use the resource name assigned when creating the vnode. An unknown name or an SNMP vnode awaiting its first usable identity leaves an enabled job waiting. Creating the vnode or acquiring its first usable identity wakes that job even when `autodetection_retry` is zero. Passive registrations and disabled jobs stay inactive until enabled.
 
 Several jobs can reference the same vnode. Its configured hostname and host labels govern output to its GUID within that plugin process, including collector-generated scopes using the same GUID. Job labels remain chart labels. Removing an unreferenced configured vnode lets generated contributors resume using their own host metadata.
 
