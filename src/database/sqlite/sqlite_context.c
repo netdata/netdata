@@ -319,12 +319,14 @@ done:
 
 int sql_context_cache_stats(int op)
 {
-    int count, dummy;
+    int count = 0, dummy;
 
     if (unlikely(!db_context_meta))
         return 0;
 
-    sqlite3_db_status(db_context_meta, op, &count, &dummy, 0);
+    if (sqlite3_db_status(db_context_meta, op, &count, &dummy, 0) != SQLITE_OK)
+        return 0;
+
     return count;
 }
 
