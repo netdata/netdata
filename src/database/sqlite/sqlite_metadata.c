@@ -274,11 +274,17 @@ struct thread_unittest {
     unsigned *done;
 };
 
+// returns -1 when the value is unavailable, which pulse turns into UINT64_MAX and skips
 int sql_metadata_cache_stats(int op)
 {
-    int count, dummy;
+    int count = 0, dummy;
 
-    sqlite3_db_status(db_meta, op, &count, &dummy, 0);
+    if (unlikely(!db_meta))
+        return -1;
+
+    if (sqlite3_db_status(db_meta, op, &count, &dummy, 0) != SQLITE_OK)
+        return -1;
+
     return count;
 }
 
