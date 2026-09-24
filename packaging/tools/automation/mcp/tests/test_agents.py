@@ -58,3 +58,16 @@ def test_declare_rejects_unsafe_agent_id():
 
 def test_get_unknown_returns_none():
     assert AgentRegistry().get("nope") is None
+
+
+def test_declare_pins_port_and_re_declare_without_it_unpins():
+    reg = AgentRegistry()
+    assert reg.declare("a", "/wt", "debug").port is None  # auto-assigned by default
+    assert reg.declare("a", "/wt", "debug", port=19999).port == 19999
+    assert reg.declare("a", "/wt", "debug").port is None  # declare replaces, like worktree/profile
+
+
+@pytest.mark.parametrize("port", [0, 65536, -1])
+def test_declare_rejects_out_of_range_port(port):
+    with pytest.raises(ValueError):
+        AgentRegistry().declare("a", "/wt", "debug", port=port)

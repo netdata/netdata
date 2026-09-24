@@ -53,6 +53,7 @@ class Run:
     run_dir: Path
     conf_path: Path
     otlp_endpoint: str = ""  # where the otel plugin listens for OTLP/gRPC data
+    port_pinned: bool = False  # port came from the agent's declaration, not free_port()
     buffer: LogBuffer = field(default_factory=LogBuffer)
     state: RunState = "building"
     error: str | None = None
@@ -131,7 +132,7 @@ class RunRegistry:
 
     async def start(
         self, agent_id: str, worktree: str, profile: str,
-        *, otel: runtime.OtelConfig | None = None,
+        *, otel: runtime.OtelConfig | None = None, port: int | None = None,
         restart: bool = False, probe: Probe | None = None,
     ) -> tuple[Run, str]:
         """Launch a run for an agent (fire-and-poll); return ``(run, outcome)``.
@@ -146,6 +147,9 @@ class RunRegistry:
           stopped and a fresh run (rebuild via ``ninja install`` + relaunch)
           started.
         - ``"started"`` - no live run existed; a fresh run started.
+
+        ``port`` pins the web port (the agent's declared port); None picks a
+        fresh free loopback port for this launch.
         """
         # Held across the decide + stop + create so a concurrent start for the
         # same agent observes the fresh run, not the one we're about to replace.
@@ -159,11 +163,12 @@ class RunRegistry:
             else:
                 outcome = "started"
 
-            port = runtime.free_port()
             rd, conf, otlp_endpoint = runtime.generate_runtime(agent_id, otel=otel)
             run = Run(
                 agent_id=agent_id, worktree=worktree, profile=profile,
-                port=port, run_dir=rd, conf_path=conf, otlp_endpoint=otlp_endpoint,
+                port=port if port is not None else runtime.free_port(),
+                port_pinned=port is not None,
+                run_dir=rd, conf_path=conf, otlp_endpoint=otlp_endpoint,
             )
             self._runs[agent_id] = run
             run._task = asyncio.get_running_loop().create_task(
@@ -229,6 +234,16 @@ class RunRegistry:
             run.state = "stopped"
             return
         run.current_phase = "launch"
+        # Checked here, after the build and after a restart's stop, so the port
+        # the previous run of this agent held is already released.
+        if run.port_pinned and not runtime.port_available(run.port):
+            run.error = (
+                f"declared port {run.port} is already in use on 127.0.0.1 "
+                "(another agent, or a survivor of a previous MCP server?)"
+            )
+            run.state = "failed"
+            run.buffer.append(f"[launch refused: {run.error}]")
+            return
         run.state = "starting"
         netdata = runtime.install_bin(run.worktree)
         cmd = runtime.launch_command(netdata, run.port, run.conf_path)

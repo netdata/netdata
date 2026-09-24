@@ -401,3 +401,15 @@ def test_free_port_is_bindable_and_in_range():
         s.bind(("127.0.0.1", p))
     finally:
         s.close()
+
+
+def test_port_available_detects_a_listener():
+    holder = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    holder.bind(("127.0.0.1", 0))
+    holder.listen()
+    try:
+        taken = holder.getsockname()[1]
+        assert runtime.port_available(taken) is False
+    finally:
+        holder.close()
+    assert runtime.port_available(taken) is True

@@ -125,7 +125,7 @@ class RunInfo(BaseModel):
     state: str = Field(description="declared | building | starting | ready | stopped | failed | unknown | error")
     profile: str | None = None
     worktree: str | None = None
-    port: int | None = Field(default=None, description="Assigned loopback port.")
+    port: int | None = Field(default=None, description="Loopback web port: the declared one, else assigned at start.")
     url: str | None = Field(default=None, description="http://127.0.0.1:<port> once the agent is ready.")
     otlp_endpoint: str | None = Field(default=None, description="Where the otel plugin listens for OTLP/gRPC data (host:port); send test logs here.")
     current_phase: str | None = Field(default=None, description="configure | install | launch.")
@@ -208,7 +208,10 @@ def run_info(run: Run, *, message: str = "") -> RunInfo:
 
 
 def agent_declared(spec: AgentSpec, *, message: str = "") -> RunInfo:
-    return RunInfo(agent_id=spec.agent_id, state="declared", profile=spec.profile, worktree=spec.worktree, message=message)
+    return RunInfo(
+        agent_id=spec.agent_id, state="declared", profile=spec.profile, worktree=spec.worktree,
+        port=spec.port, message=message,
+    )
 
 
 def unknown_agent(agent_id: str) -> RunInfo:

@@ -1,4 +1,5 @@
 import asyncio
+import socket
 from pathlib import Path
 
 import pytest_asyncio
@@ -271,3 +272,36 @@ async def test_run_wait_status_returns_terminal_immediately(reg, tmp_path, monke
     assert await _wait(run, {"failed", "stopped"}) == "failed"
     r = await reg.wait_status("a", timeout=5.0, poll=0.05)  # long timeout, but terminal -> immediate
     assert r is run and r.done
+
+
+async def test_pinned_port_is_used_and_kept_across_restart(reg, tmp_path):
+    pinned = runtime.free_port()
+    run, _ = await reg.start("a", str(tmp_path), "debug", port=pinned, probe=_always_ready)
+    assert await _wait(run, {"ready", "failed", "stopped"}) == "ready"
+    assert run.port == pinned and run.port_pinned
+    again, outcome = await reg.start("a", str(tmp_path), "debug", port=pinned, restart=True, probe=_always_ready)
+    assert outcome == "restarted"
+    assert await _wait(again, {"ready", "failed", "stopped"}) == "ready"
+    assert again.port == pinned
+
+
+async def test_unpinned_port_is_auto_assigned(reg, tmp_path):
+    run, _ = await reg.start("a", str(tmp_path), "debug", probe=_always_ready)
+    assert await _wait(run, {"ready", "failed", "stopped"}) == "ready"
+    assert run.port and not run.port_pinned
+
+
+async def test_pinned_port_in_use_fails_before_launch(reg, tmp_path, monkeypatch):
+    launched = []
+    monkeypatch.setattr(runtime, "launch_command", lambda b, port, conf: launched.append(port) or ["sh", "-c", "sleep 30"])
+    holder = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    holder.bind(("127.0.0.1", 0))
+    holder.listen()
+    try:
+        taken = holder.getsockname()[1]
+        run, _ = await reg.start("a", str(tmp_path), "debug", port=taken, probe=_always_ready)
+        assert await _wait(run, {"ready", "failed", "stopped"}) == "failed"
+        assert f"declared port {taken} is already in use" in (run.error or "")
+        assert launched == []  # netdata was never started on a taken port
+    finally:
+        holder.close()

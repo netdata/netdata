@@ -65,6 +65,26 @@ def free_port() -> int:
         sock.close()
 
 
+def port_available(port: int) -> bool:
+    """True if ``port`` can be bound on loopback right now.
+
+    Used for a pinned (declared) port, which the kernel did not pick: a
+    listener already holding it — another agent, or a survivor of a previous
+    server — must fail the run up front with a clear reason instead of
+    netdata's bind error. SO_REUSEADDR mirrors netdata's own bind, so a socket
+    of a just-stopped agent lingering in TIME_WAIT does not count as taken.
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(("127.0.0.1", port))
+        return True
+    except OSError:
+        return False
+    finally:
+        sock.close()
+
+
 def install_bin(worktree: str) -> Path:
     """Path to the installed netdata binary for a worktree (one install per worktree)."""
     return Path(profiles.install_prefix(worktree)) / "usr" / "sbin" / "netdata"
