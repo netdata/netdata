@@ -234,10 +234,6 @@ static void print_thread_stats(THREAD_STATS *stats, size_t count, usec_t duratio
     fprintf(stderr, "\n%-8s %12s %12s %12s %12s %12s\n",
             "PRIORITY", "EXECUTIONS", "EXEC/SEC", "AVG WAIT", "MAX WAIT", "% WAITING");
 
-    size_t total_execs = 0;
-    for(size_t i = 0; i < count; i++)
-        total_execs += stats[i].executions;
-
     double total_time_sec = duration / (double)USEC_PER_SEC;
 
     for(size_t i = 0; i < count; i++) {

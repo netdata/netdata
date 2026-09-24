@@ -924,7 +924,6 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     uint32_t uncompressed_payload_length, max_compressed_size, payload_offset;
     struct page_descr_with_data *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *xt_io_descr;
-    Word_t Index;
     uint8_t compression_algorithm = ctx->config.global_compress_alg;
     struct rrdengine_datafile *datafile;
     /* persistent structures */
@@ -932,9 +931,9 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     struct rrdeng_df_extent_trailer *trailer;
     uLong crc;
 
-    for(descr = base, Index = 0, count = 0, uncompressed_payload_length = 0;
+    for(descr = base, count = 0, uncompressed_payload_length = 0;
         descr && count != rrdeng_pages_per_extent;
-        descr = descr->link.next, Index++) {
+        descr = descr->link.next) {
 
         uncompressed_payload_length += descr->page_length;
         eligible_pages[count++] = descr;

@@ -662,12 +662,11 @@ void pulse_dbengine_do(bool extended) {
 
     int64_t buffers_total_size = (int64_t)dbmem.xt_buf + (int64_t)dbmem.wal;
 
-    int64_t aral_structures_total_size = 0, aral_used_total_size = 0;
+    int64_t aral_structures_total_size = 0;
     int64_t aral_padding_total_size = 0;
     for(size_t i = 0; i < RRDENG_MEM_MAX ; i++) {
         buffers_total_size += (int64_t)aral_free_bytes_from_stats(dbmem.as[i]);
         aral_structures_total_size += (int64_t)aral_structures_bytes_from_stats(dbmem.as[i]);
-        aral_used_total_size += (int64_t)aral_used_bytes_from_stats(dbmem.as[i]);
         aral_padding_total_size += (int64_t)aral_padding_bytes_from_stats(dbmem.as[i]);
     }
 

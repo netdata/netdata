@@ -2355,10 +2355,7 @@ static void aral_test_thread(void *ptr) {
     bool marked = os_random(2);
     struct aral_unittest_entry **pointers = callocz(elements, sizeof(struct aral_unittest_entry *));
 
-    size_t iterations = 0;
     do {
-        iterations++;
-
         for (size_t i = 0; i < elements; i++) {
             pointers[i] = unittest_aral_malloc(ar, marked);
         }
