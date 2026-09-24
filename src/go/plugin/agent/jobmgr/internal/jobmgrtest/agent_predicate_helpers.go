@@ -849,6 +849,6 @@ func outputFaultMatcher(cut outputFaultCut) func([]byte) bool {
 }
 
 func writeFunctionCall(writer io.Writer, uid string, call string) error {
-	_, err := io.WriteString(writer, fmt.Sprintf("FUNCTION %s 30 %q 0xFFFF %q\n", uid, call, "method=api,role=test"))
+	_, err := io.WriteString(writer, fmt.Sprintf("FUNCTION %s 30 \"%s\" 0xFFFF \"%s\"\n", uid, call, "method=api,role=test"))
 	return err
 }

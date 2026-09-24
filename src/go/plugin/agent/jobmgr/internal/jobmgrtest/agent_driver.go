@@ -767,7 +767,7 @@ func runAgentFunctionResultBoundaries(ctx context.Context) error {
 			if _, err := io.WriteString(
 				fixture.input,
 				fmt.Sprintf(
-					"FUNCTION %s 30 %q 0xFFFF %q\n",
+					"FUNCTION %s 30 \"%s\" 0xFFFF \"%s\"\n",
 					largeUID,
 					fmt.Sprintf("jobmgrtest:echo result-deferred:%d", largeDeferredBytes),
 					"method=api,role=test",
@@ -823,7 +823,7 @@ func sendFunctionAndRequireStatus(
 ) error {
 	if _, err := io.WriteString(
 		fixture.input,
-		fmt.Sprintf("FUNCTION %s %s %q 0xFFFF %q\n", uid, timeout, call, "method=api,role=test"),
+		fmt.Sprintf("FUNCTION %s %s \"%s\" 0xFFFF \"%s\"\n", uid, timeout, call, "method=api,role=test"),
 	); err != nil {
 		return err
 	}
@@ -888,7 +888,7 @@ func writeAgentFunctionPayload(
 	value byte,
 ) ([sha256.Size]byte, error) {
 	header := fmt.Sprintf(
-		"FUNCTION_PAYLOAD %s 30 %q 0xFFFF %q %s\n",
+		"FUNCTION_PAYLOAD %s 30 \"%s\" 0xFFFF \"%s\" %s\n",
 		uid,
 		route,
 		"method=api,role=test",
@@ -924,7 +924,7 @@ func writeAgentRawFunctionPayload(
 	payload []byte,
 ) ([sha256.Size]byte, error) {
 	header := fmt.Sprintf(
-		"FUNCTION_PAYLOAD %s 30 %q 0xFFFF %q %s\n",
+		"FUNCTION_PAYLOAD %s 30 \"%s\" 0xFFFF \"%s\" %s\n",
 		uid,
 		route,
 		"method=api,role=test",

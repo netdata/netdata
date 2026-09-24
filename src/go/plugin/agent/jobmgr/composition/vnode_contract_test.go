@@ -61,13 +61,32 @@ func TestVNodeCommandsValidateUnmodifiedNames(t *testing.T) {
 }
 
 func TestProcessVNodeNameRoundTrip(t *testing.T) {
-	for _, name := range []string{"db:one", "db.one", "db_one", "db-one", "vnode", "db+one", "db-α"} {
+	for name, test := range map[string]struct {
+		name      string
+		incumbent string
+		reject    bool
+	}{
+		"colon":              {name: "db:one", incumbent: "db_one", reject: true},
+		"inner NBSP":         {name: "db\u00a0one", incumbent: "db", reject: true},
+		"trailing NBSP":      {name: "db\u00a0", incumbent: "db", reject: true},
+		"Unicode space":      {name: "db\u2003", incumbent: "db", reject: true},
+		"literal hex":        {name: `d\x62`, incumbent: "db", reject: true},
+		"literal Unicode":    {name: `d\u0062`, incumbent: "db", reject: true},
+		"literal newline":    {name: `db\n`, incumbent: "db", reject: true},
+		"trailing backslash": {name: `db\`, incumbent: "db", reject: true},
+		"dot":                {name: "db.one", incumbent: "db_one"},
+		"underscore":         {name: "db_one", incumbent: "db_one"},
+		"hyphen":             {name: "db-one", incumbent: "db_one"},
+		"plain":              {name: "vnode", incumbent: "db_one"},
+		"plus":               {name: "db+one", incumbent: "db_one"},
+		"safe Unicode":       {name: "db-α", incumbent: "db_one"},
+	} {
 		t.Run(name, func(t *testing.T) {
 			reader, writer := io.Pipe()
 			output := newProcessSynchronizedBuffer()
 			jobs := testRunJobServices(t)
 			jobs.InitialVnodes = map[string]*vnodes.Config{
-				"db_one": {VirtualNode: vnodes.VirtualNode{Name: "db_one", Hostname: "original", GUID: testVNodeGUID, Source: "file=test", SourceType: confgroup.TypeUser}},
+				test.incumbent: {VirtualNode: vnodes.VirtualNode{Name: test.incumbent, Hostname: "original", GUID: testVNodeGUID, Source: "file=test", SourceType: confgroup.TypeUser}},
 			}
 			process, err := newProcessCore(processCoreConfig{
 				Input: reader, Output: output, ShutdownTimeout: time.Second, Modules: collectorapi.Registry{},
@@ -87,24 +106,24 @@ func TestProcessVNodeNameRoundTrip(t *testing.T) {
 					t.Fatal("process did not terminate")
 				}
 			})
-			output.waitContains(t, "CONFIG go.d:vnode:db_one create")
+			output.waitContains(t, "CONFIG go.d:vnode:"+test.incumbent+" create")
 			_, err = fmt.Fprintf(writer, "FUNCTION_PAYLOAD add 30 \"config go.d:vnode add %s\" 0xFFFF \"user=test\" application/json\n"+
-				"{\"hostname\":\"replacement\",\"guid\":\"22222222-2222-2222-2222-222222222222\"}\nFUNCTION_PAYLOAD_END\n", name)
+				"{\"hostname\":\"replacement\",\"guid\":\"22222222-2222-2222-2222-222222222222\"}\nFUNCTION_PAYLOAD_END\n", test.name)
 			require.NoError(t, err)
 			output.waitContains(t, "FUNCTION_RESULT_BEGIN add ")
-			if name == "db:one" {
+			if test.reject {
 				require.Contains(t, output.String(), "FUNCTION_RESULT_BEGIN add 400 ")
-				_, err = io.WriteString(writer, "FUNCTION get 30 \"config go.d:vnode:db_one get\" 0xFFFF \"user=test\"\n")
+				_, err = io.WriteString(writer, "FUNCTION get 30 \"config go.d:vnode:"+test.incumbent+" get\" 0xFFFF \"user=test\"\n")
 				require.NoError(t, err)
 				output.waitContains(t, "FUNCTION_RESULT_BEGIN get 200 ")
 				require.Contains(t, output.String(), `"hostname":"original"`)
 				require.NotContains(t, output.String(), "create running job /collectors/go.d/Vnodes dyncfg")
 			} else {
-				output.waitContains(t, "CONFIG go.d:vnode:"+name+" create running job /collectors/go.d/Vnodes dyncfg")
-				_, err = fmt.Fprintf(writer, "FUNCTION get 30 \"config go.d:vnode:%s get\" 0xFFFF \"user=test\"\n", name)
+				output.waitContains(t, "CONFIG go.d:vnode:"+test.name+" create running job /collectors/go.d/Vnodes dyncfg")
+				_, err = fmt.Fprintf(writer, "FUNCTION get 30 \"config go.d:vnode:%s get\" 0xFFFF \"user=test\"\n", test.name)
 				require.NoError(t, err)
 				output.waitContains(t, "FUNCTION_RESULT_BEGIN get 200 ")
-				require.Contains(t, output.String(), `"name":"`+name+`","hostname":"replacement"`)
+				require.Contains(t, output.String(), `"name":"`+test.name+`","hostname":"replacement"`)
 			}
 		})
 	}

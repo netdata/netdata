@@ -298,7 +298,8 @@ func (c *Controller) resolveTarget(input CommandInput) (secretTarget, *targetFai
 		}
 	}
 	kind, name, err := secretstore.ParseStoreKey(rest)
-	if err != nil {
+	// Internal key parsing trims whitespace; a wire ID must remain exact.
+	if err != nil || rest != secretstore.StoreKey(kind, name) {
 		return secretTarget{}, &targetFailure{
 			code:    400,
 			message: "invalid config ID format.",
