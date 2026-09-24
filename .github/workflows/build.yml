@@ -1089,8 +1089,8 @@ jobs:
           RCLONE_CONFIG_S3_REGION: "auto"
         working-directory: artifacts
         run: |
-          rclone copy --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/nightlies/ || exit 1
-          rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/nightlies/latest/ || exit 1
+          rclone copy --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/nightly/ || exit 1
+          rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/nightly/latest/ || exit 1
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -1101,7 +1101,7 @@ jobs:
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to upload nightly build artifacts.
-              Install RClone: ${{ steps.install-rclone.outcome }}
+              Install Rclone: ${{ steps.install-rclone.outcome }}
               Fetch artifacts: ${{ steps.fetch.outcome }}
               Upload artifacts: ${{ steps.upload.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -1188,6 +1188,60 @@ jobs:
         if: >-
           ${{
             success()
+            && github.event_name == 'workflow_dispatch'
+          }}
+
+  publish-stable-artifacts:
+    name: Publish Stable Release Artifacts
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'release' && github.repository == 'netdata/netdata'
+    needs:
+      - prepare-upload
+      - windows-test
+      - artifact-verification-dist
+      - artifact-verification-static
+    steps:
+      - name: Install Rclone
+        id: install-rclone
+        run: |
+          sudo apt-get update || exit 1
+          sudo apt-get install -y rclone || exit 1
+      - name: Retrieve Artifacts
+        id: fetch
+        uses: actions/download-artifact@v4
+        with:
+          name: r2-artifacts
+          path: artifacts
+      - name: Upload Artifacts
+        id: upload
+        env:
+          RCLONE_CONFIG_S3_TYPE: "s3"
+          RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
+          RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}"
+          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "${{ secrets.CLOUDFLARE_R2_SECRET_KEY }}"
+          RCLONE_CONFIG_S3_ENDPOINT: "${{ secrets.CLOUDFLARE_R2_RELEASE_ENDPOINT }}"
+          RCLONE_CONFIG_S3_REGION: "auto"
+        working-directory: artifacts
+        run: |
+          rclone copy --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/stable/ || exit 1
+          rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/stable/latest/ || exit 1
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to upload stable build artifacts:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to upload stable build artifacts.
+              Install Rclone: ${{ steps.install-rclone.outcome }}
+              Fetch artifacts: ${{ steps.fetch.outcome }}
+              Upload artifacts: ${{ steps.upload.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
             && github.event_name == 'workflow_dispatch'
           }}
 
