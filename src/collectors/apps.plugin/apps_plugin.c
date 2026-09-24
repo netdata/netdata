@@ -965,7 +965,8 @@ int main(int argc, char **argv) {
 #endif
 
 #if defined(OS_WINDOWS)
-        if (unlikely(fflush(stdout) == EOF)) {
+        int flush_result = fflush(stdout);
+        if (unlikely(flush_result == EOF || ferror(stdout))) {
             netdata_mutex_unlock(&apps_and_stdout_mutex);
             fatal("Cannot write to Netdata on stdout");
         }
