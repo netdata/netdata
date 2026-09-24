@@ -8,7 +8,6 @@
 #define WAITQ_SEQUENCE_BITS (64 - WAITQ_PRIORITY_BITS)
 #define WAITQ_SEQUENCE_MASK ((UINT64_C(1) << WAITQ_SEQUENCE_BITS) - 1)
 #define WAITQ_SEQUENCE_WRAP_HALF (UINT64_C(1) << (WAITQ_SEQUENCE_BITS - 1))
-#define NO_PRIORITY WAITQ_NO_PRIORITY
 
 _Static_assert(WAITQ_PRIO_MAX < (UINT64_C(1) << WAITQ_PRIORITY_BITS),
                "WAITQ priority bits must leave room for the no-priority sentinel");
@@ -35,7 +34,7 @@ static ALWAYS_INLINE uint64_t get_our_order(WAITQ *waitq, WAITQ_PRIORITY priorit
 
 ALWAYS_INLINE void waitq_init(WAITQ *waitq) {
     spinlock_init(&waitq->spinlock);
-    waitq->current_priority = NO_PRIORITY;
+    waitq->current_priority = WAITQ_NO_PRIORITY;
     waitq->last_seqno = 0;
 }
 
@@ -47,7 +46,7 @@ static ALWAYS_INLINE bool write_our_priority(WAITQ *waitq, uint64_t our_order) {
 
     do {
 
-        if(current != NO_PRIORITY && order_is_before(current, our_order))
+        if(current != WAITQ_NO_PRIORITY && order_is_before(current, our_order))
             return false;
 
     } while(!__atomic_compare_exchange_n(
@@ -68,7 +67,7 @@ static ALWAYS_INLINE bool clear_our_priority(WAITQ *waitq, uint64_t our_order) {
         __atomic_compare_exchange_n(
             &waitq->current_priority,
             &expected,
-            NO_PRIORITY,
+            WAITQ_NO_PRIORITY,
             false,
             __ATOMIC_RELAXED,
             __ATOMIC_RELAXED);
@@ -76,7 +75,7 @@ static ALWAYS_INLINE bool clear_our_priority(WAITQ *waitq, uint64_t our_order) {
 
 ALWAYS_INLINE bool waitq_try_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY priority, const char *func __maybe_unused) {
     // Fast path for no contention - try to get the lock immediately without a sequence number
-    if (__atomic_load_n(&waitq->current_priority, __ATOMIC_RELAXED) == NO_PRIORITY && 
+    if (__atomic_load_n(&waitq->current_priority, __ATOMIC_RELAXED) == WAITQ_NO_PRIORITY && 
         spinlock_trylock(&waitq->spinlock)) {
         waitq->writer = gettid_cached();
         return true;
@@ -96,7 +95,7 @@ ALWAYS_INLINE bool waitq_try_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY pri
 
 ALWAYS_INLINE void waitq_acquire_with_trace(WAITQ *waitq, WAITQ_PRIORITY priority, const char *func) {
     // Fast path for no contention - try to get the lock immediately without a sequence number
-    if (__atomic_load_n(&waitq->current_priority, __ATOMIC_RELAXED) == NO_PRIORITY && 
+    if (__atomic_load_n(&waitq->current_priority, __ATOMIC_RELAXED) == WAITQ_NO_PRIORITY && 
         spinlock_trylock(&waitq->spinlock)) {
         waitq->writer = gettid_cached();
         return;
@@ -201,7 +200,7 @@ static int unittest_order_wrap(void) {
     WAITQ_TEST(order_is_before(make_order(WAITQ_PRIO_URGENT, normal_after_u32_wrap),
                                make_order(WAITQ_PRIO_NORMAL, normal_before_u32_wrap)),
                "priority ordering remains stronger than FIFO ordering");
-    WAITQ_TEST(make_order(WAITQ_PRIO_LOW, WAITQ_SEQUENCE_MASK) != NO_PRIORITY,
+    WAITQ_TEST(make_order(WAITQ_PRIO_LOW, WAITQ_SEQUENCE_MASK) != WAITQ_NO_PRIORITY,
                "valid waitq orders cannot collide with the no-priority sentinel");
 
     return errors;
@@ -234,10 +233,6 @@ static void stress_thread(void *arg) {
 static void print_thread_stats(THREAD_STATS *stats, size_t count, usec_t duration) {
     fprintf(stderr, "\n%-8s %12s %12s %12s %12s %12s\n",
             "PRIORITY", "EXECUTIONS", "EXEC/SEC", "AVG WAIT", "MAX WAIT", "% WAITING");
-
-    size_t total_execs = 0;
-    for(size_t i = 0; i < count; i++)
-        total_execs += stats[i].executions;
 
     double total_time_sec = duration / (double)USEC_PER_SEC;
 
