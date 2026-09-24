@@ -116,6 +116,18 @@ func TestServiceDiscoveryPreflightDoesNotBlockOtherCommands(t *testing.T) {
 				t.Fatal("blocked preflight unexpectedly returned")
 			default:
 			}
+			// TEST shares GET's read identity. Capture its release before cancellation;
+			// constructor return alone does not establish that the outer handler exited.
+			var testReleased <-chan struct{}
+			if command == "test" {
+				var occupied bool
+				testReleased, occupied = generation.discovery.BuildContext.Attempts.ProcessAttemptReleased(jobmgr.ProcessAttemptIdentity{
+					Namespace: jobmgr.ProcessAttemptServiceDiscovery,
+					Key:       jobmgr.ProcessAttemptIdentityKey("service-discovery-read", "go.d", "sd:fixture_a"),
+					Resource:  "sd:fixture_a",
+				})
+				require.True(t, occupied, "blocked TEST must own the read identity before cancellation")
+			}
 			require.NoError(t, generation.kernel.Cancel(t.Context(), "blocked"))
 			result("blocked", 499)
 			// The abandoned physical UPDATE/TEST cannot occupy DISABLE's identity.
@@ -127,6 +139,13 @@ func TestServiceDiscoveryPreflightDoesNotBlockOtherCommands(t *testing.T) {
 			case <-returned:
 			case <-time.After(time.Second):
 				t.Fatal("preflight did not return")
+			}
+			if testReleased != nil {
+				select {
+				case <-testReleased:
+				case <-time.After(time.Second):
+					t.Fatal("outer TEST attempt did not release")
+				}
 			}
 			submit("get-a", []string{"go.d:sd:fixture:a", "get"}, "")
 			result("get-a", 200)
