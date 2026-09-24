@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
@@ -138,10 +137,8 @@ func (p *Pipeline) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	for {
 		select {
 		case <-ctx.Done():
-			select {
-			case <-done:
-			case <-time.After(time.Second * 10):
-			}
+			// Completion releases physical ownership, so every child must have exited.
+			<-done
 			return
 		case <-done:
 			return
@@ -150,7 +147,7 @@ func (p *Pipeline) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 			if cfggs := p.processGroups(tggs); len(cfggs) > 0 {
 				select {
 				case <-ctx.Done():
-				case in <- cfggs: // FIXME: potentially stale configs if upstream cannot receive (blocking)
+				case in <- cfggs: // The SD state owner fences the runtime before forwarding.
 				}
 			}
 		}
@@ -176,7 +173,9 @@ func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 		}
 		delete(p.configs, tgg.Source())
 
-		return &confgroup.Group{Source: tgg.Source()}
+		return &confgroup.Group{
+			Source: tgg.Source(),
+		}
 	}
 
 	targetsCache, ok := p.configs[tgg.Source()]
@@ -237,7 +236,9 @@ func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 	}
 
 	// TODO: deepcopy?
-	cfgGroup := &confgroup.Group{Source: tgg.Source()}
+	cfgGroup := &confgroup.Group{
+		Source: tgg.Source(),
+	}
 
 	for _, cfgs := range targetsCache {
 		cfgGroup.Configs = append(cfgGroup.Configs, cfgs...)
