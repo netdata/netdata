@@ -140,7 +140,7 @@ jobs:
 	require.Len(t, initial, 1)
 	require.Len(t, loadErrs, 2)
 	output.waitContains(t, "CONFIG go.d:secretstore:vault:valid create running job")
-	output.waitContains(t, "CONFIG go.d:collector:module:unrelated create running job")
+	output.waitContains(t, "CONFIG go.d:collector:module:unrelated status running")
 	require.NotContains(t, output.String(), "inferred_unknown")
 	require.NotContains(t, output.String(), "non_string_kind")
 	require.NoError(t, generation.run.DirtyCause())
@@ -309,7 +309,7 @@ func testProcessCoreSecretMutationDependentRestart(
 			require.FailNow(t, "test failed", "initial collector did not enter its gated initialization")
 		}
 	} else {
-		output.waitContains(t, "CONFIG go.d:collector:module:job create running job")
+		output.waitContains(t, "CONFIG go.d:collector:module:job status running")
 	}
 
 	uid := "secret-" + command
@@ -336,7 +336,7 @@ func testProcessCoreSecretMutationDependentRestart(
 	}
 	waitSecretStart(t, starts, "replacement")
 	if gateInitial && !terminateAfterReplacementInit {
-		output.waitContains(t, "CONFIG go.d:collector:module:job create running job")
+		output.waitContains(t, "CONFIG go.d:collector:module:job status running")
 	}
 	if !gateInitial {
 		output.waitContains(t, "FUNCTION_RESULT_BEGIN "+uid+" 200 application/json")
@@ -346,7 +346,7 @@ func testProcessCoreSecretMutationDependentRestart(
 	} else {
 		output.waitContains(t, "CONFIG go.d:collector:module:job status failed")
 		wire := output.String()
-		require.Contains(t, wire, "dependent collector restarts failed for jobs: module:job")
+		require.NotContains(t, wire, "dependent collector restarts failed for jobs: module:job", "Store acceptance precedes later collector health")
 		require.NotContains(t, wire, "backend-sensitive-detail")
 	}
 	select {
@@ -477,7 +477,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 	}
 	// Collector Init precedes graph publication and dependency acknowledgement.
 	// The Running frame makes the initial dependent authoritative before update.
-	output.waitContains(t, "CONFIG go.d:collector:module:job create running job")
+	output.waitContains(t, "CONFIG go.d:collector:module:job status running")
 
 	_, writeStringErr := io.WriteString(
 		writer,
@@ -510,8 +510,10 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 	releaseOnce.Do(func() { close(releaseReplacement) })
 	waitSecretStart(t, starts, "replacement")
 	output.waitContains(t, "CONFIG go.d:collector:module:job status running")
-	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-cancel 499 application/json")
-	require.NotContains(t, output.String(), "FUNCTION_RESULT_BEGIN secret-cancel 200 application/json")
+	// The update applied, so it answers with its own result despite the
+	// cancellation; a 499 would make the daemon drop an applied change.
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-cancel 200 application/json")
+	require.NotContains(t, output.String(), "FUNCTION_RESULT_BEGIN secret-cancel 499 application/json")
 
 	require.EqualValues(t, 1, cleanups.Load())
 
@@ -1383,7 +1385,7 @@ func TestProcessCoreSecretUpdateYieldsJobGraphDuringRestartProbe(t *testing.T) {
 	go func() {
 		done <- process.run(context.Background(), controls)
 	}()
-	output.waitContains(t, "CONFIG go.d:collector:module:job create running job")
+	output.waitContains(t, "CONFIG go.d:collector:module:job status running")
 
 	_, writeStringErr := io.WriteString(
 		writer,

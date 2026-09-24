@@ -177,6 +177,46 @@ func TestSecretDependencyIndexAcceptsMixedReferenceProviders(t *testing.T) {
 	require.Equal(t, "module_mixed", refs[0].ID)
 }
 
+func TestSecretDependencyIndexQueriesCurrentAcceptedIntent(t *testing.T) {
+	index := NewSecretDependencyIndex()
+	enabled := map[string]bool{"module_starting": true, "module_waiting": true}
+	index.SetActivationEnabled(func(id string) bool {
+		require.True(t, index.mu.TryLock(), "activation query must run outside the dependency lock")
+		index.mu.Unlock()
+		return enabled[id]
+	})
+	for name, status := range map[string]dyncfg.Status{
+		"running": dyncfg.StatusRunning, "starting": dyncfg.StatusAccepted,
+		"waiting": dyncfg.StatusAccepted, "passive": dyncfg.StatusAccepted,
+		"disabled": dyncfg.StatusDisabled, "failed": dyncfg.StatusFailed,
+	} {
+		config := confgroup.Config{"module": "module", "name": name, "secret": "${store:vault:main:key}"}.
+			SetSourceType(confgroup.TypeDyncfg)
+		payload, err := yaml.Marshal(config)
+		require.NoError(t, err)
+		commit, err := index.PrepareJobChange(config.FullName(), &dyncfg.GraphConfig{
+			ID: config.FullName(), Module: config.Module(), Name: config.Name(), Status: status.String(), Payload: payload,
+		})
+		require.NoError(t, err)
+		commit()
+	}
+	refs := index.Affected("vault:main", true)
+	require.Equal(t, []secretstore.JobRef{
+		{ID: "module_running", Display: "module:running"},
+		{ID: "module_starting", Display: "module:starting"},
+		{ID: "module_waiting", Display: "module:waiting"},
+	}, refs)
+	require.Len(t, index.Affected("vault:main", false), 6)
+	require.True(t, index.Affects("vault:main", "module_waiting", true))
+	require.False(t, index.Affects("vault:main", "module_passive", true))
+	// ENABLE and cancellation can change intent without changing Accepted status.
+	enabled["module_passive"] = true
+	delete(enabled, "module_waiting")
+	require.True(t, index.Affects("vault:main", "module_passive", true))
+	require.False(t, index.Affects("vault:main", "module_waiting", true))
+	require.Equal(t, "module_passive", index.Affected("vault:main", true)[0].ID)
+}
+
 func TestSecretDependencyIndexSourcePolicy(t *testing.T) {
 	tests := map[string]struct {
 		sourceType string

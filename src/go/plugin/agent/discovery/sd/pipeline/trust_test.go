@@ -72,7 +72,18 @@ func TestPipelineTrustControlsBothSecretConsumers(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.NoError(t, factory.Validate(t.Context(), config))
+			require.Empty(t, calls, "structural admission must not resolve references")
+			require.Equal(t, 1, module.Config.OptionInt)
+			require.True(t, module.CleanupDone)
+			if test.resolve {
+				require.Empty(t, module.Config.OptionStr, "authorized references are deferred until resolved testing")
+			} else {
+				require.Equal(t, refs, module.Config.OptionStr, "untrusted references remain literal during admission")
+			}
+
+			require.NoError(t, factory.Test(t.Context(), config))
 			require.Equal(t, refs, config.Get("option_str"))
+			require.True(t, module.CleanupDone)
 			if test.resolve {
 				require.Equal(t, "env-resolved|file-resolved|cmd-resolved|store-resolved", module.Config.OptionStr)
 				require.Equal(t, map[string]int{"env": 1, "file": 1, "cmd": 1, "scope": 1, "store": 1, "release": 1}, calls)

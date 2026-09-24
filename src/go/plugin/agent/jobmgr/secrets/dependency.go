@@ -22,14 +22,24 @@ import (
 type SecretDependencyIndex struct {
 	mu sync.RWMutex // guards the maps
 
-	jobs    map[string]jobDependency       // per-job dependency record by job full name
-	byStore map[string]map[string]struct{} // job set by store key (reverse index)
+	jobs              map[string]jobDependency       // per-job dependency record by job full name
+	byStore           map[string]map[string]struct{} // job set by store key (reverse index)
+	activationEnabled func(string) bool              // current activation authority, bound before commands start
 }
 
 type jobDependency struct {
 	display   string
 	running   bool
+	accepted  bool
 	storeKeys []string
+}
+
+// SetActivationEnabled binds the current activation authority. Accepted graph
+// status alone cannot distinguish enabled work from passive registration.
+func (sdi *SecretDependencyIndex) SetActivationEnabled(enabled func(string) bool) {
+	sdi.mu.Lock()
+	sdi.activationEnabled = enabled
+	sdi.mu.Unlock()
 }
 
 func NewSecretDependencyIndex() *SecretDependencyIndex {
@@ -66,6 +76,7 @@ func (sdi *SecretDependencyIndex) PrepareJobChange(id string, postimage *dyncfg.
 		dependency := jobDependency{
 			display:   config.Module() + ":" + config.Name(),
 			running:   postimage.Status == dyncfg.StatusRunning.String(),
+			accepted:  postimage.Status == dyncfg.StatusAccepted.String(),
 			storeKeys: slices.Clone(keys),
 		}
 		next = &dependency
@@ -75,7 +86,7 @@ func (sdi *SecretDependencyIndex) PrepareJobChange(id string, postimage *dyncfg.
 	}, nil
 }
 
-func (sdi *SecretDependencyIndex) Affected(storeKey string, runningOnly bool) []secretstore.JobRef {
+func (sdi *SecretDependencyIndex) Affected(storeKey string, activeOnly bool) []secretstore.JobRef {
 	if sdi == nil || storeKey == "" {
 		return nil
 	}
@@ -84,7 +95,7 @@ func (sdi *SecretDependencyIndex) Affected(storeKey string, runningOnly bool) []
 	refs := make([]secretstore.JobRef, 0, len(jobs))
 	for id := range jobs {
 		dependency, ok := sdi.jobs[id]
-		if !ok || runningOnly && !dependency.running {
+		if !ok || activeOnly && !dependency.running && !dependency.accepted {
 			continue
 		}
 		refs = append(refs, secretstore.JobRef{
@@ -92,7 +103,20 @@ func (sdi *SecretDependencyIndex) Affected(storeKey string, runningOnly bool) []
 			Display: dependency.display,
 		})
 	}
+	var accepted map[string]bool
+	if activeOnly {
+		accepted = make(map[string]bool, len(refs))
+		for _, ref := range refs {
+			accepted[ref.ID] = sdi.jobs[ref.ID].accepted
+		}
+	}
+	enabled := sdi.activationEnabled
 	sdi.mu.RUnlock()
+	if activeOnly {
+		refs = slices.DeleteFunc(refs, func(ref secretstore.JobRef) bool {
+			return accepted[ref.ID] && (enabled == nil || !enabled(ref.ID))
+		})
+	}
 	slices.SortFunc(refs, func(a, b secretstore.JobRef) int {
 		if a.ID != b.ID {
 			return cmp.Compare(a.ID, b.ID)
@@ -102,17 +126,19 @@ func (sdi *SecretDependencyIndex) Affected(storeKey string, runningOnly bool) []
 	return refs
 }
 
-func (sdi *SecretDependencyIndex) Affects(storeKey, id string, runningOnly bool) bool {
+func (sdi *SecretDependencyIndex) Affects(storeKey, id string, activeOnly bool) bool {
 	if sdi == nil || storeKey == "" || id == "" {
 		return false
 	}
 	sdi.mu.RLock()
-	defer sdi.mu.RUnlock()
 	if _, ok := sdi.byStore[storeKey][id]; !ok {
+		sdi.mu.RUnlock()
 		return false
 	}
 	dependency, ok := sdi.jobs[id]
-	return ok && (!runningOnly || dependency.running)
+	enabled := sdi.activationEnabled
+	sdi.mu.RUnlock()
+	return ok && (!activeOnly || dependency.running || dependency.accepted && enabled != nil && enabled(id))
 }
 
 func (sdi *SecretDependencyIndex) commitJobChange(id string, next *jobDependency) {
@@ -132,6 +158,7 @@ func (sdi *SecretDependencyIndex) commitJobChange(id string, next *jobDependency
 		cloned := jobDependency{
 			display:   next.display,
 			running:   next.running,
+			accepted:  next.accepted,
 			storeKeys: slices.Clone(next.storeKeys),
 		}
 		sdi.jobs[id] = cloned

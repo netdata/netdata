@@ -16,10 +16,9 @@ import (
 type pendingJobPlanner func(confgroup.Config, pendingJobToken) (jobmgr.WorkPlan, error)
 
 type pendingJobToken struct {
-	uid           string
-	baselineUID   string
-	version       uint64
-	requireAbsent bool // retry only while the graph still has no current job
+	uid         string
+	baselineUID string
+	version     uint64
 }
 
 type pendingJobIndex struct {
@@ -84,23 +83,6 @@ func (pji *pendingJobIndex) retain(
 	release <-chan struct{},
 	baselineUID string,
 ) {
-	pji.retainWithRequirement(config, release, baselineUID, false)
-}
-
-func (pji *pendingJobIndex) retainAbsent(
-	config confgroup.Config,
-	release <-chan struct{},
-	baselineUID string,
-) {
-	pji.retainWithRequirement(config, release, baselineUID, true)
-}
-
-func (pji *pendingJobIndex) retainWithRequirement(
-	config confgroup.Config,
-	release <-chan struct{},
-	baselineUID string,
-	requireAbsent bool,
-) {
 	if pji == nil || config == nil || config.FullName() == "" || config.UID() == "" {
 		return
 	}
@@ -121,10 +103,9 @@ func (pji *pendingJobIndex) retainWithRequirement(
 		return
 	}
 	token := pendingJobToken{
-		uid:           cloned.UID(),
-		baselineUID:   baselineUID,
-		version:       pji.version,
-		requireAbsent: requireAbsent,
+		uid:         cloned.UID(),
+		baselineUID: baselineUID,
+		version:     pji.version,
 	}
 	if current := pji.entries[id]; current != nil {
 		current.config = cloned
@@ -319,33 +300,6 @@ func (dcjc *DynCfgJobController) retainPendingAfterApply(
 	namespace jobmgr.ProcessAttemptNamespace,
 	baselineUID string,
 ) func() {
-	return dcjc.retainPendingAfterApplyWithRequirement(
-		config,
-		namespace,
-		baselineUID,
-		false,
-	)
-}
-
-func (dcjc *DynCfgJobController) retainAbsentPendingAfterApply(
-	config confgroup.Config,
-	namespace jobmgr.ProcessAttemptNamespace,
-	baselineUID string,
-) func() {
-	return dcjc.retainPendingAfterApplyWithRequirement(
-		config,
-		namespace,
-		baselineUID,
-		true,
-	)
-}
-
-func (dcjc *DynCfgJobController) retainPendingAfterApplyWithRequirement(
-	config confgroup.Config,
-	namespace jobmgr.ProcessAttemptNamespace,
-	baselineUID string,
-	requireAbsent bool,
-) func() {
 	return func() {
 		if dcjc == nil || dcjc.scheduler == nil || dcjc.scheduler.pending == nil ||
 			dcjc.factory == nil || dcjc.factory.config.Attempts == nil ||
@@ -359,11 +313,7 @@ func (dcjc *DynCfgJobController) retainPendingAfterApplyWithRequirement(
 			close(immediate)
 			release = immediate
 		}
-		if requireAbsent {
-			dcjc.scheduler.pending.retainAbsent(config, release, baselineUID)
-		} else {
-			dcjc.scheduler.pending.retain(config, release, baselineUID)
-		}
+		dcjc.scheduler.pending.retain(config, release, baselineUID)
 	}
 }
 

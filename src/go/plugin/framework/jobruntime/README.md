@@ -13,18 +13,22 @@ depend on observation data.
 
 `ManagedRun` settles startup exactly once. Accepted readiness enables collection and running availability; duplicate
 or late callbacks cannot revive canceled or failed startup. Job Manager bounds logical startup waiting with a
-separate timer using the process-attempt fuse's default two-minute duration. This timer starts when runtime startup is
-requested and applies only before readiness, not to the successful runtime lifetime. Timeout cancels the attempt but
+separate timer using the process-attempt fuse's default two-minute duration. The process-owned worker starts this timer immediately
+before launching the managed loop; it applies only before readiness, not to the successful runtime lifetime. Timeout cancels the attempt but
 does not release physical ownership: `Run` must return before collector cleanup begins, and cleanup must finish before
 a same-job successor can acquire the runtime identity.
 
 A normal startup error uses the existing configured autodetection retry cadence and tries. Runtime acquisition failures
-retain a Failed configuration, including stock jobs, and default to response code 503 when the collector supplies no
-code. A startup error classified with `collectorapi.PermanentError`, unexpected early nil return and recovered `Run`
-panic are non-retrying failures. Unexpected return after readiness, including nil, immediately cuts new ordinary output
+retain a Failed configuration, including stock jobs; `RunFailure` reports the collector's class and whether startup may
+be retried. UPDATE that accepts a replacement for activation and non-running ENABLE acknowledge configuration with
+202 before this runtime outcome; Job Manager publishes later health separately. RESTART observes the exact activation
+outside the mutation lane.
+Logical stop revokes output and Function admission promptly; physical cleanup still waits for their admitted work.
+A startup error classified with
+`collectorapi.PermanentError`, unexpected early nil return and recovered `Run` panic are non-retrying failures. Unexpected return after readiness, including nil, immediately cuts new ordinary output
 and running availability, then reconciles the exact generation to Failed without automatic retry. If the failure races
-with installation, successful startup still installs and its terminal event removes that generation. Stale events cannot
-remove its successor. Already-admitted output may finish; terminal observation does not wait for a blocked `Collect` or
+with installation, settlement rechecks the live startup and terminal outcome before publishing Running. Stale events
+cannot remove its successor. Already-admitted output may finish; terminal observation does not wait for a blocked `Collect` or
 write lease before revoking future admission.
 
 On requested stop, nil and cancellation-only returns are normal. Mixed or unrelated errors, recovered panics and

@@ -29,39 +29,41 @@ const (
 )
 
 type ControllerConfig struct {
-	Epoch        uint64                      // run generation this controller belongs to
-	PluginName   string                      // owning plugin name
-	Frames       *lifecycle.FrameOwner       // protocol frame sink
-	Store        *secretstore.SecretStore    // process-owned Store epoch
-	Operations   *StoreOperations            // process-owned Store materialization
-	Creators     *secretstore.CreatorCatalog // frozen creator catalog
-	Dependencies *SecretDependencyIndex      // secret dependency index
-	Initial      []secretstore.Config        // initial (stock/user) secret store configs
-	Diagnostics  jobmgr.DiagnosticObserver   // operational log sink
+	Epoch             uint64                      // run generation this controller belongs to
+	PluginName        string                      // owning plugin name
+	Frames            *lifecycle.FrameOwner       // protocol frame sink
+	Store             *secretstore.SecretStore    // process-owned Store epoch
+	Operations        *StoreOperations            // process-owned Store materialization
+	Creators          *secretstore.CreatorCatalog // frozen creator catalog
+	Dependencies      *SecretDependencyIndex      // secret dependency index
+	Initial           []secretstore.Config        // initial (stock/user) secret store configs
+	Diagnostics       jobmgr.DiagnosticObserver   // operational log sink
+	DependencyChanged func(string)                // nonblocking post-commit Store availability notification
 }
 
 type Controller struct {
 	mu sync.Mutex // guards run projections, entries, pending state, and counters
 
-	epoch         uint64                      // run generation
-	prefix        string                      // "<plugin>:secretstore:" ID prefix
-	path          string                      // "/collectors/<plugin>/SecretStores" config path
-	frames        *lifecycle.FrameOwner       // protocol frame sink
-	store         *secretstore.SecretStore    // process-owned Store epoch
-	operations    *StoreOperations            // process-owned Store materialization
-	creators      *secretstore.CreatorCatalog // frozen creator catalog
-	dependencies  *SecretDependencyIndex      // secret dependency index
-	diagnostics   jobmgr.DiagnosticObserver   // operational log sink
-	initial       []secretstore.Config        // initial secret store configs
-	entries       map[string]secretEntry      // published store entries by key
-	restarts      *SecretRestartCommand       // dependent-job restart command (bound at Bind)
-	commands      jobmgr.PreparedCommandPort  // run-owned internal retry ingress
-	projectionCtx context.Context             // canceled when the run projection closes
-	closeContext  context.CancelFunc
-	pending       map[string]*pendingStoreState // latest persistent desired config by Store key
-	nextDesired   uint64                        // desired-config ordering
-	nextRetry     uint64                        // internal retry UID ordering
-	commandsReady bool                          // templates are visible and commands may execute
+	epoch             uint64                      // run generation
+	prefix            string                      // "<plugin>:secretstore:" ID prefix
+	path              string                      // "/collectors/<plugin>/SecretStores" config path
+	frames            *lifecycle.FrameOwner       // protocol frame sink
+	store             *secretstore.SecretStore    // process-owned Store epoch
+	operations        *StoreOperations            // process-owned Store materialization
+	creators          *secretstore.CreatorCatalog // frozen creator catalog
+	dependencies      *SecretDependencyIndex      // secret dependency index
+	diagnostics       jobmgr.DiagnosticObserver   // operational log sink
+	dependencyChanged func(string)                // called after releasing the entry lock
+	initial           []secretstore.Config        // initial secret store configs
+	entries           map[string]secretEntry      // published store entries by key
+	restarts          *SecretRestartCommand       // dependent-job restart command (bound at Bind)
+	commands          jobmgr.PreparedCommandPort  // run-owned internal retry ingress
+	projectionCtx     context.Context             // canceled when the run projection closes
+	closeContext      context.CancelFunc
+	pending           map[string]*pendingStoreState // latest persistent desired config by Store key
+	nextDesired       uint64                        // desired-config ordering
+	nextRetry         uint64                        // internal retry UID ordering
+	commandsReady     bool                          // templates are visible and commands may execute
 }
 
 type secretEntry struct {
@@ -81,20 +83,21 @@ func NewController(config ControllerConfig) (*Controller, error) {
 	}
 	projectionCtx, closeContext := context.WithCancel(context.Background())
 	return &Controller{
-		epoch:         config.Epoch,
-		prefix:        fmt.Sprintf("%s:secretstore:", config.PluginName),
-		path:          fmt.Sprintf(dynCfgSecretPath, config.PluginName),
-		frames:        config.Frames,
-		store:         config.Store,
-		operations:    config.Operations,
-		creators:      config.Creators,
-		dependencies:  config.Dependencies,
-		diagnostics:   config.Diagnostics,
-		initial:       slices.Clone(config.Initial),
-		entries:       make(map[string]secretEntry),
-		projectionCtx: projectionCtx,
-		closeContext:  closeContext,
-		pending:       make(map[string]*pendingStoreState),
+		epoch:             config.Epoch,
+		prefix:            fmt.Sprintf("%s:secretstore:", config.PluginName),
+		path:              fmt.Sprintf(dynCfgSecretPath, config.PluginName),
+		frames:            config.Frames,
+		store:             config.Store,
+		operations:        config.Operations,
+		creators:          config.Creators,
+		dependencies:      config.Dependencies,
+		diagnostics:       config.Diagnostics,
+		dependencyChanged: config.DependencyChanged,
+		initial:           slices.Clone(config.Initial),
+		entries:           make(map[string]secretEntry),
+		projectionCtx:     projectionCtx,
+		closeContext:      closeContext,
+		pending:           make(map[string]*pendingStoreState),
 	}, nil
 }
 
@@ -319,14 +322,17 @@ func (c *Controller) entry(key string) (secretEntry, bool) {
 
 func (c *Controller) commitEntry(key string, entry *secretEntry) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if entry == nil {
 		delete(c.entries, key)
-		return
+	} else {
+		c.entries[key] = secretEntry{
+			config: cloneSecretConfig(entry.config),
+			status: entry.status,
+		}
 	}
-	c.entries[key] = secretEntry{
-		config: cloneSecretConfig(entry.config),
-		status: entry.status,
+	c.mu.Unlock()
+	if c.dependencyChanged != nil && (entry == nil || entry.status == dyncfg.StatusRunning) {
+		c.dependencyChanged(key)
 	}
 }
 

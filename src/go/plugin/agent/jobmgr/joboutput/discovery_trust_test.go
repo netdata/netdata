@@ -42,6 +42,8 @@ func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 			controller.modules["module"] = creator
 			dependencies := jobsecrets.NewSecretDependencyIndex()
 			controller.dependencies = dependencies
+			commands := runtimeTestNotifications(t, controller)
+			activations := runtimeTestBindActivations(t, controller)
 			store := &factoryTestAtomicScope{value: "1s"}
 			store.current.Store(true)
 			var acquisitions int
@@ -72,8 +74,11 @@ func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 			applied, err := transaction.Apply(t.Context())
 			require.NoError(t, err)
 			_, disposition, current := applied.Ownership()
-			require.Equal(t, lifecycle.ResourceTransactionInstalled, disposition)
+			require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+			require.Nil(t, current)
+			current = runtimeTestApplyActivation(t, activations, config.FullName(), 2)
 			require.NotNil(t, current)
+			current = runtimeTestApplyNotification(t, runtimeTestNotificationPlan(t, commands, "internal/jobs/runtime-ready"), current)
 			t.Cleanup(func() {
 				if current != nil {
 					require.NoError(t, current.Stop(context.Background()))
@@ -91,9 +96,9 @@ func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 			if test.replacementSource != "" {
 				config.SetSource(test.replacementSource)
 			}
-			permit, replacementTasks := issueTestJobPermit(t, config.FullName(), 2)
-			scope.Current = scope.Successor
-			scope.Successor.Generation = 2
+			permit, replacementTasks := issueTestJobPermit(t, config.FullName(), 3)
+			scope.Current = current.Identity()
+			scope.Successor.Generation = 3
 			transaction, err = controller.prepareDiscovered(t.Context(), DiscoveredJobChange{
 				Config: config,
 				Status: dyncfg.StatusRunning,
@@ -106,7 +111,7 @@ func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 				require.Equal(t, incumbentRecord, record)
 				require.True(t, dependencies.Affects("vault:main", config.FullName(), true))
 				require.Equal(t, 1, acquisitions)
-				require.NotEqual(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+				require.Equal(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus(), "acceptance released its unused permit")
 				require.NoError(t, permit.AbortUnused())
 				require.Equal(t, lifecycle.LongLivedCensus{}, replacementTasks.LongLivedCensus())
 				return

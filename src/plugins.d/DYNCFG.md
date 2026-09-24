@@ -124,7 +124,8 @@ Where:
 - `transaction_id` is the same ID received in the original command
 - `http_status_code` is the standard HTTP response code:
     - `200`: Success (DYNCFG_RESP_RUNNING) - Configuration accepted and running
-    - `202`: Accepted (DYNCFG_RESP_ACCEPTED) - Configuration accepted but not running yet
+    - `202`: Accepted (DYNCFG_RESP_ACCEPTED) - Configuration accepted but not running: still starting, or adopted
+      and failed (the status frame says which)
     - `298`: Accepted but disabled (DYNCFG_RESP_ACCEPTED_DISABLED)
     - `299`: Accepted but restart required (DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
     - `400`: Bad request - Invalid configuration
@@ -132,6 +133,29 @@ Where:
     - `500`: Internal server error
 - `content_type` is typically "application/json"
 - `expiration` is the absolute timestamp (unix epoch) for result expiration
+
+For `add`, `update`, `enable`, `disable` and `remove`, the response code is the plugin's adoption decision.
+For user commands, Netdata changes the saved configuration or enabledness only after a 2xx response; successful
+`remove` deletes the saved configuration. Netdata replays saved configurations when the plugin starts. Echo replies
+update status or record plugin rejection; they do not replace the already saved payload:
+
+- A plugin MUST answer 2xx only when it now holds the requested configuration and state.
+- A completed plugin rejection MUST preserve the previous configuration and enabled intent. Validate before
+  adoption; after adoption, runtime failure is a status outcome rather than a rejection.
+- Report the health of an adopted configuration, such as a job that failed to start, with `CONFIG <id> STATUS`, not
+  with the response code.
+- `test` and `restart` are not saved; their codes only report the outcome.
+
+A timeout, lost reply, plugin crash, or structural failure after a transition can leave the outcome indeterminate.
+An error from that path is not proof that the plugin rejected the change. Netdata persists a user mutation only after
+observing a successful reply; reading the plugin's current configuration does not prove that Netdata saved it.
+Clients MUST NOT turn an uncertain update result into an `add` attempt.
+
+For Go collector jobs, `update` that accepts a replacement for activation and non-running `enable` return `202`,
+without waiting for runtime readiness or physical cleanup. Disabled `update` and an identical running DynCfg-source
+`update` return `200`. `CONFIG <id> STATUS` reports later health. `add` is passive until Netdata echoes enabledness;
+`add` and disabled `update` validate structure without acquiring external
+dependencies. Interactive `update` still rejects any failed preflight, irrespective of retry policy.
 
 The result data depends on the command:
 

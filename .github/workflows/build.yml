@@ -152,8 +152,6 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - file-check
-    outputs:
-      distfile: ${{ steps.build.outputs.distfile }}
     steps:
       - name: Skip Check
         id: skip
@@ -179,21 +177,14 @@ jobs:
       - name: Build
         id: build
         if: needs.file-check.outputs.run == 'true'
-        run: |
-          mkdir -p artifacts/
-          tar --create --file "artifacts/netdata-$(git describe).tar.gz" \
-              --sort=name --posix --auto-compress --exclude=artifacts --exclude=.git \
-              --exclude=.gitignore --exclude=.gitattributes --exclude=.gitmodules \
-              --transform "s/^\\.\\//netdata-$(git describe)\\//" --verbose .
-          cd artifacts/
-          echo "distfile=$(find . -name 'netdata-*.tar.gz')" >> "${GITHUB_OUTPUT}"
+        run: packaging/create-source-archives.sh
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
         uses: actions/upload-artifact@v7.0.1
         with:
           name: dist-tarball
-          path: artifacts/*.tar.gz
+          path: artifacts/*.tar.*
           compression-level: 0
           retention-days: 30
       - name: Failure Notification
@@ -1098,8 +1089,8 @@ jobs:
           RCLONE_CONFIG_S3_REGION: "auto"
         working-directory: artifacts
         run: |
-          rclone copy --verbose --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/nightlies/ || exit 1
-          rclone sync --verbose --fast-list --use-server-modtime --metadata --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/nightlies/latest/ || exit 1
+          rclone copy --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/nightlies/ || exit 1
+          rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/nightlies/latest/ || exit 1
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:

@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -1016,6 +1017,7 @@ func fixtureRegistryWithFunctions(
 		MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
 			return fixtureFunctionHandler{
 				state: state,
+				usage: &fixtureFunctionUsage{},
 			}
 		},
 	}
@@ -1153,6 +1155,12 @@ groups:
 
 type fixtureFunctionHandler struct {
 	state *agentFixtureState
+	usage *fixtureFunctionUsage
+}
+
+type fixtureFunctionUsage struct {
+	active atomic.Int32
+	used   atomic.Bool
 }
 
 func (fixtureFunctionHandler) MethodParams(context.Context, string) ([]funcapi.ParamConfig, error) {
@@ -1164,6 +1172,9 @@ func (ffh fixtureFunctionHandler) Handle(
 	method string,
 	_ funcapi.ResolvedParams,
 ) *funcapi.FunctionResponse {
+	ffh.usage.active.Add(1)
+	ffh.usage.used.Store(true)
+	defer ffh.usage.active.Add(-1)
 	ffh.state.handle(ctx, "handle:"+method)
 	return funcapi.RawResponse(map[string]any{"method": method, "status": 200})
 }
@@ -1172,6 +1183,9 @@ func (ffh fixtureFunctionHandler) HandleRaw(
 	ctx context.Context,
 	request funcapi.RawMethodRequest,
 ) *funcapi.FunctionResponse {
+	ffh.usage.active.Add(1)
+	ffh.usage.used.Store(true)
+	defer ffh.usage.active.Add(-1)
 	ffh.state.handle(ctx, "raw:"+request.Method)
 	if deferred, ok := requestedDeferredBytes(request.Args); ok {
 		const fixedBytes = len(`{"pad":""}`)
@@ -1197,6 +1211,12 @@ func (ffh fixtureFunctionHandler) HandleRaw(
 }
 
 func (ffh fixtureFunctionHandler) Cleanup(context.Context) {
+	if ffh.usage.active.Load() != 0 {
+		ffh.state.record("handler-cleanup-active")
+	}
+	if ffh.usage.used.Load() {
+		ffh.state.record("handler-cleanup-used")
+	}
 	ffh.state.record("handler-cleanup")
 }
 
