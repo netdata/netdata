@@ -1086,13 +1086,41 @@ Consequences:
 
 ## Service Discovery
 
-Service-discovery configuration is **materialized** before a pipeline manager can start it. One contained attempt owns
-payload/descriptor parsing, user-config rendering, `ParseJSONConfig`, discoverer construction, and `pipeline.New`; the
-manager accepts only an already-prepared pipeline through `StartPrepared`/`RestartPrepared`.
+Service discovery uses the shared [prepared DynCfg handler](../../framework/dyncfg/README.md). Structural validation
+and enabled UPDATE materialization run before adoption. ADD and disabled UPDATE remain structural; ENABLE accepts
+enabled intent and constructs the pipeline afterward. Successful enabled adoption returns 202 with Accepted status;
+it does not establish runtime health. Rejected preflight preserves the exact incumbent, including file-to-DynCfg conversion.
 
-- The controller materializes and applies configurations **serially**, after deterministic source-winner selection.
-- Each materialization is individually contained, so a non-cooperative identity cannot occupy the controller loop
-  beyond its logical containment deadline.
+- The SD event loop owns desired configuration, runtime publication authority and source removal. Apply only adopts
+  prepared intent and revokes prior authority; it never waits for construction, discovery or physical cleanup.
+- Composition yields the global SD claim during contained preparation and read-only calls, then reacquires it before
+  Apply. Mutation attempts use plugin/resource/command identities. Read-only attempts exclude conflicting work per
+  plugin/resource, and each invocation captures its own result by UID until its handler physically returns, including
+  after cancellation. A blocked UPDATE or TEST cannot occupy an unrelated configuration's command path.
+- Pipeline construction is contained by its stable input: logical and origin identity, source type/source, and payload.
+  A different revision may prepare while accepted activation is still constructing, without revoking the incumbent
+  before adoption. Retrying identical retained construction cannot bypass containment; runtime exclusion remains
+  logical/origin-scoped independently of construction identity.
+- Apply rechecks the exact immutable predecessor. Its result and notification batch belong to the command. The actor
+  pauses commands, runtime events and discovered output until composition publishes the reply and notifications,
+  then releases activation. Publication failure ends the generation without releasing activation; shutdown remains selectable.
+- Each desired revision carries epoch and generation. Its slot retains the current runtime or finite snapshot, a
+  prepared successor, and grace sources. Desired and incumbent logical identities have separate indexes: file rename
+  retains the incumbent during preparation, and takeover of its old name retires only that incumbent while preserving
+  the renamed desired work. A retained incumbent's failure removes its sources without overwriting successor health.
+  File deletion follows the file-origin slot even when a renamed configuration was rejected by source priority or failed preparation.
+- Every physical pipeline reserves its logical identity; file pipelines also reserve their origin. Admission ends
+  the startup fuse before discovery begins. Busy alias acquisition releases the logical reservation before waiting,
+  and release wakes only the current desired revision. Process ownership survives logical retirement until `Run`
+  and its pipeline, accumulator, Kubernetes informer and queue children have actually exited.
+- Command retirement revokes output immediately in actor Apply. Process containment cancels physical work promptly;
+  its tokened actor event is the publication cut, not the return of process `Cut`. The actor drops unsent old output
+  after that cut. Source snapshots coalesce by source, with required removals ahead of successor updates; a blocked
+  downstream consumer cannot block command acceptance. Finite HTTP/SNMP completion retains its successful snapshot.
+  Empty-source removals leave active membership immediately, while their queued removals survive retirement until sent.
+  Routine retirement cancels the worker and joins it through process ownership without reporting a containment failure.
+  Desired construction carries a normal retirement cause on replacement, disable and generation shutdown; cancellation
+  cuts its exact preparation attempt promptly while retaining physical ownership until the constructor returns.
 - DynCfg `test` builds a complete temporary pipeline under a payload-specific test identity and never submits it to the
   pipeline manager. It invokes `dyncfg.Testable.Test(ctx)` sequentially on every discoverer that provides the optional
   capability. After each callback returns, the shared Pipeline Test boundary makes the caller's cancellation cause take
@@ -1115,13 +1143,12 @@ manager accepts only an already-prepared pipeline through `StartPrepared`/`Resta
   cache reconciliation, publication, or installation. A non-empty HTTP method other than exact `GET`, plus Kubernetes
   and SNMP, remains validation-only. Local-listener process count and elapsed time are bounded to one invocation and the
   caller/configured timeout; its work and buffered output still scale with the host socket/process inventory.
-- File-backed stock/user state keeps one latest pending retry after a busy/contained result; synchronous DynCfg
-  commands do not.
-- The complete service-discovery DynCfg Function is also contained, so a non-cooperative command cannot pin the
-  Function catalog or the Job Manager run.
+- Busy/contained materialization keeps the latest desired revision in its slot and waits for physical release. Replaced,
+  disabled or removed revisions cannot reactivate from a late preparation or release event. Structural failure keeps
+  the existing process-quarantine behavior.
 
-`plugin/agent/discovery/sd/materialization.go`, `plugin/agent/discovery/sd/pending.go`,
-`composition/service_discovery.go`.
+`plugin/agent/discovery/sd/materialization.go`, `plugin/agent/discovery/sd/dyncfg_handoff.go`,
+`plugin/agent/discovery/sd/pipeline_manager.go`, `composition/service_discovery.go`.
 
 ## Functions
 

@@ -609,9 +609,10 @@ func TestProcessCoreServiceDiscoveryMutationSendsFunctionResultBeforeStatus(t *t
 
 	output.waitContains(t, "CONFIG go.d:sd:test:job status running")
 	wire := output.String()
-	result := strings.Index(wire, "FUNCTION_RESULT_BEGIN sd-enable 200 application/json")
+	result := strings.Index(wire, "FUNCTION_RESULT_BEGIN sd-enable 202 application/json")
+	accepted := strings.Index(wire, "CONFIG go.d:sd:test:job status accepted")
 	notification := strings.Index(wire, "CONFIG go.d:sd:test:job status running")
-	require.False(t, result < 0 || notification < 0 || result >= notification)
+	require.True(t, result >= 0 && accepted > result && notification > accepted, "wire=%q", wire)
 	controls.sendTerminate(testProcessControl())
 	select {
 	case err := <-done:
@@ -629,7 +630,8 @@ func TestProcessCoreVnodeDynCfgOrdersAddCreateAndGet(t *testing.T) {
 	jobs := testRunJobServices(t)
 	jobs.InitialVnodes = map[string]*vnodes.Config{
 		"initial": {VirtualNode: vnodes.VirtualNode{
-			Name: "initial", Hostname: "initial",
+			Name:       "initial",
+			Hostname:   "initial",
 			GUID:       "11111111-1111-1111-1111-111111111111",
 			Source:     "file=test",
 			SourceType: confgroup.TypeUser,
@@ -1150,7 +1152,7 @@ func testRunServiceDiscoveryServices(t testing.TB) runDiscoveryServices {
 }
 
 type processServiceDiscovery struct {
-	registry frameworkfunctions.Registry
+	registry dyncfg.PreparedRegistry
 	output   dyncfg.Output
 }
 
@@ -1174,17 +1176,27 @@ func (pnd processNoncooperativeDiscovery) Run(context.Context, chan<- []*confgro
 }
 
 func (psd processServiceDiscovery) Run(ctx context.Context, _ chan<- []*confgroup.Group) {
-	psd.registry.RegisterPrefix(
+	psd.registry.RegisterPrefix("config", "go.d:sd:", func(context.Context, frameworkfunctions.Function) {})
+	psd.registry.RegisterCommandPreparer(
 		"config",
 		"go.d:sd:",
-		func(_ context.Context, function frameworkfunctions.Function) {
-			psd.output.FunctionResult(dyncfg.Result{
-				UID:         function.UID,
-				Code:        200,
-				ContentType: "application/json",
-				Payload:     `{"status":200}`,
-			})
-			psd.output.ConfigStatus("go.d:sd:test:job", dyncfg.StatusRunning)
+		func(fn dyncfg.Function) (dyncfg.PreparedCommand, error) {
+			return &preparedSDTestCommand{
+				apply: func(context.Context) (dyncfg.AppliedCommand, error) {
+					return dyncfg.AppliedCommand{
+						Result: dyncfg.Result{
+							UID:         fn.UID(),
+							Code:        202,
+							ContentType: "application/json",
+							Payload:     `{"status":202}`,
+						},
+						Notifications: []dyncfg.Notification{
+							{Kind: dyncfg.NotificationStatus, ID: "go.d:sd:test:job", Status: dyncfg.StatusAccepted},
+						},
+						Published: func() { psd.output.ConfigStatus("go.d:sd:test:job", dyncfg.StatusRunning) },
+					}, nil
+				},
+			}, nil
 		},
 	)
 	psd.output.ConfigCreate(netdataapi.ConfigOpts{
