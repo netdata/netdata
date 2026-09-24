@@ -62,10 +62,8 @@ static ebpf_local_maps_t process_maps[] = {
 char *tracepoint_sched_type = "sched";
 char *tracepoint_sched_process_exit = "sched_process_exit";
 char *tracepoint_sched_process_exec = "sched_process_exec";
-char *tracepoint_sched_process_fork = "sched_process_fork";
 static int was_sched_process_exit_enabled = 0;
 static int was_sched_process_exec_enabled = 0;
-static int was_sched_process_fork_enabled = 0;
 
 static netdata_idx_t *process_hash_values = NULL;
 ebpf_process_stat_t *process_stat_vector = NULL;
@@ -703,11 +701,6 @@ static void ebpf_process_disable_tracepoints()
     if (!was_sched_process_exec_enabled) {
         if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_exec))
             netdata_log_error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_exec);
-    }
-
-    if (!was_sched_process_fork_enabled) {
-        if (ebpf_disable_tracing_values(tracepoint_sched_type, tracepoint_sched_process_fork))
-            netdata_log_error("%s %s/%s.", default_message, tracepoint_sched_type, tracepoint_sched_process_fork);
     }
 }
 
@@ -1517,9 +1510,6 @@ static int ebpf_process_enable_tracepoints()
         return -1;
 
     if (ebpf_enable_single_tracepoint(tracepoint_sched_process_exec, &was_sched_process_exec_enabled))
-        return -1;
-
-    if (ebpf_enable_single_tracepoint(tracepoint_sched_process_fork, &was_sched_process_fork_enabled))
         return -1;
 
     return 0;

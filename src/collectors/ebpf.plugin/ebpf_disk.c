@@ -23,15 +23,8 @@ static ebpf_local_maps_t disk_maps[] = {
      .map_type = BPF_MAP_TYPE_PERCPU_HASH
 #endif
     },
-    {.name = "tmp_disk_tp_stat",
-     .internal_input = 8192,
-     .user_input = 8192,
-     .type = NETDATA_EBPF_MAP_STATIC,
-     .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED,
-#ifdef LIBBPF_MAJOR_VERSION
-     .map_type = BPF_MAP_TYPE_PERCPU_HASH
-#endif
-    },
+    // tmp_disk_tp_stat is intentionally absent: its type must stay as defined by the object, because
+    // issue and completion can run on different CPUs.
     {.name = NULL,
      .internal_input = 0,
      .user_input = 0,
@@ -44,12 +37,6 @@ static ebpf_local_maps_t disk_maps[] = {
 static avl_tree_lock disk_tree;
 netdata_ebpf_disks_t *disk_list = NULL;
 
-const char *tracepoint_block_type = "block";
-const char *tracepoint_block_issue = "block_rq_issue";
-const char *tracepoint_block_rq_complete = "block_rq_complete";
-
-static int was_block_issue_enabled = 0;
-static int was_block_rq_complete_enabled = 0;
 static bool disk_safe_clean = false;
 
 static char **dimensions = NULL;
@@ -59,8 +46,6 @@ static netdata_publish_syscall_t disk_publish_aggregated[NETDATA_EBPF_HIST_MAX_B
 static netdata_idx_t *disk_hash_values = NULL;
 
 netdata_mutex_t plot_mutex;
-
-static netdata_mutex_t tracepoint_mutex;
 
 #ifdef LIBBPF_MAJOR_VERSION
 /**
@@ -406,33 +391,6 @@ void ebpf_update_disks(ebpf_module_t *em)
  *****************************************************************/
 
 /**
- * Disk disable tracepoints
- *
- * Disable tracepoints when the plugin was responsible to enable it.
- */
-static void ebpf_disk_disable_tracepoints(void)
-{
-    const char *default_message = "Cannot disable the tracepoint";
-    int block_issue_enabled;
-    int block_rq_complete_enabled;
-
-    netdata_mutex_lock(&tracepoint_mutex);
-    block_issue_enabled = was_block_issue_enabled;
-    block_rq_complete_enabled = was_block_rq_complete_enabled;
-    netdata_mutex_unlock(&tracepoint_mutex);
-
-    if (!block_issue_enabled) {
-        if (ebpf_disable_tracing_values(tracepoint_block_type, tracepoint_block_issue))
-            netdata_log_error("%s %s/%s.", default_message, tracepoint_block_type, tracepoint_block_issue);
-    }
-
-    if (!block_rq_complete_enabled) {
-        if (ebpf_disable_tracing_values(tracepoint_block_type, tracepoint_block_rq_complete))
-            netdata_log_error("%s %s/%s.", default_message, tracepoint_block_type, tracepoint_block_rq_complete);
-    }
-}
-
-/**
  * Cleanup Disk List
  */
 static void ebpf_cleanup_disk_list(void)
@@ -469,8 +427,6 @@ static void ebpf_disk_exit(void *pptr)
         return;
     }
 
-    ebpf_disk_disable_tracepoints();
-
     if (dimensions) {
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
         dimensions = NULL;
@@ -480,7 +436,6 @@ static void ebpf_disk_exit(void *pptr)
     disk_hash_values = NULL;
 
     netdata_mutex_destroy(&plot_mutex);
-    netdata_mutex_destroy(&tracepoint_mutex);
 
     if (disk_list)
         ebpf_cleanup_disk_list();
@@ -774,42 +729,6 @@ static void disk_collector(ebpf_module_t *em)
  *
  *****************************************************************/
 
-/**
- * Enable tracepoints
- *
- * Enable necessary tracepoints for thread.
- *
- * @return  It returns 0 on success and -1 otherwise
- */
-static int ebpf_disk_enable_tracepoints()
-{
-    int test = ebpf_is_tracepoint_enabled(tracepoint_block_type, tracepoint_block_issue);
-    if (test == -1)
-        return -1;
-    else if (!test) {
-        if (ebpf_enable_tracing_values(tracepoint_block_type, tracepoint_block_issue))
-            return -1;
-    }
-
-    netdata_mutex_lock(&tracepoint_mutex);
-    was_block_issue_enabled = test;
-    netdata_mutex_unlock(&tracepoint_mutex);
-
-    test = ebpf_is_tracepoint_enabled(tracepoint_block_type, tracepoint_block_rq_complete);
-    if (test == -1)
-        return -1;
-    else if (!test) {
-        if (ebpf_enable_tracing_values(tracepoint_block_type, tracepoint_block_rq_complete))
-            return -1;
-    }
-
-    netdata_mutex_lock(&tracepoint_mutex);
-    was_block_rq_complete_enabled = test;
-    netdata_mutex_unlock(&tracepoint_mutex);
-
-    return 0;
-}
-
 /*
  * Load BPF
  *
@@ -879,18 +798,8 @@ void ebpf_disk_thread(void *ptr)
         goto enddisk;
     }
 
-    if (netdata_mutex_init(&tracepoint_mutex)) {
-        netdata_log_error("Cannot initialize tracepoint mutex");
-        goto enddisk;
-    }
-
+    // From here on, the exit handler owns plot_mutex cleanup.
     disk_safe_clean = true;
-
-    if (ebpf_disk_enable_tracepoints()) {
-        goto enddisk;
-    }
-
-    // disk_safe_clean already true - mutexes will be cleaned up on exit
 
     avl_init_lock(&disk_tree, ebpf_compare_disks);
     if (read_local_disks()) {

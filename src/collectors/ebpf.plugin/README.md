@@ -406,7 +406,10 @@ Internally, the Linux kernel treats both processes and threads as `tasks`. To cr
 system calls: `fork(2)`, `vfork(2)`, and `clone(2)`. To generate this chart, the eBPF
 collector uses the following `tracepoints` and `kprobe`:
 
-- `sched/sched_process_fork`: Tracepoint called after a call for `fork (2)`, `vfork (2)` and `clone (2)`.
+- `sched/sched_process_fork`: Tracepoint called after a call for `fork (2)`, `vfork (2)` and `clone (2)`. It is
+     attached as a BTF raw tracepoint (`tp_btf`) when CO-RE code runs in `trampoline` or `tracepoint` mode.
+- `kprobe/wake_up_new_task`: called when a new task is started. Legacy code, and CO-RE code in `probe` mode, use it
+     instead of `sched/sched_process_fork`.
 - `sched/sched_process_exec`: Tracepoint called after a exec-family syscall.
 - `kprobe/kernel_clone`: This is the main [`fork()`](https://elixir.bootlin.com/linux/v5.10/source/kernel/fork.c#L2415)
      routine since kernel `5.10.0` was released.
@@ -597,12 +600,12 @@ The eBPF plugin also shows a chart in the Disk section when the `disk` thread is
 
 #### Disk Latency
 
-This will create the chart `disk_latency_io` for each disk on the host. The following tracepoints are used:
+This will create the chart `disk_latency_io` for each disk on the host. The following functions are monitored:
 
-- [`block/block_rq_issue`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_issue):
-    IO request operation to a device drive.
-- [`block/block_rq_complete`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_complete):
-    IO operation completed by device.
+- `kprobe/blk_mq_start_request`: IO request operation sent to a device driver.
+- `kprobe/blk_mq_end_request`: IO operation completed by the device.
+- `blk_complete_request`: IO completion on the older request path. It is attached only when the running kernel
+    provides this function (a `kprobe` with legacy code, `fentry` with CO-RE code).
 
 Disk Latency is the single most important metric to focus on when it comes to storage performance, under most circumstances.
 For hard drives, an average latency somewhere between 10 to 20 ms can be considered acceptable. For SSD (Solid State Drives),
