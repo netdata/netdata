@@ -510,8 +510,10 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 	releaseOnce.Do(func() { close(releaseReplacement) })
 	waitSecretStart(t, starts, "replacement")
 	output.waitContains(t, "CONFIG go.d:collector:module:job status running")
-	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-cancel 499 application/json")
-	require.NotContains(t, output.String(), "FUNCTION_RESULT_BEGIN secret-cancel 200 application/json")
+	// The update applied, so it answers with its own result despite the
+	// cancellation; a 499 would make the daemon drop an applied change.
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-cancel 200 application/json")
+	require.NotContains(t, output.String(), "FUNCTION_RESULT_BEGIN secret-cancel 499 application/json")
 
 	require.EqualValues(t, 1, cleanups.Load())
 
