@@ -145,9 +145,8 @@ if [ -r "${NETDATA_WEB_DIR}/.MANIFEST" ]; then
   tmp_manifest="/opt/netdata/.nd-dashboard-manifest"
   old_pwd="$(pwd)"
   grep -vE "^$" "${NETDATA_WEB_DIR}/.MANIFEST" > "${tmp_manifest}"
-  cd "${NETDATA_WEB_DIR}" && remove_files="$(find "." -type f -print0 | grep -vzFf "${tmp_manifest}")"
+  cd "${NETDATA_WEB_DIR}" && (find "." -type f -print0 | grep -vxzFf "${tmp_manifest}" xargs -0 rm -f)
   cd "${old_pwd}" || true
-  [ -n "${remove_files}" ] && echo "${remove_files}" | xargs -0 rm -f
   rm -f "${tmp_manifest}"
 fi
 
