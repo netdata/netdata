@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	vaultbackend "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends/vault"
@@ -90,7 +91,9 @@ func TestSecretFailedUpdatePreservesAcceptedConfig(t *testing.T) {
 	}, nil)
 	p.call("add-failed", "config go.d:secretstore:vault add main", `{"value":"public-failure"}`, 202)
 	p.output.waitContains(t, "CONFIG go.d:secretstore:vault:main create failed job")
+	p.waitStoreAttemptReleased("vault:main")
 	p.call("retry-same-failed", "config go.d:secretstore:vault:main update", `{"value":"public-failure"}`, 400)
+	p.waitStoreAttemptReleased("vault:main")
 	p.call("update-failed", "config go.d:secretstore:vault:main update", `{"value":"backend-sensitive-detail"}`, 400)
 	require.JSONEq(t, `{"value":"public-failure"}`,
 		p.call("get-failed", "config go.d:secretstore:vault:main get", "", 200))
@@ -164,6 +167,7 @@ func TestSecretSourceConversionUsesExactNamedResource(t *testing.T) {
 			}})
 			id := "go.d:secretstore:vault:" + name
 			p.output.waitContains(t, "CONFIG "+id+" create running job")
+			p.waitStoreAttemptReleased("vault:" + name)
 			p.call("convert", "config "+id+" update", `{"value":"initial"}`, 200)
 			p.output.waitContains(t, "CONFIG "+id+" create running job /collectors/go.d/SecretStores dyncfg")
 			p.call("remove-converted", "config "+id+" remove", "", 200)
@@ -241,9 +245,10 @@ func (s *adoptionTestStore) Init(ctx context.Context) error {
 }
 
 type secretAdoptionProcess struct {
-	t      *testing.T
-	writer *io.PipeWriter
-	output *processSynchronizedBuffer
+	t       *testing.T
+	writer  *io.PipeWriter
+	output  *processSynchronizedBuffer
+	process *processCore
 }
 
 func newSecretAdoptionProcess(
@@ -277,7 +282,7 @@ func newSecretAdoptionProcess(
 	done := make(chan error, 1)
 	go func() { done <- process.run(context.Background(), controls) }()
 	t.Cleanup(func() {
-		require.NoError(t, writer.Close())
+		defer func() { require.NoError(t, writer.Close()) }()
 		controls.sendTerminate(testProcessControl())
 		select {
 		case err := <-done:
@@ -288,10 +293,31 @@ func newSecretAdoptionProcess(
 	})
 	output.waitContains(t, "CONFIG go.d:secretstore:vault create accepted template")
 	return &secretAdoptionProcess{
-		t:      t,
-		writer: writer,
-		output: output,
+		t:       t,
+		writer:  writer,
+		output:  output,
+		process: process,
 	}
+}
+
+// Wire results precede physical release. Wait before testing another preflight
+// so contention cannot mask its validation result. This fixture never rotates.
+func (p *secretAdoptionProcess) waitStoreAttemptReleased(key string) {
+	p.t.Helper()
+	identity := jobmgr.ProcessAttemptIdentity{
+		Namespace: jobmgr.ProcessAttemptStore,
+		Key:       jobmgr.ProcessAttemptIdentityKey("secret-store", "1", key),
+		Resource:  jobmgr.ProcessAttemptDiagnosticResource(key, "secret Store"),
+	}
+	require.True(p.t, identity.Valid())
+	if released, exists := p.process.attempts.ProcessAttemptReleased(identity); exists {
+		select {
+		case <-released:
+		case <-time.After(time.Second):
+			p.t.Fatal("completed Store attempt did not physically release")
+		}
+	}
+	require.Zero(p.t, p.process.attempts.Census().Quarantined)
 }
 
 func (p *secretAdoptionProcess) call(uid, command, payload string, status int) string {

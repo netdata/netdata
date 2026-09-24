@@ -354,7 +354,7 @@ func (c *Controller) prepareAccepted(
 			if entry.status == dyncfg.StatusAccepted {
 				c.retainPending(entry.config, entry.version, nil)
 			} else {
-				c.observeActivationFailure(entry.config.ExposedKey(), result.err)
+				c.observeValidationFailure(entry.config.ExposedKey(), result.err)
 			}
 		},
 		cleanup: func() error {
