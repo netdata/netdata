@@ -145,6 +145,12 @@ func (di *DecisionIndex) reconcileRound(
 			}
 			continue
 		}
+		// Process retirement cuts attempts before cancelling discovery. Leave
+		// these selections unacknowledged and keep the pipeline alive to drain.
+		if jobmgr.ContainsOnlyErrorLeaves(reconciliation.err,
+			jobmgr.ErrProcessAttemptRetired, jobmgr.ErrProcessAttemptStopped) {
+			continue
+		}
 		if ctx.Err() != nil {
 			if resultErr == nil {
 				resultErr = errors.Join(ctx.Err(), reconciliation.err)
