@@ -101,8 +101,10 @@ func TestTakenStoreMutationIsAbortedWhenCommandResourceDiffers(t *testing.T) {
 	t.Cleanup(func() {
 		_ = store.Close(context.Background())
 	})
+	accepted, target := stageAdoptionEdit(t, controller, "add", "initial")
+	applyAdoptionEdit(t, controller, accepted, target, 202)
 	input := CommandInput{
-		Args:        []string{"go.d:secretstore:vault", string(dyncfg.CommandAdd), "main"},
+		Args:        []string{"go.d:secretstore:vault:main", string(dyncfg.CommandUpdate)},
 		Payload:     []byte(`{"value":"replacement"}`),
 		ContentType: "application/json",
 		HasPayload:  true,
@@ -112,6 +114,7 @@ func TestTakenStoreMutationIsAbortedWhenCommandResourceDiffers(t *testing.T) {
 	defer stage.Release()
 	stage.Start()
 	requireStoreOperationReady(t, stage)
+	require.EqualValues(t, 1, store.Census().Preparations)
 	resourceID := secretResourceID("vault:main")
 
 	_, err = controller.PrepareStaged(
