@@ -144,7 +144,15 @@ func (m *PipelineManager) enable(cfg sdConfig, prepared sdPipeline, old sdConfig
 		exposed:    cfg.ExposedKey(),
 	}
 	slot.config = cfg
-	slot.ctx, slot.cancel = context.WithCancel(m.ctx)
+	// Both supersession and generation shutdown normally retire desired work.
+	// Forward parent cancellation explicitly so it cannot win with a generic cause.
+	desiredCtx, cancelDesired := context.WithCancelCause(context.WithoutCancel(m.ctx))
+	stopParent := context.AfterFunc(m.ctx, func() { cancelDesired(jobmgr.ErrProcessAttemptRetired) })
+	slot.ctx = desiredCtx
+	slot.cancel = func() {
+		stopParent()
+		cancelDesired(jobmgr.ErrProcessAttemptRetired)
+	}
 	slot.prepared = prepared
 	slot.preparing, slot.waiting, slot.published = false, false, false
 	m.logical[cfg.ExposedKey()] = slot

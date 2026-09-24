@@ -142,7 +142,15 @@ func runMaterialization[T any](
 	if err != nil {
 		return zero, classifyMaterializationError(err, identity)
 	}
-	if err := attempt.Await(ctx); err != nil {
+	// Preserve the owner's retirement cause when cutting this exact attempt.
+	// Await's generic caller cancellation would otherwise turn it into an error.
+	stopCancellation := context.AfterFunc(ctx, func() { attempt.Cut(context.Cause(ctx)) })
+	defer stopCancellation()
+	err = attempt.Await(context.WithoutCancel(ctx))
+	if cause := context.Cause(ctx); cause != nil {
+		return zero, cause
+	}
+	if err != nil {
 		return zero, classifyMaterializationError(err, identity)
 	}
 	select {

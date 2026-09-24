@@ -301,14 +301,21 @@ func TestIncumbentNameTakeoverPreservesPendingRename(t *testing.T) {
 }
 
 type sdDiagnosticRecorder struct {
-	mu     sync.Mutex
-	events []jobmgr.DiagnosticEvent
+	mu        sync.Mutex
+	events    []jobmgr.DiagnosticEvent
+	contained chan jobmgr.DiagnosticEvent
 }
 
 func (o *sdDiagnosticRecorder) ObserveDiagnostic(e jobmgr.DiagnosticEvent) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.events = append(o.events, e)
+	if e.Name == "job manager attempt contained" {
+		select {
+		case o.contained <- e:
+		default:
+		}
+	}
 }
 func (o *sdDiagnosticRecorder) errorsNamed(name string) int {
 	o.mu.Lock()
@@ -410,4 +417,96 @@ func TestUpdateSupersedesConstructingRevision(t *testing.T) {
 		"valid replacement cannot be blocked solely by the incumbent revision's construction",
 	)
 	waitSignal(t, nextStarted)
+}
+
+func TestRoutineConstructionRetirementPreservesPhysicalOwnership(t *testing.T) {
+	for _, action := range []string{"disable", "supersede", "shutdown"} {
+		t.Run(action, func(t *testing.T) {
+			obs := &sdDiagnosticRecorder{
+				contained: make(chan jobmgr.DiagnosticEvent, 8),
+			}
+			authority, err := containment.NewAuthority(obs)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				defer cancel()
+				_ = authority.Shutdown(ctx)
+			})
+			entered, release := make(chan struct{}), make(chan struct{})
+			var released bool
+			t.Cleanup(func() {
+				if !released {
+					close(release)
+				}
+			})
+			staleStarted := make(chan struct{}, 1)
+			d, _, _, shutdown := newActorDiscovery(
+				t,
+				Config{
+					Attempts: authority,
+				},
+				func(cfg pipeline.Config) (sdPipeline, error) {
+					if cfg.Services[0].ID == "initial" {
+						close(entered)
+						<-release
+						return &recordingStartPipeline{
+							started: staleStarted,
+						}, nil
+					}
+					return &controlledPipeline{}, nil
+				},
+			)
+			add := dyncfg.NewFunction(t.Context(), functions.Function{
+				UID:    "add",
+				Args:   []string{d.dyncfgTemplateID(testDiscovererTypeNetListeners), "add", "job"},
+				Source: "user=test",
+				Payload: []byte(
+					`{"name":"job","discoverer":{"net_listeners":{}},"services":[{"id":"initial","match":"true"}]}`,
+				),
+			})
+			require.Equal(t, 202, applyTestCommand(t, d, add).Result.Code)
+			require.Equal(t, 202, applyTestCommand(t, d, actorFunction(d, t.Context(), "job", "enable")).Result.Code)
+			waitSignal(t, entered)
+			entry, ok := d.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job")
+			require.True(t, ok)
+			physicalDone, ok := authority.ProcessAttemptReleased(pipelineMaterializationIdentity(entry.Cfg))
+			require.True(t, ok)
+			switch action {
+			case "disable":
+				require.Equal(
+					t,
+					200,
+					applyTestCommand(t, d, actorFunction(d, t.Context(), "job", "disable")).Result.Code,
+				)
+			case "supersede":
+				update := dyncfg.NewFunction(t.Context(), functions.Function{
+					UID:    "update",
+					Args:   []string{d.dyncfgJobID(testDiscovererTypeNetListeners, "job"), "update"},
+					Source: "user=test",
+					Payload: []byte(
+						`{"name":"job","discoverer":{"net_listeners":{}},"services":[{"id":"replacement","match":"true"}]}`,
+					),
+				})
+				require.Equal(t, 202, applyTestCommand(t, d, update).Result.Code)
+			case "shutdown":
+				shutdown()
+			}
+			select {
+			case event := <-obs.contained:
+				require.Equal(t, jobmgr.DiagnosticInfo, event.Level, "routine construction retirement")
+				require.ErrorIs(t, event.Err, jobmgr.ErrProcessAttemptRetired)
+			case <-time.After(time.Second):
+				t.Fatal("construction was not logically retired")
+			}
+			select {
+			case <-physicalDone:
+				t.Fatal("physical ownership released before constructor returned")
+			default:
+			}
+			close(release)
+			released = true
+			waitSignal(t, physicalDone)
+			require.Empty(t, staleStarted, "retired constructor must never activate")
+		})
+	}
 }

@@ -1119,6 +1119,8 @@ it does not establish runtime health. Rejected preflight preserves the exact inc
   downstream consumer cannot block command acceptance. Finite HTTP/SNMP completion retains its successful snapshot.
   Empty-source removals leave active membership immediately, while their queued removals survive retirement until sent.
   Routine retirement cancels the worker and joins it through process ownership without reporting a containment failure.
+  Desired construction carries a normal retirement cause on replacement, disable and generation shutdown; cancellation
+  cuts its exact preparation attempt promptly while retaining physical ownership until the constructor returns.
 - DynCfg `test` builds a complete temporary pipeline under a payload-specific test identity and never submits it to the
   pipeline manager. It invokes `dyncfg.Testable.Test(ctx)` sequentially on every discoverer that provides the optional
   capability. After each callback returns, the shared Pipeline Test boundary makes the caller's cancellation cause take
