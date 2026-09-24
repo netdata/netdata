@@ -327,6 +327,18 @@ func (aai *acceptedActivationIndex) runAttempt(id string, entry *acceptedActivat
 	aai.mu.Unlock()
 	var stageErr error
 	if stage == nil {
+		// Resume permission does not imply physical release. Probe only when
+		// promotion can reuse the result instead of discarding it as busy.
+		runtimeID := jobAttemptIdentity(jobmgr.ProcessAttemptJobRuntime, id)
+		if released, exists := aai.factory.config.Attempts.ProcessAttemptReleased(runtimeID); exists {
+			select {
+			case <-released:
+			case <-entry.cancel:
+				return false
+			case <-aai.stop:
+				return false
+			}
+		}
 		stage, stageErr = aai.factory.newCandidate(entry.spec.config)
 	}
 	aai.mu.Lock()

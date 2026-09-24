@@ -735,8 +735,9 @@ cancellation, and deadlines through the actual kernel.
 current resource distinguish enabled intent; a passive registration never starts merely because a dependency appears.
 
 - A short accepted mutation arms `{run epoch, config UID, activation generation}` only after commit. The worker builds
-  and probes outside the Function request, graph claim, and resource lane. Acknowledged terminal submission retains
-  authority until its actual outcome is known.
+  and probes outside the Function request, graph claim, and resource lane. Fresh construction waits for predecessor
+  runtime release as well as any Store resume gate, so expected retirement does not discard a successful probe.
+  Acknowledged terminal submission retains authority until its actual outcome is known.
 - Missing named vnode/Store dependencies retain `accepted` independent of retry settings. Registration precedes lookup;
   a buffered wake remains queued across failed lookup and terminal acknowledgment. Post-commit dependency events wake
   only affected enabled jobs. Runtime identity contention waits for physical release without polling.
