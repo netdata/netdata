@@ -181,7 +181,7 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: dist-tarball
           path: artifacts/*.tar.*
@@ -301,7 +301,7 @@ jobs:
       - name: Upload topology-ip-intel stock payload
         id: upload-stock
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@v7
         with:
           name: static-topology-ip-intel-stock
           path: ${{ github.workspace }}/.topology-ip-intel-stock/
@@ -441,7 +441,7 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: dist-static-${{ matrix.arch }}
           path: artifacts/*.gz.run
@@ -549,7 +549,7 @@ jobs:
           timestamp-digest: SHA256
       - name: Upload Installer
         id: upload
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: windows-x86_64-installer
           path: packaging\windows\netdata*.msi
@@ -603,7 +603,7 @@ jobs:
       - name: Retrieve Windows Artifacts
         id: fetch-windows
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: windows-*-installer
           path: dist-artifacts
@@ -671,7 +671,7 @@ jobs:
       - name: Retrieve Build Artifacts
         id: fetch-dist
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: dist-*
           path: dist-artifacts
@@ -679,7 +679,7 @@ jobs:
       - name: Retrieve Windows Artifacts
         id: fetch-windows
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: windows-*-installer
           path: dist-artifacts
@@ -697,7 +697,7 @@ jobs:
       - name: Store GitHub Artifacts
         id: store-github
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: github-artifacts
           path: artifacts/github/*
@@ -706,7 +706,7 @@ jobs:
       - name: Store R2 Artifacts
         id: store-r2
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: r2-artifacts
           path: artifacts/r2/*
@@ -764,7 +764,7 @@ jobs:
       - name: Fetch artifacts
         id: fetch
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: github-artifacts
           path: artifacts
@@ -831,7 +831,7 @@ jobs:
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: github-artifacts
           path: artifacts
@@ -898,7 +898,7 @@ jobs:
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: github-artifacts
           path: artifacts
@@ -966,7 +966,7 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: github-artifacts
           path: final-artifacts
@@ -1074,7 +1074,7 @@ jobs:
           sudo apt-get install -y rclone || exit 1
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: r2-artifacts
           path: artifacts
@@ -1142,7 +1142,7 @@ jobs:
         uses: actions/checkout@v7
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: github-artifacts
           path: final-artifacts
