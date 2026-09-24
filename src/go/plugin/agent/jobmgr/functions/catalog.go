@@ -190,10 +190,10 @@ func resolveDynCfgJobResource(policy ResourcePolicy, arguments []string) string 
 
 // addCommandJobName extracts the job name from a DynCfg "add" command's
 // arguments. It reports whether this is an add command (arguments[1] == "add");
-// the returned name is the replacer-normalized arguments[2] and may be empty.
+// the returned name is the raw arguments[2] and may be empty.
 func addCommandJobName(arguments []string) (string, bool) {
 	if len(arguments) > 2 && dyncfg.CommandFromArgs(arguments) == dyncfg.CommandAdd {
-		return dyncfg.NormalizeJobName(arguments[2]), true
+		return arguments[2], true
 	}
 	return "", false
 }

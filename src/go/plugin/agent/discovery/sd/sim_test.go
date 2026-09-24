@@ -20,6 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var lock = &sync.Mutex{}
@@ -74,7 +75,9 @@ func (sim *discoverySimExt) run(t *testing.T) {
 			AutoEnableDiscovered: true,
 		},
 	}
-	mgr.sdCb = &sdCallbacks{sd: mgr}
+	mgr.sdCb = &sdCallbacks{
+		sd: mgr,
+	}
 	mgr.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
 		API:       mgr.dyncfgApi,
 		Seen:      mgr.seen,
@@ -93,6 +96,7 @@ func (sim *discoverySimExt) run(t *testing.T) {
 		},
 	})
 
+	mgr.confProv.(*mockConfigProvider).afterSend = func() { waitActorIdle(t, mgr) }
 	in := make(chan<- []*confgroup.Group)
 	done := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -126,9 +130,23 @@ func (sim *discoverySimExt) run(t *testing.T) {
 		if !assert.Truef(t, ok, "exposed config '%s:%s' not found", want.discovererType, want.name) {
 			continue
 		}
-		assert.Equal(t, want.sourceType, entry.Cfg.SourceType(), "exposed config '%s:%s' sourceType", want.discovererType, want.name)
+		assert.Equal(
+			t,
+			want.sourceType,
+			entry.Cfg.SourceType(),
+			"exposed config '%s:%s' sourceType",
+			want.discovererType,
+			want.name,
+		)
 		if want.source != "" {
-			assert.Equal(t, want.source, entry.Cfg.Source(), "exposed config '%s:%s' source", want.discovererType, want.name)
+			assert.Equal(
+				t,
+				want.source,
+				entry.Cfg.Source(),
+				"exposed config '%s:%s' source",
+				want.discovererType,
+				want.name,
+			)
 		}
 		assert.Equal(t, want.status, entry.Status, "exposed config '%s:%s' status", want.discovererType, want.name)
 	}
@@ -160,7 +178,9 @@ func (sim *discoverySim) run(t *testing.T) {
 			AutoEnableDiscovered: true,
 		},
 	}
-	mgr.sdCb = &sdCallbacks{sd: mgr}
+	mgr.sdCb = &sdCallbacks{
+		sd: mgr,
+	}
 	mgr.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
 		API:       mgr.dyncfgApi,
 		Seen:      mgr.seen,
@@ -179,6 +199,7 @@ func (sim *discoverySim) run(t *testing.T) {
 		},
 	})
 
+	mgr.confProv.(*mockConfigProvider).afterSend = func() { waitActorIdle(t, mgr) }
 	in := make(chan<- []*confgroup.Group)
 	done := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -197,17 +218,24 @@ func (sim *discoverySim) run(t *testing.T) {
 
 	select {
 	case <-done:
-		lock.Lock()
-		for _, pl := range fact.pipelines {
-			assert.Truef(t, pl.stopped, "pipeline '%s' is not stopped after cancel()", pl.name)
-		}
-		lock.Unlock()
+		require.Eventually(t, func() bool {
+			lock.Lock()
+			defer lock.Unlock()
+			for _, pl := range fact.pipelines {
+				if pl.started && !pl.stopped {
+					return false
+				}
+			}
+			return true
+		}, time.Second, time.Millisecond)
+
 	case <-time.After(timeout):
 		t.Errorf("sd failed to exit in %s", timeout)
 	}
 }
 
 type mockConfigProvider struct {
+	afterSend func()
 	confFiles []confFile
 	ch        chan confFile
 }
@@ -218,6 +246,9 @@ func (m *mockConfigProvider) run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case m.ch <- conf:
+		}
+		if m.afterSend != nil {
+			m.afterSend()
 		}
 	}
 	<-ctx.Done()
@@ -239,7 +270,9 @@ func (m *mockFactory) create(cfg pipeline.Config) (sdPipeline, error) {
 		return nil, errors.New("mock sdPipelineFactory.create() error")
 	}
 
-	pl := mockPipeline{name: cfg.Name}
+	pl := mockPipeline{
+		name: cfg.Name,
+	}
 	m.pipelines = append(m.pipelines, &pl)
 
 	return &pl, nil
@@ -261,4 +294,36 @@ func (m *mockPipeline) Run(ctx context.Context, _ chan<- []*confgroup.Group) {
 	lock.Unlock()
 	defer func() { lock.Lock(); m.stopped = true; lock.Unlock() }()
 	<-ctx.Done()
+}
+
+func waitActorIdle(t *testing.T, d *ServiceDiscovery) {
+	t.Helper()
+	request := sdActorCommand{
+		ctx:    d.ctx,
+		result: make(chan sdActorResult, 1),
+		prepared: testActorPrepared{
+			apply: func() {},
+		},
+	}
+	select {
+	case d.actorCommands <- request:
+	case <-d.ctx.Done():
+		return
+	}
+	result := <-request.result
+	result.applied.Published()
+	require.Eventually(t, func() bool {
+		d.mgr.mux.Lock()
+		defer d.mgr.mux.Unlock()
+		for _, slot := range d.mgr.pipelines {
+			if slot.preparing || slot.waiting {
+				return false
+			}
+			entry, ok := d.exposed.LookupByKey(slot.config.ExposedKey())
+			if ok && entry.Status == dyncfg.StatusAccepted {
+				return false
+			}
+		}
+		return true
+	}, time.Second, time.Millisecond)
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 
@@ -32,10 +31,10 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 
 				require.Eventually(t, sd.handler.WaitingForDecision, time.Second, 10*time.Millisecond)
 
-				sd.dyncfgCh <- dyncfg.NewFunction(t.Context(), functions.Function{
+				applyTestCommand(t, sd, dyncfg.NewFunction(t.Context(), functions.Function{
 					UID:  "enable-job1",
 					Args: []string{sd.dyncfgJobID(testDiscovererTypeNetListeners, "job1"), "enable"},
-				})
+				}))
 
 				require.Eventually(t, func() bool {
 					return !sd.handler.WaitingForDecision() &&
@@ -82,10 +81,10 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 				require.True(t, sd.handler.WaitingForDecision(), "wait gate should still be open before decision")
 
 				// Send the matching enable for cfg1 — this clears the wait gate.
-				sd.dyncfgCh <- dyncfg.NewFunction(t.Context(), functions.Function{
+				applyTestCommand(t, sd, dyncfg.NewFunction(t.Context(), functions.Function{
 					UID:  "enable-job1",
 					Args: []string{sd.dyncfgJobID(testDiscovererTypeNetListeners, "job1"), "enable"},
-				})
+				}))
 
 				select {
 				case <-secondSent:
@@ -118,11 +117,45 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 	}
 }
 
+// A saved DynCfg job can be replayed after its same-named file is registered.
+func TestServiceDiscoveryReplayTransfersPendingDecision(t *testing.T) {
+	for _, command := range []string{"enable", "disable", "remove"} {
+		t.Run(command, func(t *testing.T) {
+			d, configs, cancel, done := newWaitTestServiceDiscovery(t)
+			defer stopWaitTestServiceDiscovery(t, d, cancel, done)
+			configs <- prepareConfigFile("/etc/netdata/sd.d/job.conf", "job")
+			require.Eventually(t, d.handler.WaitingForDecision, time.Second, time.Millisecond)
+			add := dyncfg.NewFunction(t.Context(), functions.Function{
+				UID:    "replayed-add",
+				Args:   []string{d.dyncfgTemplateID(testDiscovererTypeNetListeners), "add", "job"},
+				Source: "user=test",
+				Payload: []byte(
+					`{"name":"job","discoverer":{"net_listeners":{}},"services":[{"id":"restored","match":"true"}]}`,
+				),
+			})
+			require.Equal(t, 202, applyTestCommand(t, d, add).Result.Code)
+			require.True(t, d.handler.WaitingForDecision(), "ADD stays passive until a decision")
+			want := 200
+			if command == "enable" {
+				want = 202
+			}
+			require.Equal(t, want, applyTestCommand(t, d, actorFunction(d, t.Context(), "job", command)).Result.Code)
+			select {
+			case configs <- prepareConfigFile("/etc/netdata/sd.d/next.conf", "next"):
+			case <-time.After(time.Second):
+				t.Fatal("file discovery still blocked after replay adoption and decision")
+			}
+		})
+	}
+}
+
 func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile, context.CancelFunc, <-chan struct{}) {
 	t.Helper()
 
 	var out bytes.Buffer
-	confProv := &mockConfigProvider{ch: make(chan confFile)}
+	confProv := &mockConfigProvider{
+		ch: make(chan confFile),
+	}
 
 	sd := &ServiceDiscovery{
 		epoch:          1,
@@ -135,12 +168,14 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 		dyncfgApi:      dyncfg.NewResponder(dyncfg.NewProtocolOutput(safewriter.New(&out))),
 		seen:           dyncfg.NewSeenCache[sdConfig](),
 		exposed:        dyncfg.NewExposedCache[sdConfig](),
-		dyncfgCh:       make(chan dyncfg.Function, 1),
+		actorCommands:  make(chan sdActorCommand),
 		newPipeline:    newWaitTestPipeline,
 		runModePolicy:  policy.RunModePolicy{},
 		configDefaults: nil,
 	}
-	sd.sdCb = &sdCallbacks{sd: sd}
+	sd.sdCb = &sdCallbacks{
+		sd: sd,
+	}
 	sd.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
 		API:       sd.dyncfgApi,
 		Seen:      sd.seen,
@@ -162,8 +197,7 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 		},
 	})
 
-	send := func(context.Context, []*confgroup.Group) {}
-	sd.mgr = NewPipelineManager(sd.Logger, send)
+	sd.mgr = NewPipelineManager(sd.Logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	sd.ctx = ctx
@@ -179,8 +213,9 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 
 type waitTestFunctionRegistry struct{}
 
-func (waitTestFunctionRegistry) RegisterPrefix(string, string, functions.Handler) {}
-func (waitTestFunctionRegistry) UnregisterPrefix(string, string)                  {}
+func (waitTestFunctionRegistry) RegisterPrefix(string, string, functions.Handler)               {}
+func (waitTestFunctionRegistry) RegisterCommandPreparer(string, string, dyncfg.CommandPreparer) {}
+func (waitTestFunctionRegistry) UnregisterPrefix(string, string)                                {}
 
 func stopWaitTestServiceDiscovery(t *testing.T, sd *ServiceDiscovery, cancel context.CancelFunc, done <-chan struct{}) {
 	t.Helper()
