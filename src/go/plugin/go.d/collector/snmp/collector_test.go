@@ -911,6 +911,24 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 				{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.9.1.1166"},
 			},
 		},
+		"numeric OID text in octet string system object": {
+			pdus: []gosnmp.SnmpPDU{
+				{Name: snmputils.OidSysObject, Type: gosnmp.OctetString, Value: []byte("1.3.6.1.4.1.9.1.1166")},
+			},
+		},
+		"non-OID octet string system object with manual profile": {
+			pdus: []gosnmp.SnmpPDU{
+				{Name: snmputils.OidSysObject, Type: gosnmp.OctetString, Value: []byte("private device identifier")},
+			},
+			manualProfiles: []string{"generic-device"},
+		},
+		"non-OID octet string system object without manual profile": {
+			pdus: []gosnmp.SnmpPDU{
+				{Name: snmputils.OidSysObject, Type: gosnmp.OctetString, Value: []byte("private device identifier")},
+			},
+			wantErr:    "sysObjectID of type OctetString that is not a numeric OID",
+			wantAbsent: []string{"private device identifier"},
+		},
 		"explicit ping only": {
 			pingOnly: true,
 		},
@@ -999,6 +1017,7 @@ func TestSysInfoDiagnosticOmitsRawSystemValues(t *testing.T) {
 			PDUCount:        5,
 			SeenSysDescr:    true,
 			SeenSysObjectID: true,
+			SysObjectIDType: "ObjectIdentifier",
 			SeenSysContact:  true,
 			SeenSysName:     true,
 			SeenSysLocation: true,
@@ -1009,6 +1028,7 @@ func TestSysInfoDiagnosticOmitsRawSystemValues(t *testing.T) {
 	assert.Contains(t, diagnostic, si.SysObjectID)
 	assert.Contains(t, diagnostic, "pdu_count=5")
 	assert.Contains(t, diagnostic, "sys_object_id=true")
+	assert.Contains(t, diagnostic, `sys_object_id_type="ObjectIdentifier"`)
 	for _, raw := range []string{si.Descr, si.Contact, si.Name, si.Location} {
 		assert.NotContains(t, diagnostic, raw)
 	}

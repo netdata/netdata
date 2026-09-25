@@ -50,6 +50,8 @@ type SysInfoProbe struct {
 	PDUCount        int
 	SeenSysDescr    bool
 	SeenSysObjectID bool
+	// SysObjectIDType is the ASN.1 type of the sysObjectID value; its content is never recorded.
+	SysObjectIDType string
 	SeenSysContact  bool
 	SeenSysName     bool
 	SeenSysLocation bool
@@ -89,14 +91,8 @@ func GetSysInfo(client ScalarClient) (*SysInfo, error) {
 			si.Descr = valueSanitizer.Replace(si.Descr)
 		case OidSysObject:
 			si.Probe.SeenSysObjectID = true
-			if pdu.Type != gosnmp.ObjectIdentifier {
-				err = fmt.Errorf("expected ObjectIdentifier, got %v", pdu.Type)
-				break
-			}
-			var sysObj string
-			if sysObj, err = PduToString(pdu); err == nil {
-				si.SysObjectID = sysObj
-			}
+			si.Probe.SysObjectIDType = pdu.Type.String()
+			si.SysObjectID = sysObjectIDFromPDU(pdu)
 		case OidSysContact:
 			si.Probe.SeenSysContact = true
 			si.Contact, err = PduToString(pdu)
@@ -118,6 +114,36 @@ func GetSysInfo(client ScalarClient) (*SysInfo, error) {
 	updateMetadata(si)
 
 	return si, nil
+}
+
+// sysObjectIDFromPDU returns the sysObjectID without a leading dot, or "" when the value is not a numeric OID.
+// Some agents send the OID as OctetString text; accepting only numeric OID syntax keeps free-form text out of
+// profile matching, labels, and diagnostics. An unusable value is treated as absent so manual profiles still apply.
+func sysObjectIDFromPDU(pdu gosnmp.SnmpPDU) string {
+	if pdu.Type != gosnmp.ObjectIdentifier && pdu.Type != gosnmp.OctetString {
+		return ""
+	}
+	v, err := PduToString(pdu)
+	if err != nil {
+		return ""
+	}
+	v = strings.TrimPrefix(strings.TrimSpace(v), ".")
+	if !isNumericOID(v) {
+		return ""
+	}
+	return v
+}
+
+// isNumericOID reports whether s is a dotted numeric OID with at least two arcs.
+func isNumericOID(s string) bool {
+	arcs := 0
+	for arc := range strings.SplitSeq(s, ".") {
+		if arc == "" || strings.ContainsFunc(arc, func(r rune) bool { return r < '0' || r > '9' }) {
+			return false
+		}
+		arcs++
+	}
+	return arcs >= 2
 }
 
 func sysInfoOIDs() []string {

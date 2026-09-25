@@ -409,7 +409,8 @@ hostname, and labels independently of an SNMP metrics job. The result does not p
 
 The caller composes the existing acquisition steps:
 
-1. Obtain system information with `snmputils.GetSysInfo` using a connected `gosnmp.Handler`.
+1. Obtain system information with `snmputils.GetSysInfo` using a connected `snmputils.ScalarClient`. An unusable
+   `sysObjectID` value (not a numeric OID) does not fail acquisition; it leaves `SysObjectID` empty.
 2. Resolve profiles with `ddsnmp.Catalog.Resolve`. Choose the appropriate profile projection and no-profile policy
    for the consumer; those decisions do not belong to identity assembly.
 3. Construct `ddsnmpcollector.New` with the selected profiles, system object ID, client, and logger, or reuse the
