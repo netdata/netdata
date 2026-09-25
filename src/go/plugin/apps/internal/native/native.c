@@ -450,13 +450,6 @@ static void scan_optional(apps_scanner *s, pid_entry *p, const char *status, dou
                 rate(p, READ_BYTES + i, v, 1, io_at);
         free(io);
     }
-    size_t len;
-    char *cmd = read_file(s, p->row.pid, "cmdline", &len);
-    free(p->row.cmdline);
-    p->row.cmdline = NULL;
-    // Preserve procfs argument boundaries; Go renders a separate matcher string.
-    p->row.cmdline_len = cmd ? len : 0;
-    p->row.cmdline = cmd;
     if (s->collect_fds)
         scan_fds(s, p);
 }
@@ -542,8 +535,25 @@ static void scan_pid(apps_scanner *s, pid_entry *p) {
     p->row.start = parsed.start;
     p->row.ppid = parsed.ppid;
     p->row.state = parsed.state;
-    free(p->row.comm);
-    p->row.comm = copy(s, parsed.comm);
+    if (!p->row.comm || strcmp(p->row.comm, parsed.comm)) {
+        free(p->row.comm);
+        p->row.comm = copy(s, parsed.comm);
+        // Match apps.plugin: a comm change reads cmdline only if none is cached.
+        if (!p->row.cmdline) {
+            size_t len = 0;
+            p->row.cmdline = read_file(s, p->row.pid, "cmdline", &len);
+            // The original string cache treats a blank rendered command line as absent.
+            size_t first = 0;
+            while (first < len && (!p->row.cmdline[first] || p->row.cmdline[first] == ' '))
+                first++;
+            if (first == len) {
+                free(p->row.cmdline);
+                p->row.cmdline = NULL;
+            }
+            // Keep argv boundaries for Go naming; matching renders spaces separately.
+            p->row.cmdline_len = p->row.cmdline ? len : 0;
+        }
+    }
     free(buf);
     double status_at = sample_time(s);
     char *status = read_file(s, p->row.pid, "status", NULL);
@@ -567,24 +577,6 @@ static void scan_pid(apps_scanner *s, pid_entry *p) {
         value(p, UPTIME, fmax(0, s->uptime - (double)f[22] / s->hz));
     scan_optional(s, p, status, status_at);
     free(status);
-    // A process may exit and reuse its PID between independent procfs reads.
-    char *verify = read_file(s, p->row.pid, "stat", NULL);
-    int verify_error = verify ? 0 : errno;
-    apps_row identity = {0};
-    uint64_t ignored[53] = {0};
-    int identity_valid = verify && parse_stat(verify, p->row.pid, &identity, ignored);
-    if (!identity_valid || identity.start != p->row.start) {
-        if (!verify)
-            check_disappearance(s, p, verify_error);
-        else if (identity_valid && identity.start != p->row.start)
-            p->present = 0;
-        free(verify);
-        p->raw_valid = 0;
-        p->pss_valid = 0;
-        free_fds(p);
-        return;
-    }
-    free(verify);
     // Reconciliation may subtract only lifetime counters from accepted rows.
     const int indices[] = {14, 15, 43, 16, 17, 44, 10, 12, 11, 13};
     for (int i = 0; i < 10; i++) {
@@ -761,12 +753,7 @@ static void sample_pss(apps_scanner *s) {
             uint64_t bytes;
             p->pss_attempt = s->now;
             p->pss_force = 0;
-            apps_row identity = {0};
-            uint64_t fields[53] = {0};
-            char *stat = buf ? read_file(s, p->row.pid, "stat", NULL) : NULL;
-            int same = stat && parse_stat(stat, p->row.pid, &identity, fields) && identity.start == p->row.start;
-            free(stat);
-            if (same && buf && field(buf, "Pss", &bytes)) {
+            if (buf && field(buf, "Pss", &bytes)) {
                 p->pss = (double)bytes * 1024;
                 p->pss_ratio = p->row.values[RSS] > 0 ? fmin(1, p->pss / p->row.values[RSS]) : 1;
                 p->pss_at = s->now;

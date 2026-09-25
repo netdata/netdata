@@ -130,6 +130,75 @@ func TestSnapshotRatesAndOwnedValues(t *testing.T) {
 	_, err := s.Scan(context.Background())
 	require.ErrorContains(t, err, "closed")
 }
+func TestOriginalAcquisitionReadBudget(t *testing.T) {
+	for _, features := range []bool{false, true} {
+		t.Run(fmt.Sprintf("fds_and_pss_%t", features), func(t *testing.T) {
+			f := newFixture(t)
+			f.proc(t, 100, 0, 10, 100, 0)
+			s := f.scanner(t, features, features)
+			first := f.scan(t, s)
+			// Global stat/uptime and PID stat/cmdline/status/io; optionally
+			// limits and smaps_rollup. No second identity-verification read.
+			want := uint64(6)
+			if features {
+				want += 2
+			}
+			assert.Equal(t, want, first.Stats.FileReads)
+			finish(t, s, first)
+			warm := f.scan(t, s)
+			assert.Equal(t, want-1, warm.Stats.FileReads, "cached cmdline skips one file")
+			finish(t, s, warm)
+		})
+	}
+}
+
+func TestCommandLineCacheFollowsOriginalCommGate(t *testing.T) {
+	f := newFixture(t)
+	f.proc(t, 100, 0, 10, 100, 0)
+	s := f.scanner(t, false, false)
+	first := f.scan(t, s)
+	finish(t, s, first)
+	f.write(t, "100/cmdline", "replacement\x00--new\x00")
+	for _, comm := range []string{"worker (helper) with ) spaces", "replacement"} {
+		f.stat(t, 100, 0, 10, 100, 0, comm)
+		snap := f.scan(t, s)
+		require.Len(t, snap.Processes, 1)
+		assert.Equal(t, comm, snap.Processes[0].Comm)
+		assert.Equal(t, "worker\x00--flag\x00", snap.Processes[0].Cmdline)
+		assert.Equal(t, uint64(5), snap.Stats.FileReads)
+		finish(t, s, snap)
+	}
+}
+
+func TestCommandLineCacheMissRetriesOnlyOnCommChange(t *testing.T) {
+	for _, initial := range []string{"missing", "", " \x00 \x00"} {
+		t.Run(fmt.Sprintf("initial_%q", initial), func(t *testing.T) {
+			f := newFixture(t)
+			f.proc(t, 100, 0, 10, 100, 0)
+			if initial == "missing" {
+				require.NoError(t, os.Remove(filepath.Join(f.root, "100/cmdline")))
+			} else {
+				f.write(t, "100/cmdline", initial)
+			}
+			s := f.scanner(t, false, false)
+			first := f.scan(t, s)
+			require.Len(t, first.Processes, 1)
+			assert.Empty(t, first.Processes[0].Cmdline)
+			finish(t, s, first)
+			f.write(t, "100/cmdline", "replacement\x00--new\x00")
+			unchanged := f.scan(t, s)
+			assert.Empty(t, unchanged.Processes[0].Cmdline)
+			assert.Equal(t, uint64(5), unchanged.Stats.FileReads)
+			finish(t, s, unchanged)
+			f.stat(t, 100, 0, 10, 100, 0, "replacement")
+			changed := f.scan(t, s)
+			assert.Equal(t, "replacement\x00--new\x00", changed.Processes[0].Cmdline)
+			assert.Equal(t, uint64(6), changed.Stats.FileReads)
+			finish(t, s, changed)
+		})
+	}
+}
+
 func TestCounterResetAndPIDReuse(t *testing.T) {
 	f := newFixture(t)
 	f.proc(t, 100, 0, 10, 100, 0)
@@ -411,7 +480,7 @@ func BenchmarkScanWarmFDs200x20(b *testing.B) {
 	b.ReportMetric(float64(reads)/float64(b.N), "proc-reads/op")
 }
 
-func TestPIDReuseBetweenStatAndStatus(t *testing.T) {
+func TestPIDReuseBetweenFilesIsObservedNextScan(t *testing.T) {
 	f := newFixture(t)
 	f.proc(t, 100, 0, 10, 100, 0)
 	s := f.scanner(t, false, false)
@@ -436,7 +505,11 @@ func TestPIDReuseBetweenStatAndStatus(t *testing.T) {
 	select {
 	case got := <-done:
 		require.NoError(t, got.err)
-		assert.Empty(t, got.snap.Processes)
+		// Match the original read policy: the initial stat identifies this row,
+		// even when the PID is replaced before the remaining files are read.
+		require.Len(t, got.snap.Processes, 1)
+		assert.Equal(t, uint64(10), got.snap.Processes[0].Key.StartTime)
+		finish(t, s, got.snap)
 	case <-time.After(5 * time.Second):
 		t.Fatal("native scan did not complete")
 	}
@@ -497,7 +570,7 @@ func TestScanExportsCPUWithoutHostNormalization(t *testing.T) {
 }
 
 func TestExitedChildAfterDirectoryEnumeration(t *testing.T) {
-	for _, stage := range []string{"stat", "status", "identity"} {
+	for _, stage := range []string{"stat", "status"} {
 		t.Run(stage, func(t *testing.T) {
 			f := newFixture(t)
 			f.proc(t, 100, 0, 10, 100, 0)
@@ -517,9 +590,6 @@ func TestExitedChildAfterDirectoryEnumeration(t *testing.T) {
 			if stage == "status" {
 				blocked = "101/stat"
 			}
-			if stage == "identity" {
-				blocked = "101/cmdline"
-			}
 			filename := filepath.Join(f.root, blocked)
 			data, err := os.ReadFile(filename)
 			require.NoError(t, err)
@@ -534,11 +604,6 @@ func TestExitedChildAfterDirectoryEnumeration(t *testing.T) {
 			writer, err := os.OpenFile(filename, os.O_WRONLY, 0600)
 			require.NoError(t, err)
 			require.NoError(t, os.RemoveAll(filepath.Join(f.root, "101")))
-			if stage == "stat" {
-				// Parent's final identity check needs a regular file again.
-				require.NoError(t, os.Remove(filename))
-				require.NoError(t, os.WriteFile(filename, data, 0600))
-			}
 			_, err = writer.Write(data)
 			require.NoError(t, err)
 			require.NoError(t, writer.Close())

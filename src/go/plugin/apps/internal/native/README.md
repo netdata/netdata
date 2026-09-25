@@ -47,9 +47,10 @@ caches. The old incarnation's accepted CPU/fault lifetime and accepted parent
 PID/start-time identity move into a separate compact retirement record before
 that reset. Ordinary disappearance uses the same retirement path. Pending debt
 therefore survives reuse of either the child PID or its ancestors, and retirement
-records never own FD strings or sampling caches. A second stat read detects PID
-replacement between per-process file reads; sampled PSS also validates the
-incarnation. Only live readable rows leave C.
+records never own FD strings or sampling caches. Like the original collector,
+stat is read once per PID per scan. There is no final row or PSS identity recheck:
+a PID replaced between separate file reads can produce a mixed observation until
+the next scan. Only rows with readable required files leave C.
 
 Retirement debt is eligible during the detecting scan and one additional scan,
 matching the original collector's grace. Expired ancestors may still supply
@@ -58,6 +59,19 @@ before their records are removed. This preserves ancestry without extending old
 debt's lifetime. Read gaps do not create retirements: ancestor resolution stops at
 a matching parent that is still present but unreadable, leaving debt pending for
 that parent's recovery within the grace window.
+
+## Acquisition policy
+
+Command-line reads follow `apps_pid.c:update_pid_comm`: read on the first comm
+or a changed comm only when no command line is cached. A successful cached value
+is retained even across later comm/argv changes; a failed or blank read is retried only
+after another comm change. A newly observed process incarnation starts with an
+empty cache. Raw NUL-separated argv is preserved at the language boundary.
+
+The single stat read supplies both the sample and the start-time comparison with
+the previous scan. No additional stat read follows ordinary collection or PSS
+sampling. These choices deliberately retain the original acquisition limitations
+for the POC performance comparison, rather than adding correctness work.
 
 ## POC sampling differences
 

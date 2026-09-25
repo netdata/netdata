@@ -75,8 +75,10 @@ func TestNativeCollectionPipeline(t *testing.T) {
 	assert.Equal(t, int32(12), rows[0][1])
 	assert.Equal(t, "worker", rows[0][4])
 
-	// Procfs argv contains NUL separators, not shell quotes. Spaces inside a
-	// script argument must survive the native boundary and keep its group name.
+	// A new PID incarnation reads its own argv. Comm/argv changes alone retain
+	// the original cached command line, matching the C collector's read policy.
+	fields[22] = "200"
+	// Spaces inside a script argument must survive the native boundary.
 	write("12/stat", "12 (python3) S "+strings.Join(fields[4:], " ")+"\n")
 	write("12/cmdline", "python3\x00/opt/my service.py\x00--flag\x00")
 	_, err = collecttest.CollectScalarSeries(c)
