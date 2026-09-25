@@ -222,6 +222,7 @@ int https_client_timeout_unittest(void);
 int mqtt_wss_client_timeout_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
+int pgd_unittest(void);
 int pluginsd_parser_unittest(void);
 int websocket_compression_unittest(void);
 int web_client_request_size_unittest(void);
@@ -569,6 +570,7 @@ int netdata_main(int argc, char **argv) {
                             if (uuidmap_unittest()) return 1;
 #ifdef ENABLE_DBENGINE
                             if (mrg_unittest()) return 1;
+                            if (pgd_unittest()) return 1;
 #endif
                             if (paths_unittest()) return 1;
 #ifdef HAVE_LIBBACKTRACE
@@ -749,6 +751,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "mrgtest") == 0) {
                             unittest_running = true;
                             return mrg_unittest();
+                        }
+                        else if(strcmp(optarg, "pgdtest") == 0) {
+                            unittest_running = true;
+                            return pgd_unittest();
                         }
                         else if(strcmp(optarg, "mrgretentionbench") == 0) {
                             unittest_running = true;
