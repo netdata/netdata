@@ -74,4 +74,12 @@ func TestNativeCollectionPipeline(t *testing.T) {
 	require.Len(t, rows, 1)
 	assert.Equal(t, int32(12), rows[0][1])
 	assert.Equal(t, "worker", rows[0][4])
+
+	// Procfs argv contains NUL separators, not shell quotes. Spaces inside a
+	// script argument must survive the native boundary and keep its group name.
+	write("12/stat", "12 (python3) S "+strings.Join(fields[4:], " ")+"\n")
+	write("12/cmdline", "python3\x00/opt/my service.py\x00--flag\x00")
+	_, err = collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, "my service", c.CurrentSnapshot().Processes[0].Application)
 }

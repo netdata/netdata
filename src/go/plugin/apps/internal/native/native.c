@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -89,34 +90,43 @@ static char *path(apps_scanner *s, int32_t pid, const char *file) {
 }
 static char *read_file(apps_scanner *s, int32_t pid, const char *file, size_t *length) {
     char *p = path(s, pid, file);
-    if (!p)
+    if (!p) {
+        errno = ENOMEM;
         return NULL;
+    }
     int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int error = errno;
     free(p);
     s->snap.file_reads++;
     if (fd < 0) {
         s->snap.read_errors++;
+        errno = error;
         return NULL;
     }
     FILE *f = fdopen(fd, "rb");
     if (!f) {
+        error = errno;
         close(fd);
         s->snap.read_errors++;
+        errno = error;
         return NULL;
     }
     size_t cap = 4096, len = 0;
     char *buf = resize(s, NULL, cap, 1);
     if (!buf) {
         fclose(f);
+        errno = ENOMEM;
         return NULL;
     }
     for (;;) {
         size_t n = fread(buf + len, 1, cap - len - 1, f);
         len += n;
         if (ferror(f)) {
+            error = errno;
             s->snap.read_errors++;
             free(buf);
             fclose(f);
+            errno = error;
             return NULL;
         }
         if (feof(f))
@@ -125,6 +135,7 @@ static char *read_file(apps_scanner *s, int32_t pid, const char *file, size_t *l
             s->failed = 1;
             free(buf);
             fclose(f);
+            errno = ENOMEM;
             return NULL;
         }
         cap *= 2;
@@ -132,6 +143,7 @@ static char *read_file(apps_scanner *s, int32_t pid, const char *file, size_t *l
         if (!q) {
             free(buf);
             fclose(f);
+            errno = ENOMEM;
             return NULL;
         }
         buf = q;
@@ -435,16 +447,29 @@ static void scan_optional(apps_scanner *s, pid_entry *p, const char *status, dou
     char *cmd = read_file(s, p->row.pid, "cmdline", &len);
     free(p->row.cmdline);
     p->row.cmdline = NULL;
-    if (cmd) {
-        for (size_t i = 0; i < len; i++)
-            if (!cmd[i])
-                cmd[i] = ' ';
-        while (len && cmd[len - 1] == ' ')
-            cmd[--len] = 0;
-        p->row.cmdline = cmd;
-    }
+    // Preserve procfs argument boundaries; Go renders a separate matcher string.
+    p->row.cmdline_len = cmd ? len : 0;
+    p->row.cmdline = cmd;
     if (s->collect_fds)
         scan_fds(s, p);
+}
+
+// A vanished required file is an exit only when the process itself is gone.
+// Permission, malformed-file and isolated missing-file failures remain gaps.
+static void check_disappearance(apps_scanner *s, pid_entry *p, int error) {
+    if (error == ESRCH) {
+        p->present = 0;
+        return;
+    }
+    if (error != ENOENT)
+        return;
+    char *directory = path(s, p->row.pid, "");
+    if (!directory)
+        return;
+    struct stat st;
+    if (stat(directory, &st) != 0 && (errno == ENOENT || errno == ESRCH))
+        p->present = 0;
+    free(directory);
 }
 
 static void scan_pid(apps_scanner *s, pid_entry *p) {
@@ -452,8 +477,10 @@ static void scan_pid(apps_scanner *s, pid_entry *p) {
     apps_row parsed = {0};
     double stat_at = sample_time(s);
     char *buf = read_file(s, p->row.pid, "stat", NULL);
-    if (!buf)
+    if (!buf) {
+        check_disappearance(s, p, errno);
         return;
+    }
     if (!parse_stat(buf, p->row.pid, &parsed, f)) {
         s->snap.read_errors++;
         free(buf);
@@ -481,8 +508,10 @@ static void scan_pid(apps_scanner *s, pid_entry *p) {
     double status_at = sample_time(s);
     char *status = read_file(s, p->row.pid, "status", NULL);
     uint64_t uid, gid;
-    if (!status)
+    if (!status) {
+        check_disappearance(s, p, errno);
         return;
+    }
     // Without identity we cannot safely attribute a process to a user/group.
     if (!field(status, "Uid", &uid) || !field(status, "Gid", &gid) || uid > UINT32_MAX || gid > UINT32_MAX) {
         s->snap.read_errors++;
@@ -491,15 +520,6 @@ static void scan_pid(apps_scanner *s, pid_entry *p) {
     }
     p->row.uid = (uint32_t)uid;
     p->row.gid = (uint32_t)gid;
-    const int indices[] = {14, 15, 43, 16, 17, 44, 10, 12, 11, 13};
-    for (int i = 0; i < 10; i++) {
-        uint64_t raw = f[indices[i]];
-        if (i == CPU_USER)
-            raw = raw >= f[43] ? raw - f[43] : 0;
-        if (i == CHILD_USER)
-            raw = raw >= f[44] ? raw - f[44] : 0;
-        rate(p, i, raw, i < 6 ? 100.0 / s->hz : 1.0, stat_at);
-    }
     value(p, THREADS, f[20]);
     value(p, VMEM, f[23]);
     value(p, RSS, (double)f[24] * s->page);
@@ -509,9 +529,15 @@ static void scan_pid(apps_scanner *s, pid_entry *p) {
     free(status);
     // A process may exit and reuse its PID between independent procfs reads.
     char *verify = read_file(s, p->row.pid, "stat", NULL);
+    int verify_error = verify ? 0 : errno;
     apps_row identity = {0};
     uint64_t ignored[53] = {0};
-    if (!verify || !parse_stat(verify, p->row.pid, &identity, ignored) || identity.start != p->row.start) {
+    int identity_valid = verify && parse_stat(verify, p->row.pid, &identity, ignored);
+    if (!identity_valid || identity.start != p->row.start) {
+        if (!verify)
+            check_disappearance(s, p, verify_error);
+        else if (identity_valid && identity.start != p->row.start)
+            p->present = 0;
         free(verify);
         p->raw_valid = 0;
         p->pss_valid = 0;
@@ -519,6 +545,16 @@ static void scan_pid(apps_scanner *s, pid_entry *p) {
         return;
     }
     free(verify);
+    // Reconciliation may subtract only lifetime counters from accepted rows.
+    const int indices[] = {14, 15, 43, 16, 17, 44, 10, 12, 11, 13};
+    for (int i = 0; i < 10; i++) {
+        uint64_t raw = f[indices[i]];
+        if (i == CPU_USER)
+            raw = raw >= f[43] ? raw - f[43] : 0;
+        if (i == CHILD_USER)
+            raw = raw >= f[44] ? raw - f[44] : 0;
+        rate(p, i, raw, i < 6 ? 100.0 / s->hz : 1.0, stat_at);
+    }
     p->live = 1;
 }
 

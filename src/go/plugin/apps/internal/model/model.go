@@ -63,7 +63,7 @@ type Process struct {
 	UID         uint32
 	GID         uint32
 	Comm        string
-	Cmdline     string
+	Cmdline     string // Owned procfs argv bytes, including NUL separators.
 	State       string
 	Application string
 	Values      [MetricCount]float64

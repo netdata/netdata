@@ -148,9 +148,10 @@ func (e *Engine) applications(processes []model.Process) ([]string, error) {
 		byPID[p.Key.PID] = i
 		display[i] = processName(p)
 		managers[i] = isManager(p, display[i])
+		cmdline := strings.ReplaceAll(strings.TrimRight(p.Cmdline, "\x00"), "\x00", " ")
 		for _, r := range e.rules {
 			for _, c := range r.clauses {
-				if (c.comm == nil || c.comm.MatchString(p.Comm)) && (c.cmdline == nil || c.cmdline.MatchString(p.Cmdline)) {
+				if (c.comm == nil || c.comm.MatchString(p.Comm)) && (c.cmdline == nil || c.cmdline.MatchString(cmdline)) {
 					names[i] = r.name
 					break
 				}

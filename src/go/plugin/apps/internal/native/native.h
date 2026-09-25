@@ -40,6 +40,7 @@ typedef struct {
     uint64_t start;
     uint32_t uid, gid;
     char *comm, *cmdline;
+    size_t cmdline_len;
     char state;
     double values[METRIC_COUNT];
     uint64_t valid, fds[FD_COUNT];

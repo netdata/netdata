@@ -178,3 +178,14 @@ func TestKernelAndExplicitManagerRules(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"kernel", "kernel", "orchestrator", "service"}, applications(s))
 }
+
+func TestRulesUseRenderedNativeArguments(t *testing.T) {
+	e, err := New([]Rule{{Name: "matched", Match: []Match{{Cmdline: "= python3 /opt/my service.py --flag"}}}})
+	require.NoError(t, err)
+	p := process(12, 1, "python3")
+	p.Cmdline = "python3\x00/opt/my service.py\x00--flag\x00"
+	s := model.Snapshot{Processes: []model.Process{p}}
+	_, _, err = e.Aggregate(&s)
+	require.NoError(t, err)
+	assert.Equal(t, "matched", s.Processes[0].Application)
+}

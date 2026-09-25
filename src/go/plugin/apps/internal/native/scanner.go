@@ -97,7 +97,7 @@ func (s *Scanner) scan(ctx context.Context, now float64) (model.Snapshot, error)
 		p := &out.Processes[i]
 		p.Key = model.Key{PID: int32(row.pid), StartTime: uint64(row.start)}
 		p.PPID, p.UID, p.GID = int32(row.ppid), uint32(row.uid), uint32(row.gid)
-		p.Comm, p.Cmdline, p.State = C.GoString(row.comm), C.GoString(row.cmdline), string(byte(row.state))
+		p.Comm, p.Cmdline, p.State = C.GoString(row.comm), C.GoStringN(row.cmdline, C.int(row.cmdline_len)), string(byte(row.state))
 		p.Valid, p.FDValid = uint64(row.valid), row.fd_valid != 0
 		for j := range p.Values {
 			p.Values[j] = float64(row.values[j])

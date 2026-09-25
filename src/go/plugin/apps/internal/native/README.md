@@ -29,7 +29,7 @@ contains the GPL text. Existing source copyright ownership is unchanged.
 
 `Scan` and `Finalize` each perform one batched operation. C owns all mutable
 sampling state. Go copies complete strings/values before returning a snapshot.
-No Go pointer is retained by C. `Finalize` accepts exactly one PID/start-time
+Command lines cross as length-delimited NUL-separated argv bytes; Go renders matching text separately so script paths containing spaces keep their identity. No Go pointer is retained by C. `Finalize` accepts exactly one PID/start-time
 assignment per current row and rejects wrong generations, stale incarnations,
 missing rows and duplicates before changing assignment state. Group IDs MUST be
 unique across aggregation axes. Go owns ordered matching and aggregation policy.

@@ -104,7 +104,7 @@ func TestSnapshotRatesAndOwnedValues(t *testing.T) {
 	require.Len(t, first.Processes, 1)
 	p := first.Processes[0]
 	assert.Equal(t, "worker (helper) with ) spaces", p.Comm)
-	assert.Equal(t, "worker --flag", p.Cmdline)
+	assert.Equal(t, "worker\x00--flag\x00", p.Cmdline)
 	assert.Equal(t, uint32(1000), p.UID)
 	assert.Equal(t, uint32(1001), p.GID)
 	assert.False(t, p.Has(model.CPUUser))
@@ -125,7 +125,7 @@ func TestSnapshotRatesAndOwnedValues(t *testing.T) {
 	assert.Equal(t, 2, second.CPUCount)
 	finish(t, s, second)
 	s.Close()
-	assert.Equal(t, "worker --flag", first.Processes[0].Cmdline)
+	assert.Equal(t, "worker\x00--flag\x00", first.Processes[0].Cmdline)
 	s.Close()
 	_, err := s.Scan(context.Background())
 	require.ErrorContains(t, err, "closed")
@@ -493,5 +493,104 @@ func TestScanExportsCPUWithoutHostNormalization(t *testing.T) {
 		assert.Equal(t, own, snap.Processes[0].Values[model.CPUUser], "host ticks %d", hostTicks)
 		assert.Equal(t, children, snap.Processes[0].Values[model.CPUChildrenUser], "host ticks %d", hostTicks)
 		finish(t, s, snap)
+	}
+}
+
+func TestExitedChildAfterDirectoryEnumeration(t *testing.T) {
+	for _, stage := range []string{"stat", "status", "identity"} {
+		t.Run(stage, func(t *testing.T) {
+			f := newFixture(t)
+			f.proc(t, 100, 0, 10, 100, 0)
+			f.proc(t, 101, 100, 11, 20, 0)
+			s := f.scanner(t, false, false)
+			finish(t, s, f.scan(t, s))
+			f.proc(t, 100, 0, 10, 110, 0)
+			f.proc(t, 101, 100, 11, 30, 0)
+			previous := f.scan(t, s)
+			own := previous.Processes[1].Values[model.CPUUser]
+			finish(t, s, previous)
+			f.proc(t, 100, 0, 10, 120, 40)
+			f.proc(t, 101, 100, 11, 35, 0)
+
+			// Block after directory enumeration, at the required-read boundary.
+			blocked := "100/stat"
+			if stage == "status" {
+				blocked = "101/stat"
+			}
+			if stage == "identity" {
+				blocked = "101/cmdline"
+			}
+			filename := filepath.Join(f.root, blocked)
+			data, err := os.ReadFile(filename)
+			require.NoError(t, err)
+			require.NoError(t, os.Remove(filename))
+			require.NoError(t, syscall.Mkfifo(filename, 0600))
+			type result struct {
+				snapshot model.Snapshot
+				err      error
+			}
+			done := make(chan result, 1)
+			go func() { snap, err := s.scan(context.Background(), 3); done <- result{snap, err} }()
+			writer, err := os.OpenFile(filename, os.O_WRONLY, 0600)
+			require.NoError(t, err)
+			require.NoError(t, os.RemoveAll(filepath.Join(f.root, "101")))
+			if stage == "stat" {
+				// Parent's final identity check needs a regular file again.
+				require.NoError(t, os.Remove(filename))
+				require.NoError(t, os.WriteFile(filename, data, 0600))
+			}
+			_, err = writer.Write(data)
+			require.NoError(t, err)
+			require.NoError(t, writer.Close())
+			select {
+			case got := <-done:
+				require.NoError(t, got.err)
+				require.Len(t, got.snapshot.Processes, 1)
+				assert.InDelta(t, own, got.snapshot.Processes[0].Values[model.CPUChildrenUser], 0.001)
+				assert.Equal(t, 20.0, got.snapshot.Processes[0].Values[model.ChildrenMinorFaults])
+				assert.Equal(t, 10.0, got.snapshot.Processes[0].Values[model.ChildrenMajorFaults])
+				finish(t, s, got.snapshot)
+			case <-time.After(5 * time.Second):
+				t.Fatal("native scan did not finish")
+			}
+		})
+	}
+}
+
+func TestRequiredReadGapDoesNotReconcileAsExit(t *testing.T) {
+	for _, failure := range []string{"missing stat", "missing status", "malformed stat", "no-follow stat", "permission denied stat"} {
+		t.Run(failure, func(t *testing.T) {
+			if failure == "permission denied stat" && os.Geteuid() == 0 {
+				t.Skip("root bypasses ordinary file mode permissions")
+			}
+			f := newFixture(t)
+			f.proc(t, 100, 0, 10, 100, 0)
+			f.proc(t, 101, 100, 11, 20, 0)
+			s := f.scanner(t, false, false)
+			finish(t, s, f.scan(t, s))
+			f.proc(t, 100, 0, 10, 110, 0)
+			f.proc(t, 101, 100, 11, 30, 0)
+			previous := f.scan(t, s)
+			own := previous.Processes[1].Values[model.CPUUser]
+			finish(t, s, previous)
+			f.proc(t, 100, 0, 10, 120, 40)
+			switch failure {
+			case "missing stat":
+				require.NoError(t, os.Remove(filepath.Join(f.root, "101/stat")))
+			case "missing status":
+				require.NoError(t, os.Remove(filepath.Join(f.root, "101/status")))
+			case "malformed stat":
+				f.write(t, "101/stat", "101 (truncated) S 100\n")
+			case "permission denied stat":
+				require.NoError(t, os.Chmod(filepath.Join(f.root, "101/stat"), 0))
+			case "no-follow stat":
+				require.NoError(t, os.Rename(filepath.Join(f.root, "101/stat"), filepath.Join(f.root, "saved-stat")))
+				require.NoError(t, os.Symlink(filepath.Join(f.root, "saved-stat"), filepath.Join(f.root, "101/stat")))
+			}
+			snap := f.scan(t, s)
+			require.Len(t, snap.Processes, 1)
+			assert.InDelta(t, 4*own, snap.Processes[0].Values[model.CPUChildrenUser], 0.001)
+			finish(t, s, snap)
+		})
 	}
 }
