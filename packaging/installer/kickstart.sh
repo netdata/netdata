@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0526
+# Next unused error code: F0527
 
 # ======================================================================
 # Constants
@@ -57,6 +57,7 @@ STABLE_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/stable"
 NIGHTLY_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/edge"
 REPOCONFIG_URL_PREFIX="https://repository.netdata.cloud/repos/repoconfig"
 TELEMETRY_URL="https://us-east1-netdata-analytics-bi.cloudfunctions.net/ingest_agent_events"
+RELEASE_ARTIFACT_URL_PREFIX="https://artifacts.netdata.cloud/"
 
 # ======================================================================
 # Defaults for environment variables
@@ -106,6 +107,7 @@ BADNET_MSG="This is usually a result of a networking issue"
 ERROR_F0003="Could not find a usable HTTP client. Either curl or wget is required to proceed with installation."
 BADOPT_MSG="If you are following a third-party guide online, please see ${INSTALL_DOC_URL} for current instructions for using this script. If you are using a local copy of this script instead of fetching it from our servers, consider updating it. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead."
 GITHUB_BADNET_MSG="This usually means there is some networking issue preventing access to https://github.com/ from this system."
+RELEASE_BADNET_MSG="This usually means there is some networking issue preventing access to ${RELEASE_ARTIFACT_URL_PREFIX} from this system."
 
 # ======================================================================
 # Core program logic
@@ -944,6 +946,7 @@ get_redirect() {
 verify_manifest() {
   dir="${1}"
   old_pwd="${PWD}"
+  failed=0
   cd "${dir}" || fatal "Failed to change current working directory to ${dir}." F000A
 
   if [ "${DRY_RUN}" -eq 1 ]; then
@@ -951,9 +954,29 @@ verify_manifest() {
   else
     progress "Verifying integrity of downloaded files."
 
-    if [ -r "./sha256sums.txt" ]; then
-      files="$(awk '{print $2}' | tr -d '*')"
-      failed=0
+    if [ -r "./Manifest" ]; then
+      files="$(awk '{ print $1 }')"
+      for f in ${files} ; do
+        if [ -r "${f}" ]; then
+          file_info="$(grep -E "^${f} " ./Manifest)"
+          file_size="$(echo "${file_info}" | awk '{ print $2 }')"
+          file_hash="$(echo "${file_info}" | awk '{ print $3 }')"
+
+          actual_size="$(wc -c "${f}")"
+          if [ "${actual_size}" -ne "${file_size}" ]; then
+            failed="$((failed + 1))"
+            warning "Invalid file size for ${dir}/${f}, expected ${file_size}, actual ${actual_size}"
+            continue
+          fi
+
+          if ! echo "${file_hash} *${f}" | safe_sha256sum -c -; then
+            failed="$((failed + 1))"
+            warning "Invalid checksum for ${dir}/${f}, expected: ${csum}, actual $(safe_sha256sum "${file}" | awk '{print $1}')"
+          fi
+        fi
+      done
+    elif [ -r "./sha256sums.txt" ]; then
+      files="$(awk '{ print $2 }' | tr -d '*')"
       for f in ${files} ; do
         if [ -r "${f}" ]; then
           csum="$(grep -E "${f}\$" ./sha256sums.txt | awk '{print $1}')"
@@ -963,16 +986,16 @@ verify_manifest() {
           fi
         fi
       done
-
-      if [ "${failed}" -gt 0 ]; then
-        fatal "${failed} files failed checksum verification, see warnings for details on the failed files.\n${BADCACHE_MSG}" F0525
-      fi
     else
-      fatal "No sha256sums.txt file found, unable to verify files in ${dir}" F0524
+      fatal "No Manifest or sha256sums.txt file found, unable to verify files in ${dir}" F0524
     fi
   fi
 
-  cd "${old_pwd}" || fatal "Failed to change current working old_pwdectory to ${old_pwd}." F000A
+  if [ "${failed}" -gt 0 ]; then
+    fatal "${failed} files failed verification, see warnings for details on the failed files.\n${BADCACHE_MSG}" F0525
+  fi
+
+  cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
 }
 
 safe_sha256sum() {
@@ -2101,75 +2124,113 @@ set_static_archive_urls() {
   fi
 
   if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
-    path="$(cd "${NETDATA_OFFLINE_INSTALL_SOURCE}" || exit 1; pwd)"
-    export NETDATA_STATIC_ARCHIVE_URL="file://${path}/netdata-${arch}-latest.gz.run"
-    export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-latest.gz.run"
-    export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="file://${path}/sha256sums.txt"
-  elif [ "${1}" = "stable" ]; then
-    if [ -n "${INSTALL_VERSION}" ]; then
-      export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-${arch}-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_OLD_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_OLD_NAME="netdata-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/sha256sums.txt"
-    else
-      latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
-      export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${arch}-latest.gz.run"
-      export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-latest.gz.run"
-      export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
-    fi
+    NETDATA_STATIC_ARCHIVE_URL_PREFIX="file://${NETDATA_OFFLINE_INSTALL_SOURCE}"
+  elif [ -n "${INSTALL_VERSION}" ]; then
+    NETDATA_STATIC_ARCHIVE_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/v${INSTALL_VERSION}"
   else
-    if [ -n "${INSTALL_VERSION}" ]; then
-      export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/netdata-${arch}-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_OLD_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/netdata-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_OLD_NAME="netdata-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/sha256sums.txt"
-    else
-      tag="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
-      export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/netdata-${arch}-latest.gz.run"
-      export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-latest.gz.run"
-      export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/sha256sums.txt"
-    fi
+    NETDATA_STATIC_ARCHIVE_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/latest"
   fi
+
+  check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest"
+
+  case $? in
+    0) NETDATA_MANIFEST_INSTALL=1 ;;
+    1)
+      if [ "${1}" = "stable" ]; then
+        if [ -n "${INSTALL_VERSION}" ]; then
+          version="v${INSTALL_VERSION}"
+        else
+          version="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
+        fi
+        NETDATA_STATIC_ARCHIVE_URL_PREFIX="https://github.com/netdata/netdata/releases/download/${version}"
+      else
+        if [ -n "${INSTALL_VERSION}" ]; then
+          version="v${INSTALL_VERSION}"
+        else
+          version="$(get_redirect "${NETDATA_TARBALL_BASEURL}/releases/latest")"
+        fi
+        NETDATA_STATIC_ARCHIVE_URL_PREFIX="${NETDATA_TARBALL_BASEURL}/releases/${version}"
+      fi
+
+      check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest"
+
+      case $? in
+        0) NETDATA_MANIFEST_INSTALL=1 ;;
+        1)
+          NETDATA_MANIFEST_INSTALL=0
+          NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-${version}.gz.run"
+          NETDATA_STATIC_ARCHIVE_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/${NETDATA_STATIC_ARCHIVE_NAME}"
+          NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/sha256sums.txt"
+          ;;
+        *)
+          warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
+          return 1
+      esac
+
+      check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}"
+
+      case "$?" in
+        0) ;;
+        1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
+        *)
+          warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
+          return 1
+          ;;
+      esac
+      ;;
+    *)
+      warning "Unable to check for remote Manifest file for release. ${RELEASE_BADNET_MSG}"
+      return 1
+      ;;
+  esac
 }
 
 try_static_install() {
-  set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}"
+  set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" || return 1
+
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would attempt to install using static build..."
   else
     progress "Attempting to install using static build..."
   fi
 
-  check_for_remote_file "${NETDATA_TARBALL_BASEURL}"
+  if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
+    if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest" "./Manifest" "force"; then
+      fatal "Unable to download release manifest file. ${BADNET_MSG}" F0526
+    fi
 
-  case "$?" in
-    0) ;;
-    1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
-    *)
-      warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
-      return 1
-      ;;
-  esac
+    archive_info="$(grep -E "^netdata-${SYSARCH}-.*\\.run " ./Manifest)"
 
-  # Check status code first, so that we can provide nicer fallback for dry runs.
-  if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
-    netdata_agent="${NETDATA_STATIC_ARCHIVE_NAME}"
-  elif [ "${SYSARCH}" = "x86_64" ] && check_for_remote_file "${NETDATA_STATIC_ARCHIVE_OLD_URL}"; then
-    netdata_agent="${NETDATA_STATIC_ARCHIVE_OLD_NAME}"
-    export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_STATIC_ARCHIVE_OLD_URL}"
+    if [ -z "${archive_info}" ]; then
+      warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs."
+      return 2
+    fi
+
+    if [ "$(echo "${archive_info}" | wc -l)" -gt 1 ]; then
+      archive_info="$(echo "${archive_info}" | grep -ve ".*-latest.*" | tail -n 1)"
+    fi
+
+    archive_name="$(echo "${archive_info}" | awk '{ print $1 }')"
+
+    if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/${archive_name}" "./${archive_name}"; then
+      fatal "Unable to download static build archive for ${SYSARCH}. ${BADNET_MSG}." F0208
+    fi
   else
-    warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs. ${GITHUB_BADNET_MSG}"
-    return 2
-  fi
+    # Check status code first, so that we can provide nicer fallback for dry runs.
+    if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
+      archive_name="${NETDATA_STATIC_ARCHIVE_NAME}"
+    else
+      warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs. ${GITHUB_BADNET_MSG}"
+      return 2
+    fi
 
-  if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "./${netdata_agent}"; then
-    fatal "Unable to download static build archive for ${SYSARCH}. ${BADNET_MSG}." F0208
-  fi
+    if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "./${archive_name}"; then
+      fatal "Unable to download static build archive for ${SYSARCH}. ${BADNET_MSG}." F0208
+    fi
 
-  if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "./sha256sum.txt"; then
-    fatal "Unable to fetch checksums to verify static build archive. ${BADNET_MSG}." F0206
+    if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "./sha256sum.txt"; then
+      fatal "Unable to fetch checksums to verify static build archive. ${BADNET_MSG}." F0206
+    fi
   fi
 
   verify_manifest ./
@@ -2186,7 +2247,7 @@ try_static_install() {
 
   progress "Installing netdata"
   # shellcheck disable=SC2086
-  if ! run_as_root ${env_cmd} /bin/sh "./${netdata_agent}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
+  if ! run_as_root ${env_cmd} /bin/sh "./${archive_name}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
     warning "Failed to install static build of Netdata on ${SYSARCH}."
     run rm -rf /opt/netdata
     return 2
