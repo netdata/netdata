@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Next unused error code: I0016
+# Next unused error code: I0018
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 uniquepath() {
@@ -227,6 +227,8 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-scripts   Explicitly disable the scripts.d plugin.
   --enable-plugin-statsd     Enable the experimental Go StatsD plugin. Default: disabled.
   --disable-plugin-statsd    Explicitly disable the Go StatsD plugin.
+  --enable-plugin-appsgo     Build and install the experimental Linux C/Go apps plugin. Default: disabled.
+  --disable-plugin-appsgo    Explicitly disable the C/Go apps plugin build.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
                              and its dependencies are available.
   --disable-exporting-kinesis Explicitly disable AWS Kinesis exporting connector.
@@ -274,6 +276,7 @@ ENABLE_OTEL=""
 ENABLE_IBM=0
 ENABLE_SCRIPTS=1
 ENABLE_STATSD=0
+ENABLE_APPSGO=0
 FORCE_LEGACY_CXX=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
 REMOVE_BUILD=1
@@ -325,6 +328,8 @@ while [ -n "${1}" ]; do
     "--disable-plugin-scripts") ENABLE_SCRIPTS=0 ;;
     "--enable-plugin-statsd") ENABLE_STATSD=1 ;;
     "--disable-plugin-statsd") ENABLE_STATSD=0 ;;
+    "--enable-plugin-appsgo") ENABLE_APPSGO=1 ;;
+    "--disable-plugin-appsgo") ENABLE_APPSGO=0 ;;
     "--enable-exporting-kinesis" | "--enable-backend-kinesis")
       # TODO: Needs CMake Support
       ;;
@@ -573,9 +578,14 @@ fi
 trap build_error EXIT
 
 # -----------------------------------------------------------------------------
+# The C/Go apps POC supports native Linux source builds only.
+if [ "${ENABLE_APPSGO}" -eq 1 ] && [ "$(uname -s)" != "Linux" ]; then
+  fatal "--enable-plugin-appsgo requires Linux." I0016
+fi
+
 # If we’re building any Go-based component, ensure a working Go toolchain exists.
 NEED_GO_TOOLCHAIN=0
-if [ "${ENABLE_GO}" -eq 1 ] || [ "${ENABLE_IBM}" -eq 1 ] || [ "${ENABLE_SCRIPTS}" -eq 1 ] || [ "${ENABLE_STATSD}" -eq 1 ]; then
+if [ "${ENABLE_GO}" -eq 1 ] || [ "${ENABLE_IBM}" -eq 1 ] || [ "${ENABLE_SCRIPTS}" -eq 1 ] || [ "${ENABLE_STATSD}" -eq 1 ] || [ "${ENABLE_APPSGO}" -eq 1 ]; then
   NEED_GO_TOOLCHAIN=1
 fi
 
@@ -585,6 +595,9 @@ if [ "${NEED_GO_TOOLCHAIN}" -eq 1 ]; then
   . "${NETDATA_SOURCE_DIR}/packaging/check-for-go-toolchain.sh"
 
   if ! ensure_go_toolchain; then
+    if [ "${ENABLE_APPSGO}" -eq 1 ]; then
+      fatal "appsgo.plugin was requested but Go ${GOLANG_MIN_VERSION} is unavailable: ${GOLANG_FAILURE_REASON}." I0017
+    fi
     warning "Go ${GOLANG_MIN_VERSION} needed to build Go-based plugins (go.d, scripts.d, Go StatsD, IBM), but could not find or install a usable toolchain: ${GOLANG_FAILURE_REASON}. Disabling those components."
     ENABLE_GO=0
     ENABLE_IBM=0
@@ -942,6 +955,27 @@ if [ "$(id -u)" -eq 0 ]; then
     if [ $capabilities -eq 0 ]; then
       # fix apps.plugin to be setuid to root
       run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"
+    fi
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/appsgo.plugin" ]; then
+    # Use capabilities for host-wide procfs access; this POC has no setuid fallback.
+    appsgo_binary="${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/appsgo.plugin"
+    run chown "root:${NETDATA_GROUP}" "${appsgo_binary}"
+    run chmod 0750 "${appsgo_binary}"
+    appsgo_capabilities=0
+    if ! iscontainer && command -v setcap > /dev/null 2>&1; then
+      if run setcap cap_dac_read_search,cap_sys_ptrace+ep "${appsgo_binary}"; then
+        if "${appsgo_binary}" -v > /dev/null 2>&1; then
+          appsgo_capabilities=1
+        else
+          # A capability outside the bounding set can prevent exec entirely.
+          run setcap -r "${appsgo_binary}" || exit 1
+        fi
+      fi
+    fi
+    if [ "${appsgo_capabilities}" -eq 0 ]; then
+      warning "appsgo.plugin installed without elevated capabilities; process visibility is limited to the Netdata user's permissions. See src/go/plugin/apps/README.md for setup."
     fi
   fi
 

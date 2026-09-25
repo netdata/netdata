@@ -2,7 +2,7 @@
 
 This Linux-only proof of concept demonstrates modernizing `apps.plugin` without rewriting its entire collection engine in Go. It builds a separate `appsgo.plugin` executable using `plugin/agent`, `CollectorV2`, `metrix`, YAML chart templates, dynamic configuration, and a Go process-list Function.
 
-## Build and run
+## Build and run without installation
 
 From the repository root, on Linux with the Go version required by `src/go/go.mod` and a C compiler:
 
@@ -14,9 +14,90 @@ CGO_ENABLED=1 go build -o /tmp/appsgo.plugin ./cmd/appsplugin
 
 Run the second command in a terminal for the standalone demo: the standard runtime automatically enables its job when attached to a terminal. With redirected IO it follows the Agent's dynamic-configuration enable protocol. `-d` enables diagnostic logging; it does not bypass that protocol.
 
-The build uses libc and the C math library; it does not require a Netdata C build, libnetdata, or sources outside this plugin for the native backend. The shared Go runtime is reused from the enclosing Go module. The executable is not installed or enabled by production packaging.
+The build uses libc and the C math library; it does not require a Netdata C build, libnetdata, or sources outside this plugin for the native backend. The shared Go runtime is reused from the enclosing Go module. Source installation is opt-in as described below; distribution packages do not include the POC.
 
 Run with the permissions needed for the processes being observed. Ordinary users can inspect their own processes; Linux permissions may restrict another user's IO, file descriptors, command line, or PSS. Unavailable optional observations remain missing. Native fixture tests also run on macOS; the live executable supports Linux only. A build with cgo disabled cannot collect processes.
+
+## Install from source on Linux
+
+From the repository root, with the normal Netdata source-build dependencies:
+
+```sh
+sudo ./netdata-installer.sh --enable-plugin-appsgo
+```
+
+This builds and installs Netdata plus `appsgo.plugin`. The installer checks for
+the Go version required by `src/go/go.mod` (currently 1.27.0 or newer) and attempts
+to provision it if missing. A C compiler is also required. The appsgo build is
+independent of `--disable-plugin-go`, which controls `go.d.plugin`.
+Use `--dont-start-it` to install without starting/restarting the Agent.
+`--disable-plugin-appsgo` disables building it; it does not uninstall an existing
+copy. The default is disabled.
+
+For an installation without a prefix, the installed files are:
+
+- `/usr/libexec/netdata/plugins.d/appsgo.plugin`
+- `/usr/lib/netdata/conf.d/appsgo.conf`
+- `/usr/lib/netdata/conf.d/appsgo/processes.conf`
+
+The installer applies its usual installation prefix to these paths. User
+configuration overrides belong in `/etc/netdata/appsgo.conf` and
+`/etc/netdata/appsgo/processes.conf` (also under the prefix, when used). For
+example, use `sudo /etc/netdata/edit-config appsgo/processes.conf` to customize
+groups without changing the stock file.
+
+Netdata normally discovers the installed plugin automatically. If new plugins are
+disabled on the test Agent, enable it in `netdata.conf` and restart Netdata:
+
+```ini
+[plugins]
+    appsgo = yes
+```
+
+The stock YAML enables the canonical `processes` job. The original `apps.plugin`
+can run alongside it; to collect only with the POC, set `apps = no` in the same
+section. Charts use the POC's distinct identities and the process-list Function
+is `appsgo:processes`.
+
+A root source installation grants `cap_dac_read_search,cap_sys_ptrace` when
+supported on the host, with ownership `root:netdata` and mode `0750`. If
+capabilities are unavailable (including the installer's container path), the
+installer warns and leaves it executable with ordinary Netdata-user visibility.
+There is no setuid fallback. A non-root install also has only that user's access.
+For a terminal diagnostic after installation:
+
+```sh
+sudo -u netdata /usr/libexec/netdata/plugins.d/appsgo.plugin -d
+```
+
+### Direct CMake build or staged install
+
+For an existing Netdata installation, the equivalent CMake option is
+`ENABLE_PLUGIN_APPSGO`, default `OFF`:
+
+```sh
+cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/ -DENABLE_PLUGIN_APPSGO=ON
+cmake --build build --target appsgo-plugin -j2
+sudo cmake --install build --component plugin-appsgo
+```
+
+The component installs only this executable and its stock YAML. Use the prefix
+matching the test Agent; configuration paths are embedded at build time. For a
+staged install, replace the last command with
+`DESTDIR=/tmp/appsgo-stage cmake --install build --component plugin-appsgo`.
+CMake installation does not grant capabilities. To give a direct host install
+the same access as the source installer, with an existing `netdata` group:
+
+```sh
+sudo chown root:netdata /usr/libexec/netdata/plugins.d/appsgo.plugin
+sudo chmod 0750 /usr/libexec/netdata/plugins.d/appsgo.plugin
+sudo setcap cap_dac_read_search,cap_sys_ptrace+ep /usr/libexec/netdata/plugins.d/appsgo.plugin
+```
+
+The target uses `CGO_ENABLED=1` and CMake's selected C compiler. Existing pure-Go
+targets retain `CGO_ENABLED=0`. Native sources/headers and embedded charts/schema
+are build dependencies. The POC currently supports native Linux builds only;
+CMake rejects other platforms and cross-compilation when this option is enabled.
 
 ## Audit and responsibility split
 
@@ -94,7 +175,7 @@ The `appsgo:processes` Function shows process-instance identity, PID/PPID, comma
 - Linux only; no FreeBSD, macOS or Windows collection backends.
 - No eBPF shared-memory input, cgroup/container enrichment, or NetIPC lookup service.
 - No legacy `apps_groups.conf` parser or chart/Function compatibility promise.
-- No changes to the original production collector, its packaging, or its alerts.
+- No changes to the original production collector or its alerts; source installation of the POC is an explicit opt-in.
 - No claim of production readiness or performance equivalence; the measurements below show additional runtime cost.
 
 ## Validation

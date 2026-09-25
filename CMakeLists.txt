@@ -223,6 +223,13 @@ option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATU
 cmake_dependent_option(ENABLE_ND_MCP "Build nd-mcp stdio-to-websocket bridge for MCP integration" ${DEFAULT_FEATURE_STATE} "ENABLE_PLUGIN_GO" False)
 option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" ON)
 option(ENABLE_PLUGIN_STATSD "Enable the experimental Go StatsD plugin (statsd.plugin)" OFF)
+option(ENABLE_PLUGIN_APPSGO "Enable the experimental Linux C/Go apps plugin (appsgo.plugin)" OFF)
+if(ENABLE_PLUGIN_APPSGO AND NOT OS_LINUX)
+    message(FATAL_ERROR "appsgo.plugin requires Linux")
+endif()
+if(ENABLE_PLUGIN_APPSGO AND CMAKE_CROSSCOMPILING)
+    message(FATAL_ERROR "appsgo.plugin currently requires a native Linux build")
+endif()
 cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_MACOS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETFLOW "Enable NetFlow/IPFIX/sFlow flow analysis plugin" False "NOT OS_WINDOWS" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
@@ -510,14 +517,14 @@ if(ENABLE_JEMALLOC)
 endif()
 
 set(ENABLE_PLUGIN_EBPF_GO OFF)
-if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_STATSD OR ENABLE_PLUGIN_NETFLOW OR ENABLE_CGROUP_NAME)
+if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_STATSD OR ENABLE_PLUGIN_APPSGO OR ENABLE_PLUGIN_NETFLOW OR ENABLE_CGROUP_NAME)
     include(NetdataGoTools)
 
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
 
     find_package(Go "${MIN_GO_VERSION}" QUIET)
     if(NOT GO_FOUND)
-        if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_STATSD OR ENABLE_PLUGIN_NETFLOW)
+        if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_STATSD OR ENABLE_PLUGIN_APPSGO OR ENABLE_PLUGIN_NETFLOW)
             find_package(Go "${MIN_GO_VERSION}" REQUIRED)
         endif()
     endif()
@@ -3949,6 +3956,31 @@ if(ENABLE_PLUGIN_STATSD)
 
     install(DIRECTORY src/go/plugin/statsd/config/statsd
             COMPONENT plugin-statsd
+            DESTINATION usr/lib/netdata/conf.d
+            FILES_MATCHING PATTERN "*.conf")
+endif()
+
+#
+# Build the experimental Linux C/Go apps plugin
+#
+
+if(ENABLE_PLUGIN_APPSGO)
+    add_go_target(appsgo-plugin appsgo.plugin src/go cmd/appsplugin CGO
+                  DEPENDS src/go/plugin/apps/internal/native/native.c
+                          src/go/plugin/apps/internal/native/native.h
+                          src/go/plugin/apps/collector/processes/charts.yaml
+                          src/go/plugin/apps/collector/processes/config_schema.json)
+
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/appsgo.plugin
+            COMPONENT plugin-appsgo
+            DESTINATION usr/libexec/netdata/plugins.d)
+
+    install(FILES src/go/plugin/apps/config/appsgo.conf
+            COMPONENT plugin-appsgo
+            DESTINATION usr/lib/netdata/conf.d)
+
+    install(DIRECTORY src/go/plugin/apps/config/appsgo
+            COMPONENT plugin-appsgo
             DESTINATION usr/lib/netdata/conf.d
             FILES_MATCHING PATTERN "*.conf")
 endif()
