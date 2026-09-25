@@ -12,6 +12,7 @@ static struct ml_statistics {
     PAD64(uint64_t) ml_memory_consumption;
     PAD64(uint64_t) ml_memory_new;
     PAD64(uint64_t) ml_memory_delete;
+    PAD64(uint64_t) ml_memory_unmatched_free;
 } ml_statistics = { 0 };
 
 void pulse_ml_models_received()
@@ -59,15 +60,20 @@ void pulse_ml_memory_freed(size_t n)
     // overrides account every allocation symmetrically, so a counted free
     // always has a matching counted allocation; this saturation is defensive
     // against a free whose allocation bypassed the overrides (for example
-    // memory handed in from a foreign allocator).
+    // memory handed in from a foreign allocator). Every clamp is counted,
+    // so an accounting bug shows up on the ml_memory_ops chart instead of
+    // hiding behind a flat memory line.
     uint64_t cur = __atomic_load_n(&ml_statistics.ml_memory_consumption, __ATOMIC_RELAXED);
-    while (true) {
-        uint64_t next = (n > cur) ? 0 : (cur - n);
-        if (__atomic_compare_exchange_n(&ml_statistics.ml_memory_consumption,
-                                        &cur, next, true,
-                                        __ATOMIC_RELAXED, __ATOMIC_RELAXED))
-            break;
-    }
+    uint64_t next;
+    do {
+        next = (n > cur) ? 0 : (cur - n);
+    } while (!__atomic_compare_exchange_n(&ml_statistics.ml_memory_consumption,
+                                          &cur, next, true,
+                                          __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+
+    if (unlikely(n > cur))
+        __atomic_fetch_add(&ml_statistics.ml_memory_unmatched_free, 1, __ATOMIC_RELAXED);
+
     __atomic_fetch_add(&ml_statistics.ml_memory_delete, 1, __ATOMIC_RELAXED);
 }
 
@@ -87,6 +93,7 @@ static inline void ml_statistics_copy(struct ml_statistics *gs)
     gs->ml_memory_consumption = __atomic_load_n(&ml_statistics.ml_memory_consumption, __ATOMIC_RELAXED);
     gs->ml_memory_new = __atomic_load_n(&ml_statistics.ml_memory_new, __ATOMIC_RELAXED);
     gs->ml_memory_delete = __atomic_load_n(&ml_statistics.ml_memory_delete, __ATOMIC_RELAXED);
+    gs->ml_memory_unmatched_free = __atomic_load_n(&ml_statistics.ml_memory_unmatched_free, __ATOMIC_RELAXED);
 }
 
 void pulse_ml_do(bool extended)
@@ -105,5 +112,6 @@ void pulse_ml_do(bool extended)
         gs.ml_models_deserialization_failures,
         gs.ml_memory_consumption,
         gs.ml_memory_new,
-        gs.ml_memory_delete);
+        gs.ml_memory_delete,
+        gs.ml_memory_unmatched_free);
 }

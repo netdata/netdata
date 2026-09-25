@@ -107,7 +107,8 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
                                         uint64_t models_deserialization_failures,
                                         uint64_t memory_consumption,
                                         uint64_t memory_new,
-                                        uint64_t memory_delete) {
+                                        uint64_t memory_delete,
+                                        uint64_t memory_unmatched_free) {
     UNUSED(models_consulted);
     UNUSED(models_received);
     UNUSED(models_sent);
@@ -116,6 +117,7 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
     UNUSED(memory_consumption);
     UNUSED(memory_new);
     UNUSED(memory_delete);
+    UNUSED(memory_unmatched_free);
 }
 
 bool ml_host_get_host_status(RRDHOST *rh __maybe_unused, struct ml_metrics_statistics *mlm) {

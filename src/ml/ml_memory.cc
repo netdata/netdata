@@ -1,14 +1,6 @@
 #include <cstdlib>
 #include <new>
 
-// libnetdata.h is included first so that, when NETDATA_TRACE_ALLOCATIONS
-// is defined, this translation unit sees the same view of malloc /
-// malloc_usable_size as the rest of the codebase. nd-mallocz.c overrides
-// the libc symbols in that mode and prepends a Netdata header to every
-// allocation; ml_usable_size() below must route through that shim, not
-// through Apple's malloc_size(), to read the correct accounted size.
-#include "libnetdata/libnetdata.h"
-
 #if defined(__linux__)
   #include <malloc.h>
   #define ML_HAVE_MALLOC_USABLE_SIZE 1
@@ -23,23 +15,17 @@
 #include "daemon/pulse/pulse-ml.h"
 
 #ifdef ML_HAVE_MALLOC_USABLE_SIZE
-// Return the allocator's view of the block size for ptr. When
-// NETDATA_TRACE_ALLOCATIONS is on, we route through nd-mallocz's
-// mallocz_usable_size(), which reads the Netdata allocation header so
-// size reporting stays consistent with the matching malloc() (also
-// overridden in that mode). We call the declared wrapper rather than the
-// libc-override symbol malloc_usable_size: the override is defined in
-// nd-mallocz.c but never declared in a header, and on macOS
-// <malloc/malloc.h> exposes only malloc_size(), so calling
-// malloc_usable_size() here would not compile in C++ under trace mode.
-// When NETDATA_TRACE_ALLOCATIONS is off, we call the platform-native
-// function directly: malloc_usable_size on Linux/FreeBSD, malloc_size on
-// macOS (Apple does not expose malloc_usable_size).
+// Return the allocator's view of the block size for ptr, using the
+// platform-native call (Apple exposes malloc_size, not
+// malloc_usable_size). This is also correct under
+// NETDATA_TRACE_ALLOCATIONS: nd-mallocz.c only interposes the libc
+// allocator when ENABLE_DLSYM is defined, and then it interposes
+// malloc_usable_size too, so the size always comes from the same
+// allocator that produced the pointer. mallocz_usable_size() must not be
+// used here: it expects a Netdata header these pointers do not carry.
 static inline size_t ml_usable_size(void *ptr) noexcept
 {
-#if defined(NETDATA_TRACE_ALLOCATIONS)
-    return mallocz_usable_size(ptr);
-#elif defined(__APPLE__)
+#if defined(__APPLE__)
     return malloc_size(ptr);
 #else
     return malloc_usable_size(ptr);
