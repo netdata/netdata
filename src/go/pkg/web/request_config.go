@@ -3,6 +3,7 @@
 package web
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
@@ -69,8 +71,15 @@ func (r RequestConfig) Copy() RequestConfig {
 
 var userAgent = fmt.Sprintf("Netdata %s.plugin/%s", executable.Name, buildinfo.Version)
 
-// NewHTTPRequest returns a new *http.Request given a RequestConfig configuration and an error if any.
-func NewHTTPRequest(cfg RequestConfig) (*http.Request, error) {
+// NewHTTPRequest builds a request, reading a configured bearer file with reduced
+// authority on every call. Requests without a bearer file create no file reader.
+func NewHTTPRequest(ctx context.Context, cfg RequestConfig) (*http.Request, error) {
+	return newHTTPRequest(ctx, cfg, credentialfile.Read)
+}
+
+type readCredentialFile func(context.Context, string) ([]byte, error)
+
+func newHTTPRequest(ctx context.Context, cfg RequestConfig, readFile readCredentialFile) (*http.Request, error) {
 	var body io.Reader
 	if cfg.Body != "" {
 		body = strings.NewReader(cfg.Body)
@@ -81,14 +90,14 @@ func NewHTTPRequest(cfg RequestConfig) (*http.Request, error) {
 		method = http.MethodGet
 	}
 
-	req, err := http.NewRequest(method, cfg.URL, body)
+	req, err := http.NewRequestWithContext(ctx, method, cfg.URL, body)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("User-Agent", userAgent)
 
-	if err := setAuthentication(req, cfg); err != nil {
+	if err := setAuthentication(req, cfg, readFile); err != nil {
 		return nil, err
 	}
 
@@ -109,19 +118,22 @@ func NewHTTPRequest(cfg RequestConfig) (*http.Request, error) {
 	return req, nil
 }
 
-func setAuthentication(req *http.Request, cfg RequestConfig) error {
+func setAuthentication(req *http.Request, cfg RequestConfig, readFile readCredentialFile) error {
 	// Priority: Bearer Token > Basic Auth
 	switch {
 	case cfg.BearerTokenFile != "":
-		return setBearerTokenAuth(req, cfg.BearerTokenFile)
+		return setBearerTokenAuth(req, cfg.BearerTokenFile, readFile)
 	case cfg.Username != "" || cfg.Password != "":
 		req.SetBasicAuth(cfg.Username, cfg.Password)
 	}
 	return nil
 }
 
-func setBearerTokenAuth(req *http.Request, tokenFile string) error {
-	tokenBs, err := safefile.Read(tokenFile)
+func setBearerTokenAuth(req *http.Request, tokenFile string, readFile readCredentialFile) error {
+	if readFile == nil {
+		return fmt.Errorf("bearer token file reader unavailable: %w", safefile.ErrFile)
+	}
+	tokenBs, err := readFile(req.Context(), tokenFile)
 	if err != nil {
 		// A missing mounted service-account token is optional outside Kubernetes.
 		if isOptionalK8sTokenFileError(tokenFile, hostinfo.IsInsideK8sCluster(), err) {
@@ -145,8 +157,17 @@ func isOptionalK8sTokenFileError(tokenFile string, insideK8s bool, err error) bo
 		errors.Is(err, fs.ErrNotExist)
 }
 
-// NewHTTPRequestWithPath creates a new HTTP request with the given path appended to the base URL.
-func NewHTTPRequestWithPath(cfg RequestConfig, urlPath string) (*http.Request, error) {
+// NewHTTPRequestWithPath appends a path to the base URL without changing cfg.
+func NewHTTPRequestWithPath(ctx context.Context, cfg RequestConfig, urlPath string) (*http.Request, error) {
+	return newHTTPRequestWithPath(ctx, cfg, urlPath, credentialfile.Read)
+}
+
+func newHTTPRequestWithPath(
+	ctx context.Context,
+	cfg RequestConfig,
+	urlPath string,
+	readFile readCredentialFile,
+) (*http.Request, error) {
 	// Make a copy to avoid modifying the original config
 	cfg = cfg.Copy()
 
@@ -157,7 +178,7 @@ func NewHTTPRequestWithPath(cfg RequestConfig, urlPath string) (*http.Request, e
 	}
 	cfg.URL = v
 
-	return NewHTTPRequest(cfg)
+	return newHTTPRequest(ctx, cfg, readFile)
 }
 
 // URLQuery creates a URL-encoded query string from a single key-value pair.

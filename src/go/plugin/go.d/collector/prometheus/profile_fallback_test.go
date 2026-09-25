@@ -16,9 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/pkg/relabel"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 func TestCollector_ProfileFallbackOnlyUsesBoundPipeline(t *testing.T) {

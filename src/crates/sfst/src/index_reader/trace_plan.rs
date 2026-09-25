@@ -61,6 +61,12 @@
 //! positions, never the full matched set. `TracePlan::default()` (match
 //! all) compiles to the full-range set, so extraction costs O(K) per
 //! file — the most common UI query stays bounded.
+//!
+//! Aggregating consumers that need the WHOLE matched population (the
+//! traces overview's filtered grid) use `matched_in_range` instead:
+//! one intersection with the caller's range and a full iteration, with
+//! emission charged to `work` and a `count_in_range` probe available to
+//! refuse an extraction that would breach the budget.
 
 use super::{FieldLocation, IndexReader, KvId, KvIdSet, PosSet};
 
@@ -965,6 +971,27 @@ impl CompiledTracePlan {
         band.and_assign(&self.set);
         let out: Vec<u32> = band.iter().collect();
         debug_assert_eq!(out.len() as u64, target, "band holds exactly `target`");
+        work.rows_visited += out.len() as u64;
+        out
+    }
+
+    /// EVERY matched position within `[lo, hi)`, ascending. The
+    /// whole-set counterpart of [`Self::newest_in_range`] for consumers
+    /// that aggregate over the matched population instead of ranking
+    /// it (the traces overview's filtered grid). Emission is the whole
+    /// match count, so it is the caller's ceiling unit: probe
+    /// [`Self::count_in_range`] first (a tree walk, not a row visit)
+    /// and skip the extraction when it would breach the budget — a
+    /// counter alone would overshoot by the whole file. Every emitted
+    /// position counts into `work`.
+    pub fn matched_in_range(&self, lo: u32, hi: u32, work: &mut ScanWork) -> Vec<u32> {
+        let hi = hi.min(self.universe);
+        if lo >= hi {
+            return Vec::new();
+        }
+        let mut band = PosSet::range(lo, hi, self.universe);
+        band.and_assign(&self.set);
+        let out: Vec<u32> = band.iter().collect();
         work.rows_visited += out.len() as u64;
         out
     }

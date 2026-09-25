@@ -157,6 +157,7 @@ pub fn slowest(
         // root-resolving aggregates view (uncharged by the budget; see
         // the fold's docs).
         resolve_roots: true,
+        filter: None,
     };
     let Some(merged) = merge_trace_sources(sources, &spec, &cancel, &progress, &mut status)
     else {

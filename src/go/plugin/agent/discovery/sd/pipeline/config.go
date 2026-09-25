@@ -13,11 +13,13 @@ import (
 )
 
 type Config struct {
+	PipelineID     string             `yaml:"-" json:"-"`
 	Source         string             `yaml:"-" json:"-"`
 	ConfigDefaults confgroup.Registry `yaml:"-" json:"-"`
 
-	Disabled bool   `yaml:"disabled,omitempty" json:"disabled,omitempty"`
-	Name     string `yaml:"name" json:"name"`
+	Disabled               bool   `yaml:"disabled,omitempty" json:"disabled,omitempty"`
+	Name                   string `yaml:"name" json:"name"`
+	TrustDiscoveredTargets bool   `yaml:"trust_discovered_targets,omitempty" json:"trust_discovered_targets,omitempty"`
 
 	// Canonical format: discoverer: { <type>: <config> }
 	Discoverer DiscovererPayload `yaml:"discoverer,omitempty" json:"discoverer"`
@@ -304,16 +306,18 @@ func mergeJSONArrays(aRaw, bRaw json.RawMessage) (json.RawMessage, error) {
 // It only marshals the canonical format, not legacy fields.
 func (c Config) MarshalYAML() (any, error) {
 	type output struct {
-		Disabled   bool                `yaml:"disabled,omitempty"`
-		Name       string              `yaml:"name,omitempty"`
-		Discoverer DiscovererPayload   `yaml:"discoverer,omitempty"`
-		Services   []ServiceRuleConfig `yaml:"services,omitempty"`
+		Disabled               bool                `yaml:"disabled,omitempty"`
+		Name                   string              `yaml:"name,omitempty"`
+		Discoverer             DiscovererPayload   `yaml:"discoverer,omitempty"`
+		Services               []ServiceRuleConfig `yaml:"services,omitempty"`
+		TrustDiscoveredTargets bool                `yaml:"trust_discovered_targets,omitempty"`
 	}
 	return output{
-		Disabled:   c.Disabled,
-		Name:       c.Name,
-		Discoverer: c.Discoverer,
-		Services:   c.Services,
+		Disabled:               c.Disabled,
+		Name:                   c.Name,
+		Discoverer:             c.Discoverer,
+		Services:               c.Services,
+		TrustDiscoveredTargets: c.TrustDiscoveredTargets,
 	}, nil
 }
 

@@ -483,6 +483,10 @@
                       "type": "string",
                       "description": "Function method ID."
                     },
+                    "function_name": {
+                      "type": "string",
+                      "description": "Public Function name when the collector overrides the default `<module>:<id>`; the UI and the Functions API use it."
+                    },
                     "name": {
                       "type": "string",
                       "description": "Function display name."

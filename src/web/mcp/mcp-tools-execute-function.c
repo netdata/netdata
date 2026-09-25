@@ -1521,8 +1521,8 @@ static void build_function_name_with_params(BUFFER *dest, const char *function_n
     
     // Add time-based parameters if supported and specified
     if (entry->has_timeframe) {
-        buffer_sprintf(dest, " after:%ld", data->request.after);
-        buffer_sprintf(dest, " before:%ld", data->request.before);
+        buffer_sprintf(dest, " after:%" PRId64, (int64_t)data->request.after);
+        buffer_sprintf(dest, " before:%" PRId64, (int64_t)data->request.before);
     }
 
     if (entry->pagination.enabled && data->request.anchor > 0) {

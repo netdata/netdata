@@ -1855,7 +1855,7 @@ static int test_rrdset_homogeneity_multiplier_sign(void) {
         bool deferred = rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS);
         if(deferred != cases[i].heterogeneous ||
            rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK)) {
-            fprintf(stderr, "%s: %s deferred classified heterogeneous=%d, expected %d (check pending=%d)\n",
+            fprintf(stderr, "%s: %s deferred classified heterogeneous=%d, expected %d (check pending=%u)\n",
                     __FUNCTION__, cases[i].name, deferred, cases[i].heterogeneous,
                     rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK));
             rc = 1;
@@ -2044,16 +2044,16 @@ static int test_rrdset_rejects_invalid_update_every(void) {
     uint32_t min_update_every =
         __atomic_load_n(&st->rrdhost->stream.rcv.min_update_every, __ATOMIC_RELAXED);
     if(min_update_every != valid_update_every) {
-        fprintf(stderr, "%s: valid update every selected minimum %u instead of %ld seconds\n",
-                __FUNCTION__, min_update_every, valid_update_every);
+        fprintf(stderr, "%s: valid update every selected minimum %u instead of %" PRId64 " seconds\n",
+                __FUNCTION__, min_update_every, (int64_t)valid_update_every);
         rc = 1;
     }
 
     rrdset_set_update_every_s(st, 600);
     min_update_every = __atomic_load_n(&st->rrdhost->stream.rcv.min_update_every, __ATOMIC_RELAXED);
     if(min_update_every != valid_update_every) {
-        fprintf(stderr, "%s: receiver minimum increased from %ld to %u seconds\n",
-                __FUNCTION__, valid_update_every, min_update_every);
+        fprintf(stderr, "%s: receiver minimum increased from %" PRId64 " to %u seconds\n",
+                __FUNCTION__, (int64_t)valid_update_every, min_update_every);
         rc = 1;
     }
 

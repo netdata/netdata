@@ -141,12 +141,12 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         }
 
         internal_error(true,
-                       "RRDMETRIC: '%s' of instance '%s' of host '%s' changed UUID from '%s' (retention %ld to %ld, %ld secs) to '%s' (retention %ld to %ld, %ld secs)"
+                       "RRDMETRIC: '%s' of instance '%s' of host '%s' changed UUID from '%s' (retention %" PRId64 " to %" PRId64 ", %" PRId64 " secs) to '%s' (retention %" PRId64 " to %" PRId64 ", %" PRId64 " secs)"
                        , string2str(rm->id)
                        , string2str(rm->ri->id)
                        , rrdhost_hostname(rm->ri->rc->rrdhost)
-                       , uuid1, old_first_time_s, old_last_time_s, old_last_time_s - old_first_time_s
-                       , uuid2, new_first_time_s, new_last_time_s, new_last_time_s - new_first_time_s
+                       , uuid1, (int64_t)old_first_time_s, (int64_t)old_last_time_s, (int64_t)(old_last_time_s - old_first_time_s)
+                       , uuid2, (int64_t)new_first_time_s, (int64_t)new_last_time_s, (int64_t)(new_last_time_s - new_first_time_s)
                        );
 #endif
 

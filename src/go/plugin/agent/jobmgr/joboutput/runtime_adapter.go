@@ -14,7 +14,7 @@ import (
 // ManagedJob is the V1/V2 collector-loop boundary consumed by Job Manager.
 // Collector-specific chart, cycle, and runner state remains private.
 type ManagedJob interface {
-	StartManaged(chan<- struct{})
+	StartManaged(*jobruntime.ManagedRun)
 	Stop()
 	Cleanup()
 }
@@ -59,6 +59,7 @@ func newProcessManagedJob(
 		CollectorCleanup: collectorCleanup,
 		candidateJob:     job,
 		processOwner:     owner,
+		publishRuntime:   scheduled.Publish,
 	}, nil
 }
 
@@ -131,7 +132,8 @@ type scheduledJobSupport struct {
 	scheduler *Scheduler                 // scheduler this job registers with
 	identity  lifecycle.ResourceIdentity // resource identity
 	job       RuntimeJob                 // runtime job registered for ticks
-	started   bool                       // Register succeeded
+	started   bool                       // runtime initiation succeeded
+	published bool                       // Register succeeded after readiness
 	stopped   bool                       // Unregister succeeded
 	released  bool                       // Release succeeded (terminal)
 }
@@ -145,10 +147,20 @@ func (sjs *scheduledJobSupport) Start(context.Context) error {
 	if sjs.started || sjs.stopped || sjs.released {
 		return errors.New("job output: invalid scheduler support start")
 	}
+	sjs.started = true
+	return nil
+}
+
+func (sjs *scheduledJobSupport) Publish() error {
+	sjs.mu.Lock()
+	defer sjs.mu.Unlock()
+	if !sjs.started || sjs.stopped || sjs.released || sjs.published {
+		return errors.New("job output: invalid scheduler support publication")
+	}
 	if err := sjs.scheduler.Register(sjs.identity, sjs.job); err != nil {
 		return err
 	}
-	sjs.started = true
+	sjs.published = true
 	return nil
 }
 
@@ -164,8 +176,10 @@ func (sjs *scheduledJobSupport) Stop(context.Context) error {
 	if sjs.stopped {
 		return nil
 	}
-	if err := sjs.scheduler.Unregister(sjs.identity, sjs.job); err != nil {
-		return err
+	if sjs.published {
+		if err := sjs.scheduler.Unregister(sjs.identity, sjs.job); err != nil {
+			return err
+		}
 	}
 	sjs.stopped = true
 	return nil

@@ -7,6 +7,8 @@ import (
 	"errors"
 	"net"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/unbound/config"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
@@ -71,7 +73,7 @@ func (c *Collector) applyConfig(cfg *config.UnboundConfig) {
 	}
 }
 
-func (c *Collector) initClient() (err error) {
+func (c *Collector) initClient(ctx context.Context) (err error) {
 	var tlsCfg *tls.Config
 	useTLS := !socket.IsUnixSocket(c.Address) && c.UseTLS
 
@@ -80,7 +82,7 @@ func (c *Collector) initClient() (err error) {
 	}
 
 	if useTLS {
-		if tlsCfg, err = tlscfg.NewTLSConfig(c.TLSConfig); err != nil {
+		if tlsCfg, err = tlscfg.NewTLSConfig(ctx, c.TLSConfig); err != nil {
 			return err
 		}
 	}

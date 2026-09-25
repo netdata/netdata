@@ -274,7 +274,7 @@ func newStoreTestCapabilityController(
 	key := config.ExposedKey()
 	return &Controller{
 		store:        store,
-		dependencies: NewSecretDependencyIndex(),
+		dependencies: NewSecretDependencyIndex(testDependencyConfigResolver(t)),
 		entries: map[string]secretEntry{
 			key: {
 				config: config,

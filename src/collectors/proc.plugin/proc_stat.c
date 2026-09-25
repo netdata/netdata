@@ -269,7 +269,7 @@ struct per_core_cpuidle_chart {
 static void* wake_cpu_thread(void* core) {
     pthread_t thread;
     cpu_set_t cpu_set;
-    static size_t cpu_wakeups = 0;
+    static size_t cpu_wakeups __maybe_unused = 0;
     static int errors = 0;
 
     CPU_ZERO(&cpu_set);

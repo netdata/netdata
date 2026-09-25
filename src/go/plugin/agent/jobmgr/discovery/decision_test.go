@@ -41,6 +41,69 @@ func decisionIndexCensus(index *DecisionIndex) decisionTestCensus {
 	return census
 }
 
+func TestDecisionIndexProcessRetirementDoesNotAcknowledgeOrReject(t *testing.T) {
+	unexpected := errors.New("independent preparation failure")
+	tests := map[string]struct {
+		err  error
+		want error
+	}{
+		"process stopped":    {err: jobmgr.ErrProcessAttemptStopped},
+		"target retired":     {err: jobmgr.ErrProcessAttemptRetired},
+		"wrapped retirement": {err: fmt.Errorf("prepare: %w", jobmgr.ErrProcessAttemptRetired)},
+		"joined retirement":  {err: errors.Join(jobmgr.ErrProcessAttemptStopped, jobmgr.ErrProcessAttemptRetired)},
+		"mixed failure":      {err: errors.Join(jobmgr.ErrProcessAttemptStopped, unexpected), want: unexpected},
+		"unrelated failure":  {err: unexpected, want: unexpected},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			commands := &decisionTestCommands{err: test.err}
+			index := newDecisionTestIndex(t, commands, func(DiscoveredChange) (jobmgr.WorkPlan, error) {
+				return jobmgr.WorkPlan{}, nil
+			})
+			config := decisionTestConfig("job", confgroup.TypeStock, "source")
+			batch := []*confgroup.Group{{Source: "source", Configs: []confgroup.Config{config}}}
+			for revision := uint64(1); revision <= 2; revision++ {
+				err := index.Apply(t.Context(), batch)
+				if test.want == nil {
+					require.NoError(t, err)
+				} else {
+					require.ErrorIs(t, err, test.want)
+				}
+				require.Equal(t, decisionTestCensus{
+					sources:    1,
+					candidates: 1,
+					revision:   revision,
+				}, decisionIndexCensus(index))
+				require.Len(t, commands.requests, int(revision), "retirement must not acknowledge the selection")
+			}
+		})
+	}
+}
+
+func TestDecisionIndexRetirementDoesNotHideAnotherReconciliationFailure(t *testing.T) {
+	unexpected := errors.New("independent preparation failure")
+	index := newDecisionTestIndex(t, &decisionTestCommands{err: unexpected},
+		func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
+			if change.Config.Name() == "a-retired" {
+				return jobmgr.WorkPlan{}, jobmgr.ErrProcessAttemptStopped
+			}
+			return jobmgr.WorkPlan{}, nil
+		})
+	err := index.Apply(t.Context(), []*confgroup.Group{{
+		Source: "source",
+		Configs: []confgroup.Config{
+			decisionTestConfig("a-retired", confgroup.TypeStock, "source"),
+			decisionTestConfig("b-failed", confgroup.TypeStock, "source"),
+		},
+	}})
+	require.ErrorIs(t, err, unexpected)
+	require.Equal(t, decisionTestCensus{
+		sources:    1,
+		candidates: 2,
+		revision:   1,
+	}, decisionIndexCensus(index))
+}
+
 func TestDecisionIndexQuarantinesTypedProposalAndContinuesBatch(t *testing.T) {
 	commands := &decisionTestCommands{}
 	index := newDecisionTestIndex(
@@ -877,4 +940,59 @@ func (cdtc *concurrentDecisionTestCommands) SubmitPreparedAndWait(
 	}
 	close(cdtc.healthy)
 	return nil
+}
+
+func TestDecisionIndexReconcilesDiscoveryTrustChanges(t *testing.T) {
+	commands := &decisionTestCommands{}
+	var planned []string
+	index := newDecisionTestIndex(t, commands, func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
+		planned = append(planned, fmt.Sprintf("%s:%t", change.Config.DiscoveryPipelineID(), change.Config.TrustDiscoveredTargets()))
+		return jobmgr.WorkPlan{}, nil
+	})
+	for _, owner := range []struct {
+		pipelineID string
+		trust      bool
+	}{{"pipeline-a", false}, {"pipeline-a", true}, {"pipeline-b", true}, {"pipeline-b", false}} {
+		// Identical target sources and values must not hide a change of trusted owner.
+		config := decisionTestConfig("job", confgroup.TypeDiscovered, "source").
+			SetTrustDiscoveredTargets(owner.trust).SetDiscoveryPipelineID(owner.pipelineID)
+		require.NoError(t, index.Apply(t.Context(), []*confgroup.Group{{Source: "source", Configs: []confgroup.Config{config}}}))
+		require.Equal(t, owner.pipelineID, index.acknowledged[config.FullName()].DiscoveryPipelineID())
+		// Repeating the same authority and values must still be a no-op.
+		require.NoError(t, index.Apply(t.Context(), []*confgroup.Group{{Source: "source", Configs: []confgroup.Config{config}}}))
+	}
+	require.Equal(t, []string{"pipeline-a:false", "pipeline-a:true", "pipeline-b:true", "pipeline-b:false"}, planned)
+	require.Len(t, commands.requests, 4)
+}
+
+func TestDecisionIndexCompetingRejectionDoesNotSuppressTrustRevocation(t *testing.T) {
+	commands := &sequenceDecisionTestCommands{results: []error{
+		nil,
+		jobmgr.RejectProposal(errors.New("invalid competing literal config")),
+		nil,
+	}}
+	index := newDecisionTestIndex(t, commands, func(DiscoveredChange) (jobmgr.WorkPlan, error) {
+		return jobmgr.WorkPlan{}, nil
+	})
+	incumbent := decisionTestConfig("job", confgroup.TypeDiscovered, "shared-source").
+		SetDiscoveryPipelineID("pipeline-a").SetTrustDiscoveredTargets(true)
+	competitor := decisionTestConfig("job", confgroup.TypeDiscovered, "shared-source").
+		SetDiscoveryPipelineID("pipeline-b").SetTrustDiscoveredTargets(false)
+	apply := func(config confgroup.Config) {
+		t.Helper()
+		require.NoError(t, index.Apply(t.Context(), []*confgroup.Group{{Source: config.Source(), Configs: []confgroup.Config{config}}}))
+	}
+	apply(incumbent)
+	apply(competitor)
+	apply(competitor)
+	require.Len(t, commands.requests, 2)
+	require.Equal(t, incumbent.UID(), index.acknowledged[incumbent.FullName()].UID())
+	require.Equal(t, 1, decisionIndexCensus(index).rejected)
+
+	// Same literal data and source, but this time the trusted owner really opts out.
+	incumbent.SetTrustDiscoveredTargets(false)
+	apply(incumbent)
+	require.Len(t, commands.requests, 3)
+	require.Equal(t, incumbent.UID(), index.acknowledged[incumbent.FullName()].UID())
+	require.Zero(t, decisionIndexCensus(index).rejected)
 }

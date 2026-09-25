@@ -1166,23 +1166,149 @@ async fn the_scope_gate_suppresses_the_root_facets_while_selections_are_active()
         json!({"top": [{"value": "span-1", "traces": 5}], "other": 0, "unattributed": 0})
     );
 
-    // Selections active: the aggregate is still the whole window (it
-    // applies no selections and says so), so the facet lists — which
-    // would enumerate filtered-out services with unfiltered counts —
-    // are suppressed even though the request opted in.
+    // Selections active: the aggregate follows them (the svc-a traces
+    // A, C, E — 5 stored spans — and says so through `scope`), while the
+    // facet lists stay suppressed by the product rule "facets describe
+    // the whole window or not at all", even though the request opted in.
     let mut body = functions_body(20);
     body["overview_facets"] = json!(true);
     body["selections"] = json!({"resource.service.name": ["svc-a"]});
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0e", "0c", "0a"]);
     let o = &v["data"]["overview"];
+    assert_eq!(o["scope"], "selection");
+    assert_eq!(o["totals"], json!({"traces": 3, "spans": 5, "errors": 0}));
+    let cells = o["grid"]["cells"].as_array().unwrap();
+    let sum: u64 = cells
+        .iter()
+        .flat_map(|r| r.as_array().unwrap())
+        .map(|c| c.as_u64().unwrap())
+        .sum();
+    assert_eq!(sum, 3, "the grid bins the selected traces only");
+    // A at second 10, C at 30 (D, svc-b, no longer shares the cell), E at 40.
+    assert_eq!(cells[10][0], 1);
+    assert_eq!(cells[20][0], 0);
+    assert_eq!(cells[30][0], 1);
+    assert_eq!(cells[40][0], 1);
+    assert!(o.get("top_root_services").is_none(), "facets stay whole-window-or-nothing");
+    assert!(o.get("top_root_operations").is_none());
+}
+
+#[tokio::test]
+async fn the_aggregate_follows_the_selections_but_never_the_duration_bounds() {
+    let h = handler_with_search_corpus().await;
+    // A selection AND a duration bound: the list honours both (E is the
+    // only svc-a trace with a ≥1µs envelope), the grid honours the
+    // selection alone — duration is its own axis — and `scope` names
+    // exactly that.
+    let mut body = functions_body(20);
+    body["selections"] = json!({"resource.service.name": ["svc-a"]});
+    body["min_trace_duration_ns"] = json!(1_000);
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v["data"]), ["0e"]);
+    let o = &v["data"]["overview"];
+    assert_eq!(o["scope"], "selection");
+    assert_eq!(o["totals"], json!({"traces": 3, "spans": 5, "errors": 0}));
+
+    // Values OR within a key: both services select everything, and the
+    // grid equals the unfiltered one — but the scope still says what ran.
+    let mut body = functions_body(20);
+    body["selections"] = json!({"resource.service.name": ["svc-a", "svc-b"]});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    let o = &v["data"]["overview"];
+    assert_eq!(o["scope"], "selection");
+    assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
+
+    // An empty value list constrains nothing: the plain window grid.
+    let mut body = functions_body(20);
+    body["selections"] = json!({"resource.service.name": []});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(v["data"]["overview"]["scope"], "window");
+}
+
+/// Every trace-level word the engine owns (`trace_level_target`), as
+/// the wire spells it, with a value the list can apply and the ids the
+/// list then shows (newest first). `trace_duration` is absent: a
+/// selection value is text and the field takes integers, so the list
+/// rejects it before any grid decision; the standalone mode, which has
+/// no list, still names it (see [`TRACE_DURATION_SELECTION`]).
+const TRACE_LEVEL_SELECTIONS: [(&str, &str, &[&str]); 3] = [
+    ("root_service_name", "svc-a", &["0e", "0c", "0a"]),
+    ("root_name", "span-1", &["0e", "0c", "0d", "0b", "0a"]),
+    ("trace_id", "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a", &["0a"]),
+];
+
+/// The fourth trace-level word, reachable only where no list validates
+/// the value first.
+const TRACE_DURATION_SELECTION: (&str, &str) = ("trace_duration", "1000");
+
+#[tokio::test]
+async fn a_trace_level_selection_word_falls_back_to_the_window_grid() {
+    let h = handler_with_search_corpus().await;
+    // A trace-level word is a legitimate LIST filter but stored rows
+    // cannot answer it for the grid: the grid runs unfiltered and says
+    // so, rather than guessing from the rollup's approximate root.
+    for (word, value, listed) in TRACE_LEVEL_SELECTIONS {
+        let mut body = functions_body(20);
+        body["selections"] = json!({word: [value]});
+        let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+        assert_eq!(ids(&v["data"]), listed, "{word}: the list applies the word");
+        let o = &v["data"]["overview"];
+        assert_eq!(o["scope"], "window", "{word}");
+        assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}), "{word}");
+    }
+
+    // Mixed with a span-level word, the WHOLE predicate is dropped: the
+    // span-level half alone (svc-b: 2 traces) would misrepresent a list
+    // that applies both.
+    let mut body = functions_body(20);
+    body["selections"] =
+        json!({"root_service_name": ["svc-a"], "resource.service.name": ["svc-b"]});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert!(ids(&v["data"]).is_empty(), "no trace is on both services");
+    let o = &v["data"]["overview"];
     assert_eq!(o["scope"], "window");
     assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
-    assert!(
-        o.get("top_root_services").is_none(),
-        "window-scoped facet lists would contradict the rail"
-    );
-    assert!(o.get("top_root_operations").is_none());
+}
+
+#[tokio::test]
+async fn the_overview_mode_applies_selections_and_reports_scope() {
+    let h = handler_with_search_corpus().await;
+    let mut body = window_body();
+    merge(&mut body, json!({"selections": {"resource.service.name": ["svc-b"]}}));
+    let v = serde_json::to_value(call_on(&h, as_mode("overview", body)).await.unwrap()).unwrap();
+    assert_eq!(v["mode"], "overview");
+    assert_eq!(v["scope"], "selection");
+    assert_eq!(v["totals"], json!({"traces": 2, "spans": 3, "errors": 0}));
+    let cells = v["grid"]["cells"].as_array().unwrap();
+    assert_eq!(cells[20][0], 1, "B at 20");
+    assert_eq!(cells[30][0], 1, "D at 30");
+
+    let v = serde_json::to_value(call_on(&h, as_mode("overview", window_body())).await.unwrap())
+        .unwrap();
+    assert_eq!(v["scope"], "window");
+    assert_eq!(v["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
+
+    // No list to carry a trace-level word for: a clean client error
+    // naming the word, never a silently unfiltered grid — alone or
+    // mixed with a span-level word.
+    let mixed = json!({"root_service_name": ["svc-a"], "resource.service.name": ["svc-b"]});
+    let cases = TRACE_LEVEL_SELECTIONS
+        .iter()
+        .map(|(word, value, _)| (*word, *value))
+        .chain([TRACE_DURATION_SELECTION])
+        .map(|(word, value)| (word, json!({word: [value]})))
+        .chain([("root_service_name", mixed)]);
+    for (word, selections) in cases {
+        let mut body = window_body();
+        merge(&mut body, json!({"selections": selections}));
+        let err = call_on(&h, as_mode("overview", body))
+            .await
+            .expect_err("must be a client error");
+        let msg = err.to_string();
+        assert!(msg.contains(word), "{msg}");
+        assert!(msg.contains("trace-level"), "{msg}");
+    }
 }
 
 #[tokio::test]
@@ -1191,9 +1317,10 @@ async fn the_scope_gate_suppresses_the_root_facets_while_a_duration_bound_is_act
 
     // A lower bound narrows the page to the window's two long traces
     // (envelopes 2500ns and 1500ns) while the aggregate keeps counting
-    // all five, so the same contradiction a selection would cause is
-    // here: lists enumerating durations the page excluded, counted over
-    // the population it does not show.
+    // all five — duration bounds never reach the grid, and `scope` stays
+    // `window` since no selection ran — so lists would enumerate
+    // durations the page excluded, counted over the population it does
+    // not show.
     let mut body = functions_body(20);
     body["overview_facets"] = json!(true);
     body["min_trace_duration_ns"] = json!(1_000);
@@ -1216,6 +1343,7 @@ async fn the_scope_gate_suppresses_the_root_facets_while_a_duration_bound_is_act
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0c", "0d", "0a"]);
     let o = &v["data"]["overview"];
+    assert_eq!(o["scope"], "window");
     assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
     assert!(o.get("top_root_services").is_none());
     assert!(o.get("top_root_operations").is_none());
@@ -1255,6 +1383,7 @@ async fn the_aggregate_captures_the_aligned_window_and_carries_its_own_status() 
     assert_eq!(native["totals"], v["data"]["overview"]["totals"]);
     assert_eq!(native["grid"], v["data"]["overview"]["grid"]);
     assert_eq!(native["unit"], v["data"]["overview"]["unit"]);
+    assert_eq!(native["scope"], v["data"]["overview"]["scope"]);
 }
 
 #[tokio::test]

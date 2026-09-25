@@ -40,6 +40,14 @@ spawn_server_unit_tests() {
   bash "$(dirname "$0")/spawn-server-tests.sh"
 }
 
+acl_tests() {
+  echo "Running ACL and bearer protection shell tests"
+  # acl.sh reads its netdata.cfg templates from the working directory
+  (cd "$(dirname "$0")/acls" &&
+    ASAN_OPTIONS=detect_leaks=0 \
+    bash "$HOME"/netdata/usr/libexec/netdata/plugins.d/acl.sh)
+}
+
 install_netdata || exit 1
 
 c_unit_tests || exit 1
@@ -49,3 +57,5 @@ system_info_unit_test || exit 1
 kickstart_path_unit_test || exit 1
 
 spawn_server_unit_tests || exit 1
+
+acl_tests || exit 1

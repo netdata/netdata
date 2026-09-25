@@ -3,7 +3,7 @@
 package secrets
 
 import (
-	"encoding/json"
+	"bytes"
 	"errors"
 	"fmt"
 	"strconv"
@@ -33,6 +33,7 @@ const (
 	msgSecretStoreNotConfigured    = "The specified secretstore '%s' is not configured."
 	msgInvalidSecretStoreConfig    = "Invalid secretstore configuration."
 	msgSecretStoreValidationFailed = "Secretstore configuration validation failed."
+	msgSecretStoreActivationFailed = "Secretstore activation failed."
 	msgSecretStoreTestFailed       = "Secretstore operational test failed."
 	msgSecretStoreTestUnsupported  = "Configuration is valid; an operational result is unavailable for this secretstore configuration."
 )
@@ -60,15 +61,19 @@ func (c *Controller) Stage(input CommandInput) (*PreparedStoreOperation, error) 
 	case dyncfg.CommandAdd:
 		spec.mode = storeOperationMutation
 		spec.expected = c.store.Generation(target.key)
-		spec.supersede = true
+		spec.acceptedVersion = c.acceptedVersion(target.key)
+		if spec.expected == 0 {
+			spec.mode = storeOperationAdmission
+		}
 		spec.desiredVersion, versionErr = c.allocateDesiredVersion()
 	case dyncfg.CommandUpdate:
 		if _, ok := c.entry(target.key); !ok {
 			return c.operations.immediate(storeOperationResult{}), nil
 		}
+		spec.coalesceConfig = c.pendingAcceptedConfig(target.key)
 		spec.mode = storeOperationMutation
 		spec.expected = c.store.Generation(target.key)
-		spec.supersede = true
+		spec.acceptedVersion = c.acceptedVersion(target.key)
 		spec.desiredVersion, versionErr = c.allocateDesiredVersion()
 	case dyncfg.CommandTest:
 		entry, ok := c.entry(target.key)
@@ -128,20 +133,9 @@ func (c *Controller) prepareGet(
 	if !ok {
 		return c.noopMessage(scope, current, 404, fmt.Sprintf(msgSecretStoreNotConfigured, target.key))
 	}
-	typed, err := typedSecretConfig(c.creators, entry.config.Kind())
-	if err == nil {
-		var payload []byte
-		payload, err = yaml.Marshal(entry.config)
-		if err == nil {
-			err = yaml.Unmarshal(payload, typed)
-		}
-	}
+	payload, err := entry.config.PayloadJSON()
 	if err != nil {
 		return c.noopMessage(scope, current, 500, "Failed to materialize secretstore configuration.")
-	}
-	payload, err := json.Marshal(typed)
-	if err != nil {
-		return nil, err
 	}
 	result, err := lifecycle.NewSealedResult(200, "application/json", payload)
 	if err != nil {
@@ -252,10 +246,30 @@ func (c *Controller) prepareAdd(
 	current lifecycle.ReadyResource,
 	target secretTarget,
 	stage *PreparedStoreOperation,
-) (
-	transaction lifecycle.PreparedResourceTransaction,
-	resultErr error,
-) {
+) (lifecycle.PreparedResourceTransaction, error) {
+	return c.prepareEdit(scope, current, target, stage, true)
+}
+
+func (c *Controller) prepareUpdate(
+	scope lifecycle.ResourceTransactionScope,
+	current lifecycle.ReadyResource,
+	target secretTarget,
+	stage *PreparedStoreOperation,
+) (lifecycle.PreparedResourceTransaction, error) {
+	return c.prepareEdit(scope, current, target, stage, false)
+}
+
+func (c *Controller) prepareEdit(
+	scope lifecycle.ResourceTransactionScope,
+	current lifecycle.ReadyResource,
+	target secretTarget,
+	stage *PreparedStoreOperation,
+	add bool,
+) (transaction lifecycle.PreparedResourceTransaction, resultErr error) {
+	entry, exists := c.entry(target.key)
+	if !add && !exists {
+		return c.noopMessage(scope, current, 404, fmt.Sprintf(msgSecretStoreNotConfigured, target.key))
+	}
 	operation, err := takeStoreOperation(stage)
 	if err != nil {
 		return nil, err
@@ -263,18 +277,22 @@ func (c *Controller) prepareAdd(
 	defer operation.releaseUntransferred(&transaction, &resultErr)
 	result := operation.result
 	if result.config == nil {
-		return c.noopMessageWithCommit(
-			scope,
-			current,
-			400,
-			msgInvalidSecretStoreConfig,
-			func() {
-				c.clearPendingThrough(target.key, result.desiredVersion)
-			},
-		)
+		return c.noopMessage(scope, current, 400, msgInvalidSecretStoreConfig)
 	}
-	config := result.config
-	entry, exists := c.entry(target.key)
+	// Replay can race acceptance or acquisition completion. Identical current
+	// intent needs no adoption; an unused preflight mutation is still aborted.
+	if !add && exists && entry.config.SourceType() == confgroup.TypeDyncfg &&
+		sameSecretPayload(entry.config, result.config) {
+		if entry.status == dyncfg.StatusRunning {
+			return c.noopMessage(scope, current, 200, "")
+		}
+		if c.pendingAcceptedVersion(target.key, entry.version) {
+			return c.noopMessage(scope, current, 202, "")
+		}
+	}
+	if result.coalesced {
+		return c.noopMessage(scope, current, 503, "Secretstore changed while configuration was prepared.")
+	}
 	expected := c.store.Generation(target.key)
 	if expected != 0 {
 		if !exists || current == nil || !scope.Current.Valid() {
@@ -283,98 +301,70 @@ func (c *Controller) prepareAdd(
 	} else if current != nil || scope.Current.Valid() {
 		return nil, errors.New("jobmgr secrets: command resource has no active Store")
 	}
-	if expected != 0 &&
-		entry.status == dyncfg.StatusRunning &&
-		entry.config.SourceType() == confgroup.TypeDyncfg &&
-		entry.config.Hash() == config.Hash() {
-		return c.noopWithCommit(
-			scope,
-			current,
-			mustSecretMessage(200, ""),
-			nil,
-			c.configCreateCleanup(entry),
-			func() {
-				c.clearPendingThrough(target.key, result.desiredVersion)
-			},
-		)
+	if result.expected != expected || result.acceptedVersion != entry.version {
+		return c.noopMessage(scope, current, 503, "Secretstore changed while configuration was prepared.")
 	}
-	if result.expected != expected {
-		result.retryable = true
-		result.err = errors.New("jobmgr secrets: Store changed while preparation was staged")
-		return c.prepareRetryableResult(scope, current, result, expected == 0)
+	if add && expected == 0 {
+		return c.prepareAccepted(scope, current, result)
+	}
+	if expected != 0 && entry.status == dyncfg.StatusRunning &&
+		entry.config.SourceType() == confgroup.TypeDyncfg && entry.config.Hash() == result.config.Hash() {
+		return c.noop(scope, current, mustSecretMessage(200, ""), nil, c.configCreateCleanup(entry))
 	}
 	if result.retryable {
-		return c.prepareRetryableResult(scope, current, result, expected == 0)
+		return c.noopMessage(scope, current, 503, "Secretstore configuration is still busy.")
 	}
-	return c.prepareStoreMutation(scope, current, operation, expected == 0)
+	return c.prepareStoreMutation(scope, current, operation, false)
 }
 
-func (c *Controller) prepareUpdate(
+// JSON normalizes nested YAML maps and numeric decoding differences without
+// resolving references or discarding payload fields from the equality check.
+func sameSecretPayload(a, b secretstore.Config) bool {
+	left, err := a.PayloadJSON()
+	if err != nil {
+		return false
+	}
+	right, err := b.PayloadJSON()
+	return err == nil && bytes.Equal(left, right)
+}
+
+// prepareAccepted publishes raw intent before starting its exact activation owner.
+func (c *Controller) prepareAccepted(
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
-	target secretTarget,
-	stage *PreparedStoreOperation,
-) (
-	transaction lifecycle.PreparedResourceTransaction,
-	resultErr error,
-) {
-	entry, exists := c.entry(target.key)
-	if !exists {
-		return c.noopMessage(
-			scope,
-			current,
-			404,
-			fmt.Sprintf(msgSecretStoreNotConfigured, target.key),
-		)
+	result storeOperationResult,
+) (lifecycle.PreparedResourceTransaction, error) {
+	entry := secretEntry{
+		config:  result.config,
+		status:  dyncfg.StatusAccepted,
+		version: result.desiredVersion,
 	}
-	operation, err := takeStoreOperation(stage)
-	if err != nil {
-		return nil, err
+	if result.err != nil {
+		entry.status = dyncfg.StatusFailed
 	}
-	defer operation.releaseUntransferred(&transaction, &resultErr)
-	result := operation.result
-	if result.config == nil {
-		return c.noopMessageWithCommit(
-			scope,
-			current,
-			400,
-			msgInvalidSecretStoreConfig,
-			func() {
-				c.clearPendingThrough(target.key, result.desiredVersion)
-			},
-		)
-	}
-	config := result.config
-	expected := c.store.Generation(target.key)
-	if expected != 0 {
-		if current == nil || !scope.Current.Valid() {
-			return nil, errors.New("jobmgr secrets: active Store differs from command resource")
-		}
-	} else if current != nil || scope.Current.Valid() {
-		return nil, errors.New("jobmgr secrets: command resource has no active Store")
-	}
-	installFailure := expected == 0
-	if expected != 0 && entry.config.Hash() == config.Hash() {
-		return c.noopWithCommit(
-			scope,
-			current,
-			mustSecretMessage(200, ""),
-			nil,
-			c.configCreateCleanup(entry),
-			func() {
-				c.clearPendingThrough(target.key, result.desiredVersion)
-			},
-		)
-	}
-	if result.expected != expected {
-		result.retryable = true
-		result.err = errors.New("jobmgr secrets: Store changed while preparation was staged")
-		return c.prepareRetryableResult(scope, current, result, installFailure)
-	}
-	if result.retryable {
-		return c.prepareRetryableResult(scope, current, result, installFailure)
-	}
-	return c.prepareStoreMutation(scope, current, operation, installFailure)
+	emit := c.configCreateCleanup(entry)
+	return newPreparedSecretTransaction(preparedSecretSpec{
+		scope:      scope,
+		current:    current,
+		controller: c,
+		entry:      &entry,
+		result:     mustSecretMessage(202, ""),
+		commit: func() {
+			c.clearPendingThrough(entry.config.ExposedKey(), entry.version)
+			if entry.status == dyncfg.StatusAccepted {
+				c.retainPending(entry.config, entry.version, nil)
+			} else {
+				c.observeValidationFailure(entry.config.ExposedKey(), result.err)
+			}
+		},
+		cleanup: func() error {
+			if err := emit(); err != nil {
+				return err
+			}
+			c.startPending(entry.config.ExposedKey(), entry.version)
+			return nil
+		},
+	})
 }
 
 func (c *Controller) prepareRemove(
@@ -421,8 +411,7 @@ func (c *Controller) prepareRemove(
 	expected := c.store.Generation(target.key)
 	if expected == 0 &&
 		current == nil &&
-		!scope.Current.Valid() &&
-		entry.status == dyncfg.StatusFailed {
+		!scope.Current.Valid() {
 		return newPreparedSecretTransaction(
 			preparedSecretSpec{
 				scope:      scope,
@@ -445,7 +434,9 @@ func (c *Controller) prepareRemove(
 	if err != nil {
 		return nil, err
 	}
-	mutationOwner := preparedMutationOwner{mutation: mutation}
+	mutationOwner := preparedMutationOwner{
+		mutation: mutation,
+	}
 	defer mutationOwner.releaseUntransferred(&transaction, &resultErr)
 	return mutationOwner.prepareTransaction(preparedSecretSpec{
 		scope:      scope,
@@ -484,7 +475,7 @@ func (c *Controller) prepareStoreMutation(
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	operation *takenStoreOperation,
-	installFailure bool,
+	settleAccepted bool,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if operation == nil || !scope.Successor.Valid() {
 		return nil, errors.New("jobmgr secrets: invalid Store mutation successor")
@@ -493,8 +484,9 @@ func (c *Controller) prepareStoreMutation(
 	config := materialized.config
 	prepareErr := materialized.err
 	entry := secretEntry{
-		config: config,
-		status: dyncfg.StatusRunning,
+		config:  config,
+		status:  dyncfg.StatusRunning,
+		version: materialized.desiredVersion,
 	}
 	if prepareErr != nil {
 		spec := preparedSecretSpec{
@@ -508,11 +500,13 @@ func (c *Controller) prepareStoreMutation(
 			),
 			cleanup:    func() error { return nil },
 			controller: c,
-			commit: func() {
-				c.clearPendingThrough(config.ExposedKey(), materialized.desiredVersion)
-			},
 		}
-		if installFailure {
+		if settleAccepted {
+			spec.commit = func() {
+				c.clearPendingThrough(config.ExposedKey(), materialized.desiredVersion)
+				c.observeActivationFailure(config.ExposedKey(), prepareErr)
+			}
+			spec.result = mustSecretMessage(202, secretFailureMessage(msgSecretStoreActivationFailed, prepareErr))
 			entry.status = dyncfg.StatusFailed
 			spec.cleanup = c.configCreateCleanup(entry)
 			spec.entry = &entry
@@ -550,8 +544,10 @@ func takeStoreOperation(stage *PreparedStoreOperation) (*takenStoreOperation, er
 	mutation := result.mutation
 	result.mutation = nil
 	return &takenStoreOperation{
-		result:   result,
-		mutation: preparedMutationOwner{mutation: mutation},
+		result: result,
+		mutation: preparedMutationOwner{
+			mutation: mutation,
+		},
 	}, nil
 }
 
@@ -602,23 +598,6 @@ func (c *Controller) noopMessage(
 	message string,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	return c.noop(scope, current, mustSecretMessage(code, message), nil, nil)
-}
-
-func (c *Controller) noopMessageWithCommit(
-	scope lifecycle.ResourceTransactionScope,
-	current lifecycle.ReadyResource,
-	code int,
-	message string,
-	commit func(),
-) (lifecycle.PreparedResourceTransaction, error) {
-	return c.noopWithCommit(
-		scope,
-		current,
-		mustSecretMessage(code, message),
-		nil,
-		nil,
-		commit,
-	)
 }
 
 func formatSecretJobs(refs []secretstore.JobRef) string {

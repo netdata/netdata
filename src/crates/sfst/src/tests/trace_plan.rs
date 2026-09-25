@@ -338,6 +338,20 @@ fn tier_matrix_matches_the_oracle() {
                     "case {ci}: count agrees with the oracle"
                 );
             }
+            // The whole-set extraction is the k = "everything" oracle,
+            // and charges exactly what it emits.
+            let mut w = ScanWork::default();
+            let all = compiled.matched_in_range(lo, hi, &mut w);
+            assert_eq!(
+                all,
+                oracle(rows.as_slice(), pred, lo, hi, N),
+                "case {ci}, window [{lo},{hi}): matched_in_range = full oracle"
+            );
+            assert_eq!(
+                w.rows_visited,
+                all.len() as u64,
+                "case {ci}: whole-set extraction work = emitted positions"
+            );
         }
     }
 }
@@ -511,6 +525,15 @@ fn extraction_edges() {
         matched
     );
     assert_eq!(compiled.count_in_range(0, u32::MAX), matched.len() as u64);
+
+    // The whole-set extraction shares the window edges: empty and
+    // inverted windows emit nothing, hi past the universe clamps.
+    let mut w = ScanWork::default();
+    assert!(compiled.matched_in_range(50, 50, &mut w).is_empty());
+    assert!(compiled.matched_in_range(60, 50, &mut w).is_empty());
+    assert_eq!(w.rows_visited, 0, "empty extractions charge nothing");
+    assert_eq!(compiled.matched_in_range(0, u32::MAX, &mut w), matched);
+    assert_eq!(w.rows_visited, matched.len() as u64);
 }
 
 /// A malformed regex is a hard compile error, whichever tier the field

@@ -7,7 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -58,7 +61,7 @@ func TestSecretImpactMessageHasOneCombinedBound(t *testing.T) {
 }
 
 func TestSecretDependencyIndexTracksAcknowledgedPostimages(t *testing.T) {
-	index := NewSecretDependencyIndex()
+	index := NewSecretDependencyIndex(testDependencyConfigResolver(t))
 	tests := map[string]struct {
 		id         string
 		status     dyncfg.Status
@@ -73,7 +76,11 @@ func TestSecretDependencyIndexTracksAcknowledgedPostimages(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			config := map[string]any{"module": "module", "name": test.id[len("module_"):]}
+			config := map[string]any{
+				"module":          "module",
+				"name":            test.id[len("module_"):],
+				"__source_type__": confgroup.TypeDyncfg,
+			}
 			for keyIndex, key := range test.references {
 				config[fmt.Sprintf("secret_%d", keyIndex)] = "${store:" + key + ":value}"
 			}
@@ -142,14 +149,15 @@ func TestSecretDependencyIndexTracksAcknowledgedPostimages(t *testing.T) {
 }
 
 func TestSecretDependencyIndexAcceptsMixedReferenceProviders(t *testing.T) {
-	index := NewSecretDependencyIndex()
+	index := NewSecretDependencyIndex(testDependencyConfigResolver(t))
 	payload, err := yaml.Marshal(map[string]any{
-		"module": "module",
-		"name":   "mixed",
-		"token":  "${store:vault:main:value}",
-		"host":   "${HOST:-localhost}",
-		"path":   "${file:/run/config}",
-		"custom": "${custom:operand}",
+		"module":          "module",
+		"name":            "mixed",
+		"token":           "${store:vault:main:value}",
+		"host":            "${HOST:-localhost}",
+		"path":            "${file:/run/config}",
+		"custom":          "${custom:operand}",
+		"__source_type__": confgroup.TypeDyncfg,
 	})
 	require.NoError(t, err)
 
@@ -171,8 +179,104 @@ func TestSecretDependencyIndexAcceptsMixedReferenceProviders(t *testing.T) {
 	require.Equal(t, "module_mixed", refs[0].ID)
 }
 
+func TestSecretDependencyIndexQueriesCurrentAcceptedIntent(t *testing.T) {
+	index := NewSecretDependencyIndex(testDependencyConfigResolver(t))
+	enabled := map[string]bool{"module_starting": true, "module_waiting": true}
+	index.SetActivationEnabled(func(id string) bool {
+		require.True(t, index.mu.TryLock(), "activation query must run outside the dependency lock")
+		index.mu.Unlock()
+		return enabled[id]
+	})
+	for name, status := range map[string]dyncfg.Status{
+		"running": dyncfg.StatusRunning, "starting": dyncfg.StatusAccepted,
+		"waiting": dyncfg.StatusAccepted, "passive": dyncfg.StatusAccepted,
+		"disabled": dyncfg.StatusDisabled, "failed": dyncfg.StatusFailed,
+	} {
+		config := confgroup.Config{"module": "module", "name": name, "secret": "${store:vault:main:key}"}.
+			SetSourceType(confgroup.TypeDyncfg)
+		payload, err := yaml.Marshal(config)
+		require.NoError(t, err)
+		commit, err := index.PrepareJobChange(config.FullName(), &dyncfg.GraphConfig{
+			ID: config.FullName(), Module: config.Module(), Name: config.Name(), Status: status.String(), Payload: payload,
+		})
+		require.NoError(t, err)
+		commit()
+	}
+	refs := index.Affected("vault:main", true)
+	require.Equal(t, []secretstore.JobRef{
+		{ID: "module_running", Display: "module:running"},
+		{ID: "module_starting", Display: "module:starting"},
+		{ID: "module_waiting", Display: "module:waiting"},
+	}, refs)
+	require.Len(t, index.Affected("vault:main", false), 6)
+	require.True(t, index.Affects("vault:main", "module_waiting", true))
+	require.False(t, index.Affects("vault:main", "module_passive", true))
+	// ENABLE and cancellation can change intent without changing Accepted status.
+	enabled["module_passive"] = true
+	delete(enabled, "module_waiting")
+	require.True(t, index.Affects("vault:main", "module_passive", true))
+	require.False(t, index.Affects("vault:main", "module_waiting", true))
+	require.Equal(t, "module_passive", index.Affected("vault:main", true)[0].ID)
+}
+
+func TestSecretDependencyIndexSourcePolicy(t *testing.T) {
+	tests := map[string]struct {
+		sourceType string
+		trust      bool
+		allowed    bool
+	}{
+		"stock":              {sourceType: confgroup.TypeStock, allowed: true},
+		"user":               {sourceType: confgroup.TypeUser, allowed: true},
+		"dyncfg":             {sourceType: confgroup.TypeDyncfg, allowed: true},
+		"trusted discovered": {sourceType: confgroup.TypeDiscovered, trust: true, allowed: true},
+		"discovered":         {sourceType: confgroup.TypeDiscovered},
+		"empty":              {},
+		"unknown":            {sourceType: "future-source"},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			index := NewSecretDependencyIndex(testDependencyConfigResolver(t))
+			config := confgroup.Config{
+				"module": "module", "name": "job",
+				"secret":    "${store:vault:main:value}",
+				"providers": "${env:VALUE}|${file:/synthetic/value}|${cmd:/synthetic/command}",
+			}
+			expected := []secretstore.JobRef{{ID: config.FullName(), Display: "module:job"}}
+			postimage := func() *dyncfg.GraphConfig {
+				payload, err := yaml.Marshal(config)
+				require.NoError(t, err)
+				return &dyncfg.GraphConfig{
+					ID: config.FullName(), Module: config.Module(), Name: config.Name(),
+					Status: dyncfg.StatusRunning.String(), Payload: payload,
+				}
+			}
+			// Begin with a dependency so replacement must remove any old Store edge.
+			config.SetSourceType(confgroup.TypeUser)
+			commit, err := index.PrepareJobChange(config.FullName(), postimage())
+			require.NoError(t, err)
+			commit()
+			require.Equal(t, expected, index.Affected("vault:main", true))
+
+			config.SetSourceType(test.sourceType).SetTrustDiscoveredTargets(test.trust)
+			if !test.allowed {
+				config["malformed"] = "${store:invalid}|${env:}"
+			}
+			commit, err = index.PrepareJobChange(config.FullName(), postimage())
+			require.NoError(t, err)
+			require.Equal(t, expected, index.Affected("vault:main", true))
+			commit()
+			if test.allowed {
+				require.Equal(t, expected, index.Affected("vault:main", true))
+			} else {
+				require.Empty(t, index.Affected("vault:main", false))
+				require.False(t, index.Affects("vault:main", config.FullName(), false))
+			}
+		})
+	}
+}
+
 func BenchmarkBSecretDependencyLookup(b *testing.B) {
-	index := NewSecretDependencyIndex()
+	index := NewSecretDependencyIndex(testDependencyConfigResolver(b))
 	const population = 1_000
 	for job := range population {
 		key := "vault:other"
@@ -182,7 +286,7 @@ func BenchmarkBSecretDependencyLookup(b *testing.B) {
 		id := fmt.Sprintf("module_%d", job)
 		payload, err := yaml.Marshal(map[string]any{
 			"module": "module", "name": fmt.Sprintf("%d", job),
-			"secret": "${store:" + key + ":value}",
+			"secret": "${store:" + key + ":value}", "__source_type__": confgroup.TypeDyncfg,
 		})
 		if err != nil {
 			require.FailNow(b, "benchmark failed", err)
@@ -209,4 +313,15 @@ func BenchmarkBSecretDependencyLookup(b *testing.B) {
 			require.FailNow(b, "benchmark failed", len(refs))
 		}
 	}
+}
+
+func testDependencyConfigResolver(t testing.TB) *secretconfig.ConfigResolver {
+	t.Helper()
+	resolver, err := secretresolver.NewAtomicResolver(nil)
+	require.NoError(t, err)
+	configs, err := secretconfig.NewConfigResolver(resolver, func([]string) (secretresolver.AtomicScope, error) {
+		panic("dependency extraction must not acquire secrets")
+	})
+	require.NoError(t, err)
+	return configs
 }

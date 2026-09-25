@@ -1346,7 +1346,7 @@ static int unittest_dump_labels(const char *name, const char *value, RRDLABEL_SR
     if (!index && data) {
         fprintf(stderr, "%s\n", (char *) data);
     }
-    fprintf(stderr, "LABEL \"%s\" = %d \"%s\"\n", name, ls & (~RRDLABEL_FLAG_INTERNAL), value);
+    fprintf(stderr, "LABEL \"%s\" = %u \"%s\"\n", name, ls & (~RRDLABEL_FLAG_INTERNAL), value);
     return 1;
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -494,8 +495,8 @@ func (*assemblyTestJob) CleanupRejected()                           {}
 func (*assemblyTestJob) Tick(int)                                   {}
 func (*assemblyTestJob) Cleanup()                                   {}
 func (*assemblyTestJob) Stop()                                      {}
-func (*assemblyTestJob) StartManaged(ready chan<- struct{}) {
-	close(ready)
+func (*assemblyTestJob) StartManaged(run *jobruntime.ManagedRun) {
+	run.Ready()
 }
 
 type shutdownFunctionReadyResource struct {

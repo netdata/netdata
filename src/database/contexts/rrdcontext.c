@@ -31,11 +31,9 @@ struct rrdcontext_reason rrdcontext_reasons[] = {
 };
 
 void rrd_reasons_to_buffer_json_array_items(RRD_FLAGS flags, BUFFER *wb) {
-    for(int i = 0, added = 0; rrdcontext_reasons[i].name ; i++) {
-        if (flags & rrdcontext_reasons[i].flag) {
+    for(int i = 0; rrdcontext_reasons[i].name ; i++) {
+        if (flags & rrdcontext_reasons[i].flag)
             buffer_json_add_array_item_string(wb, rrdcontext_reasons[i].name);
-            added++;
-        }
     }
 }
 // ----------------------------------------------------------------------------

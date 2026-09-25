@@ -1,6 +1,6 @@
 ---
 name: collectors-go-framework-v2
-description: Implement, migrate or review Go go.d framework V2 collectors, CollectorV2 lifecycle, metrix metric stores, charts.yaml/charttpl/chartengine, Functions and host scopes/vnodes. Use affected contracts and source owners; collector product/config design uses collectors-go-design.
+description: Implement, migrate or review Go go.d framework V2 collectors, CollectorV2 lifecycle, metrix metric stores, charts.yaml authoring (defaults, families, ordering, statesets, labels), charttpl/chartengine, Functions and host scopes/vnodes. Use affected contracts and source owners; collector product/config design uses collectors-go-design.
 ---
 
 # Writing Go go.d Modules With Framework V2
@@ -28,6 +28,7 @@ also needs its compatibility guide. Follow dependencies when a change reaches ad
 | Metric-store cycles, descriptors or caching | `src/go/pkg/metrix/README.md` and Metrics And Charts below |
 | Runtime chart output or lifecycle | `src/go/plugin/framework/chartengine/README.md` |
 | Template format, identity or reducers | `src/go/plugin/framework/charttpl/README.md` and Chart Label Identity below |
+| Writing or reviewing a `charts.yaml`: defaults, families, ordering, statesets, labels, shared contexts, tests | `./chart-template.md` |
 | Host scopes or vnodes | `.agents/skills/collectors-go-framework-v2/go-v2-host-scope.md` and Host Scopes below |
 
 Primary modern example: `src/go/plugin/go.d/collector/cato_networks/`. Use focused pieces, not the whole collector
@@ -55,15 +56,16 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
 - `New()` SHOULD own scalar defaults, `metrix.NewCollectorStore()`, typed metric instruments, and test seams;
   conditional or mode-dependent defaults follow `collectors-go-design/operator-surface.md` §4.
 - V2 collectors MUST write metrics through `metrix.CollectorStore` during
-  `Collect()` and provide chart template YAML through `ChartTemplateYAML()`;
-  embedded `charts.yaml` is RECOMMENDED.
+  `Collect()` and expose exactly one chart provider. Embedded `charts.yaml` through `ChartTemplateYAML()` is
+  RECOMMENDED for static definitions. Changing native membership uses `ChartTemplateSet()`; its ownership,
+  normalization, fixed-policy and replacement contracts are in
+  `src/go/plugin/framework/chartengine/README.md#named-active-template-sets`.
 - `Collect(ctx)` MUST return `error` and write metrics to `metrix`; it MUST NOT
   return a V1 `map[string]int64`.
-- Long-running side-effect loops that must start only with the running job MAY
-  implement optional `collectorapi.CollectorV2Runner`. `Run(ctx)` MUST return
-  promptly after cancellation. Do not start operational polling from `Init()` or
-  `Check()`, because DynCfg `test` and autodetection use those methods without
-  starting the runtime job.
+- Receivers and long-running background loops MAY implement optional `collectorapi.CollectorV2Runner.Run(ctx, ready)`.
+  Keep exclusive acquisition and operational polling out of `Init`/`Check`, which may run while an incumbent is active.
+  Readiness, retry, cancellation, panic, cleanup and output fencing MUST follow
+  `src/go/plugin/framework/jobruntime/README.md#runtime-readiness-and-termination`.
 - Collector `Cleanup(ctx)` MUST be idempotent. The framework may call it more
   than once, including after partial `Init` / `Check` setup.
 - `Check()` MUST stay a cheap detection path: no reservation, no remote side
@@ -118,9 +120,10 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
 - Use `Vec(...)` for labels, `Gauge` for current values,
   `Counter.ObserveTotal()` for source counters, and `StateSet` for fixed
   one-active-state values.
-- Metric names MUST be stable and selected by `charts.yaml`.
-- In `charts.yaml`, use `version: v1`, `context_namespace`, `instances.by_labels`,
-  `instances.optional_by_labels`, and `label_promotion` where their operator-facing behavior is needed.
+- Metric names MUST be stable and selected by `charts.yaml`; stateset metric naming is owned by
+  `./chart-template.md#statesets`.
+- Template authoring (defaults, contexts, families, ordering, statesets, values, labels, shared contexts, tests) is
+  owned by `./chart-template.md`; the bullets below are the runtime contracts it relies on.
 - Charts SHOULD omit `algorithm` for normal type-driven behavior. At runtime,
   chartengine maps `metrix` counters to `incremental` dimensions and gauges or
   other kinds to `absolute`, including dynamically built `charttpl.Chart`
@@ -142,8 +145,8 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
   bare `le` upper-bound value and ordered numerically with `+Inf` last. Do NOT
   add collector-local cumulative-bucket workaround metrics or a bucket-mode
   option for V2 charts.
-- Put multipliers, divisors, hidden flags, and float formatting in the chart
-  template, not ad hoc chart-emission code.
+- Multipliers, divisors and hidden flags belong in the chart template, not ad hoc chart-emission code; the float
+  flag is instrument metadata (`./chart-template.md#values`).
 - When instance identity omits labels—either because `instances.by_labels` does not select them or an
   `instances.optional_by_labels` key is absent—multiple source series can map to one rendered dimension. The effective
   `aggregation` MUST match the metric meaning. Set it on the chart; it applies to every dimension. Absence means
@@ -174,15 +177,18 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
 - To reproduce a V1 chart context in a migration, inject `context_namespace` (the
   fixed prefix, or `prefix.<app>` per job) so autogen rebuilds `prefix.<metric>` /
   `prefix.<app>.<metric>` without hand-built chart IDs.
-- When a collector builds its chart template at RUNTIME (not a static `charts.yaml`):
+- When a collector builds a static YAML document at runtime (the supported `ChartTemplateYAML` capability):
   - Emit it with `charttpl.Spec.MarshalTemplate()` (runs `Validate()` only, then
     marshals with `yaml.v2`, the decoder's library). Do NOT hand-roll `Validate()` +
     `yaml.Marshal`, and do NOT marshal with `yaml.v3`.
   - If you mutate a `charttpl.Group` borrowed from a shared profile/catalog, deep-copy
     it first with `Group.Clone()` so per-job edits cannot corrupt the shared template.
     A `Group` you decoded yourself per job is already owned and needs no clone.
-- Skip empty distributions -- e.g. a summary whose every quantile is NaN -- so a
-  chart waits for real data, matching how scalar NaN values are already skipped.
+- For native snapshots, handle `NewTemplateSet` errors where content is selected and retain the resulting pointer.
+  Use the live provider and store with `collecttest.AssertChartCoverage`; do not reconstruct a second test-only set.
+- Collectors MUST choose whether an empty observation window omits the family or publishes unavailable fields.
+  Snapshot MeasureSet gauge availability and its effect on chart lifetime are owned by
+  `src/go/pkg/metrix/README.md#field-availability`; do not universally skip all-NaN families.
 - For dynamic surfaces whose label sets churn, `metrix`'s `Vec` handle cache is
   unbounded; cache per-series instruments yourself and evict handles unseen for N
   cycles to stay bounded. Prefer a framework fix if the need is general
@@ -270,9 +276,12 @@ applicable coverage and required validation evidence without creating a new PR/S
 
 - config YAML/JSON serialization compatibility;
 - `Init`, `Check`, `Collect`, and `Cleanup` lifecycle coverage;
+- for a `CollectorV2Runner`: readiness only after acquisition, startup rollback, cancellation and terminal failure;
+  `jobruntime.NewJobV2` with `jobruntime.NewManagedRun` drives the real `Run`/tick/emission path from a collector test;
 - explicit metric-store cycle tests with `BeginCycle`, success commit, and abort
   on expected collection errors;
-- chart-template schema/decode/validate/compile coverage;
+- chart-template schema/decode/validate/compile coverage and the artifact drift checks in
+  `src/go/plugin/go.d/pkg/collecttest/artifacts.go` (`./chart-template.md#tests`);
 - chart coverage assertions for fixtures expected to materialize all dimensions;
 - host-scope tests when scopes/vnodes are used.
 
@@ -307,3 +316,9 @@ Tests are evidence only when they have an independent oracle:
 - Final sweep: dead fields and helpers, duplicated defaults, unused persisted
   state, repeated finalization, interfaces or knobs whose motivating requirement
   disappeared, and tests that pin prose are removed before review.
+- Checklist pass: before declaring a new collector ready, you MUST check the complete diff against
+  `src/go/plugin/go.d/docs/how-to-write-a-collector.md` (File Layout, Registration And Lifecycle, Collect Flow, Tests),
+  `AGENTS.md#go-test-style`, `./chart-template.md#review-checklist` and the review questions of every
+  `collectors-metadata-yaml` family the collector's `metadata.yaml` fills. Record each deviation and its reason in the
+  SOW; a passing build and test run is not evidence that these were applied. When independent review is required,
+  put the same sections in the reviewer's brief; a parser-only or arithmetic-only review does not cover them.

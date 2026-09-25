@@ -3,6 +3,7 @@
 package vsphere
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -96,7 +97,7 @@ func (c *Collector) validateVSANConfig() error {
 	return nil
 }
 
-func (c *Collector) initClient() (*client.Client, error) {
+func (c *Collector) initClient(ctx context.Context) (*client.Client, error) {
 	config := client.Config{
 		URL:       c.URL,
 		User:      c.Username,
@@ -104,7 +105,7 @@ func (c *Collector) initClient() (*client.Client, error) {
 		Timeout:   c.Timeout.Duration(),
 		TLSConfig: c.ClientConfig.TLSConfig,
 	}
-	return client.New(config)
+	return client.New(ctx, config)
 }
 
 func (c *Collector) initDiscoverer(cli *client.Client) error {

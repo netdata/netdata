@@ -18,11 +18,12 @@ already owns the behavior.
 | Need | Start with |
 |---|---|
 | V2 metrics, metric stores, host scopes | `src/go/pkg/metrix` |
-| Duration and tri-state config option types | `src/go/pkg/confopt` |
+| Duration, tri-state and enum config option types | `src/go/pkg/confopt` |
 | HTTP request/client config | `src/go/pkg/web` |
 | TLS config outside HTTP | `src/go/pkg/tlscfg` |
-| Bounded configured-file reads | `src/go/pkg/safefile` |
+| Configured credential-file reads | `src/go/pkg/credentialfile` |
 | Prometheus exposition parsing | `src/go/pkg/prometheus` |
+| Metric name/label replacement and filtering | [`src/go/pkg/relabel`](/src/go/pkg/relabel/README.md) |
 | User selector/matcher grammar | `src/go/pkg/matcher` |
 | Collector logging and log limiting | `src/go/logger` |
 | Function request/response helpers | `src/go/pkg/funcapi` |
@@ -52,12 +53,14 @@ When:
 
 - users configure durations that should accept strings such as `5s`, `30m`, or numeric seconds;
 - users need explicit `auto` / `enabled` / `disabled` behavior instead of a plain boolean;
+- an option takes one of a fixed set of string values, with a default that an empty or omitted value means;
 - a migration needs to preserve legacy pointer-boolean semantics without keeping pointer plumbing in new code.
 
 Why:
 
 - `confopt.Duration` and `confopt.LongDuration` centralize YAML/JSON duration parsing and formatting;
 - `confopt.AutoBool` makes tri-state behavior explicit and schema-friendly;
+- `confopt.Enum` decodes and encodes an empty value as its default, and `Validate` reports the allowed values;
 - collectors avoid ad hoc parsers and inconsistent boolean defaults.
 
 ## HTTP Collectors
@@ -74,8 +77,10 @@ When:
 Why:
 
 - `web.HTTPConfig` embeds `web.RequestConfig` and `web.ClientConfig` so HTTP collectors expose the same option surface;
-- `web.NewHTTPClient(c.ClientConfig)` applies timeout, TLS, proxy, redirect, and HTTP/2 behavior consistently;
-- `web.NewHTTPRequest(c.RequestConfig)` and `web.NewHTTPRequestWithPath(c.RequestConfig, path)` apply user agent,
+- `web.NewHTTPClient(ctx, c.ClientConfig)` applies timeout, TLS, proxy, redirect, and HTTP/2
+  behavior consistently;
+- `web.NewHTTPRequest(ctx, c.RequestConfig)` and
+  `web.NewHTTPRequestWithPath(ctx, c.RequestConfig, path)` apply user agent,
   authentication, headers, body, and safe path joining.
 
 Pattern:
@@ -91,12 +96,33 @@ x509-style checks. HTTP collectors should get TLS behavior through `web.HTTPConf
 
 ### Configured credential and TLS files
 
-`web` bearer-token files and `tlscfg` CA files use `src/go/pkg/safefile`; certificate and key files use it when both are
-configured. The helper opens the path once, verifies the opened object is a regular file, reads at most 1 MiB, and closes
-it. Symlinks to regular files are supported; non-regular objects and larger files are rejected.
+HTTP helpers handle credential files internally. `web.NewHTTPClient(ctx, cfg)` returns a standard `*http.Client`;
+`web.NewHTTPRequest(ctx, cfg)` and `web.NewHTTPRequestWithPath(ctx, cfg, path)` return standard requests. Callers do not
+pass or own a reader. Ordinary test/custom transports can be passed directly to clients and `web.DoHTTP`.
+Keep `web.DoHTTP(client)` response/parsing helpers per use; their `OnNokCode` callback is mutable.
 
-Use `safefile.Read` for new bounded credential or key-material paths that share this contract. Do not add a separate
-preflight followed by `os.ReadFile`: that checks a different filesystem object and leaves the production read unbounded.
+Each configured file operation uses its own reduced-authority helper on Unix. Requests without a bearer file start no
+helper process. `tlscfg.NewTLSConfig(ctx, cfg)` reads each configured CA/cert/key file independently. SDK/RPC HTTP consumers
+use the same `web.NewHTTPClient` constructor. Cookie collection calls `Stat` and conditionally `Open`/parse; it closes the
+stream before returning. No helper process is retained between operations.
+
+On Unix the operation uses a reduced-authority helper. Windows retains the service account's file authority. Helpers
+fail closed and never fall back to elevated local reads. Pass the current Init, collection or Function context before
+reading a file. Do not retain reader state in a job, HTTP client, configuration or context, or cache bearer contents.
+
+Bearer tokens are read on every request. CA files, and certificate/key files when both are configured, retain the
+`safefile` contract: validate the opened object as regular, accept symlinks to regular files and read at most 1 MiB.
+`ReadAll` and streaming `Open` support existing unbounded input policies; they do not implicitly adopt that limit. Cookie
+files retain per-collection `Stat`, reload on mtime changes and streaming parsing. Errors must not contain file contents
+or parser fragments derived from credential input.
+
+Use `credentialfile.Read`/`ReadAll` for new configurable credential paths. `safefile` is descriptor validation, not a
+privilege boundary. Do not add preflight checks followed by `os.ReadFile`. Unit tests may use private stateless
+read seams and `testutil.New()` from `pkg/credentialfile/testutil` for synthetic fixtures; public APIs use the real
+credential-file boundary.
+
+This boundary covers explicit native credential-file options. SDK default credential chains and database DSN processing
+retain their existing behavior.
 
 ## Prometheus Endpoints
 
@@ -114,7 +140,18 @@ Why:
 - it handles Prometheus text parsing and gzip responses;
 - selectors avoid parsing or processing metric families the collector will not use.
 
+Pass the HTTP client to `prometheus.New(client, request)` or
+`prometheus.NewWithSelector(client, request, selector)`. Use `ScrapeContext(ctx)`, `ScrapeSeries(ctx)` or
+`ScrapeSamples(ctx)` so cancellation reaches the bearer read as well as the HTTP request.
+
 Do not hand-roll text exposition parsing in a collector.
+
+## Metric Relabeling
+
+Use `pkg/relabel` for Prometheus-compatible transformations of metric names and labels. Its `Record` excludes
+values and types, which remain owned by the caller. Reuse a compiled `Processor` or name-matched `Pipeline`
+serially; retain collector-specific validation and typed-family integrity checks at the caller boundary.
+See the [shared relabel contract](/src/go/pkg/relabel/README.md) for ownership, drop behavior, and rule syntax.
 
 ## Selectors And Matchers
 
@@ -211,11 +248,32 @@ Why:
 Use:
 
 - `RunUnprivileged` / `RunUnprivilegedWithOptions...` for unprivileged commands;
+- `UnprivilegedCommandContext` when callers need to own stdio and output limits, such as secret file reads;
 - `RunNDSudo` for commands exposed through `ndsudo`;
 - `RunDirect` only when direct execution is intentionally required;
 - `FindBinary` for PATH/default-path discovery.
 
 Do not call `exec.Command` directly unless the helper cannot support the case and the reason is documented.
+
+`UnprivilegedCommandContext` returns an unstarted `*exec.Cmd` using the same helper discovery and cancellation
+as the Run APIs. The caller MUST configure stdio and call Start/Wait (or Run), and MUST supply a context deadline
+when execution needs a timeout. Construction does not log arguments or output. Secret consumers MUST bound stdout
+and discard stderr: the Run APIs buffer stdout and include stderr snippets in errors, so they are unsuitable for
+secret output without caller-owned handling.
+
+On Unix, `nd-run` uses a minimal environment by default. Passing `Env` to a Run API changes the helper's input
+but does not enable preservation. Use `UnprivilegedCommandContextWithPreservedEnv` when the target requires inherited
+application variables, such as authentication tokens or explicit tool configuration. It invokes
+`nd-run --preserve-env -- command [args...]`; a missing helper or one without this option fails without direct fallback.
+Both constructors leave `Cmd.Env` unset to inherit the caller's environment; callers may set it explicitly before Start.
+
+Both modes replace USER, LOGNAME and HOME with the selected account's values, SHELL with `/bin/sh`, and LC_ALL with `C`.
+The helper selects the configured Netdata user (fallback `nobody`); an unprivileged caller that cannot switch users
+retains its current identity. Capability clearing is performed by the helper when built with capability support.
+Windows callers need an explicit platform path when this Unix privilege-drop behavior does not apply.
+
+The Unix file secret provider uses the default constructor; the command secret provider uses the preserving constructor.
+Both keep their own bounded output and secret-safe error handling. Windows providers retain direct execution.
 
 ## Log File Collectors
 

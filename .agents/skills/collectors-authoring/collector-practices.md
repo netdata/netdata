@@ -240,8 +240,12 @@ constructor defaults versus conditional branches, and which schema tests carry w
 `.agents/skills/collectors-go-design/operator-surface.md`; writing `config_schema.json` itself (text channels,
 tabs, widgets, secrets, standard option wording, the repo-wide rule tests) is owned by its sibling `config-schema.md`.
 
-Credentials use the `${env:}/${file:}/${cmd:}/${store:}` indirection; see `src/collectors/SECRETS.md`. Privileged
-operations route through `src/collectors/utils/ndsudo.c`.
+Collector secret-reference source authority, per-pipeline discovery trust, literal application and DynCfg adoption
+are owned by
+`src/go/plugin/agent/jobmgr/ARCHITECTURE.md#secrets`; operator guidance is generated from
+`integrations/gen_doc_secrets_page.py`. Discovery value serialization guidance is owned by
+`integrations/gen_doc_service_discovery_page.py` (`config_template` and `troubleshooting`). Privileged operations route
+through `src/collectors/utils/ndsudo.c`.
 
 ### 2.7 Generated artifacts are not source
 
@@ -298,7 +302,10 @@ question*. Use labels for instance and context annotations. Pick the right chart
 `src/plugins.d/README.md`).
 
 Common bugs: `absolute` on a counter (counters are `incremental`); `line` when `stacked` is the right shape (CPU states,
-disk-time breakdown). Reuse shared metric definitions from `src/collectors/common-contexts/` for C plugins.
+disk-time breakdown). Reuse shared metric definitions from `src/collectors/common-contexts/` for C plugins that
+describe the Agent host; a collector polling a remote target keeps its own contexts and uses a vnode for placement
+(§1.9). Writing a go.d V2 `charts.yaml` (defaults, families, ordering, statesets, labels, shared contexts, tests) is
+owned by `.agents/skills/collectors-go-framework-v2/chart-template.md`.
 
 ### 3.2 Mechanisms per ingestion path
 
@@ -309,8 +316,12 @@ them; for SNMP, extend a profile rather than hardcode OIDs, and for Prometheus p
 
 ### 3.3 Chart priorities
 
-Chart priorities (`priority` field in C, `Priority` in Go) drive UI ordering. C plugins follow conventions in
-`src/collectors/all.h`. Don't pick priorities arbitrarily; mirror an adjacent collector's range.
+Chart priorities drive UI ordering; equal-priority charts follow their names in the dashboard (dashboard behavior,
+not owned by this repository). C plugins follow
+`src/collectors/all.h`; go.d V1 charts step from `collectorapi.Priority`; go.d V2 templates optionally set
+`chart_defaults.priority` on top-level sections only, from the same engine default
+(`.agents/skills/collectors-go-framework-v2/chart-template.md#ordering`). Don't pick values arbitrarily; mirror an
+adjacent collector of the same kind.
 
 ## 4. Production-quality criteria & pre-PR checklist
 
@@ -386,12 +397,16 @@ the finished collector MUST NOT run through a V1-to-V2 bridge.
 V2 imports: `github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi` and `.../pkg/metrix`. The
 `CollectorV2` interface lives at `src/go/plugin/framework/collectorapi/collector.go`.
 
-`Init()` prepares the job; non-retryable initialization errors disable autodetection, while errors explicitly marked
-retryable can retain configured retry eligibility. `Check()` is the cheap detection probe; retries depend on job
-policy. `Collect()` is the scheduled hot path. Cleanup belongs to the orderly runtime teardown, including the optional
-V2 runner's shutdown ordering. Exact behavior is in `src/go/plugin/framework/jobruntime/job_v1.go`,
-`src/go/plugin/framework/jobruntime/job_v2.go`, `src/go/plugin/framework/jobruntime/job_common.go` and
-`src/go/plugin/framework/dyncfg/handler.go`; public lifecycle requirements are in
+`Init()` prepares the job and `Check()` is the cheap detection probe. By default, a Check error is retried every
+`autodetection_retry` seconds (never when it is 0, the framework default) and an Init error is never retried;
+`collectorapi.PermanentError` (never retried) and `collectorapi.TemporaryError` (configured retry) classify either.
+DynCfg command acceptance is owned by `src/go/plugin/agent/jobmgr/ARCHITECTURE.md#dyncfg-reply-contract`.
+`Collect()` is the scheduled hot path. Cleanup belongs to the orderly runtime teardown, including the optional V2
+runner's shutdown ordering. Exact behavior is in
+`src/go/plugin/framework/jobruntime/job_v1.go`, `src/go/plugin/framework/jobruntime/job_v2.go`,
+`src/go/plugin/framework/jobruntime/job_common.go`, `src/go/plugin/agent/jobmgr/joboutput/generation.go`
+(`autoDetectionFailureFor`) and `src/go/plugin/agent/jobmgr/joboutput/dyncfg_reply.go` (DynCfg replies); public
+lifecycle requirements are in
 `src/go/plugin/go.d/docs/how-to-write-a-collector.md#registration-and-lifecycle`.
 
 A collector can compile without being registered or enabled. Runtime imports and configuration are distinct from
@@ -400,7 +415,6 @@ checklist. IBM uses its own framework and imports in `src/go/cmd/ibmdplugin/main
 than copying go.d wiring or applying the new-go.d V2 mandate to it.
 
 **Don't:**
-- write new go.d modules against V1
 - add modules to `charts.d.plugin` or `python.d.plugin`
 - assume go.d needs `go generate`; inspect actual directives rather than copying the IBM procedure
 - add new third-party Go modules or system-library dependencies casually — they ship to every Netdata install; check
@@ -432,7 +446,7 @@ than copying go.d wiring or applying the new-go.d V2 mandate to it.
 | statsd synthetic_charts | operator-curated dashboards | `src/collectors/statsd.plugin/README.md#synthetic-statsd-charts` |
 | Prometheus mapping | generic exposition scrape and authored profiles | `src/go/plugin/go.d/collector/prometheus/profile-format.md`, `src/go/plugin/go.d/collector/prometheus/` source; generated README is an operator output |
 | Prometheus profile format | curated exporter dashboards + autogen fallback selectors | `src/go/plugin/go.d/collector/prometheus/profile-format.md` |
-| Prometheus metric relabeling | rewriting scraped metric names/labels | `src/go/plugin/go.d/collector/prometheus/relabel/README.md` |
+| Prometheus metric relabeling | rewriting scraped metric names/labels | `src/go/pkg/relabel/README.md` |
 | log2journal | parsing application logs into the journal | `src/collectors/log2journal/log2journal.d/` |
 | Auto-discovery rules | adding service-detection rules | `src/go/plugin/go.d/config/go.d/sd/{net_listeners,docker,snmp,http}.conf` |
 | Topology library | topology producers in Go | `src/go/pkg/topology/v1` |

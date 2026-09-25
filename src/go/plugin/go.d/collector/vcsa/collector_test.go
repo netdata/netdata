@@ -224,7 +224,7 @@ type mockVCenterHealthClient struct {
 	pingCalls        int
 }
 
-func (m *mockVCenterHealthClient) Login() error {
+func (m *mockVCenterHealthClient) Login(ctx context.Context) error {
 	m.loginCalls += 1
 	if m.login == nil {
 		return nil
@@ -232,7 +232,7 @@ func (m *mockVCenterHealthClient) Login() error {
 	return m.login()
 }
 
-func (m *mockVCenterHealthClient) Logout() error {
+func (m *mockVCenterHealthClient) Logout(ctx context.Context) error {
 	m.logoutCalls += 1
 	if m.logout == nil {
 		return nil
@@ -240,7 +240,7 @@ func (m *mockVCenterHealthClient) Logout() error {
 	return m.logout()
 }
 
-func (m *mockVCenterHealthClient) Ping() error {
+func (m *mockVCenterHealthClient) Ping(ctx context.Context) error {
 	m.pingCalls += 1
 	if m.ping == nil {
 		return nil
@@ -248,56 +248,56 @@ func (m *mockVCenterHealthClient) Ping() error {
 	return m.ping()
 }
 
-func (m *mockVCenterHealthClient) ApplMgmt() (string, error) {
+func (m *mockVCenterHealthClient) ApplMgmt(ctx context.Context) (string, error) {
 	if m.applMgmt == nil {
 		return "green", nil
 	}
 	return m.applMgmt()
 }
 
-func (m *mockVCenterHealthClient) DatabaseStorage() (string, error) {
+func (m *mockVCenterHealthClient) DatabaseStorage(ctx context.Context) (string, error) {
 	if m.databaseStorage == nil {
 		return "green", nil
 	}
 	return m.databaseStorage()
 }
 
-func (m *mockVCenterHealthClient) Load() (string, error) {
+func (m *mockVCenterHealthClient) Load(ctx context.Context) (string, error) {
 	if m.load == nil {
 		return "green", nil
 	}
 	return m.load()
 }
 
-func (m *mockVCenterHealthClient) Mem() (string, error) {
+func (m *mockVCenterHealthClient) Mem(ctx context.Context) (string, error) {
 	if m.mem == nil {
 		return "green", nil
 	}
 	return m.mem()
 }
 
-func (m *mockVCenterHealthClient) SoftwarePackages() (string, error) {
+func (m *mockVCenterHealthClient) SoftwarePackages(ctx context.Context) (string, error) {
 	if m.softwarePackages == nil {
 		return "green", nil
 	}
 	return m.softwarePackages()
 }
 
-func (m *mockVCenterHealthClient) Storage() (string, error) {
+func (m *mockVCenterHealthClient) Storage(ctx context.Context) (string, error) {
 	if m.storage == nil {
 		return "green", nil
 	}
 	return m.storage()
 }
 
-func (m *mockVCenterHealthClient) Swap() (string, error) {
+func (m *mockVCenterHealthClient) Swap(ctx context.Context) (string, error) {
 	if m.swap == nil {
 		return "green", nil
 	}
 	return m.swap()
 }
 
-func (m *mockVCenterHealthClient) System() (string, error) {
+func (m *mockVCenterHealthClient) System(ctx context.Context) (string, error) {
 	if m.system == nil {
 		return "green", nil
 	}

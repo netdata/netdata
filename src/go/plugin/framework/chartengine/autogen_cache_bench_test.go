@@ -95,7 +95,8 @@ func BenchmarkAutogenMixedChurn(b *testing.B) {
 }
 
 // Construct lifecycle state through real collection and planning, then isolate
-// expiry cost. Each destructive sample gets an untimed clone of that state.
+// expiry cost. Each sample stages removals through a plan journal, as a plan build
+// does, and rolls them back untimed.
 func BenchmarkCollectExpiryRemovals(b *testing.B) {
 	for _, shape := range []struct{ charts, dims int }{{1, 10000}, {100, 100}, {1000, 10}} {
 		for _, mode := range []string{"none", "half_dimensions", "all_dimensions", "all_charts"} {
@@ -168,17 +169,19 @@ groups:
 					current = 4
 					wantCharts = shape.charts
 				}
-				fixture := engine.state.materialized
+				state := engine.state.materialized
 				b.ReportAllocs()
 				b.ResetTimer()
-				for range b.N {
+				for i := range b.N {
+					// Expiry stages removals in the committed state, as a plan build does.
+					journal := new(newPlanJournal(uint64(i+1), journalSizing{}))
+					dims, charts := collectExpiryRemovals(current, &state, journal)
 					b.StopTimer()
-					state := fixture.clone()
-					b.StartTimer()
-					dims, charts := collectExpiryRemovals(current, &state)
 					if len(dims) != wantDims || len(charts) != wantCharts {
 						b.Fatalf("removed dims/charts=%d/%d, want %d/%d", len(dims), len(charts), wantDims, wantCharts)
 					}
+					journal.rollback()
+					b.StartTimer()
 				}
 			})
 		}

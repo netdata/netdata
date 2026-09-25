@@ -98,7 +98,9 @@ Voice, for every channel:
   `["object", "null"]` / `["array", "null"]` (a YAML key with no value decodes to nil). Scalars stay single-typed.
 - Enums: 2 to 5 values render as `"ui:widget": "radio"` with `"ui:options": {"inline": true}`; longer lists stay a
   select. Display labels come from `ui:options.enumNames` (the JSON Schema `enumNames` keyword is ignored). Avoid `0`,
-  `false`, and `""` as enum values.
+  `false`, and `""` as enum values. An enum with a default SHOULD be a `confopt.Enum`, so an empty or omitted value
+  means the default (the form can submit a list item without it); the schema then carries that `default` and leaves the
+  field out of `required`.
 - Multi-line text (queries, request bodies, templates) uses `"ui:widget": "textarea"`, with `"ui:options": {"rows": N}`
   when 2 rows are too few.
 - Durations are strings in Netdata duration syntax (`30s`, `5m`); give a placeholder. Numbers carry `minimum`
@@ -224,7 +226,9 @@ seconds.`.
   the schema `required` list.
 - `collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")` checks tabs and
   descriptions in both directions: every documented option exists in the schema with the same description, and every
-  visible top-level property is documented. Nested option names resolve through `properties`, `dependencies`
+  visible top-level property is documented. A form without tabs skips the tab checks and requires no `group` on any
+  option. `AssertConfigSchemaMatchesMetadataWith(..., collecttest.ConfigSchemaCheck{Defaults: true})` also compares
+  `default_value` with the schema `default` (booleans as `yes`/`no`); opt in once the collector's defaults agree. Nested option names resolve through `properties`, `dependencies`
   branches, `allOf`, `$ref`, and array items written as `rules[].query.period`; keys of a free map
   (`additionalProperties`) are not documented as options. The call is opt-in because most collectors predate the
   alignment rule and would fail it today; `cloudwatch`, `ceph`, `s3check`, and `azure_monitor` are the worked examples.

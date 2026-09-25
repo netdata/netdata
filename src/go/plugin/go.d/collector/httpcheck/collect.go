@@ -3,13 +3,13 @@
 package httpcheck
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -26,14 +26,14 @@ const (
 	codeNoConnection
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating HTTP requests to %s : %v", c.RequestConfig.URL, err)
 	}
 
 	if c.CookieFile != "" {
-		if err := c.readCookieFile(); err != nil {
+		if err := c.readCookieFile(ctx); err != nil {
 			return nil, fmt.Errorf("error on reading cookie file '%s': %v", c.CookieFile, err)
 		}
 	}
@@ -163,30 +163,30 @@ func decodeReqError(err error) reqErrCode {
 	return codeNoConnection
 }
 
-func (c *Collector) readCookieFile() error {
+func (c *Collector) readCookieFile(ctx context.Context) error {
 	if c.CookieFile == "" {
 		return nil
 	}
 
-	fi, err := os.Stat(c.CookieFile)
+	modTime, err := c.statCookieFile(ctx, c.CookieFile)
 	if err != nil {
 		return err
 	}
 
-	if c.cookieFileModTime.Equal(fi.ModTime()) {
+	if c.cookieFileModTime.Equal(modTime) {
 		c.Debugf("cookie file '%s' modification time has not changed, using previously read data", c.CookieFile)
 		return nil
 	}
 
 	c.Debugf("reading cookie file '%s'", c.CookieFile)
 
-	jar, err := loadCookieJar(c.CookieFile)
+	jar, err := loadCookieJar(ctx, c.CookieFile, c.openCookieFile)
 	if err != nil {
 		return err
 	}
 
 	c.httpClient.Jar = jar
-	c.cookieFileModTime = fi.ModTime()
+	c.cookieFileModTime = modTime
 
 	return nil
 }

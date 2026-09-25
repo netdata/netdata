@@ -1,0 +1,7 @@
+{
+  "@context": "http://schema.org/extensions",
+  "@type": "MessageCard",
+  "themeColor": "D93F3C",
+  "title": "🔥 Alert CRITICAL from Netdata on node",
+  "text": "summary  \nNode: node  \nAlert: alert  \nStatus: CRITICAL  \nTime: 2026\\-09\\-14T12:00:00Z"
+}

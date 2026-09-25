@@ -3,6 +3,7 @@
 package rspamd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
@@ -12,8 +13,8 @@ import (
 type rspamdStats struct {
 	Version  string `json:"version"`
 	ConfigId string `json:"config_id"`
-	Scanned  *int64 `json:"scanned" stm:"scanned"`
-	Learned  *int64 `json:"learned" stm:"learned"`
+	Scanned  *int64 `json:"scanned"             stm:"scanned"`
+	Learned  *int64 `json:"learned"             stm:"learned"`
 	Actions  struct {
 		Reject           int64 `json:"reject" stm:"reject"`
 		SoftReject       int64 `json:"soft reject" stm:"soft_reject"`
@@ -26,17 +27,17 @@ type rspamdStats struct {
 		Discard          int64 `json:"discard" stm:"discard"`
 		Quarantine       int64 `json:"quarantine" stm:"quarantine"`
 		UnknownAction    int64 `json:"unknown action" stm:"unknown_action"`
-	} `json:"actions" stm:"actions"`
+	} `json:"actions"             stm:"actions"`
 	ScanTimes          []float64        `json:"scan_times"`
-	SpamCount          int64            `json:"spam_count" stm:"spam_count"`
-	HamCount           int64            `json:"ham_count" stm:"ham_count"`
-	Connections        int64            `json:"connections" stm:"connections"`
+	SpamCount          int64            `json:"spam_count"          stm:"spam_count"`
+	HamCount           int64            `json:"ham_count"           stm:"ham_count"`
+	Connections        int64            `json:"connections"         stm:"connections"`
 	ControlConnections int64            `json:"control_connections" stm:"control_connections"`
 	FuzzyHashes        map[string]int64 `json:"fuzzy_hashes"`
 }
 
-func (c *Collector) collect() (map[string]int64, error) {
-	stats, err := c.queryRspamdStats()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	stats, err := c.queryRspamdStats(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -46,8 +47,8 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) queryRspamdStats() (*rspamdStats, error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, "/stat")
+func (c *Collector) queryRspamdStats(ctx context.Context) (*rspamdStats, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, "/stat")
 	if err != nil {
 		return nil, err
 	}

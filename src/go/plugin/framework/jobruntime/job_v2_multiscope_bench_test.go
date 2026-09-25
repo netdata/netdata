@@ -12,28 +12,30 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
-var benchmarkLiveScopesSink map[string]metrix.HostScope
+var benchmarkScopeWorkSink []jobV2ScopeWork
 
-func BenchmarkBV2LiveScopeSetWarm(b *testing.B) {
+func BenchmarkBV2ScopeWorkWarm(b *testing.B) {
 	const seriesPerScope = 8
 
 	for _, totalScopes := range []int{1, 8, 64, 512} {
 		b.Run(fmt.Sprintf("scopes_%d/series_per_scope_%d", totalScopes, seriesPerScope), func(b *testing.B) {
 			store, _ := benchmarkJobV2ScopedStore(b, totalScopes, seriesPerScope)
-			job := &JobV2{store: store}
-			live := job.liveScopeSet()
-			if len(live) != totalScopes {
-				b.Fatalf("expected %d live scopes, got %d", totalScopes, len(live))
+			job := &JobV2{
+				store: store,
+			}
+			work := job.scopeWork()
+			if len(work) != totalScopes {
+				b.Fatalf("expected %d live scopes, got %d", totalScopes, len(work))
 			}
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for b.Loop() {
-				live = job.liveScopeSet()
-				if len(live) != totalScopes {
-					b.Fatalf("expected %d live scopes, got %d", totalScopes, len(live))
+				work = job.scopeWork()
+				if len(work) != totalScopes {
+					b.Fatalf("expected %d live scopes, got %d", totalScopes, len(work))
 				}
-				benchmarkLiveScopesSink = live
+				benchmarkScopeWorkSink = work
 			}
 		})
 	}

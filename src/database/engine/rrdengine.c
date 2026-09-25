@@ -924,7 +924,6 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     uint32_t uncompressed_payload_length, max_compressed_size, payload_offset;
     struct page_descr_with_data *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *xt_io_descr;
-    Word_t Index;
     uint8_t compression_algorithm = ctx->config.global_compress_alg;
     struct rrdengine_datafile *datafile;
     /* persistent structures */
@@ -932,9 +931,9 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     struct rrdeng_df_extent_trailer *trailer;
     uLong crc;
 
-    for(descr = base, Index = 0, count = 0, uncompressed_payload_length = 0;
+    for(descr = base, count = 0, uncompressed_payload_length = 0;
         descr && count != rrdeng_pages_per_extent;
-        descr = descr->link.next, Index++) {
+        descr = descr->link.next) {
 
         uncompressed_payload_length += descr->page_length;
         eligible_pages[count++] = descr;
@@ -2131,12 +2130,12 @@ void async_cb(uv_async_t *handle)
 
 static void async_closed_cb(uv_handle_t *handle)
 {
-    struct rrdeng_main *main = handle->data;
+    struct rrdeng_main *rmain = handle->data;
 
-    int ret = uv_async_init(handle->loop, &main->async, async_cb);
+    int ret = uv_async_init(handle->loop, &rmain->async, async_cb);
     if (ret)
         netdata_log_error("DBENGINE: reinitializing uv_async_init(): %s", uv_strerror(ret));
-    __atomic_store_n(&main->async_ready, true, __ATOMIC_RELEASE);
+    __atomic_store_n(&rmain->async_ready, true, __ATOMIC_RELEASE);
 }
 #else
 void async_cb(uv_async_t *handle __maybe_unused)
@@ -2637,13 +2636,13 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_custom_metric(RRDENG_WORKS_DISPATCHED, "works dispatched", "works",   WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(RRDENG_WORKS_EXECUTING,  "works executing",  "works",   WORKER_METRIC_ABSOLUTE);
 
-    struct rrdeng_main *main = arg;
+    struct rrdeng_main *rmain = arg;
     enum rrdeng_opcode opcode;
     struct rrdeng_cmd cmd;
-    main->tid = gettid_cached();
+    rmain->tid = gettid_cached();
 
-    fatal_assert(0 == uv_timer_start(&main->timer, timer_per_sec_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
-    fatal_assert(0 == uv_timer_start(&main->retention_timer, retention_timer_cb, TIMER_PERIOD_MS * 60, TIMER_PERIOD_MS * 60));
+    fatal_assert(0 == uv_timer_start(&rmain->timer, timer_per_sec_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
+    fatal_assert(0 == uv_timer_start(&rmain->retention_timer, retention_timer_cb, TIMER_PERIOD_MS * 60, TIMER_PERIOD_MS * 60));
 
     bool shutdown = false;
     size_t cpus = netdata_conf_cpus();
@@ -2660,7 +2659,7 @@ void dbengine_event_loop(void* arg) {
 
     while (likely(!shutdown)) {
         worker_is_idle();
-        uv_run(&main->loop, UV_RUN_ONCE);
+        uv_run(&rmain->loop, UV_RUN_ONCE);
 
         do {
             worker_is_busy(RRDENG_OPCODE_MAX);
@@ -2689,8 +2688,8 @@ void dbengine_event_loop(void* arg) {
                     if (uv_hrtime() - last_async_callback > 1000UL * NSEC_PER_MSEC) {
                         if (++max_timeout_count > 30) {
                             netdata_log_error("DBENGINE: async callback timeout detected, re-initializing the async handle");
-                            __atomic_store_n(&main->async_ready, false, __ATOMIC_RELEASE);
-                            uv_close((uv_handle_t *)&main->async, async_closed_cb);
+                            __atomic_store_n(&rmain->async_ready, false, __ATOMIC_RELEASE);
+                            uv_close((uv_handle_t *)&rmain->async, async_closed_cb);
                             max_timeout_count = 0;
                         } else
                             netdata_log_error("DBENGINE: async callback timeout detected count = %d", max_timeout_count);
@@ -2811,13 +2810,13 @@ void dbengine_event_loop(void* arg) {
                 }
 
                 case RRDENG_OPCODE_SHUTDOWN_EVLOOP: {
-                    uv_close((uv_handle_t *)&main->async, NULL);
+                    uv_close((uv_handle_t *)&rmain->async, NULL);
 
-                    (void) uv_timer_stop(&main->timer);
-                    uv_close((uv_handle_t *)&main->timer, NULL);
+                    (void) uv_timer_stop(&rmain->timer);
+                    uv_close((uv_handle_t *)&rmain->timer, NULL);
 
-                    (void) uv_timer_stop(&main->retention_timer);
-                    uv_close((uv_handle_t *)&main->retention_timer, NULL);
+                    (void) uv_timer_stop(&rmain->retention_timer);
+                    uv_close((uv_handle_t *)&rmain->retention_timer, NULL);
                     shutdown = true;
                     break;
                 }
@@ -2835,7 +2834,7 @@ void dbengine_event_loop(void* arg) {
                 }
             }
             if (opcode != RRDENG_OPCODE_NOOP)
-                uv_run(&main->loop, UV_RUN_NOWAIT);
+                uv_run(&rmain->loop, UV_RUN_NOWAIT);
 
         } while (opcode != RRDENG_OPCODE_NOOP);
     }
@@ -2843,7 +2842,7 @@ void dbengine_event_loop(void* arg) {
     uv_sem_destroy(&sem);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down dbengine thread");
-    (void) uv_loop_close(&main->loop);
+    (void) uv_loop_close(&rmain->loop);
     worker_unregister();
 }
 

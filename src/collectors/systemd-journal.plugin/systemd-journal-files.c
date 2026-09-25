@@ -394,9 +394,9 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
             if (strncmp(s, "/remote-", 8) == 0) {
                 s = &s[8]; // skip "/remote-"
 
-                char *e = strchr(s, '@');
+                const char *e = strchr(s, '@');
                 if (!e)
-                    is_journal_file(s, -1, (const char **)&e);
+                    is_journal_file(s, -1, &e);
 
                 if (e) {
                     const char *d = s;

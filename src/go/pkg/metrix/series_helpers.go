@@ -27,6 +27,8 @@ const (
 	committedSeriesCloneFull committedSeriesCloneKind = iota
 	committedSeriesCloneHistogramOverwrite
 	committedSeriesCloneHistogramMutation
+	// committedSeriesCloneSummaryOverwrite skips the quantile slice a summary write replaces.
+	committedSeriesCloneSummaryOverwrite
 )
 
 func ensureCommitSeriesMutable(old, next *readSnapshot, key string) *committedSeries {
@@ -125,6 +127,9 @@ func cloneCommittedSeriesForKind(s *committedSeries, kind committedSeriesCloneKi
 		return cloneCommittedSeriesForHistogramOverwrite(s)
 	case committedSeriesCloneHistogramMutation:
 		return cloneCommittedSeriesForHistogramMutation(s)
+	case committedSeriesCloneSummaryOverwrite:
+		cp := cloneCommittedSeriesBaseWithoutQuantiles(s)
+		return &cp
 	default:
 		return cloneCommittedSeries(s)
 	}
@@ -153,6 +158,16 @@ func cloneCommittedSeriesForHistogramMutation(s *committedSeries) *committedSeri
 }
 
 func cloneCommittedSeriesBase(s *committedSeries) committedSeries {
+	return cloneCommittedSeriesBaseWith(s, true)
+}
+
+// cloneCommittedSeriesBaseWithoutQuantiles clones s for a write that replaces its
+// summary quantiles. The published source is never modified.
+func cloneCommittedSeriesBaseWithoutQuantiles(s *committedSeries) committedSeries {
+	return cloneCommittedSeriesBaseWith(s, false)
+}
+
+func cloneCommittedSeriesBaseWith(s *committedSeries, copyQuantiles bool) committedSeries {
 	cp := *s
 	ensureSeriesMeta(cp.desc, &cp.meta)
 	cp.hostScope = cloneHostScope(s.hostScope)
@@ -167,7 +182,10 @@ func cloneCommittedSeriesBase(s *committedSeries) committedSeries {
 	if len(s.measureSetPreviousValues) > 0 {
 		cp.measureSetPreviousValues = append([]SampleValue(nil), s.measureSetPreviousValues...)
 	}
-	if len(s.summaryQuantiles) > 0 {
+	switch {
+	case !copyQuantiles:
+		cp.summaryQuantiles = nil
+	case len(s.summaryQuantiles) > 0:
 		cp.summaryQuantiles = append([]SampleValue(nil), s.summaryQuantiles...)
 	}
 	if s.summarySketch != nil {

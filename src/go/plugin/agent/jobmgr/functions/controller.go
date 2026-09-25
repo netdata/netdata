@@ -239,6 +239,9 @@ func (jh *JobHandle) Publish() error {
 	return nil
 }
 
+// Detach closes new catalog admissions and withdraws the job's publication.
+// Wire publication may block, but admitted calls and physical handler cleanup
+// drain only in Finalize under the job's process owner.
 func (jh *JobHandle) Detach(ctx context.Context) error {
 	if jh == nil || ctx == nil {
 		return errors.New("jobmgr Function controller: invalid job-handle detach")
@@ -249,7 +252,7 @@ func (jh *JobHandle) Detach(ctx context.Context) error {
 		return nil
 	}
 	if jh.published {
-		if err := jh.controller.closeAndDrainJob(ctx, jh.identity, jh.bundle); err != nil {
+		if err := jh.controller.detachJob(ctx, jh.identity, jh.bundle); err != nil {
 			return err
 		}
 		jh.published = false
@@ -258,6 +261,9 @@ func (jh *JobHandle) Detach(ctx context.Context) error {
 	return nil
 }
 
+// Finalize retires the owner's bundle reference and waits for every catalog
+// generation, physical callback and handler cleanup before releasing the job.
+// A canceled wait preserves that ownership and may be retried.
 func (jh *JobHandle) Finalize(ctx context.Context) error {
 	if jh == nil || ctx == nil {
 		return errors.New("jobmgr Function controller: invalid job-handle finalization")
@@ -269,7 +275,7 @@ func (jh *JobHandle) Finalize(ctx context.Context) error {
 	}
 	if !jh.detached {
 		if jh.published {
-			if err := jh.controller.closeAndDrainJob(ctx, jh.identity, jh.bundle); err != nil {
+			if err := jh.controller.detachJob(ctx, jh.identity, jh.bundle); err != nil {
 				return err
 			}
 			jh.published = false
@@ -520,7 +526,7 @@ func (c *Controller) publishJob(
 		bundle:   bundle,
 		methods:  slices.Clone(methods),
 	}
-	if _, err := c.reconcileModuleLocked(ctx, job.ModuleName(), creator); err != nil {
+	if err := c.reconcileModuleLocked(ctx, job.ModuleName(), creator); err != nil {
 		if c.dirty == nil {
 			delete(moduleJobs, job.Name())
 			if len(moduleJobs) == 0 {
@@ -532,7 +538,7 @@ func (c *Controller) publishJob(
 	return nil
 }
 
-func (c *Controller) closeAndDrainJob(
+func (c *Controller) detachJob(
 	ctx context.Context,
 	identity lifecycle.ResourceIdentity,
 	bundle *functionBundle,
@@ -557,18 +563,7 @@ func (c *Controller) closeAndDrainJob(
 		if len(moduleJobs) == 0 {
 			delete(c.jobs, job.ModuleName())
 		}
-		retired := make([]*methodGeneration, 0, len(c.groups))
-		for _, group := range c.groups {
-			if generationReferencesJob(group.generation, job) {
-				retired = append(retired, group.generation)
-			}
-		}
 		c.mu.Unlock()
-		for _, generation := range retired {
-			if err := generation.wait(ctx); err != nil {
-				return err
-			}
-		}
 		return nil
 	}
 	if err := c.usableLocked(); err != nil {
@@ -590,7 +585,7 @@ func (c *Controller) closeAndDrainJob(
 	if len(moduleJobs) == 0 {
 		delete(c.jobs, job.ModuleName())
 	}
-	retired, err := c.reconcileModuleLocked(ctx, job.ModuleName(), creator)
+	err := c.reconcileModuleLocked(ctx, job.ModuleName(), creator)
 	if err != nil {
 		if c.dirty == nil {
 			moduleJobs = c.jobs[job.ModuleName()]
@@ -604,13 +599,6 @@ func (c *Controller) closeAndDrainJob(
 		return err
 	}
 	c.mu.Unlock()
-	for _, generation := range retired {
-		if generationReferencesJob(generation, job) {
-			if err := generation.wait(ctx); err != nil {
-				return err
-			}
-		}
-	}
 	return nil
 }
 
@@ -697,7 +685,7 @@ func (c *Controller) finishAvailabilityPoll(
 		c.mu.Unlock()
 		return
 	}
-	_, err := c.reconcileModuleLocked(context.Background(), module, creator)
+	err := c.reconcileModuleLocked(context.Background(), module, creator)
 	c.mu.Unlock()
 	c.observeAvailabilityFailure(DiagnosticAvailabilityReconciliationFailed, poll.bundle, err)
 }
@@ -761,7 +749,7 @@ func (c *Controller) reconcileModuleLocked(
 	ctx context.Context,
 	module string,
 	creator collectorapi.Creator,
-) ([]*methodGeneration, error) {
+) error {
 	unpublished := make(map[string]*controllerGroup)
 	cleanupUnpublished := true
 	defer func() {
@@ -772,7 +760,7 @@ func (c *Controller) reconcileModuleLocked(
 	desired, err := c.buildModuleGroups(module, creator, unpublished)
 	if err != nil {
 		cleanupUnpublished = false
-		return nil, errors.Join(err, c.cleanupUnpublishedGroups(context.WithoutCancel(ctx), unpublished))
+		return errors.Join(err, c.cleanupUnpublishedGroups(context.WithoutCancel(ctx), unpublished))
 	}
 
 	nextGroups := make(map[string]*controllerGroup, len(c.groups)+len(desired))
@@ -784,11 +772,11 @@ func (c *Controller) reconcileModuleLocked(
 	maps.Copy(nextGroups, desired)
 	nextRoutes, err := indexControllerRoutes(nextGroups)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for name := range c.initialNames {
 		if _, exists := nextRoutes[name]; exists {
-			return nil, errors.New("jobmgr Function controller: collector Function collides with initial route")
+			return errors.New("jobmgr Function controller: collector Function collides with initial route")
 		}
 	}
 	routeChanges := controllerRouteChanges(c.routes, nextRoutes)
@@ -796,16 +784,15 @@ func (c *Controller) reconcileModuleLocked(
 		c.groups = nextGroups
 		cleanupUnpublished = false
 		_ = c.cleanupUnpublishedGroups(context.WithoutCancel(ctx), unpublished)
-		return nil, nil
+		return nil
 	}
 	mutation, err := c.catalog.NewMutation(c.version, routeChanges)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer func() {
 		_ = mutation.Discard()
 	}()
-	retired := retiredMethodGenerations(c.groups, nextGroups)
 	publicationChanges := controllerPublicationChanges(c.routes, nextRoutes)
 	expectedVersion := c.version + 1
 	transitionCtx := context.WithoutCancel(ctx)
@@ -840,9 +827,9 @@ func (c *Controller) reconcileModuleLocked(
 	err = errors.Join(err, mutation.Discard())
 	if err != nil {
 		c.dirty = errors.Join(c.dirty, err)
-		return nil, err
+		return err
 	}
-	return retired, nil
+	return nil
 }
 
 func (c *Controller) buildModuleGroups(
@@ -1033,6 +1020,12 @@ func validateConfiguredMethods(module string, methods []funcapi.FunctionConfig) 
 			return nil, errors.New("jobmgr Function controller: duplicate method ID")
 		}
 		seen[method.ID] = struct{}{}
+		if method.ManagedInfo && !method.RawRequest {
+			return nil, fmt.Errorf("jobmgr Function controller: method %q ManagedInfo requires RawRequest", method.ID)
+		}
+		if len(method.AcceptedParams) != 0 && !method.RawRequest {
+			return nil, fmt.Errorf("jobmgr Function controller: method %q AcceptedParams requires RawRequest", method.ID)
+		}
 		if !validQuotedProtocolField(method.Help) {
 			return nil, errors.New("jobmgr Function controller: invalid Function help")
 		}
@@ -1076,6 +1069,12 @@ func controllerGroupSignature(
 		writeDigestString(digest, method.Tags)
 		writeDigestString(digest, method.ResponseType)
 		writeDigestBool(digest, method.RawRequest)
+		writeDigestBool(digest, method.ManagedInfo)
+		writeDigestBool(digest, method.HasHistory)
+		writeDigestUint64(digest, uint64(len(method.AcceptedParams)))
+		for _, name := range method.AcceptedParams {
+			writeDigestString(digest, name)
+		}
 		for _, alias := range method.Aliases {
 			writeDigestString(digest, alias)
 		}
@@ -1327,37 +1326,6 @@ func (c *Controller) cleanupModuleBundles(ctx context.Context) (result error) {
 		result = errors.Join(result, bundle.wait(ctx))
 	}
 	return result
-}
-
-func retiredMethodGenerations(
-	current map[string]*controllerGroup,
-	next map[string]*controllerGroup,
-) []*methodGeneration {
-	seen := make(map[*methodGeneration]struct{})
-	var retired []*methodGeneration
-	for key, group := range current {
-		if next[key] == group {
-			continue
-		}
-		if _, exists := seen[group.generation]; exists {
-			continue
-		}
-		seen[group.generation] = struct{}{}
-		retired = append(retired, group.generation)
-	}
-	return retired
-}
-
-func generationReferencesJob(generation *methodGeneration, job collectorapi.RuntimeJob) bool {
-	if generation == nil || job == nil {
-		return false
-	}
-	for _, bundle := range generation.bundles {
-		if bundle.job == job {
-			return true
-		}
-	}
-	return false
 }
 
 func (c *Controller) cleanupUnpublishedGroups(ctx context.Context, groups map[string]*controllerGroup) (err error) {

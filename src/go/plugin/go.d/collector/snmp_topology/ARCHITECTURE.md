@@ -23,9 +23,12 @@ immutable topology generation from SNMP jobs registered by the SNMP collector.
 
 It has three independent entry points:
 
-- `Run(ctx)` refreshes topology in the background.
+- `Run(ctx, ready)` refreshes topology in the background.
 - `Collect(ctx)` only publishes internal collector metrics.
 - `snmp:topology:snmp` serves the latest cached topology through a Function.
+
+Runtime readiness is signaled after local setup and before the first sweep. The topology Function remains unavailable
+until renderable observations exist.
 
 Function calls do not walk SNMP. They acquire one already-published generation,
 build a graph, shape/enrich it, and render `netdata.topology.v1`.
@@ -78,7 +81,7 @@ collector instance for the whole agent.
 
 ```mermaid
 flowchart TD
-    Run["Run(ctx)"]
+    Run["Run(ctx, ready)"]
     TrapPublish["publish trap enrichment"]
     Tick["initial refresh, then every update_every"]
     Devices["read registered jobs from DeviceStore"]
@@ -100,8 +103,9 @@ flowchart TD
 ```
 
 ```text
-Run(ctx)
-  publish trap enrichment handle
+Run(ctx, ready)
+  publish trap enrichment handle and start reverse DNS support
+  ready()                             # local runtime setup; no observation required
   refreshTopologyRecovering(ctx)       # immediate first refresh
   every update_every:
     refreshTopologyRecovering(ctx)
@@ -819,7 +823,7 @@ upload them.
 
 `topology_trap_enrich.go` publishes a separate handle used by `snmp_traps`.
 
-The topology collector publishes enrichment state when `Run(ctx)` starts and
+The topology collector publishes enrichment state when `Run(ctx, ready)` starts and
 unpublishes it on cleanup. Trap enrichment is not part of the topology Function
 payload; it is a cross-collector lookup path for trap log rows.
 
@@ -829,7 +833,7 @@ The collector emits internal metrics only. These metrics describe refresh health
 and retained device-generation state; they are not the topology payload.
 
 - `Collect(ctx)` writes current internal metric values.
-- `Run(ctx)` performs SNMP topology refresh.
+- `Run(ctx, ready)` performs SNMP topology refresh.
 - `charts.go` and `metrix.go` define this internal observability surface.
 
 ## Concurrency Rules

@@ -37,10 +37,7 @@ func (dcjc *DynCfgJobController) publishInitialTemplates(
 	commands jobmgr.PreparedCommandPort,
 	epoch uint64,
 ) error {
-	result, err := lifecycle.NewSealedResult(204, "application/json", nil)
-	if err != nil {
-		return err
-	}
+	result := noResponseResult()
 	plan := jobmgr.WorkPlan{
 		Claims:     []string{DynCfgJobGraphClaim},
 		NoResponse: true,

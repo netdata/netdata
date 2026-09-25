@@ -33,6 +33,7 @@ jobs:
             .github/workflows/go-tests.yml
             packaging/cmake/
             src/go/**
+            src/health/notifications/alarm-notify/**
             src/collectors/cgroups.plugin/cgroup-name/**
             src/collectors/ebpf.plugin/ebpfgo.plugin/**
           files_ignore: |

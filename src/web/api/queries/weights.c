@@ -1218,7 +1218,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
             context_dun = (!limit || t->context_selected) ?
                 dict_unique_name_units_add(dict_contexts, rrdcontext_acquired_id(t->rca),
                                            rrdcontext_acquired_units(t->rca), &ci_max) : NULL;
-            ci = context_dun ? context_dun->i : -1;
+            ci = context_dun ? (ssize_t)context_dun->i : -1;
         }
 
         // open instance
@@ -1226,7 +1226,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
             last_ria = t->ria;
             instance_dun = (!limit || t->instance_selected) ?
                 dict_unique_id_name_add(dict_instances, rrdinstance_acquired_id(t->ria), rrdinstance_acquired_name(t->ria), &ii_max) : NULL;
-            ii = instance_dun ? instance_dun->i : -1;
+            ii = instance_dun ? (ssize_t)instance_dun->i : -1;
         }
 
         if(!limit || t->selected) {

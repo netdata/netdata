@@ -129,7 +129,7 @@ void api_v1_management_init(void) {
 #define HLT_MGM "manage/health"
 int api_v1_manage(RRDHOST *host, struct web_client *w, char *url) {
     const char *haystack = buffer_tostring(w->url_path_decoded);
-    char *needle;
+    const char *needle;
 
     buffer_flush(w->response.data);
 

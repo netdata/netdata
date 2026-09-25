@@ -345,11 +345,10 @@ func TestFactoryRejectsCandidateWhenResolvedStoreGenerationChangesDuringProbe(t 
 		Modules: collectorapi.Registry{
 			"module": creator,
 		},
-		Resolver: resolver,
-		StoreScope: func([]string) (secretresolver.AtomicScope, error) {
+		Configs: testConfigResolver(t, resolver, func([]string) (secretresolver.AtomicScope, error) {
 			scope.current.Store(true)
 			return scope, nil
-		},
+		}),
 	})
 	require.NoError(t, err)
 	factory.config.ConfigModules = configModules
@@ -940,6 +939,7 @@ func TestFactoryCandidateWaitYieldsGraphClaimForWholeMaterialization(t *testing.
 	resource, err := prepared.AcceptStart(context.Background(), 1)
 	require.NoError(t, err)
 	generation := resource.(*JobGeneration)
+	require.NoError(t, generation.AwaitReady(t.Context()))
 	require.NoError(t, generation.Publish())
 	require.NoError(t, generation.reserveInstallation())
 	require.NoError(t, generation.acknowledgeInstallation())
@@ -1177,6 +1177,7 @@ func TestFactoryReplacementCandidateCoexistsWithIncumbentUntilRuntimePromotion(t
 	firstResource, err := firstPrepared.AcceptStart(context.Background(), 1)
 	require.NoError(t, err)
 	firstGeneration := firstResource.(*JobGeneration)
+	require.NoError(t, firstGeneration.AwaitReady(t.Context()))
 	require.NoError(t, firstGeneration.Publish())
 	require.NoError(t, firstGeneration.reserveInstallation())
 	require.NoError(t, firstGeneration.acknowledgeInstallation())
@@ -1220,24 +1221,17 @@ func TestFactoryReplacementCandidateCoexistsWithIncumbentUntilRuntimePromotion(t
 	}()
 	select {
 	case result := <-accepted:
-		require.FailNowf(t, "test failed", "replacement did not wait for incumbent physical release: %v", result.err)
-	case <-time.After(100 * time.Millisecond):
-	}
-	close(cleanupRelease)
-
-	var secondGeneration *JobGeneration
-	select {
-	case result := <-accepted:
-		require.NoError(t, result.err)
-		secondGeneration = result.generation
+		require.ErrorIs(t, result.err, jobmgr.ErrProcessAttemptBusy)
+		require.Nil(t, result.generation)
 	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "replacement did not promote after incumbent physical release")
+		close(cleanupRelease)
+		t.Fatal("replacement waited for incumbent physical release")
 	}
-	require.NoError(t, secondGeneration.Publish())
-	require.NoError(t, secondGeneration.reserveInstallation())
-	require.NoError(t, secondGeneration.acknowledgeInstallation())
-	require.NoError(t, secondGeneration.Stop(context.Background()))
-	require.NoError(t, secondGeneration.Finalize())
+	secondStage.mu.Lock()
+	secondReleased := secondStage.attempt.Released()
+	secondStage.mu.Unlock()
+	requireTestSignal(t, secondReleased, "rejected replacement did not finish cleanup")
+	close(cleanupRelease)
 
 	firstStage.Release()
 	secondStage.Release()
@@ -1429,7 +1423,7 @@ func TestFactoryProbeRedactsResolvedValuesFromCollectorFailure(t *testing.T) {
 					),
 				})
 				require.NoError(t, err)
-				factory.config.ConfigModules.config.Resolver = resolver
+				factory.config.ConfigModules.config.Configs = testConfigResolver(t, resolver, unavailableStoreScope)
 				permit, tasks := issueTestJobPermit(t, "module_job", 1)
 				config := factoryTestConfig(false)
 				config["option_str"] = "${fixture:value}"
@@ -1522,6 +1516,7 @@ func TestFactorySuccessfulCollectorCleanupIsExactlyOnce(t *testing.T) {
 			resource, err := prepared.AcceptStart(context.Background(), 1)
 			require.NoError(t, err)
 			generation := resource.(*JobGeneration)
+			require.NoError(t, generation.AwaitReady(t.Context()))
 			require.NoError(t, generation.Publish())
 			require.NoError(t, generation.reserveInstallation())
 			require.NoError(t, generation.acknowledgeInstallation())
@@ -1724,8 +1719,7 @@ func newFactoryTestHarness(
 		Modules: collectorapi.Registry{
 			"module": creator,
 		},
-		Resolver:   resolver,
-		StoreScope: unavailableStoreScope,
+		Configs: testConfigResolver(t, resolver, unavailableStoreScope),
 	})
 	require.NoError(t, err)
 	attempts, err := containment.NewAuthority(nil)
@@ -1846,5 +1840,5 @@ func factoryTestConfig(functionOnly bool) confgroup.Config {
 		"name":          "job",
 		"update_every":  1,
 		"function_only": functionOnly,
-	}
+	}.SetSourceType(confgroup.TypeUser)
 }

@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile/testutil"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -149,6 +151,8 @@ func TestCollector_Check(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			collr, cleanup := test.prepare()
+			collr.statCookieFile = testutil.New().Stat
+			collr.openCookieFile = testutil.New().Open
 			defer cleanup()
 
 			require.NoError(t, collr.Init(context.Background()))
@@ -454,6 +458,8 @@ func TestCollector_Collect(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			collr, cleanup := test.prepare()
+			collr.statCookieFile = testutil.New().Stat
+			collr.openCookieFile = testutil.New().Open
 			defer cleanup()
 
 			if test.update != nil {

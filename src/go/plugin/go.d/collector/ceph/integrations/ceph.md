@@ -356,20 +356,20 @@ Metrics:
 | ceph.cluster_osds_count | Ceph Cluster OSDs | osds | osds |
 | ceph.cluster_osds_by_status_count | Ceph Cluster OSDs by Status | up, down, in, out | osds |
 | ceph.cluster_managers_count | Ceph Cluster Managers | active, standby | managers |
-| ceph.cluster_object_gateways_count | Ceph Cluster Object Gateways | object | gateways |
+| ceph.cluster_object_gateways_count | Ceph Cluster Object Gateways (RGW) | object | gateways |
 | ceph.cluster_iscsi_gateways_count | Ceph Cluster iSCSI Gateways | iscsi | gateways |
 | ceph.cluster_iscsi_gateways_by_status_count | Ceph Cluster iSCSI Gateways by Status | up, down | gateways |
 | ceph.cluster_physical_capacity_utilization | Ceph Cluster Physical Capacity Utilization | utilization | percent |
 | ceph.cluster_physical_capacity_usage | Ceph Cluster Physical Capacity Usage | avail, used | bytes |
-| ceph.cluster_objects_count | Ceph Cluster Logical Objects | objects | objects |
+| ceph.cluster_objects_count | Ceph Cluster Objects | objects | objects |
 | ceph.cluster_object_copies_health | Ceph Cluster Object Copy Health | degraded, misplaced | percent |
 | ceph.cluster_objects_unfound | Ceph Cluster Unfound Objects | unfound | percent |
 | ceph.cluster_pools_count | Ceph Cluster Pools | pools | pools |
 | ceph.cluster_pgs_count | Ceph Cluster Placement Groups | pgs | pgs |
-| ceph.cluster_pgs_by_status_count | Ceph Cluster Placement Groups by Compatibility Category | clean, working, warning, unknown | pgs |
+| ceph.cluster_pgs_by_status_count | Ceph Cluster Placement Groups by Status | clean, working, warning, unknown | pgs |
 | ceph.cluster_pgs_per_osd_count | Ceph Cluster Placement Groups per OSD | per_osd | pgs |
-| ceph.cluster_client_io | Ceph Cluster Client I/O | read, written | bytes/s |
-| ceph.cluster_client_iops | Ceph Cluster Client Operations | read, write | ops/s |
+| ceph.cluster_client_io | Ceph Cluster Client IO | read, written | bytes/s |
+| ceph.cluster_client_iops | Ceph Cluster Client IOPS | read, write | ops/s |
 | ceph.cluster_recovery_throughput | Ceph Cluster Recovery Throughput | recovery | bytes/s |
 | ceph.cluster_scrub_status | Ceph Cluster Scrubbing Status | disabled, active, inactive | status |
 
@@ -393,8 +393,8 @@ Metrics:
 |:------|:------------|:----------|:----|
 | ceph.osd_status | Ceph OSD Status | up, down, in, out | status |
 | ceph.osd_space_usage | Ceph OSD Space Usage | avail, used | bytes |
-| ceph.osd_io | Ceph OSD I/O Rate | read, written | bytes/s |
-| ceph.osd_iops | Ceph OSD Operation Rate | read, write | ops/s |
+| ceph.osd_io | Ceph OSD IO | read, written | bytes/s |
+| ceph.osd_iops | Ceph OSD IOPS | read, write | ops/s |
 | ceph.osd_latency | Ceph OSD Latency | commit, apply | milliseconds |
 
 
@@ -416,8 +416,8 @@ Metrics:
 | ceph.pool_space_utilization | Ceph Pool Space Utilization | utilization | percent |
 | ceph.pool_space_usage | Ceph Pool Space Usage | avail, used | bytes |
 | ceph.pool_objects_count | Ceph Pool Objects | objects | objects |
-| ceph.pool_io | Ceph Pool I/O Rate | read, written | bytes/s |
-| ceph.pool_iops | Ceph Pool Operation Rate | read, write | ops/s |
+| ceph.pool_io | Ceph Pool IO | read, written | bytes/s |
+| ceph.pool_iops | Ceph Pool IOPS | read, write | ops/s |
 
 
 

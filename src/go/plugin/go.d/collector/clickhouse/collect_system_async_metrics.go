@@ -3,6 +3,7 @@
 package clickhouse
 
 import (
+	"context"
 	"errors"
 	"strconv"
 
@@ -21,8 +22,8 @@ where
     OR metric LIKE 'ReplicasMaxAbsoluteDelay' FORMAT CSVWithNames
 `
 
-func (c *Collector) collectSystemAsyncMetrics(mx map[string]int64) error {
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+func (c *Collector) collectSystemAsyncMetrics(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return err
 	}

@@ -538,15 +538,15 @@ static inline time_t rrddim_slot2time(STORAGE_METRIC_HANDLE *smh, size_t slot) {
         ret = last_entry_s - (time_t)(update_every * (last_slot - slot));
 
     if(unlikely(ret < first_entry_s)) {
-        netdata_log_error("INTERNAL ERROR: rrddim_slot2time() returned time (%ld) too far in the past (before first_entry_s %ld) for slot %zu",
-              ret, first_entry_s, slot);
+        netdata_log_error("INTERNAL ERROR: rrddim_slot2time() returned time (%" PRId64 ") too far in the past (before first_entry_s %" PRId64 ") for slot %zu",
+              (int64_t)ret, (int64_t)first_entry_s, slot);
 
         ret = first_entry_s;
     }
 
     if(unlikely(ret > last_entry_s)) {
-        netdata_log_error("INTERNAL ERROR: rrddim_slot2time() returned time (%ld) too far into the future (after last_entry_s %ld) for slot %zu",
-              ret, last_entry_s, slot);
+        netdata_log_error("INTERNAL ERROR: rrddim_slot2time() returned time (%" PRId64 ") too far into the future (after last_entry_s %" PRId64 ") for slot %zu",
+              (int64_t)ret, (int64_t)last_entry_s, slot);
 
         ret = last_entry_s;
     }

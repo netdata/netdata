@@ -120,7 +120,7 @@ groups:
             name: z
 `
 
-			coverage, err := buildChartCoverage(templateYAML, 1, store.Read(metrix.ReadRaw()), tc.excludePatterns)
+			coverage, err := buildChartCoverage(testCoverageSet(t, templateYAML), store.Read(metrix.ReadRaw()), tc.excludePatterns)
 			if tc.wantErr {
 				require.Error(t, err)
 				return
@@ -244,7 +244,7 @@ groups:
             name: y
 `
 
-	coverages, err := buildChartCoveragesFromStore(templateYAML, 1, store, nil)
+	coverages, err := buildChartCoveragesFromStore(testCoverageSet(t, templateYAML), store, nil)
 	require.NoError(t, err)
 	require.Len(t, coverages, 2)
 
@@ -336,8 +336,7 @@ groups:
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			coverage, err := buildChartCoverage(
-				tc.template,
-				1,
+				testCoverageSet(t, tc.template),
 				tc.store.Read(metrix.ReadRaw(), metrix.ReadFlatten()),
 				nil,
 			)
@@ -385,7 +384,7 @@ groups:
             name: stale
 `
 
-	coverage, err := buildChartCoverage(templateYAML, 1, store.Read(metrix.ReadRaw()), nil)
+	coverage, err := buildChartCoverage(testCoverageSet(t, templateYAML), store.Read(metrix.ReadRaw()), nil)
 	require.NoError(t, err)
 	require.Equal(t, map[string][]string{"test.current": {"current"}}, normalizeCoverageDimsList(coverage.ExpectedByContext))
 	require.Equal(t, map[string][]string{"test.current": {"current"}}, normalizeCoverageDims(coverage.ActualByContext))
@@ -493,4 +492,11 @@ func normalizeCoverageDimsList(in map[string][]string) map[string][]string {
 		out[contextName] = clone
 	}
 	return out
+}
+
+func testCoverageSet(t *testing.T, data string) *chartengine.TemplateSet {
+	t.Helper()
+	set, err := chartengine.NewTemplateSetYAML([]byte(data))
+	require.NoError(t, err)
+	return set
 }

@@ -31,8 +31,8 @@ static long rrdr_line_init(RRDR *r __maybe_unused, time_t t __maybe_unused, long
     rrdr_line = rrdr_line_next(r, rrdr_line);
 
     internal_fatal(r->t[rrdr_line] != t,
-                   "QUERY: wrong timestamp at RRDR line %ld, expected %ld, got %ld, of query '%s'",
-                   rrdr_line, r->t[rrdr_line], t, r->internal.qt->id);
+                   "QUERY: wrong timestamp at RRDR line %ld, expected %" PRId64 ", got %" PRId64 ", of query '%s'",
+                   rrdr_line, (int64_t)r->t[rrdr_line], (int64_t)t, r->internal.qt->id);
 
     return rrdr_line;
 }
@@ -376,9 +376,9 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                         new_point.sp.start_time_s == new_point.sp.end_time_s)) {
 
                 internal_error(true, "QUERY: '%s', dimension '%s' next_metric() returned "
-                                     "point %zu from %ld to %ld, that are both equal",
+                                     "point %zu from %" PRId64 " to %" PRId64 ", that are both equal",
                                qt->id, query_metric_id(qt, qm),
-                               new_point.id, new_point.sp.start_time_s, new_point.sp.end_time_s);
+                               new_point.id, (int64_t)new_point.sp.start_time_s, (int64_t)new_point.sp.end_time_s);
 
                 new_point.sp.start_time_s = new_point.sp.end_time_s - ops->tier_ptr->db_update_every_s;
             }
@@ -389,13 +389,13 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
 
                 internal_error(true,
                                "QUERY: '%s', dimension '%s' next_metric() returned "
-                               "point %zu from %ld to %ld, before the "
-                               "last point %zu from %ld to %ld, "
-                               "now is %ld to %ld",
+                               "point %zu from %" PRId64 " to %" PRId64 ", before the "
+                               "last point %zu from %" PRId64 " to %" PRId64 ", "
+                               "now is %" PRId64 " to %" PRId64,
                                qt->id, query_metric_id(qt, qm),
-                               new_point.id, new_point.sp.start_time_s, new_point.sp.end_time_s,
-                               last1_point.id, last1_point.sp.start_time_s, last1_point.sp.end_time_s,
-                               now_start_time, now_end_time);
+                               new_point.id, (int64_t)new_point.sp.start_time_s, (int64_t)new_point.sp.end_time_s,
+                               last1_point.id, (int64_t)last1_point.sp.start_time_s, (int64_t)last1_point.sp.end_time_s,
+                               (int64_t)now_start_time, (int64_t)now_end_time);
 
                 count_same_end_time++;
                 continue;
@@ -425,13 +425,13 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                     internal_error(new_point.sp.end_time_s < ops->plan_expanded_after &&
                                    db_points_read_since_plan_switch > 1,
                                    "QUERY: '%s', dimension '%s' next_metric() "
-                                   "returned point %zu from %ld time %ld, "
-                                   "which is entirely before our current timeframe %ld to %ld "
-                                   "(and before the entire query, after %ld, before %ld)",
+                                   "returned point %zu from %" PRId64 " time %" PRId64 ", "
+                                   "which is entirely before our current timeframe %" PRId64 " to %" PRId64 " "
+                                   "(and before the entire query, after %" PRId64 ", before %" PRId64 ")",
                                    qt->id, query_metric_id(qt, qm),
-                                   new_point.id, new_point.sp.start_time_s, new_point.sp.end_time_s,
-                                   now_start_time, now_end_time,
-                                   ops->plan_expanded_after, ops->plan_expanded_before);
+                                   new_point.id, (int64_t)new_point.sp.start_time_s, (int64_t)new_point.sp.end_time_s,
+                                   (int64_t)now_start_time, (int64_t)now_end_time,
+                                   (int64_t)ops->plan_expanded_after, (int64_t)ops->plan_expanded_before);
                 }
 
             }
@@ -446,9 +446,9 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             internal_error(true,
                            "QUERY: '%s', dimension '%s', the database does not advance the query,"
                            " it returned an end time less or equal to the end time of the last "
-                           "point we got %ld, %zu times",
+                           "point we got %" PRId64 ", %zu times",
                            qt->id, query_metric_id(qt, qm),
-                           last1_point.sp.end_time_s, count_same_end_time);
+                           (int64_t)last1_point.sp.end_time_s, count_same_end_time);
 
             if(unlikely(new_point.sp.end_time_s <= last1_point.sp.end_time_s))
                 new_point.sp.end_time_s = now_end_time;
@@ -467,8 +467,8 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
         // we select the one to use based on their timestamps
 
         internal_fatal(now_end_time > stop_time || points_added >= points_wanted,
-            "QUERY: first part of query provides invalid point to interpolate (now_end_time %ld, stop_time %ld",
-            now_end_time, stop_time);
+            "QUERY: first part of query provides invalid point to interpolate (now_end_time %" PRId64 ", stop_time %" PRId64,
+            (int64_t)now_end_time, (int64_t)stop_time);
 
         NETDATA_DOUBLE new_point_total_remaining = NAN;
 

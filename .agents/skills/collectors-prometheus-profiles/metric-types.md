@@ -331,7 +331,7 @@ representative.
 ## Collection filtering and relabeling
 
 Relabel actions, the ordered stages, histogram and summary safety, and profile
-precedence are owned by `src/go/plugin/go.d/collector/prometheus/relabel/README.md`;
+precedence are owned by `src/go/pkg/relabel/README.md`;
 read it in full and validate the exact ordered rules with the profile. Relabeling
 changes the data contract: a rename or a label change on one member of a
 distribution, or on an instance label, changes what the writer assembles and what

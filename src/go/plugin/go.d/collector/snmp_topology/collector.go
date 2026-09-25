@@ -162,7 +162,7 @@ func (c *Collector) Collect(context.Context) error {
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
-func (c *Collector) Run(ctx context.Context) error {
+func (c *Collector) Run(ctx context.Context, ready func()) error {
 	defer c.releaseDiagnosticProvider()
 	if err := ctx.Err(); err != nil {
 		return nil
@@ -172,6 +172,7 @@ func (c *Collector) Run(ctx context.Context) error {
 	c.topologyRegistry.setReverseDNSWarmContext(ctx)
 	defer c.topologyRegistry.setReverseDNSWarmContext(nil)
 
+	ready()
 	c.refreshTopologyRecovering(ctx)
 	c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
 

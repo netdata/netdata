@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
+
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -81,6 +83,7 @@ func TestProcessOwnedJobRetirementDoesNotWaitForPhysicalStop(t *testing.T) {
 		processOwner: owner,
 	}
 	require.NoError(t, generation.Start(context.Background()))
+	require.NoError(t, generation.AwaitReady(t.Context()))
 	require.NoError(t, generation.Publish())
 	require.NoError(t, generation.reserveInstallation())
 	require.NoError(t, generation.acknowledgeInstallation())
@@ -592,9 +595,9 @@ func newBlockingStopManagedJob() *blockingStopManagedJob {
 	}
 }
 
-func (job *blockingStopManagedJob) StartManaged(ready chan<- struct{}) {
+func (job *blockingStopManagedJob) StartManaged(run *jobruntime.ManagedRun) {
 	close(job.started)
-	close(ready)
+	run.Ready()
 	<-job.stopped
 }
 

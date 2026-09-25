@@ -1,0 +1,14 @@
+{
+  "originator": [
+    "Netdata Ops"
+  ],
+  "recipients": [
+    "+15005550009"
+  ],
+  "body": [
+    "summary\nNode: node\nAlert: alert\nStatus: WARNING\nTime: 2026-09-14T12:00:00Z"
+  ],
+  "datacoding": [
+    "auto"
+  ]
+}
