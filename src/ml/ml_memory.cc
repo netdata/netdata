@@ -52,13 +52,14 @@ static inline size_t ml_usable_size(void *ptr) noexcept
 //
 // On platforms with malloc_usable_size() (Linux/macOS/FreeBSD and the
 // Windows MSYS2 runtime), every path reports the allocator block size
-// returned by ml_usable_size(ptr), not the size argument. This makes alloc/free symmetric regardless of which delete
-// form the compiler emits: when -fsized-deallocation is off, every free
-// routes through the unsized overload (which has no size argument); when it
-// is on, the compiler may emit either form depending on type knowledge. By
-// reading the size from the pointer on every path, the per-pointer
-// alloc/free pair is balanced independent of which delete form was chosen.
-// The reported byte total also reflects actual allocator block sizes
+// returned by ml_usable_size(ptr), not the size argument. This makes
+// alloc/free symmetric regardless of which delete form the compiler
+// emits: when -fsized-deallocation is off, every free routes through the
+// unsized overload (which has no size argument); when it is on, the
+// compiler may emit either form depending on type knowledge. By reading
+// the size from the pointer on every path, the per-pointer alloc/free
+// pair is balanced independent of which delete form was chosen. The
+// reported byte total also reflects actual allocator block sizes
 // (including alignment/rounding slack), not requested sizes -- a more
 // accurate measure of real RAM consumption.
 //
@@ -68,9 +69,11 @@ static inline size_t ml_usable_size(void *ptr) noexcept
 // unsized delete overloads have no size to fall back to; they decrement
 // zero and rely on the saturating pulse_ml_memory_freed() to prevent
 // underflow. Net effect on these platforms: the counter over-counts by
-// every allocation freed through unsized delete, which is most of them
-// unless -fsized-deallocation is in effect, so it only ever grows. No
-// supported platform takes this path today.
+// every allocation freed through unsized delete. GCC enables
+// -fsized-deallocation by default from C++14 (Clang from version 19), so
+// that is usually a small share, but USE_CXX_11 builds route every free
+// through unsized delete and the counter then only grows. No supported
+// platform takes this path today.
 //
 // Over-aligned types (alignof(T) > __STDCPP_DEFAULT_NEW_ALIGNMENT__)
 // route through the std::align_val_t-tagged overloads below; without
