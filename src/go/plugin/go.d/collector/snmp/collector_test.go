@@ -873,6 +873,7 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 		wantErr        string
 		wantAbsent     []string
 		wantContextOID string
+		wantSysObject  string
 	}{
 		"empty system query": {
 			wantErr: "SNMP system scalar query returned no PDUs",
@@ -910,11 +911,13 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 			pdus: []gosnmp.SnmpPDU{
 				{Name: snmputils.OidSysObject, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.9.1.1166"},
 			},
+			wantSysObject: "1.3.6.1.4.1.9.1.1166",
 		},
 		"numeric OID text in octet string system object": {
 			pdus: []gosnmp.SnmpPDU{
 				{Name: snmputils.OidSysObject, Type: gosnmp.OctetString, Value: []byte("1.3.6.1.4.1.9.1.1166")},
 			},
+			wantSysObject: "1.3.6.1.4.1.9.1.1166",
 		},
 		"non-OID octet string system object with manual profile": {
 			pdus: []gosnmp.SnmpPDU{
@@ -957,6 +960,10 @@ func TestCollector_CheckRejectsNoProjectedProfiles(t *testing.T) {
 			err := collr.Check(context.Background())
 			if tc.wantErr == "" {
 				require.NoError(t, err)
+				if tc.wantSysObject != "" {
+					require.NotNil(t, collr.sysInfo)
+					assert.Equal(t, tc.wantSysObject, collr.sysInfo.SysObjectID)
+				}
 				return
 			}
 			if tc.wantContextOID != "" {

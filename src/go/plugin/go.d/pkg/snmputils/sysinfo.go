@@ -116,9 +116,10 @@ func GetSysInfo(client ScalarClient) (*SysInfo, error) {
 	return si, nil
 }
 
-// sysObjectIDFromPDU returns the sysObjectID without a leading dot, or "" when the value is not a numeric OID.
-// Some agents send the OID as OctetString text; accepting only numeric OID syntax keeps free-form text out of
-// profile matching, labels, and diagnostics. An unusable value is treated as absent so manual profiles still apply.
+// sysObjectIDFromPDU returns the sysObjectID without a leading dot, or "" when the value is not a valid numeric OID.
+// Some agents send the OID as OctetString text; accepting only OID syntax keeps other device text out of profile
+// matching and the collector's error and log diagnostics. An unusable value is treated as absent so manual
+// profiles still apply.
 func sysObjectIDFromPDU(pdu gosnmp.SnmpPDU) string {
 	if pdu.Type != gosnmp.ObjectIdentifier && pdu.Type != gosnmp.OctetString {
 		return ""
@@ -127,23 +128,34 @@ func sysObjectIDFromPDU(pdu gosnmp.SnmpPDU) string {
 	if err != nil {
 		return ""
 	}
-	v = strings.TrimPrefix(strings.TrimSpace(v), ".")
+	v = strings.TrimPrefix(strings.Trim(v, " \t\r\n\x00"), ".")
 	if !isNumericOID(v) {
 		return ""
 	}
 	return v
 }
 
-// isNumericOID reports whether s is a dotted numeric OID with at least two arcs.
+// isNumericOID reports whether s is a dotted numeric OID with at least two arcs whose first arcs follow
+// ITU-T X.660: the first arc is 0, 1 or 2, and the second arc is below 40 when the first is 0 or 1.
 func isNumericOID(s string) bool {
-	arcs := 0
-	for arc := range strings.SplitSeq(s, ".") {
+	arcs := strings.Split(s, ".")
+	if len(arcs) < 2 {
+		return false
+	}
+	for _, arc := range arcs {
 		if arc == "" || strings.ContainsFunc(arc, func(r rune) bool { return r < '0' || r > '9' }) {
 			return false
 		}
-		arcs++
 	}
-	return arcs >= 2
+	switch arcs[0] {
+	case "0", "1":
+		second, err := strconv.ParseUint(arcs[1], 10, 64)
+		return err == nil && second < 40
+	case "2":
+		return true
+	default:
+		return false
+	}
 }
 
 func sysInfoOIDs() []string {

@@ -164,6 +164,32 @@ func TestGetSysInfoSysObjectIDTypeHandling(t *testing.T) {
 			wantSysObject: "1.3.6.1.4.1.11.2.3.9.1",
 			wantType:      "OctetString",
 		},
+		"octet string with NUL-terminated numeric OID": {
+			pdu:           gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("1.3.6.1.4.1.11.2.3.9.1\x00")},
+			wantSysObject: "1.3.6.1.4.1.11.2.3.9.1",
+			wantType:      "OctetString",
+		},
+		"octet string with joint-iso-itu-t OID": {
+			pdu:           gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("2.999")},
+			wantSysObject: "2.999",
+			wantType:      "OctetString",
+		},
+		"octet string with IPv4 address": {
+			pdu:      gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("192.0.2.10")},
+			wantType: "OctetString",
+		},
+		"octet string with first arc above 2": {
+			pdu:      gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("3.6")},
+			wantType: "OctetString",
+		},
+		"octet string with second arc 40 under iso": {
+			pdu:      gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("1.40")},
+			wantType: "OctetString",
+		},
+		"octet string with second arc above 39 under itu-t": {
+			pdu:      gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("0.999")},
+			wantType: "OctetString",
+		},
 		"octet string with free text": {
 			pdu:      gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("private device identifier")},
 			wantType: "OctetString",

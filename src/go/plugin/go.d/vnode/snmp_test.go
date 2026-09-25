@@ -135,6 +135,7 @@ func TestAcquireRealUDPProfileFailureRetainsSystemIdentity(t *testing.T) {
 	require.NotEmpty(t, m.Labels["sys_object_id"])
 	require.Positive(t, enrichmentRequests.Load())
 }
+
 func TestAcquireRealUDPIgnoresNonOIDSystemObject(t *testing.T) {
 	var enrichmentRequests atomic.Int32
 	c, _ := serve(t, func(p *gosnmp.SnmpPacket) *gosnmp.SnmpPacket {
