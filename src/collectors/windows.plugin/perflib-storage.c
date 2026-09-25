@@ -704,22 +704,23 @@ static void volume_space_worker(void *ptr __maybe_unused)
         size_t owner = worker_id + 1;
         size_t *current_owner = dictionary_get(volume_space_inflight, name);
         bool result_superseded = current_owner && *current_owner != owner;
-        if (current_owner && *current_owner == owner)
+        bool retired = volume_space_worker_retired[worker_id];
+        if (!retired && current_owner && *current_owner == owner)
             dictionary_del(volume_space_inflight, name);
         volume_space_worker_busy[worker_id] = false;
         volume_space_worker_started_ut[worker_id] = 0;
-        bool retired = volume_space_worker_retired[worker_id];
-        volume_space_worker_target[worker_id][0] = '\0';
+        if (!retired)
+            volume_space_worker_target[worker_id][0] = '\0';
         if (stopping) {
             netdata_mutex_unlock(&volume_space_mutex);
             break;
         }
         if (space_query_cancelled) {
-            // A cancelled query is a failed sample. Publishing it arms the normal grace-period
-            // eviction path instead of making cancellation indistinguishable from no result.
+            // Cancellation is a deadline event, not proof that the returned value is invalid.
+            // Preserve a successful query; volume_space() reports false when the call was actually
+            // interrupted, which arms the normal grace-period eviction path.
             // A retired worker still publishes before leaving, otherwise the timeout it just hit
             // would be silent and the volume would gap forever instead of ageing out.
-            value.success = false;
             usec_t now_ut = now_monotonic_usec();
             if (!volume_space_last_cancel_log_ut ||
                 now_ut - volume_space_last_cancel_log_ut >= 60 * USEC_PER_SEC) {
@@ -781,6 +782,18 @@ static void volume_space_reclaim_retired(void)
             continue;
 
         netdata_mutex_lock(&volume_space_mutex);
+        if (volume_space_worker_target[i][0]) {
+            size_t owner = i + 1;
+            size_t *current_owner = dictionary_get(volume_space_inflight, volume_space_worker_target[i]);
+            if (current_owner && *current_owner == owner) {
+                struct volume_space_request request_value = { .metadata = volume_space_worker_metadata[i] };
+                dictionary_del(volume_space_inflight, volume_space_worker_target[i]);
+                if (!volume_space_request)
+                    volume_space_request = dictionary_create_advanced(
+                        DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_request));
+                dictionary_set(volume_space_request, volume_space_worker_target[i], &request_value, sizeof(request_value));
+            }
+        }
         if (volume_space_worker_handles[i]) {
             CloseHandle(volume_space_worker_handles[i]);
             volume_space_worker_handles[i] = NULL;
@@ -829,18 +842,6 @@ static void volume_space_cancel_expired(void)
                 GetLastError());
 
         volume_space_worker_retired[i] = true;
-        if (volume_space_worker_target[i][0]) {
-            size_t owner = i + 1;
-            size_t *current_owner = dictionary_get(volume_space_inflight, volume_space_worker_target[i]);
-            if (current_owner && *current_owner == owner) {
-                struct volume_space_request request_value = { .metadata = volume_space_worker_metadata[i] };
-                dictionary_del(volume_space_inflight, volume_space_worker_target[i]);
-                if (!volume_space_request)
-                    volume_space_request = dictionary_create_advanced(
-                        DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_request));
-                dictionary_set(volume_space_request, volume_space_worker_target[i], &request_value, sizeof(request_value));
-            }
-        }
         for (size_t j = 0; j < VOLUME_SPACE_WORKER_SLOT_COUNT; j++) {
             bool already_reserved = false;
             for (size_t k = 0; k < replacements_count; k++)
@@ -898,6 +899,21 @@ static void volume_space_submit(DICTIONARY *extra_targets, usec_t now_ut)
     netdata_mutex_lock(&volume_space_mutex);
     if (!volume_space_worker_stop) {
         struct volume_space_request *request_value;
+
+        // Generation state is only needed while a target is current, queued, or still executing.
+        // Retired workers keep their target in-flight until they exit, so their late result remains
+        // distinguishable without retaining names for volumes that disappeared.
+        if (volume_space_latest_generation) {
+            uint64_t *generation;
+            dfe_start_write(volume_space_latest_generation, generation)
+            {
+                if (!dictionary_get(request, generation_dfe.name) &&
+                    (!volume_space_request || !dictionary_get(volume_space_request, generation_dfe.name)) &&
+                    !volume_space_target_inflight(generation_dfe.name))
+                    dictionary_del(volume_space_latest_generation, generation_dfe.name);
+            }
+            dfe_done(generation);
+        }
 
         // a name already being queried must not be queued a second time
         dfe_start_write(request, request_value)
@@ -1395,10 +1411,10 @@ static void mount_points_worker(void *ptr __maybe_unused)
         mount_points_worker_busy[worker_id] = false;
         mount_points_worker_started_ut[worker_id] = 0;
         struct mount_points_snapshot *discard = NULL;
-        if (stopping || mount_points_worker_retired[worker_id] || mount_points_worker_results[worker_id])
+        if (stopping || mount_points_worker_results[worker_id])
             discard = snapshot;
         else {
-            if (cancelled) {
+            if (cancelled || mount_points_worker_retired[worker_id]) {
                 // A timed-out scan is incomplete, not worthless. Publishing it through the partial
                 // branch refreshes what was discovered while keeping eviction disabled. Discarding
                 // it means a host whose enumeration always exceeds the deadline never publishes
@@ -1543,7 +1559,7 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
             }
             dfe_done(value);
         }
-        if (excludedDeviceNames) {
+        if (excludedDeviceNames && snapshot->device_mapping_complete) {
             dfe_start_read(excludedDeviceNames, value)
             {
                 if (value && !dictionary_get(excluded_devices, value_dfe.name))
