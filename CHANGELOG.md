@@ -424,6 +424,22 @@
 - Feat(go.d/collectorapi): add PermanentError and TemporaryError lifecycle error classification ([#24004](https://github.com/netdata/netdata/issues/24004))
 - Fix(database): prevent machine GUID copy from writing past RRDHOST buffer ([#23991](https://github.com/netdata/netdata/issues/23991))
 - Fix 64-bit timestamp formatting on 32-bit targets ([#23997](https://github.com/netdata/netdata/issues/23997))
+- Run MCP bearer-protection ACL tests in CI ([#24001](https://github.com/netdata/netdata/issues/24001))
+- Fix(go.d/jobmgr): keep an applied transaction's reply after late cancellation ([#24010](https://github.com/netdata/netdata/issues/24010))
+- Drop `--metadata` option for R2 artifact uploads. ([#24000](https://github.com/netdata/netdata/issues/24000))
+- Fix(go.d/jobmgr): separate DynCfg acceptance from runtime activation ([#24011](https://github.com/netdata/netdata/issues/24011))
+- Provide zstd compressed source archives and use them in the kickstart and updaer scripts when supported. ([#22440](https://github.com/netdata/netdata/issues/22440))
+- Fix(go.d): separate service discovery config adoption from activation ([#24014](https://github.com/netdata/netdata/issues/24014))
+- Feat: run the Go StatsD collector as a standalone plugin ([#24016](https://github.com/netdata/netdata/issues/24016))
+- Fix(go.d/snmp): do not republish unchanged lifecycle re-projections ([#24019](https://github.com/netdata/netdata/issues/24019))
+- Fix(go.d): separate SecretStore adoption from acquisition ([#24020](https://github.com/netdata/netdata/issues/24020))
+- Test(go.d): wait for service discovery test attempt release ([#24021](https://github.com/netdata/netdata/issues/24021))
+- Fix compiler warnings across Netdata C code ([#23998](https://github.com/netdata/netdata/issues/23998))
+- Fix SQLite status checks and ACLK protobuf serialization failures ([#24012](https://github.com/netdata/netdata/issues/24012))
+- Test(go.d): wait for initial Store attempt release before update ([#24022](https://github.com/netdata/netdata/issues/24022))
+- Fix(go.d/jobmgr): keep discovery alive through process retirement ([#24023](https://github.com/netdata/netdata/issues/24023))
+- Fix(go.d): preserve vnode names and reject stale job candidates ([#24024](https://github.com/netdata/netdata/issues/24024))
+- Test(go.d): wait for Store release between secret CRUD steps ([#24025](https://github.com/netdata/netdata/issues/24025))
 
 ## [2.11.0] - 2026-08-12
 
