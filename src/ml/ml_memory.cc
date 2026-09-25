@@ -1,7 +1,9 @@
 #include <cstdlib>
 #include <new>
 
-#if defined(__linux__)
+// __CYGWIN__ covers the Windows agent, which is built on the MSYS2
+// runtime: its <malloc.h> provides malloc_usable_size.
+#if defined(__linux__) || defined(__CYGWIN__)
   #include <malloc.h>
   #define ML_HAVE_MALLOC_USABLE_SIZE 1
 #elif defined(__APPLE__)
@@ -48,9 +50,9 @@ static inline size_t ml_usable_size(void *ptr) noexcept
 // another could be counted on only one side, making the counter drift and
 // the chart flicker -- so we deliberately account unconditionally.
 //
-// On platforms with malloc_usable_size() (Linux/macOS/FreeBSD), every path
-// reports the allocator block size returned by ml_usable_size(ptr), not the
-// size argument. This makes alloc/free symmetric regardless of which delete
+// On platforms with malloc_usable_size() (Linux/macOS/FreeBSD and the
+// Windows MSYS2 runtime), every path reports the allocator block size
+// returned by ml_usable_size(ptr), not the size argument. This makes alloc/free symmetric regardless of which delete
 // form the compiler emits: when -fsized-deallocation is off, every free
 // routes through the unsized overload (which has no size argument); when it
 // is on, the compiler may emit either form depending on type knowledge. By
@@ -60,15 +62,15 @@ static inline size_t ml_usable_size(void *ptr) noexcept
 // (including alignment/rounding slack), not requested sizes -- a more
 // accurate measure of real RAM consumption.
 //
-// On platforms without malloc_usable_size() (everything that is not
-// Linux/macOS/FreeBSD), the sized paths attribute the requested size to
-// keep the counter meaningful instead of flat-zero. The unsized delete
-// overloads have no size to fall back to; they decrement zero and rely on
-// the saturating pulse_ml_memory_freed() to prevent underflow. Net effect
-// on these platforms: a small persistent over-count proportional to the
-// share of frees that route through unsized delete. We accept this over a
-// size-prefix scheme that would impose a per-allocation header on every
-// build.
+// On platforms without malloc_usable_size() (anything that is not
+// Linux/macOS/FreeBSD/Windows-MSYS2), the sized paths attribute the
+// requested size to keep the counter meaningful instead of flat-zero. The
+// unsized delete overloads have no size to fall back to; they decrement
+// zero and rely on the saturating pulse_ml_memory_freed() to prevent
+// underflow. Net effect on these platforms: the counter over-counts by
+// every allocation freed through unsized delete, which is most of them
+// unless -fsized-deallocation is in effect, so it only ever grows. No
+// supported platform takes this path today.
 //
 // Over-aligned types (alignof(T) > __STDCPP_DEFAULT_NEW_ALIGNMENT__)
 // route through the std::align_val_t-tagged overloads below; without
@@ -179,13 +181,11 @@ void operator delete[](void *ptr) noexcept
 // most POSIX systems otherwise; the resulting pointer is freed with
 // plain free().
 //
-// Guarded behind __cpp_aligned_new because some C++17-capable toolchains
-// (older libstdc++ shipped with RHEL/CentOS RPM builds, in particular)
-// declare the language standard as C++17 but ship a <new> header that
-// does not define std::align_val_t. The ML subsystem does not introduce
-// any over-aligned types today, so on those toolchains the aligned
-// overloads simply fall back to the default global new/delete, which
-// matches the pre-existing project behavior on those platforms.
+// Guarded behind __cpp_aligned_new, which the compiler predefines when
+// aligned new is enabled (the default in C++17 mode). It is undefined in
+// USE_CXX_11 builds, where std::align_val_t does not exist and these
+// overloads cannot be declared; there the language has no over-aligned
+// new at all, so nothing bypasses the unaligned overloads above.
 
 #if defined(__cpp_aligned_new) && __cpp_aligned_new >= 201606L
 
