@@ -236,6 +236,9 @@ struct rrdhost {
             // reserved for the receiver/sender thread - do not use for other purposes
             struct sender_buffer commit;
 
+            // serializes the host labels snapshot and its commit (stream_send_host_labels())
+            SPINLOCK labels_spinlock;
+
             STRING *destination;                    // where to send metrics to
             STRING *api_key;                        // the api key at the receiving netdata
             SIMPLE_PATTERN *charts_matching;        // pattern to match the charts to be sent

@@ -552,6 +552,7 @@ RRDHOST *rrdhost_create(
     rw_spinlock_init(&host->ml_host_rwlock);
     __atomic_store_n(&host->ml_running, false, __ATOMIC_RELAXED);
     spinlock_init(&host->aclk.spinlock);
+    spinlock_init(&host->stream.snd.labels_spinlock);
 
     if (likely(!archived)) {
         host->stream.snd.status.last_connected = now_realtime_sec();
