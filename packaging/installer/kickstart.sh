@@ -2207,7 +2207,7 @@ try_static_install() {
     fi
 
     if [ "$(echo "${archive_info}" | wc -l)" -gt 1 ]; then
-      archive_info="$(echo "${archive_info}" | grep -ve ".*-latest.*" | tail -n 1)"
+      archive_info="$(echo "${archive_info}" | grep -v ".*-latest.*" | tail -n 1)"
     fi
 
     archive_name="$(echo "${archive_info}" | awk '{ print $1 }')"
@@ -2432,7 +2432,7 @@ try_build_install() {
 
     if [ -n "${zstd}" ] && [ -n "${zstd_info}" ]; then
       if [ "$(echo "${zstd_info}" | wc -l)" -gt 1 ]; then
-        zstd_info="$(echo "${zstd_info}" | grep -ve ".*-latest.*" | tail -n 1)"
+        zstd_info="$(echo "${zstd_info}" | grep -v ".*-latest.*" | tail -n 1)"
       fi
 
       zstd_name="$(echo "${zstd_info}" | awk '{ print $1 }')"
@@ -2447,7 +2447,7 @@ try_build_install() {
 
     if [ -z "${archive_name}" ] && [ -n "${gzip_name}" ]; then
       if [ "$(echo "${gzip_info}" | wc -l)" -gt 1 ]; then
-        gzip_info="$(echo "${gzip_info}" | grep -ve ".*-latest.*" | tail -n 1)"
+        gzip_info="$(echo "${gzip_info}" | grep -v ".*-latest.*" | tail -n 1)"
       fi
 
       gzip_name="$(echo "${gzip_info}" | awk '{ print $1 }')"
