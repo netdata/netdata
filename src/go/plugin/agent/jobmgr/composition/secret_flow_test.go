@@ -197,12 +197,19 @@ func testProcessCoreSecretMutationDependentRestart(
 	modules := collectorapi.Registry{
 		"module": {
 			Create: func() collectorapi.CollectorV1 {
+				// Startup does not wait for initial Store acquisition, so discovery
+				// may build candidates that fail resolution and are cleaned before
+				// Init. Only collectors that reached Init are counted.
+				var initialized atomic.Bool
 				collector := &collectorapi.MockCollectorV1{
 					CleanupFunc: func(context.Context) {
-						cleanups.Add(1)
+						if initialized.Load() {
+							cleanups.Add(1)
+						}
 					},
 				}
 				collector.InitFunc = func(ctx context.Context) error {
+					initialized.Store(true)
 					starts <- collector.Config.OptionStr
 					if gateInitial && collector.Config.OptionStr == "initial" {
 						enterInitialOnce.Do(func() { close(initialEntered) })
@@ -382,8 +389,12 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 	modules := collectorapi.Registry{
 		"module": {
 			Create: func() collectorapi.CollectorV1 {
+				// Count only collectors that reached Init; see
+				// testProcessCoreSecretMutationDependentRestart.
+				var initialized atomic.Bool
 				collector := &collectorapi.MockCollectorV1{}
 				collector.InitFunc = func(context.Context) error {
+					initialized.Store(true)
 					starts <- collector.Config.OptionStr
 					if collector.Config.OptionStr == "replacement" {
 						replacementEnteredOnce.Do(func() { close(replacementEntered) })
@@ -392,7 +403,9 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 					return nil
 				}
 				collector.CleanupFunc = func(context.Context) {
-					cleanups.Add(1)
+					if initialized.Load() {
+						cleanups.Add(1)
+					}
 				}
 				return collector
 			},
