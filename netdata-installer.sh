@@ -1250,7 +1250,7 @@ if [ -r "${NETDATA_WEB_DIR}/.MANIFEST" ]; then
   tmp_manifest="$(mktemp)"
   old_pwd="$(pwd)"
   grep -vE "^$" "${NETDATA_WEB_DIR}/.MANIFEST" > "${tmp_manifest}"
-  cd "${NETDATA_WEB_DIR}" && (find "." -type f -print0 | grep -vxzFf "${tmp_manifest}" xargs -0 rm -f)
+  cd "${NETDATA_WEB_DIR}" && (find "." -type f -print0 | grep -vxzFf "${tmp_manifest}" | xargs -0 rm -f)
   cd "${old_pwd}" || true
   rm -f "${tmp_manifest}"
 fi
