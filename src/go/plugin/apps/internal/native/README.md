@@ -42,10 +42,22 @@ use the local procfs mount. There are no mutable globals or static reader buffer
 A process row requires valid stat and UID/GID identity. Optional observations have
 independent validity bits. Counter warmup and resets produce gaps. Missing reads
 preserve the last successful counter timestamp, so recovery spans the actual
-measurement interval. A start-time change resets every baseline/cache. A second
-stat read detects PID replacement between per-process file reads; sampled PSS
-also validates the incarnation. Only live readable rows leave C. Exited state is
-retained internally for the original collector's one-extra-collection grace.
+measurement interval. A start-time change resets the replacement's baselines and
+caches. The old incarnation's accepted CPU/fault lifetime and accepted parent
+PID/start-time identity move into a separate compact retirement record before
+that reset. Ordinary disappearance uses the same retirement path. Pending debt
+therefore survives reuse of either the child PID or its ancestors, and retirement
+records never own FD strings or sampling caches. A second stat read detects PID
+replacement between per-process file reads; sampled PSS also validates the
+incarnation. Only live readable rows leave C.
+
+Retirement debt is eligible during the detecting scan and one additional scan,
+matching the original collector's grace. Expired ancestors may still supply
+ancestry during reconciliation; younger retirement records bypass those ancestors
+before their records are removed. This preserves ancestry without extending old
+debt's lifetime. Read gaps do not create retirements: ancestor resolution stops at
+a matching parent that is still present but unreadable, leaving debt pending for
+that parent's recovery within the grace window.
 
 ## POC sampling differences
 
@@ -76,11 +88,17 @@ integration and non-Linux live collection are outside this POC.
 
 ## Complexity and validation
 
-For P live/recent PIDs, F open descriptors, A nonzero assignments (at most 3P),
-and depth D: PID lookup is O(log P), parent-first traversal visits each known PID
-once, reconciliation is O(exits × D log P), and deduplication sorts at most 3F+A
-pairs in O((F+P) log(F+P)). Memory is O(P+F), including at most one extra collection
-of exited PID state; there is no group-by-FD-registry product allocation. FD cache
+For P live/recent PID slots, R retired incarnations, F open descriptors, A nonzero
+assignments (at most 3P), and ancestry depth D: current PID lookup is O(log P),
+retired incarnation lookup is O(log R), and the retirement index sorts in
+O(R log R). Parent-first traversal visits each known PID once. Reconciliation and
+ancestry cleanup are O(R × D log(P+R)); neither scans all PIDs for each retirement.
+FD deduplication sorts at most 3F+A pairs in O((F+P) log(F+P)). Active data occupies
+O(P+F+R), with retirement debt limited to the detection scan and one extra scan.
+Backing arrays may retain previous peaks: the PID pointer vector resizes on later
+PID additions, while the retirement vector retains capacity until a retirement-free
+window, when it is released. Thus allocated bytes can exceed the current logical
+O(P+F+R) population. There is no group-by-FD-registry product allocation. FD cache
 lookups are O(log descriptors-in-process), and cached target strings are reused.
 Per-process file buffers and FD vectors remain ordinary short-lived allocations.
 

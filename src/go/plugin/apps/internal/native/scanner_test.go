@@ -594,3 +594,109 @@ func TestRequiredReadGapDoesNotReconcileAsExit(t *testing.T) {
 		})
 	}
 }
+
+func TestRetiredIncarnationReconciliation(t *testing.T) {
+	for _, transition := range []string{"reused child", "departed then reused", "reused ancestors", "zero-lifetime reused ancestor", "retired parent then child", "expired parent debt"} {
+		t.Run(transition, func(t *testing.T) {
+			f := newFixture(t)
+			parentUser := uint64(20)
+			if transition == "zero-lifetime reused ancestor" {
+				parentUser = 0
+			}
+			f.proc(t, 99, 0, 1, 100, 0)
+			f.proc(t, 100, 99, 10, parentUser, 0)
+			f.proc(t, 101, 100, 11, 20, 0)
+			s := f.scanner(t, true, true)
+			finish(t, s, f.scan(t, s))
+			f.proc(t, 99, 0, 1, 110, 0)
+			if parentUser > 0 {
+				parentUser += 10
+			}
+			f.proc(t, 100, 99, 10, parentUser, 0)
+			f.proc(t, 101, 100, 11, 30, 0)
+			previous := f.scan(t, s)
+			own := previous.Processes[2].Values[model.CPUUser]
+			finish(t, s, previous)
+
+			switch transition {
+			case "reused child":
+				f.proc(t, 100, 99, 10, 40, 40)
+				f.proc(t, 101, 1, 22, 500, 0)
+			case "departed then reused":
+				require.NoError(t, os.RemoveAll(filepath.Join(f.root, "101")))
+				f.proc(t, 100, 99, 10, 40, 10)
+				partial := f.scan(t, s)
+				assert.Zero(t, partial.Processes[1].Values[model.CPUChildrenUser])
+				finish(t, s, partial)
+				f.proc(t, 100, 99, 10, 50, 40)
+				f.proc(t, 101, 1, 22, 500, 0)
+			case "reused ancestors", "zero-lifetime reused ancestor":
+				f.proc(t, 99, 0, 1, 120, 40+parentUser)
+				f.proc(t, 100, 1, 30, 500, 0)
+				f.proc(t, 101, 1, 31, 500, 0)
+			case "retired parent then child", "expired parent debt":
+				f.proc(t, 100, 1, 30, 500, 0)
+				// An unreadable child retains its last accepted ancestry.
+				require.NoError(t, os.Remove(filepath.Join(f.root, "101/status")))
+				finish(t, s, f.scan(t, s))
+				require.NoError(t, os.RemoveAll(filepath.Join(f.root, "101")))
+				if transition == "expired parent debt" {
+					finish(t, s, f.scan(t, s))
+					// Parent's debt expires, but its ancestry still locates the child's ancestor.
+					f.proc(t, 99, 0, 1, 120, 40)
+				} else {
+					f.proc(t, 99, 0, 1, 120, 70)
+				}
+			}
+			current := f.scan(t, s)
+			parentIndex := 1
+			if transition == "reused ancestors" || transition == "zero-lifetime reused ancestor" || transition == "retired parent then child" || transition == "expired parent debt" {
+				parentIndex = 0
+			}
+			assert.InDelta(t, own, current.Processes[parentIndex].Values[model.CPUChildrenUser], 0.001)
+			assert.Equal(t, 20.0, current.Processes[parentIndex].Values[model.ChildrenMinorFaults])
+			assert.Equal(t, 10.0, current.Processes[parentIndex].Values[model.ChildrenMajorFaults])
+			for _, p := range current.Processes {
+				if p.Key.StartTime >= 22 && transition != "retired parent then child" && transition != "expired parent debt" {
+					assert.False(t, p.Has(model.CPUUser), "replacement must start with a clean rate baseline")
+				}
+			}
+			finish(t, s, current)
+		})
+	}
+}
+
+func TestUnreadablePresentParentKeepsChildDebt(t *testing.T) {
+	f := newFixture(t)
+	f.proc(t, 99, 0, 1, 100, 0)
+	f.proc(t, 100, 99, 10, 20, 0)
+	f.proc(t, 101, 100, 11, 20, 0)
+	s := f.scanner(t, false, false)
+	finish(t, s, f.scan(t, s))
+	f.proc(t, 99, 0, 1, 110, 0)
+	f.proc(t, 100, 99, 10, 30, 0)
+	f.proc(t, 101, 100, 11, 30, 0)
+	previous := f.scan(t, s)
+	unit := previous.Processes[2].Values[model.CPUUser]
+	finish(t, s, previous)
+
+	require.NoError(t, os.RemoveAll(filepath.Join(f.root, "101")))
+	require.NoError(t, os.Remove(filepath.Join(f.root, "100/status")))
+	f.proc(t, 99, 0, 1, 120, 20)
+	gap := f.scan(t, s)
+	require.Len(t, gap.Processes, 1)
+	assert.InDelta(t, 2*unit, gap.Processes[0].Values[model.CPUChildrenUser], 0.001,
+		"a present unreadable parent cannot transfer its child's lifetime to unrelated grandparent work")
+	assert.Equal(t, 40.0, gap.Processes[0].Values[model.ChildrenMinorFaults])
+	finish(t, s, gap)
+
+	// The child's pending debt still belongs to its parent when that parent recovers.
+	f.proc(t, 100, 99, 10, 40, 40)
+	recovered := f.scan(t, s)
+	require.Len(t, recovered.Processes, 2)
+	assert.InDelta(t, unit/2, recovered.Processes[1].Values[model.CPUChildrenUser], 0.001,
+		"recovered rates span two seconds and subtract the retained child lifetime")
+	assert.Equal(t, 10.0, recovered.Processes[1].Values[model.ChildrenMinorFaults])
+	assert.Equal(t, 5.0, recovered.Processes[1].Values[model.ChildrenMajorFaults])
+	finish(t, s, recovered)
+}

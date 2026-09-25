@@ -27,16 +27,21 @@ typedef struct {
     apps_row row;
     uint64_t raw[METRIC_COUNT], raw_valid;
     double stamps[METRIC_COUNT], delta[METRIC_COUNT];
+    int32_t parent_pid;
     uint64_t parent_start;
     uint32_t groups[3], retired_groups[3];
-    int live, present, departed, read_state;
-    uint64_t departed_generation;
-    double debt[5];
+    int live, present, departed, read_state, accepted;
     fd_entry *fds;
     size_t fd_count;
     double pss, pss_ratio, pss_at, pss_attempt;
     int pss_valid, pss_force;
 } pid_entry;
+// Retired lifetime and ancestry belong to an incarnation, not its reusable PID slot.
+typedef struct {
+    int32_t pid, parent_pid;
+    uint64_t start, parent_start, generation;
+    double debt[5];
+} retired_entry;
 struct apps_scanner {
     char *root;
     int collect_fds, collect_pss, failed;
@@ -46,6 +51,8 @@ struct apps_scanner {
     int uptime_valid;
     pid_entry **pids;
     size_t count;
+    retired_entry *retired;
+    size_t retired_count, retired_capacity;
     apps_snapshot snap;
     apps_group_fd *groups;
     uint64_t cpu_raw[3];
@@ -454,6 +461,34 @@ static void scan_optional(apps_scanner *s, pid_entry *p, const char *status, dou
         scan_fds(s, p);
 }
 
+// Snapshot only accepted lifetime totals; transient read failures never enter here.
+static void retire_pid(apps_scanner *s, pid_entry *p) {
+    if (p->departed)
+        return;
+    if (p->accepted) {
+        if (s->retired_count == s->retired_capacity) {
+            size_t capacity = s->retired_capacity ? s->retired_capacity * 2 : 32;
+            retired_entry *next = resize(s, s->retired, capacity, sizeof(*next));
+            if (!next)
+                return;
+            s->retired = next;
+            s->retired_capacity = capacity;
+        }
+        retired_entry *r = &s->retired[s->retired_count++];
+        *r = (retired_entry){.pid = p->row.pid,
+                             .start = p->row.start,
+                             .parent_pid = p->parent_pid,
+                             .parent_start = p->parent_start,
+                             .generation = s->snap.generation};
+        const int own[] = {CPU_USER, CPU_SYSTEM, CPU_GUEST, MINFLT, MAJFLT};
+        const int child[] = {CHILD_USER, CHILD_SYSTEM, CHILD_GUEST, CHILD_MINFLT, CHILD_MAJFLT};
+        for (int m = 0; m < 5; m++)
+            r->debt[m] = (double)p->raw[own[m]] + p->raw[child[m]];
+    }
+    p->departed = 1;
+    free_fds(p);
+}
+
 // A vanished required file is an exit only when the process itself is gone.
 // Permission, malformed-file and isolated missing-file failures remain gaps.
 static void check_disappearance(apps_scanner *s, pid_entry *p, int error) {
@@ -487,6 +522,11 @@ static void scan_pid(apps_scanner *s, pid_entry *p) {
         return;
     }
     if (p->row.start != parsed.start || p->departed) {
+        retire_pid(s, p);
+        if (s->failed) {
+            free(buf);
+            return;
+        }
         int32_t pid = p->row.pid;
         uint32_t retired[3];
         for (int axis = 0; axis < 3; axis++)
@@ -556,6 +596,7 @@ static void scan_pid(apps_scanner *s, pid_entry *p) {
         rate(p, i, raw, i < 6 ? 100.0 / s->hz : 1.0, stat_at);
     }
     p->live = 1;
+    p->accepted = 1;
 }
 
 static void global_cpu(apps_scanner *s) {
@@ -595,45 +636,98 @@ static void global_cpu(apps_scanner *s) {
 }
 
 static pid_entry *parent(apps_scanner *s, pid_entry *p) {
-    pid_entry *pp = lookup(s, p->row.ppid);
+    pid_entry *pp = lookup(s, p->parent_pid);
     return pp && pp != p && pp->row.start <= p->row.start && pp->row.start == p->parent_start ? pp : NULL;
 }
-static void reconcile(apps_scanner *s) {
-    const int own[] = {CPU_USER, CPU_SYSTEM, CPU_GUEST, MINFLT, MAJFLT};
-    const int child[] = {CHILD_USER, CHILD_SYSTEM, CHILD_GUEST, CHILD_MINFLT, CHILD_MAJFLT};
-    for (size_t i = 0; i < s->count; i++) {
-        pid_entry *p = s->pids[i];
-        if (p->present || p->departed)
+static int compare_retired(const void *a, const void *b) {
+    const retired_entry *x = a, *y = b;
+    if (x->pid != y->pid)
+        return x->pid > y->pid ? 1 : -1;
+    return (x->start > y->start) - (x->start < y->start);
+}
+static retired_entry *find_retired(apps_scanner *s, int32_t pid, uint64_t start) {
+    retired_entry key = {.pid = pid, .start = start};
+    return s->retired_count ? bsearch(&key, s->retired, s->retired_count, sizeof(key), compare_retired) : NULL;
+}
+static pid_entry *surviving_ancestor(apps_scanner *s, const retired_entry *r) {
+    int32_t pid = r->parent_pid;
+    uint64_t start = r->parent_start;
+    // Both indexes use incarnation identity; reused parent PIDs cannot redirect debt.
+    for (size_t hops = 0; pid && hops < s->count + s->retired_count; hops++) {
+        pid_entry *p = lookup(s, pid);
+        if (p && p->row.start == start && p->accepted) {
+            if (p->live)
+                return p;
+            // A read gap does not transfer this parent's child lifetime to its ancestors.
+            if (p->present)
+                return NULL;
+            pid = p->parent_pid;
+            start = p->parent_start;
             continue;
-        p->departed = 1;
-        p->departed_generation = s->snap.generation;
-        free_fds(p);
-        for (int m = 0; m < 5; m++)
-            p->debt[m] = (double)p->raw[own[m]] + p->raw[child[m]];
+        }
+        retired_entry *ancestor = find_retired(s, pid, start);
+        if (!ancestor)
+            return NULL;
+        pid = ancestor->parent_pid;
+        start = ancestor->parent_start;
     }
-    // Move each vanished child's already observed lifetime into the first live ancestor's subtraction.
-    for (size_t i = 0; i < s->count; i++) {
-        pid_entry *p = s->pids[i];
-        if (!p->departed)
+    return NULL;
+}
+static int retirement_expired(apps_scanner *s, const retired_entry *r) {
+    return s->snap.generation - r->generation > 1;
+}
+static void prune_retired(apps_scanner *s) {
+    // Preserve ancestry needed by younger retirements without extending old debt's grace.
+    for (size_t i = 0; i < s->retired_count; i++) {
+        retired_entry *r = &s->retired[i];
+        if (retirement_expired(s, r))
             continue;
-        pid_entry *pp = parent(s, p);
-        size_t hops = 0;
-        while (pp && !pp->live && ++hops < s->count)
-            pp = parent(s, pp);
-        if (!pp || !pp->live)
+        for (size_t hops = 0; hops < s->retired_count; hops++) {
+            retired_entry *ancestor = find_retired(s, r->parent_pid, r->parent_start);
+            if (!ancestor || !retirement_expired(s, ancestor))
+                break;
+            r->parent_pid = ancestor->parent_pid;
+            r->parent_start = ancestor->parent_start;
+        }
+    }
+    size_t kept = 0;
+    for (size_t i = 0; i < s->retired_count; i++)
+        if (!retirement_expired(s, &s->retired[i]))
+            s->retired[kept++] = s->retired[i];
+    s->retired_count = kept;
+    // Release peak churn storage once the retirement window becomes empty.
+    if (!kept) {
+        free(s->retired);
+        s->retired = NULL;
+        s->retired_capacity = 0;
+    }
+}
+static void reconcile(apps_scanner *s) {
+    const int child[] = {CHILD_USER, CHILD_SYSTEM, CHILD_GUEST, CHILD_MINFLT, CHILD_MAJFLT};
+    for (size_t i = 0; i < s->count; i++)
+        if (!s->pids[i]->present)
+            retire_pid(s, s->pids[i]);
+    if (s->retired_count > 1)
+        qsort(s->retired, s->retired_count, sizeof(*s->retired), compare_retired);
+    for (size_t i = 0; i < s->retired_count; i++) {
+        retired_entry *r = &s->retired[i];
+        if (retirement_expired(s, r))
+            continue;
+        pid_entry *pp = surviving_ancestor(s, r);
+        if (!pp)
             continue;
         for (int m = 0; m < 5; m++) {
             int k = child[m];
             if (!(pp->row.valid & (UINT64_C(1) << k)))
                 continue;
-            double used = fmin(p->debt[m], pp->delta[k]);
-            p->debt[m] -= used;
+            double used = fmin(r->debt[m], pp->delta[k]);
+            r->debt[m] -= used;
             pp->delta[k] -= used;
-            // rate() already advanced its stamp; retain the measured interval via rate/delta.
             double original = pp->row.values[k];
             pp->row.values[k] = (pp->delta[k] + used) > 0 ? original * pp->delta[k] / (pp->delta[k] + used) : 0;
         }
     }
+    prune_retired(s);
     // Export reconciled rates unchanged; Go owns live-first host CPU normalization.
 }
 static int pss_priority(const void *a, const void *b) {
@@ -715,6 +809,7 @@ void apps_close(apps_scanner *s) {
     for (size_t i = 0; i < s->count; i++)
         free_pid(s->pids[i]);
     free(s->pids);
+    free(s->retired);
     free(s->root);
     free(s->snap.rows);
     free(s->groups);
@@ -823,6 +918,7 @@ int apps_scan(apps_scanner *s, double now, apps_snapshot **out) {
         if (!p->live)
             continue;
         pid_entry *pp = lookup(s, p->row.ppid);
+        p->parent_pid = p->row.ppid;
         p->parent_start = pp && pp->row.start <= p->row.start ? pp->row.start : UINT64_MAX;
     }
     reconcile(s);
@@ -972,21 +1068,10 @@ int apps_finalize(apps_scanner *s, uint64_t generation, const apps_assignment *a
             g->counts[pairs[i].type]++;
     }
     free(pairs);
-    // Match apps.plugin's one extra collection grace for unresolved exits.
+    // Incarnation retirement records own reconciliation; dead PID slots can be released.
     size_t kept = 0;
     for (size_t i = 0; i < s->count; i++) {
-        pid_entry *p = s->pids[i];
-        int debt = 0;
-        for (int m = 0; m < 5; m++)
-            if (p->debt[m] > 0)
-                debt = 1;
-        if (p->departed && (!debt || !parent(s, p) ||
-                            s->snap.generation > p->departed_generation)) { /* Mark now; free after all lookups. */
-            p->present = -1;
-        }
-    }
-    for (size_t i = 0; i < s->count; i++) {
-        if (s->pids[i]->present == -1)
+        if (s->pids[i]->departed)
             free_pid(s->pids[i]);
         else
             s->pids[kept++] = s->pids[i];
