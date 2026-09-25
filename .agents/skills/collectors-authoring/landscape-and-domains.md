@@ -36,7 +36,9 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
   drivers; CGO outside the IBM ecosystem is a design discussion.
 - **Rust SDK** at `src/crates/netdata-plugin/` — modules `bridge/`, `protocol/`, `rt/`, `charts-derive/`, `schema/`,
   `types/`, `error/`. Documentation lives in `lib.rs` doc-comments — there is no README. New Rust crates go into the
-  `src/crates/Cargo.toml` workspace. Reference impl: `src/crates/netflow-plugin/`.
+  `src/crates/Cargo.toml` workspace. Reference impl: `src/crates/netflow-plugin/`. `PluginRuntime::run()` publishes
+  (Functions, chart data): call it only after every fallible startup step, or a startup failure restart-loops forever
+  (contract: `run()` doc-comment and `src/plugins.d/README.md#operation`).
 - **Internal C plugins** — mirror an adjacent collector under `src/collectors/<name>.plugin/`; reuse `src/libnetdata/`.
   `libnetdata.h` includes most of libnetdata so individual headers are usually unnecessary. Allocators with the `z`
   suffix (`mallocz`, `callocz`, `strdupz`, `freez`) handle failures via `fatal()`; `freez(NULL)` is safe. JSON parsing:
