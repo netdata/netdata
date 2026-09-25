@@ -821,11 +821,12 @@ a later opt-out from the actual owner, even when their untrusted hashes match.
 
 The run-scoped `plugin/agent/secrets.ConfigResolver` combines capability presence with this source policy.
 `joboutput/config_factory.go`, accepted-activation dependency extraction and `secrets/dependency.go` share it for
-validation, resolution and Store references. Untrusted discovered, empty, and unknown sources keep every string literal, including malformed reference
-syntax, and create no SecretStore dependencies. Their application still uses the resolver's bounded literal clone.
-The pipeline option does not resolve discovery connection credentials.
+validation, resolution and Store references. Untrusted discovered, empty, and unknown sources keep every string literal,
+including malformed reference syntax, and create no SecretStore dependencies. Their application still uses the
+resolver's bounded literal clone. The pipeline option does not resolve discovery connection credentials.
 DynCfg adoption re-stamps the complete submitted configuration as `dyncfg`, enabling reference resolution throughout
-that payload when the host supplies secrets. Operators must review the whole configuration when adopting a discovered job.
+that payload when the host supplies secrets. Operators must review the whole configuration when adopting a
+discovered job.
 
 Resolution happens only in memory, only when a job is built. The key property is that it is **atomic — all references
 resolve, or none do**. Picture a notary: photocopy the whole document, list every blank, check out the referenced
