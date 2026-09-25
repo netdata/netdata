@@ -210,6 +210,7 @@ static bool mountPointsPrimed = false;
 static bool deviceMappingIncomplete = false;
 static bool mountPointsDiscoveryWarningActive = false;
 static usec_t volume_space_last_cancel_log_ut = 0;
+static usec_t volume_space_last_timeout_log_ut = 0;
 static SIMPLE_PATTERN *excluded_logical_disk_paths = NULL;
 
 struct volume_space_result {
@@ -288,6 +289,7 @@ static bool volume_space_target_inflight(const char *name)
 }
 
 static void volume_space_worker(void *ptr);
+static void volume_space_publish_result_locked(const char *name, struct volume_space_result *value);
 static void volume_space_cancel_expired(void);
 static void mount_points_worker(void *ptr);
 static void mount_points_cancel_expired(void);
@@ -403,6 +405,7 @@ static void initialize(void)
     mountPointsPrimed = false;
     deviceMappingIncomplete = false;
     volume_space_last_cancel_log_ut = 0;
+    volume_space_last_timeout_log_ut = 0;
     mountPointsDiscoveryWarningActive = false;
 
     netdata_mutex_init(&volume_space_mutex);
@@ -743,13 +746,7 @@ static void volume_space_worker(void *ptr __maybe_unused)
             value.filesystem[0] = '\0';
         }
         if (!result_superseded) {
-            if (!volume_space_results)
-                volume_space_results = dictionary_create_advanced(
-                    DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
-            uint64_t *latest = dictionary_get(volume_space_latest_generation, name);
-            struct volume_space_result *previous = dictionary_get(volume_space_results, name);
-            if (latest && *latest == value.generation && (!previous || previous->generation <= value.generation))
-                dictionary_set(volume_space_results, name, &value, sizeof(value));
+            volume_space_publish_result_locked(name, &value);
         }
         netdata_cond_broadcast(&volume_space_cond);
         netdata_mutex_unlock(&volume_space_mutex);
@@ -832,6 +829,21 @@ static void volume_space_cancel_expired(void)
             continue;
 
         volume_space_worker_cancel_requested[i] = true;
+        struct volume_space_result timeout_result = {
+            .generation = volume_space_worker_generation[i],
+            .success = false,
+        };
+        volume_space_publish_result_locked(volume_space_worker_target[i], &timeout_result);
+
+        if (!volume_space_last_timeout_log_ut ||
+            now_ut - volume_space_last_timeout_log_ut >= 60 * USEC_PER_SEC) {
+            volume_space_last_timeout_log_ut = now_ut;
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_WARNING,
+                "PerflibStorage volume-space query timed out for '%s'; published a failure result",
+                volume_space_worker_target[i]);
+        }
         HANDLE handle = volume_space_worker_handles[i];
         if (handle && !CancelSynchronousIo(handle))
             nd_log(
@@ -967,6 +979,19 @@ static DICTIONARY *volume_space_collect_results(void)
     volume_space_results = NULL;
     netdata_mutex_unlock(&volume_space_mutex);
     return results;
+}
+
+// Publish only the newest result for a target. Callers must hold volume_space_mutex.
+static void volume_space_publish_result_locked(const char *name, struct volume_space_result *value)
+{
+    if (!volume_space_results)
+        volume_space_results = dictionary_create_advanced(
+            DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
+
+    uint64_t *latest = dictionary_get(volume_space_latest_generation, name);
+    struct volume_space_result *previous = dictionary_get(volume_space_results, name);
+    if (latest && *latest == value->generation && (!previous || previous->generation <= value->generation))
+        dictionary_set(volume_space_results, name, value, sizeof(*value));
 }
 
 // Register one canonical mount path per volume; prefer a drive letter because PerfLib commonly
@@ -2743,6 +2768,59 @@ static int mount_points_query_failure_unittest_run(void)
     return errors;
 }
 
+static int volume_space_result_unittest_run(void)
+{
+    DICTIONARY *previous_results = volume_space_results;
+    DICTIONARY *previous_generations = volume_space_latest_generation;
+    int errors = 0;
+
+    // This helper is normally called with volume_space_mutex held. The unit test is single-threaded.
+    volume_space_results = dictionary_create_advanced(
+        DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
+    volume_space_latest_generation = dictionary_create_advanced(
+        DICT_OPTION_FIXED_SIZE, NULL, sizeof(uint64_t));
+
+    uint64_t generation = 7;
+    dictionary_set(volume_space_latest_generation, "C:\\ClusterStorage\\Volume1", &generation, sizeof(generation));
+
+    struct volume_space_result timeout = {
+        .generation = generation,
+        .success = false,
+    };
+    volume_space_publish_result_locked("C:\\ClusterStorage\\Volume1", &timeout);
+    struct volume_space_result *published =
+        dictionary_get(volume_space_results, "C:\\ClusterStorage\\Volume1");
+    errors += mount_points_unittest_expect(
+        "a timeout publishes a failed volume-space result", published && !published->success);
+
+    struct volume_space_result recovered = {
+        .generation = generation,
+        .success = true,
+        .total_bytes = UINT64_C(100),
+        .free_bytes = UINT64_C(40),
+    };
+    volume_space_publish_result_locked("C:\\ClusterStorage\\Volume1", &recovered);
+    published = dictionary_get(volume_space_results, "C:\\ClusterStorage\\Volume1");
+    errors += mount_points_unittest_expect(
+        "a real result replaces the synthetic timeout failure", published && published->success &&
+            published->total_bytes == UINT64_C(100));
+
+    struct volume_space_result stale = {
+        .generation = generation - 1,
+        .success = false,
+    };
+    volume_space_publish_result_locked("C:\\ClusterStorage\\Volume1", &stale);
+    published = dictionary_get(volume_space_results, "C:\\ClusterStorage\\Volume1");
+    errors += mount_points_unittest_expect(
+        "a stale result cannot replace recovered data", published && published->success);
+
+    dictionary_destroy(volume_space_results);
+    dictionary_destroy(volume_space_latest_generation);
+    volume_space_results = previous_results;
+    volume_space_latest_generation = previous_generations;
+    return errors;
+}
+
 int perflib_storage_unittest(void)
 {
     int errors = 0;
@@ -2751,6 +2829,7 @@ int perflib_storage_unittest(void)
     errors += logical_disk_chart_id_unittest_run();
     errors += logical_disk_unittest_run("*AssuredRecoveryTemp*", 1, "C:", NULL);
     errors += logical_disk_unittest_run(NULL, 2, "C:", "Z:\\ASSUREDRECOVERYTEMP\\volume");
+    errors += volume_space_result_unittest_run();
     errors += mount_points_query_failure_unittest_run();
     errors += mount_points_unittest_run();
 
@@ -3277,5 +3356,6 @@ void do_PerflibStorage_cleanup(void)
     mountPointsPrimed = false;
     deviceMappingIncomplete = false;
     volume_space_last_cancel_log_ut = 0;
+    volume_space_last_timeout_log_ut = 0;
     mountPointsDiscoveryWarningActive = false;
 }
