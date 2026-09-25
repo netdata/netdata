@@ -409,7 +409,8 @@ hostname, and labels independently of an SNMP metrics job. The result does not p
 
 The caller composes the existing acquisition steps:
 
-1. Obtain system information with `snmputils.GetSysInfo` using a connected `gosnmp.Handler`.
+1. Obtain system information with `snmputils.GetSysInfo` using a connected `snmputils.ScalarClient`. An unusable
+   `sysObjectID` value (not a valid numeric OID) does not fail acquisition; it leaves `SysObjectID` empty.
 2. Resolve profiles with `ddsnmp.Catalog.Resolve`. Choose the appropriate profile projection and no-profile policy
    for the consumer; those decisions do not belong to identity assembly.
 3. Construct `ddsnmpcollector.New` with the selected profiles, system object ID, client, and logger, or reuse the
@@ -428,8 +429,9 @@ Identity defaults preserve the SNMP collector's existing behavior:
   normalization, DNS resolution, port, credentials, and descriptive metadata do not participate in that calculation.
 - Hostname uses the configured override, then system name, then `snmp-device`.
 - System labels include the SNMP vnode marker, address, and system information. Policy defaults supplied through
-  `BaseLabels` precede system labels. Profile metadata fills empty labels or replaces them on an exact match;
-  configured `Labels` override all previous values, including with empty values.
+  `BaseLabels` precede system labels. Profile metadata fills empty labels or replaces them on an exact match,
+  except `sys_object_id`, which keeps the system value used for profile selection; configured `Labels` override all
+  previous values, including with empty values.
 - Input maps and system information remain unchanged; the returned labels belong to the caller.
 
 The SNMP metrics collector keeps its availability timeout calculation and device publication locally. It passes its
