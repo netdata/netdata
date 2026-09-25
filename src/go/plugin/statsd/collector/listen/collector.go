@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 	"github.com/netdata/netdata/go/plugins/plugin/statsd/collector/listen/internal/percentile"
+	"github.com/netdata/netdata/go/plugins/plugin/statsd/collector/listen/internal/server"
 )
 
 //go:embed config_schema.json
@@ -40,7 +41,7 @@ func New() *Collector {
 		store:       metrix.NewCollectorStore(),
 		now:         time.Now,
 		profileDirs: defaultProfileDirs(),
-		maxRecord:   maxRecordSize,
+		maxRecord:   server.MaxRecordSize,
 	}
 }
 

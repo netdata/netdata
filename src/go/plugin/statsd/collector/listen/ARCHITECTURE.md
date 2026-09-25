@@ -15,7 +15,8 @@ from `statsd/statsd.profiles/` under the user config directory.
 |---|---|
 | `collector.go` | `New`, the `Collector` type and the collector interface methods |
 | `config.go`, `init.go`, `config_schema.json` | Configuration, defaults and validation; Init helpers; the DynCfg form |
-| `server.go`, `udp.go`, `tcp.go` | `Run`: listener acquisition, lifecycle and failure handling; UDP and TCP framing |
+| `run.go` | `Run`: expands listeners into sockets and orders admission around the server's lifetime |
+| `internal/server` | Socket acquisition, UDP and TCP framing, the TCP connection cap and listener failure handling |
 | `parser.go`, `prepare.go`, `rejections.go` | Record parsing, final label/metadata preparation, the rejection vocabulary |
 | `profiles.go` | Profile loading, validation, lifetimes and the replace adapter |
 | `receiver.go`, `handoff.go` | Ingest and admission under the receiver lock; the Collect handoff (`cut`/`release`) |
@@ -30,9 +31,9 @@ binds a UDP and a TCP socket on that address, so duplicates are checked per sock
 `tcp` on the same address. `Init` and `Check` validate configuration and load profiles without binding sockets, so a
 configuration test can run while an incumbent job owns the endpoints. `Run` binds every socket in listener order; any
 failure closes the sockets that attempt already bound and returns, leaving retries to the framework's configured
-startup retry. Readiness follows successful
-acquisition, not traffic. Cancellation stops admission, closes listeners and clients and joins every reader before
-`Run` returns.
+startup retry. Readiness follows successful acquisition, not traffic. Cancellation stops admission, closes listeners
+and clients and joins every reader before `Run` returns. The server hands each framed record to the receiver and
+counts bytes, connections and framing rejections in collector-owned counters, so totals survive a retried `Run`.
 
 Socket errors reporting `Temporary()` (descriptor exhaustion, timeouts) back off 100 ms on the same bound socket; the
 Go runtime already retries interrupted calls and aborted connections. Any other listener error while the job is not

@@ -3,24 +3,22 @@
 package listen
 
 import (
-	"sync/atomic"
-
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/statsd/collector/listen/internal/percentile"
+	"github.com/netdata/netdata/go/plugins/plugin/statsd/collector/listen/internal/server"
 )
 
 // diagnostics is fixed-cardinality receiver self-monitoring. It never carries
-// input text, names, tags or sender addresses. Socket readers update the atomic
-// counters; everything else is Collect-owned.
+// input text, names, tags or sender addresses. Socket readers update transport,
+// which outlives any one server; everything else is Collect-owned.
 type diagnostics struct {
-	udpBytes, tcpBytes atomic.Uint64
-	tcpConnections     atomic.Int64
-	tcpRefused         atomic.Uint64 // connections closed at max_tcp_connections
-	withheld           [len(percentile.WithheldReasons)]uint64
+	transport server.Stats
+	withheld  [len(percentile.WithheldReasons)]uint64
 
 	udpBytesTotal, tcpBytesTotal metrix.SnapshotCounter // nil for an unconfigured transport
 	updates                      metrix.SnapshotCounter
-	rejections                   [len(rejectReasons)]metrix.SnapshotCounter
+	rejections                   [len(recordRejections)]metrix.SnapshotCounter
+	oversize, unterminated       metrix.SnapshotCounter
 	series, seriesLimit          metrix.SnapshotGauge
 	connections, connectionLimit metrix.SnapshotGauge   // nil without TCP listeners
 	connectionsRefused           metrix.SnapshotCounter // nil without TCP listeners
@@ -48,9 +46,11 @@ func newDiagnostics(store metrix.CollectorStore, cfg Config) *diagnostics {
 		d.connectionsRefused = m.Counter("tcp_connections_refused")
 	}
 	rejections := m.Vec("reason").Counter("rejections")
-	for i, reason := range rejectReasons {
+	for i, reason := range recordRejections {
 		d.rejections[i] = rejections.WithLabelValues(string(reason))
 	}
+	d.oversize = rejections.WithLabelValues(string(rejectOversize))
+	d.unterminated = rejections.WithLabelValues(string(rejectUnterminated))
 	withheld := m.Vec("reason").Counter("percentiles_withheld")
 	for i, reason := range percentile.WithheldReasons {
 		d.withheldTotal[i] = withheld.WithLabelValues(reason)
@@ -70,19 +70,22 @@ func (d *diagnostics) percentilesWithheld(reason string) {
 
 // write publishes cumulative counters and current gauges; the Agent owns rates.
 func (d *diagnostics) write(stats receiverStats) {
+	t := &d.transport
 	if d.udpBytesTotal != nil {
-		d.udpBytesTotal.ObserveTotal(float64(d.udpBytes.Load()))
+		d.udpBytesTotal.ObserveTotal(float64(t.UDPBytes.Load()))
 	}
 	if d.tcpBytesTotal != nil {
-		d.tcpBytesTotal.ObserveTotal(float64(d.tcpBytes.Load()))
-		d.connections.Observe(float64(d.tcpConnections.Load()))
+		d.tcpBytesTotal.ObserveTotal(float64(t.TCPBytes.Load()))
+		d.connections.Observe(float64(t.TCPConnections.Load()))
 		d.connectionLimit.Observe(d.maxConnections)
-		d.connectionsRefused.ObserveTotal(float64(d.tcpRefused.Load()))
+		d.connectionsRefused.ObserveTotal(float64(t.TCPRefused.Load()))
 	}
 	d.updates.ObserveTotal(float64(stats.accepted))
 	for i, total := range stats.rejects {
 		d.rejections[i].ObserveTotal(float64(total))
 	}
+	d.oversize.ObserveTotal(float64(t.Oversize.Load()))
+	d.unterminated.ObserveTotal(float64(t.Unterminated.Load()))
 	d.series.Observe(float64(stats.series))
 	d.seriesLimit.Observe(d.maxSeries)
 	for i, total := range d.withheld {

@@ -20,6 +20,7 @@ const (
 	defaultMaxTCPConnections = 64
 )
 
+// Listener protocols. udp and tcp are also the server network names.
 const (
 	protocolUDP  = "udp"
 	protocolTCP  = "tcp"

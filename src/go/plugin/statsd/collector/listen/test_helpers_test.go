@@ -404,7 +404,8 @@ func (f *runtimeFixture) dialTCP(t testing.TB) net.Conn {
 	return conn
 }
 
-// receiverCounts are the receiver's accepted and nonzero rejected totals.
+// receiverCounts are the accepted and nonzero rejected totals, including the
+// server's framing rejections.
 type receiverCounts struct {
 	accepted uint64
 	rejected map[rejection]uint64
@@ -420,7 +421,16 @@ func (f *coreFixture) counts() receiverCounts {
 	}
 	for i, n := range r.rejects {
 		if n != 0 {
-			out.rejected[rejectReasons[i]] = n
+			out.rejected[recordRejections[i]] = n
+		}
+	}
+	transport := &f.c.diagnostics.transport
+	for reason, n := range map[rejection]uint64{
+		rejectOversize:     transport.Oversize.Load(),
+		rejectUnterminated: transport.Unterminated.Load(),
+	} {
+		if n != 0 {
+			out.rejected[reason] = n
 		}
 	}
 	return out

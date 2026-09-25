@@ -3,6 +3,8 @@
 package listen
 
 import (
+	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,19 +16,32 @@ import (
 )
 
 func TestReceiverDiagnostics(t *testing.T) {
-	f := startRuntime(t, nil)
+	f := startRuntime(t, func(c *Collector) {
+		c.maxRecord = 32
+		c.MaxTCPConnections = 1
+	})
+	transport := &f.c.diagnostics.transport
+	conn := f.dialTCP(t)
+	require.Eventually(t, func() bool { return transport.TCPConnections.Load() == 1 }, waitFor, time.Millisecond)
+	refused := f.dialTCP(t)
+	require.NoError(t, refused.SetReadDeadline(time.Now().Add(waitFor)))
+	_, err := refused.Read(make([]byte, 1))
+	require.Error(t, err, "a client beyond the cap is closed")
+	// Records, one over the bound, and an unterminated fragment at EOF.
+	tcp := "b:1|g\nb:1|c\nlatency:10|h\n" + strings.Repeat("y", 40) + "\nfrag"
+	_, err = conn.Write([]byte(tcp))
+	require.NoError(t, err)
+	require.NoError(t, conn.(*net.TCPConn).CloseWrite())
 	udp := "a:1|c\nbad\n"
 	f.sendUDP(t, udp)
-	conn := f.dialTCP(t)
-	tcp := "b:1|g\nb:1|c\nlatency:10|h\n"
-	_, err := conn.Write([]byte(tcp))
-	require.NoError(t, err)
 	f.waitCounts(t, receiverCounts{
 		accepted: 3,
-		rejected: map[rejection]uint64{rejectSyntax: 1, rejectType: 1},
+		rejected: map[rejection]uint64{rejectSyntax: 1, rejectType: 1, rejectOversize: 1, rejectUnterminated: 1},
 	})
-	tcpBytes := func() bool { return f.c.diagnostics.tcpBytes.Load() == uint64(len(tcp)) }
-	require.Eventually(t, tcpBytes, waitFor, time.Millisecond)
+	tcpDone := func() bool {
+		return transport.TCPBytes.Load() == uint64(len(tcp)) && transport.TCPConnections.Load() == 0
+	}
+	require.Eventually(t, tcpDone, waitFor, time.Millisecond)
 	f.collect(t, false, false)
 	value(t, f.c, "receiver.bytes", float64(len(udp)), metrix.Labels{
 		"transport": protocolUDP,
@@ -35,15 +50,17 @@ func TestReceiverDiagnostics(t *testing.T) {
 		"transport": protocolTCP,
 	})
 	value(t, f.c, "receiver.updates", 3, nil)
-	for _, reason := range rejectReasons {
-		want := map[rejection]float64{rejectSyntax: 1, rejectType: 1}[reason]
+	for _, reason := range append(recordRejections[:], rejectOversize, rejectUnterminated) {
+		want := map[rejection]float64{rejectSyntax: 1, rejectType: 1, rejectOversize: 1, rejectUnterminated: 1}[reason]
 		value(t, f.c, "receiver.rejections", want, metrix.Labels{
 			"reason": string(reason),
 		})
 	}
 	value(t, f.c, "receiver.series", 3, nil)
 	value(t, f.c, "receiver.series_limit", 1000, nil)
-	value(t, f.c, "receiver.tcp_connections", 1, nil)
+	value(t, f.c, "receiver.tcp_connections", 0, nil)
+	value(t, f.c, "receiver.tcp_connections_limit", 1, nil)
+	value(t, f.c, "receiver.tcp_connections_refused", 1, nil)
 
 	// A quiet interval is zero activity, not failure; totals repeat.
 	f.collect(t, false, false)

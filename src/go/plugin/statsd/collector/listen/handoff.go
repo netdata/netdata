@@ -18,7 +18,7 @@ type measurement struct {
 // receiverStats are cumulative receiver diagnostics captured with a cut.
 type receiverStats struct {
 	accepted uint64
-	rejects  [len(rejectReasons)]uint64
+	rejects  [len(recordRejections)]uint64
 	series   int
 }
 
