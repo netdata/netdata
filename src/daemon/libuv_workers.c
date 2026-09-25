@@ -111,16 +111,22 @@ static void register_libuv_worker_jobs_internal(void) {
     uv_thread_set_name_np(buf);
 }
 
+// every libuv pool work callback calls register_libuv_worker_jobs(),
+// so this is true exactly on the threads of the (process-wide) libuv pool
+static __thread bool libuv_worker_registered = false;
+
 // Register workers
 ALWAYS_INLINE
 void register_libuv_worker_jobs() {
-    static __thread bool registered = false;
-
-    if(likely(registered))
+    if(likely(libuv_worker_registered))
         return;
 
-    registered = true;
+    libuv_worker_registered = true;
     register_libuv_worker_jobs_internal();
+}
+
+bool libuv_worker_thread_is_current(void) {
+    return libuv_worker_registered;
 }
 
 void libuv_close_callback(uv_handle_t *handle, void *data __maybe_unused)
