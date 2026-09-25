@@ -1,0 +1,24 @@
+version: v1
+context_namespace: socket
+groups:
+  - family: socket
+    metrics:
+      - ipv4_send
+      - ipv4_recv
+      - ipv6_send
+      - ipv6_recv
+    charts:
+      - id: socket_send_recv
+        title: Socket send/receive
+        context: net.socket_send_recv
+        units: "bytes/s"
+        type: area
+        dimensions:
+          - selector: ipv4_send
+            name: ipv4_send
+          - selector: ipv4_recv
+            name: ipv4_recv
+          - selector: ipv6_send
+            name: ipv6_send
+          - selector: ipv6_recv
+            name: ipv6_recv
