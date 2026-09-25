@@ -160,10 +160,3 @@ func testConfigResolver(t testing.TB, resolver *secretresolver.AtomicResolver, s
 	require.NoError(t, err)
 	return configs
 }
-
-func testAtomicResolver(t testing.TB) *secretresolver.AtomicResolver {
-	t.Helper()
-	resolver, err := secretresolver.NewAtomicResolver(nil)
-	require.NoError(t, err)
-	return resolver
-}

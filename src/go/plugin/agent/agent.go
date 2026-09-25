@@ -55,7 +55,7 @@ type Config struct {
 	RunModePolicy policy.RunModePolicy
 
 	DiscoveryProviders []discovery.ProviderFactory
-	Secrets            *secrets.Config // nil disables secret loading, resolution and DynCfg
+	Secrets            *secrets.Config // nil disables secret loading, resolution and SecretStore DynCfg
 }
 
 // Agent represents orchestrator.
@@ -84,7 +84,7 @@ type Agent struct {
 	runModePolicy policy.RunModePolicy
 
 	DiscoveryProviders []discovery.ProviderFactory
-	Secrets            *secrets.Config // nil disables secret loading, resolution and DynCfg
+	Secrets            *secrets.Config // nil disables secret loading, resolution and SecretStore DynCfg
 
 	Services       []composition.ProcessService
 	ModuleRegistry collectorapi.Registry
