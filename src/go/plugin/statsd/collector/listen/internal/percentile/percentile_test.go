@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package listen
+package percentile
 
 import (
 	"fmt"
@@ -45,11 +45,11 @@ func referenceQuantile(input []weightedSample, num, den int64) float64 {
 
 func checkPercentiles(t *testing.T, input []weightedSample, limit int) (available bool, reason string) {
 	t.Helper()
-	a := newPercentiles(limit)
+	a := New(limit)
 	for _, s := range input {
-		a.add(s.value, s.rate)
+		a.Add(s.value, s.rate)
 	}
-	got, _ := a.query(make([]percentileBin, 0, 2*limit+1))
+	got, _ := a.Query(make([]Bin, 0, 2*limit+1))
 	if math.IsNaN(got[0]) || math.IsNaN(got[1]) {
 		if !math.IsNaN(got[0]) || !math.IsNaN(got[1]) {
 			t.Fatal("partial reliability")
@@ -148,7 +148,7 @@ func TestPercentileCoverage(t *testing.T) {
 }
 
 func TestPercentileMappingBoundaries(t *testing.T) {
-	a := newPercentiles(1024)
+	a := New(1024)
 	available := 0
 	for index := -39000; index <= 39000; index += 17 {
 		v := a.mapping.LowerBound(index)
@@ -166,21 +166,21 @@ func TestPercentileMappingBoundaries(t *testing.T) {
 }
 
 func TestSpanBeforeMutationAndReset(t *testing.T) {
-	a := newPercentiles(128)
-	a.add(1, 1)
+	a := New(128)
+	a.Add(1, 1)
 	before := a.positive.TotalCount()
-	a.add(1e20, 1)
+	a.Add(1e20, 1)
 	if a.reason != "span" || a.positive.TotalCount() != before {
 		t.Fatal("collapsed/mutated failed span")
 	}
-	a.add(1, 1)
+	a.Add(1, 1)
 	if a.positive.TotalCount() != before {
 		t.Fatal("mutated unreliable window")
 	}
-	a.reset()
-	a.add(20, .3)
-	a.add(10, .3)
-	got, _ := a.query(nil)
+	a.Reset()
+	a.Add(20, .3)
+	a.Add(10, .3)
+	got, _ := a.Query(nil)
 	if a.reason != "" || math.Abs(got[0]-10) > .1 || math.Abs(got[1]-20) > .2 {
 		t.Fatal(got, a.reason)
 	}
@@ -189,20 +189,20 @@ func TestSpanBeforeMutationAndReset(t *testing.T) {
 func BenchmarkInsert(b *testing.B) {
 	for _, mixed := range []bool{false, true} {
 		b.Run(fmt.Sprint(mixed), func(b *testing.B) {
-			a := newPercentiles(1024)
-			a.add(1, 1)
-			a.add(60000, 1)
+			a := New(1024)
+			a.Add(1, 1)
+			a.Add(60000, 1)
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				if a.n > 1<<20 {
-					a.reset()
+					a.Reset()
 				}
 				rate := 1.0
 				if mixed {
 					rate = []float64{.3, .1, .01, 1}[i%4]
 				}
-				a.add(float64(i%10000+1), rate)
+				a.Add(float64(i%10000+1), rate)
 			}
 		})
 	}
@@ -211,19 +211,19 @@ func BenchmarkInsert(b *testing.B) {
 func BenchmarkQuery(b *testing.B) {
 	for _, mixed := range []bool{false, true} {
 		b.Run(fmt.Sprint(mixed), func(b *testing.B) {
-			a := newPercentiles(1024)
+			a := New(1024)
 			for i := 0; i < 10000; i++ {
 				rate := 1.0
 				if mixed {
 					rate = []float64{.3, .1, .01, 1}[i%4]
 				}
-				a.add(float64(i+1), rate)
+				a.Add(float64(i+1), rate)
 			}
-			scratch := make([]percentileBin, 0, 2049)
+			scratch := make([]Bin, 0, 2049)
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, scratch = a.query(scratch)
+				_, scratch = a.Query(scratch)
 			}
 		})
 	}
@@ -239,17 +239,17 @@ func TestExactLaneTransitions(t *testing.T) {
 			t.Fatal(why)
 		}
 	}
-	a := newPercentiles(1024)
-	a.add(1, 1)
-	a.add(100, 0x1p-52)
+	a := New(1024)
+	a.Add(1, 1)
+	a.Add(100, 0x1p-52)
 	if !a.exact {
 		t.Fatal("expected exact <=2^53 units")
 	}
-	a.add(100, 0x1p-52)
+	a.Add(100, 0x1p-52)
 	if a.exact {
 		t.Fatal("expected transition beyond exact unit budget")
 	}
-	got, _ := a.query(nil)
+	got, _ := a.Query(nil)
 	if math.IsNaN(got[0]) {
 		t.Fatal("dominant mass remains certifiable", a.reason)
 	}
@@ -311,18 +311,18 @@ func TestAdversarialWeights(t *testing.T) {
 // Allocation measurements run as benchmarks: race instrumentation changes escape
 // analysis and is not a useful allocation envelope for the production build.
 func BenchmarkPercentileReuse(b *testing.B) {
-	a := newPercentiles(1024)
+	a := New(1024)
 	for i := 0; i < 1024; i++ {
-		a.add(a.mapping.Value(i), 1)
-		a.add(-a.mapping.Value(i), 1)
+		a.Add(a.mapping.Value(i), 1)
+		a.Add(-a.mapping.Value(i), 1)
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		a.reset()
+		a.Reset()
 		for j := 0; j < 1024; j += 7 {
-			a.add(a.mapping.Value(j+5000), .3)
-			a.add(-a.mapping.Value(j+5000), .3)
+			a.Add(a.mapping.Value(j+5000), .3)
+			a.Add(-a.mapping.Value(j+5000), .3)
 		}
 		if a.reason != "" {
 			b.Fatal(a.reason)

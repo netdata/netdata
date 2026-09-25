@@ -15,22 +15,26 @@ from `statsd/statsd.profiles/` under the user config directory.
 |---|---|
 | `collector.go` | `New`, the `Collector` type and the collector interface methods |
 | `config.go`, `init.go`, `config_schema.json` | Configuration, defaults and validation; Init helpers; the DynCfg form |
-| `server.go`, `udp.go`, `tcp.go` | `Run`: listener acquisition, lifecycle and failure handling; UDP and TCP framing |
+| `run.go` | `Run`: expands listeners into sockets and orders admission around the server's lifetime |
+| `internal/server` | Socket acquisition, UDP and TCP framing, the TCP connection cap and listener failure handling |
 | `parser.go`, `prepare.go`, `rejections.go` | Record parsing, final label/metadata preparation, the rejection vocabulary |
 | `profiles.go` | Profile loading, validation, lifetimes and the replace adapter |
 | `receiver.go`, `handoff.go` | Ingest and admission under the receiver lock; the Collect handoff (`cut`/`release`) |
-| `aggregate.go`, `percentile.go` | Numeric updates and interval windows; certified weighted percentiles |
+| `aggregate.go`, `internal/percentile` | Numeric updates and interval windows; certified weighted percentiles |
 | `collect.go`, `write_metrics.go` | Collect orchestration; application metric writes |
 | `chart_templates.go`, `charts.yaml`, `diagnostics.go` | Native template set composition; receiver diagnostics template and metrics |
 
 ## Runtime and framing
 
-`listeners` lists required endpoints as `{protocol: udp|tcp, address: host:port}` with a numeric port. `Init` and
-`Check` validate configuration and load profiles without binding sockets, so a configuration test can run while an
-incumbent job owns the endpoints. `Run` binds every listener in order; any failure closes the listeners that attempt
-already bound and returns, leaving retries to the framework's configured startup retry. Readiness follows successful
-acquisition, not traffic. Cancellation stops admission, closes listeners and clients and joins every reader before
-`Run` returns.
+`listeners` lists required endpoints as `{protocol: udp|tcp|both, address: host:port}` with a numeric port; `both`, also
+meant by an empty or omitted protocol, binds a UDP and a TCP socket on that address, so duplicates are checked per
+socket and `both` conflicts with `udp` or `tcp` on the same address. `Init` and `Check` validate configuration and load
+profiles without binding sockets, so a configuration test can run while an incumbent job owns the endpoints. `Run` binds
+every socket in listener order; any failure closes the sockets that attempt already bound and returns, leaving retries
+to the framework's configured startup retry. Readiness follows successful acquisition, not traffic. Cancellation stops
+admission, closes listeners and clients and joins every reader before `Run` returns. The server hands each framed record
+to the receiver and counts bytes, connections and framing rejections in collector-owned counters, so totals survive a
+retried `Run`.
 
 Socket errors reporting `Temporary()` (descriptor exhaustion, timeouts) back off 100 ms on the same bound socket; the
 Go runtime already retries interrupted calls and aborted connections. Any other listener error while the job is not
@@ -150,9 +154,9 @@ The reference is the smallest observed value with cumulative weight at least `q 
 `19/20`. Weights are mathematical reciprocals of parsed binary64 rates. For equal weights on 10 and 100, p50 is 10.
 The library's built-in quantile does not implement this contract and is not used.
 
-`percentile.go` uses `sketches-go` v1.4.8's logarithmic mapping and two bounded sign stores. A separate exact-zero bin
-prevents tiny nonzero observations from silently becoming zero. Both percentiles must satisfy a 1% relative error
-bound on the reference value, with exact zero or a gap when the reference is zero.
+`internal/percentile` uses `sketches-go` v1.4.8's logarithmic mapping and two bounded sign stores. A separate
+exact-zero bin prevents tiny nonzero observations from silently becoming zero. Both percentiles must satisfy a 1%
+relative error bound on the reference value, with exact zero or a gap when the reference is zero.
 
 Weights are normalized by the first rate: `z = firstRate/rate`. Equal sampling rates therefore produce exact unit
 weights, including rates such as `.3`. The certification domain is rates at least `2^-128` and at most `2^26`
@@ -182,7 +186,8 @@ boundaries, ambiguous examples and useful-coverage floors; agreement with librar
 One receiver mutex owns admission, type bindings, activity and receiving aggregates. There is no receive queue or
 per-sender state. The positive `max_series` cap covers all job identities; existing admitted identities continue at
 capacity. `metric_idle_timeout` applies to accepted input only; zero disables idle retirement. Publication does not
-refresh activity. These two defaults are provisional: 1,000 identities and five minutes.
+refresh activity. `max_series` defaults to 1,000 identities (provisional); `metric_idle_timeout` is a duration
+defaulting to 30 minutes.
 
 `Collect` reconciles the prior metric cycle, retires eligible entries, and detaches one coherent batch. At most one
 receiving and one detached/reusable interval exist per identity. Pending observations survive idle expiry until that

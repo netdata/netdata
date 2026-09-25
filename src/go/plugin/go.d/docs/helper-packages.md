@@ -18,7 +18,7 @@ already owns the behavior.
 | Need | Start with |
 |---|---|
 | V2 metrics, metric stores, host scopes | `src/go/pkg/metrix` |
-| Duration and tri-state config option types | `src/go/pkg/confopt` |
+| Duration, tri-state and enum config option types | `src/go/pkg/confopt` |
 | HTTP request/client config | `src/go/pkg/web` |
 | TLS config outside HTTP | `src/go/pkg/tlscfg` |
 | Configured credential-file reads | `src/go/pkg/credentialfile` |
@@ -53,12 +53,14 @@ When:
 
 - users configure durations that should accept strings such as `5s`, `30m`, or numeric seconds;
 - users need explicit `auto` / `enabled` / `disabled` behavior instead of a plain boolean;
+- an option takes one of a fixed set of string values, with a default that an empty or omitted value means;
 - a migration needs to preserve legacy pointer-boolean semantics without keeping pointer plumbing in new code.
 
 Why:
 
 - `confopt.Duration` and `confopt.LongDuration` centralize YAML/JSON duration parsing and formatting;
 - `confopt.AutoBool` makes tri-state behavior explicit and schema-friendly;
+- `confopt.Enum` decodes and encodes an empty value as its default, and `Validate` reports the allowed values;
 - collectors avoid ad hoc parsers and inconsistent boolean defaults.
 
 ## HTTP Collectors

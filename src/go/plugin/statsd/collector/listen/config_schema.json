@@ -29,12 +29,14 @@
           "properties": {
             "protocol": {
               "title": "Protocol",
-              "description": "Transport to receive StatsD metrics on.",
+              "description": "Transport to receive StatsD metrics on. UDP and TCP, the default, listens on both at the same address.",
               "type": "string",
               "enum": [
                 "udp",
-                "tcp"
-              ]
+                "tcp",
+                "both"
+              ],
+              "default": "both"
             },
             "address": {
               "title": "Address",
@@ -43,7 +45,6 @@
             }
           },
           "required": [
-            "protocol",
             "address"
           ]
         },
@@ -72,10 +73,10 @@
       },
       "metric_idle_timeout": {
         "title": "Metric idle timeout",
-        "description": "How long a metric may receive no updates before it is removed, in seconds. Zero keeps idle metrics until the job restarts.",
-        "type": "number",
-        "minimum": 0,
-        "default": 300
+        "description": "How long a metric may receive no updates before it is removed, as a duration such as `30m` or `2h`. Zero keeps idle metrics until the job restarts.",
+        "type": "string",
+        "pattern": "^[0-9]+(\\.[0-9]+)?(ms|s|m|h|d|w|mo|y)?$",
+        "default": "30m"
       },
       "max_tcp_connections": {
         "title": "TCP connection limit",
@@ -119,7 +120,7 @@
     },
     "listeners": {
       "ui:listFlavour": "list",
-      "ui:help": "UDP and TCP listeners may use the same port. Over TCP, every metric line must end with a newline, including the last one.",
+      "ui:help": "Over TCP, every metric line must end with a newline, including the last one.",
       "items": {
         "protocol": {
           "ui:widget": "radio",
@@ -127,7 +128,8 @@
             "inline": true,
             "enumNames": [
               "UDP",
-              "TCP"
+              "TCP",
+              "UDP and TCP"
             ]
           }
         },
@@ -143,6 +145,9 @@
       "items": {
         "ui:placeholder": "myapp"
       }
+    },
+    "metric_idle_timeout": {
+      "ui:help": "Units include `s`, `m`, `h` and `d`; a plain number is seconds.\n\nUntil a metric is removed, an idle gauge keeps showing its last value, and idle counters, timers and sets report no activity."
     },
     "max_series": {
       "ui:help": "Rejected updates appear as `capacity` on the StatsD rejected input chart. Idle metrics count toward the limit until the metric idle timeout removes them."

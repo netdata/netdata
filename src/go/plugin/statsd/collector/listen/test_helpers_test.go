@@ -49,7 +49,7 @@ func newCoreFixture(t testing.TB, capacity int, idle time.Duration, opts ...metr
 	c := New()
 	c.Listeners = testListeners
 	c.MaxSeries = capacity
-	c.MetricIdleTimeout = confopt.Duration(idle)
+	c.MetricIdleTimeout = confopt.LongDuration(idle)
 	if len(opts) > 0 {
 		c.store = metrix.NewCollectorStore(opts...)
 	}
@@ -342,13 +342,13 @@ type runtimeFixture struct {
 	done   chan error
 }
 
-// startRuntime prepares a collector on one UDP and one TCP loopback listener
-// and runs it until readiness. configure may adjust configuration before Init.
+// startRuntime prepares a collector on one loopback listener serving both UDP
+// and TCP and runs it until readiness. configure may adjust configuration before Init.
 func startRuntime(t testing.TB, configure func(*Collector)) *runtimeFixture {
 	t.Helper()
 	c := New()
 	addr := freeAddress(t)
-	c.Listeners = []ListenerConfig{{Protocol: protocolUDP, Address: addr}, {Protocol: protocolTCP, Address: addr}}
+	c.Listeners = []ListenerConfig{{Protocol: protocolBoth, Address: addr}}
 	c.profileDirs = nil
 	if configure != nil {
 		configure(c)
@@ -404,7 +404,8 @@ func (f *runtimeFixture) dialTCP(t testing.TB) net.Conn {
 	return conn
 }
 
-// receiverCounts are the receiver's accepted and nonzero rejected totals.
+// receiverCounts are the accepted and nonzero rejected totals, including the
+// server's framing rejections.
 type receiverCounts struct {
 	accepted uint64
 	rejected map[rejection]uint64
@@ -420,7 +421,16 @@ func (f *coreFixture) counts() receiverCounts {
 	}
 	for i, n := range r.rejects {
 		if n != 0 {
-			out.rejected[rejectReasons[i]] = n
+			out.rejected[recordRejections[i]] = n
+		}
+	}
+	transport := &f.c.diagnostics.transport
+	for reason, n := range map[rejection]uint64{
+		rejectOversize:     transport.Oversize.Load(),
+		rejectUnterminated: transport.Unterminated.Load(),
+	} {
+		if n != 0 {
+			out.rejected[reason] = n
 		}
 	}
 	return out

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package listen
+// Package percentile estimates the p50 and p95 of weighted observations with a
+// bounded logarithmic mapping, and withholds both when a 1% relative error
+// cannot be certified.
+package percentile
 
 import (
 	"math"
@@ -13,7 +16,8 @@ import (
 
 // Numeric-domain bounds keep rank certification valid; these are not input quotas.
 const (
-	percentileBins  = 1024
+	// Bins is the production span limit of each sign store.
+	Bins            = 1024
 	maxObservations = 1 << 26
 	minRate         = 0x1p-128
 	maxExactUnits   = 1 << 53
@@ -29,14 +33,17 @@ const (
 	withheldAmbiguousRank    = "ambiguous_rank"
 )
 
-var withheldReasons = [...]string{
+// WithheldReasons lists every reason Withheld can report.
+var WithheldReasons = [...]string{
 	withheldNumericDomain, withheldObservationBound, withheldMappingDomain,
 	withheldMappingError, withheldSpan, withheldAmbiguousRank,
 }
 
-type percentileBin struct{ value, count float64 }
+// Bin is one query representative and its weight; callers own the scratch slice.
+type Bin struct{ value, count float64 }
 
-type percentiles struct {
+// Estimator accumulates one observation window.
+type Estimator struct {
 	mapping            *mapping.LogarithmicMapping
 	positive, negative *store.CollapsingLowestDenseStore
 	limit              int
@@ -48,12 +55,13 @@ type percentiles struct {
 	reason             string
 }
 
-func newPercentiles(limit int) *percentiles {
+// New returns an empty estimator whose sign stores span at most limit bins.
+func New(limit int) *Estimator {
 	m, err := mapping.NewLogarithmicMapping(.009)
 	if err != nil {
 		panic(err)
 	}
-	return &percentiles{
+	return &Estimator{
 		mapping:  m,
 		positive: store.NewCollapsingLowestDenseStore(limit),
 		negative: store.NewCollapsingLowestDenseStore(limit),
@@ -86,15 +94,19 @@ func up(v float64) float64 {
 	}
 }
 
-func (a *percentiles) fail(reason string) {
+// Withheld reports why both percentiles of this window are withheld, or "" when
+// they are available.
+func (a *Estimator) Withheld() string { return a.reason }
+
+func (a *Estimator) fail(reason string) {
 	if a.reason == "" {
 		a.reason = reason
 	}
 }
 
-// add runs only after basic statistics pass their atomic finite checks.
+// Add runs only after basic statistics pass their atomic finite checks.
 // Reliability failure withholds both percentiles, without rejecting that observation.
-func (a *percentiles) add(value, rate float64) {
+func (a *Estimator) Add(value, rate float64) {
 	if a.reason != "" {
 		return
 	}
@@ -174,7 +186,8 @@ func (a *percentiles) add(value, rate float64) {
 
 func finite(x float64) bool { return !math.IsNaN(x) && !math.IsInf(x, 0) }
 
-func (a *percentiles) reset() {
+// Reset empties the estimator for the next window.
+func (a *Estimator) Reset() {
 	a.positive.Clear()
 	a.negative.Clear()
 	a.n = 0
@@ -186,24 +199,26 @@ func (a *percentiles) reset() {
 	a.reason = ""
 }
 
-func (a *percentiles) query(scratch []percentileBin) ([2]float64, []percentileBin) {
+// Query returns p50 and p95, or NaN for both when they are withheld. It reuses
+// scratch and returns it for the next query.
+func (a *Estimator) Query(scratch []Bin) ([2]float64, []Bin) {
 	result := [2]float64{math.NaN(), math.NaN()}
 	scratch = scratch[:0]
 	if a.reason != "" || a.n == 0 {
 		return result, scratch
 	}
 	a.negative.ForEach(func(i int, c float64) bool {
-		scratch = append(scratch, percentileBin{-a.mapping.Value(i), c})
+		scratch = append(scratch, Bin{-a.mapping.Value(i), c})
 		return false
 	})
 	if a.zero > 0 {
-		scratch = append(scratch, percentileBin{0, a.zero})
+		scratch = append(scratch, Bin{0, a.zero})
 	}
 	a.positive.ForEach(func(i int, c float64) bool {
-		scratch = append(scratch, percentileBin{a.mapping.Value(i), c})
+		scratch = append(scratch, Bin{a.mapping.Value(i), c})
 		return false
 	})
-	slices.SortFunc(scratch, func(a, b percentileBin) int {
+	slices.SortFunc(scratch, func(a, b Bin) int {
 		if a.value < b.value {
 			return -1
 		}

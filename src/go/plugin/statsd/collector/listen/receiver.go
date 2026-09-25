@@ -75,7 +75,7 @@ type receiver struct {
 	templated  int // profiles with templates; activation stops scanning once all are active
 
 	accepted uint64
-	rejects  [len(rejectReasons)]uint64
+	rejects  [len(recordRejections)]uint64
 
 	// Record storage reused under the lock; records needing more grow on the heap.
 	tagBuf, replaceBuf, labelBuf [16]metrix.Label
@@ -186,15 +186,8 @@ func (r *receiver) activate(original string) {
 	}
 }
 
-// reject counts input refused before record ingestion: framing and connection limits.
-func (r *receiver) reject(reason rejection) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.countRejection(reason)
-}
-
 func (r *receiver) countRejection(reason rejection) {
-	for i, known := range rejectReasons {
+	for i, known := range recordRejections {
 		if known == reason {
 			r.rejects[i]++
 			return

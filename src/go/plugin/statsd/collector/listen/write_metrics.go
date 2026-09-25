@@ -72,10 +72,10 @@ func (c *Collector) writeObservations(h *instruments, w *interval) {
 	if w != nil && w.count != 0 {
 		count, sum = w.count, w.sum
 		var q [2]float64
-		q, c.scratch = w.quantiles.query(c.scratch)
+		q, c.scratch = w.quantiles.Query(c.scratch)
 		if math.IsNaN(q[0]) {
 			// Rank ambiguity is known only here, before the window resets at release.
-			c.diagnostics.percentilesWithheld(w.quantiles.reason)
+			c.diagnostics.percentilesWithheld(w.quantiles.Withheld())
 		}
 		values[0], values[1], values[2], values[3], values[4] = w.min, w.max, sum/count, q[0], q[1]
 	} else {

@@ -3,6 +3,7 @@
 package listen
 
 import (
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -136,6 +137,8 @@ func parseNumber(text string) (float64, error) {
 	}
 	return v, nil
 }
+
+func finite(x float64) bool { return !math.IsNaN(x) && !math.IsInf(x, 0) }
 
 // parseTags appends the tags, sorted by key, to labels. Identical repeats
 // collapse. A conflicting repeat rejects as labels, and takes precedence over a

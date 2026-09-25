@@ -224,33 +224,6 @@ func datagrams(lines []string, perDatagram int) [][]byte {
 	return out
 }
 
-// UDP framing and ingestion without the socket, for single-record and batched
-// datagrams of admitted identities. ns/op and allocations are per record.
-func BenchmarkDatagram(b *testing.B) {
-	for _, perDatagram := range []int{1, 16} {
-		b.Run(fmt.Sprint(perDatagram), func(b *testing.B) {
-			f := newCoreFixture(b, 1000, 5*time.Minute)
-			s := &server{
-				receiver: f.c.receiver,
-				stats:    f.c.diagnostics,
-				now:      f.c.now,
-			}
-			// 960 identities divide evenly into datagrams and the five-type mix.
-			payloads := datagrams(mixedRecords(960), perDatagram)
-			for _, p := range payloads {
-				s.datagram(p)
-			}
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i += perDatagram {
-				s.datagram(payloads[(i/perDatagram)%len(payloads)])
-			}
-			b.StopTimer()
-			require.Empty(b, f.counts().rejected)
-		})
-	}
-}
-
 // Complete UDP path: socket read, datagram framing, parsing, admission and
 // aggregation, 16 records per datagram. Sends pause every window datagrams until
 // the receiver has admitted them, so loopback buffers never drop input.
@@ -352,7 +325,7 @@ func BenchmarkRuntimeEnvelope(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&after)
 		b.ReportMetric(float64(after.HeapAlloc-before.HeapAlloc)/1e6, "retained_MB")
-		b.ReportMetric(float64(f.c.diagnostics.tcpConnections.Load()), "tcp_clients")
+		b.ReportMetric(float64(f.c.diagnostics.transport.TCPConnections.Load()), "tcp_clients")
 		runtime.KeepAlive(f)
 		require.NoError(b, f.stop(b))
 	}

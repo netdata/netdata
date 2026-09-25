@@ -4,11 +4,8 @@ package listen
 
 import (
 	"context"
+	"errors"
 	"net"
-	"os"
-	"runtime"
-	"sync/atomic"
-	"syscall"
 	"testing"
 	"time"
 
@@ -68,27 +65,52 @@ func TestRunAcquiresOnlyAfterPreparation(t *testing.T) {
 }
 
 func TestRunStartupFailureReleasesAcquiredListeners(t *testing.T) {
-	free := freeAddress(t)
-	occupied, err := net.Listen(protocolTCP, "127.0.0.1:0")
-	require.NoError(t, err)
-	defer occupied.Close()
+	for name, tc := range map[string]struct {
+		listeners func(free, occupied string) []ListenerConfig
+		wantErr   string
+	}{
+		"later listener fails": {
+			listeners: func(free, occupied string) []ListenerConfig {
+				return []ListenerConfig{
+					{Protocol: protocolUDP, Address: free},
+					{Protocol: protocolTCP, Address: free},
+					{Protocol: protocolTCP, Address: occupied},
+				}
+			},
+			wantErr: "listeners[2]",
+		},
+		"both fails after its udp socket bound": {
+			listeners: func(free, occupied string) []ListenerConfig {
+				return []ListenerConfig{
+					{Protocol: protocolBoth, Address: free},
+					{Protocol: protocolBoth, Address: occupied},
+				}
+			},
+			wantErr: "listeners[1]",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			free := freeAddress(t)
+			occupied, err := net.Listen(protocolTCP, "127.0.0.1:0")
+			require.NoError(t, err)
+			defer occupied.Close()
+			requireFree(t, protocolUDP, occupied.Addr().String())
 
-	c := New()
-	c.Listeners = []ListenerConfig{
-		{Protocol: protocolUDP, Address: free},
-		{Protocol: protocolTCP, Address: free},
-		{Protocol: protocolTCP, Address: occupied.Addr().String()},
+			c := New()
+			c.Listeners = tc.listeners(free, occupied.Addr().String())
+			c.profileDirs = nil
+			prepareFixture(t, c)
+			readyCalled := false
+			err = c.Run(context.Background(), func() { readyCalled = true })
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantErr)
+			assert.False(t, readyCalled)
+			requireFree(t, protocolUDP, free)
+			requireFree(t, protocolTCP, free)
+			requireFree(t, protocolUDP, occupied.Addr().String())
+			require.ErrorIs(t, c.Collect(context.Background()), rejectUnavailable)
+		})
 	}
-	c.profileDirs = nil
-	prepareFixture(t, c)
-	readyCalled := false
-	err = c.Run(context.Background(), func() { readyCalled = true })
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "listeners[2]")
-	assert.False(t, readyCalled)
-	requireFree(t, protocolUDP, free)
-	requireFree(t, protocolTCP, free)
-	require.ErrorIs(t, c.Collect(context.Background()), rejectUnavailable)
 }
 
 func TestConfigurationTestDuringIncumbentReception(t *testing.T) {
@@ -128,163 +150,55 @@ func TestCancellationClosesClientsAndJoinsReaders(t *testing.T) {
 	require.NoError(t, conn.SetReadDeadline(time.Now().Add(waitFor)))
 	_, err = conn.Read(make([]byte, 1))
 	require.Error(t, err, "shutdown closes established clients")
-	assert.Zero(t, f.c.diagnostics.tcpConnections.Load())
+	assert.Zero(t, f.c.diagnostics.transport.TCPConnections.Load())
 	requireFree(t, protocolUDP, f.addr)
 	requireFree(t, protocolTCP, f.addr)
 	require.ErrorIs(t, f.c.Collect(context.Background()), rejectUnavailable)
 }
 
-func TestPermanentListenerLossStopsReceiver(t *testing.T) {
-	for name, lose := range map[string]func(*server) error{
-		"udp": func(s *server) error { return s.udp[0].Close() },
-		"tcp": func(s *server) error { return s.tcp[0].Close() },
-	} {
-		t.Run(name, func(t *testing.T) {
-			addr := freeAddress(t)
-			c := New()
-			c.Listeners = []ListenerConfig{{Protocol: protocolUDP, Address: addr}, {Protocol: protocolTCP, Address: addr}}
-			c.profileDirs = nil
-			f := prepareFixture(t, c)
-			s, err := c.listen(context.Background())
-			require.NoError(t, err)
-			done := make(chan error, 1)
-			ready := make(chan struct{})
-			go func() { done <- c.serve(context.Background(), s, func() { close(ready) }) }()
-			<-ready
-			client, err := net.Dial(protocolTCP, addr)
-			require.NoError(t, err)
-			defer client.Close()
-			_, err = client.Write([]byte("held:10|g\n"))
-			require.NoError(t, err)
-			f.waitCounts(t, receiverCounts{
-				accepted: 1,
-			})
-
-			require.NoError(t, lose(s))
-			select {
-			case err := <-done:
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), name+" listener")
-			case <-time.After(waitFor):
-				t.Fatal("listener loss did not end the receiver")
-			}
-			// No held gauge or empty interval can be published after failure.
-			f.cycle.BeginCycle()
-			require.ErrorIs(t, c.Collect(context.Background()), rejectUnavailable)
-			f.cycle.AbortCycle()
-			require.NoError(t, client.SetReadDeadline(time.Now().Add(waitFor)))
-			_, err = client.Read(make([]byte, 1))
-			require.Error(t, err, "peers are closed with the failed receiver")
-			requireFree(t, protocolUDP, addr)
-			requireFree(t, protocolTCP, addr)
-		})
-	}
+// fakeServer lets a test fail the server and observe what the collector does
+// before closing it.
+type fakeServer struct {
+	failed  chan struct{}
+	err     error
+	started bool
+	onClose func()
 }
 
-func TestReaderPanicFailsOnlyTheReceiver(t *testing.T) {
-	addr := freeAddress(t)
+func (s *fakeServer) Start()                  { s.started = true }
+func (s *fakeServer) Failed() <-chan struct{} { return s.failed }
+func (s *fakeServer) Close()                  { s.onClose() }
+func (s *fakeServer) Err() error              { return s.err }
+
+func TestServerFailureStopsAdmissionBeforeClose(t *testing.T) {
 	c := New()
-	c.Listeners = []ListenerConfig{{Protocol: protocolUDP, Address: addr}, {Protocol: protocolTCP, Address: addr}}
+	c.Listeners = testListeners
 	c.profileDirs = nil
-	prepareFixture(t, c)
-	s, err := c.listen(context.Background())
-	require.NoError(t, err)
-	s.receiver = nil // Any reader panic takes this path; a nil receiver is a deterministic trigger.
+	f := prepareFixture(t, c)
+	lost := errors.New("udp listener lost")
+	var ingestAtClose error
+	s := &fakeServer{
+		failed: make(chan struct{}),
+		err:    lost,
+	}
+	s.onClose = func() { ingestAtClose = c.receiver.ingest("late:1|c", time.Now()) }
 	done := make(chan error, 1)
 	ready := make(chan struct{})
 	go func() { done <- c.serve(context.Background(), s, func() { close(ready) }) }()
 	<-ready
-	conn, err := net.Dial(protocolTCP, addr)
-	require.NoError(t, err)
-	defer conn.Close()
-	_, err = conn.Write([]byte("x:1|c\n"))
-	require.NoError(t, err)
+	require.NoError(t, c.receiver.ingest("held:10|g", time.Now()))
+
+	close(s.failed)
 	select {
 	case err := <-done:
-		require.ErrorContains(t, err, "tcp listener "+addr+" client: receiver panic")
-		var cause runtime.Error
-		require.ErrorAs(t, err, &cause, "an error panic value stays in the chain")
+		require.ErrorIs(t, err, lost, "Run reports the server failure")
 	case <-time.After(waitFor):
-		t.Fatal("reader panic did not fail the receiver")
+		t.Fatal("server failure did not end the receiver")
 	}
+	assert.True(t, s.started)
+	require.ErrorIs(t, ingestAtClose, rejectUnavailable, "admission stops before sockets close")
+	// No held gauge or empty interval can be published after failure.
+	f.cycle.BeginCycle()
 	require.ErrorIs(t, c.Collect(context.Background()), rejectUnavailable)
-	requireFree(t, protocolUDP, addr)
-	requireFree(t, protocolTCP, addr)
-}
-
-type temporaryFailingListener struct {
-	net.Listener
-	failures atomic.Int32
-}
-
-func (l *temporaryFailingListener) Accept() (net.Conn, error) {
-	if l.failures.Add(-1) >= 0 {
-		return nil, &net.OpError{
-			Op:  "accept",
-			Net: protocolTCP,
-			Err: os.NewSyscallError("accept", syscall.EMFILE),
-		}
-	}
-	return l.Listener.Accept()
-}
-
-type temporaryFailingPacketConn struct {
-	net.PacketConn
-	failures atomic.Int32
-}
-
-func (c *temporaryFailingPacketConn) ReadFrom(p []byte) (int, net.Addr, error) {
-	if c.failures.Add(-1) >= 0 {
-		return 0, nil, &net.OpError{
-			Op:  "read",
-			Net: protocolUDP,
-			Err: os.NewSyscallError("recvfrom", syscall.EMFILE),
-		}
-	}
-	return c.PacketConn.ReadFrom(p)
-}
-
-func TestTemporaryListenerErrorsKeepServing(t *testing.T) {
-	addr := freeAddress(t)
-	c := New()
-	c.Listeners = []ListenerConfig{{Protocol: protocolUDP, Address: addr}, {Protocol: protocolTCP, Address: addr}}
-	c.profileDirs = nil
-	f := prepareFixture(t, c)
-	s, err := c.listen(context.Background())
-	require.NoError(t, err)
-	udp := &temporaryFailingPacketConn{
-		PacketConn: s.udp[0],
-	}
-	udp.failures.Store(2)
-	tcp := &temporaryFailingListener{
-		Listener: s.tcp[0],
-	}
-	tcp.failures.Store(2)
-	s.udp[0], s.tcp[0] = udp, tcp
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	ready := make(chan struct{})
-	go func() { done <- c.serve(ctx, s, func() { close(ready) }) }()
-	<-ready
-
-	client, err := net.Dial(protocolTCP, addr)
-	require.NoError(t, err)
-	defer client.Close()
-	_, err = client.Write([]byte("tcp:1|c\n"))
-	require.NoError(t, err)
-	sender, err := net.Dial(protocolUDP, addr)
-	require.NoError(t, err)
-	defer sender.Close()
-	_, err = sender.Write([]byte("udp:1|c"))
-	require.NoError(t, err)
-	f.waitCounts(t, receiverCounts{
-		accepted: 2,
-	})
-	select {
-	case err := <-done:
-		t.Fatalf("temporary errors ended the receiver: %v", err)
-	default:
-	}
-	cancel()
-	require.NoError(t, <-done)
+	f.cycle.AbortCycle()
 }

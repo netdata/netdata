@@ -13,6 +13,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
+	"github.com/netdata/netdata/go/plugins/plugin/statsd/collector/listen/internal/percentile"
+	"github.com/netdata/netdata/go/plugins/plugin/statsd/collector/listen/internal/server"
 )
 
 //go:embed config_schema.json
@@ -27,19 +29,19 @@ func init() {
 	})
 }
 
-// New returns a collector with provisional resource defaults. No listener is
-// assigned by default.
+// New returns a collector with the resource defaults. No listener is assigned
+// by default.
 func New() *Collector {
 	return &Collector{
 		Config: Config{
 			MaxSeries:         defaultMaxSeries,
-			MetricIdleTimeout: confopt.Duration(defaultMetricIdleTimeout),
+			MetricIdleTimeout: confopt.LongDuration(defaultMetricIdleTimeout),
 			MaxTCPConnections: defaultMaxTCPConnections,
 		},
 		store:       metrix.NewCollectorStore(),
 		now:         time.Now,
 		profileDirs: defaultProfileDirs(),
-		maxRecord:   maxRecordSize,
+		maxRecord:   server.MaxRecordSize,
 	}
 }
 
@@ -57,7 +59,7 @@ type Collector struct {
 	templates *chartengine.TemplateSet
 	published int // activated profile count captured in templates
 
-	scratch []percentileBin                      // Collect-owned, shared by all percentile queries
+	scratch []percentile.Bin                     // Collect-owned, shared by all percentile queries
 	values  [len(valueFields)]metrix.SampleValue // Collect-owned; staging copies each point
 
 	// Test seams.

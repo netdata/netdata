@@ -3,29 +3,45 @@
 package listen
 
 import (
+	"net"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+	"github.com/netdata/netdata/go/plugins/plugin/statsd/collector/listen/internal/percentile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestReceiverDiagnostics(t *testing.T) {
-	f := startRuntime(t, nil)
+	f := startRuntime(t, func(c *Collector) {
+		c.maxRecord = 32
+		c.MaxTCPConnections = 1
+	})
+	transport := &f.c.diagnostics.transport
+	conn := f.dialTCP(t)
+	require.Eventually(t, func() bool { return transport.TCPConnections.Load() == 1 }, waitFor, time.Millisecond)
+	refused := f.dialTCP(t)
+	require.NoError(t, refused.SetReadDeadline(time.Now().Add(waitFor)))
+	_, err := refused.Read(make([]byte, 1))
+	require.Error(t, err, "a client beyond the cap is closed")
+	// Records, one over the bound, and an unterminated fragment at EOF.
+	tcp := "b:1|g\nb:1|c\nlatency:10|h\n" + strings.Repeat("y", 40) + "\nfrag"
+	_, err = conn.Write([]byte(tcp))
+	require.NoError(t, err)
+	require.NoError(t, conn.(*net.TCPConn).CloseWrite())
 	udp := "a:1|c\nbad\n"
 	f.sendUDP(t, udp)
-	conn := f.dialTCP(t)
-	tcp := "b:1|g\nb:1|c\nlatency:10|h\n"
-	_, err := conn.Write([]byte(tcp))
-	require.NoError(t, err)
 	f.waitCounts(t, receiverCounts{
 		accepted: 3,
-		rejected: map[rejection]uint64{rejectSyntax: 1, rejectType: 1},
+		rejected: map[rejection]uint64{rejectSyntax: 1, rejectType: 1, rejectOversize: 1, rejectUnterminated: 1},
 	})
-	tcpBytes := func() bool { return f.c.diagnostics.tcpBytes.Load() == uint64(len(tcp)) }
-	require.Eventually(t, tcpBytes, waitFor, time.Millisecond)
+	tcpDone := func() bool {
+		return transport.TCPBytes.Load() == uint64(len(tcp)) && transport.TCPConnections.Load() == 0
+	}
+	require.Eventually(t, tcpDone, waitFor, time.Millisecond)
 	f.collect(t, false, false)
 	value(t, f.c, "receiver.bytes", float64(len(udp)), metrix.Labels{
 		"transport": protocolUDP,
@@ -34,15 +50,17 @@ func TestReceiverDiagnostics(t *testing.T) {
 		"transport": protocolTCP,
 	})
 	value(t, f.c, "receiver.updates", 3, nil)
-	for _, reason := range rejectReasons {
-		want := map[rejection]float64{rejectSyntax: 1, rejectType: 1}[reason]
+	for _, reason := range append(recordRejections[:], rejectOversize, rejectUnterminated) {
+		want := map[rejection]float64{rejectSyntax: 1, rejectType: 1, rejectOversize: 1, rejectUnterminated: 1}[reason]
 		value(t, f.c, "receiver.rejections", want, metrix.Labels{
 			"reason": string(reason),
 		})
 	}
 	value(t, f.c, "receiver.series", 3, nil)
 	value(t, f.c, "receiver.series_limit", 1000, nil)
-	value(t, f.c, "receiver.tcp_connections", 1, nil)
+	value(t, f.c, "receiver.tcp_connections", 0, nil)
+	value(t, f.c, "receiver.tcp_connections_limit", 1, nil)
+	value(t, f.c, "receiver.tcp_connections_refused", 1, nil)
 
 	// A quiet interval is zero activity, not failure; totals repeat.
 	f.collect(t, false, false)
@@ -53,8 +71,8 @@ func TestWithheldPercentileDiagnostics(t *testing.T) {
 	f := newCoreFixture(t, 3, time.Minute)
 	f.ingest(t, "wide:1|h", "wide:1e20|h", "tiny:1|ms|@1e-40", "fine:5|ms")
 	f.collect(t, false, false)
-	for _, reason := range withheldReasons {
-		want := map[string]float64{withheldSpan: 1, withheldNumericDomain: 1}[reason]
+	for _, reason := range percentile.WithheldReasons {
+		want := map[string]float64{"span": 1, "numeric_domain": 1}[reason]
 		value(t, f.c, "receiver.percentiles_withheld", want, metrix.Labels{
 			"reason": reason,
 		})
@@ -62,7 +80,7 @@ func TestWithheldPercentileDiagnostics(t *testing.T) {
 	// Empty windows have no percentiles to withhold.
 	f.collect(t, false, false)
 	value(t, f.c, "receiver.percentiles_withheld", 1, metrix.Labels{
-		"reason": withheldSpan,
+		"reason": "span",
 	})
 	// TCP-only diagnostics are not written for a UDP-only job.
 	_, ok := f.c.store.Read().Value("receiver.tcp_connections", nil)
