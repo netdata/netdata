@@ -49,11 +49,11 @@ Netdata counts these lines as useful output (collected data): `END`, `END2`, `RE
 
 -   A plugin that exits with a non-zero value without having produced useful output since Netdata started is disabled until Netdata restarts.
 -   A plugin that exits with a non-zero value after it has produced useful output since Netdata started, in this run or an earlier one, is restarted after `10 * update_every` seconds.
-    It is disabled only after more than 10 consecutive runs without useful output, so a plugin that produces some useful output and then fails on every run is restarted forever.
+    It is disabled only after more than 10 consecutive runs without useful output, so a plugin that produces useful output on every run before failing is restarted forever.
 -   A plugin that exits with zero after it has produced useful output since Netdata started is restarted after `update_every` seconds, always.
     One that exits with zero and has never produced useful output is restarted after `10 * update_every` seconds, and disabled after more than 10 such runs.
 -   A plugin killed by a signal other than `SIGTERM` or `SIGPIPE` is disabled.
--   When Netdata ends the connection itself because it could not take ownership of a virtual node the plugin defined, the plugin is restarted after `update_every` seconds, unless it was killed by a signal, and a run without useful output does not add to the consecutive-run count.
+-   When Netdata ends the connection itself because it could not create or take ownership of a virtual node the plugin defined, the plugin is restarted after `update_every` seconds, unless it was killed by a signal other than `SIGTERM` or `SIGPIPE`, and a run without useful output does not add to the consecutive-run count.
 -   Plugins may also be disabled by Netdata if they output things that Netdata does not understand.
 
 So a plugin that cannot start (for example, its listening port is already in use) should finish every fallible startup step before it declares functions or sends data, and exit with a non-zero value if any of them fails.
