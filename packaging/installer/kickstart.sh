@@ -2530,57 +2530,86 @@ prepare_offline_install_source() {
     static|auto|any)
       set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "x86_64"
 
-      check_for_remote_file "${NETDATA_TARBALL_BASEURL}"
+      if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
+        manifest_url="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest"
+        progress "Fetching ${manifest_url}"
+        if ! download "${manifest_url}" "./Manifest" "force"; then
+          fatal "Unable to download release manifest file. ${BADNET_MSG}" F0526
+        fi
 
-      case "$?" in
-        0) ;;
-        1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
-        *)
-          warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
-          return 1
-          ;;
-      esac
+        archive_info="$(grep -E "^netdata-.*-.*\\.run " ./Manifest)"
 
-      if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
-        for arch in $(echo "${NETDATA_OFFLINE_ARCHES:-${STATIC_INSTALL_ARCHES}}" | awk '{for (i=1;i<=NF;i++) if (!a[$i]++) printf("%s%s",$i,FS)}{printf("\n")}'); do
-          set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
+        if [ -z "${archive_info}" ]; then
+          warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs."
+          return 2
+        fi
 
-          if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
-            progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
-            if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "netdata-${arch}-latest.gz.run"; then
-                warning "Failed to download static installer archive for ${arch}. ${BADNET_MSG}."
-            fi
-          else
-            progress "Skipping ${NETDATA_STATIC_ARCHIVE_URL} as it does not exist on the server."
+        if echo "${archive_info}" | grep -qvE ".*-latest.*"; then
+          archive_info="$(echo "${archive_info}" | grep -vE ".*-latest.*")"
+        fi
+
+        archive_names="$(echo "${archive_info}" | awk '{ print $1 }')"
+
+        for f in ${archive_names}; do
+          archive_url="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/${f}"
+          progress "Fetching ${archive_url}"
+          if ! download "${archive_url}" "${f}"; then
+            warning "Failed to download ${archive_url}. ${BADNET_MSG}."
           fi
         done
-        legacy=0
       else
-        warning "Selected version of Netdata only provides static builds for x86_64. You will only be able to install on x86_64 systems with this offline install source."
-        progress "Fetching ${NETDATA_STATIC_ARCHIVE_OLD_URL}"
-        legacy=1
+        check_for_remote_file "${NETDATA_TARBALL_BASEURL}"
 
-        if ! download "${NETDATA_STATIC_ARCHIVE_OLD_URL}" "netdata-x86_64-latest.gz.run"; then
-          warning "Failed to download static installer archive for x86_64. ${BADNET_MSG}."
+        case "$?" in
+          0) ;;
+          1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
+          *)
+            warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
+            return 1
+            ;;
+        esac
+
+        if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
+          for arch in $(echo "${NETDATA_OFFLINE_ARCHES:-${STATIC_INSTALL_ARCHES}}" | awk '{for (i=1;i<=NF;i++) if (!a[$i]++) printf("%s%s",$i,FS)}{printf("\n")}'); do
+            set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
+
+            if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
+              progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
+              if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "netdata-${arch}-latest.gz.run"; then
+                  warning "Failed to download static installer archive for ${arch}. ${BADNET_MSG}."
+              fi
+            else
+              progress "Skipping ${NETDATA_STATIC_ARCHIVE_URL} as it does not exist on the server."
+            fi
+          done
+          legacy=0
+        else
+          warning "Selected version of Netdata only provides static builds for x86_64. You will only be able to install on x86_64 systems with this offline install source."
+          progress "Fetching ${NETDATA_STATIC_ARCHIVE_OLD_URL}"
+          legacy=1
+
+          if ! download "${NETDATA_STATIC_ARCHIVE_OLD_URL}" "netdata-x86_64-latest.gz.run"; then
+            warning "Failed to download static installer archive for x86_64. ${BADNET_MSG}."
+          fi
         fi
-      fi
 
-      if [ -z "$(find . -name '*.gz.run')" ]; then
-        fatal "Did not actually download any static installer archives, cannot continue. ${BADNET_MSG}." F0516
-      fi
+        if [ -z "$(find . -name '*.gz.run')" ]; then
+          fatal "Did not actually download any static installer archives, cannot continue. ${BADNET_MSG}." F0516
+        fi
 
-      progress "Fetching ${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}"
-      if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "sha256sums.txt"; then
-        fatal "Failed to download checksum file. ${BADNET_MSG}." F0506
+        progress "Fetching ${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}"
+        if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "sha256sums.txt"; then
+          fatal "Failed to download checksum file. ${BADNET_MSG}." F0506
+        fi
+
+        if [ "${legacy:-0}" -eq 1 ]; then
+          sed -e 's/netdata-latest.gz.run/netdata-x86_64-latest.gz.run' sha256sums.txt > sha256sums.tmp
+          mv sha256sums.tmp sha256sums.txt
+        fi
       fi
       ;;
     *) fatal "Install type ${NETDATA_REQUESTED_INSTALL_TYPE} is not supported for offline installs." F051B
   esac
-
-  if [ "${legacy:-0}" -eq 1 ]; then
-    sed -e 's/netdata-latest.gz.run/netdata-x86_64-latest.gz.run' sha256sums.txt > sha256sums.tmp
-    mv sha256sums.tmp sha256sums.txt
-  fi
 
   verify_manifest ./
 
@@ -2609,6 +2638,17 @@ prepare_offline_install_source() {
     echo "${SELECTED_RELEASE_CHANNEL}" > "channel"
   else
     progress "Would save release channel information to offline install source directory"
+  fi
+
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    progress "Generating updated Manifest for offline install source directory."
+    rm -f Manifest
+
+    for f in *; do
+      echo "${f} $(wc -c "${f}") $(safe_sha256sum "${f}" | awk '{ print $1 }')" >> ./Manifest
+    done
+  else
+    progress "Would generate updated Manifest for offline install source directory."
   fi
 
   progress "Finished preparing offline install source directory at ${1}. You can now copy this directory to a target system and then run the script ‘install.sh’ from it to install on that system."
