@@ -541,7 +541,7 @@ progress() {
 }
 
 run_logfile="/dev/null"
-run() {
+_get_run_info() {
   user="${USER--}"
   dir="${PWD}"
 
@@ -552,11 +552,9 @@ run() {
     info="[${user} ${dir}]$ "
     info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
   fi
+}
 
-  if [ "${DRY_RUN}" -eq 1 ]; then
-    printf >&2 "%s" "Would run command:\n"
-  fi
-
+_log_run_cmd() {
   {
     printf "%s" "${info}"
     escaped_print "${@}"
@@ -566,15 +564,11 @@ run() {
   printf >&2 "%s" "${info_console}${TPUT_BOLD}"
   escaped_print >&2 "${@}"
   printf >&2 "%s\n" "${TPUT_RESET}"
+}
 
-  if [ "${DRY_RUN}" -ne 1 ]; then
-    "${@}"
-    ret=$?
-  else
-    ret=0
-  fi
-
-  if [ ${ret} -ne 0 ]; then
+_log_run_result() {
+  ret="${1}"
+  if [ "${ret}" -ne 0 ]; then
     printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET}"
     printf "%s\n" "FAILED with exit code ${ret}" >> "${run_logfile}"
     # shellcheck disable=SC2089
@@ -583,8 +577,36 @@ run() {
     printf >&2 "%s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET}"
     printf "OK\n" >> "${run_logfile}"
   fi
+}
 
-  return ${ret}
+run() {
+  _get_run_info
+
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    printf >&2 "%s" "Would run command:\n"
+  fi
+
+  _log_run_cmd "${@}"
+
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    "${@}"
+    ret=$?
+  else
+    ret=0
+  fi
+
+  _log_run_result "${ret}"
+
+  return "${ret}"
+}
+
+always_run() {
+  _get_run_info
+  _log_run_cmd "${@}"
+  "${@}"
+  ret="$?"
+  _log_run_result "${ret}"
+  return "${ret}"
 }
 
 run_as_root() {
@@ -796,14 +818,14 @@ check_for_remote_file() {
   fi
 
   if [ -n "${CURL}" ]; then
-    "${CURL}" --write-out "%{http_code}" --output /dev/null --silent --head --fail "${url}" > "${dl_log}"
+    always_run "${CURL}" --write-out "%{http_code}" --output /dev/null --silent --head --fail "${url}" > "${dl_log}"
 
     handle_curl_result "$?" "${url}" "${dl_log}" "checking for remote file at"
     return "$?"
   fi
 
   if [ -n "${WGET}" ]; then
-    "${WGET}" -S -o "${dl_log}" --spider "${url}"
+    always_run "${WGET}" -S -o "${dl_log}" --spider "${url}"
 
     handle_wget_result "$?" "${url}" "${dl_log}" "checking for remote file at"
     return "$?"
@@ -815,6 +837,7 @@ check_for_remote_file() {
 download() {
   url="${1}"
   dest="${2}"
+  force="${3}"
 
   old_pwd="${PWD}"
   set_tmpdir
@@ -822,20 +845,26 @@ download() {
   dl_log="${tmpdir}/download.log"
   rm -f "${dl_log}"
 
+  if [ "${force}" = "force" ]; then
+    runcmd="always_run"
+  else
+    runcmd="run"
+  fi
+
   if echo "${url}" | grep -Eq "^file:///"; then
-    run cp "${url#file://}" "${dest}" || return 1
+    "${runcmd}" cp "${url#file://}" "${dest}" || return 1
     return 0
   fi
 
   if [ -n "${CURL}" ]; then
-    run sh -c '"${1}" --fail -q -sSL --connect-timeout 10 --retry 3 --write-out "%{http_code}" --output "${2}" "${3}" > "${4}"' _ "${CURL}" "${dest}" "${url}" "${dl_log}"
+    "${runcmd}" sh -c '"${1}" --fail -q -sSL --connect-timeout 10 --retry 3 --write-out "%{http_code}" --output "${2}" "${3}" > "${4}"' _ "${CURL}" "${dest}" "${url}" "${dl_log}"
 
     handle_curl_result "$?" "${url}" "${dl_log}" "downloading" "${dest}"
     return "$?"
   fi
 
   if [ -n "${WGET}" ]; then
-    run "${WGET}" -S -T 15 -o "${dl_log}" -O "${dest}" "${url}"
+    "${runcmd}" "${WGET}" -S -T 15 -o "${dl_log}" -O "${dest}" "${url}"
 
     handle_wget_result "$?" "${url}" "${dl_log}" "downloading" "${dest}"
     return "$?"
@@ -874,7 +903,7 @@ get_redirect() {
   rm -f "${output}"
 
   if [ -n "${CURL}" ]; then
-    run sh -c '"${1}" "${2}" -s -L -I -o /dev/null -w "%{url_effective}" > "${3}"' _ "${CURL}" "${url}" "${output}"
+    always_run sh -c '"${1}" "${2}" -s -L -I -o /dev/null -w "%{url_effective}" > "${3}"' _ "${CURL}" "${url}" "${output}"
 
     ret="$?"
 
@@ -892,7 +921,7 @@ get_redirect() {
   fi
 
   if [ -n "${WGET}" ]; then
-    run "${WGET}" -S -o "${output}" -O /dev/null "${url}"
+    always_run "${WGET}" -S -o "${output}" -O /dev/null "${url}"
 
     ret="$?"
 
