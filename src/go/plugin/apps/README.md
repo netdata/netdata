@@ -65,7 +65,7 @@ jobs:
 - `proc_path`: absolute procfs mount; defaults to `/proc`, prefixed by `NETDATA_HOST_PREFIX` when set.
 - `collect_fds`: collect descriptors and limits; enabled by default.
 - `collect_pss`: sample proportional memory; enabled by default.
-- `groups`: ordered rules. The first matching group wins. Match clauses within one group are alternatives; populated fields inside one clause must all match. Expressions use the existing `pkg/matcher` syntax. Matching is against collected command names and rendered command lines, before display-name processing.
+- `groups`: ordered rules. The first matching group wins. Match clauses within one group are alternatives; populated fields inside one clause must all match. Expressions use the existing `pkg/matcher` syntax. Matching is against collected command names and space-rendered command lines, before display-name processing. Native argv boundaries remain intact for interpreter/script naming, including paths containing spaces.
 
 Unmatched processes use process-tree groups, with manager boundaries and best-effort interpreter/script naming. User and group views use numeric UID/GID identities. There is one canonical scan job; multiple host scans are not created for each grouping axis. Group names are display metadata; a stable byte encoding identifies each named group independently of native numeric assignment IDs.
 
@@ -83,9 +83,9 @@ Each application, user and group gets the same metric families:
 | Processes | Process/thread counts and newest/oldest process uptime |
 | File descriptors | Unique resources by type and maximum per-process soft-limit utilization |
 
-System charts show process-state counts. Collector charts show reads, readlinks and read errors per scan. CPU/IO/fault/switch rates are already derived in C and published as gauges; Go and the Agent do not differentiate them again. Initial or reset counter baselines have no rate sample. If any member lacks a group measurement, that aggregate remains missing rather than being presented as a complete total.
+System charts show state counts for readable processes; processes whose required identity files are inaccessible cannot be attributed or counted. Collector charts show file-read attempts, readlinks and read errors per scan; these diagnostics are not syscall counters. CPU/IO/fault/switch rates are already derived in C and published as gauges; Go and the Agent do not differentiate them again. Initial or reset counter baselines have no rate sample. If any member lacks a group measurement, that aggregate remains missing rather than being presented as a complete total.
 
-PSS is sampled, not an instantaneous measurement for every process each interval. Its age is visible; estimated memory scales current RSS by the last measured PSS/RSS ratio. Membership changes and exits trigger refresh feedback. CPU normalization retains the original preference for live-process accounting over exited-child estimates; fault normalization retains the original CPU-based heuristic. If the global CPU observation is unavailable, valid process rates are preserved without normalization.
+PSS requires readable `smaps_rollup` files; this POC has no full-`smaps` fallback. PSS is sampled, not an instantaneous measurement for every process each interval. Its age is visible; estimated memory scales current RSS by the last measured PSS/RSS ratio. Membership changes and exits trigger refresh feedback. CPU normalization retains the original preference for live-process accounting over exited-child estimates; fault normalization retains the original CPU-based heuristic. If the global CPU observation is unavailable, valid process rates are preserved without normalization.
 
 The `appsgo:processes` Function shows process-instance identity, PID/PPID, command, application, UID/GID, state, CPU, RSS/PSS and sample age, IO, threads and uptime. It supports an application selector and identifies the completed snapshot's time and age. Raw command lines are used for matching but are not returned by this POC Function or used as metric labels.
 
@@ -95,7 +95,7 @@ The `appsgo:processes` Function shows process-instance identity, PID/PPID, comma
 - No eBPF shared-memory input, cgroup/container enrichment, or NetIPC lookup service.
 - No legacy `apps_groups.conf` parser or chart/Function compatibility promise.
 - No changes to the original production collector, its packaging, or its alerts.
-- No claim of production readiness or performance equivalence before matched-workload measurement.
+- No claim of production readiness or performance equivalence; the measurements below show additional runtime cost.
 
 ## Validation
 
@@ -110,3 +110,84 @@ go test -asan -count=1 ./plugin/apps/internal/native  # Linux with a supported c
 Tests cover real synthetic-procfs parsing and lifecycle transitions, missing measurements, PID reuse, exited children, shared FD deduplication, PSS aging, Go matching/grouping, configuration serialization, chart materialization, snapshot publication and Function output. Go race detection validates Go synchronization; native sanitizers validate the C memory path.
 
 Performance evaluation must separate backend scanning from Go grouping, chart materialization and protocol output. Compare equal process populations, enabled features, permissions and sampling intervals, with cold and warm caches and process/FD churn. A grouping-only benchmark is not evidence that the complete hybrid matches the original executable.
+
+## Performance evidence
+
+The C boundary avoids per-file cgo calls and retains FD caching, but the complete
+POC currently costs more than the original executable. These development-machine
+measurements are evidence of that tradeoff, not production thresholds.
+
+The live comparison uses Linux/aarch64 in Docker, 200 idle worker processes with
+20 additional `/dev/zero` descriptors each, root permissions, a one-second
+interval, and FD/PSS/child/guest/user/group collection enabled. Both executables
+observe the same workers sequentially; each run has six seconds of warmup and
+12 seconds of measurement. Three runs alternate the original and hybrid order.
+CPU comes from `/proc/PID/stat`, RSS from `/proc/PID/status`, and read/write-call
+counts from `/proc/PID/io`. Output is continuously drained.
+
+At commit `ad573aa70a` on 2026-09-25 (median of the three runs):
+
+| Measurement | Original C | Hybrid POC |
+|---|---:|---:|
+| CPU time, ms/s | 15.8 | 28.2 |
+| Resident memory, MiB | 8.3 | 30.1 |
+| Read calls/s | 1652.4 | 2502.5 |
+| Write calls/s | 2.0 | 4.2 |
+| Protocol output, KiB/s | 5.3 | 22.7 |
+| Reported collection duration, ms | unavailable | 23.5 |
+
+The original is `apps.plugin v2.11.0-305-nightly` from image
+`netdata/netdata@sha256:2dd6963cb15637748985871016af3c52d1a0cc67ea03a5b7fcfe51600e481e9f`;
+it is not built from this POC's base revision. Original stock grouping and the POC
+example grouping differ, as do chart count and protocol volume. PSS scheduling
+also differs. Consequently this compares complete demo executables, not an
+isolated C-versus-Go language cost. Host-global CPU observations include the VM;
+this is not a cgroup isolation test. All timing is subject to development VM noise.
+
+The original was invoked with:
+
+```sh
+apps.plugin 1 with-files with-childs with-guest with-detailed-uptime --pss 10
+```
+
+The hybrid used the example YAML configuration and the documented headless job
+enablement. Original C allocation counts and collection wall time are not exposed
+by this installed baseline; no equivalent numbers are inferred from CPU use.
+
+Reproduce the checked-in native and full-pipeline fixture benchmarks with:
+
+```sh
+cd src/go
+go test -run '^$' -bench 'Benchmark(Pipeline|ScanWarm)' -benchtime=1s -count=6 -benchmem \
+  ./plugin/apps/collector/processes ./plugin/apps/internal/native
+```
+
+The same revision, using Go 1.27.1 on Linux/aarch64, produced these ranges over
+six benchmark runs:
+
+| Fixture path | Time per cycle | Go bytes per cycle | Go allocations per cycle |
+|---|---:|---:|---:|
+| Native scan, snapshot copy and finalization | 3.91–4.20 ms | 92,632–92,633 | 605 |
+| Full collector/chart pipeline | 4.30–4.40 ms | 347,489–349,504 | 2,423–2,424 |
+
+Both fixtures use ordinary cached files with static counters, not live procfs.
+The native fixture uses a controlled clock; the full pipeline uses real time,
+including periodic cache refresh. Their timings cannot be subtracted to isolate
+framework overhead or compared directly with the live collection duration above.
+Process/FD churn is covered by correctness fixtures, not a separate throughput
+measurement.
+
+The full-pipeline benchmark includes real native reads, grouping, metric commit,
+chart planning and protocol emission to a reusable memory buffer. Its 200
+processes share 20 distinct FD targets and produce 44 charts. It excludes the
+scheduler and actual stdout transport. Native and full-pipeline `B/op` and
+`allocs/op` count only Go allocations, not C/libc allocations. Live RSS includes
+both runtimes. A profile identifies command parsing/copies, metric label writes
+and committed-series cloning as allocation contributors. The original has no
+corresponding Go benchmark at the base revision.
+
+The source also explains two intentional acquisition costs: command lines are
+read each cycle so exec changes can affect grouping, and a second stat read
+checks PID incarnation before publishing a row. These contribute to the hybrid's
+higher read-call count. Production tuning should measure these costs separately
+from the Go framework and retain the identity and missing-data guarantees.
