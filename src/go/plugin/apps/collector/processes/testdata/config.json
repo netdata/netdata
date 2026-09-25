@@ -1,0 +1,1 @@
+{"update_every":2,"proc_path":"/proc","collect_fds":false,"collect_pss":false,"groups":[{"name":"web","match":[{"comm":"glob:nginx*"},{"cmdline":"regexp:gunicorn|uvicorn"}]}]}

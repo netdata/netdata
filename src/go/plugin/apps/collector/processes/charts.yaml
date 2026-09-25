@@ -1,0 +1,225 @@
+version: v1
+context_namespace: appsgo
+groups:
+  - family: Process groups
+    chart_defaults:
+      instances:
+        by_labels: [kind, group_id]
+    groups:
+      - family: CPU
+        metrics:
+          - cpu_user_percent
+          - cpu_system_percent
+          - cpu_guest_percent
+          - cpu_children_user_percent
+          - cpu_children_system_percent
+          - cpu_children_guest_percent
+        charts:
+          - context: cpu
+            title: Process group CPU utilization
+            units: percentage
+            dimensions:
+              - selector: 'cpu_user_percent'
+                name: user
+              - selector: 'cpu_system_percent'
+                name: system
+              - selector: 'cpu_guest_percent'
+                name: guest
+              - selector: 'cpu_children_user_percent'
+                name: exited children user
+              - selector: 'cpu_children_system_percent'
+                name: exited children system
+              - selector: 'cpu_children_guest_percent'
+                name: exited children guest
+      - family: Memory
+        metrics:
+          - resident_memory_bytes
+          - virtual_memory_bytes
+          - shared_memory_bytes
+          - swap_memory_bytes
+          - proportional_memory_bytes
+          - estimated_memory_bytes
+          - pss_age_seconds
+          - minor_faults_per_second
+          - major_faults_per_second
+          - children_minor_faults_per_second
+          - children_major_faults_per_second
+        charts:
+          - context: memory
+            title: Process group memory
+            units: bytes
+            dimensions:
+              - selector: 'resident_memory_bytes'
+                name: resident
+              - selector: 'virtual_memory_bytes'
+                name: virtual
+              - selector: 'shared_memory_bytes'
+                name: shared
+              - selector: 'swap_memory_bytes'
+                name: swap
+          - context: proportional_memory
+            title: Process group proportional and estimated memory
+            units: bytes
+            dimensions:
+              - selector: 'proportional_memory_bytes'
+                name: proportional
+              - selector: 'estimated_memory_bytes'
+                name: estimated
+          - context: pss_age
+            title: Oldest proportional memory sample
+            units: seconds
+            dimensions:
+              - selector: 'pss_age_seconds'
+                name: age
+          - context: page_faults
+            title: Process group page faults
+            units: faults/s
+            dimensions:
+              - selector: 'minor_faults_per_second'
+                name: minor
+              - selector: 'major_faults_per_second'
+                name: major
+              - selector: 'children_minor_faults_per_second'
+                name: exited children minor
+              - selector: 'children_major_faults_per_second'
+                name: exited children major
+      - family: IO
+        metrics:
+          - read_bytes_per_second
+          - write_bytes_per_second
+          - logical_read_bytes_per_second
+          - logical_write_bytes_per_second
+          - read_calls_per_second
+          - write_calls_per_second
+        charts:
+          - context: physical_io
+            title: Process group storage IO
+            units: bytes/s
+            dimensions:
+              - selector: 'read_bytes_per_second'
+                name: read
+              - selector: 'write_bytes_per_second'
+                name: write
+          - context: logical_io
+            title: Process group logical IO
+            units: bytes/s
+            dimensions:
+              - selector: 'logical_read_bytes_per_second'
+                name: read
+              - selector: 'logical_write_bytes_per_second'
+                name: write
+          - context: io_calls
+            title: Process group IO calls
+            units: calls/s
+            dimensions:
+              - selector: 'read_calls_per_second'
+                name: read
+              - selector: 'write_calls_per_second'
+                name: write
+      - family: Scheduling
+        metrics:
+          - voluntary_switches_per_second
+          - involuntary_switches_per_second
+        charts:
+          - context: context_switches
+            title: Process group context switches
+            units: switches/s
+            dimensions:
+              - selector: 'voluntary_switches_per_second'
+                name: voluntary
+              - selector: 'involuntary_switches_per_second'
+                name: involuntary
+      - family: Processes
+        metrics:
+          - processes
+          - threads
+          - uptime_min_seconds
+          - uptime_max_seconds
+        charts:
+          - context: processes
+            title: Process group processes
+            units: processes
+            dimensions:
+              - selector: 'processes'
+                name: processes
+          - context: threads
+            title: Process group threads
+            units: threads
+            dimensions:
+              - selector: 'threads'
+                name: threads
+          - context: uptime
+            title: Process group uptime
+            units: seconds
+            dimensions:
+              - selector: 'uptime_min_seconds'
+                name: newest
+              - selector: 'uptime_max_seconds'
+                name: oldest
+      - family: File descriptors
+        metrics:
+          - fd_limit_percent
+          - unique_fds
+        charts:
+          - context: fd_limit
+            title: Maximum process descriptor-limit utilization
+            units: percentage
+            dimensions:
+              - selector: 'fd_limit_percent'
+                name: limit
+          - context: unique_fds
+            title: Unique open resources per process group
+            units: resources
+            dimensions:
+              - selector: 'unique_fds{fd_type="file"}'
+                name: file
+              - selector: 'unique_fds{fd_type="socket"}'
+                name: socket
+              - selector: 'unique_fds{fd_type="pipe"}'
+                name: pipe
+              - selector: 'unique_fds{fd_type="inotify"}'
+                name: inotify
+              - selector: 'unique_fds{fd_type="event"}'
+                name: event
+              - selector: 'unique_fds{fd_type="timer"}'
+                name: timer
+              - selector: 'unique_fds{fd_type="signal"}'
+                name: signal
+              - selector: 'unique_fds{fd_type="epoll"}'
+                name: epoll
+              - selector: 'unique_fds{fd_type="other"}'
+                name: other
+  - family: System
+    metrics: [process_state_count]
+    charts:
+      - context: process_states
+        title: Processes by state
+        units: processes
+        dimensions:
+          - selector: 'process_state_count{state="running"}'
+            name: running
+          - selector: 'process_state_count{state="sleeping"}'
+            name: sleeping
+          - selector: 'process_state_count{state="uninterruptible"}'
+            name: uninterruptible
+          - selector: 'process_state_count{state="zombie"}'
+            name: zombie
+          - selector: 'process_state_count{state="stopped"}'
+            name: stopped
+          - selector: 'process_state_count{state="idle"}'
+            name: idle
+          - selector: 'process_state_count{state="other"}'
+            name: other
+  - family: Collector
+    metrics: [scan_file_reads, scan_readlinks, scan_read_errors]
+    charts:
+      - context: scan_operations
+        title: Process scan operations
+        units: operations/scan
+        dimensions:
+          - selector: scan_file_reads
+            name: file reads
+          - selector: scan_readlinks
+            name: readlinks
+          - selector: scan_read_errors
+            name: failed reads
