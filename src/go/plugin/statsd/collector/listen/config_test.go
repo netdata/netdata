@@ -5,11 +5,14 @@ package listen
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+	"github.com/netdata/netdata/go/plugins/plugin/statsd/collector/listen/internal/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 )
 
 //go:embed testdata/config.json
@@ -57,9 +60,14 @@ func TestConfigValidation(t *testing.T) {
 		"both overlaps udp":               {change: listeners(udp(":18125"), both(":18125")), wantErr: true},
 		"both overlaps tcp":               {change: listeners(both(":18125"), tcp(":18125")), wantErr: true},
 		"duplicate both":                  {change: listeners(both(":18125"), both(":18125")), wantErr: true},
-		"idle expiry disabled":            {change: func(c *Config) { c.Listeners, c.MetricIdleTimeout = pair, 0 }},
-		"zero series cap":                 {change: func(c *Config) { c.Listeners, c.MaxSeries = pair, 0 }, wantErr: true},
-		"negative series cap":             {change: func(c *Config) { c.Listeners, c.MaxSeries = pair, -1 }, wantErr: true},
+		"empty protocol means both":       {change: listeners(ListenerConfig{Address: ":18125"})},
+		"empty protocol overlaps udp": {
+			change:  listeners(udp(":18125"), ListenerConfig{Address: ":18125"}),
+			wantErr: true,
+		},
+		"idle expiry disabled": {change: func(c *Config) { c.Listeners, c.MetricIdleTimeout = pair, 0 }},
+		"zero series cap":      {change: func(c *Config) { c.Listeners, c.MaxSeries = pair, 0 }, wantErr: true},
+		"negative series cap":  {change: func(c *Config) { c.Listeners, c.MaxSeries = pair, -1 }, wantErr: true},
 		"negative idle timeout": {
 			change:  func(c *Config) { c.Listeners, c.MetricIdleTimeout = pair, -1 },
 			wantErr: true,
@@ -91,6 +99,54 @@ func TestConfigValidation(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+// TestEmptyProtocolMeansBoth covers a DynCfg or file job whose listener leaves
+// the protocol blank or omits it. Jobs reach the collector the way the job
+// manager applies them: the config map encoded to YAML and decoded into the
+// collector.
+func TestEmptyProtocolMeansBoth(t *testing.T) {
+	tests := map[string]struct {
+		decode func([]byte, any) error
+		input  string
+	}{
+		"dyncfg json": {
+			decode: json.Unmarshal,
+			input:  `{"listeners":[{"address":"127.0.0.1:18125"},{"protocol":"","address":"127.0.0.1:18126"}]}`,
+		},
+		"file yaml": {
+			decode: yaml.Unmarshal,
+			input:  "listeners:\n  - address: 127.0.0.1:18125\n  - protocol: ''\n    address: 127.0.0.1:18126\n",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var job map[string]any
+			require.NoError(t, tc.decode([]byte(tc.input), &job))
+			payload, err := yaml.Marshal(job)
+			require.NoError(t, err)
+			c := New()
+			require.NoError(t, yaml.Unmarshal(payload, c))
+			require.NoError(t, c.Init(context.Background()))
+
+			bs, err := json.Marshal(c.Configuration())
+			require.NoError(t, err)
+			var got struct {
+				Listeners []map[string]string `json:"listeners"`
+			}
+			require.NoError(t, json.Unmarshal(bs, &got))
+			assert.Equal(t, []map[string]string{
+				{"protocol": "both", "address": "127.0.0.1:18125"},
+				{"protocol": "both", "address": "127.0.0.1:18126"},
+			}, got.Listeners)
+			assert.Equal(t, []server.Endpoint{
+				{Network: "udp", Address: "127.0.0.1:18125", Name: "listeners[0]"},
+				{Network: "tcp", Address: "127.0.0.1:18125", Name: "listeners[0]"},
+				{Network: "udp", Address: "127.0.0.1:18126", Name: "listeners[1]"},
+				{Network: "tcp", Address: "127.0.0.1:18126", Name: "listeners[1]"},
+			}, c.serverConfig().Endpoints)
 		})
 	}
 }

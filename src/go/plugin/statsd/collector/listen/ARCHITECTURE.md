@@ -26,14 +26,15 @@ from `statsd/statsd.profiles/` under the user config directory.
 
 ## Runtime and framing
 
-`listeners` lists required endpoints as `{protocol: udp|tcp|both, address: host:port}` with a numeric port; `both`
-binds a UDP and a TCP socket on that address, so duplicates are checked per socket and `both` conflicts with `udp` or
-`tcp` on the same address. `Init` and `Check` validate configuration and load profiles without binding sockets, so a
-configuration test can run while an incumbent job owns the endpoints. `Run` binds every socket in listener order; any
-failure closes the sockets that attempt already bound and returns, leaving retries to the framework's configured
-startup retry. Readiness follows successful acquisition, not traffic. Cancellation stops admission, closes listeners
-and clients and joins every reader before `Run` returns. The server hands each framed record to the receiver and
-counts bytes, connections and framing rejections in collector-owned counters, so totals survive a retried `Run`.
+`listeners` lists required endpoints as `{protocol: udp|tcp|both, address: host:port}` with a numeric port; `both`, also
+meant by an empty or omitted protocol, binds a UDP and a TCP socket on that address, so duplicates are checked per
+socket and `both` conflicts with `udp` or `tcp` on the same address. `Init` and `Check` validate configuration and load
+profiles without binding sockets, so a configuration test can run while an incumbent job owns the endpoints. `Run` binds
+every socket in listener order; any failure closes the sockets that attempt already bound and returns, leaving retries
+to the framework's configured startup retry. Readiness follows successful acquisition, not traffic. Cancellation stops
+admission, closes listeners and clients and joins every reader before `Run` returns. The server hands each framed record
+to the receiver and counts bytes, connections and framing rejections in collector-owned counters, so totals survive a
+retried `Run`.
 
 Socket errors reporting `Temporary()` (descriptor exhaustion, timeouts) back off 100 ms on the same bound socket; the
 Go runtime already retries interrupted calls and aborted connections. Any other listener error while the job is not

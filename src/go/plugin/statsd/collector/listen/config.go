@@ -20,12 +20,19 @@ const (
 	defaultMaxTCPConnections = 64
 )
 
-// Listener protocols. udp and tcp are also the server network names.
+// Listener protocols, untyped so they serve as protocol values and plain
+// strings. udp and tcp are also the server network names.
 const (
 	protocolUDP  = "udp"
 	protocolTCP  = "tcp"
 	protocolBoth = "both" // a UDP and a TCP socket on the same address
 )
+
+// protocolSpec defines the listener protocol option: empty or omitted means both.
+type protocolSpec struct{}
+
+func (protocolSpec) Values() []string { return []string{protocolUDP, protocolTCP, protocolBoth} }
+func (protocolSpec) Default() string  { return protocolBoth }
 
 type Config struct {
 	UpdateEvery        int                  `yaml:"update_every,omitempty"        json:"update_every"`
@@ -40,16 +47,16 @@ type Config struct {
 // ListenerConfig is one required endpoint. Address is host:port; every
 // configured listener must bind for the job to start.
 type ListenerConfig struct {
-	Protocol string `yaml:"protocol" json:"protocol"`
-	Address  string `yaml:"address"  json:"address"`
+	Protocol confopt.Enum[protocolSpec] `yaml:"protocol" json:"protocol"`
+	Address  string                     `yaml:"address"  json:"address"`
 }
 
 // protocols returns the transports this listener binds, in binding order.
 func (l ListenerConfig) protocols() []string {
-	if l.Protocol == protocolBoth {
-		return []string{protocolUDP, protocolTCP}
+	if p := l.Protocol.Normalized(); p != protocolBoth {
+		return []string{string(p)}
 	}
-	return []string{l.Protocol}
+	return []string{protocolUDP, protocolTCP}
 }
 
 // validate checks everything except profiles, which Init loads and validates.
@@ -73,10 +80,8 @@ func validateListeners(listeners []ListenerConfig) error {
 	type socket struct{ protocol, address string }
 	seen := make(map[socket]bool, len(listeners))
 	for i, l := range listeners {
-		switch l.Protocol {
-		case protocolUDP, protocolTCP, protocolBoth:
-		default:
-			return fmt.Errorf("listeners[%d]: protocol must be %q, %q or %q", i, protocolUDP, protocolTCP, protocolBoth)
+		if err := l.Protocol.Validate(); err != nil {
+			return fmt.Errorf("listeners[%d]: protocol %w", i, err)
 		}
 		_, port, err := net.SplitHostPort(l.Address)
 		if err != nil {

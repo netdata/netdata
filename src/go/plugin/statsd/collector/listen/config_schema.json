@@ -29,13 +29,14 @@
           "properties": {
             "protocol": {
               "title": "Protocol",
-              "description": "Transport to receive StatsD metrics on. UDP and TCP listens on both at the same address.",
+              "description": "Transport to receive StatsD metrics on. UDP and TCP, the default, listens on both at the same address.",
               "type": "string",
               "enum": [
                 "udp",
                 "tcp",
                 "both"
-              ]
+              ],
+              "default": "both"
             },
             "address": {
               "title": "Address",
@@ -44,7 +45,6 @@
             }
           },
           "required": [
-            "protocol",
             "address"
           ]
         },
