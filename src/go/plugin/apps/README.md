@@ -195,8 +195,8 @@ Performance evaluation must separate backend scanning from Go grouping, chart ma
 ## Performance evidence
 
 The C boundary avoids per-file cgo calls and retains FD caching, but the complete
-POC currently costs more than the original executable. These development-machine
-measurements are evidence of that tradeoff, not production thresholds.
+POC also runs grouping, metric storage and chart publication in Go. These
+development-machine measurements are workload evidence, not production thresholds.
 
 The live comparison uses Linux/aarch64 in Docker, 200 idle worker processes with
 20 additional `/dev/zero` descriptors each, root permissions, a one-second
@@ -206,16 +206,20 @@ observe the same workers sequentially; each run has six seconds of warmup and
 CPU comes from `/proc/PID/stat`, RSS from `/proc/PID/status`, and read/write-call
 counts from `/proc/PID/io`. Output is continuously drained.
 
-At commit `ad573aa70a` on 2026-09-25 (median of the three runs):
+At `1448b11e3d` on 2026-09-25, after matching the original acquisition policy
+(median of three runs):
 
 | Measurement | Original C | Hybrid POC |
 |---|---:|---:|
-| CPU time, ms/s | 15.8 | 28.2 |
-| Resident memory, MiB | 8.3 | 30.1 |
-| Read calls/s | 1652.4 | 2502.5 |
+| CPU time, ms/s | 14.9 | 24.9 |
+| Resident memory, MiB | 8.3 | 28.6 |
+| Read calls/s | 1651.0 | 1654.1 |
 | Write calls/s | 2.0 | 4.2 |
 | Protocol output, KiB/s | 5.3 | 22.7 |
-| Reported collection duration, ms | unavailable | 23.5 |
+| Reported collection duration, ms | unavailable | 20.0 |
+
+Read-call rates are now close, while the complete POC still uses more CPU and
+resident memory on this workload.
 
 The original is `apps.plugin v2.11.0-305-nightly` from image
 `netdata/netdata@sha256:2dd6963cb15637748985871016af3c52d1a0cc67ea03a5b7fcfe51600e481e9f`;
@@ -243,13 +247,30 @@ go test -run '^$' -bench 'Benchmark(Pipeline|ScanWarm)' -benchtime=1s -count=6 -
   ./plugin/apps/collector/processes ./plugin/apps/internal/native
 ```
 
-The same revision, using Go 1.27.1 on Linux/aarch64, produced these ranges over
-six benchmark runs:
+Revision `1448b11e3d`, using Go 1.27.1 on Linux/aarch64, produced these ranges
+over six benchmark runs:
 
 | Fixture path | Time per cycle | Go bytes per cycle | Go allocations per cycle |
 |---|---:|---:|---:|
-| Native scan, snapshot copy and finalization | 3.91–4.20 ms | 92,632–92,633 | 605 |
-| Full collector/chart pipeline | 4.30–4.40 ms | 347,489–349,504 | 2,423–2,424 |
+| Native scan, snapshot copy and finalization | 3.10–3.52 ms | 92,632–92,633 | 605 |
+| Full collector/chart pipeline | 3.52–3.59 ms | 351,031–351,636 | 2,424 |
+
+Preserved benchmark binaries from `6e2880ad6b` and the updated revision were run
+alternately, six times each. Benchstat reports these medians:
+
+| Fixture path | Before | Original acquisition policy | Change |
+|---|---:|---:|---:|
+| Native cycle time | 4.021 ms | 3.137 ms | -22.0% |
+| Full-pipeline cycle time | 4.414 ms | 3.521 ms | -20.2% |
+| File-read attempts per cycle, both paths | 1,204 | 803 | -33.3% |
+
+These time differences have p=0.002 and are development-machine trends. Go
+allocation counts are unchanged: 605 native and 2,424 full-pipeline allocations
+per cycle. Full-pipeline Go bytes increased by 0.68%; native Go bytes were
+unchanged. File-read attempts count the backend's calls to its file reader,
+not kernel read syscalls. Acquisition still visits each process once and retains
+one command line per tracked process; its cache occupies O(total cached argv
+bytes). Existing process lookup, FD sorting and accounting work is unchanged.
 
 Both fixtures use ordinary cached files with static counters, not live procfs.
 The native fixture uses a controlled clock; the full pipeline uses real time,
@@ -267,8 +288,8 @@ both runtimes. A profile identifies command parsing/copies, metric label writes
 and committed-series cloning as allocation contributors. The original has no
 corresponding Go benchmark at the base revision.
 
-The source also explains two intentional acquisition costs: command lines are
-read each cycle so exec changes can affect grouping, and a second stat read
-checks PID incarnation before publishing a row. These contribute to the hybrid's
-higher read-call count. Production tuning should measure these costs separately
-from the Go framework and retain the identity and missing-data guarantees.
+Acquisition follows the original command-line cache gate and uses one stat read
+per PID per scan, without additional row/PSS identity checks. Cached command
+lines may remain stale after exec, and PID replacement between file reads may
+mix observations until the next scan. The POC intentionally accepts those
+limitations; it does not add correctness checks to the modernization comparison.
