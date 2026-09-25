@@ -355,13 +355,14 @@ async fn async_main() -> i32 {
     let mut ingest_task_finished = false;
 
     // `runtime.run()` publishes: it declares the Function and starts the chart
-    // registry. The Agent counts either as collected data, and it restarts a
-    // plugin that exits with an error after collecting anything, every
-    // 10 * update_every seconds, forever; only a plugin that fails before
-    // publishing is disabled. So nothing is published until the ingest service
-    // has finished its fallible startup (tier rebuild, every listener bound).
-    // Keepalives cover the wait, which the Agent otherwise times out after two
-    // minutes of silence.
+    // registry. The Agent counts either as collected data. A plugin that exits
+    // with an error before collecting anything is disabled; one that collected
+    // something is restarted every 10 * update_every seconds, and a startup
+    // failure that follows publication collects something on every run, so
+    // the restarts never stop. So nothing is published until the ingest
+    // service has finished its fallible startup (tier rebuild, every listener
+    // bound). Keepalives cover the wait, which the Agent otherwise times out
+    // after two minutes of silence.
     let keepalive_writer = runtime.writer();
     let ingest_started = tokio::select! {
         biased;
@@ -401,52 +402,20 @@ async fn async_main() -> i32 {
         exit_code = exit_code.max(ingest_task_exit_code(ingest_task.await, true));
     }
     if let Some(task) = direction_migration_task {
-        match task.await {
-            Ok(()) => {}
-            Err(err) if !err.is_cancelled() => {
-                tracing::error!("DIRECTION migration task join error: {err}");
-                exit_code = 1;
-            }
-            Err(_) => {}
-        }
+        exit_code = exit_code.max(task_join_exit_code(task.await, "DIRECTION migration task"));
     }
-    match notify_task.await {
-        Ok(()) => {}
-        Err(err) if !err.is_cancelled() => {
-            tracing::error!("journal notify event task join error: {err}");
-            exit_code = 1;
-        }
-        Err(_) => {}
-    }
+    exit_code = exit_code.max(task_join_exit_code(
+        notify_task.await,
+        "journal notify event task",
+    ));
     if let Some(task) = bmp_task {
-        match task.await {
-            Ok(()) => {}
-            Err(err) if !err.is_cancelled() => {
-                tracing::error!("BMP listener task join error: {err}");
-                exit_code = 1;
-            }
-            Err(_) => {}
-        }
+        exit_code = exit_code.max(task_join_exit_code(task.await, "BMP listener task"));
     }
     if let Some(task) = bioris_task {
-        match task.await {
-            Ok(()) => {}
-            Err(err) if !err.is_cancelled() => {
-                tracing::error!("BioRIS listener task join error: {err}");
-                exit_code = 1;
-            }
-            Err(_) => {}
-        }
+        exit_code = exit_code.max(task_join_exit_code(task.await, "BioRIS listener task"));
     }
     if let Some(task) = network_sources_task {
-        match task.await {
-            Ok(()) => {}
-            Err(err) if !err.is_cancelled() => {
-                tracing::error!("network-sources task join error: {err}");
-                exit_code = 1;
-            }
-            Err(_) => {}
-        }
+        exit_code = exit_code.max(task_join_exit_code(task.await, "network-sources task"));
     }
 
     exit_code
@@ -474,6 +443,17 @@ fn ingest_task_exit_code(
             1
         }
         Err(_) => 0,
+    }
+}
+
+/// Log a background task that ended in a panic and map it to the exit code.
+fn task_join_exit_code(result: Result<(), tokio::task::JoinError>, task: &str) -> i32 {
+    match result {
+        Err(err) if !err.is_cancelled() => {
+            tracing::error!("{task} join error: {err}");
+            1
+        }
+        _ => 0,
     }
 }
 

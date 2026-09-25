@@ -956,8 +956,9 @@ where
     /// # Publishing
     ///
     /// Calling `run()` publishes the plugin: the Agent counts function declarations and chart
-    /// updates as collected data. A plugin that exits with an error after collecting anything is
-    /// restarted forever; only one that fails before collecting anything is disabled. Call `run()`
+    /// updates as collected data. A plugin that exits with an error before collecting anything is
+    /// disabled; one that collected something is restarted, and a startup failure that follows
+    /// publication collects something on every run, so it is restarted forever. Call `run()`
     /// only after every fallible startup step (binding listeners, opening storage) has succeeded,
     /// and send `PLUGIN_KEEPALIVE` through [`writer`](Self::writer) while waiting for them: the
     /// Agent gives up on a plugin that stays silent for two minutes.
