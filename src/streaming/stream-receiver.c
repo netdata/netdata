@@ -717,7 +717,7 @@ static void stream_receiver_remove_internal(struct stream_thread *sth, struct re
     usec_t idle_ut = rpt->thread.last_traffic_ut ?
         clocks_usec_delta_or_zero(now_monotonic_usec(), rpt->thread.last_traffic_ut) : 0;
     long long idle_s = (long long)(idle_ut / USEC_PER_SEC);
-    double repl_pct = rpt->host ? rpt->host->stream.rcv.status.replication.percent : 0.0;
+    double repl_pct = rpt->host ? (double)rrdhost_receiver_replication_completion(rpt->host, NULL) : 0.0;
 
     errno_clear();
     nd_log(NDLS_DAEMON, NDLP_ERR,
@@ -1342,9 +1342,7 @@ void stream_receiver_cleanup(struct stream_thread *sth) {
 static void stream_receiver_replication_reset(RRDHOST *host) {
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        RRDSET_FLAGS old = rrdset_flag_set_and_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
-        if(!(old & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
-            rrdhost_receiver_replicating_charts_minus_one(host);
+        rrdhost_receiver_replication_release_no_pulse(st, 0);
 
 #ifdef REPLICATION_TRACKING
         st->stream.rcv.who = REPLAY_WHO_UNKNOWN;
@@ -1352,14 +1350,20 @@ static void stream_receiver_replication_reset(RRDHOST *host) {
     }
     rrdset_foreach_done(st);
 
+    // Safe to zero outside the walk: chart teardown does BOTH its flag CAS and its decrement inside
+    // rrdset_delete_callback(), under the rrdset dictionary WRITE lock, which the walk's read lock
+    // excludes - so a teardown can never be sitting between the two while we iterate. Any teardown
+    // that runs after the walk finds IN_PROGRESS already cleared by the release above and decrements
+    // nothing, and no new claim can arrive because the parser for this connection is gone.
     if(rrdhost_receiver_replicating_charts(host) != 0) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM REPLAY ERROR: receiver replication instances counter should be zero, but it is %u"
                " - resetting it to zero",
                rrdhost_receiver_replicating_charts(host));
-
-        rrdhost_receiver_replicating_charts_zero(host);
     }
+
+    // one store clears both halves: the outstanding charts and the cohort of the generation that ended
+    rrdhost_receiver_replicating_charts_zero(host);
 
     __atomic_store_n(&host->stream.rcv.status.replication.counter_in, 0, __ATOMIC_RELAXED);
     __atomic_store_n(&host->stream.rcv.status.replication.counter_out, 0, __ATOMIC_RELAXED);
