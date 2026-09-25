@@ -1032,15 +1032,12 @@ if [ "$(id -u)" -eq 0 ]; then
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping"
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin"
-    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf.plugin"
-  fi
-
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf-go.plugin" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf-go.plugin"
-    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ebpf-go.plugin"
-  fi
+  for ebpf_plugin in ebpf.plugin ebpf-go.plugin ebpf-poc.plugin; do
+    if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/${ebpf_plugin}" ]; then
+      run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/${ebpf_plugin}"
+      run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/${ebpf_plugin}"
+    fi
+  done
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
