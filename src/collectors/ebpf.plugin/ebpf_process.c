@@ -207,6 +207,12 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
     } else { // Tracepoint
         ebpf_process_disable_probe(obj);
         ebpf_disable_trampoline(obj);
+
+        // tp_btf needs BPF_PROG_TYPE_TRACING and kernel BTF; without them, count forks with the kprobe instead.
+        if (libbpf_probe_bpf_prog_type(BPF_PROG_TYPE_TRACING, NULL) <= 0) {
+            bpf_program__set_autoload(obj->progs.netdata_sched_process_fork_btf, false);
+            bpf_program__set_autoload(obj->progs.netdata_wake_up_new_task_probe, true);
+        }
     }
 
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_3) {

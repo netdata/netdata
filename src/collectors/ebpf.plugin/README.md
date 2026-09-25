@@ -408,8 +408,8 @@ collector uses the following `tracepoints` and `kprobe`:
 
 - `sched/sched_process_fork`: Tracepoint called after a call for `fork (2)`, `vfork (2)` and `clone (2)`. It is
      attached as a BTF raw tracepoint (`tp_btf`) when CO-RE code runs in `trampoline` or `tracepoint` mode.
-- `kprobe/wake_up_new_task`: called when a new task is started. Legacy code, and CO-RE code in `probe` mode, use it
-     instead of `sched/sched_process_fork`.
+- `kprobe/wake_up_new_task`: called when a new task is started. Legacy code, CO-RE code in `probe` mode, and CO-RE
+     code in `tracepoint` mode on kernels without BTF raw tracepoint support use it instead of `sched/sched_process_fork`.
 - `sched/sched_process_exec`: Tracepoint called after a exec-family syscall.
 - `kprobe/kernel_clone`: This is the main [`fork()`](https://elixir.bootlin.com/linux/v5.10/source/kernel/fork.c#L2415)
      routine since kernel `5.10.0` was released.
