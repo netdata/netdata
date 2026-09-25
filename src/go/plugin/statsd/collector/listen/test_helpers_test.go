@@ -49,7 +49,7 @@ func newCoreFixture(t testing.TB, capacity int, idle time.Duration, opts ...metr
 	c := New()
 	c.Listeners = testListeners
 	c.MaxSeries = capacity
-	c.MetricIdleTimeout = confopt.Duration(idle)
+	c.MetricIdleTimeout = confopt.LongDuration(idle)
 	if len(opts) > 0 {
 		c.store = metrix.NewCollectorStore(opts...)
 	}
@@ -342,13 +342,13 @@ type runtimeFixture struct {
 	done   chan error
 }
 
-// startRuntime prepares a collector on one UDP and one TCP loopback listener
-// and runs it until readiness. configure may adjust configuration before Init.
+// startRuntime prepares a collector on one loopback listener serving both UDP
+// and TCP and runs it until readiness. configure may adjust configuration before Init.
 func startRuntime(t testing.TB, configure func(*Collector)) *runtimeFixture {
 	t.Helper()
 	c := New()
 	addr := freeAddress(t)
-	c.Listeners = []ListenerConfig{{Protocol: protocolUDP, Address: addr}, {Protocol: protocolTCP, Address: addr}}
+	c.Listeners = []ListenerConfig{{Protocol: protocolBoth, Address: addr}}
 	c.profileDirs = nil
 	if configure != nil {
 		configure(c)

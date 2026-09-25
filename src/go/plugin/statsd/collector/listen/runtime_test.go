@@ -68,27 +68,52 @@ func TestRunAcquiresOnlyAfterPreparation(t *testing.T) {
 }
 
 func TestRunStartupFailureReleasesAcquiredListeners(t *testing.T) {
-	free := freeAddress(t)
-	occupied, err := net.Listen(protocolTCP, "127.0.0.1:0")
-	require.NoError(t, err)
-	defer occupied.Close()
+	for name, tc := range map[string]struct {
+		listeners func(free, occupied string) []ListenerConfig
+		wantErr   string
+	}{
+		"later listener fails": {
+			listeners: func(free, occupied string) []ListenerConfig {
+				return []ListenerConfig{
+					{Protocol: protocolUDP, Address: free},
+					{Protocol: protocolTCP, Address: free},
+					{Protocol: protocolTCP, Address: occupied},
+				}
+			},
+			wantErr: "listeners[2]",
+		},
+		"both fails after its udp socket bound": {
+			listeners: func(free, occupied string) []ListenerConfig {
+				return []ListenerConfig{
+					{Protocol: protocolBoth, Address: free},
+					{Protocol: protocolBoth, Address: occupied},
+				}
+			},
+			wantErr: "listeners[1]",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			free := freeAddress(t)
+			occupied, err := net.Listen(protocolTCP, "127.0.0.1:0")
+			require.NoError(t, err)
+			defer occupied.Close()
+			requireFree(t, protocolUDP, occupied.Addr().String())
 
-	c := New()
-	c.Listeners = []ListenerConfig{
-		{Protocol: protocolUDP, Address: free},
-		{Protocol: protocolTCP, Address: free},
-		{Protocol: protocolTCP, Address: occupied.Addr().String()},
+			c := New()
+			c.Listeners = tc.listeners(free, occupied.Addr().String())
+			c.profileDirs = nil
+			prepareFixture(t, c)
+			readyCalled := false
+			err = c.Run(context.Background(), func() { readyCalled = true })
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantErr)
+			assert.False(t, readyCalled)
+			requireFree(t, protocolUDP, free)
+			requireFree(t, protocolTCP, free)
+			requireFree(t, protocolUDP, occupied.Addr().String())
+			require.ErrorIs(t, c.Collect(context.Background()), rejectUnavailable)
+		})
 	}
-	c.profileDirs = nil
-	prepareFixture(t, c)
-	readyCalled := false
-	err = c.Run(context.Background(), func() { readyCalled = true })
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "listeners[2]")
-	assert.False(t, readyCalled)
-	requireFree(t, protocolUDP, free)
-	requireFree(t, protocolTCP, free)
-	require.ErrorIs(t, c.Collect(context.Background()), rejectUnavailable)
 }
 
 func TestConfigurationTestDuringIncumbentReception(t *testing.T) {

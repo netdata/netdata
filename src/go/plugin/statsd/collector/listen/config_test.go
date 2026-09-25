@@ -39,22 +39,33 @@ func TestConfigValidation(t *testing.T) {
 			Address:  addr,
 		}
 	}
-	both := []ListenerConfig{udp(":18125"), tcp(":18125")}
+	both := func(addr string) ListenerConfig {
+		return ListenerConfig{
+			Protocol: protocolBoth,
+			Address:  addr,
+		}
+	}
+	pair := []ListenerConfig{udp(":18125"), tcp(":18125")}
 	listeners := func(ls ...ListenerConfig) func(*Config) { return func(c *Config) { c.Listeners = ls } }
 	for name, tc := range map[string]struct {
 		change  func(*Config)
 		wantErr bool
 	}{
-		"same port on both transports": {change: listeners(both...)},
-		"idle expiry disabled":         {change: func(c *Config) { c.Listeners, c.MetricIdleTimeout = both, 0 }},
-		"zero series cap":              {change: func(c *Config) { c.Listeners, c.MaxSeries = both, 0 }, wantErr: true},
-		"negative series cap":          {change: func(c *Config) { c.Listeners, c.MaxSeries = both, -1 }, wantErr: true},
+		"udp and tcp listeners on a port": {change: listeners(pair...)},
+		"both transports in one listener": {change: listeners(both(":18125"))},
+		"both beside udp on another port": {change: listeners(udp(":18125"), both(":18126"))},
+		"both overlaps udp":               {change: listeners(udp(":18125"), both(":18125")), wantErr: true},
+		"both overlaps tcp":               {change: listeners(both(":18125"), tcp(":18125")), wantErr: true},
+		"duplicate both":                  {change: listeners(both(":18125"), both(":18125")), wantErr: true},
+		"idle expiry disabled":            {change: func(c *Config) { c.Listeners, c.MetricIdleTimeout = pair, 0 }},
+		"zero series cap":                 {change: func(c *Config) { c.Listeners, c.MaxSeries = pair, 0 }, wantErr: true},
+		"negative series cap":             {change: func(c *Config) { c.Listeners, c.MaxSeries = pair, -1 }, wantErr: true},
 		"negative idle timeout": {
-			change:  func(c *Config) { c.Listeners, c.MetricIdleTimeout = both, -1 },
+			change:  func(c *Config) { c.Listeners, c.MetricIdleTimeout = pair, -1 },
 			wantErr: true,
 		},
 		"zero tcp cap": {
-			change:  func(c *Config) { c.Listeners, c.MaxTCPConnections = both, 0 },
+			change:  func(c *Config) { c.Listeners, c.MaxTCPConnections = pair, 0 },
 			wantErr: true,
 		},
 		"no listener": {change: listeners(), wantErr: true},
@@ -70,7 +81,7 @@ func TestConfigValidation(t *testing.T) {
 		"port zero":      {change: listeners(udp("127.0.0.1:0")), wantErr: true},
 		"port too large": {change: listeners(tcp("127.0.0.1:65536")), wantErr: true},
 		"named port":     {change: listeners(tcp("127.0.0.1:statsd")), wantErr: true},
-		"duplicate":      {change: listeners(both[0], both[0]), wantErr: true},
+		"duplicate":      {change: listeners(pair[0], pair[0]), wantErr: true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := New()

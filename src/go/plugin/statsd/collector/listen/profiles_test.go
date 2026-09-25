@@ -313,7 +313,7 @@ func TestActivationSurvivesPublicationFailure(t *testing.T) {
 // TestProfileDimensionChurnRetires uses the case that motivates finite omitted
 // dimension expiry: a name_from_label chart whose label values keep changing.
 func TestProfileDimensionChurnRetires(t *testing.T) {
-	idle := func(c *Collector) { c.MetricIdleTimeout = confopt.Duration(time.Second) }
+	idle := func(c *Collector) { c.MetricIdleTimeout = confopt.LongDuration(time.Second) }
 	f := newConfiguredProfileFixture(t, idle, map[string]string{"jobs": `
 match: 'jobs.*'
 template:

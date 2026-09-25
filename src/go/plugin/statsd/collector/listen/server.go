@@ -78,22 +78,24 @@ func (c *Collector) listen(ctx context.Context) (*server, error) {
 	}
 	var lc net.ListenConfig
 	for i, l := range c.Listeners {
-		var err error
-		switch l.Protocol {
-		case protocolUDP:
-			var conn net.PacketConn
-			if conn, err = lc.ListenPacket(ctx, protocolUDP, l.Address); err == nil {
-				s.udp = append(s.udp, conn)
+		for _, protocol := range l.protocols() {
+			var err error
+			switch protocol {
+			case protocolUDP:
+				var conn net.PacketConn
+				if conn, err = lc.ListenPacket(ctx, protocolUDP, l.Address); err == nil {
+					s.udp = append(s.udp, conn)
+				}
+			case protocolTCP:
+				var ln net.Listener
+				if ln, err = lc.Listen(ctx, protocolTCP, l.Address); err == nil {
+					s.tcp = append(s.tcp, ln)
+				}
 			}
-		case protocolTCP:
-			var ln net.Listener
-			if ln, err = lc.Listen(ctx, protocolTCP, l.Address); err == nil {
-				s.tcp = append(s.tcp, ln)
+			if err != nil {
+				s.closeListeners()
+				return nil, fmt.Errorf("listeners[%d]: %w", i, err)
 			}
-		}
-		if err != nil {
-			s.closeListeners()
-			return nil, fmt.Errorf("listeners[%d]: %w", i, err)
 		}
 	}
 	return s, nil

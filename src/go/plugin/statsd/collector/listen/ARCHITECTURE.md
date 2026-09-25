@@ -25,10 +25,12 @@ from `statsd/statsd.profiles/` under the user config directory.
 
 ## Runtime and framing
 
-`listeners` lists required endpoints as `{protocol: udp|tcp, address: host:port}` with a numeric port. `Init` and
-`Check` validate configuration and load profiles without binding sockets, so a configuration test can run while an
-incumbent job owns the endpoints. `Run` binds every listener in order; any failure closes the listeners that attempt
-already bound and returns, leaving retries to the framework's configured startup retry. Readiness follows successful
+`listeners` lists required endpoints as `{protocol: udp|tcp|both, address: host:port}` with a numeric port; `both`
+binds a UDP and a TCP socket on that address, so duplicates are checked per socket and `both` conflicts with `udp` or
+`tcp` on the same address. `Init` and `Check` validate configuration and load profiles without binding sockets, so a
+configuration test can run while an incumbent job owns the endpoints. `Run` binds every socket in listener order; any
+failure closes the sockets that attempt already bound and returns, leaving retries to the framework's configured
+startup retry. Readiness follows successful
 acquisition, not traffic. Cancellation stops admission, closes listeners and clients and joins every reader before
 `Run` returns.
 
@@ -182,7 +184,8 @@ boundaries, ambiguous examples and useful-coverage floors; agreement with librar
 One receiver mutex owns admission, type bindings, activity and receiving aggregates. There is no receive queue or
 per-sender state. The positive `max_series` cap covers all job identities; existing admitted identities continue at
 capacity. `metric_idle_timeout` applies to accepted input only; zero disables idle retirement. Publication does not
-refresh activity. These two defaults are provisional: 1,000 identities and five minutes.
+refresh activity. `max_series` defaults to 1,000 identities (provisional); `metric_idle_timeout` is a duration
+defaulting to 30 minutes.
 
 `Collect` reconciles the prior metric cycle, retires eligible entries, and detaches one coherent batch. At most one
 receiving and one detached/reusable interval exist per identity. Pending observations survive idle expiry until that

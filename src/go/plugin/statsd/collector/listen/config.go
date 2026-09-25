@@ -13,26 +13,27 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 )
 
-// Provisional resource defaults.
+// Resource defaults. The series and TCP connection caps are provisional.
 const (
 	defaultMaxSeries         = 1000
-	defaultMetricIdleTimeout = 5 * time.Minute
+	defaultMetricIdleTimeout = 30 * time.Minute
 	defaultMaxTCPConnections = 64
 )
 
 const (
-	protocolUDP = "udp"
-	protocolTCP = "tcp"
+	protocolUDP  = "udp"
+	protocolTCP  = "tcp"
+	protocolBoth = "both" // a UDP and a TCP socket on the same address
 )
 
 type Config struct {
-	UpdateEvery        int              `yaml:"update_every,omitempty"        json:"update_every"`
-	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
-	Listeners          []ListenerConfig `yaml:"listeners"                     json:"listeners"`
-	Profiles           []string         `yaml:"profiles,omitempty"            json:"profiles"`
-	MaxSeries          int              `yaml:"max_series"                    json:"max_series"`
-	MetricIdleTimeout  confopt.Duration `yaml:"metric_idle_timeout"           json:"metric_idle_timeout"`
-	MaxTCPConnections  int              `yaml:"max_tcp_connections"           json:"max_tcp_connections"`
+	UpdateEvery        int                  `yaml:"update_every,omitempty"        json:"update_every"`
+	AutoDetectionRetry int                  `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
+	Listeners          []ListenerConfig     `yaml:"listeners"                     json:"listeners"`
+	Profiles           []string             `yaml:"profiles,omitempty"            json:"profiles"`
+	MaxSeries          int                  `yaml:"max_series"                    json:"max_series"`
+	MetricIdleTimeout  confopt.LongDuration `yaml:"metric_idle_timeout"           json:"metric_idle_timeout"`
+	MaxTCPConnections  int                  `yaml:"max_tcp_connections"           json:"max_tcp_connections"`
 }
 
 // ListenerConfig is one required endpoint. Address is host:port; every
@@ -40,6 +41,14 @@ type Config struct {
 type ListenerConfig struct {
 	Protocol string `yaml:"protocol" json:"protocol"`
 	Address  string `yaml:"address"  json:"address"`
+}
+
+// protocols returns the transports this listener binds, in binding order.
+func (l ListenerConfig) protocols() []string {
+	if l.Protocol == protocolBoth {
+		return []string{protocolUDP, protocolTCP}
+	}
+	return []string{l.Protocol}
 }
 
 // validate checks everything except profiles, which Init loads and validates.
@@ -59,10 +68,14 @@ func validateListeners(listeners []ListenerConfig) error {
 	if len(listeners) == 0 {
 		return errors.New("at least one listener is required")
 	}
-	seen := make(map[ListenerConfig]bool, len(listeners))
+	// Duplicates are per bound socket, so "both" overlaps "udp" and "tcp".
+	type socket struct{ protocol, address string }
+	seen := make(map[socket]bool, len(listeners))
 	for i, l := range listeners {
-		if l.Protocol != protocolUDP && l.Protocol != protocolTCP {
-			return fmt.Errorf("listeners[%d]: protocol must be %q or %q", i, protocolUDP, protocolTCP)
+		switch l.Protocol {
+		case protocolUDP, protocolTCP, protocolBoth:
+		default:
+			return fmt.Errorf("listeners[%d]: protocol must be %q, %q or %q", i, protocolUDP, protocolTCP, protocolBoth)
 		}
 		_, port, err := net.SplitHostPort(l.Address)
 		if err != nil {
@@ -71,14 +84,20 @@ func validateListeners(listeners []ListenerConfig) error {
 		if n, err := strconv.Atoi(port); err != nil || n < 1 || n > 65535 {
 			return fmt.Errorf("listeners[%d]: port must be 1-65535", i)
 		}
-		if seen[l] {
-			return fmt.Errorf("listeners[%d]: duplicate listener", i)
+		for _, protocol := range l.protocols() {
+			s := socket{protocol, l.Address}
+			if seen[s] {
+				return fmt.Errorf("listeners[%d]: duplicate %s listener", i, protocol)
+			}
+			seen[s] = true
 		}
-		seen[l] = true
 	}
 	return nil
 }
 
 func (c Config) hasListener(protocol string) bool {
-	return slices.ContainsFunc(c.Listeners, func(l ListenerConfig) bool { return l.Protocol == protocol })
+	return slices.ContainsFunc(
+		c.Listeners,
+		func(l ListenerConfig) bool { return slices.Contains(l.protocols(), protocol) },
+	)
 }

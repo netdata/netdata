@@ -27,13 +27,13 @@ func init() {
 	})
 }
 
-// New returns a collector with provisional resource defaults. No listener is
-// assigned by default.
+// New returns a collector with the resource defaults. No listener is assigned
+// by default.
 func New() *Collector {
 	return &Collector{
 		Config: Config{
 			MaxSeries:         defaultMaxSeries,
-			MetricIdleTimeout: confopt.Duration(defaultMetricIdleTimeout),
+			MetricIdleTimeout: confopt.LongDuration(defaultMetricIdleTimeout),
 			MaxTCPConnections: defaultMaxTCPConnections,
 		},
 		store:       metrix.NewCollectorStore(),
