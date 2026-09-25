@@ -390,6 +390,13 @@ async fn async_main() -> i32 {
         }
     };
 
+    // Only a failed keepalive ends the wait with the ingest task still running.
+    // Its tier rebuild does not observe `shutdown`, so abort it rather than let
+    // an Agent that is already gone wait for the rebuild to finish.
+    if !ingest_started && !ingest_task_finished {
+        ingest_task.abort();
+    }
+
     if ingest_started {
         tokio::select! {
             result = runtime.run() => {
