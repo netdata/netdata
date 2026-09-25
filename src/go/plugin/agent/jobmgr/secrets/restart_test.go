@@ -87,7 +87,7 @@ func (rtj restartTestJobs) PlanDependentStart(string) (jobmgr.WorkPlan, Dependen
 }
 
 func TestSecretRestartCommandCommitsWithoutDependentsOrCompositeScope(t *testing.T) {
-	command, err := NewSecretRestartCommand(1, NewSecretDependencyIndex(), restartTestJobs{}, nil)
+	command, err := NewSecretRestartCommand(1, NewSecretDependencyIndex(testDependencyConfigResolver(t)), restartTestJobs{}, nil)
 	require.NoError(t, err)
 	commits := 0
 	result, message, restored, err := command.Apply(
@@ -110,7 +110,7 @@ func TestSecretRestartCommandCommitsWithoutDependentsOrCompositeScope(t *testing
 func TestSecretRestartCommandReportsFailedPrecommitRestoration(t *testing.T) {
 	stopError := errors.New("second dependent stop failed")
 	restoreError := errors.New("first dependent restore failed")
-	index := NewSecretDependencyIndex()
+	index := NewSecretDependencyIndex(testDependencyConfigResolver(t))
 	for _, name := range []string{"one", "two"} {
 		config := confgroup.Config{
 			"module": "module",
@@ -159,7 +159,7 @@ func TestSecretRestartCommandReportsFailedPrecommitRestoration(t *testing.T) {
 }
 
 func TestSecretRestartCommandRestoresStopAcknowledgedDuringCancellation(t *testing.T) {
-	index := NewSecretDependencyIndex()
+	index := NewSecretDependencyIndex(testDependencyConfigResolver(t))
 	config := confgroup.Config{
 		"module": "module",
 		"name":   "one",
@@ -202,7 +202,7 @@ func TestSecretRestartCommandRestoresStopAcknowledgedDuringCancellation(t *testi
 }
 
 func TestSecretRestartTimeoutAfterAppliedMutationIsOperational(t *testing.T) {
-	index := NewSecretDependencyIndex()
+	index := NewSecretDependencyIndex(testDependencyConfigResolver(t))
 	config := confgroup.Config{
 		"module": "module",
 		"name":   "one",
@@ -283,7 +283,7 @@ func TestSecretRestartBudgetsCapAggregateAndFairShareChildren(t *testing.T) {
 
 func TestSecretRestartCommandRedactsAppliedRestartFailure(t *testing.T) {
 	sensitive := errors.New("collector initialization exposed backend-sensitive-detail")
-	index := NewSecretDependencyIndex()
+	index := NewSecretDependencyIndex(testDependencyConfigResolver(t))
 	config := confgroup.Config{
 		"module": "module",
 		"name":   "one",
@@ -338,7 +338,7 @@ func TestSecretRestartCommandRedactsAppliedRestartFailure(t *testing.T) {
 }
 
 func BenchmarkBSecretRestart(b *testing.B) {
-	index := NewSecretDependencyIndex()
+	index := NewSecretDependencyIndex(testDependencyConfigResolver(b))
 	const dependents = 16
 	for job := range dependents {
 		name := fmt.Sprintf("job-%d", job)

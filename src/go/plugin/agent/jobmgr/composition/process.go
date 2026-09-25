@@ -53,7 +53,7 @@ type processCoreConfig struct {
 	KeepAlive       bool                        // emit keepalive frames (long-lived agent mode)
 	Modules         collectorapi.Registry       // collector module registry
 	Jobs            runJobServices              // process-lifetime job services (resolver, catalogs, vnodes)
-	Secrets         runSecretServices           // process-lifetime secret services
+	Secrets         *SecretsConfig              // process-lifetime secret services
 	Discovery       runDiscoveryServices        // discovery services (providers, build context)
 	StopServices    func(context.Context) error // cancels and joins within the shutdown budget
 	FinalizeOutput  func()                      // stops the runtime service at process teardown
@@ -80,11 +80,12 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		config.Modules == nil ||
 		config.Jobs.PluginName == "" ||
 		config.Jobs.Defaults == nil ||
-		config.Jobs.Resolver == nil ||
-		config.Jobs.StoreCreators == nil ||
 		config.Diagnostics == nil ||
 		!config.Discovery.valid() {
 		return nil, errors.New("jobmgr composition: invalid process construction")
+	}
+	if err := config.Secrets.validate(); err != nil {
+		return nil, err
 	}
 	frames, err := lifecycle.NewFrameOwner(config.Output)
 	if err != nil {
@@ -102,9 +103,12 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 	if err != nil {
 		return nil, err
 	}
-	storeEpochs, err := newProcessSecretEpochs(config.Jobs.Resolver, config.Diagnostics)
-	if err != nil {
-		return nil, err
+	var storeEpochs *processSecretEpochs
+	if config.Secrets != nil {
+		storeEpochs, err = newProcessSecretEpochs(config.Secrets.Providers.Resolver, config.Diagnostics)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &processCore{
 		config:      config,
@@ -134,7 +138,7 @@ type processTransition struct {
 }
 
 func (pc *processCore) run(ctx context.Context, controls processControls) error {
-	if pc == nil || ctx == nil || !controls.valid() || pc.attempts == nil || pc.storeEpochs == nil {
+	if pc == nil || ctx == nil || !controls.valid() || pc.attempts == nil {
 		return errors.New("jobmgr composition: invalid process run")
 	}
 	generationID := uint64(1)
@@ -478,9 +482,13 @@ func (pc *processCore) newRun(
 	ctx context.Context,
 	generation uint64,
 ) (*runGeneration, error) {
-	epoch, err := pc.storeEpochs.create(generation)
-	if err != nil {
-		return nil, err
+	var epoch *processSecretEpoch
+	if pc.storeEpochs != nil {
+		var err error
+		epoch, err = pc.storeEpochs.create(generation)
+		if err != nil {
+			return nil, err
+		}
 	}
 	run, err := newRunGeneration(ctx, runGenerationConfig{
 		Generation:      generation,
@@ -498,7 +506,10 @@ func (pc *processCore) newRun(
 		Attempts:        pc.attempts,
 	})
 	if err != nil {
-		return nil, errors.Join(err, pc.storeEpochs.seal(epoch))
+		if epoch != nil {
+			err = errors.Join(err, pc.storeEpochs.seal(epoch))
+		}
+		return nil, err
 	}
 	return run, nil
 }
@@ -556,7 +567,7 @@ func (pc *processCore) retireForSuccessor(
 	if ctx == nil {
 		return errors.New("jobmgr composition: invalid successor retirement context")
 	}
-	if current != nil {
+	if current != nil && pc.storeEpochs != nil {
 		if err := pc.storeEpochs.seal(current.secretEpoch); err != nil {
 			pc.storeEpochs.observeFailure(
 				current.run.Generation(),

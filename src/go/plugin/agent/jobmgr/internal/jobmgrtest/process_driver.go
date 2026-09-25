@@ -88,7 +88,12 @@ func startProcessFixture(
 			return discoverer, err == nil, err
 		},
 	)
+	secrets, err := fixtureSecrets()
+	if err != nil {
+		return nil, err
+	}
 	process, err := composition.NewProcess(composition.Config{
+		Secrets:               &composition.SecretsConfig{Providers: *secrets},
 		Input:                 reader,
 		Output:                output,
 		PluginName:            "jobmgrtest",

@@ -8,8 +8,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
-	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -20,7 +19,8 @@ import (
 // authority. Reads scale with the selected Store's dependents, not the full
 // DynCfg graph.
 type SecretDependencyIndex struct {
-	mu sync.RWMutex // guards the maps
+	configs *secretconfig.ConfigResolver
+	mu      sync.RWMutex // guards the maps
 
 	jobs              map[string]jobDependency       // per-job dependency record by job full name
 	byStore           map[string]map[string]struct{} // job set by store key (reverse index)
@@ -42,8 +42,9 @@ func (sdi *SecretDependencyIndex) SetActivationEnabled(enabled func(string) bool
 	sdi.mu.Unlock()
 }
 
-func NewSecretDependencyIndex() *SecretDependencyIndex {
+func NewSecretDependencyIndex(configs *secretconfig.ConfigResolver) *SecretDependencyIndex {
 	return &SecretDependencyIndex{
+		configs: configs,
 		jobs:    make(map[string]jobDependency),
 		byStore: make(map[string]map[string]struct{}),
 	}
@@ -65,14 +66,11 @@ func (sdi *SecretDependencyIndex) PrepareJobChange(id string, postimage *dyncfg.
 		if config == nil || config.FullName() != id {
 			return nil, errors.New("jobmgr secrets: dependency configuration identity differs")
 		}
-		var keys []string
-		if policy.SecretReferencesAllowed(config) {
-			var referenceErr error
-			keys, referenceErr = secretresolver.StoreReferences(map[string]any(config))
-			if referenceErr != nil {
-				return nil, referenceErr
-			}
+		keys, err := sdi.configs.StoreReferences(config)
+		if err != nil {
+			return nil, err
 		}
+
 		dependency := jobDependency{
 			display:   config.Module() + ":" + config.Name(),
 			running:   postimage.Status == dyncfg.StatusRunning.String(),

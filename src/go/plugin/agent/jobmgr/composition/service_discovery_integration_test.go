@@ -180,6 +180,7 @@ func newSDIntegrationGeneration(t *testing.T, registry sd.Registry) (*runGenerat
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets:         testRunSecrets(t),
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -258,6 +259,7 @@ func TestServiceDiscoveryPublicationFailureDoesNotActivate(t *testing.T) {
 	reader, writer := io.Pipe()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         testRunSecrets(t),
 		Input:           reader,
 		Output:          sdAcceptedFailureWriter{output},
 		ShutdownTimeout: time.Second,

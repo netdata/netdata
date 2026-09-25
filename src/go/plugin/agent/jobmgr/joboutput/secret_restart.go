@@ -82,7 +82,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStop(id string) (jobmgr.Work
 				if err != nil {
 					return nil, err
 				}
-				spec, err := newAcceptedActivationSpec(config)
+				spec, err := dcjc.configModules.newAcceptedActivationSpec(config)
 				if err != nil {
 					return nil, err
 				}
@@ -101,7 +101,9 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(id string) (jobmgr.Wor
 	if dcjc == nil || id == "" {
 		return jobmgr.WorkPlan{}, nil, errors.New("job output: invalid dependent start")
 	}
-	state := &SecretDependentStart{resume: dcjc.scheduler.accepted.resumeFor(id)}
+	state := &SecretDependentStart{
+		resume: dcjc.scheduler.accepted.resumeFor(id),
+	}
 	// The enclosing Store mutation retains the graph claim across stop, commit
 	// and resume. No collector construction or startup runs in this child.
 	return jobmgr.WorkPlan{
@@ -117,7 +119,8 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(id string) (jobmgr.Wor
 				if err := validateGraphResourcePair(record, exists, current, scope); err != nil {
 					return nil, err
 				}
-				if !exists || record.Status != dyncfg.StatusAccepted.String() || current != nil || !dcjc.ActivationEnabled(id) {
+				if !exists || record.Status != dyncfg.StatusAccepted.String() || current != nil ||
+					!dcjc.ActivationEnabled(id) {
 					return dcjc.noop(scope, current, permit, noResponseResult())
 				}
 				return dcjc.noopWithAfterApply(scope, nil, permit, noResponseResult(), state.RetainPending)

@@ -100,7 +100,7 @@ func TestSecretTransactionAlwaysAbortsUncommittedMutation(t *testing.T) {
 		0,
 	)
 	require.NoError(t, err)
-	dependencies := NewSecretDependencyIndex()
+	dependencies := NewSecretDependencyIndex(testDependencyConfigResolver(t))
 	dependencies.jobs["module_two"] = jobDependency{
 		display:   "module:job",
 		running:   true,

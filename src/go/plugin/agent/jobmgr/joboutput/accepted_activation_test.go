@@ -277,11 +277,10 @@ func TestAcceptedActivationCurrentContentionRetainsAcceptedIntent(t *testing.T) 
 				return module
 			}
 			controller.modules["module"] = creator
-			controller.factory.config.ConfigModules.config.StoreScope =
-				func([]string) (secretresolver.AtomicScope, error) {
-					scopeState.current.Store(true)
-					return scopeState, nil
-				}
+			controller.factory.config.ConfigModules.config.Configs = testConfigResolver(t, testAtomicResolver(t), func([]string) (secretresolver.AtomicScope, error) {
+				scopeState.current.Store(true)
+				return scopeState, nil
+			})
 			config["option_str"] = "${store:vault:test:key}"
 		},
 	}

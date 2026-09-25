@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -59,7 +61,7 @@ func TestSecretImpactMessageHasOneCombinedBound(t *testing.T) {
 }
 
 func TestSecretDependencyIndexTracksAcknowledgedPostimages(t *testing.T) {
-	index := NewSecretDependencyIndex()
+	index := NewSecretDependencyIndex(testDependencyConfigResolver(t))
 	tests := map[string]struct {
 		id         string
 		status     dyncfg.Status
@@ -147,7 +149,7 @@ func TestSecretDependencyIndexTracksAcknowledgedPostimages(t *testing.T) {
 }
 
 func TestSecretDependencyIndexAcceptsMixedReferenceProviders(t *testing.T) {
-	index := NewSecretDependencyIndex()
+	index := NewSecretDependencyIndex(testDependencyConfigResolver(t))
 	payload, err := yaml.Marshal(map[string]any{
 		"module":          "module",
 		"name":            "mixed",
@@ -178,7 +180,7 @@ func TestSecretDependencyIndexAcceptsMixedReferenceProviders(t *testing.T) {
 }
 
 func TestSecretDependencyIndexQueriesCurrentAcceptedIntent(t *testing.T) {
-	index := NewSecretDependencyIndex()
+	index := NewSecretDependencyIndex(testDependencyConfigResolver(t))
 	enabled := map[string]bool{"module_starting": true, "module_waiting": true}
 	index.SetActivationEnabled(func(id string) bool {
 		require.True(t, index.mu.TryLock(), "activation query must run outside the dependency lock")
@@ -233,7 +235,7 @@ func TestSecretDependencyIndexSourcePolicy(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			index := NewSecretDependencyIndex()
+			index := NewSecretDependencyIndex(testDependencyConfigResolver(t))
 			config := confgroup.Config{
 				"module": "module", "name": "job",
 				"secret":    "${store:vault:main:value}",
@@ -274,7 +276,7 @@ func TestSecretDependencyIndexSourcePolicy(t *testing.T) {
 }
 
 func BenchmarkBSecretDependencyLookup(b *testing.B) {
-	index := NewSecretDependencyIndex()
+	index := NewSecretDependencyIndex(testDependencyConfigResolver(b))
 	const population = 1_000
 	for job := range population {
 		key := "vault:other"
@@ -311,4 +313,15 @@ func BenchmarkBSecretDependencyLookup(b *testing.B) {
 			require.FailNow(b, "benchmark failed", len(refs))
 		}
 	}
+}
+
+func testDependencyConfigResolver(t testing.TB) *secretconfig.ConfigResolver {
+	t.Helper()
+	resolver, err := secretresolver.NewAtomicResolver(nil)
+	require.NoError(t, err)
+	configs, err := secretconfig.NewConfigResolver(resolver, func([]string) (secretresolver.AtomicScope, error) {
+		panic("dependency extraction must not acquire secrets")
+	})
+	require.NoError(t, err)
+	return configs
 }

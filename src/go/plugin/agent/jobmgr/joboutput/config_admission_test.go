@@ -47,11 +47,10 @@ func TestConfigModuleFactoryAdmissionDoesNotResolveReferences(t *testing.T) {
 						CleanupFunc: func(context.Context) { cleanupCalls++ },
 					}
 				}}},
-				Resolver: resolver,
-				StoreScope: func([]string) (secretresolver.AtomicScope, error) {
+				Configs: testConfigResolver(t, resolver, func([]string) (secretresolver.AtomicScope, error) {
 					scopeCalls++
 					return nil, errors.New("unavailable Store")
-				},
+				}),
 			})
 			require.NoError(t, err)
 			config := factoryTestConfig(false)
@@ -108,7 +107,7 @@ func TestConfigModuleFactoryAdmissionContainsPanics(t *testing.T) {
 						},
 					}}
 				}}},
-				Resolver: resolver, StoreScope: unavailableStoreScope,
+				Configs: testConfigResolver(t, resolver, unavailableStoreScope),
 			})
 			require.NoError(t, err)
 			config := factoryTestConfig(false).SetSourceType(confgroup.TypeDyncfg)
@@ -145,8 +144,7 @@ func TestConfigModuleFactoryAdmissionValidatesAvailableNestedFields(t *testing.T
 					module = &admissionTestCollector{MockCollectorV1: &collectorapi.MockCollectorV1{}}
 					return module
 				}}},
-				Resolver:   resolver,
-				StoreScope: unavailableStoreScope,
+				Configs: testConfigResolver(t, resolver, unavailableStoreScope),
 			})
 			require.NoError(t, err)
 			config := factoryTestConfig(false).SetSourceType(confgroup.TypeDyncfg)

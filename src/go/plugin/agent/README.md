@@ -34,7 +34,18 @@ The `agent` package is framework/core orchestration only.
   - signal handling / exits / keepalive lifecycle
   - module registry selection
   - discovery provider wiring and policy selection
+  - optional secrets capability and provider/backend selection
 - Provider implementations (for example go.d SD discoverers) are selected explicitly in `cmd` wiring, not by implicit imports in `agent`.
+
+`agent.Config.Secrets` selects the secrets capability. Nil means absent: the Agent does not load `ss/`,
+construct SecretStore services, or register their DynCfg routes. Collector configurations keep all strings literal,
+including `${...}` and dollar escapes, across file discovery, DynCfg and restarts. Collector validation, vnodes,
+Functions and ordinary job cleanup still apply.
+
+Enabled hosts supply both an atomic resolver and a frozen Store creator catalog; incomplete inputs are invalid.
+Empty provider/catalog selections remain explicitly enabled. The go.d, ibm.d and scripts.d command roots select
+existing defaults through `cmd/internal/secretproviders`. StatsD omits the capability. Shared Agent/job-manager
+packages do not select concrete backends. See [Job Manager secrets](jobmgr/ARCHITECTURE.md#secrets).
 
 ## Custom plugin example
 

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -17,27 +16,30 @@ type activationDependency struct {
 	name string
 }
 
-func dependencyKeys(config confgroup.Config) ([]activationDependency, error) {
+func (cmf *ConfigModuleFactory) dependencyKeys(config confgroup.Config) ([]activationDependency, error) {
 	var keys []activationDependency
 	if name := config.Vnode(); name != "" {
-		keys = append(keys, activationDependency{kind: "vnode", name: name})
+		keys = append(keys, activationDependency{
+			kind: "vnode",
+			name: name,
+		})
 	}
-	if !policy.SecretReferencesAllowed(config) {
-		return keys, nil
-	}
-	stores, err := secretresolver.StoreReferences(map[string]any(config))
+	stores, err := cmf.config.Configs.StoreReferences(config)
 	if err != nil {
 		return nil, err
 	}
 	for _, name := range stores {
-		keys = append(keys, activationDependency{kind: "secretstore", name: name})
+		keys = append(keys, activationDependency{
+			kind: "secretstore",
+			name: name,
+		})
 	}
 	return keys, nil
 }
 
 // activationWaitsForDependency distinguishes missing framework-owned names from
 // provider failures, which retain the collector's operational retry policy.
-func activationWaitsForDependency(config confgroup.Config, err error) bool {
+func (cmf *ConfigModuleFactory) activationWaitsForDependency(config confgroup.Config, err error) bool {
 	if err == nil {
 		return false
 	}
@@ -53,7 +55,7 @@ func activationWaitsForDependency(config confgroup.Config, err error) bool {
 		!errors.Is(err, secretstore.ErrStoreNotFound) {
 		return false
 	}
-	keys, keyErr := dependencyKeys(config)
+	keys, keyErr := cmf.dependencyKeys(config)
 	if keyErr != nil {
 		return false
 	}
@@ -114,7 +116,10 @@ func (index *activationDependencyIndex) removeLocked(id string) {
 func (index *activationDependencyIndex) notify(kind, name string) {
 	index.mu.Lock()
 	defer index.mu.Unlock()
-	for _, wake := range index.watchers[activationDependency{kind: kind, name: name}] {
+	for _, wake := range index.watchers[activationDependency{
+		kind: kind,
+		name: name,
+	}] {
 		select {
 		case wake <- struct{}{}:
 		default:

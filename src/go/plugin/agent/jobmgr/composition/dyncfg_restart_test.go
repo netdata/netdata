@@ -102,6 +102,7 @@ func TestDynCfgRestartObservesExactActivationOutsideResourceLane(t *testing.T) {
 			require.NoError(t, err)
 			uids := lifecycle.NewUIDLedger()
 			generation, err := newTestRunGeneration(t, runGenerationConfig{
+				Secrets:    testRunSecrets(t),
 				Generation: 1, ShutdownTimeout: time.Second, UIDs: uids, Frames: frames,
 				Modules: modules, Jobs: testRunJobServices(t), Discovery: testRunDiscoveryServices(t, cfg),
 			})

@@ -109,7 +109,10 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if !exists {
-		return dcjc.reject(scope, current, permit, jobFailure{class: failureNotFound, message: "config not found."})
+		return dcjc.reject(scope, current, permit, jobFailure{
+			class:   failureNotFound,
+			message: "config not found.",
+		})
 	}
 	config, failure := dcjc.parseConfig(request, target.module, target.name)
 	if failure.valid {
@@ -200,7 +203,10 @@ func (dcjc *DynCfgJobController) prepareEnable(
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if !exists {
-		return dcjc.reject(scope, current, permit, jobFailure{class: failureNotFound, message: "config not found."})
+		return dcjc.reject(scope, current, permit, jobFailure{
+			class:   failureNotFound,
+			message: "config not found.",
+		})
 	}
 	status := dyncfg.Status(record.Status)
 	if status == dyncfg.StatusRunning {
@@ -210,7 +216,7 @@ func (dcjc *DynCfgJobController) prepareEnable(
 	if err != nil {
 		return nil, err
 	}
-	spec, err := newAcceptedActivationSpec(config)
+	spec, err := dcjc.configModules.newAcceptedActivationSpec(config)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +245,10 @@ func (dcjc *DynCfgJobController) prepareRestart(
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if !exists {
-		return dcjc.reject(scope, current, permit, jobFailure{class: failureNotFound, message: "config not found."})
+		return dcjc.reject(scope, current, permit, jobFailure{
+			class:   failureNotFound,
+			message: "config not found.",
+		})
 	}
 	status := dyncfg.Status(record.Status)
 	if status != dyncfg.StatusRunning && status != dyncfg.StatusFailed {
@@ -328,7 +337,12 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
 		}
-		rejection, ok := preparationFailure(activation, cmd.messages.busy, cmd.messages.deadline, cmd.messages.quarantined)
+		rejection, ok := preparationFailure(
+			activation,
+			cmd.messages.busy,
+			cmd.messages.deadline,
+			cmd.messages.quarantined,
+		)
 		if !ok {
 			return nil, err
 		}
@@ -336,7 +350,10 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 			return dcjc.rejectKeeping(scope, current, permit, rejection, kept)
 		}
 		transient := transientActivationFailure(cmd.config, err)
-		failure := jobFailure{class: failureTemporary, message: fmt.Sprintf(cmd.messages.failed, err)}
+		failure := jobFailure{
+			class:   failureTemporary,
+			message: fmt.Sprintf(cmd.messages.failed, err),
+		}
 		if !cmd.adoptsFailures || !adoptsFailure(transient) {
 			return dcjc.rejectKeeping(scope, current, permit, failure, kept)
 		}
@@ -393,7 +410,10 @@ func (dcjc *DynCfgJobController) prepareDisable(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	permit := lifecycle.LongLivedPermit{}
 	if !exists {
-		return dcjc.reject(scope, current, permit, jobFailure{class: failureNotFound, message: "config not found."})
+		return dcjc.reject(scope, current, permit, jobFailure{
+			class:   failureNotFound,
+			message: "config not found.",
+		})
 	}
 	if record.Status == dyncfg.StatusDisabled.String() {
 		return dcjc.satisfy(scope, current, permit, dyncfg.StatusDisabled, nil)
@@ -420,7 +440,10 @@ func (dcjc *DynCfgJobController) prepareRemove(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	permit := lifecycle.LongLivedPermit{}
 	if !exists {
-		return dcjc.reject(scope, current, permit, jobFailure{class: failureNotFound, message: "config not found."})
+		return dcjc.reject(scope, current, permit, jobFailure{
+			class:   failureNotFound,
+			message: "config not found.",
+		})
 	}
 	config, err := graphRecordConfig(record)
 	if err != nil {

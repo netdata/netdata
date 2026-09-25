@@ -23,6 +23,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	frameworkfunctions "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -307,7 +311,12 @@ func startAgentFixtureConfiguredWithRegistry(
 	if wrapOutput != nil {
 		agentOutput = wrapOutput(output)
 	}
+	secrets, err := fixtureSecrets()
+	if err != nil {
+		return nil, err
+	}
 	instance := agent.New(agent.Config{
+		Secrets:         secrets,
 		Name:            "jobmgrtest",
 		ModuleRegistry:  registry,
 		RunModule:       productionFixtureModule,
@@ -1258,4 +1267,16 @@ func indexOf(values []string, value string, occurrence int) int {
 		occurrence--
 	}
 	return -1
+}
+
+func fixtureSecrets() (*secretconfig.Config, error) {
+	resolver, err := secretresolver.NewDefaultAtomicResolver()
+	if err != nil {
+		return nil, err
+	}
+	creators, err := secretstore.NewCreatorCatalog(backends.Creators())
+	if err != nil {
+		return nil, err
+	}
+	return &secretconfig.Config{Resolver: resolver, Creators: creators}, nil
 }

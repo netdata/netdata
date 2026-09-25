@@ -99,10 +99,11 @@ jobs:
 	)
 	require.NoError(t, err)
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 	output := newProcessSynchronizedBuffer()
 	frames, err := lifecycle.NewFrameOwner(output)
 	require.NoError(t, err)
@@ -114,8 +115,9 @@ jobs:
 		Frames:          frames,
 		Modules:         modules,
 		Jobs:            jobs,
-		Secrets: runSecretServices{
-			Initial: initial,
+		Secrets: &SecretsConfig{
+			Providers: secretConfig.Providers,
+			Initial:   initial,
 		},
 		Discovery: testRunDiscoveryServices(t, jobConfig),
 	})
@@ -245,6 +247,7 @@ func testProcessCoreSecretMutationDependentRestart(
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
@@ -258,7 +261,7 @@ func testProcessCoreSecretMutationDependentRestart(
 		}},
 	)
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 	initialStore := secretstore.Config{
 		"name":            "main",
 		"kind":            string(secretstore.KindVault),
@@ -276,8 +279,9 @@ func testProcessCoreSecretMutationDependentRestart(
 		ShutdownTimeout: time.Second,
 		Modules:         modules,
 		Jobs:            jobs,
-		Secrets: runSecretServices{
-			Initial: []secretstore.Config{initialStore},
+		Secrets: &SecretsConfig{
+			Providers: secretConfig.Providers,
+			Initial:   []secretstore.Config{initialStore},
 		},
 		Discovery:   testRunDiscoveryServices(t, jobConfig),
 		Diagnostics: testProcessDiagnostics(),
@@ -418,6 +422,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
@@ -431,7 +436,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 		}},
 	)
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 	initialStore := secretstore.Config{
 		"name":            "main",
 		"kind":            string(secretstore.KindVault),
@@ -449,8 +454,9 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 		ShutdownTimeout: time.Second,
 		Modules:         modules,
 		Jobs:            jobs,
-		Secrets: runSecretServices{
-			Initial: []secretstore.Config{initialStore},
+		Secrets: &SecretsConfig{
+			Providers: secretConfig.Providers,
+			Initial:   []secretstore.Config{initialStore},
 		},
 		Discovery:   testRunDiscoveryServices(t, jobConfig),
 		Diagnostics: testProcessDiagnostics(),
@@ -529,6 +535,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 
 func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	var err error
 	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
@@ -540,11 +547,12 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 		}},
 	)
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -687,11 +695,13 @@ func TestProcessCoreVaultOperationalTest(t *testing.T) {
 	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{vaultbackend.New()})
 	require.NoError(t, err)
 	jobs := testRunJobServices(t)
-	jobs.StoreCreators = creators
+	secretConfig := testRunSecrets(t)
+	secretConfig.Providers.Creators = creators
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -821,11 +831,13 @@ func TestProcessCoreAWSOperationalTest(t *testing.T) {
 	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{awsbackend.New()})
 	require.NoError(t, err)
 	jobs := testRunJobServices(t)
-	jobs.StoreCreators = creators
+	secretConfig := testRunSecrets(t)
+	secretConfig.Providers.Creators = creators
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -943,6 +955,7 @@ func TestProcessCoreAcceptedStoreSurvivesRequestCancellationWithoutHoldingJobGra
 		},
 	}
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
@@ -956,12 +969,13 @@ func TestProcessCoreAcceptedStoreSurvivesRequestCancellationWithoutHoldingJobGra
 		},
 	}})
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -1049,6 +1063,7 @@ func TestProcessCoreRotationFencesLateStoreMaterializationAndFreshEpochProceeds(
 	gate := newProcessBlockingStoreGate()
 	t.Cleanup(gate.release)
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
 		Kind:   secretstore.KindVault,
 		Schema: `{}`,
@@ -1059,12 +1074,13 @@ func TestProcessCoreRotationFencesLateStoreMaterializationAndFreshEpochProceeds(
 		},
 	}})
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -1159,6 +1175,7 @@ func testProcessCoreStoreRemovalCancelsPendingMaterialization(t *testing.T, inst
 	gate := newProcessBlockingStoreGate()
 	t.Cleanup(gate.release)
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
 		Kind:   secretstore.KindVault,
 		Schema: `{}`,
@@ -1169,12 +1186,13 @@ func testProcessCoreStoreRemovalCancelsPendingMaterialization(t *testing.T, inst
 		},
 	}})
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -1278,6 +1296,7 @@ func TestProcessCoreRetriesLatestPendingStoreAfterStuckIdentityReleases(t *testi
 	gate := newProcessBlockingStoreGate()
 	t.Cleanup(gate.release)
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
 		Kind:   secretstore.KindVault,
 		Schema: `{}`,
@@ -1288,12 +1307,13 @@ func TestProcessCoreRetriesLatestPendingStoreAfterStuckIdentityReleases(t *testi
 		},
 	}})
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -1406,6 +1426,7 @@ func TestProcessCoreSecretUpdateYieldsJobGraphDuringRestartProbe(t *testing.T) {
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
@@ -1419,7 +1440,7 @@ func TestProcessCoreSecretUpdateYieldsJobGraphDuringRestartProbe(t *testing.T) {
 		}},
 	)
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 	initialStore := secretstore.Config{
 		"name":            "main",
 		"kind":            string(secretstore.KindVault),
@@ -1436,8 +1457,9 @@ func TestProcessCoreSecretUpdateYieldsJobGraphDuringRestartProbe(t *testing.T) {
 		ShutdownTimeout: time.Second,
 		Modules:         modules,
 		Jobs:            jobs,
-		Secrets: runSecretServices{
-			Initial: []secretstore.Config{initialStore},
+		Secrets: &SecretsConfig{
+			Providers: secretConfig.Providers,
+			Initial:   []secretstore.Config{initialStore},
 		},
 		Discovery:   testRunDiscoveryServices(t, jobConfig),
 		Diagnostics: testProcessDiagnostics(),

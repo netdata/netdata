@@ -155,11 +155,10 @@ func TestDiscoveredStaleStoreCandidateRetainsPendingDesired(t *testing.T) {
 		return module
 	}
 	controller.modules["module"] = creator
-	controller.factory.config.ConfigModules.config.StoreScope =
-		func([]string) (secretresolver.AtomicScope, error) {
-			scopeState.current.Store(true)
-			return scopeState, nil
-		}
+	controller.factory.config.ConfigModules.config.Configs = testConfigResolver(t, testAtomicResolver(t), func([]string) (secretresolver.AtomicScope, error) {
+		scopeState.current.Store(true)
+		return scopeState, nil
+	})
 	commands := &autoDetectionRetryTestCommands{}
 	require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(error) {}))
 	t.Cleanup(func() {

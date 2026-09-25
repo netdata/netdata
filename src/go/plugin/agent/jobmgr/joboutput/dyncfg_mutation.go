@@ -76,7 +76,8 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApply(
 	failures ...collectorapi.JobConfigFailure,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	jobConfig := preparedJobConfigLifecycleState(successor)
-	if len(failures) != 0 && postimage != nil && (postimage.Status == dyncfg.StatusFailed.String() || postimage.Status == dyncfg.StatusAccepted.String()) {
+	if len(failures) != 0 && postimage != nil &&
+		(postimage.Status == dyncfg.StatusFailed.String() || postimage.Status == dyncfg.StatusAccepted.String()) {
 		jobConfig.identity = dcjc.postimageJobConfigLifecycleGraphState(postimage).identity
 		jobConfig.failure = failures[0]
 	}
@@ -117,7 +118,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 		if err := yaml.Unmarshal(postimage.Payload, &config); err != nil {
 			return nil, err
 		}
-		spec, err := newAcceptedActivationSpec(config)
+		spec, err := dcjc.configModules.newAcceptedActivationSpec(config)
 		if err != nil {
 			return nil, err
 		}
@@ -327,7 +328,8 @@ func (dcjc *DynCfgJobController) retrySettlement(id string, token autoDetectionR
 func (dcjc *DynCfgJobController) prepareResourceTransaction(
 	spec ResourceTransactionSpec,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	if spec.Current != nil && (spec.Disposition == lifecycle.ResourceTransactionRemoved || spec.Disposition == lifecycle.ResourceTransactionReplaced) {
+	if spec.Current != nil &&
+		(spec.Disposition == lifecycle.ResourceTransactionRemoved || spec.Disposition == lifecycle.ResourceTransactionReplaced) {
 		identity := spec.Current.Identity()
 		retire := func() { dcjc.retireRestart(identity) }
 		spec.AfterApply = composeAfterApply(spec.AfterApply, retire)
