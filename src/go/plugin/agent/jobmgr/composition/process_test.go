@@ -58,6 +58,7 @@ func TestProcessCoreRestartSupersedesInitialStartup(t *testing.T) {
 func TestProcessCoreFencesCleanupOutputBeforeFinalizingOutput(t *testing.T) {
 	var output bytes.Buffer
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         testRunSecrets(t),
 		Input:           strings.NewReader(""),
 		Output:          &output,
 		ShutdownTimeout: time.Second,
@@ -84,6 +85,7 @@ func TestProcessCoreRestartFencesInitialTargetAfterCanceledConstruction(t *testi
 	release := make(chan struct{})
 	var handlerCalls atomic.Int32
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         testRunSecrets(t),
 		Input:           reader,
 		Output:          newProcessSynchronizedBuffer(),
 		ShutdownTimeout: time.Second,
@@ -204,92 +206,95 @@ func TestProcessCoreRestartAndTerminateDoNotWaitForSuccessorStore(t *testing.T) 
 }
 
 func TestProcessCorePublishesKnownRestartFailureBeforeFinalization(t *testing.T) {
-	reader, writer := io.Pipe()
-	started := make(chan struct{})
-	failureKnown := make(chan struct{})
-	var builds atomic.Int32
-	factory := agentdiscovery.NewProviderFactory(
-		"failing-successor",
-		func(build agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
-			if builds.Add(1) == 2 {
-				close(failureKnown)
-				panic("successor construction failed")
-			}
-			return processSignalingDiscovery{
-				started: started,
-			}, true, nil
-		},
-	)
-	catalog, err := agentdiscovery.NewProviderCatalog([]agentdiscovery.ProviderFactory{factory})
-	require.NoError(t, err)
-	process, err := newProcessCore(processCoreConfig{
-		Input:           reader,
-		Output:          newProcessSynchronizedBuffer(),
-		ShutdownTimeout: time.Second,
-		Modules:         collectorapi.Registry{},
-		Jobs:            testRunJobServices(t),
-		Discovery: runDiscoveryServices{
-			BuildContext: agentdiscovery.BuildContext{
-				Registry: confgroup.Registry{
-					"test": {},
-				},
+	withSecretsModes(t, func(t *testing.T, secretConfig *SecretsConfig) {
+		reader, writer := io.Pipe()
+		started := make(chan struct{})
+		failureKnown := make(chan struct{})
+		var builds atomic.Int32
+		factory := agentdiscovery.NewProviderFactory(
+			"failing-successor",
+			func(build agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
+				if builds.Add(1) == 2 {
+					close(failureKnown)
+					panic("successor construction failed")
+				}
+				return processSignalingDiscovery{
+					started: started,
+				}, true, nil
 			},
-			Providers: catalog,
-		},
-		Diagnostics: testProcessDiagnostics(),
-	})
-	require.NoError(t, err)
-	finalizeEntered := make(chan struct{})
-	releaseFinalize := make(chan struct{})
-	process.config.FinalizeOutput = func() {
-		close(finalizeEntered)
-		<-releaseFinalize
-	}
-	t.Cleanup(func() {
-		_ = writer.Close()
-		select {
-		case <-releaseFinalize:
-		default:
-			close(releaseFinalize)
+		)
+		catalog, err := agentdiscovery.NewProviderCatalog([]agentdiscovery.ProviderFactory{factory})
+		require.NoError(t, err)
+		process, err := newProcessCore(processCoreConfig{
+			Secrets:         secretConfig,
+			Input:           reader,
+			Output:          newProcessSynchronizedBuffer(),
+			ShutdownTimeout: time.Second,
+			Modules:         collectorapi.Registry{},
+			Jobs:            testRunJobServices(t),
+			Discovery: runDiscoveryServices{
+				BuildContext: agentdiscovery.BuildContext{
+					Registry: confgroup.Registry{
+						"test": {},
+					},
+				},
+				Providers: catalog,
+			},
+			Diagnostics: testProcessDiagnostics(),
+		})
+		require.NoError(t, err)
+		finalizeEntered := make(chan struct{})
+		releaseFinalize := make(chan struct{})
+		process.config.FinalizeOutput = func() {
+			close(finalizeEntered)
+			<-releaseFinalize
 		}
+		t.Cleanup(func() {
+			_ = writer.Close()
+			select {
+			case <-releaseFinalize:
+			default:
+				close(releaseFinalize)
+			}
+		})
+
+		controls := newTestProcessControls(1)
+		done := make(chan error, 1)
+		go func() {
+			done <- process.run(context.Background(), controls)
+		}()
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			require.FailNow(t, "test failed", "initial discovery provider did not start")
+		}
+
+		restart := testProcessControl()
+		controls.sendRestart(restart)
+		select {
+		case <-failureKnown:
+		case <-time.After(time.Second):
+			require.FailNow(t, "test failed", "successor failure was not reached")
+		}
+		select {
+		case err := <-restart.result:
+			require.ErrorContains(t, err, "provider factory panic")
+		case <-time.After(100 * time.Millisecond):
+			require.FailNow(t, "test failed", "known restart failure was withheld behind finalization")
+		}
+		select {
+		case <-finalizeEntered:
+		case <-time.After(time.Second):
+			require.FailNow(t, "test failed", "process finalization did not start")
+		}
+		select {
+		case err := <-done:
+			require.FailNowf(t, "test failed", "process stopped before finalization was released: %v", err)
+		default:
+		}
+		close(releaseFinalize)
+		require.ErrorContains(t, <-done, "provider factory panic")
 	})
-
-	controls := newTestProcessControls(1)
-	done := make(chan error, 1)
-	go func() {
-		done <- process.run(context.Background(), controls)
-	}()
-	select {
-	case <-started:
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "initial discovery provider did not start")
-	}
-
-	restart := testProcessControl()
-	controls.sendRestart(restart)
-	select {
-	case <-failureKnown:
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "successor failure was not reached")
-	}
-	select {
-	case err := <-restart.result:
-		require.ErrorContains(t, err, "provider factory panic")
-	case <-time.After(100 * time.Millisecond):
-		require.FailNow(t, "test failed", "known restart failure was withheld behind finalization")
-	}
-	select {
-	case <-finalizeEntered:
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "process finalization did not start")
-	}
-	select {
-	case err := <-done:
-		require.FailNowf(t, "test failed", "process stopped before finalization was released: %v", err)
-	default:
-	}
-	close(releaseFinalize)
-	require.ErrorContains(t, <-done, "provider factory panic")
 }
 
 func TestProcessCoreRotationRetainsOldStoreScopeOutsideRun(t *testing.T) {
@@ -304,14 +309,16 @@ func TestProcessCoreRotationRetainsOldStoreScopeOutsideRun(t *testing.T) {
 	}})
 	require.NoError(t, err)
 	jobs := testRunJobServices(t)
-	jobs.StoreCreators = creators
+	secretConfig := testRunSecrets(t)
+	secretConfig.Providers.Creators = creators
 	process, err := newProcessCore(processCoreConfig{
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
 		Modules:         collectorapi.Registry{},
 		Jobs:            jobs,
-		Secrets: runSecretServices{
+		Secrets: &SecretsConfig{
+			Providers: secretConfig.Providers,
 			Initial: []secretstore.Config{{
 				"name":            "main",
 				"kind":            string(secretstore.KindVault),
@@ -590,6 +597,7 @@ func TestProcessCoreServiceDiscoveryMutationSendsFunctionResultBeforeStatus(t *t
 	output := newProcessSynchronizedBuffer()
 	services := testRunServiceDiscoveryServices(t)
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         testRunSecrets(t),
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -633,6 +641,7 @@ func TestProcessCoreVnodeDynCfgOrdersAddCreateAndGet(t *testing.T) {
 	reader, writer := io.Pipe()
 	output := newProcessSynchronizedBuffer()
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.InitialVnodes = map[string]*vnodes.Config{
 		"initial": {VirtualNode: vnodes.VirtualNode{
 			Name:       "initial",
@@ -643,6 +652,7 @@ func TestProcessCoreVnodeDynCfgOrdersAddCreateAndGet(t *testing.T) {
 		}},
 	}
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -712,6 +722,7 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 		},
 	}
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         testRunSecrets(t),
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -797,6 +808,7 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(t *testing.
 	catalog, err := agentdiscovery.NewProviderCatalog([]agentdiscovery.ProviderFactory{factory})
 	require.NoError(t, err)
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         testRunSecrets(t),
 		Input:           reader,
 		Output:          newProcessSynchronizedBuffer(),
 		ShutdownTimeout: 100 * time.Millisecond,
@@ -845,6 +857,7 @@ func TestProcessCoreRequestsFreshProcessForQuarantinedModule(t *testing.T) {
 	defer func() { require.NoError(t, writer.Close()) }()
 	diagnostics := &recordingCompositionDiagnosticObserver{}
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         testRunSecrets(t),
 		Input:           reader,
 		Output:          newProcessSynchronizedBuffer(),
 		ShutdownTimeout: time.Second,
@@ -902,7 +915,8 @@ func TestProcessCoreContainsProviderConstructionPanic(t *testing.T) {
 	catalog, err := agentdiscovery.NewProviderCatalog([]agentdiscovery.ProviderFactory{factory})
 	require.NoError(t, err)
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader,
+		Secrets: testRunSecrets(t),
+		Input:   reader,
 		Output: processRecordingWriter{
 			record: func(payload []byte) {
 				switch {
@@ -1005,7 +1019,8 @@ func newStartupControlTestProcess(
 	}})
 	require.NoError(t, err)
 	jobs := testRunJobServices(t)
-	jobs.StoreCreators = creators
+	secretConfig := testRunSecrets(t)
+	secretConfig.Providers.Creators = creators
 	reader, writer := io.Pipe()
 	process, err := newProcessCore(processCoreConfig{
 		Input:           reader,
@@ -1013,7 +1028,8 @@ func newStartupControlTestProcess(
 		ShutdownTimeout: time.Second,
 		Modules:         collectorapi.Registry{},
 		Jobs:            jobs,
-		Secrets: runSecretServices{
+		Secrets: &SecretsConfig{
+			Providers: secretConfig.Providers,
 			Initial: []secretstore.Config{{
 				"name":            "main",
 				"kind":            string(secretstore.KindVault),
@@ -1255,6 +1271,7 @@ func TestProcessCorePublishesConfiguredMetadataForGeneratedJob(t *testing.T) {
 	defer writer.Close()
 	output := newProcessSynchronizedBuffer()
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
@@ -1277,6 +1294,7 @@ func TestProcessCorePublishesConfiguredMetadataForGeneratedJob(t *testing.T) {
 	config.SetSourceType(confgroup.TypeUser)
 	config.SetSource("test")
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,

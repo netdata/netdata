@@ -73,7 +73,7 @@ func (dcjc *DynCfgJobController) prepareCandidateAdoption(
 		adoption.release()
 		return nil, err
 	}
-	spec, err := newAcceptedActivationSpec(config)
+	spec, err := dcjc.configModules.newAcceptedActivationSpec(config)
 	if err != nil {
 		adoption.release()
 		return nil, err

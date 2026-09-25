@@ -85,11 +85,13 @@ func TestProcessVNodeNameRoundTrip(t *testing.T) {
 			reader, writer := io.Pipe()
 			output := newProcessSynchronizedBuffer()
 			jobs := testRunJobServices(t)
+			secretConfig := testRunSecrets(t)
 			jobs.InitialVnodes = map[string]*vnodes.Config{
 				test.incumbent: {VirtualNode: vnodes.VirtualNode{Name: test.incumbent, Hostname: "original", GUID: testVNodeGUID, Source: "file=test", SourceType: confgroup.TypeUser}},
 			}
 			process, err := newProcessCore(processCoreConfig{
-				Input: reader, Output: output, ShutdownTimeout: time.Second, Modules: collectorapi.Registry{},
+				Secrets: secretConfig,
+				Input:   reader, Output: output, ShutdownTimeout: time.Second, Modules: collectorapi.Registry{},
 				Jobs: jobs, Discovery: testRunDiscoveryServices(t), Diagnostics: testProcessDiagnostics(),
 			})
 			require.NoError(t, err)
@@ -159,6 +161,7 @@ func TestVNodeUpdatePreflightChecksLifetime(t *testing.T) {
 			require.NoError(t, err)
 			uids := lifecycle.NewUIDLedger()
 			generation, err := newTestRunGeneration(t, runGenerationConfig{
+				Secrets:    testRunSecrets(t),
 				Generation: 1, ShutdownTimeout: time.Second, UIDs: uids, Frames: frames,
 				Modules: modules, Jobs: testRunJobServices(t), Discovery: testRunDiscoveryServices(t, cfg),
 			})
@@ -251,6 +254,7 @@ func TestDiscoveredJobRebuildsAfterVNodeRemovalDuringPreflight(t *testing.T) {
 			cfg := confgroup.Config{"module": "module", "name": "receiver", "vnode": "x", "update_every": 1, "autodetection_retry": 0}.
 				SetSourceType(confgroup.TypeUser).SetProvider(confgroup.TypeUser).SetSource("file=test")
 			jobs := testRunJobServices(t)
+			secretConfig := testRunSecrets(t)
 			jobs.InitialVnodes = map[string]*vnodes.Config{
 				"x": {VirtualNode: vnodes.VirtualNode{Name: "x", Hostname: "x", GUID: testVNodeGUID, Source: "user=test", SourceType: confgroup.TypeDyncfg}},
 			}
@@ -258,6 +262,7 @@ func TestDiscoveredJobRebuildsAfterVNodeRemovalDuringPreflight(t *testing.T) {
 			frames, err := lifecycle.NewFrameOwner(output)
 			require.NoError(t, err)
 			generation, err := newTestRunGeneration(t, runGenerationConfig{
+				Secrets:    secretConfig,
 				Generation: 1, ShutdownTimeout: time.Second, UIDs: lifecycle.NewUIDLedger(), Frames: frames,
 				Modules: modules, Jobs: jobs, Discovery: testRunDiscoveryServices(t, cfg),
 			})
@@ -324,12 +329,14 @@ func TestVNodeArrivalStartsOnlyEnabledJobsWithoutOperationalRetry(t *testing.T) 
 					cfg := confgroup.Config{"module": "module", "name": "receiver", "vnode": "x", "update_every": 1, "autodetection_retry": 0}.
 						SetSourceType(confgroup.TypeUser).SetProvider(confgroup.TypeUser).SetSource("file=test")
 					jobs := testRunJobServices(t)
+					secretConfig := testRunSecrets(t)
 					acquirer := controlledAcquirer{attempts: make(chan acquisitionAttempt, 4)}
 					jobs.SNMPVnodeAcquirer = acquirer
 					output := newProcessSynchronizedBuffer()
 					frames, err := lifecycle.NewFrameOwner(output)
 					require.NoError(t, err)
 					generation, err := newTestRunGeneration(t, runGenerationConfig{
+						Secrets:    secretConfig,
 						Generation: 1, ShutdownTimeout: time.Second, UIDs: lifecycle.NewUIDLedger(), Frames: frames,
 						Modules: modules, Jobs: jobs, Discovery: testRunDiscoveryServicesAccepted(t, cfg),
 					})

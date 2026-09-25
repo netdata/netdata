@@ -790,6 +790,15 @@ Timed retry scheduling uses one per-run map, heap and dispatcher, with no timer 
 
 ## Secrets
 
+Secrets are an optional, process-fixed host capability. `composition.Config.Secrets == nil` omits file-configured
+Stores, epoch authority, run controller, Store dependency index and SecretStore DynCfg routes. The host Agent skips
+`ss/` loading in this mode. All collector sources preserve secret-looking strings literally, including malformed
+syntax and dollar escapes; collector validation, vnode dependencies, Functions and general cleanup remain active.
+
+Enabled hosts supply a resolver and Store creator catalog together. Empty catalogs are enabled; incomplete inputs
+fail construction. `NewProcess` copies the capability and clones its initial Store configurations. Concrete defaults
+are selected by go.d, ibm.d and scripts.d command roots; StatsD leaves the capability absent.
+
 Secrets keep credentials out of collector configs. A config value can carry a **reference** instead of a literal:
 
 - `${store:kind:name:key}` — looked up in a SecretStore (Vault, AWS Secrets Manager, Azure Key Vault, GCP Secret
@@ -810,12 +819,14 @@ from a different or unidentified pipeline retain ordinary rejection behavior, pr
 Rejected discovered candidates are scoped by pipeline ID too, so a competing candidate's rejection cannot suppress
 a later opt-out from the actual owner, even when their untrusted hashes match.
 
-`joboutput/config_factory.go` and `secrets/dependency.go` enforce the same policy before resolving or indexing
-references. Untrusted discovered, empty, and unknown sources keep every string literal, including malformed reference
-syntax, and create no SecretStore dependencies. Their application still uses the resolver's bounded literal clone.
-The pipeline option does not resolve discovery connection credentials.
+The run-scoped `plugin/agent/secrets.ConfigResolver` combines capability presence with this source policy.
+`joboutput/config_factory.go`, accepted-activation dependency extraction and `secrets/dependency.go` share it for
+validation, resolution and Store references. Untrusted discovered, empty, and unknown sources keep every string literal,
+including malformed reference syntax, and create no SecretStore dependencies. Their application still uses the
+resolver's bounded literal clone. The pipeline option does not resolve discovery connection credentials.
 DynCfg adoption re-stamps the complete submitted configuration as `dyncfg`, enabling reference resolution throughout
-that payload. Operators must review the whole configuration when adopting a discovered job.
+that payload when the host supplies secrets. Operators must review the whole configuration when adopting a
+discovered job.
 
 Resolution happens only in memory, only when a job is built. The key property is that it is **atomic — all references
 resolve, or none do**. Picture a notary: photocopy the whole document, list every blank, check out the referenced
@@ -1237,6 +1248,9 @@ Job Manager separates two lifetimes:
   kernel and its loop, the task supervisor, the run supervisor, the DynCfg graph, the run-owned SecretStore
   controller/dependency projections, Function catalog projections and publications, the job factory, the accepted-job
   activation owner, the autodetection scheduler, and the `jobmgr.runtime` metrics.
+
+Secrets-specific authorities and projections in these lifetimes exist only for enabled hosts. With secrets absent,
+rotation skips epoch creation/sealing and Store projection cleanup; all other fencing and finalization still run.
 
 A **SIGHUP reload tries to evict the whole tenant and move a fresh one in without touching the building.** The host
 gives the complete rotation one 30-second budget. If it expires, or a quarantined agent-module identity makes an

@@ -40,17 +40,17 @@ func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 				return &trustDurationCollector{MockCollectorV1: *module}
 			}
 			controller.modules["module"] = creator
-			dependencies := jobsecrets.NewSecretDependencyIndex()
+			dependencies := jobsecrets.NewSecretDependencyIndex(controller.configModules.config.Configs)
 			controller.dependencies = dependencies
 			commands := runtimeTestNotifications(t, controller)
 			activations := runtimeTestBindActivations(t, controller)
 			store := &factoryTestAtomicScope{value: "1s"}
 			store.current.Store(true)
 			var acquisitions int
-			controller.factory.config.ConfigModules.config.StoreScope = func([]string) (secretresolver.AtomicScope, error) {
+			controller.factory.config.ConfigModules.config.Configs = testConfigResolver(t, testAtomicResolver(t), func([]string) (secretresolver.AtomicScope, error) {
 				acquisitions++
 				return store, nil
-			}
+			})
 			config := factoryTestConfig(false)
 			config.Set("timeout", "${store:vault:main:value}")
 			config.SetSourceType(confgroup.TypeDiscovered)

@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -58,8 +59,7 @@ func TestConfigModuleFactoryCleansEveryAttemptAndPrefersV2(t *testing.T) {
 							},
 						},
 					},
-					Resolver:   resolver,
-					StoreScope: unavailableStoreScope,
+					Configs: testConfigResolver(t, resolver, unavailableStoreScope),
 				},
 			)
 			require.NoError(t, err)
@@ -104,8 +104,7 @@ func TestConfigModuleFactoryRedactsResolvedValuesFromDecodeErrors(t *testing.T) 
 				},
 			},
 		},
-		Resolver:   resolver,
-		StoreScope: unavailableStoreScope,
+		Configs: testConfigResolver(t, resolver, unavailableStoreScope),
 	})
 	require.NoError(t, err)
 	config := factoryTestConfig(false)
@@ -171,12 +170,11 @@ func TestConfigModuleFactorySecretReferenceSourcePolicy(t *testing.T) {
 					require.NoError(t, err)
 					creator, option := newVariant()
 					factory, err := NewConfigModuleFactory(ConfigModuleFactoryConfig{
-						Modules:  collectorapi.Registry{"module": creator},
-						Resolver: resolver,
-						StoreScope: func([]string) (secretresolver.AtomicScope, error) {
+						Modules: collectorapi.Registry{"module": creator},
+						Configs: testConfigResolver(t, resolver, func([]string) (secretresolver.AtomicScope, error) {
 							scopeCalls++
 							return &factoryTestAtomicScope{value: "store-resolved"}, nil
-						},
+						}),
 					})
 					require.NoError(t, err)
 					config := factoryTestConfig(false)
@@ -303,8 +301,7 @@ func TestConfigModuleFactoryRedactsReferenceResolutionFailures(t *testing.T) {
 						},
 					},
 				},
-				Resolver:   test.resolver(t),
-				StoreScope: test.storeScope,
+				Configs: testConfigResolver(t, test.resolver(t), test.storeScope),
 			})
 			require.NoError(t, err)
 			config := factoryTestConfig(false)
@@ -357,8 +354,7 @@ func TestConfigModuleFactoryRedactsResolvedValuesFromCollectorLifecycle(t *testi
 						},
 					},
 				},
-				Resolver:   resolver,
-				StoreScope: unavailableStoreScope,
+				Configs: testConfigResolver(t, resolver, unavailableStoreScope),
 			})
 			require.NoError(t, err)
 			config := factoryTestConfig(false)
@@ -398,8 +394,7 @@ func TestConfigModuleFactoryRedactsCollectorInternalLogsAfterResolution(t *testi
 				},
 			},
 		},
-		Resolver:   resolver,
-		StoreScope: unavailableStoreScope,
+		Configs: testConfigResolver(t, resolver, unavailableStoreScope),
 	})
 	require.NoError(t, err)
 	var logs bytes.Buffer
@@ -531,4 +526,18 @@ func (scfs *sensitiveConfigFactoryScope) Resolve(context.Context, string, string
 
 func (scfs *sensitiveConfigFactoryScope) Release(context.Context) error {
 	return scfs.releaseErr
+}
+
+func testConfigResolver(t testing.TB, resolver *secretresolver.AtomicResolver, scope secretresolver.AtomicScopeAcquirer) *secretconfig.ConfigResolver {
+	t.Helper()
+	configs, err := secretconfig.NewConfigResolver(resolver, scope)
+	require.NoError(t, err)
+	return configs
+}
+
+func testAtomicResolver(t testing.TB) *secretresolver.AtomicResolver {
+	t.Helper()
+	resolver, err := secretresolver.NewAtomicResolver(nil)
+	require.NoError(t, err)
+	return resolver
 }

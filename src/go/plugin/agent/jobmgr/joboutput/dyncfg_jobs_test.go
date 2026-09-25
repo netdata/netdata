@@ -175,11 +175,10 @@ func TestDynCfgPassiveAdmissionPreservesUnavailableDependencies(t *testing.T) {
 				}),
 			})
 			require.NoError(t, err)
-			controller.configModules.config.Resolver = resolver
-			controller.configModules.config.StoreScope = func([]string) (secretresolver.AtomicScope, error) {
+			controller.configModules.config.Configs = testConfigResolver(t, resolver, func([]string) (secretresolver.AtomicScope, error) {
 				storeCalls++
 				return nil, errors.New("Store unavailable")
-			}
+			})
 			controller.factory.config.Vnode = func(string) (jobruntime.VnodeSnapshot, bool) {
 				vnodeCalls++
 				return jobruntime.VnodeSnapshot{}, false
@@ -387,7 +386,7 @@ func TestDynCfgAdoptionTransfersSecretAuthorityForFullPayload(t *testing.T) {
 		}),
 	})
 	require.NoError(t, err)
-	controller.factory.config.ConfigModules.config.Resolver = resolver
+	controller.factory.config.ConfigModules.config.Configs = testConfigResolver(t, resolver, unavailableStoreScope)
 
 	discovered := factoryTestConfig(false)
 	discovered.SetSourceType(confgroup.TypeDiscovered)
@@ -1690,11 +1689,10 @@ func TestRunningUpdateRejectsStaleStoreCandidateAndPreservesIncumbent(t *testing
 		return module
 	}
 	controller.modules["module"] = creator
-	controller.factory.config.ConfigModules.config.StoreScope =
-		func([]string) (secretresolver.AtomicScope, error) {
-			scopeState.current.Store(true)
-			return scopeState, nil
-		}
+	controller.factory.config.ConfigModules.config.Configs = testConfigResolver(t, testAtomicResolver(t), func([]string) (secretresolver.AtomicScope, error) {
+		scopeState.current.Store(true)
+		return scopeState, nil
+	})
 
 	config := factoryTestConfig(false)
 	config.SetSourceType(confgroup.TypeDyncfg)
@@ -1865,7 +1863,7 @@ func installFailingFixtureResolver(t *testing.T, controller *DynCfgJobController
 		),
 	})
 	require.NoError(t, err)
-	controller.factory.config.ConfigModules.config.Resolver = resolver
+	controller.factory.config.ConfigModules.config.Configs = testConfigResolver(t, resolver, unavailableStoreScope)
 }
 
 type runtimeBusyTestAuthority struct {
@@ -2201,9 +2199,8 @@ func newDynCfgJobTestHarnessWithDiagnostics(
 	require.NoError(t, err)
 	configModules, err := NewConfigModuleFactory(
 		ConfigModuleFactoryConfig{
-			Modules:    modules,
-			Resolver:   resolver,
-			StoreScope: unavailableStoreScope,
+			Modules: modules,
+			Configs: testConfigResolver(t, resolver, unavailableStoreScope),
 		},
 	)
 	require.NoError(t, err)

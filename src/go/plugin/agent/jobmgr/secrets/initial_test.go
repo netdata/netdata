@@ -175,7 +175,7 @@ func TestDisposedInitialPublicationDoesNotAcquire(t *testing.T) {
 		Store:        store,
 		Operations:   operations,
 		Creators:     catalog,
-		Dependencies: NewSecretDependencyIndex(),
+		Dependencies: NewSecretDependencyIndex(testDependencyConfigResolver(t)),
 		Initial: []secretstore.Config{
 			secretInitialMaterializationConfig("a-blocked", "blocked"),
 			secretInitialMaterializationConfig("z-fast", "fast"),
@@ -1107,7 +1107,7 @@ func newSecretControllerTestHarnessWithWriter(
 		Store:        store,
 		Operations:   operations,
 		Creators:     catalog,
-		Dependencies: NewSecretDependencyIndex(),
+		Dependencies: NewSecretDependencyIndex(testDependencyConfigResolver(t)),
 		Initial:      initial,
 	})
 	require.NoError(t, err)

@@ -16,9 +16,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
-	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
@@ -58,14 +57,14 @@ type RuntimeService interface {
 }
 
 // Config is the process-fixed production composition input. NewProcess freezes
-// the mutable registries and constructs the provider, secret-creator, resolver,
-// vnode-metadata, UID, and frame authorities exactly once.
+// mutable inputs, retains explicitly supplied secret providers, and constructs
+// discovery, vnode-metadata, UID and frame authorities exactly once.
 type Config struct {
 	SNMPVnodeAcquirer vnodes.SNMPAcquirer
 	Input             io.Reader // plugin stdin
 	Output            io.Writer // plugin stdout
 
-	PluginName string                // plugin name (go.d / ibm.d / scripts.d)
+	PluginName string                // plugin name (go.d / ibm.d / scripts.d / statsd)
 	Modules    collectorapi.Registry // enabled collector module registry
 	Defaults   confgroup.Registry    // per-module config defaults
 
@@ -74,8 +73,8 @@ type Config struct {
 	RunJob                []string                         // allow-list filter of job names (empty = allow all)
 	AutoEnable            bool                             // publish discovered jobs as Running vs Accepted
 
-	InitialSecrets []secretstore.Config      // initial secret store configs
-	InitialVnodes  map[string]*vnodes.Config // file-configured vnodes
+	Secrets       *SecretsConfig            // nil disables all secret services
+	InitialVnodes map[string]*vnodes.Config // file-configured vnodes
 
 	Services []ProcessService // optional process-owned background services
 
@@ -83,6 +82,19 @@ type Config struct {
 
 	ShutdownTimeout time.Duration // per-run shutdown budget
 	KeepAlive       bool          // emit keepalive frames (long-lived agent mode)
+}
+
+// SecretsConfig groups enabled providers with their initial Store configurations.
+type SecretsConfig struct {
+	Providers secrets.Config
+	Initial   []secretstore.Config
+}
+
+func (c *SecretsConfig) validate() error {
+	if c == nil {
+		return nil
+	}
+	return c.Providers.Validate()
 }
 
 // Process owns the one process-lifetime ingress and rotates only complete run
@@ -118,12 +130,7 @@ func NewProcess(config Config) (*Process, error) {
 	if err != nil {
 		return nil, err
 	}
-	creatorCatalog, err := secretstore.NewCreatorCatalog(backends.Creators())
-	if err != nil {
-		return nil, err
-	}
-	resolver, err := secretresolver.NewDefaultAtomicResolver()
-	if err != nil {
+	if err := config.Secrets.validate(); err != nil {
 		return nil, err
 	}
 	initialVnodes := make(map[string]*vnodes.Config, len(config.InitialVnodes))
@@ -153,9 +160,16 @@ func NewProcess(config Config) (*Process, error) {
 	if shutdownTimeout == 0 {
 		shutdownTimeout = lifecycle.DefaultShutdownTimeout
 	}
-	initialSecrets, err := cloneSecretConfigs(config.InitialSecrets)
-	if err != nil {
-		return nil, err
+	var secretConfig *SecretsConfig
+	if config.Secrets != nil {
+		initial, err := cloneSecretConfigs(config.Secrets.Initial)
+		if err != nil {
+			return nil, err
+		}
+		secretConfig = &SecretsConfig{
+			Providers: config.Secrets.Providers,
+			Initial:   initial,
+		}
 	}
 	var finalizeOutput func()
 	if config.Runtime != nil {
@@ -170,15 +184,11 @@ func NewProcess(config Config) (*Process, error) {
 		Jobs: runJobServices{
 			PluginName:        config.PluginName,
 			Defaults:          defaults,
-			Resolver:          resolver,
-			StoreCreators:     creatorCatalog,
 			Runtime:           config.Runtime,
 			InitialVnodes:     initialVnodes,
 			SNMPVnodeAcquirer: config.SNMPVnodeAcquirer,
 		},
-		Secrets: runSecretServices{
-			Initial: initialSecrets,
-		},
+		Secrets: secretConfig,
 		Discovery: runDiscoveryServices{
 			BuildContext: build,
 			Providers:    providers,

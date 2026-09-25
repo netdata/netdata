@@ -33,7 +33,8 @@ func (dcjc *DynCfgJobController) planAutoDetectionRetry(
 		return jobmgr.WorkPlan{}, errors.New("job output: invalid activation retry")
 	}
 	return jobmgr.WorkPlan{
-		Claims: []string{DynCfgJobGraphClaim}, NoResponse: true,
+		Claims:     []string{DynCfgJobGraphClaim},
+		NoResponse: true,
 		Transaction: &jobmgr.ResourceTransactionPlan{
 			ID: config.FullName(),
 			Prepare: func(_ context.Context, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {
@@ -55,7 +56,7 @@ func (dcjc *DynCfgJobController) planAutoDetectionRetry(
 				} else if config.SourceType() != confgroup.TypeStock {
 					return dcjc.noopWithAfterApply(scope, current, permit, noResponseResult(), settle)
 				}
-				spec, err := newAcceptedActivationSpec(committed)
+				spec, err := dcjc.configModules.newAcceptedActivationSpec(committed)
 				if err != nil {
 					return nil, err
 				}
@@ -63,14 +64,34 @@ func (dcjc *DynCfgJobController) planAutoDetectionRetry(
 				if err != nil {
 					return nil, err
 				}
-				postimage := dyncfg.GraphConfig{ID: scope.ID, Module: committed.Module(), Name: committed.Name(), Status: dyncfg.StatusAccepted.String(), Payload: payload}
+				postimage := dyncfg.GraphConfig{
+					ID:      scope.ID,
+					Module:  committed.Module(),
+					Name:    committed.Name(),
+					Status:  dyncfg.StatusAccepted.String(),
+					Payload: payload,
+				}
 				cleanup := dcjc.configStatusCleanup(scope.ID, dyncfg.StatusAccepted)
 				if !exists {
-					cleanup = dcjc.configCreateCleanup(postimage, committed.SourceType(), committed.Source(), dcjc.configType(dcjc.modules[committed.Module()]))
+					cleanup = dcjc.configCreateCleanup(
+						postimage,
+						committed.SourceType(),
+						committed.Source(),
+						dcjc.configType(dcjc.modules[committed.Module()]),
+					)
 				}
-				return dcjc.prepareMutationWithRetryAfterApply(scope, current, nil, permit, lifecycle.ResourceTransactionUnchanged,
-					&postimage, internalReply(), cleanup, token,
-					func() { dcjc.scheduler.accepted.arm(spec) })
+				return dcjc.prepareMutationWithRetryAfterApply(
+					scope,
+					current,
+					nil,
+					permit,
+					lifecycle.ResourceTransactionUnchanged,
+					&postimage,
+					internalReply(),
+					cleanup,
+					token,
+					func() { dcjc.scheduler.accepted.arm(spec) },
+				)
 			},
 		},
 	}, nil
@@ -214,7 +235,10 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		)
 	}
 	if change.Remove {
-		settlement = composeAfterApply(settlement, func() { dcjc.scheduler.retries.cancelConfig(scope.ID, change.Config.UID()) })
+		settlement = composeAfterApply(
+			settlement,
+			func() { dcjc.scheduler.retries.cancelConfig(scope.ID, change.Config.UID()) },
+		)
 		if !exists || incumbent.UID() != change.Config.UID() {
 			return dcjc.noopWithAfterApply(
 				scope,
@@ -288,7 +312,12 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		record.Payload() == string(payload) &&
 		!change.Restart {
 		postimage.Status = record.Status
-		cleanup = dcjc.configCreateCleanup(postimage, change.Config.SourceType(), change.Config.Source(), dcjc.configType(dcjc.modules[change.Config.Module()]))
+		cleanup = dcjc.configCreateCleanup(
+			postimage,
+			change.Config.SourceType(),
+			change.Config.Source(),
+			dcjc.configType(dcjc.modules[change.Config.Module()]),
+		)
 		return dcjc.noopWithAfterApply(
 			scope,
 			current,
@@ -306,8 +335,17 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
 		}
-		if activationWaitsForDependency(change.Config, err) {
-			return dcjc.prepareDiscoveredActivationWait(change, current, scope, permit, postimage, pendingSettlement, err, 0)
+		if dcjc.configModules.activationWaitsForDependency(change.Config, err) {
+			return dcjc.prepareDiscoveredActivationWait(
+				change,
+				current,
+				scope,
+				permit,
+				postimage,
+				pendingSettlement,
+				err,
+				0,
+			)
 		}
 		switch activation.kind {
 		case activationFailureQuarantined, activationFailureProposal:
@@ -365,7 +403,16 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		case activationFailureSuperseded:
 			return dcjc.noopWithAfterApply(scope, current, permit, result, settlement)
 		case activationFailureDeadline:
-			return dcjc.prepareDiscoveredActivationWait(change, current, scope, permit, postimage, pendingSettlement, err, jobmgr.ProcessAttemptJob)
+			return dcjc.prepareDiscoveredActivationWait(
+				change,
+				current,
+				scope,
+				permit,
+				postimage,
+				pendingSettlement,
+				err,
+				jobmgr.ProcessAttemptJob,
+			)
 		case activationFailureTransient:
 			failedPostimage := postimage
 			failedPostimage.Status = dyncfg.StatusFailed.String()
@@ -420,8 +467,17 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		removePlainStock: change.Config.SourceType() == confgroup.TypeStock,
 	}
 	if probeFailure != nil {
-		if activationWaitsForDependency(change.Config, probeFailure) {
-			return dcjc.prepareDiscoveredActivationWait(change, current, scope, permit, postimage, pendingSettlement, probeFailure, 0)
+		if dcjc.configModules.activationWaitsForDependency(change.Config, probeFailure) {
+			return dcjc.prepareDiscoveredActivationWait(
+				change,
+				current,
+				scope,
+				permit,
+				postimage,
+				pendingSettlement,
+				probeFailure,
+				0,
+			)
 		}
 		return dcjc.prepareProbeFailure(
 			scope,
@@ -433,7 +489,12 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		)
 	}
 	postimage.Status = dyncfg.StatusAccepted.String()
-	cleanup = dcjc.configCreateCleanup(postimage, change.Config.SourceType(), change.Config.Source(), dcjc.configType(dcjc.modules[change.Config.Module()]))
+	cleanup = dcjc.configCreateCleanup(
+		postimage,
+		change.Config.SourceType(),
+		change.Config.Source(),
+		dcjc.configType(dcjc.modules[change.Config.Module()]),
+	)
 	return dcjc.prepareCandidateAdoption(
 		scope, current, permit, stage, change.Config, &postimage, reply, cleanup,
 		dcjc.pendingDesiredSettlement(change.Config, change.pending),
@@ -450,7 +511,7 @@ func (dcjc *DynCfgJobController) prepareDiscoveredActivationWait(
 	cause error,
 	namespace jobmgr.ProcessAttemptNamespace,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	spec, err := newAcceptedActivationSpec(change.Config)
+	spec, err := dcjc.configModules.newAcceptedActivationSpec(change.Config)
 	if err != nil {
 		return nil, err
 	}
@@ -459,8 +520,22 @@ func (dcjc *DynCfgJobController) prepareDiscoveredActivationWait(
 		activate = func() { dcjc.scheduler.accepted.armAfterRelease(spec, dcjc.activationRelease(scope.ID, namespace)) }
 	}
 	postimage.Status = dyncfg.StatusAccepted.String()
-	return dcjc.prepareMutationWithRetryAfterApply(scope, current, nil, permit,
-		resourceRemovalDisposition(current), &postimage, internalReply(),
-		dcjc.configCreateCleanup(postimage, change.Config.SourceType(), change.Config.Source(), dcjc.configType(dcjc.modules[change.Config.Module()])),
-		autoDetectionRetryToken{}, composeAfterApply(settle, activate), jobConfigFailure(cause, "activation"))
+	return dcjc.prepareMutationWithRetryAfterApply(
+		scope,
+		current,
+		nil,
+		permit,
+		resourceRemovalDisposition(current),
+		&postimage,
+		internalReply(),
+		dcjc.configCreateCleanup(
+			postimage,
+			change.Config.SourceType(),
+			change.Config.Source(),
+			dcjc.configType(dcjc.modules[change.Config.Module()]),
+		),
+		autoDetectionRetryToken{},
+		composeAfterApply(settle, activate),
+		jobConfigFailure(cause, "activation"),
+	)
 }

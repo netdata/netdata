@@ -27,7 +27,7 @@ type acceptedActivationSpec struct {
 	dependencies []activationDependency
 }
 
-func newAcceptedActivationSpec(config confgroup.Config) (acceptedActivationSpec, error) {
+func (cmf *ConfigModuleFactory) newAcceptedActivationSpec(config confgroup.Config) (acceptedActivationSpec, error) {
 	if config == nil || config.FullName() == "" || config.UID() == "" {
 		return acceptedActivationSpec{}, errors.New("job output: invalid accepted activation config")
 	}
@@ -35,11 +35,14 @@ func newAcceptedActivationSpec(config confgroup.Config) (acceptedActivationSpec,
 	if err != nil {
 		return acceptedActivationSpec{}, err
 	}
-	keys, err := dependencyKeys(cloned)
+	keys, err := cmf.dependencyKeys(cloned)
 	if err != nil {
 		return acceptedActivationSpec{}, err
 	}
-	return acceptedActivationSpec{config: cloned, dependencies: keys}, nil
+	return acceptedActivationSpec{
+		config:       cloned,
+		dependencies: keys,
+	}, nil
 }
 
 type acceptedActivationAttempt struct {
@@ -171,7 +174,12 @@ func (aai *acceptedActivationIndex) resumeFor(id string) func() {
 }
 
 // armWithGate consumes stage, including when registration is no longer possible.
-func (aai *acceptedActivationIndex) armWithGate(spec acceptedActivationSpec, release <-chan struct{}, resume chan struct{}, stage *preparedJobCandidate) {
+func (aai *acceptedActivationIndex) armWithGate(
+	spec acceptedActivationSpec,
+	release <-chan struct{},
+	resume chan struct{},
+	stage *preparedJobCandidate,
+) {
 	defer func() { stage.Release() }()
 	if aai == nil || spec.config == nil || spec.config.FullName() == "" || spec.config.UID() == "" {
 		return
@@ -182,7 +190,10 @@ func (aai *acceptedActivationIndex) armWithGate(spec acceptedActivationSpec, rel
 		aai.mu.Unlock()
 		return
 	}
-	if current := aai.entries[id]; current != nil && current.state != acceptedActivationInstalled && current.token.uid == spec.config.UID() && resume == nil && stage == nil {
+	if current := aai.entries[id]; current != nil && current.state != acceptedActivationInstalled &&
+		current.token.uid == spec.config.UID() &&
+		resume == nil &&
+		stage == nil {
 		aai.mu.Unlock()
 		return
 	}
@@ -233,8 +244,12 @@ func (aai *acceptedActivationIndex) trackInstalled(spec acceptedActivationSpec) 
 	}
 	previous := aai.detachLocked(id)
 	aai.entries[id] = &acceptedActivationEntry{
-		spec:   spec,
-		token:  acceptedActivationToken{run: aai.run, generation: aai.generation, uid: spec.config.UID()},
+		spec: spec,
+		token: acceptedActivationToken{
+			run:        aai.run,
+			generation: aai.generation,
+			uid:        spec.config.UID(),
+		},
 		state:  acceptedActivationInstalled,
 		cancel: make(chan struct{}),
 	}
@@ -666,7 +681,14 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 		reply:          internalFailureReply,
 		afterApply: composeProbeFailureAfterApply(
 			func(failure *autoDetectionFailure) {
-				dcjc.completeActivationRestart(attempt.token, adoptedResult(dyncfg.CommandRestart, dyncfg.StatusFailed, collectorFailure(failure, "config restart failed: %v")))
+				dcjc.completeActivationRestart(
+					attempt.token,
+					adoptedResult(
+						dyncfg.CommandRestart,
+						dyncfg.StatusFailed,
+						collectorFailure(failure, "config restart failed: %v"),
+					),
+				)
 				dcjc.scheduleAutoDetectionRetry(config, failure)
 			},
 			attempt.markApplied(),
@@ -674,7 +696,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 		removePlainStock: config.SourceType() == confgroup.TypeStock,
 	}
 	if probeFailure != nil {
-		if activationWaitsForDependency(config, probeFailure) {
+		if dcjc.configModules.activationWaitsForDependency(config, probeFailure) {
 			return dcjc.prepareAcceptedActivationWait(attempt, current, scope, permit, probeFailure, nil)
 		}
 		return dcjc.prepareProbeFailure(
@@ -696,13 +718,20 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 		reply,
 		dcjc.configStatusCleanup(scope.ID, dyncfg.StatusAccepted),
 		autoDetectionRetryToken{},
-		composeAfterApply(func() { dcjc.installActivationRestart(attempt.token, scope.Successor) }, attempt.markApplied()),
+		composeAfterApply(
+			func() { dcjc.installActivationRestart(attempt.token, scope.Successor) },
+			attempt.markApplied(),
+		),
 		activationFallbackPlan{
 			postimage: &acceptedPostimage,
 			cleanup:   dcjc.configStatusCleanup(scope.ID, dyncfg.StatusAccepted),
 			afterApply: composeAfterApply(
 				func() {
-					dcjc.scheduler.accepted.waitFor(scope.ID, attempt.token, dcjc.activationRelease(scope.ID, jobmgr.ProcessAttemptJobRuntime))
+					dcjc.scheduler.accepted.waitFor(
+						scope.ID,
+						attempt.token,
+						dcjc.activationRelease(scope.ID, jobmgr.ProcessAttemptJobRuntime),
+					)
 				},
 				attempt.markApplied(),
 			),
@@ -711,7 +740,15 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 			postimage: &failedPostimage,
 			cleanup:   dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
 			afterApply: composeAfterApply(func() {
-				dcjc.completeActivationRestart(attempt.token, rejectedResult(jobFailure{class: failureUnavailable, message: "the job cannot start until the plugin restarts."}))
+				dcjc.completeActivationRestart(
+					attempt.token,
+					rejectedResult(
+						jobFailure{
+							class:   failureUnavailable,
+							message: "the job cannot start until the plugin restarts.",
+						},
+					),
+				)
 			}, attempt.markApplied()),
 		},
 	)
@@ -741,10 +778,11 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 	}
 	failedPostimage := graphConfig(record, dyncfg.StatusFailed)
 	config := attempt.spec.config
-	if activationWaitsForDependency(config, err) {
+	if dcjc.configModules.activationWaitsForDependency(config, err) {
 		return dcjc.prepareAcceptedActivationWait(attempt, current, scope, permit, err, nil)
 	}
-	if activation.kind == activationFailureBusy || activation.kind == activationFailureStaleStore || activation.kind == activationFailureSuperseded {
+	if activation.kind == activationFailureBusy || activation.kind == activationFailureStaleStore ||
+		activation.kind == activationFailureSuperseded {
 		return dcjc.prepareAcceptedActivationWait(attempt, current, scope, permit, err,
 			dcjc.activationRelease(scope.ID, jobmgr.ProcessAttemptJob))
 	}
@@ -760,7 +798,10 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 			reply,
 			dcjc.configStatusCleanup(scope.ID, dyncfg.StatusFailed),
 			autoDetectionRetryToken{},
-			composeAfterApply(func() { dcjc.completeActivationRestart(attempt.token, rejectedResult(testFailure(err))) }, attempt.markApplied()),
+			composeAfterApply(
+				func() { dcjc.completeActivationRestart(attempt.token, rejectedResult(testFailure(err))) },
+				attempt.markApplied(),
+			),
 			jobConfigFailure(err, "activation"),
 		)
 	case activationFailureDeadline, activationFailureTransient:
@@ -788,7 +829,10 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 
 // A missing owner means release won the race with registration. A closed
 // signal forces a fresh attempt against the committed dependency state.
-func (dcjc *DynCfgJobController) activationRelease(id string, namespace jobmgr.ProcessAttemptNamespace) <-chan struct{} {
+func (dcjc *DynCfgJobController) activationRelease(
+	id string,
+	namespace jobmgr.ProcessAttemptNamespace,
+) <-chan struct{} {
 	if release, ok := dcjc.factory.config.Attempts.ProcessAttemptReleased(jobAttemptIdentity(namespace, id)); ok {
 		return release
 	}
@@ -811,9 +855,19 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationWait(
 	}
 	postimage := graphConfig(record, dyncfg.StatusAccepted)
 	return dcjc.prepareMutationWithRetryAfterApply(
-		scope, current, nil, permit, resourceRemovalDisposition(current), &postimage, internalReply(),
-		dcjc.configStatusCleanup(scope.ID, dyncfg.StatusAccepted), autoDetectionRetryToken{},
-		composeAfterApply(func() { dcjc.scheduler.accepted.waitFor(scope.ID, attempt.token, release) }, attempt.markApplied()),
+		scope,
+		current,
+		nil,
+		permit,
+		resourceRemovalDisposition(current),
+		&postimage,
+		internalReply(),
+		dcjc.configStatusCleanup(scope.ID, dyncfg.StatusAccepted),
+		autoDetectionRetryToken{},
+		composeAfterApply(
+			func() { dcjc.scheduler.accepted.waitFor(scope.ID, attempt.token, release) },
+			attempt.markApplied(),
+		),
 		jobConfigFailure(cause, "activation"),
 	)
 }

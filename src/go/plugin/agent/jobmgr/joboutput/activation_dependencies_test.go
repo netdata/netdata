@@ -15,21 +15,22 @@ import (
 )
 
 func TestActivationDependencyKeysPreserveSourceAuthority(t *testing.T) {
+	controller, _, _, _, _ := newDynCfgJobTestHarness(t)
 	config := confgroup.Config{
 		"vnode": "router", "password": "${store:vault:credentials:key}",
 		"duplicate": "${store:vault:credentials:other}", "env": "${env:IGNORED}",
 		"__internal__": "${store:vault:internal:key}",
 	}.SetSourceType(confgroup.TypeDyncfg)
-	keys, err := dependencyKeys(config)
+	keys, err := controller.configModules.dependencyKeys(config)
 	require.NoError(t, err)
 	require.Equal(t, []activationDependency{{"vnode", "router"}, {"secretstore", "vault:credentials"}}, keys)
 	config.SetSourceType(confgroup.TypeDiscovered)
-	keys, err = dependencyKeys(config)
+	keys, err = controller.configModules.dependencyKeys(config)
 	require.NoError(t, err)
 	require.Equal(t, []activationDependency{{"vnode", "router"}}, keys)
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config["password"] = "${store:invalid}"
-	_, err = dependencyKeys(config)
+	_, err = controller.configModules.dependencyKeys(config)
 	require.Error(t, err)
 }
 
@@ -91,6 +92,7 @@ func TestActivationDependencyIndexConcurrentNotifications(t *testing.T) {
 }
 
 func TestActivationDependencyWaitClassification(t *testing.T) {
+	controller, _, _, _, _ := newDynCfgJobTestHarness(t)
 	config := confgroup.Config{"vnode": "router", "password": "${store:vault:credentials:key}"}.SetSourceType(confgroup.TypeDyncfg)
 	missing := &secretresolver.AtomicResolveError{Kind: secretresolver.AtomicErrorScope,
 		Cause: fmt.Errorf("sensitive scope details: %w", secretstore.ErrStoreNotFound)}
@@ -108,10 +110,10 @@ func TestActivationDependencyWaitClassification(t *testing.T) {
 		"collector failure":        {errors.New("vnode is missing"), false},
 	} {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, test.wait, activationWaitsForDependency(config, test.err))
+			require.Equal(t, test.wait, controller.configModules.activationWaitsForDependency(config, test.err))
 		})
 	}
 	require.NotContains(t, redactResolvedLifecycleError(missing).Error(), "sensitive scope details")
 	config.SetSourceType(confgroup.TypeDiscovered)
-	require.False(t, activationWaitsForDependency(config, missing))
+	require.False(t, controller.configModules.activationWaitsForDependency(config, missing))
 }

@@ -115,6 +115,7 @@ func testSecretReplacementProviderRecovery(t *testing.T, scenario secretReplacem
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1, AutoDetectionRetry: 1},
 	}
@@ -128,7 +129,7 @@ func testSecretReplacementProviderRecovery(t *testing.T, scenario secretReplacem
 		},
 	}})
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 	reader, writer := io.Pipe()
 	output := &secretRetryTickOutput{
 		processSynchronizedBuffer: newProcessSynchronizedBuffer(),
@@ -140,7 +141,8 @@ func testSecretReplacementProviderRecovery(t *testing.T, scenario secretReplacem
 		KeepAlive:       true,
 		Modules:         modules,
 		Jobs:            jobs,
-		Secrets: runSecretServices{
+		Secrets: &SecretsConfig{
+			Providers: secretConfig.Providers,
 			Initial: []secretstore.Config{{
 				"name": "main", "kind": string(secretstore.KindVault), "value": "initial",
 				"__source__": confgroup.TypeUser, "__source_type__": confgroup.TypeUser,

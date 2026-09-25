@@ -17,12 +17,14 @@ import (
 
 func TestVNodeDependencyNotificationObservesCommittedState(t *testing.T) {
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	acquirer := controlledAcquirer{attempts: make(chan acquisitionAttempt, 4)}
 	jobs.SNMPVnodeAcquirer = acquirer
 	output := newProcessSynchronizedBuffer()
 	frames, err := lifecycle.NewFrameOwner(output)
 	require.NoError(t, err)
 	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets:    secretConfig,
 		Generation: 1, ShutdownTimeout: time.Second, UIDs: lifecycle.NewUIDLedger(), Frames: frames,
 		Modules: collectorapi.Registry{}, Jobs: jobs, Discovery: testRunDiscoveryServices(t),
 	})

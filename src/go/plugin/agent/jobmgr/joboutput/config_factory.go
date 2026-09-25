@@ -12,7 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -20,9 +20,8 @@ import (
 )
 
 type ConfigModuleFactoryConfig struct {
-	Modules    ModuleCatalog                      // registry of module creators to look up by name
-	Resolver   *secretresolver.AtomicResolver     // resolves secret references in a config
-	StoreScope secretresolver.AtomicScopeAcquirer // acquires the reader scope for secret resolution
+	Modules ModuleCatalog                // registry of module creators to look up by name
+	Configs *secretconfig.ConfigResolver // run-scoped config interpretation shared with dependencies
 }
 
 type configModule interface {
@@ -42,7 +41,7 @@ type ConfigModuleFactory struct {
 }
 
 func NewConfigModuleFactory(config ConfigModuleFactoryConfig) (*ConfigModuleFactory, error) {
-	if config.Modules == nil || config.Resolver == nil || config.StoreScope == nil {
+	if config.Modules == nil || config.Configs == nil {
 		return nil, errors.New("job output: incomplete config-module factory configuration")
 	}
 	return &ConfigModuleFactory{
@@ -135,12 +134,8 @@ func (cmf *ConfigModuleFactory) Validate(ctx context.Context, config confgroup.C
 			err = redactResolvedLifecycleError(err)
 		}
 	}()
-	var value any
-	if policy.SecretReferencesAllowed(config) {
-		value, probe.redact, err = cmf.config.Resolver.CloneForValidation(map[string]any(config))
-	} else {
-		value, err = secretresolver.CloneLiteral(map[string]any(config))
-	}
+	value, references, err := cmf.config.Configs.CloneForValidation(config)
+	probe.redact = references
 	if err != nil {
 		return err
 	}
@@ -232,21 +227,7 @@ func (cmf *ConfigModuleFactory) applyResolvedInternal(
 		ctx,
 		cmf.logger.With(slog.String("collector", config.Module()), slog.String("job", config.Name())),
 	)
-	var resolved any
-	var references bool
-	var err error
-	if !policy.SecretReferencesAllowed(config) {
-		resolved, err = secretresolver.CloneLiteral(map[string]any(config))
-	} else if captureSnapshot {
-		resolved, references, snapshot, err = cmf.config.Resolver.ResolveWithSnapshot(
-			resolveCtx,
-			map[string]any(config),
-			cmf.config.StoreScope,
-		)
-	} else {
-		resolved, references, err =
-			cmf.config.Resolver.ResolveWithReferences(resolveCtx, map[string]any(config), cmf.config.StoreScope)
-	}
+	resolved, references, snapshot, err := cmf.config.Configs.Resolve(resolveCtx, config, captureSnapshot)
 	hasReferences = references
 	if err != nil {
 		err = fmt.Errorf("job output: resolving configuration secrets: %w", err)
@@ -275,7 +256,11 @@ func applyConfigModuleValue(value any, module any, hasReferences bool) error {
 	}
 	if len(payload) > secretresolver.MaximumAtomicResolvedBytes {
 		return invalidJobConfiguration(
-			withJobConfigFailure(errors.New("job output: serialized configuration exceeds maximum size"), "configuration", "result_limit"),
+			withJobConfigFailure(
+				errors.New("job output: serialized configuration exceeds maximum size"),
+				"configuration",
+				"result_limit",
+			),
 		)
 	}
 	if err := yaml.Unmarshal(payload, module); err != nil {

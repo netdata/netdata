@@ -65,12 +65,12 @@ func TestAcceptedHandoffUpdateDuringStartupPreservesEnabledIntent(t *testing.T) 
 			newStore.current.Store(true)
 			var resolutions atomic.Int32
 			if test.staleStore {
-				controller.factory.config.ConfigModules.config.StoreScope = func([]string) (secretresolver.AtomicScope, error) {
+				controller.factory.config.ConfigModules.config.Configs = testConfigResolver(t, testAtomicResolver(t), func([]string) (secretresolver.AtomicScope, error) {
 					if resolutions.Add(1) == 1 {
 						return oldStore, nil
 					}
 					return newStore, nil
-				}
+				})
 			}
 			commands := bindHandoffTestWorkers(t, controller)
 			var current lifecycle.ReadyResource
@@ -179,7 +179,7 @@ func TestAcceptedHandoffReleasesCandidateWhenActivationRevoked(t *testing.T) {
 			stage, err := controller.factory.newCandidate(config)
 			require.NoError(t, err)
 			require.NoError(t, controller.factory.awaitCandidate(t.Context(), stage))
-			spec, err := newAcceptedActivationSpec(config)
+			spec, err := controller.configModules.newAcceptedActivationSpec(config)
 			require.NoError(t, err)
 			if closed {
 				controller.scheduler.StopBackgroundWorkers()

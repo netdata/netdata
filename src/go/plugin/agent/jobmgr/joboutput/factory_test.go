@@ -345,11 +345,10 @@ func TestFactoryRejectsCandidateWhenResolvedStoreGenerationChangesDuringProbe(t 
 		Modules: collectorapi.Registry{
 			"module": creator,
 		},
-		Resolver: resolver,
-		StoreScope: func([]string) (secretresolver.AtomicScope, error) {
+		Configs: testConfigResolver(t, resolver, func([]string) (secretresolver.AtomicScope, error) {
 			scope.current.Store(true)
 			return scope, nil
-		},
+		}),
 	})
 	require.NoError(t, err)
 	factory.config.ConfigModules = configModules
@@ -1424,7 +1423,7 @@ func TestFactoryProbeRedactsResolvedValuesFromCollectorFailure(t *testing.T) {
 					),
 				})
 				require.NoError(t, err)
-				factory.config.ConfigModules.config.Resolver = resolver
+				factory.config.ConfigModules.config.Configs = testConfigResolver(t, resolver, unavailableStoreScope)
 				permit, tasks := issueTestJobPermit(t, "module_job", 1)
 				config := factoryTestConfig(false)
 				config["option_str"] = "${fixture:value}"
@@ -1720,8 +1719,7 @@ func newFactoryTestHarness(
 		Modules: collectorapi.Registry{
 			"module": creator,
 		},
-		Resolver:   resolver,
-		StoreScope: unavailableStoreScope,
+		Configs: testConfigResolver(t, resolver, unavailableStoreScope),
 	})
 	require.NoError(t, err)
 	attempts, err := containment.NewAuthority(nil)
