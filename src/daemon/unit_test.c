@@ -1855,7 +1855,7 @@ static int test_rrdset_homogeneity_multiplier_sign(void) {
         bool deferred = rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS);
         if(deferred != cases[i].heterogeneous ||
            rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK)) {
-            fprintf(stderr, "%s: %s deferred classified heterogeneous=%d, expected %d (check pending=%d)\n",
+            fprintf(stderr, "%s: %s deferred classified heterogeneous=%d, expected %d (check pending=%u)\n",
                     __FUNCTION__, cases[i].name, deferred, cases[i].heterogeneous,
                     rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK));
             rc = 1;

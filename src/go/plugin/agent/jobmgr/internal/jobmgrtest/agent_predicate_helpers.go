@@ -50,7 +50,8 @@ func runAgentStartAcknowledgementVariant(ctx context.Context, v2 bool) error {
 	releaseGate()
 	if err := waitUntil(ctx, func() bool {
 		return fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`) &&
-			fixture.output.contains("CONFIG jobmgrtest:collector:jobmgrtest create running single ")
+			fixture.output.contains("CONFIG jobmgrtest:collector:jobmgrtest create accepted single ") &&
+			fixture.output.contains("CONFIG jobmgrtest:collector:jobmgrtest status running")
 	}); err != nil {
 		return fmt.Errorf(
 			"Start acknowledgement did not publish running generation: %w; output=%s",
@@ -292,10 +293,15 @@ func runAgentFunctionAdmissionClosesBeforeLeaseDrain(ctx context.Context) error 
 	if state.count("raw:echo") != 1 {
 		return fmt.Errorf("post-close invocation entered the handler: %v", state.snapshot())
 	}
-	if _, completed, parseErr := fixture.output.functionResult(disableUID); parseErr != nil {
-		return parseErr
-	} else if completed {
-		return errors.New("disable completed before the active Function lease drained")
+	disabled, err := waitFunctionResult(ctx, fixture.output, disableUID)
+	if err != nil {
+		return fmt.Errorf("logical disable waited for an active Function lease: %w", err)
+	}
+	if disabled.status != 200 {
+		return fmt.Errorf("logical disable status=%d, want 200", disabled.status)
+	}
+	if state.count("cleanup") != 0 || state.count("handler-cleanup") != 0 {
+		return fmt.Errorf("logical disable cleaned resources still owned by the active Function: %v", state.snapshot())
 	}
 	releaseGate()
 	first, err := waitFunctionResult(ctx, fixture.output, firstUID)
@@ -305,14 +311,12 @@ func runAgentFunctionAdmissionClosesBeforeLeaseDrain(ctx context.Context) error 
 	if first.status != 200 {
 		return fmt.Errorf("active invocation status=%d, want 200", first.status)
 	}
-	disabled, err := waitFunctionResult(ctx, fixture.output, disableUID)
-	if err != nil {
-		return err
-	}
-	if disabled.status != 200 || state.count("cleanup") != 1 || state.count("handler-cleanup") != 1 {
+	if err := waitUntil(ctx, func() bool {
+		return state.count("cleanup") == 1 && state.count("handler-cleanup") == 1
+	}); err != nil {
 		return fmt.Errorf(
-			"disable did not drain and clean the exact generation: status=%d events=%v",
-			disabled.status,
+			"disable did not drain and clean the exact generation: %w; events=%v",
+			err,
 			state.snapshot(),
 		)
 	}
@@ -337,10 +341,11 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 		_ = fixture.input.Close()
 	}()
 	const functionPublication = `FUNCTION GLOBAL "jobmgrtest:echo"`
-	const initialPublication = "CONFIG jobmgrtest:collector:jobmgrtest create running single "
+	const initialPublication = "CONFIG jobmgrtest:collector:jobmgrtest create accepted single "
 	const runningPublication = "CONFIG jobmgrtest:collector:jobmgrtest status running"
 	if err := waitUntil(ctx, func() bool {
-		return fixture.output.contains(functionPublication) && fixture.output.contains(initialPublication)
+		return fixture.output.contains(functionPublication) && fixture.output.contains(initialPublication) &&
+			fixture.output.contains(runningPublication)
 	}); err != nil {
 		return fmt.Errorf(
 			"initial generation was not published: %w; events=%v; output=%s",
@@ -350,7 +355,7 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 		)
 	}
 	initialFunctions := fixture.output.count(functionPublication)
-	initialRunning := fixture.output.count(initialPublication)
+	initialRunning := fixture.output.count(runningPublication)
 
 	const oldUID = "jobmgrtest-replace-old"
 	if err := writeFunctionCall(fixture.input, oldUID, "jobmgrtest:echo old"); err != nil {
@@ -383,13 +388,22 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 		)
 	}
 	if fixture.output.count(functionPublication) != initialFunctions ||
-		fixture.output.count(initialPublication) != initialRunning ||
-		fixture.output.contains(runningPublication) {
+		fixture.output.count(runningPublication) != initialRunning {
 		return fmt.Errorf(
 			"replacement published before the old handler drained: events=%v output=%s",
 			state.snapshot(),
 			fixture.output.String(),
 		)
+	}
+	updated, err := waitFunctionResult(ctx, fixture.output, updateUID)
+	if err != nil {
+		return fmt.Errorf("update acceptance waited for the old Function lease: %w", err)
+	}
+	if updated.status != 202 {
+		return fmt.Errorf("update acceptance status=%d, want 202; payload=%s", updated.status, updated.payload)
+	}
+	if state.count("handler-cleanup-active") != 0 || state.count("handler-cleanup-used") != 0 {
+		return fmt.Errorf("update cleaned the old handler before its invocation returned: %v", state.snapshot())
 	}
 
 	releaseGate()
@@ -405,22 +419,10 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 	if old.status != 200 {
 		return fmt.Errorf("old invocation status=%d, want 200", old.status)
 	}
-	updated, err := waitFunctionResult(ctx, fixture.output, updateUID)
-	if err != nil {
-		return fmt.Errorf(
-			"update did not complete after old generation drain: %w; events=%v; output=%s",
-			err,
-			state.snapshot(),
-			fixture.output.String(),
-		)
-	}
-	if updated.status != 200 {
-		return fmt.Errorf("update status=%d, want 200; payload=%s", updated.status, updated.payload)
-	}
 	if err := waitUntil(ctx, func() bool {
 		return fixture.output.count(functionPublication) ==
 			initialFunctions+1 &&
-			fixture.output.count(initialPublication) ==
+			fixture.output.count(runningPublication) ==
 				initialRunning+1
 	}); err != nil {
 		return fmt.Errorf(
@@ -432,7 +434,9 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 	}
 	events := state.snapshot()
 	returned := indexOf(events, "raw:echo:returned", 0)
-	handlerCleanup := indexOf(events, "handler-cleanup", 0)
+	// A rejected successor may clean its unused handler before the incumbent
+	// drains. Only the incumbent has served an invocation at this point.
+	handlerCleanup := indexOf(events, "handler-cleanup-used", 0)
 	runtimeCleanup := -1
 	for index := returned + 1; index < len(events); index++ {
 		if events[index] == "cleanup" {
@@ -440,7 +444,8 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 			break
 		}
 	}
-	if returned < 0 || handlerCleanup <= returned || runtimeCleanup <= returned {
+	if returned < 0 || handlerCleanup <= returned || runtimeCleanup <= returned ||
+		state.count("handler-cleanup-used") != 1 || state.count("handler-cleanup-active") != 0 {
 		return fmt.Errorf("new running publication preceded old generation drain: %v", events)
 	}
 
@@ -844,6 +849,6 @@ func outputFaultMatcher(cut outputFaultCut) func([]byte) bool {
 }
 
 func writeFunctionCall(writer io.Writer, uid string, call string) error {
-	_, err := io.WriteString(writer, fmt.Sprintf("FUNCTION %s 30 %q 0xFFFF %q\n", uid, call, "method=api,role=test"))
+	_, err := io.WriteString(writer, fmt.Sprintf("FUNCTION %s 30 \"%s\" 0xFFFF \"%s\"\n", uid, call, "method=api,role=test"))
 	return err
 }

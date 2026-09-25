@@ -428,7 +428,7 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
         worker_is_busy(WORKER_JOB_PP_INSTANCE);
 
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
-    size_t metrics_active = 0, metrics_deleted = 0, metrics_no_tier0 = 0;
+    size_t metrics_active = 0, metrics_no_tier0 = 0;
     bool live_retention = true, currently_collected = false;
     if(dictionary_entries(ri->rrdmetrics) > 0) {
         RRDMETRIC *rm;
@@ -448,7 +448,6 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
                         metrics_no_tier0++;
 
                     if (unlikely((rrdmetric_should_be_deleted(rm)))) {
-                        metrics_deleted++;
                         continue;
                     }
 
@@ -636,7 +635,7 @@ bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reaso
     size_t min_priority_not_collected = LONG_MAX;
     size_t min_priority = LONG_MAX;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
-    size_t instances_active = 0, instances_deleted = 0, instances_no_tier0 = 0;
+    size_t instances_active = 0, instances_no_tier0 = 0;
     bool live_retention = true, currently_collected = false, hidden = true;
     if(dictionary_entries(rc->rrdinstances) > 0) {
         RRDINSTANCE *ri;
@@ -656,7 +655,6 @@ bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reaso
                         live_retention = false;
 
                     if (unlikely(rrdinstance_should_be_deleted(ri))) {
-                        instances_deleted++;
                         continue;
                     }
 

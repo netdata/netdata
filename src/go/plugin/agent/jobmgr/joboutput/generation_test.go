@@ -845,7 +845,7 @@ func TestCandidateCancellationDoesNotRejectPromotionInProgress(t *testing.T) {
 	require.NoError(t, delegate.Shutdown(context.Background()))
 }
 
-func TestCandidateCancellationControlsFailedPromotion(t *testing.T) {
+func TestBusyPromotionReturnsWithoutWaitingForPhysicalRelease(t *testing.T) {
 	delegate, err := containment.NewAuthority(nil)
 	require.NoError(t, err)
 	attempts := &busyPromotionGateAuthority{
@@ -883,22 +883,18 @@ func TestCandidateCancellationControlsFailedPromotion(t *testing.T) {
 		promoted <- owner.Promote(context.Background())
 	}()
 	select {
-	case <-attempts.entered:
-	case <-time.After(time.Second):
-		t.Fatal("promotion did not reach busy runtime supersession")
-	}
-
-	cancelCandidate(jobmgr.ErrProcessAttemptStopped)
-	timer := time.NewTimer(time.Second)
-	defer timer.Stop()
-	select {
 	case err := <-promoted:
-		require.ErrorIs(t, err, jobmgr.ErrProcessAttemptStopped)
-	case <-timer.C:
+		require.ErrorIs(t, err, jobmgr.ErrProcessAttemptBusy)
+	case <-time.After(time.Second):
 		close(attempts.release)
-		<-promoted
-		t.Fatal("candidate cancellation did not interrupt busy runtime supersession")
+		t.Fatal("busy promotion waited for physical release")
 	}
+	select {
+	case <-attempts.entered:
+		t.Fatal("promotion attempted blocking supersession")
+	default:
+	}
+	cancelCandidate(jobmgr.ErrProcessAttemptStopped)
 	require.NoError(t, <-finished)
 	require.EqualValues(t, 1, cleanups)
 

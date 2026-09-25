@@ -40,8 +40,10 @@ char *generate_update_agent_connection(size_t *len, const update_agent_connectio
 
     *len = PROTO_COMPAT_MSG_SIZE(connupd);
     char *msg = (char*)mallocz(*len);
-    if (msg)
-        connupd.SerializeToArray(msg, *len);
+    if (!connupd.SerializeToArray(msg, *len)) {
+        freez(msg);
+        return NULL;
+    }
 
     return msg;
 }

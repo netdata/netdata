@@ -34,9 +34,7 @@ type methodGeneration struct {
 	methods map[string]funcapi.FunctionConfig // method configs by method ID
 	bundles map[string]*functionBundle        // stable handler bundles by job name; agent uses ""
 
-	cleanupOnce sync.Once     // guards cleanup (once)
-	cleanupErr  error         // captured cleanup error
-	done        chan struct{} // closed when cleanup completes
+	cleanupOnce sync.Once // releases this generation's bundle references once
 }
 
 func newMethodGeneration(
@@ -57,7 +55,6 @@ func newMethodGeneration(
 		creator: creator,
 		methods: make(map[string]funcapi.FunctionConfig, len(methods)),
 		bundles: make(map[string]*functionBundle, max(1, len(bundles))),
-		done:    make(chan struct{}),
 	}
 	transferred := false
 	defer func() {
@@ -117,26 +114,13 @@ func (mg *methodGeneration) declaration() *HandlerGenerationDeclaration {
 	}
 }
 
-func (mg *methodGeneration) wait(ctx context.Context) error {
-	if mg == nil {
-		return nil
-	}
-	select {
-	case <-mg.done:
-		return mg.cleanupErr
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
 func (mg *methodGeneration) cleanup(ctx context.Context) error {
 	mg.cleanupOnce.Do(func() {
 		for _, bundle := range mg.bundles {
 			bundle.release()
 		}
-		close(mg.done)
 	})
-	return mg.cleanupErr
+	return nil
 }
 
 func callMethodCleanup(ctx context.Context, handler funcapi.MethodHandler) (err error) {

@@ -1049,12 +1049,15 @@ static char *get_smbios_string(const BYTE *table_start, DWORD table_size,
     return NULL;
 }
 
+// GetSystemFirmwareTable() provider signature 'RSMB', spelled out to avoid a multi-character constant
+#define SMBIOS_PROVIDER_RSMB (((DWORD)'R' << 24) | ((DWORD)'S' << 16) | ((DWORD)'M' << 8) | (DWORD)'B')
+
 // Get SMBIOS data with proper memory management
 static smbios_data_t get_smbios_data(void) {
     smbios_data_t result = {NULL, 0, 0, false};
     
     // Request SMBIOS data size
-    DWORD size = GetSystemFirmwareTable('RSMB', 0, NULL, 0);
+    DWORD size = GetSystemFirmwareTable(SMBIOS_PROVIDER_RSMB, 0, NULL, 0);
     if (size == 0 || size > 1024*1024) // Sanity check on size
         return result;
         
@@ -1066,7 +1069,7 @@ static smbios_data_t get_smbios_data(void) {
     result.size = size;
     
     // Get the SMBIOS data
-    DWORD bytes_read = GetSystemFirmwareTable('RSMB', 0, result.data, result.size);
+    DWORD bytes_read = GetSystemFirmwareTable(SMBIOS_PROVIDER_RSMB, 0, result.data, result.size);
     if (bytes_read == 0 || bytes_read > result.size) {
         freez(result.data);
         result.data = NULL;

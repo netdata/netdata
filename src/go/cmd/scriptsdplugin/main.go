@@ -12,12 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
 	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
-	"github.com/netdata/netdata/go/plugins/plugin/agent"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
-	"go.uber.org/automaxprocs/maxprocs"
-	"golang.org/x/net/http/httpproxy"
-
+	"github.com/netdata/netdata/go/plugins/cmd/internal/secretproviders"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
@@ -25,8 +20,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/pkg/terminal"
+	"github.com/netdata/netdata/go/plugins/plugin/agent"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios"
+	"go.uber.org/automaxprocs/maxprocs"
+	"golang.org/x/net/http/httpproxy"
 )
 
 func init() {
@@ -66,7 +66,13 @@ func main() {
 	}
 	isTerminal := terminal.IsTerminal()
 
+	secrets, err := secretproviders.Default()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "initializing secrets: %v\n", err)
+		os.Exit(1)
+	}
 	a := agent.New(agent.Config{
+		Secrets:                   secrets,
 		Name:                      executable.Name,
 		PluginConfigDir:           pluginconfig.ConfigDir(),
 		CollectorsConfigDir:       pluginconfig.CollectorsDir(),
@@ -92,7 +98,11 @@ func main() {
 	}
 
 	proxyCfg := httpproxy.FromEnvironment()
-	a.Infof("env proxy settings: HTTP_PROXY set=%t, HTTPS_PROXY set=%t", proxyCfg.HTTPProxy != "", proxyCfg.HTTPSProxy != "")
+	a.Infof(
+		"env proxy settings: HTTP_PROXY set=%t, HTTPS_PROXY set=%t",
+		proxyCfg.HTTPProxy != "",
+		proxyCfg.HTTPSProxy != "",
+	)
 
 	a.Infof("directories → config: %s | collectors: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.VarLibDir)

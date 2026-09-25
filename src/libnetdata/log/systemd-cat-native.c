@@ -337,8 +337,6 @@ static log_to_journal_remote_ret_t log_input_to_journal_remote(const char *url, 
     size_t msg_full_events = 0;
     size_t msg_partial_fields = 0;
     usec_t msg_started_ut = 0;
-    size_t failures = 0;
-    size_t messages_logged = 0;
 
     log_to_journal_remote_ret_t ret = 0;
 
@@ -349,12 +347,9 @@ static log_to_journal_remote_ret_t log_input_to_journal_remote(const char *url, 
                 res = journal_remote_send_buffer(curl, msg);
                 if(res != CURLE_OK) {
                     fprintf(stderr, "journal_remote_send_buffer() failed: %s\n", curl_easy_strerror(res));
-                    failures++;
                     ret = LOG_TO_JOURNAL_REMOTE_CANNOT_SEND;
                     goto cleanup;
                 }
-                else
-                    messages_logged++;
 
                 msg_full_events = 0;
                 buffer_flush(msg);
@@ -377,12 +372,9 @@ static log_to_journal_remote_ret_t log_input_to_journal_remote(const char *url, 
                         res = journal_remote_send_buffer(curl, msg);
                         if(res != CURLE_OK) {
                             fprintf(stderr, "journal_remote_send_buffer() failed: %s\n", curl_easy_strerror(res));
-                            failures++;
                             ret = LOG_TO_JOURNAL_REMOTE_CANNOT_SEND;
                             goto cleanup;
                         }
-                        else
-                            messages_logged++;
 
                         msg_full_events = 0;
                         buffer_flush(msg);
@@ -414,10 +406,7 @@ static log_to_journal_remote_ret_t log_input_to_journal_remote(const char *url, 
             res = journal_remote_send_buffer(curl, msg);
             if(res != CURLE_OK) {
                 fprintf(stderr, "journal_remote_send_buffer() failed: %s\n", curl_easy_strerror(res));
-                failures++;
             }
-            else
-                messages_logged++;
 
             msg_full_events = 0;
             buffer_flush(msg);

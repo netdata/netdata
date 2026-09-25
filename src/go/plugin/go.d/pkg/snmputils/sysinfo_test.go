@@ -39,6 +39,7 @@ func TestGetSysInfoRecordsProbeDiagnostics(t *testing.T) {
 		PDUCount:        len(pdus),
 		SeenSysDescr:    true,
 		SeenSysObjectID: true,
+		SysObjectIDType: "ObjectIdentifier",
 		SeenSysContact:  true,
 		SeenSysName:     true,
 		SeenSysLocation: true,
@@ -142,23 +143,111 @@ func TestGetSysInfoWrapsGetError(t *testing.T) {
 	assert.Contains(t, err.Error(), "SNMP system scalars")
 }
 
-func TestGetSysInfoRejectsWrongTypedSysObjectWithoutEchoingValue(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+func TestGetSysInfoSysObjectIDTypeHandling(t *testing.T) {
+	tests := map[string]struct {
+		pdu           gosnmp.SnmpPDU
+		wantSysObject string
+		wantType      string
+	}{
+		"object identifier": {
+			pdu:           gosnmp.SnmpPDU{Type: gosnmp.ObjectIdentifier, Value: ".1.3.6.1.4.1.11.2.3.9.1"},
+			wantSysObject: "1.3.6.1.4.1.11.2.3.9.1",
+			wantType:      "ObjectIdentifier",
+		},
+		"octet string with numeric OID": {
+			pdu:           gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("1.3.6.1.4.1.11.2.3.9.1")},
+			wantSysObject: "1.3.6.1.4.1.11.2.3.9.1",
+			wantType:      "OctetString",
+		},
+		"octet string with dotted numeric OID and whitespace": {
+			pdu:           gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte(" .1.3.6.1.4.1.11.2.3.9.1\n")},
+			wantSysObject: "1.3.6.1.4.1.11.2.3.9.1",
+			wantType:      "OctetString",
+		},
+		"octet string with NUL-terminated numeric OID": {
+			pdu:           gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("1.3.6.1.4.1.11.2.3.9.1\x00")},
+			wantSysObject: "1.3.6.1.4.1.11.2.3.9.1",
+			wantType:      "OctetString",
+		},
+		"octet string with joint-iso-itu-t OID": {
+			pdu:           gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("2.999")},
+			wantSysObject: "2.999",
+			wantType:      "OctetString",
+		},
+		"octet string with IPv4 address": {
+			pdu:      gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("192.0.2.10")},
+			wantType: "OctetString",
+		},
+		"octet string with first arc above 2": {
+			pdu:      gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("3.6")},
+			wantType: "OctetString",
+		},
+		"octet string with second arc 40 under iso": {
+			pdu:      gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("1.40")},
+			wantType: "OctetString",
+		},
+		"octet string with second arc above 39 under itu-t": {
+			pdu:      gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("0.999")},
+			wantType: "OctetString",
+		},
+		"octet string with free text": {
+			pdu:      gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("private device identifier")},
+			wantType: "OctetString",
+		},
+		"octet string with symbolic OID": {
+			pdu:      gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("SNMPv2-SMI::enterprises.11.2.3.9.1")},
+			wantType: "OctetString",
+		},
+		"octet string with single arc": {
+			pdu:      gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("11")},
+			wantType: "OctetString",
+		},
+		"octet string with empty arc": {
+			pdu:      gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("1.3..6.1")},
+			wantType: "OctetString",
+		},
+		"empty octet string": {
+			pdu:      gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte{}},
+			wantType: "OctetString",
+		},
+		"integer": {
+			pdu:      gosnmp.SnmpPDU{Type: gosnmp.Integer, Value: 11},
+			wantType: "Integer",
+		},
+		"unsupported type": {
+			pdu:      gosnmp.SnmpPDU{Type: gosnmp.IPAddress, Value: "192.0.2.1"},
+			wantType: "IPAddress",
+		},
+	}
 
-	const rawValue = "private device identifier"
-	client := snmpmock.NewMockHandler(ctrl)
-	client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
-	client.EXPECT().Version().Return(gosnmp.Version2c)
-	client.EXPECT().Get(sysInfoOIDs()).Return(testSysInfoResponse([]gosnmp.SnmpPDU{
-		{Name: OidSysObject, Type: gosnmp.OctetString, Value: []byte(rawValue)},
-	}), nil)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-	si, err := GetSysInfo(client)
-	require.Error(t, err)
-	assert.Nil(t, si)
-	assert.Contains(t, err.Error(), "expected ObjectIdentifier")
-	assert.NotContains(t, err.Error(), rawValue)
+			pdu := tc.pdu
+			pdu.Name = OidSysObject
+			client := snmpmock.NewMockHandler(ctrl)
+			client.EXPECT().MaxOids().Return(len(sysInfoOIDs()))
+			client.EXPECT().Version().Return(gosnmp.Version2c)
+			client.EXPECT().Get(sysInfoOIDs()).Return(testSysInfoResponse([]gosnmp.SnmpPDU{
+				{Name: OidSysName, Type: gosnmp.OctetString, Value: []byte("printer")},
+				pdu,
+			}), nil)
+
+			si, err := GetSysInfo(client)
+			require.NoError(t, err)
+			require.NotNil(t, si)
+			assert.Equal(t, tc.wantSysObject, si.SysObjectID)
+			assert.Equal(t, "printer", si.Name)
+			assert.Equal(t, SysInfoProbe{
+				PDUCount:        2,
+				SeenSysObjectID: true,
+				SysObjectIDType: tc.wantType,
+				SeenSysName:     true,
+			}, si.Probe)
+		})
+	}
 }
 
 func TestGetSysInfoReturnsErrorForNilResponse(t *testing.T) {

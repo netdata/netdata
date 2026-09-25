@@ -5,8 +5,9 @@ package ddsnmp
 import "maps"
 
 const (
-	deviceMetadataVendorKey = "vendor"
-	deviceMetadataModelKey  = "model"
+	deviceMetadataVendorKey      = "vendor"
+	deviceMetadataModelKey       = "model"
+	deviceMetadataSysObjectIDKey = "sys_object_id"
 )
 
 // MergeMetaTag keeps the first value at equal specificity and lets an exact
@@ -36,12 +37,18 @@ func MergeDeviceIdentityMetadata(dest, src map[string]MetaTag) {
 }
 
 // ResolveDeviceMetadata applies static fallback, profile metadata, and final
-// vnode labels in that order without modifying its inputs.
+// vnode labels in that order without modifying its inputs. Profile metadata
+// does not change sys_object_id: the base value is the normalized identity used
+// for profile selection, while a profile re-reads the raw scalar, which system
+// identity may have rejected as unusable.
 func ResolveDeviceMetadata(base map[string]string, profile map[string]MetaTag, final map[string]string) map[string]string {
 	resolved := make(map[string]string, len(base)+len(profile)+len(final))
 	maps.Copy(resolved, base)
 
 	for key, tag := range profile {
+		if key == deviceMetadataSysObjectIDKey {
+			continue
+		}
 		resolved[key] = resolveProfileMetadataValue(resolved[key], tag)
 	}
 	maps.Copy(resolved, final)

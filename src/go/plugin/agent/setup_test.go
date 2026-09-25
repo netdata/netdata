@@ -12,7 +12,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -245,6 +244,7 @@ jobs:
 `)
 
 		agent := &Agent{
+			loadSecretStores:  secretstore.LoadFileConfigs,
 			ConfigDir:         []string{configRoot},
 			CollectorsConfDir: []string{userCollectors, stockCollectors},
 		}

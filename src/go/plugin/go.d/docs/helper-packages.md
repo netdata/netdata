@@ -18,7 +18,7 @@ already owns the behavior.
 | Need | Start with |
 |---|---|
 | V2 metrics, metric stores, host scopes | `src/go/pkg/metrix` |
-| Duration and tri-state config option types | `src/go/pkg/confopt` |
+| Duration, tri-state and enum config option types | `src/go/pkg/confopt` |
 | HTTP request/client config | `src/go/pkg/web` |
 | TLS config outside HTTP | `src/go/pkg/tlscfg` |
 | Configured credential-file reads | `src/go/pkg/credentialfile` |
@@ -53,12 +53,14 @@ When:
 
 - users configure durations that should accept strings such as `5s`, `30m`, or numeric seconds;
 - users need explicit `auto` / `enabled` / `disabled` behavior instead of a plain boolean;
+- an option takes one of a fixed set of string values, with a default that an empty or omitted value means;
 - a migration needs to preserve legacy pointer-boolean semantics without keeping pointer plumbing in new code.
 
 Why:
 
 - `confopt.Duration` and `confopt.LongDuration` centralize YAML/JSON duration parsing and formatting;
 - `confopt.AutoBool` makes tri-state behavior explicit and schema-friendly;
+- `confopt.Enum` decodes and encodes an empty value as its default, and `Validate` reports the allowed values;
 - collectors avoid ad hoc parsers and inconsistent boolean defaults.
 
 ## HTTP Collectors
@@ -407,7 +409,8 @@ hostname, and labels independently of an SNMP metrics job. The result does not p
 
 The caller composes the existing acquisition steps:
 
-1. Obtain system information with `snmputils.GetSysInfo` using a connected `gosnmp.Handler`.
+1. Obtain system information with `snmputils.GetSysInfo` using a connected `snmputils.ScalarClient`. An unusable
+   `sysObjectID` value (not a valid numeric OID) does not fail acquisition; it leaves `SysObjectID` empty.
 2. Resolve profiles with `ddsnmp.Catalog.Resolve`. Choose the appropriate profile projection and no-profile policy
    for the consumer; those decisions do not belong to identity assembly.
 3. Construct `ddsnmpcollector.New` with the selected profiles, system object ID, client, and logger, or reuse the
@@ -426,8 +429,9 @@ Identity defaults preserve the SNMP collector's existing behavior:
   normalization, DNS resolution, port, credentials, and descriptive metadata do not participate in that calculation.
 - Hostname uses the configured override, then system name, then `snmp-device`.
 - System labels include the SNMP vnode marker, address, and system information. Policy defaults supplied through
-  `BaseLabels` precede system labels. Profile metadata fills empty labels or replaces them on an exact match;
-  configured `Labels` override all previous values, including with empty values.
+  `BaseLabels` precede system labels. Profile metadata fills empty labels or replaces them on an exact match,
+  except `sys_object_id`, which keeps the system value used for profile selection; configured `Labels` override all
+  previous values, including with empty values.
 - Input maps and system information remain unchanged; the returned labels belong to the caller.
 
 The SNMP metrics collector keeps its availability timeout calculation and device publication locally. It passes its

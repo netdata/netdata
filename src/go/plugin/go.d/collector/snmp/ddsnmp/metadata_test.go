@@ -111,6 +111,38 @@ func TestResolveDeviceMetadata(t *testing.T) {
 	require.Equal(t, finalBefore, final)
 }
 
+func TestResolveDeviceMetadataKeepsSystemSysObjectID(t *testing.T) {
+	tests := map[string]struct {
+		base    map[string]string
+		profile map[string]MetaTag
+		final   map[string]string
+		want    map[string]string
+	}{
+		"rejected system value is not filled by profile": {
+			base:    map[string]string{"sys_object_id": ""},
+			profile: map[string]MetaTag{"sys_object_id": {Value: "private device identifier"}},
+			want:    map[string]string{"sys_object_id": ""},
+		},
+		"exact profile does not replace normalized system value": {
+			base:    map[string]string{"sys_object_id": "1.3.6.1.4.1.9.1.1166"},
+			profile: map[string]MetaTag{"sys_object_id": {Value: " .1.3.6.1.4.1.9.1.1166\n", IsExactMatch: true}},
+			want:    map[string]string{"sys_object_id": "1.3.6.1.4.1.9.1.1166"},
+		},
+		"final label still overrides": {
+			base:    map[string]string{"sys_object_id": "1.3.6.1.4.1.9.1.1166"},
+			profile: map[string]MetaTag{"sys_object_id": {Value: "1.3.6.1.4.1.9.1.1166", IsExactMatch: true}},
+			final:   map[string]string{"sys_object_id": "operator-value"},
+			want:    map[string]string{"sys_object_id": "operator-value"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.want, ResolveDeviceMetadata(tc.base, tc.profile, tc.final))
+		})
+	}
+}
+
 func TestResolveDeviceMetadataFinalEmptyValueRemainsAuthoritative(t *testing.T) {
 	resolved := ResolveDeviceMetadata(
 		map[string]string{"model": "static-model"},
