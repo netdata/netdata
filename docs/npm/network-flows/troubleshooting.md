@@ -29,6 +29,7 @@ The plugin won't come up at all, or starts and immediately exits.
 | Required GeoIP DB missing (`optional: false`) | Same log search. Look for `failed to load database`. Either fix the path or set `optional: true`. |
 | Listen address conflict | Look for `failed to bind`, followed by the Agent's `exited with error code 1 and haven't collected any data. Disabling it.` Another process is on one of the configured ports (stock defaults: `2055` and `6343`); find it with `sudo ss -unlp`. The plugin publishes nothing until every listener is bound, so it exits once and stays disabled until you restart Netdata. |
 | Validation error | Look for `must be greater than 0` and similar. The plugin validates the full config at startup. |
+| Still starting | Look for `declaring function: flows:netflow`, which the plugin logs once it is up; `UDP receive buffer for` lines mean its listeners are bound. At startup it first rebuilds its 1-minute, 5-minute and 1-hour tiers from up to the last hour of raw flows, then binds its listeners. The Network Flows view and the `netflow.*` charts appear only after both finish, so on a host with a lot of recent raw data they can take a while to show up. |
 | `enabled: false` was set | Look for `netflow plugin disabled by config`. The plugin honours this and shuts down cleanly — looks like "not running" if you don't read the log. |
 
 **Recovery:**
