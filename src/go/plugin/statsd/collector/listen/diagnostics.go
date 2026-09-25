@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/statsd/collector/listen/internal/percentile"
 )
 
 // diagnostics is fixed-cardinality receiver self-monitoring. It never carries
@@ -15,7 +16,7 @@ type diagnostics struct {
 	udpBytes, tcpBytes atomic.Uint64
 	tcpConnections     atomic.Int64
 	tcpRefused         atomic.Uint64 // connections closed at max_tcp_connections
-	withheld           [len(withheldReasons)]uint64
+	withheld           [len(percentile.WithheldReasons)]uint64
 
 	udpBytesTotal, tcpBytesTotal metrix.SnapshotCounter // nil for an unconfigured transport
 	updates                      metrix.SnapshotCounter
@@ -23,7 +24,7 @@ type diagnostics struct {
 	series, seriesLimit          metrix.SnapshotGauge
 	connections, connectionLimit metrix.SnapshotGauge   // nil without TCP listeners
 	connectionsRefused           metrix.SnapshotCounter // nil without TCP listeners
-	withheldTotal                [len(withheldReasons)]metrix.SnapshotCounter
+	withheldTotal                [len(percentile.WithheldReasons)]metrix.SnapshotCounter
 	maxSeries, maxConnections    float64
 }
 
@@ -51,7 +52,7 @@ func newDiagnostics(store metrix.CollectorStore, cfg Config) *diagnostics {
 		d.rejections[i] = rejections.WithLabelValues(string(reason))
 	}
 	withheld := m.Vec("reason").Counter("percentiles_withheld")
-	for i, reason := range withheldReasons {
+	for i, reason := range percentile.WithheldReasons {
 		d.withheldTotal[i] = withheld.WithLabelValues(reason)
 	}
 	return d
@@ -59,7 +60,7 @@ func newDiagnostics(store metrix.CollectorStore, cfg Config) *diagnostics {
 
 // percentilesWithheld counts one observation window whose percentiles are gapped.
 func (d *diagnostics) percentilesWithheld(reason string) {
-	for i, known := range withheldReasons {
+	for i, known := range percentile.WithheldReasons {
 		if known == reason {
 			d.withheld[i]++
 			return

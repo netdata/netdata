@@ -19,7 +19,7 @@ from `statsd/statsd.profiles/` under the user config directory.
 | `parser.go`, `prepare.go`, `rejections.go` | Record parsing, final label/metadata preparation, the rejection vocabulary |
 | `profiles.go` | Profile loading, validation, lifetimes and the replace adapter |
 | `receiver.go`, `handoff.go` | Ingest and admission under the receiver lock; the Collect handoff (`cut`/`release`) |
-| `aggregate.go`, `percentile.go` | Numeric updates and interval windows; certified weighted percentiles |
+| `aggregate.go`, `internal/percentile` | Numeric updates and interval windows; certified weighted percentiles |
 | `collect.go`, `write_metrics.go` | Collect orchestration; application metric writes |
 | `chart_templates.go`, `charts.yaml`, `diagnostics.go` | Native template set composition; receiver diagnostics template and metrics |
 
@@ -152,9 +152,9 @@ The reference is the smallest observed value with cumulative weight at least `q 
 `19/20`. Weights are mathematical reciprocals of parsed binary64 rates. For equal weights on 10 and 100, p50 is 10.
 The library's built-in quantile does not implement this contract and is not used.
 
-`percentile.go` uses `sketches-go` v1.4.8's logarithmic mapping and two bounded sign stores. A separate exact-zero bin
-prevents tiny nonzero observations from silently becoming zero. Both percentiles must satisfy a 1% relative error
-bound on the reference value, with exact zero or a gap when the reference is zero.
+`internal/percentile` uses `sketches-go` v1.4.8's logarithmic mapping and two bounded sign stores. A separate
+exact-zero bin prevents tiny nonzero observations from silently becoming zero. Both percentiles must satisfy a 1%
+relative error bound on the reference value, with exact zero or a gap when the reference is zero.
 
 Weights are normalized by the first rate: `z = firstRate/rate`. Equal sampling rates therefore produce exact unit
 weights, including rates such as `.3`. The certification domain is rates at least `2^-128` and at most `2^26`

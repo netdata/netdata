@@ -2,19 +2,23 @@
 
 package listen
 
-import "github.com/axiomhq/hyperloglog"
+import (
+	"github.com/axiomhq/hyperloglog"
+
+	"github.com/netdata/netdata/go/plugins/plugin/statsd/collector/listen/internal/percentile"
+)
 
 // interval contains no received member strings or individual observations.
 type interval struct {
 	count, sum, min, max float64
-	quantiles            *percentiles
+	quantiles            *percentile.Estimator
 	members              *hyperloglog.Sketch
 }
 
 func (w *interval) reset() {
 	w.count, w.sum, w.min, w.max = 0, 0, 0, 0
 	if w.quantiles != nil {
-		w.quantiles.reset()
+		w.quantiles.Reset()
 	}
 	if w.members != nil {
 		w.members.Reset()
@@ -87,7 +91,7 @@ func (e *series) update(r record, value, count, sum float64) {
 	}
 	w.count, w.sum = count, sum
 	if w.quantiles == nil {
-		w.quantiles = newPercentiles(percentileBins)
+		w.quantiles = percentile.New(percentile.Bins)
 	}
-	w.quantiles.add(r.value, r.rate)
+	w.quantiles.Add(r.value, r.rate)
 }

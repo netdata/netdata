@@ -8,6 +8,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+	"github.com/netdata/netdata/go/plugins/plugin/statsd/collector/listen/internal/percentile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -53,8 +54,8 @@ func TestWithheldPercentileDiagnostics(t *testing.T) {
 	f := newCoreFixture(t, 3, time.Minute)
 	f.ingest(t, "wide:1|h", "wide:1e20|h", "tiny:1|ms|@1e-40", "fine:5|ms")
 	f.collect(t, false, false)
-	for _, reason := range withheldReasons {
-		want := map[string]float64{withheldSpan: 1, withheldNumericDomain: 1}[reason]
+	for _, reason := range percentile.WithheldReasons {
+		want := map[string]float64{"span": 1, "numeric_domain": 1}[reason]
 		value(t, f.c, "receiver.percentiles_withheld", want, metrix.Labels{
 			"reason": reason,
 		})
@@ -62,7 +63,7 @@ func TestWithheldPercentileDiagnostics(t *testing.T) {
 	// Empty windows have no percentiles to withhold.
 	f.collect(t, false, false)
 	value(t, f.c, "receiver.percentiles_withheld", 1, metrix.Labels{
-		"reason": withheldSpan,
+		"reason": "span",
 	})
 	// TCP-only diagnostics are not written for a UDP-only job.
 	_, ok := f.c.store.Read().Value("receiver.tcp_connections", nil)

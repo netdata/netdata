@@ -13,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
+	"github.com/netdata/netdata/go/plugins/plugin/statsd/collector/listen/internal/percentile"
 )
 
 //go:embed config_schema.json
@@ -57,7 +58,7 @@ type Collector struct {
 	templates *chartengine.TemplateSet
 	published int // activated profile count captured in templates
 
-	scratch []percentileBin                      // Collect-owned, shared by all percentile queries
+	scratch []percentile.Bin                     // Collect-owned, shared by all percentile queries
 	values  [len(valueFields)]metrix.SampleValue // Collect-owned; staging copies each point
 
 	// Test seams.
