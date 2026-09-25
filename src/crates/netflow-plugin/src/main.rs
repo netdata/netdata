@@ -244,6 +244,7 @@ async fn async_main() -> i32 {
 
     let ingest_shutdown = shutdown.clone();
     let ingest_listener_ready = listener_ready.clone();
+    let publish_listener_ready = listener_ready.clone();
     let ingest_task = tokio::spawn(async move {
         ingest_service
             .run_with_listener_ready_signal(ingest_shutdown, ingest_listener_ready)
@@ -350,53 +351,63 @@ async fn async_main() -> i32 {
     }
 
     let mut exit_code = 0;
-    let keepalive_required = !std::io::stdout().is_terminal();
     let mut ingest_task = ingest_task;
     let mut ingest_task_finished = false;
 
-    tokio::select! {
-        result = async {
-            if keepalive_required {
-                let writer = runtime.writer();
-                let keepalive = async move {
-                    let mut interval = tokio::time::interval(Duration::from_secs(60));
-                    loop {
-                        interval.tick().await;
-                        if let Ok(mut w) = writer.try_lock() {
-                            let _ = w.write_raw(b"PLUGIN_KEEPALIVE\n").await;
-                        }
-                    }
-                };
-
-                tokio::select! {
-                    result = runtime.run() => result,
-                    _ = keepalive => Ok(()),
-                }
-            } else {
-                runtime.run().await
-            }
-        } => {
-            if let Err(err) = result {
-                tracing::error!("plugin runtime error: {err:#}");
-                exit_code = 1;
-            }
-        }
+    // `runtime.run()` publishes: it declares the Function and starts the chart
+    // registry. The Agent counts either as collected data. A plugin that exits
+    // with an error before collecting anything is disabled; one that collected
+    // something is restarted every 10 * update_every seconds, and a startup
+    // failure that follows publication collects something on every run, so
+    // the restarts never stop. So nothing is published until the ingest
+    // service has finished its fallible startup (tier rebuild, every listener
+    // bound). Keepalives cover the wait, which the Agent otherwise times out
+    // after two minutes of silence.
+    let keepalive_writer = runtime.writer();
+    let ingest_started = tokio::select! {
+        biased;
+        _ = publish_listener_ready.cancelled() => true,
         result = &mut ingest_task => {
             ingest_task_finished = true;
-            match result {
-                Ok(Ok(())) => {
-                    tracing::error!("ingestion task exited unexpectedly");
+            exit_code = ingest_task_exit_code(result, false);
+            false
+        }
+        err = async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(60));
+            loop {
+                interval.tick().await;
+                if let Err(err) = keepalive_writer.lock().await.write_raw(b"PLUGIN_KEEPALIVE\n").await {
+                    break err;
+                }
+            }
+        }, if !std::io::stdout().is_terminal() => {
+            tracing::error!(
+                "failed to send PLUGIN_KEEPALIVE to the Agent while waiting for the UDP listeners \
+                 (expected the write to stdout to succeed): {err}"
+            );
+            exit_code = 1;
+            false
+        }
+    };
+
+    // Only a failed keepalive ends the wait with the ingest task still running.
+    // Its tier rebuild does not observe `shutdown`, so abort it rather than let
+    // an Agent that is already gone wait for the rebuild to finish.
+    if !ingest_started && !ingest_task_finished {
+        ingest_task.abort();
+    }
+
+    if ingest_started {
+        tokio::select! {
+            result = runtime.run() => {
+                if let Err(err) = result {
+                    tracing::error!("plugin runtime error: {err:#}");
                     exit_code = 1;
                 }
-                Ok(Err(err)) => {
-                    tracing::error!("ingestion task error: {err:#}");
-                    exit_code = 1;
-                }
-                Err(err) if !err.is_cancelled() => {
-                    tracing::error!("ingestion task join error: {err}");
-                    exit_code = 1;
-                }
-                Err(_) => {}
+            }
+            result = &mut ingest_task => {
+                ingest_task_finished = true;
+                exit_code = ingest_task_exit_code(result, false);
             }
         }
     }
@@ -404,69 +415,62 @@ async fn async_main() -> i32 {
     shutdown.cancel();
 
     if !ingest_task_finished {
-        match ingest_task.await {
-            Ok(Ok(())) => {}
-            Ok(Err(err)) => {
-                tracing::error!("ingestion task error: {err:#}");
-                exit_code = 1;
-            }
-            Err(err) if !err.is_cancelled() => {
-                tracing::error!("ingestion task join error: {err}");
-                exit_code = 1;
-            }
-            Err(_) => {}
-        }
+        exit_code = exit_code.max(ingest_task_exit_code(ingest_task.await, true));
     }
     if let Some(task) = direction_migration_task {
-        match task.await {
-            Ok(()) => {}
-            Err(err) if !err.is_cancelled() => {
-                tracing::error!("DIRECTION migration task join error: {err}");
-                exit_code = 1;
-            }
-            Err(_) => {}
-        }
+        exit_code = exit_code.max(task_join_exit_code(task.await, "DIRECTION migration task"));
     }
-    match notify_task.await {
-        Ok(()) => {}
-        Err(err) if !err.is_cancelled() => {
-            tracing::error!("journal notify event task join error: {err}");
-            exit_code = 1;
-        }
-        Err(_) => {}
-    }
+    exit_code = exit_code.max(task_join_exit_code(
+        notify_task.await,
+        "journal notify event task",
+    ));
     if let Some(task) = bmp_task {
-        match task.await {
-            Ok(()) => {}
-            Err(err) if !err.is_cancelled() => {
-                tracing::error!("BMP listener task join error: {err}");
-                exit_code = 1;
-            }
-            Err(_) => {}
-        }
+        exit_code = exit_code.max(task_join_exit_code(task.await, "BMP listener task"));
     }
     if let Some(task) = bioris_task {
-        match task.await {
-            Ok(()) => {}
-            Err(err) if !err.is_cancelled() => {
-                tracing::error!("BioRIS listener task join error: {err}");
-                exit_code = 1;
-            }
-            Err(_) => {}
-        }
+        exit_code = exit_code.max(task_join_exit_code(task.await, "BioRIS listener task"));
     }
     if let Some(task) = network_sources_task {
-        match task.await {
-            Ok(()) => {}
-            Err(err) if !err.is_cancelled() => {
-                tracing::error!("network-sources task join error: {err}");
-                exit_code = 1;
-            }
-            Err(_) => {}
-        }
+        exit_code = exit_code.max(task_join_exit_code(task.await, "network-sources task"));
     }
 
     exit_code
+}
+
+/// Log the ingestion task's outcome and map it to the process exit code.
+/// `shutdown_requested` says whether the task was asked to stop; if not, even a
+/// clean return is a failure, because ingestion only ends on shutdown.
+fn ingest_task_exit_code(
+    result: Result<anyhow::Result<()>, tokio::task::JoinError>,
+    shutdown_requested: bool,
+) -> i32 {
+    match result {
+        Ok(Ok(())) if shutdown_requested => 0,
+        Ok(Ok(())) => {
+            tracing::error!("ingestion task exited unexpectedly");
+            1
+        }
+        Ok(Err(err)) => {
+            tracing::error!("ingestion task error: {err:#}");
+            1
+        }
+        Err(err) if !err.is_cancelled() => {
+            tracing::error!("ingestion task join error: {err}");
+            1
+        }
+        Err(_) => 0,
+    }
+}
+
+/// Log a background task that ended in a panic and map it to the exit code.
+fn task_join_exit_code(result: Result<(), tokio::task::JoinError>, task: &str) -> i32 {
+    match result {
+        Err(err) if !err.is_cancelled() => {
+            tracing::error!("{task} join error: {err}");
+            1
+        }
+        _ => 0,
+    }
 }
 
 async fn wait_for_listener_ready(

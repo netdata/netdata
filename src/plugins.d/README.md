@@ -41,10 +41,22 @@ Each of the external plugins is expected to run forever.
 Netdata will start it when it starts and stop it when it exits.
 
 If the external plugin exits or crashes, Netdata will log an error.
-If the external plugin exits or crashes without pushing metrics to Netdata, Netdata will not start it again.
+Whether Netdata starts it again depends on its exit status and on whether it has produced useful output since Netdata started.
 
--   Plugins that exit with any value other than zero, will be disabled. Plugins that exit with zero, will be restarted after some time.
+Netdata counts these lines as useful output (collected data): `END`, `END2`, `REND`, `FUNCTION`, `FUNCTION_DEL`,
+`FUNCTION_RESULT_END` and `CONFIG`. A declared function counts even though no metric has been collected yet.
+`TRUST_DURATIONS`, `PLUGIN_KEEPALIVE`, `CHART` and `DIMENSION` do not count.
+
+-   A plugin that exits with a non-zero value without having produced useful output since Netdata started is disabled until Netdata restarts.
+-   A plugin that exits with a non-zero value after it has produced useful output since Netdata started, in this run or an earlier one, is restarted after `10 * update_every` seconds.
+    It is disabled only after more than 10 consecutive runs without useful output, so a plugin that produces useful output on every run before failing is restarted forever.
+-   A plugin that exits with zero after it has produced useful output since Netdata started is restarted after `update_every` seconds, always.
+    One that exits with zero and has never produced useful output is restarted after `10 * update_every` seconds, and disabled after more than 10 such runs.
+-   A plugin killed by a signal other than `SIGTERM` or `SIGPIPE` is disabled.
+-   When Netdata ends the connection itself because it could not create or take ownership of a virtual node the plugin defined, the plugin is restarted after `update_every` seconds, unless it was killed by a signal other than `SIGTERM` or `SIGPIPE`, and a run without useful output does not add to the consecutive-run count.
 -   Plugins may also be disabled by Netdata if they output things that Netdata does not understand.
+
+So a plugin that cannot start (for example, its listening port is already in use) should finish every fallible startup step before it declares functions or sends data, and exit with a non-zero value if any of them fails.
 
 The `stdout` of external plugins is connected to Netdata to receive metrics,
 with the API defined below.
@@ -105,7 +117,7 @@ Keep in mind, that the user may use Netdata configuration to overwrite chart and
 
 Plugins should attempt to autoconfigure themselves when possible.
 
-For example, if your plugin wants to monitor `squid`, you can search for it on port `3128` or `8080`. If any succeeds, you can proceed. If it fails you can output an error (on stderr) saying that you cannot find `squid` running and giving instructions about the plugin configuration. Then you can stop (exit with non-zero value), so that Netdata will not attempt to start the plugin again.
+For example, if your plugin wants to monitor `squid`, you can search for it on port `3128` or `8080`. If any succeeds, you can proceed. If it fails you can output an error (on stderr) saying that you cannot find `squid` running and giving instructions about the plugin configuration. Then you can stop (exit with non-zero value) before sending any data or function declarations, so that Netdata will not attempt to start the plugin again.
 
 ## External Plugins API
 
@@ -186,7 +198,7 @@ The plugin should output instructions for Netdata to its output (`stdout`). Sinc
 
 #### DISABLE
 
-`DISABLE` will disable this plugin. This will prevent Netdata from restarting the plugin. You can also exit with the value `1` to have the same effect.
+`DISABLE` will disable this plugin. This will prevent Netdata from restarting the plugin. Exiting with the value `1` has the same effect only if the plugin has not produced useful output yet (see [Operation](#operation)).
 
 #### HOST_DEFINE
 

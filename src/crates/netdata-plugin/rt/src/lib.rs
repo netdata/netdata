@@ -952,6 +952,16 @@ where
     /// # Note
     ///
     /// This method runs indefinitely until shutdown is requested (via signals or stdin closing).
+    ///
+    /// # Publishing
+    ///
+    /// Calling `run()` publishes the plugin: the Agent counts function declarations and chart
+    /// updates as collected data. A plugin that exits with an error before collecting anything is
+    /// disabled; one that collected something is restarted, and a startup failure that follows
+    /// publication collects something on every run, so it is restarted forever. Call `run()`
+    /// only after every fallible startup step (binding listeners, opening storage) has succeeded,
+    /// and send `PLUGIN_KEEPALIVE` through [`writer`](Self::writer) while waiting for them: the
+    /// Agent gives up on a plugin that stays silent for two minutes.
     pub async fn run(mut self) -> Result<()> {
         info!("starting plugin runtime: {}", self.plugin_name);
 
