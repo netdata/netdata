@@ -372,13 +372,22 @@ async fn async_main() -> i32 {
             exit_code = ingest_task_exit_code(result, false);
             false
         }
-        _ = async move {
+        err = async move {
             let mut interval = tokio::time::interval(Duration::from_secs(60));
             loop {
                 interval.tick().await;
-                let _ = keepalive_writer.lock().await.write_raw(b"PLUGIN_KEEPALIVE\n").await;
+                if let Err(err) = keepalive_writer.lock().await.write_raw(b"PLUGIN_KEEPALIVE\n").await {
+                    break err;
+                }
             }
-        }, if !std::io::stdout().is_terminal() => unreachable!("keepalive loop never ends"),
+        }, if !std::io::stdout().is_terminal() => {
+            tracing::error!(
+                "failed to send PLUGIN_KEEPALIVE to the Agent while waiting for the UDP listeners \
+                 (expected the write to stdout to succeed): {err}"
+            );
+            exit_code = 1;
+            false
+        }
     };
 
     if ingest_started {
