@@ -528,7 +528,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         .scope_contexts = context,  // Use the single context as scope_contexts
         .scope_instances = buffer_tostring(instances_buffer), // Use instances as scope_instances for MCP
         .scope_labels = buffer_tostring(labels_buffer),     // Use labels as scope_labels for MCP
-        .scope_dimensions = buffer_tostring(dimensions_buffer), // Use dimensions as scope_dimensions for MCP
+        .scope_dimensions = NULL,
         .after = after,
         .before = before,
         .host = NULL,
@@ -536,7 +536,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         .nodes = NULL,              // Don't use the 'nodes' parameter here (we use scope_nodes)
         .contexts = NULL,           // Don't use the 'contexts' parameter here (we use scope_contexts)
         .instances = NULL,          // Don't use the 'instances' parameter here (we use scope_instances)
-        .dimensions = NULL,         // Don't use the 'dimensions' parameter here (we use scope_dimensions)
+        .dimensions = buffer_tostring(dimensions_buffer),
         .alerts = NULL,
         .timeout_ms = (int)(timeout * MSEC_PER_SEC),
         .points = points,
