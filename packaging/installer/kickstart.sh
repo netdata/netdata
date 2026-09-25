@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0527
+# Next unused error code: F0528
 
 # ======================================================================
 # Constants
@@ -2274,29 +2274,64 @@ try_static_install() {
 # Local build install code
 
 set_source_archive_urls() {
-  if [ "$1" = "stable" ]; then
-    if [ -n "${INSTALL_VERSION}" ]; then
-      export NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-v${INSTALL_VERSION}.tar"
-      export NETDATA_SOURCE_ARCHIVE_BASEURL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
-      export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/sha256sums.txt"
-    else
-      latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
-      export NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-${latest}.tar"
-      export NETDATA_SOURCE_ARCHIVE_BASEURL="https://github.com/netdata/netdata/releases/download/${latest}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
-      export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
-    fi
+  if [ -n "${INSTALL_VERSION}" ]; then
+    NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/v${INSTALL_VERSION}"
   else
-    export NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-latest.tar"
-
-    if [ -n "${INSTALL_VERSION}" ]; then
-      export NETDATA_SOURCE_ARCHIVE_BASEURL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
-      export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/sha256sums.txt"
-    else
-      tag="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
-      export NETDATA_SOURCE_ARCHIVE_BASEURL="${NETDATA_TARBALL_BASEURL}/download/${tag}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
-      export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/sha256sums.txt"
-    fi
+    NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/latest"
   fi
+
+  check_for_remote_file "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/Manifest"
+
+  case $? in
+    0) NETDATA_MANIFEST_INSTALL=1 ;;
+    1)
+      if [ "${1}" = "stable" ]; then
+        if [ -n "${INSTALL_VERSION}" ]; then
+          version="v${INSTALL_VERSION}"
+        else
+          version="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
+        fi
+        NETDATA_SOURCE_ARCHIVE_URL_PREFIX="https://github.com/netdata/netdata/releases/download/${version}"
+      else
+        if [ -n "${INSTALL_VERSION}" ]; then
+          version="v${INSTALL_VERSION}"
+        else
+          version="$(get_redirect "${NETDATA_TARBALL_BASEURL}/releases/latest")"
+        fi
+        NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${NETDATA_TARBALL_BASEURL}/releases/${version}"
+      fi
+
+      check_for_remote_file "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/Manifest"
+
+      case $? in
+        0) NETDATA_MANIFEST_INSTALL=1 ;;
+        1)
+          NETDATA_MANIFEST_INSTALL=0
+          NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-${version}.tar"
+          NETDATA_SOURCE_ARCHIVE_BASEURL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
+          NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/sha256sums.txt"
+          ;;
+        *)
+          warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
+          return 1
+      esac
+
+      check_for_remote_file "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}"
+
+      case "$?" in
+        0) ;;
+        1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
+        *)
+          warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
+          return 1
+          ;;
+      esac
+      ;;
+    *)
+      warning "Unable to check for remote Manifest file for release. ${RELEASE_BADNET_MSG}"
+      return 1
+      ;;
+  esac
 }
 
 install_local_build_dependencies() {
@@ -2387,28 +2422,71 @@ try_build_install() {
   zstd="$(command -v zstd 2>/dev/null || true)"
   archive_name=""
 
-  if [ -n "${zstd}" ]; then
-    if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.zst" "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"; then
-      archive_name="${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"
-      decompress="${zstd} -dcf"
+  if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
+    if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest" "./Manifest" "force"; then
+      fatal "Unable to download release manifest file. ${BADNET_MSG}" F0526
+    fi
+
+    zstd_info="$(grep -E "^netdata-.*\\.tar\\.zst " ./Manifest)"
+    gzip_info="$(grep -E "^netdata-.*\\.tar\\.gz " ./Manifest)"
+
+    if [ -n "${zstd}" ] && [ -n "${zstd_info}" ]; then
+      if [ "$(echo "${zstd_info}" | wc -l)" -gt 1 ]; then
+        zstd_info="$(echo "${zstd_info}" | grep -ve ".*-latest.*" | tail -n 1)"
+      fi
+
+      zstd_name="$(echo "${zstd_info}" | awk '{ print $1 }')"
+
+      if download "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/${zstd_name}" "${zstd_name}"; then
+        archive_name="${zstd_name}"
+        decompress="${zstd} -dcf"
+      else
+        warning "Unable to fetch zstd compressed source tarball, trying gzip compressed tarball instead."
+      fi
+    fi
+
+    if [ -z "${archive_name}" ] && [ -n "${gzip_name}" ]; then
+      if [ "$(echo "${gzip_info}" | wc -l)" -gt 1 ]; then
+        gzip_info="$(echo "${gzip_info}" | grep -ve ".*-latest.*" | tail -n 1)"
+      fi
+
+      gzip_name="$(echo "${gzip_info}" | awk '{ print $1 }')"
+
+      if download "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/${gzip_name}" "${gzip_name}"; then
+        archive_name="${gzip_name}"
+        decompress="$(command -v gzip 2>/dev/null) -dc"
+      fi
     else
-      warning "Unable to fetch zstd compressed source tarball, trying gzip compressed tarball instead."
+      fatal "Unable to find a usable ${SELECTED_RELEASE_CHANNEL} source archive in Manifest file.\n${BADNET_MESSAGE}" F0527
     fi
-  fi
 
-  if [ -z "${archive_name}" ]; then
-    if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.gz" "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.gz"; then
-      archive_name="${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.gz"
-      decompress="$(command -v gzip 2>/dev/null) -dc"
+    if [ -z "${archive_name}" ]; then
+      fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
     fi
-  fi
+  else
+    if [ -n "${zstd}" ]; then
+      if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.zst" "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"; then
+        archive_name="${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"
+        decompress="${zstd} -dcf"
+      else
+        warning "Unable to fetch zstd compressed source tarball, trying gzip compressed tarball instead."
+      fi
+    fi
 
-  if [ -z "${archive_name}" ]; then
-    fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
-  fi
+    if [ -z "${archive_name}" ]; then
+      if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.gz" "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.gz"; then
+        archive_name="${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.gz"
+        decompress="$(command -v gzip 2>/dev/null) -dc"
+      fi
+    fi
 
-  if ! download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "./sha256sum.txt"; then
-    fatal "Failed to download checksums for source tarball verification. ${BADNET_MSG}." F000C
+    if [ -z "${archive_name}" ]; then
+      fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
+    fi
+
+    if ! download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "./sha256sum.txt"; then
+      fatal "Failed to download checksums for source tarball verification. ${BADNET_MSG}." F000C
+    fi
   fi
 
   verify_manifest ./
