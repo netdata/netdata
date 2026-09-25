@@ -2526,7 +2526,10 @@ modules:
             process ID; it may report `0` before the process has completed its first garbage collection, so it cannot
             universally separate the other CLR objects. Processes with unique names are unaffected.
         performance_impact:
-          description: ""
+          description: |
+            Creates up to 49 charts per .NET Framework process, up from 32 in the previous implementation. A chart is
+            only created when its Perflib counter is available, so the actual number depends on the .NET runtime in
+            use.
     setup:
       prerequisites:
         list: []
@@ -2814,7 +2817,7 @@ modules:
               unit: bytes
               chart_type: line
               dimensions:
-                - name: gen0_budget
+                - name: gen0
                 - name: gen1
                 - name: gen2
                 - name: loh

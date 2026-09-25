@@ -379,6 +379,18 @@ static void netframework_process_cleanup(struct net_framework_instances *p)
     netframework_mark_chart_obsolete(&p->st_clrlocksandthreads_contentions);
 }
 
+static void netframework_update_process_id_label(RRDSET *st, const char *value)
+{
+    if (!st || !rrdlabels_add_changed(st->rrdlabels, "process_id", value, RRDLABEL_SRC_AUTO))
+        return;
+
+    rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
+    rrdset_metadata_updated(st);
+    rrdset_flag_set(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+}
+
 static void netframework_update_memory_process_id_labels(struct net_framework_instances *p, bool has_process_id)
 {
     if (!has_process_id)
@@ -388,10 +400,9 @@ static void netframework_update_memory_process_id_labels(struct net_framework_in
     char process_id[UINT64_MAX_LENGTH];
     snprintfz(process_id, sizeof(process_id), "%llu", (unsigned long long)current_process_id);
 
-#define UPDATE_PROCESS_ID_LABEL(st) \
-    do { \
-        if ((st)) \
-            rrdlabels_add((st)->rrdlabels, "process_id", process_id, RRDLABEL_SRC_AUTO); \
+#define UPDATE_PROCESS_ID_LABEL(st)                                                                                    \
+    do {                                                                                                               \
+        netframework_update_process_id_label((st), process_id);                                                        \
     } while (0)
 
     UPDATE_PROCESS_ID_LABEL(p->st_clrmemory_allocated_bytes);
@@ -2397,6 +2408,7 @@ int do_PerflibNetFramework(int update_every, usec_t dt __maybe_unused)
     }
 
     netframework_now_ut = now_monotonic_usec();
+    bool collection_failed = false;
 
     int i;
     for (i = 0; i < NETDATA_NETFRAMEWORK_END; i++) {
@@ -2405,17 +2417,21 @@ int do_PerflibNetFramework(int update_every, usec_t dt __maybe_unused)
             continue;
 
         PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
-        if (!pDataBlock)
+        if (!pDataBlock) {
+            collection_failed = true;
             continue;
+        }
 
         PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, netframewrk_obj[i].object);
-        if (!pObjectType)
+        if (!pObjectType) {
+            collection_failed = true;
             continue;
+        }
 
         netframewrk_obj[i].fnct(pDataBlock, pObjectType, update_every);
     }
 
-    {
+    if (!collection_failed) {
         struct net_framework_instances *p;
         dfe_start_write(processes, p)
         {
