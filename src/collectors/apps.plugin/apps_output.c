@@ -6,6 +6,7 @@
 static void send_cachestat_data_to_netdata(struct target *w, const char *type, usec_t dt);
 static void send_dcstat_data_to_netdata(struct target *w, const char *type, usec_t dt);
 static void send_fd_data_to_netdata(struct target *w, const char *type, usec_t dt);
+static void send_process_data_to_netdata(struct target *w, const char *type, usec_t dt);
 #endif
 
 static inline void send_BEGIN(const char *type, const char *name,const char *metric,  usec_t usec) {
@@ -129,6 +130,8 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
             send_dcstat_data_to_netdata(w, type, dt);
         if (apps_ebpf_fd_data_ready())
             send_fd_data_to_netdata(w, type, dt);
+        if (apps_ebpf_process_data_ready())
+            send_process_data_to_netdata(w, type, dt);
 #endif
 
         if (unlikely(!w->values[PDF_PROCESSES]))
@@ -433,6 +436,14 @@ static const struct apps_ebpf_chart apps_fd_charts[] = {
     { "ebpf_file_close_error", "Fails to close files.", "calls/s", "stacked", 20223, "calls", "incremental", NULL, true  },
 };
 
+static const struct apps_ebpf_chart apps_process_charts[] = {
+    { "ebpf_process_start", "Processes started", "calls/s", "stacked", 20161, "calls", "incremental", NULL, false },
+    { "ebpf_thread_start", "Threads started", "calls/s", "stacked", 20162, "calls", "incremental", NULL, false },
+    { "ebpf_task_exit", "Tasks started exiting", "calls/s", "stacked", 20163, "calls", "incremental", NULL, false },
+    { "ebpf_task_released", "Tasks released", "calls/s", "stacked", 20164, "calls", "incremental", NULL, false },
+    { "ebpf_task_error", "Process or thread creation errors", "calls/s", "stacked", 20165, "calls", "incremental", NULL, true },
+};
+
 static void send_cachestat_charts_to_netdata(struct target *w, const char *type, const char *lbl_name) {
     send_ebpf_charts_to_netdata(w, type, lbl_name, "page_cache",
                                 apps_cachestat_charts, _countof(apps_cachestat_charts), true);
@@ -481,6 +492,15 @@ static void send_fd_data_to_netdata(struct target *w, const char *type, usec_t d
 
     send_ebpf_data_to_netdata(w, type, dt, apps_fd_charts, values, _countof(values),
                               apps_ebpf_fd_errors_are_available());
+}
+
+static void send_process_data_to_netdata(struct target *w, const char *type, usec_t dt) {
+    const kernel_uint_t values[] = {(kernel_uint_t)w->process.process_create,
+                                    (kernel_uint_t)w->process.thread_create,
+                                    (kernel_uint_t)w->process.task_exit,
+                                    (kernel_uint_t)w->process.task_close,
+                                    (kernel_uint_t)w->process.task_error};
+    send_ebpf_data_to_netdata(w, type, dt, apps_process_charts, values, _countof(values), true);
 }
 #endif
 
@@ -603,6 +623,9 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
             send_dcstat_charts_to_netdata(w, type, lbl_name);
         if (apps_ebpf_fd_is_available())
             send_fd_charts_to_netdata(w, type, lbl_name);
+        if (apps_ebpf_process_is_available())
+            send_ebpf_charts_to_netdata(w, type, lbl_name, "tasks",
+                                        apps_process_charts, _countof(apps_process_charts), true);
 #endif
 
         fprintf(stdout, "CHART %s.%s_uptime '' '%s uptime' 'seconds' uptime %s.uptime line 20250 %d\n",
@@ -642,6 +665,16 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
             send_dcstat_charts_to_netdata(w, type, lbl_name);
         }
         dcstat_charts_announced = true;
+    }
+
+    static bool process_charts_announced = false;
+    if (!process_charts_announced && apps_ebpf_process_is_available() && strcmp(type, NETDATA_APP_FAMILY) == 0) {
+        for (w = root; w; w = w->next) {
+            if (!w->exposed) continue;
+            send_ebpf_charts_to_netdata(w, type, lbl_name, "tasks",
+                                        apps_process_charts, _countof(apps_process_charts), true);
+        }
+        process_charts_announced = true;
     }
 
     /* fd needs two latches, not one.  The error charts are announced only while
