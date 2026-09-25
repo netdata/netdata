@@ -2300,11 +2300,16 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
 // The pool can be as small as MIN_LIBUV_WORKER_THREADS (8 on 32-bit), while FLUSH_MAIN alone is
 // allowed pgc_max_flushers() (the number of CPUs) and the per-tier flushes had no limit at all.
 //
-// So all of them share one budget that always leaves pool threads free for extent writes.
-// Over-budget per-tier flushes and ctx shutdowns are deferred (never dropped) and dispatched
-// when a waiter finishes. FLUSH_MAIN is periodic, so over budget it is skipped, as it already
-// is over pgc_max_flushers(). flush_inline() in cache.c never runs on pool threads, for the
-// same reason. Everything here runs on the event loop thread.
+// So all of them share one budget below the pool size: these jobs alone can never occupy the
+// whole pool. Over-budget per-tier flushes and ctx shutdowns are deferred (never dropped) and
+// dispatched when a waiter finishes. FLUSH_MAIN is periodic, so over budget it is skipped, as it
+// already is over pgc_max_flushers(). flush_inline() in cache.c never runs on pool threads, for
+// the same reason. Everything here runs on the event loop thread.
+//
+// The budget does NOT guarantee free threads for extent writes: other pool jobs that block on
+// dbengine are not counted - Cloud queries (aclk_run_query_job()) and weights (weights_worker())
+// wait for EXTENT_READs that need a pool thread too - and together with the waiters here they
+// can still fill a small pool.
 
 static size_t extent_waiters_max(void) {
     int max = libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS;
