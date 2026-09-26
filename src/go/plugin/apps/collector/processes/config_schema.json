@@ -1,0 +1,103 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "title": "Linux processes POC collector configuration.",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "proc_path": {
+        "title": "Procfs directory",
+        "description": "Absolute path to the Linux procfs mount. Defaults to /proc, prefixed by NETDATA_HOST_PREFIX when set.",
+        "type": "string",
+        "minLength": 1
+      },
+      "collect_fds": {
+        "title": "Collect file descriptors",
+        "description": "Collect open file types, unique files per group and descriptor-limit utilization. Disabling this reduces directory scans and readlink calls.",
+        "type": "boolean",
+        "default": true
+      },
+      "collect_pss": {
+        "title": "Collect proportional memory",
+        "description": "Sample proportional set size and estimate memory usage between samples. Disabling this avoids smaps_rollup reads.",
+        "type": "boolean",
+        "default": true
+      },
+      "groups": {
+        "title": "Application groups",
+        "description": "Ordered application rules. The first matching rule wins; unmatched processes use process-tree grouping.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "default": [],
+        "items": {
+          "type": "object",
+          "title": "Application group",
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "Group name",
+              "description": "Name shown for processes assigned to this application group.",
+              "minLength": 1
+            },
+            "match": {
+              "type": "array",
+              "title": "Matching rules",
+              "description": "Any rule may match. Within a rule, all populated fields must match.",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "title": "Matching rule",
+                "properties": {
+                  "comm": {
+                    "type": "string",
+                    "title": "Command name",
+                    "description": "Shared matcher expression for the command name, for example glob:postgres*."
+                  },
+                  "cmdline": {
+                    "type": "string",
+                    "title": "Command line",
+                    "description": "Shared matcher expression for the command line, for example regexp:gunicorn|uvicorn."
+                  }
+                },
+                "anyOf": [
+                  {
+                    "required": [
+                      "comm"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "cmdline"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "required": [
+            "name",
+            "match"
+          ]
+        }
+      }
+    }
+  },
+  "uiSchema": {
+    "groups": {
+      "ui:listFlavour": "list",
+      "items": {
+        "match": {
+          "ui:listFlavour": "list"
+        }
+      }
+    }
+  }
+}
