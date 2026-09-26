@@ -34,6 +34,22 @@ static inline bool stream_receiver_parse_hops(const char *value, int16_t *hops) 
     return true;
 }
 
+// The receiver accumulates input into line_buffer across reads until a newline
+// shows up. Reject a line as soon as its accumulated size exceeds the protocol
+// limit, regardless of whether the current input completed the line.
+static inline bool stream_receiver_line_buffer_overflow(const BUFFER *line_buffer) {
+    return line_buffer->len > PLUGINSD_LINE_MAX;
+}
+
+static inline bool stream_receiver_next_line_checked(
+    struct buffered_reader *reader, BUFFER *line_buffer, bool *overflow) {
+
+    bool complete = buffered_reader_next_line(reader, line_buffer);
+    *overflow = stream_receiver_line_buffer_overflow(line_buffer);
+
+    return complete;
+}
+
 struct parser;
 
 struct receiver_state {
