@@ -161,8 +161,17 @@ static inline void pluginsd_function_progress_to_stdout(const char *transaction,
 static inline void send_newline_and_flush(netdata_mutex_t *mutex) {
     netdata_mutex_lock(mutex);
     fprintf(stdout, "\n");
+#if defined(OS_WINDOWS)
+    int flush_result = fflush(stdout);
+    bool output_error = flush_result == EOF || ferror(stdout);
+#else
     fflush(stdout);
+#endif
     netdata_mutex_unlock(mutex);
+#if defined(OS_WINDOWS)
+    if (unlikely(output_error))
+        fatal("Cannot write to Netdata on stdout");
+#endif
 }
 
 void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char *id, const char *path,

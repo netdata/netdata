@@ -15,14 +15,44 @@ function(netdata_bundle_libbacktrace)
         set(libbacktrace_INSTALL_DIR "${CMAKE_BINARY_DIR}/libbacktrace-install")
         set(libbacktrace_LIBRARY "${libbacktrace_INSTALL_DIR}/lib/libbacktrace.a")
 
+        # On Windows, ExternalProject runs commands through cmd.exe which cannot
+        # execute shell scripts directly. The configure script must be run through
+        # bash, but make.exe is an MSYS2 binary that handles POSIX paths and shell
+        # commands in Makefiles natively and can be invoked directly by cmake.
+        if(OS_WINDOWS)
+                unset(BASH_EXECUTABLE CACHE)
+                find_program(BASH_EXECUTABLE NAMES bash.exe bash
+                             HINTS "$ENV{MSYS2_ROOT}/usr/bin"
+                                   "C:/msys64/usr/bin"
+                                   "$ENV{ChocolateyToolsLocation}/msys64/usr/bin"
+                             NO_DEFAULT_PATH)
+                if(NOT BASH_EXECUTABLE)
+                        message(FATAL_ERROR "MSYS2 bash not found; install it under MSYS2/usr/bin")
+                endif()
+                get_filename_component(_BT_MSYS_BIN "${BASH_EXECUTABLE}" DIRECTORY)
+                find_program(_BT_MAKE_EXECUTABLE NAMES make.exe make
+                             HINTS "${_BT_MSYS_BIN}" NO_DEFAULT_PATH)
+                if(NOT _BT_MAKE_EXECUTABLE)
+                        message(FATAL_ERROR "MSYS2 make not found next to the selected bash")
+                endif()
+                set(_bt_configure_cmd ${BASH_EXECUTABLE} -c
+                        "PATH='/ucrt64/bin:/usr/bin':\$PATH '${libbacktrace_SOURCE_DIR}/configure' --prefix='${libbacktrace_INSTALL_DIR}' --enable-static")
+                set(_bt_build_cmd ${BASH_EXECUTABLE} -c
+                        "PATH='/ucrt64/bin:/usr/bin':\$PATH MAKEFLAGS= '${_BT_MAKE_EXECUTABLE}' install")
+        else()
+                set(_BT_MAKE_EXECUTABLE make)
+                set(_bt_configure_cmd "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static)
+                set(_bt_build_cmd ${_BT_MAKE_EXECUTABLE} install)
+        endif()
+
         # Clone and build libbacktrace
         ExternalProject_Add(
                 libbacktrace
                 GIT_REPOSITORY https://github.com/ianlancetaylor/libbacktrace.git
                 SOURCE_DIR "${libbacktrace_SOURCE_DIR}"
                 BINARY_DIR "${libbacktrace_BINARY_DIR}"
-                CONFIGURE_COMMAND "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static
-                BUILD_COMMAND make install
+                CONFIGURE_COMMAND ${_bt_configure_cmd}
+                BUILD_COMMAND ${_bt_build_cmd}
                 INSTALL_COMMAND ""
                 BUILD_BYPRODUCTS "${libbacktrace_LIBRARY}"
                 EXCLUDE_FROM_ALL 1

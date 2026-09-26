@@ -29,7 +29,6 @@ use sfsq::traces::{
 fn grid() -> sfst::Grid {
     sfst::Grid::new(0, 1_000_000_000, 10)
 }
-
 /// An overflowing width x count is rejected with ITS OWN reason — not
 /// the empty-grid message, which would misdiagnose a valid-looking grid.
 #[test]
@@ -1038,4 +1037,3 @@ fn filtered_grid_agrees_with_search_on_a_canonical_corpus() {
         );
     }
 }
-

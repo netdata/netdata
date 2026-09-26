@@ -15,6 +15,28 @@ static const char *status_file_io_fallback_dirs[] = {
 static bool status_file_io_obsolete_removed = false;
 static _Alignas(8) uint64_t status_file_io_tmp_attempt_counter = 0;
 
+static int status_file_io_unlink(const char *path) {
+#if defined(OS_WINDOWS)
+    wchar_t *native_path = os_translate_msys_to_windows_pathW(path);
+    if (!native_path) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    BOOL removed = DeleteFileW(native_path);
+    DWORD error = removed ? ERROR_SUCCESS : GetLastError();
+    freez(native_path);
+    if (!removed) {
+        errno = (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND) ? ENOENT :
+                (error == ERROR_ACCESS_DENIED || error == ERROR_SHARING_VIOLATION) ? EACCES : EIO;
+        return -1;
+    }
+    return 0;
+#else
+    return unlink(path);
+#endif
+}
+
 _Static_assert(__atomic_always_lock_free(sizeof(status_file_io_obsolete_removed),
                                          &status_file_io_obsolete_removed),
                "signal-safe status cleanup state must be lock-free");
@@ -70,7 +92,7 @@ static void status_file_io_remove_obsolete(const char *protected_dir, const char
             len = strcatz(dst, len, "/", sizeof(dst));
         len = strcatz(dst, len, filename, sizeof(dst));
 
-        unlink(dst);
+        status_file_io_unlink(dst);
     }
 
     errno_clear();
@@ -100,11 +122,19 @@ bool status_file_io_load(const char *filename, bool (*cb)(const char *, void *),
     }
 
     // Load the newest file found
-    if(*newest && cb(newest, data))
-        return true;
+    if(*newest) {
+        if(cb(newest, data))
+            return true;
 
+        // File exists but couldn't be parsed — genuine error.
+        if(log)
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot parse the status file '%s'", newest);
+        return false;
+    }
+
+    // No file found in any location — expected on first run, debug-only.
     if(log)
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot find a status file in any location");
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "Cannot find a status file in any location (expected on first run)");
 
     return false;
 }
@@ -148,29 +178,40 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     memcpy(&temp[pos], tid_str, tid_len); pos += tid_len;
     temp[pos] = '\0';
 
-    // Reuse a regular temporary file left by an interrupted save; create absent names exclusively.
-    struct stat before;
-    bool reuse = lstat(temp, &before) == 0;
-    if(reuse && !S_ISREG(before.st_mode))
-        return false;
-
-    if(!reuse && errno != ENOENT)
-        return false;
-
+    // Reuse a regular temporary file left by an interrupted save; create absent names
+    // exclusively. Open with O_CREAT|O_EXCL first so the create-or-exist decision is
+    // atomic; this avoids the lstat-before-open TOCTOU window (c:S5847). O_NOFOLLOW
+    // rejects symlinks at open time, so the post-open fstat cannot be tricked into
+    // accepting a non-regular file.
     int flags = O_WRONLY | O_NONBLOCK;
 #ifdef O_NOFOLLOW
     flags |= O_NOFOLLOW;
 #endif
-    if(!reuse)
-        flags |= O_CREAT | O_EXCL;
 
-    int fd = open(temp, flags, 0664);
-    if (fd == -1)
-        return false;
+    int fd;
+#if defined(OS_WINDOWS)
+    fd = nd_open_no_follow(temp, flags | O_CREAT | O_EXCL, 0660);
+#else
+    fd = open(temp, flags | O_CREAT | O_EXCL,
+              0664);
+#endif
+    bool reuse = false;
+    if (fd == -1) {
+        if (errno != EEXIST)
+            return false;
+        // File exists from a prior interrupted save; truncate it.
+#if defined(OS_WINDOWS)
+        fd = nd_open_no_follow(temp, flags, 0660);
+#else
+        fd = open(temp, flags, 0664);
+#endif
+        if (fd == -1)
+            return false;
+        reuse = true;
+    }
 
     struct stat after;
-    if(fstat(fd, &after) != 0 || !S_ISREG(after.st_mode) ||
-       (reuse && (before.st_dev != after.st_dev || before.st_ino != after.st_ino))) {
+    if(fstat(fd, &after) != 0 || !S_ISREG(after.st_mode)) {
         close(fd);
         return false;
     }
@@ -191,7 +232,7 @@ static bool status_file_io_save_this(const char *directory, const char *filename
                 continue; /* Retry if interrupted by signal */
 
             close(fd);
-            unlink(temp);  /* Remove the temp file */
+            status_file_io_unlink(temp);  /* Remove the temp file */
             return false;
         }
 
@@ -201,28 +242,51 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     /* Fsync to ensure data is written to disk */
     if (fsync(fd) == -1) {
         close(fd);
-        unlink(temp);
+        status_file_io_unlink(temp);
         return false;
     }
 
     /* Set permissions using chmod() */
-    if (fchmod(fd, 0664) != 0) {
+    if (fchmod(fd,
+#if defined(OS_WINDOWS)
+               0660
+#else
+               0664
+#endif
+               ) != 0) {
         close(fd);
-        unlink(temp);
+        status_file_io_unlink(temp);
         return false;
     }
 
     /* Close file */
     if (close(fd) == -1) {
-        unlink(temp);
+        status_file_io_unlink(temp);
         return false;
     }
 
     /* Rename temp file to target file */
-    if (rename(temp, final) != 0) {
-        unlink(temp);
+#if defined(OS_WINDOWS)
+    // UCRT open/unlink and Win32 publication must all address the same native
+    // paths; translate the complete names, including configured directory prefixes.
+    wchar_t *native_temp = os_translate_msys_to_windows_pathW(temp);
+    wchar_t *native_final = os_translate_msys_to_windows_pathW(final);
+    if (!native_temp || !native_final ||
+        !MoveFileExW(native_temp, native_final,
+                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        freez(native_temp);
+        freez(native_final);
+        status_file_io_unlink(temp);
         return false;
     }
+    freez(native_temp);
+    freez(native_final);
+#else
+    if (rename(temp, final) != 0) {
+        status_file_io_unlink(temp);
+        return false;
+    }
+#endif
 
     return true;
 }

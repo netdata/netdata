@@ -8,6 +8,19 @@ static uv_async_t async;
 static struct completion completion;
 static uv_pipe_t server_pipe;
 
+#if defined(OS_WINDOWS)
+#define COMMAND_PIPE_QUEUE_SIZE 32
+static uv_thread_t command_pipe_accept_worker;
+static HANDLE command_pipe_stop_event;
+static HANDLE command_pipe_started_event;
+static DWORD command_pipe_start_error;
+static bool command_pipe_accept_thread_created;
+static SRWLOCK command_pipe_queue_lock = SRWLOCK_INIT;
+static HANDLE command_pipe_queue[COMMAND_PIPE_QUEUE_SIZE];
+static size_t command_pipe_queue_head;
+static size_t command_pipe_queue_count;
+#endif
+
 char cmd_prefix_by_status[] = {
         CMD_PREFIX_INFO,
         CMD_PREFIX_ERROR,
@@ -53,6 +66,9 @@ struct command_context {
     // If the uv_write fails to start, send_command_reply() closes the handle itself there and
     // then, so the flag staying set costs nothing - uv_is_closing() covers that case.
     bool close_by_callback;
+#if defined(OS_WINDOWS)
+    bool client_authorized;
+#endif
 
     uv_work_t work;
     uv_write_t write_req;
@@ -825,9 +841,31 @@ static void parse_commands(struct command_context *cmd_ctx)
     }
 }
 
+#if defined(OS_WINDOWS)
+static bool command_pipe_client_authorized(uv_pipe_t *client);
+static bool command_pipe_queue_pop(HANDLE *pipe);
+static void command_pipe_queue_drain_to_loop(void);
+#endif
+
 static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
 {
     struct command_context *cmd_ctx = (struct command_context *)client;
+
+#if defined(OS_WINDOWS)
+    // Verify the peer on the first read, before retaining or parsing command bytes.
+    if (!cmd_ctx->client_authorized && (nread > 0 || nread == UV_EOF)) {
+        if (nread <= 0 || !command_pipe_client_authorized(&cmd_ctx->client)) {
+            netdata_log_error("COMMAND: rejected unauthorized Windows command-pipe client.");
+            (void)uv_read_stop(client);
+            if (buf && buf->len)
+                freez(buf->base);
+            uv_close((uv_handle_t *)client, pipe_close_cb);
+            --clients;
+            return;
+        }
+        cmd_ctx->client_authorized = true;
+    }
+#endif
 
     if (0 == nread) {
         netdata_log_info("%s: Zero bytes read by command pipe.", __func__);
@@ -866,6 +904,476 @@ static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
     buf->len = suggested_size;
 }
 
+#if defined(OS_WINDOWS)
+// Authorize by the kernel-reported client PID and that process's primary token.
+// This avoids impersonation, which is incompatible with clients using reduced SQOS.
+static bool command_pipe_client_authorized(uv_pipe_t *client) {
+    uv_os_fd_t raw_fd;
+    int rc = uv_fileno((const uv_handle_t *)client, &raw_fd);
+    if (rc != 0) {
+        netdata_log_error("COMMAND: cannot resolve the command-pipe handle to authorize its client: %s",
+                          uv_strerror(rc));
+        return false;
+    }
+
+    HANDLE pipe = (HANDLE)raw_fd;
+    ULONG client_pid = 0;
+    if (!GetNamedPipeClientProcessId(pipe, &client_pid) || !client_pid) {
+        netdata_log_error("COMMAND: GetNamedPipeClientProcessId() failed with Win32 error %lu; "
+                          "rejecting the command-pipe client.", (unsigned long)GetLastError());
+        return false;
+    }
+
+    bool authorized = false;
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, client_pid);
+    HANDLE token = NULL;
+    PSID administrators = NULL;
+    SID_IDENTIFIER_AUTHORITY nt_authority = SECURITY_NT_AUTHORITY;
+
+    if (!process) {
+        netdata_log_error("COMMAND: OpenProcess() failed with Win32 error %lu while authorizing the "
+                          "command-pipe client.", (unsigned long)GetLastError());
+    }
+    else if (GetProcessId(process) != client_pid) {
+        netdata_log_error("COMMAND: the command-pipe client process identity changed during authorization.");
+    }
+    else {
+        ULONG verified_pid = 0;
+        if (!GetNamedPipeClientProcessId(pipe, &verified_pid) || verified_pid != client_pid) {
+            netdata_log_error("COMMAND: the connected pipe's client PID changed during authorization.");
+            CloseHandle(process);
+            return false;
+        }
+    }
+
+    if (process && GetProcessId(process) == client_pid && !token &&
+        !OpenProcessToken(process, TOKEN_QUERY | TOKEN_DUPLICATE, &token)) {
+        netdata_log_error("COMMAND: OpenProcessToken() failed with Win32 error %lu while authorizing the "
+                          "command-pipe client.", (unsigned long)GetLastError());
+    }
+
+    if (token && !AllocateAndInitializeSid(&nt_authority, 2,
+                                           SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS,
+                                           0, 0, 0, 0, 0, 0, &administrators)) {
+        netdata_log_error("COMMAND: AllocateAndInitializeSid() failed with Win32 error %lu while authorizing "
+                          "the command-pipe client.", (unsigned long)GetLastError());
+    }
+    else if (token && administrators) {
+        HANDLE membership_token = NULL;
+        BOOL member = FALSE;
+        if (!DuplicateToken(token, SecurityIdentification, &membership_token))
+            netdata_log_error("COMMAND: DuplicateToken() failed with Win32 error %lu while authorizing "
+                              "the command-pipe client.", (unsigned long)GetLastError());
+        else if (!CheckTokenMembership(membership_token, administrators, &member))
+            netdata_log_error("COMMAND: CheckTokenMembership() failed with Win32 error %lu while authorizing "
+                              "the command-pipe client.", (unsigned long)GetLastError());
+        else if (!member)
+            netdata_log_error("COMMAND: the command-pipe client is not a member of the local Administrators "
+                              "group; rejecting it.");
+        else
+            authorized = true;
+        if (membership_token)
+            CloseHandle(membership_token);
+    }
+
+    if (administrators)
+        FreeSid(administrators);
+    if (token)
+        CloseHandle(token);
+    if (process)
+        CloseHandle(process);
+
+    return authorized;
+}
+
+static HANDLE command_pipe_create_instance(const wchar_t *name, bool first_instance, DWORD *error_out,
+                                           bool report_error) {
+    *error_out = ERROR_SUCCESS;
+    PSECURITY_DESCRIPTOR descriptor = NULL;
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            L"D:P(A;;GA;;;SY)(A;;GA;;;BA)", SDDL_REVISION_1, &descriptor, NULL)) {
+        *error_out = GetLastError();
+        if (report_error)
+            netdata_log_error("COMMAND: cannot create named-pipe security descriptor (Win32 error %lu).",
+                              (unsigned long)*error_out);
+        return INVALID_HANDLE_VALUE;
+    }
+
+    SECURITY_ATTRIBUTES attributes = {
+        .nLength = sizeof(attributes),
+        .lpSecurityDescriptor = descriptor,
+        .bInheritHandle = FALSE,
+    };
+    DWORD open_mode = PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED;
+    if (first_instance)
+        open_mode |= FILE_FLAG_FIRST_PIPE_INSTANCE;
+
+    HANDLE pipe = CreateNamedPipeW(name, open_mode,
+                                   PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+                                   PIPE_UNLIMITED_INSTANCES, 64 * 1024, 64 * 1024, 0, &attributes);
+    DWORD error = pipe == INVALID_HANDLE_VALUE ? GetLastError() : ERROR_SUCCESS;
+    LocalFree(descriptor);
+    if (pipe == INVALID_HANDLE_VALUE) {
+        *error_out = error;
+        if (report_error)
+            netdata_log_error("COMMAND: CreateNamedPipeW() failed with Win32 error %lu.", (unsigned long)error);
+    }
+    return pipe;
+}
+
+static bool command_pipe_queue_push(HANDLE pipe) {
+    bool queued = false;
+    AcquireSRWLockExclusive(&command_pipe_queue_lock);
+    if (command_pipe_queue_count < COMMAND_PIPE_QUEUE_SIZE &&
+        WaitForSingleObject(command_pipe_stop_event, 0) != WAIT_OBJECT_0) {
+        size_t tail = (command_pipe_queue_head + command_pipe_queue_count) % COMMAND_PIPE_QUEUE_SIZE;
+        command_pipe_queue[tail] = pipe;
+        ++command_pipe_queue_count;
+        queued = true;
+    }
+    ReleaseSRWLockExclusive(&command_pipe_queue_lock);
+    return queued;
+}
+
+static bool command_pipe_queue_pop(HANDLE *pipe) {
+    bool available = false;
+    AcquireSRWLockExclusive(&command_pipe_queue_lock);
+    if (command_pipe_queue_count) {
+        *pipe = command_pipe_queue[command_pipe_queue_head];
+        command_pipe_queue[command_pipe_queue_head] = NULL;
+        command_pipe_queue_head = (command_pipe_queue_head + 1) % COMMAND_PIPE_QUEUE_SIZE;
+        --command_pipe_queue_count;
+        available = true;
+    }
+    ReleaseSRWLockExclusive(&command_pipe_queue_lock);
+    return available;
+}
+
+static void command_pipe_startup_complete(DWORD error) {
+    command_pipe_start_error = error;
+    SetEvent(command_pipe_started_event);
+}
+
+static bool command_pipe_wait_for_connection(HANDLE pipe) {
+    OVERLAPPED overlapped = {0};
+    overlapped.hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
+    if (!overlapped.hEvent) {
+        netdata_log_error("COMMAND: cannot create connect event (Win32 error %lu).",
+                          (unsigned long)GetLastError());
+        return false;
+    }
+
+    bool connected = false;
+    BOOL result = ConnectNamedPipe(pipe, &overlapped);
+    DWORD error = result ? ERROR_SUCCESS : GetLastError();
+    if (result || error == ERROR_PIPE_CONNECTED)
+        connected = true;
+    else if (error == ERROR_IO_PENDING) {
+        HANDLE wait_handles[] = { command_pipe_stop_event, overlapped.hEvent };
+        DWORD wait_result = WaitForMultipleObjects(_countof(wait_handles), wait_handles, FALSE, INFINITE);
+        if (wait_result == WAIT_OBJECT_0) {
+            (void)CancelIoEx(pipe, &overlapped);
+            (void)WaitForSingleObject(overlapped.hEvent, INFINITE);
+            DWORD transferred = 0;
+            (void)GetOverlappedResult(pipe, &overlapped, &transferred, FALSE);
+        }
+        else if (wait_result == WAIT_OBJECT_0 + 1) {
+            DWORD transferred = 0;
+            connected = GetOverlappedResult(pipe, &overlapped, &transferred, FALSE) != FALSE;
+            if (!connected && GetLastError() == ERROR_PIPE_CONNECTED)
+                connected = true;
+        }
+        else
+            netdata_log_error("COMMAND: waiting for a named-pipe client failed (Win32 error %lu).",
+                              (unsigned long)GetLastError());
+    }
+    else
+        netdata_log_error("COMMAND: ConnectNamedPipe() failed with Win32 error %lu.", (unsigned long)error);
+
+    CloseHandle(overlapped.hEvent);
+    return connected;
+}
+
+static void command_pipe_accept_thread(void *arg) {
+    const wchar_t *name = arg;
+    bool first_instance = true;
+    DWORD create_error = ERROR_SUCCESS;
+    HANDLE pipe = command_pipe_create_instance(name, first_instance, &create_error, true);
+    if (pipe == INVALID_HANDLE_VALUE) {
+        command_pipe_startup_complete(create_error);
+        freez((void *)name);
+        return;
+    }
+    first_instance = false;
+    command_pipe_startup_complete(ERROR_SUCCESS);
+
+    while (WaitForSingleObject(command_pipe_stop_event, 0) != WAIT_OBJECT_0) {
+        if (pipe == INVALID_HANDLE_VALUE) {
+            pipe = command_pipe_create_instance(name, first_instance, &create_error, true);
+            if (pipe == INVALID_HANDLE_VALUE) {
+                Sleep(100);
+                continue;
+            }
+        }
+
+        bool connected = command_pipe_wait_for_connection(pipe);
+        if (connected) {
+            if (command_pipe_queue_push(pipe)) {
+                if (uv_async_send(&async) != 0) {
+                    // Queue ownership remains authoritative; shutdown drains it if the loop is gone.
+                    netdata_log_error("COMMAND: unable to notify the command loop about a connected client.");
+                    pipe = INVALID_HANDLE_VALUE;
+                }
+                else
+                    pipe = INVALID_HANDLE_VALUE; // ownership moved to the queue
+            }
+            else {
+                (void)DisconnectNamedPipe(pipe);
+                CloseHandle(pipe);
+                pipe = INVALID_HANDLE_VALUE;
+            }
+        }
+        else {
+            DWORD stop = WaitForSingleObject(command_pipe_stop_event, 0);
+            if (stop != WAIT_OBJECT_0)
+                Sleep(100);
+        }
+
+        if (pipe != INVALID_HANDLE_VALUE) {
+            CloseHandle(pipe);
+            pipe = INVALID_HANDLE_VALUE;
+        }
+        if (WaitForSingleObject(command_pipe_stop_event, 0) == WAIT_OBJECT_0)
+            break;
+
+        pipe = command_pipe_create_instance(name, first_instance, &create_error, true);
+        if (pipe == INVALID_HANDLE_VALUE) {
+            Sleep(100);
+            continue;
+        }
+    }
+
+    if (pipe != INVALID_HANDLE_VALUE)
+        CloseHandle(pipe);
+    freez((void *)name);
+}
+
+static void command_pipe_queue_drain_to_loop(void) {
+    HANDLE pipe;
+    while (command_pipe_queue_pop(&pipe)) {
+        struct command_context *cmd_ctx = mallocz(sizeof(*cmd_ctx));
+        cmd_ctx->idx = CMD_HELP;
+        cmd_ctx->close_by_callback = false;
+        cmd_ctx->client_authorized = false;
+        cmd_ctx->command_string_size = 0;
+        cmd_ctx->command_string[0] = '\0';
+
+        int ret = uv_pipe_init(loop, &cmd_ctx->client, 1);
+        if (ret) {
+            netdata_log_error("uv_pipe_init() for accepted Windows pipe: %s", uv_strerror(ret));
+            CloseHandle(pipe);
+            freez(cmd_ctx);
+            continue;
+        }
+        uv_file pipe_fd = uv_open_osfhandle((uv_os_fd_t)pipe);
+        if (pipe_fd < 0) {
+            netdata_log_error("uv_open_osfhandle() for accepted Windows pipe failed");
+            CloseHandle(pipe);
+            uv_close((uv_handle_t *)&cmd_ctx->client, pipe_close_cb);
+            continue;
+        }
+
+        ret = uv_pipe_open(&cmd_ctx->client, pipe_fd);
+        if (ret) {
+            netdata_log_error("uv_pipe_open() for accepted Windows pipe: %s", uv_strerror(ret));
+            close(pipe_fd);
+            uv_close((uv_handle_t *)&cmd_ctx->client, pipe_close_cb);
+            continue;
+        }
+
+        ++clients;
+        ret = uv_read_start((uv_stream_t *)&cmd_ctx->client, alloc_cb, pipe_read_cb);
+        if (ret) {
+            netdata_log_error("uv_read_start() for accepted Windows pipe: %s", uv_strerror(ret));
+            uv_close((uv_handle_t *)&cmd_ctx->client, pipe_close_cb);
+            --clients;
+        }
+    }
+}
+
+static void command_pipe_queue_close_all(void) {
+    HANDLE pipe;
+    while (command_pipe_queue_pop(&pipe))
+        CloseHandle(pipe);
+}
+
+static int command_pipe_server_start(const char *pipename) {
+    int wide_len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pipename, -1, NULL, 0);
+    if (!wide_len) {
+        netdata_log_error("COMMAND: invalid UTF-8 in named-pipe path (Win32 error %lu).",
+                          (unsigned long)GetLastError());
+        return UV_EINVAL;
+    }
+    wchar_t *wide_name = mallocz((size_t)wide_len * sizeof(*wide_name));
+    if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pipename, -1, wide_name, wide_len)) {
+        netdata_log_error("COMMAND: cannot convert named-pipe path (Win32 error %lu).",
+                          (unsigned long)GetLastError());
+        freez(wide_name);
+        return UV_EINVAL;
+    }
+
+    command_pipe_stop_event = CreateEventW(NULL, TRUE, FALSE, NULL);
+    command_pipe_started_event = CreateEventW(NULL, TRUE, FALSE, NULL);
+    if (!command_pipe_stop_event || !command_pipe_started_event) {
+        netdata_log_error("COMMAND: cannot create named-pipe synchronization events (Win32 error %lu).",
+                          (unsigned long)GetLastError());
+        freez(wide_name);
+        if (command_pipe_stop_event) CloseHandle(command_pipe_stop_event);
+        if (command_pipe_started_event) CloseHandle(command_pipe_started_event);
+        command_pipe_stop_event = command_pipe_started_event = NULL;
+        return UV_ENOMEM;
+    }
+
+    command_pipe_queue_head = command_pipe_queue_count = 0;
+    command_pipe_start_error = ERROR_SUCCESS;
+    int ret = uv_thread_create(&command_pipe_accept_worker, command_pipe_accept_thread, wide_name);
+    if (ret) {
+        freez(wide_name);
+        CloseHandle(command_pipe_stop_event);
+        CloseHandle(command_pipe_started_event);
+        command_pipe_stop_event = command_pipe_started_event = NULL;
+        return ret;
+    }
+    command_pipe_accept_thread_created = true;
+    DWORD wait_result = WaitForSingleObject(command_pipe_started_event, INFINITE);
+    if (wait_result != WAIT_OBJECT_0) {
+        netdata_log_error("COMMAND: waiting for named-pipe listener startup failed (Win32 error %lu).",
+                          (unsigned long)GetLastError());
+        SetEvent(command_pipe_stop_event);
+        uv_thread_join(&command_pipe_accept_worker);
+        command_pipe_accept_thread_created = false;
+        CloseHandle(command_pipe_started_event);
+        command_pipe_started_event = NULL;
+        CloseHandle(command_pipe_stop_event);
+        command_pipe_stop_event = NULL;
+        return UV_EIO;
+    }
+    CloseHandle(command_pipe_started_event);
+    command_pipe_started_event = NULL;
+    if (command_pipe_start_error != ERROR_SUCCESS) {
+        SetEvent(command_pipe_stop_event);
+        uv_thread_join(&command_pipe_accept_worker);
+        command_pipe_accept_thread_created = false;
+        CloseHandle(command_pipe_stop_event);
+        command_pipe_stop_event = NULL;
+        return UV_EACCES;
+    }
+    return 0;
+}
+
+static void command_pipe_server_stop(void) {
+    if (command_pipe_stop_event)
+        SetEvent(command_pipe_stop_event);
+    if (command_pipe_accept_thread_created) {
+        uv_thread_join(&command_pipe_accept_worker);
+        command_pipe_accept_thread_created = false;
+    }
+    command_pipe_queue_close_all();
+    if (command_pipe_stop_event) {
+        CloseHandle(command_pipe_stop_event);
+        command_pipe_stop_event = NULL;
+    }
+}
+
+int command_pipe_security_unittest(void) {
+    wchar_t name[96];
+    swprintf(name, _countof(name), L"\\\\.\\pipe\\netdata-security-test-%lu",
+             (unsigned long)GetCurrentProcessId());
+
+    DWORD error = ERROR_SUCCESS;
+    HANDLE pipe = command_pipe_create_instance(name, true, &error, true);
+    if (pipe == INVALID_HANDLE_VALUE) {
+        netdata_log_error("COMMAND unittest: cannot create protected test pipe (Win32 error %lu).",
+                          (unsigned long)error);
+        return 1;
+    }
+
+    HANDLE competing_first_instance = command_pipe_create_instance(name, true, &error, false);
+    if (competing_first_instance != INVALID_HANDLE_VALUE || error != ERROR_ACCESS_DENIED) {
+        if (competing_first_instance != INVALID_HANDLE_VALUE)
+            CloseHandle(competing_first_instance);
+        CloseHandle(pipe);
+        netdata_log_error("COMMAND unittest: first-instance exclusion failed (Win32 error %lu).",
+                          (unsigned long)error);
+        return 1;
+    }
+
+    PACL dacl = NULL;
+    PSECURITY_DESCRIPTOR descriptor = NULL;
+    DWORD rc = GetSecurityInfo(pipe, SE_KERNEL_OBJECT, DACL_SECURITY_INFORMATION,
+                               NULL, NULL, &dacl, NULL, &descriptor);
+    if (rc != ERROR_SUCCESS) {
+        if (descriptor)
+            LocalFree(descriptor);
+        CloseHandle(pipe);
+        netdata_log_error("COMMAND unittest: GetSecurityInfo() failed with Win32 error %lu.", (unsigned long)rc);
+        return 1;
+    }
+
+    BYTE admin_sid[SECURITY_MAX_SID_SIZE], system_sid[SECURITY_MAX_SID_SIZE];
+    BYTE world_sid[SECURITY_MAX_SID_SIZE], anonymous_sid[SECURITY_MAX_SID_SIZE];
+    DWORD admin_sid_size = sizeof(admin_sid), system_sid_size = sizeof(system_sid);
+    DWORD world_sid_size = sizeof(world_sid), anonymous_sid_size = sizeof(anonymous_sid);
+    bool expected_principals =
+        CreateWellKnownSid(WinBuiltinAdministratorsSid, NULL, admin_sid, &admin_sid_size) &&
+        CreateWellKnownSid(WinLocalSystemSid, NULL, system_sid, &system_sid_size) &&
+        CreateWellKnownSid(WinWorldSid, NULL, world_sid, &world_sid_size) &&
+        CreateWellKnownSid(WinAnonymousSid, NULL, anonymous_sid, &anonymous_sid_size);
+    bool has_admins = false, has_system = false, has_world = false, has_anonymous = false;
+    DWORD ace_count = 0;
+    if (expected_principals) {
+        ACL_SIZE_INFORMATION acl_info;
+        if (!GetAclInformation(dacl, &acl_info, sizeof(acl_info), AclSizeInformation))
+            expected_principals = false;
+        else {
+            for (DWORD i = 0; i < acl_info.AceCount; ++i) {
+                void *ace_ptr = NULL;
+                if (!GetAce(dacl, i, &ace_ptr)) {
+                    expected_principals = false;
+                    break;
+                }
+                ++ace_count;
+                ACE_HEADER *header = ace_ptr;
+                if (header->AceType != ACCESS_ALLOWED_ACE_TYPE) {
+                    expected_principals = false;
+                    continue;
+                }
+                ACCESS_ALLOWED_ACE *ace = ace_ptr;
+                PSID sid = (PSID)&ace->SidStart;
+                has_admins |= EqualSid(sid, admin_sid) != FALSE;
+                has_system |= EqualSid(sid, system_sid) != FALSE;
+                has_world |= EqualSid(sid, world_sid) != FALSE;
+                has_anonymous |= EqualSid(sid, anonymous_sid) != FALSE;
+            }
+        }
+    }
+
+    SECURITY_DESCRIPTOR_CONTROL control = 0;
+    DWORD revision = 0;
+    bool protected_dacl = GetSecurityDescriptorControl(descriptor, &control, &revision) &&
+                          (control & SE_DACL_PROTECTED) != 0;
+    LocalFree(descriptor);
+    CloseHandle(pipe);
+    if (!expected_principals || !protected_dacl || ace_count != 2 ||
+        !has_admins || !has_system || has_world || has_anonymous) {
+        netdata_log_error("COMMAND unittest: the named-pipe DACL does not match the required principals.");
+        return 1;
+    }
+    return 0;
+}
+#endif
+
+#if !defined(OS_WINDOWS)
 static void connection_cb(uv_stream_t *server, int status)
 {
     int ret;
@@ -906,10 +1414,15 @@ static void connection_cb(uv_stream_t *server, int status)
         return;
     }
 }
+#endif
 
 static void async_cb(uv_async_t *handle)
 {
-    uv_stop(handle->loop);
+#if defined(OS_WINDOWS)
+    command_pipe_queue_drain_to_loop();
+#endif
+    if (__atomic_load_n(&command_thread_shutdown, __ATOMIC_ACQUIRE) != 0)
+        uv_stop(handle->loop);
 }
 
 // Close the client connections that are merely sitting there.
@@ -946,7 +1459,9 @@ static void command_thread(void *arg) {
     uv_thread_set_name_np("DAEMON_COMMAND");
 
     int ret;
+#if !defined(OS_WINDOWS)
     uv_fs_t req;
+#endif
 
     (void) arg;
     loop = mallocz(sizeof(uv_loop_t));
@@ -974,7 +1489,14 @@ static void command_thread(void *arg) {
     }
 
     const char *pipename = daemon_pipename();
-
+#if defined(OS_WINDOWS)
+    ret = command_pipe_server_start(pipename);
+    if (ret) {
+        netdata_log_error("Windows command-pipe server setup failed: %s", uv_strerror(ret));
+        command_thread_error = ret;
+        goto error_after_uv_listen;
+    }
+#else
     (void)uv_fs_unlink(loop, &req, pipename, NULL);
     uv_fs_req_cleanup(&req);
     ret = uv_pipe_bind(&server_pipe, pipename);
@@ -995,6 +1517,7 @@ static void command_thread(void *arg) {
         command_thread_error = ret;
         goto error_after_uv_listen;
     }
+#endif
 
     command_thread_error = 0;
     __atomic_store_n(&command_thread_shutdown, 0, __ATOMIC_RELEASE);
@@ -1006,6 +1529,9 @@ static void command_thread(void *arg) {
     }
     /* cleanup operations of the event loop */
     netdata_log_info("Shutting down command event loop.");
+#if defined(OS_WINDOWS)
+    command_pipe_server_stop();
+#endif
     uv_close((uv_handle_t *)&async, NULL);
 
     /* stop accepting new connections first, then drop the idle ones, then flush */
@@ -1174,6 +1700,12 @@ void commands_exit(void)
 
     uv_thread_t self = uv_thread_self();
     if (uv_thread_equal(&thread, &self) || this_thread_runs_a_command) {
+#if defined(OS_WINDOWS)
+        // Shutdown may run inside a command callback and cannot join the loop thread.
+        // Still stop the independent native accept worker before process teardown.
+        if (command_pipe_stop_event)
+            SetEvent(command_pipe_stop_event);
+#endif
         uint32_t in_flight = __atomic_load_n(&commands_in_flight, __ATOMIC_ACQUIRE);
 
         if (in_flight) {
@@ -1202,6 +1734,10 @@ void commands_exit(void)
     }
 
     __atomic_store_n(&command_thread_shutdown, 1, __ATOMIC_RELEASE);
+#if defined(OS_WINDOWS)
+    if (command_pipe_stop_event)
+        SetEvent(command_pipe_stop_event);
+#endif
     netdata_log_info("Shutting down command server.");
     /* wake up event loop */
     fatal_assert(0 == uv_async_send(&async));

@@ -52,6 +52,13 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags);
 #define DEFAULT_SOCKET_FLAGS 0
 #endif
 
+// Portable socket close: Winsock SOCKETs require closesocket(), not CRT close()
+#if defined(OS_WINDOWS)
+#  define sock_close(fd) closesocket((SOCKET)(fd))
+#else
+#  define sock_close(fd) close(fd)
+#endif
+
 
 bool ip_to_hostname(const char *ip, char *dst, size_t dst_len);
 
