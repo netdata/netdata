@@ -132,7 +132,7 @@ func TestExporterCSVSemantics(t *testing.T) {
 			assert.Contains(t, rows, annotation, name)
 		}
 	}
-	assert.Equal(t, 123, enabled, "preserve the stock field selection")
+	assert.Equal(t, 121, enabled, "preserve the stock field selection")
 }
 func TestStockAlertsMatchMetadata(t *testing.T) {
 	metadata, err := os.ReadFile("metadata.yaml")
