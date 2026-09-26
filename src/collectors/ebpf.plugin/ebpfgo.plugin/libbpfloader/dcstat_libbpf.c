@@ -456,21 +456,13 @@ static void dcstat_destroy_ring_buffer(struct netdata_ebpf_dcstat_runtime *rt)
     nd_ebpf_acc_free(&rt->acc);
 }
 
-/* Arena flavor: the BPF programs publish events into an mmap-able BPF arena
- * instead of a ring buffer.  The state layout and the drain loop are shared (see
- * struct nd_ebpf_arena_state); only the companion BSS field name is per-module.
- *
- * bpf_map__initial_value() on a BPF_MAP_TYPE_ARENA map returns the arena region
- * start, but the data section sits at a page-aligned offset inside it, so using
- * the arena map pointer directly reads uninitialized memory.  The arena skeleton
- * wires a companion BSS map whose mmaped pointer libbpf resolves to the correct
- * offset after load — use that. */
+/* The generated arena skeleton maps the arena data section through `arena`. */
 static void dcstat_setup_arena(struct netdata_ebpf_dcstat_runtime *rt)
 {
-    if (!rt->core.arena || !rt->core.arena->bss)
+    if (!rt->core.arena || !rt->core.arena->arena)
         return;
 
-    rt->arena_state = (void *)&rt->core.arena->bss->dc_arena_state;
+    rt->arena_state = (void *)&rt->core.arena->arena->dc_arena_state;
 }
 
 static void dcstat_rb_event(void *ctx, const struct nd_ebpf_pid_event *ev)
