@@ -3,6 +3,12 @@
 #include "../libnetdata.h"
 #include "spawn_library.h"
 
+// Compatibility wrapper: every caller that does not care which of the three outcomes happened keeps
+// using this and is unaffected by the reporting variant.
+int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms) {
+    return spawn_server_exec_kill_ex(server, si, timeout_ms, NULL);
+}
+
 BUFFER *argv_to_cmdline_buffer(const char **argv) {
     BUFFER *wb = buffer_create(0, NULL);
 
