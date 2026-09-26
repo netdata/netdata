@@ -150,8 +150,8 @@ modules:
             cause: The firmware table is inconsistent; it declares more or fewer memory devices than it lists.
             fix: Check the table with the hardware vendor's tools and firmware updates. A missing record in an inconsistent table is not proof of a lost memory device, so nothing is reported as loss.
           - error: memory baseline has unsupported version, owner or content
-            cause: The state file belongs to another Agent, is damaged, or uses an unsupported format.
-            fix: Restore the matching state file from a backup, or start a new baseline with the stopped-collector reset above; do not edit the file in place. Restart the collector afterwards, because a failed state load is reported until restart.
+            cause: The state file belongs to another Agent, is damaged, or uses an unsupported format, such as one written by a newer Netdata version before a downgrade.
+            fix: After a downgrade, upgrade Netdata again; the older collector leaves the file unchanged. Otherwise restore the matching state file from a backup, or start a new baseline with the stopped-collector reset above; do not edit the file in place. Restart the collector afterwards, because a failed state load is reported until restart.
           - error: memory baseline contains an invalid slot
             cause: The state file was edited or truncated and no longer describes valid accepted slots.
             fix: Restore the state file from a backup, or start a new baseline with the stopped-collector reset above, then restart the collector.

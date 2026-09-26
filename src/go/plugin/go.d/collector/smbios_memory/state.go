@@ -42,6 +42,10 @@ type persistentState struct {
 	Baseline   []inventory.Device `json:"baseline"`
 	Loss       []discrepancy      `json:"loss,omitempty"`
 	LossAt     time.Time          `json:"loss_at,omitempty"`
+
+	// locatorKeyed marks a state upgraded from version 1 until a comparable
+	// table has been matched with it; see adoptBanks.
+	locatorKeyed bool
 }
 
 func (s *persistentState) validate(owner string) error {
@@ -87,6 +91,36 @@ func (s *persistentState) upgrade() {
 		s.Loss[i].Bank = banks[s.Loss[i].Locator]
 	}
 	s.Version = stateVersion
+	s.locatorKeyed = true
+}
+
+// adoptBanks matches an upgraded version 1 state with the first comparable
+// table the way version 1 did, by device locator, and takes the table's banks.
+// Version 1 kept the bank it first saw as descriptive metadata, so firmware may
+// have renamed it since. A table whose locators repeat cannot be matched that
+// way, and the saved banks remain.
+func (s *persistentState) adoptBanks(devices []inventory.Device) {
+	if !s.locatorKeyed {
+		return
+	}
+	s.locatorKeyed = false
+	banks := make(map[string]string, len(devices))
+	for _, d := range devices {
+		if _, ok := banks[d.Locator]; ok {
+			return
+		}
+		banks[d.Locator] = d.Bank
+	}
+	for i, d := range s.Baseline {
+		if bank, ok := banks[d.Locator]; ok {
+			s.Baseline[i].Bank = bank
+		}
+	}
+	for i, l := range s.Loss {
+		if bank, ok := banks[l.Locator]; ok {
+			s.Loss[i].Bank = bank
+		}
+	}
 }
 
 // baselineStore owns the state file of the running canonical job. A read-only
@@ -131,6 +165,9 @@ func (b *baselineStore) load() {
 func (b *baselineStore) reconcile(table *inventory.Table, now time.Time) error {
 	if b.err != nil || (b.current == nil && table.Populated == 0) {
 		return nil
+	}
+	if b.current != nil {
+		b.current.adoptBanks(table.Devices)
 	}
 	next := proposedState(b.current, table, b.owner, now)
 	if !b.dirty && reflect.DeepEqual(b.current, next) {
