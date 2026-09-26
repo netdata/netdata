@@ -25,30 +25,30 @@ const (
 // slot the current table does not mention. A nil table means the firmware
 // table could not be read this cycle.
 func inventoryRows(table *inventory.Table, state *persistentState, comparison string) []inventory.Row {
-	baseline := make(map[string]inventory.Device)
-	lost := make(map[string]bool)
+	baseline := make(map[slotKey]inventory.Device)
+	lost := make(map[slotKey]bool)
 	if state != nil {
 		for _, d := range state.Baseline {
-			baseline[d.Locator] = d
+			baseline[slotOf(d)] = d
 		}
-		for _, d := range state.Loss {
-			lost[d.Locator] = true
+		for _, l := range state.Loss {
+			lost[l.slot()] = true
 		}
 	}
 
 	var rows []inventory.Row
-	seen := make(map[string]bool)
+	seen := make(map[slotKey]bool)
 	if table != nil {
 		for _, d := range table.Devices {
-			seen[d.Locator] = true
-			old, accepted := baseline[d.Locator]
+			seen[slotOf(d)] = true
+			old, accepted := baseline[slotOf(d)]
 			rows = append(rows, currentRow(d, old, accepted, comparison))
 		}
 	}
 	if state != nil {
 		for _, d := range state.Baseline {
-			if !seen[d.Locator] {
-				rows = append(rows, baselineOnlyRow(d, lost[d.Locator], comparison, table != nil))
+			if slot := slotOf(d); !seen[slot] {
+				rows = append(rows, baselineOnlyRow(d, lost[slot], comparison, table != nil))
 			}
 		}
 	}
