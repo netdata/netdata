@@ -17,9 +17,10 @@ enum netdata_netframework_metrics {
 };
 
 struct net_framework_instances {
-    usec_t last_collected;
     ULONGLONG last_process_id;
     bool process_id_label_initialized;
+    uint32_t objects_seen;
+    uint32_t objects_seen_this_cycle;
 
     RRDSET *st_clrexception_thrown;
     RRDDIM *rd_clrexception_thrown;
@@ -239,7 +240,6 @@ struct net_framework_instances {
     COUNTER_DATA NETFrameworkCLRLocksAndThreadsContentions;
 };
 
-static usec_t netframework_now_ut = 0;
 static DICTIONARY *processes = NULL;
 
 static inline void initialize_net_framework_processes_keys(struct net_framework_instances *p)
@@ -448,7 +448,7 @@ static void dict_net_framework_processes_delete_cb(
     netframework_process_cleanup(p);
 }
 
-static inline struct net_framework_instances *netframework_process_get(const char *name)
+static inline struct net_framework_instances *netframework_process_get(const char *name, unsigned object)
 {
     // Known limitation, accepted: Perflib may suffix duplicate names (for example, w3wp#1), but suffixes are
     // assigned per counter object and can change as processes start or stop. Same-named processes can therefore
@@ -456,7 +456,8 @@ static inline struct net_framework_instances *netframework_process_get(const cha
     // available dumps, and only .NET CLR Memory exposes a process ID, so there is no reliable cross-object
     // discriminator. This limitation is documented under the integration's limits.
     struct net_framework_instances *p = dictionary_set(processes, name, NULL, sizeof(*p));
-    p->last_collected = netframework_now_ut;
+    p->objects_seen |= 1U << object;
+    p->objects_seen_this_cycle |= 1U << object;
     return p;
 }
 
@@ -485,7 +486,8 @@ netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
         if (strcasecmp(windows_shared_buffer, "_Global_") == 0)
             continue;
 
-        struct net_framework_instances *p = netframework_process_get(windows_shared_buffer);
+        struct net_framework_instances *p =
+            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_EXCEPTIONS);
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRExceptionThrown)) {
             if (!p->st_clrexception_thrown) {
@@ -635,7 +637,8 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
         if (strcasecmp(windows_shared_buffer, "_Global_") == 0)
             continue;
 
-        struct net_framework_instances *p = netframework_process_get(windows_shared_buffer);
+        struct net_framework_instances *p =
+            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_INTEROP);
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRInteropCOMCallableWrappers)) {
             if (!p->st_clrinterop_com_callable_wrappers) {
@@ -764,7 +767,7 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
         if (strcasecmp(windows_shared_buffer, "_Global_") == 0)
             continue;
 
-        struct net_framework_instances *p = netframework_process_get(windows_shared_buffer);
+        struct net_framework_instances *p = netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_JIT);
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITMethods)) {
             if (!p->st_clrjit_methods) {
@@ -905,7 +908,8 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
         if (strcasecmp(windows_shared_buffer, "_Global_") == 0)
             continue;
 
-        struct net_framework_instances *p = netframework_process_get(windows_shared_buffer);
+        struct net_framework_instances *p =
+            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_LOADING);
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingHeapSize)) {
             if (!p->st_clrloading_heap_size) {
@@ -1225,7 +1229,8 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
         if (strcasecmp(windows_shared_buffer, "_Global_") == 0)
             continue;
 
-        struct net_framework_instances *p = netframework_process_get(windows_shared_buffer);
+        struct net_framework_instances *p =
+            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_MEMORY);
 
         bool has_allocated_bytes =
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryAllocatedBytesPerSec);
@@ -1756,7 +1761,8 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
         if (strcasecmp(windows_shared_buffer, "_Global_") == 0)
             continue;
 
-        struct net_framework_instances *p = netframework_process_get(windows_shared_buffer);
+        struct net_framework_instances *p =
+            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_REMOTING);
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRRemotingChannels)) {
             if (!p->st_clrremoting_channels) {
@@ -1973,7 +1979,8 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
         if (strcasecmp(windows_shared_buffer, "_Global_") == 0)
             continue;
 
-        struct net_framework_instances *p = netframework_process_get(windows_shared_buffer);
+        struct net_framework_instances *p =
+            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_SECURITY);
 
         if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityLinkTimeChecks)) {
             if (!p->st_clrsecurity_link_time_checks) {
@@ -2121,7 +2128,8 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
         if (strcasecmp(windows_shared_buffer, "_Global_") == 0)
             continue;
 
-        struct net_framework_instances *p = netframework_process_get(windows_shared_buffer);
+        struct net_framework_instances *p =
+            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_LOCKS_THREADS);
 
         if (perflibGetInstanceCounter(
                 pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLocksAndThreadsCurrentQueueLength)) {
@@ -2407,9 +2415,9 @@ int do_PerflibNetFramework(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
-    netframework_now_ut = now_monotonic_usec();
-    bool collection_failed = false;
+    uint32_t failed_objects = 0;
 
+    struct net_framework_instances *p;
     int i;
     for (i = 0; i < NETDATA_NETFRAMEWORK_END; i++) {
         DWORD id = RegistryFindIDByName(netframewrk_obj[i].object);
@@ -2418,29 +2426,33 @@ int do_PerflibNetFramework(int update_every, usec_t dt __maybe_unused)
 
         PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
         if (!pDataBlock) {
-            collection_failed = true;
+            failed_objects |= 1U << i;
             continue;
         }
 
         PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, netframewrk_obj[i].object);
         if (!pObjectType) {
-            collection_failed = true;
+            failed_objects |= 1U << i;
             continue;
         }
 
         netframewrk_obj[i].fnct(pDataBlock, pObjectType, update_every);
     }
 
-    if (!collection_failed) {
-        struct net_framework_instances *p;
-        dfe_start_write(processes, p)
-        {
-            if (p->last_collected < netframework_now_ut)
-                dictionary_del(processes, p_dfe.name);
+    dfe_start_write(processes, p)
+    {
+        // CLR objects expose the same instance population. Drop a process when at least one object that has
+        // reported it before succeeded this cycle and no object reported it. If every object that knows this
+        // process failed, we have no evidence either way and keep it.
+        if ((p->objects_seen & ~failed_objects) != 0 && p->objects_seen_this_cycle == 0) {
+            dictionary_del(processes, p_dfe.name);
+            continue;
         }
-        dfe_done(p);
-        dictionary_garbage_collect(processes);
+
+        p->objects_seen_this_cycle = 0;
     }
+    dfe_done(p);
+    dictionary_garbage_collect(processes);
 
     return 0;
 }
