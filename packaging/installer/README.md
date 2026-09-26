@@ -24,6 +24,12 @@ You can also install Netdata directly without connecting to Netdata Cloud. Choos
 **Windows** - Native Windows monitoring agent
 [→ Install on Windows](/packaging/windows/WINDOWS_INSTALLER.md)
 
+:::note
+
+Windows is available via a dedicated MSI installer but is not currently listed in the tiered platform support model, which covers Linux distributions, static builds, and related platforms. See the [platform support policy](/packaging/PLATFORM_SUPPORT.md) for details.
+
+:::
+
 **macOS** - Monitor your Mac systems
 [→ Install on macOS](/packaging/installer/methods/macos.md)
 
