@@ -99,8 +99,10 @@ func TestProcessVNodeNameRoundTrip(t *testing.T) {
 			done := make(chan error, 1)
 			go func() { done <- process.run(context.Background(), controls) }()
 			t.Cleanup(func() {
+				// Close stdin only after Run returns: EOF without QUIT is a terminal
+				// input failure and would race the requested termination.
+				defer func() { require.NoError(t, writer.Close()) }()
 				controls.sendTerminate(testProcessControl())
-				require.NoError(t, writer.Close())
 				select {
 				case err := <-done:
 					require.NoError(t, err)
