@@ -603,7 +603,7 @@ jobs:
       - name: Retrieve Windows Artifacts
         id: fetch-windows
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: windows-*-installer
           path: dist-artifacts
@@ -671,7 +671,7 @@ jobs:
       - name: Retrieve Build Artifacts
         id: fetch-dist
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: dist-*
           path: dist-artifacts
@@ -679,7 +679,7 @@ jobs:
       - name: Retrieve Windows Artifacts
         id: fetch-windows
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: windows-*-installer
           path: dist-artifacts
@@ -764,7 +764,7 @@ jobs:
       - name: Fetch artifacts
         id: fetch
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: github-artifacts
           path: artifacts
@@ -831,7 +831,7 @@ jobs:
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: github-artifacts
           path: artifacts
@@ -898,7 +898,7 @@ jobs:
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: github-artifacts
           path: artifacts
@@ -966,7 +966,7 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: github-artifacts
           path: final-artifacts
@@ -1142,7 +1142,7 @@ jobs:
         uses: actions/checkout@v7
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: github-artifacts
           path: final-artifacts
