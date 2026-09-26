@@ -132,7 +132,8 @@ func (j *Job) Start(ctx context.Context, onCommit func()) error {
 			cleanupPreflight()
 			return startupError(errors.New("SNMP engine state root is not configured"))
 		}
-		if err := recv.PrepareV3(j.deps.EngineStateRoot(), j.policy.jobName); err != nil {
+		readOnly := j.deps.EngineStateReadOnly != nil && j.deps.EngineStateReadOnly()
+		if err := recv.PrepareV3(j.deps.EngineStateRoot(), j.policy.jobName, readOnly); err != nil {
 			cleanupPreflight()
 			if receiver.IsConfigPreparationError(err) {
 				return configError(err)

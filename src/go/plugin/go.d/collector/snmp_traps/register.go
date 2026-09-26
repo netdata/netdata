@@ -5,6 +5,7 @@ package snmp_traps
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
@@ -59,6 +60,7 @@ func requiredPluginServices(caller string, deviceStore *ddsnmp.DeviceStore, topo
 		newHostIdentityService(),
 		telemetry.NewRegistry(),
 		netdataEngineStateRoot,
+		terminal.IsTerminal,
 	)
 }
 

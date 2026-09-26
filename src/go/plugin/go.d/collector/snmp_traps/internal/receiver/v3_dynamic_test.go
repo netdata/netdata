@@ -47,7 +47,7 @@ func newDynamicTestReceiver(t *testing.T, max int, rateLimit RateLimitConfig) (*
 		DynamicEngineIDMax: max,
 		RateLimit:          rateLimit,
 	}), recorder.report)
-	if err := recv.PrepareV3(t.TempDir(), "dynamic-test"); err != nil {
+	if err := recv.PrepareV3(t.TempDir(), "dynamic-test", false); err != nil {
 		t.Fatalf("prepare v3 receiver: %v", err)
 	}
 	t.Cleanup(recv.RollbackPreparedState)

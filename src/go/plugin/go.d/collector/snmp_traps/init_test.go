@@ -706,6 +706,7 @@ func TestCollectorInit_JournalHostFailureRetriesFreshProvider(t *testing.T) {
 		service,
 		telemetry.NewRegistry(),
 		func() string { return t.TempDir() },
+		func() bool { return false },
 	)
 	services.catalog = manager
 	c := newCollector(services)
