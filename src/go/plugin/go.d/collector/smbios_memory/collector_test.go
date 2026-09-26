@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -17,6 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smbios_memory/internal/inventory"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
@@ -65,7 +67,7 @@ func TestCollector_Collect(t *testing.T) {
 		"installed_capacity_bytes": 15 * (64 << 30), "populated_slots": 15, "empty_slots": 0,
 		"missing_devices": 1, "capacity_deficit_bytes": 64 << 30,
 	}
-	missing.Loss = []discrepancy{{Locator: "DIMM_P0_A0", Missing: true, Deficit: 64 << 30}}
+	missing.Loss = []discrepancy{{Bank: "BANK 0", Locator: "DIMM_P0_A0", Missing: true, Deficit: 64 << 30}}
 	offset := healthyCollection()
 	offset.ConfirmedLoss = "present"
 	offset.Values = map[string]float64{
@@ -75,16 +77,16 @@ func TestCollector_Collect(t *testing.T) {
 	offset.Loss = missing.Loss
 	growth := healthyCollection()
 	growth.Values["installed_capacity_bytes"] += 64 << 30
-	growth.Baseline["DIMM_P0_A0"] = 128 << 30
+	growth.Baseline[firstSlot] = 128 << 30
 	reduced := healthyCollection()
 	reduced.ConfirmedLoss = "present"
 	reduced.Values["capacity_deficit_bytes"] = 64 << 30
-	reduced.Baseline["DIMM_P0_A0"] = 128 << 30
-	reduced.Loss = []discrepancy{{Locator: "DIMM_P0_A0", Deficit: 64 << 30}}
+	reduced.Baseline[firstSlot] = 128 << 30
+	reduced.Loss = []discrepancy{{Bank: "BANK 0", Locator: "DIMM_P0_A0", Deficit: 64 << 30}}
 	reset := healthyCollection()
 	reset.Values["installed_capacity_bytes"] = 15 * (64 << 30)
 	reset.Values["populated_slots"] = 15
-	delete(reset.Baseline, "DIMM_P0_A0")
+	delete(reset.Baseline, firstSlot)
 
 	for name, tc := range map[string]struct {
 		prepare       func(*testing.T, *fixtureHost, *Collector) *Collector
@@ -131,7 +133,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			want: healthyCollection(), unchangedFile: true,
 		},
-		"duplicate locators do not confirm loss": {
+		"locators duplicated within a bank do not confirm loss": {
 			prepare: func(t *testing.T, h *fixtureHost, c *Collector) *Collector {
 				r := fixtureRecords(t, h.data)
 				r[1][16], r[2][16] = 2, 2
@@ -202,6 +204,139 @@ func TestCollector_Collect(t *testing.T) {
 	}
 }
 
+// Firmware that reuses device locators in every bank is comparable, and a loss
+// names the slot in its bank, not the same-named slot of another bank.
+func TestSharedLocatorsAcrossBanks(t *testing.T) {
+	h := newFixtureHost(t)
+	r := sharedLocatorRecords(t, h.data)
+	h.write(t, joinRecords(r))
+	c := h.collector(t)
+	cycle(t, c)
+
+	healthy := healthyCollection()
+	healthy.Baseline = make(map[slotKey]uint64)
+	for i := range 16 {
+		healthy.Baseline[slotKey{
+			bank:    sharedLocatorBank(i),
+			locator: fmt.Sprintf("DIMM %d", i%2),
+		}] = 64 << 30
+	}
+	assert.Equal(t, healthy, collectionOutput(t, c))
+
+	// Device 2 is "DIMM 0" in channel B; channel A has a "DIMM 0" too.
+	binary.LittleEndian.PutUint16(r[3][12:14], 0)
+	h.write(t, joinRecords(r))
+	cycle(t, c)
+
+	emptied := slotKey{
+		bank:    "P0 CHANNEL B",
+		locator: "DIMM 0",
+	}
+	loss := healthy
+	loss.ConfirmedLoss = "present"
+	loss.Values = map[string]float64{
+		"installed_capacity_bytes": 15 * (64 << 30), "populated_slots": 15, "empty_slots": 1,
+		"missing_devices": 1, "capacity_deficit_bytes": 64 << 30,
+	}
+	loss.Loss = []discrepancy{{Bank: "P0 CHANNEL B", Locator: "DIMM 0", Missing: true, Deficit: 64 << 30}}
+	assert.Equal(t, loss, collectionOutput(t, c))
+
+	wantComparisons := make(map[slotKey]any)
+	for slot := range healthy.Baseline {
+		wantComparisons[slot] = "unchanged"
+	}
+	wantComparisons[emptied] = "missing"
+	comparisons := make(map[slotKey]any)
+	response := c.funcRouter.Handle(t.Context(), "inventory", funcapi.ResolvedParams{})
+	require.Equal(t, 200, response.Status)
+	for _, row := range response.Data.([][]any) {
+		comparisons[slotKey{
+			bank:    row[2].(string),
+			locator: row[1].(string),
+		}] = row[6]
+	}
+	assert.Equal(t, wantComparisons, comparisons)
+}
+
+// A version 1 state file identified slots by locator alone. It keeps working
+// and is rewritten only when the state changes.
+func TestVersion1StateUpgrade(t *testing.T) {
+	lossV1 := []map[string]any{{"locator": "DIMM_P0_A0", "missing": true, "deficit_bytes": 64 << 30}}
+	emptyFirstSlot := func(t *testing.T, h *fixtureHost) {
+		r := fixtureRecords(t, h.data)
+		binary.LittleEndian.PutUint16(r[1][12:14], 0)
+		h.write(t, joinRecords(r))
+	}
+	retained := healthyCollection()
+	retained.ConfirmedLoss = "present"
+	retained.Values = map[string]float64{
+		"installed_capacity_bytes": 15 * (64 << 30), "populated_slots": 15, "empty_slots": 1,
+		"missing_devices": 1, "capacity_deficit_bytes": 64 << 30,
+	}
+	retained.Loss = []discrepancy{{Bank: "BANK 0", Locator: "DIMM_P0_A0", Missing: true, Deficit: 64 << 30}}
+	repeatedLocator := fixtureDevices()
+	repeatedLocator[1].Bank, repeatedLocator[1].Locator = "BANK 1", repeatedLocator[0].Locator
+
+	for name, tc := range map[string]struct {
+		baseline      []inventory.Device
+		loss          []map[string]any
+		prepare       func(*testing.T, *fixtureHost)
+		want          collectionResult
+		wantRewritten bool
+	}{
+		"unchanged baseline": {baseline: fixtureDevices(), want: healthyCollection()},
+		"loss takes the bank of its accepted slot": {
+			baseline: fixtureDevices(), loss: lossV1, prepare: emptyFirstSlot, want: retained,
+		},
+		"restoration saves version 2": {
+			baseline: fixtureDevices(), loss: lossV1, want: healthyCollection(), wantRewritten: true,
+		},
+		"repeated locator is not a version 1 baseline": {
+			baseline: repeatedLocator,
+			want: collectionResult{
+				Inventory:     "available",
+				Comparison:    "state_error",
+				ConfirmedLoss: "unknown",
+				Values:        map[string]float64{"installed_capacity_bytes": 1 << 40, "populated_slots": 16, "empty_slots": 0},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := newFixtureHost(t)
+			if tc.prepare != nil {
+				tc.prepare(t, h)
+			}
+			v1 := map[string]any{
+				"version":     1,
+				"owner":       "fixture-agent",
+				"accepted_at": fixtureTime,
+				"baseline":    tc.baseline,
+			}
+			if tc.loss != nil {
+				v1["loss"], v1["loss_at"] = tc.loss, fixtureTime
+			}
+			before, err := json.Marshal(v1)
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(h.statePath, before, 0600))
+
+			c := h.collector(t)
+			cycle(t, c)
+
+			assert.Equal(t, tc.want, collectionOutput(t, c))
+			after := diskState(t, h)
+			if !tc.wantRewritten {
+				assert.Equal(t, before, after)
+				return
+			}
+			var saved struct {
+				Version int `json:"version"`
+			}
+			require.NoError(t, json.Unmarshal(after, &saved))
+			assert.Equal(t, 2, saved.Version)
+		})
+	}
+}
+
 func TestBaselineFilePermissionsAndUnchangedPoll(t *testing.T) {
 	h := newFixtureHost(t)
 	c := h.collector(t)
@@ -223,7 +358,7 @@ func TestPersistenceFailureRetainsLossAndRetries(t *testing.T) {
 	c := h.collector(t)
 	cycle(t, c)
 	dir := filepath.Dir(h.statePath)
-	loss := []discrepancy{{Locator: "DIMM_P0_A0", Missing: true, Deficit: 64 << 30}}
+	loss := []discrepancy{{Bank: "BANK 0", Locator: "DIMM_P0_A0", Missing: true, Deficit: 64 << 30}}
 	// These steps deliberately share state: persistence failures, retry and restart
 	// must be exercised in order through the real collector and filesystem.
 	for _, step := range []struct {
@@ -543,7 +678,7 @@ func TestCandidateLoadsStateOnlyAfterActivation(t *testing.T) {
 		Comparison:    "unavailable",
 		ConfirmedLoss: "present",
 		Baseline:      expectedBaseline(),
-		Loss:          []discrepancy{{Locator: "DIMM_P0_A0", Missing: true, Deficit: 64 << 30}},
+		Loss:          []discrepancy{{Bank: "BANK 0", Locator: "DIMM_P0_A0", Missing: true, Deficit: 64 << 30}},
 	}
 	assert.Equal(t, want, collectionOutput(t, candidate))
 	assert.Equal(
@@ -562,7 +697,7 @@ func TestTerminalSessionKeepsStateReadOnly(t *testing.T) {
 		"installed_capacity_bytes": 15 * (64 << 30), "populated_slots": 15, "empty_slots": 1,
 		"missing_devices": 1, "capacity_deficit_bytes": 64 << 30,
 	}
-	loss.Loss = []discrepancy{{Locator: "DIMM_P0_A0", Missing: true, Deficit: 64 << 30}}
+	loss.Loss = []discrepancy{{Bank: "BANK 0", Locator: "DIMM_P0_A0", Missing: true, Deficit: 64 << 30}}
 
 	for name, tc := range map[string]struct {
 		saved bool

@@ -51,7 +51,7 @@ type Table struct {
 	Populated   int
 	Empty       int
 	CountsKnown bool   // Populated and Empty cover every device
-	Comparable  bool   // every device has a unique locator and a known capacity
+	Comparable  bool   // every device has a locator unique within its bank and a known capacity
 	Reason      string // why the table is not comparable
 }
 
