@@ -628,7 +628,8 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
                                         uint64_t models_deserialization_failures,
                                         uint64_t memory_consumption,
                                         uint64_t memory_new,
-                                        uint64_t memory_delete)
+                                        uint64_t memory_delete,
+                                        uint64_t memory_unmatched_free)
 {
     if (!Cfg.enable_statistics_charts)
         return;
@@ -729,6 +730,7 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
         static RRDSET *st = NULL;
         static RRDDIM *rd_memory_new = NULL;
         static RRDDIM *rd_memory_delete = NULL;
+        static RRDDIM *rd_memory_unmatched_free = NULL;
 
         if (unlikely(!st)) {
             st = rrdset_create_localhost(
@@ -748,10 +750,12 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
 
             rd_memory_new = rrddim_add(st, "new", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_memory_delete = rrddim_add(st, "delete", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_memory_unmatched_free = rrddim_add(st, "unmatched_free", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_memory_new, (collected_number) memory_new);
         rrddim_set_by_pointer(st, rd_memory_delete, (collected_number) memory_delete);
+        rrddim_set_by_pointer(st, rd_memory_unmatched_free, (collected_number) memory_unmatched_free);
         rrdset_done(st);
     }
 }
