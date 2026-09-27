@@ -495,8 +495,7 @@ cleanup() {
 deferred_warnings() {
   if [ -n "${NETDATA_WARNINGS}" ]; then
     printf >&2 "%s\n" "The following non-fatal warnings or errors were encountered:"
-    # shellcheck disable=SC2059
-    printf >&2 "${NETDATA_WARNINGS}"
+    printf >&2 "%b" "${NETDATA_WARNINGS}"
     printf >&2 "\n\n"
   fi
 }
@@ -717,6 +716,14 @@ handle_curl_result() {
   dl_log="${3}"
   action="${4}"
   dest="${5}"
+
+  # Some curl versions report an HTTP failure as a receive error. Only
+  # normalize it when the response actually contains an HTTP error status.
+  if [ "${ret}" -eq 56 ]; then
+    case "$(tail -n 1 "${dl_log}")" in
+      4[0-9][0-9]|5[0-9][0-9]) ret=22 ;;
+    esac
+  fi
 
   case "${ret}" in
     0) return 0 ;;
