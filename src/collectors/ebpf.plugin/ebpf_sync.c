@@ -351,14 +351,17 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
  */
 static void ebpf_sync_read_global_table(int maps_per_core)
 {
-    netdata_idx_t stored[NETDATA_MAX_PROCESSOR];
+    static netdata_idx_t *stored = NULL;
+    if (!stored)
+        stored = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
+
     uint32_t idx = NETDATA_SYNC_CALL;
     int i;
     for (i = 0; i < NETDATA_SYNC_IDX_END; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
         if (w->enabled) {
             int fd = w->sync_maps[NETDATA_SYNC_GLOBAL_TABLE].map_fd;
-            if (!bpf_map_lookup_elem(fd, &idx, &stored)) {
+            if (!bpf_map_lookup_elem(fd, &idx, stored)) {
                 int j, end = (maps_per_core) ? ebpf_nprocs : 1;
                 netdata_idx_t total = 0;
                 for (j = 0; j < end; j++)

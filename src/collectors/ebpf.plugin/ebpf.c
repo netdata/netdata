@@ -1015,10 +1015,11 @@ static void ebpf_set_global_variables()
     if (!ebpf_configured_log_dir)
         ebpf_configured_log_dir = LOG_DIR;
 
-    ebpf_nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
-    if (ebpf_nprocs < 0) {
+    // Per-CPU maps hold a value for every possible CPU, not only the online ones
+    ebpf_nprocs = libbpf_num_possible_cpus();
+    if (ebpf_nprocs <= 0) {
         ebpf_nprocs = NETDATA_MAX_PROCESSOR;
-        netdata_log_error("Cannot identify number of process, using default value %d", ebpf_nprocs);
+        netdata_log_error("Cannot identify number of possible processors, using default value %d", ebpf_nprocs);
     }
 
     isrh = get_redhat_release();
@@ -1236,6 +1237,10 @@ static void ebpf_parse_args(int argc, char **argv)
                     goto unittest;
 
                 if (ebpf_adjust_memory_limit())
+                    goto unittest;
+
+                // Buffers sized with ebpf_nprocs must hold a per-CPU map value
+                if (ebpf_ut_percpu_lookup_fits_nprocs())
                     goto unittest;
 
                 // Load binary in entry mode
