@@ -178,7 +178,9 @@ production topology contract in `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`. F
 compact-table helpers. For Rust, implement the `FunctionHandler` trait from the SDK runtime
 (`src/crates/netdata-plugin/rt/`).
 
-Functions run concurrently with the collection loop — they must not block it. Validate during development with
+Functions run concurrently with the collection loop — they must not block it. C plugins also share its stdout:
+response serialization is stated above the `*_to_stdout()` helpers in
+`src/libnetdata/functions_evloop/functions_evloop.h`. Validate during development with
 `src/go/tools/functions-validation/`.
 
 Reference implementations: `src/collectors/network-viewer.plugin/` (topology + connections),
