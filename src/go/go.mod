@@ -24,7 +24,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.72.0
 	github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.41.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.4
-	github.com/aws/aws-sdk-go-v2/service/sts v1.51.0
+	github.com/aws/aws-sdk-go-v2/service/sts v1.51.1
 	github.com/aws/smithy-go v1.28.2
 	github.com/axiomhq/hyperloglog v0.3.0
 	github.com/blang/semver/v4 v4.0.0
