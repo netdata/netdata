@@ -352,14 +352,16 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
 static void ebpf_sync_read_global_table(int maps_per_core)
 {
     static netdata_idx_t *stored = NULL;
-    if (!stored)
-        stored = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
 
     uint32_t idx = NETDATA_SYNC_CALL;
     int i;
     for (i = 0; i < NETDATA_SYNC_IDX_END; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
         if (w->enabled) {
+            // Allocated on the first lookup, so nothing is allocated when no syscall is enabled
+            if (!stored)
+                stored = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
+
             int fd = w->sync_maps[NETDATA_SYNC_GLOBAL_TABLE].map_fd;
             if (!bpf_map_lookup_elem(fd, &idx, stored)) {
                 int j, end = (maps_per_core) ? ebpf_nprocs : 1;
