@@ -1037,30 +1037,29 @@ static void ebpf_parse_args(int argc, char **argv)
 {
     int disable_cgroups = 1;
     int freq = 0;
-    int option_index = 0;
     uint64_t select_threads = 0;
+    /* val is the enum ebpf_main_index constant handled by the switch below; the order of entries does not matter */
     static struct option long_options[] = {
-        {"process", no_argument, 0, 0},
-        {"sync", no_argument, 0, 0},
-        {"swap", no_argument, 0, 0},
-        {"vfs", no_argument, 0, 0},
-        {"filesystem", no_argument, 0, 0},
-        {"disk", no_argument, 0, 0},
-        {"mount", no_argument, 0, 0},
-        {"hardirq", no_argument, 0, 0},
-        {"softirq", no_argument, 0, 0},
-        {"oomkill", no_argument, 0, 0},
-        {"shm", no_argument, 0, 0},
-        {"mdflush", no_argument, 0, 0},
-        /* INSERT NEW THREADS BEFORE THIS COMMENT TO KEEP COMPATIBILITY WITH enum ebpf_module_indexes */
-        {"all", no_argument, 0, 0},
-        {"version", no_argument, 0, 0},
-        {"help", no_argument, 0, 0},
-        {"global", no_argument, 0, 0},
-        {"return", no_argument, 0, 0},
-        {"legacy", no_argument, 0, 0},
-        {"core", no_argument, 0, 0},
-        {"unittest", no_argument, 0, 0},
+        {"process", no_argument, 0, EBPF_MODULE_PROCESS_IDX},
+        {"sync", no_argument, 0, EBPF_MODULE_SYNC_IDX},
+        {"swap", no_argument, 0, EBPF_MODULE_SWAP_IDX},
+        {"vfs", no_argument, 0, EBPF_MODULE_VFS_IDX},
+        {"filesystem", no_argument, 0, EBPF_MODULE_FILESYSTEM_IDX},
+        {"disk", no_argument, 0, EBPF_MODULE_DISK_IDX},
+        {"mount", no_argument, 0, EBPF_MODULE_MOUNT_IDX},
+        {"hardirq", no_argument, 0, EBPF_MODULE_HARDIRQ_IDX},
+        {"softirq", no_argument, 0, EBPF_MODULE_SOFTIRQ_IDX},
+        {"oomkill", no_argument, 0, EBPF_MODULE_OOMKILL_IDX},
+        {"shm", no_argument, 0, EBPF_MODULE_SHM_IDX},
+        {"mdflush", no_argument, 0, EBPF_MODULE_MDFLUSH_IDX},
+        {"all", no_argument, 0, EBPF_OPTION_ALL_CHARTS},
+        {"version", no_argument, 0, EBPF_OPTION_VERSION},
+        {"help", no_argument, 0, EBPF_OPTION_HELP},
+        {"global", no_argument, 0, EBPF_OPTION_GLOBAL_CHART},
+        {"return", no_argument, 0, EBPF_OPTION_RETURN_MODE},
+        {"legacy", no_argument, 0, EBPF_OPTION_LEGACY},
+        {"core", no_argument, 0, EBPF_OPTION_CORE},
+        {"unittest", no_argument, 0, EBPF_OPTION_UNITTEST},
         {0, 0, 0, 0}};
 
     if (argc > 1) {
@@ -1085,11 +1084,11 @@ static void ebpf_parse_args(int argc, char **argv)
     ebpf_load_thread_config();
 
     while (1) {
-        int c = getopt_long_only(argc, argv, "", long_options, &option_index);
+        int c = getopt_long_only(argc, argv, "", long_options, NULL);
         if (c == -1)
             break;
 
-        switch (option_index) {
+        switch (c) {
             case EBPF_MODULE_PROCESS_IDX: {
                 select_threads |= 1 << EBPF_MODULE_PROCESS_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
