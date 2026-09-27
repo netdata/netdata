@@ -878,8 +878,18 @@ fn test_receive_timeout() {
 
     // No client sends anything, so receive must timeout
     let mut buf = [0u8; 1024];
-    let result = server.receive(&mut buf, 50); // 50ms timeout
-    assert_eq!(result.unwrap_err(), ShmError::Timeout);
+    server.spin_tries = 0;
+    for timeout_ms in [100, 1100] {
+        let start = std::time::Instant::now();
+        let result = server.receive(&mut buf, timeout_ms);
+        let elapsed = start.elapsed();
+        assert_eq!(result.unwrap_err(), ShmError::Timeout);
+        assert!(
+            elapsed >= Duration::from_millis(timeout_ms as u64),
+            "{elapsed:?}"
+        );
+        assert!(elapsed < Duration::from_secs(6), "{elapsed:?}");
+    }
 
     server.destroy();
     cleanup_shm(svc, sid);
