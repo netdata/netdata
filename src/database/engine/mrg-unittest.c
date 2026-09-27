@@ -54,37 +54,11 @@ static void mrg_stress(void *ptr) {
             time_t before = __atomic_add_fetch(&e->before, 1, __ATOMIC_RELAXED);
 
             mrg_update_metric_retention_and_granularity_by_uuid(
-                mrg, (Word_t)&test_ctx_0, &e->uuid, after, before, 1, before, NULL);
+                mrg, (Word_t)&test_ctx_0, &e->uuid, after, before, 1, before);
 
             __atomic_add_fetch(&t->updates, 1, __ATOMIC_RELAXED);
         }
     }
-}
-
-static int mrg_unittest_expect_samples_delta(
-    struct rrdengine_instance *ctx,
-    time_t first_time_s,
-    time_t last_time_s,
-    uint32_t update_every_s,
-    bool expected_rc,
-    uint64_t expected_samples,
-    const char *name)
-{
-    uint64_t samples = UINT64_MAX;
-    bool rc = rrdeng_retention_samples_delta(ctx, first_time_s, last_time_s, update_every_s, name, &samples);
-
-    if(rc == expected_rc && samples == expected_samples)
-        return 0;
-
-    fprintf(stderr,
-            "DBENGINE METRIC: samples delta test '%s' failed, expected rc=%s samples=%"PRIu64
-            ", got rc=%s samples=%"PRIu64"\n",
-            name,
-            expected_rc ? "true" : "false",
-            expected_samples,
-            rc ? "true" : "false",
-            samples);
-    return 1;
 }
 
 static int mrg_unittest_expect_counter_sub(
@@ -112,19 +86,105 @@ static int mrg_unittest_expect_counter_sub(
     return 1;
 }
 
-static int dbengine_accounting_helpers_unittest(void) {
+// The tier's samples counter must always equal the sum of what is charged to its
+// datafiles: charges add, a set replaces one datafile's charge (journal v2 load or
+// a successful journal v2 write), an uncharge removes it (datafile deletion).
+static int dbengine_datafile_samples_unittest(void) {
     int errors = 0;
     struct rrdengine_instance ctx = {0};
+    ctx.config.tier = 0;
+    struct rrdengine_datafile df1 = { .ctx = &ctx }, df2 = { .ctx = &ctx };
+
+#define EXPECT_SAMPLES(what, got, want) do { \
+        if((uint64_t)(got) != (uint64_t)(want)) { \
+            fprintf(stderr, "DBENGINE: datafile samples test '%s' failed, expected %"PRIu64" got %"PRIu64"\n", \
+                    what, (uint64_t)(want), (uint64_t)(got)); \
+            errors++; \
+        } \
+    } while(0)
+
+    // flushed extents / replayed pages of two datafiles
+    rrdeng_datafile_samples_charge(&df1, 100);
+    rrdeng_datafile_samples_charge(&df1, 20);
+    rrdeng_datafile_samples_charge(&df2, 7);
+    rrdeng_datafile_samples_charge(&df2, 0);
+    EXPECT_SAMPLES("charge df1", df1.samples.charged, 120);
+    EXPECT_SAMPLES("charge df2", df2.samples.charged, 7);
+    EXPECT_SAMPLES("charge total", ctx.atomic.samples, 127);
+
+    // journal v2 written for df1: duplicates were rejected, the indexed count is lower
+    rrdeng_datafile_samples_set(&df1, 110, false);
+    EXPECT_SAMPLES("reconcile down df1", df1.samples.charged, 110);
+    EXPECT_SAMPLES("reconcile down total", ctx.atomic.samples, 117);
+
+    // setting the same value again (a retried write) changes nothing
+    rrdeng_datafile_samples_set(&df1, 110, false);
+    EXPECT_SAMPLES("reconcile twice total", ctx.atomic.samples, 117);
+
+    // an estimate larger than what was charged
+    rrdeng_datafile_samples_set(&df2, 9, true);
+    EXPECT_SAMPLES("reconcile up df2", df2.samples.charged, 9);
+    EXPECT_SAMPLES("reconcile up total", ctx.atomic.samples, 119);
+    if(!df2.samples.estimated || df1.samples.estimated) {
+        fprintf(stderr, "DBENGINE: datafile samples test 'estimated flag' failed\n");
+        errors++;
+    }
+
+    // deleting a datafile removes exactly its charge
+    rrdeng_datafile_samples_uncharge(&df1);
+    EXPECT_SAMPLES("uncharge df1", df1.samples.charged, 0);
+    EXPECT_SAMPLES("uncharge df1 total", ctx.atomic.samples, 9);
+
+    // deleting it again removes nothing
+    rrdeng_datafile_samples_uncharge(&df1);
+    EXPECT_SAMPLES("uncharge twice total", ctx.atomic.samples, 9);
+
+    rrdeng_datafile_samples_uncharge(&df2);
+    EXPECT_SAMPLES("uncharge all total", ctx.atomic.samples, 0);
+
+#undef EXPECT_SAMPLES
+    return errors;
+}
+
+// The estimate for a metric entry of a journal v2 file without a samples section:
+// its span at its latest cadence, never below its page count.
+static int dbengine_estimated_samples_unittest(void) {
+    int errors = 0;
+
+    struct {
+        const char *name;
+        struct journal_metric_list metric;
+        uint64_t expected;
+    } cases[] = {
+        // 100 s at 1 s: 101 slots, more than its 2 pages
+        { "span at cadence", { .entries = 2, .delta_start_s = 100, .delta_end_s = 200, .update_every_s = 1 }, 101 },
+        // one point, one page
+        { "single point", { .entries = 1, .delta_start_s = 100, .delta_end_s = 100, .update_every_s = 1 }, 1 },
+        // cadence got coarser: 100 s at 60 s is 2 slots, but the file holds 5 pages
+        { "floored at pages", { .entries = 5, .delta_start_s = 100, .delta_end_s = 200, .update_every_s = 60 }, 5 },
+        // unknown cadence: one slot per page
+        { "no update every", { .entries = 3, .delta_start_s = 100, .delta_end_s = 200, .update_every_s = 0 }, 3 },
+        // corrupt range: one slot per page
+        { "reversed range", { .entries = 4, .delta_start_s = 200, .delta_end_s = 100, .update_every_s = 1 }, 4 },
+    };
+
+    for(size_t i = 0; i < _countof(cases); i++) {
+        uint64_t got = journalfile_v2_metric_estimated_samples(&cases[i].metric);
+        if(got != cases[i].expected) {
+            fprintf(stderr, "DBENGINE: estimated samples test '%s' failed, expected %"PRIu64" got %"PRIu64"\n",
+                    cases[i].name, cases[i].expected, got);
+            errors++;
+        }
+    }
+
+    return errors;
+}
+
+static int dbengine_accounting_helpers_unittest(void) {
+    int errors = 0;
+    errors += dbengine_estimated_samples_unittest();
+    struct rrdengine_instance ctx = {0};
     ctx.config.tier = 1;
-
-    errors += mrg_unittest_expect_samples_delta(&ctx, 10, 70, 10, true, 6, "normal positive interval");
-    errors += mrg_unittest_expect_samples_delta(&ctx, 10, 10, 10, false, 0, "equal timestamps");
-    errors += mrg_unittest_expect_samples_delta(&ctx, 0, 10, 10, false, 0, "missing first timestamp");
-    errors += mrg_unittest_expect_samples_delta(&ctx, 10, 70, 0, false, 0, "missing update every");
-
-#ifndef NETDATA_INTERNAL_CHECKS
-    errors += mrg_unittest_expect_samples_delta(&ctx, 70, 10, 10, false, 0, "reversed interval");
-#endif
 
     errors += mrg_unittest_expect_counter_sub(&ctx, 9, 4, true, 5, "normal decrement");
     errors += mrg_unittest_expect_counter_sub(&ctx, 9, 0, true, 9, "zero decrement");
@@ -152,6 +212,8 @@ static int dbengine_accounting_helpers_unittest(void) {
                 ctx.atomic.samples);
         errors++;
     }
+
+    errors += dbengine_datafile_samples_unittest();
 
     return errors;
 }
@@ -1726,9 +1788,11 @@ static int mrg_jv2_real_writer_unittest(void) {
     // two different extents, so the rejected page's extent must not be serialized
     xio_old.fileno = TEST_FILENO; xio_old.block = 4096;
     xio_old.bytes = 4096; xio_old.uuid_id = tp.shared_id;
+    xio_old.slots = END_SHORT - START_TIME + 1;
 
     xio_new.fileno = TEST_FILENO; xio_new.block = 8192;
     xio_new.bytes = 4096; xio_new.uuid_id = tp.shared_id;
+    xio_new.slots = END_LONG - START_TIME + 1;
     p_old = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
         .section = section, .metric_id = (Word_t)tp.stale_ptr,
         .start_time_s = START_TIME, .end_time_s = END_SHORT, .size = 4096, .data = &datafile,
@@ -1815,6 +1879,14 @@ static int mrg_jv2_real_writer_unittest(void) {
                             page_list[0].extent_index, j2->extent_count);
                     errors++;
                 }
+
+                // the samples section counts only the page the index kept
+                const uint32_t *samples = journalfile_v2_samples_section((const uint8_t *)j2, j2->journal_v2_file_size);
+                if(!samples || samples[0] != END_LONG - START_TIME + 1) {
+                    fprintf(stderr, "ERROR: the samples section has %u for the metric (expected %d, the surviving "
+                                    "page only)\n", samples ? samples[0] : 0, END_LONG - START_TIME + 1);
+                    errors++;
+                }
             }
 
             journalfile_v2_data_release(journalfile);
@@ -1862,6 +1934,428 @@ cleanup:
     else
         fprintf(stderr, "jv2 real writer test: OK\n");
 
+    return errors;
+}
+
+// Exact samples in journal v2 (stored slots):
+//  - the writer sums the slots of every metric's indexed pages into the samples
+//    section, in metric list order, and resets the datafile's charge to that total;
+//  - when a page does not know its slots, no section is written and the charge
+//    taken at flush time is kept;
+//  - the startup loader charges the section's total, or a per-entry estimate when
+//    the file has no valid section (absent, or damaged on disk).
+#define JV2_SAMPLES_METRICS 3
+#define JV2_SAMPLES_PAGES 2
+
+static int mrg_jv2_samples_section_check(bool all_slots_known) {
+    int errors = 0;
+    enum { TEST_FILENO = 12, FLUSH_CHARGE = 999 };
+
+    char dbpath[FILENAME_MAX + 1];
+    if(!jv2_make_tmpdir(dbpath, sizeof(dbpath))) {
+        fprintf(stderr, "SKIPPED: no usable temporary directory for the journal\n");
+        return 0;
+    }
+
+    // same fixture as mrg_jv2_real_writer_unittest()
+    struct rrdengine_instance ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.config.tier = 0;
+    strncpyz(ctx.config.dbfiles_path, dbpath, sizeof(ctx.config.dbfiles_path) - 1);
+    fatal_assert(0 == netdata_rwlock_init(&ctx.datafiles.rwlock));
+    rw_spinlock_init(&ctx.njfv2idx.spinlock);
+
+    struct rrdengine_datafile datafile;
+    memset(&datafile, 0, sizeof(datafile));
+    datafile.tier = 1;
+    datafile.fileno = TEST_FILENO;
+    datafile.ctx = &ctx;
+    datafile.magic1 = datafile.magic2 = DATAFILE_MAGIC;
+    datafile.users.available = true;
+    fatal_assert(0 == netdata_rwlock_init(&datafile.extent_rwlock));
+    spinlock_tracked_init(&datafile.users.spinlock);
+    spinlock_init(&datafile.writers.spinlock);
+    rw_spinlock_init(&datafile.extent_epdl.spinlock);
+
+    struct rrdengine_journalfile *journalfile = journalfile_alloc_and_init(&datafile);
+    const Word_t section = (Word_t)&ctx;
+
+    MRG *mrg = mrg_create_for_unittest();
+    MRG *saved_main_mrg = main_mrg;
+    main_mrg = mrg;
+
+    PGC *cache = pgc_create(
+        "jv2-samples-test",
+        32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
+        64, NULL, jv2_stale_metric_save_dirty_cb,
+        10, 10, 1000, 10,
+        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+
+    nd_uuid_t uuids[JV2_SAMPLES_METRICS];
+    METRIC *metrics[JV2_SAMPLES_METRICS] = { 0 };
+    PGC_PAGE *pages[JV2_SAMPLES_METRICS][JV2_SAMPLES_PAGES] = { 0 };
+    uint64_t expected[JV2_SAMPLES_METRICS] = { 0 };
+    uint64_t expected_total = 0, expected_estimate = 0;
+    bool published = false;
+
+    // what the extents flushed to this datafile charged
+    rrdeng_datafile_samples_charge(&datafile, FLUSH_CHARGE);
+
+    for(size_t m = 0; m < JV2_SAMPLES_METRICS; m++) {
+        uuid_generate(uuids[m]);
+        MRG_ENTRY entry = {
+            .uuid = &uuids[m], .section = section,
+            .first_time_s = 100, .last_time_s = 100, .latest_update_every_s = 1,
+        };
+        bool added;
+        metrics[m] = mrg_metric_add_and_acquire(mrg, entry, &added);
+
+        for(size_t p = 0; p < JV2_SAMPLES_PAGES; p++) {
+            time_t start = 100 + (time_t)(p * 1000);
+            time_t end = start + 50 + (time_t)(m * 10);
+            uint32_t slots = (uint32_t)(end - start + 1);
+            if(!all_slots_known && m == 1 && p == 1)
+                slots = 0;
+
+            struct extent_io_data xio = {
+                .fileno = TEST_FILENO, .block = (uint32_t)(4096 * (1 + m * JV2_SAMPLES_PAGES + p)),
+                .bytes = 4096, .uuid_id = mrg_metric_uuidmap_id(mrg, metrics[m]), .slots = slots,
+            };
+            bool page_added;
+            pages[m][p] = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
+                .section = section, .metric_id = mrg_metric_id(mrg, metrics[m]),
+                .start_time_s = start, .end_time_s = end, .size = 4096, .data = &datafile,
+                .update_every_s = 1, .hot = true, .custom_data = (uint8_t *)&xio,
+            }, &page_added);
+            if(!pages[m][p] || !page_added) {
+                fprintf(stderr, "ERROR: cannot add hot page %zu of metric %zu\n", p, m);
+                errors++;
+                goto cleanup;
+            }
+            expected[m] += slots;
+        }
+        expected_total += expected[m];
+        // estimate: the metric spans [100, 1000 + 150 + m*10] at 1s
+        expected_estimate += (uint64_t)((1000 + 150 + (time_t)(m * 10)) - 100) + 1;
+    }
+
+    pgc_open_cache_to_journal_v2(cache, section, TEST_FILENO, 1,
+                                 journalfile_migrate_to_v2_callback, journalfile, true);
+
+    if(!journalfile_v2_data_available(journalfile)) {
+        fprintf(stderr, "ERROR: the writer did not activate a v2 journal\n");
+        errors++;
+        goto cleanup;
+    }
+    published = true;
+
+    // the writer's section and the datafile charge
+    {
+        size_t data_size = 0;
+        struct journal_v2_header *j2 = journalfile_v2_data_acquire(journalfile, &data_size, 0, 0);
+        if(!j2) {
+            fprintf(stderr, "ERROR: cannot acquire the published v2 journal data\n");
+            errors++;
+            goto cleanup;
+        }
+
+        const uint32_t *samples = journalfile_v2_samples_section((const uint8_t *)j2, data_size);
+        if(all_slots_known) {
+            if(!samples) {
+                fprintf(stderr, "ERROR: the writer did not write a valid samples section\n");
+                errors++;
+            }
+            else {
+                const struct journal_metric_list *list = (const void *)((uint8_t *)j2 + j2->metric_offset);
+                for(size_t i = 0; i < j2->metric_count; i++) {
+                    for(size_t m = 0; m < JV2_SAMPLES_METRICS; m++) {
+                        if(nd_uuid_eq(list[i].uuid, uuids[m]) && samples[i] != expected[m]) {
+                            fprintf(stderr, "ERROR: metric %zu has %u samples in the section (expected %" PRIu64 ")\n",
+                                    m, samples[i], expected[m]);
+                            errors++;
+                        }
+                    }
+                }
+            }
+
+            if(datafile.samples.charged != expected_total || ctx.atomic.samples != expected_total || datafile.samples.estimated) {
+                fprintf(stderr, "ERROR: after the write the datafile is charged %" PRIu64 " (tier %" PRIu64 ", estimated %d), expected %" PRIu64 "\n",
+                        datafile.samples.charged, (uint64_t)ctx.atomic.samples, datafile.samples.estimated, expected_total);
+                errors++;
+            }
+        }
+        else {
+            if(samples) {
+                fprintf(stderr, "ERROR: a samples section was written although a page did not know its slots\n");
+                errors++;
+            }
+            if(datafile.samples.charged != FLUSH_CHARGE) {
+                fprintf(stderr, "ERROR: without a section the flush-time charge must be kept (%" PRIu64 ", expected %d)\n",
+                        datafile.samples.charged, FLUSH_CHARGE);
+                errors++;
+            }
+        }
+
+        journalfile_v2_data_release(journalfile);
+    }
+
+    // the startup loader
+    journalfile_v2_populate_retention_to_mrg(&ctx, journalfile);
+    {
+        uint64_t want = all_slots_known ? expected_total : expected_estimate;
+        if(datafile.samples.charged != want || ctx.atomic.samples != want || datafile.samples.estimated == all_slots_known) {
+            fprintf(stderr, "ERROR: the loader charged %" PRIu64 " (tier %" PRIu64 ", estimated %d), expected %" PRIu64 " (estimated %d)\n",
+                    datafile.samples.charged, (uint64_t)ctx.atomic.samples, datafile.samples.estimated, want, !all_slots_known);
+            errors++;
+        }
+    }
+
+    // rotation: the tier total is always what the remaining datafiles hold.
+    // A second datafile (its charge stands for its own journal) joins the tier,
+    // this datafile is deleted, then loading the remaining journal afresh gives
+    // the same total as the running counter.
+    {
+        uint64_t want = all_slots_known ? expected_total : expected_estimate;
+        struct rrdengine_datafile other = { .ctx = &ctx };
+        rrdeng_datafile_samples_set(&other, 12345, false);
+        if(ctx.atomic.samples != want + 12345) {
+            fprintf(stderr, "ERROR: with a second datafile the tier holds %" PRIu64 ", expected %" PRIu64 "\n",
+                    (uint64_t)ctx.atomic.samples, want + 12345);
+            errors++;
+        }
+
+        // delete the second datafile: only this journal remains
+        rrdeng_datafile_samples_uncharge(&other);
+        journalfile_v2_populate_retention_to_mrg(&ctx, journalfile);
+        if(ctx.atomic.samples != want || datafile.samples.charged != want) {
+            fprintf(stderr, "ERROR: after deleting the second datafile the tier holds %" PRIu64 " (datafile %" PRIu64 "), expected %" PRIu64 "\n",
+                    (uint64_t)ctx.atomic.samples, datafile.samples.charged, want);
+            errors++;
+        }
+
+        // delete this datafile too: nothing remains
+        rrdeng_datafile_samples_set(&other, 12345, false);
+        rrdeng_datafile_samples_uncharge(&datafile);
+        if(ctx.atomic.samples != 12345) {
+            fprintf(stderr, "ERROR: after deleting this datafile the tier holds %" PRIu64 ", expected 12345\n",
+                    (uint64_t)ctx.atomic.samples);
+            errors++;
+        }
+
+        // and loading its journal again restores exactly its samples
+        rrdeng_datafile_samples_uncharge(&other);
+        journalfile_v2_populate_retention_to_mrg(&ctx, journalfile);
+        if(ctx.atomic.samples != want || datafile.samples.charged != want) {
+            fprintf(stderr, "ERROR: reloading the journal charged %" PRIu64 " (tier %" PRIu64 "), expected %" PRIu64 "\n",
+                    datafile.samples.charged, (uint64_t)ctx.atomic.samples, want);
+            errors++;
+        }
+    }
+
+    // damage on disk: the loader trusts the descriptor alone (it never reads the
+    // array), per-metric readers need both
+    if(all_slots_known) {
+        char path[FILENAME_MAX + 1];
+        journalfile_v2_generate_path(&datafile, path, sizeof(path));
+
+        struct journal_v2_samples_descriptor descriptor = { 0 };
+        uint32_t original_value = 0;
+        int fd = open(path, O_RDWR | O_CLOEXEC);
+        if(fd == -1 ||
+           pread(fd, &descriptor, sizeof(descriptor), JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET) != (ssize_t)sizeof(descriptor)) {
+            fprintf(stderr, "ERROR: cannot read the samples descriptor back\n");
+            errors++;
+        }
+        else {
+            if(descriptor.samples != expected_total) {
+                fprintf(stderr, "ERROR: the descriptor total is %" PRIu64 ", expected %" PRIu64 "\n",
+                        descriptor.samples, expected_total);
+                errors++;
+            }
+
+            uint32_t value;
+            if(pread(fd, &value, sizeof(value), descriptor.offset) == (ssize_t)sizeof(value)) {
+                original_value = value;
+                value ^= 0x5a5a;
+                if(pwrite(fd, &value, sizeof(value), descriptor.offset) != (ssize_t)sizeof(value)) {
+                    fprintf(stderr, "ERROR: cannot damage the samples section\n");
+                    errors++;
+                }
+            }
+        }
+        if(fd != -1)
+            close(fd);
+
+        // a damaged array: the loader still charges the descriptor's total,
+        // the per-metric reader rejects the section
+        journalfile_v2_populate_retention_to_mrg(&ctx, journalfile);
+        if(datafile.samples.charged != expected_total || datafile.samples.estimated) {
+            fprintf(stderr, "ERROR: with a damaged array the loader charged %" PRIu64 " (estimated %d), expected the descriptor total %" PRIu64 "\n",
+                    datafile.samples.charged, datafile.samples.estimated, expected_total);
+            errors++;
+        }
+        {
+            size_t data_size = 0;
+            struct journal_v2_header *j2 = journalfile_v2_data_acquire(journalfile, &data_size, 0, 0);
+            if(j2) {
+                if(journalfile_v2_samples_section((const uint8_t *)j2, data_size)) {
+                    fprintf(stderr, "ERROR: the samples section was accepted with a damaged array\n");
+                    errors++;
+                }
+                journalfile_v2_data_release(journalfile);
+            }
+        }
+
+        // a damaged descriptor: the loader estimates
+        {
+            struct journal_v2_samples_descriptor damaged = descriptor;
+            damaged.samples ^= 1;
+            fd = open(path, O_RDWR | O_CLOEXEC);
+            if(fd == -1 || pwrite(fd, &damaged, sizeof(damaged), JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET) != (ssize_t)sizeof(damaged)) {
+                fprintf(stderr, "ERROR: cannot damage the samples descriptor\n");
+                errors++;
+            }
+            if(fd != -1)
+                close(fd);
+
+            journalfile_v2_populate_retention_to_mrg(&ctx, journalfile);
+            if(datafile.samples.charged != expected_estimate || !datafile.samples.estimated) {
+                fprintf(stderr, "ERROR: with a damaged descriptor the loader charged %" PRIu64 " (estimated %d), expected the estimate %" PRIu64 "\n",
+                        datafile.samples.charged, datafile.samples.estimated, expected_estimate);
+                errors++;
+            }
+
+            fd = open(path, O_RDWR | O_CLOEXEC);
+            if(fd == -1 || pwrite(fd, &descriptor, sizeof(descriptor), JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET) != (ssize_t)sizeof(descriptor)) {
+                fprintf(stderr, "ERROR: cannot restore the samples descriptor\n");
+                errors++;
+            }
+            if(fd != -1)
+                close(fd);
+        }
+
+        // undo the damage: the section must be accepted again, so that the bad
+        // descriptors below are rejected by their field checks, not by the CRC
+        fd = open(path, O_RDWR | O_CLOEXEC);
+        if(fd == -1 || pwrite(fd, &original_value, sizeof(original_value), descriptor.offset) != (ssize_t)sizeof(original_value)) {
+            fprintf(stderr, "ERROR: cannot restore the samples section\n");
+            errors++;
+        }
+        if(fd != -1)
+            close(fd);
+
+        journalfile_v2_populate_retention_to_mrg(&ctx, journalfile);
+        if(datafile.samples.charged != expected_total || datafile.samples.estimated) {
+            fprintf(stderr, "ERROR: with the section restored the loader charged %" PRIu64 " (estimated %d), expected %" PRIu64 "\n",
+                    datafile.samples.charged, datafile.samples.estimated, expected_total);
+            errors++;
+        }
+        {
+            size_t data_size = 0;
+            struct journal_v2_header *j2 = journalfile_v2_data_acquire(journalfile, &data_size, 0, 0);
+            if(j2) {
+                if(!journalfile_v2_samples_section((const uint8_t *)j2, data_size)) {
+                    fprintf(stderr, "ERROR: the restored samples section is not accepted\n");
+                    errors++;
+                }
+                journalfile_v2_data_release(journalfile);
+            }
+        }
+
+        // descriptors whose own CRC is valid but whose fields are wrong must be
+        // rejected by the field checks themselves
+        struct {
+            const char *name;
+            int32_t count_delta;
+            int32_t offset_delta;
+            int64_t samples_delta;
+        } bad_descriptors[] = {
+            { "count off by one", 1, 0, 0 },
+            { "section not at the file trailer", 0, 4, 0 },
+            { "section overlapping the metric list", 0, -(int32_t)(descriptor.offset) + 8, 0 },
+            { "section pointing into the page region", 0, -64, 0 },
+            { "total disagreeing with the array", 0, 0, 1 },
+        };
+        for(size_t b = 0; b < _countof(bad_descriptors); b++) {
+            struct journal_v2_samples_descriptor bad = descriptor;
+            bad.count = (uint32_t)((int64_t)bad.count + bad_descriptors[b].count_delta);
+            bad.offset = (uint32_t)((int64_t)bad.offset + bad_descriptors[b].offset_delta);
+            bad.samples = (uint64_t)((int64_t)bad.samples + bad_descriptors[b].samples_delta);
+            uLong crc = crc32(0L, Z_NULL, 0);
+            crc = crc32(crc, (void *)&bad, offsetof(struct journal_v2_samples_descriptor, crc));
+            bad.crc = (uint32_t)crc;
+
+            fd = open(path, O_RDWR | O_CLOEXEC);
+            if(fd == -1 || pwrite(fd, &bad, sizeof(bad), JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET) != (ssize_t)sizeof(bad)) {
+                fprintf(stderr, "ERROR: cannot write the bad descriptor '%s'\n", bad_descriptors[b].name);
+                errors++;
+            }
+            if(fd != -1)
+                close(fd);
+
+            size_t data_size = 0;
+            struct journal_v2_header *j2 = journalfile_v2_data_acquire(journalfile, &data_size, 0, 0);
+            if(j2) {
+                if(journalfile_v2_samples_section((const uint8_t *)j2, data_size)) {
+                    fprintf(stderr, "ERROR: the samples section was accepted with a bad descriptor: %s\n", bad_descriptors[b].name);
+                    errors++;
+                }
+                journalfile_v2_data_release(journalfile);
+            }
+
+            // the loader trusts a well-formed descriptor without reading the
+            // array: a total that disagrees with the array is charged as is
+            // (by design - the array is not touched at startup)
+            if(bad_descriptors[b].samples_delta) {
+                journalfile_v2_populate_retention_to_mrg(&ctx, journalfile);
+                if(datafile.samples.charged != bad.samples || datafile.samples.estimated) {
+                    fprintf(stderr, "ERROR: the loader charged %" PRIu64 " (estimated %d) from a descriptor whose total is %" PRIu64 "\n",
+                            datafile.samples.charged, datafile.samples.estimated, bad.samples);
+                    errors++;
+                }
+            }
+        }
+    }
+
+cleanup:
+    for(size_t m = 0; m < JV2_SAMPLES_METRICS; m++)
+        for(size_t p = 0; p < JV2_SAMPLES_PAGES; p++)
+            if(pages[m][p]) pgc_page_release(cache, pages[m][p]);
+
+    pgc_destroy(cache, false);
+
+    for(size_t m = 0; m < JV2_SAMPLES_METRICS; m++)
+        if(metrics[m]) mrg_metric_release_and_delete(mrg, metrics[m]);
+
+    main_mrg = saved_main_mrg;
+    size_t referenced = mrg_destroy(mrg);
+    if(referenced) {
+        fprintf(stderr, "ERROR: %zu metrics still referenced - the MRG was not destroyed\n", referenced);
+        errors++;
+    }
+
+    if(published)
+        journalfile_close(journalfile, &datafile);
+    freez(journalfile);
+
+    netdata_rwlock_destroy(&datafile.extent_rwlock);
+    netdata_rwlock_destroy(&ctx.datafiles.rwlock);
+
+    {
+        char path[FILENAME_MAX + 1];
+        journalfile_v2_generate_path(&datafile, path, sizeof(path));
+        unlink(path);
+        rmdir(dbpath);
+    }
+
+    return errors;
+}
+
+static int mrg_jv2_samples_section_unittest(void) {
+    fprintf(stderr, "\nTesting jv2 samples section (writer, loader, damaged section)...\n");
+    int errors = mrg_jv2_samples_section_check(true);
+    errors += mrg_jv2_samples_section_check(false);
+    fprintf(stderr, "jv2 samples section test: %s\n", errors ? "FAILED" : "OK");
     return errors;
 }
 
@@ -1915,6 +2409,7 @@ int mrg_unittest(void) {
     errors += mrg_jv2_stale_metric_not_dereferenced_unittest();
     errors += mrg_jv2_same_uuid_grouped_once_unittest();
     errors += mrg_jv2_real_writer_unittest();
+    errors += mrg_jv2_samples_section_unittest();
     errors += mrg_uuid_lookup_delete_race_unittest();
 
     // Use mrg_create_for_unittest to avoid pre-loaded metrics that block deletion
@@ -2028,7 +2523,7 @@ int mrg_unittest(void) {
                 e->after,
                 e->before,
                 1,
-                e->before, NULL);
+                e->before);
         }
     }
     fprintf(stderr, "stress test ready to run...\n");

@@ -339,15 +339,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
         check_completed_page_consistency(handle);
         mrg_metric_set_clean_latest_time_s(main_mrg, handle->metric, pgc_page_end_time_s(handle->pgc_page));
 
-        struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
-        time_t start_time_s = pgc_page_start_time_s(handle->pgc_page);
-        time_t end_time_s = pgc_page_end_time_s(handle->pgc_page);
-        uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, handle->metric);
-        if (end_time_s && start_time_s && end_time_s > start_time_s && update_every_s) {
-            uint64_t add_samples = (end_time_s - start_time_s) / update_every_s;
-            __atomic_add_fetch(&ctx->atomic.samples, add_samples, __ATOMIC_RELAXED);
-        }
-
+        // samples are charged when the page reaches disk, see extent_flush_to_open()
         pgc_page_hot_to_dirty_and_release(main_cache, handle->pgc_page, false);
     }
 
