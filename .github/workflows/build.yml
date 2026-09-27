@@ -1329,6 +1329,9 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         with:
           submodules: recursive
+      - name: Test kickstart URL validation
+        if: needs.file-check.outputs.run == 'true'
+        run: ./tests/kickstart-url-validation-test.sh
       - name: Install latest bash
         id: install-bash
         if: needs.file-check.outputs.run == 'true'
