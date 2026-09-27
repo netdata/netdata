@@ -823,7 +823,7 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
                         // loop through all the complete lines found in the uncompressed buffer
 
                         while (buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
-                            if (unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
+                            if (unlikely(parser_action(parser, rpt->thread.line_buffer->buffer) != PARSER_RC_OK)) {
                                 stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
                                 *removed = true;
                                 return -1;
@@ -864,7 +864,7 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
             return rc;
 
         while(buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
-            if(unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
+            if(unlikely(parser_action(parser, rpt->thread.line_buffer->buffer) != PARSER_RC_OK)) {
                 stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
                 *removed = true;
                 return -1;
