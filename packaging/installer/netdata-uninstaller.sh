@@ -62,14 +62,16 @@ info() {
 error() {
   echo >&2 "$(date) : ERROR: ${script_name}: " "${1}"
   if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
-    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${1}"
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}
+  - ${1}"
   fi
 }
 
 fatal() {
   echo >&2 "$(date) : FATAL: ${script_name}: FAILED TO UNINSTALL NETDATA: " "${1}"
   if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
-    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${1}"
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}
+  - ${1}"
   fi
   exit_reason "${1}" "${2}"
   exit 1
@@ -323,7 +325,8 @@ run() {
   if [ ${ret} -ne 0 ]; then
     printf >&2 "%s FAILED %s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}"
     printf >> "${run_logfile}" "FAILED with exit code %s\n" "${ret}"
-    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - Command \"${*}\" failed with exit code ${ret}."
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}
+  - Command \"${*}\" failed with exit code ${ret}."
   else
     printf >&2 "%s OK %s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}"
     printf >> "${run_logfile}" "OK\n"

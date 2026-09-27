@@ -488,9 +488,15 @@ exit_reason() {
     if [ -n "${NETDATA_PROPAGATE_WARNINGS}" ]; then
       if [ -n "${NETDATA_SCRIPT_STATUS_PATH}" ]; then
         {
-          echo "EXIT_REASON=\"${EXIT_REASON}\""
-          echo "EXIT_CODE=\"${EXIT_CODE}\""
-          echo "NETDATA_WARNINGS=\"${NETDATA_WARNINGS}${SAVED_WARNINGS}\""
+          printf '%s' 'EXIT_REASON="'
+          printf '%s' "${EXIT_REASON}" | sed 's/[\\"$`]/\\&/g'
+          printf '"\n'
+          printf '%s' 'EXIT_CODE="'
+          printf '%s' "${EXIT_CODE}" | sed 's/[\\"$`]/\\&/g'
+          printf '"\n'
+          printf '%s' 'NETDATA_WARNINGS="'
+          printf '%s' "${NETDATA_WARNINGS}${SAVED_WARNINGS}" | sed 's/[\\"$`]/\\&/g'
+          printf '"\n'
         } >> "${NETDATA_SCRIPT_STATUS_PATH}"
       else
         export EXIT_REASON
@@ -504,7 +510,8 @@ exit_reason() {
 fatal() {
   printf >&2 "%s ABORTED %s %s \n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${1}"
   if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
-    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${1}"
+    SAVED_WARNINGS="${SAVED_WARNINGS}
+  - ${1}"
   fi
   exit_reason "${1}" "${2}"
   exit 1
@@ -513,7 +520,8 @@ fatal() {
 warning() {
   printf >&2 "%s WARNING %s %s\n\n" "${TPUT_BGYELLOW}${TPUT_BLACK}${TPUT_BOLD}" "${TPUT_RESET}" "${1}"
   if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
-    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${1}"
+    SAVED_WARNINGS="${SAVED_WARNINGS}
+  - ${1}"
   fi
 }
 
@@ -524,7 +532,8 @@ run_ok() {
 run_failed() {
   printf >&2 "%s FAILED %s %s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${1:-''}"
   if [ -n "${NETDATA_SAVE_WARNINGS}" ] && [ -n "${1:-''}" ]; then
-    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${1}"
+    SAVED_WARNINGS="${SAVED_WARNINGS}
+  - ${1}"
   fi
 }
 
@@ -570,7 +579,8 @@ run() {
     run_failed
     printf >> "${run_logfile}" "FAILED with exit code %s\n" "${ret}"
     if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
-      SAVED_WARNINGS="${SAVED_WARNINGS}\n  - Command '${*}' failed with exit code ${ret}."
+      SAVED_WARNINGS="${SAVED_WARNINGS}
+  - Command '${*}' failed with exit code ${ret}."
     fi
   else
     run_ok

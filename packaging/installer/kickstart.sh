@@ -495,7 +495,7 @@ cleanup() {
 deferred_warnings() {
   if [ -n "${NETDATA_WARNINGS}" ]; then
     printf >&2 "%s\n" "The following non-fatal warnings or errors were encountered:"
-    printf >&2 "%b" "${NETDATA_WARNINGS}"
+    printf >&2 "%s" "${NETDATA_WARNINGS}"
     printf >&2 "\n\n"
   fi
 }
@@ -577,7 +577,8 @@ run() {
     printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET}"
     printf "%s\n" "FAILED with exit code ${ret}" >> "${run_logfile}"
     # shellcheck disable=SC2089
-    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - Command \"${*}\" failed with exit code ${ret}."
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}
+  - Command \"${*}\" failed with exit code ${ret}."
   else
     printf >&2 "%s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET}"
     printf "OK\n" >> "${run_logfile}"
@@ -637,7 +638,8 @@ warning() {
   bracket="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}$(printf "%${TERM_WIDTH}s" " " | tr " " "=")${TPUT_RESET}"
   msg="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
   printf >&2 "%s\n%s\n%s\n" "${bracket}" "${msg}" "${bracket}"
-  NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${*}"
+  NETDATA_WARNINGS="${NETDATA_WARNINGS}
+  - ${*}"
 }
 
 _cannot_use_tmpdir() {

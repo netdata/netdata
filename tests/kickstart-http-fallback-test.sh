@@ -38,7 +38,8 @@ for scenario in '56 404 1' '56 403 5' '56 503 6' '56 200 99' '56 000 99' '22 404
     fi
 done
 
-NETDATA_WARNINGS='\n  - curl --write-out "%{http_code}" failed (100%).'
+NETDATA_WARNINGS='
+  - curl --write-out "%{http_code}" failed (100%).'
 warning_status=0
 deferred_warnings 2> "${test_dir}/warnings" || warning_status=$?
 if [ "${warning_status}" -ne 0 ] || ! grep -F '  - curl --write-out "%{http_code}" failed (100%).' "${test_dir}/warnings" >/dev/null; then
