@@ -965,13 +965,8 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
     em->load |= EBPF_LOAD_LEGACY;
 
     *obj = bpf_object__open_file(lpath, NULL);
-    if (!*obj) {
-        *obj = NULL;
-        return NULL;
-    }
-
-    if (libbpf_get_error(*obj)) {
-        bpf_object__close(*obj);
+    // A failed open leaves nothing to close: libbpf 1.x returns NULL, older versions an error pointer
+    if (!*obj || libbpf_get_error(*obj)) {
         *obj = NULL;
         return NULL;
     }
