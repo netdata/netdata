@@ -1277,8 +1277,9 @@ static void ebpf_parse_args(int argc, char **argv)
 
     // Not every loader can make the maps single-valued, so without the possible-CPU count no module may collect.
     // This runs after the options, so --help, --version and --unittest still work.
+    // Plain exit(): ebpf_cleanup() would touch the mutex, PID file and shared memory that main() hasn't set up yet.
     if (ebpf_possible_cpus_unknown)
-        ebpf_exit(1);
+        exit(1);
 
     if (disable_cgroups) {
         ebpf_disable_cgroups();
