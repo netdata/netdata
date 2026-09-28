@@ -818,7 +818,6 @@ int test_dbengine(void) {
 #ifdef ENABLE_ML
     // the ML training scheduler's page-close ordering, driven against this host's dbengine-backed charts;
     // it takes the RRD read lock and stores points, so it must run before the quiesce/exit sequence below
-    int ml_queue_host_order_unittest(RRDHOST *host);
     errors += (size_t)ml_queue_host_order_unittest(host);
 #endif
 
