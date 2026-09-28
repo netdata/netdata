@@ -108,7 +108,11 @@ func packageForm(name string, config *packageConfig) (string, error) {
 	if config != nil {
 		cloned, _ := jsonValue(config.document)
 		child := cloned.(map[string]any)
-		_ = walkSchema(child, true, func(node map[string]any, _ bool) error {
+		_ = walkSchema(child, "", true, func(value any, _ string, _ bool) error {
+			node, ok := value.(map[string]any)
+			if !ok {
+				return nil
+			}
 			if ref, ok := node["$ref"].(string); ok {
 				node["$ref"] = "#/properties/config" + strings.TrimPrefix(ref, "#")
 			}

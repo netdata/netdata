@@ -129,12 +129,25 @@ func loadPackageConfig(dir, name string) (*packageConfig, error) {
 	if form.Schema["$schema"] != "http://json-schema.org/draft-07/schema#" || form.Schema["type"] != "object" {
 		return nil, fmt.Errorf("config schema must be a draft-07 object")
 	}
-	if err := walkSchema(form.Schema, true, func(node map[string]any, defaults bool) error {
+	positions := make(map[string]bool)
+	var references []string
+	if err := walkSchema(form.Schema, "", true, func(value any, pointer string, defaults bool) error {
+		positions[pointer] = true
+		node, ok := value.(map[string]any)
+		if !ok {
+			return nil
+		}
+		if dialect, exists := node["$schema"]; exists && dialect != "http://json-schema.org/draft-07/schema#" {
+			return fmt.Errorf("config schema dialects must be draft-07")
+		}
 		if _, exists := node["$id"]; exists {
 			return fmt.Errorf("config schema IDs are not supported; use local references")
 		}
-		if ref, ok := node["$ref"].(string); ok && ref != "#" && !strings.HasPrefix(ref, "#/") {
-			return fmt.Errorf("config schema references must be local")
+		if ref, ok := node["$ref"].(string); ok {
+			if ref != "#" && !strings.HasPrefix(ref, "#/") {
+				return fmt.Errorf("config schema references must be local")
+			}
+			references = append(references, ref)
 		}
 		if value, exists := node["default"]; exists {
 			if !defaults {
@@ -148,7 +161,16 @@ func loadPackageConfig(dir, name string) (*packageConfig, error) {
 	}); err != nil {
 		return nil, err
 	}
+	// JSON Pointer refs can otherwise turn arbitrary annotation data into schemas,
+	// bypassing both validation above and reference rebasing in the job form.
+	for _, ref := range references {
+		pointer, err := url.PathUnescape(strings.TrimPrefix(ref, "#"))
+		if err != nil || !positions[pointer] {
+			return nil, fmt.Errorf("config schema references must target standard schema locations")
+		}
+	}
 	compiler := jsonschema.NewCompiler()
+	compiler.UseLoader(nil) // Only this document and the compiler's built-in metaschemas.
 	compiler.DefaultDraft(jsonschema.Draft7)
 	const resource = "urn:netdata:native:config"
 	if compiler.AddResource(resource, form.Schema) != nil {
@@ -196,31 +218,32 @@ func validateConfigDefaults(node map[string]any, compiler *jsonschema.Compiler, 
 	return nil
 }
 
-// Visit only schema positions, never arbitrary values in annotations/defaults.
-func walkSchema(value any, defaults bool, visit func(map[string]any, bool) error) error {
-	node, ok := value.(map[string]any)
-	if !ok {
+// Visit only Draft 7 schema positions, never arbitrary annotation/default data.
+func walkSchema(value any, pointer string, defaults bool, visit func(any, string, bool) error) error {
+	node, object := value.(map[string]any)
+	if _, boolean := value.(bool); !object && !boolean {
 		return nil
 	}
-	if err := visit(node, defaults); err != nil {
+	if err := visit(value, pointer, defaults); err != nil {
 		return err
 	}
 	for _, key := range []string{"properties", "patternProperties", "definitions", "dependencies"} {
 		children, _ := node[key].(map[string]any)
-		for _, child := range children {
-			if err := walkSchema(child, defaults && key == "properties", visit); err != nil {
+		for name, child := range children {
+			path := pointer + "/" + key + "/" + strings.ReplaceAll(strings.ReplaceAll(name, "~", "~0"), "/", "~1")
+			if err := walkSchema(child, path, defaults && key == "properties", visit); err != nil {
 				return err
 			}
 		}
 	}
 	for _, key := range []string{"items", "additionalItems", "additionalProperties", "contains", "propertyNames", "if", "then", "else", "not", "allOf", "anyOf", "oneOf"} {
 		if children, ok := node[key].([]any); ok {
-			for _, child := range children {
-				if err := walkSchema(child, false, visit); err != nil {
+			for i, child := range children {
+				if err := walkSchema(child, fmt.Sprintf("%s/%s/%d", pointer, key, i), false, visit); err != nil {
 					return err
 				}
 			}
-		} else if err := walkSchema(node[key], defaults && key == "items", visit); err != nil {
+		} else if err := walkSchema(node[key], pointer+"/"+key, defaults && key == "items", visit); err != nil {
 			return err
 		}
 	}

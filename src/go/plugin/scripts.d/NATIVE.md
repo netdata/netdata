@@ -200,8 +200,10 @@ DynCfg form envelope; its `jsonSchema` describes only the package's `config` obj
 ```
 
 Use Draft 7 and local fragment references (`#` or `#/definitions/...`); external
-resources and `$id` are rejected. Local references are rebased when the form is
-embedded in the job schema. Use `ui:widget: password` for credential fields.
+resources and `$id` are rejected. References must target standard Draft 7 schema
+locations, such as `definitions` or `properties`; annotation objects cannot be
+reference targets. Nested dialect declarations must also select Draft 7. Local
+references are rebased when the form is embedded in the job schema. Use `ui:widget: password` for credential fields.
 Schema compilation and runtime errors omit submitted values. Configuration numbers
 use IEEE-754 double precision; represent exact large identifiers as strings.
 

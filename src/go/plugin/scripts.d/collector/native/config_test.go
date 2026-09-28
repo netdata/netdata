@@ -116,6 +116,38 @@ func TestPackageFormLocalReferences(t *testing.T) {
 	)
 }
 
+func TestPackageFormEscapedAndBooleanReferences(t *testing.T) {
+	dir := t.TempDir()
+	body := `{
+	 "jsonSchema": {
+	  "$schema":"http://json-schema.org/draft-07/schema#", "type":"object",
+	  "properties":{"text":{"$ref":"#/definitions/alias"},"blocked":{"$ref":"#/definitions/blocked"}},
+	  "definitions":{
+	   "alias":{"$ref":"#/definitions/a~1b%20~0"},
+	   "a/b ~":{"type":"string"},
+	   "blocked":false
+	  },
+	  "examples":[{"$ref":"file:///annotation-is-data"}]
+	 },
+	 "uiSchema":{}
+	}`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "schema.json"), []byte(body), 0644))
+	config, err := loadPackageConfig(dir, "schema.json")
+	require.NoError(t, err)
+	composed, err := packageForm("native-fixture", config)
+	require.NoError(t, err)
+	var form map[string]any
+	require.NoError(t, json.Unmarshal([]byte(composed), &form))
+	compiler := jsonschema.NewCompiler()
+	compiler.UseLoader(nil)
+	require.NoError(t, compiler.AddResource("urn:fixture:form", form["jsonSchema"]))
+	schema, err := compiler.Compile("urn:fixture:form")
+	require.NoError(t, err)
+	require.NoError(t, schema.Validate(map[string]any{"config": map[string]any{"text": "valid"}}))
+	require.Error(t, schema.Validate(map[string]any{"config": map[string]any{"text": false}}))
+	require.Error(t, schema.Validate(map[string]any{"config": map[string]any{"blocked": "anything"}}))
+}
+
 func TestPackageSchemaRejectsUnsafeOrAmbiguousInputs(t *testing.T) {
 	cases := map[string]string{
 		"invalid default": strings.Replace(fixtureSchema, `"default": 17`, `"default": -1`, 1),
@@ -154,6 +186,27 @@ func TestPackageSchemaRejectsUnsafeOrAmbiguousInputs(t *testing.T) {
 			_, err := loadPackageConfig(dir, "schema.json")
 			require.Error(t, err)
 			assert.NotContains(t, err.Error(), "SYNTHETIC")
+		})
+	}
+}
+
+func TestPackageSchemaReferenceBoundaries(t *testing.T) {
+	dir := t.TempDir()
+	external := filepath.Join(dir, "external.json")
+	require.NoError(
+		t,
+		os.WriteFile(external, []byte(`{"$schema":"http://json-schema.org/draft-07/schema#","type":"string"}`), 0644),
+	)
+	for name, extra := range map[string]string{
+		"hidden external reference": fmt.Sprintf(`"properties":{"text":{"$ref":"#/x-hidden"}},"x-hidden":{"$ref":%q}`, "file://"+external),
+		"hidden local reference":    `"properties":{"text":{"$ref":"#/x-hidden"}},"x-hidden":{"$ref":"#/definitions/text"},"definitions":{"text":{"type":"string"}}`,
+		"external nested dialect":   fmt.Sprintf(`"properties":{"text":{"type":"string","$schema":%q}}`, "file://"+external),
+	} {
+		t.Run(name, func(t *testing.T) {
+			body := `{"jsonSchema":{"$schema":"http://json-schema.org/draft-07/schema#","type":"object",` + extra + `},"uiSchema":{}}`
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "schema.json"), []byte(body), 0644))
+			_, err := loadPackageConfig(dir, "schema.json")
+			require.Error(t, err)
 		})
 	}
 }
