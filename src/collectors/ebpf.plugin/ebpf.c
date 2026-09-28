@@ -25,6 +25,7 @@ struct config collector_config = APPCONFIG_INITIALIZER;
 
 int running_on_kernel = 0;
 int ebpf_nprocs;
+static bool ebpf_possible_cpus_unknown = false;
 int isrh = 0;
 int main_thread_id = 0;
 int process_pid_fd = -1;
@@ -1016,10 +1017,18 @@ static void ebpf_set_global_variables()
         ebpf_configured_log_dir = LOG_DIR;
 
     // Per-CPU maps hold a value for every possible CPU, not only the online ones
-    ebpf_nprocs = libbpf_num_possible_cpus();
-    if (ebpf_nprocs <= 0) {
+    int possible_cpus = libbpf_num_possible_cpus();
+    if (possible_cpus > 0) {
+        ebpf_nprocs = possible_cpus;
+    } else {
+        // No buffer size is safe for a per-CPU lookup without this count, so ebpf_parse_args() disables per-CPU maps
+        ebpf_possible_cpus_unknown = true;
         ebpf_nprocs = NETDATA_MAX_PROCESSOR;
-        netdata_log_error("Cannot identify number of possible processors, using default value %d", ebpf_nprocs);
+        netdata_log_error(
+            "libbpf_num_possible_cpus() returned %d instead of a positive CPU count: per-CPU maps are disabled "
+            "and lookup buffers use %d entries.",
+            possible_cpus,
+            ebpf_nprocs);
     }
 
     isrh = get_redhat_release();
@@ -1083,6 +1092,12 @@ static void ebpf_parse_args(int argc, char **argv)
     }
 
     ebpf_load_thread_config();
+
+    // Without the possible-CPU count, read every map with one value per key, whatever the configuration says
+    if (ebpf_possible_cpus_unknown) {
+        for (int i = 0; ebpf_modules[i].info.thread_name; i++)
+            ebpf_modules[i].maps_per_core = CONFIG_BOOLEAN_NO;
+    }
 
     while (1) {
         int c = getopt_long_only(argc, argv, "", long_options, NULL);

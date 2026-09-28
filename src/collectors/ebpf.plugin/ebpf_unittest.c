@@ -150,9 +150,10 @@ int ebpf_ut_percpu_lookup_fits_nprocs()
     }
 
     int ret = bpf_map_lookup_elem(fd, &key, values);
+    int lookup_errno = errno;
     close(fd);
     if (ret) {
-        fprintf(stderr, "Cannot read the per-CPU array: %s\n", strerror(errno));
+        fprintf(stderr, "Cannot read the per-CPU array: %s\n", strerror(lookup_errno));
         freez(values);
         return -1;
     }
