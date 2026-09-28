@@ -41,6 +41,12 @@ typedef struct {
     RRDDIM *training_time_stats_allotted_rd;
     RRDDIM *training_time_stats_consumed_rd;
     RRDDIM *training_time_stats_remaining_rd;
+    RRDDIM *training_time_stats_pass_resolve_rd;
+    RRDDIM *training_time_stats_pass_sort_rd;
+
+    RRDSET *training_pass_rs;
+    RRDDIM *training_pass_entries_rd;
+    RRDDIM *training_pass_key0_entries_rd;
 
     RRDSET *training_results_rs;
     RRDDIM *training_results_ok_rd;

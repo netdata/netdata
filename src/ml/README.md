@@ -115,6 +115,17 @@ To reduce false positives in your environment, Netdata trains multiple models pe
 
 The anomaly detection algorithm uses the [Euclidean distance](https://en.wikipedia.org/wiki/Euclidean_distance) between recent metric patterns and the learned cluster centers. If this distance exceeds a threshold based on the 99th percentile of training data, that model considers the metric anomalous.
 
+### Training Order
+
+Each training thread retrains its dimensions one pass at a time, and a pass takes about `train every`. Within a
+pass, dimensions are trained in the order in which the database engine will complete their current tier-0 page,
+which is also the order it packs pages into extents on disk. Dimensions whose pages complete together therefore
+train back to back, so the extents loaded for one dimension are still in the extent cache when its siblings are
+trained, instead of being reloaded and decompressed once per dimension hours apart. Dimensions with no open page at
+the start of a pass, or whose open page is idle and already past its expected completion (a collection gap), or
+that are not stored in the database engine, are trained first, as one group. The per-thread `netdata.ml_training_pass` chart shows the size of the last sorted pass and how many of its
+dimensions fell into that first group; `netdata.ml_training_time_stats` shows the time spent resolving and sorting a pass.
+
 ### Anomaly Bit
 
 Each trained model assigns an **anomaly score** at every time step based on how far your data deviates from learned clusters. If the score exceeds the 99th percentile of training data, the **anomaly bit** is set to `true` (100); otherwise, it remains `false` (0).

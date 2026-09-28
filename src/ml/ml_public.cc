@@ -549,6 +549,7 @@ void ml_init()
 
         worker->id = idx;
         worker->queue = ml_queue_init();
+        ml_queue_set_pass_key_fn(worker->queue, ml_queue_dimension_pass_key, nullptr);
         worker->pending_model_info.reserve(Cfg.flush_models_batch_size);
         netdata_mutex_init(&worker->nd_mutex);
 

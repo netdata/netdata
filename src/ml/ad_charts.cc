@@ -554,6 +554,10 @@ void ml_update_training_statistics_chart(ml_worker_t *worker, const ml_queue_sta
                 rrddim_add(worker->training_time_stats_rs, "consumed", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
             worker->training_time_stats_remaining_rd =
                 rrddim_add(worker->training_time_stats_rs, "remaining", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+            worker->training_time_stats_pass_resolve_rd =
+                rrddim_add(worker->training_time_stats_rs, "pass resolve", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+            worker->training_time_stats_pass_sort_rd =
+                rrddim_add(worker->training_time_stats_rs, "pass sort", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(worker->training_time_stats_rs,
@@ -562,8 +566,54 @@ void ml_update_training_statistics_chart(ml_worker_t *worker, const ml_queue_sta
                               worker->training_time_stats_consumed_rd, stats.consumed_ut);
         rrddim_set_by_pointer(worker->training_time_stats_rs,
                               worker->training_time_stats_remaining_rd, stats.remaining_ut);
+        rrddim_set_by_pointer(worker->training_time_stats_rs,
+                              worker->training_time_stats_pass_resolve_rd, stats.pass_resolve_ut);
+        rrddim_set_by_pointer(worker->training_time_stats_rs,
+                              worker->training_time_stats_pass_sort_rd, stats.pass_sort_ut);
 
         rrdset_done(worker->training_time_stats_rs);
+    }
+
+    /*
+     * training pass: entries of the last sorted pass and how many of them had no usable page close (key 0)
+    */
+    {
+        if (!worker->training_pass_rs) {
+            char id_buf[1024];
+            char name_buf[1024];
+
+            snprintfz(id_buf, 1024, "training_queue_%zu_pass", worker->id);
+            snprintfz(name_buf, 1024, "training_queue_%zu_pass", worker->id);
+
+            worker->training_pass_rs = rrdset_create(
+                    localhost,
+                    "netdata", // type
+                    id_buf, // id
+                    name_buf, // name
+                    NETDATA_ML_CHART_FAMILY, // family
+                    "netdata.ml_training_pass", // ctx
+                    "Training pass", // title
+                    "dimensions", // units
+                    NETDATA_ML_PLUGIN, // plugin
+                    NETDATA_ML_MODULE_TRAINING, // module
+                    NETDATA_ML_CHART_PRIO_TRAINING_PASS, // priority
+                    localhost->rrd_update_every, // update_every
+                    RRDSET_TYPE_LINE// chart_type
+            );
+            rrdset_flag_set(worker->training_pass_rs, RRDSET_FLAG_ANOMALY_DETECTION);
+
+            worker->training_pass_entries_rd =
+                rrddim_add(worker->training_pass_rs, "entries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            worker->training_pass_key0_entries_rd =
+                rrddim_add(worker->training_pass_rs, "key-0 entries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(worker->training_pass_rs,
+                              worker->training_pass_entries_rd, (collected_number)stats.pass_entries);
+        rrddim_set_by_pointer(worker->training_pass_rs,
+                              worker->training_pass_key0_entries_rd, (collected_number)stats.pass_key0_entries);
+
+        rrdset_done(worker->training_pass_rs);
     }
 
     /*
