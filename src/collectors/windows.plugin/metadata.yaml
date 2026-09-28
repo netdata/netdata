@@ -475,7 +475,7 @@ modules:
                 - name: reads
                 - name: writes
         - name: Logical Disk
-          description: "These metrics refer to Logical Disks. Volumes without a drive letter are included, addressed by the folder they are mounted on - this covers Cluster Shared Volumes on failover-cluster nodes, which Windows exposes only as 'C:\\ClusterStorage\\VolumeN'."
+          description: "These metrics refer to Logical Disks. Volumes without a drive letter are included, addressed by the folder they are mounted on - this covers Cluster Shared Volumes on failover-cluster nodes, which Windows exposes only below the system drive, as '%SystemDrive%\\ClusterStorage\\VolumeN' (for example 'C:\\ClusterStorage\\Volume1')."
           labels:
             - name: mount_point
               description: "Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:', 'C:\\ClusterStorage\\Volume1')."

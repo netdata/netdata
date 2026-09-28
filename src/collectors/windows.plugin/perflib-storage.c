@@ -211,6 +211,7 @@ static bool deviceMappingIncomplete = false;
 static bool mountPointsDiscoveryWarningActive = false;
 static usec_t volume_space_last_cancel_log_ut = 0;
 static usec_t volume_space_last_timeout_log_ut = 0;
+static bool volume_space_pool_warning_active = false;
 static SIMPLE_PATTERN *excluded_logical_disk_paths = NULL;
 
 struct volume_space_result {
@@ -406,6 +407,7 @@ static void initialize(void)
     deviceMappingIncomplete = false;
     volume_space_last_cancel_log_ut = 0;
     volume_space_last_timeout_log_ut = 0;
+    volume_space_pool_warning_active = false;
     mountPointsDiscoveryWarningActive = false;
 
     netdata_mutex_init(&volume_space_mutex);
@@ -890,9 +892,22 @@ static void volume_space_submit(DICTIONARY *extra_targets, usec_t now_ut)
             break;
         }
     }
+    // Without a live worker no target is queried, so the affected charts gap without a failure result.
+    // Report the transition, since the per-timeout warnings stop once every slot is quarantined.
     if (!workers_available) {
+        if (!volume_space_pool_warning_active) {
+            nd_log(
+                NDLS_COLLECTORS,
+                NDLP_WARNING,
+                "PerflibStorage has no available volume-space worker; volume-space queries are suspended");
+            volume_space_pool_warning_active = true;
+        }
         dictionary_destroy(request);
         return;
+    }
+    if (volume_space_pool_warning_active) {
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "PerflibStorage volume-space workers recovered");
+        volume_space_pool_warning_active = false;
     }
 
     void *value;
@@ -1584,10 +1599,13 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
             }
             dfe_done(value);
         }
+        // A device the scan mapped to a path is no longer excluded by its bare name, e.g. after Windows
+        // reused the device number for another volume.
         if (excludedDeviceNames && snapshot->device_mapping_complete) {
             dfe_start_read(excludedDeviceNames, value)
             {
-                if (value && !dictionary_get(excluded_devices, value_dfe.name))
+                if (value && !dictionary_get(excluded_devices, value_dfe.name) &&
+                    !dictionary_get(devices, value_dfe.name))
                     dictionary_set(excluded_devices, value_dfe.name, value, strlen(value) + 1);
             }
             dfe_done(value);
@@ -2054,6 +2072,15 @@ struct logical_disk_collection_ops {
         usec_t now_ut);
 };
 
+// A Perflib sample proves the volume is alive, so an older Win32 failure must not keep ageing: the
+// grace period only counts while no producer has data, otherwise a volume Perflib omits for a single
+// cycle long after a timeout would be evicted immediately.
+static void logical_disk_mark_perflib_collected(struct logical_disk *d, usec_t now_ut)
+{
+    d->last_collected = now_ut;
+    d->space_failed_since = 0;
+}
+
 static void logical_disk_collect_instance(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
@@ -2088,7 +2115,7 @@ static void logical_disk_collect_instance(
     if (!logical_disk_set_space(pDataBlock, pObjectType, pi, d, resolved_name, NULL))
         return;
 
-    d->last_collected = now_ut;
+    logical_disk_mark_perflib_collected(d, now_ut);
 
     // chart creation belongs to logical_disk_chart(), so both producers emit the same chart
     logical_disk_chart(d, resolved_name, update_every);
@@ -2759,12 +2786,86 @@ static int mount_points_query_failure_unittest_run(void)
         "a persistent failure becomes evictable",
         logical_disk_should_evict(disk, "C:\\ClusterStorage\\Volume1", 2 + SPACE_FAILURE_GRACE_UT, true));
 
+    // A Perflib sample after the failure restarts the grace period, so omitting the volume for a single
+    // later cycle must not evict it.
+    logical_disk_mark_perflib_collected(disk, 2 + SPACE_FAILURE_GRACE_UT);
+    errors += mount_points_unittest_expect(
+        "a Perflib sample clears the space-query failure age", disk->space_failed_since == 0);
+    errors += mount_points_unittest_expect(
+        "a single missed Perflib cycle after recovery does not evict the volume",
+        !logical_disk_should_evict(
+            disk, "C:\\ClusterStorage\\Volume1", 2 + SPACE_FAILURE_GRACE_UT + MOUNT_POINTS_REFRESH_EVERY_UT, true));
+
     dictionary_destroy(mountPoints);
     dictionary_destroy(logicalDisks);
     mountPoints = previous_paths;
     logicalDisks = previous_disks;
     volume_space_results = previous_results;
     volume_space_cycle_results = previous_cycle_results;
+    return errors;
+}
+
+// An incomplete refresh carries previous bare-device exclusions forward, but never for a device the
+// new scan mapped to a path: Windows may have reused that device number for another volume.
+static int mount_points_excluded_carry_unittest_run(void)
+{
+    DICTIONARY *previous_paths = mountPoints;
+    DICTIONARY *previous_devices = deviceMountPaths;
+    DICTIONARY *previous_volume_ids = mountPointVolumeIds;
+    DICTIONARY *previous_uncertain_paths = uncertainMountPoints;
+    DICTIONARY *previous_excluded_devices = excludedDeviceNames;
+    bool previous_refresh_success = mountPointsEvictionSafe;
+    bool previous_primed = mountPointsPrimed;
+    bool previous_device_mapping_incomplete = deviceMappingIncomplete;
+    bool previous_warning_active = mountPointsDiscoveryWarningActive;
+    int errors = 0;
+
+    mountPoints = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    deviceMountPaths = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    mountPointVolumeIds = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    uncertainMountPoints = dictionary_create_advanced(
+        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE, NULL, sizeof(usec_t));
+    excludedDeviceNames = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    dictionary_set(excludedDeviceNames, "HarddiskVolume10", "HarddiskVolume10", sizeof("HarddiskVolume10"));
+    dictionary_set(excludedDeviceNames, "HarddiskVolume11", "HarddiskVolume11", sizeof("HarddiskVolume11"));
+
+    struct mount_points_snapshot *snapshot = callocz(1, sizeof(*snapshot));
+    snapshot->paths = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    snapshot->devices = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    snapshot->excluded_devices = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    snapshot->volume_ids = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    snapshot->failed_volume_ids = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    snapshot->uncertain_paths = dictionary_create_advanced(
+        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE, NULL, sizeof(usec_t));
+    snapshot->device_mapping_complete = true;
+    snapshot->volumes = (struct mount_points_scan_status){ .started = true, .complete = false, .eviction_safe = false };
+    snapshot->cluster = (struct mount_points_scan_status){ .started = true, .complete = true, .eviction_safe = true };
+    dictionary_set(snapshot->paths, "F:", NULL, 0);
+    dictionary_set(snapshot->volume_ids, "F:", "Volume{f}", sizeof("Volume{f}"));
+    dictionary_set(snapshot->devices, "HarddiskVolume10", "F:", sizeof("F:"));
+
+    mount_points_publish_snapshot(snapshot);
+    errors += mount_points_unittest_expect(
+        "a device mapped by the new scan drops its previous exclusion",
+        !logical_disk_is_excluded("HarddiskVolume10"));
+    errors += mount_points_unittest_expect(
+        "an unmapped device keeps its previous exclusion during an incomplete refresh",
+        logical_disk_is_excluded("HarddiskVolume11"));
+
+    dictionary_destroy(mountPoints);
+    dictionary_destroy(deviceMountPaths);
+    dictionary_destroy(mountPointVolumeIds);
+    dictionary_destroy(uncertainMountPoints);
+    dictionary_destroy(excludedDeviceNames);
+    mountPoints = previous_paths;
+    deviceMountPaths = previous_devices;
+    mountPointVolumeIds = previous_volume_ids;
+    uncertainMountPoints = previous_uncertain_paths;
+    excludedDeviceNames = previous_excluded_devices;
+    mountPointsEvictionSafe = previous_refresh_success;
+    mountPointsPrimed = previous_primed;
+    deviceMappingIncomplete = previous_device_mapping_incomplete;
+    mountPointsDiscoveryWarningActive = previous_warning_active;
     return errors;
 }
 
@@ -2831,6 +2932,7 @@ int perflib_storage_unittest(void)
     errors += logical_disk_unittest_run(NULL, 2, "C:", "Z:\\ASSUREDRECOVERYTEMP\\volume");
     errors += volume_space_result_unittest_run();
     errors += mount_points_query_failure_unittest_run();
+    errors += mount_points_excluded_carry_unittest_run();
     errors += mount_points_unittest_run();
 
     if (errors)
@@ -3357,5 +3459,6 @@ void do_PerflibStorage_cleanup(void)
     deviceMappingIncomplete = false;
     volume_space_last_cancel_log_ut = 0;
     volume_space_last_timeout_log_ut = 0;
+    volume_space_pool_warning_active = false;
     mountPointsDiscoveryWarningActive = false;
 }
