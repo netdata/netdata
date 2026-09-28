@@ -74,6 +74,8 @@ static netdata_publish_syscall_t process_publish_aggregated[NETDATA_KEY_PUBLISH_
 struct config process_config = APPCONFIG_INITIALIZER;
 
 #ifdef LIBBPF_MAJOR_VERSION
+#include <bpf/btf.h>
+
 /**
  * Disable probe
  *
@@ -208,8 +210,21 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
         ebpf_process_disable_probe(obj);
         ebpf_disable_trampoline(obj);
 
-        // tp_btf needs BPF_PROG_TYPE_TRACING and kernel BTF; without them, count forks with the kprobe instead.
-        if (libbpf_probe_bpf_prog_type(BPF_PROG_TYPE_TRACING, NULL) <= 0) {
+        // tp_btf needs tracing support and its target in kernel BTF; otherwise count forks with the kprobe.
+        bool raw_tracepoint_available = false;
+        if (libbpf_probe_bpf_prog_type(BPF_PROG_TYPE_TRACING, NULL) > 0) {
+            struct btf *kernel_btf = btf__load_vmlinux_btf();
+            if (kernel_btf) {
+                long btf_error = libbpf_get_error(kernel_btf);
+                if (!btf_error) {
+                    raw_tracepoint_available =
+                        btf__find_by_name_kind(kernel_btf, "btf_trace_sched_process_fork", BTF_KIND_TYPEDEF) > 0;
+                    btf__free(kernel_btf);
+                }
+            }
+        }
+
+        if (!raw_tracepoint_available) {
             bpf_program__set_autoload(obj->progs.netdata_sched_process_fork_btf, false);
             bpf_program__set_autoload(obj->progs.netdata_wake_up_new_task_probe, true);
         }

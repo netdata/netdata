@@ -17,6 +17,9 @@
 #include "../nd_alloc_shim.h"
 #include "nd_ebpf_runtime_common.h"
 
+#if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
+#define NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED 1
+#endif
 
 #if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1) && defined(__has_include) && __has_include(<linux/btf.h>)
 /*
@@ -77,6 +80,7 @@ struct netdata_ebpf_dcstat_runtime {
     int flavor;
     struct bpf_object *obj;
     struct bpf_link **links;
+    const char *program_names[NETDATA_DCSTAT_LINK_COUNT];
     /* Persistent per-CPU work buffers — allocated once in prepare(), reused on
      * every snapshot call to eliminate per-cycle malloc/free overhead. */
     uint64_t *percpu_u64;               /* global snapshot: ncpus × uint64      */
@@ -97,6 +101,8 @@ struct netdata_ebpf_dcstat_runtime {
         struct dc_buffer_bpf *buffer;
         struct dc_arena_bpf *arena;
     } core;
+#endif
+#ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
     /* Event consumer and per-TGID accumulator (buffer and arena flavors).
      * These flavors emit ring buffer / arena events rather than writing
      * directly to dcstat_pid, so per-app counters are accumulated here. */
@@ -146,55 +152,53 @@ enum netdata_dcstat_global_key {
 #define NETDATA_DCSTAT_DEFAULT_LOOKUP_FAST_TARGET "lookup_fast"
 #define NETDATA_DCSTAT_DEFAULT_D_LOOKUP_TARGET "d_lookup"
 
-static const char *dcstat_lookup_fast_program_name(int flavor)
+static const char *dcstat_find_program_name(struct bpf_object *obj, const char *const *candidates, size_t count)
 {
-#ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
-    if (flavor == NETDATA_DCSTAT_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_DCSTAT_RUNTIME_FLAVOR_ARENA)
-        return "netdata_lookup_fast_buffer";
-#else
-    (void)flavor;
-#endif
-    return "netdata_lookup_fast_kprobe";
+    for (size_t i = 0; i < count; i++)
+        if (bpf_object__find_program_by_name(obj, candidates[i]))
+            return candidates[i];
+
+    return NULL;
 }
 
-static const char *dcstat_d_lookup_program_name(int flavor)
-{
-#ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
-    if (flavor == NETDATA_DCSTAT_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_DCSTAT_RUNTIME_FLAVOR_ARENA)
-        return "netdata_d_lookup_buffer";
-#else
-    (void)flavor;
-#endif
-    return "netdata_d_lookup_kretprobe";
-}
-
-/* The Go loader attaches with kprobe/kretprobe only, so the trampoline
- * (fentry/fexit) programs shipped in the same object are never used. */
-static void dcstat_disable_trampoline_programs(struct bpf_object *obj)
+static int dcstat_prepare_autoload(struct bpf_object *obj, const char **program_names)
 {
     struct bpf_program *prog;
     bpf_object__for_each_program(prog, obj)
-    {
-        const char *name = bpf_program__name(prog);
-        if (strstr(name, "_fentry") || strstr(name, "_fexit"))
-            bpf_program__set_autoload(prog, false);
+        bpf_program__set_autoload(prog, false);
+
+    for (size_t i = 0; i < NETDATA_DCSTAT_LINK_COUNT; i++) {
+        if (!program_names[i])
+            return -1;
+        struct bpf_program *prog = bpf_object__find_program_by_name(obj, program_names[i]);
+        if (!prog) {
+            fprintf(stderr, "dcstat: object does not contain required program %s\n", program_names[i]);
+            return -1;
+        }
+        bpf_program__set_autoload(prog, true);
     }
+
+    return 0;
 }
 
-static void dcstat_prepare_autoload(struct bpf_object *obj, int flavor)
+static int dcstat_resolve_program_names(struct bpf_object *obj, const char **names)
 {
-    dcstat_disable_trampoline_programs(obj);
-
-    const char *program_names[] = {
-        dcstat_lookup_fast_program_name(flavor),
-        dcstat_d_lookup_program_name(flavor),
+    static const char *const lookup_fast[] = {
+        "netdata_lookup_fast_kprobe", "netdata_lookup_fast_buffer", "netdata_lookup_fast",
+    };
+    static const char *const d_lookup[] = {
+        "netdata_d_lookup_kretprobe", "netdata_d_lookup_buffer", "netdata_d_lookup",
     };
 
-    for (size_t i = 0; i < sizeof(program_names) / sizeof(program_names[0]); i++) {
-        struct bpf_program *prog = bpf_object__find_program_by_name(obj, program_names[i]);
-        if (prog)
-            bpf_program__set_autoload(prog, true);
+    names[0] = dcstat_find_program_name(obj, lookup_fast, sizeof(lookup_fast) / sizeof(lookup_fast[0]));
+    names[1] = dcstat_find_program_name(obj, d_lookup, sizeof(d_lookup) / sizeof(d_lookup[0]));
+    for (size_t i = 0; i < NETDATA_DCSTAT_LINK_COUNT; i++) {
+        if (!names[i]) {
+            fprintf(stderr, "dcstat: object does not contain required probe %zu\n", i);
+            return -1;
+        }
     }
+    return 0;
 }
 
 static int dcstat_update_map_types(struct bpf_object *obj, int maps_per_core)
@@ -227,7 +231,6 @@ static struct bpf_link *dcstat_attach_program_by_name(
     return bpf_program__attach_kprobe(prog, retprobe, target);
 }
 
-#ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
 static int dcstat_runtime_flavor_from_path(const char *path)
 {
     if (!path)
@@ -241,7 +244,6 @@ static int dcstat_runtime_flavor_from_path(const char *path)
 
     return NETDATA_DCSTAT_RUNTIME_FLAVOR_BASE;
 }
-#endif
 
 static struct bpf_object *dcstat_runtime_object(struct netdata_ebpf_dcstat_runtime *rt)
 {
@@ -315,16 +317,16 @@ struct netdata_ebpf_dcstat_runtime *netdata_dcstat_runtime_open_mode(const char 
         return NULL;
     }
 
-#ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
+#ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
     /* The buffer/arena flavors accumulate per-TGID counters in userspace; the
      * table has to know the entry layout before the first event arrives. */
     nd_ebpf_acc_init(&rt->acc, sizeof(struct netdata_ebpf_dcstat_pid_entry), offsetof(struct netdata_ebpf_dcstat_pid_entry, tgid));
 #endif
 
 #ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
+    rt->flavor = dcstat_runtime_flavor_from_path(path);
     if (use_core) {
         rt->kind = NETDATA_DCSTAT_RUNTIME_CORE;
-        rt->flavor = dcstat_runtime_flavor_from_path(path);
         switch (rt->flavor) {
         case NETDATA_DCSTAT_RUNTIME_FLAVOR_BUFFER:
             rt->core.buffer = dc_buffer_bpf__open();
@@ -350,6 +352,8 @@ struct netdata_ebpf_dcstat_runtime *netdata_dcstat_runtime_open_mode(const char 
     (void)use_core;
 #endif
     {
+        rt->kind = NETDATA_DCSTAT_RUNTIME_LEGACY;
+        rt->flavor = dcstat_runtime_flavor_from_path(path);
         struct bpf_object *obj = bpf_object__open_file(path, NULL);
         if (!obj || libbpf_get_error(obj)) {
             if (obj && libbpf_get_error(obj))
@@ -373,14 +377,14 @@ int netdata_dcstat_runtime_prepare(
     if (!rt || !obj)
         return -1;
 
-    dcstat_prepare_autoload(obj, rt->flavor);
+    if (dcstat_resolve_program_names(obj, rt->program_names) != 0 ||
+        dcstat_prepare_autoload(obj, rt->program_names) != 0)
+        return -1;
     if (dcstat_update_map_types(obj, maps_per_core) != 0)
         return -1;
     dcstat_update_map_sizes(obj, pid_table_size);
-#ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
-    /* The userspace accumulator only exists for the buffer and arena flavors,
-     * which require CO-RE.  Bounding it is meaningless — and the field is not
-     * even declared — in a legacy-only build. */
+#ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
+    /* Buffer and arena objects emit per-TGID events instead of using dcstat_pid. */
     nd_ebpf_acc_set_max_entries(&rt->acc, pid_table_size);
 #endif
 
@@ -392,7 +396,7 @@ int netdata_dcstat_runtime_prepare(
     return 0;
 }
 
-#ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
+#ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
 
 /* Action values emitted by the dcstat BPF programs.  SLOW_MISS is a single
  * event meaning "slow path AND nothing found", so it bumps both counters.
@@ -456,13 +460,38 @@ static void dcstat_destroy_ring_buffer(struct netdata_ebpf_dcstat_runtime *rt)
     nd_ebpf_acc_free(&rt->acc);
 }
 
-/* The generated arena skeleton maps the arena data section through `arena`. */
-static void dcstat_setup_arena(struct netdata_ebpf_dcstat_runtime *rt)
+/* The generated skeleton exposes the arena data section directly; raw objects
+ * expose the arena map's mapped initial data through libbpf. */
+static int dcstat_setup_arena(struct netdata_ebpf_dcstat_runtime *rt)
 {
-    if (!rt->core.arena || !rt->core.arena->arena)
-        return;
+#ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
+    if (rt->kind == NETDATA_DCSTAT_RUNTIME_CORE) {
+        if (!rt->core.arena || !rt->core.arena->arena)
+            return -1;
 
-    rt->arena_state = (void *)&rt->core.arena->arena->dc_arena_state;
+        rt->arena_state = (void *)&rt->core.arena->arena->dc_arena_state;
+        return 0;
+    }
+#endif
+    struct bpf_map *map = bpf_object__find_map_by_name(dcstat_runtime_object(rt), "arena");
+    size_t data_size = 0;
+    void *mapped = map ? bpf_map__initial_value(map, &data_size) : NULL;
+    long page_size_value = sysconf(_SC_PAGESIZE);
+    size_t entries = map ? bpf_map__max_entries(map) : 0;
+    if (!mapped || page_size_value <= 0 || !entries)
+        return -1;
+
+    size_t page_size = (size_t)page_size_value;
+    if (entries > SIZE_MAX / page_size || data_size > SIZE_MAX - (page_size - 1))
+        return -1;
+
+    size_t arena_size = entries * page_size;
+    size_t rounded_data_size = ((data_size + page_size - 1) / page_size) * page_size;
+    if (rounded_data_size > arena_size || data_size < sizeof(struct nd_ebpf_arena_state))
+        return -1;
+
+    rt->arena_state = (char *)mapped + arena_size - rounded_data_size;
+    return 0;
 }
 
 static void dcstat_rb_event(void *ctx, const struct nd_ebpf_pid_event *ev)
@@ -509,7 +538,7 @@ static void dcstat_drain_arena(struct netdata_ebpf_dcstat_runtime *rt)
     rt->arena_tail = nd_ebpf_arena_drain(rt->arena_state, rt->arena_tail, dcstat_rb_event, rt);
 }
 
-#endif /* NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED */
+#endif /* NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED */
 
 int netdata_dcstat_runtime_load(struct netdata_ebpf_dcstat_runtime *rt)
 {
@@ -518,18 +547,25 @@ int netdata_dcstat_runtime_load(struct netdata_ebpf_dcstat_runtime *rt)
 
 #ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
     if (rt->kind == NETDATA_DCSTAT_RUNTIME_CORE) {
-        int rc = dcstat_runtime_load_core(rt);
-        if (rc != 0)
-            return rc;
-        if (rt->flavor == NETDATA_DCSTAT_RUNTIME_FLAVOR_BUFFER && dcstat_setup_ring_buffer(rt) != 0)
+        if (dcstat_runtime_load_core(rt) != 0)
             return -1;
-        else if (rt->flavor == NETDATA_DCSTAT_RUNTIME_FLAVOR_ARENA)
-            dcstat_setup_arena(rt);
-        return 0;
+    } else
+#endif
+    if (bpf_object__load(rt->obj) != 0)
+        return -1;
+
+#ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
+    if (rt->flavor == NETDATA_DCSTAT_RUNTIME_FLAVOR_BUFFER) {
+        if (dcstat_setup_ring_buffer(rt) != 0)
+            return -1;
+    } else if (rt->flavor == NETDATA_DCSTAT_RUNTIME_FLAVOR_ARENA) {
+        if (dcstat_setup_arena(rt) != 0) {
+            fprintf(stderr, "dcstat: unable to map arena event state\n");
+            return -1;
+        }
     }
 #endif
-
-    return bpf_object__load(rt->obj);
+    return 0;
 }
 
 /* lookup_fast is a static kernel function whose symbol is often suffixed
@@ -557,13 +593,23 @@ int netdata_dcstat_runtime_attach(
 
     /* d_lookup must be a return probe: the BPF program reads PT_REGS_RC to tell
      * a successful lookup from a miss. */
-    rt->links[0] = dcstat_attach_program_by_name(
-        obj, dcstat_lookup_fast_program_name(rt->flavor), lookup_fast_target, false);
-    rt->links[1] = dcstat_attach_program_by_name(
-        obj, dcstat_d_lookup_program_name(rt->flavor), d_lookup_target, true);
+    rt->links[0] = dcstat_attach_program_by_name(obj, rt->program_names[0], lookup_fast_target, false);
+    rt->links[1] = dcstat_attach_program_by_name(obj, rt->program_names[1], d_lookup_target, true);
 
+    const char **program_names = rt->program_names;
+    const char *targets[] = {lookup_fast_target, d_lookup_target};
     for (size_t i = 0; i < NETDATA_DCSTAT_LINK_COUNT; i++) {
-        if (!rt->links[i] || libbpf_get_error(rt->links[i])) {
+        if (!rt->links[i]) {
+            fprintf(stderr, "dcstat: failed to attach %s to %s: %s\n",
+                    program_names[i], targets[i], "program not found");
+            nd_ebpf_destroy_links(&rt->links, NETDATA_DCSTAT_LINK_COUNT);
+            return -1;
+        }
+
+        long error = libbpf_get_error(rt->links[i]);
+        if (error) {
+            fprintf(stderr, "dcstat: failed to attach %s to %s: %s (%ld)\n",
+                    program_names[i], targets[i], strerror((int)-error), error);
             nd_ebpf_destroy_links(&rt->links, NETDATA_DCSTAT_LINK_COUNT);
             return -1;
         }
@@ -667,7 +713,7 @@ int netdata_dcstat_runtime_snapshot_apps(
 
     struct bpf_map *map = bpf_object__find_map_by_name(obj, "dcstat_pid");
 
-#ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
+#ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
     if (!map) {
         /* Buffer and arena flavors have no dcstat_pid map; drain events into the
          * userspace accumulator and convert to snapshot format. */
@@ -735,7 +781,7 @@ int netdata_dcstat_runtime_delete_pid(struct netdata_ebpf_dcstat_runtime *rt, ui
 
     /* Buffer/arena flavor: no dcstat_pid map.  Evict from the userspace
      * accumulator so dead TGIDs do not inflate it indefinitely. */
-#ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
+#ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
     nd_ebpf_acc_evict_tgid(&rt->acc, pid);
 #endif
     return 0;
@@ -755,7 +801,7 @@ int netdata_dcstat_runtime_delete_pids(
     if (!map_missing)
         return rc;
 
-#ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
+#ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
     /* nd_ebpf_acc_evict_tgid() rebuilds the hash table after each removal.
      * Eviction batches are typically small (<= 10), so the O(N*count) cost is
      * accepted rather than adding a deferred-rebuild path. */
@@ -777,6 +823,10 @@ void netdata_dcstat_runtime_close(struct netdata_ebpf_dcstat_runtime *rt)
     freez(rt->percpu_entries);
     freez(rt->items_buf);
     nd_ebpf_key_table_free(&rt->pid_keys);
+#ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
+    if (rt->kind != NETDATA_DCSTAT_RUNTIME_CORE)
+        dcstat_destroy_ring_buffer(rt);
+#endif
 #ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
     if (rt->kind == NETDATA_DCSTAT_RUNTIME_CORE) {
         dcstat_destroy_ring_buffer(rt);

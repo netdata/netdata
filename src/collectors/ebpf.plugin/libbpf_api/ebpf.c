@@ -1211,7 +1211,6 @@ struct btf *ebpf_parse_btf_file(const char *filename)
     struct btf *bf = btf__parse(filename, NULL);
     if (libbpf_get_error(bf)) {
         fprintf(stderr, "Cannot parse btf file");
-        btf__free(bf);
         return NULL;
     }
 
