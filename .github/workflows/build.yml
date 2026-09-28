@@ -80,6 +80,7 @@ jobs:
             packaging/*.sh
             packaging/*.version
             packaging/*.checksums
+            tests/kickstart-url-validation-test.sh
           files_ignore: |
             packaging/**/*.md
             packaging/repoconfig/
