@@ -433,33 +433,58 @@ int map_status_code_to_signal(DWORD status_code) {
     }
 }
 
-int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si, int timeout_ms __maybe_unused) {
+int spawn_server_exec_kill_ex(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *si, int timeout_ms __maybe_unused, SPAWN_KILL_OUTCOME *outcome) {
     // this gives some warnings at the spawn-tester, but it is generally better
     // to have them, to avoid abnormal shutdown of the plugins
     if(si->read_fd != -1) { close(si->read_fd); si->read_fd = -1; }
     if(si->write_fd != -1) { close(si->write_fd); si->write_fd = -1; }
 
+    // Whether the child went away on its own within the grace. This MUST be observed here: the exit
+    // code cannot carry it, because TerminateProcess() below uses STATUS_CONTROL_C_EXIT, which
+    // map_status_code_to_signal() deliberately maps to SIGTERM and spawn_popen_status_rc() then maps
+    // to 0 - identical to a clean voluntary exit.
+    bool exited_within_grace = false;
     if(timeout_ms > 0)
-        WaitForSingleObject(si->process_handle, timeout_ms);
+        exited_within_grace = (WaitForSingleObject(si->process_handle, timeout_ms) == WAIT_OBJECT_0);
 
-    errno_clear();
-    if(si->child_pid != -1 && kill(si->child_pid, SIGTERM) != 0)
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be killed",
-               si->request_id, (int)si->child_pid, si->dwProcessId);
+    if(!exited_within_grace) {
+        errno_clear();
+        if(si->child_pid != -1 && kill(si->child_pid, SIGTERM) != 0)
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be killed",
+                   si->request_id, (int)si->child_pid, si->dwProcessId);
 
-    errno_clear();
-    if(TerminateProcess(si->process_handle, STATUS_CONTROL_C_EXIT) == 0)
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be terminated",
-               si->request_id, (int)si->child_pid, si->dwProcessId);
+        errno_clear();
+        if(TerminateProcess(si->process_handle, STATUS_CONTROL_C_EXIT) == 0)
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: child of request No %zu, pid %d (winpid %u), failed to be terminated",
+                   si->request_id, (int)si->child_pid, si->dwProcessId);
+    }
 
+    // grandchildren can outlive the child either way
     errno_clear();
     TerminateChildProcesses(si);
 
     spawn_server_release_stderr_fd(server, si);
 
-    return spawn_server_exec_wait(server, si);
+    // An INFINITE wait is NOT by itself proof the child exited: WaitForSingleObject() returns
+    // WAIT_FAILED immediately when the handle is unusable, and spawn_server_exec_wait() below does
+    // not check for that - it goes on to read an exit code that was never set. So establish here
+    // whether the child is actually gone, or the caller could be told a still-running process had
+    // exited and start a second one beside it.
+    bool confirmed_gone = (WaitForSingleObject(si->process_handle, INFINITE) == WAIT_OBJECT_0);
+
+    int rc = spawn_server_exec_wait(server, si);
+
+    if(outcome) {
+        if(!confirmed_gone)
+            // the handle could not be waited on, so we know nothing about the process
+            *outcome = SPAWN_KILL_UNKNOWN;
+        else
+            *outcome = exited_within_grace ? SPAWN_KILL_EXITED : SPAWN_KILL_FORCED_EXITED;
+    }
+
+    return rc;
 }
 
 SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_INSTANCE *si, int timeout_ms, int *status) {

@@ -7,13 +7,24 @@ char *plugin_directories[PLUGINSD_MAX_DIRECTORIES] = { [0] = PLUGINS_DIR, };
 struct plugind *pluginsd_root = NULL;
 
 static inline void pluginsd_sleep(const int seconds) {
-    int timeout_ms = seconds * 1000;
-    int waited_ms = 0;
-    while(waited_ms < timeout_ms) {
+    // usec_t rather than int milliseconds. `seconds * 1000` in an int wrapped negative for large
+    // values and skipped the wait entirely - the opposite of the intent. The update_every clamp
+    // now keeps callers well inside the range anyway; this is the second line of defence, and it
+    // costs nothing.
+    usec_t timeout_ut = (seconds > 0) ? (usec_t)seconds * USEC_PER_SEC : 0;
+    usec_t waited_ut = 0;
+    while(waited_ut < timeout_ut) {
         if(!service_running(SERVICE_COLLECTORS)) break;
         sleep_usec(ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS * USEC_PER_MS);
-        waited_ms += ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS;
+        waited_ut += ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS * USEC_PER_MS;
     }
+}
+
+// The "wait longer before trying again" delay. Every site that wants it comes through here, so the
+// three of them cannot drift - written out by hand as `cd->update_every * 10`, one of them once
+// produced no delay at all for values update_every could legitimately hold.
+static inline void pluginsd_sleep_backoff(const struct plugind *cd) {
+    pluginsd_sleep(cd->update_every * 10);
 }
 
 inline size_t pluginsd_initialize_plugin_directories()
@@ -69,7 +80,7 @@ static void pluginsd_worker_thread_handle_success(struct plugind *cd) {
              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid,
              plugin_is_enabled(cd) ? "Waiting a bit before starting it again." : "Will not start it again - it is now disabled.");
 
-        pluginsd_sleep(cd->update_every * 10);
+        pluginsd_sleep_backoff(cd);
         return;
     }
 
@@ -103,7 +114,7 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
               rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, worker_ret_code, cd->successful_collections,
               plugin_is_enabled(cd) ? "Waiting a bit before starting it again." : "Will not start it again - it is disabled.");
 
-        pluginsd_sleep(cd->update_every * 10);
+        pluginsd_sleep_backoff(cd);
         return;
     }
 
@@ -169,11 +180,56 @@ static void pluginsd_worker_thread(void *arg) {
                "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections.",
                rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, count);
 
-        int worker_ret_code = spawn_popen_kill(cd->unsafe.pi, 3 * MSEC_PER_SEC);
+        SPAWN_KILL_OUTCOME kill_outcome;
+        int worker_ret_code = spawn_popen_kill_ex(cd->unsafe.pi, 3 * MSEC_PER_SEC, &kill_outcome);
         cd->unsafe.pi = NULL;
 
-        if (retry && worker_ret_code != -1)
-            pluginsd_sleep(cd->update_every);
+        if(unlikely(kill_outcome == SPAWN_KILL_UNKNOWN)) {
+            // We could not confirm the process is gone, so it may still be running and still
+            // writing. Starting a replacement would give this collector two live writers for the
+            // same charts, which corrupts data rather than merely losing it. Refusing is the only
+            // safe answer here, whatever the exit code says.
+            netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) could not be confirmed stopped. "
+                              "Not starting it again - a second instance would write the same data.",
+                              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid);
+            plugin_set_disabled(cd);
+            cd->unsafe.pid = 0;
+            break;
+        }
+
+        if (retry) {
+            // WE asked for this retry - the parser hit a transient condition (a host being deleted,
+            // a receiver it could not evict, a host it could not create) and wants a fresh
+            // connection. So honour it, and do NOT ask why the process is dead.
+            //
+            // That question has no reliable answer, and it is unanswerable differently per platform.
+            // On POSIX the exit code maps our own SIGKILL, a crash and an OOM kill all to -1; on
+            // Windows they separate, but wrongly for us - our forced termination reports 0, exactly
+            // like a clean exit, while a crash reports -1. Nor does the kill outcome help: it says
+            // whether WE escalated, never whether our signal is why the child died, because an
+            // operator and the OOM killer send the identical SIGKILL. Every rule built on any of
+            // that mislabels some real case, so the retry does not depend on it at all.
+            //
+            // And it retries indefinitely, with no attrition. A plugin is not the right unit to
+            // give up on here: go.d.plugin runs many independent jobs over one connection, and the
+            // retry conditions are per-vnode - one device whose receiver cannot be evicted aborts
+            // the session for all of them. Disabling on a streak would stop every healthy job in
+            // the process over one stuck device, and nothing re-enables a disabled collector short
+            // of an agent restart. The plugin is not what failed, so the plugin is not what stops.
+            // Throttled because this path has no end: a condition that never clears restarts the
+            // plugin every backoff, forever, and an unthrottled line here is thousands a day per
+            // plugin. Thread-local, and this thread is this plugin, so a noisy one cannot hide
+            // another's. The limiter reports how many it suppressed.
+            nd_log_limit_static_thread_var(erl_retry, 60, 0);
+            nd_log_limit(&erl_retry, NDLS_COLLECTORS, NDLP_WARNING,
+                   "PLUGINSD: 'host:%s', '%s' is being restarted for a retry we requested%s.",
+                   rrdhost_hostname(cd->host), string2str(cd->fullfilename),
+                   kill_outcome == SPAWN_KILL_FORCED_EXITED ? " (it had to be forced to exit)" : "");
+
+            // the condition that triggered the retry can persist for a while - a host deletion
+            // holds its lock across two cloud round-trips - so do not spin on it
+            pluginsd_sleep_backoff(cd);
+        }
         else if(likely(worker_ret_code == 0))
             pluginsd_worker_thread_handle_success(cd);
         else
@@ -415,7 +471,21 @@ void *pluginsd_main(void *ptr) {
                     cd->unsafe.enabled = enabled;
                     cd->unsafe.running = false;
 
-                    cd->update_every = (int)inicfg_get_duration_seconds(&netdata_config, string2str(cd->id), "update every", localhost->rrd_update_every);
+                    // clamp on the way in, so nothing downstream has to. Both ends were reachable
+                    // and both defeated the backoff delays: 0 made every wait return immediately,
+                    // and a large value overflowed the arithmetic that derives them.
+                    int64_t update_every_cfg = inicfg_get_duration_seconds(&netdata_config, string2str(cd->id), "update every", localhost->rrd_update_every);
+                    int64_t update_every_clamped = update_every_cfg;
+                    if(update_every_clamped < UPDATE_EVERY_MIN) update_every_clamped = UPDATE_EVERY_MIN;
+                    if(update_every_clamped > UPDATE_EVERY_MAX) update_every_clamped = UPDATE_EVERY_MAX;
+
+                    if(unlikely(update_every_clamped != update_every_cfg))
+                        nd_log(NDLS_DAEMON, NDLP_WARNING,
+                               "PLUGINSD: '%s' has 'update every = %" PRId64 "', which is outside %d..%d - using %" PRId64 ".",
+                                          string2str(cd->id), update_every_cfg,
+                                          UPDATE_EVERY_MIN, UPDATE_EVERY_MAX, update_every_clamped);
+
+                    cd->update_every = (int)update_every_clamped;
                     cd->started_t = now_realtime_sec();
 
                     {

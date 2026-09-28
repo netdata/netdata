@@ -1701,7 +1701,8 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
 // ours. The pre-kill grace makes this worse by discarding its poll result and signalling regardless.
 // Closing the window needs the signalling to move into the spawn server, keyed by request id, so the
 // process that reaps is the one that signals; until then this is a known, accepted race.
-int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms) {
+int spawn_server_exec_kill_ex(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms, SPAWN_KILL_OUTCOME *outcome) {
+    if(outcome) *outcome = SPAWN_KILL_UNKNOWN;
     if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
     if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
 
@@ -1722,8 +1723,10 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
         // EXITED here is authoritative (the server reaps before it reports); RUNNING is not - see
         // the pid-safety note above this function.
         int status;
-        if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
+        if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED) {
+            if(outcome) *outcome = SPAWN_KILL_EXITED;
             return status;
+        }
 
         // still not gone: force-kill, then wait another bounded grace. We must NOT fall through to
         // an unbounded blocking wait here - a child we cannot signal (e.g. SIGKILL returns EPERM)
@@ -1731,10 +1734,14 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
         if(kill(instance->child_pid, SIGKILL) != 0)
             spawn_server_log_kill_failure(instance, SIGKILL);
 
-        if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
+        if(spawn_server_exec_timedwait(server, instance, SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED) {
+            // we escalated and it is gone
+            if(outcome) *outcome = SPAWN_KILL_FORCED_EXITED;
             return status;
+        }
 
-        // could not confirm the child exited within the bounded waits; reclaim the instance so we
+        // could not confirm the child exited within the bounded waits; *outcome stays UNKNOWN -
+        // this path says in its own log line that the child is left running; reclaim the instance so we
         // neither leak it nor block. The spawn server reaps the child if/when it actually dies.
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: giving up waiting for pid %d after SIGKILL (request No %zu) - reclaiming, "
@@ -1746,7 +1753,12 @@ int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int t
         return -1;
     }
 
-    return spawn_server_exec_wait(server, instance);
+    {
+        // nothing was signalled here: whatever the child did, it did on its own terms
+        int rc = spawn_server_exec_wait(server, instance);
+        if(outcome) *outcome = SPAWN_KILL_EXITED;
+        return rc;
+    }
 }
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custom_fd, const char **argv, const void *data, size_t data_size, SPAWN_INSTANCE_TYPE type) {
