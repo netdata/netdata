@@ -27,8 +27,8 @@ if /bin/sh -c '
     export PATH
     . "$1"
     is_valid_url "$2" "http|https"
-' sh "${functions_script}" 'ftp://app.netdata.cloud'; then
-    printf '%s\n' 'kickstart URL validator accepted an unsupported FTP claim URL' >&2
+' sh "${functions_script}" 'sftp://app.netdata.cloud'; then
+    printf '%s\n' 'kickstart URL validator accepted an unsupported SFTP claim URL' >&2
     exit 1
 fi
 
