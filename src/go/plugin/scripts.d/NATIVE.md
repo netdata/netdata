@@ -418,11 +418,14 @@ still starts and signals readiness when enabled, but never receives `collect`.
 Both modes receive this Function envelope as one compact JSON line:
 
 ```json
-{"id":"1","method":"function","function":"items","info":false,"args":["queue:mail"],"payload_base64":"eyJmaWx0ZXIiOiJzdW1tYXJ5In0=","content_type":"application/json","deadline_unix_ms":1800000000000,"permissions":"0xFFFF","source":"user=test"}
+{"id":"1","method":"function","function":"items","info":false,"args":[],"payload_base64":"eyJzZWxlY3Rpb25zIjp7InF1ZXVlIjpbIm1haWwiXX19","content_type":"application/json","deadline_unix_ms":1800000000000,"permissions":"0xFFFF","source":"user=test"}
 ```
 
 `args` is an array, empty when none were supplied. `payload_base64` preserves the
 original payload bytes; decode it before parsing according to `content_type`.
+The v3 UI sends selectors as `{"selections":{"queue":["mail"]}}` in its JSON
+payload, including arrays for single-select fields. Scripts MUST handle this
+shape when declaring selectors; see the [Function UI request flow](../../../plugins.d/FUNCTION_UI_REFERENCE.md#modern-flow-v3).
 Payload, content type, permissions and source are omitted when empty. The absolute
 Unix deadline in milliseconds is present when the caller supplies a deadline.
 Arguments, payload and configuration stay on stdin, never in host-generated argv,

@@ -24,6 +24,7 @@ answer_request() {
                 else
                     (if .payload_base64 then (.payload_base64 | @base64d | fromjson) else {} end) as $payload |
                     ([.args[] | select(startswith("queue:") or startswith("queue=")) | .[6:]] +
+                     ($payload.selections.queue // []) +
                      [($payload.queue // empty)]) as $values |
                     ($values[0] // "mail") as $queue |
                     if ($values | length) > 1 or ($queue != "mail" and $queue != "batch") then
@@ -34,7 +35,7 @@ answer_request() {
                                   depth:{index:1,name:"Depth",type:"integer",units:"jobs"}},
                          data:[[$queue,17]],default_sort_column:"depth"}
                     end
-                end' ) || result='{"version":"v1","status":400,"message":"Invalid Function input"}'
+                end' 2>/dev/null) || result='{"version":"v1","status":400,"message":"Invalid Function input"}'
             ;;
         *) return 2 ;;
     esac

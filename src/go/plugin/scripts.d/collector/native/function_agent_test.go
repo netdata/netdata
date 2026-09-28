@@ -318,9 +318,31 @@ func TestFunctionDevelopmentExamples(t *testing.T) {
 					validateFunctionUI(t, result)
 				}
 				if name == "functions-bash" {
-					result := a.call(t, "selected", "native-fixture:items __job:example", `{"queue":"batch"}`, 200)
+					result := a.call(
+						t,
+						"selected",
+						"native-fixture:items",
+						`{"selections":{"__job":["example"],"queue":["batch"]}}`,
+						200,
+					)
 					validateFunctionUI(t, result)
 					assert.Contains(t, result, `["batch",17]`)
+					result = a.call(
+						t,
+						"invalid-selection",
+						"native-fixture:items __job:example",
+						`{"selections":{"queue":["missing"]}}`,
+						400,
+					)
+					validateFunctionUI(t, result)
+					result = a.call(
+						t,
+						"duplicate-selection",
+						"native-fixture:items __job:example",
+						`{"selections":{"queue":["mail","batch"]}}`,
+						400,
+					)
+					validateFunctionUI(t, result)
 					result = a.call(t, "invalid", "native-fixture:items __job:example queue:missing", "", 400)
 					validateFunctionUI(t, result)
 					require.Eventually(
