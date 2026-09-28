@@ -1021,14 +1021,13 @@ static void ebpf_set_global_variables()
     if (possible_cpus > 0) {
         ebpf_nprocs = possible_cpus;
     } else {
-        // No buffer size is safe for a per-CPU lookup without this count, so ebpf_parse_args() disables per-CPU maps
+        // No buffer size is safe for a per-CPU lookup without this count, so ebpf_parse_args() stops the plugin
         ebpf_possible_cpus_unknown = true;
         ebpf_nprocs = NETDATA_MAX_PROCESSOR;
         netdata_log_error(
-            "libbpf_num_possible_cpus() returned %d instead of a positive CPU count: per-CPU maps are disabled "
-            "and lookup buffers use %d entries.",
-            possible_cpus,
-            ebpf_nprocs);
+            "libbpf_num_possible_cpus() returned %d instead of a positive CPU count: per-CPU maps cannot be read "
+            "safely, so eBPF collection will not start.",
+            possible_cpus);
     }
 
     isrh = get_redhat_release();
@@ -1092,12 +1091,6 @@ static void ebpf_parse_args(int argc, char **argv)
     }
 
     ebpf_load_thread_config();
-
-    // Without the possible-CPU count, read every map with one value per key, whatever the configuration says
-    if (ebpf_possible_cpus_unknown) {
-        for (int i = 0; ebpf_modules[i].info.thread_name; i++)
-            ebpf_modules[i].maps_per_core = CONFIG_BOOLEAN_NO;
-    }
 
     while (1) {
         int c = getopt_long_only(argc, argv, "", long_options, NULL);
@@ -1281,6 +1274,11 @@ static void ebpf_parse_args(int argc, char **argv)
             }
         }
     }
+
+    // Not every loader can make the maps single-valued, so without the possible-CPU count no module may collect.
+    // This runs after the options, so --help, --version and --unittest still work.
+    if (ebpf_possible_cpus_unknown)
+        ebpf_exit(1);
 
     if (disable_cgroups) {
         ebpf_disable_cgroups();
