@@ -344,7 +344,7 @@ func TestConfigSchemaMatchesMetadata(t *testing.T) {
 	collecttest.AssertConfigSchemaMatchesMetadataWith(
 		t,
 		"config_schema.json",
-		"metadata.yaml",
+		"metadata.dev.yaml",
 		collecttest.ConfigSchemaCheck{
 			Defaults: true,
 		},

@@ -759,8 +759,9 @@ set(CPACK_COMPONENT_PLUGIN-SCRIPTS_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-SCRIPTS_DESCRIPTION
 		"The scripts metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect metrics using scripts
-using Nagios-compatible output or the native JSON script protocol.
-Native packages support labeled metrics, chart templates and service checks.")
+that provide data in an extended version of the output format used by
+Nagios plugins. This provides compatibility with most Nagios plugins,
+as well as enabling simple active checks.")
 
 set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_NAME "netdata-plugin-scripts")
 set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_SECTION "net")

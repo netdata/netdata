@@ -1,3 +1,4 @@
+# Development metadata fixture. Keep outside metadata.yaml catalog discovery until release.
 plugin_name: scripts.d.plugin
 modules:
   - meta:
@@ -99,7 +100,7 @@ modules:
               and oversized responses fail the complete attempt. The collector does not log script stderr.
     alerts:
       - name: native_script_check
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/native_script.conf
+        link: https://github.com/netdata/netdata/blob/master/src/go/plugin/scripts.d/development/native_script.conf
         metric: native_script.check_state
         info: Service health reported by a native script (0 = OK, 1 = warning, 2 = critical)
     metrics:

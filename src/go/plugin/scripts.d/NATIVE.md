@@ -1,16 +1,32 @@
-# Native script packages (preview)
+# Native script development
 
 The `native` collector runs language-neutral executable packages through scripts.d.
 A package supplies a manifest, an executable, and optionally a V2 chart template.
-Scripts report labeled metrics and named service checks. Stock alerts turn warning
-and critical checks into notifications without a separate health configuration.
+Scripts report labeled metrics and named service checks. The development health
+template turns warning and critical checks into notifications.
 
 This contract is WIP. The first implementation supports one-shot collection,
 scalar gauges and cumulative counters. Persistent processes, additional metric
 kinds, script-specific DynCfg forms, and Functions are later steps. The manifest
 and wire format may change during the preview.
 
-## Install and configure
+## Development build and configuration
+
+Native is excluded from ordinary scripts.d builds and its DynCfg registry. The
+helper, example config and health template are not installed, and native metadata
+is excluded from the integration catalog. Build explicitly for development:
+
+```sh
+cd src/go
+go build -tags scripts_native_dev -o /tmp/scripts.d.plugin ./cmd/scriptsdplugin
+```
+
+The source fixtures in `development/native.conf` and
+`development/native_script.conf` are retained for testing. For manual developer
+tests, copy them into a scratch configuration tree as `scripts.d/native.conf` and
+`health.d/native_script.conf`. The smoke test below prepares its own tree.
+`collector/native/metadata.dev.yaml` is the future integration metadata fixture;
+its name deliberately excludes it from normal catalog discovery.
 
 Place the package in an administrator-controlled directory, for example
 `/usr/local/lib/netdata/custom/queue/`. On Unix, the command executable and every
@@ -37,8 +53,9 @@ jobs:
     timeout: 5
 ```
 
-There is no package auto-discovery. Initialization reads and validates local files
-without running the executable. Editing package files requires restarting or
+Use the development binary for this configuration. There is no package
+auto-discovery. Initialization reads and validates local files without running
+the executable. Editing package files requires restarting or
 reconfiguring the job; charts and declarations are fixed for that job instance.
 
 ## Manifest v1
@@ -153,8 +170,8 @@ collection attempts.
 
 Each declared check plus identity labels produces a chart in
 `native_script.check_state`. It exposes `ok`, `warning`, `critical`, and `unknown`
-as explicit zero/one dimensions. The `native_script_check` stock template evaluates
-every 10 seconds and routes warning/critical notifications to `sysadmin`.
+as explicit zero/one dimensions. The development `native_script_check` template
+evaluates every 10 seconds and routes warning/critical notifications to `sysadmin`.
 
 | Observation | Health meaning |
 |---|---|
@@ -173,9 +190,9 @@ cadence and notification policy; they do not emulate Nagios retries.
 
 ## Bash helper
 
-The package installs a pure Bash library at
-`/usr/libexec/netdata/scripts.d/native.sh` (beneath the installation prefix).
-It requires no `jq`, Python, or helper subprocess per sample. Use `nd_begin`,
+The pure Bash library stays in the source tree at `lib/native.sh`; it is not
+installed. Source it using an absolute path in development scripts. It requires
+no `jq`, Python, or helper subprocess per sample. Use `nd_begin`,
 `nd_metric NAME VALUE [KEY VALUE ...]`, `nd_check ID STATE [KEY VALUE ...]`, and
 `nd_end`. These functions encode strings, including quotes, backslashes and control
 characters supported by Bash; Bash variables cannot represent NUL bytes.
@@ -190,7 +207,7 @@ A runnable synthetic example for the manifest above:
 ```bash
 #!/bin/bash
 set -eu
-source /usr/libexec/netdata/scripts.d/native.sh
+source /absolute/path/to/netdata/src/go/plugin/scripts.d/lib/native.sh
 [[ ${1:-} == collect ]] || exit 2
 nd_begin
 nd_metric queue_depth 17 queue mail region east
@@ -219,8 +236,8 @@ go test ./plugin/scripts.d/collector/native/...
 ```
 
 For a real health-runtime smoke test, build an Agent and `nd-run` in a scratch
-directory. Build scripts.d with `pkg/buildinfo.NetdataBinDir` pointing to that
-directory, then run:
+directory. Build scripts.d with `-tags scripts_native_dev` and
+`pkg/buildinfo.NetdataBinDir` pointing to that directory, then run:
 
 ```sh
 python3 src/go/plugin/scripts.d/tests/native_health.py --agent /path/to/netdata --plugin /path/to/scripts.d.plugin

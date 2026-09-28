@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Run a disposable Unix Agent to verify native check health transitions.
 
-Supply built Agent and scripts.d binaries. The plugin must resolve a usable
-nd-run helper (see NATIVE.md). No installed Agent is contacted or modified.
+Supply built Agent and scripts.d binaries (scripts.d requires scripts_native_dev).
+The plugin must resolve a usable nd-run helper (see NATIVE.md). No installed Agent is contacted or modified.
 """
 import argparse
 import json
@@ -42,7 +42,7 @@ def main():
     ):
         (root / name).mkdir(parents=True)
     (root / "etc/health.d/native_script.conf").write_bytes(
-        (repo / "src/health/health.d/native_script.conf").read_bytes()
+        (repo / "src/go/plugin/scripts.d/development/native_script.conf").read_bytes()
     )
     (root / "etc/scripts.d.conf").write_text(
         "enabled: yes\ndefault_run: yes\nmodules:\n  native: yes\n  nagios: no\n"

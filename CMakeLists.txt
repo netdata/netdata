@@ -3916,10 +3916,6 @@ if(ENABLE_PLUGIN_SCRIPTS)
             COMPONENT plugin-scripts
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    install(FILES src/go/plugin/scripts.d/lib/native.sh
-            COMPONENT plugin-scripts
-            DESTINATION usr/libexec/netdata/scripts.d)
-
     install(FILES src/go/plugin/scripts.d/config/scripts.d.conf
             COMPONENT plugin-scripts
             DESTINATION usr/lib/netdata/conf.d)

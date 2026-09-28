@@ -25,7 +25,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/nagios"
-	_ "github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 )

@@ -1,12 +1,8 @@
 # scripts.d.plugin (preview)
 
-`scripts.d.plugin` runs custom monitoring scripts through V2 collectors:
-
-- `nagios` accepts existing Nagios plugin output, with scheduling and retry state.
-- [`native`](NATIVE.md) accepts labeled JSON metrics and named service checks, with
-  package-provided chart templates. Its protocol is a work in progress.
-
-The configuration and output examples below describe the Nagios collector.
+`scripts.d.plugin` runs Nagios-style check scripts inside Netdata without changing
+plugin output format. The active collector is `nagios` (single collector surface),
+implemented as a normal V2 collector with collector-local scheduling/state.
 
 > **Status:** preview. Core execution, retry/state tracking, and perfdata routing are
 > implemented; config/docs may still evolve.
