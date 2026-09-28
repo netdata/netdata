@@ -21,6 +21,10 @@ struct net_framework_instances {
     bool process_id_label_initialized;
     uint32_t objects_seen;
     uint32_t objects_seen_this_cycle;
+    uint32_t instances_seen_this_cycle[NETDATA_NETFRAMEWORK_END];
+    uint32_t instances_seen_previous_cycle[NETDATA_NETFRAMEWORK_END];
+    bool population_changed[NETDATA_NETFRAMEWORK_END];
+    unsigned current_object;
 
     RRDSET *st_clrexception_thrown;
     RRDDIM *rd_clrexception_thrown;
@@ -241,6 +245,198 @@ struct net_framework_instances {
 };
 
 static DICTIONARY *processes = NULL;
+static DICTIONARY *netframework_instance_groups = NULL;
+static bool netframework_chart_commit_allowed = true;
+static bool netframework_current_name_unique = true;
+
+struct netframework_instance_group {
+    unsigned count;
+    PERF_INSTANCE_DEFINITION *last;
+};
+
+static void netframework_rrdset_done(RRDSET *st, struct net_framework_instances *p)
+{
+    if (netframework_chart_commit_allowed) {
+        if (p->population_changed[p->current_object]) {
+            RRDDIM *rd;
+            rrddim_foreach_read(rd, st) {
+                if (rd->algorithm != RRD_ALGORITHM_INCREMENTAL || !rrddim_check_updated(rd))
+                    continue;
+
+                // A membership change alters the aggregate's cumulative baseline.
+                if (rrddim_is_float(rd))
+                    rrddim_set_last_collected_float(rd, rrddim_collected_as_double(rd));
+                else
+                    rrddim_set_last_collected_int(rd, rd->collector.collected.i.collected_value);
+            }
+            rrddim_foreach_done(rd);
+        }
+        rrdset_done(st);
+    }
+}
+
+#define NETFRAMEWORK_RESET_COUNTER(counter)                                                                            \
+    do {                                                                                                               \
+        if (p->counter.current.CounterType)                                                                            \
+            p->counter.previous = p->counter.current;                                                                  \
+        p->counter.current = RAW_DATA_EMPTY;                                                                           \
+        p->counter.updated = false;                                                                                   \
+    } while (0)
+
+static void netframework_begin_object_instance(struct net_framework_instances *p, unsigned object)
+{
+    if (p->instances_seen_this_cycle[object]++ != 0)
+        return;
+
+    switch (object) {
+        case NETDATA_NETFRAMEWORK_EXCEPTIONS:
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRExceptionThrown);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRExceptionFilters);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRExceptionFinallys);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRExceptionTotalCatchDepth);
+            break;
+        case NETDATA_NETFRAMEWORK_INTEROP:
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRInteropCOMCallableWrappers);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRInteropMarshalling);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRInteropStubsCreated);
+            break;
+        case NETDATA_NETFRAMEWORK_JIT:
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRJITMethods);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRJITPercentTime);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRJITStandardFailures);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRJITIlBytes);
+            break;
+        case NETDATA_NETFRAMEWORK_LOADING:
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLoadingHeapSize);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLoadingCurrentAppdomains);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLoadingCurrentAssemblies);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLoadingCurrentClassesLoaded);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLoadingAppDomainsLoaded);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLoadingAppDomainsUnloaded);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLoadingAssembliesLoaded);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLoadingClassesLoaded);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLoadingClassLoadFailure);
+            break;
+        case NETDATA_NETFRAMEWORK_MEMORY:
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryAllocatedBytesPerSec);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryProcessId);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryFinalizationSurvivors);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryGen0HeapSize);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryGen0PromotedBytesPerSec);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryGen1HeapSize);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryGen1PromotedBytesPerSec);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryGen2HeapSize);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryLargeObjectHeapSize);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryGCHandles);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryGen0Collections);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryGen1Collections);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryGen2Collections);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryInducedGC);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryPinnedObjects);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemorySinkBlocksInUse);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryCommittedBytes);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryReservedBytes);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRMemoryTimeInGC);
+            break;
+        case NETDATA_NETFRAMEWORK_REMOTING:
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRRemotingChannels);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRRemotingContextBoundClassesLoaded);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRRemotingContextBoundObjects);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRRemotingContextProxies);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRRemotingContexts);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRRemotingRemoteCalls);
+            break;
+        case NETDATA_NETFRAMEWORK_SECURITY:
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRSecurityLinkTimeChecks);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRSecurityPercentTimeinRTChecks);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRSecurityStackWalkDepth);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRSecurityRunTimeChecks);
+            break;
+        case NETDATA_NETFRAMEWORK_LOCKS_THREADS:
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLocksAndThreadsQueueLength);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLocksAndThreadsCurrentQueueLength);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLocksAndThreadsCurrentLogicalThreads);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLocksAndThreadsCurrentPhysicalThreads);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLocksAndThreadsRecognizedThreads);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLocksAndThreadsCurrentRecognizedThreads);
+            NETFRAMEWORK_RESET_COUNTER(NETFrameworkCLRLocksAndThreadsContentions);
+            break;
+    }
+}
+
+static bool netframework_add_raw_sample(RAW_DATA *total, const RAW_DATA *sample)
+{
+    if (total->CounterType != sample->CounterType)
+        return false;
+
+    total->Data += sample->Data;
+
+    switch (sample->CounterType) {
+        case PERF_RAW_FRACTION:
+        case PERF_LARGE_RAW_FRACTION:
+        case PERF_SAMPLE_FRACTION:
+        case PERF_PRECISION_SYSTEM_TIMER:
+        case PERF_PRECISION_100NS_TIMER:
+        case PERF_PRECISION_OBJECT_TIMER:
+        case PERF_AVERAGE_TIMER:
+        case PERF_AVERAGE_BULK:
+            total->Time += sample->Time;
+            break;
+        default:
+            break;
+    }
+
+    if ((sample->CounterType & PERF_MULTI_COUNTER) == PERF_MULTI_COUNTER)
+        total->MultiCounterData += sample->MultiCounterData;
+
+    if (!total->Frequency)
+        total->Frequency = sample->Frequency;
+    if (!total->Time)
+        total->Time = sample->Time;
+
+    return true;
+}
+
+static bool netframework_get_instance_counter(
+    PERF_DATA_BLOCK *data,
+    PERF_OBJECT_TYPE *object,
+    PERF_INSTANCE_DEFINITION *instance,
+    COUNTER_DATA *counter)
+{
+    // CounterType zero marks a group with at least one failed member read this cycle.
+    if (counter->updated && !counter->current.CounterType)
+        return false;
+
+    COUNTER_DATA sample = *counter;
+    sample.current = RAW_DATA_EMPTY;
+    sample.previous = RAW_DATA_EMPTY;
+    sample.updated = false;
+
+    bool found = perflibGetInstanceCounter(data, object, instance, &sample);
+    counter->id = sample.id;
+    counter->failures = sample.failures;
+    counter->backoff = sample.backoff;
+
+    if (!found) {
+        counter->current = RAW_DATA_EMPTY;
+        counter->updated = true;
+        return false;
+    }
+
+    if (!counter->updated) {
+        counter->current = sample.current;
+        counter->updated = true;
+    }
+    else if (!netframework_add_raw_sample(&counter->current, &sample.current)) {
+        counter->current = RAW_DATA_EMPTY;
+        counter->updated = true;
+        return false;
+    }
+
+    return counter->updated;
+}
+
+#undef NETFRAMEWORK_RESET_COUNTER
 
 static inline void initialize_net_framework_processes_keys(struct net_framework_instances *p)
 {
@@ -391,9 +587,36 @@ static void netframework_update_process_id_label(RRDSET *st, const char *value)
     rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
 }
 
+static int netframework_copy_label_without_process_id(const char *name, const char *value, RRDLABEL_SRC source, void *data)
+{
+    if (strcmp(name, "process_id") != 0)
+        rrdlabels_add(data, name, value, source);
+    return 0;
+}
+
+static void netframework_remove_memory_process_id_label(RRDSET *st)
+{
+    if (!st || !rrdlabels_exist(st->rrdlabels, "process_id"))
+        return;
+
+    RRDLABELS *labels = rrdlabels_create();
+    rrdlabels_walkthrough_read(st->rrdlabels, netframework_copy_label_without_process_id, labels);
+    bool changed = rrdlabels_migrate_to_these(st->rrdlabels, labels);
+    rrdlabels_destroy(labels);
+
+    if (!changed)
+        return;
+
+    rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
+    rrdset_metadata_updated(st);
+    rrdset_flag_set(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+}
+
 static void netframework_update_memory_process_id_labels(struct net_framework_instances *p, bool has_process_id)
 {
-    if (!has_process_id)
+    if (!has_process_id || !netframework_current_name_unique)
         return;
 
     ULONGLONG current_process_id = p->NETFrameworkCLRMemoryProcessId.current.Data;
@@ -432,7 +655,7 @@ static void netframework_add_memory_labels(
 {
     rrdlabels_add(st->rrdlabels, "process", process, RRDLABEL_SRC_AUTO);
 
-    if (has_process_id) {
+    if (has_process_id && netframework_current_name_unique) {
         char process_id_label[UINT64_MAX_LENGTH];
         snprintfz(process_id_label, sizeof(process_id_label), "%llu", (unsigned long long)process_id);
         rrdlabels_add(st->rrdlabels, "process_id", process_id_label, RRDLABEL_SRC_AUTO);
@@ -448,23 +671,59 @@ static void dict_net_framework_processes_delete_cb(
     netframework_process_cleanup(p);
 }
 
-static inline struct net_framework_instances *netframework_process_get(const char *name, unsigned object)
+static inline struct net_framework_instances *netframework_process_get(
+    const char *name,
+    unsigned object,
+    PERF_INSTANCE_DEFINITION *instance)
 {
-    // Known limitation, accepted: Perflib may suffix duplicate names (for example, w3wp#1), but suffixes are
-    // assigned per counter object and can change as processes start or stop. Same-named processes can therefore
-    // still collapse into this one entry and interleave their samples. Instance UniqueID is unavailable in the
-    // available dumps, and only .NET CLR Memory exposes a process ID, so there is no reliable cross-object
-    // discriminator. This limitation is documented under the integration's limits.
+    // Raw same-name instances are intentionally aggregated because only CLR Memory exposes a process ID and it
+    // cannot reliably correlate instances across all CLR objects.
     struct net_framework_instances *p = dictionary_set(processes, name, NULL, sizeof(*p));
     p->objects_seen |= 1U << object;
     p->objects_seen_this_cycle |= 1U << object;
+    struct netframework_instance_group *group = dictionary_get(netframework_instance_groups, name);
+    unsigned name_instances = group ? group->count : 1;
+    if (p->instances_seen_this_cycle[object] == 0)
+        p->population_changed[object] = p->instances_seen_previous_cycle[object] != name_instances;
+
+    netframework_begin_object_instance(p, object);
+    netframework_chart_commit_allowed = !group || group->last == instance;
+    netframework_current_name_unique = name_instances == 1;
+    p->current_object = object;
     return p;
+}
+
+static void netframework_prepare_instance_groups(
+    PERF_DATA_BLOCK *data,
+    PERF_OBJECT_TYPE *object)
+{
+    dictionary_flush(netframework_instance_groups);
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+
+    for (LONG i = 0; i < object->NumInstances; i++) {
+        pi = perflibForEachInstance(data, object, pi);
+        if (!pi)
+            break;
+
+        char candidate[RRD_ID_LENGTH_MAX + 1];
+        if (!getInstanceName(data, object, pi, candidate, sizeof(candidate)))
+            strncpyz(candidate, "[unknown]", sizeof(candidate) - 1);
+        if (strcasecmp(candidate, "_Global_") == 0)
+            continue;
+
+        struct netframework_instance_group *group = dictionary_set(
+            netframework_instance_groups, candidate, NULL, sizeof(*group));
+        group->count++;
+        group->last = pi;
+    }
 }
 
 static void initialize(void)
 {
     processes = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct net_framework_instances));
+    netframework_instance_groups = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct netframework_instance_group));
 
     dictionary_register_insert_callback(processes, dict_net_framework_processes_insert_cb, NULL);
     dictionary_register_delete_callback(processes, dict_net_framework_processes_delete_cb, NULL);
@@ -487,9 +746,9 @@ netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
             continue;
 
         struct net_framework_instances *p =
-            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_EXCEPTIONS);
+            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_EXCEPTIONS, pi);
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRExceptionThrown)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRExceptionThrown)) {
             if (!p->st_clrexception_thrown) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_thrown", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -518,10 +777,10 @@ netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
                 p->st_clrexception_thrown,
                 p->rd_clrexception_thrown,
                 (collected_number)p->NETFrameworkCLRExceptionThrown.current.Data);
-            rrdset_done(p->st_clrexception_thrown);
+            netframework_rrdset_done(p->st_clrexception_thrown, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRExceptionFilters)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRExceptionFilters)) {
             if (!p->st_clrexception_filters) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_filters", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -550,10 +809,10 @@ netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
                 p->st_clrexception_filters,
                 p->rd_clrexception_filters,
                 (collected_number)p->NETFrameworkCLRExceptionFilters.current.Data);
-            rrdset_done(p->st_clrexception_filters);
+            netframework_rrdset_done(p->st_clrexception_filters, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRExceptionFinallys)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRExceptionFinallys)) {
             if (!p->st_clrexception_finallys) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_finallys", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -582,10 +841,10 @@ netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
                 p->st_clrexception_finallys,
                 p->rd_clrexception_finallys,
                 (collected_number)p->NETFrameworkCLRExceptionFinallys.current.Data);
-            rrdset_done(p->st_clrexception_finallys);
+            netframework_rrdset_done(p->st_clrexception_finallys, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRExceptionTotalCatchDepth)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRExceptionTotalCatchDepth)) {
             if (!p->st_clrexception_total_catch_depth) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrexception_throw_to_catch_depth", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -617,7 +876,7 @@ netdata_framework_clr_exceptions(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *
                 p->st_clrexception_total_catch_depth,
                 p->rd_clrexception_total_catch_depth,
                 (collected_number)p->NETFrameworkCLRExceptionTotalCatchDepth.current.Data);
-            rrdset_done(p->st_clrexception_total_catch_depth);
+            netframework_rrdset_done(p->st_clrexception_total_catch_depth, p);
         }
     }
 }
@@ -638,9 +897,9 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
             continue;
 
         struct net_framework_instances *p =
-            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_INTEROP);
+            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_INTEROP, pi);
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRInteropCOMCallableWrappers)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRInteropCOMCallableWrappers)) {
             if (!p->st_clrinterop_com_callable_wrappers) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrinterop_com_callable_wrappers", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -677,10 +936,10 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 p->st_clrinterop_com_callable_wrappers,
                 p->rd_clrinterop_com_callable_wrappers,
                 (collected_number)p->NETFrameworkCLRInteropCOMCallableWrappers.current.Data);
-            rrdset_done(p->st_clrinterop_com_callable_wrappers);
+            netframework_rrdset_done(p->st_clrinterop_com_callable_wrappers, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRInteropMarshalling)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRInteropMarshalling)) {
             if (!p->st_clrinterop_marshalling) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrinterop_interop_marshalling", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -712,10 +971,10 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 p->st_clrinterop_marshalling,
                 p->rd_clrinterop_marshalling,
                 (collected_number)p->NETFrameworkCLRInteropMarshalling.current.Data);
-            rrdset_done(p->st_clrinterop_marshalling);
+            netframework_rrdset_done(p->st_clrinterop_marshalling, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRInteropStubsCreated)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRInteropStubsCreated)) {
             if (!p->st_clrinterop_interop_stubs_created) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrinterop_interop_stubs_created", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -747,7 +1006,7 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 p->st_clrinterop_interop_stubs_created,
                 p->rd_clrinterop_interop_stubs_created,
                 (collected_number)p->NETFrameworkCLRInteropStubsCreated.current.Data);
-            rrdset_done(p->st_clrinterop_interop_stubs_created);
+            netframework_rrdset_done(p->st_clrinterop_interop_stubs_created, p);
         }
     }
 }
@@ -767,9 +1026,9 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
         if (strcasecmp(windows_shared_buffer, "_Global_") == 0)
             continue;
 
-        struct net_framework_instances *p = netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_JIT);
+        struct net_framework_instances *p = netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_JIT, pi);
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITMethods)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITMethods)) {
             if (!p->st_clrjit_methods) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_methods", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -797,10 +1056,10 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
                 p->st_clrjit_methods,
                 p->rd_clrjit_methods,
                 (collected_number)p->NETFrameworkCLRJITMethods.current.Data);
-            rrdset_done(p->st_clrjit_methods);
+            netframework_rrdset_done(p->st_clrjit_methods, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITPercentTime)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITPercentTime)) {
             if (!p->st_clrjit_time) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_time", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -825,10 +1084,10 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
             }
 
             perflib_rrddim_set_by_pointer(p->st_clrjit_time, p->rd_clrjit_time, &p->NETFrameworkCLRJITPercentTime);
-            rrdset_done(p->st_clrjit_time);
+            netframework_rrdset_done(p->st_clrjit_time, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITStandardFailures)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITStandardFailures)) {
             if (!p->st_clrjit_standard_failures) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_standard_failures", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -857,10 +1116,10 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
                 p->st_clrjit_standard_failures,
                 p->rd_clrjit_standard_failures,
                 (collected_number)p->NETFrameworkCLRJITStandardFailures.current.Data);
-            rrdset_done(p->st_clrjit_standard_failures);
+            netframework_rrdset_done(p->st_clrjit_standard_failures, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITIlBytes)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITIlBytes)) {
             if (!p->st_clrjit_il_bytes) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_il_bytes", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -888,7 +1147,7 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
                 p->st_clrjit_il_bytes,
                 p->rd_clrjit_il_bytes,
                 (collected_number)p->NETFrameworkCLRJITIlBytes.current.Data);
-            rrdset_done(p->st_clrjit_il_bytes);
+            netframework_rrdset_done(p->st_clrjit_il_bytes, p);
         }
     }
 }
@@ -909,9 +1168,9 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
             continue;
 
         struct net_framework_instances *p =
-            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_LOADING);
+            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_LOADING, pi);
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingHeapSize)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingHeapSize)) {
             if (!p->st_clrloading_heap_size) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_loader_heap_size", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -940,10 +1199,10 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 p->st_clrloading_heap_size,
                 p->rd_clrloading_heap_size,
                 (collected_number)p->NETFrameworkCLRLoadingHeapSize.current.Data);
-            rrdset_done(p->st_clrloading_heap_size);
+            netframework_rrdset_done(p->st_clrloading_heap_size, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingCurrentAppdomains)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingCurrentAppdomains)) {
             if (!p->st_clrloading_current_appdomains) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_current_appdomains", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -975,10 +1234,10 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 p->st_clrloading_current_appdomains,
                 p->rd_clrloading_current_appdomains,
                 (collected_number)p->NETFrameworkCLRLoadingCurrentAppdomains.current.Data);
-            rrdset_done(p->st_clrloading_current_appdomains);
+            netframework_rrdset_done(p->st_clrloading_current_appdomains, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingCurrentAssemblies)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingCurrentAssemblies)) {
             if (!p->st_clrloading_current_assemblies) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_current_assemblies", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1010,10 +1269,10 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 p->st_clrloading_current_assemblies,
                 p->rd_clrloading_current_assemblies,
                 (collected_number)p->NETFrameworkCLRLoadingCurrentAssemblies.current.Data);
-            rrdset_done(p->st_clrloading_current_assemblies);
+            netframework_rrdset_done(p->st_clrloading_current_assemblies, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingCurrentClassesLoaded)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingCurrentClassesLoaded)) {
             if (!p->st_clrloading_current_classes_loaded) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_current_classes_loaded", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1045,10 +1304,10 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 p->st_clrloading_current_classes_loaded,
                 p->rd_clrloading_current_classes_loaded,
                 (collected_number)p->NETFrameworkCLRLoadingCurrentClassesLoaded.current.Data);
-            rrdset_done(p->st_clrloading_current_classes_loaded);
+            netframework_rrdset_done(p->st_clrloading_current_classes_loaded, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingAppDomainsLoaded)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingAppDomainsLoaded)) {
             if (!p->st_clrloading_app_domains_loaded) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_appdomains_loaded", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1077,10 +1336,10 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 p->st_clrloading_app_domains_loaded,
                 p->rd_clrloading_app_domains_loaded,
                 (collected_number)p->NETFrameworkCLRLoadingAppDomainsLoaded.current.Data);
-            rrdset_done(p->st_clrloading_app_domains_loaded);
+            netframework_rrdset_done(p->st_clrloading_app_domains_loaded, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingAppDomainsUnloaded)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingAppDomainsUnloaded)) {
             if (!p->st_clrloading_app_domains_unloaded) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_appdomains_unloaded", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1112,10 +1371,10 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 p->st_clrloading_app_domains_unloaded,
                 p->rd_clrloading_app_domains_unloaded,
                 (collected_number)p->NETFrameworkCLRLoadingAppDomainsUnloaded.current.Data);
-            rrdset_done(p->st_clrloading_app_domains_unloaded);
+            netframework_rrdset_done(p->st_clrloading_app_domains_unloaded, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingAssembliesLoaded)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingAssembliesLoaded)) {
             if (!p->st_clrloading_assemblies_loaded) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_assemblies_loaded", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1144,10 +1403,10 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 p->st_clrloading_assemblies_loaded,
                 p->rd_clrloading_assemblies_loaded,
                 (collected_number)p->NETFrameworkCLRLoadingAssembliesLoaded.current.Data);
-            rrdset_done(p->st_clrloading_assemblies_loaded);
+            netframework_rrdset_done(p->st_clrloading_assemblies_loaded, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingClassesLoaded)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingClassesLoaded)) {
             if (!p->st_clrloading_classes_loaded) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_classes_loaded", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1176,10 +1435,10 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 p->st_clrloading_classes_loaded,
                 p->rd_clrloading_classes_loaded,
                 (collected_number)p->NETFrameworkCLRLoadingClassesLoaded.current.Data);
-            rrdset_done(p->st_clrloading_classes_loaded);
+            netframework_rrdset_done(p->st_clrloading_classes_loaded, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingClassLoadFailure)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingClassLoadFailure)) {
             if (!p->st_clrloading_class_load_failure) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_class_load_failure", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1208,7 +1467,7 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
                 p->st_clrloading_class_load_failure,
                 p->rd_clrloading_class_load_failure,
                 (collected_number)p->NETFrameworkCLRLoadingClassLoadFailure.current.Data);
-            rrdset_done(p->st_clrloading_class_load_failure);
+            netframework_rrdset_done(p->st_clrloading_class_load_failure, p);
         }
     }
 }
@@ -1230,49 +1489,49 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
             continue;
 
         struct net_framework_instances *p =
-            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_MEMORY);
+            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_MEMORY, pi);
 
         bool has_allocated_bytes =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryAllocatedBytesPerSec);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryAllocatedBytesPerSec);
         bool has_process_id =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryProcessId);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryProcessId);
         // Perflib may park this counter temporarily; force one relabel pass when it returns.
         if (!has_process_id)
             p->process_id_label_initialized = false;
         bool has_finalization_survivors =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryFinalizationSurvivors);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryFinalizationSurvivors);
         bool has_gen0_heap =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen0HeapSize);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen0HeapSize);
         bool has_gen0_promoted =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen0PromotedBytesPerSec);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen0PromotedBytesPerSec);
         bool has_gen1_heap =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen1HeapSize);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen1HeapSize);
         bool has_gen1_promoted =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen1PromotedBytesPerSec);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen1PromotedBytesPerSec);
         bool has_gen2_heap =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen2HeapSize);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen2HeapSize);
         bool has_loh_heap =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryLargeObjectHeapSize);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryLargeObjectHeapSize);
         bool has_gc_handles =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGCHandles);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGCHandles);
         bool has_gen0_collections =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen0Collections);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen0Collections);
         bool has_gen1_collections =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen1Collections);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen1Collections);
         bool has_gen2_collections =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen2Collections);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryGen2Collections);
         bool has_induced_gc =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryInducedGC);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryInducedGC);
         bool has_pinned_objects =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryPinnedObjects);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryPinnedObjects);
         bool has_sink_blocks =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemorySinkBlocksInUse);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemorySinkBlocksInUse);
         bool has_committed_bytes =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryCommittedBytes);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryCommittedBytes);
         bool has_reserved_bytes =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryReservedBytes);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryReservedBytes);
         bool has_gc_time =
-            perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryTimeInGC);
+            netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryTimeInGC);
 
         if (has_allocated_bytes) {
             if (!p->st_clrmemory_allocated_bytes) {
@@ -1306,7 +1565,7 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->st_clrmemory_allocated_bytes,
                 p->rd_clrmemory_allocated_bytes,
                 (collected_number)p->NETFrameworkCLRMemoryAllocatedBytesPerSec.current.Data);
-            rrdset_done(p->st_clrmemory_allocated_bytes);
+            netframework_rrdset_done(p->st_clrmemory_allocated_bytes, p);
         }
 
         if (has_finalization_survivors) {
@@ -1341,7 +1600,7 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->st_clrmemory_finalization_survivors,
                 p->rd_clrmemory_finalization_survivors,
                 (collected_number)p->NETFrameworkCLRMemoryFinalizationSurvivors.current.Data);
-            rrdset_done(p->st_clrmemory_finalization_survivors);
+            netframework_rrdset_done(p->st_clrmemory_finalization_survivors, p);
         }
 
         if (has_gen0_heap || has_gen1_heap || has_gen2_heap || has_loh_heap) {
@@ -1400,7 +1659,7 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                     p->st_clrmemory_heap_size,
                     p->rd_clrmemory_heap_loh,
                     (collected_number)p->NETFrameworkCLRMemoryLargeObjectHeapSize.current.Data);
-            rrdset_done(p->st_clrmemory_heap_size);
+            netframework_rrdset_done(p->st_clrmemory_heap_size, p);
         }
 
         if (has_gen0_promoted || has_gen1_promoted) {
@@ -1443,7 +1702,7 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                     p->st_clrmemory_promoted_bytes,
                     p->rd_clrmemory_promoted_gen1,
                     (collected_number)p->NETFrameworkCLRMemoryGen1PromotedBytesPerSec.current.Data);
-            rrdset_done(p->st_clrmemory_promoted_bytes);
+            netframework_rrdset_done(p->st_clrmemory_promoted_bytes, p);
         }
 
         if (has_gc_handles) {
@@ -1478,7 +1737,7 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->st_clrmemory_gc_handles,
                 p->rd_clrmemory_gc_handles,
                 (collected_number)p->NETFrameworkCLRMemoryGCHandles.current.Data);
-            rrdset_done(p->st_clrmemory_gc_handles);
+            netframework_rrdset_done(p->st_clrmemory_gc_handles, p);
         }
 
         if (has_gen0_collections || has_gen1_collections || has_gen2_collections) {
@@ -1528,7 +1787,7 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                     p->st_clrmemory_collections,
                     p->rd_clrmemory_collections_gen2,
                     (collected_number)p->NETFrameworkCLRMemoryGen2Collections.current.Data);
-            rrdset_done(p->st_clrmemory_collections);
+            netframework_rrdset_done(p->st_clrmemory_collections, p);
         }
 
         if (has_induced_gc) {
@@ -1563,7 +1822,7 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->st_clrmemory_induced_gc,
                 p->rd_clrmemory_induced_gc,
                 (collected_number)p->NETFrameworkCLRMemoryInducedGC.current.Data);
-            rrdset_done(p->st_clrmemory_induced_gc);
+            netframework_rrdset_done(p->st_clrmemory_induced_gc, p);
         }
 
         if (has_pinned_objects) {
@@ -1598,7 +1857,7 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->st_clrmemory_pinned_objects,
                 p->rd_clrmemory_pinned_objects,
                 (collected_number)p->NETFrameworkCLRMemoryPinnedObjects.current.Data);
-            rrdset_done(p->st_clrmemory_pinned_objects);
+            netframework_rrdset_done(p->st_clrmemory_pinned_objects, p);
         }
 
         if (has_sink_blocks) {
@@ -1633,7 +1892,7 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->st_clrmemory_sink_blocks_in_use,
                 p->rd_clrmemory_sink_blocks_in_use,
                 (collected_number)p->NETFrameworkCLRMemorySinkBlocksInUse.current.Data);
-            rrdset_done(p->st_clrmemory_sink_blocks_in_use);
+            netframework_rrdset_done(p->st_clrmemory_sink_blocks_in_use, p);
         }
 
         if (has_committed_bytes) {
@@ -1668,7 +1927,7 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->st_clrmemory_committed_bytes,
                 p->rd_clrmemory_committed_bytes,
                 (collected_number)p->NETFrameworkCLRMemoryCommittedBytes.current.Data);
-            rrdset_done(p->st_clrmemory_committed_bytes);
+            netframework_rrdset_done(p->st_clrmemory_committed_bytes, p);
         }
 
         if (has_reserved_bytes) {
@@ -1703,7 +1962,7 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
                 p->st_clrmemory_reserved_bytes,
                 p->rd_clrmemory_reserved_bytes,
                 (collected_number)p->NETFrameworkCLRMemoryReservedBytes.current.Data);
-            rrdset_done(p->st_clrmemory_reserved_bytes);
+            netframework_rrdset_done(p->st_clrmemory_reserved_bytes, p);
         }
 
         if (has_gc_time) {
@@ -1736,13 +1995,29 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
 
             perflib_rrddim_set_by_pointer(p->st_clrmemory_gc_time, p->rd_clrmemory_gc_time,
                                           &p->NETFrameworkCLRMemoryTimeInGC);
-            rrdset_done(p->st_clrmemory_gc_time);
+            netframework_rrdset_done(p->st_clrmemory_gc_time, p);
         }
 
         if (has_process_id &&
             (!p->process_id_label_initialized ||
              p->last_process_id != p->NETFrameworkCLRMemoryProcessId.current.Data))
             netframework_update_memory_process_id_labels(p, has_process_id);
+
+        if (!netframework_current_name_unique && netframework_chart_commit_allowed) {
+            netframework_remove_memory_process_id_label(p->st_clrmemory_allocated_bytes);
+            netframework_remove_memory_process_id_label(p->st_clrmemory_finalization_survivors);
+            netframework_remove_memory_process_id_label(p->st_clrmemory_heap_size);
+            netframework_remove_memory_process_id_label(p->st_clrmemory_promoted_bytes);
+            netframework_remove_memory_process_id_label(p->st_clrmemory_gc_handles);
+            netframework_remove_memory_process_id_label(p->st_clrmemory_collections);
+            netframework_remove_memory_process_id_label(p->st_clrmemory_induced_gc);
+            netframework_remove_memory_process_id_label(p->st_clrmemory_pinned_objects);
+            netframework_remove_memory_process_id_label(p->st_clrmemory_sink_blocks_in_use);
+            netframework_remove_memory_process_id_label(p->st_clrmemory_committed_bytes);
+            netframework_remove_memory_process_id_label(p->st_clrmemory_reserved_bytes);
+            netframework_remove_memory_process_id_label(p->st_clrmemory_gc_time);
+            p->process_id_label_initialized = false;
+        }
     }
 }
 
@@ -1762,9 +2037,9 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
             continue;
 
         struct net_framework_instances *p =
-            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_REMOTING);
+            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_REMOTING, pi);
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRRemotingChannels)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRRemotingChannels)) {
             if (!p->st_clrremoting_channels) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrremoting_channels", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1793,10 +2068,10 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                 p->st_clrremoting_channels,
                 p->rd_clrremoting_channels,
                 (collected_number)p->NETFrameworkCLRRemotingChannels.current.Data);
-            rrdset_done(p->st_clrremoting_channels);
+            netframework_rrdset_done(p->st_clrremoting_channels, p);
         }
 
-        if (perflibGetInstanceCounter(
+        if (netframework_get_instance_counter(
                 pDataBlock, pObjectType, pi, &p->NETFrameworkCLRRemotingContextBoundClassesLoaded)) {
             if (!p->st_clrremoting_context_bound_classes_loaded) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrremoting_context_bound_classes_loaded", windows_shared_buffer);
@@ -1829,10 +2104,10 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                 p->st_clrremoting_context_bound_classes_loaded,
                 p->rd_clrremoting_context_bound_classes_loaded,
                 (collected_number)p->NETFrameworkCLRRemotingContextBoundClassesLoaded.current.Data);
-            rrdset_done(p->st_clrremoting_context_bound_classes_loaded);
+            netframework_rrdset_done(p->st_clrremoting_context_bound_classes_loaded, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRRemotingContextBoundObjects)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRRemotingContextBoundObjects)) {
             if (!p->st_clrremoting_context_bound_objects) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrremoting_context_bound_objects", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1864,9 +2139,9 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                 p->st_clrremoting_context_bound_objects,
                 p->rd_clrremoting_context_bound_objects,
                 (collected_number)p->NETFrameworkCLRRemotingContextBoundObjects.current.Data);
-            rrdset_done(p->st_clrremoting_context_bound_objects);
+            netframework_rrdset_done(p->st_clrremoting_context_bound_objects, p);
         }
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRRemotingContextProxies)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRRemotingContextProxies)) {
             if (!p->st_clrremoting_context_proxies) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrremoting_context_proxies", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1895,10 +2170,10 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                 p->st_clrremoting_context_proxies,
                 p->rd_clrremoting_context_proxies,
                 (collected_number)p->NETFrameworkCLRRemotingContextProxies.current.Data);
-            rrdset_done(p->st_clrremoting_context_proxies);
+            netframework_rrdset_done(p->st_clrremoting_context_proxies, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRRemotingContexts)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRRemotingContexts)) {
             if (!p->st_clrremoting_contexts) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrremoting_contexts", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1927,10 +2202,10 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                 p->st_clrremoting_contexts,
                 p->rd_clrremoting_contexts,
                 (collected_number)p->NETFrameworkCLRRemotingContexts.current.Data);
-            rrdset_done(p->st_clrremoting_contexts);
+            netframework_rrdset_done(p->st_clrremoting_contexts, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRRemotingRemoteCalls)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRRemotingRemoteCalls)) {
             if (!p->st_clrremoting_remote_calls) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrremoting_calls", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1959,7 +2234,7 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                 p->st_clrremoting_remote_calls,
                 p->rd_clrremoting_remote_calls,
                 (collected_number)p->NETFrameworkCLRRemotingRemoteCalls.current.Data);
-            rrdset_done(p->st_clrremoting_remote_calls);
+            netframework_rrdset_done(p->st_clrremoting_remote_calls, p);
         }
     }
 }
@@ -1980,9 +2255,9 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
             continue;
 
         struct net_framework_instances *p =
-            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_SECURITY);
+            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_SECURITY, pi);
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityLinkTimeChecks)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityLinkTimeChecks)) {
             if (!p->st_clrsecurity_link_time_checks) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrsecurity_link_time_checks", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -2011,10 +2286,10 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                 p->st_clrsecurity_link_time_checks,
                 p->rd_clrsecurity_link_time_checks,
                 (collected_number)p->NETFrameworkCLRSecurityLinkTimeChecks.current.Data);
-            rrdset_done(p->st_clrsecurity_link_time_checks);
+            netframework_rrdset_done(p->st_clrsecurity_link_time_checks, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityPercentTimeinRTChecks)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityPercentTimeinRTChecks)) {
             if (!p->st_clrsecurity_rt_checks_time) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrsecurity_checks_time", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -2043,10 +2318,10 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
             perflib_rrddim_set_by_pointer(
                 p->st_clrsecurity_rt_checks_time, p->rd_clrsecurity_rt_checks_time,
                 &p->NETFrameworkCLRSecurityPercentTimeinRTChecks);
-            rrdset_done(p->st_clrsecurity_rt_checks_time);
+            netframework_rrdset_done(p->st_clrsecurity_rt_checks_time, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityStackWalkDepth)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityStackWalkDepth)) {
             if (!p->st_clrsecurity_stack_walk_depth) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrsecurity_stack_walk_depth", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -2075,10 +2350,10 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                 p->st_clrsecurity_stack_walk_depth,
                 p->rd_clrsecurity_stack_walk_depth,
                 (collected_number)p->NETFrameworkCLRSecurityStackWalkDepth.current.Data);
-            rrdset_done(p->st_clrsecurity_stack_walk_depth);
+            netframework_rrdset_done(p->st_clrsecurity_stack_walk_depth, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityRunTimeChecks)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityRunTimeChecks)) {
             if (!p->st_clrsecurity_run_time_checks) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrsecurity_runtime_checks", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -2107,7 +2382,7 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
                 p->st_clrsecurity_run_time_checks,
                 p->rd_clrsecurity_run_time_checks,
                 (collected_number)p->NETFrameworkCLRSecurityRunTimeChecks.current.Data);
-            rrdset_done(p->st_clrsecurity_run_time_checks);
+            netframework_rrdset_done(p->st_clrsecurity_run_time_checks, p);
         }
     }
 }
@@ -2129,9 +2404,9 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
             continue;
 
         struct net_framework_instances *p =
-            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_LOCKS_THREADS);
+            netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_LOCKS_THREADS, pi);
 
-        if (perflibGetInstanceCounter(
+        if (netframework_get_instance_counter(
                 pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLocksAndThreadsCurrentQueueLength)) {
             if (!p->st_clrlocksandthreads_current_queue_length) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrlocksandthreads_current_queue_length", windows_shared_buffer);
@@ -2164,10 +2439,10 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
                 p->st_clrlocksandthreads_current_queue_length,
                 p->rd_locksandthreads_current_queue_length,
                 (collected_number)p->NETFrameworkCLRLocksAndThreadsCurrentQueueLength.current.Data);
-            rrdset_done(p->st_clrlocksandthreads_current_queue_length);
+            netframework_rrdset_done(p->st_clrlocksandthreads_current_queue_length, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLocksAndThreadsQueueLength)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLocksAndThreadsQueueLength)) {
             if (!p->st_clrlocksandthreads_queue_length) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrlocksandthreads_queue_length", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -2199,10 +2474,10 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
                 p->st_clrlocksandthreads_queue_length,
                 p->rd_locksandthreads_queue_length,
                 (collected_number)p->NETFrameworkCLRLocksAndThreadsQueueLength.current.Data);
-            rrdset_done(p->st_clrlocksandthreads_queue_length);
+            netframework_rrdset_done(p->st_clrlocksandthreads_queue_length, p);
         }
 
-        if (perflibGetInstanceCounter(
+        if (netframework_get_instance_counter(
                 pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLocksAndThreadsCurrentLogicalThreads)) {
             if (!p->st_clrlocksandthreads_current_logical_threads) {
                 snprintfz(
@@ -2236,10 +2511,10 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
                 p->st_clrlocksandthreads_current_logical_threads,
                 p->rd_locksandthreads_current_logical_threads,
                 (collected_number)p->NETFrameworkCLRLocksAndThreadsCurrentLogicalThreads.current.Data);
-            rrdset_done(p->st_clrlocksandthreads_current_logical_threads);
+            netframework_rrdset_done(p->st_clrlocksandthreads_current_logical_threads, p);
         }
 
-        if (perflibGetInstanceCounter(
+        if (netframework_get_instance_counter(
                 pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLocksAndThreadsCurrentPhysicalThreads)) {
             if (!p->st_clrlocksandthreads_current_physical_threads) {
                 snprintfz(
@@ -2273,10 +2548,10 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
                 p->st_clrlocksandthreads_current_physical_threads,
                 p->rd_locksandthreads_current_physical_threads,
                 (collected_number)p->NETFrameworkCLRLocksAndThreadsCurrentPhysicalThreads.current.Data);
-            rrdset_done(p->st_clrlocksandthreads_current_physical_threads);
+            netframework_rrdset_done(p->st_clrlocksandthreads_current_physical_threads, p);
         }
 
-        if (perflibGetInstanceCounter(
+        if (netframework_get_instance_counter(
                 pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLocksAndThreadsCurrentRecognizedThreads)) {
             if (!p->st_clrlocksandthreads_current_recognized_threads) {
                 snprintfz(
@@ -2315,10 +2590,10 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
                 p->st_clrlocksandthreads_current_recognized_threads,
                 p->rd_locksandthreads_current_recognized_threads,
                 (collected_number)p->NETFrameworkCLRLocksAndThreadsCurrentRecognizedThreads.current.Data);
-            rrdset_done(p->st_clrlocksandthreads_current_recognized_threads);
+            netframework_rrdset_done(p->st_clrlocksandthreads_current_recognized_threads, p);
         }
 
-        if (perflibGetInstanceCounter(
+        if (netframework_get_instance_counter(
                 pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLocksAndThreadsRecognizedThreads)) {
             if (!p->st_clrlocksandthreads_recognized_threads) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrlocksandthreads_recognized_threads", windows_shared_buffer);
@@ -2351,10 +2626,10 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
                 p->st_clrlocksandthreads_recognized_threads,
                 p->rd_locksandthreads_recognized_threads,
                 (collected_number)p->NETFrameworkCLRLocksAndThreadsRecognizedThreads.current.Data);
-            rrdset_done(p->st_clrlocksandthreads_recognized_threads);
+            netframework_rrdset_done(p->st_clrlocksandthreads_recognized_threads, p);
         }
 
-        if (perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLocksAndThreadsContentions)) {
+        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLocksAndThreadsContentions)) {
             if (!p->st_clrlocksandthreads_contentions) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrlocksandthreads_contentions", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -2386,7 +2661,7 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
                 p->st_clrlocksandthreads_contentions,
                 p->rd_locksandthreads_contentions,
                 (collected_number)p->NETFrameworkCLRLocksAndThreadsContentions.current.Data);
-            rrdset_done(p->st_clrlocksandthreads_contentions);
+            netframework_rrdset_done(p->st_clrlocksandthreads_contentions, p);
         }
     }
 }
@@ -2436,11 +2711,18 @@ int do_PerflibNetFramework(int update_every, usec_t dt __maybe_unused)
             continue;
         }
 
+        netframework_prepare_instance_groups(pDataBlock, pObjectType);
         netframewrk_obj[i].fnct(pDataBlock, pObjectType, update_every);
+        dictionary_flush(netframework_instance_groups);
     }
 
     dfe_start_write(processes, p)
     {
+        for (i = 0; i < NETDATA_NETFRAMEWORK_END; i++) {
+            if (!(failed_objects & (1U << i)))
+                p->instances_seen_previous_cycle[i] = p->instances_seen_this_cycle[i];
+        }
+
         // CLR objects expose the same instance population. Drop a process when at least one object that has
         // reported it before succeeded this cycle and no object reported it. If every object that knows this
         // process failed, we have no evidence either way and keep it.
@@ -2450,6 +2732,7 @@ int do_PerflibNetFramework(int update_every, usec_t dt __maybe_unused)
         }
 
         p->objects_seen_this_cycle = 0;
+        memset(p->instances_seen_this_cycle, 0, sizeof(p->instances_seen_this_cycle));
     }
     dfe_done(p);
     dictionary_garbage_collect(processes);
