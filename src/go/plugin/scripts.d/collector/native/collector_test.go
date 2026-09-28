@@ -292,6 +292,7 @@ func TestManifestValidation(t *testing.T) {
 	valid, err := os.ReadFile(c.Manifest)
 	require.NoError(t, err)
 	cases := map[string]string{
+		"mode":            string(valid) + "mode: push\n",
 		"version":         strings.Replace(string(valid), "version: v1", "version: v2", 1),
 		"unknown field":   string(valid) + "typo: true\n",
 		"second document": string(valid) + "---\nversion: v1\n",

@@ -22,10 +22,16 @@ var checkStates = []string{"ok", "warning", "critical", "unknown"}
 
 const checkPrefix = "native.check."
 
+const (
+	modeOneshot    = "oneshot"
+	modePersistent = "persistent"
+)
+
 func checkMetric(id string) string { return checkPrefix + id }
 
 type manifest struct {
 	Version      string             `yaml:"version"`
+	Mode         string             `yaml:"mode"`
 	Command      []string           `yaml:"command"`
 	Metrics      []metricDefinition `yaml:"metrics"`
 	Checks       []checkDefinition  `yaml:"checks"`
@@ -66,6 +72,12 @@ func loadManifest(path string, validate func(string) (string, error)) (manifest,
 	}
 	if m.Version != "v1" {
 		return m, nil, fmt.Errorf("unsupported manifest version")
+	}
+	if m.Mode == "" {
+		m.Mode = modeOneshot
+	}
+	if m.Mode != modeOneshot && m.Mode != modePersistent {
+		return m, nil, fmt.Errorf("mode must be oneshot or persistent")
 	}
 	if len(m.Command) == 0 || m.Command[0] == "" {
 		return m, nil, fmt.Errorf("manifest command is required")

@@ -5,9 +5,9 @@ A package supplies a manifest, an executable, and optionally a V2 chart template
 Scripts report labeled metrics and named service checks. The development health
 template turns warning and critical checks into notifications.
 
-This contract is WIP. The first implementation supports one-shot collection,
-scalar gauges and cumulative counters. Persistent processes, additional metric
-kinds, script-specific DynCfg forms, and Functions are later steps. The manifest
+This contract is WIP. It supports one-shot and persistent collection, scalar gauges
+and cumulative counters. Additional metric kinds, script-specific DynCfg forms,
+and Functions are later steps. The manifest
 and wire format may change during the preview.
 
 ## Development build and configuration
@@ -62,6 +62,7 @@ reconfiguring the job; charts and declarations are fixed for that job instance.
 
 ```yaml
 version: v1
+mode: oneshot
 command: [./collect.sh]
 charts: charts.yaml
 metrics:
@@ -79,7 +80,9 @@ checks:
 
 - `command` is an argv array, without shell expansion. Its first path is resolved
   relative to the manifest directory unless absolute. Subsequent arguments are
-  literal. Netdata appends `collect` to invoke collection.
+  literal. Netdata appends `collect` for one-shot mode or `serve` for persistent mode.
+- `mode` is `oneshot` (the default when omitted) or `persistent`. Persistent jobs
+  retain one process across collection attempts; their state resets on restart.
 - `metrics` declares each name, type (`gauge` or `counter`) and nonempty unit.
   Names match `[A-Za-z_][A-Za-z0-9_.]*`; the `native.` prefix is reserved.
 - `checks` declares each check ID, title, and stable identity label names.
@@ -124,8 +127,9 @@ IDs, timestamps, diagnostic messages or other continuously changing identifiers.
 
 ## Collection response
 
-Each invocation MUST exit zero and print exactly one UTF-8 JSON object, at most
-1 MiB including whitespace. Stdin is EOF and reserved for future requests. Stdout
+In one-shot mode, each invocation MUST exit zero and print exactly one UTF-8 JSON
+object, at most 1 MiB including whitespace. Stdin is EOF. In persistent mode, the
+same snapshot is carried in a correlated reply as described below. Stdout
 is exclusively the protocol; redirect command chatter to stderr. The collector
 discards stderr to avoid copying arbitrary script output into Agent logs.
 
@@ -155,8 +159,8 @@ A sample name MUST be declared. Duplicate JSON keys, duplicate metric identities
 fields, missing/null values and unknown states invalidate the complete response.
 Checks may have extra labels, but the built-in charts promote only identity labels.
 
-A valid `warning`, `critical`, or `unknown` is a successful collection and MUST
-exit zero. Nonzero exit, timeout, oversized or malformed output fails collection
+A valid `warning`, `critical`, or `unknown` is a successful collection. In one-shot
+mode the script MUST exit zero. Nonzero exit, timeout, oversized or malformed output fails collection
 and publishes none of that response. It does not convert checks into OK or
 unknown. Netdata's existing `plugin_data_collection_status` owns execution failures;
 its stock notification route is silent.
@@ -165,6 +169,58 @@ The process MUST finish all children before returning and MUST NOT daemonize or
 escape its process group. Cancellation terminates the command group on Unix using
 the existing execution helper. One-shot scripts cannot retain process state across
 collection attempts.
+
+## Persistent sessions
+
+Set `mode: persistent` in the manifest. Netdata starts the command with `serve`
+after the preceding job has stopped. Local initialization and configuration tests
+never start the process. After fallible local setup, the script MUST emit and flush:
+
+```json
+{"version":"v1","ready":true}
+```
+
+Readiness does not require a successful target measurement. Netdata then writes
+one request to stdin per collection. The canonical spelling is fixed so Bash can
+read it without a general JSON parser:
+
+```json
+{"id":"1","method":"collect"}
+```
+
+IDs are positive decimal strings, increasing per process. Treat them as opaque
+correlation values. Reply exactly once, echoing the ID and using the snapshot above:
+
+```json
+{"id":"1","result":{"version":"v1","metrics":[],"checks":[]}}
+```
+
+If the attempt failed and cannot produce a trustworthy full snapshot, reply:
+
+```json
+{"id":"1","error":"collection_failed"}
+```
+
+This fixed error code aborts the collection without publishing any samples; the
+same process can answer the next request. It is not a health state. Use an explicit
+`unknown` check when that is a valid observation of an existing service.
+
+Every handshake, request and reply MUST be one UTF-8 JSON object on one physical
+line, terminated by LF and flushed immediately. A frame is limited to 1 MiB,
+including LF and other whitespace. Embedded newlines in strings MUST be escaped.
+Exact field spelling, duplicate-key and null rules apply to envelopes as well as
+snapshots. A reply MUST contain exactly one of `result` or `error`; the only error
+code is `collection_failed`. There is one outstanding request and no push channel.
+Scripts MAY perform background work, but MUST NOT emit unsolicited frames.
+
+`timeout` bounds the ready handshake and each request/reply exchange independently;
+it is not a process lifetime limit. A mismatched ID, malformed/oversized frame,
+partial frame at EOF, timeout, closed stdout or process exit terminates the session.
+After readiness this marks the job Failed and requires an explicit restart or
+reconfiguration. No private respawn loop retries it. Failures before readiness use
+the normal `autodetection_retry` policy. In either case, no synthetic healthy sample
+is published. Stop or replacement cancels in-flight I/O, terminates the owned process
+group on Unix and waits for cleanup. Scripts MUST NOT daemonize or escape that group.
 
 ## Checks and automatic alerts
 
@@ -216,11 +272,27 @@ nd_check backlog critical queue mail
 nd_end
 ```
 
+For persistent Bash, call `nd_ready` once and loop over `nd_next`. Each successful
+`nd_next` MUST be answered by `nd_begin` / observations / `nd_end`, or by `nd_fail`.
+`nd_end` automatically wraps a pending request's snapshot with its ID. `nd_next`
+reads the host's canonical request line; EOF or an invalid request ends the loop.
+Do not pipe the loop into a subshell if its state must survive.
+
+Runnable development packages are in
+[`development/persistent-bash`](development/persistent-bash/collect.sh) and
+[`development/persistent-python`](development/persistent-python/collect.py), each
+with a manifest. Both retain a counter, report critical on the first request,
+report a collection failure on the second, and recover on the third. They use
+synthetic observations. For manual inspection, send three request lines to `serve`;
+for Agent use, copy the package/helper to administrator-controlled paths or use an
+administrator-managed interpreter command. Python peers MUST flush each reply.
+
 Replace the fixed observations with measurements of your service. Use safe command
 argument arrays. When running consequential commands, show a redacted command on
 stderr, preserve its exit status, and keep credentials out of diagnostics. A failed
 measurement may report an explicit unknown check; a failure to produce a complete
-protocol response MUST exit nonzero. Helper errors MUST propagate (for example,
+protocol response MUST fail the attempt (`nd_fail` in a live session, or a nonzero
+exit for a terminal failure). Helper errors MUST propagate (for example,
 with `set -e` as above); do not emit a partial response after ignoring an error.
 
 ## Local validation
@@ -228,7 +300,8 @@ with `set -e` as above); do not emit a partial response after ignoring an error.
 Run the executable with the `collect` operation to inspect its JSON, then configure
 a scripts.d job. The collector tests run real Bash commands through the production
 V2 job and command path with a test privilege-drop shim, and test encoding, complete
-snapshot validation, startup in a critical state and cancellation.
+snapshot validation, startup in a critical state, persistent state/recovery, terminal
+protocol failure, cancellation and descendant cleanup.
 
 ```sh
 cd src/go
@@ -240,11 +313,12 @@ directory. Build scripts.d with `-tags scripts_native_dev` and
 `pkg/buildinfo.NetdataBinDir` pointing to that directory, then run:
 
 ```sh
-python3 src/go/plugin/scripts.d/tests/native_health.py --agent /path/to/netdata --plugin /path/to/scripts.d.plugin
+python3 src/go/plugin/scripts.d/tests/native_health.py --agent /path/to/netdata --plugin /path/to/scripts.d.plugin --mode persistent
 ```
 
 The test launches its own unprivileged Agent on a loopback port, suppresses crash
 reports and notification delivery, checks startup, unknown, recovery and removal,
 and stops only that Agent. It retains its temporary artifacts for inspection.
 It does not query or reconfigure an installed Agent. Allow roughly two minutes
-for the stock health cadence and obsolete-chart cleanup.
+for the stock health cadence and obsolete-chart cleanup. Omit `--mode persistent`
+to exercise the default one-shot transport.

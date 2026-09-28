@@ -6,6 +6,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -43,6 +44,8 @@ type Collector struct {
 	definition         manifest
 	templates          *chartengine.TemplateSet
 	validateExecutable func(string) (string, error)
+	runtimeMu          sync.Mutex
+	runtime            *scriptRuntime
 }
 
 func New() *Collector {
@@ -81,14 +84,37 @@ func (c *Collector) Check(context.Context) error {
 	return nil
 }
 
+// Run owns operational resources only after predecessor cleanup. Candidate
+// validation in Init and Check never launches the script.
+func (c *Collector) Run(ctx context.Context, ready func()) error {
+	if c.definition.Mode == modePersistent {
+		return c.runPersistent(ctx, ready)
+	}
+	ready()
+	<-ctx.Done()
+	return ctx.Err()
+}
+
 func (c *Collector) Collect(ctx context.Context) error {
-	data, err := runCommand(ctx, c.Timeout.Duration(), c.definition.Command)
+	var result response
+	var err error
+	if c.definition.Mode == modePersistent {
+		result, err = c.collectPersistent(ctx)
+	} else {
+		var data []byte
+		data, err = runCommand(ctx, c.Timeout.Duration(), c.definition.Command)
+		if err == nil {
+			result, err = c.definition.decodeResponse(data)
+			if err != nil {
+				err = fmt.Errorf("invalid collect response: %w", err)
+			}
+		}
+	}
 	if err != nil {
 		return err
 	}
-	result, err := c.definition.decodeResponse(data)
-	if err != nil {
-		return fmt.Errorf("invalid collect response: %w", err)
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	// The complete response has been validated before staging any writes.
 	meter := c.store.Write().SnapshotMeter("")

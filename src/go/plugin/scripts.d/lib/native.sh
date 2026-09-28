@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Source from Bash 3.2 or newer. Protocol output goes only to stdout.
-# These functions encode data; they do not execute commands or read stdin.
+# Collection helpers encode data; nd_next reads one canonical host request.
 
 _nd_quote() {
     local _nd_value=$1 _nd_code _nd_char _nd_escape
@@ -66,14 +66,53 @@ nd_check() {
 
 nd_end() {
     local _nd_item _nd_sep=
+    if [[ -n ${_nd_request_id:-} ]]; then
+        printf '{"id":"%s","result":' "$_nd_request_id"
+    fi
     printf '%s' '{"version":"v1","metrics":['
-    for _nd_item in "${_nd_metrics[@]}"; do
+    # Bash 3.2 with nounset treats an empty array as unset.
+    for _nd_item in ${_nd_metrics[@]+"${_nd_metrics[@]}"}; do
         printf '%s%s' "$_nd_sep" "$_nd_item"; _nd_sep=,
     done
     printf '%s' '],"checks":['
     _nd_sep=
-    for _nd_item in "${_nd_checks[@]}"; do
+    for _nd_item in ${_nd_checks[@]+"${_nd_checks[@]}"}; do
         printf '%s%s' "$_nd_sep" "$_nd_item"; _nd_sep=,
     done
-    printf '%s\n' ']}'
+    printf '%s' ']}'
+    if [[ -n ${_nd_request_id:-} ]]; then
+        printf '%s' '}'
+        _nd_request_id=
+    fi
+    printf '\n'
+}
+
+# Persistent mode: emit readiness once, then answer each nd_next with nd_end or
+# nd_fail. The host deliberately uses this canonical spelling for Bash peers.
+nd_ready() {
+    _nd_request_id=
+    printf '%s\n' '{"version":"v1","ready":true}'
+}
+
+nd_next() {
+    if [[ -n ${_nd_request_id:-} ]]; then
+        printf '%s\n' 'native: previous request has no reply' >&2
+        return 1
+    fi
+    local _nd_line _nd_pattern='^\{"id":"([1-9][0-9]*)","method":"collect"\}$'
+    IFS= read -r _nd_line || return 1
+    if [[ ! $_nd_line =~ $_nd_pattern ]]; then
+        printf '%s\n' 'native: invalid collection request' >&2
+        return 1
+    fi
+    _nd_request_id=${BASH_REMATCH[1]}
+}
+
+nd_fail() {
+    if [[ -z ${_nd_request_id:-} ]]; then
+        printf '%s\n' 'native: no pending collection request' >&2
+        return 1
+    fi
+    printf '{"id":"%s","error":"collection_failed"}\n' "$_nd_request_id"
+    _nd_request_id=
 }
