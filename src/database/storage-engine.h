@@ -285,6 +285,31 @@ static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *sch) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+time_t rrdeng_store_metric_page_close_time_s(STORAGE_COLLECT_HANDLE *sch);
+
+// The time the dimension's current tier page will be complete, i.e. the time of the point that fills it and
+// makes it flush (start + (capacity - 1) * update_every), or 0 when there is no open page or the backend has
+// no pages. It is a capacity close: it is the flush time only while the dimension keeps collecting, and it is
+// in the past for a page left idle by a collection gap. The caller MUST hold rd->tiers[tier].spinlock so the
+// handle cannot be finalized under it; the fields themselves are read atomically, without the collector's
+// cooperation, so a page change racing the read yields a value that is off by one page - acceptable for the
+// ML training scheduler, its only user (see src/ml/ml_queue.h).
+static inline time_t storage_engine_store_page_close_time_s(STORAGE_COLLECT_HANDLE *sch) {
+    if(unlikely(!sch))
+        return 0;
+
+    internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
+
+#ifdef ENABLE_DBENGINE
+    if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_store_metric_page_close_time_s(sch);
+#endif
+
+    return 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
 int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *sch);
 int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *sch);
 // a finalization function to run after collection is over
