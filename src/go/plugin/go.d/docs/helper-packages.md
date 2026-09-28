@@ -261,6 +261,20 @@ when execution needs a timeout. Construction does not log arguments or output. S
 and discard stderr: the Run APIs buffer stdout and include stderr snippets in errors, so they are unsuitable for
 secret output without caller-owned handling.
 
+For a persistent command that must own descendant cleanup, use `StartUnprivilegedProcess` with
+`ProcessOptions` file descriptors. Nil stdio uses the null device. The caller owns its pipe ends; the returned
+`Process` exclusively owns cancellation, termination and reaping. Call `Wait` to join it or `Close` to terminate
+and join; both permit repeated/concurrent calls. Completion joins the leader and termination requests, not each
+descendant independently. Leader exit also requests termination of contained descendants. Do not build
+this contract by calling a raw command's `Cancel` after `Wait`: a reaped Unix PID/process-group ID can be reused.
+
+The owned API supports Linux, macOS, FreeBSD and Windows 10 or later. Unix exit observation keeps the group leader
+unreaped until group termination is permanently disarmed. Descendants MUST remain in that process group; this is
+lifecycle containment, not a sandbox against a script deliberately creating another session/group. Windows uses a
+Job Object assigned during process creation, with no breakaway permission. Containment/setup failures fail startup
+without an uncontained fallback. File stdio avoids copier goroutines waiting on a descendant's inherited stream.
+The existing `exec.Cmd` constructors retain their existing behavior; they do not provide this ownership guarantee.
+
 On Unix, `nd-run` uses a minimal environment by default. Passing `Env` to a Run API changes the helper's input
 but does not enable preservation. Use `UnprivilegedCommandContextWithPreservedEnv` when the target requires inherited
 application variables, such as authentication tokens or explicit tool configuration. It invokes
