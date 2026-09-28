@@ -1463,8 +1463,12 @@ extern "C" int ml_queue_host_order_unittest(RRDHOST *host)
 
     // phase change: chart a collects past its page close and beyond e's close, so among a, b, c, e its new
     // page now closes last (still before d's, which is not part of the following passes)
-    for (time_t t = now - 99; t <= close_e + 200; t++)
-        storage_engine_store_metric(rd_a->tiers[0].sch, (usec_t)t * USEC_PER_SEC, 1, 1, 1, 1, 0, SN_DEFAULT_FLAGS);
+    time_t t_a = now - 99;
+    for (; t_a <= close_e + 200; t_a++)
+        storage_engine_store_metric(rd_a->tiers[0].sch, (usec_t)t_a * USEC_PER_SEC, 1, 1, 1, 1, 0, SN_DEFAULT_FLAGS);
+    // the last point may have filled and flushed the page (page boundaries follow the wall clock): open a new one
+    if (!ml_host_test_close(rd_a))
+        storage_engine_store_metric(rd_a->tiers[0].sch, (usec_t)t_a * USEC_PER_SEC, 1, 1, 1, 1, 0, SN_DEFAULT_FLAGS);
     time_t close_a2 = ml_host_test_close(rd_a);
     ML_HOST_TEST_CHECK(close_a2 > close_e, "chart a's current page now closes after chart e's");
 
