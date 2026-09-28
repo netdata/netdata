@@ -174,3 +174,19 @@ done
 	tickUntil(t, nextJob, func() bool { return strings.Contains(nextOut.String(), "SET 'critical' = 1") })
 	assert.Equal(t, firstID, chartID(nextOut.String(), "native_script.check_state"))
 }
+
+func TestPersistentJobStopDuringCollection(t *testing.T) {
+	setupRunner(t)
+	c, dir := persistentCollector(t, bashHelper(t)+`
+nd_ready
+nd_next
+printf started > "$(dirname "$0")/started"
+sleep 30
+`)
+	out := &jobOutput{}
+	job, run := startManagedTestJob(t, c, out)
+	tickUntil(t, job, func() bool { _, err := os.Stat(filepath.Join(dir, "started")); return err == nil })
+	job.Stop()
+	assert.Nil(t, run.Failure(), "requested stop must not become terminal failure")
+	assert.NotContains(t, out.String(), "'native_script.check_state'")
+}

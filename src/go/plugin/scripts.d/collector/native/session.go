@@ -74,7 +74,7 @@ func (c *Collector) runPersistent(ctx context.Context, ready func()) error {
 			return s.exitError()
 		case frame := <-s.frames:
 			if frame.err != nil {
-				return frame.err
+				return s.transportError(ctx, frame.err)
 			}
 			return fmt.Errorf("unsolicited persistent response")
 		case request := <-r.requests:
@@ -147,26 +147,33 @@ func startSession(ctx context.Context, argv []string) (*scriptSession, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	args := append(append([]string(nil), argv[1:]...), "serve")
 	cmd := ndexec.UnprivilegedCommandContext(ctx, argv[0], args...)
-	stdin, err := cmd.StdinPipe()
+	childStdin, stdin, err := os.Pipe()
 	if err != nil {
 		cancel()
 		return nil, err
 	}
+	cmd.Stdin = childStdin
 	// Own the read end: Cmd.Wait must not close it while the reader is using it.
 	stdout, childStdout, err := os.Pipe()
 	if err != nil {
 		cancel()
+		_ = childStdin.Close()
 		_ = stdin.Close()
 		return nil, err
 	}
 	cmd.Stdout, cmd.Stderr = childStdout, io.Discard
 	if err := cmd.Start(); err != nil {
+		if ctx.Err() != nil {
+			err = ctx.Err()
+		}
 		cancel()
+		_ = childStdin.Close()
 		_ = stdin.Close()
 		_ = stdout.Close()
 		_ = childStdout.Close()
 		return nil, fmt.Errorf("start persistent command: %w", err)
 	}
+	_ = childStdin.Close()
 	_ = childStdout.Close() // Only the child may keep stdout alive.
 	s := &scriptSession{
 		ctx:        ctx,
@@ -201,7 +208,25 @@ func (s *scriptSession) close() {
 	<-s.exited
 }
 
+// Cancellation can close pipes or reap a killed process before the select sees
+// ctx.Done. Normalize only transport errors, never an observed protocol error.
+func (s *scriptSession) transportError(ctx context.Context, err error) error {
+	if err == nil || errors.Is(err, errResponseTooLarge) {
+		return err
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if s.ctx.Err() != nil {
+		return s.ctx.Err()
+	}
+	return err
+}
+
 func (s *scriptSession) exitError() error {
+	if s.ctx.Err() != nil {
+		return s.ctx.Err()
+	}
 	if s.waitErr != nil {
 		return fmt.Errorf("persistent command exited: %w", s.waitErr)
 	}
@@ -217,7 +242,7 @@ func (s *scriptSession) read(ctx context.Context) ([]byte, error) {
 	case <-s.exited:
 		return nil, s.exitError()
 	case frame := <-s.frames:
-		return frame.data, frame.err
+		return frame.data, s.transportError(ctx, frame.err)
 	}
 }
 
@@ -230,7 +255,7 @@ func (s *scriptSession) exchange(ctx context.Context, id string) ([]byte, error)
 	select {
 	case err := <-written:
 		if err != nil {
-			return nil, fmt.Errorf("write collection request: %w", err)
+			return nil, fmt.Errorf("write collection request: %w", s.transportError(ctx, err))
 		}
 	case <-ctx.Done():
 		_ = s.stdin.Close()
