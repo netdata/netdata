@@ -152,6 +152,12 @@ public:
         return Dim;
     }
 
+    // the acquired RRDDIM itself, valid whether or not ML state exists for it
+    RRDDIM *rrddim() const {
+        assert(acquired());
+        return rrddim_acquired_to_rrddim(AcqRD);
+    }
+
     ~AcquiredDimension()
     {
         if (AcqRD)

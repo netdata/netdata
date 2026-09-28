@@ -650,6 +650,111 @@ cleanup:
     return errors;
 }
 
+
+// The ML training scheduler orders dimensions by rrdeng_store_metric_page_close_time_s(): the time of the point
+// that fills the current page and makes it flush. Verify it against the engine's own page sequence, for a
+// cadence whose pages align (1 s) and one whose pages are irregular (5 s: aligned_allocation_entries() works in
+// seconds while a page advances slots * update_every, and the max_slots / 3 floor kicks in), by storing points
+// one by one and watching when the page actually flushes.
+static size_t test_dbengine_page_close_time(RRDHOST *host) {
+    size_t errors = 0;
+    const int cadences[] = { 1, 5 };
+
+    for(size_t c = 0; c < _countof(cadences); c++) {
+        const int ue = cadences[c];
+        char prefix[64];
+        snprintfz(prefix, sizeof(prefix) - 1, "dbengine-page-close-%d", ue);
+
+        RRDDIM *rd = dbengine_cadence_test_create_metric(host, prefix, ue);
+        if(!rd)
+            return errors + 1;
+
+        STORAGE_COLLECT_HANDLE *sch = rd->tiers[0].sch;
+
+        if(rrdeng_store_metric_page_close_time_s(sch) != 0) {
+            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: a handle without a page must report 0\n", ue);
+            errors++;
+        }
+
+        // deliberately not aligned to anything, so the first page is alignment-shortened. The data is written
+        // BEFORE the region test's time range: pages dated after it, sharing the first datafile with the first
+        // region charts, made those charts' region-0 tier-0 pages unreachable in the second verification pass
+        // (queries fell back to tier 1). Recorded as a separate observation; this test does not exercise it.
+        time_t t = START_TIMESTAMP - 10000000 + 17;
+        time_t predicted = 0;       // the close reported while the current page was open (0: no page)
+        size_t pages = 0, points = 0;
+
+        while(pages < 4 && points < 20000) {
+            dbengine_cadence_test_store_point(rd, t, (NETDATA_DOUBLE)points);
+            points++;
+
+            time_t close = rrdeng_store_metric_page_close_time_s(sch);
+
+            if(!predicted) {
+                // the point just stored opened a page
+                if(!close) {
+                    fprintf(stderr, " >>> DBENGINE: page-close ue=%d: a stored point must open a page (t=%ld)\n", ue, (long)t);
+                    errors++;
+                    break;
+                }
+                if(close < t) {
+                    fprintf(stderr, " >>> DBENGINE: page-close ue=%d: close %ld is before the page start %ld\n", ue, (long)close, (long)t);
+                    errors++;
+                }
+                predicted = close;
+            }
+            else if(!close) {
+                // the page just flushed: the point that flushed it must be the predicted close
+                if(t != predicted) {
+                    fprintf(stderr, " >>> DBENGINE: page-close ue=%d: page %zu flushed at %ld, predicted %ld\n", ue, pages, (long)t, (long)predicted);
+                    errors++;
+                }
+                pages++;
+                predicted = 0;
+            }
+            else if(close != predicted) {
+                fprintf(stderr, " >>> DBENGINE: page-close ue=%d: close moved from %ld to %ld while the page was open\n", ue, (long)predicted, (long)close);
+                errors++;
+                predicted = close;
+            }
+
+            t += ue;
+        }
+
+        if(pages < 4) {
+            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: only %zu pages flushed in %zu points\n", ue, pages, points);
+            errors++;
+        }
+
+        // an explicit flush (chart reset after a gap) leaves no page: no usable close
+        dbengine_cadence_test_store_point(rd, t, 0);
+        unittest_storage_engine_store_flush(sch);
+        if(rrdeng_store_metric_page_close_time_s(sch) != 0) {
+            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: a flushed handle must report 0\n", ue);
+            errors++;
+        }
+
+        // a collection frequency change flushes too, and the next page closes on the new cadence
+        t += ue;
+        dbengine_cadence_test_store_point(rd, t, 0);
+        unittest_storage_engine_store_change_collection_frequency(sch, ue * 2);
+        if(rrdeng_store_metric_page_close_time_s(sch) != 0) {
+            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: a frequency change must flush the page\n", ue);
+            errors++;
+        }
+        t += ue * 2;
+        dbengine_cadence_test_store_point(rd, t, 0);
+        time_t close = rrdeng_store_metric_page_close_time_s(sch);
+        if(close < t || ((close - t) % (ue * 2)) != 0) {
+            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: close %ld after a frequency change to %d is not on the new cadence from %ld\n", ue, (long)close, ue * 2, (long)t);
+            errors++;
+        }
+        unittest_storage_engine_store_flush(sch);
+    }
+
+    return errors;
+}
+
 int test_dbengine(void) {
     // provide enough threads to dbengine
     setenv("UV_THREADPOOL_SIZE", "48", 1);
@@ -666,6 +771,7 @@ int test_dbengine(void) {
         fatal("Failed to initialize host");
 
     errors += test_dbengine_burst_retention(host);
+    errors += test_dbengine_page_close_time(host);
 
     RRDSET *st[CHARTS] = { 0 };
     RRDDIM *rd[CHARTS][DIMS] = { 0 };
@@ -708,6 +814,13 @@ int test_dbengine(void) {
 
     errors += test_dbengine_long_collection_cadence(host);
     errors += test_dbengine_zero_page_cadence_is_repaired(host);
+
+#ifdef ENABLE_ML
+    // the ML training scheduler's page-close ordering, driven against this host's dbengine-backed charts;
+    // it takes the RRD read lock and stores points, so it must run before the quiesce/exit sequence below
+    int ml_queue_host_order_unittest(RRDHOST *host);
+    errors += (size_t)ml_queue_host_order_unittest(host);
+#endif
 
     // prevent closing the database before the test is finished
     sleep(5);

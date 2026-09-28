@@ -1592,6 +1592,25 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
     worker->pending_model_info.clear();
 }
 
+time_t ml_queue_dimension_pass_key(const ml_request_create_new_model_t &req, void *arg __maybe_unused) {
+    AcquiredDimension AcqDim(req.DLI);
+
+    if (!AcqDim.acquired())
+        return 0;
+
+    RRDDIM *rd = AcqDim.rrddim();
+    if (!rd)
+        return 0;
+
+    // the tier spinlock keeps the collect handle alive across the read (rrddim_free finalizes it under the
+    // same lock); the handle's fields are read atomically (see storage_engine_store_page_close_time_s())
+    spinlock_lock(&rd->tiers[0].spinlock);
+    time_t close_s = storage_engine_store_page_close_time_s(rd->tiers[0].sch);
+    spinlock_unlock(&rd->tiers[0].spinlock);
+
+    return close_s;
+}
+
 static enum ml_worker_result ml_worker_create_new_model(ml_worker_t *worker, ml_request_create_new_model_t req) {
     AcquiredDimension AcqDim(req.DLI);
 
@@ -1746,6 +1765,12 @@ void ml_train_main(void *arg) {
             loop_stats.consumed_ut = consumed_ut;
             loop_stats.remaining_ut = remaining_ut;
 
+            loop_stats.pass_resolve_ut = queue_stats.pass_resolve_ut;
+            loop_stats.pass_sort_ut = queue_stats.pass_sort_ut;
+            loop_stats.passes_sorted = queue_stats.passes_sorted;
+            loop_stats.pass_entries = queue_stats.pass_entries;
+            loop_stats.pass_key0_entries = queue_stats.pass_key0_entries;
+
             switch (worker_res) {
                 case ML_WORKER_RESULT_OK:
                     loop_stats.item_result_ok = 1;
@@ -1781,6 +1806,13 @@ void ml_train_main(void *arg) {
             worker->queue_stats.allotted_ut += loop_stats.allotted_ut;
             worker->queue_stats.consumed_ut += loop_stats.consumed_ut;
             worker->queue_stats.remaining_ut += loop_stats.remaining_ut;
+
+            // the queue keeps these cumulative (timings) or per last pass (counts); copy, do not add
+            worker->queue_stats.pass_resolve_ut = loop_stats.pass_resolve_ut;
+            worker->queue_stats.pass_sort_ut = loop_stats.pass_sort_ut;
+            worker->queue_stats.passes_sorted = loop_stats.passes_sorted;
+            worker->queue_stats.pass_entries = loop_stats.pass_entries;
+            worker->queue_stats.pass_key0_entries = loop_stats.pass_key0_entries;
 
             worker->queue_stats.item_result_ok += loop_stats.item_result_ok;
             worker->queue_stats.item_result_invalid_query_time_range += loop_stats.item_result_invalid_query_time_range;
