@@ -26,7 +26,7 @@
       },
       "timeout": {
         "title": "Timeout",
-        "description": "Maximum duration in seconds of one-shot execution, persistent startup, or a collection exchange.",
+        "description": "Maximum duration in seconds of collection, including waiting for a busy persistent script, or persistent process startup. Function requests use their caller deadline.",
         "type": "number",
         "exclusiveMinimum": 0,
         "default": 5

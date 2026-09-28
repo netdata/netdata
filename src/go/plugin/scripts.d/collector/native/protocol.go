@@ -135,6 +135,18 @@ func validateJSONFields(decoder *json.Decoder, role string) error {
 			if role == "schema" {
 				childRole = "schema"
 			}
+			if role == "function_reply" && key == "result" {
+				childRole = "function_result"
+			}
+			if role == "function_result" && (key == "data" || key == "columns" || key == "raw_response") {
+				childRole = "schema" // Arbitrary Function data can contain null and large integers.
+			}
+			if role == "charts" {
+				childRole = "function_chart"
+			}
+			if role == "group_by" {
+				childRole = "function_group"
+			}
 			if role == "labels" {
 				childRole = "label_value"
 			}
@@ -166,6 +178,37 @@ func knownField(role, key string) bool {
 		return true
 	case "ready":
 		return key == "version" || key == "ready"
+	case "function_result":
+		switch key {
+		case "version",
+			"status",
+			"message",
+			"help",
+			"type",
+			"columns",
+			"data",
+			"default_sort_column",
+			"required_params",
+			"charts",
+			"default_charts",
+			"group_by",
+			"raw_response":
+			return true
+		}
+		return false
+	case "required_params":
+		return key == "id" || key == "name" || key == "help" || key == "type" || key == "options" ||
+			key == "unique_view"
+	case "options":
+		return key == "id" || key == "name" || key == "defaultSelected" || key == "disabled"
+	case "charts", "group_by":
+		return true
+	case "function_chart":
+		return key == "name" || key == "type" || key == "columns"
+	case "function_group":
+		return key == "name" || key == "columns"
+	case "function_reply":
+		return key == "id" || key == "result"
 	case "reply":
 		return key == "id" || key == "result" || key == "error"
 	default:
@@ -188,6 +231,9 @@ func decodeMessage(data []byte, role string, target any) error {
 		return err
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
+	if role == "function_reply" {
+		decoder.UseNumber() // Preserve numbers in arbitrary Function data.
+	}
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
 		return fmt.Errorf("invalid response schema")

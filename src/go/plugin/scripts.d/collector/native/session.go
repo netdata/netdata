@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
@@ -19,16 +20,18 @@ import (
 var _ collectorapi.CollectorV2Runner = (*Collector)(nil)
 
 type scriptRuntime struct {
-	requests chan collectionRequest
+	requests chan scriptRequest
 	done     chan struct{}
 }
 
-type collectionRequest struct {
-	ctx   context.Context
-	reply chan collectionResult
+type scriptRequest struct {
+	function *funcapi.RawMethodRequest
+	ctx      context.Context
+	reply    chan scriptResult
 }
 
-type collectionResult struct {
+type scriptResult struct {
+	function *funcapi.FunctionResponse
 	response response
 	err      error
 }
@@ -56,7 +59,7 @@ func (c *Collector) runPersistent(ctx context.Context, ready func()) error {
 	}
 
 	r := &scriptRuntime{
-		requests: make(chan collectionRequest),
+		requests: make(chan scriptRequest),
 		done:     make(chan struct{}),
 	}
 	c.runtimeMu.Lock()
@@ -83,51 +86,97 @@ func (c *Collector) runPersistent(ctx context.Context, ready func()) error {
 			}
 			return fmt.Errorf("unsolicited persistent response")
 		case request := <-r.requests:
+			// A canceled sender can race with channel delivery. Until this point the
+			// request owns no stream bytes, so reject it without disturbing the peer.
+			if err := request.ctx.Err(); err != nil {
+				request.reply <- scriptResult{
+					err: err,
+				}
+				continue
+			}
 			sequence++
-			requestCtx, cancel := context.WithTimeout(request.ctx, c.Timeout.Duration())
-			data, err := s.exchange(requestCtx, strconv.FormatUint(sequence, 10))
-			cancel()
-			var result response
-			if err == nil {
-				result, err = c.definition.decodeReply(data, strconv.FormatUint(sequence, 10))
+			id := strconv.FormatUint(sequence, 10)
+			var result scriptResult
+			if request.function == nil {
+				data, err := s.exchange(request.ctx, id)
+				if err == nil {
+					result.response, err = c.definition.decodeReply(data, id)
+				}
+				result.err = err
+			} else {
+				frame, err := encodeFunctionRequest(*request.function, id, request.ctx)
+				if err != nil {
+					request.reply <- scriptResult{
+						err: err,
+					}
+					continue // A local encoding failure has not touched the stream.
+				}
+				if err = s.write(request.ctx, frame); err == nil {
+					var data []byte
+					data, err = s.read(request.ctx)
+					if err == nil {
+						result.function, err = decodeFunctionReply(data, id, request.function.Info)
+					}
+				}
+				result.err = err
 			}
-			// A buffered reply lets Run finish teardown even if Collect was canceled.
-			request.reply <- collectionResult{
-				response: result,
-				err:      err,
-			}
-			if err != nil && !errors.Is(err, errCollectionFailed) {
-				return fmt.Errorf("persistent collection: %w", err)
+			// A buffered reply lets Run finish teardown after the caller stops waiting.
+			request.reply <- result
+			if result.err != nil && !errors.Is(result.err, errCollectionFailed) {
+				return fmt.Errorf("persistent exchange: %w", result.err)
 			}
 		}
 	}
 }
 
 func (c *Collector) collectPersistent(ctx context.Context) (response, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
+	defer cancel()
+	result := c.requestPersistent(ctx, nil)
+	return result.response, result.err
+}
+
+func (c *Collector) requestPersistent(ctx context.Context, function *funcapi.RawMethodRequest) scriptResult {
+	if err := ctx.Err(); err != nil {
+		return scriptResult{
+			err: err,
+		}
+	}
 	c.runtimeMu.Lock()
 	r := c.runtime
 	c.runtimeMu.Unlock()
 	if r == nil {
-		return response{}, fmt.Errorf("persistent script is not running")
+		return scriptResult{
+			err: fmt.Errorf("persistent script is not running"),
+		}
 	}
-	request := collectionRequest{
-		ctx:   ctx,
-		reply: make(chan collectionResult, 1),
+	request := scriptRequest{
+		ctx:      ctx,
+		function: function,
+		reply:    make(chan scriptResult, 1),
 	}
 	select {
 	case <-ctx.Done():
-		return response{}, ctx.Err()
+		return scriptResult{
+			err: ctx.Err(),
+		}
 	case <-r.done:
-		return response{}, fmt.Errorf("persistent script stopped")
+		return scriptResult{
+			err: fmt.Errorf("persistent script stopped"),
+		}
 	case r.requests <- request:
 	}
 	select {
 	case <-ctx.Done():
-		return response{}, ctx.Err()
+		return scriptResult{
+			err: ctx.Err(),
+		}
 	case result := <-request.reply:
-		return result.response, result.err
+		return result
 	case <-r.done:
-		return response{}, fmt.Errorf("persistent script stopped")
+		return scriptResult{
+			err: fmt.Errorf("persistent script stopped"),
+		}
 	}
 }
 
@@ -255,6 +304,9 @@ func (s *scriptSession) exchange(ctx context.Context, id string) ([]byte, error)
 }
 
 func (s *scriptSession) write(ctx context.Context, data []byte) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	written := make(chan error, 1)
 	go func() {
 		_, err := s.stdin.Write(data)
