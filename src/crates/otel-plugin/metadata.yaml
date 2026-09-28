@@ -61,7 +61,7 @@ modules:
             The plugin starts automatically and listens on `127.0.0.1:4317` for OTLP/gRPC connections.
         limits:
           description: |
-            Each export request can create at most 100 new charts by default. This is a per-request throttle, not a total cardinality limit. By default, log timestamps are accepted from up to 24 hours in the past through 10 minutes in the future; records without a timestamp use their arrival time. A span is accepted when it started no more than 24 hours ago and ends no more than 10 minutes in the future. Log and trace retention are each configured per tenant and bounded by whichever limit is reached first: retained file count, retained indexed-data size, or age.
+            Each export request can create at most 100 new charts by default. This is a per-request throttle, not a total cardinality limit. By default, log timestamps are accepted from up to 24 hours in the past through 10 minutes in the future; records without a timestamp use their arrival time. A span is accepted when it started no more than 24 hours ago and ends no more than 10 minutes in the future. Log and trace retention are each bounded by whichever limit is reached first: retained file count, retained indexed-data size, or age.
         performance_impact:
           description: |
             Resource use depends on the number and cardinality of received metrics, log and span volume, retention, and query activity. Keep unbounded attributes out of metric identities and dimension names.
@@ -83,7 +83,7 @@ modules:
 
             The absolute paths shown below are the defaults for standard Linux packages. The installed stock configuration resolves its configuration and log directories for the installation layout, so macOS and custom-prefix installations use different paths. Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) with `otel.yaml` to inspect the installed values.
 
-            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Most names are the uppercase option path with dots replaced by underscores. For example, `endpoint.tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`. For the default log and trace policies, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`. Named per-tenant policy overrides are YAML-only.
+            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Most names are the uppercase option path with dots replaced by underscores. For example, `endpoint.tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
 
             Configuration is strict. Unknown YAML fields, unknown `NETDATA_OTEL_CFG_*` variables, malformed values, and the former experimental schema prevent the plugin from starting. The effective configuration is logged at startup; `remote_storage.uri` is redacted in that log.
           folding:
@@ -158,54 +158,48 @@ modules:
               description: Maximum size of the local download cache, shared by logs and traces, for data fetched back from remote storage during queries.
               default_value: "1GB"
               required: false
-            - name: auth.enabled
-              description: Require the `X-Scope-OrgID` gRPC header to select a tenant for logs and traces.
-              detailed_description: |
-                This is tenant selection, not credential authentication. When disabled, logs and traces use the `default` tenant. When enabled, trust the header only behind TLS or mutual TLS and suitable network controls. Metrics are not tenant-scoped.
-              default_value: false
-              required: false
             - name: logs.rotation.default.max_file_size
-              description: Write-ahead log file size that triggers rotation for tenants without an override.
+              description: Write-ahead log file size that triggers rotation.
               default_value: "25MB"
               required: false
             - name: logs.rotation.default.max_entries
-              description: Write-ahead log entry count that triggers rotation for tenants without an override.
+              description: Write-ahead log entry count that triggers rotation.
               default_value: 50000
               required: false
             - name: logs.retention.default.max_files
-              description: Maximum retained indexed-file count for each tenant without an override.
+              description: Maximum retained indexed-file count.
               default_value: 100000
               required: false
             - name: logs.retention.default.max_total_size
-              description: Maximum retained indexed-data size for each tenant without an override.
+              description: Maximum retained indexed-data size.
               detailed_description: |
                 This is not a cap on all plugin disk use. Write-ahead logs, catalogs, and cache are additional.
               default_value: "1GB"
               required: false
             - name: logs.retention.default.max_age
-              description: Maximum retained indexed-file age for each tenant without an override.
+              description: Maximum retained indexed-file age.
               default_value: "7 days"
               required: false
             - name: traces.rotation.default.max_file_size
-              description: Trace write-ahead log file size that triggers rotation for tenants without an override.
+              description: Trace write-ahead log file size that triggers rotation.
               default_value: "25MB"
               required: false
             - name: traces.rotation.default.max_entries
-              description: Trace write-ahead log span count that triggers rotation for tenants without an override.
+              description: Trace write-ahead log span count that triggers rotation.
               default_value: 50000
               required: false
             - name: traces.retention.default.max_files
-              description: Maximum retained indexed trace-file count for each tenant without an override.
+              description: Maximum retained indexed trace-file count.
               default_value: 100000
               required: false
             - name: traces.retention.default.max_total_size
-              description: Maximum retained indexed trace-data size for each tenant without an override.
+              description: Maximum retained indexed trace-data size.
               detailed_description: |
                 This is not a cap on all plugin disk use. Write-ahead logs, catalogs, and cache are additional.
               default_value: "1GB"
               required: false
             - name: traces.retention.default.max_age
-              description: Maximum retained indexed trace-file age for each tenant without an override, measured on the start time of its newest span.
+              description: Maximum retained indexed trace-file age, measured on the start time of its newest span.
               default_value: "7 days"
               required: false
         examples:
@@ -224,25 +218,20 @@ modules:
                   tls_cert_path: /etc/netdata/ssl/server-cert.pem
                   tls_key_path: /etc/netdata/ssl/server-key.pem
                   tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
-            - name: Configure log and trace retention for one tenant
+            - name: Configure log and trace retention
               folding:
                 enabled: true
               description: |
-                Per-tenant entries inherit omitted fields from `default`. The key must match the sender's `X-Scope-OrgID` value when tenant selection is enabled. Logs and traces have separate settings.
+                A user file needs only the fields that change; omitted fields keep their stock values. Logs and traces have separate settings.
               config: |
-                auth:
-                  enabled: true
                 logs:
-                  rotation:
-                    production:
-                      max_file_size: "100MB"
                   retention:
-                    production:
+                    default:
                       max_total_size: "10GB"
                       max_age: "30 days"
                 traces:
                   retention:
-                    production:
+                    default:
                       max_total_size: "10GB"
                       max_age: "30 days"
             - name: Metric mapping file

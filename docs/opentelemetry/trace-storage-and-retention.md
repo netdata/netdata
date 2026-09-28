@@ -1,23 +1,22 @@
 # Trace Storage and Retention
 
 The Netdata Agent stores the OpenTelemetry traces it receives on its own disk, indexed, and serves them to the Traces
-tab of the dashboard. This page covers how spans are stored, how long they are kept, retention per tenant, offloading
-to object storage, and sizing the receiving node. To send traces to the Agent, see
+tab of the dashboard. This page covers how spans are stored, how long they are kept, offloading to object storage,
+and sizing the receiving node. To send traces to the Agent, see
 [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md#send-traces).
 
 ## How spans are stored
 
 Spans received over OpenTelemetry are stored by the receiving Netdata Agent under `base_dir` (default
-`/var/log/netdata/otel/v2` on package installs), in its `traces/` directory, with per-tenant subdirectories under the
-write-ahead-log and index directories. Each tenant has one write-ahead log that incoming spans are appended to. When it
-reaches `traces.rotation.default.max_file_size` (25MB) or `traces.rotation.default.max_entries` (50000 spans), or about
+`/var/log/netdata/otel/v2` on package installs), in its `traces/` directory. Incoming spans are appended to one
+write-ahead log. When it reaches `traces.rotation.default.max_file_size` (25MB) or `traces.rotation.default.max_entries` (50000 spans), or about
 15 minutes after its first span, it is sealed into an indexed file and the write-ahead log is deleted. Each indexed file
 indexes the span names, kinds, and statuses and the span, resource, scope, event, and link attributes, and keeps an
 index of trace IDs so that a whole trace can be looked up by its ID.
 
 ## Retention
 
-Retention applies to sealed indexed files, per tenant, oldest first, when any of three limits is exceeded:
+Retention applies to sealed indexed files, oldest first, when any of three limits is exceeded:
 
 | Option | Default | Meaning |
 |:-------|:--------|:--------|
@@ -25,27 +24,20 @@ Retention applies to sealed indexed files, per tenant, oldest first, when any of
 | `traces.retention.default.max_total_size` | 1GB | Maximum total size of indexed files kept |
 | `traces.retention.default.max_age` | 7 days | Maximum age of an indexed file, measured on the start time of its newest span |
 
-`max_total_size` is not a cap on the plugin's disk usage: the active write-ahead log (up to `max_file_size` per tenant),
-catalogs, and the download cache for offloaded data are additional. Retention runs when a file is sealed; a tenant that
-stops sending gets one final pass when its last write-ahead log seals on idle (within about 15 minutes), then keeps its
-remaining files until it sends again or the Agent restarts.
+`max_total_size` is not a cap on the plugin's disk usage: the active write-ahead log (up to `max_file_size`), catalogs,
+and the download cache for offloaded data are additional. Retention runs when a file is sealed; when spans stop
+arriving, the last write-ahead log seals on idle (within about 15 minutes) and gets one final pass, and the remaining
+files are kept until spans arrive again or the Agent restarts.
 
-Traces have their own settings, separate from `logs`. Per-tenant sections, under `traces.retention` and
-`traces.rotation`, inherit every field they omit from `default`. The section name is the tenant, which is the
-`X-Scope-OrgID` header value when tenant selection is enabled; with it disabled, every span lands in the `default`
-tenant. Tenant selection applies to logs and traces together:
+Traces have their own settings, separate from `logs`. Set the limits under `traces.retention.default`; a user
+`otel.yaml` needs only the fields that change:
 
 ```yaml
-auth:
-  enabled: true
 traces:
   retention:
     default:
       max_total_size: "20GB"
       max_age: "30 days"
-    checkout:
-      max_total_size: "50GB"
-      max_age: "90 days"
 ```
 
 Edit `otel.yaml` with [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) and restart
@@ -77,12 +69,12 @@ Reading traces back from object storage has these limits:
 
 ## Sizing the receiving node
 
-Run the senders for a full day, then measure `du -sh` on the tenant's directory under `<base_dir>/traces/index/` and
-multiply by the retention you want locally; set `max_total_size` to that size, since the 1GB default is usually reached
+Run the senders for a full day, then measure `du -sh` on `<base_dir>/traces/index/` and multiply by the retention you
+want locally; set `max_total_size` to that size, since the 1GB default is usually reached
 long before the 7-day `max_age`. For longer retention, keep `max_age` short, enable offloading, and size the object
 storage for one day's index size × the time you keep objects there; the Agent does not delete offloaded files, so
 expire them with the object storage's own lifecycle rules. Add headroom for the active write-ahead log
-(`max_file_size` per tenant) and, when offloading is enabled, for the download cache, which logs and traces share.
+(`max_file_size`) and, when offloading is enabled, for the download cache, which logs and traces share.
 
 ## Exploring traces
 
@@ -92,5 +84,6 @@ traces requires a signed-in Netdata Cloud user of the Agent's Space; trace data 
 ## Where to next
 
 - [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md) — send traces from an SDK or a Collector.
-- [Securing the OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md) — TLS, mutual TLS, and tenants.
+- [Securing the OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md) — TLS and mutual TLS for remote
+  senders.
 - [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) — every `otel.yaml` option.

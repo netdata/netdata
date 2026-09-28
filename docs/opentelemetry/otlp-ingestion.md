@@ -151,9 +151,8 @@ Set the `service.name` resource attribute in every application; it names the ser
 ## Accept remote senders securely
 
 The default loopback endpoint is the safe choice for a same-host Collector. To receive remote OTLP traffic, bind
-beyond loopback with TLS or mutual TLS, restrict port `4317` with network controls, and enable tenant selection when
-log and trace sender groups need separate retention — the procedure, certificate rotation, and what tenant selection
-does and does not protect are in [Securing the OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md). See
+beyond loopback with TLS or mutual TLS and restrict port `4317` with network controls — the procedure and certificate
+rotation are in [Securing the OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md). See
 the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) for every option.
 
 ## Troubleshoot the pipeline
