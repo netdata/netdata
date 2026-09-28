@@ -219,8 +219,14 @@ partial frame at EOF, timeout, closed stdout or process exit terminates the sess
 After readiness this marks the job Failed and requires an explicit restart or
 reconfiguration. No private respawn loop retries it. Failures before readiness use
 the normal `autodetection_retry` policy. In either case, no synthetic healthy sample
-is published. Stop or replacement cancels in-flight I/O, terminates the owned process
-group on Unix and waits for cleanup. Scripts MUST NOT daemonize or escape that group.
+is published. Stop or replacement cancels in-flight I/O, requests termination of
+contained processes, and waits for the leader and owned I/O to finish. Leader exit
+also triggers descendant termination. On Linux, macOS and FreeBSD, the leader is
+kept unreaped until its process group has been signaled; scripts MUST NOT daemonize
+or escape that group. On Windows 10 or later, the process starts inside an owned
+Job Object that contains its descendants. Startup fails if containment cannot be
+established. Discarded stderr uses the null device, so inherited stderr cannot keep
+a host-side copying goroutine alive. Descendant exits are not individually awaited.
 
 ## Checks and automatic alerts
 

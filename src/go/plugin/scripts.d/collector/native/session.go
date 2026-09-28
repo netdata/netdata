@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strconv"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -134,7 +133,7 @@ type scriptFrame struct {
 type scriptSession struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
-	cmd        *exec.Cmd
+	process    *ndexec.Process
 	stdin      io.WriteCloser
 	stdout     *os.File
 	frames     chan scriptFrame
@@ -146,14 +145,12 @@ type scriptSession struct {
 func startSession(ctx context.Context, argv []string) (*scriptSession, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	args := append(append([]string(nil), argv[1:]...), "serve")
-	cmd := ndexec.UnprivilegedCommandContext(ctx, argv[0], args...)
 	childStdin, stdin, err := os.Pipe()
 	if err != nil {
 		cancel()
 		return nil, err
 	}
-	cmd.Stdin = childStdin
-	// Own the read end: Cmd.Wait must not close it while the reader is using it.
+	// Own the read end for the protocol reader; the process owner receives only the child end.
 	stdout, childStdout, err := os.Pipe()
 	if err != nil {
 		cancel()
@@ -161,8 +158,12 @@ func startSession(ctx context.Context, argv []string) (*scriptSession, error) {
 		_ = stdin.Close()
 		return nil, err
 	}
-	cmd.Stdout, cmd.Stderr = childStdout, io.Discard
-	if err := cmd.Start(); err != nil {
+	opts := ndexec.ProcessOptions{
+		Stdin:  childStdin,
+		Stdout: childStdout,
+	}
+	process, err := ndexec.StartUnprivilegedProcess(ctx, opts, argv[0], args...)
+	if err != nil {
 		if ctx.Err() != nil {
 			err = ctx.Err()
 		}
@@ -178,7 +179,7 @@ func startSession(ctx context.Context, argv []string) (*scriptSession, error) {
 	s := &scriptSession{
 		ctx:        ctx,
 		cancel:     cancel,
-		cmd:        cmd,
+		process:    process,
 		stdin:      stdin,
 		stdout:     stdout,
 		frames:     make(chan scriptFrame),
@@ -186,7 +187,7 @@ func startSession(ctx context.Context, argv []string) (*scriptSession, error) {
 		exited:     make(chan struct{}),
 	}
 	go func() {
-		s.waitErr = cmd.Wait()
+		s.waitErr = process.Wait()
 		close(s.exited)
 	}()
 	go s.readFrames()
@@ -195,13 +196,7 @@ func startSession(ctx context.Context, argv []string) (*scriptSession, error) {
 
 func (s *scriptSession) close() {
 	s.cancel()
-	// Also cancel after Wait: an exited parent may have left descendants holding
-	// its pipes. ndexec's callback targets only this command's process group.
-	if s.cmd.Cancel != nil {
-		_ = s.cmd.Cancel()
-	} else {
-		_ = s.cmd.Process.Kill()
-	}
+	_ = s.process.Close()
 	_ = s.stdin.Close()
 	_ = s.stdout.Close()
 	<-s.readerDone
