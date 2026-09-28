@@ -124,9 +124,15 @@ In Netdata, open the node's Logs tab, select the `otel-logs` source, and choose 
 Traces come from instrumented applications. Export them to the Agent directly from the OpenTelemetry SDK, or through a Collector that forwards them.
 
 - **SDK:** set `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317` and `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` in the application's environment. Many SDKs default to OTLP/HTTP, which Netdata does not accept.
-- **Collector:** add the exporter above to a `traces` pipeline. A Collector on the Agent's host cannot receive on port `4317`, which the Agent already uses, so give its `otlp` receiver another port and point the applications at it:
+- **Collector:** add the exporter above to a `traces` pipeline. A Collector on the Agent's host cannot listen on the address the Agent already uses (`127.0.0.1:4317` by default), so give its `otlp` receiver another port and point the applications at it:
 
   ```yaml
+  exporters:
+    otlp_grpc/netdata:
+      endpoint: "127.0.0.1:4317"
+      tls:
+        insecure: true
+
   receivers:
     otlp:
       protocols:
@@ -157,6 +163,6 @@ the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) for ever
 - **The Collector or SDK connects but data is absent:** confirm that it uses OTLP/gRPC on `4317`; SDKs commonly select it with `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`. Then check both sender and Agent logs for rejected exports. On a systemd-based Agent host, query recent plugin messages with `journalctl SYSLOG_IDENTIFIER=otel-plugin SYSLOG_IDENTIFIER=otel-plugin/ingestor --since "-10 min"`.
 - **A metric is absent:** exponential histograms are not currently ingested. For other metrics, inspect mapping errors and search for the `otel.<metric-name>` context.
 - **Some logs are absent:** by default, Netdata accepts log timestamps from up to 24 hours in the past through 10 minutes in the future. Records outside this window are rejected. Netdata reports rejected records through OTLP `partial_success`; whether that message is visible depends on the sender.
-- **Some spans are absent:** by default, Netdata accepts a span only if it started no more than 24 hours ago and ends no more than 10 minutes in the future; a span without an end time is judged by its start. Rejected spans are reported through OTLP `partial_success` and logged as a warning in the Agent journal.
+- **Some spans are absent:** by default, Netdata accepts a span only if it started no more than 24 hours ago and ends no more than 10 minutes in the future; a span without an end time is judged by its start. Netdata reports rejected spans through OTLP `partial_success`, whose visibility depends on the sender, and logs a warning in the Agent journal.
 
 For plugin-specific diagnosis, use the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md). To derive a metric from matching log records, continue with [Create metrics from OpenTelemetry logs](/docs/opentelemetry/logs-to-metrics.md).

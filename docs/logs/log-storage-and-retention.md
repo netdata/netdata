@@ -198,6 +198,8 @@ remote_storage:
   Apply with `systemctl daemon-reload && systemctl restart netdata`.
 - Uploads that fail are retried with backoff; while the remote is unreachable, sealed files accumulate locally without
   a ceiling. Monitor free disk on the receiving node.
+- The Agent never deletes offloaded files, for logs or traces: expire them with the object storage's own lifecycle
+  rules, such as an S3 lifecycle expiration rule.
 - This is how long retention is made cheap: keep days locally with a small `max_age`, keep months or years in object
   storage, and query both from the same Logs tab.
 - Earlier versions kept a logs-only cache at `<base_dir>/logs/remote-read`. With offloading enabled, the Agent moves it

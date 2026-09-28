@@ -48,7 +48,8 @@ are rejected. Metrics are not tenant-scoped. The header chooses the tenant — i
 policy — and nothing more. It does not authenticate
 the sender: any client that passes TLS can claim any tenant, so rely on mutual TLS and network controls to decide who
 can send at all, and treat tenants as an organization tool (one retention policy per team, environment, or system).
-See [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) for per-tenant retention.
+See [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) and
+[Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md) for per-tenant retention.
 
 ## What reaches Netdata Cloud
 
