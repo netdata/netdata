@@ -181,7 +181,17 @@ static void worker_add_job(struct functions_evloop_globals *wg, const char *keyw
                     .cb = we->cb,
                     .cb_data = we->cb_data,
                 };
-                struct functions_evloop_worker_job *j = dictionary_set(wg->worker_queue, transaction, &t, sizeof(t));
+                // Keep the job acquired while using it: once queued, a worker can run, delete and free it
+                const DICTIONARY_ITEM *item =
+                    dictionary_set_and_acquire_item(wg->worker_queue, transaction, &t, sizeof(t));
+                if(!item) {
+                    // nothing was queued, so t still owns its allocations
+                    worker_job_cleanup(&t);
+                    msg = "Cannot queue this function transaction.";
+                    continue;
+                }
+
+                struct functions_evloop_worker_job *j = dictionary_acquired_item_value(item);
                 if(j->used) {
                     nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Received duplicate function transaction '%s'. Ignoring it.", transaction);
                     worker_job_cleanup(&t);
@@ -194,6 +204,7 @@ static void worker_add_job(struct functions_evloop_globals *wg, const char *keyw
                     netdata_cond_signal(&wg->worker_cond_var);
                     netdata_mutex_unlock(&wg->worker_mutex);
                 }
+                dictionary_acquired_item_release(wg->worker_queue, item);
             }
         }
 
