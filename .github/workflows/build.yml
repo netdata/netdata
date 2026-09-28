@@ -1330,6 +1330,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         with:
           submodules: recursive
+          persist-credentials: false
       - name: Test kickstart URL validation
         if: needs.file-check.outputs.run == 'true'
         run: ./tests/kickstart-url-validation-test.sh
