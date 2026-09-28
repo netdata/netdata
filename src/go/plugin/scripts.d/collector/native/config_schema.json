@@ -30,6 +30,14 @@
         "type": "number",
         "exclusiveMinimum": 0,
         "default": 5
+      },
+      "config": {
+        "title": "Package configuration",
+        "description": "Values for the package configuration schema. Leave empty to use package defaults.",
+        "type": [
+          "object",
+          "null"
+        ]
       }
     },
     "required": [

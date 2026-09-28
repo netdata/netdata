@@ -19,7 +19,7 @@ const maxResponseBytes = 1 << 20
 
 var errResponseTooLarge = errors.New("collect response exceeds 1 MiB")
 
-func runCommand(ctx context.Context, timeout time.Duration, argv []string) ([]byte, error) {
+func runCommand(ctx context.Context, timeout time.Duration, argv []string, config []byte) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	output := responseBuffer{
@@ -28,7 +28,10 @@ func runCommand(ctx context.Context, timeout time.Duration, argv []string) ([]by
 	args := append(append([]string(nil), argv[1:]...), "collect")
 	cmd := ndexec.UnprivilegedCommandContext(ctx, argv[0], args...)
 	cmd.Stdout, cmd.Stderr = &output, io.Discard
-	// nil stdin is EOF: children cannot accidentally consume a later protocol frame.
+	// Schema-free packages retain EOF; configured packages receive exactly one envelope.
+	if len(config) > 0 {
+		cmd.Stdin = bytes.NewReader(config)
+	}
 	err := cmd.Run()
 	if output.exceeded {
 		return nil, errResponseTooLarge

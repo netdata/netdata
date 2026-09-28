@@ -36,6 +36,8 @@ type manifest struct {
 	Metrics      []metricDefinition `yaml:"metrics"`
 	Checks       []checkDefinition  `yaml:"checks"`
 	Charts       string             `yaml:"charts"`
+	ConfigSchema string             `yaml:"config_schema"`
+	config       *packageConfig
 	metricByName map[string]metricDefinition
 	checkByID    map[string]checkDefinition
 }
@@ -124,6 +126,10 @@ func loadManifest(path string, validate func(string) (string, error)) (manifest,
 	}
 	if len(m.Metrics)+len(m.Checks) == 0 {
 		return m, nil, fmt.Errorf("manifest must declare metrics or checks")
+	}
+	m.config, err = loadPackageConfig(filepath.Dir(path), m.ConfigSchema)
+	if err != nil {
+		return m, nil, err
 	}
 	templates, err := m.chartTemplates(filepath.Dir(path))
 	return m, templates, err

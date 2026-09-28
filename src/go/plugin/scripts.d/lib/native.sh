@@ -116,3 +116,13 @@ nd_fail() {
     printf '{"id":"%s","error":"collection_failed"}\n' "$_nd_request_id"
     _nd_request_id=
 }
+
+# Call once before nd_ready (persistent) or collection (one-shot) when the
+# manifest declares config_schema. ND_CONFIG stays a shell variable, not an
+# environment variable. Scripts may parse it with jq or another JSON decoder.
+nd_read_config() {
+    IFS= read -r ND_CONFIG || {
+        printf '%s\n' 'native: missing configuration envelope' >&2
+        return 1
+    }
+}

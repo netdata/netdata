@@ -31,9 +31,10 @@ func init() {
 }
 
 type Config struct {
+	ScriptConfig    Settings         `yaml:"config,omitempty"              json:"config,omitempty"`
 	UpdateEvery     int              `yaml:"update_every,omitempty"        json:"update_every,omitempty"`
 	AutoDetectEvery int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
-	Manifest        string           `yaml:"manifest"                      json:"manifest"`
+	Manifest        string           `yaml:"manifest,omitempty"            json:"manifest,omitempty"`
 	Timeout         confopt.Duration `yaml:"timeout,omitempty"             json:"timeout,omitempty"`
 }
 
@@ -42,6 +43,8 @@ type Collector struct {
 	Config             `yaml:",inline" json:",inline"`
 	store              metrix.CollectorStore
 	definition         manifest
+	bound              bool
+	configInput        []byte
 	templates          *chartengine.TemplateSet
 	validateExecutable func(string) (string, error)
 	runtimeMu          sync.Mutex
@@ -59,7 +62,14 @@ func New() *Collector {
 	}
 }
 
-func (c *Collector) Configuration() any                         { return c.Config }
+func (c *Collector) Configuration() any {
+	cfg := c.Config
+	if c.bound {
+		cfg.Manifest = ""
+		cfg.ScriptConfig = c.definition.config.effective(cfg.ScriptConfig)
+	}
+	return cfg
+}
 func (c *Collector) MetricStore() metrix.CollectorStore         { return c.store }
 func (c *Collector) ChartTemplateSet() *chartengine.TemplateSet { return c.templates }
 func (c *Collector) Cleanup(context.Context)                    {}
@@ -68,12 +78,20 @@ func (c *Collector) Init(context.Context) error {
 	if c.UpdateEvery < 1 || c.Timeout.Duration() <= 0 {
 		return fmt.Errorf("update_every and timeout must be positive")
 	}
-	definition, templates, err := loadManifest(c.Manifest, c.validateExecutable)
-	if err != nil {
-		return err
+	if c.bound {
+		if c.Manifest != "" {
+			return fmt.Errorf("registered packages cannot override manifest")
+		}
+	} else {
+		definition, templates, err := loadManifest(c.Manifest, c.validateExecutable)
+		if err != nil {
+			return err
+		}
+		c.definition, c.templates = definition, templates
 	}
-	c.definition, c.templates = definition, templates
-	return nil
+	var err error
+	c.configInput, err = c.configurationEnvelope()
+	return err
 }
 
 // Check validates local initialization only. A target's first observation may be critical.
@@ -102,7 +120,7 @@ func (c *Collector) Collect(ctx context.Context) error {
 		result, err = c.collectPersistent(ctx)
 	} else {
 		var data []byte
-		data, err = runCommand(ctx, c.Timeout.Duration(), c.definition.Command)
+		data, err = runCommand(ctx, c.Timeout.Duration(), c.definition.Command, c.configInput)
 		if err == nil {
 			result, err = c.definition.decodeResponse(data)
 			if err != nil {

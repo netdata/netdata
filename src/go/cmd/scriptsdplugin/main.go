@@ -66,6 +66,11 @@ func main() {
 	}
 	isTerminal := terminal.IsTerminal()
 
+	modules, dummy, err := configurePackages(pluginconfig.ConfigDir(), collectorapi.DefaultRegistry)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "initializing native packages: %v\n", err)
+		os.Exit(1)
+	}
 	secrets, err := secretproviders.Default()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "initializing secrets: %v\n", err)
@@ -79,12 +84,12 @@ func main() {
 		ServiceDiscoveryConfigDir: nil,
 		CollectorsConfigWatchPath: watchPaths,
 		VarLibDir:                 pluginconfig.VarLibDir(),
-		ModuleRegistry:            collectorapi.DefaultRegistry,
+		ModuleRegistry:            modules,
 		IsInsideK8s:               hostinfo.IsInsideK8sCluster(),
 		RunModePolicy:             policy.Agent(isTerminal),
 		DiscoveryProviders: []discovery.ProviderFactory{
 			discoveryproviders.File(),
-			discoveryproviders.Dummy(),
+			dummy,
 		},
 		RunModule:               opts.Module,
 		RunJob:                  opts.Job,

@@ -6,7 +6,7 @@ Scripts report labeled metrics and named service checks. The development health
 template turns warning and critical checks into notifications.
 
 This contract is WIP. It supports one-shot and persistent collection, scalar gauges
-and cumulative counters. Additional metric kinds, script-specific DynCfg forms,
+and cumulative counters. Package-specific DynCfg forms are supported. Additional metric kinds
 and Functions are later steps. The manifest
 and wire format may change during the preview.
 
@@ -54,7 +54,7 @@ jobs:
 ```
 
 Use the development binary for this configuration. There is no package
-auto-discovery. Initialization reads and validates local files without running
+auto-discovery. Explicit package registration below provides individual DynCfg forms. Initialization reads and validates local files without running
 the executable. Editing package files requires restarting or
 reconfiguring the job; charts and declarations are fixed for that job instance.
 
@@ -81,6 +81,8 @@ checks:
 - `command` is an argv array, without shell expansion. Its first path is resolved
   relative to the manifest directory unless absolute. Subsequent arguments are
   literal. Netdata appends `collect` for one-shot mode or `serve` for persistent mode.
+- `config_schema` optionally names a local JSON form, relative to the manifest
+  directory. It enables configuration input on stdin in both modes; see below.
 - `mode` is `oneshot` (the default when omitted) or `persistent`. Persistent jobs
   retain one process across collection attempts; their state resets on restart.
 - `metrics` declares each name, type (`gauge` or `counter`) and nonempty unit.
@@ -125,10 +127,130 @@ groups:
 instances SHOULD represent a bounded set of monitored entities, never request
 IDs, timestamps, diagnostic messages or other continuously changing identifiers.
 
+## Package registration and DynCfg
+
+For a package-specific form, create `scripts.d.packages.yaml` in the Netdata
+configuration directory (next to `scripts.d.conf`):
+
+```yaml
+version: v1
+packages:
+  - name: queue
+    manifest: /usr/local/lib/netdata/custom/queue/manifest.yaml
+```
+
+The first matching inventory in the configured directory search order wins.
+Package names contain lowercase letters, digits and single hyphens between words,
+beginning with a letter. Each entry registers module `native-<name>`, for example
+`native-queue`. Duplicate names or invalid packages reject startup. Ordinary
+production builds ignore this inventory entirely.
+
+The package's manifest, chart templates and configuration schema are read once at
+plugin startup. Changes to these files or the inventory require a plugin restart.
+The registered module binds that package: job configuration cannot replace its
+manifest or executable. Package registration never runs the executable and never
+creates a default job. Add a job through DynCfg or `scripts.d/native-queue.conf`:
+
+```yaml
+jobs:
+  - name: local
+    update_every: 10
+    timeout: 5
+    config:
+      queue: mail
+      depth: 15
+```
+
+Normal module enablement applies: `default_run: yes` exposes registered package
+modules unless disabled individually. With `default_run: no`, enable
+`native-queue` under `modules` in `scripts.d.conf`. Enabling the generic `native`
+module does not enable package modules. `-m native-queue` selects that module.
+
+DynCfg serves the package form under `config`, alongside collection settings.
+GET preserves submitted secret references; effective configuration also includes
+package defaults. The generic `native` module remains usable with a manifest path
+and a `config` object, but its form cannot reflect a particular package schema.
+Generic jobs load package files during initialization; their pre-initialization
+configuration retrieval contains only submitted package values.
+
+### Package configuration schema
+
+Add `config_schema: config_schema.json` to the manifest. The file uses the existing
+DynCfg form envelope; its `jsonSchema` describes only the package's `config` object:
+
+```json
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "title": "Queue settings",
+    "description": "Configure the queue to monitor.",
+    "additionalProperties": false,
+    "properties": {
+      "queue": {
+        "type": "string",
+        "title": "Queue",
+        "description": "Name of the queue to monitor.",
+        "default": "mail"
+      }
+    }
+  },
+  "uiSchema": {}
+}
+```
+
+Use Draft 7 and local fragment references (`#` or `#/definitions/...`); external
+resources and `$id` are rejected. Local references are rebased when the form is
+embedded in the job schema. Use `ui:widget: password` for credential fields.
+Schema compilation and runtime errors omit submitted values. Configuration numbers
+use IEEE-754 double precision; represent exact large identifiers as strings.
+
+Defaults are applied along direct `properties` and homogeneous array `items`.
+An absent object is created only when that property has a default, such as `{}`.
+Existing objects receive defaults for missing properties; explicit false, zero,
+and null property values are preserved. Omitted `config` or `config: null` uses
+package defaults. Defaults inside conditional/composed schemas, definitions,
+pattern properties, or tuple items are rejected: put a default directly on the
+property where it is used. Schema validation still supports those constructs.
+Defaults MUST NOT contain secret references. Put references in job configuration,
+where the existing resolver can resolve and track them before initialization.
+
+Full schema validation runs during Init, including DynCfg Test, active-update
+preflight, and activation. Passive ADD/disabled edits retain the framework's
+structural/reference-syntax admission; invalid values cannot start a script.
+An invalid active update leaves the existing job running. An accepted valid update
+replaces its process through the existing lifecycle; scripts do not hot-reload
+configuration themselves.
+
+### Configuration input
+
+When `config_schema` is present, the host sends exactly one UTF-8 JSON object on
+one LF-terminated line to stdin before the script performs collection or emits
+persistent readiness:
+
+```json
+{"version":"v1","config":{"queue":"mail"}}
+```
+
+The envelope is at most 1 MiB including LF. One-shot stdin then reaches EOF;
+persistent stdin continues with normal collection requests after readiness.
+Initialization has the same timeout as persistent startup. Blocking or failing to
+consume configuration fails startup/collection. Values are never passed through
+argv, environment variables, or temporary files by the collector. Scripts MUST
+keep credentials out of their logs, metric labels, and child command arguments.
+
+Bash can call `nd_read_config` to read the envelope into the unexported shell
+variable `ND_CONFIG`, then use a JSON decoder such as `jq`. Python can use
+`json.loads(sys.stdin.readline())["config"]`. See the runnable synthetic examples
+in `development/configured-bash` and `development/configured-python`; the Bash
+example requires `jq`. Both example scripts support `collect` and `serve`.
+Schema-free scripts keep their existing stdin and readiness behavior.
+
 ## Collection response
 
 In one-shot mode, each invocation MUST exit zero and print exactly one UTF-8 JSON
-object, at most 1 MiB including whitespace. Stdin is EOF. In persistent mode, the
+object, at most 1 MiB including whitespace. Stdin is EOF for schema-free packages;
+configured packages receive one configuration envelope followed by EOF. In persistent mode, the
 same snapshot is carried in a correlated reply as described below. Stdout
 is exclusively the protocol; redirect command chatter to stderr. The collector
 discards stderr to avoid copying arbitrary script output into Agent logs.
