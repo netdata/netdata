@@ -130,6 +130,7 @@ MUST be nonnegative cumulative totals, not interval deltas. Counter resets use
 the existing incremental chart behavior. Values use IEEE-754 double precision;
 integers above 2^53 may lose precision. Labels are string-to-string objects.
 
+Field names are case-sensitive; JSON null is invalid in every position.
 Each response is a full snapshot. Omit unavailable metric samples rather than
 inventing zero. An empty metrics or checks array is valid; arrays may be omitted.
 A sample name MUST be declared. Duplicate JSON keys, duplicate metric identities

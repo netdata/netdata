@@ -34,11 +34,13 @@ func (m manifest) decodeResponse(data []byte) (response, error) {
 	if !utf8.Valid(data) {
 		return result, fmt.Errorf("response must be UTF-8")
 	}
-	// json.Valid bounds nesting and rejects incomplete frames before the key scan.
+	// json.Valid bounds nesting and rejects incomplete frames before the field scan.
 	if !json.Valid(data) {
 		return result, fmt.Errorf("expected one complete JSON object")
 	}
-	if err := uniqueKeys(json.NewDecoder(bytes.NewReader(data))); err != nil {
+	fields := json.NewDecoder(bytes.NewReader(data))
+	fields.UseNumber() // Type validation below reports errors without raw numeric values.
+	if err := validateJSONFields(fields, "response"); err != nil {
 		return result, err
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
@@ -114,13 +116,16 @@ func identity(name string, labels map[string]string) string {
 	return name + ":" + string(encoded)
 }
 
-// uniqueKeys rejects ambiguous objects instead of accepting last-key-wins values.
-func uniqueKeys(decoder *json.Decoder) error {
+// Validate field spelling and nulls before encoding/json can coerce them.
+// Array items inherit their field role; label keys are arbitrary data.
+func validateJSONFields(decoder *json.Decoder, role string) error {
 	token, err := decoder.Token()
 	if err != nil {
 		return err
 	}
 	switch token {
+	case nil:
+		return fmt.Errorf("null is not a protocol value")
 	case json.Delim('{'):
 		seen := map[string]bool{}
 		for decoder.More() {
@@ -129,22 +134,44 @@ func uniqueKeys(decoder *json.Decoder) error {
 				return err
 			}
 			key := token.(string)
+			if !knownField(role, key) {
+				return fmt.Errorf("unknown response field")
+			}
 			if seen[key] {
 				return fmt.Errorf("duplicate JSON key")
 			}
 			seen[key] = true
-			if err = uniqueKeys(decoder); err != nil {
+			childRole := key
+			if role == "labels" {
+				childRole = "label_value"
+			}
+			if err = validateJSONFields(decoder, childRole); err != nil {
 				return err
 			}
 		}
 		_, err = decoder.Token()
 	case json.Delim('['):
 		for decoder.More() {
-			if err = uniqueKeys(decoder); err != nil {
+			if err = validateJSONFields(decoder, role); err != nil {
 				return err
 			}
 		}
 		_, err = decoder.Token()
 	}
 	return err
+}
+
+func knownField(role, key string) bool {
+	switch role {
+	case "response":
+		return key == "version" || key == "metrics" || key == "checks"
+	case "metrics":
+		return key == "name" || key == "value" || key == "labels"
+	case "checks":
+		return key == "id" || key == "state" || key == "labels"
+	case "labels":
+		return true
+	default:
+		return false
+	}
 }

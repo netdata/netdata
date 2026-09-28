@@ -139,10 +139,18 @@ func TestCollectSnapshots(t *testing.T) {
 func TestDecodeResponse(t *testing.T) {
 	c, _ := fixtureCollector(t, "exit 0\n")
 	tests := map[string]string{
-		"truncated":                  `{"version":"v1"`,
-		"trailing":                   validResponse("ok") + `{}`,
-		"unsupported version":        `{"version":"v2"}`,
-		"unknown field":              `{"version":"v1","surprise":1}`,
+		"truncated":               `{"version":"v1"`,
+		"trailing":                validResponse("ok") + `{}`,
+		"unsupported version":     `{"version":"v2"}`,
+		"unknown field":           `{"version":"v1","surprise":1}`,
+		"case folded field":       `{"version":"v1","Metrics":[]}`,
+		"case folded check state": `{"version":"v1","checks":[{"id":"backlog","state":"critical","State":"ok","labels":{"queue":"mail"}}]}`,
+		"null metric label":       `{"version":"v1","metrics":[{"name":"depth","value":1,"labels":{"queue":null}}]}`,
+		"null check metadata":     `{"version":"v1","checks":[{"id":"backlog","state":"ok","labels":{"queue":"mail","region":null}}]}`,
+		"null metrics":            `{"version":"v1","metrics":null}`,
+		"null checks":             `{"version":"v1","checks":null}`,
+		"null labels":             `{"version":"v1","metrics":[{"name":"depth","value":1,"labels":null}]}`,
+
 		"missing value":              `{"version":"v1","metrics":[{"name":"depth"}]}`,
 		"null value":                 `{"version":"v1","metrics":[{"name":"depth","value":null}]}`,
 		"overflow":                   `{"version":"v1","metrics":[{"name":"depth","value":1e999}]}`,
@@ -158,7 +166,11 @@ func TestDecodeResponse(t *testing.T) {
 		"invalid utf8":               "{\"version\":\"v1\",\"x\":\"\xff\"}",
 	}
 	for name, data := range tests {
-		t.Run(name, func(t *testing.T) { _, err := c.definition.decodeResponse([]byte(data)); require.Error(t, err) })
+		t.Run(name, func(t *testing.T) {
+			_, err := c.definition.decodeResponse([]byte(data))
+			require.Error(t, err)
+			assert.NotContains(t, err.Error(), "1e999", "errors must not expose raw sample values")
+		})
 	}
 }
 
@@ -337,4 +349,12 @@ func TestConfigSchemaMatchesMetadata(t *testing.T) {
 			Defaults: true,
 		},
 	)
+}
+
+func TestLabelKeysAreData(t *testing.T) {
+	c, _ := fixtureCollector(t, "exit 0\n")
+	data := `{"version":"v1","metrics":[{"name":"depth","value":0,"labels":{"Version":"x","metrics":"y","State":"z"}}]}`
+	result, err := c.definition.decodeResponse([]byte(data))
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"Version": "x", "metrics": "y", "State": "z"}, result.Metrics[0].Labels)
 }
