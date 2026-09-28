@@ -117,7 +117,7 @@ func TestParseTable_DocumentedSizeEncodings(t *testing.T) {
 func TestParseTable_Classification(t *testing.T) {
 	healthy := inventory.Table{Capacity: uintPtr(1 << 40), Populated: 16, CountsKnown: true, Comparable: true}
 	uncomparable := healthy
-	uncomparable.Comparable, uncomparable.Reason = false, "Slot locators are missing or duplicated"
+	uncomparable.Comparable, uncomparable.Reason = false, "Slot locators are missing or duplicated within a bank"
 	unknownType := fixtureDevice(0)
 	unknownType.MemoryType = ""
 	unnamedSlot := fixtureDevice(0)
@@ -126,6 +126,9 @@ func TestParseTable_Classification(t *testing.T) {
 	minimal.Capacity = uintPtr(8 << 30)
 	minimal.Manufacturer, minimal.Part, minimal.Serial = "", "", ""
 	minimal.Ranks, minimal.RatedSpeed, minimal.ConfiguredSpeed = nil, nil, nil
+
+	sharedLocator := fixtureDevice(0)
+	sharedLocator.Bank, sharedLocator.Locator = "P0 CHANNEL A", "DIMM 0"
 
 	for name, tc := range map[string]struct {
 		modify  func([][]byte)
@@ -142,6 +145,25 @@ func TestParseTable_Classification(t *testing.T) {
 		"duplicated locator": {
 			modify: func(r [][]byte) { r[1][16], r[2][16] = 2, 2 }, devices: 16, table: uncomparable,
 			first: func() inventory.Device { d := fixtureDevice(0); d.Locator = "BANK 0"; return d }(),
+		},
+		"locator repeated across banks": {
+			modify:  func(r [][]byte) { copy(r, sharedLocatorRecords(t, joinRecords(r))) },
+			devices: 16, first: sharedLocator, table: healthy,
+		},
+		"locator repeated within a bank": {
+			modify: func(r [][]byte) {
+				copy(r, sharedLocatorRecords(t, joinRecords(r)))
+				r[2] = relabel(t, r[2], "P0 CHANNEL A", "DIMM 0")
+			},
+			devices: 16, first: sharedLocator, table: uncomparable,
+		},
+		"locator without bank repeated": {
+			modify: func(r [][]byte) {
+				copy(r, sharedLocatorRecords(t, joinRecords(r)))
+				r[1][17], r[3][17] = 0, 0
+			},
+			devices: 16, table: uncomparable,
+			first: func() inventory.Device { d := sharedLocator; d.Bank = ""; return d }(),
 		},
 		"unknown technology still physical": {
 			modify: func(r [][]byte) { r[1][18] = 2 }, devices: 16, first: unknownType, table: healthy,

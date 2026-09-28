@@ -39,7 +39,8 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
   drivers; CGO outside the IBM ecosystem is a design discussion.
 - **Rust SDK** at `src/crates/netdata-plugin/` — modules `bridge/`, `protocol/`, `rt/`, `charts-derive/`, `schema/`,
   `types/`, `error/`. Documentation lives in `lib.rs` doc-comments — there is no README. New Rust crates go into the
-  `src/crates/Cargo.toml` workspace. Reference impl: `src/crates/netflow-plugin/`.
+  `src/crates/Cargo.toml` workspace. Reference impl: `src/crates/netflow-plugin/`. When to call
+  `PluginRuntime::run()` at startup: its doc-comment and `src/plugins.d/README.md#operation`.
 - **Internal C plugins** — mirror an adjacent collector under `src/collectors/<name>.plugin/`; reuse `src/libnetdata/`.
   `libnetdata.h` includes most of libnetdata so individual headers are usually unnecessary. Allocators with the `z`
   suffix (`mallocz`, `callocz`, `strdupz`, `freez`) handle failures via `fatal()`; `freez(NULL)` is safe. JSON parsing:
@@ -73,6 +74,16 @@ Path conventions: internal C plugins → `src/collectors/<name>.plugin/`; Go orc
   - Failure mode this catches: a runtime field declared inside the CO-RE guard but referenced outside it.
     It compiles wherever CO-RE is on and fails everywhere else with `has no member named '<field>'`, which
     surfaces as a distro build break (EL8 ships libbpf 0.x) long after the Go job went green.
+- freeipmi.plugin without IPMI hardware (Linux; target `freeipmi.plugin` needs `libipmimonitoring`): run OpenIPMI
+  `ipmi_sim` as a LAN BMC and pass the plugin `hostname <addr> username <user> password <pass>`. Observed with
+  libipmimonitoring 1.6.10 and OpenIPMI 2.0.33:
+  - `127.0.0.1` and `localhost` select in-band access; bind `ipmi_sim` (`addr` in its LAN config) to a
+    non-loopback address.
+  - The LAN channel opens only after `mc_enable 0x20` in the command file.
+  - `main_sdr_add` takes `0x`-prefixed bytes; `sdrcomp -r -8` compiles text SDRs to raw bytes with 8-bit ID strings.
+  - Without `sensor_set_event_support <mc> <lun> <num> enable scanning ...` a threshold sensor's reading type is
+    unknown, so only its state chart appears.
+  - The Functions reader makes the plugin exit on stdin EOF, so keep stdin open.
 
 ## Migrating a C ebpf.plugin module to ebpfgo.plugin
 
@@ -177,7 +188,9 @@ production topology contract in `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`. F
 compact-table helpers. For Rust, implement the `FunctionHandler` trait from the SDK runtime
 (`src/crates/netdata-plugin/rt/`).
 
-Functions run concurrently with the collection loop — they must not block it. Validate during development with
+Functions run concurrently with the collection loop — they must not block it. C plugins also share its stdout:
+response serialization is stated above the `*_to_stdout()` helpers in
+`src/libnetdata/functions_evloop/functions_evloop.h`. Validate during development with
 `src/go/tools/functions-validation/`.
 
 Reference implementations: `src/collectors/network-viewer.plugin/` (topology + connections),

@@ -57,14 +57,14 @@ A standard installation needs nothing extra: the installer grants `go.d.plugin` 
 
 The stock configuration starts the single `smbios_memory` job when the host exposes a readable SMBIOS table with a system-memory array. A host that already has a saved baseline also starts when the table cannot be read, so an unresolved loss stays visible.
 
-The baseline is learned automatically: the first complete inventory with unique slot locators and known capacities is saved as the accepted configuration. It is the first configuration observed, not an independently verified healthy one. Added devices and capacity increases are accepted automatically only while every previously accepted slot still has at least its accepted capacity; a missing or smaller slot is reported as loss until it is restored or the baseline is reset (see Troubleshooting).
+The baseline is learned automatically: the first complete inventory in which every device has a known capacity and a slot locator unique within its bank is saved as the accepted configuration. It is the first configuration observed, not an independently verified healthy one. Added devices and capacity increases are accepted automatically only while every previously accepted slot still has at least its accepted capacity; a missing or smaller slot is reported as loss until it is restored or the baseline is reset (see Troubleshooting).
 
 
 #### Limits
 
-Comparison depends on firmware quality. Blank or repeated slot locators, unknown device capacities or array use, malformed records, and inconsistent array counts leave the inventory readable but not comparable: the comparison status chart reports `uncomparable` and the `smbios_memory_comparison_unavailable` alert raises a warning.
+Comparison depends on firmware quality. Blank slot locators, a slot locator repeated within one bank, unknown device capacities or array use, malformed records, and inconsistent array counts leave the inventory readable but not comparable: the comparison status chart reports `uncomparable` and the `smbios_memory_comparison_unavailable` alert raises a warning.
 
-Slot locators must stay stable across boots; a firmware update that renames slots is not matched automatically and shows every old slot as missing and every new slot as not in the baseline. Replacing a device with one of equal or larger capacity in the same slot is not loss.
+A slot is identified by its bank and slot locators, which must stay stable across boots; a firmware update that renames either is not matched automatically and shows every old slot as missing and every new slot as not in the baseline. Replacing a device with one of equal or larger capacity in the same slot is not loss.
 
 Inventory does not attribute EDAC errors to physical devices: the evidence needed to join platform-specific EDAC ranks to SMBIOS slots is not available.
 
@@ -229,8 +229,8 @@ One row per current physical system-memory device, plus accepted populated slots
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
 | Key | string |  | hidden | Identity within this snapshot; not a persistent hardware identity. |
-| Slot | string |  |  | Firmware device locator. |
-| Bank | string |  | hidden | Firmware bank locator. |
+| Slot | string |  |  | Firmware device locator; together with the bank, it identifies the slot. |
+| Bank | string |  |  | Firmware bank locator; slots in different banks may share a device locator. |
 | Population | string |  |  | Populated, empty, or unknown. |
 | Capacity | integer | bytes |  | Current firmware-reported physical capacity. |
 | Accepted capacity | integer | bytes |  | Capacity in the accepted baseline. |
@@ -403,11 +403,11 @@ Firmware does not state whether a memory array holds system memory, so the colle
 
 The inventory table remains available with totals withheld; comparison stays `uncomparable`. Check the vendor's firmware updates.
 
-#### Slot locators are missing or duplicated
+#### Slot locators are missing or duplicated within a bank
 
 **Cause**
 
-Firmware does not give every memory device a unique slot locator, so devices cannot be matched across observations.
+Firmware leaves a memory device without a slot locator, or gives two devices in the same bank the same one, so devices cannot be matched across observations. The Memory Inventory Function shows each device's Slot and Bank.
 
 **Fix**
 
@@ -427,11 +427,11 @@ Check the table with the hardware vendor's tools and firmware updates. A missing
 
 **Cause**
 
-The state file belongs to another Agent, is damaged, or uses an unsupported format.
+The state file belongs to another Agent, is damaged, or uses an unsupported format, such as one written by a newer Netdata version before a downgrade.
 
 **Fix**
 
-Restore the matching state file from a backup, or start a new baseline with the stopped-collector reset above; do not edit the file in place. Restart the collector afterwards, because a failed state load is reported until restart.
+After a downgrade, upgrade Netdata again; the older collector leaves the file unchanged. Otherwise restore the matching state file from a backup, or start a new baseline with the stopped-collector reset above; do not edit the file in place. Restart the collector afterwards, because a failed state load is reported until restart.
 
 #### memory baseline contains an invalid slot
 

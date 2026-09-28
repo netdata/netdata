@@ -54,7 +54,8 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
                                         uint64_t models_deserialization_failures,
                                         uint64_t memory_consumption,
                                         uint64_t memory_new,
-                                        uint64_t memory_delete);
+                                        uint64_t memory_delete,
+                                        uint64_t memory_unmatched_free);
 
 bool ml_host_get_host_status(RRDHOST *rh, struct ml_metrics_statistics *mlm);
 bool ml_host_running(RRDHOST *rh);

@@ -50,6 +50,8 @@ type SysInfoProbe struct {
 	PDUCount        int
 	SeenSysDescr    bool
 	SeenSysObjectID bool
+	// SysObjectIDType is the ASN.1 type of the sysObjectID value; its content is never recorded.
+	SysObjectIDType string
 	SeenSysContact  bool
 	SeenSysName     bool
 	SeenSysLocation bool
@@ -89,14 +91,8 @@ func GetSysInfo(client ScalarClient) (*SysInfo, error) {
 			si.Descr = valueSanitizer.Replace(si.Descr)
 		case OidSysObject:
 			si.Probe.SeenSysObjectID = true
-			if pdu.Type != gosnmp.ObjectIdentifier {
-				err = fmt.Errorf("expected ObjectIdentifier, got %v", pdu.Type)
-				break
-			}
-			var sysObj string
-			if sysObj, err = PduToString(pdu); err == nil {
-				si.SysObjectID = sysObj
-			}
+			si.Probe.SysObjectIDType = pdu.Type.String()
+			si.SysObjectID = sysObjectIDFromPDU(pdu)
 		case OidSysContact:
 			si.Probe.SeenSysContact = true
 			si.Contact, err = PduToString(pdu)
@@ -118,6 +114,48 @@ func GetSysInfo(client ScalarClient) (*SysInfo, error) {
 	updateMetadata(si)
 
 	return si, nil
+}
+
+// sysObjectIDFromPDU returns the sysObjectID without a leading dot, or "" when the value is not a valid numeric OID.
+// Some agents send the OID as OctetString text; accepting only OID syntax keeps other device text out of profile
+// matching and the collector's error and log diagnostics. An unusable value is treated as absent so manual
+// profiles still apply.
+func sysObjectIDFromPDU(pdu gosnmp.SnmpPDU) string {
+	if pdu.Type != gosnmp.ObjectIdentifier && pdu.Type != gosnmp.OctetString {
+		return ""
+	}
+	v, err := PduToString(pdu)
+	if err != nil {
+		return ""
+	}
+	v = strings.TrimPrefix(strings.Trim(v, " \t\r\n\x00"), ".")
+	if !isNumericOID(v) {
+		return ""
+	}
+	return v
+}
+
+// isNumericOID reports whether s is a dotted numeric OID with at least two arcs whose first arcs follow
+// ITU-T X.660: the first arc is 0, 1 or 2, and the second arc is below 40 when the first is 0 or 1.
+func isNumericOID(s string) bool {
+	arcs := strings.Split(s, ".")
+	if len(arcs) < 2 {
+		return false
+	}
+	for _, arc := range arcs {
+		if arc == "" || strings.ContainsFunc(arc, func(r rune) bool { return r < '0' || r > '9' }) {
+			return false
+		}
+	}
+	switch arcs[0] {
+	case "0", "1":
+		second, err := strconv.ParseUint(arcs[1], 10, 64)
+		return err == nil && second < 40
+	case "2":
+		return true
+	default:
+		return false
+	}
 }
 
 func sysInfoOIDs() []string {

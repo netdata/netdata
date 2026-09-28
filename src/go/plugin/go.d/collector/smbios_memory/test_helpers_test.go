@@ -81,6 +81,30 @@ func fixtureRecords(t *testing.T, data []byte) [][]byte {
 
 func joinRecords(records [][]byte) []byte { return bytes.Join(records, nil) }
 
+// sharedLocatorRecords relabels the fixture's devices the way many consumer
+// boards do: every channel reuses the locators "DIMM 0" and "DIMM 1", and only
+// the bank locator tells the slots apart (records[1+i] is device i).
+func sharedLocatorRecords(t *testing.T, data []byte) [][]byte {
+	t.Helper()
+	records := fixtureRecords(t, data)
+	for i := range 16 {
+		records[1+i] = relabel(t, records[1+i], sharedLocatorBank(i), fmt.Sprintf("DIMM %d", i%2))
+	}
+	return records
+}
+
+func sharedLocatorBank(i int) string { return fmt.Sprintf("P0 CHANNEL %c", 'A'+i/2) }
+
+// relabel replaces a Type 17 record's bank and device locator strings.
+func relabel(t *testing.T, record []byte, bank, locator string) []byte {
+	t.Helper()
+	n := int(record[1])
+	require.True(t, record[16] != 0 && record[17] != 0 && record[16] != record[17])
+	strs := strings.Split(string(record[n:len(record)-2]), "\x00")
+	strs[record[16]-1], strs[record[17]-1] = locator, bank
+	return append(bytes.Clone(record[:n]), strings.Join(strs, "\x00")+"\x00\x00"...)
+}
+
 // entry3 builds a checksummed SMBIOS 3 entry point whose maximum size exceeds the table.
 func entry3(data []byte) []byte {
 	e := make([]byte, 24)
@@ -188,7 +212,7 @@ type collectionResult struct {
 	Comparison    string
 	ConfirmedLoss string
 	Values        map[string]float64
-	Baseline      map[string]uint64
+	Baseline      map[slotKey]uint64
 	Loss          []discrepancy
 }
 
@@ -220,21 +244,33 @@ func collectionOutput(t *testing.T, c *Collector) collectionResult {
 		got.Values[name] = value
 	})
 	if state := c.baseline.current; state != nil {
-		got.Baseline = make(map[string]uint64)
+		got.Baseline = make(map[slotKey]uint64)
 		for _, device := range state.Baseline {
-			got.Baseline[device.Locator] = *device.Capacity
+			got.Baseline[slotKey{
+				bank:    device.Bank,
+				locator: device.Locator,
+			}] = *device.Capacity
 		}
 		got.Loss = state.Loss
 	}
 	return got
 }
 
-func expectedBaseline() map[string]uint64 {
-	baseline := make(map[string]uint64)
+func expectedBaseline() map[slotKey]uint64 {
+	baseline := make(map[slotKey]uint64)
 	for _, d := range fixtureDevices() {
-		baseline[d.Locator] = *d.Capacity
+		baseline[slotKey{
+			bank:    d.Bank,
+			locator: d.Locator,
+		}] = *d.Capacity
 	}
 	return baseline
+}
+
+// firstSlot is fixture device 0, the slot the loss scenarios empty or shrink.
+var firstSlot = slotKey{
+	bank:    "BANK 0",
+	locator: "DIMM_P0_A0",
 }
 
 func healthyCollection() collectionResult {

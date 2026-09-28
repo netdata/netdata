@@ -85,6 +85,30 @@ func TestAcquireDeviceIdentity(t *testing.T) {
 				},
 			},
 		},
+		"rejected system object is not filled by profile metadata": {
+			sysInfo: snmputils.SysInfo{
+				Name: "printer",
+				Probe: snmputils.SysInfoProbe{
+					SeenSysObjectID: true,
+					SysObjectIDType: "OctetString",
+				},
+			},
+			metadata: map[string]ddsnmp.MetaTag{
+				"sys_object_id": {Value: "private device identifier"},
+			},
+			opts: ddsnmp.DeviceIdentityOptions{
+				Address: "192.0.2.1",
+				GUID:    "configured-guid",
+			},
+			want: &ddsnmp.DeviceIdentity{
+				GUID:     "configured-guid",
+				Hostname: "printer",
+				Labels: map[string]string{
+					"_vnode_type": "snmp", "_net_default_iface_ip": "192.0.2.1", "address": "192.0.2.1",
+					"sys_object_id": "", "name": "printer", "description": "", "contact": "", "location": "",
+				},
+			},
+		},
 		"empty system fallback without metadata source": {
 			opts: ddsnmp.DeviceIdentityOptions{
 				Address: "Router.Example.",

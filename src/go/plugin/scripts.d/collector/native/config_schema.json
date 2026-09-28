@@ -1,0 +1,52 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Native script collector configuration.",
+    "type": "object",
+    "properties": {
+      "manifest": {
+        "title": "Manifest",
+        "description": "Absolute path to the installed native script package manifest.",
+        "type": "string",
+        "minLength": 1
+      },
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Retry interval in seconds for failed startup checks. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Maximum duration in seconds of one-shot execution, persistent startup, or a collection exchange.",
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "default": 5
+      },
+      "config": {
+        "title": "Package configuration",
+        "description": "Values for the package configuration schema. Leave empty to use package defaults.",
+        "type": [
+          "object",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "manifest"
+    ]
+  },
+  "uiSchema": {
+    "manifest": {
+      "ui:placeholder": "/usr/local/lib/netdata/custom/example/manifest.yaml"
+    }
+  }
+}

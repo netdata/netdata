@@ -689,6 +689,13 @@ func TestPendingStoreActivationRequiresExactPublishedVersion(t *testing.T) {
 	controller.mu.Unlock()
 	t.Cleanup(func() {
 		require.NoError(t, controller.CloseProjection())
+		// A failed retry releases its staged mutation from the attempt
+		// goroutine; drain attempts so Close observes a zero census.
+		attempts := controller.operations.attempts.(*containment.Authority)
+		attempts.BeginShutdown()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		require.NoError(t, attempts.Shutdown(shutdownCtx))
 		require.NoError(t, store.Close(context.Background()))
 	})
 

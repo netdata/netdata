@@ -1,0 +1,126 @@
+# Development metadata fixture. Keep outside metadata.yaml catalog discovery until release.
+plugin_name: scripts.d.plugin
+modules:
+  - meta:
+      id: collector-scripts.d.plugin-native
+      plugin_name: scripts.d.plugin
+      module_name: native
+      monitored_instance:
+        name: Native Scripts
+        link: https://github.com/netdata/netdata/blob/master/src/go/plugin/scripts.d/NATIVE.md
+        categories:
+          - data-collection.synthetic-testing
+        icon_filename: bolt.svg
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords: [scripts, custom, bash, python, checks, json]
+    overview:
+      multi_instance: true
+      data_collection:
+        metrics_description: |
+          Monitor custom services with labeled metrics and named health checks from scripts in any language.
+          Packages can provide chart templates, and warning or critical checks have built-in alerts.
+
+          This collector is a preview. Its package and response formats may change.
+        method_description: |
+          Each job runs an executable per collection or keeps one persistent process, as selected by its manifest.
+          Both modes read complete JSON snapshots; persistent requests and replies carry matching IDs.
+          A package manifest declares metrics, checks and an optional configuration schema without executing code during startup validation.
+          Registered packages expose their own dynamic configuration forms. Validated values reach scripts through stdin.
+          Warning and critical service observations are successful collections; command or protocol failures discard the entire response.
+      supported_platforms:
+        include: []
+        exclude: []
+      additional_permissions:
+        description: |
+          Commands run unprivileged through nd-run. On Unix, the executable and all ancestor directories must be
+          root-owned and not writable by group or others. Administrators must also protect package files and scripts
+          passed as interpreter arguments. On Windows, use appropriate ACLs; Unix path checks do not apply.
+      default_behavior:
+        auto_detection:
+          description: No commands are discovered automatically. Administrators register package manifests explicitly or select a manifest per job. Registering a package does not create a job.
+        limits:
+          description: Each JSON response and configuration envelope is limited to 1 MiB, including whitespace.
+        performance_impact:
+          description: One-shot collection starts a process per interval; persistent collection retains one process per job. CPU, memory and target load depend on the script and interval.
+    setup:
+      prerequisites:
+        list:
+          - title: Install a native script package
+            description: |
+              Install an executable and manifest in an administrator-controlled directory.
+              Follow the [native script package guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/scripts.d/NATIVE.md)
+              for the protocol, optional chart template and Bash helper.
+      configuration:
+        file:
+          name: scripts.d/native.conf
+        options:
+          description: Configure one job for each package instance. update_every and autodetection_retry may also be defined globally.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: manifest
+              description: Absolute path to the installed native script package manifest.
+              default_value: ""
+              required: true
+            - name: config
+              description: Values for the package configuration schema. Leave empty to use package defaults.
+              default_value: ""
+              required: false
+            - name: update_every
+              description: Data collection interval in seconds.
+              default_value: 10
+              required: false
+            - name: autodetection_retry
+              description: Retry interval in seconds for failed startup checks. Zero disables retries.
+              default_value: 0
+              required: false
+            - name: timeout
+              description: Maximum duration in seconds of one-shot execution, persistent startup, or a collection exchange.
+              default_value: 5
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Installed package
+              description: Run an installed package every 10 seconds.
+              config: |
+                jobs:
+                  - name: queue
+                    manifest: /usr/local/lib/netdata/custom/queue/manifest.yaml
+                    update_every: 10
+                    timeout: 5
+    troubleshooting:
+      problems:
+        list:
+          - name: Script runs manually but collection fails
+            description: |
+              Verify the executable's ownership and permissions, its operation argument, and its sanitized execution
+              environment. Stdout must contain only protocol JSON. Persistent scripts must flush a ready handshake and
+              one correlated reply per request. Nonzero exits, timeout, malformed output
+              and oversized responses fail the complete attempt. The collector does not log script stderr.
+    alerts:
+      - name: native_script_check
+        link: https://github.com/netdata/netdata/blob/master/src/go/plugin/scripts.d/development/native_script.conf
+        metric: native_script.check_state
+        info: Service health reported by a native script (0 = OK, 1 = warning, 2 = critical)
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Metric charts and their labels come from each package's declarations and optional chart template.
+        Check charts use the package's check titles and identity labels. They share the context
+        native_script.check_state, units state, and dimensions ok, warning, critical and unknown.
+
+        Unknown observations leave health undefined. A check omitted from a successful response disappears;
+        it does not recover. An explicit ok observation signals recovery. Execution failures publish no check
+        samples and use the existing collection-failure alert, whose stock notification route is silent.
+      availability: []
+      scopes: []

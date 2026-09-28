@@ -137,16 +137,32 @@ static int open_run_dir_fd(const char *run_dir)
     return fd;
 }
 
-/* Thin wrapper around the futex syscall. */
+/* Use the kernel ABI, not libc's timespec (which can use time64 on a
+ * legacy 32-bit syscall ABI). All receive budgets are uint32_t milliseconds,
+ * so their relative seconds fit even the legacy signed 32-bit field.
+ * __kernel_long_t also preserves the 64-bit syscall words on x32. */
+#if defined(SYS_futex_time64) && (!defined(SYS_futex) || SYS_futex == SYS_futex_time64)
+#define NIPC_SYS_FUTEX SYS_futex_time64
+typedef int64_t nipc_futex_time_word_t;
+#else
+#define NIPC_SYS_FUTEX SYS_futex
+typedef __kernel_long_t nipc_futex_time_word_t;
+#endif
 static int futex_wake(uint32_t *addr, int count)
 {
-    return (int)syscall(SYS_futex, addr, FUTEX_WAKE, count, NULL, NULL, 0);
+    return (int)syscall(NIPC_SYS_FUTEX, addr, FUTEX_WAKE, count, NULL, NULL, 0);
 }
 
 static int futex_wait(uint32_t *addr, uint32_t expected,
                       const struct timespec *timeout)
 {
-    return (int)syscall(SYS_futex, addr, FUTEX_WAIT, expected, timeout, NULL, 0);
+    nipc_futex_time_word_t kernel_timeout[2];
+    if (timeout) {
+        kernel_timeout[0] = (nipc_futex_time_word_t)timeout->tv_sec;
+        kernel_timeout[1] = (nipc_futex_time_word_t)timeout->tv_nsec;
+    }
+    return (int)syscall(NIPC_SYS_FUTEX, addr, FUTEX_WAIT, expected,
+                       timeout ? kernel_timeout : NULL, NULL, 0);
 }
 
 /* CPU pause hint for spin loops. */
