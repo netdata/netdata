@@ -40,6 +40,12 @@ func (c *Collector) runPersistent(ctx context.Context, ready func()) error {
 	}
 	defer s.close()
 	startupCtx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
+	if len(c.configInput) > 0 {
+		if err := s.write(startupCtx, c.configInput); err != nil {
+			cancel()
+			return fmt.Errorf("persistent configuration: %w", err)
+		}
+	}
 	frame, err := s.read(startupCtx)
 	cancel()
 	if err != nil {
@@ -242,30 +248,37 @@ func (s *scriptSession) read(ctx context.Context) ([]byte, error) {
 }
 
 func (s *scriptSession) exchange(ctx context.Context, id string) ([]byte, error) {
+	if err := s.write(ctx, []byte(fmt.Sprintf("{\"id\":\"%s\",\"method\":\"collect\"}\n", id))); err != nil {
+		return nil, fmt.Errorf("write collection request: %w", err)
+	}
+	return s.read(ctx)
+}
+
+func (s *scriptSession) write(ctx context.Context, data []byte) error {
 	written := make(chan error, 1)
 	go func() {
-		_, err := fmt.Fprintf(s.stdin, "{\"id\":\"%s\",\"method\":\"collect\"}\n", id)
+		_, err := s.stdin.Write(data)
 		written <- err
 	}()
 	select {
 	case err := <-written:
 		if err != nil {
-			return nil, fmt.Errorf("write collection request: %w", s.transportError(ctx, err))
+			return s.transportError(ctx, err)
 		}
 	case <-ctx.Done():
 		_ = s.stdin.Close()
 		<-written
-		return nil, ctx.Err()
+		return ctx.Err()
 	case <-s.ctx.Done():
 		_ = s.stdin.Close()
 		<-written
-		return nil, s.ctx.Err()
+		return s.ctx.Err()
 	case <-s.exited:
 		_ = s.stdin.Close()
 		<-written
-		return nil, s.exitError()
+		return s.exitError()
 	}
-	return s.read(ctx)
+	return nil
 }
 
 func (s *scriptSession) readFrames() {

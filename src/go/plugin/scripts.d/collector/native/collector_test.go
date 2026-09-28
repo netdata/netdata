@@ -207,7 +207,7 @@ func TestRunCommandFailureAndLimit(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c, _ := fixtureCollector(t, tc.body+"\n")
 			start := time.Now()
-			data, err := runCommand(context.Background(), tc.timeout, c.definition.Command)
+			data, err := runCommand(context.Background(), tc.timeout, c.definition.Command, nil)
 			require.ErrorContains(t, err, tc.want)
 			assert.Nil(t, data)
 			assert.NotContains(t, err.Error(), "SYNTHETIC_SECRET")
@@ -336,9 +336,16 @@ func TestManifestValidation(t *testing.T) {
 }
 
 func TestConfigurationSerialize(t *testing.T) {
-	collecttest.TestConfigurationSerialize(t, New(),
-		[]byte(`{"manifest":"/opt/custom/manifest.yaml","update_every":15,"timeout":3.5,"autodetection_retry":60}`),
-		[]byte("manifest: /opt/custom/manifest.yaml\nupdate_every: 15\ntimeout: 3.5\nautodetection_retry: 60\n"))
+	collecttest.TestConfigurationSerialize(
+		t,
+		New(),
+		[]byte(
+			`{"manifest":"/opt/custom/manifest.yaml","update_every":15,"timeout":3.5,"autodetection_retry":60,"config":{"enabled":false,"count":0,"nested":{"optional":null}}}`,
+		),
+		[]byte(
+			"manifest: /opt/custom/manifest.yaml\nupdate_every: 15\ntimeout: 3.5\nautodetection_retry: 60\nconfig:\n  enabled: false\n  count: 0\n  nested:\n    optional: null\n",
+		),
+	)
 }
 
 func TestConfigSchemaMatchesMetadata(t *testing.T) {

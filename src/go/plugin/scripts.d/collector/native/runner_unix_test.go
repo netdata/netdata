@@ -31,7 +31,7 @@ func TestCancellationContainsDescendant(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)
-	go func() { _, err := runCommand(ctx, 5*time.Second, c.definition.Command); done <- err }()
+	go func() { _, err := runCommand(ctx, 5*time.Second, c.definition.Command, nil); done <- err }()
 	require.Eventually(
 		t,
 		func() bool { _, err := os.Stat(filepath.Join(dir, "started")); return err == nil },

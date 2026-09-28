@@ -1,0 +1,6 @@
+# Development-only example; copy to the Netdata configuration directory.
+# Registration exposes a template. Add jobs in DynCfg or scripts.d/native-queue.conf.
+version: v1
+packages:
+  - name: queue
+    manifest: /usr/local/lib/netdata/custom/queue/manifest.yaml

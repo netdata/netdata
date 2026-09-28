@@ -112,6 +112,9 @@ func validateJSONFields(decoder *json.Decoder, role string) error {
 	}
 	switch token {
 	case nil:
+		if role == "schema" {
+			return nil
+		}
 		return fmt.Errorf("null is not a protocol value")
 	case json.Delim('{'):
 		seen := map[string]bool{}
@@ -129,6 +132,9 @@ func validateJSONFields(decoder *json.Decoder, role string) error {
 			}
 			seen[key] = true
 			childRole := key
+			if role == "schema" {
+				childRole = "schema"
+			}
 			if role == "labels" {
 				childRole = "label_value"
 			}
@@ -156,7 +162,7 @@ func knownField(role, key string) bool {
 		return key == "name" || key == "value" || key == "labels"
 	case "checks":
 		return key == "id" || key == "state" || key == "labels"
-	case "labels":
+	case "labels", "schema":
 		return true
 	case "ready":
 		return key == "version" || key == "ready"
