@@ -40,7 +40,7 @@ type processHandle interface {
 
 // StartUnprivilegedProcess starts a command through nd-run with owned process
 // containment. Cancellation, Close, or leader exit terminates contained children.
-// Wait reports completion only after cleanup and reaping. Unlike exec.Cmd, this
+// Wait reports completion after termination requests and leader reaping. Unlike exec.Cmd, this
 // API never exposes an independent reaper or a reusable numeric process ID.
 func StartUnprivilegedProcess(
 	ctx context.Context,
@@ -115,15 +115,16 @@ func (p *Process) stop() error {
 	return p.stopErr
 }
 
-// Wait joins the process, descendant cleanup, and cancellation watcher. Repeated
-// calls return the same exit/cleanup error. A nonzero exit is an exec.ExitError.
+// Wait joins leader reaping, termination requests, and the cancellation watcher.
+// It does not independently await each descendant. Repeated calls return the same
+// exit/cleanup error. A nonzero exit is an exec.ExitError.
 func (p *Process) Wait() error {
 	<-p.done
 	<-p.watcherDone
 	return p.err
 }
 
-// Close terminates the owned process tree and waits for cleanup. It is idempotent;
+// Close requests termination of the owned tree and then calls Wait. It is idempotent;
 // a process killed by Close normally produces an exit error, also returned by Wait.
 func (p *Process) Close() error {
 	_ = p.stop()
