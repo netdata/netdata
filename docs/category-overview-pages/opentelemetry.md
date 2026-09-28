@@ -1,7 +1,7 @@
 # OpenTelemetry Overview
 
-The Netdata Agent receives OpenTelemetry telemetry over OTLP/gRPC, on port 4317: metrics become Netdata charts, logs
-are stored in Netdata's indexed log store, and traces are accepted and stored. Anything that speaks OTLP/gRPC can send to it — an OpenTelemetry
+The Netdata Agent receives OpenTelemetry telemetry over OTLP/gRPC, on port 4317: metrics become Netdata charts, and logs
+and traces are stored, indexed, on the receiving Agent. Anything that speaks OTLP/gRPC can send to it — an OpenTelemetry
 Collector, an instrumented application, an SDK — with TLS or mutual TLS on the endpoint and, when different sender
 groups need their own retention, a tenant per group. Start with
 [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md) for the endpoint, the exporter block, and two smoke tests.
@@ -26,25 +26,11 @@ source are in [Logs Collection](/docs/opentelemetry/logs-collection.md), and ret
 
 ## Traces
 
-The endpoint accepts and stores OTLP traces, with the same retention options as logs and the same optional offloading
-to object storage: trace files that local retention removed are downloaded back when a query needs them, through the
-download cache logs use ([Log Storage and Retention](/docs/logs/log-storage-and-retention.md#offloading-to-object-storage)).
-A traces view is not yet available in the dashboards and the traces workflow is not yet documented. Stay tuned.
-
-Known limits of reading traces back from object storage in this release:
-
-- A query that needs more offloaded data than the download cache holds fails with a message to narrow the time range
-  or raise `remote_storage.read_cache_max_size`. A search also reads up to 24 hours beyond each side of its window to
-  complete the traces it finds.
-- A trace opened without a time range covers everything kept, local and offloaded, so it fails once the offloaded
-  history exceeds the download cache.
-- A file that cannot be downloaded, or a catalog that cannot be read, makes the answer partial with the reason
-  `remote_unavailable`; one missing file in a search's range marks every trace summary as possibly incomplete and
-  empties searches that filter on the root service, root operation or trace duration. A file that downloads intact
-  but cannot be read is reported as a failed source (`source_failure`).
-- Files are downloaded one at a time, each within its own time limit. While the remote is down, each file waits out
-  its limit in turn (a file that another query is already downloading can cost up to about three limits), so a query
-  over many offloaded files can take minutes.
+Traces land on the receiving Agent too: spans indexed per tenant, their own retention settings, and the same optional
+offloading to S3-compatible object storage as logs, read back through the download cache both signals share. You
+explore them in the Traces tab. Sending traces from an SDK or a Collector is in
+[OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md#send-traces); storage, retention, offloading, and sizing are in
+[Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md).
 
 ## Requirements
 
@@ -52,7 +38,7 @@ Known limits of reading traces back from object storage in this release:
   ARMv6) and all Docker images include it. macOS kickstart installs provision a Rust toolchain and build it — when no
   adequate toolchain ends up available, the install continues with a warning and without the plugin. Linux source
   builds need `--enable-plugin-otel`. It is not available on Windows or FreeBSD.
-- Viewing logs requires signing in with Netdata Cloud, free for community use.
+- Viewing logs and traces requires signing in with Netdata Cloud, free for community use.
 - The examples on these pages are validated with OpenTelemetry Collector Contrib 0.157.0.
 
 ## In this section
@@ -66,5 +52,7 @@ Known limits of reading traces back from object storage in this release:
 - [Transformations](/docs/opentelemetry/transformations.md) — parse, enrich, normalize, and drop records before
   export.
 - [Logs-to-Metrics](/docs/opentelemetry/logs-to-metrics.md) — count matching log records and alert on the rate.
+- [Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md) — how spans are stored, retention
+  per tenant, offloading, and sizing.
 - [Syslog from Network Devices](/docs/npm/syslog/README.md) — device syslog through a Collector receiver.
 - [OpenTelemetry Plugin Reference](/src/crates/otel-plugin/README.md) — every `otel.yaml` option.

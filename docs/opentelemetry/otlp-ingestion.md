@@ -1,4 +1,4 @@
-# Ingest OpenTelemetry Metrics and Logs
+# Ingest OpenTelemetry Metrics, Logs, and Traces
 
 Use Netdata's OTLP/gRPC endpoint when an application already emits OpenTelemetry data or an OpenTelemetry Collector is already part of your observability pipeline. For host and application metrics that Netdata can collect directly, the native collector is usually simpler and exposes purpose-built charts and alerts.
 
@@ -10,7 +10,7 @@ Use Netdata's OTLP/gRPC endpoint when an application already emits OpenTelemetry
 | An application already emits OTLP, or a Collector fans data out to several backends | Export OTLP/gRPC to Netdata as described below                                               |
 | Network devices send syslog                                                         | Use the dedicated [OpenTelemetry Collector syslog setup](/docs/npm/syslog/otel-collector.md) |
 
-The Netdata Agent receives OTLP metrics, logs, and traces. Traces are accepted and stored under their own retention settings — the `traces` section of `otel.yaml`, which takes the same rotation and retention options as `logs`; like logs, trace files offloaded to object storage are fetched back when a query needs them, through the download cache both signals share. A traces view is not yet available in the dashboards. Stay tuned.
+The Netdata Agent receives OTLP metrics, logs, and traces. Traces are stored on the receiving Agent under their own retention settings, the `traces` section of `otel.yaml`, and explored in the Traces tab; see [Send traces](/docs/opentelemetry/otlp-ingestion.md#send-traces) below and [Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md).
 
 ## How data flows
 
@@ -20,7 +20,7 @@ flowchart LR
     sdk["OTLP SDK or<br/>instrumented application"] -->|"OTLP/gRPC · port 4317"| plugin
     plugin --> metrics["Metrics<br/>charts and alerts"]
     plugin --> logs["Logs<br/>indexed Logs tab"]
-    plugin --> traces["Traces<br/>stored"]
+    plugin --> traces["Traces<br/>indexed Traces tab"]
 ```
 
 ## What you need
@@ -28,7 +28,7 @@ flowchart LR
 - A Netdata Agent with the OpenTelemetry plugin. Linux native DEB and RPM packages install it as a dependency of `netdata`, static builds bundle it (except the 32-bit ARMv6 build), and all Docker images include it. macOS kickstart installs provision a Rust toolchain and build it; if no adequate toolchain ends up available, the install continues with a warning and without the plugin. Linux source builds need `--enable-plugin-otel`. It is not available on Windows or FreeBSD. Wherever it is present, Netdata starts it automatically.
 - An OTLP/gRPC source. The examples use [OpenTelemetry Collector Contrib](https://github.com/open-telemetry/opentelemetry-collector-releases) because the `host_metrics` and `file_log` receivers are Contrib components.
 - Network access from the sender to the Agent's endpoint.
-- For log verification, a Netdata Cloud account and sign-in. The `otel-logs` view is access-gated.
+- For log and trace verification, a Netdata Cloud account and sign-in. The `otel-logs` and `otel-traces` views are access-gated.
 
 The maintained examples are validated with OpenTelemetry Collector Contrib `0.157.0`. Upstream documentation links on these pages follow upstream's latest version, which may be newer than the validated examples; if you run an older release, check that release's component identifiers before copying the configuration.
 
@@ -119,6 +119,29 @@ service:
 
 In Netdata, open the node's Logs tab, select the `otel-logs` source, and choose `netdata-otel-filelog-example` with the **Services** selector. To filter by the stored field instead, use `resource.attributes.service.name = netdata-otel-filelog-example`. The `service.namespace` and `service.name` resource attributes identify log streams, so set them consistently in production pipelines.
 
+## Send traces
+
+Traces come from instrumented applications. Export them to the Agent directly from the OpenTelemetry SDK, or through a Collector that forwards them.
+
+- **SDK:** set `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317` and `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` in the application's environment. Many SDKs default to OTLP/HTTP, which Netdata does not accept.
+- **Collector:** add the exporter above to a `traces` pipeline. A Collector on the Agent's host cannot receive on port `4317`, which the Agent already uses, so give its `otlp` receiver another port and point the applications at it:
+
+  ```yaml
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "127.0.0.1:4319"
+
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        exporters: [otlp_grpc/netdata]
+  ```
+
+Set the `service.name` resource attribute in every application; it names the service each span belongs to. The spans appear in the Traces tab. How they are stored and kept is in [Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md).
+
 ## Accept remote senders securely
 
 The default loopback endpoint is the safe choice for a same-host Collector. To receive remote OTLP traffic, bind
@@ -134,5 +157,6 @@ the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) for ever
 - **The Collector or SDK connects but data is absent:** confirm that it uses OTLP/gRPC on `4317`; SDKs commonly select it with `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`. Then check both sender and Agent logs for rejected exports. On a systemd-based Agent host, query recent plugin messages with `journalctl SYSLOG_IDENTIFIER=otel-plugin SYSLOG_IDENTIFIER=otel-plugin/ingestor --since "-10 min"`.
 - **A metric is absent:** exponential histograms are not currently ingested. For other metrics, inspect mapping errors and search for the `otel.<metric-name>` context.
 - **Some logs are absent:** by default, Netdata accepts log timestamps from up to 24 hours in the past through 10 minutes in the future. Records outside this window are rejected. Netdata reports rejected records through OTLP `partial_success`; whether that message is visible depends on the sender.
+- **Some spans are absent:** by default, Netdata accepts a span only if it started no more than 24 hours ago and ends no more than 10 minutes in the future; a span without an end time is judged by its start. Rejected spans are reported through OTLP `partial_success` and logged as a warning in the Agent journal.
 
 For plugin-specific diagnosis, use the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md). To derive a metric from matching log records, continue with [Create metrics from OpenTelemetry logs](/docs/opentelemetry/logs-to-metrics.md).

@@ -154,7 +154,9 @@ the Agent. The full option list is in the [OpenTelemetry plugin reference](/src/
 ### Offloading to object storage
 
 With `remote_storage.enabled: true`, every sealed indexed file is also uploaded to `remote_storage.uri`, an `s3://` or
-`fs://` location. The same applies to traces. Uploading changes nothing locally: files stay under local retention, and
+`fs://` location. Traces are uploaded the same way; how trace queries read them back is in
+[Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md#offloading-to-object-storage).
+Uploading changes nothing locally: files stay under local retention, and
 a local file is not deleted by retention until its catalog entry confirms it is in the remote. When a query needs an
 offloaded file that is no longer local, the Agent downloads it whole into a download cache at `<base_dir>/remote-read`,
 bounded by `remote_storage.read_cache_max_size` (1GB) and shared by logs and traces, then answers from it; repeated

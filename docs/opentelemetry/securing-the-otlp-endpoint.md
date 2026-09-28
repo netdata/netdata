@@ -52,9 +52,9 @@ See [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) for per
 
 ## What reaches Netdata Cloud
 
-Received telemetry is stored on the Agent, not in Netdata Cloud. Viewing logs requires a signed-in Netdata Cloud user
-of the Agent's Space; when viewing through Netdata Cloud, content is transmitted encrypted to the browser and is not
-stored in Netdata Cloud.
+Received telemetry is stored on the Agent, not in Netdata Cloud. Viewing logs or traces requires a signed-in Netdata
+Cloud user of the Agent's Space; when viewing through Netdata Cloud, content is transmitted encrypted to the browser
+and is not stored in Netdata Cloud.
 
 ## Checklist
 

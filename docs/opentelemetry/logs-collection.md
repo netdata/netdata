@@ -2,7 +2,7 @@
 
 Use these recipes to send systemd journal entries, application log files, Windows event channels, Kubernetes container logs, and the macOS unified log through an OpenTelemetry Collector to Netdata. For network-device syslog, use the dedicated [OpenTelemetry Collector syslog setup](/docs/npm/syslog/otel-collector.md). For when to centralize a source at all, see [Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md).
 
-Before you begin, complete [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md). The examples use OpenTelemetry Collector Contrib `0.157.0` and the local, plaintext loopback endpoint from that guide. Use TLS when the Collector and Netdata Agent are on different hosts.
+Before you begin, complete [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md). The examples use OpenTelemetry Collector Contrib `0.157.0` and the local, plaintext loopback endpoint from that guide. Use TLS when the Collector and Netdata Agent are on different hosts.
 
 ## Shared exporter
 
