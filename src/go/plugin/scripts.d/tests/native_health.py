@@ -22,6 +22,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--agent", required=True, type=pathlib.Path)
     parser.add_argument("--plugin", required=True, type=pathlib.Path)
+    parser.add_argument("--mode", choices=("oneshot", "persistent"), default="oneshot")
     args = parser.parse_args()
     agent, plugin = args.agent.resolve(), args.plugin.resolve()
     if os.name != "posix" or not pathlib.Path("/bin/bash").is_file():
@@ -49,13 +50,33 @@ def main():
     )
     (root / "manifest.yaml").write_text(
         "version: v1\n"
+        f"mode: {args.mode}\n"
         f"command: [/bin/bash, {root}/collect.sh]\n"
         "checks:\n  - id: probe\n    title: Probe\n    by_labels: [queue]\n"
     )
-    (root / "collect.sh").write_text(
-        "#!/bin/bash\nset -eu\n[[ $1 == collect ]]\n"
-        f"cat {shlex.quote(str(root / 'response.json'))}\n"
+    helper = repo / "src/go/plugin/scripts.d/lib/native.sh"
+    script = (
+        "#!/bin/bash\nset -eu\n"
+        f"source {shlex.quote(str(helper))}\n"
+        "collect_snapshot() {\n"
+        f"    state=$(cat {shlex.quote(str(root / 'state'))})\n"
+        "    nd_begin\n"
+        "    if [[ $state != omitted ]]; then nd_check probe \"$state\" queue 'mail\\'; fi\n"
+        "    nd_end\n"
+        "}\n"
     )
+    if args.mode == "persistent":
+        script += (
+            "[[ $1 == serve ]]\n"
+            f"printf '%s\\n' \"$$\" >> {shlex.quote(str(root / 'launches'))}\n"
+            "nd_ready\ncount=0\nwhile nd_next; do\n"
+            "    count=$((count+1))\n"
+            f"    printf '%s' \"$count\" > {shlex.quote(str(root / 'exchanges'))}\n"
+            "    collect_snapshot\ndone\n"
+        )
+    else:
+        script += "[[ $1 == collect ]]\ncollect_snapshot\n"
+    (root / "collect.sh").write_text(script)
     (root / "etc/scripts.d/native.conf").write_text(
         "jobs:\n  - name: health_probe\n"
         f"    manifest: {root}/manifest.yaml\n"
@@ -102,11 +123,8 @@ def main():
 """)
 
     def set_state(state):
-        checks = [] if state is None else [
-            {"id": "probe", "state": state, "labels": {"queue": "mail\\"}}
-        ]
-        (root / "next.json").write_text(json.dumps({"version": "v1", "checks": checks}))
-        (root / "next.json").replace(root / "response.json")
+        (root / "next.state").write_text(state if state is not None else "omitted")
+        (root / "next.state").replace(root / "state")
 
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
@@ -125,6 +143,7 @@ def main():
         )
         try:
             (root / "owned-pid").write_text(str(proc.pid))
+            initial_launches = None
             for state, wanted in (
                 ("critical", "CRITICAL"), ("unknown", "UNDEFINED"),
                 ("warning", "WARNING"), ("ok", "CLEAR"), ("critical", "CRITICAL"),
@@ -145,11 +164,24 @@ def main():
                 else:
                     raise AssertionError(f"{state}: expected {wanted}, last={seen}")
                 print(f"{state} -> {wanted}", flush=True)
+                if args.mode == "persistent":
+                    launches = (root / "launches").read_text().splitlines()
+                    # Initial discovery can replace the file-reader job with the
+                    # watched configuration before the first health evaluation.
+                    if initial_launches is None:
+                        initial_launches = launches
+                    else:
+                        assert launches == initial_launches, launches
 
             charts = [v for v in api("charts")["charts"].values() if v.get("context") == "native_script.check_state"]
             assert len(charts) == 1, charts
             assert charts[0]["chart_labels"]["queue"] == "mail/", charts[0]["chart_labels"]
             print("Label normalization: PASS", flush=True)
+            if args.mode == "persistent":
+                launches = (root / "launches").read_text().splitlines()
+                assert launches == initial_launches, launches
+                assert int((root / "exchanges").read_text()) >= 5
+                print("Persistent process retained across health transitions: PASS", flush=True)
             removal_start = int(time.time())
             set_state(None)
             deadline = time.monotonic() + 90

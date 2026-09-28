@@ -32,6 +32,12 @@ func (b *jobOutput) Reset()         { b.mu.Lock(); defer b.mu.Unlock(); b.buffer
 
 func startTestJob(t *testing.T, c *Collector, out *jobOutput) *jobruntime.JobV2 {
 	t.Helper()
+	job, _ := startManagedTestJob(t, c, out)
+	return job
+}
+
+func startManagedTestJob(t *testing.T, c *Collector, out *jobOutput) (*jobruntime.JobV2, *jobruntime.ManagedRun) {
+	t.Helper()
 	job := jobruntime.NewJobV2(
 		jobruntime.JobV2Config{
 			PluginName:  "scripts.d",
@@ -45,7 +51,8 @@ func startTestJob(t *testing.T, c *Collector, out *jobOutput) *jobruntime.JobV2 
 	)
 	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 	done := make(chan struct{})
-	go func() { defer close(done); job.StartManaged(jobruntime.NewManagedRun(context.Background(), nil)) }()
+	run := jobruntime.NewManagedRun(context.Background(), nil)
+	go func() { defer close(done); job.StartManaged(run) }()
 	t.Cleanup(func() {
 		job.Stop()
 		select {
@@ -55,8 +62,8 @@ func startTestJob(t *testing.T, c *Collector, out *jobOutput) *jobruntime.JobV2 
 		}
 		job.Cleanup()
 	})
-	require.Eventually(t, job.IsRunning, 2*time.Second, 10*time.Millisecond)
-	return job
+	require.Eventually(t, run.Running, 3*time.Second, 10*time.Millisecond)
+	return job, run
 }
 
 func tickUntil(t *testing.T, job *jobruntime.JobV2, condition func() bool) {
@@ -112,5 +119,74 @@ func TestJobStopCancelsCommand(t *testing.T) {
 	start := time.Now()
 	job.Stop()
 	assert.Less(t, time.Since(start), 2*time.Second)
+	assert.NotContains(t, out.String(), "'native_script.check_state'")
+}
+
+func TestPersistentJobFailureAndReplacement(t *testing.T) {
+	setupRunner(t)
+	c, dir := persistentCollector(t, bashHelper(t)+`
+dir=$(dirname "$0")
+printf '%s' "$$" >> "$dir/launches"
+nd_ready
+while nd_next; do
+    if [[ -f $dir/fail ]]; then exit 7; fi
+    nd_begin
+    nd_metric depth 17 queue mail
+    nd_check backlog critical queue mail
+    nd_end
+done
+`)
+	out := &jobOutput{}
+	job, run := startManagedTestJob(t, c, out)
+	tickUntil(t, job, func() bool { return strings.Contains(out.String(), "SET 'critical' = 1") })
+	firstID := chartID(out.String(), "native_script.check_state")
+	require.NotEmpty(t, firstID)
+	launches, err := os.ReadFile(filepath.Join(dir, "launches"))
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "fail"), nil, 0644))
+	tickUntil(t, job, func() bool { return run.Failure() != nil })
+	require.True(t, run.Failure().AfterReady())
+	assert.False(t, run.Failure().Retryable())
+	out.Reset()
+	for i := 0; i < 5; i++ {
+		job.Tick(i + 10)
+	}
+	job.Stop() // joins process teardown before replacement
+	assert.NotContains(t, out.String(), "SET 'ok' = 1")
+	assert.NotContains(t, out.String(), "SET 'critical' = 1")
+	after, err := os.ReadFile(filepath.Join(dir, "launches"))
+	require.NoError(t, err)
+	assert.Equal(t, launches, after, "failure must not respawn the process")
+
+	// A separately initialized job is an explicit replacement, with identical
+	// local declarations and chart identity but a new operational process.
+	replacement, _ := persistentCollector(t, bashHelper(t)+`
+nd_ready
+while nd_next; do
+    nd_begin
+    nd_metric depth 17 queue mail
+    nd_check backlog critical queue mail
+    nd_end
+done
+`)
+	nextOut := &jobOutput{}
+	nextJob := startTestJob(t, replacement, nextOut)
+	tickUntil(t, nextJob, func() bool { return strings.Contains(nextOut.String(), "SET 'critical' = 1") })
+	assert.Equal(t, firstID, chartID(nextOut.String(), "native_script.check_state"))
+}
+
+func TestPersistentJobStopDuringCollection(t *testing.T) {
+	setupRunner(t)
+	c, dir := persistentCollector(t, bashHelper(t)+`
+nd_ready
+nd_next
+printf started > "$(dirname "$0")/started"
+sleep 30
+`)
+	out := &jobOutput{}
+	job, run := startManagedTestJob(t, c, out)
+	tickUntil(t, job, func() bool { _, err := os.Stat(filepath.Join(dir, "started")); return err == nil })
+	job.Stop()
+	assert.Nil(t, run.Failure(), "requested stop must not become terminal failure")
 	assert.NotContains(t, out.String(), "'native_script.check_state'")
 }

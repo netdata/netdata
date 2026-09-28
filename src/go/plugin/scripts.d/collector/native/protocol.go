@@ -5,6 +5,7 @@ package native
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"slices"
@@ -31,22 +32,8 @@ type checkSample struct {
 
 func (m manifest) decodeResponse(data []byte) (response, error) {
 	var result response
-	if !utf8.Valid(data) {
-		return result, fmt.Errorf("response must be UTF-8")
-	}
-	// json.Valid bounds nesting and rejects incomplete frames before the field scan.
-	if !json.Valid(data) {
-		return result, fmt.Errorf("expected one complete JSON object")
-	}
-	fields := json.NewDecoder(bytes.NewReader(data))
-	fields.UseNumber() // Type validation below reports errors without raw numeric values.
-	if err := validateJSONFields(fields, "response"); err != nil {
+	if err := decodeMessage(data, "response", &result); err != nil {
 		return result, err
-	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&result); err != nil {
-		return result, fmt.Errorf("invalid response schema")
 	}
 	if result.Version != "v1" {
 		return result, fmt.Errorf("unsupported response version")
@@ -163,7 +150,7 @@ func validateJSONFields(decoder *json.Decoder, role string) error {
 
 func knownField(role, key string) bool {
 	switch role {
-	case "response":
+	case "response", "result":
 		return key == "version" || key == "metrics" || key == "checks"
 	case "metrics":
 		return key == "name" || key == "value" || key == "labels"
@@ -171,7 +158,73 @@ func knownField(role, key string) bool {
 		return key == "id" || key == "state" || key == "labels"
 	case "labels":
 		return true
+	case "ready":
+		return key == "version" || key == "ready"
+	case "reply":
+		return key == "id" || key == "result" || key == "error"
 	default:
 		return false
 	}
+}
+
+// Both transports validate the complete message before any store writes.
+func decodeMessage(data []byte, role string, target any) error {
+	if !utf8.Valid(data) {
+		return fmt.Errorf("response must be UTF-8")
+	}
+	// json.Valid bounds nesting and rejects incomplete frames before the field scan.
+	if !json.Valid(data) {
+		return fmt.Errorf("expected one complete JSON object")
+	}
+	fields := json.NewDecoder(bytes.NewReader(data))
+	fields.UseNumber() // Type validation reports errors without raw numeric values.
+	if err := validateJSONFields(fields, role); err != nil {
+		return err
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return fmt.Errorf("invalid response schema")
+	}
+	return nil
+}
+
+func decodeReady(data []byte) error {
+	var result struct {
+		Version string `json:"version"`
+		Ready   bool   `json:"ready"`
+	}
+	if err := decodeMessage(data, "ready", &result); err != nil {
+		return err
+	}
+	if result.Version != "v1" || !result.Ready {
+		return fmt.Errorf("expected v1 ready handshake")
+	}
+	return nil
+}
+
+var errCollectionFailed = errors.New("script reported collection_failed")
+
+func (m manifest) decodeReply(data []byte, id string) (response, error) {
+	var result struct {
+		ID     string          `json:"id"`
+		Result json.RawMessage `json:"result"`
+		Error  *string         `json:"error"`
+	}
+	if err := decodeMessage(data, "reply", &result); err != nil {
+		return response{}, err
+	}
+	if result.ID != id {
+		return response{}, fmt.Errorf("unexpected response id")
+	}
+	if (len(result.Result) != 0) == (result.Error != nil) {
+		return response{}, fmt.Errorf("reply must contain exactly one of result or error")
+	}
+	if result.Error != nil {
+		if *result.Error != "collection_failed" {
+			return response{}, fmt.Errorf("unknown collection error code")
+		}
+		return response{}, errCollectionFailed
+	}
+	return m.decodeResponse(result.Result)
 }

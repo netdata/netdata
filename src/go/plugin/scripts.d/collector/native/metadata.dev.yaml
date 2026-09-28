@@ -26,7 +26,8 @@ modules:
 
           This collector is a preview. Its package and response formats may change.
         method_description: |
-          Each configured job runs an executable once per collection interval and reads a complete JSON snapshot.
+          Each job runs an executable per collection or keeps one persistent process, as selected by its manifest.
+          Both modes read complete JSON snapshots; persistent requests and replies carry matching IDs.
           A package manifest declares metrics and checks without executing code during startup validation.
           Warning and critical service observations are successful collections; command or protocol failures discard the entire response.
       supported_platforms:
@@ -43,7 +44,7 @@ modules:
         limits:
           description: Each JSON response is limited to 1 MiB, including whitespace.
         performance_impact:
-          description: Each collection starts one process. CPU, memory and target load depend on the configured script and interval.
+          description: One-shot collection starts a process per interval; persistent collection retains one process per job. CPU, memory and target load depend on the script and interval.
     setup:
       prerequisites:
         list:
@@ -74,7 +75,7 @@ modules:
               default_value: 0
               required: false
             - name: timeout
-              description: Maximum duration of one script execution in seconds.
+              description: Maximum duration in seconds of one-shot execution, persistent startup, or a collection exchange.
               default_value: 5
               required: false
         examples:
@@ -96,7 +97,8 @@ modules:
           - name: Script runs manually but collection fails
             description: |
               Verify the executable's ownership and permissions, its operation argument, and its sanitized execution
-              environment. Stdout must contain only one valid JSON response. Nonzero exits, timeout, malformed output
+              environment. Stdout must contain only protocol JSON. Persistent scripts must flush a ready handshake and
+              one correlated reply per request. Nonzero exits, timeout, malformed output
               and oversized responses fail the complete attempt. The collector does not log script stderr.
     alerts:
       - name: native_script_check

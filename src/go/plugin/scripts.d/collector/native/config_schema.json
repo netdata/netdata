@@ -26,7 +26,7 @@
       },
       "timeout": {
         "title": "Timeout",
-        "description": "Maximum duration of one script execution in seconds.",
+        "description": "Maximum duration in seconds of one-shot execution, persistent startup, or a collection exchange.",
         "type": "number",
         "exclusiveMinimum": 0,
         "default": 5
