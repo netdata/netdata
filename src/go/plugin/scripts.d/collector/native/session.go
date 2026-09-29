@@ -363,7 +363,7 @@ func (s *scriptSession) write(ctx context.Context, data []byte) error {
 func (s *scriptSession) readFrames() {
 	defer close(s.readerDone)
 	scanner := bufio.NewScanner(s.stdout)
-	scanner.Buffer(make([]byte, 4096), maxResponseBytes+1)
+	scanner.Buffer(make([]byte, 4096), maxMessageBytes+1)
 	scanner.Split(splitFrame)
 	for scanner.Scan() {
 		frame := scriptFrame{
@@ -393,12 +393,12 @@ func (s *scriptSession) readFrames() {
 // byte counts toward the limit (JSON whitespace is accepted by the decoder).
 func splitFrame(data []byte, atEOF bool) (int, []byte, error) {
 	if i := bytes.IndexByte(data, '\n'); i >= 0 {
-		if i+1 > maxResponseBytes {
+		if i+1 > maxMessageBytes {
 			return 0, nil, errResponseTooLarge
 		}
 		return i + 1, data[:i], nil
 	}
-	if len(data) >= maxResponseBytes {
+	if len(data) >= maxMessageBytes {
 		return 0, nil, errResponseTooLarge
 	}
 	if atEOF && len(data) != 0 {

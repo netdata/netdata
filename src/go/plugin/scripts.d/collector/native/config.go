@@ -345,8 +345,8 @@ func (c *Collector) configurationEnvelope() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("config cannot be encoded")
 	}
-	if len(data)+1 > maxResponseBytes {
-		return nil, fmt.Errorf("config envelope exceeds 1 MiB")
+	if len(data)+1 > maxMessageBytes {
+		return nil, fmt.Errorf("config envelope exceeds 64 MiB")
 	}
 	return append(data, '\n'), nil
 }

@@ -113,7 +113,7 @@ func TestDescribeExecutionBoundaries(t *testing.T) {
 	setupRunner(t)
 	for _, tc := range []struct{ name, body, want string }{
 		{"exit", "printf 'private-output' >&2\nexit 7\n", "status 7"},
-		{"oversized", fmt.Sprintf("printf '%%*s' %d x\nsleep 30\n", maxDescriptionBytes+1), "exceeds 4 MiB"},
+		{"oversized", fmt.Sprintf("printf '%%*s' %d x\nsleep 30\n", maxDescriptionBytes+1), "exceeds 64 MiB"},
 		{"timeout", "sleep 30\n", "deadline exceeded"},
 		{"startup deadline", "exec 1>&-\nsleep 30\n", "deadline exceeded"},
 	} {
@@ -131,7 +131,7 @@ func TestDescribeExecutionBoundaries(t *testing.T) {
 			assert.NotContains(t, err.Error(), "private-output")
 		})
 	}
-	for _, size := range []int{maxResponseBytes + 1, maxDescriptionBytes} {
+	for _, size := range []int{(4 << 20) + 1, maxDescriptionBytes} {
 		t.Run(fmt.Sprint(size), func(t *testing.T) {
 			const header = "version: v1\nchecks: [{id: ready, title: Ready}]\n"
 			body := fmt.Sprintf(

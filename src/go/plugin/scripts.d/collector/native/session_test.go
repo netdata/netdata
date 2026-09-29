@@ -134,14 +134,20 @@ func TestPersistentStartupFailure(t *testing.T) {
 		"invalid ready":    `printf '%s\n' '{"version":"v1","ready":false}'; sleep 30`,
 		"early exit":       "exit 0\n",
 		"eof without exit": "exec 1>&-\nsleep 30\n",
-		"oversize":         "printf '%1048576s\\n' x\nsleep 30\n",
+		"oversize":         fmt.Sprintf("head -c %d /dev/zero; printf '\\n'; sleep 30\n", maxMessageBytes),
 	} {
 		t.Run(name, func(t *testing.T) {
 			c, _ := persistentCollector(t, body)
 			c.Timeout = confopt.Duration(time.Second)
+			if name == "oversize" {
+				c.Timeout = confopt.Duration(5 * time.Second)
+			}
 			r := startRuntime(t, c)
 			r.wait(t)
 			require.Error(t, r.err)
+			if name == "oversize" {
+				require.ErrorIs(t, r.err, errResponseTooLarge)
+			}
 			select {
 			case <-r.ready:
 				t.Fatal("invalid startup signaled readiness")
@@ -160,7 +166,7 @@ func TestPersistentTerminalReply(t *testing.T) {
 		"partial":       `printf '%s' '{"id":"1","result":{"version":"v1"}}'`,
 		"timeout":       ":",
 		"exit":          "exit 1",
-		"oversize":      `printf '%1048576s\n' x`,
+		"oversize":      fmt.Sprintf("head -c %d /dev/zero; printf '\\n'", maxMessageBytes),
 	} {
 		t.Run(name, func(t *testing.T) {
 			c, _ := persistentCollector(
@@ -168,6 +174,9 @@ func TestPersistentTerminalReply(t *testing.T) {
 				"printf '%s\\n' '{\"version\":\"v1\",\"ready\":true}'\nread -r request\n"+body+"\nsleep 30\n",
 			)
 			c.Timeout = confopt.Duration(time.Second)
+			if name == "oversize" {
+				c.Timeout = confopt.Duration(5 * time.Second)
+			}
 			r := startRuntime(t, c)
 			r.waitReady(t)
 			// Intentionally commit even on failure: no sample may have been staged.
@@ -176,6 +185,9 @@ func TestPersistentTerminalReply(t *testing.T) {
 			managed.CycleController().BeginCycle()
 			err := c.Collect(context.Background())
 			require.Error(t, err)
+			if name == "oversize" {
+				require.ErrorIs(t, err, errResponseTooLarge)
+			}
 			managed.CycleController().CommitCycleSuccess()
 			values := map[string]float64{}
 			c.store.Read(metrix.ReadRaw()).
@@ -245,12 +257,12 @@ sleep 30
 }
 
 func TestPersistentFrameBoundaries(t *testing.T) {
-	for _, size := range []int{1, maxResponseBytes - 1, maxResponseBytes, maxResponseBytes + 1} {
+	for _, size := range []int{1, maxMessageBytes - 1, maxMessageBytes, maxMessageBytes + 1} {
 		t.Run(fmt.Sprint(size), func(t *testing.T) {
 			scanner := bufio.NewScanner(strings.NewReader(strings.Repeat(" ", size-1) + "\n"))
-			scanner.Buffer(make([]byte, 4096), maxResponseBytes+1)
+			scanner.Buffer(make([]byte, 4096), maxMessageBytes+1)
 			scanner.Split(splitFrame)
-			if size <= maxResponseBytes {
+			if size <= maxMessageBytes {
 				require.True(t, scanner.Scan())
 				assert.Len(t, scanner.Bytes(), size-1)
 				assert.False(t, scanner.Scan())

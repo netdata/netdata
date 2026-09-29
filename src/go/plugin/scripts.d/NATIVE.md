@@ -222,13 +222,12 @@ Execution occurs for every command entry in the selected inventory, even before 
 job exists or its module is enabled; only register trusted, administrator-controlled
 commands. Merely placing an executable in a directory does not register or run it.
 
-Each invocation has a five-second execution deadline and a separate **4 MiB**
-stdout limit, including whitespace. The startup metadata budget is larger than the
-collection/Function frame budget because it includes complete schemas and templates.
-A survey of existing Go collector chart YAML plus config schemas found the largest
-bundle at about 149 KiB; 4 MiB leaves roughly 27 times that size for declarations,
-Functions and larger custom forms while bounding buffering from a broken producer.
-This WIP descriptor limit is independent of the **1 MiB** operational frame limit.
+Each invocation has a five-second execution deadline and a separately defined
+**64 MiB** stdout limit, including whitespace. This startup-only cutoff bounds a
+broken producer while leaving generous room for embedded templates and forms;
+it is not derived from the size of existing packages. Operational messages have
+their own **64 MiB** ceiling. These are encoded-byte cutoffs, not memory budgets:
+buffers grow on demand, and copies plus decoded structures can use more memory.
 Timeout, nonzero exit, oversized output or invalid metadata rejects plugin startup;
 partial definitions are not registered. Command failures report safe categories,
 and metadata errors identify the failing document/declarations/form/template stage
@@ -324,7 +323,7 @@ persistent readiness:
 {"version":"v1","config":{"queue":"mail"}}
 ```
 
-The envelope is at most 1 MiB including LF. One-shot stdin then reaches EOF;
+The envelope is at most 64 MiB including LF. One-shot stdin then reaches EOF;
 persistent stdin continues with normal collection requests after readiness.
 Initialization has the same timeout as persistent startup. Blocking or failing to
 consume configuration fails startup/collection. Values are never passed through
@@ -341,7 +340,7 @@ Schema-free scripts keep their existing stdin and readiness behavior.
 ## Collection response
 
 In one-shot mode, each invocation MUST exit zero and print exactly one UTF-8 JSON
-object, at most 1 MiB including whitespace. Stdin is EOF for schema-free packages;
+object, at most 64 MiB including whitespace. Stdin is EOF for schema-free packages;
 configured packages receive one configuration envelope followed by EOF. In persistent mode, the
 same snapshot is carried in a correlated reply as described below. Stdout
 is exclusively the protocol; redirect command chatter to stderr. The collector
@@ -423,7 +422,7 @@ same process can answer the next request. It is not a health state. Use an expli
 `unknown` check when that is a valid observation of an existing service.
 
 Every handshake, request and reply MUST be one UTF-8 JSON object on one physical
-line, terminated by LF and flushed immediately. A frame is limited to 1 MiB,
+line, terminated by LF and flushed immediately. A frame is limited to 64 MiB,
 including LF and other whitespace. Embedded newlines in strings MUST be escaped.
 Exact field spelling, duplicate-key and null rules apply to envelopes as well as
 snapshots. A reply MUST contain exactly one of `result` or `error`; the only error
@@ -523,10 +522,10 @@ Arguments, payload and configuration stay on stdin, never in host-generated argv
 environment variables or diagnostics. Scripts MUST NOT expose credentials in
 Function output or error messages; those results are sent to the requesting UI.
 
-The request, including base64 expansion and terminating LF, MUST fit in 1 MiB.
+The request, including base64 expansion and terminating LF, MUST fit in 64 MiB.
 The host reserves space for the largest correlation ID when admitting a request;
 oversized requests fail before executing or writing to a script. Replies use the
-same 1 MiB bound. The Function context bounds how long the caller waits, including
+same 64 MiB bound. The Function context bounds how long the caller waits, including
 queue waiting. Cancellation before admission leaves the persistent peer usable.
 After admission, cancellation or deadline expiry returns to the caller promptly;
 the host allows up to `timeout` more seconds to finish writing and drain the

@@ -202,7 +202,7 @@ func TestRunCommandFailureAndLimit(t *testing.T) {
 	}{
 		{"nonzero", "printf '%s' 'SYNTHETIC_SECRET' >&2; exit 7", time.Second, "exit status 7"},
 		{"timeout", "sleep 30", 50 * time.Millisecond, "deadline exceeded"},
-		{"over limit", "while :; do printf '%01024d' 0; done", time.Second, "exceeds 1 MiB"},
+		{"over limit", fmt.Sprintf("head -c %d /dev/zero; sleep 30", maxMessageBytes+1), 5 * time.Second, "exceeds 64 MiB"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c, _ := fixtureCollector(t, tc.body+"\n")
@@ -211,7 +211,7 @@ func TestRunCommandFailureAndLimit(t *testing.T) {
 			require.ErrorContains(t, err, tc.want)
 			assert.Nil(t, data)
 			assert.NotContains(t, err.Error(), "SYNTHETIC_SECRET")
-			assert.Less(t, time.Since(start), 2*time.Second)
+			assert.Less(t, time.Since(start), tc.timeout+time.Second)
 		})
 	}
 	// Test the exact protocol boundary independently of executable chunking.
@@ -220,9 +220,9 @@ func TestRunCommandFailureAndLimit(t *testing.T) {
 	b := responseBuffer{
 		cancel: cancel,
 	}
-	n, err := b.Write(make([]byte, maxResponseBytes))
+	n, err := b.Write(make([]byte, maxMessageBytes))
 	require.NoError(t, err)
-	assert.Equal(t, maxResponseBytes, n)
+	assert.Equal(t, maxMessageBytes, n)
 	_, err = b.Write([]byte{1})
 	require.ErrorIs(t, err, errResponseTooLarge)
 	assert.ErrorIs(t, ctx.Err(), context.Canceled)

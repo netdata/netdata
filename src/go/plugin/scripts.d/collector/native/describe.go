@@ -12,10 +12,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
-// Descriptions include templates and forms, unlike collection frames. This
-// startup-only budget leaves room beyond existing collector metadata bundles
-// while bounding a broken producer's buffered output. See NATIVE.md.
-const maxDescriptionBytes = 4 << 20
+// Metadata has its own startup-only cutoff for a broken producer, independent
+// of operational messages. Leave generous room for embedded templates and forms
+// instead of sizing this budget from existing packages. See NATIVE.md.
+const maxDescriptionBytes = 64 << 20
 const describeTimeout = 5 * time.Second
 
 func describePackage(ctx context.Context, command []string) ([]byte, error) {
@@ -47,7 +47,7 @@ func describePackage(ctx context.Context, command []string) ([]byte, error) {
 	defer stop()
 	data, readErr := io.ReadAll(io.LimitReader(stdout, maxDescriptionBytes+1))
 	if len(data) > maxDescriptionBytes {
-		return nil, fmt.Errorf("package description exceeds 4 MiB")
+		return nil, fmt.Errorf("package description exceeds 64 MiB")
 	}
 	if ctx.Err() != nil {
 		return nil, ctx.Err()

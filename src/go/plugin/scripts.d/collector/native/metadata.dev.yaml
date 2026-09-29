@@ -43,7 +43,7 @@ modules:
         auto_detection:
           description: No commands are discovered automatically. Administrators register package manifests explicitly or select a manifest per job. Registering a package does not create a job.
         limits:
-          description: Each JSON response, Function request and configuration envelope is limited to 1 MiB, including whitespace. A persistent script handles collection and Function calls sequentially.
+          description: Each JSON response, Function request and configuration envelope is limited to 64 MiB, including whitespace. Startup descriptions have a separate 64 MiB limit. These are encoded-byte cutoffs, not memory budgets. A persistent script handles collection and Function calls sequentially.
         performance_impact:
           description: One-shot mode starts a process per collection or Function call; persistent mode retains one process per job. CPU, memory and target load depend on the script, collection interval and Function requests.
     setup:

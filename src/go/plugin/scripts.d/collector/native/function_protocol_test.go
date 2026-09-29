@@ -95,9 +95,6 @@ func TestFunctionRequest(t *testing.T) {
 	assert.True(t, got.Info)
 	deadline, _ := ctx.Deadline()
 	assert.Equal(t, deadline.UnixMilli(), got.Deadline)
-	request.Args = []string{strings.Repeat("x", maxResponseBytes)}
-	_, err = encodeFunctionRequest(request, "7", ctx)
-	require.ErrorContains(t, err, "exceeds 1 MiB")
 	// Exact encoded boundary including the terminating LF.
 	request = funcapi.RawMethodRequest{
 		Method: "items",
@@ -105,11 +102,11 @@ func TestFunctionRequest(t *testing.T) {
 	}
 	frame, err = encodeFunctionRequest(request, "7", ctx)
 	require.NoError(t, err)
-	request.Args[0] = strings.Repeat("x", maxResponseBytes-len(frame))
+	request.Args[0] = strings.Repeat("x", maxMessageBytes-len(frame))
 	frame, err = encodeFunctionRequest(request, "7", ctx)
 	require.NoError(t, err)
-	assert.Len(t, frame, maxResponseBytes)
+	assert.Len(t, frame, maxMessageBytes)
 	request.Args[0] += "x"
 	_, err = encodeFunctionRequest(request, "7", ctx)
-	require.Error(t, err)
+	require.ErrorContains(t, err, "exceeds 64 MiB")
 }

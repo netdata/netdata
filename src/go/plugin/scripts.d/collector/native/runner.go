@@ -13,11 +13,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
-// v1 bounds one complete response, including whitespace. Cancel a producer that
-// exceeds it so accidental endless output cannot consume unbounded memory.
-const maxResponseBytes = 1 << 20
+// Bound encoded messages, including envelopes and whitespace, generously enough
+// for complete snapshots, tables and base64 Function payloads. This is a runaway
+// output cutoff, not a per-job memory budget; buffers still grow on demand.
+const maxMessageBytes = 64 << 20
 
-var errResponseTooLarge = errors.New("script response exceeds 1 MiB")
+var errResponseTooLarge = errors.New("script response exceeds 64 MiB")
 
 func runCommand(ctx context.Context, timeout time.Duration, argv []string, config []byte) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -68,7 +69,7 @@ type responseBuffer struct {
 }
 
 func (b *responseBuffer) Write(data []byte) (int, error) {
-	if len(data) > maxResponseBytes-b.buffer.Len() {
+	if len(data) > maxMessageBytes-b.buffer.Len() {
 		b.exceeded = true
 		b.cancel()
 		return 0, errResponseTooLarge

@@ -68,7 +68,7 @@ func commandFailureReason(err error) string {
 	case errors.Is(err, context.DeadlineExceeded):
 		return "caller deadline exceeded"
 	case errors.Is(err, errResponseTooLarge):
-		return "response exceeds 1 MiB"
+		return "response exceeds 64 MiB"
 	case errors.As(err, &exitErr):
 		if exitErr.ExitCode() < 0 {
 			return "command terminated by signal"
@@ -103,8 +103,8 @@ func encodeFunctionRequest(request funcapi.RawMethodRequest, id string, ctx cont
 	if err != nil {
 		return nil, fmt.Errorf("cannot encode Function request")
 	}
-	if len(data)+1 > maxResponseBytes {
-		return nil, fmt.Errorf("Function request exceeds 1 MiB")
+	if len(data)+1 > maxMessageBytes {
+		return nil, fmt.Errorf("Function request exceeds 64 MiB")
 	}
 	return append(data, '\n'), nil
 }
