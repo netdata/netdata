@@ -15,21 +15,29 @@ import (
 // A description carries assets inline and cannot choose its execution command.
 type packageDescription struct {
 	packageSpec  `yaml:",inline"`
-	Charts       string         `yaml:"charts"`
-	ConfigSchema map[string]any `yaml:"config_schema"`
+	Charts       string         `yaml:"charts"        json:"charts"`
+	ConfigSchema map[string]any `yaml:"config_schema" json:"config_schema"`
 }
 
 func parseDescription(data []byte, command []string) (manifest, *chartengine.TemplateSet, error) {
 	var description packageDescription
 	var m manifest
-	decoder := yaml.NewDecoder(bytes.NewReader(data))
-	decoder.SetStrict(true)
-	if decoder.Decode(&description) != nil {
-		return m, nil, fmt.Errorf("invalid package description document")
-	}
-	var extra any
-	if err := decoder.Decode(&extra); err != io.EOF {
-		return m, nil, fmt.Errorf("package description must contain one document")
+	// YAML flow mappings can also start with '{'. Only complete JSON selects this
+	// path; encoding/json handles surrogate-pair escapes that yaml.v2 rejects.
+	if json.Valid(data) {
+		if decodeMessage(data, "description", &description) != nil {
+			return m, nil, fmt.Errorf("invalid package description document")
+		}
+	} else {
+		decoder := yaml.NewDecoder(bytes.NewReader(data))
+		decoder.SetStrict(true)
+		if decoder.Decode(&description) != nil {
+			return m, nil, fmt.Errorf("invalid package description document")
+		}
+		var extra any
+		if err := decoder.Decode(&extra); err != io.EOF {
+			return m, nil, fmt.Errorf("package description must contain one document")
+		}
 	}
 	m.packageSpec = description.packageSpec
 	m.Command = append([]string(nil), command...)

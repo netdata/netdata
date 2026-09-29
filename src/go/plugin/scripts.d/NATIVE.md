@@ -199,8 +199,10 @@ The host appends the operation argument to the configured argv. For example,
 for `collect`, `serve` and `function`. The description MUST NOT contain `command`
 or select another executable.
 
-`describe` MUST print exactly one UTF-8 YAML or JSON document and exit zero. It uses
-the manifest's `version`, `mode`, `metrics`, `checks` and `functions` declarations,
+`describe` MUST print exactly one UTF-8 YAML or JSON document and exit zero. JSON
+strings support standard Unicode escapes, including surrogate pairs. Declaration
+field names are case-sensitive, and unknown fields and duplicate keys are rejected.
+It uses the manifest's `version`, `mode`, `metrics`, `checks` and `functions` declarations,
 with these inline assets:
 
 | Field | File manifest | Executable description |

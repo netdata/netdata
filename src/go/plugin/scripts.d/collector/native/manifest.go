@@ -33,11 +33,11 @@ func checkMetric(id string) string { return checkPrefix + id }
 
 // packageSpec is shared by file manifests and executable descriptions.
 type packageSpec struct {
-	Version   string                  `yaml:"version"`
-	Mode      string                  `yaml:"mode"`
-	Metrics   []metricDefinition      `yaml:"metrics"`
-	Checks    []checkDefinition       `yaml:"checks"`
-	Functions []nativefunc.Definition `yaml:"functions"`
+	Version   string                  `yaml:"version"   json:"version"`
+	Mode      string                  `yaml:"mode"      json:"mode"`
+	Metrics   []metricDefinition      `yaml:"metrics"   json:"metrics"`
+	Checks    []checkDefinition       `yaml:"checks"    json:"checks"`
+	Functions []nativefunc.Definition `yaml:"functions" json:"functions"`
 }
 
 type manifest struct {
@@ -52,15 +52,15 @@ type manifest struct {
 }
 
 type metricDefinition struct {
-	Name string `yaml:"name"`
-	Type string `yaml:"type"`
-	Unit string `yaml:"unit"`
+	Name string `yaml:"name" json:"name"`
+	Type string `yaml:"type" json:"type"`
+	Unit string `yaml:"unit" json:"unit"`
 }
 
 type checkDefinition struct {
-	ID       string   `yaml:"id"`
-	Title    string   `yaml:"title"`
-	ByLabels []string `yaml:"by_labels"`
+	ID       string   `yaml:"id"        json:"id"`
+	Title    string   `yaml:"title"     json:"title"`
+	ByLabels []string `yaml:"by_labels" json:"by_labels"`
 }
 
 func loadManifest(path string, validate func(string) (string, error)) (manifest, *chartengine.TemplateSet, error) {

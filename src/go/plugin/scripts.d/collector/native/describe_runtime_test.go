@@ -46,7 +46,7 @@ func TestExecutablePackageRegistration(t *testing.T) {
 	description := map[string]any{
 		"version": "v1", "mode": "persistent",
 		"metrics":       []any{map[string]any{"name": "depth", "type": "gauge", "unit": "jobs"}},
-		"functions":     []any{map[string]any{"id": "items", "name": "Items", "help": "Show items."}},
+		"functions":     []any{map[string]any{"id": "items", "name": "Items", "help": "Show items 😀."}},
 		"config_schema": form,
 	}
 	encoded, err := json.Marshal(description)
@@ -55,7 +55,7 @@ func TestExecutablePackageRegistration(t *testing.T) {
 if sys.argv[-1] == "describe":
     assert sys.stdin.read() == ""
     with (root / "described").open("a") as f: f.write("describe\n")
-    print(%q)
+    print(json.dumps(json.loads(%q)))
     sys.exit(0)
 `, string(encoded))
 	peer := strings.Replace(
@@ -71,6 +71,7 @@ if sys.argv[-1] == "describe":
 	// Editing a former sidecar cannot influence the executable package.
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "manifest.yaml"), []byte("invalid"), 0644))
 	creator := registry["native-fixture"]
+	assert.Equal(t, "Show items 😀.", creator.SharedFunctions()[0].Help)
 	for range 2 {
 		c := initFunctionCollector(t, registry)
 		assert.Equal(t, []string{filepath.Join(dir, "collect.sh")}, c.definition.Command)

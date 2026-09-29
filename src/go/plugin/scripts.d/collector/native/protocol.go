@@ -103,7 +103,7 @@ func identity(name string, labels map[string]string) string {
 	return name + ":" + string(encoded)
 }
 
-// Validate field spelling and nulls before encoding/json can coerce them.
+// Validate field spelling, duplicates and nulls before encoding/json can coerce them.
 // Array items inherit their field role; label keys are arbitrary data.
 func validateJSONFields(decoder *json.Decoder, role string) error {
 	token, err := decoder.Token()
@@ -112,7 +112,11 @@ func validateJSONFields(decoder *json.Decoder, role string) error {
 	}
 	switch token {
 	case nil:
-		if role == "schema" {
+		switch role {
+		case "schema", "description", "metric_definition", "check_definition", "function_definition",
+			"parameter_definition", "option_definition":
+			// Optional metadata nulls retain the same defaults as YAML. Runtime
+			// protocol values still reject null outside arbitrary schema/data.
 			return nil
 		}
 		return fmt.Errorf("null is not a protocol value")
@@ -132,6 +136,30 @@ func validateJSONFields(decoder *json.Decoder, role string) error {
 			}
 			seen[key] = true
 			childRole := key
+			switch role {
+			case "description":
+				childRole = "schema"
+				switch key {
+				case "metrics":
+					childRole = "metric_definition"
+				case "checks":
+					childRole = "check_definition"
+				case "functions":
+					childRole = "function_definition"
+				}
+			case "function_definition":
+				childRole = "schema"
+				if key == "required_params" {
+					childRole = "parameter_definition"
+				}
+			case "parameter_definition":
+				childRole = "schema"
+				if key == "options" {
+					childRole = "option_definition"
+				}
+			case "metric_definition", "check_definition", "option_definition":
+				childRole = "schema"
+			}
 			if role == "schema" {
 				childRole = "schema"
 			}
@@ -168,6 +196,16 @@ func validateJSONFields(decoder *json.Decoder, role string) error {
 
 func knownField(role, key string) bool {
 	switch role {
+	case "description":
+		return key == "version" || key == "mode" || key == "metrics" || key == "checks" ||
+			key == "functions" || key == "charts" || key == "config_schema"
+	case "metric_definition":
+		return key == "name" || key == "type" || key == "unit"
+	case "check_definition":
+		return key == "id" || key == "title" || key == "by_labels"
+	case "function_definition":
+		return key == "id" || key == "name" || key == "help" || key == "update_every" ||
+			key == "response_type" || key == "has_history" || key == "accepted_params" || key == "required_params"
 	case "response", "result":
 		return key == "version" || key == "metrics" || key == "checks"
 	case "metrics":
@@ -196,10 +234,10 @@ func knownField(role, key string) bool {
 			return true
 		}
 		return false
-	case "required_params":
+	case "required_params", "parameter_definition":
 		return key == "id" || key == "name" || key == "help" || key == "type" || key == "options" ||
 			key == "unique_view"
-	case "options":
+	case "options", "option_definition":
 		return key == "id" || key == "name" || key == "defaultSelected" || key == "disabled"
 	case "charts", "group_by":
 		return true
