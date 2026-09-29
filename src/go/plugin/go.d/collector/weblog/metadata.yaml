@@ -686,3 +686,9 @@ modules:
                 - name: min
                 - name: max
                 - name: avg
+            - name: web_log.url_pattern_http_method_request_processing_time
+              description: Request Processing Time By HTTP Method
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: a dimension per HTTP method
