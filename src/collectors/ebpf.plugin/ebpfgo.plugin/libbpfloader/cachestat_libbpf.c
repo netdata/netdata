@@ -379,9 +379,8 @@ struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const
 #endif
     {
         struct bpf_object *obj = bpf_object__open_file(path, NULL);
+        // A failed open leaves nothing to close: libbpf 1.x returns NULL, older versions an error pointer
         if (!obj || libbpf_get_error(obj)) {
-            if (obj && libbpf_get_error(obj))
-                bpf_object__close(obj);
             freez(rt);
             return NULL;
         }
