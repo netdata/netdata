@@ -47,7 +47,7 @@ func (c *Collector) ExecuteFunction(
 	input := append(bytes.Clone(c.configInput), frame...)
 	data, err := runOperation(ctx, c.definition.Command, "function", input)
 	if err != nil {
-		c.Errorf("one-shot Function command failed: %s", functionCommandFailure(err))
+		c.Errorf("one-shot Function command failed: %s", commandFailureReason(err))
 		return nil, err
 	}
 	result, err := decodeFunctionReply(data, "1", request.Info)
@@ -60,7 +60,7 @@ func (c *Collector) ExecuteFunction(
 
 // Never log the original error: command errors can include paths, and output
 // belongs to the script. Numeric exit status and fixed categories are safe.
-func functionCommandFailure(err error) string {
+func commandFailureReason(err error) string {
 	var exitErr *exec.ExitError
 	switch {
 	case errors.Is(err, context.Canceled):

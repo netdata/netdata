@@ -26,9 +26,9 @@ modules:
 
           This collector is a preview. Its package and response formats may change.
         method_description: |
-          Each job runs an executable per collection or keeps one persistent process, as selected by its manifest.
+          Each job runs an executable per collection or keeps one persistent process, as selected by its package definition.
           Both modes read complete JSON snapshots; persistent requests and replies carry matching IDs.
-          A package manifest declares metrics, checks and an optional configuration schema without executing code during startup validation.
+          A file-backed manifest supplies metadata without execution. An explicitly registered self-contained executable supplies declarations, templates and a configuration form through a bounded describe operation at plugin startup. Job creation, configuration tests and updates reuse that description.
           Registered packages expose their own dynamic configuration forms and can provide interactive Functions, with or without periodic collection. Validated configuration and Function inputs reach scripts through stdin.
           Warning and critical service observations are successful collections; command or protocol failures discard the entire response.
       supported_platforms:

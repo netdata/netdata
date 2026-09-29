@@ -108,6 +108,10 @@ func loadPackageConfig(dir, name string) (*packageConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read package config schema: %w", err)
 	}
+	return parsePackageConfig(data)
+}
+
+func parsePackageConfig(data []byte) (*packageConfig, error) {
 	// The same strict JSON token checks used for protocol objects reject duplicate keys.
 	tokens := json.NewDecoder(bytes.NewReader(data))
 	tokens.UseNumber()

@@ -91,6 +91,7 @@ func functionFixture(t *testing.T, mode string, only bool) (collectorapi.Registr
 `)...)
 	require.NoError(t, os.WriteFile(path, data, 0644))
 	registry, err := loadPackages(
+		context.Background(),
 		filepath.Join(dir, "packages.yaml"),
 		collectorapi.Registry{},
 		func(path string) (string, error) { _, err := os.Stat(path); return path, err },

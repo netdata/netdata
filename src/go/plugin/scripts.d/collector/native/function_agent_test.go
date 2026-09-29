@@ -319,6 +319,7 @@ func TestFunctionDevelopmentExamples(t *testing.T) {
 					),
 				)
 				registry, err := loadPackages(
+					context.Background(),
 					inventory,
 					collectorapi.Registry{},
 					func(path string) (string, error) { _, err := os.Stat(path); return path, err },

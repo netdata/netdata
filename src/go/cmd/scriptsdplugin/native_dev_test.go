@@ -18,7 +18,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 )
 
 func TestNativeAvailableInDevelopmentRegistry(t *testing.T) {
@@ -109,4 +111,36 @@ func TestPackageInventoryAndExplicitExecution(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(high, "scripts.d.packages.yaml"), []byte("invalid: true"), 0644))
 	_, _, err = configurePackages(multipath.MultiPath{high, dir}, base)
 	require.Error(t, err)
+}
+
+func TestCommandPackageInventory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fixture uses Unix scripts")
+	}
+	dir := t.TempDir()
+	shim := filepath.Join(dir, "nd-run")
+	require.NoError(t, os.WriteFile(shim, []byte("#!/bin/sh\nexec \"$@\"\n"), 0755))
+	t.Cleanup(ndexec.SetRunnerPathsForTests(shim, ""))
+	script := filepath.Join(dir, "package.sh")
+	require.NoError(t, os.WriteFile(script, []byte(`#!/bin/sh
+[ "$1" = describe ] || exit 2
+printf describe >> "$(dirname "$0")/described"
+printf '%s\n' 'version: v1' 'checks: [{id: ready, title: Ready}]'
+`), 0755))
+	data, err := yaml.Marshal(
+		map[string]any{
+			"version":  "v1",
+			"packages": []any{map[string]any{"name": "example", "command": []string{"/bin/sh", script}}},
+		},
+	)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "scripts.d.packages.yaml"), data, 0644))
+	registry, _, err := configurePackages(multipath.MultiPath{dir}, collectorapi.Registry{})
+	require.NoError(t, err)
+	c := registry["native-example"].CreateV2()
+	require.NoError(t, c.Init(context.Background()))
+	require.NoError(t, c.Check(context.Background()))
+	observed, err := os.ReadFile(filepath.Join(dir, "described"))
+	require.NoError(t, err)
+	require.Equal(t, "describe", string(observed))
 }

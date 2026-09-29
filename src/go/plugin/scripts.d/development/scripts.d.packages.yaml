@@ -4,3 +4,8 @@ version: v1
 packages:
   - name: queue
     manifest: /usr/local/lib/netdata/custom/queue/manifest.yaml
+
+# A self-contained executable can replace the manifest source:
+#  - name: embedded-queue
+#    command: [/usr/local/lib/netdata/custom/queue/queue-plugin]
+# Describe executes once at plugin startup; this does not create a job.
