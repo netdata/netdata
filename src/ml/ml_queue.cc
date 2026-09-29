@@ -97,17 +97,17 @@ static void ml_queue_start_pass(ml_queue_t *q)
     netdata_mutex_unlock(&q->mutex);
 
     usec_t resolve_started_ut = now_monotonic_usec();
-    bool aborted = false;
-
     if (key_fn) {
         for (auto &e : pass) {
-            if (q->exit.load(std::memory_order_relaxed)) {
-                aborted = true;
+            if (q->exit.load(std::memory_order_relaxed))
                 break;
-            }
             e.key = key_fn(e.req, key_arg);
         }
     }
+
+    // checked after the resolution too, so a stop request that arrives during the last key callback does not
+    // start the sort
+    bool aborted = q->exit.load(std::memory_order_relaxed);
 
     usec_t sort_started_ut = now_monotonic_usec();
     size_t key0_entries = 0;

@@ -1336,6 +1336,27 @@ static void test_queue_stop_during_pass_sort()
     ml_queue_destroy(q);
 }
 
+static void test_queue_stop_at_last_key()
+{
+    fprintf(stderr, "  test_queue_stop_at_last_key...\n");
+
+    ml_queue_t *q = ml_queue_init();
+    ml_queue_set_pass_key_fn(q, ml_test_pass_key, q);
+
+    ml_queue_push(q, ml_test_create_item("k:100"));
+    ml_queue_push(q, ml_test_create_item("k:200"));
+    ml_queue_push(q, ml_test_create_item("stop"));
+
+    ml_queue_item_t item = ml_queue_pop(q);
+    ML_TEST_ASSERT(item.type == ML_QUEUE_ITEM_STOP_REQUEST, "a stop request during the last key callback is honoured");
+    ML_TEST_ASSERT(ml_queue_size(q).create_new_model == 3, "the entries of the abandoned pass are kept");
+
+    ml_queue_stats_t stats = ml_queue_stats(q);
+    ML_TEST_ASSERT(stats.passes_sorted == 0, "a pass whose last key saw the stop request is not sorted");
+
+    ml_queue_destroy(q);
+}
+
 static void test_queue_sort_pass_normalises_past_keys()
 {
     fprintf(stderr, "  test_queue_sort_pass_normalises_past_keys...\n");
@@ -1552,6 +1573,7 @@ extern "C" int ml_unittest()
     test_queue_without_key_fn_keeps_push_order();
     test_queue_add_model_served_before_create_model();
     test_queue_stop_during_pass_sort();
+    test_queue_stop_at_last_key();
     test_queue_sort_pass_normalises_past_keys();
 
     fprintf(stderr, "\nML tests: %d run, %d failed\n", tests_run, tests_failed);
