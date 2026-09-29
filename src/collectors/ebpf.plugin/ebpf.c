@@ -1015,10 +1015,10 @@ static void ebpf_set_global_variables()
     if (!ebpf_configured_log_dir)
         ebpf_configured_log_dir = LOG_DIR;
 
-    ebpf_nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
-    if (ebpf_nprocs < 0) {
+    ebpf_nprocs = libbpf_num_possible_cpus();
+    if (ebpf_nprocs < 1) {
         ebpf_nprocs = NETDATA_MAX_PROCESSOR;
-        netdata_log_error("Cannot identify number of process, using default value %d", ebpf_nprocs);
+        netdata_log_error("Cannot identify number of possible CPUs, using default value %d", ebpf_nprocs);
     }
 
     isrh = get_redhat_release();

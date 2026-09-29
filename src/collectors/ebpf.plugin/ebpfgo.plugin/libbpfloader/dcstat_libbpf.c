@@ -369,9 +369,10 @@ int netdata_dcstat_runtime_prepare(
     nd_ebpf_acc_set_max_entries(&rt->acc, pid_table_size);
 #endif
 
-    nd_ebpf_alloc_percpu_buffers(
+    if (nd_ebpf_alloc_percpu_buffers(
         &rt->percpu_u64, &rt->percpu_u64_cap,
-        (void **)&rt->percpu_entries, &rt->percpu_entries_cap, sizeof(*rt->percpu_entries));
+        (void **)&rt->percpu_entries, &rt->percpu_entries_cap, sizeof(*rt->percpu_entries)) != 0)
+        return -1;
 
     /* items_buf starts NULL; grows lazily in snapshot_apps */
     return 0;

@@ -416,7 +416,7 @@ static inline int nd_ebpf_alloc_percpu_buffers(
 {
     int ncpu = libbpf_num_possible_cpus();
     if (ncpu < 1)
-        ncpu = 1;
+        return -1;
 
     *percpu_u64 = callocz((size_t)ncpu, sizeof(**percpu_u64));
     *percpu_u64_cap = ncpu;
