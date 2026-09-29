@@ -130,42 +130,6 @@ static inline void ebpf_disable_clone3(struct process_bpf *obj)
 }
 
 /**
- * Mount Attach Probe
- *
- * Attach probes to target
- *
- * @param obj is the main structure for bpf objects.
- *
- * @return It returns 0 on success and -1 otherwise.
- */
-static inline int process_attach_kprobe_target(struct process_bpf *obj)
-{
-    obj->links.netdata_release_task_probe = bpf_program__attach_kprobe(
-        obj->progs.netdata_release_task_probe, false, process_targets[PROCESS_RELEASE_TASK_NAME].name);
-    int ret = libbpf_get_error(obj->links.netdata_release_task_probe);
-    if (ret)
-        goto endakt;
-
-    obj->links.netdata_wake_up_new_task_probe = bpf_program__attach_kprobe(
-        obj->progs.netdata_wake_up_new_task_probe, false, "wake_up_new_task");
-    ret = libbpf_get_error(obj->links.netdata_wake_up_new_task_probe);
-    if (ret)
-        goto endakt;
-
-    if (running_on_kernel <= NETDATA_EBPF_KERNEL_5_9_16) {
-        obj->links.netdata_do_fork_probe =
-            bpf_program__attach_kprobe(obj->progs.netdata_do_fork_probe, false, process_targets[PROCESS_SYS_FORK].name);
-        ret = libbpf_get_error(obj->links.netdata_do_fork_probe);
-    } else {
-        obj->links.netdata_kernel_clone_probe = bpf_program__attach_kprobe(
-            obj->progs.netdata_kernel_clone_probe, false, process_targets[PROCESS_KERNEL_CLONE].name);
-        ret = libbpf_get_error(obj->links.netdata_kernel_clone_probe);
-    }
-endakt:
-    return ret;
-}
-
-/**
  * Set hash tables
  *
  * Set the values for maps according the value given by kernel.
@@ -210,6 +174,16 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
         ebpf_process_disable_probe(obj);
         ebpf_disable_trampoline(obj);
 
+        // Keep release accounting active; tracepoint-only exit counts otherwise
+        // make every unreaped exit appear to be a zombie.
+        bpf_program__set_autoload(obj->progs.netdata_release_task_probe, true);
+
+#if defined(__aarch64__)
+        // arm64 has no fork/vfork syscalls, so these syscall tracepoints cannot attach.
+        bpf_program__set_autoload(obj->progs.netdata_fork_exit, false);
+        bpf_program__set_autoload(obj->progs.netdata_vfork_exit, false);
+#endif
+
         // tp_btf needs tracing support and its target in kernel BTF; otherwise count forks with the kprobe.
         bool raw_tracepoint_available = false;
         if (libbpf_probe_bpf_prog_type(BPF_PROG_TYPE_TRACING, NULL) > 0) {
@@ -232,8 +206,8 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
         return ret;
     }
 
-    ret = (mode == EBPF_LOAD_PROBE || mode == EBPF_LOAD_RETPROBE) ? process_attach_kprobe_target(obj) :
-                                                                    process_bpf__attach(obj);
+    // Section names carry each program's target and probe type, so auto-attach covers every mode.
+    ret = process_bpf__attach(obj);
     if (!ret) {
         ebpf_process_set_hash_tables(obj);
 

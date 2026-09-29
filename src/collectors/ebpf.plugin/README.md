@@ -604,6 +604,8 @@ This will create the chart `disk_latency_io` for each disk on the host. The foll
 
 - `kprobe/blk_mq_start_request`: IO request operation sent to a device driver.
 - `kprobe/blk_mq_end_request`: IO operation completed by the device.
+- `kprobe/__blk_mq_end_request`: IO operation completed by the SCSI layer (SCSI, SATA and SAS disks), which does not
+    call `blk_mq_end_request`. A request seen by both functions is counted once.
 - `blk_complete_request`: IO completion on the older request path. It is attached only when the running kernel
     provides this function (a `kprobe` with legacy code, `fentry` with CO-RE code).
 

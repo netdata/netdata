@@ -47,6 +47,50 @@ static netdata_idx_t *disk_hash_values = NULL;
 
 netdata_mutex_t plot_mutex;
 
+// SCSI (and so SATA/SAS) completes requests through __blk_mq_end_request() without calling
+// blk_mq_end_request(), the only completion target in the object. The completion program deletes
+// the in-flight entry, so a request seen by both functions is still counted once.
+#define NETDATA_DISK_SCSI_COMPLETE_TARGET "__blk_mq_end_request"
+#define NETDATA_DISK_COMPLETE_PROGRAM "netdata_block_rq_complete"
+
+static struct bpf_link *disk_scsi_complete_link = NULL;
+
+/**
+ * Attach SCSI completion
+ *
+ * Attach the request completion program to the completion function used by the SCSI layer.
+ * The attach is optional: without it, disks completed through blk_mq_end_request() keep working.
+ *
+ * @param prog the loaded completion program.
+ */
+static void ebpf_disk_attach_scsi_completion(struct bpf_program *prog)
+{
+    if (!prog)
+        return;
+
+    struct bpf_link *link = bpf_program__attach_kprobe(prog, false, NETDATA_DISK_SCSI_COMPLETE_TARGET);
+    if (!link || libbpf_get_error(link)) {
+        netdata_log_info(
+            "Cannot attach disk completion to %s; latency of SCSI, SATA and SAS disks will not be collected.",
+            NETDATA_DISK_SCSI_COMPLETE_TARGET);
+        return;
+    }
+
+    disk_scsi_complete_link = link;
+}
+
+/**
+ * Detach SCSI completion
+ */
+static void ebpf_disk_detach_scsi_completion(void)
+{
+    if (!disk_scsi_complete_link)
+        return;
+
+    bpf_link__destroy(disk_scsi_complete_link);
+    disk_scsi_complete_link = NULL;
+}
+
 #ifdef LIBBPF_MAJOR_VERSION
 /**
  * Set hash table
@@ -83,7 +127,11 @@ static inline int ebpf_disk_load_and_attach(struct disk_bpf *obj)
         return ret;
     }
 
-    return disk_bpf__attach(obj);
+    ret = disk_bpf__attach(obj);
+    if (!ret)
+        ebpf_disk_attach_scsi_completion(obj->progs.netdata_block_rq_complete);
+
+    return ret;
 }
 #endif
 
@@ -435,6 +483,8 @@ static void ebpf_disk_exit(void *pptr)
     if (disk_list)
         ebpf_cleanup_disk_list();
 
+    ebpf_disk_detach_scsi_completion();
+
     if (!ebpf_plugin_stop() && em->functions.bpf_unload)
         em->functions.bpf_unload(em);
 
@@ -740,6 +790,9 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
         if (!em->probe_links) {
             ret = -1;
+        } else {
+            ebpf_disk_attach_scsi_completion(
+                bpf_object__find_program_by_name(em->objects, NETDATA_DISK_COMPLETE_PROGRAM));
         }
     }
 #ifdef LIBBPF_MAJOR_VERSION
