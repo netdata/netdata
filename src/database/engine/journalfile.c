@@ -1715,15 +1715,21 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
                                         Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos,
                                         size_t number_of_extents, size_t number_of_metrics, size_t number_of_pages, void *user_data)
 {
-    // Nothing to migrate if no metrics
-    if (number_of_metrics == 0)
-        return true;
-
     char path[RRDENG_PATH_MAX];
     Pvoid_t *PValue;
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
     struct rrdengine_journalfile *journalfile = (struct rrdengine_journalfile *) user_data;
     struct rrdengine_datafile *datafile = journalfile->datafile;
+
+    // Nothing to migrate if no metrics. Every page may have been rejected (all
+    // of deleted metrics): they become unreachable, so the datafile holds no
+    // indexed samples - drop the flush-time charge, like the reset below does
+    if (number_of_metrics == 0) {
+        internal_fatal(datafile->writers.running || datafile->writers.flushed_to_open_running,
+                       "DBENGINE: resetting the samples of a datafile that has writers");
+        rrdeng_datafile_samples_set(datafile, 0, false);
+        return true;
+    }
     time_t min_time_s = LONG_MAX;
     time_t max_time_s = 0;
     struct jv2_metrics_info *metric_info;
