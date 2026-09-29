@@ -261,7 +261,7 @@ when execution needs a timeout. Construction does not log arguments or output. S
 and discard stderr: the Run APIs buffer stdout and include stderr snippets in errors, so they are unsuitable for
 secret output without caller-owned handling.
 
-For a persistent command that must own descendant cleanup, use `StartUnprivilegedProcess` with
+For a command that must own descendant cleanup, one-shot or persistent, use `StartUnprivilegedProcess` with
 `ProcessOptions` file descriptors. Nil stdio uses the null device. The caller owns its pipe ends; the returned
 `Process` exclusively owns cancellation, termination and reaping. Call `Wait` to join it or `Close` to terminate
 and join; both permit repeated/concurrent calls. Completion joins the leader and termination requests, not each

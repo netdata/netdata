@@ -96,14 +96,19 @@ func runOwned(ctx context.Context, command []string, operation string, input []b
 	defer process.Close()
 	if stdin != nil {
 		// Write concurrently with reading stdout, so neither pipe can fill and block
-		// the other. Closing the write end unblocks the writer on early return.
+		// the other. On early return, terminate the process tree before joining the
+		// writer, then close the write end in case an escaped holder keeps stdin open.
 		written := make(chan struct{})
 		go func() {
 			defer close(written)
 			_, _ = stdin.Write(input)
 			_ = stdin.Close()
 		}()
-		defer func() { _ = stdin.Close(); <-written }()
+		defer func() {
+			_ = process.Close()
+			_ = stdin.Close()
+			<-written
+		}()
 	}
 	// Closing our read end also bounds escaped descendants retaining stdout.
 	stop := context.AfterFunc(ctx, func() { _ = stdout.Close() })
