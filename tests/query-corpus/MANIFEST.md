@@ -281,6 +281,7 @@ set at the end.
 | W/limit-node-ties | equal weights select physical metrics by stable node and metric identity while retaining metadata for nodes without selected metrics | n/a |  |
 | W/v1-host-scope | v1 weights respect the URL-selected host while v2/v3 retain explicit multi-node scope | n/a |  |
 | W/limit-mcp | MCP weights preserve caller default and minimum limits and descending raw scores while reporting exact-boundary truncation truthfully | n/a |  |
+| W/anomaly-gaps | Anomaly-rate weights count missing samples as zero without changing ordinary value weights | n/a | |
 
 ## Corpus-wide pusher discipline
 
