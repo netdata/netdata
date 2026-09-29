@@ -364,12 +364,15 @@ static void netframework_begin_object_instance(struct net_framework_instances *p
     }
 }
 
-static bool netframework_add_raw_sample(RAW_DATA *total, const RAW_DATA *sample)
+static bool netframework_add_raw_sample(RAW_DATA *total, const RAW_DATA *sample, bool take_max)
 {
     if (total->CounterType != sample->CounterType)
         return false;
 
-    total->Data += sample->Data;
+    if (take_max)
+        total->Data = MAX(total->Data, sample->Data);
+    else
+        total->Data += sample->Data;
 
     switch (sample->CounterType) {
         case PERF_RAW_FRACTION:
@@ -397,11 +400,12 @@ static bool netframework_add_raw_sample(RAW_DATA *total, const RAW_DATA *sample)
     return true;
 }
 
-static bool netframework_get_instance_counter(
+static bool netframework_get_instance_counter_with_aggregation(
     PERF_DATA_BLOCK *data,
     PERF_OBJECT_TYPE *object,
     PERF_INSTANCE_DEFINITION *instance,
-    COUNTER_DATA *counter)
+    COUNTER_DATA *counter,
+    bool take_max)
 {
     // CounterType zero marks a group with at least one failed member read this cycle.
     if (counter->updated && !counter->current.CounterType)
@@ -427,13 +431,31 @@ static bool netframework_get_instance_counter(
         counter->current = sample.current;
         counter->updated = true;
     }
-    else if (!netframework_add_raw_sample(&counter->current, &sample.current)) {
+    else if (!netframework_add_raw_sample(&counter->current, &sample.current, take_max)) {
         counter->current = RAW_DATA_EMPTY;
         counter->updated = true;
         return false;
     }
 
     return counter->updated;
+}
+
+static bool netframework_get_instance_counter(
+    PERF_DATA_BLOCK *data,
+    PERF_OBJECT_TYPE *object,
+    PERF_INSTANCE_DEFINITION *instance,
+    COUNTER_DATA *counter)
+{
+    return netframework_get_instance_counter_with_aggregation(data, object, instance, counter, false);
+}
+
+static bool netframework_get_instance_counter_max(
+    PERF_DATA_BLOCK *data,
+    PERF_OBJECT_TYPE *object,
+    PERF_INSTANCE_DEFINITION *instance,
+    COUNTER_DATA *counter)
+{
+    return netframework_get_instance_counter_with_aggregation(data, object, instance, counter, true);
 }
 
 #undef NETFRAMEWORK_RESET_COUNTER
@@ -2321,7 +2343,8 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
             netframework_rrdset_done(p->st_clrsecurity_rt_checks_time, p);
         }
 
-        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityStackWalkDepth)) {
+        if (netframework_get_instance_counter_max(
+                pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityStackWalkDepth)) {
             if (!p->st_clrsecurity_stack_walk_depth) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrsecurity_stack_walk_depth", windows_shared_buffer);
                 netdata_fix_chart_name(id);
