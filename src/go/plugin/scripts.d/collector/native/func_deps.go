@@ -47,7 +47,7 @@ func (c *Collector) ExecuteFunction(
 	input := append(bytes.Clone(c.configInput), frame...)
 	data, err := runOperation(ctx, c.definition.Command, "function", input)
 	if err != nil {
-		c.Errorf("one-shot Function command failed: %s", functionCommandFailure(err))
+		c.Errorf("one-shot Function command failed: %s", commandFailureReason(err))
 		return nil, err
 	}
 	result, err := decodeFunctionReply(data, "1", request.Info)
@@ -60,7 +60,7 @@ func (c *Collector) ExecuteFunction(
 
 // Never log the original error: command errors can include paths, and output
 // belongs to the script. Numeric exit status and fixed categories are safe.
-func functionCommandFailure(err error) string {
+func commandFailureReason(err error) string {
 	var exitErr *exec.ExitError
 	switch {
 	case errors.Is(err, context.Canceled):
@@ -68,7 +68,7 @@ func functionCommandFailure(err error) string {
 	case errors.Is(err, context.DeadlineExceeded):
 		return "caller deadline exceeded"
 	case errors.Is(err, errResponseTooLarge):
-		return "response exceeds 1 MiB"
+		return "response exceeds 64 MiB"
 	case errors.As(err, &exitErr):
 		if exitErr.ExitCode() < 0 {
 			return "command terminated by signal"
@@ -103,8 +103,8 @@ func encodeFunctionRequest(request funcapi.RawMethodRequest, id string, ctx cont
 	if err != nil {
 		return nil, fmt.Errorf("cannot encode Function request")
 	}
-	if len(data)+1 > maxResponseBytes {
-		return nil, fmt.Errorf("Function request exceeds 1 MiB")
+	if len(data)+1 > maxMessageBytes {
+		return nil, fmt.Errorf("Function request exceeds 64 MiB")
 	}
 	return append(data, '\n'), nil
 }

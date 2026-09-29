@@ -91,6 +91,7 @@ func functionFixture(t *testing.T, mode string, only bool) (collectorapi.Registr
 `)...)
 	require.NoError(t, os.WriteFile(path, data, 0644))
 	registry, err := loadPackages(
+		context.Background(),
 		filepath.Join(dir, "packages.yaml"),
 		collectorapi.Registry{},
 		func(path string) (string, error) { _, err := os.Stat(path); return path, err },
@@ -143,7 +144,7 @@ func TestFunctionPeersBothModes(t *testing.T) {
 			if mode == modePersistent {
 				startRuntime(t, c).waitReady(t)
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			input := funcapi.RawMethodRequest{
 				Method:      "items",
@@ -179,10 +180,10 @@ func TestFunctionPeersBothModes(t *testing.T) {
 				ctx,
 				funcapi.RawMethodRequest{
 					Method:  "items",
-					Payload: []byte(strings.Repeat("x", maxResponseBytes)),
+					Payload: make([]byte, maxMessageBytes*3/4),
 				},
 			)
-			require.ErrorContains(t, err, "exceeds 1 MiB")
+			require.ErrorContains(t, err, "exceeds 64 MiB")
 			_, err = c.ExecuteFunction(ctx, funcapi.RawMethodRequest{
 				Method: "items",
 				Info:   true,

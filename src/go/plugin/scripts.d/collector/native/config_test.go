@@ -56,6 +56,7 @@ func configuredFixture(t *testing.T, body, mode string) (collectorapi.Registry, 
 		),
 	)
 	registry, err := loadPackages(
+		context.Background(),
 		inventory,
 		collectorapi.Registry{},
 		func(path string) (string, error) { _, err := os.Stat(path); return path, err },
@@ -285,9 +286,29 @@ func TestPackageInventoryValidation(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "inventory.yaml")
 			require.NoError(t, os.WriteFile(path, []byte("version: v1\npackages:\n"+entries), 0644))
 			base := collectorapi.Registry{}
-			_, err := loadPackages(path, base, func(path string) (string, error) { return path, nil })
+			_, err := loadPackages(
+				context.Background(),
+				path,
+				base,
+				func(path string) (string, error) { return path, nil },
+			)
 			require.Error(t, err)
 			assert.Empty(t, base, "failed registration must not partially mutate the caller's registry")
 		})
 	}
+}
+
+func TestPackageRegistrationCancellation(t *testing.T) {
+	_, dir := configuredFixture(t, "exit 0\n", modeOneshot)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	base := collectorapi.Registry{}
+	registry, err := loadPackages(ctx, filepath.Join(dir, "packages.yaml"), base, func(path string) (string, error) {
+		// Cancellation can arrive while the final entry is still being validated.
+		cancel()
+		return testPackagePath(path)
+	})
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Nil(t, registry, "canceled registration must not publish the new registry")
+	assert.Empty(t, base)
 }

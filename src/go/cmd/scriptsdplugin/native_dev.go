@@ -5,9 +5,12 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
@@ -21,6 +24,9 @@ func configurePackages(
 	paths multipath.MultiPath,
 	base collectorapi.Registry,
 ) (collectorapi.Registry, discovery.ProviderFactory, error) {
+	// Agent host signal handling starts after registration completes.
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	defer cancel()
 	registry := base
 	for _, dir := range paths {
 		path := filepath.Join(dir, "scripts.d.packages.yaml")
@@ -30,7 +36,7 @@ func configurePackages(
 			return nil, nil, err
 		}
 		var err error
-		registry, err = native.LoadPackages(path, base)
+		registry, err = native.LoadPackages(ctx, path, base)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -50,5 +56,8 @@ func configurePackages(
 			return dummy.Build(ctx)
 		},
 	)
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 	return registry, filtered, nil
 }

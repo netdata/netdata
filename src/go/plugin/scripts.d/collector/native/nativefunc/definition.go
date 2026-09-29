@@ -15,14 +15,14 @@ var paramID = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
 
 // Definition is startup metadata, independent of any running script or job.
 type Definition struct {
-	ID             string      `yaml:"id"`
-	Name           string      `yaml:"name"`
-	Help           string      `yaml:"help"`
-	UpdateEvery    int         `yaml:"update_every"`
-	ResponseType   string      `yaml:"response_type"`
-	HasHistory     bool        `yaml:"has_history"`
-	AcceptedParams []string    `yaml:"accepted_params"`
-	RequiredParams []Parameter `yaml:"required_params"`
+	ID             string      `yaml:"id"              json:"id"`
+	Name           string      `yaml:"name"            json:"name"`
+	Help           string      `yaml:"help"            json:"help"`
+	UpdateEvery    int         `yaml:"update_every"    json:"update_every"`
+	ResponseType   string      `yaml:"response_type"   json:"response_type"`
+	HasHistory     bool        `yaml:"has_history"     json:"has_history"`
+	AcceptedParams []string    `yaml:"accepted_params" json:"accepted_params"`
+	RequiredParams []Parameter `yaml:"required_params" json:"required_params"`
 }
 
 type Parameter struct {

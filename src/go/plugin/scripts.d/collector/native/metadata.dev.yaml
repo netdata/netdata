@@ -26,9 +26,9 @@ modules:
 
           This collector is a preview. Its package and response formats may change.
         method_description: |
-          Each job runs an executable per collection or keeps one persistent process, as selected by its manifest.
+          Each job runs an executable per collection or keeps one persistent process, as selected by its package definition.
           Both modes read complete JSON snapshots; persistent requests and replies carry matching IDs.
-          A package manifest declares metrics, checks and an optional configuration schema without executing code during startup validation.
+          A file-backed manifest supplies metadata without execution. An explicitly registered self-contained executable supplies declarations, templates and a configuration form through a bounded describe operation at plugin startup. Job creation, configuration tests and updates reuse that description.
           Registered packages expose their own dynamic configuration forms and can provide interactive Functions, with or without periodic collection. Validated configuration and Function inputs reach scripts through stdin.
           Warning and critical service observations are successful collections; command or protocol failures discard the entire response.
       supported_platforms:
@@ -43,7 +43,7 @@ modules:
         auto_detection:
           description: No commands are discovered automatically. Administrators register package manifests explicitly or select a manifest per job. Registering a package does not create a job.
         limits:
-          description: Each JSON response, Function request and configuration envelope is limited to 1 MiB, including whitespace. A persistent script handles collection and Function calls sequentially.
+          description: Each JSON response, Function request and configuration envelope is limited to 64 MiB, including whitespace. Startup descriptions have a separate 64 MiB limit. These are encoded-byte cutoffs, not memory budgets. A persistent script handles collection and Function calls sequentially.
         performance_impact:
           description: One-shot mode starts a process per collection or Function call; persistent mode retains one process per job. CPU, memory and target load depend on the script, collection interval and Function requests.
     setup:

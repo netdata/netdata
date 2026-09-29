@@ -4,14 +4,17 @@ package native
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pathvalidate"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/nativefunc"
@@ -20,13 +23,14 @@ import (
 
 var packageName = regexp.MustCompile(`^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$`)
 
-// LoadPackages returns a startup registry. Neither inventory loading nor creator
-// construction executes a script. The caller owns discovery and enablement.
-func LoadPackages(path string, base collectorapi.Registry) (collectorapi.Registry, error) {
-	return loadPackages(path, base, pathvalidate.ValidateBinaryPath)
+// LoadPackages returns a startup registry. Command entries execute describe once;
+// file entries and creator construction remain passive. The caller owns enablement.
+func LoadPackages(ctx context.Context, path string, base collectorapi.Registry) (collectorapi.Registry, error) {
+	return loadPackages(ctx, path, base, pathvalidate.ValidateBinaryPath)
 }
 
 func loadPackages(
+	ctx context.Context,
 	path string,
 	base collectorapi.Registry,
 	validate func(string) (string, error),
@@ -38,8 +42,9 @@ func loadPackages(
 	var inventory struct {
 		Version  string `yaml:"version"`
 		Packages []struct {
-			Name     string `yaml:"name"`
-			Manifest string `yaml:"manifest"`
+			Name     string   `yaml:"name"`
+			Manifest string   `yaml:"manifest"`
+			Command  []string `yaml:"command"`
 		} `yaml:"packages"`
 	}
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
@@ -63,7 +68,30 @@ func loadPackages(
 		if _, exists := registry[name]; exists {
 			return nil, fmt.Errorf("duplicate package module %q", name)
 		}
-		definition, templates, err := loadManifest(entry.Manifest, validate)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if (entry.Manifest == "") == (entry.Command == nil) {
+			return nil, fmt.Errorf("package %s requires exactly one manifest or command", name)
+		}
+		var definition manifest
+		var templates *chartengine.TemplateSet
+		if entry.Command == nil {
+			definition, templates, err = loadManifest(entry.Manifest, validate)
+		} else {
+			if len(entry.Command) == 0 || !filepath.IsAbs(entry.Command[0]) {
+				return nil, fmt.Errorf("package %s command requires an absolute executable", name)
+			}
+			command := append([]string(nil), entry.Command...)
+			command[0], err = validate(command[0])
+			if err == nil {
+				var data []byte
+				data, err = describePackage(ctx, command)
+				if err == nil {
+					definition, templates, err = parseDescription(data, command)
+				}
+			}
+		}
 		if err != nil {
 			return nil, fmt.Errorf("package %s: %w", name, err)
 		}
@@ -102,6 +130,9 @@ func loadPackages(
 			}
 		}
 		registry.Register(name, creator)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	return registry, nil
 }

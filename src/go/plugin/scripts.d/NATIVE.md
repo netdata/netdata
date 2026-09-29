@@ -1,7 +1,8 @@
 # Native script development
 
 The `native` collector runs language-neutral executable packages through scripts.d.
-A package supplies a manifest, an executable, and optionally a V2 chart template.
+A package can be one executable or script with a `describe` operation, or a file-backed
+manifest with an executable and optional chart/configuration files.
 Scripts report labeled metrics and named service checks. The development health
 template turns warning and critical checks into notifications.
 
@@ -54,8 +55,9 @@ jobs:
 ```
 
 Use the development binary for this configuration. There is no package
-auto-discovery. Explicit package registration below provides individual DynCfg forms. Initialization reads and validates local files without running
-the executable. Editing package files requires restarting or
+auto-discovery. Explicit package registration below provides individual DynCfg forms
+and self-contained executable packages. For the generic manifest job shown above,
+initialization reads and validates local files without running the executable. Editing package files requires restarting or
 reconfiguring the job; charts and declarations are fixed for that job instance.
 
 ## Manifest v1
@@ -150,10 +152,20 @@ beginning with a letter. Each entry registers module `native-<name>`, for exampl
 `native-queue`. Duplicate names or invalid packages reject startup. Ordinary
 production builds ignore this inventory entirely.
 
-The package's manifest, chart templates and configuration schema are read once at
-plugin startup. Changes to these files or the inventory require a plugin restart.
-The registered module binds that package: job configuration cannot replace its
-manifest or executable. Package registration never runs the executable and never
+Each entry MUST specify exactly one `manifest` path or `command` argv. A
+self-contained package uses an absolute executable path:
+
+```yaml
+version: v1
+packages:
+  - name: queue
+    command: [/usr/local/lib/netdata/custom/queue/queue-plugin]
+```
+
+The manifest source reads metadata files without executing the package. The command
+source executes `describe` once during plugin process startup. Both sources compile
+the same package definition before registration. The registered module binds its
+metadata and command: job configuration cannot replace them. Registration never
 creates a default job. Add a job through DynCfg or `scripts.d/native-queue.conf`:
 
 ```yaml
@@ -178,6 +190,79 @@ and a `config` object, but its form cannot reflect a particular package schema.
 The generic module accepts collection-only packages; Function declarations require
 startup registration. Generic jobs load package files during initialization; their pre-initialization
 configuration retrieval contains only submitted package values.
+
+### Self-contained executable packages
+
+The host appends the operation argument to the configured argv. For example,
+`command: [/usr/bin/python3, /protected/queue.py]` runs
+`/usr/bin/python3 /protected/queue.py describe`. The same configured command is used
+for `collect`, `serve` and `function`. The description MUST NOT contain `command`
+or select another executable.
+
+`describe` MUST print exactly one UTF-8 YAML or JSON document and exit zero. JSON
+strings support standard Unicode escapes, including surrogate pairs. Declaration
+field names are case-sensitive, and unknown fields and duplicate keys are rejected.
+It uses the manifest's `version`, `mode`, `metrics`, `checks` and `functions` declarations,
+with these inline assets:
+
+| Field | File manifest | Executable description |
+|---|---|---|
+| `charts` | Path to chart YAML | String containing the complete chart YAML |
+| `config_schema` | Path to the configuration form | Object containing `jsonSchema` and `uiSchema` |
+
+Both assets are optional under the same capability rules as file-backed packages.
+YAML block scalars make inline chart templates convenient; JSON producers encode
+the template as a string. Configuration forms use the same validation, default and
+local-reference rules described below. External asset paths are not supported in a
+description. Files are never extracted to disk.
+
+Description runs unprivileged through `nd-run`, with EOF on stdin, its minimal
+environment, and discarded stderr. It receives no job configuration or secrets.
+It MUST return static metadata without contacting the monitored service or starting
+background collection. This is an authoring contract, not a network sandbox.
+Execution occurs for every command entry in the selected inventory, even before a
+job exists or its module is enabled; only register trusted, administrator-controlled
+commands. Merely placing an executable in a directory does not register or run it.
+
+Each invocation has a five-second execution deadline and a separately defined
+**64 MiB** stdout limit, including whitespace. This startup-only cutoff bounds a
+broken producer while leaving generous room for embedded templates and forms;
+it is not derived from the size of existing packages. Operational messages have
+their own **64 MiB** ceiling. These are encoded-byte cutoffs, not memory budgets:
+buffers grow on demand, and copies plus decoded structures can use more memory.
+Timeout, nonzero exit, oversized output or invalid metadata rejects plugin startup;
+partial definitions are not registered. Command failures report safe categories,
+and metadata errors identify the failing document/declarations/form/template stage
+without echoing script-produced values. The host terminates contained descendants
+and joins its owned process/I/O before completing the operation.
+
+The validated metadata stays in memory for the plugin process lifetime. Creating
+jobs, DynCfg Test and configuration updates do not rerun `describe`. Replacing a
+binary or changing its metadata requires a **plugin process restart**, not only an
+in-process Agent restart. File-backed registered packages have the same metadata
+refresh rule. Scripts MUST keep the operational protocol compatible with the loaded
+description until that restart.
+
+Runnable single-file examples:
+
+- [`self-contained-bash/collect.sh`](development/self-contained-bash/collect.sh):
+  fixed labeled metrics and checks, with no JSON encoder dependency.
+- [`self-contained-python/collect.py`](development/self-contained-python/collect.py):
+  inline form, chart and interactive Function in one script.
+- [`self-contained-go`](development/self-contained-go/main.go): a Go binary using
+  `go:embed`; only the resulting executable is needed at runtime.
+
+All examples default to one-shot mode. Put `--persistent` before the appended
+operation by adding it to the configured argv to select persistent mode. For the
+Go example, build from `src/go` with:
+
+```sh
+go build -o native-queue ./plugin/scripts.d/development/self-contained-go
+```
+
+Install the resulting file under the protected path used in the inventory. Its
+build-time `description.yaml` is embedded and is not a runtime sidecar. The Bash
+example uses fixed values; use a proper JSON encoder when adding variable strings.
 
 ### Package configuration schema
 
@@ -240,7 +325,7 @@ persistent readiness:
 {"version":"v1","config":{"queue":"mail"}}
 ```
 
-The envelope is at most 1 MiB including LF. One-shot stdin then reaches EOF;
+The envelope is at most 64 MiB including LF. One-shot stdin then reaches EOF;
 persistent stdin continues with normal collection requests after readiness.
 Initialization has the same timeout as persistent startup. Blocking or failing to
 consume configuration fails startup/collection. Values are never passed through
@@ -257,7 +342,7 @@ Schema-free scripts keep their existing stdin and readiness behavior.
 ## Collection response
 
 In one-shot mode, each invocation MUST exit zero and print exactly one UTF-8 JSON
-object, at most 1 MiB including whitespace. Stdin is EOF for schema-free packages;
+object, at most 64 MiB including whitespace. Stdin is EOF for schema-free packages;
 configured packages receive one configuration envelope followed by EOF. In persistent mode, the
 same snapshot is carried in a correlated reply as described below. Stdout
 is exclusively the protocol; redirect command chatter to stderr. The collector
@@ -339,7 +424,7 @@ same process can answer the next request. It is not a health state. Use an expli
 `unknown` check when that is a valid observation of an existing service.
 
 Every handshake, request and reply MUST be one UTF-8 JSON object on one physical
-line, terminated by LF and flushed immediately. A frame is limited to 1 MiB,
+line, terminated by LF and flushed immediately. A frame is limited to 64 MiB,
 including LF and other whitespace. Embedded newlines in strings MUST be escaped.
 Exact field spelling, duplicate-key and null rules apply to envelopes as well as
 snapshots. A reply MUST contain exactly one of `result` or `error`; the only error
@@ -439,10 +524,10 @@ Arguments, payload and configuration stay on stdin, never in host-generated argv
 environment variables or diagnostics. Scripts MUST NOT expose credentials in
 Function output or error messages; those results are sent to the requesting UI.
 
-The request, including base64 expansion and terminating LF, MUST fit in 1 MiB.
+The request, including base64 expansion and terminating LF, MUST fit in 64 MiB.
 The host reserves space for the largest correlation ID when admitting a request;
 oversized requests fail before executing or writing to a script. Replies use the
-same 1 MiB bound. The Function context bounds how long the caller waits, including
+same 64 MiB bound. The Function context bounds how long the caller waits, including
 queue waiting. Cancellation before admission leaves the persistent peer usable.
 After admission, cancellation or deadline expiry returns to the caller promptly;
 the host allows up to `timeout` more seconds to finish writing and drain the
@@ -584,8 +669,10 @@ with `set -e` as above); do not emit a partial response after ignoring an error.
 
 ## Local validation
 
-Run the executable with the `collect` operation to inspect its JSON, then configure
-a scripts.d job. The collector tests run real Bash commands through the production
+For self-contained packages, run `describe` to inspect metadata without job input.
+For collection, supply the documented configuration envelope when a form is declared
+and invoke `collect`, or start `serve` and exchange framed requests. Then configure
+a development scripts.d job. The collector tests run real Bash commands through the production
 V2 job and command path with a test privilege-drop shim, and test encoding, complete
 snapshot validation, startup in a critical state, persistent state/recovery, terminal
 protocol failure, cancellation and descendant cleanup.

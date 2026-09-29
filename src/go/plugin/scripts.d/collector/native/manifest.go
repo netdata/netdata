@@ -31,31 +31,36 @@ const (
 
 func checkMetric(id string) string { return checkPrefix + id }
 
+// packageSpec is shared by file manifests and executable descriptions.
+type packageSpec struct {
+	Version   string                  `yaml:"version"   json:"version"`
+	Mode      string                  `yaml:"mode"      json:"mode"`
+	Metrics   []metricDefinition      `yaml:"metrics"   json:"metrics"`
+	Checks    []checkDefinition       `yaml:"checks"    json:"checks"`
+	Functions []nativefunc.Definition `yaml:"functions" json:"functions"`
+}
+
 type manifest struct {
-	Version      string                  `yaml:"version"`
-	Mode         string                  `yaml:"mode"`
-	Command      []string                `yaml:"command"`
-	Metrics      []metricDefinition      `yaml:"metrics"`
-	Checks       []checkDefinition       `yaml:"checks"`
-	Charts       string                  `yaml:"charts"`
-	Functions    []nativefunc.Definition `yaml:"functions"`
+	packageSpec  `yaml:",inline"`
+	Command      []string `yaml:"command"`
+	Charts       string   `yaml:"charts"`
+	ConfigSchema string   `yaml:"config_schema"`
 	methods      []funcapi.FunctionConfig
-	ConfigSchema string `yaml:"config_schema"`
 	config       *packageConfig
 	metricByName map[string]metricDefinition
 	checkByID    map[string]checkDefinition
 }
 
 type metricDefinition struct {
-	Name string `yaml:"name"`
-	Type string `yaml:"type"`
-	Unit string `yaml:"unit"`
+	Name string `yaml:"name" json:"name"`
+	Type string `yaml:"type" json:"type"`
+	Unit string `yaml:"unit" json:"unit"`
 }
 
 type checkDefinition struct {
-	ID       string   `yaml:"id"`
-	Title    string   `yaml:"title"`
-	ByLabels []string `yaml:"by_labels"`
+	ID       string   `yaml:"id"        json:"id"`
+	Title    string   `yaml:"title"     json:"title"`
+	ByLabels []string `yaml:"by_labels" json:"by_labels"`
 }
 
 func loadManifest(path string, validate func(string) (string, error)) (manifest, *chartengine.TemplateSet, error) {
@@ -76,15 +81,6 @@ func loadManifest(path string, validate func(string) (string, error)) (manifest,
 	if err := decoder.Decode(&extra); err != io.EOF {
 		return m, nil, fmt.Errorf("manifest must contain one YAML document")
 	}
-	if m.Version != "v1" {
-		return m, nil, fmt.Errorf("unsupported manifest version")
-	}
-	if m.Mode == "" {
-		m.Mode = modeOneshot
-	}
-	if m.Mode != modeOneshot && m.Mode != modePersistent {
-		return m, nil, fmt.Errorf("mode must be oneshot or persistent")
-	}
 	if len(m.Command) == 0 || m.Command[0] == "" {
 		return m, nil, fmt.Errorf("manifest command is required")
 	}
@@ -95,61 +91,89 @@ func loadManifest(path string, validate func(string) (string, error)) (manifest,
 	if err != nil {
 		return m, nil, fmt.Errorf("validate executable: %w", err)
 	}
+	if err := m.validate(); err != nil {
+		return m, nil, err
+	}
+	m.config, err = loadPackageConfig(filepath.Dir(path), m.ConfigSchema)
+	if err != nil {
+		return m, nil, err
+	}
+	var charts []byte
+	if m.Charts != "" {
+		chartPath := m.Charts
+		if !filepath.IsAbs(chartPath) {
+			chartPath = filepath.Join(filepath.Dir(path), chartPath)
+		}
+		charts, err = os.ReadFile(chartPath)
+		if err != nil {
+			return m, nil, fmt.Errorf("read charts: %w", err)
+		}
+	}
+	templates, err := m.chartTemplates(charts)
+	return m, templates, err
+}
+
+func (m *manifest) validate() error {
+	if m.Version != "v1" {
+		return fmt.Errorf("unsupported manifest version")
+	}
+	if m.Mode == "" {
+		m.Mode = modeOneshot
+	}
+	if m.Mode != modeOneshot && m.Mode != modePersistent {
+		return fmt.Errorf("mode must be oneshot or persistent")
+	}
 	m.metricByName = make(map[string]metricDefinition, len(m.Metrics))
 	for _, d := range m.Metrics {
 		if !metricName.MatchString(d.Name) || strings.HasPrefix(d.Name, "native.") {
-			return m, nil, fmt.Errorf("invalid or reserved metric name %q", d.Name)
+			return fmt.Errorf("invalid or reserved metric name %q", d.Name)
 		}
 		if d.Type != "gauge" && d.Type != "counter" {
-			return m, nil, fmt.Errorf("metric %q requires gauge or counter type", d.Name)
+			return fmt.Errorf("metric %q requires gauge or counter type", d.Name)
 		}
 		if _, ok := m.metricByName[d.Name]; ok {
-			return m, nil, fmt.Errorf("duplicate metric %q", d.Name)
+			return fmt.Errorf("duplicate metric %q", d.Name)
 		}
 		if strings.TrimSpace(d.Unit) == "" {
-			return m, nil, fmt.Errorf("metric %q requires a unit", d.Name)
+			return fmt.Errorf("metric %q requires a unit", d.Name)
 		}
 		m.metricByName[d.Name] = d
 	}
 	m.checkByID = make(map[string]checkDefinition, len(m.Checks))
 	for _, d := range m.Checks {
 		if !identifier.MatchString(d.ID) || strings.TrimSpace(d.Title) == "" {
-			return m, nil, fmt.Errorf("check requires a valid id and title")
+			return fmt.Errorf("check requires a valid id and title")
 		}
 		if _, ok := m.checkByID[d.ID]; ok {
-			return m, nil, fmt.Errorf("duplicate check %q", d.ID)
+			return fmt.Errorf("duplicate check %q", d.ID)
 		}
 		seen := map[string]bool{}
 		for _, key := range d.ByLabels {
 			if !identifier.MatchString(key) || seen[key] {
-				return m, nil, fmt.Errorf("check %q has invalid or duplicate identity labels", d.ID)
+				return fmt.Errorf("check %q has invalid or duplicate identity labels", d.ID)
 			}
 			seen[key] = true
 		}
 		m.checkByID[d.ID] = d
 	}
 	if len(m.Metrics)+len(m.Checks)+len(m.Functions) == 0 {
-		return m, nil, fmt.Errorf("manifest must declare metrics, checks or functions")
+		return fmt.Errorf("manifest must declare metrics, checks or functions")
 	}
+	var err error
 	m.methods, err = nativefunc.Declarations(m.Functions)
 	if err != nil {
-		return m, nil, err
+		return err
 	}
-	if m.functionOnly() && m.Charts != "" {
-		return m, nil, fmt.Errorf("function-only packages cannot declare charts")
-	}
-	m.config, err = loadPackageConfig(filepath.Dir(path), m.ConfigSchema)
-	if err != nil {
-		return m, nil, err
-	}
-	templates, err := m.chartTemplates(filepath.Dir(path))
-	return m, templates, err
+	return nil
 }
 
 func (m manifest) functionOnly() bool { return len(m.Metrics)+len(m.Checks) == 0 }
 
-func (m manifest) chartTemplates(dir string) (*chartengine.TemplateSet, error) {
+func (m manifest) chartTemplates(data []byte) (*chartengine.TemplateSet, error) {
 	if m.functionOnly() {
+		if data != nil {
+			return nil, fmt.Errorf("function-only packages cannot declare charts")
+		}
 		return nil, nil
 	}
 	spec := chartengine.TemplateSetSpec{
@@ -161,15 +185,7 @@ func (m manifest) chartTemplates(dir string) (*chartengine.TemplateSet, error) {
 			},
 		},
 	}
-	if m.Charts != "" {
-		path := m.Charts
-		if !filepath.IsAbs(path) {
-			path = filepath.Join(dir, path)
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("read charts: %w", err)
-		}
+	if data != nil {
 		set, err := chartengine.NewTemplateSetYAML(data)
 		if err != nil {
 			return nil, fmt.Errorf("invalid chart template")

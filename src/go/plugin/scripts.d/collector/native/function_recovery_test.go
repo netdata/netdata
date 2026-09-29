@@ -5,6 +5,7 @@ package native
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -167,7 +168,7 @@ func TestOneshotFunctionDiagnostics(t *testing.T) {
 	setupRunner(t)
 	for _, tc := range []struct{ name, body, diagnostic string }{
 		{"exit", `print("private-script-output", file=sys.stderr); sys.exit(7)`, "command exited with status 7"},
-		{"oversized", `print("x" * 1048577); sys.exit(0)`, "response exceeds 1 MiB"},
+		{"oversized", fmt.Sprintf(`print("x" * %d); sys.exit(0)`, maxMessageBytes+1), "response exceeds 64 MiB"},
 		{"invalid", `print('{"private-script-output":true}'); sys.exit(0)`, "invalid reply"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

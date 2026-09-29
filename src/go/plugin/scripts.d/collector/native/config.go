@@ -108,6 +108,10 @@ func loadPackageConfig(dir, name string) (*packageConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read package config schema: %w", err)
 	}
+	return parsePackageConfig(data)
+}
+
+func parsePackageConfig(data []byte) (*packageConfig, error) {
 	// The same strict JSON token checks used for protocol objects reject duplicate keys.
 	tokens := json.NewDecoder(bytes.NewReader(data))
 	tokens.UseNumber()
@@ -341,8 +345,8 @@ func (c *Collector) configurationEnvelope() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("config cannot be encoded")
 	}
-	if len(data)+1 > maxResponseBytes {
-		return nil, fmt.Errorf("config envelope exceeds 1 MiB")
+	if len(data)+1 > maxMessageBytes {
+		return nil, fmt.Errorf("config envelope exceeds 64 MiB")
 	}
 	return append(data, '\n'), nil
 }
