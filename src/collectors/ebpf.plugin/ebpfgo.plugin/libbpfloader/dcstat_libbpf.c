@@ -153,7 +153,17 @@ enum netdata_dcstat_global_key {
 #define NETDATA_DCSTAT_DEFAULT_LOOKUP_FAST_TARGET "lookup_fast"
 #define NETDATA_DCSTAT_DEFAULT_D_LOOKUP_TARGET "d_lookup"
 
-static int dcstat_resolve_program_names(struct bpf_object *obj, const char **names)
+static bool dcstat_prefer_buffer_programs(int flavor)
+{
+#ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
+    return flavor == NETDATA_DCSTAT_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_DCSTAT_RUNTIME_FLAVOR_ARENA;
+#else
+    (void)flavor;
+    return false;
+#endif
+}
+
+static int dcstat_resolve_program_names(struct bpf_object *obj, int flavor, const char **names)
 {
     static const char *const lookup_fast[] = {
         "netdata_lookup_fast_kprobe", "netdata_lookup_fast_buffer", "netdata_lookup_fast",
@@ -162,8 +172,11 @@ static int dcstat_resolve_program_names(struct bpf_object *obj, const char **nam
         "netdata_d_lookup_kretprobe", "netdata_d_lookup_buffer", "netdata_d_lookup",
     };
 
-    names[0] = nd_ebpf_find_program_name(obj, lookup_fast, sizeof(lookup_fast) / sizeof(lookup_fast[0]));
-    names[1] = nd_ebpf_find_program_name(obj, d_lookup, sizeof(d_lookup) / sizeof(d_lookup[0]));
+    bool prefer_buffer = dcstat_prefer_buffer_programs(flavor);
+    names[0] = nd_ebpf_find_program_name_preferring_buffer(
+        obj, lookup_fast, sizeof(lookup_fast) / sizeof(lookup_fast[0]), prefer_buffer);
+    names[1] = nd_ebpf_find_program_name_preferring_buffer(
+        obj, d_lookup, sizeof(d_lookup) / sizeof(d_lookup[0]), prefer_buffer);
     for (size_t i = 0; i < NETDATA_DCSTAT_LINK_COUNT; i++) {
         if (!names[i]) {
             fprintf(stderr, "dcstat: object does not contain required probe %zu\n", i);
@@ -358,7 +371,7 @@ int netdata_dcstat_runtime_prepare(
     if (!rt || !obj)
         return -1;
 
-    if (dcstat_resolve_program_names(obj, rt->program_names) != 0 ||
+    if (dcstat_resolve_program_names(obj, rt->flavor, rt->program_names) != 0 ||
         nd_ebpf_prepare_autoload(obj, rt->program_names, NETDATA_DCSTAT_LINK_COUNT, "dcstat") != 0)
         return -1;
     if (dcstat_update_map_types(obj, maps_per_core) != 0)

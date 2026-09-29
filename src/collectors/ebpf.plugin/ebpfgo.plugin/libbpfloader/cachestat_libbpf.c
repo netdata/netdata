@@ -129,7 +129,18 @@ ND_EBPF_ASSERT_PID_FIRST(struct netdata_ebpf_cachestat_pid_snapshot);
 int netdata_cachestat_runtime_supports_core(void);
 
 
-static const char *cachestat_resolve_account_program(struct bpf_object *obj, const char *account_function)
+static bool cachestat_prefer_buffer_programs(int flavor)
+{
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
+    return flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA;
+#else
+    (void)flavor;
+    return false;
+#endif
+}
+
+static const char *cachestat_resolve_account_program(
+    struct bpf_object *obj, const char *account_function, bool prefer_buffer)
 {
     static const char *const folio[] = {
         "netdata_folio_mark_dirty_kprobe", "netdata_folio_mark_dirty_buffer",
@@ -151,16 +162,20 @@ static const char *cachestat_resolve_account_program(struct bpf_object *obj, con
     };
 
     if (!account_function || !strcmp(account_function, "account_page_dirtied"))
-        return nd_ebpf_find_program_name(obj, account, sizeof(account) / sizeof(account[0]));
+        return nd_ebpf_find_program_name_preferring_buffer(
+            obj, account, sizeof(account) / sizeof(account[0]), prefer_buffer);
     if (!strcmp(account_function, "__set_page_dirty"))
-        return nd_ebpf_find_program_name(obj, set_page, sizeof(set_page) / sizeof(set_page[0]));
+        return nd_ebpf_find_program_name_preferring_buffer(
+            obj, set_page, sizeof(set_page) / sizeof(set_page[0]), prefer_buffer);
     if (!strcmp(account_function, "__folio_mark_dirty"))
-        return nd_ebpf_find_program_name(obj, folio, sizeof(folio) / sizeof(folio[0]));
+        return nd_ebpf_find_program_name_preferring_buffer(
+            obj, folio, sizeof(folio) / sizeof(folio[0]), prefer_buffer);
 
     return NULL;
 }
 
-static int cachestat_resolve_program_names(struct bpf_object *obj, const char *account_function, const char **names)
+static int cachestat_resolve_program_names(
+    struct bpf_object *obj, const char *account_function, int flavor, const char **names)
 {
     static const char *const add[] = {
         "netdata_add_to_page_cache_lru_kprobe", "netdata_add_to_page_cache_lru_buffer",
@@ -175,10 +190,13 @@ static int cachestat_resolve_program_names(struct bpf_object *obj, const char *a
         "netdata_mark_buffer_dirty",
     };
 
-    names[0] = nd_ebpf_find_program_name(obj, add, sizeof(add) / sizeof(add[0]));
-    names[1] = nd_ebpf_find_program_name(obj, access, sizeof(access) / sizeof(access[0]));
-    names[2] = cachestat_resolve_account_program(obj, account_function);
-    names[3] = nd_ebpf_find_program_name(obj, dirty, sizeof(dirty) / sizeof(dirty[0]));
+    bool prefer_buffer = cachestat_prefer_buffer_programs(flavor);
+    names[0] = nd_ebpf_find_program_name_preferring_buffer(obj, add, sizeof(add) / sizeof(add[0]), prefer_buffer);
+    names[1] =
+        nd_ebpf_find_program_name_preferring_buffer(obj, access, sizeof(access) / sizeof(access[0]), prefer_buffer);
+    names[2] = cachestat_resolve_account_program(obj, account_function, prefer_buffer);
+    names[3] =
+        nd_ebpf_find_program_name_preferring_buffer(obj, dirty, sizeof(dirty) / sizeof(dirty[0]), prefer_buffer);
 
     for (size_t i = 0; i < 4; i++) {
         if (!names[i]) {
@@ -381,7 +399,7 @@ int netdata_cachestat_runtime_prepare(
     if (!rt || !obj)
         return -1;
 
-    if (cachestat_resolve_program_names(obj, account_function, rt->program_names) != 0 ||
+    if (cachestat_resolve_program_names(obj, account_function, rt->flavor, rt->program_names) != 0 ||
         nd_ebpf_prepare_autoload(obj, rt->program_names, 4, "cachestat") != 0)
         return -1;
     if (cachestat_update_map_types(obj, maps_per_core) != 0)

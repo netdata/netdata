@@ -100,6 +100,24 @@ static inline const char *nd_ebpf_find_program_name(
     return NULL;
 }
 
+static inline const char *nd_ebpf_find_program_name_preferring_buffer(
+    struct bpf_object *obj, const char *const *candidates, size_t count, bool prefer_buffer)
+{
+    static const char suffix[] = "_buffer";
+
+    if (prefer_buffer) {
+        for (size_t i = 0; i < count; i++) {
+            size_t name_len = strlen(candidates[i]);
+            if (name_len >= sizeof(suffix) - 1 &&
+                strcmp(candidates[i] + name_len - (sizeof(suffix) - 1), suffix) == 0 &&
+                bpf_object__find_program_by_name(obj, candidates[i]))
+                return candidates[i];
+        }
+    }
+
+    return nd_ebpf_find_program_name(obj, candidates, count);
+}
+
 static inline int nd_ebpf_prepare_autoload(
     struct bpf_object *obj, const char *const *program_names, size_t count, const char *module)
 {
