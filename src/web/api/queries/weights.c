@@ -1941,6 +1941,11 @@ static NETDATA_DOUBLE weights_anomaly_rate_with_gaps(
        !netdata_double_isnumber(value) || !sp->count)
         return value;
 
+    // These options return a transformed value, not a window anomaly rate.
+    if((options & RRDR_OPTION_DIMS_MIN2MAX) ||
+       ((options & RRDR_OPTION_PERCENTAGE) && !(options & RRDR_OPTION_RETURN_RAW)))
+        return value;
+
     time_t update_every = rrdinstance_acquired_update_every(ria);
     if(update_every <= 0 || window_duration_s <= 0)
         return value;
