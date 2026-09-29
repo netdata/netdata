@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio_util::sync::CancellationToken;
 
 use common::{
-    kv_double, kv_int, kv_null, kv_str, memory_source, missing_source, req, req_with,
+    SpanSpec, kv_double, kv_int, kv_null, kv_str, memory_source, missing_source, req, req_with,
     sealed_source, sp, tail_source, unavailable_source, write_wal,
 };
 use sfsq::Source;
@@ -373,13 +373,45 @@ fn builtin_values_serve_and_virtual_builtins_reject() {
         keys.keys
             .contains(&(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Status)))
     );
-    // But its VALUES are an empty Complete result — a data condition.
+    // Its spans were sent without a status or kind: the OTel defaults are
+    // stored, so they are the values.
     let sv = values(
         vec![sealed_source(dir.path(), &plain, "bare2")],
         AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Status)),
     );
-    assert!(sv.values.is_empty());
+    assert_eq!(value_strings(&sv), ["UNSET"]);
     assert_eq!(sv.status, QueryStatus::Complete);
+    let kv = values(
+        vec![sealed_source(dir.path(), &plain, "bare3")],
+        AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Kind)),
+    );
+    assert_eq!(value_strings(&kv), ["UNSPECIFIED"]);
+
+    // Defaults sit beside explicit values in one sorted list.
+    let mut ok = sp(2, 0, 2_000, "op-ok");
+    ok.status = Some((1, ""));
+    let mixed = write_wal(
+        dir.path(),
+        vec![req(&[a_error_server(), ok, sp(3, 0, 3_000, "op-default")])],
+        "m",
+    );
+    let status = values(
+        vec![sealed_source(dir.path(), &mixed, "mixed-status")],
+        AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Status)),
+    );
+    assert_eq!(value_strings(&status), ["ERROR", "OK", "UNSET"]);
+    let kind = values(
+        vec![sealed_source(dir.path(), &mixed, "mixed-kind")],
+        AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Kind)),
+    );
+    assert_eq!(value_strings(&kind), ["SERVER", "UNSPECIFIED"]);
+}
+
+fn a_error_server() -> SpanSpec {
+    let mut a = sp(1, 0, 1_000, "op-a");
+    a.kind = 2; // SERVER
+    a.status = Some((2, "boom")); // ERROR
+    a
 }
 
 /// The optional window prunes SFST candidates by summary overlap

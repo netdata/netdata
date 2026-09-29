@@ -566,6 +566,36 @@ async fn selections_narrow_by_service_operation_and_attributes() {
 }
 
 #[tokio::test]
+async fn the_otel_defaults_are_selectable_in_the_functions_view() {
+    use crate::ledger::rpc::traces::fixtures::otlp_req_err;
+    let registries = make_registries();
+    install_wal(
+        &registries,
+        "default",
+        1,
+        vec![
+            otlp_req_err(0x0A, 1, base_ns(10), "svc"), // its only span is ERROR
+            otlp_req_svc(0x0B, 2, base_ns(20), "svc"), // no status, no kind
+        ],
+    )
+    .await;
+    let h = make_handler_over(registries);
+
+    let mut body = functions_body(20);
+    body["selections"] = json!({"status": ["UNSET"]});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v["data"]), ["0b"]);
+    let o = &v["data"]["overview"];
+    assert_eq!(o["scope"], "selection");
+    assert_eq!(o["totals"], json!({"traces": 1, "spans": 2, "errors": 0}));
+
+    let mut body = functions_body(20);
+    body["selections"] = json!({"kind": ["UNSPECIFIED"]});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v["data"]), ["0b", "0a"]);
+}
+
+#[tokio::test]
 async fn duration_bounds_filter_spans() {
     let h = handler_with_search_corpus().await;
     // Fixture spans last 500 ns each.

@@ -58,7 +58,8 @@ pub struct SpanRef {
     pub position: u32,
     pub start_ns: i64,
     pub span_id: SpanId,
-    /// Raw OTLP span kind int (0 = UNSPECIFIED/absent) — part of the
+    /// Raw OTLP span kind int (0 = UNSPECIFIED, which older files leave
+    /// absent) — part of the
     /// dedup key.
     pub kind: i32,
 }

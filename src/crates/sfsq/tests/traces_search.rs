@@ -462,16 +462,50 @@ fn oracle_equivalence_under_relayouts() {
             vec![],
         ),
         (
-            // Negated builtin with skip-at-flatten absence: the kind
-            // LABEL exists only on T1's SERVER and T4's CONSUMER spans
-            // (UNSPECIFIED is skipped), so `kind != SERVER` = T4 alone.
+            // Negated builtin: every span stores its kind label, the
+            // UNSPECIFIED default included, so `kind != SERVER` matches
+            // every trace owning a non-SERVER span — all six (T1 through
+            // its UNSPECIFIED child).
             "negated-kind",
             SearchQuery::new(pred(vec![builtin(
                 BuiltinField::Kind,
                 CompareOp::NotEq,
                 vec![text("SERVER")],
             )])),
-            vec![hex(4)],
+            vec![hex(3), hex(5), hex(6), hex(4), hex(2), hex(1)],
+        ),
+        (
+            // The UNSPECIFIED default is a stored, selectable kind.
+            "kind-unspecified",
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::Kind,
+                CompareOp::Eq,
+                vec![text("UNSPECIFIED")],
+            )])),
+            vec![hex(3), hex(5), hex(6), hex(2), hex(1)],
+        ),
+        (
+            // The UNSET default is a stored, selectable status: every
+            // span sent without a status (T1's child, T3's late child,
+            // T4, T6's canonical copy).
+            "status-unset",
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::Status,
+                CompareOp::Eq,
+                vec![text("UNSET")],
+            )])),
+            vec![hex(3), hex(6), hex(4), hex(1)],
+        ),
+        (
+            // `status != ERROR` reaches UNSET spans too, not only OK ones
+            // (which alone would give T1 and T3).
+            "status-not-error",
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::Status,
+                CompareOp::NotEq,
+                vec![text("ERROR")],
+            )])),
+            vec![hex(3), hex(6), hex(4), hex(1)],
         ),
         (
             // The any-owner disjunction: `env` is a RESOURCE attribute of

@@ -117,8 +117,8 @@ impl BuiltinField {
     /// VIRTUAL (no value dictionary anywhere — see the type docs).
     ///
     /// Values come back as the STORAGE labels (`kind` ∈
-    /// `INTERNAL/SERVER/CLIENT/PRODUCER/CONSUMER`, `status` ∈
-    /// `OK/ERROR`); mapping those to a wire vocabulary is the wire
+    /// `UNSPECIFIED/INTERNAL/SERVER/CLIENT/PRODUCER/CONSUMER`, `status` ∈
+    /// `UNSET/OK/ERROR`); mapping those to a wire vocabulary is the wire
     /// adapter's job, next to its name table.
     pub fn dictionary_field(self) -> Option<&'static str> {
         match self {

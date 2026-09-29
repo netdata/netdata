@@ -782,8 +782,8 @@ pub struct AttributesResult {
 }
 
 /// One key's values. Values are the engine's STORAGE labels (`status` ∈
-/// `OK`/`ERROR`, `kind` ∈ `INTERNAL`/`SERVER`/…) — exactly what search
-/// `selections` match on.
+/// `UNSET`/`OK`/`ERROR`, `kind` ∈ `UNSPECIFIED`/`INTERNAL`/`SERVER`/…) —
+/// exactly what search `selections` match on.
 #[derive(Debug, Serialize)]
 pub struct AttributeValuesResult {
     /// The response's self-description: always `"attribute_values"`.
