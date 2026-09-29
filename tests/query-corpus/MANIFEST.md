@@ -279,6 +279,7 @@ set at the end.
 | W/limit-thousand | a weights cap of 1000 retains exactly the strongest 1000 of 1005 physical metrics while preserving complete parent means | n/a |  |
 | W/limit-hierarchy | weights limiting preserves complete shared ancestors and emits only dictionaries and ancestor rows reachable from retained metrics | n/a |  |
 | W/limit-node-ties | equal weights select physical metrics by stable node and metric identity while retaining metadata for nodes without selected metrics | n/a |  |
+| W/v1-host-scope | v1 weights respect the URL-selected host while v2/v3 retain explicit multi-node scope | n/a |  |
 | W/limit-mcp | MCP weights preserve caller default and minimum limits and descending raw scores while reporting exact-boundary truncation truthfully | n/a |  |
 
 ## Corpus-wide pusher discipline

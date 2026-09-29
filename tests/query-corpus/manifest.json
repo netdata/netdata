@@ -1238,6 +1238,10 @@
     "proves": "equal weights select physical metrics by stable node and metric identity while retaining metadata for nodes without selected metrics"
   },
   {
+    "name": "W/v1-host-scope",
+    "proves": "v1 weights respect the URL-selected host while v2/v3 retain explicit multi-node scope"
+  },
+  {
     "name": "W/limit-mcp",
     "proves": "MCP weights preserve caller default and minimum limits and descending raw scores while reporting exact-boundary truncation truthfully"
   }
