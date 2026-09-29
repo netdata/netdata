@@ -997,7 +997,8 @@ pub struct TraceSummaryWire {
 /// `sum(top[].spans) + other + unattributed == span_count`.
 #[derive(Debug, Serialize)]
 pub struct ServiceBreakdownWire {
-    /// At most 5 services — span count DESC, name ASC.
+    /// At most [`sfsq::traces::SERVICE_BREAKDOWN_TOP_K`] services — span
+    /// count DESC, name ASC.
     pub top: Vec<ServiceSpansWire>,
     /// Spans in the services beyond `top`.
     pub other: u64,

@@ -922,6 +922,22 @@ fn service_breakdown_partitions_the_retained_canonical_spans() {
         )
     );
 
+    // Filtered to cart: only trace 21 matches, on two spans, yet its
+    // breakdown still covers every retained span, not just the matched ones.
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let filtered = run(
+        sources,
+        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Resource, "service.name", "cart")])),
+    );
+    assert_eq!(ids(&filtered), vec![hex(21)]);
+    assert_breakdowns_partition(&filtered);
+    let t21 = &filtered.traces[0];
+    assert_eq!((t21.span_count, t21.matched_count), (9, 2));
+    assert_eq!(
+        t21.service_breakdown,
+        breakdown(&[("frontend", 3), ("auth", 2), ("cart", 2)], 0, 0, 2)
+    );
+
     // Capped at 2 spans: each trace keeps its two earliest, inexact, and
     // the breakdown partitions exactly those.
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
