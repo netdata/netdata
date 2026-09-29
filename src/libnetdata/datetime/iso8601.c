@@ -49,7 +49,16 @@ size_t iso8601_datetime_ut(char *buffer, size_t len, usec_t now_ut, ISO8601_OPTI
     }
     else {
         // Calculate the timezone offset in hours and minutes from UTC.
+#ifdef HAVE_TM_GMTOFF
         long offset = tmbuf.tm_gmtoff;
+#elif defined(OS_WINDOWS)
+        // _mkgmtime treats the local-time struct as UTC; the difference to t
+        // is exactly the UTC offset (including DST).
+        struct tm tmp_gm = tmbuf;
+        long offset = (long)(_mkgmtime(&tmp_gm) - t);
+#else
+        long offset = 0;
+#endif
         int hours = (int) (offset / 3600); // Convert offset seconds to hours.
         int minutes = (int) ((offset % 3600) / 60); // Convert remainder to minutes (keep the sign for minutes).
 

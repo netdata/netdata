@@ -558,7 +558,8 @@ static void dyncfg_unittest_cleanup_files(void) {
     struct dirent *entry;
     char filename[FILENAME_MAX + sizeof(entry->d_name)];
     while ((entry = readdir(dir)) != NULL) {
-        if ((entry->d_type == DT_REG || entry->d_type == DT_LNK) &&
+        unsigned char type = nd_dirent_type(path, entry);
+        if ((type == DT_REG || type == DT_LNK) &&
             (strstartswith(entry->d_name, "unittest:") || strstartswith(entry->d_name, escaped_prefix)) &&
             strendswith(entry->d_name, ".dyncfg")) {
             snprintf(filename, sizeof(filename), "%s/%s", path, entry->d_name);

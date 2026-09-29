@@ -185,7 +185,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     }
     run = true;
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);
-
     nd_log_limits_unlimited();
     netdata_log_exit_reason();
 
@@ -229,9 +228,10 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_STOP_COLLECTORS_AND_STREAMING_THREADS);
 
 #ifdef ENABLE_DBENGINE
-    if(!abnormal && dbengine_enabled)
+    if(!abnormal && dbengine_enabled) {
         // flush all dirty pages now that all collectors and streaming completed
         rrdeng_flush_everything_and_wait(false, false, true);
+    }
 #endif
 
     service_wait_exit(SERVICE_REPLICATION, 5 * USEC_PER_SEC);
@@ -398,6 +398,14 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
 
     // unlink the pipe
+    // During the commands_exit() signal-handler path, libuv may already
+    // have unlinked the pipe on close. For other exit paths the command
+    // thread keeps running and we must clean it up here. ENOENT just means
+    // libuv beat us to removing it.
+    // On Windows, the pipe is a Named Pipe (\\.\pipe\...) — a kernel object,
+    // not a filesystem path. Windows cleans it up automatically when the last
+    // handle closes; unlink()/DeleteFile() on a pipe path always fails.
+#if !defined(OS_WINDOWS)
     // commands_exit() above (or the earlier signal-handler call) has normally stopped the
     // command loop by now, and libuv unlinks the pipe when it closes. Two exceptions, where the
     // loop is still live and we unlink from under it:
@@ -414,6 +422,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     const char *pipe = daemon_pipename();
     if(pipe && *pipe && unlink(pipe) != 0 && errno != ENOENT)
         netdata_log_error("EXIT: cannot unlink netdatacli socket file '%s'.", pipe);
+#endif
 
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_PID_FILE);
 
@@ -505,6 +514,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     fprintf(stderr, "All done, exiting...\n");
 #endif
 
+#if defined(OS_WINDOWS)
+    if (!abnormal)
+        nd_log_stop_windows_async();
+#endif
+
     if(!exit_when_done) {
         curl_global_cleanup();
         return;
@@ -516,12 +530,19 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     nd_sentry_fini();
     curl_global_cleanup();
+#if defined(OS_WINDOWS)
+    if (!abnormal)
+        nd_windows_signal_shutdown_complete();
+#endif
     exit(abnormal ? 1 : 0);
 #else
     if(abnormal)
         _exit(1);
     else {
         curl_global_cleanup();
+#if defined(OS_WINDOWS)
+        nd_windows_signal_shutdown_complete();
+#endif
         exit(0);
     }
 #endif

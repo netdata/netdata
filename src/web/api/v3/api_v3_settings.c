@@ -116,6 +116,15 @@ static inline size_t settings_get_version(const char *path, bool have_lock) {
 }
 
 static FILE *settings_open_tmp_file(const char *filename) {
+#if defined(OS_WINDOWS)
+    bool reuse = false;
+    int flags = O_WRONLY | O_CLOEXEC | O_NONBLOCK;
+    int fd = nd_open_no_follow(filename, flags | O_CREAT | O_EXCL, 0666);
+    if(fd == -1 && errno == EEXIST) {
+        reuse = true;
+        fd = nd_open_no_follow(filename, flags, 0666);
+    }
+#else
     struct stat before;
     bool reuse = lstat(filename, &before) == 0;
     if(reuse && !S_ISREG(before.st_mode)) {
@@ -134,6 +143,7 @@ static FILE *settings_open_tmp_file(const char *filename) {
         flags |= O_CREAT | O_EXCL;
 
     int fd = open(filename, flags, 0666);
+#endif
     if(fd == -1)
         return NULL;
 
@@ -145,8 +155,11 @@ static FILE *settings_open_tmp_file(const char *filename) {
         return NULL;
     }
 
-    if(!S_ISREG(after.st_mode) ||
-       (reuse && (before.st_dev != after.st_dev || before.st_ino != after.st_ino))) {
+    if(!S_ISREG(after.st_mode)
+#if !defined(OS_WINDOWS)
+       || (reuse && (before.st_dev != after.st_dev || before.st_ino != after.st_ino))
+#endif
+    ) {
         close(fd);
         errno = EINVAL;
         return NULL;
@@ -265,7 +278,7 @@ static inline int settings_put(struct web_client *w, char *file) {
     char filename[FILENAME_MAX];
     settings_filename(filename, file, NULL);
 
-    bool renamed = rename(tmp_filename, filename) == 0;
+    bool renamed = os_rename(tmp_filename, filename) == 0;
     if(!renamed)
         unlink(tmp_filename);
 

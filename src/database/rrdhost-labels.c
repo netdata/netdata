@@ -172,6 +172,12 @@ static void rrdhost_load_config_labels(void) {
 // the previously-loaded k8s labels (see reload_host_labels()) so a transient
 // script failure does not silently delete them.
 static bool rrdhost_load_kubernetes_labels(void) {
+#if defined(OS_WINDOWS)
+    // Windows agents never run inside a Kubernetes pod, and the loader is a
+    // shell script the package does not guarantee a shell for. Report "not
+    // loaded" so the caller preserves whatever a previous run added.
+    return false;
+#else
     char label_script[sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("get-kubernetes-labels.sh") + 2)];
     sprintf(label_script, "%s/%s", netdata_configured_primary_plugins_dir, "get-kubernetes-labels.sh");
 
@@ -207,6 +213,7 @@ static bool rrdhost_load_kubernetes_labels(void) {
     }
 
     return true;
+#endif
 }
 
 static void rrdhost_load_auto_labels(void) {
@@ -421,6 +428,12 @@ static int streamed_windows_system_info_unittest(void) {
     rrdlabels_add(labels, "_os_marketing_version", "11", RRDLABEL_SRC_AUTO);
 
     struct rrdhost_system_info *system_info = rrdhost_system_info_from_host_labels(labels);
+    struct rrdhost_system_info *wmi_info = rrdhost_system_info_create();
+    rrdhost_system_info_set_by_name(wmi_info, "NETDATA_SYSTEM_VIRTUALIZATION", "KVM");
+    rrdhost_system_info_set_by_name(wmi_info, "NETDATA_SYSTEM_VIRT_DETECTION", "WMI");
+    rrdhost_system_info_copy_virtualization(system_info, wmi_info);
+    rrdhost_system_info_free(wmi_info);
+
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
     rrdhost_system_info_to_json_v1(wb, system_info);
@@ -429,13 +442,18 @@ static int streamed_windows_system_info_unittest(void) {
     rrdhost_system_info_to_rrdlabels(system_info, roundtrip);
     char version[RRDLABELS_MAX_VALUE_LENGTH + 1];
     char marketing_version[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    char virtualization[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    char virtualization_detection[RRDLABELS_MAX_VALUE_LENGTH + 1];
     rrdlabels_get_value_strcpyz(roundtrip, version, sizeof(version), "_os_version");
     rrdlabels_get_value_strcpyz(roundtrip, marketing_version, sizeof(marketing_version), "_os_marketing_version");
+    rrdlabels_get_value_strcpyz(roundtrip, virtualization, sizeof(virtualization), "_virtualization");
+    rrdlabels_get_value_strcpyz(roundtrip, virtualization_detection, sizeof(virtualization_detection), "_virt_detection");
 
     int err = !strstr(buffer_tostring(wb), "Microsoft Windows") ||
               !strstr(buffer_tostring(wb), "Microsoft Windows 11 Home") ||
-              strcmp(version, "Microsoft Windows 11 Home") || strcmp(marketing_version, "11");
-    fprintf(stderr, "  streamed Windows OS labels and public metadata: %s\n", err ? "FAILED" : "OK");
+              strcmp(version, "Microsoft Windows 11 Home") || strcmp(marketing_version, "11") ||
+              strcmp(virtualization, "KVM") || strcmp(virtualization_detection, "WMI");
+    fprintf(stderr, "  streamed Windows OS labels and WMI field-only merge: %s\n", err ? "FAILED" : "OK");
 
     rrdlabels_destroy(roundtrip);
     rrdhost_system_info_free(system_info);

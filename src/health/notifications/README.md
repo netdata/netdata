@@ -10,7 +10,8 @@ The Agent uses a notification script defined in `netdata.conf` under the `[healt
 script to execute on alarm = /usr/libexec/netdata/plugins.d/alarm-notify.sh
 ```
 
-The default script is `alarm-notify.sh`.
+The default script is `alarm-notify.sh` on non-Windows systems. Windows does not execute this legacy shell script;
+configure a native notification executable instead.
 
 This script handles:
 

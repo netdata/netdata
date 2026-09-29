@@ -46,6 +46,7 @@ static inline void initialize_single_ctx(struct rrdengine_instance *ctx) {
     memset(ctx, 0, sizeof(*ctx));
     netdata_rwlock_init(&ctx->datafiles.rwlock);
     rw_spinlock_init(&ctx->njfv2idx.spinlock);
+    spinlock_init(&ctx->deletion.spinlock);
 }
 
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
@@ -1201,6 +1202,7 @@ int rrdeng_init(
     if(ctxp) {
         *ctxp = ctx = mallocz(sizeof(*ctx));
         initialize_single_ctx(ctx);
+        ctx->dynamically_allocated = true;
         freshly_initialized_ctx = true;
     }
     else
@@ -1227,16 +1229,28 @@ int rrdeng_init(
     // Global contexts may already have MRG prepopulation accounting from the first DBEngine spawn.
     rrdeng_reset_accounting_if_fresh(ctx, freshly_initialized_ctx);
 
-    if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
-        // success - we run this ctx too
-        rrdeng_populate_mrg(ctx);
-        return 0;
+    bool spawn_ok = rrdeng_dbengine_spawn(ctx);
+    if (spawn_ok) {
+        int files_ret = init_rrd_files(ctx);
+        if (!files_ret) {
+            // success - we run this ctx too
+            rrdeng_populate_mrg(ctx);
+            return 0;
+        }
     }
 
-    if (unittest_running) {
-        freez(ctx);
-        if (ctxp)
-            *ctxp = NULL;
+    if (ctx->dynamically_allocated) {
+        bool drained = rrdeng_file_deletion_drain(ctx);
+        if (drained) {
+            freez(ctx);
+            if (ctxp)
+                *ctxp = NULL;
+        }
+        else if (ctxp) {
+            // Keep the context alive until queued callbacks finish; they retain
+            // its pointer while unlink work is in flight.
+            *ctxp = ctx;
+        }
     }
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
@@ -1273,6 +1287,8 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
 
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
 
+    (void)rrdeng_file_deletion_drain(ctx);
+
     struct completion completion = {};
     completion_init(&completion);
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_SHUTDOWN, NULL, &completion, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
@@ -1280,8 +1296,20 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
-    if(unittest_running)
-        freez(ctx);
+    // After shutdown completion the loop may have enqueued final file
+    // deletions. Wait for them, and only free `ctx` when the drain succeeded:
+    // rrdeng_file_deletion_after() dereferences `ctx` (atomic counters,
+    // deletion spinlock, config), so freeing while a callback is still
+    // pending is a use-after-free.
+    bool drained = rrdeng_file_deletion_drain(ctx);
+
+    if(unittest_running && ctx->dynamically_allocated) {
+        if(drained)
+            freez(ctx);
+        else
+            netdata_log_error("DBENGINE: tier %d: keeping ctx allocated because file-deletion drain timed out",
+                              ctx->config.tier);
+    }
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return 0;

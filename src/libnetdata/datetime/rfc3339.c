@@ -156,7 +156,14 @@ size_t rfc3339_datetime_ut(char *buffer, size_t len, usec_t now_ut, size_t fract
         buffer[pos++] = 'Z';
     }
     else {
+#ifdef HAVE_TM_GMTOFF
         long offset = tmbuf.tm_gmtoff;
+#elif defined(OS_WINDOWS)
+        struct tm tmp_gm = tmbuf;
+        long offset = (long)(_mkgmtime(&tmp_gm) - t);
+#else
+        long offset = 0;
+#endif
         int hours = (int)(offset / 3600);
         int minutes = abs((int)((offset % 3600) / 60));
 

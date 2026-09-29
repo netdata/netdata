@@ -195,9 +195,11 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
             break;
 #endif
 #if defined(HAVE_WEL)
-            case NDLM_WEL:
-            nd_log_init_wel();
+            case NDLM_WEL: {
+            bool wel_ok = nd_log_init_wel();
+            (void)wel_ok;
             break;
+            }
 #endif
 #endif
 
@@ -220,7 +222,23 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
 
         case NDLM_DEVNULL:
         case NDLM_FILE: {
-            int fd = open(e->filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
+            // UCRT64's open() cannot resolve MSYS2 POSIX paths (/c/...) —
+            // translate to Windows form (C:\...) so the log file is actually created.
+#if defined(OS_WINDOWS)
+            char win_log_path[FILENAME_MAX + 1];
+            const char *log_path = e->method == NDLM_DEVNULL
+                ? "NUL"
+                : os_translate_path(win_log_path, e->filename, sizeof(win_log_path));
+#else
+            const char *log_path = e->filename;
+#endif
+            int fd = open(log_path, O_WRONLY | O_APPEND | O_CREAT,
+#if defined(OS_WINDOWS)
+                          0640
+#else
+                          0664
+#endif
+            );
             if(fd == -1) {
                 if(e->fd != STDOUT_FILENO && e->fd != STDERR_FILENO) {
                     e->fd = STDERR_FILENO;
@@ -276,7 +294,17 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
 // --------------------------------------------------------------------------------------------------------------------
 
 void nd_log_stdin_init(int fd, const char *filename) {
-    int f = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0664);
+#if defined(OS_WINDOWS)
+    if (filename && strcmp(filename, "/dev/null") == 0)
+        filename = "NUL";
+#endif
+    int f = open(filename, O_WRONLY | O_APPEND | O_CREAT,
+#if defined(OS_WINDOWS)
+                 0640
+#else
+                 0664
+#endif
+    );
     if(f == -1)
         return;
 

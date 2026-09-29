@@ -413,13 +413,13 @@ static void aral_delete_leftover_files(const char *name, const char *path, const
 
     struct dirent *de = NULL;
     while((de = readdir(dir))) {
-        if(de->d_type == DT_DIR)
+        if(nd_dirent_type(path, de) == DT_DIR)
             continue;
-
         if(strncmp(de->d_name, required_prefix, len) != 0)
             continue;
 
         snprintfz(full_path, FILENAME_MAX, "%s/%s", path, de->d_name);
+
         netdata_log_info("ARAL: '%s' removing left-over file '%s'", name, full_path);
         if(unlikely(unlink(full_path) == -1))
             netdata_log_error("ARAL: '%s' cannot delete file '%s'", name, full_path);
@@ -946,7 +946,7 @@ retry_acquisition:
         }
         else {
             // let the adders/deallocators do it
-            sched_yield();
+            yield_the_processor();
             tinysleep();
         }
     }
