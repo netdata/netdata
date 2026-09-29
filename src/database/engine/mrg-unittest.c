@@ -931,6 +931,16 @@ static void jv2_stale_metric_save_dirty_cb(
     PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused,
     PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused) { ; }
 
+// the open cache every jv2 test indexes: no-op callbacks, extent_io_data per page
+static PGC *jv2_test_cache_create(const char *name) {
+    return pgc_create(
+        name,
+        32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
+        64, NULL, jv2_stale_metric_save_dirty_cb,
+        10, 10, 1000, 10,
+        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+}
+
 static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
 #if defined(FSANITIZE_ADDRESS)
     fprintf(stderr, "\nTesting jv2 does not dereference a stale METRIC... SKIPPED (FSANITIZE_ADDRESS)\n");
@@ -952,12 +962,7 @@ static int mrg_jv2_stale_metric_not_dereferenced_unittest(void) {
     MRG *saved_main_mrg = main_mrg;
     main_mrg = mrg;
 
-    PGC *cache = pgc_create(
-        "jv2-stale-metric-test",
-        32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
-        64, NULL, jv2_stale_metric_save_dirty_cb,
-        10, 10, 1000, 10,
-        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+    PGC *cache = jv2_test_cache_create("jv2-stale-metric-test");
 
     // 1. a real metric, with no retention so it is deletable on release
     nd_uuid_t victim;
@@ -1438,12 +1443,7 @@ static int mrg_jv2_same_uuid_grouped_once_check(
     MRG *saved_main_mrg = main_mrg;
     main_mrg = mrg;
 
-    PGC *cache = pgc_create(
-        "jv2-same-uuid-test",
-        32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
-        64, NULL, jv2_stale_metric_save_dirty_cb,
-        10, 10, 1000, 10,
-        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+    PGC *cache = jv2_test_cache_create("jv2-same-uuid-test");
 
     // declared before the goto below, so jumping to cleanup cannot skip an
     // initialization and leave the teardown reading indeterminate values
@@ -1696,6 +1696,120 @@ static bool jv2_make_tmpdir(char *dst, size_t dst_size) {
     return mkdtemp(dst) != NULL;
 }
 
+// A real journal on disk for the jv2 writer tests: a tier-0 ctx, one datafile and its
+// journalfile, and a test MRG installed as main_mrg (pgc_open_cache_to_journal_v2()
+// resolves metrics through it). ctx and datafile point at each other, so a fixture is
+// initialized in place and never copied. The caller owns its cache, pages and metrics
+// and releases them, in its own order, before jv2_journal_fixture_destroy().
+struct jv2_journal_fixture {
+    char dbpath[FILENAME_MAX + 1];
+    struct rrdengine_instance ctx;
+    struct rrdengine_datafile datafile;
+    struct rrdengine_journalfile *journalfile;
+    Word_t section;
+    MRG *mrg;
+    MRG *saved_main_mrg;
+    bool published;                 // set by jv2_journal_fixture_publish() on activation
+};
+
+// Returns false, having built nothing, when no temporary directory is usable. That is
+// an environment problem, not a defect in the code under test, and jv2_make_tmpdir()
+// documents that its caller skips on it - so the caller reports the skip and succeeds
+// rather than failing the whole MRG unit test.
+static bool jv2_journal_fixture_init(struct jv2_journal_fixture *fx, unsigned fileno) {
+    memset(fx, 0, sizeof(*fx));
+
+    if(!jv2_make_tmpdir(fx->dbpath, sizeof(fx->dbpath))) {
+        fprintf(stderr, "SKIPPED: no usable temporary directory for the journal\n");
+        return false;
+    }
+
+    // A zeroed fixture is NOT enough: activation validates the datafile and takes
+    // locks that must be constructed, not merely zeroed. Mirror what production does.
+    //
+    //   - initialize_single_ctx() (rrdengineapi.c) builds the two ctx locks. It is
+    //     static, so they are constructed here: njfv2idx.spinlock is taken by
+    //     njfv2idx_add(), which journalfile_v2_data_set() calls on activation.
+    //   - datafile_alloc_and_init() (datafile.c) stamps DATAFILE_MAGIC and builds the
+    //     datafile locks. It is static AND asserts tier == 1, so it is replicated.
+    //     Without the magic, datafile_ctx() fatals with "invalid magic" as soon as the
+    //     writer resolves the ctx from the datafile.
+    //   - journalfile_alloc_and_init() IS exported, so it is used rather than
+    //     hand-rolled: it builds data_spinlock (taken by journalfile_v2_data_set()),
+    //     builds unsafe.spinlock (read by journalfile_current_size()), sets
+    //     mmap.fd = -1, and links itself to the datafile.
+    fx->ctx.config.tier = 0;
+    strncpyz(fx->ctx.config.dbfiles_path, fx->dbpath, sizeof(fx->ctx.config.dbfiles_path) - 1);
+    fatal_assert(0 == netdata_rwlock_init(&fx->ctx.datafiles.rwlock));
+    rw_spinlock_init(&fx->ctx.njfv2idx.spinlock);
+
+    fx->datafile.tier = 1;          // datafile_alloc_and_init() asserts exactly this
+    fx->datafile.fileno = fileno;
+    fx->datafile.ctx = &fx->ctx;
+    fx->datafile.magic1 = fx->datafile.magic2 = DATAFILE_MAGIC;
+    fx->datafile.users.available = true;
+    fatal_assert(0 == netdata_rwlock_init(&fx->datafile.extent_rwlock));
+    spinlock_tracked_init(&fx->datafile.users.spinlock);
+    spinlock_init(&fx->datafile.writers.spinlock);
+    rw_spinlock_init(&fx->datafile.extent_epdl.spinlock);
+
+    fx->journalfile = journalfile_alloc_and_init(&fx->datafile);
+    fx->section = (Word_t)&fx->ctx;
+
+    fx->mrg = mrg_create_for_unittest();
+    fx->saved_main_mrg = main_mrg;
+    main_mrg = fx->mrg;
+
+    return true;
+}
+
+// Runs the real writer over the cache's hot pages of this fixture's section and
+// datafile. Returns true once the v2 journal is activated; only then may the
+// fixture's teardown close it.
+static bool jv2_journal_fixture_publish(struct jv2_journal_fixture *fx, PGC *cache) {
+    pgc_open_cache_to_journal_v2(cache, fx->section, fx->datafile.fileno, 1,
+                                 journalfile_migrate_to_v2_callback, fx->journalfile, true);
+
+    if(!journalfile_v2_data_available(fx->journalfile)) {
+        fprintf(stderr, "ERROR: the writer did not activate a v2 journal\n");
+        return false;
+    }
+
+    fx->published = true;
+    return true;
+}
+
+// Restores main_mrg, destroys the MRG, closes the journal and removes it from disk.
+// Returns the number of errors found (metrics still referenced).
+static int jv2_journal_fixture_destroy(struct jv2_journal_fixture *fx) {
+    int errors = 0;
+
+    main_mrg = fx->saved_main_mrg;
+
+    size_t referenced = mrg_destroy(fx->mrg);
+    if(referenced) {
+        fprintf(stderr, "ERROR: %zu metrics still referenced - the MRG was not destroyed\n",
+                referenced);
+        errors++;
+    }
+
+    // journalfile_close() removes the datafile from ctx.njfv2idx and unmaps the file;
+    // only valid once activation succeeded, otherwise it would close an unset uv_file.
+    if(fx->published)
+        journalfile_close(fx->journalfile, &fx->datafile);
+    freez(fx->journalfile);
+
+    netdata_rwlock_destroy(&fx->datafile.extent_rwlock);
+    netdata_rwlock_destroy(&fx->ctx.datafiles.rwlock);
+
+    char path[FILENAME_MAX + 1];
+    journalfile_v2_generate_path(&fx->datafile, path, sizeof(path));
+    unlink(path);
+    rmdir(fx->dbpath);
+
+    return errors;
+}
+
 // Drives the REAL writer end to end: journalfile_migrate_to_v2_callback() computes the
 // file size, writes the extent/metric/page structures, checksums them, and activates
 // the result through journalfile_v2_data_set(). We then read the SERIALIZED bytes back.
@@ -1715,72 +1829,20 @@ static int mrg_jv2_real_writer_unittest(void) {
     enum { TEST_FILENO = 11 };
     enum { START_TIME = 100, END_SHORT = 200, END_LONG = 400 };
 
-    char dbpath[FILENAME_MAX + 1];
-    if(!jv2_make_tmpdir(dbpath, sizeof(dbpath))) {
-        // Neither TMPDIR nor /tmp is usable. That is an environment problem, not a defect in
-        // the code under test, and jv2_make_tmpdir() documents that its caller skips on it -
-        // so report the skip and succeed rather than failing the whole MRG unit test.
-        fprintf(stderr, "SKIPPED: no usable temporary directory for the journal\n");
+    struct jv2_journal_fixture fx;
+    if(!jv2_journal_fixture_init(&fx, TEST_FILENO))
         return 0;
-    }
 
-    // A zeroed fixture is NOT enough: activation validates the datafile and takes
-    // locks that must be constructed, not merely zeroed. Mirror what production does.
-    //
-    //   - initialize_single_ctx() (rrdengineapi.c) builds the two ctx locks. It is
-    //     static, so they are constructed here: njfv2idx.spinlock is taken by
-    //     njfv2idx_add(), which journalfile_v2_data_set() calls on activation.
-    //   - datafile_alloc_and_init() (datafile.c) stamps DATAFILE_MAGIC and builds the
-    //     datafile locks. It is static AND asserts tier == 1, so it is replicated.
-    //     Without the magic, datafile_ctx() fatals with "invalid magic" as soon as the
-    //     writer resolves the ctx from the datafile.
-    //   - journalfile_alloc_and_init() IS exported, so it is used rather than
-    //     hand-rolled: it builds data_spinlock (taken by journalfile_v2_data_set()),
-    //     builds unsafe.spinlock (read by journalfile_current_size()), sets
-    //     mmap.fd = -1, and links itself to the datafile.
-    struct rrdengine_instance ctx;
-    memset(&ctx, 0, sizeof(ctx));
-    ctx.config.tier = 0;
-    strncpyz(ctx.config.dbfiles_path, dbpath, sizeof(ctx.config.dbfiles_path) - 1);
-    fatal_assert(0 == netdata_rwlock_init(&ctx.datafiles.rwlock));
-    rw_spinlock_init(&ctx.njfv2idx.spinlock);
-
-    struct rrdengine_datafile datafile;
-    memset(&datafile, 0, sizeof(datafile));
-    datafile.tier = 1;              // datafile_alloc_and_init() asserts exactly this
-    datafile.fileno = TEST_FILENO;
-    datafile.ctx = &ctx;
-    datafile.magic1 = datafile.magic2 = DATAFILE_MAGIC;
-    datafile.users.available = true;
-    fatal_assert(0 == netdata_rwlock_init(&datafile.extent_rwlock));
-    spinlock_tracked_init(&datafile.users.spinlock);
-    spinlock_init(&datafile.writers.spinlock);
-    rw_spinlock_init(&datafile.extent_epdl.spinlock);
-
-    struct rrdengine_journalfile *journalfile = journalfile_alloc_and_init(&datafile);
-
-    const Word_t section = (Word_t)&ctx;
-
-    MRG *mrg = mrg_create_for_unittest();
-    MRG *saved_main_mrg = main_mrg;
-    main_mrg = mrg;
-
-    PGC *cache = pgc_create(
-        "jv2-real-writer-test",
-        32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
-        64, NULL, jv2_stale_metric_save_dirty_cb,
-        10, 10, 1000, 10,
-        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+    PGC *cache = jv2_test_cache_create("jv2-real-writer-test");
 
     // everything the cleanup path can touch, and everything the gotos below jump
     // over, is declared and initialized up front
     struct jv2_two_pointers tp = { 0 };
     PGC_PAGE *p_old = NULL, *p_new = NULL;
-    bool published = false;
     bool a1 = false, a2 = false;
     struct extent_io_data xio_old = { 0 }, xio_new = { 0 };
 
-    if(jv2_make_two_pointers_one_uuid(mrg, section, &tp)) {
+    if(jv2_make_two_pointers_one_uuid(fx.mrg, fx.section, &tp)) {
         errors++;
         goto cleanup;
     }
@@ -1794,13 +1856,13 @@ static int mrg_jv2_real_writer_unittest(void) {
     xio_new.bytes = 4096; xio_new.uuid_id = tp.shared_id;
     xio_new.slots = END_LONG - START_TIME + 1;
     p_old = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
-        .section = section, .metric_id = (Word_t)tp.stale_ptr,
-        .start_time_s = START_TIME, .end_time_s = END_SHORT, .size = 4096, .data = &datafile,
+        .section = fx.section, .metric_id = (Word_t)tp.stale_ptr,
+        .start_time_s = START_TIME, .end_time_s = END_SHORT, .size = 4096, .data = &fx.datafile,
         .update_every_s = 1, .hot = true, .custom_data = (uint8_t *)&xio_old,
     }, &a1);
     p_new = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
-        .section = section, .metric_id = (Word_t)mrg_metric_id(mrg, tp.live),
-        .start_time_s = START_TIME, .end_time_s = END_LONG, .size = 4096, .data = &datafile,
+        .section = fx.section, .metric_id = (Word_t)mrg_metric_id(fx.mrg, tp.live),
+        .start_time_s = START_TIME, .end_time_s = END_LONG, .size = 4096, .data = &fx.datafile,
         .update_every_s = 1, .hot = true, .custom_data = (uint8_t *)&xio_new,
     }, &a2);
 
@@ -1810,19 +1872,14 @@ static int mrg_jv2_real_writer_unittest(void) {
         goto cleanup;
     }
 
-    pgc_open_cache_to_journal_v2(cache, section, TEST_FILENO, 1,
-                                 journalfile_migrate_to_v2_callback, journalfile, true);
-
-    if(!journalfile_v2_data_available(journalfile)) {
-        fprintf(stderr, "ERROR: the writer did not activate a v2 journal\n");
+    if(!jv2_journal_fixture_publish(&fx, cache)) {
         errors++;
         goto cleanup;
     }
-    published = true;
 
     // Read the serialized structures back through the same mmap the reader uses.
     {
-        struct journal_v2_header *j2 = journalfile_v2_data_acquire(journalfile, NULL, START_TIME, END_LONG);
+        struct journal_v2_header *j2 = journalfile_v2_data_acquire(fx.journalfile, NULL, START_TIME, END_LONG);
         if(!j2) {
             fprintf(stderr, "ERROR: cannot acquire the published v2 journal data\n");
             errors++;
@@ -1889,7 +1946,7 @@ static int mrg_jv2_real_writer_unittest(void) {
                 }
             }
 
-            journalfile_v2_data_release(journalfile);
+            journalfile_v2_data_release(fx.journalfile);
         }
     }
 
@@ -1897,37 +1954,14 @@ cleanup:
     if(p_old) pgc_page_release(cache, p_old);
     if(p_new) pgc_page_release(cache, p_new);
 
-    if(tp.live) mrg_metric_release_and_delete(mrg, tp.live);
+    if(tp.live) mrg_metric_release_and_delete(fx.mrg, tp.live);
     tp.live = NULL;
-    if(tp.decoy) mrg_metric_release_and_delete(mrg, tp.decoy);
+    if(tp.decoy) mrg_metric_release_and_delete(fx.mrg, tp.decoy);
     tp.decoy = NULL;
 
     pgc_destroy(cache, false);
-    jv2_two_pointers_undo(mrg, &tp);
-    main_mrg = saved_main_mrg;
-
-    size_t referenced = mrg_destroy(mrg);
-    if(referenced) {
-        fprintf(stderr, "ERROR: %zu metrics still referenced - the MRG was not destroyed\n",
-                referenced);
-        errors++;
-    }
-
-    // journalfile_close() removes the datafile from ctx.njfv2idx and unmaps the file;
-    // only valid once activation succeeded, otherwise it would close an unset uv_file.
-    if(published)
-        journalfile_close(journalfile, &datafile);
-    freez(journalfile);
-
-    netdata_rwlock_destroy(&datafile.extent_rwlock);
-    netdata_rwlock_destroy(&ctx.datafiles.rwlock);
-
-    {
-        char path[FILENAME_MAX + 1];
-        journalfile_v2_generate_path(&datafile, path, sizeof(path));
-        unlink(path);
-        rmdir(dbpath);
-    }
+    jv2_two_pointers_undo(fx.mrg, &tp);
+    errors += jv2_journal_fixture_destroy(&fx);
 
     if(errors)
         fprintf(stderr, "jv2 real writer test: %d ERROR(S)\n", errors);
@@ -1951,64 +1985,29 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
     int errors = 0;
     enum { TEST_FILENO = 12, FLUSH_CHARGE = 999 };
 
-    char dbpath[FILENAME_MAX + 1];
-    if(!jv2_make_tmpdir(dbpath, sizeof(dbpath))) {
-        fprintf(stderr, "SKIPPED: no usable temporary directory for the journal\n");
+    struct jv2_journal_fixture fx;
+    if(!jv2_journal_fixture_init(&fx, TEST_FILENO))
         return 0;
-    }
 
-    // same fixture as mrg_jv2_real_writer_unittest()
-    struct rrdengine_instance ctx;
-    memset(&ctx, 0, sizeof(ctx));
-    ctx.config.tier = 0;
-    strncpyz(ctx.config.dbfiles_path, dbpath, sizeof(ctx.config.dbfiles_path) - 1);
-    fatal_assert(0 == netdata_rwlock_init(&ctx.datafiles.rwlock));
-    rw_spinlock_init(&ctx.njfv2idx.spinlock);
-
-    struct rrdengine_datafile datafile;
-    memset(&datafile, 0, sizeof(datafile));
-    datafile.tier = 1;
-    datafile.fileno = TEST_FILENO;
-    datafile.ctx = &ctx;
-    datafile.magic1 = datafile.magic2 = DATAFILE_MAGIC;
-    datafile.users.available = true;
-    fatal_assert(0 == netdata_rwlock_init(&datafile.extent_rwlock));
-    spinlock_tracked_init(&datafile.users.spinlock);
-    spinlock_init(&datafile.writers.spinlock);
-    rw_spinlock_init(&datafile.extent_epdl.spinlock);
-
-    struct rrdengine_journalfile *journalfile = journalfile_alloc_and_init(&datafile);
-    const Word_t section = (Word_t)&ctx;
-
-    MRG *mrg = mrg_create_for_unittest();
-    MRG *saved_main_mrg = main_mrg;
-    main_mrg = mrg;
-
-    PGC *cache = pgc_create(
-        "jv2-samples-test",
-        32 * 1024 * 1024, jv2_stale_metric_free_clean_cb,
-        64, NULL, jv2_stale_metric_save_dirty_cb,
-        10, 10, 1000, 10,
-        PGC_OPTIONS_DEFAULT, 1, sizeof(struct extent_io_data));
+    PGC *cache = jv2_test_cache_create("jv2-samples-test");
 
     nd_uuid_t uuids[JV2_SAMPLES_METRICS];
     METRIC *metrics[JV2_SAMPLES_METRICS] = { 0 };
     PGC_PAGE *pages[JV2_SAMPLES_METRICS][JV2_SAMPLES_PAGES] = { 0 };
     uint64_t expected[JV2_SAMPLES_METRICS] = { 0 };
     uint64_t expected_total = 0, expected_estimate = 0;
-    bool published = false;
 
     // what the extents flushed to this datafile charged
-    rrdeng_datafile_samples_charge(&datafile, FLUSH_CHARGE);
+    rrdeng_datafile_samples_charge(&fx.datafile, FLUSH_CHARGE);
 
     for(size_t m = 0; m < JV2_SAMPLES_METRICS; m++) {
         uuid_generate(uuids[m]);
         MRG_ENTRY entry = {
-            .uuid = &uuids[m], .section = section,
+            .uuid = &uuids[m], .section = fx.section,
             .first_time_s = 100, .last_time_s = 100, .latest_update_every_s = 1,
         };
         bool added;
-        metrics[m] = mrg_metric_add_and_acquire(mrg, entry, &added);
+        metrics[m] = mrg_metric_add_and_acquire(fx.mrg, entry, &added);
 
         for(size_t p = 0; p < JV2_SAMPLES_PAGES; p++) {
             time_t start = 100 + (time_t)(p * 1000);
@@ -2019,12 +2018,12 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
 
             struct extent_io_data xio = {
                 .fileno = TEST_FILENO, .block = (uint32_t)(4096 * (1 + m * JV2_SAMPLES_PAGES + p)),
-                .bytes = 4096, .uuid_id = mrg_metric_uuidmap_id(mrg, metrics[m]), .slots = slots,
+                .bytes = 4096, .uuid_id = mrg_metric_uuidmap_id(fx.mrg, metrics[m]), .slots = slots,
             };
             bool page_added;
             pages[m][p] = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
-                .section = section, .metric_id = mrg_metric_id(mrg, metrics[m]),
-                .start_time_s = start, .end_time_s = end, .size = 4096, .data = &datafile,
+                .section = fx.section, .metric_id = mrg_metric_id(fx.mrg, metrics[m]),
+                .start_time_s = start, .end_time_s = end, .size = 4096, .data = &fx.datafile,
                 .update_every_s = 1, .hot = true, .custom_data = (uint8_t *)&xio,
             }, &page_added);
             if(!pages[m][p] || !page_added) {
@@ -2039,20 +2038,15 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
         expected_estimate += (uint64_t)((1000 + 150 + (time_t)(m * 10)) - 100) + 1;
     }
 
-    pgc_open_cache_to_journal_v2(cache, section, TEST_FILENO, 1,
-                                 journalfile_migrate_to_v2_callback, journalfile, true);
-
-    if(!journalfile_v2_data_available(journalfile)) {
-        fprintf(stderr, "ERROR: the writer did not activate a v2 journal\n");
+    if(!jv2_journal_fixture_publish(&fx, cache)) {
         errors++;
         goto cleanup;
     }
-    published = true;
 
     // the writer's section and the datafile charge
     {
         size_t data_size = 0;
-        struct journal_v2_header *j2 = journalfile_v2_data_acquire(journalfile, &data_size, 0, 0);
+        struct journal_v2_header *j2 = journalfile_v2_data_acquire(fx.journalfile, &data_size, 0, 0);
         if(!j2) {
             fprintf(stderr, "ERROR: cannot acquire the published v2 journal data\n");
             errors++;
@@ -2078,9 +2072,9 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
                 }
             }
 
-            if(datafile.samples.charged != expected_total || ctx.atomic.samples != expected_total || datafile.samples.estimated) {
+            if(fx.datafile.samples.charged != expected_total || fx.ctx.atomic.samples != expected_total || fx.datafile.samples.estimated) {
                 fprintf(stderr, "ERROR: after the write the datafile is charged %" PRIu64 " (tier %" PRIu64 ", estimated %d), expected %" PRIu64 "\n",
-                        datafile.samples.charged, (uint64_t)ctx.atomic.samples, datafile.samples.estimated, expected_total);
+                        fx.datafile.samples.charged, (uint64_t)fx.ctx.atomic.samples, fx.datafile.samples.estimated, expected_total);
                 errors++;
             }
         }
@@ -2089,23 +2083,23 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
                 fprintf(stderr, "ERROR: a samples section was written although a page did not know its slots\n");
                 errors++;
             }
-            if(datafile.samples.charged != FLUSH_CHARGE) {
+            if(fx.datafile.samples.charged != FLUSH_CHARGE) {
                 fprintf(stderr, "ERROR: without a section the flush-time charge must be kept (%" PRIu64 ", expected %d)\n",
-                        datafile.samples.charged, FLUSH_CHARGE);
+                        fx.datafile.samples.charged, FLUSH_CHARGE);
                 errors++;
             }
         }
 
-        journalfile_v2_data_release(journalfile);
+        journalfile_v2_data_release(fx.journalfile);
     }
 
     // the startup loader
-    journalfile_v2_populate_retention_to_mrg(&ctx, journalfile);
+    journalfile_v2_populate_retention_to_mrg(&fx.ctx, fx.journalfile);
     {
         uint64_t want = all_slots_known ? expected_total : expected_estimate;
-        if(datafile.samples.charged != want || ctx.atomic.samples != want || datafile.samples.estimated == all_slots_known) {
+        if(fx.datafile.samples.charged != want || fx.ctx.atomic.samples != want || fx.datafile.samples.estimated == all_slots_known) {
             fprintf(stderr, "ERROR: the loader charged %" PRIu64 " (tier %" PRIu64 ", estimated %d), expected %" PRIu64 " (estimated %d)\n",
-                    datafile.samples.charged, (uint64_t)ctx.atomic.samples, datafile.samples.estimated, want, !all_slots_known);
+                    fx.datafile.samples.charged, (uint64_t)fx.ctx.atomic.samples, fx.datafile.samples.estimated, want, !all_slots_known);
             errors++;
         }
     }
@@ -2116,38 +2110,38 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
     // the same total as the running counter.
     {
         uint64_t want = all_slots_known ? expected_total : expected_estimate;
-        struct rrdengine_datafile other = { .ctx = &ctx };
+        struct rrdengine_datafile other = { .ctx = &fx.ctx };
         rrdeng_datafile_samples_set(&other, 12345, false);
-        if(ctx.atomic.samples != want + 12345) {
+        if(fx.ctx.atomic.samples != want + 12345) {
             fprintf(stderr, "ERROR: with a second datafile the tier holds %" PRIu64 ", expected %" PRIu64 "\n",
-                    (uint64_t)ctx.atomic.samples, want + 12345);
+                    (uint64_t)fx.ctx.atomic.samples, want + 12345);
             errors++;
         }
 
         // delete the second datafile: only this journal remains
         rrdeng_datafile_samples_uncharge(&other);
-        journalfile_v2_populate_retention_to_mrg(&ctx, journalfile);
-        if(ctx.atomic.samples != want || datafile.samples.charged != want) {
+        journalfile_v2_populate_retention_to_mrg(&fx.ctx, fx.journalfile);
+        if(fx.ctx.atomic.samples != want || fx.datafile.samples.charged != want) {
             fprintf(stderr, "ERROR: after deleting the second datafile the tier holds %" PRIu64 " (datafile %" PRIu64 "), expected %" PRIu64 "\n",
-                    (uint64_t)ctx.atomic.samples, datafile.samples.charged, want);
+                    (uint64_t)fx.ctx.atomic.samples, fx.datafile.samples.charged, want);
             errors++;
         }
 
         // delete this datafile too: nothing remains
         rrdeng_datafile_samples_set(&other, 12345, false);
-        rrdeng_datafile_samples_uncharge(&datafile);
-        if(ctx.atomic.samples != 12345) {
+        rrdeng_datafile_samples_uncharge(&fx.datafile);
+        if(fx.ctx.atomic.samples != 12345) {
             fprintf(stderr, "ERROR: after deleting this datafile the tier holds %" PRIu64 ", expected 12345\n",
-                    (uint64_t)ctx.atomic.samples);
+                    (uint64_t)fx.ctx.atomic.samples);
             errors++;
         }
 
         // and loading its journal again restores exactly its samples
         rrdeng_datafile_samples_uncharge(&other);
-        journalfile_v2_populate_retention_to_mrg(&ctx, journalfile);
-        if(ctx.atomic.samples != want || datafile.samples.charged != want) {
+        journalfile_v2_populate_retention_to_mrg(&fx.ctx, fx.journalfile);
+        if(fx.ctx.atomic.samples != want || fx.datafile.samples.charged != want) {
             fprintf(stderr, "ERROR: reloading the journal charged %" PRIu64 " (tier %" PRIu64 "), expected %" PRIu64 "\n",
-                    datafile.samples.charged, (uint64_t)ctx.atomic.samples, want);
+                    fx.datafile.samples.charged, (uint64_t)fx.ctx.atomic.samples, want);
             errors++;
         }
     }
@@ -2156,7 +2150,7 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
     // array), per-metric readers need both
     if(all_slots_known) {
         char path[FILENAME_MAX + 1];
-        journalfile_v2_generate_path(&datafile, path, sizeof(path));
+        journalfile_v2_generate_path(&fx.datafile, path, sizeof(path));
 
         struct journal_v2_samples_descriptor descriptor = { 0 };
         uint32_t original_value = 0;
@@ -2188,21 +2182,21 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
 
         // a damaged array: the loader still charges the descriptor's total,
         // the per-metric reader rejects the section
-        journalfile_v2_populate_retention_to_mrg(&ctx, journalfile);
-        if(datafile.samples.charged != expected_total || datafile.samples.estimated) {
+        journalfile_v2_populate_retention_to_mrg(&fx.ctx, fx.journalfile);
+        if(fx.datafile.samples.charged != expected_total || fx.datafile.samples.estimated) {
             fprintf(stderr, "ERROR: with a damaged array the loader charged %" PRIu64 " (estimated %d), expected the descriptor total %" PRIu64 "\n",
-                    datafile.samples.charged, datafile.samples.estimated, expected_total);
+                    fx.datafile.samples.charged, fx.datafile.samples.estimated, expected_total);
             errors++;
         }
         {
             size_t data_size = 0;
-            struct journal_v2_header *j2 = journalfile_v2_data_acquire(journalfile, &data_size, 0, 0);
+            struct journal_v2_header *j2 = journalfile_v2_data_acquire(fx.journalfile, &data_size, 0, 0);
             if(j2) {
                 if(journalfile_v2_samples_section((const uint8_t *)j2, data_size)) {
                     fprintf(stderr, "ERROR: the samples section was accepted with a damaged array\n");
                     errors++;
                 }
-                journalfile_v2_data_release(journalfile);
+                journalfile_v2_data_release(fx.journalfile);
             }
         }
 
@@ -2218,10 +2212,10 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
             if(fd != -1)
                 close(fd);
 
-            journalfile_v2_populate_retention_to_mrg(&ctx, journalfile);
-            if(datafile.samples.charged != expected_estimate || !datafile.samples.estimated) {
+            journalfile_v2_populate_retention_to_mrg(&fx.ctx, fx.journalfile);
+            if(fx.datafile.samples.charged != expected_estimate || !fx.datafile.samples.estimated) {
                 fprintf(stderr, "ERROR: with a damaged descriptor the loader charged %" PRIu64 " (estimated %d), expected the estimate %" PRIu64 "\n",
-                        datafile.samples.charged, datafile.samples.estimated, expected_estimate);
+                        fx.datafile.samples.charged, fx.datafile.samples.estimated, expected_estimate);
                 errors++;
             }
 
@@ -2244,21 +2238,21 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
         if(fd != -1)
             close(fd);
 
-        journalfile_v2_populate_retention_to_mrg(&ctx, journalfile);
-        if(datafile.samples.charged != expected_total || datafile.samples.estimated) {
+        journalfile_v2_populate_retention_to_mrg(&fx.ctx, fx.journalfile);
+        if(fx.datafile.samples.charged != expected_total || fx.datafile.samples.estimated) {
             fprintf(stderr, "ERROR: with the section restored the loader charged %" PRIu64 " (estimated %d), expected %" PRIu64 "\n",
-                    datafile.samples.charged, datafile.samples.estimated, expected_total);
+                    fx.datafile.samples.charged, fx.datafile.samples.estimated, expected_total);
             errors++;
         }
         {
             size_t data_size = 0;
-            struct journal_v2_header *j2 = journalfile_v2_data_acquire(journalfile, &data_size, 0, 0);
+            struct journal_v2_header *j2 = journalfile_v2_data_acquire(fx.journalfile, &data_size, 0, 0);
             if(j2) {
                 if(!journalfile_v2_samples_section((const uint8_t *)j2, data_size)) {
                     fprintf(stderr, "ERROR: the restored samples section is not accepted\n");
                     errors++;
                 }
-                journalfile_v2_data_release(journalfile);
+                journalfile_v2_data_release(fx.journalfile);
             }
         }
 
@@ -2294,23 +2288,23 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
                 close(fd);
 
             size_t data_size = 0;
-            struct journal_v2_header *j2 = journalfile_v2_data_acquire(journalfile, &data_size, 0, 0);
+            struct journal_v2_header *j2 = journalfile_v2_data_acquire(fx.journalfile, &data_size, 0, 0);
             if(j2) {
                 if(journalfile_v2_samples_section((const uint8_t *)j2, data_size)) {
                     fprintf(stderr, "ERROR: the samples section was accepted with a bad descriptor: %s\n", bad_descriptors[b].name);
                     errors++;
                 }
-                journalfile_v2_data_release(journalfile);
+                journalfile_v2_data_release(fx.journalfile);
             }
 
             // the loader trusts a well-formed descriptor without reading the
             // array: a total that disagrees with the array is charged as is
             // (by design - the array is not touched at startup)
             if(bad_descriptors[b].samples_delta) {
-                journalfile_v2_populate_retention_to_mrg(&ctx, journalfile);
-                if(datafile.samples.charged != bad.samples || datafile.samples.estimated) {
+                journalfile_v2_populate_retention_to_mrg(&fx.ctx, fx.journalfile);
+                if(fx.datafile.samples.charged != bad.samples || fx.datafile.samples.estimated) {
                     fprintf(stderr, "ERROR: the loader charged %" PRIu64 " (estimated %d) from a descriptor whose total is %" PRIu64 "\n",
-                            datafile.samples.charged, datafile.samples.estimated, bad.samples);
+                            fx.datafile.samples.charged, fx.datafile.samples.estimated, bad.samples);
                     errors++;
                 }
             }
@@ -2325,28 +2319,9 @@ cleanup:
     pgc_destroy(cache, false);
 
     for(size_t m = 0; m < JV2_SAMPLES_METRICS; m++)
-        if(metrics[m]) mrg_metric_release_and_delete(mrg, metrics[m]);
+        if(metrics[m]) mrg_metric_release_and_delete(fx.mrg, metrics[m]);
 
-    main_mrg = saved_main_mrg;
-    size_t referenced = mrg_destroy(mrg);
-    if(referenced) {
-        fprintf(stderr, "ERROR: %zu metrics still referenced - the MRG was not destroyed\n", referenced);
-        errors++;
-    }
-
-    if(published)
-        journalfile_close(journalfile, &datafile);
-    freez(journalfile);
-
-    netdata_rwlock_destroy(&datafile.extent_rwlock);
-    netdata_rwlock_destroy(&ctx.datafiles.rwlock);
-
-    {
-        char path[FILENAME_MAX + 1];
-        journalfile_v2_generate_path(&datafile, path, sizeof(path));
-        unlink(path);
-        rmdir(dbpath);
-    }
+    errors += jv2_journal_fixture_destroy(&fx);
 
     return errors;
 }
