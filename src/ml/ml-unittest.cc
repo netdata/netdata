@@ -1184,7 +1184,7 @@ static time_t ml_test_pass_key(const ml_request_create_new_model_t &req, void *a
     time_t now = now_realtime_sec();
 
     if (!strcmp(id, "stop")) {
-        ml_queue_signal((ml_queue_t *) arg);
+        ml_queue_signal(static_cast<ml_queue_t *>(arg));
         return 0;
     }
     if (!strcmp(id, "k:none"))
