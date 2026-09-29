@@ -1,5 +1,8 @@
+from pathlib import Path
+
 import pytest
 
+from netdata_mcp import runtime
 from netdata_mcp.agents import AgentRegistry
 from netdata_mcp.runtime import OtelConfig
 
@@ -54,6 +57,14 @@ def test_declare_rejects_unsafe_agent_id():
     reg = AgentRegistry()
     with pytest.raises(ValueError):
         reg.declare("../x", "/wt", "debug")
+
+
+def test_declare_rejects_id_too_long_for_socket_paths(monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: Path("/h")))
+    reg = AgentRegistry()
+    assert reg.declare("x" * 43, "/wt", "debug").agent_id == "x" * 43
+    with pytest.raises(ValueError):
+        reg.declare("x" * 44, "/wt", "debug")
 
 
 def test_get_unknown_returns_none():

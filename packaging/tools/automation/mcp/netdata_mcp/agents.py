@@ -42,6 +42,7 @@ class AgentRegistry:
         it returns the agent to auto-assigned ports.
         """
         runtime.sanitize_agent_id(agent_id)
+        runtime.check_runtime_socket_paths(agent_id)
         buildcfg.validate_profile(profile)
         if port is not None and not 1 <= port <= 65535:
             raise ValueError(f"port must be within 1-65535, got {port}")

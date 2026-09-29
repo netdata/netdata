@@ -260,6 +260,9 @@ class RunRegistry:
         # netdata (which treats any non-empty token as a claim request) and trigger
         # a doomed claim attempt with its ~50s startup tail.
         launch_env = claim or {"NETDATA_CLAIM_TOKEN": ""}
+        # Its own runtime dir, overriding any inherited one: parallel agents
+        # sharing one break each other's spawn-server and plugin sockets.
+        launch_env["NETDATA_RUN_DIR"] = str(runtime.runtime_dir(run.agent_id))
         run.buffer.append(f"[phase: launch] {' '.join(cmd)}")
         launch = asyncio.get_running_loop().create_task(
             run_command(cmd, run.worktree, run.buffer.append, on_spawn=run._set_proc, env=launch_env)

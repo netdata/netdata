@@ -51,9 +51,13 @@ so multiple agents of one worktree coexist without clobbering.
 | `netdata_run_stop(agent_id)` | Stop the agent (terminates its process group). |
 
 Each agent gets an isolated runtime dir **`~/opt/netdata-mcp/run/<agent-id>/`**
-(`etc`, `cache`, `lib`, `log`) and a generated `netdata.conf` (ram db, isolated
+(`etc`, `cache`, `lib`, `log`, `run`) and a generated `netdata.conf` (ram db, isolated
 `[directories]`, bind `127.0.0.1`); netdata launches as
-`<install>/usr/sbin/netdata -D -p <port> -c <conf>`. Readiness is probed via
+`<install>/usr/sbin/netdata -D -p <port> -c <conf>` with `NETDATA_RUN_DIR=<run dir>/run`,
+so its spawn-server and plugin sockets never collide with another agent's (without it
+every agent falls back to the shared `/tmp/netdata`). Unix socket paths are limited to
+107 bytes, so `netdata_agent_declare` refuses an agent id that would push the longest
+of them past it (about 35 chars under a short `/home/<user>`). Readiness is probed via
 `/api/v1/info`. The run dir is **kept after stop** for inspection; agent logs are
 not in the run dir — they're in the journal (`netdata_agent_logs`) on journald
 hosts, or in `netdata_run_logs` otherwise. Agents are in-memory and do not

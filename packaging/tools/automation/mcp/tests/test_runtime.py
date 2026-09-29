@@ -28,6 +28,19 @@ def test_run_dir_rejects_unsafe_id():
         runtime.run_dir("../escape")
 
 
+def test_runtime_dir_is_inside_the_run_dir():
+    assert runtime.runtime_dir("child-debug") == runtime.run_dir("child-debug") / "run"
+
+
+def test_runtime_socket_paths_limit_the_id_length(monkeypatch):
+    # "/h/opt/netdata-mcp/run/" + id + "/run/otel-plugin/legacy-logs-4194304.sock"
+    # is 64 + len(id) bytes, so ids up to 43 chars fit the 107-byte limit.
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: Path("/h")))
+    runtime.check_runtime_socket_paths("x" * 43)
+    with pytest.raises(ValueError, match="1 chars too long"):
+        runtime.check_runtime_socket_paths("x" * 44)
+
+
 def test_install_bin_path():
     b = runtime.install_bin("/home/u/repos/nd")
     assert b.parts[-3:] == ("usr", "sbin", "netdata")
@@ -60,6 +73,12 @@ def test_generate_runtime_writes_isolated_conf(tmp_path, monkeypatch):
     assert "[logs]" in text
     assert "collector = journal" in text
     assert "daemon = journal" in text
+
+
+def test_generate_runtime_creates_the_runtime_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    runtime.generate_runtime("agent-x")
+    assert runtime.runtime_dir("agent-x").is_dir()
 
 
 def test_generate_runtime_uses_stderr_logs_without_journald(tmp_path, monkeypatch):

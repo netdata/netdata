@@ -48,6 +48,35 @@ def run_dir(agent_id: str) -> Path:
     return Path.home() / "opt" / "netdata-mcp" / "run" / sanitize_agent_id(agent_id)
 
 
+# The longest socket path netdata creates under NETDATA_RUN_DIR is the otel
+# plugin's legacy-logs worker socket, named after the supervisor's pid (Linux
+# pid_max is at most 4194304, 7 digits). A Unix socket path holds 107 bytes.
+_LONGEST_RUNTIME_SOCKET = "otel-plugin/legacy-logs-4194304.sock"
+_UNIX_SOCKET_PATH_MAX = 107
+
+
+def runtime_dir(agent_id: str) -> Path:
+    """The agent's own netdata runtime dir, exported to it as ``NETDATA_RUN_DIR``.
+
+    Without it netdata falls back to the host-wide ``/tmp/netdata``, where
+    parallel agents share the spawn-server and plugin socket paths: a second
+    agent's failed spawn-server start deletes the first agent's socket file, and
+    the first agent can no longer launch or relaunch any plugin.
+    """
+    return run_dir(agent_id) / "run"
+
+
+def check_runtime_socket_paths(agent_id: str) -> None:
+    """Raise ValueError if ``agent_id`` makes netdata's socket paths overflow."""
+    excess = len(os.fsencode(runtime_dir(agent_id) / _LONGEST_RUNTIME_SOCKET)) - _UNIX_SOCKET_PATH_MAX
+    if excess > 0:
+        raise ValueError(
+            f"Agent id {agent_id!r} is {excess} chars too long on this host: netdata's sockets "
+            f"under {runtime_dir(agent_id)} would exceed the {_UNIX_SOCKET_PATH_MAX}-byte "
+            f"Unix socket path limit. Use at most {len(agent_id) - excess} chars."
+        )
+
+
 def free_port() -> int:
     """An OS-assigned free loopback TCP port.
 
@@ -395,7 +424,7 @@ def generate_runtime(
     push OTLP data.
     """
     rd = run_dir(agent_id)
-    for sub in ("etc", "cache", "lib", "log"):
+    for sub in ("etc", "cache", "lib", "log", "run"):
         (rd / sub).mkdir(parents=True, exist_ok=True)
 
     conf = _default_conf(agent_id, rd)

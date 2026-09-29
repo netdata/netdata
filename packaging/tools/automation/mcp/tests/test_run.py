@@ -220,8 +220,33 @@ async def test_launch_unclaimed_without_token(reg, tmp_path, monkeypatch):
     run, _ = await reg.start("a", str(tmp_path), "debug", probe=_always_ready)
     await _wait(run, {"ready", "failed"})
     # token explicitly blanked so a stray inherited NETDATA_CLAIM_TOKEN can't claim
-    assert captured["env"] == {"NETDATA_CLAIM_TOKEN": ""}
+    assert captured["env"] == {
+        "NETDATA_CLAIM_TOKEN": "",
+        "NETDATA_RUN_DIR": str(tmp_path / "opt" / "netdata-mcp" / "run" / "a" / "run"),
+    }
     assert any("running unclaimed" in line for line in run.buffer.read(0).text.splitlines())
+
+
+async def test_launch_gives_each_agent_its_own_runtime_dir(reg, tmp_path, monkeypatch):
+    # An inherited NETDATA_RUN_DIR (or none, falling back to /tmp/netdata) would be
+    # shared by every agent; the launch must override it per agent.
+    monkeypatch.setenv("NETDATA_RUN_DIR", "/tmp/netdata")
+    monkeypatch.setattr(
+        runtime, "launch_command",
+        lambda b, port, conf: ["sh", "-c", 'echo "RUN_DIR=$NETDATA_RUN_DIR"; sleep 30'],
+    )
+    a, _ = await reg.start("a", str(tmp_path), "debug", probe=_always_ready)
+    b, _ = await reg.start("b", str(tmp_path), "debug", probe=_always_ready)
+    await _wait(a, {"ready", "failed"})
+    await _wait(b, {"ready", "failed"})
+    for run in (a, b):
+        expected = tmp_path / "opt" / "netdata-mcp" / "run" / run.agent_id / "run"
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + 5.0
+        while f"RUN_DIR={expected}" not in run.buffer.read(0).text and loop.time() < deadline:
+            await asyncio.sleep(0.02)
+        assert f"RUN_DIR={expected}" in run.buffer.read(0).text.splitlines()
+        assert expected.is_dir()
 
 
 async def test_run_returncode_is_negative_when_killed_by_signal(reg, tmp_path, monkeypatch):
