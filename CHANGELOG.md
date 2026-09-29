@@ -467,6 +467,12 @@
 - Fix(apps.plugin): serialize Function responses with chart output ([#24050](https://github.com/netdata/netdata/issues/24050))
 - Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.41.0 to 1.41.1 in /src/go ([#24061](https://github.com/netdata/netdata/issues/24061))
 - Fix(freeipmi.plugin): serialize Function responses with chart output ([#24052](https://github.com/netdata/netdata/issues/24052))
+- Fix use-after-free when queueing Function calls ([#24071](https://github.com/netdata/netdata/issues/24071))
+- Feat(scripts.d): add development-only native script collector ([#24075](https://github.com/netdata/netdata/issues/24075))
+- Fix(ndexec): add owned subprocess lifecycle and containment ([#24077](https://github.com/netdata/netdata/issues/24077))
+- Feat(scripts.d): add persistent native script sessions ([#24076](https://github.com/netdata/netdata/issues/24076))
+- Fix ML memory accounting across C++ allocation paths ([#22477](https://github.com/netdata/netdata/issues/22477))
+- Feat(scripts.d): add native package configuration and DynCfg support ([#24078](https://github.com/netdata/netdata/issues/24078))
 
 ## [2.11.0] - 2026-08-12
 
