@@ -9,19 +9,20 @@
 
 mod common;
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio_util::sync::CancellationToken;
 
 use common::{
-    SpanSpec, TRACE, kv_double, kv_int, kv_str, memory_source, req, sealed_source, sp,
-    tail_source, write_wal,
+    SpanSpec, TRACE, kv_double, kv_int, kv_str, memory_source, missing_source, req, sealed_source,
+    sp, tail_source, unavailable_source, write_wal,
 };
 use sfsq::Source;
 use sfsq::traces::{
-    PartialReason, SourceId, TraceQuery, TraceSfstCandidate, TraceSource,
-    WalCoverage, trace_by_id,
+    PartialReason, QueryStatus, SourceId, TraceQuery, TraceSfstCandidate, TraceSource, WalCoverage,
+    trace_by_id,
 };
 
 fn run(sources: Vec<TraceSource>) -> sfsq::traces::TraceData {
@@ -565,4 +566,41 @@ fn coexisting_partial_reasons_accumulate() {
     assert_eq!(data.trace.spans.len(), 1);
     assert!(data.status.has(PartialReason::SourceFailure));
     assert!(data.status.has(PartialReason::SizeCap));
+}
+
+/// A source whose bytes could not be obtained reports its own reason
+/// beside a missing local file's, while the good source still serves;
+/// alone, it is never Complete and never a source failure.
+#[test]
+fn unavailable_sources_are_reported_with_their_own_reason() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&[sp(1, 0, 1, "good")])], "ok");
+    let progress = Arc::new(AtomicUsize::new(0));
+    let data = trace_by_id(
+        vec![
+            unavailable_source("remote", 0, 10),
+            missing_source(dir.path(), "missing", 0, 10),
+            sealed_source(dir.path(), &wal, "good"),
+        ],
+        TraceQuery::new(sfst::TraceId::from(TRACE)),
+        CancellationToken::new(),
+        Arc::clone(&progress),
+    )
+    .unwrap();
+    assert_eq!(span_names(&data), ["good"]);
+    assert_eq!(
+        data.status,
+        QueryStatus::Partial(BTreeSet::from([
+            PartialReason::SourceFailure,
+            PartialReason::RemoteUnavailable,
+        ]))
+    );
+    assert_eq!(progress.load(Ordering::Relaxed), 3, "one tick per source");
+
+    let only = run(vec![unavailable_source("remote", 0, 10)]);
+    assert!(only.trace.spans.is_empty());
+    assert_eq!(
+        only.status,
+        QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]))
+    );
 }

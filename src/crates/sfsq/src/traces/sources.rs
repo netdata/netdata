@@ -98,14 +98,30 @@ pub struct TraceWalTail {
     pub coverage: WalCoverage,
 }
 
+/// A source whose bytes could not be obtained — a remote file whose
+/// download failed, or the span of a remote catalog that could not be
+/// read. It holds no bytes, only what the caller knew about the missing
+/// data; every operation that visits it reports
+/// [`RemoteUnavailable`](super::PartialReason::RemoteUnavailable).
+#[derive(Clone)]
+pub struct TraceUnavailable {
+    pub source_id: SourceId,
+    /// The known time range and counts of the missing data (for a remote
+    /// file, its catalog entry): operations that prune sealed files by
+    /// summary prune an unavailable source the same way, so one outside
+    /// their window is irrelevant rather than missing.
+    pub summary: sfst::Summary,
+}
+
 /// A source of trace data: an SFST (sealed file or in-memory chunk)
-/// evaluated through the indexed reader, or a WAL tail row scan.
-/// Cloning is cheap — sources are descriptors (paths, ids, coverage),
-/// never data.
+/// evaluated through the indexed reader, a WAL tail row scan, or a
+/// source whose bytes could not be obtained. Cloning is cheap — sources
+/// are descriptors (paths, ids, coverage), never data.
 #[derive(Clone)]
 pub enum TraceSource {
     Sfst(TraceSfstCandidate),
     Tail(TraceWalTail),
+    Unavailable(TraceUnavailable),
 }
 
 impl TraceSource {
@@ -113,6 +129,7 @@ impl TraceSource {
         match self {
             TraceSource::Sfst(c) => &c.source_id,
             TraceSource::Tail(t) => &t.source_id,
+            TraceSource::Unavailable(u) => &u.source_id,
         }
     }
 
@@ -120,6 +137,7 @@ impl TraceSource {
         match self {
             TraceSource::Sfst(c) => c.coverage.as_ref(),
             TraceSource::Tail(t) => Some(&t.coverage),
+            TraceSource::Unavailable(_) => None,
         }
     }
 }

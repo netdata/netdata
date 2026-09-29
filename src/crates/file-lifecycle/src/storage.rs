@@ -225,6 +225,19 @@ pub(crate) struct MockStorage {
     /// Counts `read` calls (shared, so a `.clone()` of the mock still counts) —
     /// lets the normal-boot no-op test assert zero downloads.
     pub read_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    /// Per-key read failures, checked before every other read mode.
+    pub read_key_errors: std::collections::HashMap<String, MockReadError>,
+    /// Per-key read delays (`tokio::time::sleep`, so paused-clock tests can
+    /// drive download deadlines).
+    pub read_delays: std::collections::HashMap<String, Duration>,
+}
+
+/// A per-key [`MockStorage`] read failure.
+#[cfg(test)]
+#[derive(Clone, Copy)]
+pub(crate) enum MockReadError {
+    NotFound,
+    Other,
 }
 
 #[cfg(test)]
@@ -249,6 +262,8 @@ impl Default for MockStorage {
             read_error: None,
             read_not_found: false,
             read_calls: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            read_key_errors: std::collections::HashMap::new(),
+            read_delays: std::collections::HashMap::new(),
         }
     }
 }
@@ -287,6 +302,16 @@ impl Storage for MockStorage {
     async fn read(&self, key: &str) -> Result<Vec<u8>, StorageError> {
         self.read_calls
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if let Some(delay) = self.read_delays.get(key) {
+            tokio::time::sleep(*delay).await;
+        }
+        match self.read_key_errors.get(key) {
+            Some(MockReadError::NotFound) => return Err(StorageError::NotFound),
+            Some(MockReadError::Other) => {
+                return Err(StorageError::Other(anyhow::anyhow!("mock read failure")));
+            }
+            None => {}
+        }
         if self.read_not_found {
             return Err(StorageError::NotFound);
         }

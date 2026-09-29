@@ -17,8 +17,8 @@ use super::wire::{
     AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, CoverageWire,
     EventWire, FacetListWire, FacetValueWire, FieldKindsWire, LinkWire,
     OverviewGridWire, OverviewPercentilesWire, OverviewResult, OverviewSection, OverviewTotals,
-    SearchItems, SearchResult, SlowestResult, SlowestTraceWire, SpanWire, StatusWire, TraceItems,
-    TraceResult, TraceSummaryWire,
+    SearchItems, SearchResult, ServiceBreakdownWire, ServiceSpansWire, SlowestResult, SlowestTraceWire,
+    SpanWire, StatusWire, TraceItems, TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -39,17 +39,12 @@ pub(crate) fn parse_trace_id(s: &str) -> Result<sfst::TraceId, String> {
     Ok(sfst::TraceId::from(bytes))
 }
 
-/// The by-id assembly-bounds width cap, seconds (48h): a backstop for
-/// callers not following the UI's `anchor ± clamp(W, 1h, 24h)` formula
-/// (whose total width maxes at exactly 48h). A wider request is a
-/// client error, never a clamp — the wire cannot know which end the
-/// caller values. Full retention is requested by OMITTING bounds.
-pub(crate) const MAX_TRACE_BOUNDS_WIDTH_S: u32 = 172_800;
-
 /// Validate the `trace` sub-object's optional assembly bounds into a
-/// capture range. Both-or-neither; `after < before`; width capped —
-/// all violations are client errors (the structural-error precedent of
-/// the envelope window and every other cap). `None` = full retention.
+/// capture range. Both-or-neither; `after < before` — violations are
+/// client errors (the structural-error precedent of the envelope
+/// window). Any width is accepted: the agent is relaxed on time ranges
+/// and the response's `coverage` declares the range used. `None` =
+/// full retention.
 pub(crate) fn validate_trace_bounds(
     after: Option<u32>,
     before: Option<u32>,
@@ -67,13 +62,6 @@ pub(crate) fn validate_trace_bounds(
     if after >= before {
         return Err(format!(
             "invalid trace bounds: after {after} >= before {before}"
-        ));
-    }
-    if before - after > MAX_TRACE_BOUNDS_WIDTH_S {
-        return Err(format!(
-            "trace bounds width {} exceeds the maximum {MAX_TRACE_BOUNDS_WIDTH_S} seconds (48h); \
-             omit the bounds to request full retention",
-            before - after
         ));
     }
     Ok(Some(after..before))
@@ -793,9 +781,23 @@ fn summary_wire(t: sfsq::traces::TraceSummary) -> TraceSummaryWire {
         duration_ns: t.duration_ns,
         span_count: t.span_count,
         error_count: t.error_count,
+        service_breakdown: service_breakdown_wire(t.service_breakdown),
         matched_count: t.matched_count,
         exact: t.exact,
         matched_spans: t.matched_spans.into_iter().map(span_wire).collect(),
+    }
+}
+
+fn service_breakdown_wire(b: sfsq::traces::ServiceBreakdown) -> ServiceBreakdownWire {
+    ServiceBreakdownWire {
+        top: b
+            .top
+            .into_iter()
+            .map(|(value, spans)| ServiceSpansWire { value, spans })
+            .collect(),
+        other: b.other,
+        other_services: b.other_services,
+        unattributed: b.unattributed,
     }
 }
 

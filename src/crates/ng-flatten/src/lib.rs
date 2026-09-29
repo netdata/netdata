@@ -219,8 +219,8 @@ mod tests {
     }
 
     #[test]
-    fn span_enum_default_skipped_unknown_keeps_raw_int() {
-        // UNSPECIFIED kind (0) + UNSET status (0) → no enum facets at all.
+    fn span_enum_defaults_are_stored_unknown_keeps_raw_int() {
+        // UNSPECIFIED kind (0) + UNSET status (0) → stored like any other variant.
         let mut f = Flattener::new();
         let e = f.flatten_span(Span {
             name: "x".into(),
@@ -232,8 +232,10 @@ mod tests {
             ..Default::default()
         });
         let l = f.into_tree().resolve(&e.entries);
-        assert!(at(&l, "kind").is_empty() && at(&l, "_kind").is_empty());
-        assert!(at(&l, "status_code").is_empty() && at(&l, "_status_code").is_empty());
+        assert_eq!(at(&l, "kind"), [&Value::Str("UNSPECIFIED".into())]);
+        assert_eq!(at(&l, "_kind"), [&Value::Int(0)]);
+        assert_eq!(at(&l, "status_code"), [&Value::Str("UNSET".into())]);
+        assert_eq!(at(&l, "_status_code"), [&Value::Int(0)]);
 
         // Unknown future variant → raw int survives (forward-compat), no label.
         let mut f = Flattener::new();
@@ -516,9 +518,9 @@ mod tests {
     }
 
     #[test]
-    fn span_no_status_and_empty_name_emit_nothing() {
-        // status: None (vs Some(UNSET)) and an empty name → those facets absent;
-        // an unrelated facet (kind) still emits.
+    fn span_no_status_is_unset_and_empty_name_emits_nothing() {
+        // status: None is the OTel default, stored like Some(UNSET); an empty
+        // name → no facet; an unrelated facet (kind) still emits.
         let mut f = Flattener::new();
         let e = f.flatten_span(Span {
             name: String::new(),
@@ -528,10 +530,8 @@ mod tests {
         });
         let l = f.into_tree().resolve(&e.entries);
         assert!(at(&l, "name").is_empty(), "empty name → no facet");
-        assert!(
-            at(&l, "status_code").is_empty() && at(&l, "_status_code").is_empty(),
-            "status None → no facet"
-        );
+        assert_eq!(at(&l, "status_code"), [&Value::Str("UNSET".into())]);
+        assert_eq!(at(&l, "_status_code"), [&Value::Int(0)]);
         assert_eq!(at(&l, "kind"), [&Value::Str("SERVER".into())]);
     }
 
@@ -549,9 +549,10 @@ mod tests {
         let l = f.into_tree().resolve(&e.entries);
         assert_eq!(at(&l, "trace_state"), [&Value::Str("ot=th:8".into())]);
         assert_eq!(at(&l, "status_message"), [&Value::Str("boom".into())]);
-        assert!(
-            at(&l, "status_code").is_empty(),
-            "UNSET code stays absent even with a message"
+        assert_eq!(
+            at(&l, "status_code"),
+            [&Value::Str("UNSET".into())],
+            "an UNSET code is stored next to its message"
         );
 
         // Empty trace_state / message → absent (proto3 empty == unset on the wire).

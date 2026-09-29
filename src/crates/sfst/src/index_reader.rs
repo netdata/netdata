@@ -56,7 +56,8 @@ pub struct TraceSpan {
     pub parent_span_id: SpanId,
     pub start_ns: i64,
     pub duration_ns: i64,
-    /// Raw OTLP span kind int (0 = UNSPECIFIED/absent), parsed once from
+    /// Raw OTLP span kind int (0 = UNSPECIFIED, which older files leave
+    /// absent), parsed once from
     /// the `_kind` facet at materialization — part of the combiner's
     /// dedup key (shared client/server span ids are real). The readable
     /// `kind` label stays in [`fields`](Self::fields).

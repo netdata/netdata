@@ -11,7 +11,8 @@
 use std::collections::BTreeSet;
 
 /// Why a result is partial. Ordered (BTreeSet) so the set — and its
-/// rendering — is deterministic.
+/// rendering — is deterministic; the order is declaration order, so a
+/// new reason is appended last.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PartialReason {
     /// The span cap was reached: the result holds the globally earliest
@@ -54,6 +55,13 @@ pub enum PartialReason {
     /// deterministic prefix of sources (SourceId order) processed so
     /// far — the true slowest trace may live in an unvisited source.
     SlowestCeiling,
+    /// A source's bytes could not be obtained from remote storage (a
+    /// download failed or timed out, or the catalog listing the file
+    /// could not be read): spans that may live there are absent.
+    /// Distinct from [`SourceFailure`](Self::SourceFailure), which
+    /// reports bytes that were available but could not be read.
+    /// Declared last: wire order is declaration order.
+    RemoteUnavailable,
 }
 
 /// The status of one query's result.

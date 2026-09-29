@@ -21,7 +21,7 @@ mod grid;
 mod logs;
 mod traces;
 
-pub(crate) use logs::{OtelLogsHandler, RemoteRead};
+pub(crate) use logs::OtelLogsHandler;
 pub(crate) use traces::OtelTracesHandler;
 
 /// Replicate the rt-level GET shim (`netdata-plugin/rt/src/lib.rs`):

@@ -12,7 +12,7 @@ Each platform centralizes logs with its own native mechanism, and Netdata works 
 |:----------|:---------|:-------------------------------|
 | `systemd-journal-remote` / `systemd-journal-upload` | Linux | Native journal files per sender, explorable under the `systemd-journal` source |
 | Windows Event Forwarding (WEF) | Windows | Native event channels with events from all forwarders, explorable under the `windows-events` source |
-| [OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md) (OTLP/gRPC) | Any | Netdata's indexed log store with per-tenant retention and optional `fs`/`s3` archiving, explorable under the `otel-logs` source |
+| [OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md) (OTLP/gRPC) | Any | Netdata's indexed log store with its own retention and optional `fs`/`s3` archiving, explorable under the `otel-logs` source |
 
 Because the first two transports keep logs in the OS-native format, the aggregated data remains readable by the platform's own tools (`journalctl`, Event Viewer) and by SIEM agents on the aggregation point.
 
@@ -94,6 +94,6 @@ Netdata Cloud unifies *access*, not the log streams: you open the Logs tab, sele
 ## Choosing between journal centralization and OpenTelemetry
 
 - **Journal and event centralization** applies when your environment already aggregates journals or Windows events, or when you decide to aggregate them so the data stays in the OS-native format — for SIEM ingestion, compliance tooling, or the platform's own tools. Netdata on the aggregation point manages that data as it is.
-- **[OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md)** is the way to centralize logs into Netdata's own log store, with per-tenant retention policies and object-storage archiving. It also covers platforms and sources the OS mechanisms do not (macOS, network device syslog, application pipelines).
+- **[OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md)** is the way to centralize logs into Netdata's own log store, with its own retention policies and object-storage archiving. It also covers platforms and sources the OS mechanisms do not (macOS, network device syslog, application pipelines).
 
 Both can feed the same Netdata Agent and appear side by side in the Logs tab.

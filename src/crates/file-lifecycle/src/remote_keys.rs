@@ -50,7 +50,7 @@ const SCHEMA_VERSION: &str = "v2";
 /// Object extensions, matching the filename builders (`otel_catalog::filename`
 /// stamps `.catalog`; SFST keys use `FileId::to_filename("sfst")`).
 const CATALOG_EXT: &str = "catalog";
-const SFST_EXT: &str = "sfst";
+pub(crate) const SFST_EXT: &str = "sfst";
 
 /// Remote key for an uploaded SFST file, scoped to `signal`.
 pub fn sfst(signal: &str, tenant_id: &TenantId, date: NaiveDate, id: FileId) -> String {

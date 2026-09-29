@@ -235,8 +235,8 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
 
     Only fields the caller set are emitted; the plugin keeps its stock defaults
     for the rest. ``base_dir`` is always pinned under the run dir, so every
-    derived per-signal dir (``{base_dir}/{logs,traces}/{wal,index,catalog}``,
-    ``{base_dir}/{signal}/remote-read``, ``{base_dir}/shared/seq_highwater``)
+    derived dir (``{base_dir}/{logs,traces}/{wal,index,catalog}``, the shared
+    download cache ``{base_dir}/remote-read``, ``{base_dir}/shared/seq_highwater``)
     lands in isolation — one pin isolates both signals.
     """
     base_dir = str(rd / "lib" / "otel")
