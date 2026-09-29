@@ -220,6 +220,7 @@ nd_next
 printf started > "$(dirname "$0")/started"
 sleep 30
 `)
+	c.Timeout = confopt.Duration(500 * time.Millisecond)
 	r := startRuntime(t, c)
 	r.waitReady(t)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -240,7 +241,7 @@ sleep 30
 		t.Fatal("Collect ignored cancellation")
 	}
 	r.wait(t)
-	require.ErrorIs(t, r.err, context.Canceled)
+	require.ErrorIs(t, r.err, context.DeadlineExceeded)
 }
 
 func TestPersistentFrameBoundaries(t *testing.T) {

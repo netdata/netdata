@@ -45,6 +45,7 @@ type Collector struct {
 	definition         manifest
 	bound              bool
 	configInput        []byte
+	initialized        bool
 	templates          *chartengine.TemplateSet
 	validateExecutable func(string) (string, error)
 	runtimeMu          sync.Mutex
@@ -75,6 +76,7 @@ func (c *Collector) ChartTemplateSet() *chartengine.TemplateSet { return c.templ
 func (c *Collector) Cleanup(context.Context)                    {}
 
 func (c *Collector) Init(context.Context) error {
+	c.initialized = false
 	if c.UpdateEvery < 1 || c.Timeout.Duration() <= 0 {
 		return fmt.Errorf("update_every and timeout must be positive")
 	}
@@ -87,16 +89,20 @@ func (c *Collector) Init(context.Context) error {
 		if err != nil {
 			return err
 		}
+		if len(definition.Functions) > 0 {
+			return fmt.Errorf("packages with Functions must be registered in scripts.d.packages.yaml")
+		}
 		c.definition, c.templates = definition, templates
 	}
 	var err error
 	c.configInput, err = c.configurationEnvelope()
+	c.initialized = err == nil
 	return err
 }
 
 // Check validates local initialization only. A target's first observation may be critical.
 func (c *Collector) Check(context.Context) error {
-	if c.templates == nil {
+	if !c.initialized {
 		return fmt.Errorf("collector is not initialized")
 	}
 	return nil

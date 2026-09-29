@@ -29,7 +29,7 @@ modules:
           Each job runs an executable per collection or keeps one persistent process, as selected by its manifest.
           Both modes read complete JSON snapshots; persistent requests and replies carry matching IDs.
           A package manifest declares metrics, checks and an optional configuration schema without executing code during startup validation.
-          Registered packages expose their own dynamic configuration forms. Validated values reach scripts through stdin.
+          Registered packages expose their own dynamic configuration forms and can provide interactive Functions, with or without periodic collection. Validated configuration and Function inputs reach scripts through stdin.
           Warning and critical service observations are successful collections; command or protocol failures discard the entire response.
       supported_platforms:
         include: []
@@ -43,9 +43,9 @@ modules:
         auto_detection:
           description: No commands are discovered automatically. Administrators register package manifests explicitly or select a manifest per job. Registering a package does not create a job.
         limits:
-          description: Each JSON response and configuration envelope is limited to 1 MiB, including whitespace.
+          description: Each JSON response, Function request and configuration envelope is limited to 1 MiB, including whitespace. A persistent script handles collection and Function calls sequentially.
         performance_impact:
-          description: One-shot collection starts a process per interval; persistent collection retains one process per job. CPU, memory and target load depend on the script and interval.
+          description: One-shot mode starts a process per collection or Function call; persistent mode retains one process per job. CPU, memory and target load depend on the script, collection interval and Function requests.
     setup:
       prerequisites:
         list:
@@ -80,7 +80,7 @@ modules:
               default_value: 0
               required: false
             - name: timeout
-              description: Maximum duration in seconds of one-shot execution, persistent startup, or a collection exchange.
+              description: Timeout in seconds for startup and collection, including queue waiting. Admitted persistent collections get a full exchange timeout. Canceled Functions allow up to this timeout to drain their reply; callers still use their own deadline.
               default_value: 5
               required: false
         examples:

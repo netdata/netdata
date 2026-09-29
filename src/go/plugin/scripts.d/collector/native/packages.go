@@ -11,8 +11,10 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pathvalidate"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/nativefunc"
 	"gopkg.in/yaml.v2"
 )
 
@@ -65,11 +67,11 @@ func loadPackages(
 		if err != nil {
 			return nil, fmt.Errorf("package %s: %w", name, err)
 		}
-		schema, err := packageForm(name, definition.config)
+		schema, err := packageForm(name, definition)
 		if err != nil {
 			return nil, err
 		}
-		registry.Register(name, collectorapi.Creator{
+		creator := collectorapi.Creator{
 			Defaults: collectorapi.Defaults{
 				UpdateEvery: 10,
 			},
@@ -87,12 +89,25 @@ func loadPackages(
 					ScriptConfig: definition.config.effective(nil),
 				}
 			},
-		})
+		}
+		if len(definition.methods) > 0 {
+			creator.FunctionOnly = definition.functionOnly()
+			creator.SharedFunctions = func() []funcapi.FunctionConfig { return append([]funcapi.FunctionConfig(nil), definition.methods...) }
+			creator.MethodHandler = func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
+				c, ok := job.Collector().(*Collector)
+				if !ok {
+					return nil
+				}
+				return nativefunc.New(c, c.definition.methods)
+			}
+		}
+		registry.Register(name, creator)
 	}
 	return registry, nil
 }
 
-func packageForm(name string, config *packageConfig) (string, error) {
+func packageForm(name string, definition manifest) (string, error) {
+	config := definition.config
 	var form map[string]any
 	if json.Unmarshal([]byte(configSchema), &form) != nil {
 		return "", fmt.Errorf("invalid native form")
@@ -105,6 +120,14 @@ func packageForm(name string, config *packageConfig) (string, error) {
 	delete(schema, "required")
 	ui := form["uiSchema"].(map[string]any)
 	delete(ui, "manifest")
+	if definition.functionOnly() {
+		delete(properties, "update_every")
+		if definition.Mode == modePersistent {
+			properties["timeout"].(map[string]any)["description"] = "Timeout in seconds for persistent startup and for draining a Function reply after caller cancellation. Function callers use their own deadline."
+		} else {
+			delete(properties, "timeout")
+		}
+	}
 	if config != nil {
 		cloned, _ := jsonValue(config.document)
 		child := cloned.(map[string]any)

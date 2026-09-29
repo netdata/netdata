@@ -11,8 +11,10 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/nativefunc"
 	"gopkg.in/yaml.v2"
 )
 
@@ -30,13 +32,15 @@ const (
 func checkMetric(id string) string { return checkPrefix + id }
 
 type manifest struct {
-	Version      string             `yaml:"version"`
-	Mode         string             `yaml:"mode"`
-	Command      []string           `yaml:"command"`
-	Metrics      []metricDefinition `yaml:"metrics"`
-	Checks       []checkDefinition  `yaml:"checks"`
-	Charts       string             `yaml:"charts"`
-	ConfigSchema string             `yaml:"config_schema"`
+	Version      string                  `yaml:"version"`
+	Mode         string                  `yaml:"mode"`
+	Command      []string                `yaml:"command"`
+	Metrics      []metricDefinition      `yaml:"metrics"`
+	Checks       []checkDefinition       `yaml:"checks"`
+	Charts       string                  `yaml:"charts"`
+	Functions    []nativefunc.Definition `yaml:"functions"`
+	methods      []funcapi.FunctionConfig
+	ConfigSchema string `yaml:"config_schema"`
 	config       *packageConfig
 	metricByName map[string]metricDefinition
 	checkByID    map[string]checkDefinition
@@ -124,8 +128,15 @@ func loadManifest(path string, validate func(string) (string, error)) (manifest,
 		}
 		m.checkByID[d.ID] = d
 	}
-	if len(m.Metrics)+len(m.Checks) == 0 {
-		return m, nil, fmt.Errorf("manifest must declare metrics or checks")
+	if len(m.Metrics)+len(m.Checks)+len(m.Functions) == 0 {
+		return m, nil, fmt.Errorf("manifest must declare metrics, checks or functions")
+	}
+	m.methods, err = nativefunc.Declarations(m.Functions)
+	if err != nil {
+		return m, nil, err
+	}
+	if m.functionOnly() && m.Charts != "" {
+		return m, nil, fmt.Errorf("function-only packages cannot declare charts")
 	}
 	m.config, err = loadPackageConfig(filepath.Dir(path), m.ConfigSchema)
 	if err != nil {
@@ -135,7 +146,12 @@ func loadManifest(path string, validate func(string) (string, error)) (manifest,
 	return m, templates, err
 }
 
+func (m manifest) functionOnly() bool { return len(m.Metrics)+len(m.Checks) == 0 }
+
 func (m manifest) chartTemplates(dir string) (*chartengine.TemplateSet, error) {
+	if m.functionOnly() {
+		return nil, nil
+	}
 	spec := chartengine.TemplateSetSpec{
 		FallbackContextNamespace: "native_script",
 		Policy: chartengine.EnginePolicy{

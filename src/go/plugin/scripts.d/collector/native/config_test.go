@@ -134,7 +134,9 @@ func TestPackageFormEscapedAndBooleanReferences(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "schema.json"), []byte(body), 0644))
 	config, err := loadPackageConfig(dir, "schema.json")
 	require.NoError(t, err)
-	composed, err := packageForm("native-fixture", config)
+	composed, err := packageForm("native-fixture", manifest{
+		config: config,
+	})
 	require.NoError(t, err)
 	var form map[string]any
 	require.NoError(t, json.Unmarshal([]byte(composed), &form))

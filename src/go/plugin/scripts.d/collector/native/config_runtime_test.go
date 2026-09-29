@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,10 +15,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/agent"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
-	discoveryfile "github.com/netdata/netdata/go/plugins/plugin/agent/discovery/file"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -159,87 +154,10 @@ func TestPersistentConfigurationWriteTimeout(t *testing.T) {
 func TestPackageDynCfgReplacement(t *testing.T) {
 	setupRunner(t)
 	registry, dir := configuredFixture(t, configPeer(t), modePersistent)
-	// Agent owns real request parsing, preflight, activation, and replacement.
-	ctx, cancel := context.WithCancel(context.Background())
-	reader, writer := io.Pipe()
-	out := &jobOutput{}
-	a := agent.New(
-		agent.Config{
-			Name:                    "scripts.d",
-			ModuleRegistry:          registry,
-			PluginConfigDir:         []string{dir},
-			VarLibDir:               dir,
-			RunModePolicy:           policy.Agent(false),
-			DisableServiceDiscovery: true,
-			DiscoveryProviders: []discovery.ProviderFactory{
-				discovery.NewProviderFactory(
-					"file",
-					func(build discovery.BuildContext) (discovery.Discoverer, bool, error) {
-						d, err := discoveryfile.NewDiscovery(
-							discoveryfile.Config{
-								Registry: build.Registry,
-								Watch:    []string{filepath.Join(dir, "*.conf")},
-							},
-						)
-						return d, true, err
-					},
-				),
-			},
-		},
-	)
-	a.In = reader
-	a.Out = out
-	done := make(chan error, 1)
-	go func() { defer reader.Close(); done <- a.RunContext(ctx) }()
-	t.Cleanup(func() {
-		cancel()
-		_ = writer.Close()
-		_ = reader.Close()
-		select {
-		case err := <-done:
-			if err != nil {
-				require.True(t, agent.ContainsOnlyProcessControlErrors(err, context.Canceled), "%v", err)
-			}
-		case <-time.After(5 * time.Second):
-			t.Error("Agent did not stop")
-		}
-	})
-	require.Eventually(
-		t,
-		func() bool { return strings.Contains(out.String(), "scripts.d:collector:native-fixture") },
-		5*time.Second,
-		10*time.Millisecond,
-	)
+	a := startNativeAgent(t, registry, dir)
 	call := func(id, command, payload string, code int) string {
 		t.Helper()
-		if payload == "" {
-			_, err := fmt.Fprintf(
-				writer,
-				"FUNCTION %s 5 \"config scripts.d:collector:native-fixture%s\" 0xFFFF \"user=test\"\n",
-				id,
-				command,
-			)
-			require.NoError(t, err)
-		} else {
-			_, err := fmt.Fprintf(writer, "FUNCTION_PAYLOAD %s 5 \"config scripts.d:collector:native-fixture%s\" 0xFFFF \"user=test\" application/json\n%s\nFUNCTION_PAYLOAD_END\n", id, command, payload)
-			require.NoError(t, err)
-		}
-		var result string
-		require.Eventually(t, func() bool {
-			wire := out.String()
-			start := strings.Index(wire, "FUNCTION_RESULT_BEGIN "+id+" ")
-			if start < 0 {
-				return false
-			}
-			end := strings.Index(wire[start:], "FUNCTION_RESULT_END")
-			if end < 0 {
-				return false
-			}
-			result = wire[start : start+end]
-			return true
-		}, 5*time.Second, 10*time.Millisecond)
-		require.Contains(t, result, fmt.Sprintf("FUNCTION_RESULT_BEGIN %s %d ", id, code))
-		return result
+		return a.call(t, id, "config scripts.d:collector:native-fixture"+command, payload, code)
 	}
 	schema := call("schema", " schema", "", 200)
 	assert.Contains(t, schema, `#/properties/config/definitions/text`)
@@ -247,7 +165,7 @@ func TestPackageDynCfgReplacement(t *testing.T) {
 	call("enable", ":job enable", "", 202)
 	require.Eventually(
 		t,
-		func() bool { return strings.Contains(out.String(), " = 23") },
+		func() bool { return strings.Contains(a.out.String(), " = 23") },
 		5*time.Second,
 		20*time.Millisecond,
 	)
@@ -257,7 +175,7 @@ func TestPackageDynCfgReplacement(t *testing.T) {
 	call("update", ":job update", `{"update_every":1,"config":{"text":"replacement","count":41}}`, 202)
 	require.Eventually(
 		t,
-		func() bool { return strings.Contains(out.String(), " = 41") },
+		func() bool { return strings.Contains(a.out.String(), " = 41") },
 		5*time.Second,
 		20*time.Millisecond,
 	)

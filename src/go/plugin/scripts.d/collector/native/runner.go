@@ -17,30 +17,46 @@ import (
 // exceeds it so accidental endless output cannot consume unbounded memory.
 const maxResponseBytes = 1 << 20
 
-var errResponseTooLarge = errors.New("collect response exceeds 1 MiB")
+var errResponseTooLarge = errors.New("script response exceeds 1 MiB")
 
 func runCommand(ctx context.Context, timeout time.Duration, argv []string, config []byte) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	return runOwnedCommand(ctx, cancel, argv, "collect", config)
+}
+
+func runOperation(ctx context.Context, argv []string, operation string, input []byte) ([]byte, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	return runOwnedCommand(ctx, cancel, argv, operation, input)
+}
+
+func runOwnedCommand(
+	ctx context.Context,
+	cancel context.CancelFunc,
+	argv []string,
+	operation string,
+	input []byte,
+) ([]byte, error) {
 	output := responseBuffer{
 		cancel: cancel,
 	}
-	args := append(append([]string(nil), argv[1:]...), "collect")
+	args := append(append([]string(nil), argv[1:]...), operation)
 	cmd := ndexec.UnprivilegedCommandContext(ctx, argv[0], args...)
 	cmd.Stdout, cmd.Stderr = &output, io.Discard
-	// Schema-free packages retain EOF; configured packages receive exactly one envelope.
-	if len(config) > 0 {
-		cmd.Stdin = bytes.NewReader(config)
+	// Input is configuration, a Function request, both, or EOF for schema-free collection.
+	if len(input) > 0 {
+		cmd.Stdin = bytes.NewReader(input)
 	}
 	err := cmd.Run()
 	if output.exceeded {
 		return nil, errResponseTooLarge
 	}
 	if ctx.Err() != nil {
-		return nil, fmt.Errorf("collect command: %w", ctx.Err())
+		return nil, fmt.Errorf("script command: %w", ctx.Err())
 	}
 	if err != nil {
-		return nil, fmt.Errorf("collect command: %w", err)
+		return nil, fmt.Errorf("script command: %w", err)
 	}
 	return output.buffer.Bytes(), nil
 }

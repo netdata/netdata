@@ -6,8 +6,8 @@ Scripts report labeled metrics and named service checks. The development health
 template turns warning and critical checks into notifications.
 
 This contract is WIP. It supports one-shot and persistent collection, scalar gauges
-and cumulative counters. Package-specific DynCfg forms are supported. Additional metric kinds
-and Functions are later steps. The manifest
+and cumulative counters, package-specific DynCfg forms, and script-provided Functions.
+Additional metric kinds and production delivery remain later steps. The manifest
 and wire format may change during the preview.
 
 ## Development build and configuration
@@ -80,7 +80,7 @@ checks:
 
 - `command` is an argv array, without shell expansion. Its first path is resolved
   relative to the manifest directory unless absolute. Subsequent arguments are
-  literal. Netdata appends `collect` for one-shot mode or `serve` for persistent mode.
+  literal. Netdata appends `collect` or `function` for one-shot calls, or `serve` for persistent mode.
 - `config_schema` optionally names a local JSON form, relative to the manifest
   directory. It enables configuration input on stdin in both modes; see below.
 - `mode` is `oneshot` (the default when omitted) or `persistent`. Persistent jobs
@@ -96,7 +96,12 @@ checks:
   With it, its autogen setting determines whether unmatched metrics get charts.
   The `native_check_` chart-ID prefix is reserved. Global chart selectors are
   rejected when checks are declared, so they cannot silently filter health data.
-- At least one metric or check MUST be declared. Unknown manifest fields are errors.
+- `functions` optionally declares interactive methods; see Functions below. Packages
+  with Functions MUST use startup registration in `scripts.d.packages.yaml`.
+- At least one metric, check or Function MUST be declared. Packages with Functions
+  and no metrics/checks are function-only: no periodic collection or charts run.
+  Function-only manifests MUST NOT specify `charts`.
+- Unknown manifest fields are errors.
 
 Example `charts.yaml`, using an identity label and changeable chart metadata:
 
@@ -170,7 +175,8 @@ DynCfg serves the package form under `config`, alongside collection settings.
 GET preserves submitted secret references; effective configuration also includes
 package defaults. The generic `native` module remains usable with a manifest path
 and a `config` object, but its form cannot reflect a particular package schema.
-Generic jobs load package files during initialization; their pre-initialization
+The generic module accepts collection-only packages; Function declarations require
+startup registration. Generic jobs load package files during initialization; their pre-initialization
 configuration retrieval contains only submitted package values.
 
 ### Package configuration schema
@@ -255,7 +261,9 @@ object, at most 1 MiB including whitespace. Stdin is EOF for schema-free package
 configured packages receive one configuration envelope followed by EOF. In persistent mode, the
 same snapshot is carried in a correlated reply as described below. Stdout
 is exclusively the protocol; redirect command chatter to stderr. The collector
-discards stderr to avoid copying arbitrary script output into Agent logs.
+discards stderr to avoid copying arbitrary script output into Agent logs. One-shot
+Function failures log only safe command categories (including numeric exit status)
+or an invalid-reply diagnostic; script output and request data are never logged.
 
 ```json
 {
@@ -275,7 +283,8 @@ MUST be nonnegative cumulative totals, not interval deltas. Counter resets use
 the existing incremental chart behavior. Values use IEEE-754 double precision;
 integers above 2^53 may lose precision. Labels are string-to-string objects.
 
-Field names are case-sensitive; JSON null is invalid in every position.
+Collection field names are case-sensitive; JSON null is invalid in every position
+of a collection snapshot.
 Each response is a full snapshot. Omit unavailable metric samples rather than
 inventing zero. An empty metrics or checks array is valid; arrays may be omitted.
 A sample name MUST be declared. Duplicate JSON keys, duplicate metric identities
@@ -337,9 +346,15 @@ snapshots. A reply MUST contain exactly one of `result` or `error`; the only err
 code is `collection_failed`. There is one outstanding request and no push channel.
 Scripts MAY perform background work, but MUST NOT emit unsolicited frames.
 
-`timeout` bounds the ready handshake and each request/reply exchange independently;
-it is not a process lifetime limit. A mismatched ID, malformed/oversized frame,
-partial frame at EOF, timeout, closed stdout or process exit terminates the session.
+`timeout` bounds startup and the caller's collection wait, including time behind
+an active Function. An admitted collection exchange gets a full `timeout` to
+finish, independently of the caller's remaining wait budget. A caller timeout
+publishes no sample; the host still drains and validates the outstanding reply
+before accepting another request. An exchange exceeding its full budget stops
+the session. Function callers use their own deadline, with bounded reply draining
+after cancellation as described below. These are not process lifetime limits.
+A mismatched ID, malformed/oversized frame, partial frame at EOF, closed stdout
+or process exit terminates the session.
 After readiness this marks the job Failed and requires an explicit restart or
 reconfiguration. No private respawn loop retries it. Failures before readiness use
 the normal `autodetection_retry` policy. In either case, no synthetic healthy sample
@@ -351,6 +366,142 @@ or escape that group. On Windows 10 or later, the process starts inside an owned
 Job Object that contains its descendants. Startup fails if containment cannot be
 established. Discarded stderr uses the null device, so inherited stderr cannot keep
 a host-side copying goroutine alive. Descendant exits are not individually awaited.
+
+## Functions
+
+Declare methods in the manifest and register the package at startup:
+
+```yaml
+functions:
+  - id: items
+    name: Queue Items
+    help: Inspect the selected queue.
+    update_every: 10
+    response_type: table
+    accepted_params: [filter]
+    required_params:
+      - id: queue
+        name: Queue
+        type: select
+        options:
+          - {id: mail, name: Mail, defaultSelected: true}
+```
+
+IDs match `[a-z][a-z0-9_-]*` and are unique within the package. `name` and `help`
+are required. `update_every` is the UI refresh interval in seconds (default 10);
+`response_type` defaults to `table`. `has_history` advertises time-range support
+but does not implement history. Parameter IDs match `[A-Za-z_][A-Za-z0-9_-]*`.
+Selectors support `select` (default), `multiselect`, `help`, `unique_view`, and
+options with `id`, `name`, `defaultSelected` and `disabled`.
+
+For package `queue`, method `items` is published as `native-queue:items`. Netdata
+owns registration, removal, request deadlines and the reserved `__job` selector.
+Unscoped `info` is answered from the manifest without calling the script. Scoped
+`info` selects a running job and calls its script. With multiple jobs, callers
+select one through `__job`; a missing or invalid selection follows the standard
+Function interface. Restart the plugin after changing declarations.
+
+Scripts receive **raw input**. `required_params` and `accepted_params` describe
+the UI; they do not validate or default domain values on the host. The script
+MUST parse, default and validate its own args/payload, including duplicate or
+unknown selector values. Netdata validates `__job`; scripts MUST NOT declare it.
+This preview uses the existing read-oriented Function publication permissions.
+It does not provide a separate authorization contract for remote mutations.
+
+### Input and execution
+
+One-shot Function calls append `function` to `command`. Stdin contains the
+configuration envelope first, if `config_schema` is declared, then one Function
+request and EOF. Collection still appends `collect` and receives only optional
+configuration. Each Function call owns an independent process and may overlap
+one-shot collection or another Function call.
+
+Persistent packages use the existing `serve` startup and ready handshake. After
+readiness, collection and Function requests share one serial request/reply stream.
+A long Function delays collection; keep interactive work short or use one-shot
+mode when calls need independent execution. A function-only persistent package
+still starts and signals readiness when enabled, but never receives `collect`.
+
+Both modes receive this Function envelope as one compact JSON line:
+
+```json
+{"id":"1","method":"function","function":"items","info":false,"args":[],"payload_base64":"eyJzZWxlY3Rpb25zIjp7InF1ZXVlIjpbIm1haWwiXX19","content_type":"application/json","deadline_unix_ms":1800000000000,"permissions":"0xFFFF","source":"user=test"}
+```
+
+`args` is an array, empty when none were supplied. `payload_base64` preserves the
+original payload bytes; decode it before parsing according to `content_type`.
+The v3 UI sends selectors as `{"selections":{"queue":["mail"]}}` in its JSON
+payload, including arrays for single-select fields. Scripts MUST handle this
+shape when declaring selectors; see the [Function UI request flow](../../../plugins.d/FUNCTION_UI_REFERENCE.md#modern-flow-v3).
+Payload, content type, permissions and source are omitted when empty. The absolute
+Unix deadline in milliseconds is present when the caller supplies a deadline.
+Arguments, payload and configuration stay on stdin, never in host-generated argv,
+environment variables or diagnostics. Scripts MUST NOT expose credentials in
+Function output or error messages; those results are sent to the requesting UI.
+
+The request, including base64 expansion and terminating LF, MUST fit in 1 MiB.
+The host reserves space for the largest correlation ID when admitting a request;
+oversized requests fail before executing or writing to a script. Replies use the
+same 1 MiB bound. The Function context bounds how long the caller waits, including
+queue waiting. Cancellation before admission leaves the persistent peer usable.
+After admission, cancellation or deadline expiry returns to the caller promptly;
+the host allows up to `timeout` more seconds to finish writing and drain the
+matching reply. It validates and discards that reply before accepting another
+request. A missing, invalid or mismatched reply stops the session. While draining,
+other requests keep waiting under their own deadlines. A script SHOULD promptly
+return a valid error response when its supplied deadline expires. There is no
+script cancellation frame or private process restart. One-shot cancellation still
+terminates its owned process; job stop/replacement immediately terminates either mode.
+
+### Results
+
+Echo the request ID and return a `v1` result. One-shot scripts MUST exit zero;
+persistent scripts MUST flush a single LF-terminated reply:
+
+```json
+{"id":"1","result":{"version":"v1","status":200,"columns":{"queue":{"index":0,"name":"Queue","type":"string"},"depth":{"index":1,"name":"Depth","type":"integer"}},"data":[["mail",17]],"default_sort_column":"depth"}}
+```
+
+A managed result supplies `status`, plus `columns` and `data` for successful data
+requests. `data` is an array of rows ordered by column index. Scoped info can
+return just `version` and `status`; optionally return `required_params` to update
+domain selector options. Netdata adds metadata and the job selector, and merges
+dynamic selectors with declarations. Other managed fields are `message`, `help`,
+`type`, `default_sort_column`, `charts`, `default_charts`, and `group_by`, following
+[the Function UI schema](../../../plugins.d/FUNCTION_UI_SCHEMA.json).
+
+To report a request failure without destroying a healthy persistent session:
+
+```json
+{"id":"1","result":{"version":"v1","status":503,"message":"Queue is temporarily unavailable"}}
+```
+
+For formats requiring the complete UI envelope, use explicit raw response ownership:
+
+```json
+{"id":"1","result":{"version":"v1","raw_response":{"status":500,"errorMessage":"Queue is temporarily unavailable"}}}
+```
+
+`raw_response` MUST contain a JSON integer status from 100 through 599 and
+MUST NOT be combined with managed result fields. Netdata sends this complete
+object without adding metadata, selectors or table fields. The script owns its
+UI-schema validity, including scoped info. Use managed results for ordinary tables.
+
+Protocol field names are exact and duplicate JSON keys are rejected. Null values
+and arbitrary JSON numbers are allowed inside table data, column definitions and
+raw responses; integers are preserved through host serialization. The frontend's
+numeric precision may differ. Invalid envelopes, versions, field types, IDs or
+other protocol failures stop a persistent session. A valid script error status
+is an ordinary Function result and leaves it available for another request.
+
+Runnable examples are [`development/functions-bash`](development/functions-bash/collect.sh)
+(mixed collection and Functions, using jq) and
+[`development/functions-python`](development/functions-python/inspect.py)
+(function-only). Both support either manifest mode. Tests route their actual
+responses through Agent stdin dispatch and validate emitted info/data against the
+canonical UI schema. Function-only DynCfg forms omit the collection interval;
+the timeout field is shown only in persistent mode, for startup and reply draining
+after cancellation. Function callers always use their own deadline.
 
 ## Checks and automatic alerts
 
@@ -405,8 +556,14 @@ nd_end
 For persistent Bash, call `nd_ready` once and loop over `nd_next`. Each successful
 `nd_next` MUST be answered by `nd_begin` / observations / `nd_end`, or by `nd_fail`.
 `nd_end` automatically wraps a pending request's snapshot with its ID. `nd_next`
-reads the host's canonical request line; EOF or an invalid request ends the loop.
+reads the host's canonical **collection-only** request line; EOF or an invalid request ends the loop.
 Do not pipe the loop into a subshell if its state must survive.
+
+For packages with Functions, use `nd_read_request` to read a line into the shell
+variable `ND_REQUEST`, parse it with jq or another JSON decoder, and call
+`nd_reply ID COMPACT_RESULT_JSON`. This wraps a compact JSON object produced by
+an encoder; it does not validate that object's schema. Do not use `nd_next` for
+a mixed stream. `nd_read_config` still precedes request reading when configured.
 
 Runnable development packages are in
 [`development/persistent-bash`](development/persistent-bash/collect.sh) and
