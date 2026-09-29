@@ -3,25 +3,38 @@
 package native
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pathvalidate"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/nativefunc"
-	"gopkg.in/yaml.v2"
 )
 
-var packageName = regexp.MustCompile(`^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$`)
+const packageModulePrefix = "native-"
+
+var rePackageName = regexp.MustCompile(`^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$`)
+
+// packageInventory is scripts.d.packages.yaml.
+type packageInventory struct {
+	Version  string           `yaml:"version"`
+	Packages []inventoryEntry `yaml:"packages"`
+}
+
+// inventoryEntry registers one package from exactly one source: a manifest
+// file, or a self-contained command that describes itself.
+type inventoryEntry struct {
+	Name     string   `yaml:"name"`
+	Manifest string   `yaml:"manifest"`
+	Command  []string `yaml:"command"`
+}
 
 // LoadPackages returns a startup registry. Command entries execute describe once;
 // file entries and creator construction remain passive. The caller owns enablement.
@@ -33,101 +46,33 @@ func loadPackages(
 	ctx context.Context,
 	path string,
 	base collectorapi.Registry,
-	validate func(string) (string, error),
+	validateExecutable func(string) (string, error),
 ) (collectorapi.Registry, error) {
-	data, err := os.ReadFile(path)
+	inventory, err := readInventory(path)
 	if err != nil {
-		return nil, fmt.Errorf("read package inventory: %w", err)
+		return nil, err
 	}
-	var inventory struct {
-		Version  string `yaml:"version"`
-		Packages []struct {
-			Name     string   `yaml:"name"`
-			Manifest string   `yaml:"manifest"`
-			Command  []string `yaml:"command"`
-		} `yaml:"packages"`
-	}
-	decoder := yaml.NewDecoder(bytes.NewReader(data))
-	decoder.SetStrict(true)
-	if decoder.Decode(&inventory) != nil {
-		return nil, fmt.Errorf("invalid package inventory")
-	}
-	var extra any
-	if decoder.Decode(&extra) != io.EOF || inventory.Version != "v1" {
-		return nil, fmt.Errorf("package inventory requires one v1 document")
-	}
+	// Build a new registry so a failure never partially mutates base.
 	registry := make(collectorapi.Registry, len(base)+len(inventory.Packages))
-	for name, creator := range base {
-		registry[name] = creator
-	}
+	maps.Copy(registry, base)
 	for _, entry := range inventory.Packages {
-		if !packageName.MatchString(entry.Name) {
-			return nil, fmt.Errorf("package name must contain lowercase words separated by hyphens")
+		if !rePackageName.MatchString(entry.Name) {
+			return nil, errors.New("package name must contain lowercase words separated by hyphens")
 		}
-		name := "native-" + entry.Name
+		name := packageModulePrefix + entry.Name
 		if _, exists := registry[name]; exists {
 			return nil, fmt.Errorf("duplicate package module %q", name)
 		}
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		if (entry.Manifest == "") == (entry.Command == nil) {
-			return nil, fmt.Errorf("package %s requires exactly one manifest or command", name)
-		}
-		var definition manifest
-		var templates *chartengine.TemplateSet
-		if entry.Command == nil {
-			definition, templates, err = loadManifest(entry.Manifest, validate)
-		} else {
-			if len(entry.Command) == 0 || !filepath.IsAbs(entry.Command[0]) {
-				return nil, fmt.Errorf("package %s command requires an absolute executable", name)
-			}
-			command := append([]string(nil), entry.Command...)
-			command[0], err = validate(command[0])
-			if err == nil {
-				var data []byte
-				data, err = describePackage(ctx, command)
-				if err == nil {
-					definition, templates, err = parseDescription(data, command)
-				}
-			}
-		}
+		definition, err := entry.load(ctx, validateExecutable)
 		if err != nil {
 			return nil, fmt.Errorf("package %s: %w", name, err)
 		}
-		schema, err := packageForm(name, definition)
+		creator, err := packageCreator(name, definition)
 		if err != nil {
 			return nil, err
-		}
-		creator := collectorapi.Creator{
-			Defaults: collectorapi.Defaults{
-				UpdateEvery: 10,
-			},
-			JobConfigSchema: schema,
-			CreateV2: func() collectorapi.CollectorV2 {
-				c := New()
-				c.bound = true
-				c.definition = definition
-				c.templates = templates
-				c.ScriptConfig = definition.config.effective(nil)
-				return c
-			},
-			Config: func() any {
-				return &Config{
-					ScriptConfig: definition.config.effective(nil),
-				}
-			},
-		}
-		if len(definition.methods) > 0 {
-			creator.FunctionOnly = definition.functionOnly()
-			creator.SharedFunctions = func() []funcapi.FunctionConfig { return append([]funcapi.FunctionConfig(nil), definition.methods...) }
-			creator.MethodHandler = func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
-				c, ok := job.Collector().(*Collector)
-				if !ok {
-					return nil
-				}
-				return nativefunc.New(c, c.definition.methods)
-			}
 		}
 		registry.Register(name, creator)
 	}
@@ -137,48 +82,105 @@ func loadPackages(
 	return registry, nil
 }
 
-func packageForm(name string, definition manifest) (string, error) {
-	config := definition.config
+func readInventory(path string) (packageInventory, error) {
+	var inventory packageInventory
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return inventory, fmt.Errorf("read package inventory: %w", err)
+	}
+	if err := decodeYAMLDocument(data, &inventory); err != nil {
+		return inventory, fmt.Errorf("package inventory %w", err)
+	}
+	if inventory.Version != "v1" {
+		return inventory, errors.New("unsupported package inventory version")
+	}
+	return inventory, nil
+}
+
+func (e inventoryEntry) load(
+	ctx context.Context,
+	validateExecutable func(string) (string, error),
+) (packageDefinition, error) {
+	if (e.Manifest == "") == (e.Command == nil) {
+		return packageDefinition{}, errors.New("requires exactly one manifest or command")
+	}
+	if e.Command == nil {
+		return loadManifest(e.Manifest, validateExecutable)
+	}
+	if len(e.Command) == 0 || !filepath.IsAbs(e.Command[0]) {
+		return packageDefinition{}, errors.New("command requires an absolute executable")
+	}
+	command := slices.Clone(e.Command)
+	var err error
+	if command[0], err = validateExecutable(command[0]); err != nil {
+		return packageDefinition{}, err
+	}
+	return loadDescribedPackage(ctx, command)
+}
+
+// packageCreator registers a package as its own module. Every job receives the
+// startup definition; package files are never reread.
+func packageCreator(name string, definition packageDefinition) (collectorapi.Creator, error) {
+	schema, err := packageForm(name, definition)
+	if err != nil {
+		return collectorapi.Creator{}, err
+	}
+	creator := collectorapi.Creator{
+		Defaults: collectorapi.Defaults{
+			UpdateEvery: defaultUpdateEvery,
+		},
+		JobConfigSchema: schema,
+		CreateV2: func() collectorapi.CollectorV2 {
+			c := New()
+			c.registered = true
+			c.definition = definition
+			c.ScriptConfig = definition.effectiveSettings(nil)
+			return c
+		},
+		Config: func() any {
+			return &Config{
+				ScriptConfig: definition.effectiveSettings(nil),
+			}
+		},
+	}
+	if len(definition.methods) > 0 {
+		creator.FunctionOnly = definition.functionOnly()
+		creator.SharedFunctions = func() []funcapi.FunctionConfig { return slices.Clone(definition.methods) }
+		creator.MethodHandler = functionHandler
+	}
+	return creator, nil
+}
+
+// packageForm derives a package's job form from the generic native form: no
+// manifest option, and the package configuration form embedded as config.
+func packageForm(name string, definition packageDefinition) (string, error) {
 	var form map[string]any
 	if json.Unmarshal([]byte(configSchema), &form) != nil {
-		return "", fmt.Errorf("invalid native form")
+		return "", errors.New("invalid native form")
 	}
 	schema := form["jsonSchema"].(map[string]any)
 	schema["title"] = name + " collector configuration."
+	delete(schema, "required")
 	properties := schema["properties"].(map[string]any)
 	delete(properties, "manifest")
 	delete(properties, "config")
-	delete(schema, "required")
 	ui := form["uiSchema"].(map[string]any)
 	delete(ui, "manifest")
 	if definition.functionOnly() {
 		delete(properties, "update_every")
 		if definition.Mode == modePersistent {
-			properties["timeout"].(map[string]any)["description"] = "Timeout in seconds for persistent startup and for draining a Function reply after caller cancellation. Function callers use their own deadline."
+			properties["timeout"].(map[string]any)["description"] = "Timeout in seconds for persistent startup " +
+				"and for draining a Function reply after caller cancellation. Function callers use their own deadline."
 		} else {
 			delete(properties, "timeout")
 		}
 	}
-	if config != nil {
-		cloned, _ := jsonValue(config.document)
-		child := cloned.(map[string]any)
-		_ = walkSchema(child, "", true, func(value any, _ string, _ bool) error {
-			node, ok := value.(map[string]any)
-			if !ok {
-				return nil
-			}
-			if ref, ok := node["$ref"].(string); ok {
-				node["$ref"] = "#/properties/config" + strings.TrimPrefix(ref, "#")
-			}
-			return nil
-		})
-		// The returned job form embeds the package schema and rebases its local refs.
-		properties["config"] = child
-		ui["config"] = config.ui
+	if definition.form != nil {
+		properties["config"], ui["config"] = definition.form.Embed("#/properties/config")
 	}
 	data, err := json.Marshal(form)
 	if err != nil {
-		return "", fmt.Errorf("cannot encode package form")
+		return "", errors.New("cannot encode package form")
 	}
 	return string(data), nil
 }

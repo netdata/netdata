@@ -21,7 +21,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLargeCollectionSnapshots(t *testing.T) {
+// Real peers move a snapshot well above 1 MiB through both transports.
+func TestLimits_LargeSnapshot(t *testing.T) {
 	setupRunner(t)
 	samples := make([]metricSample, 10000)
 	for i := range samples {
@@ -37,30 +38,27 @@ func TestLargeCollectionSnapshots(t *testing.T) {
 			},
 		}
 	}
-	snapshot, err := json.Marshal(response{
+	data, err := json.Marshal(snapshot{
 		Version: "v1",
 		Metrics: samples,
 		Checks:  []checkSample{},
 	})
 	require.NoError(t, err)
-	require.Greater(t, len(snapshot), 1<<20, "exercise a real snapshot above the old cap")
+	require.Greater(t, len(data), 1<<20)
+	const cat = `cat "$(dirname "$0")/response.json"` + "\n"
 	for _, mode := range []string{modeOneshot, modePersistent} {
 		t.Run(mode, func(t *testing.T) {
-			body := `cat "$(dirname "$0")/response.json"` + "\n"
 			var c *Collector
 			var dir string
-			data := snapshot
+			frame := data
 			if mode == modePersistent {
-				c, dir = persistentCollector(
-					t,
-					"printf '%s\\n' '{\"version\":\"v1\",\"ready\":true}'\nread -r request\n"+body+"read -r request\n",
-				)
-				data = append(append([]byte(`{"id":"1","result":`), snapshot...), '}')
+				c, dir = persistentCollector(t, readyLine+"read -r request\n"+cat+"read -r request\n")
+				frame = append(append([]byte(`{"id":"1","result":`), data...), '}')
 			} else {
-				c, dir = fixtureCollector(t, body)
+				c, dir = fixtureCollector(t, cat)
 			}
 			c.Timeout = confopt.Duration(10 * time.Second)
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "response.json"), append(data, '\n'), 0644))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "response.json"), append(frame, '\n'), 0644))
 			if mode == modePersistent {
 				startRuntime(t, c).waitReady(t)
 			}
@@ -76,7 +74,8 @@ func TestLargeCollectionSnapshots(t *testing.T) {
 	}
 }
 
-func TestLargeFunctionAndConfiguration(t *testing.T) {
+// A 2 MiB configuration value and a 20 MiB Function payload reach the script in both modes.
+func TestLimits_LargeFunctionAndConfiguration(t *testing.T) {
 	setupRunner(t)
 	for _, mode := range []string{modeOneshot, modePersistent} {
 		t.Run(mode, func(t *testing.T) {
@@ -103,36 +102,14 @@ func TestLargeFunctionAndConfiguration(t *testing.T) {
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-			result, err := c.ExecuteFunction(ctx, funcapi.RawMethodRequest{
+			result, err := c.executeFunction(ctx, funcapi.RawMethodRequest{
 				Method:  "items",
 				Args:    []string{"large"},
 				Payload: bytes.Repeat([]byte{'x'}, 20<<20),
 			})
 			require.NoError(t, err)
 			require.Equal(t, 200, result.Status)
-			rows := result.Data.([][]any)
-			require.Len(t, rows, 1)
-			require.Len(t, rows[0], 2)
-			assert.Equal(t, text, rows[0][0])
-			assert.Equal(t, json.Number("20971520"), rows[0][1])
+			assert.Equal(t, [][]any{{text, json.Number("20971520")}}, result.Data)
 		})
 	}
-}
-
-func TestConfigurationEnvelopeBoundary(t *testing.T) {
-	registry, _ := configuredFixture(t, "exit 0\n", modeOneshot)
-	c := registry["native-fixture"].CreateV2().(*Collector)
-	c.ScriptConfig = Settings{
-		"text": "x",
-	}
-	frame, err := c.configurationEnvelope()
-	require.NoError(t, err)
-	// Include the JSON envelope, effective defaults and terminating LF.
-	c.ScriptConfig["text"] = strings.Repeat("x", maxMessageBytes-len(frame)+1)
-	frame, err = c.configurationEnvelope()
-	require.NoError(t, err)
-	assert.Len(t, frame, maxMessageBytes)
-	c.ScriptConfig["text"] = c.ScriptConfig["text"].(string) + "x"
-	_, err = c.configurationEnvelope()
-	require.ErrorContains(t, err, "config envelope exceeds 64 MiB")
 }

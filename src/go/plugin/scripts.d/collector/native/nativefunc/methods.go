@@ -3,15 +3,25 @@
 package nativefunc
 
 import (
-	"fmt"
+	"errors"
 	"regexp"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/internal/strictjson"
 )
 
-var methodID = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
-var paramID = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
+const (
+	defaultUpdateEvery  = 10
+	defaultResponseType = "table"
+	// jobSelector is the framework's job selection parameter.
+	jobSelector = "__job"
+)
+
+var (
+	reMethodID = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
+	reParamID  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_-]*$`)
+)
 
 // Definition is startup metadata, independent of any running script or job.
 type Definition struct {
@@ -41,32 +51,53 @@ type Option struct {
 	Disabled bool   `yaml:"disabled,omitempty"        json:"disabled,omitempty"`
 }
 
-func Declarations(definitions []Definition) ([]funcapi.FunctionConfig, error) {
+var (
+	parameterFields = []string{"id", "name", "help", "type", "unique_view"}
+	optionFields    = []string{"id", "name", "defaultSelected", "disabled"}
+)
+
+// DefinitionShape is the strict JSON shape of a Definition in package
+// metadata, where null selects a default.
+func DefinitionShape() *strictjson.Shape {
+	return strictjson.Optional(strictjson.Fields{
+		"required_params": parameterShape(strictjson.Optional),
+	}, "id", "name", "help", "update_every", "response_type", "has_history", "accepted_params")
+}
+
+func parameterShape(object func(strictjson.Fields, ...string) *strictjson.Shape) *strictjson.Shape {
+	return object(strictjson.Fields{
+		"options": object(nil, optionFields...),
+	}, parameterFields...)
+}
+
+// Methods validates declared Functions and returns their raw-request method
+// configurations. Info requests are managed by the framework.
+func Methods(definitions []Definition) ([]funcapi.FunctionConfig, error) {
 	methods := make([]funcapi.FunctionConfig, 0, len(definitions))
 	seen := map[string]bool{}
 	for _, d := range definitions {
-		if !methodID.MatchString(d.ID) || seen[d.ID] || strings.TrimSpace(d.Name) == "" ||
+		if !reMethodID.MatchString(d.ID) || seen[d.ID] || strings.TrimSpace(d.Name) == "" ||
 			strings.TrimSpace(d.Help) == "" {
-			return nil, fmt.Errorf("functions require unique valid IDs, names and help")
+			return nil, errors.New("functions require unique valid IDs, names and help")
 		}
 		seen[d.ID] = true
 		if d.UpdateEvery < 0 {
-			return nil, fmt.Errorf("function update_every must not be negative")
+			return nil, errors.New("function update_every must not be negative")
 		}
 		if d.UpdateEvery == 0 {
-			d.UpdateEvery = 10
+			d.UpdateEvery = defaultUpdateEvery
 		}
 		if d.ResponseType == "" {
-			d.ResponseType = "table"
+			d.ResponseType = defaultResponseType
 		}
-		params, err := parameters(d.RequiredParams)
+		params, err := paramConfigs(d.RequiredParams)
 		if err != nil {
 			return nil, err
 		}
 		accepted := map[string]bool{}
 		for _, key := range d.AcceptedParams {
-			if !paramID.MatchString(key) || key == "__job" || accepted[key] {
-				return nil, fmt.Errorf("invalid or duplicate accepted Function parameter")
+			if !reParamID.MatchString(key) || key == jobSelector || accepted[key] {
+				return nil, errors.New("invalid or duplicate accepted Function parameter")
 			}
 			accepted[key] = true
 		}
@@ -86,12 +117,12 @@ func Declarations(definitions []Definition) ([]funcapi.FunctionConfig, error) {
 	return methods, nil
 }
 
-func parameters(input []Parameter) ([]funcapi.ParamConfig, error) {
-	result := make([]funcapi.ParamConfig, 0, len(input))
+func paramConfigs(params []Parameter) ([]funcapi.ParamConfig, error) {
+	result := make([]funcapi.ParamConfig, 0, len(params))
 	seen := map[string]bool{}
-	for _, p := range input {
-		if !paramID.MatchString(p.ID) || p.ID == "__job" || seen[p.ID] || strings.TrimSpace(p.Name) == "" {
-			return nil, fmt.Errorf("invalid or duplicate Function parameter")
+	for _, p := range params {
+		if !reParamID.MatchString(p.ID) || p.ID == jobSelector || seen[p.ID] || strings.TrimSpace(p.Name) == "" {
+			return nil, errors.New("invalid or duplicate Function parameter")
 		}
 		seen[p.ID] = true
 		selection := funcapi.ParamSelect
@@ -100,36 +131,30 @@ func parameters(input []Parameter) ([]funcapi.ParamConfig, error) {
 		case "multiselect":
 			selection = funcapi.ParamMultiSelect
 		default:
-			return nil, fmt.Errorf("invalid Function parameter selection type")
+			return nil, errors.New("invalid Function parameter selection type")
 		}
 		options := make([]funcapi.ParamOption, 0, len(p.Options))
 		ids := map[string]bool{}
 		for _, o := range p.Options {
 			if o.ID == "" || o.Name == "" || ids[o.ID] {
-				return nil, fmt.Errorf("invalid or duplicate Function parameter option")
+				return nil, errors.New("invalid or duplicate Function parameter option")
 			}
 			ids[o.ID] = true
-			options = append(
-				options,
-				funcapi.ParamOption{
-					ID:       o.ID,
-					Name:     o.Name,
-					Default:  o.Default,
-					Disabled: o.Disabled,
-				},
-			)
+			options = append(options, funcapi.ParamOption{
+				ID:       o.ID,
+				Name:     o.Name,
+				Default:  o.Default,
+				Disabled: o.Disabled,
+			})
 		}
-		result = append(
-			result,
-			funcapi.ParamConfig{
-				ID:         p.ID,
-				Name:       p.Name,
-				Help:       p.Help,
-				Selection:  selection,
-				Options:    options,
-				UniqueView: p.UniqueView,
-			},
-		)
+		result = append(result, funcapi.ParamConfig{
+			ID:         p.ID,
+			Name:       p.Name,
+			Help:       p.Help,
+			Selection:  selection,
+			Options:    options,
+			UniqueView: p.UniqueView,
+		})
 	}
 	return result, nil
 }

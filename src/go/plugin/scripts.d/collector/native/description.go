@@ -3,68 +3,71 @@
 package native
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
+	"slices"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
-	"gopkg.in/yaml.v2"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/internal/configform"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/internal/strictjson"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/nativefunc"
 )
 
-// A description carries assets inline and cannot choose its execution command.
+// packageDescription is the describe output of a self-contained package. It
+// carries assets inline and cannot choose its execution command.
 type packageDescription struct {
-	packageSpec  `yaml:",inline"`
+	packageSpec  `               yaml:",inline"`
 	Charts       string         `yaml:"charts"        json:"charts"`
 	ConfigSchema map[string]any `yaml:"config_schema" json:"config_schema"`
 }
 
-func parseDescription(data []byte, command []string) (manifest, *chartengine.TemplateSet, error) {
+// Description metadata may use null for any optional value, as YAML can.
+var descriptionShape = strictjson.Optional(strictjson.Fields{
+	"metrics":       strictjson.Optional(nil, "name", "type", "unit"),
+	"checks":        strictjson.Optional(nil, "id", "title", "by_labels"),
+	"functions":     nativefunc.DefinitionShape(),
+	"config_schema": strictjson.Any(),
+}, "version", "mode", "charts")
+
+// loadDescribedPackage runs a self-contained package's describe operation once
+// and validates its output.
+func loadDescribedPackage(ctx context.Context, command []string) (packageDefinition, error) {
+	data, err := runDescribe(ctx, command)
+	if err != nil {
+		return packageDefinition{}, err
+	}
+	return parseDescription(data, command)
+}
+
+// parseDescription validates a description. Errors name the failing stage only:
+// the document, declarations, form and template are script-produced.
+func parseDescription(data []byte, command []string) (packageDefinition, error) {
 	var description packageDescription
-	var m manifest
 	// YAML flow mappings can also start with '{'. Only complete JSON selects this
 	// path; encoding/json handles surrogate-pair escapes that yaml.v2 rejects.
 	if json.Valid(data) {
-		if decodeMessage(data, "description", &description) != nil {
-			return m, nil, fmt.Errorf("invalid package description document")
+		if strictjson.Decode(data, descriptionShape, &description) != nil {
+			return packageDefinition{}, errors.New("invalid package description document")
 		}
-	} else {
-		decoder := yaml.NewDecoder(bytes.NewReader(data))
-		decoder.SetStrict(true)
-		if decoder.Decode(&description) != nil {
-			return m, nil, fmt.Errorf("invalid package description document")
-		}
-		var extra any
-		if err := decoder.Decode(&extra); err != io.EOF {
-			return m, nil, fmt.Errorf("package description must contain one document")
-		}
+	} else if err := decodeYAMLDocument(data, &description); err != nil {
+		return packageDefinition{}, fmt.Errorf("package description %w", err)
 	}
-	m.packageSpec = description.packageSpec
-	m.Command = append([]string(nil), command...)
-	if m.validate() != nil {
-		return m, nil, fmt.Errorf("invalid package description declarations")
+	def, err := newPackageDefinition(description.packageSpec, slices.Clone(command))
+	if err != nil {
+		return packageDefinition{}, errors.New("invalid package description declarations")
 	}
 	if description.ConfigSchema != nil {
-		value, err := jsonValue(description.ConfigSchema)
-		if err != nil {
-			return m, nil, fmt.Errorf("invalid inline configuration form")
-		}
-		data, err := json.Marshal(value)
-		if err != nil {
-			return m, nil, fmt.Errorf("invalid inline configuration form")
-		}
-		m.config, err = parsePackageConfig(data)
-		if err != nil {
-			return m, nil, fmt.Errorf("invalid inline configuration form")
+		if def.form, err = configform.ParseValue(description.ConfigSchema); err != nil {
+			return packageDefinition{}, errors.New("invalid inline configuration form")
 		}
 	}
 	var charts []byte
 	if description.Charts != "" {
 		charts = []byte(description.Charts)
 	}
-	templates, err := m.chartTemplates(charts)
-	if err != nil {
-		return m, nil, fmt.Errorf("invalid inline chart template")
+	if def.templates, err = def.chartTemplates(charts); err != nil {
+		return packageDefinition{}, errors.New("invalid inline chart template")
 	}
-	return m, templates, nil
+	return def, nil
 }

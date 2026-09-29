@@ -10,182 +10,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
-var _ collectorapi.CollectorV2Runner = (*Collector)(nil)
-
-type scriptRuntime struct {
-	requests chan scriptRequest
-	done     chan struct{}
-}
-
-type scriptRequest struct {
-	function *funcapi.RawMethodRequest
-	ctx      context.Context
-	reply    chan scriptResult
-}
-
-type scriptResult struct {
-	function *funcapi.FunctionResponse
-	response response
-	err      error
-}
-
-func (c *Collector) runPersistent(ctx context.Context, ready func()) error {
-	s, err := startSession(ctx, c.definition.Command)
-	if err != nil {
-		return err
-	}
-	defer s.close()
-	startupCtx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
-	if len(c.configInput) > 0 {
-		if err := s.write(startupCtx, c.configInput); err != nil {
-			cancel()
-			return fmt.Errorf("persistent configuration: %w", err)
-		}
-	}
-	frame, err := s.read(startupCtx)
-	cancel()
-	if err != nil {
-		return fmt.Errorf("persistent startup: %w", err)
-	}
-	if err := decodeReady(frame); err != nil {
-		return fmt.Errorf("persistent startup: %w", err)
-	}
-
-	r := &scriptRuntime{
-		requests: make(chan scriptRequest),
-		done:     make(chan struct{}),
-	}
-	c.runtimeMu.Lock()
-	c.runtime = r
-	c.runtimeMu.Unlock()
-	defer func() {
-		c.runtimeMu.Lock()
-		c.runtime = nil
-		c.runtimeMu.Unlock()
-		close(r.done)
-	}()
-	ready()
-
-	var sequence uint64
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-s.exited:
-			return s.exitError()
-		case frame := <-s.frames:
-			if frame.err != nil {
-				return s.transportError(ctx, frame.err)
-			}
-			return fmt.Errorf("unsolicited persistent response")
-		case request := <-r.requests:
-			// A canceled sender can race with channel delivery. Until this point the
-			// request owns no stream bytes, so reject it without disturbing the peer.
-			if err := request.ctx.Err(); err != nil {
-				request.reply <- scriptResult{
-					err: err,
-				}
-				continue
-			}
-			sequence++
-			id := strconv.FormatUint(sequence, 10)
-			var result scriptResult
-			if request.function == nil {
-				// Queue waiting must not consume the admitted exchange budget.
-				exchangeCtx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
-				data, err := s.exchange(exchangeCtx, id)
-				cancel()
-				if err == nil {
-					result.response, err = c.definition.decodeReply(data, id)
-				}
-				result.err = err
-			} else {
-				frame, err := encodeFunctionRequest(*request.function, id, request.ctx)
-				if err != nil {
-					request.reply <- scriptResult{
-						err: err,
-					}
-					continue // A local encoding failure has not touched the stream.
-				}
-				data, err := s.exchangeFunction(request.ctx, frame, c.Timeout.Duration())
-				if err == nil {
-					result.function, err = decodeFunctionReply(data, id, request.function.Info)
-				}
-				result.err = err
-			}
-			// A buffered reply lets Run finish teardown after the caller stops waiting.
-			request.reply <- result
-			if result.err != nil && !errors.Is(result.err, errCollectionFailed) {
-				return fmt.Errorf("persistent exchange: %w", result.err)
-			}
-		}
-	}
-}
-
-func (c *Collector) collectPersistent(ctx context.Context) (response, error) {
-	ctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
-	defer cancel()
-	result := c.requestPersistent(ctx, nil)
-	return result.response, result.err
-}
-
-func (c *Collector) requestPersistent(ctx context.Context, function *funcapi.RawMethodRequest) scriptResult {
-	if err := ctx.Err(); err != nil {
-		return scriptResult{
-			err: err,
-		}
-	}
-	c.runtimeMu.Lock()
-	r := c.runtime
-	c.runtimeMu.Unlock()
-	if r == nil {
-		return scriptResult{
-			err: fmt.Errorf("persistent script is not running"),
-		}
-	}
-	request := scriptRequest{
-		ctx:      ctx,
-		function: function,
-		reply:    make(chan scriptResult, 1),
-	}
-	select {
-	case <-ctx.Done():
-		return scriptResult{
-			err: ctx.Err(),
-		}
-	case <-r.done:
-		return scriptResult{
-			err: fmt.Errorf("persistent script stopped"),
-		}
-	case r.requests <- request:
-	}
-	select {
-	case <-ctx.Done():
-		return scriptResult{
-			err: ctx.Err(),
-		}
-	case result := <-request.reply:
-		return result
-	case <-r.done:
-		return scriptResult{
-			err: fmt.Errorf("persistent script stopped"),
-		}
-	}
-}
-
-type scriptFrame struct {
-	data []byte
-	err  error
-}
-
+// scriptSession owns a persistent script process and its LF-framed stdio.
+// Canceling the session context or closing it terminates contained processes.
 type scriptSession struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -198,9 +29,14 @@ type scriptSession struct {
 	waitErr    error // Published by closing exited.
 }
 
-func startSession(ctx context.Context, argv []string) (*scriptSession, error) {
+// scriptFrame is one stdout frame, or the terminal read error.
+type scriptFrame struct {
+	data []byte
+	err  error
+}
+
+func startSession(ctx context.Context, command []string) (*scriptSession, error) {
 	ctx, cancel := context.WithCancel(ctx)
-	args := append(append([]string(nil), argv[1:]...), "serve")
 	childStdin, stdin, err := os.Pipe()
 	if err != nil {
 		cancel()
@@ -218,7 +54,7 @@ func startSession(ctx context.Context, argv []string) (*scriptSession, error) {
 		Stdin:  childStdin,
 		Stdout: childStdout,
 	}
-	process, err := ndexec.StartUnprivilegedProcess(ctx, opts, argv[0], args...)
+	process, err := ndexec.StartUnprivilegedProcess(ctx, opts, command[0], operationArgs(command, opServe)...)
 	if err != nil {
 		if ctx.Err() != nil {
 			err = ctx.Err()
@@ -259,8 +95,9 @@ func (s *scriptSession) close() {
 	<-s.exited
 }
 
-// Cancellation can close pipes or reap a killed process before the select sees
-// ctx.Done. Normalize only transport errors, never an observed protocol error.
+// transportError normalizes transport errors only, never an observed protocol
+// error: cancellation can close pipes or reap a killed process before a select
+// observes ctx.Done.
 func (s *scriptSession) transportError(ctx context.Context, err error) error {
 	if err == nil || errors.Is(err, errResponseTooLarge) {
 		return err
@@ -281,7 +118,37 @@ func (s *scriptSession) exitError() error {
 	if s.waitErr != nil {
 		return fmt.Errorf("persistent command exited: %w", s.waitErr)
 	}
-	return fmt.Errorf("persistent command exited")
+	return errors.New("persistent command exited")
+}
+
+// exchange writes one request frame and reads its reply frame.
+func (s *scriptSession) exchange(ctx context.Context, frame []byte) ([]byte, error) {
+	if err := s.write(ctx, frame); err != nil {
+		return nil, fmt.Errorf("write request: %w", err)
+	}
+	return s.read(ctx)
+}
+
+// exchangeWithDrain lets a caller stop waiting without abandoning bytes already
+// owned by the session: after caller cancellation, the exchange has up to drain
+// to complete. Session shutdown still interrupts I/O immediately.
+func (s *scriptSession) exchangeWithDrain(caller context.Context, frame []byte, drain time.Duration) ([]byte, error) {
+	ctx, cancel := context.WithCancelCause(s.ctx)
+	stop := context.AfterFunc(caller, func() {
+		timer := time.NewTimer(drain)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+		case <-timer.C:
+			cancel(context.DeadlineExceeded)
+		}
+	})
+	defer func() { stop(); cancel(nil) }()
+	data, err := s.exchange(ctx, frame)
+	if errors.Is(err, context.Canceled) {
+		err = context.Cause(ctx)
+	}
+	return data, err
 }
 
 func (s *scriptSession) read(ctx context.Context) ([]byte, error) {
@@ -297,39 +164,8 @@ func (s *scriptSession) read(ctx context.Context) ([]byte, error) {
 	}
 }
 
-func (s *scriptSession) exchange(ctx context.Context, id string) ([]byte, error) {
-	if err := s.write(ctx, []byte(fmt.Sprintf("{\"id\":\"%s\",\"method\":\"collect\"}\n", id))); err != nil {
-		return nil, fmt.Errorf("write collection request: %w", err)
-	}
-	return s.read(ctx)
-}
-
-// A Function caller can stop waiting without abandoning bytes already owned by
-// the session. Allow one timeout to complete the exchange after cancellation;
-// job shutdown still interrupts I/O immediately through the session context.
-func (s *scriptSession) exchangeFunction(caller context.Context, frame []byte, timeout time.Duration) ([]byte, error) {
-	ctx, cancel := context.WithCancelCause(s.ctx)
-	stop := context.AfterFunc(caller, func() {
-		timer := time.NewTimer(timeout)
-		defer timer.Stop()
-		select {
-		case <-ctx.Done():
-		case <-timer.C:
-			cancel(context.DeadlineExceeded)
-		}
-	})
-	defer func() { stop(); cancel(nil) }()
-	err := s.write(ctx, frame)
-	var data []byte
-	if err == nil {
-		data, err = s.read(ctx)
-	}
-	if errors.Is(err, context.Canceled) {
-		err = context.Cause(ctx)
-	}
-	return data, err
-}
-
+// write joins the writer goroutine on every path, closing stdin to unblock a
+// peer that stopped reading.
 func (s *scriptSession) write(ctx context.Context, data []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -341,9 +177,7 @@ func (s *scriptSession) write(ctx context.Context, data []byte) error {
 	}()
 	select {
 	case err := <-written:
-		if err != nil {
-			return s.transportError(ctx, err)
-		}
+		return s.transportError(ctx, err)
 	case <-ctx.Done():
 		_ = s.stdin.Close()
 		<-written
@@ -357,7 +191,6 @@ func (s *scriptSession) write(ctx context.Context, data []byte) error {
 		<-written
 		return s.exitError()
 	}
-	return nil
 }
 
 func (s *scriptSession) readFrames() {
@@ -389,8 +222,9 @@ func (s *scriptSession) readFrames() {
 	}
 }
 
-// LF is mandatory, including for the last frame. Keep CR in the token so every
-// byte counts toward the limit (JSON whitespace is accepted by the decoder).
+// splitFrame requires LF, including after the last frame. It keeps CR in the
+// token so every byte counts toward the limit (JSON whitespace is accepted by
+// the decoder).
 func splitFrame(data []byte, atEOF bool) (int, []byte, error) {
 	if i := bytes.IndexByte(data, '\n'); i >= 0 {
 		if i+1 > maxMessageBytes {

@@ -3,122 +3,84 @@
 package native
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"os/exec"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/nativefunc"
 )
 
-func (c *Collector) ExecuteFunction(
+// funcDeps adapts a job's Collector to the Function router.
+type funcDeps struct {
+	c *Collector
+}
+
+var _ nativefunc.Deps = funcDeps{}
+
+func (d funcDeps) ExecuteFunction(
+	ctx context.Context,
+	request funcapi.RawMethodRequest,
+) (*funcapi.FunctionResponse, error) {
+	return d.c.executeFunction(ctx, request)
+}
+
+// functionHandler binds a registered package's Function router to a running job.
+func functionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
+	c, ok := job.Collector().(*Collector)
+	if !ok {
+		return nil
+	}
+	return nativefunc.NewRouter(funcDeps{
+		c: c,
+	}, c.definition.methods)
+}
+
+func (c *Collector) executeFunction(
 	ctx context.Context,
 	request funcapi.RawMethodRequest,
 ) (*funcapi.FunctionResponse, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	declared := false
-	for _, method := range c.definition.methods {
-		if method.ID == request.Method {
-			declared = true
-			break
-		}
-	}
-	if !c.initialized || !c.bound || !declared {
-		return nil, fmt.Errorf("native Function is unavailable")
+	declared := slices.ContainsFunc(
+		c.definition.methods,
+		func(m funcapi.FunctionConfig) bool { return m.ID == request.Method },
+	)
+	if !c.initialized || !c.registered || !declared {
+		return nil, errors.New("native Function is unavailable")
 	}
 	// Reserve the largest session ID before queue admission. Rejection must not
 	// touch an existing process, even when ingress allowed a larger payload.
-	if _, err := encodeFunctionRequest(request, "18446744073709551615", ctx); err != nil {
+	if _, err := encodeFunctionRequest(ctx, maxRequestID, request); err != nil {
 		return nil, err
 	}
 	if c.definition.Mode == modePersistent {
 		result := c.requestPersistent(ctx, &request)
 		return result.function, result.err
 	}
-	frame, err := encodeFunctionRequest(request, "1", ctx)
+	return c.executeOneshotFunction(ctx, request)
+}
+
+func (c *Collector) executeOneshotFunction(
+	ctx context.Context,
+	request funcapi.RawMethodRequest,
+) (*funcapi.FunctionResponse, error) {
+	const id = "1"
+	frame, err := encodeFunctionRequest(ctx, id, request)
 	if err != nil {
 		return nil, err
 	}
-	input := append(bytes.Clone(c.configInput), frame...)
-	data, err := runOperation(ctx, c.definition.Command, "function", input)
+	data, err := runOneshot(ctx, c.definition.command, opFunction, slices.Concat(c.configEnvelope, frame))
 	if err != nil {
 		c.Errorf("one-shot Function command failed: %s", commandFailureReason(err))
 		return nil, err
 	}
-	result, err := decodeFunctionReply(data, "1", request.Info)
+	result, err := decodeFunctionReply(data, id, request.Info)
 	if err != nil {
 		// Decoder errors can contain script-controlled field names or values.
 		c.Error("one-shot Function protocol failed: invalid reply")
 	}
 	return result, err
-}
-
-// Never log the original error: command errors can include paths, and output
-// belongs to the script. Numeric exit status and fixed categories are safe.
-func commandFailureReason(err error) string {
-	var exitErr *exec.ExitError
-	switch {
-	case errors.Is(err, context.Canceled):
-		return "caller canceled"
-	case errors.Is(err, context.DeadlineExceeded):
-		return "caller deadline exceeded"
-	case errors.Is(err, errResponseTooLarge):
-		return "response exceeds 64 MiB"
-	case errors.As(err, &exitErr):
-		if exitErr.ExitCode() < 0 {
-			return "command terminated by signal"
-		}
-		return fmt.Sprintf("command exited with status %d", exitErr.ExitCode())
-	default:
-		return "command execution failed"
-	}
-}
-
-func encodeFunctionRequest(request funcapi.RawMethodRequest, id string, ctx context.Context) ([]byte, error) {
-	deadlineMS := int64(0)
-	if deadline, ok := ctx.Deadline(); ok {
-		deadlineMS = deadline.UnixMilli()
-	}
-	args := request.Args
-	if args == nil {
-		args = []string{}
-	}
-	data, err := json.Marshal(struct {
-		ID          string   `json:"id"`
-		Method      string   `json:"method"`
-		Function    string   `json:"function"`
-		Info        bool     `json:"info"`
-		Args        []string `json:"args"`
-		Payload     []byte   `json:"payload_base64,omitempty"`
-		ContentType string   `json:"content_type,omitempty"`
-		DeadlineMS  int64    `json:"deadline_unix_ms,omitempty"`
-		Permissions string   `json:"permissions,omitempty"`
-		Source      string   `json:"source,omitempty"`
-	}{id, "function", request.Method, request.Info, args, request.Payload, request.ContentType, deadlineMS, request.Permissions, request.Source})
-	if err != nil {
-		return nil, fmt.Errorf("cannot encode Function request")
-	}
-	if len(data)+1 > maxMessageBytes {
-		return nil, fmt.Errorf("Function request exceeds 64 MiB")
-	}
-	return append(data, '\n'), nil
-}
-
-func decodeFunctionReply(data []byte, id string, info bool) (*funcapi.FunctionResponse, error) {
-	var reply struct {
-		ID     string             `json:"id"`
-		Result *nativefunc.Result `json:"result"`
-	}
-	if err := decodeMessage(data, "function_reply", &reply); err != nil {
-		return nil, err
-	}
-	if reply.ID != id || reply.Result == nil {
-		return nil, fmt.Errorf("invalid Function reply envelope")
-	}
-	return reply.Result.Response(info)
 }
