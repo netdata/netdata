@@ -123,7 +123,7 @@ func packageForm(name string, definition manifest) (string, error) {
 	if definition.functionOnly() {
 		delete(properties, "update_every")
 		if definition.Mode == modePersistent {
-			properties["timeout"].(map[string]any)["description"] = "Maximum duration in seconds of persistent process startup. Function requests use their caller deadline."
+			properties["timeout"].(map[string]any)["description"] = "Timeout in seconds for persistent startup and for draining a Function reply after caller cancellation. Function callers use their own deadline."
 		} else {
 			delete(properties, "timeout")
 		}

@@ -261,7 +261,9 @@ object, at most 1 MiB including whitespace. Stdin is EOF for schema-free package
 configured packages receive one configuration envelope followed by EOF. In persistent mode, the
 same snapshot is carried in a correlated reply as described below. Stdout
 is exclusively the protocol; redirect command chatter to stderr. The collector
-discards stderr to avoid copying arbitrary script output into Agent logs.
+discards stderr to avoid copying arbitrary script output into Agent logs. One-shot
+Function failures log only safe command categories (including numeric exit status)
+or an invalid-reply diagnostic; script output and request data are never logged.
 
 ```json
 {
@@ -344,10 +346,15 @@ snapshots. A reply MUST contain exactly one of `result` or `error`; the only err
 code is `collection_failed`. There is one outstanding request and no push channel.
 Scripts MAY perform background work, but MUST NOT emit unsolicited frames.
 
-`timeout` bounds startup and each collection attempt, including time waiting
-behind a Function. Function calls use the caller deadline instead. Neither is a
-process lifetime limit. A mismatched ID, malformed/oversized frame,
-partial frame at EOF, timeout, closed stdout or process exit terminates the session.
+`timeout` bounds startup and the caller's collection wait, including time behind
+an active Function. An admitted collection exchange gets a full `timeout` to
+finish, independently of the caller's remaining wait budget. A caller timeout
+publishes no sample; the host still drains and validates the outstanding reply
+before accepting another request. An exchange exceeding its full budget stops
+the session. Function callers use their own deadline, with bounded reply draining
+after cancellation as described below. These are not process lifetime limits.
+A mismatched ID, malformed/oversized frame, partial frame at EOF, closed stdout
+or process exit terminates the session.
 After readiness this marks the job Failed and requires an explicit restart or
 reconfiguration. No private respawn loop retries it. Failures before readiness use
 the normal `autodetection_retry` policy. In either case, no synthetic healthy sample
@@ -435,11 +442,16 @@ Function output or error messages; those results are sent to the requesting UI.
 The request, including base64 expansion and terminating LF, MUST fit in 1 MiB.
 The host reserves space for the largest correlation ID when admitting a request;
 oversized requests fail before executing or writing to a script. Replies use the
-same 1 MiB bound. The Function context bounds queue waiting and execution. A
-request canceled before exchange starts leaves the persistent peer usable. Once
-an exchange has started, cancellation or timeout before a complete valid reply
-terminates the session to prevent a stale reply reaching a later request. There
-is no script cancellation frame or private process restart.
+same 1 MiB bound. The Function context bounds how long the caller waits, including
+queue waiting. Cancellation before admission leaves the persistent peer usable.
+After admission, cancellation or deadline expiry returns to the caller promptly;
+the host allows up to `timeout` more seconds to finish writing and drain the
+matching reply. It validates and discards that reply before accepting another
+request. A missing, invalid or mismatched reply stops the session. While draining,
+other requests keep waiting under their own deadlines. A script SHOULD promptly
+return a valid error response when its supplied deadline expires. There is no
+script cancellation frame or private process restart. One-shot cancellation still
+terminates its owned process; job stop/replacement immediately terminates either mode.
 
 ### Results
 
@@ -488,8 +500,8 @@ Runnable examples are [`development/functions-bash`](development/functions-bash/
 (function-only). Both support either manifest mode. Tests route their actual
 responses through Agent stdin dispatch and validate emitted info/data against the
 canonical UI schema. Function-only DynCfg forms omit the collection interval;
-the timeout field is shown only for persistent startup. Function execution always
-uses the caller deadline.
+the timeout field is shown only in persistent mode, for startup and reply draining
+after cancellation. Function callers always use their own deadline.
 
 ## Checks and automatic alerts
 

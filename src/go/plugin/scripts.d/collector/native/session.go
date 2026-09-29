@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -98,7 +99,10 @@ func (c *Collector) runPersistent(ctx context.Context, ready func()) error {
 			id := strconv.FormatUint(sequence, 10)
 			var result scriptResult
 			if request.function == nil {
-				data, err := s.exchange(request.ctx, id)
+				// Queue waiting must not consume the admitted exchange budget.
+				exchangeCtx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
+				data, err := s.exchange(exchangeCtx, id)
+				cancel()
 				if err == nil {
 					result.response, err = c.definition.decodeReply(data, id)
 				}
@@ -111,12 +115,9 @@ func (c *Collector) runPersistent(ctx context.Context, ready func()) error {
 					}
 					continue // A local encoding failure has not touched the stream.
 				}
-				if err = s.write(request.ctx, frame); err == nil {
-					var data []byte
-					data, err = s.read(request.ctx)
-					if err == nil {
-						result.function, err = decodeFunctionReply(data, id, request.function.Info)
-					}
+				data, err := s.exchangeFunction(request.ctx, frame, c.Timeout.Duration())
+				if err == nil {
+					result.function, err = decodeFunctionReply(data, id, request.function.Info)
 				}
 				result.err = err
 			}
@@ -301,6 +302,32 @@ func (s *scriptSession) exchange(ctx context.Context, id string) ([]byte, error)
 		return nil, fmt.Errorf("write collection request: %w", err)
 	}
 	return s.read(ctx)
+}
+
+// A Function caller can stop waiting without abandoning bytes already owned by
+// the session. Allow one timeout to complete the exchange after cancellation;
+// job shutdown still interrupts I/O immediately through the session context.
+func (s *scriptSession) exchangeFunction(caller context.Context, frame []byte, timeout time.Duration) ([]byte, error) {
+	ctx, cancel := context.WithCancelCause(s.ctx)
+	stop := context.AfterFunc(caller, func() {
+		timer := time.NewTimer(timeout)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+		case <-timer.C:
+			cancel(context.DeadlineExceeded)
+		}
+	})
+	defer func() { stop(); cancel(nil) }()
+	err := s.write(ctx, frame)
+	var data []byte
+	if err == nil {
+		data, err = s.read(ctx)
+	}
+	if errors.Is(err, context.Canceled) {
+		err = context.Cause(ctx)
+	}
+	return data, err
 }
 
 func (s *scriptSession) write(ctx context.Context, data []byte) error {

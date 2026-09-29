@@ -80,7 +80,7 @@ modules:
               default_value: 0
               required: false
             - name: timeout
-              description: Maximum duration in seconds of collection, including waiting for a busy persistent script, or persistent process startup. Function requests use their caller deadline.
+              description: Timeout in seconds for startup and collection, including queue waiting. Admitted persistent collections get a full exchange timeout. Canceled Functions allow up to this timeout to drain their reply; callers still use their own deadline.
               default_value: 5
               required: false
         examples:

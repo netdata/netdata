@@ -6,7 +6,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os/exec"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/nativefunc"
@@ -45,9 +47,36 @@ func (c *Collector) ExecuteFunction(
 	input := append(bytes.Clone(c.configInput), frame...)
 	data, err := runOperation(ctx, c.definition.Command, "function", input)
 	if err != nil {
+		c.Errorf("one-shot Function command failed: %s", functionCommandFailure(err))
 		return nil, err
 	}
-	return decodeFunctionReply(data, "1", request.Info)
+	result, err := decodeFunctionReply(data, "1", request.Info)
+	if err != nil {
+		// Decoder errors can contain script-controlled field names or values.
+		c.Error("one-shot Function protocol failed: invalid reply")
+	}
+	return result, err
+}
+
+// Never log the original error: command errors can include paths, and output
+// belongs to the script. Numeric exit status and fixed categories are safe.
+func functionCommandFailure(err error) string {
+	var exitErr *exec.ExitError
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "caller canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "caller deadline exceeded"
+	case errors.Is(err, errResponseTooLarge):
+		return "response exceeds 1 MiB"
+	case errors.As(err, &exitErr):
+		if exitErr.ExitCode() < 0 {
+			return "command terminated by signal"
+		}
+		return fmt.Sprintf("command exited with status %d", exitErr.ExitCode())
+	default:
+		return "command execution failed"
+	}
 }
 
 func encodeFunctionRequest(request funcapi.RawMethodRequest, id string, ctx context.Context) ([]byte, error) {

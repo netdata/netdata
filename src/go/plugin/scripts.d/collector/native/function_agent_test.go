@@ -248,6 +248,26 @@ func TestFunctionAgentReplacement(t *testing.T) {
 	assert.Contains(t, a.out.String(), `FUNCTION_DEL GLOBAL "native-fixture:items"`)
 }
 
+func TestFunctionAgentActiveCancellation(t *testing.T) {
+	setupRunner(t)
+	registry, dir := functionFixture(t, modePersistent, false)
+	a := startNativeAgent(t, registry, dir)
+	a.enable(t, "alpha", 23)
+	a.send(t, "active", "native-fixture:items __job:alpha wait", "")
+	waitFile(t, filepath.Join(dir, "23.active"))
+	_, err := fmt.Fprintln(a.input, "FUNCTION_CANCEL active")
+	require.NoError(t, err)
+	a.result(t, "active", 499)
+	before := strings.Count(a.out.String(), " = 23")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "release"), nil, 0644))
+	a.call(t, "after", "native-fixture:items __job:alpha", "", 200)
+	require.Eventually(t, func() bool {
+		return strings.Count(a.out.String(), " = 23") > before
+	}, 3*time.Second, 10*time.Millisecond, "collection must resume after caller cancellation")
+	assert.NotContains(t, a.out.String(), "status failed")
+	assert.NotContains(t, a.out.String(), `FUNCTION_DEL GLOBAL "native-fixture:items"`)
+}
+
 func TestFunctionAgentQueuedCancellation(t *testing.T) {
 	setupRunner(t)
 	registry, dir := functionFixture(t, modePersistent, true)

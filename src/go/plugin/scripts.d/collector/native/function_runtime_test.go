@@ -106,7 +106,7 @@ func initFunctionCollector(t *testing.T, registry collectorapi.Registry) *Collec
 		"text":  "synthetic",
 		"count": float64(23),
 	}
-	c.Timeout = confopt.Duration(500 * time.Millisecond)
+	c.Timeout = confopt.Duration(time.Second)
 	require.NoError(t, c.Init(context.Background()))
 	require.NoError(t, c.Check(context.Background()))
 	return c
@@ -317,7 +317,7 @@ func TestActiveFunctionCancellation(t *testing.T) {
 			}
 			if runtime != nil {
 				runtime.wait(t)
-				require.ErrorIs(t, runtime.err, context.Canceled)
+				require.ErrorIs(t, runtime.err, context.DeadlineExceeded)
 				_, err := c.ExecuteFunction(context.Background(), funcapi.RawMethodRequest{
 					Method: "items",
 				})
