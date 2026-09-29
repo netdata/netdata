@@ -73,16 +73,7 @@ static inline int ebpf_disk_load_and_attach(struct disk_bpf *obj)
 {
     const char *section = bpf_program__section_name(obj->progs.netdata_blk_complete_request);
     if (section && strncmp(section, "fentry/", 7) == 0) {
-        struct btf *kernel_btf = btf__load_vmlinux_btf();
-        int complete_id = -1;
-        if (kernel_btf) {
-            long btf_error = libbpf_get_error(kernel_btf);
-            if (!btf_error) {
-                complete_id = btf__find_by_name_kind(kernel_btf, "blk_complete_request", BTF_KIND_FUNC);
-                btf__free(kernel_btf);
-            }
-        }
-
+        int complete_id = ebpf_kernel_btf_find_by_name_kind("blk_complete_request", BTF_KIND_FUNC);
         if (complete_id < 0)
             bpf_program__set_autoload(obj->progs.netdata_blk_complete_request, false);
     }

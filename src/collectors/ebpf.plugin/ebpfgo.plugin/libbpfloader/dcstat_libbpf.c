@@ -103,6 +103,7 @@ struct netdata_ebpf_dcstat_runtime {
     } core;
 #endif
 #ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
+    struct nd_ebpf_raw_arena *raw_arena;
     /* Event consumer and per-TGID accumulator (buffer and arena flavors).
      * These flavors emit ring buffer / arena events rather than writing
      * directly to dcstat_pid, so per-app counters are accumulated here. */
@@ -152,35 +153,6 @@ enum netdata_dcstat_global_key {
 #define NETDATA_DCSTAT_DEFAULT_LOOKUP_FAST_TARGET "lookup_fast"
 #define NETDATA_DCSTAT_DEFAULT_D_LOOKUP_TARGET "d_lookup"
 
-static const char *dcstat_find_program_name(struct bpf_object *obj, const char *const *candidates, size_t count)
-{
-    for (size_t i = 0; i < count; i++)
-        if (bpf_object__find_program_by_name(obj, candidates[i]))
-            return candidates[i];
-
-    return NULL;
-}
-
-static int dcstat_prepare_autoload(struct bpf_object *obj, const char **program_names)
-{
-    struct bpf_program *prog;
-    bpf_object__for_each_program(prog, obj)
-        bpf_program__set_autoload(prog, false);
-
-    for (size_t i = 0; i < NETDATA_DCSTAT_LINK_COUNT; i++) {
-        if (!program_names[i])
-            return -1;
-        struct bpf_program *prog = bpf_object__find_program_by_name(obj, program_names[i]);
-        if (!prog) {
-            fprintf(stderr, "dcstat: object does not contain required program %s\n", program_names[i]);
-            return -1;
-        }
-        bpf_program__set_autoload(prog, true);
-    }
-
-    return 0;
-}
-
 static int dcstat_resolve_program_names(struct bpf_object *obj, const char **names)
 {
     static const char *const lookup_fast[] = {
@@ -190,8 +162,8 @@ static int dcstat_resolve_program_names(struct bpf_object *obj, const char **nam
         "netdata_d_lookup_kretprobe", "netdata_d_lookup_buffer", "netdata_d_lookup",
     };
 
-    names[0] = dcstat_find_program_name(obj, lookup_fast, sizeof(lookup_fast) / sizeof(lookup_fast[0]));
-    names[1] = dcstat_find_program_name(obj, d_lookup, sizeof(d_lookup) / sizeof(d_lookup[0]));
+    names[0] = nd_ebpf_find_program_name(obj, lookup_fast, sizeof(lookup_fast) / sizeof(lookup_fast[0]));
+    names[1] = nd_ebpf_find_program_name(obj, d_lookup, sizeof(d_lookup) / sizeof(d_lookup[0]));
     for (size_t i = 0; i < NETDATA_DCSTAT_LINK_COUNT; i++) {
         if (!names[i]) {
             fprintf(stderr, "dcstat: object does not contain required probe %zu\n", i);
@@ -363,6 +335,17 @@ struct netdata_ebpf_dcstat_runtime *netdata_dcstat_runtime_open_mode(const char 
         }
 
         rt->obj = obj;
+#ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
+        if (rt->flavor == NETDATA_DCSTAT_RUNTIME_FLAVOR_ARENA) {
+            rt->raw_arena = nd_ebpf_raw_arena_create(obj, "dc_events");
+            if (!rt->raw_arena) {
+                bpf_object__close(obj);
+                nd_ebpf_acc_free(&rt->acc);
+                freez(rt);
+                return NULL;
+            }
+        }
+#endif
     }
 
     return rt;
@@ -378,7 +361,7 @@ int netdata_dcstat_runtime_prepare(
         return -1;
 
     if (dcstat_resolve_program_names(obj, rt->program_names) != 0 ||
-        dcstat_prepare_autoload(obj, rt->program_names) != 0)
+        nd_ebpf_prepare_autoload(obj, rt->program_names, NETDATA_DCSTAT_LINK_COUNT, "dcstat") != 0)
         return -1;
     if (dcstat_update_map_types(obj, maps_per_core) != 0)
         return -1;
@@ -460,8 +443,7 @@ static void dcstat_destroy_ring_buffer(struct netdata_ebpf_dcstat_runtime *rt)
     nd_ebpf_acc_free(&rt->acc);
 }
 
-/* The generated skeleton exposes the arena data section directly; raw objects
- * expose the arena map's mapped initial data through libbpf. */
+/* Both generated and runtime-built skeletons expose the correctly offset arena data section. */
 static int dcstat_setup_arena(struct netdata_ebpf_dcstat_runtime *rt)
 {
 #ifdef NETDATA_DCSTAT_LIBBPF_CORE_SUPPORTED
@@ -473,25 +455,7 @@ static int dcstat_setup_arena(struct netdata_ebpf_dcstat_runtime *rt)
         return 0;
     }
 #endif
-    struct bpf_map *map = bpf_object__find_map_by_name(dcstat_runtime_object(rt), "arena");
-    size_t data_size = 0;
-    void *mapped = map ? bpf_map__initial_value(map, &data_size) : NULL;
-    long page_size_value = sysconf(_SC_PAGESIZE);
-    size_t entries = map ? bpf_map__max_entries(map) : 0;
-    if (!mapped || page_size_value <= 0 || !entries)
-        return -1;
-
-    size_t page_size = (size_t)page_size_value;
-    if (entries > SIZE_MAX / page_size || data_size > SIZE_MAX - (page_size - 1))
-        return -1;
-
-    size_t arena_size = entries * page_size;
-    size_t rounded_data_size = ((data_size + page_size - 1) / page_size) * page_size;
-    if (rounded_data_size > arena_size || data_size < sizeof(struct nd_ebpf_arena_state))
-        return -1;
-
-    rt->arena_state = (char *)mapped + arena_size - rounded_data_size;
-    return 0;
+    return nd_ebpf_raw_arena_get_state(rt->raw_arena, &rt->arena_state);
 }
 
 static void dcstat_rb_event(void *ctx, const struct nd_ebpf_pid_event *ev)
@@ -551,8 +515,16 @@ int netdata_dcstat_runtime_load(struct netdata_ebpf_dcstat_runtime *rt)
             return -1;
     } else
 #endif
-    if (bpf_object__load(rt->obj) != 0)
-        return -1;
+    {
+#ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
+        if (rt->raw_arena) {
+            if (nd_ebpf_raw_arena_load(rt->raw_arena) != 0)
+                return -1;
+        } else
+#endif
+        if (bpf_object__load(rt->obj) != 0)
+            return -1;
+    }
 
 #ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
     if (rt->flavor == NETDATA_DCSTAT_RUNTIME_FLAVOR_BUFFER) {
@@ -596,23 +568,11 @@ int netdata_dcstat_runtime_attach(
     rt->links[0] = dcstat_attach_program_by_name(obj, rt->program_names[0], lookup_fast_target, false);
     rt->links[1] = dcstat_attach_program_by_name(obj, rt->program_names[1], d_lookup_target, true);
 
-    const char **program_names = rt->program_names;
     const char *targets[] = {lookup_fast_target, d_lookup_target};
-    for (size_t i = 0; i < NETDATA_DCSTAT_LINK_COUNT; i++) {
-        if (!rt->links[i]) {
-            fprintf(stderr, "dcstat: failed to attach %s to %s: %s\n",
-                    program_names[i], targets[i], "program not found");
-            nd_ebpf_destroy_links(&rt->links, NETDATA_DCSTAT_LINK_COUNT);
-            return -1;
-        }
-
-        long error = libbpf_get_error(rt->links[i]);
-        if (error) {
-            fprintf(stderr, "dcstat: failed to attach %s to %s: %s (%ld)\n",
-                    program_names[i], targets[i], strerror((int)-error), error);
-            nd_ebpf_destroy_links(&rt->links, NETDATA_DCSTAT_LINK_COUNT);
-            return -1;
-        }
+    if (nd_ebpf_validate_links(rt->links, rt->program_names, targets,
+                                NETDATA_DCSTAT_LINK_COUNT, "dcstat") != 0) {
+        nd_ebpf_destroy_links(&rt->links, NETDATA_DCSTAT_LINK_COUNT);
+        return -1;
     }
 
     return 0;
@@ -831,11 +791,16 @@ void netdata_dcstat_runtime_close(struct netdata_ebpf_dcstat_runtime *rt)
     if (rt->kind == NETDATA_DCSTAT_RUNTIME_CORE) {
         dcstat_destroy_ring_buffer(rt);
         dcstat_runtime_destroy_core(rt);
-    } else if (rt->obj)
-        bpf_object__close(rt->obj);
-#else
-    if (rt->obj)
-        bpf_object__close(rt->obj);
+    } else
 #endif
+    {
+#ifdef NETDATA_DCSTAT_EVENT_FLAVORS_SUPPORTED
+        if (rt->raw_arena)
+            nd_ebpf_raw_arena_destroy(rt->raw_arena);
+        else
+#endif
+        if (rt->obj)
+            bpf_object__close(rt->obj);
+    }
     freez(rt);
 }

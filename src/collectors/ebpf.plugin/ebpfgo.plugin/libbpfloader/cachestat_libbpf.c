@@ -90,6 +90,7 @@ struct netdata_ebpf_cachestat_runtime {
     } core;
 #endif
 #ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
+    struct nd_ebpf_raw_arena *raw_arena;
     /* Event consumer and per-TGID accumulator (buffer and arena flavors).
      * These flavors emit ring buffer / arena events rather than writing
      * directly to cstat_pid, so per-app counters are accumulated here. */
@@ -128,15 +129,6 @@ ND_EBPF_ASSERT_PID_FIRST(struct netdata_ebpf_cachestat_pid_snapshot);
 int netdata_cachestat_runtime_supports_core(void);
 
 
-static const char *cachestat_find_program_name(struct bpf_object *obj, const char *const *candidates, size_t count)
-{
-    for (size_t i = 0; i < count; i++)
-        if (bpf_object__find_program_by_name(obj, candidates[i]))
-            return candidates[i];
-
-    return NULL;
-}
-
 static const char *cachestat_resolve_account_program(struct bpf_object *obj, const char *account_function)
 {
     static const char *const folio[] = {
@@ -159,34 +151,13 @@ static const char *cachestat_resolve_account_program(struct bpf_object *obj, con
     };
 
     if (!account_function || !strcmp(account_function, "account_page_dirtied"))
-        return cachestat_find_program_name(obj, account, sizeof(account) / sizeof(account[0]));
+        return nd_ebpf_find_program_name(obj, account, sizeof(account) / sizeof(account[0]));
     if (!strcmp(account_function, "__set_page_dirty"))
-        return cachestat_find_program_name(obj, set_page, sizeof(set_page) / sizeof(set_page[0]));
+        return nd_ebpf_find_program_name(obj, set_page, sizeof(set_page) / sizeof(set_page[0]));
     if (!strcmp(account_function, "__folio_mark_dirty"))
-        return cachestat_find_program_name(obj, folio, sizeof(folio) / sizeof(folio[0]));
+        return nd_ebpf_find_program_name(obj, folio, sizeof(folio) / sizeof(folio[0]));
 
     return NULL;
-}
-
-static int cachestat_prepare_autoload(struct bpf_object *obj, const char **program_names)
-{
-    struct bpf_program *prog;
-    bpf_object__for_each_program(prog, obj)
-        bpf_program__set_autoload(prog, false);
-
-    for (size_t i = 0; i < 4; i++) {
-        if (!program_names[i])
-            return -1;
-
-        struct bpf_program *prog = bpf_object__find_program_by_name(obj, program_names[i]);
-        if (!prog) {
-            fprintf(stderr, "cachestat: object does not contain required program %s\n", program_names[i]);
-            return -1;
-        }
-        bpf_program__set_autoload(prog, true);
-    }
-
-    return 0;
 }
 
 static int cachestat_resolve_program_names(struct bpf_object *obj, const char *account_function, const char **names)
@@ -204,10 +175,10 @@ static int cachestat_resolve_program_names(struct bpf_object *obj, const char *a
         "netdata_mark_buffer_dirty",
     };
 
-    names[0] = cachestat_find_program_name(obj, add, sizeof(add) / sizeof(add[0]));
-    names[1] = cachestat_find_program_name(obj, access, sizeof(access) / sizeof(access[0]));
+    names[0] = nd_ebpf_find_program_name(obj, add, sizeof(add) / sizeof(add[0]));
+    names[1] = nd_ebpf_find_program_name(obj, access, sizeof(access) / sizeof(access[0]));
     names[2] = cachestat_resolve_account_program(obj, account_function);
-    names[3] = cachestat_find_program_name(obj, dirty, sizeof(dirty) / sizeof(dirty[0]));
+    names[3] = nd_ebpf_find_program_name(obj, dirty, sizeof(dirty) / sizeof(dirty[0]));
 
     for (size_t i = 0; i < 4; i++) {
         if (!names[i]) {
@@ -386,6 +357,17 @@ struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const
         }
 
         rt->obj = obj;
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
+        if (rt->flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA) {
+            rt->raw_arena = nd_ebpf_raw_arena_create(obj, "cachestat_events");
+            if (!rt->raw_arena) {
+                bpf_object__close(obj);
+                nd_ebpf_acc_free(&rt->acc);
+                freez(rt);
+                return NULL;
+            }
+        }
+#endif
     }
 
     return rt;
@@ -402,7 +384,7 @@ int netdata_cachestat_runtime_prepare(
         return -1;
 
     if (cachestat_resolve_program_names(obj, account_function, rt->program_names) != 0 ||
-        cachestat_prepare_autoload(obj, rt->program_names) != 0)
+        nd_ebpf_prepare_autoload(obj, rt->program_names, 4, "cachestat") != 0)
         return -1;
     if (cachestat_update_map_types(obj, maps_per_core) != 0)
         return -1;
@@ -476,8 +458,7 @@ static void cachestat_destroy_ring_buffer(struct netdata_ebpf_cachestat_runtime 
     nd_ebpf_acc_free(&rt->acc);
 }
 
-/* The generated skeleton exposes the arena data section directly; raw objects
- * expose the arena map's mapped initial data through libbpf. */
+/* Both generated and runtime-built skeletons expose the correctly offset arena data section. */
 static int cachestat_setup_arena(struct netdata_ebpf_cachestat_runtime *rt)
 {
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
@@ -489,25 +470,7 @@ static int cachestat_setup_arena(struct netdata_ebpf_cachestat_runtime *rt)
         return 0;
     }
 #endif
-    struct bpf_map *map = bpf_object__find_map_by_name(cachestat_runtime_object(rt), "arena");
-    size_t data_size = 0;
-    void *mapped = map ? bpf_map__initial_value(map, &data_size) : NULL;
-    long page_size_value = sysconf(_SC_PAGESIZE);
-    size_t entries = map ? bpf_map__max_entries(map) : 0;
-    if (!mapped || page_size_value <= 0 || !entries)
-        return -1;
-
-    size_t page_size = (size_t)page_size_value;
-    if (entries > SIZE_MAX / page_size || data_size > SIZE_MAX - (page_size - 1))
-        return -1;
-
-    size_t arena_size = entries * page_size;
-    size_t rounded_data_size = ((data_size + page_size - 1) / page_size) * page_size;
-    if (rounded_data_size > arena_size || data_size < sizeof(struct nd_ebpf_arena_state))
-        return -1;
-
-    rt->arena_state = (char *)mapped + arena_size - rounded_data_size;
-    return 0;
+    return nd_ebpf_raw_arena_get_state(rt->raw_arena, &rt->arena_state);
 }
 
 static void cachestat_rb_event(void *ctx, const struct nd_ebpf_pid_event *ev)
@@ -568,8 +531,16 @@ int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt)
             return -1;
     } else
 #endif
-    if (bpf_object__load(rt->obj) != 0)
-        return -1;
+    {
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
+        if (rt->raw_arena) {
+            if (nd_ebpf_raw_arena_load(rt->raw_arena) != 0)
+                return -1;
+        } else
+#endif
+        if (bpf_object__load(rt->obj) != 0)
+            return -1;
+    }
 
 #ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
     if (rt->flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER && cachestat_setup_ring_buffer(rt) != 0)
@@ -603,23 +574,10 @@ int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, 
     rt->links[2] = cachestat_attach_program_by_name(obj, rt->program_names[2], account_function);
     rt->links[3] = cachestat_attach_program_by_name(obj, rt->program_names[3], "mark_buffer_dirty");
 
-    const char **program_names = rt->program_names;
     const char *targets[] = {"add_to_page_cache_lru", "mark_page_accessed", account_function, "mark_buffer_dirty"};
-    for (size_t i = 0; i < 4; i++) {
-        if (!rt->links[i]) {
-            fprintf(stderr, "cachestat: failed to attach %s to %s: %s\n",
-                    program_names[i], targets[i], "program not found");
-            nd_ebpf_destroy_links(&rt->links, 4);
-            return -1;
-        }
-
-        long error = libbpf_get_error(rt->links[i]);
-        if (error) {
-            fprintf(stderr, "cachestat: failed to attach %s to %s: %s (%ld)\n",
-                    program_names[i], targets[i], strerror((int)-error), error);
-            nd_ebpf_destroy_links(&rt->links, 4);
-            return -1;
-        }
+    if (nd_ebpf_validate_links(rt->links, rt->program_names, targets, 4, "cachestat") != 0) {
+        nd_ebpf_destroy_links(&rt->links, 4);
+        return -1;
     }
 
     return 0;
@@ -858,11 +816,16 @@ void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)
     if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE) {
         cachestat_destroy_ring_buffer(rt);
         cachestat_runtime_destroy_core(rt);
-    } else if (rt->obj)
-        bpf_object__close(rt->obj);
-#else
-    if (rt->obj)
-        bpf_object__close(rt->obj);
+    } else
 #endif
+    {
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
+        if (rt->raw_arena)
+            nd_ebpf_raw_arena_destroy(rt->raw_arena);
+        else
+#endif
+        if (rt->obj)
+            bpf_object__close(rt->obj);
+    }
     freez(rt);
 }

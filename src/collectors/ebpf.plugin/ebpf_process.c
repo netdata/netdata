@@ -213,15 +213,8 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
         // tp_btf needs tracing support and its target in kernel BTF; otherwise count forks with the kprobe.
         bool raw_tracepoint_available = false;
         if (libbpf_probe_bpf_prog_type(BPF_PROG_TYPE_TRACING, NULL) > 0) {
-            struct btf *kernel_btf = btf__load_vmlinux_btf();
-            if (kernel_btf) {
-                long btf_error = libbpf_get_error(kernel_btf);
-                if (!btf_error) {
-                    raw_tracepoint_available =
-                        btf__find_by_name_kind(kernel_btf, "btf_trace_sched_process_fork", BTF_KIND_TYPEDEF) > 0;
-                    btf__free(kernel_btf);
-                }
-            }
+            raw_tracepoint_available =
+                ebpf_kernel_btf_find_by_name_kind("btf_trace_sched_process_fork", BTF_KIND_TYPEDEF) > 0;
         }
 
         if (!raw_tracepoint_available) {
