@@ -56,5 +56,8 @@ func configurePackages(
 			return dummy.Build(ctx)
 		},
 	)
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 	return registry, filtered, nil
 }

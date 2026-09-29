@@ -131,6 +131,9 @@ func loadPackages(
 		}
 		registry.Register(name, creator)
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return registry, nil
 }
 

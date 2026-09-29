@@ -297,3 +297,18 @@ func TestPackageInventoryValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestPackageRegistrationCancellation(t *testing.T) {
+	_, dir := configuredFixture(t, "exit 0\n", modeOneshot)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	base := collectorapi.Registry{}
+	registry, err := loadPackages(ctx, filepath.Join(dir, "packages.yaml"), base, func(path string) (string, error) {
+		// Cancellation can arrive while the final entry is still being validated.
+		cancel()
+		return testPackagePath(path)
+	})
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Nil(t, registry, "canceled registration must not publish the new registry")
+	assert.Empty(t, base)
+}
