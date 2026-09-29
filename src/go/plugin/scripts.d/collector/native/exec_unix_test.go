@@ -84,3 +84,25 @@ printf '%s\n' 'version: v1' 'checks: [{id: ready, title: Ready}]'
 		})
 	}
 }
+
+// A normally exiting script still owns its descendants: they are terminated
+// when it exits, and one holding stdio does not turn valid output into a failure.
+func TestRunOneshot_LeaderExitContainsDescendants(t *testing.T) {
+	setupRunner(t)
+	tests := map[string]struct {
+		child string
+	}{
+		"child holds stdio":         {child: `(sleep 1; printf escaped > "$dir/escaped") &`},
+		"child detached from stdio": {child: `(sleep 1; printf escaped > "$dir/escaped") >/dev/null 2>&1 </dev/null &`},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c, dir := fixtureCollector(t, "dir=$(dirname \"$0\")\n"+tc.child+"\nprintf done\n")
+			data, err := runOneshot(context.Background(), c.definition.command, opCollect, nil)
+			require.NoError(t, err)
+			assert.Equal(t, "done", string(data))
+			time.Sleep(1100 * time.Millisecond)
+			assert.False(t, fileExists(filepath.Join(dir, "escaped")), "descendant survived leader exit")
+		})
+	}
+}

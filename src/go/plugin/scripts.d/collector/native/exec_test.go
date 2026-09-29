@@ -3,6 +3,7 @@
 package native
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"path/filepath"
@@ -15,25 +16,57 @@ import (
 
 func TestRunOneshot(t *testing.T) {
 	setupRunner(t)
+	large := bytes.Repeat([]byte("x"), 8<<20)
 	tests := map[string]struct {
-		body     string
-		timeout  time.Duration
-		wantText string
+		body        string
+		input       []byte
+		timeout     time.Duration
+		wantOutput  []byte
+		wantErrText string
 	}{
-		"nonzero exit": {
-			body:     "printf '%s' 'SYNTHETIC_SECRET' >&2; exit 7",
-			timeout:  time.Second,
-			wantText: "exit status 7",
+		"large input and output": {
+			body:       "cat",
+			input:      large,
+			timeout:    10 * time.Second,
+			wantOutput: large,
 		},
-		"timeout": {
-			body:     "sleep 30",
-			timeout:  50 * time.Millisecond,
-			wantText: "deadline exceeded",
+		"unread input": {
+			body:       "printf done",
+			input:      large,
+			timeout:    5 * time.Second,
+			wantOutput: []byte("done"),
+		},
+		"exact limit": {
+			body:       fmt.Sprintf("head -c %d /dev/zero", maxMessageBytes),
+			timeout:    10 * time.Second,
+			wantOutput: make([]byte, maxMessageBytes),
 		},
 		"over limit": {
-			body:     fmt.Sprintf("head -c %d /dev/zero; sleep 30", maxMessageBytes+1),
-			timeout:  5 * time.Second,
-			wantText: "exceeds 64 MiB",
+			body:        fmt.Sprintf("head -c %d /dev/zero; sleep 30", maxMessageBytes+1),
+			timeout:     5 * time.Second,
+			wantErrText: "exceeds 64 MiB",
+		},
+		"over limit with unread input": {
+			body:        fmt.Sprintf("head -c %d /dev/zero; sleep 30", maxMessageBytes+1),
+			input:       large,
+			timeout:     5 * time.Second,
+			wantErrText: "exceeds 64 MiB",
+		},
+		"timeout with unread input": {
+			body:        "sleep 30",
+			input:       large,
+			timeout:     50 * time.Millisecond,
+			wantErrText: "deadline exceeded",
+		},
+		"nonzero exit": {
+			body:        "printf '%s' 'SYNTHETIC_SECRET' >&2; exit 7",
+			timeout:     time.Second,
+			wantErrText: "exit status 7",
+		},
+		"timeout": {
+			body:        "sleep 30",
+			timeout:     50 * time.Millisecond,
+			wantErrText: "deadline exceeded",
 		},
 	}
 	for name, tc := range tests {
@@ -42,30 +75,19 @@ func TestRunOneshot(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), tc.timeout)
 			defer cancel()
 			start := time.Now()
-			data, err := runOneshot(ctx, c.definition.command, "collect", nil)
-			require.ErrorContains(t, err, tc.wantText)
-			assert.Nil(t, data)
-			assert.NotContains(t, err.Error(), "SYNTHETIC_SECRET", "stderr is discarded")
+			data, err := runOneshot(ctx, c.definition.command, opCollect, tc.input)
 			assert.Less(t, time.Since(start), tc.timeout+time.Second)
+			if tc.wantErrText != "" {
+				require.ErrorContains(t, err, tc.wantErrText)
+				assert.Nil(t, data)
+				assert.NotContains(t, err.Error(), "SYNTHETIC_SECRET", "stderr is discarded")
+				return
+			}
+			require.NoError(t, err)
+			assert.Len(t, data, len(tc.wantOutput))
+			assert.True(t, bytes.Equal(tc.wantOutput, data), "output must match")
 		})
 	}
-}
-
-// The protocol boundary is tested independently of executable output chunking.
-func TestLimitedBuffer(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	b := limitedBuffer{
-		cancel: cancel,
-	}
-	n, err := b.Write(make([]byte, maxMessageBytes))
-	require.NoError(t, err)
-	assert.Equal(t, maxMessageBytes, n)
-	require.NoError(t, ctx.Err())
-	_, err = b.Write([]byte{1})
-	require.ErrorIs(t, err, errResponseTooLarge)
-	assert.True(t, b.exceeded)
-	assert.ErrorIs(t, ctx.Err(), context.Canceled, "exceeding the limit cancels the command")
 }
 
 func TestRunDescribe(t *testing.T) {

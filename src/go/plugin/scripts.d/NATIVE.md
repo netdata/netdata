@@ -384,9 +384,12 @@ unknown. Netdata's existing `plugin_data_collection_status` owns execution failu
 its stock notification route is silent.
 
 The process MUST finish all children before returning and MUST NOT daemonize or
-escape its process group. Cancellation terminates the command group on Unix using
-the existing execution helper. One-shot scripts cannot retain process state across
-collection attempts.
+escape its process group. Each invocation is an owned process with the containment
+described under Persistent sessions: exit, timeout or cancellation terminates its
+contained descendants, so background work never outlives the invocation, and a
+descendant holding stdout cannot delay or fail the result. An invocation fails if
+containment cannot be established. One-shot scripts cannot retain process state
+across collection attempts.
 
 ## Persistent sessions
 
