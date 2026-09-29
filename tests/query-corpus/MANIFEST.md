@@ -280,6 +280,7 @@ set at the end.
 | W/limit-hierarchy | weights limiting preserves complete shared ancestors and emits only dictionaries and ancestor rows reachable from retained metrics | n/a |  |
 | W/limit-node-ties | equal weights select physical metrics by stable node and metric identity while retaining metadata for nodes without selected metrics | n/a |  |
 | W/limit-mcp | MCP weights preserve caller default and minimum limits and descending raw scores while reporting exact-boundary truncation truthfully | n/a |  |
+| W/anomaly-gaps | Anomaly-rate weights count missing samples as zero without changing ordinary value weights | n/a | |
 
 ## Corpus-wide pusher discipline
 

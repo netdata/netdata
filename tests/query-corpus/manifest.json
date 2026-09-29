@@ -1,5 +1,9 @@
 [
   {
+    "name": "W/anomaly-gaps",
+    "proves": "anomaly-rate weights count missing samples as zero without changing ordinary value weights"
+  },
+  {
     "name": "L0/live-burst",
     "proves": "a live BEGIN2/SET2 burst sent without historical spike-3 pre-burst pacing preserves exactly the fixture dimensions, timestamps, storage-number-quantized values, gaps, anomaly rates and annotations after the retention barrier (pins #23096 green)",
     "fixed_by": "#23096"
