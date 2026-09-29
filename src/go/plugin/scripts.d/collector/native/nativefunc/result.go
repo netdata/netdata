@@ -4,7 +4,7 @@ package nativefunc
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 )
@@ -27,46 +27,29 @@ type Result struct {
 	RawResponse       map[string]any                   `json:"raw_response,omitempty"`
 }
 
+// Response validates the result and converts it to a framework response.
+// info reports an info request, whose managed reply needs no rows.
 func (r Result) Response(info bool) (*funcapi.FunctionResponse, error) {
 	if r.Version != "v1" {
-		return nil, fmt.Errorf("unsupported Function result version")
+		return nil, errors.New("unsupported Function result version")
 	}
 	if r.RawResponse != nil {
-		if r.Status != 0 || r.Message != "" || r.Help != "" || r.ResponseType != "" || r.Columns != nil ||
-			r.Data != nil ||
-			r.DefaultSortColumn != "" ||
-			r.RequiredParams != nil ||
-			r.Charts != nil ||
-			r.DefaultCharts != nil ||
-			r.GroupBy != nil {
-			return nil, fmt.Errorf("raw Function response cannot include managed fields")
-		}
-		n, ok := r.RawResponse["status"].(json.Number)
-		if !ok {
-			return nil, fmt.Errorf("raw Function response requires a numeric status")
-		}
-		status, err := n.Int64()
-		if err != nil || status < 100 || status > 599 {
-			return nil, fmt.Errorf("invalid raw Function status")
-		}
-		// The framework's raw status adapter expects int; retain json.Number elsewhere.
-		r.RawResponse["status"] = int(status)
-		return funcapi.RawResponse(r.RawResponse), nil
+		return r.rawResponse()
 	}
-	if r.Status < 100 || r.Status > 599 {
-		return nil, fmt.Errorf("invalid Function status")
+	if !validStatus(int64(r.Status)) {
+		return nil, errors.New("invalid Function status")
 	}
-	params, err := parameters(r.RequiredParams)
+	params, err := paramConfigs(r.RequiredParams)
 	if err != nil {
 		return nil, err
 	}
 	if r.Status < 400 && !info && (r.Columns == nil || r.Data == nil) {
-		return nil, fmt.Errorf("managed Function data requires columns and rows")
+		return nil, errors.New("managed Function data requires columns and rows")
 	}
 	charts := make(funcapi.DefaultCharts, 0, len(r.DefaultCharts))
 	for _, item := range r.DefaultCharts {
 		if len(item) != 2 {
-			return nil, fmt.Errorf("default Function chart requires chart and group")
+			return nil, errors.New("default Function chart requires chart and group")
 		}
 		charts = append(charts, funcapi.DefaultChart{
 			Chart:   item[0],
@@ -89,3 +72,25 @@ func (r Result) Response(info bool) (*funcapi.FunctionResponse, error) {
 		},
 	}, nil
 }
+
+func (r Result) rawResponse() (*funcapi.FunctionResponse, error) {
+	managed := r.Status != 0 || r.Message != "" || r.Help != "" || r.ResponseType != "" || r.Columns != nil ||
+		r.Data != nil || r.DefaultSortColumn != "" || r.RequiredParams != nil || r.Charts != nil ||
+		r.DefaultCharts != nil || r.GroupBy != nil
+	if managed {
+		return nil, errors.New("raw Function response cannot include managed fields")
+	}
+	n, ok := r.RawResponse["status"].(json.Number)
+	if !ok {
+		return nil, errors.New("raw Function response requires a numeric status")
+	}
+	status, err := n.Int64()
+	if err != nil || !validStatus(status) {
+		return nil, errors.New("invalid raw Function status")
+	}
+	// The framework's raw status adapter expects int; retain json.Number elsewhere.
+	r.RawResponse["status"] = int(status)
+	return funcapi.RawResponse(r.RawResponse), nil
+}
+
+func validStatus(status int64) bool { return status >= 100 && status <= 599 }
