@@ -1971,6 +1971,61 @@ cleanup:
     return errors;
 }
 
+// Writes a buffer at an offset of the journal file on disk.
+static bool jv2_file_pwrite(const char *path, const void *buf, size_t size, off_t offset) {
+    int fd = open(path, O_RDWR | O_CLOEXEC);
+    if(fd == -1)
+        return false;
+
+    bool ok = pwrite(fd, buf, size, offset) == (ssize_t)size;
+    close(fd);
+    return ok;
+}
+
+// Reloads the journal as startup does and checks what its datafile is charged.
+// Returns the number of errors found.
+static int jv2_expect_loaded_charge(struct jv2_journal_fixture *fx, uint64_t want, bool want_estimated, const char *when) {
+    journalfile_v2_populate_retention_to_mrg(&fx->ctx, fx->journalfile);
+    if(fx->datafile.samples.charged != want || fx->datafile.samples.estimated != want_estimated) {
+        fprintf(stderr, "ERROR: %s the loader charged %" PRIu64 " (estimated %d), expected %" PRIu64 " (estimated %d)\n",
+                when, fx->datafile.samples.charged, fx->datafile.samples.estimated, want, want_estimated);
+        return 1;
+    }
+    return 0;
+}
+
+// Reloads the journal when it is the only datafile of the tier, and checks that both
+// the datafile and the tier hold exactly its samples. Returns the number of errors found.
+static int jv2_expect_reloaded_tier(struct jv2_journal_fixture *fx, uint64_t want, const char *when) {
+    journalfile_v2_populate_retention_to_mrg(&fx->ctx, fx->journalfile);
+    if(fx->ctx.atomic.samples != want || fx->datafile.samples.charged != want) {
+        fprintf(stderr, "ERROR: %s the tier holds %" PRIu64 " (datafile %" PRIu64 "), expected %" PRIu64 "\n",
+                when, (uint64_t)fx->ctx.atomic.samples, fx->datafile.samples.charged, want);
+        return 1;
+    }
+    return 0;
+}
+
+// Checks whether the per-metric reader accepts the journal's samples section. A journal
+// that cannot be acquired is not checked, so this is never mistaken for a rejection.
+// Returns the number of errors found.
+static int jv2_expect_samples_section(struct rrdengine_journalfile *journalfile, bool want_accepted, const char *when) {
+    size_t data_size = 0;
+    struct journal_v2_header *j2 = journalfile_v2_data_acquire(journalfile, &data_size, 0, 0);
+    if(!j2)
+        return 0;
+
+    int errors = 0;
+    bool accepted = journalfile_v2_samples_section((const uint8_t *)j2, data_size) != NULL;
+    if(accepted != want_accepted) {
+        fprintf(stderr, "ERROR: %s the samples section was %s\n", when, accepted ? "accepted" : "rejected");
+        errors++;
+    }
+
+    journalfile_v2_data_release(journalfile);
+    return errors;
+}
+
 // Exact samples in journal v2 (stored slots):
 //  - the writer sums the slots of every metric's indexed pages into the samples
 //    section, in metric list order, and resets the datafile's charge to that total;
@@ -2120,12 +2175,7 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
 
         // delete the second datafile: only this journal remains
         rrdeng_datafile_samples_uncharge(&other);
-        journalfile_v2_populate_retention_to_mrg(&fx.ctx, fx.journalfile);
-        if(fx.ctx.atomic.samples != want || fx.datafile.samples.charged != want) {
-            fprintf(stderr, "ERROR: after deleting the second datafile the tier holds %" PRIu64 " (datafile %" PRIu64 "), expected %" PRIu64 "\n",
-                    (uint64_t)fx.ctx.atomic.samples, fx.datafile.samples.charged, want);
-            errors++;
-        }
+        errors += jv2_expect_reloaded_tier(&fx, want, "after deleting the second datafile");
 
         // delete this datafile too: nothing remains
         rrdeng_datafile_samples_set(&other, 12345, false);
@@ -2138,12 +2188,7 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
 
         // and loading its journal again restores exactly its samples
         rrdeng_datafile_samples_uncharge(&other);
-        journalfile_v2_populate_retention_to_mrg(&fx.ctx, fx.journalfile);
-        if(fx.ctx.atomic.samples != want || fx.datafile.samples.charged != want) {
-            fprintf(stderr, "ERROR: reloading the journal charged %" PRIu64 " (tier %" PRIu64 "), expected %" PRIu64 "\n",
-                    fx.datafile.samples.charged, (uint64_t)fx.ctx.atomic.samples, want);
-            errors++;
-        }
+        errors += jv2_expect_reloaded_tier(&fx, want, "after deleting and reloading this datafile");
     }
 
     // damage on disk: the loader trusts the descriptor alone (it never reads the
@@ -2182,79 +2227,35 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
 
         // a damaged array: the loader still charges the descriptor's total,
         // the per-metric reader rejects the section
-        journalfile_v2_populate_retention_to_mrg(&fx.ctx, fx.journalfile);
-        if(fx.datafile.samples.charged != expected_total || fx.datafile.samples.estimated) {
-            fprintf(stderr, "ERROR: with a damaged array the loader charged %" PRIu64 " (estimated %d), expected the descriptor total %" PRIu64 "\n",
-                    fx.datafile.samples.charged, fx.datafile.samples.estimated, expected_total);
-            errors++;
-        }
-        {
-            size_t data_size = 0;
-            struct journal_v2_header *j2 = journalfile_v2_data_acquire(fx.journalfile, &data_size, 0, 0);
-            if(j2) {
-                if(journalfile_v2_samples_section((const uint8_t *)j2, data_size)) {
-                    fprintf(stderr, "ERROR: the samples section was accepted with a damaged array\n");
-                    errors++;
-                }
-                journalfile_v2_data_release(fx.journalfile);
-            }
-        }
+        errors += jv2_expect_loaded_charge(&fx, expected_total, false, "with a damaged array");
+        errors += jv2_expect_samples_section(fx.journalfile, false, "with a damaged array");
 
         // a damaged descriptor: the loader estimates
         {
             struct journal_v2_samples_descriptor damaged = descriptor;
             damaged.samples ^= 1;
-            fd = open(path, O_RDWR | O_CLOEXEC);
-            if(fd == -1 || pwrite(fd, &damaged, sizeof(damaged), JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET) != (ssize_t)sizeof(damaged)) {
+            if(!jv2_file_pwrite(path, &damaged, sizeof(damaged), JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET)) {
                 fprintf(stderr, "ERROR: cannot damage the samples descriptor\n");
                 errors++;
             }
-            if(fd != -1)
-                close(fd);
 
-            journalfile_v2_populate_retention_to_mrg(&fx.ctx, fx.journalfile);
-            if(fx.datafile.samples.charged != expected_estimate || !fx.datafile.samples.estimated) {
-                fprintf(stderr, "ERROR: with a damaged descriptor the loader charged %" PRIu64 " (estimated %d), expected the estimate %" PRIu64 "\n",
-                        fx.datafile.samples.charged, fx.datafile.samples.estimated, expected_estimate);
-                errors++;
-            }
+            errors += jv2_expect_loaded_charge(&fx, expected_estimate, true, "with a damaged descriptor");
 
-            fd = open(path, O_RDWR | O_CLOEXEC);
-            if(fd == -1 || pwrite(fd, &descriptor, sizeof(descriptor), JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET) != (ssize_t)sizeof(descriptor)) {
+            if(!jv2_file_pwrite(path, &descriptor, sizeof(descriptor), JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET)) {
                 fprintf(stderr, "ERROR: cannot restore the samples descriptor\n");
                 errors++;
             }
-            if(fd != -1)
-                close(fd);
         }
 
         // undo the damage: the section must be accepted again, so that the bad
         // descriptors below are rejected by their field checks, not by the CRC
-        fd = open(path, O_RDWR | O_CLOEXEC);
-        if(fd == -1 || pwrite(fd, &original_value, sizeof(original_value), descriptor.offset) != (ssize_t)sizeof(original_value)) {
+        if(!jv2_file_pwrite(path, &original_value, sizeof(original_value), descriptor.offset)) {
             fprintf(stderr, "ERROR: cannot restore the samples section\n");
             errors++;
         }
-        if(fd != -1)
-            close(fd);
 
-        journalfile_v2_populate_retention_to_mrg(&fx.ctx, fx.journalfile);
-        if(fx.datafile.samples.charged != expected_total || fx.datafile.samples.estimated) {
-            fprintf(stderr, "ERROR: with the section restored the loader charged %" PRIu64 " (estimated %d), expected %" PRIu64 "\n",
-                    fx.datafile.samples.charged, fx.datafile.samples.estimated, expected_total);
-            errors++;
-        }
-        {
-            size_t data_size = 0;
-            struct journal_v2_header *j2 = journalfile_v2_data_acquire(fx.journalfile, &data_size, 0, 0);
-            if(j2) {
-                if(!journalfile_v2_samples_section((const uint8_t *)j2, data_size)) {
-                    fprintf(stderr, "ERROR: the restored samples section is not accepted\n");
-                    errors++;
-                }
-                journalfile_v2_data_release(fx.journalfile);
-            }
-        }
+        errors += jv2_expect_loaded_charge(&fx, expected_total, false, "with the section restored");
+        errors += jv2_expect_samples_section(fx.journalfile, true, "with the section restored");
 
         // descriptors whose own CRC is valid but whose fields are wrong must be
         // rejected by the field checks themselves
@@ -2279,35 +2280,20 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
             crc = crc32(crc, (void *)&bad, offsetof(struct journal_v2_samples_descriptor, crc));
             bad.crc = (uint32_t)crc;
 
-            fd = open(path, O_RDWR | O_CLOEXEC);
-            if(fd == -1 || pwrite(fd, &bad, sizeof(bad), JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET) != (ssize_t)sizeof(bad)) {
+            if(!jv2_file_pwrite(path, &bad, sizeof(bad), JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET)) {
                 fprintf(stderr, "ERROR: cannot write the bad descriptor '%s'\n", bad_descriptors[b].name);
                 errors++;
             }
-            if(fd != -1)
-                close(fd);
 
-            size_t data_size = 0;
-            struct journal_v2_header *j2 = journalfile_v2_data_acquire(fx.journalfile, &data_size, 0, 0);
-            if(j2) {
-                if(journalfile_v2_samples_section((const uint8_t *)j2, data_size)) {
-                    fprintf(stderr, "ERROR: the samples section was accepted with a bad descriptor: %s\n", bad_descriptors[b].name);
-                    errors++;
-                }
-                journalfile_v2_data_release(fx.journalfile);
-            }
+            char when[128];
+            snprintfz(when, sizeof(when), "with the bad descriptor '%s'", bad_descriptors[b].name);
+            errors += jv2_expect_samples_section(fx.journalfile, false, when);
 
             // the loader trusts a well-formed descriptor without reading the
             // array: a total that disagrees with the array is charged as is
             // (by design - the array is not touched at startup)
-            if(bad_descriptors[b].samples_delta) {
-                journalfile_v2_populate_retention_to_mrg(&fx.ctx, fx.journalfile);
-                if(fx.datafile.samples.charged != bad.samples || fx.datafile.samples.estimated) {
-                    fprintf(stderr, "ERROR: the loader charged %" PRIu64 " (estimated %d) from a descriptor whose total is %" PRIu64 "\n",
-                            fx.datafile.samples.charged, fx.datafile.samples.estimated, bad.samples);
-                    errors++;
-                }
-            }
+            if(bad_descriptors[b].samples_delta)
+                errors += jv2_expect_loaded_charge(&fx, bad.samples, false, when);
         }
     }
 
