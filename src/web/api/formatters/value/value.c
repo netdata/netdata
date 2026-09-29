@@ -121,6 +121,7 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
         qv = (QUERY_VALUE) {
                 .after = r->view.after,
                 .before = r->view.before,
+                .window_duration_s = r->view.update_every,
                 .points_read = r->stats.db_points_read,
                 .result_points = r->stats.result_points_generated,
                 .sp = {
