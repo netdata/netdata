@@ -12,7 +12,19 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/nativefunc"
 )
 
-var _ nativefunc.Deps = (*Collector)(nil)
+// funcDeps adapts a job's Collector to the Function router.
+type funcDeps struct {
+	c *Collector
+}
+
+var _ nativefunc.Deps = funcDeps{}
+
+func (d funcDeps) ExecuteFunction(
+	ctx context.Context,
+	request funcapi.RawMethodRequest,
+) (*funcapi.FunctionResponse, error) {
+	return d.c.executeFunction(ctx, request)
+}
 
 // functionHandler binds a registered package's Function router to a running job.
 func functionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
@@ -20,10 +32,12 @@ func functionHandler(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 	if !ok {
 		return nil
 	}
-	return nativefunc.NewRouter(c, c.definition.methods)
+	return nativefunc.NewRouter(funcDeps{
+		c: c,
+	}, c.definition.methods)
 }
 
-func (c *Collector) ExecuteFunction(
+func (c *Collector) executeFunction(
 	ctx context.Context,
 	request funcapi.RawMethodRequest,
 ) (*funcapi.FunctionResponse, error) {
@@ -58,7 +72,7 @@ func (c *Collector) executeOneshotFunction(
 	if err != nil {
 		return nil, err
 	}
-	data, err := runOneshot(ctx, c.definition.command, "function", slices.Concat(c.configEnvelope, frame))
+	data, err := runOneshot(ctx, c.definition.command, opFunction, slices.Concat(c.configEnvelope, frame))
 	if err != nil {
 		c.Errorf("one-shot Function command failed: %s", commandFailureReason(err))
 		return nil, err

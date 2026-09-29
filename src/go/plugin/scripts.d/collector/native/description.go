@@ -11,25 +11,22 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/internal/configform"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/internal/strictjson"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/nativefunc"
 )
 
 // packageDescription is the describe output of a self-contained package. It
 // carries assets inline and cannot choose its execution command.
 type packageDescription struct {
-	packageSpec  `yaml:",inline"`
+	packageSpec  `               yaml:",inline"`
 	Charts       string         `yaml:"charts"        json:"charts"`
 	ConfigSchema map[string]any `yaml:"config_schema" json:"config_schema"`
 }
 
 // Description metadata may use null for any optional value, as YAML can.
 var descriptionShape = strictjson.Optional(strictjson.Fields{
-	"metrics": strictjson.Optional(nil, "name", "type", "unit"),
-	"checks":  strictjson.Optional(nil, "id", "title", "by_labels"),
-	"functions": strictjson.Optional(strictjson.Fields{
-		"required_params": strictjson.Optional(strictjson.Fields{
-			"options": strictjson.Optional(nil, "id", "name", "defaultSelected", "disabled"),
-		}, "id", "name", "help", "type", "unique_view"),
-	}, "id", "name", "help", "update_every", "response_type", "has_history", "accepted_params"),
+	"metrics":       strictjson.Optional(nil, "name", "type", "unit"),
+	"checks":        strictjson.Optional(nil, "id", "title", "by_labels"),
+	"functions":     nativefunc.DefinitionShape(),
 	"config_schema": strictjson.Any(),
 }, "version", "mode", "charts")
 
@@ -61,7 +58,7 @@ func parseDescription(data []byte, command []string) (packageDefinition, error) 
 		return packageDefinition{}, errors.New("invalid package description declarations")
 	}
 	if description.ConfigSchema != nil {
-		if def.config, err = configform.ParseValue(description.ConfigSchema); err != nil {
+		if def.form, err = configform.ParseValue(description.ConfigSchema); err != nil {
 			return packageDefinition{}, errors.New("invalid inline configuration form")
 		}
 	}

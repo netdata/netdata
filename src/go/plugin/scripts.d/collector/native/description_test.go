@@ -47,8 +47,9 @@ config_schema:
   uiSchema: {}
 `
 
-// Python json.dumps() uses surrogate-pair escapes by default for non-BMP Unicode.
-const escapedDescription = `{
+// unicodeDescription is a JSON description with non-BMP text. Tests also derive
+// its escaped spelling with jsonEscape.
+const unicodeDescription = `{
   "version": "v1",
   "mode": "persistent",
   "metrics": [{"name": "depth", "type": "gauge", "unit": "jobs"}],
@@ -98,6 +99,9 @@ func TestParseDescription(t *testing.T) {
 			}},
 		}},
 	}
+	escapedDescription := strings.ReplaceAll(unicodeDescription, "😀", jsonEscape("😀"))
+	require.Contains(t, escapedDescription, `\`+"ud83d", "the fixture must spell surrogate-pair escapes")
+	require.NotContains(t, escapedDescription, "😀")
 	readyCheck := packageSpec{
 		Version: "v1",
 		Mode:    modeOneshot,
@@ -133,6 +137,7 @@ func TestParseDescription(t *testing.T) {
 				Functions: []nativefunc.Definition{{ID: "items", Name: "Items", Help: "Show items."}},
 			},
 		},
+		// Python json.dumps() uses surrogate-pair escapes by default for non-BMP Unicode.
 		"JSON surrogate-pair escapes": {
 			data:       escapedDescription,
 			wantSpec:   unicodeSpec,
@@ -142,7 +147,7 @@ func TestParseDescription(t *testing.T) {
 			},
 		},
 		"JSON literal Unicode": {
-			data:       strings.ReplaceAll(escapedDescription, `😀`, "😀"),
+			data:       unicodeDescription,
 			wantSpec:   unicodeSpec,
 			wantCharts: true,
 			wantSettings: Settings{
@@ -207,7 +212,8 @@ func TestParseDescription_Invalid(t *testing.T) {
 		"JSON wrong parameter case":   `{"version":"v1","functions":[{"id":"items","name":"Items","help":"Show items.","required_params":[{"ID":"queue","name":"Queue"}]}]}`,
 		"JSON wrong option case":      `{"version":"v1","functions":[{"id":"items","name":"Items","help":"Show items.","required_params":[{"id":"queue","name":"Queue","options":[{"id":"mail","name":"Mail","DefaultSelected":true}]}]}]}`,
 		"JSON duplicate":              `{"version":"v1","checks":[{"id":"ready","title":"Ready"}],"version":"v1"}`,
-		"JSON escaped duplicate":      `{"version":"v1","checks":[{"id":"ready","title":"Ready","title":"private-title"}]}`,
+		"JSON escaped duplicate": `{"version":"v1","checks":[{"id":"ready","title":"Ready","` + jsonEscape("t") +
+			`itle":"private-title"}]}`,
 		"JSON duplicate schema key":   `{"version":"v1","checks":[{"id":"ready","title":"Ready"}],"config_schema":{"jsonSchema":{"type":"object","type":"object"},"uiSchema":{}}}`,
 		"JSON case-folded form field": `{"version":"v1","checks":[{"id":"ready","title":"Ready"}],"config_schema":{"JsonSchema":{"$schema":"http://json-schema.org/draft-07/schema#","type":"object"},"uiSchema":{}}}`,
 		"JSON trailing document":      `{"version":"v1","checks":[{"id":"ready","title":"Ready"}]} {}`,

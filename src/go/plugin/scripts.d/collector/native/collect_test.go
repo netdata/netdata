@@ -77,23 +77,3 @@ func TestCollector_CollectCheckWithoutIdentityLabels(t *testing.T) {
 		},
 	})
 }
-
-// collectAndCommit runs one cycle and commits it even on failure, so tests can
-// prove a failed collection staged no samples.
-func collectAndCommit(t *testing.T, c *Collector) error {
-	t.Helper()
-	managed, ok := metrix.AsCycleManagedStore(c.store)
-	require.True(t, ok)
-	managed.CycleController().BeginCycle()
-	err := c.Collect(context.Background())
-	managed.CycleController().CommitCycleSuccess()
-	return err
-}
-
-func rawSeries(c *Collector) map[string]float64 {
-	values := map[string]float64{}
-	c.store.Read(metrix.ReadRaw()).ForEachSeries(func(name string, _ metrix.LabelView, value float64) {
-		values[name] = value
-	})
-	return values
-}

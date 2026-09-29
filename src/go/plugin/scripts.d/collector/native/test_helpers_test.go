@@ -9,15 +9,21 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf16"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
+
+// Package fixtures, script peers and small helpers shared by tests. Runtime
+// drivers (job, Run, Agent) live in test_harness_test.go.
 
 // setupRunner exercises the production command and cancellation path. The shim
 // substitutes only privilege dropping, which an unprivileged unit test cannot exercise.
@@ -128,12 +134,38 @@ func snapshotJSON(state string) string {
 	)
 }
 
-// bashHelper sources the shipped Bash protocol helper.
-func bashHelper(t *testing.T) string {
+func bashHelperPath(t *testing.T) string {
 	t.Helper()
 	path, err := filepath.Abs("../../lib/native.sh")
 	require.NoError(t, err)
-	return "source '" + path + "'\n"
+	return path
+}
+
+// bashHelper sources the shipped Bash protocol helper.
+func bashHelper(t *testing.T) string {
+	t.Helper()
+	return "source '" + bashHelperPath(t) + "'\n"
+}
+
+// requireTool skips the test when an external peer dependency is missing.
+func requireTool(t *testing.T, name string) string {
+	t.Helper()
+	path, err := exec.LookPath(name)
+	if err != nil {
+		t.Skipf("test requires %s", name)
+	}
+	return path
+}
+
+// jsonEscape spells s with JSON unicode escapes (UTF-16 surrogate pairs outside the
+// BMP, as Python json.dumps emits). Escapes are built at run time so the test
+// source cannot lose them to tools that decode escape sequences.
+func jsonEscape(s string) string {
+	var b strings.Builder
+	for _, unit := range utf16.Encode([]rune(s)) {
+		b.WriteString("\\" + fmt.Sprintf("u%04x", unit))
+	}
+	return b.String()
 }
 
 const fixtureSchema = `{
@@ -159,14 +191,16 @@ func configuredFixture(t *testing.T, body, mode string) (collectorapi.Registry, 
 	c, dir := fixtureCollector(t, body)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "config_schema.json"), []byte(fixtureSchema), 0644))
 	appendFile(t, c.Manifest, "config_schema: config_schema.json\nmode: "+mode+"\n")
-	writeManifestInventory(t, dir, c.Manifest)
-	return loadTestPackages(t, filepath.Join(dir, "packages.yaml")), dir
+	return loadTestPackages(t, writeManifestInventory(t, dir, c.Manifest)), dir
 }
 
-func writeManifestInventory(t *testing.T, dir, manifest string) {
+// writeManifestInventory registers a manifest as native-fixture in dir/packages.yaml.
+func writeManifestInventory(t *testing.T, dir, manifest string) string {
 	t.Helper()
+	path := filepath.Join(dir, "packages.yaml")
 	inventory := fmt.Sprintf("version: v1\npackages:\n  - name: fixture\n    manifest: %s\n", manifest)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "packages.yaml"), []byte(inventory), 0644))
+	require.NoError(t, os.WriteFile(path, []byte(inventory), 0644))
+	return path
 }
 
 // writeCommandInventory registers a self-contained command as native-fixture.
@@ -192,10 +226,7 @@ func loadTestPackages(t *testing.T, inventory string) collectorapi.Registry {
 // configPeer is a configured Bash peer reporting config.count as depth in both modes.
 func configPeer(t *testing.T) string {
 	t.Helper()
-	jq, err := exec.LookPath("jq")
-	if err != nil {
-		t.Skip("configured Bash peer requires jq")
-	}
+	jq := requireTool(t, "jq")
 	return bashHelper(t) + fmt.Sprintf(`
 nd_read_config
 count=$(printf '%%s' "$ND_CONFIG" | %q -er '.config.count')
@@ -264,10 +295,7 @@ const fixtureFunctions = `functions:
 // served by functionPeer. functionOnly drops metrics, checks and charts.
 func functionFixture(t *testing.T, mode string, functionOnly bool) (collectorapi.Registry, string) {
 	t.Helper()
-	python, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("Function peer requires python3")
-	}
+	python := requireTool(t, "python3")
 	_, dir := configuredFixture(t, fmt.Sprintf("exec %q \"$(dirname \"$0\")/peer.py\" \"$@\"\n", python), mode)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "peer.py"), []byte(functionPeer), 0644))
 	path := filepath.Join(dir, "manifest.yaml")
@@ -314,4 +342,39 @@ func requireNoFile(t *testing.T, path string) {
 	t.Helper()
 	_, err := os.Stat(path)
 	require.ErrorIs(t, err, os.ErrNotExist)
+}
+
+func readFile(t *testing.T, path string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return data
+}
+
+func readLines(t *testing.T, path string) []string {
+	t.Helper()
+	return strings.Split(strings.TrimSpace(string(readFile(t, path))), "\n")
+}
+
+// readyLine is a Bash persistent peer's ready handshake.
+const readyLine = "printf '%s\\n' '{\"version\":\"v1\",\"ready\":true}'\n"
+
+// collectAndCommit runs one cycle and commits it even on failure, so tests can
+// prove a failed collection staged no samples.
+func collectAndCommit(t *testing.T, c *Collector) error {
+	t.Helper()
+	managed, ok := metrix.AsCycleManagedStore(c.store)
+	require.True(t, ok)
+	managed.CycleController().BeginCycle()
+	err := c.Collect(context.Background())
+	managed.CycleController().CommitCycleSuccess()
+	return err
+}
+
+func rawSeries(c *Collector) map[string]float64 {
+	values := map[string]float64{}
+	c.store.Read(metrix.ReadRaw()).ForEachSeries(func(name string, _ metrix.LabelView, value float64) {
+		values[name] = value
+	})
+	return values
 }

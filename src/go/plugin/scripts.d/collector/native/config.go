@@ -56,23 +56,23 @@ func (s *Settings) UnmarshalYAML(unmarshal func(any) error) error {
 
 // effectiveSettings applies the package form defaults to a job's configuration.
 func (d packageDefinition) effectiveSettings(settings Settings) Settings {
-	if d.config == nil {
+	if d.form == nil {
 		return settings
 	}
-	return d.config.Defaults(settings)
+	return d.form.WithDefaults(settings)
 }
 
 // configEnvelope encodes a job's effective configuration as the first stdin
 // line of every script invocation. Packages without a form receive no envelope.
 func (d packageDefinition) configEnvelope(settings Settings) ([]byte, error) {
-	if d.config == nil {
+	if d.form == nil {
 		if len(settings) != 0 {
 			return nil, errors.New("package does not declare config_schema")
 		}
 		return nil, nil
 	}
-	effective := d.config.Defaults(settings)
-	if err := d.config.Validate(effective); err != nil {
+	effective := d.form.WithDefaults(settings)
+	if err := d.form.Validate(effective); err != nil {
 		return nil, err
 	}
 	data, err := json.Marshal(struct {

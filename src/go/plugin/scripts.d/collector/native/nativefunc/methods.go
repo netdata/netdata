@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/internal/strictjson"
 )
 
 const (
@@ -48,6 +49,25 @@ type Option struct {
 	Name     string `yaml:"name"                      json:"name"`
 	Default  bool   `yaml:"defaultSelected,omitempty" json:"defaultSelected,omitempty"`
 	Disabled bool   `yaml:"disabled,omitempty"        json:"disabled,omitempty"`
+}
+
+var (
+	parameterFields = []string{"id", "name", "help", "type", "unique_view"}
+	optionFields    = []string{"id", "name", "defaultSelected", "disabled"}
+)
+
+// DefinitionShape is the strict JSON shape of a Definition in package
+// metadata, where null selects a default.
+func DefinitionShape() *strictjson.Shape {
+	return strictjson.Optional(strictjson.Fields{
+		"required_params": parameterShape(strictjson.Optional),
+	}, "id", "name", "help", "update_every", "response_type", "has_history", "accepted_params")
+}
+
+func parameterShape(object func(strictjson.Fields, ...string) *strictjson.Shape) *strictjson.Shape {
+	return object(strictjson.Fields{
+		"options": object(nil, optionFields...),
+	}, parameterFields...)
 }
 
 // Methods validates declared Functions and returns their raw-request method

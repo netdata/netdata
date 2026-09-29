@@ -50,7 +50,7 @@ func loadManifest(path string, validateExecutable func(string) (string, error)) 
 		if err != nil {
 			return packageDefinition{}, fmt.Errorf("read package config schema: %w", err)
 		}
-		if def.config, err = configform.Parse(data); err != nil {
+		if def.form, err = configform.Parse(data); err != nil {
 			return packageDefinition{}, err
 		}
 	}

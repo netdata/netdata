@@ -5,7 +5,6 @@ package native
 import (
 	"encoding/json"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -22,10 +21,8 @@ func runBashHelper(t *testing.T, code string, args ...string) ([]byte, error) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Bash helper")
 	}
-	helper, err := filepath.Abs("../../lib/native.sh")
-	require.NoError(t, err)
-	return exec.Command("bash", append([]string{"-c", `set -eu; source "$1"; ` + code, "test", helper}, args...)...).
-		Output()
+	argv := append([]string{"-c", `set -eu; source "$1"; ` + code, "test", bashHelperPath(t)}, args...)
+	return exec.Command("bash", argv...).Output()
 }
 
 func TestBashHelper_EncodesStrings(t *testing.T) {

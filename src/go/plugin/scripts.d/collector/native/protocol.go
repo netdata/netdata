@@ -16,6 +16,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/nativefunc"
 )
 
+// Operations appended to the configured command.
+const (
+	opCollect  = "collect"
+	opFunction = "function"
+	opDescribe = "describe"
+	opServe    = "serve"
+)
+
 // Bound encoded messages, including envelopes and whitespace, generously enough
 // for complete snapshots, tables and base64 Function payloads. This is a runaway
 // output cutoff, not a per-job memory budget; buffers still grow on demand.
@@ -50,8 +58,8 @@ type checkSample struct {
 	Labels map[string]string `json:"labels"`
 }
 
-// Message shapes. Label keys and Function data are arbitrary; every other
-// object uses exact field names.
+// Message shapes. Label keys are arbitrary; every other object uses exact field
+// names. The Function result shape belongs to nativefunc.
 var (
 	labelsShape   = strictjson.Map(strictjson.Scalar())
 	snapshotShape = strictjson.Object(strictjson.Fields{
@@ -67,17 +75,7 @@ var (
 		"result": snapshotShape,
 	}, "id", "error")
 	functionReplyShape = strictjson.Object(strictjson.Fields{
-		"result": strictjson.Object(strictjson.Fields{
-			// Arbitrary Function data can contain null and large integers.
-			"columns":      strictjson.Any(),
-			"data":         strictjson.Any(),
-			"raw_response": strictjson.Any(),
-			"required_params": strictjson.Object(strictjson.Fields{
-				"options": strictjson.Object(nil, "id", "name", "defaultSelected", "disabled"),
-			}, "id", "name", "help", "type", "unique_view"),
-			"charts":   strictjson.Map(strictjson.Object(nil, "name", "type", "columns")),
-			"group_by": strictjson.Map(strictjson.Object(nil, "name", "columns")),
-		}, "version", "status", "message", "help", "type", "default_sort_column", "default_charts"),
+		"result": nativefunc.ResultShape(),
 	}, "id")
 )
 
@@ -90,16 +88,16 @@ func (d packageDefinition) decodeSnapshot(data []byte) (snapshot, error) {
 	if result.Version != "v1" {
 		return result, errors.New("unsupported response version")
 	}
-	if err := d.checkMetricSamples(result.Metrics); err != nil {
+	if err := d.validateMetricSamples(result.Metrics); err != nil {
 		return result, err
 	}
-	if err := d.checkCheckSamples(result.Checks); err != nil {
+	if err := d.validateCheckSamples(result.Checks); err != nil {
 		return result, err
 	}
 	return result, nil
 }
 
-func (d packageDefinition) checkMetricSamples(samples []metricSample) error {
+func (d packageDefinition) validateMetricSamples(samples []metricSample) error {
 	seen := map[string]bool{}
 	for i, sample := range samples {
 		definition, ok := d.metricByName[sample.Name]
@@ -110,7 +108,7 @@ func (d packageDefinition) checkMetricSamples(samples []metricSample) error {
 			(definition.Type == metricCounter && *sample.Value < 0) {
 			return fmt.Errorf("metric %d has an invalid value", i)
 		}
-		if err := checkLabelKeys(sample.Labels); err != nil {
+		if err := validateLabelKeys(sample.Labels); err != nil {
 			return err
 		}
 		key := seriesIdentity(sample.Name, sample.Labels)
@@ -122,7 +120,7 @@ func (d packageDefinition) checkMetricSamples(samples []metricSample) error {
 	return nil
 }
 
-func (d packageDefinition) checkCheckSamples(samples []checkSample) error {
+func (d packageDefinition) validateCheckSamples(samples []checkSample) error {
 	seen := map[string]bool{}
 	for i, sample := range samples {
 		definition, ok := d.checkByID[sample.ID]
@@ -132,7 +130,7 @@ func (d packageDefinition) checkCheckSamples(samples []checkSample) error {
 		if !slices.Contains(checkStates, sample.State) {
 			return fmt.Errorf("check %d has an invalid state", i)
 		}
-		if err := checkLabelKeys(sample.Labels); err != nil {
+		if err := validateLabelKeys(sample.Labels); err != nil {
 			return err
 		}
 		labels := make(map[string]string, len(definition.ByLabels))
@@ -151,7 +149,7 @@ func (d packageDefinition) checkCheckSamples(samples []checkSample) error {
 	return nil
 }
 
-func checkLabelKeys(labels map[string]string) error {
+func validateLabelKeys(labels map[string]string) error {
 	for key := range labels {
 		if !reIdentifier.MatchString(key) {
 			return errors.New("invalid label key")

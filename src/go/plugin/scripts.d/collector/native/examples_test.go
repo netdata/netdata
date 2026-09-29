@@ -28,13 +28,6 @@ func exampleManifest(t *testing.T, name string) string {
 	return path
 }
 
-func requireTool(t *testing.T, name string) {
-	t.Helper()
-	if _, err := exec.LookPath(name); err != nil {
-		t.Skipf("example requires %s", name)
-	}
-}
-
 func TestExamples_Persistent(t *testing.T) {
 	setupRunner(t)
 	for name, tool := range map[string]string{"persistent-bash": "bash", "persistent-python": "python3"} {
@@ -85,8 +78,7 @@ func TestExamples_Functions(t *testing.T) {
 				dir := t.TempDir()
 				manifest := filepath.Join(dir, "manifest.yaml")
 				writeExampleInMode(t, exampleManifest(t, name), manifest, mode)
-				writeManifestInventory(t, dir, manifest)
-				a := startTestAgent(t, loadTestPackages(t, filepath.Join(dir, "packages.yaml")), dir)
+				a := startTestAgent(t, loadTestPackages(t, writeManifestInventory(t, dir, manifest)), dir)
 				a.startJob(t, "example", `{"update_every":1}`)
 				for id, command := range map[string]string{"bootstrap": "info", "info": "info __job:example", "data": "__job:example"} {
 					validateFunctionUI(t, a.call(t, id, "native-fixture:items "+command, "", 200))
@@ -177,19 +169,9 @@ func TestExamples_SelfContained(t *testing.T) {
 	}
 }
 
-func readFile(t *testing.T, path string) []byte {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	require.NoError(t, err)
-	return data
-}
-
 func buildGoExample(t *testing.T, source string) []byte {
 	t.Helper()
-	goBin, err := exec.LookPath("go")
-	if err != nil {
-		t.Skip("binary example requires Go compiler")
-	}
+	goBin := requireTool(t, "go")
 	binary := filepath.Join(t.TempDir(), "example")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

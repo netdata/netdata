@@ -54,7 +54,7 @@ func startSession(ctx context.Context, command []string) (*scriptSession, error)
 		Stdin:  childStdin,
 		Stdout: childStdout,
 	}
-	process, err := ndexec.StartUnprivilegedProcess(ctx, opts, command[0], operationArgs(command, "serve")...)
+	process, err := ndexec.StartUnprivilegedProcess(ctx, opts, command[0], operationArgs(command, opServe)...)
 	if err != nil {
 		if ctx.Err() != nil {
 			err = ctx.Err()

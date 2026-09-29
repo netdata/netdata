@@ -7,10 +7,13 @@ import (
 	"errors"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/internal/strictjson"
 )
 
 // Result uses public Function field names, not Go implementation serialization.
 // RawResponse explicitly transfers complete response ownership to the script.
+// Decode it with json.Decoder.UseNumber: arbitrary data keeps exact numbers and
+// a raw response status must be a json.Number.
 type Result struct {
 	Version           string                           `json:"version"`
 	Status            int                              `json:"status,omitempty"`
@@ -25,6 +28,19 @@ type Result struct {
 	DefaultCharts     [][]string                       `json:"default_charts,omitempty"`
 	GroupBy           map[string]funcapi.GroupByConfig `json:"group_by,omitempty"`
 	RawResponse       map[string]any                   `json:"raw_response,omitempty"`
+}
+
+// ResultShape is the strict JSON shape of a Result.
+func ResultShape() *strictjson.Shape {
+	return strictjson.Object(strictjson.Fields{
+		// Arbitrary Function data can contain null and large integers.
+		"columns":         strictjson.Any(),
+		"data":            strictjson.Any(),
+		"raw_response":    strictjson.Any(),
+		"required_params": parameterShape(strictjson.Object),
+		"charts":          strictjson.Map(strictjson.Object(nil, "name", "type", "columns")),
+		"group_by":        strictjson.Map(strictjson.Object(nil, "name", "columns")),
+	}, "version", "status", "message", "help", "type", "default_sort_column", "default_charts")
 }
 
 // Response validates the result and converts it to a framework response.

@@ -7,13 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
@@ -50,7 +47,7 @@ func TestConfigEnvelope_PackageWithoutForm(t *testing.T) {
 	require.ErrorContains(t, err, "does not declare config_schema")
 }
 
-func TestConfiguredPeersBothModes(t *testing.T) {
+func TestConfigEnvelope_ConfiguredPeers(t *testing.T) {
 	setupRunner(t)
 	for _, mode := range []string{modeOneshot, modePersistent} {
 		t.Run(mode, func(t *testing.T) {
@@ -68,12 +65,9 @@ func TestConfiguredPeersBothModes(t *testing.T) {
 }
 
 // A Python peer receives exactly the envelope Init encoded, in both modes.
-func TestConfigEnvelopeRoundTrip(t *testing.T) {
+func TestConfigEnvelope_RoundTrip(t *testing.T) {
 	setupRunner(t)
-	python, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("Python peer requires python3")
-	}
+	python := requireTool(t, "python3")
 	const peer = `import json, pathlib, sys
 config = json.loads(sys.stdin.readline())
 pathlib.Path(__file__).with_suffix('.received').write_text(json.dumps(config))
@@ -117,19 +111,4 @@ else:
 			assert.Equal(t, want, got)
 		})
 	}
-}
-
-func TestPersistentConfigurationWriteTimeout(t *testing.T) {
-	setupRunner(t)
-	registry, _ := configuredFixture(t, "sleep 30\n", modePersistent)
-	c := registry["native-fixture"].CreateV2().(*Collector)
-	c.ScriptConfig = Settings{
-		"text": strings.Repeat("x", 512*1024),
-	}
-	c.Timeout = confopt.Duration(150 * time.Millisecond)
-	require.NoError(t, c.Init(context.Background()))
-	start := time.Now()
-	err := c.Run(context.Background(), func() { t.Error("readiness before config consumed") })
-	require.ErrorIs(t, err, context.DeadlineExceeded)
-	assert.Less(t, time.Since(start), 3*time.Second)
 }

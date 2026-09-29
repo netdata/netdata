@@ -5,7 +5,6 @@ package native
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -128,120 +127,103 @@ func TestDecodeReady(t *testing.T) {
 func TestDecodeReply(t *testing.T) {
 	c, _ := fixtureCollector(t, "exit 0\n")
 	tests := map[string]struct {
-		data    string
-		wantErr error // nil: success; errAny: any error that is not errCollectionFailed
+		data      string
+		wantErr   bool
+		wantErrIs error
 	}{
-		"snapshot":          {data: `{"id":"1","result":` + snapshotJSON("critical") + `}`},
-		"collection failed": {data: `{"id":"1","error":"collection_failed"}`, wantErr: errCollectionFailed},
-		"missing result":    {data: `{"id":"1"}`, wantErr: errAny},
-		"numeric id":        {data: `{"id":1,"result":{"version":"v1"}}`, wantErr: errAny},
-		"null result":       {data: `{"id":"1","result":null}`, wantErr: errAny},
-		"null error":        {data: `{"id":"1","error":null}`, wantErr: errAny},
-		"result and error": {
-			data:    `{"id":"1","result":{"version":"v1"},"error":"collection_failed"}`,
-			wantErr: errAny,
+		"snapshot": {data: `{"id":"1","result":` + snapshotJSON("critical") + `}`},
+		"collection failed": {
+			data:      `{"id":"1","error":"collection_failed"}`,
+			wantErr:   true,
+			wantErrIs: errCollectionFailed,
 		},
-		"null checks":       {data: `{"id":"1","result":{"version":"v1","checks":null}}`, wantErr: errAny},
-		"duplicate id":      {data: `{"id":"1","id":"1","result":{"version":"v1"}}`, wantErr: errAny},
-		"case folded field": {data: `{"id":"1","Result":{"version":"v1"}}`, wantErr: errAny},
-		"unknown error":     {data: `{"id":"1","error":"arbitrary text"}`, wantErr: errAny},
-		"wrong id":          {data: `{"id":"2","error":"collection_failed"}`, wantErr: errAny},
+		"missing result":    {data: `{"id":"1"}`, wantErr: true},
+		"numeric id":        {data: `{"id":1,"result":{"version":"v1"}}`, wantErr: true},
+		"null result":       {data: `{"id":"1","result":null}`, wantErr: true},
+		"null error":        {data: `{"id":"1","error":null}`, wantErr: true},
+		"result and error":  {data: `{"id":"1","result":{"version":"v1"},"error":"collection_failed"}`, wantErr: true},
+		"null checks":       {data: `{"id":"1","result":{"version":"v1","checks":null}}`, wantErr: true},
+		"duplicate id":      {data: `{"id":"1","id":"1","result":{"version":"v1"}}`, wantErr: true},
+		"case folded field": {data: `{"id":"1","Result":{"version":"v1"}}`, wantErr: true},
+		"unknown error":     {data: `{"id":"1","error":"arbitrary text"}`, wantErr: true},
+		"wrong id":          {data: `{"id":"2","error":"collection_failed"}`, wantErr: true},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			_, err := c.definition.decodeReply([]byte(tc.data), "1")
-			switch tc.wantErr {
-			case nil:
+			if !tc.wantErr {
 				require.NoError(t, err)
-			case errAny:
-				require.Error(t, err)
-				require.NotErrorIs(t, err, errCollectionFailed)
-			default:
-				require.ErrorIs(t, err, tc.wantErr)
+				return
+			}
+			require.Error(t, err)
+			if tc.wantErrIs != nil {
+				require.ErrorIs(t, err, tc.wantErrIs)
+			} else {
+				require.NotErrorIs(t, err, errCollectionFailed, "only the fixed error code keeps the session")
 			}
 		})
 	}
 }
 
-var errAny = errors.New("any error")
-
+// Result conversion is tested in nativefunc; these cases cover the strict
+// envelope and number preservation of the wire decode.
 func TestDecodeFunctionReply(t *testing.T) {
 	tests := map[string]struct {
-		body       string // result object, wrapped in the id 1 envelope
-		reply      string // complete reply, used instead of body
-		info       bool
-		wantStatus int
-		wantRows   string // JSON of managed data or raw_response data
-		wantErr    bool
+		reply   string
+		want    *funcapi.FunctionResponse
+		wantErr bool
 	}{
 		"managed rows keep exact numbers": {
-			body:       `{"version":"v1","status":200,"columns":{},"data":[[9007199254740993,null]]}`,
-			wantStatus: 200,
-			wantRows:   `[[9007199254740993,null]]`,
+			reply: `{"id":"1","result":{"version":"v1","status":200,"columns":{},"data":[[9007199254740993,null]]}}`,
+			want: &funcapi.FunctionResponse{
+				Status:         200,
+				Columns:        map[string]any{},
+				Data:           [][]any{{json.Number("9007199254740993"), nil}},
+				RequiredParams: []funcapi.ParamConfig{},
+				ChartingConfig: funcapi.ChartingConfig{
+					DefaultCharts: funcapi.DefaultCharts{},
+				},
+			},
 		},
 		"raw rows keep exact numbers": {
-			body:       `{"version":"v1","raw_response":{"status":500,"data":[[9007199254740993,null]]}}`,
-			wantStatus: 500,
-			wantRows:   `[[9007199254740993,null]]`,
+			reply: `{"id":"1","result":{"version":"v1","raw_response":{"status":500,"data":[[9007199254740993,null]]}}}`,
+			want: funcapi.RawResponse(map[string]any{
+				"status": 500,
+				"data":   []any{[]any{json.Number("9007199254740993"), nil}},
+			}),
 		},
-		"info without rows": {body: `{"version":"v1","status":200}`, info: true, wantStatus: 200},
-		"error without rows": {
-			body:       `{"version":"v1","status":503,"message":"unavailable"}`,
-			wantStatus: 503,
-		},
-		"missing status":        {body: `{"version":"v1"}`, wantErr: true},
-		"wrong version":         {body: `{"version":"v2","status":500}`, wantErr: true},
-		"null status":           {body: `{"version":"v1","status":null}`, wantErr: true},
-		"wrong case":            {body: `{"Version":"v1","status":500}`, wantErr: true},
-		"duplicate":             {body: `{"version":"v1","status":500,"status":200}`, wantErr: true},
-		"missing rows":          {body: `{"version":"v1","status":200,"columns":{}}`, wantErr: true},
-		"raw and managed":       {body: `{"version":"v1","status":200,"raw_response":{"status":500}}`, wantErr: true},
-		"raw string status":     {body: `{"version":"v1","raw_response":{"status":"500"}}`, wantErr: true},
-		"raw fractional status": {body: `{"version":"v1","raw_response":{"status":500.1}}`, wantErr: true},
-		"raw rounded fraction": {
-			body:    `{"version":"v1","raw_response":{"status":500.00000000000000000001}}`,
-			wantErr: true,
-		},
-		"raw nested duplicate": {
-			body:    `{"version":"v1","raw_response":{"status":500,"data":{"x":1,"x":2}}}`,
-			wantErr: true,
-		},
-		"invalid chart pair": {
-			body:    `{"version":"v1","status":200,"columns":{},"data":[],"default_charts":[["one"]]}`,
-			wantErr: true,
-		},
-		"reserved selector": {
-			body:    `{"version":"v1","status":200,"columns":{},"data":[],"required_params":[{"id":"__job","name":"Job"}]}`,
+		"raw rounded fraction status": {
+			reply:   `{"id":"1","result":{"version":"v1","raw_response":{"status":500.00000000000000000001}}}`,
 			wantErr: true,
 		},
 		"null envelope": {reply: `null`, wantErr: true},
 		"null result":   {reply: `{"id":"1","result":null}`, wantErr: true},
 		"wrong id":      {reply: `{"id":"2","result":{"version":"v1","status":500}}`, wantErr: true},
+		"unknown field": {reply: `{"id":"1","result":{"version":"v1","status":500},"extra":1}`, wantErr: true},
+		"null status":   {reply: `{"id":"1","result":{"version":"v1","status":null}}`, wantErr: true},
+		"wrong case":    {reply: `{"id":"1","result":{"Version":"v1","status":500}}`, wantErr: true},
+		"duplicate": {
+			reply:   `{"id":"1","result":{"version":"v1","status":500,"status":200}}`,
+			wantErr: true,
+		},
+		"raw nested duplicate": {
+			reply:   `{"id":"1","result":{"version":"v1","raw_response":{"status":500,"data":{"x":1,"x":2}}}}`,
+			wantErr: true,
+		},
+		"null chart columns": {
+			reply:   `{"id":"1","result":{"version":"v1","status":200,"columns":{},"data":[],"charts":{"c":{"name":"C","columns":null}}}}`,
+			wantErr: true,
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			reply := tc.reply
-			if reply == "" {
-				reply = `{"id":"1","result":` + tc.body + `}`
-			}
-			got, err := decodeFunctionReply([]byte(reply), "1", tc.info)
+			got, err := decodeFunctionReply([]byte(tc.reply), "1", false)
 			if tc.wantErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			var rows any = got.Data
-			status := got.Status
-			if got.RawResponse != nil {
-				status = got.RawResponse["status"].(int)
-				rows = got.RawResponse["data"]
-			}
-			assert.Equal(t, tc.wantStatus, status)
-			if tc.wantRows != "" {
-				encoded, err := json.Marshal(rows)
-				require.NoError(t, err)
-				assert.JSONEq(t, tc.wantRows, string(encoded))
-			}
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }

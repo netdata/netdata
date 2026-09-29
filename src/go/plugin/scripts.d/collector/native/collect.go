@@ -17,7 +17,7 @@ func (c *Collector) collectSnapshot(ctx context.Context) (snapshot, error) {
 func (c *Collector) collectOneshot(ctx context.Context) (snapshot, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
 	defer cancel()
-	data, err := runOneshot(ctx, c.definition.command, "collect", c.configEnvelope)
+	data, err := runOneshot(ctx, c.definition.command, opCollect, c.configEnvelope)
 	if err != nil {
 		return snapshot{}, err
 	}

@@ -92,9 +92,9 @@ func (f *Form) Validate(config map[string]any) error {
 	return nil
 }
 
-// Defaults returns a copy of config with the form defaults applied. Omitted
+// WithDefaults returns a copy of config with the form defaults applied. Omitted
 // configuration uses the root default, otherwise an empty object.
-func (f *Form) Defaults(config map[string]any) map[string]any {
+func (f *Form) WithDefaults(config map[string]any) map[string]any {
 	var value any
 	if config == nil {
 		value = applyDefaults(nil, false, f.document)

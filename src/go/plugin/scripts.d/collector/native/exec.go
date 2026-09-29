@@ -90,7 +90,7 @@ func runDescribe(ctx context.Context, command []string) ([]byte, error) {
 			Stdout: childStdout,
 		},
 		command[0],
-		operationArgs(command, "describe")...)
+		operationArgs(command, opDescribe)...)
 	_ = childStdout.Close()
 	if err != nil {
 		if ctx.Err() != nil {

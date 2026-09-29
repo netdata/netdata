@@ -105,7 +105,7 @@ func (c *Collector) serve(ctx context.Context, s *scriptSession, r *persistentRu
 				continue
 			}
 			sequence++
-			result, terminal := c.exchange(ctx, s, request, strconv.FormatUint(sequence, 10))
+			result, terminal := c.serveRequest(ctx, s, request, strconv.FormatUint(sequence, 10))
 			request.reply <- result
 			if terminal {
 				return fmt.Errorf("persistent exchange: %w", result.err)
@@ -114,9 +114,9 @@ func (c *Collector) serve(ctx context.Context, s *scriptSession, r *persistentRu
 	}
 }
 
-// exchange performs one request/reply exchange and reports whether its failure
+// serveRequest performs one request/reply exchange and reports whether its failure
 // leaves the stream unusable.
-func (c *Collector) exchange(
+func (c *Collector) serveRequest(
 	ctx context.Context,
 	s *scriptSession,
 	request scriptRequest,

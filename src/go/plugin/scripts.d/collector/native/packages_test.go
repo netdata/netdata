@@ -6,8 +6,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -17,45 +19,61 @@ import (
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/collector/native/internal/configform"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
-func TestLoadPackages_InvalidInventory(t *testing.T) {
+func TestLoadPackages_Inventory(t *testing.T) {
 	c, _ := fixtureCollector(t, "exit 0\n")
 	valid := fmt.Sprintf("  - name: fixture\n    manifest: %s\n", c.Manifest)
 	tests := map[string]struct {
 		inventory string
+		wantErr   bool
 	}{
-		"unsupported version": {inventory: "version: v2\npackages:\n" + valid},
-		"second document":     {inventory: "version: v1\npackages:\n" + valid + "---\nversion: v1\n"},
-		"unknown field":       {inventory: "version: v1\npackages:\n" + valid + "    extra: true\n"},
-		"duplicate":           {inventory: "version: v1\npackages:\n" + valid + valid},
+		"valid":               {inventory: "version: v1\npackages:\n" + valid},
+		"unsupported version": {inventory: "version: v2\npackages:\n" + valid, wantErr: true},
+		"second document":     {inventory: "version: v1\npackages:\n" + valid + "---\nversion: v1\n", wantErr: true},
+		"unknown field":       {inventory: "version: v1\npackages:\n" + valid + "    extra: true\n", wantErr: true},
+		"duplicate":           {inventory: "version: v1\npackages:\n" + valid + valid, wantErr: true},
 		"invalid name": {
 			inventory: "version: v1\npackages:\n" + valid + "  - name: bad_name\n    manifest: /unused\n",
+			wantErr:   true,
 		},
-		"relative manifest": {inventory: "version: v1\npackages:\n  - name: relative\n    manifest: relative.yaml\n"},
+		"relative manifest": {
+			inventory: "version: v1\npackages:\n  - name: relative\n    manifest: relative.yaml\n",
+			wantErr:   true,
+		},
 		"both sources": {
 			inventory: "version: v1\npackages:\n  - name: fixture\n    manifest: /unused\n    command: [/bin/sh]\n",
+			wantErr:   true,
 		},
-		"neither source": {inventory: "version: v1\npackages:\n  - name: fixture\n"},
-		"empty command":  {inventory: "version: v1\npackages:\n  - name: fixture\n    command: []\n"},
+		"neither source": {inventory: "version: v1\npackages:\n  - name: fixture\n", wantErr: true},
+		"empty command":  {inventory: "version: v1\npackages:\n  - name: fixture\n    command: []\n", wantErr: true},
 		"relative command": {
 			inventory: "version: v1\npackages:\n  - name: fixture\n    command: [relative-script]\n",
+			wantErr:   true,
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "packages.yaml")
 			require.NoError(t, os.WriteFile(path, []byte(tc.inventory), 0644))
-			base := collectorapi.Registry{}
+			base := collectorapi.Registry{
+				"base": {},
+			}
 			registry, err := loadPackages(context.Background(), path, base, statExecutable)
-			require.Error(t, err)
-			assert.Nil(t, registry)
-			assert.Empty(t, base, "failed registration must not partially mutate the caller's registry")
+			assert.Equal(t, collectorapi.Registry{
+				"base": {},
+			}, base, "registration never mutates the caller's registry")
+			if tc.wantErr {
+				require.Error(t, err)
+				assert.Nil(t, registry)
+				return
+			}
+			require.NoError(t, err)
+			assert.ElementsMatch(t, []string{"base", "native-fixture"}, slices.Collect(maps.Keys(registry)))
 		})
 	}
 }
@@ -102,33 +120,50 @@ func TestPackageCreator_DefaultsAndIsolation(t *testing.T) {
 	requireNoFile(t, filepath.Join(dir, "started"))
 }
 
-func TestPackageCreator_FunctionOnlyForm(t *testing.T) {
+// Registered package forms drop the manifest option; function-only forms also
+// omit the collection interval and show timeout only in persistent mode.
+func TestPackageCreator_JobForm(t *testing.T) {
 	setupRunner(t)
 	tests := map[string]struct {
-		mode        string
-		wantTimeout bool
+		registry         func(t *testing.T) collectorapi.Registry
+		wantFunctionOnly bool
+		wantProperties   []string
 	}{
-		"one-shot":   {mode: modeOneshot, wantTimeout: false},
-		"persistent": {mode: modePersistent, wantTimeout: true},
+		"metrics package": {
+			registry: func(t *testing.T) collectorapi.Registry {
+				registry, _ := configuredFixture(t, "exit 0\n", modeOneshot)
+				return registry
+			},
+			wantProperties: []string{"autodetection_retry", "config", "timeout", "update_every"},
+		},
+		"function-only one-shot": {
+			registry: func(t *testing.T) collectorapi.Registry {
+				registry, _ := functionFixture(t, modeOneshot, true)
+				return registry
+			},
+			wantFunctionOnly: true,
+			wantProperties:   []string{"autodetection_retry", "config"},
+		},
+		"function-only persistent": {
+			registry: func(t *testing.T) collectorapi.Registry {
+				registry, _ := functionFixture(t, modePersistent, true)
+				return registry
+			},
+			wantFunctionOnly: true,
+			wantProperties:   []string{"autodetection_retry", "config", "timeout"},
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			registry, _ := functionFixture(t, tc.mode, true)
-			creator := registry["native-fixture"]
-			assert.True(t, creator.FunctionOnly)
+			creator := tc.registry(t)["native-fixture"]
+			assert.Equal(t, tc.wantFunctionOnly, creator.FunctionOnly)
 			var form struct {
 				JSONSchema struct {
 					Properties map[string]any
 				} `json:"jsonSchema"`
 			}
 			require.NoError(t, json.Unmarshal([]byte(creator.JobConfigSchema), &form))
-			assert.NotContains(t, form.JSONSchema.Properties, "update_every")
-			assert.NotContains(t, form.JSONSchema.Properties, "manifest")
-			if tc.wantTimeout {
-				assert.Contains(t, form.JSONSchema.Properties, "timeout")
-			} else {
-				assert.NotContains(t, form.JSONSchema.Properties, "timeout")
-			}
+			assert.ElementsMatch(t, tc.wantProperties, slices.Collect(maps.Keys(form.JSONSchema.Properties)))
 		})
 	}
 }
@@ -168,11 +203,12 @@ func TestPackageForm(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			form, err := configform.Parse([]byte(tc.form))
+			// A real metrics package: its job form keeps the collection options.
+			description := `{"version":"v1","metrics":[{"name":"depth","type":"gauge","unit":"jobs"}],"config_schema":` +
+				tc.form + `}`
+			definition, err := parseDescription([]byte(description), []string{"/configured/program"})
 			require.NoError(t, err)
-			composed, err := packageForm("native-fixture", packageDefinition{
-				config: form,
-			})
+			composed, err := packageForm("native-fixture", definition)
 			require.NoError(t, err)
 			var jobForm map[string]any
 			require.NoError(t, json.Unmarshal([]byte(composed), &jobForm))

@@ -25,6 +25,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Runtime drivers shared by tests: the job runtime, Collector.Run and a real
+// Agent. Package fixtures and peers live in test_helpers_test.go.
+
 // wireOutput is a concurrency-safe plugin output buffer.
 type wireOutput struct {
 	mu     sync.Mutex
@@ -49,10 +52,10 @@ func (b *wireOutput) Reset() {
 	b.buffer.Reset()
 }
 
-// chartID returns the ID of the first chart with context in the wire output.
-func chartID(wire, context string) string {
+// chartID returns the ID of the first chart with contextName in the wire output.
+func chartID(wire, contextName string) string {
 	for line := range strings.SplitSeq(wire, "\n") {
-		if strings.HasPrefix(line, "CHART '") && strings.Contains(line, "'"+context+"'") {
+		if strings.HasPrefix(line, "CHART '") && strings.Contains(line, "'"+contextName+"'") {
 			return strings.SplitN(line, "'", 3)[1]
 		}
 	}

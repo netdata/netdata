@@ -175,8 +175,8 @@ func packageForm(name string, definition packageDefinition) (string, error) {
 			delete(properties, "timeout")
 		}
 	}
-	if definition.config != nil {
-		properties["config"], ui["config"] = definition.config.Embed("#/properties/config")
+	if definition.form != nil {
+		properties["config"], ui["config"] = definition.form.Embed("#/properties/config")
 	}
 	data, err := json.Marshal(form)
 	if err != nil {

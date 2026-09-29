@@ -133,10 +133,10 @@ func TestParseValue(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal([]byte(testForm), &value))
 	form, err := ParseValue(value)
 	require.NoError(t, err)
-	assert.Equal(t, float64(17), form.Defaults(nil)["count"])
+	assert.Equal(t, float64(17), form.WithDefaults(nil)["count"])
 }
 
-func TestForm_Defaults(t *testing.T) {
+func TestForm_WithDefaults(t *testing.T) {
 	form, err := Parse([]byte(testForm))
 	require.NoError(t, err)
 	tests := map[string]struct {
@@ -161,7 +161,10 @@ func TestForm_Defaults(t *testing.T) {
 			},
 		},
 		"array items": {
-			config: map[string]any{"items": []any{map[string]any{}, map[string]any{"id": "y"}}},
+			config: map[string]any{
+				"items":  []any{map[string]any{}, map[string]any{"id": "y"}},
+				"nested": map[string]any{},
+			},
 			want: map[string]any{
 				"count":    float64(17),
 				"optional": "fallback",
@@ -172,25 +175,22 @@ func TestForm_Defaults(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, form.Defaults(tc.config))
+			input, err := Normalize(tc.config)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, form.WithDefaults(tc.config))
+			if tc.config != nil {
+				assert.Equal(t, input, any(tc.config), "WithDefaults must not modify its input")
+			}
 		})
 	}
-}
-
-func TestForm_DefaultsCopiesInput(t *testing.T) {
-	form, err := Parse([]byte(testForm))
-	require.NoError(t, err)
-	config := map[string]any{"nested": map[string]any{}}
-	_ = form.Defaults(config)
-	assert.Equal(t, map[string]any{"nested": map[string]any{}}, config)
 }
 
 func TestForm_Validate(t *testing.T) {
 	form, err := Parse([]byte(testForm))
 	require.NoError(t, err)
-	require.NoError(t, form.Validate(form.Defaults(map[string]any{"text": "x"})))
-	require.Error(t, form.Validate(form.Defaults(map[string]any{"text": ""})))
-	require.Error(t, form.Validate(form.Defaults(map[string]any{"text": "x", "unknown": true})))
+	require.NoError(t, form.Validate(form.WithDefaults(map[string]any{"text": "x"})))
+	require.Error(t, form.Validate(form.WithDefaults(map[string]any{"text": ""})))
+	require.Error(t, form.Validate(form.WithDefaults(map[string]any{"text": "x", "unknown": true})))
 }
 
 func TestForm_Embed(t *testing.T) {

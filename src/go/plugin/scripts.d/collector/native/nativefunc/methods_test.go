@@ -10,25 +10,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMethods(t *testing.T) {
-	valid := func() Definition {
-		return Definition{
-			ID:             "items",
-			Name:           "Items",
-			Help:           "List items.",
-			AcceptedParams: []string{"filter"},
-			RequiredParams: []Parameter{
-				{ID: "queue", Name: "Queue", Options: []Option{{ID: "mail", Name: "Mail", Default: true}}},
-			},
-		}
+func validDefinition() Definition {
+	return Definition{
+		ID:             "items",
+		Name:           "Items",
+		Help:           "List items.",
+		AcceptedParams: []string{"filter"},
+		RequiredParams: []Parameter{
+			{ID: "queue", Name: "Queue", Options: []Option{{ID: "mail", Name: "Mail", Default: true}}},
+		},
 	}
+}
+
+// edited returns one valid definition changed by edit.
+func edited(edit func(*Definition)) []Definition {
+	d := validDefinition()
+	edit(&d)
+	return []Definition{d}
+}
+
+func TestMethods(t *testing.T) {
 	tests := map[string]struct {
-		edit    func(*[]Definition)
-		want    []funcapi.FunctionConfig
-		wantErr bool
+		definitions []Definition
+		want        []funcapi.FunctionConfig
+		wantErr     bool
 	}{
-		"defaults": {
-			edit: func(*[]Definition) {},
+		"documented defaults": {
+			definitions: []Definition{validDefinition()},
 			want: []funcapi.FunctionConfig{{
 				ID:             "items",
 				Name:           "Items",
@@ -47,25 +55,23 @@ func TestMethods(t *testing.T) {
 			}},
 		},
 		"all fields": {
-			edit: func(d *[]Definition) {
-				(*d)[0] = Definition{
-					ID:             "items",
-					Name:           "Items",
-					Help:           "List items.",
-					UpdateEvery:    37,
-					ResponseType:   "custom",
-					HasHistory:     true,
-					AcceptedParams: []string{"queue"},
-					RequiredParams: []Parameter{{
-						ID:         "queue",
-						Name:       "Queue",
-						Help:       "Choose a queue.",
-						Type:       "multiselect",
-						UniqueView: true,
-						Options:    []Option{{ID: "mail", Name: "Mail", Default: true, Disabled: true}},
-					}},
-				}
-			},
+			definitions: []Definition{{
+				ID:             "items",
+				Name:           "Items",
+				Help:           "List items.",
+				UpdateEvery:    37,
+				ResponseType:   "custom",
+				HasHistory:     true,
+				AcceptedParams: []string{"queue"},
+				RequiredParams: []Parameter{{
+					ID:         "queue",
+					Name:       "Queue",
+					Help:       "Choose a queue.",
+					Type:       "multiselect",
+					UniqueView: true,
+					Options:    []Option{{ID: "mail", Name: "Mail", Default: true, Disabled: true}},
+				}},
+			}},
 			want: []funcapi.FunctionConfig{{
 				ID:             "items",
 				Name:           "Items",
@@ -86,42 +92,52 @@ func TestMethods(t *testing.T) {
 				}},
 			}},
 		},
-		"namespaced ID":    {edit: func(d *[]Definition) { (*d)[0].ID = "another:items" }, wantErr: true},
-		"missing help":     {edit: func(d *[]Definition) { (*d)[0].Help = " " }, wantErr: true},
-		"negative refresh": {edit: func(d *[]Definition) { (*d)[0].UpdateEvery = -1 }, wantErr: true},
-		"reserved accepted": {
-			edit:    func(d *[]Definition) { (*d)[0].AcceptedParams = []string{jobSelector} },
-			wantErr: true,
+		"namespaced ID": {
+			definitions: edited(func(d *Definition) { d.ID = "another:items" }),
+			wantErr:     true,
 		},
-		"duplicate accepted": {
-			edit:    func(d *[]Definition) { (*d)[0].AcceptedParams = []string{"x", "x"} },
-			wantErr: true,
+		"missing help": {
+			definitions: edited(func(d *Definition) { d.Help = " " }),
+			wantErr:     true,
 		},
-		"duplicate method": {edit: func(d *[]Definition) { *d = append(*d, (*d)[0]) }, wantErr: true},
+		"negative refresh": {
+			definitions: edited(func(d *Definition) { d.UpdateEvery = -1 }),
+			wantErr:     true,
+		},
+		"reserved accepted parameter": {
+			definitions: edited(func(d *Definition) { d.AcceptedParams = []string{"__job"} }),
+			wantErr:     true,
+		},
+		"duplicate accepted parameter": {
+			definitions: edited(func(d *Definition) { d.AcceptedParams = []string{"x", "x"} }),
+			wantErr:     true,
+		},
+		"duplicate method": {
+			definitions: []Definition{validDefinition(), validDefinition()},
+			wantErr:     true,
+		},
 		"reserved selector": {
-			edit:    func(d *[]Definition) { (*d)[0].RequiredParams = []Parameter{{ID: jobSelector, Name: "Job"}} },
-			wantErr: true,
+			definitions: edited(func(d *Definition) { d.RequiredParams = []Parameter{{ID: "__job", Name: "Job"}} }),
+			wantErr:     true,
 		},
 		"invalid selection type": {
-			edit: func(d *[]Definition) {
-				(*d)[0].RequiredParams = []Parameter{{ID: "queue", Name: "Queue", Type: "text"}}
-			},
+			definitions: edited(func(d *Definition) {
+				d.RequiredParams = []Parameter{{ID: "queue", Name: "Queue", Type: "text"}}
+			}),
 			wantErr: true,
 		},
 		"duplicate option": {
-			edit: func(d *[]Definition) {
-				(*d)[0].RequiredParams = []Parameter{
+			definitions: edited(func(d *Definition) {
+				d.RequiredParams = []Parameter{
 					{ID: "q", Name: "Q", Options: []Option{{ID: "x", Name: "X"}, {ID: "x", Name: "X"}}},
 				}
-			},
+			}),
 			wantErr: true,
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			definitions := []Definition{valid()}
-			tc.edit(&definitions)
-			methods, err := Methods(definitions)
+			methods, err := Methods(tc.definitions)
 			if tc.wantErr {
 				require.Error(t, err)
 				return

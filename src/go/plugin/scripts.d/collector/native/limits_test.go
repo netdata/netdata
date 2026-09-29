@@ -21,8 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Real peers move messages well above 1 MiB through both transports.
-
+// Real peers move a snapshot well above 1 MiB through both transports.
 func TestLimits_LargeSnapshot(t *testing.T) {
 	setupRunner(t)
 	samples := make([]metricSample, 10000)
@@ -75,6 +74,7 @@ func TestLimits_LargeSnapshot(t *testing.T) {
 	}
 }
 
+// A 2 MiB configuration value and a 20 MiB Function payload reach the script in both modes.
 func TestLimits_LargeFunctionAndConfiguration(t *testing.T) {
 	setupRunner(t)
 	for _, mode := range []string{modeOneshot, modePersistent} {
@@ -102,7 +102,7 @@ func TestLimits_LargeFunctionAndConfiguration(t *testing.T) {
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-			result, err := c.ExecuteFunction(ctx, funcapi.RawMethodRequest{
+			result, err := c.executeFunction(ctx, funcapi.RawMethodRequest{
 				Method:  "items",
 				Args:    []string{"large"},
 				Payload: bytes.Repeat([]byte{'x'}, 20<<20),
