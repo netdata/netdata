@@ -17,8 +17,8 @@ use super::wire::{
     AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, CoverageWire,
     EventWire, FacetListWire, FacetValueWire, FieldKindsWire, LinkWire,
     OverviewGridWire, OverviewPercentilesWire, OverviewResult, OverviewSection, OverviewTotals,
-    SearchItems, SearchResult, SlowestResult, SlowestTraceWire, SpanWire, StatusWire, TraceItems,
-    TraceResult, TraceSummaryWire,
+    SearchItems, SearchResult, ServiceBreakdownWire, ServiceSpansWire, SlowestResult, SlowestTraceWire,
+    SpanWire, StatusWire, TraceItems, TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -781,9 +781,23 @@ fn summary_wire(t: sfsq::traces::TraceSummary) -> TraceSummaryWire {
         duration_ns: t.duration_ns,
         span_count: t.span_count,
         error_count: t.error_count,
+        service_breakdown: service_breakdown_wire(t.service_breakdown),
         matched_count: t.matched_count,
         exact: t.exact,
         matched_spans: t.matched_spans.into_iter().map(span_wire).collect(),
+    }
+}
+
+fn service_breakdown_wire(b: sfsq::traces::ServiceBreakdown) -> ServiceBreakdownWire {
+    ServiceBreakdownWire {
+        top: b
+            .top
+            .into_iter()
+            .map(|(value, spans)| ServiceSpansWire { value, spans })
+            .collect(),
+        other: b.other,
+        other_services: b.other_services,
+        unattributed: b.unattributed,
     }
 }
 

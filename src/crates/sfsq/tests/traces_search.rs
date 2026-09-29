@@ -31,8 +31,9 @@ use common::{
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use sfsq::traces::{
     CompareOp, Condition, PartialReason, Predicate, PredicateError, PredicateTarget,
-    PredicateValue, QueryStatus, SearchData, SearchQuery, SearchRequestError, SearchSources,
-    AttributeOwner, TimeWindow, BuiltinField, TraceSource, search,
+    PredicateValue, QueryStatus, SERVICE_BREAKDOWN_TOP_K, SearchData, SearchQuery,
+    SearchRequestError, SearchSources, ServiceBreakdown, AttributeOwner, TimeWindow, BuiltinField,
+    TraceSource, search,
 };
 
 const NS: u64 = 1_000_000_000;
@@ -89,6 +90,7 @@ type SummaryPrint = (
     usize,          // matched_count
     Vec<(String, i64, i64)>, // attached spans: (name, start, duration)
     bool,           // exact
+    (Vec<(String, u64)>, u64, usize, u64), // service breakdown
 );
 
 fn norm(data: &SearchData) -> (Vec<SummaryPrint>, QueryStatus) {
@@ -118,10 +120,50 @@ fn norm(data: &SearchData) -> (Vec<SummaryPrint>, QueryStatus) {
                     })
                     .collect(),
                 t.exact,
+                (
+                    t.service_breakdown.top.clone(),
+                    t.service_breakdown.other,
+                    t.service_breakdown.other_services,
+                    t.service_breakdown.unattributed,
+                ),
             )
         })
         .collect();
     (traces, data.status.clone())
+}
+
+fn breakdown(
+    top: &[(&str, u64)],
+    other: u64,
+    other_services: usize,
+    unattributed: u64,
+) -> ServiceBreakdown {
+    ServiceBreakdown {
+        top: top.iter().map(|&(s, n)| (s.to_string(), n)).collect(),
+        other,
+        other_services,
+        unattributed,
+    }
+}
+
+/// Every returned row's breakdown partitions exactly the spans its
+/// `span_count` counts, within the cap, with `other` and
+/// `other_services` empty together.
+fn assert_breakdowns_partition(data: &SearchData) {
+    for t in &data.traces {
+        let b = &t.service_breakdown;
+        let mut total = b.other + b.unattributed;
+        for (_, spans) in &b.top {
+            total += spans;
+        }
+        assert_eq!(total, t.span_count as u64, "trace {}", t.trace_id);
+        assert!(
+            b.top.len() <= SERVICE_BREAKDOWN_TOP_K,
+            "trace {}",
+            t.trace_id
+        );
+        assert_eq!(b.other == 0, b.other_services == 0, "trace {}", t.trace_id);
+    }
 }
 
 // ── The shared world (six traces, two services, two time halves) ──────
@@ -755,6 +797,7 @@ fn summary_ground_truth() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
 
     let data = run(sources, SearchQuery::new(Predicate::all()).spans_per_trace(2));
+    assert_breakdowns_partition(&data);
     let by_id = |n: u8| {
         data.traces
             .iter()
@@ -769,6 +812,7 @@ fn summary_ground_truth() {
     assert_eq!(t1.start_ns, (1_000 * NS) as i64);
     assert_eq!(t1.duration_ns, 500_000);
     assert_eq!((t1.span_count, t1.error_count, t1.matched_count), (2, 0, 2));
+    assert_eq!(t1.service_breakdown, breakdown(&[("svc-a", 2)], 0, 0, 0));
     // spans_per_trace(2) attaches both, in combiner (chronological) order.
     assert_eq!(t1.matched_spans.len(), 2);
     assert!(t1.matched_spans[0].start_ns < t1.matched_spans[1].start_ns);
@@ -779,22 +823,115 @@ fn summary_ground_truth() {
     assert_eq!(t3.start_ns, (900 * NS) as i64);
     assert_eq!(t3.duration_ns, (1_000 * NS + 50) as i64);
     assert_eq!(t3.span_count, 2);
+    assert_eq!(t3.service_breakdown, breakdown(&[("svc-a", 2)], 0, 0, 0));
 
     // T5: all three spans carry ERROR.
     let t5 = by_id(5);
     assert_eq!((t5.span_count, t5.error_count), (3, 3));
+    assert_eq!(t5.service_breakdown, breakdown(&[("svc-b", 3)], 0, 0, 0));
     assert_eq!(t5.matched_spans.len(), 2, "spans_per_trace trims the attachment");
     assert_eq!(t5.matched_count, 3, "matched_count is not trimmed by spans_per_trace");
 
     // T6: the resend collapsed to the canonical copy.
     let t6 = by_id(6);
     assert_eq!((t6.span_count, t6.start_ns), (1, (1_300 * NS) as i64));
+    assert_eq!(t6.service_breakdown, breakdown(&[("svc-b", 1)], 0, 0, 0));
 
     // spans_per_trace = 0 attaches nothing, counts unaffected.
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let none = run(sources, SearchQuery::new(Predicate::all()).spans_per_trace(0));
     assert!(none.traces.iter().all(|t| t.matched_spans.is_empty()));
     assert_eq!(none.traces.iter().map(|t| t.matched_count).sum::<usize>(), 10);
+}
+
+/// The per-service breakdown over the retained canonical spans: ranked
+/// by span count then name (ties at the cut included), capped with the
+/// tail folded into `other`/`other_services`, service-less spans
+/// counted as `unattributed`, a resend from another service counted
+/// once under its canonical copy's service, and a capped trace
+/// partitioning only its retained spans.
+#[test]
+fn service_breakdown_partitions_the_retained_canonical_spans() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = |name: &str| vec![kv_str("service.name", name)];
+    // Trace 21: frontend 3, auth 2, cart 2 (a name tie), 2 spans with no
+    // service, and a later resend of a cart span from another service.
+    let mut reqs = vec![
+        req_with(svc("frontend"), None, &[
+            span_in(21, 0xA1, 0, 5_000 * NS, "root"),
+            span_in(21, 0xA2, 0xA1, 5_001 * NS, "op"),
+            span_in(21, 0xA3, 0xA1, 5_002 * NS, "op"),
+        ]),
+        req_with(svc("cart"), None, &[
+            span_in(21, 0xA4, 0xA1, 5_003 * NS, "op"),
+            span_in(21, 0xA5, 0xA1, 5_004 * NS, "op"),
+        ]),
+        req_with(svc("auth"), None, &[
+            span_in(21, 0xA6, 0xA1, 5_005 * NS, "op"),
+            span_in(21, 0xA7, 0xA1, 5_006 * NS, "op"),
+        ]),
+        req_with(vec![kv_str("env", "prod")], None, &[
+            span_in(21, 0xA8, 0xA1, 5_007 * NS, "op"),
+            span_in(21, 0xA9, 0xA1, 5_008 * NS, "op"),
+        ]),
+        req_with(svc("zz-resend"), None, &[span_in(21, 0xA4, 0xA1, 5_009 * NS, "op")]),
+    ];
+    // Trace 22: seven services, more than the cap. foxtrot ties delta and
+    // echo at the cut and is seen before them, yet folds by name.
+    let services = [
+        ("alpha", 4),
+        ("foxtrot", 2),
+        ("golf", 1),
+        ("echo", 2),
+        ("delta", 2),
+        ("charlie", 3),
+        ("bravo", 3),
+    ];
+    let mut id = 0xB0u8;
+    let mut start = 6_000 * NS;
+    for (service, spans) in services {
+        let mut specs = Vec::new();
+        for _ in 0..spans {
+            let parent = if id == 0xB0 { 0 } else { 0xB0 };
+            specs.push(span_in(22, id, parent, start, "op"));
+            id += 1;
+            start += NS;
+        }
+        reqs.push(req_with(svc(service), None, &specs));
+    }
+    let wal = write_wal(dir.path(), reqs, "breakdown");
+
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let data = run(sources, SearchQuery::new(Predicate::all()));
+    assert_eq!(ids(&data), vec![hex(22), hex(21)]);
+    assert_breakdowns_partition(&data);
+    let (t22, t21) = (&data.traces[0], &data.traces[1]);
+    assert_eq!(t21.span_count, 9);
+    assert_eq!(
+        t21.service_breakdown,
+        breakdown(&[("frontend", 3), ("auth", 2), ("cart", 2)], 0, 0, 2)
+    );
+    assert_eq!(t22.span_count, 17);
+    assert_eq!(
+        t22.service_breakdown,
+        breakdown(
+            &[("alpha", 4), ("bravo", 3), ("charlie", 3), ("delta", 2), ("echo", 2)],
+            3,
+            2,
+            0
+        )
+    );
+
+    // Capped at 2 spans: each trace keeps its two earliest, inexact, and
+    // the breakdown partitions exactly those.
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let capped = run(sources, SearchQuery::new(Predicate::all()).span_cap_for_tests(2));
+    assert!(capped.status.has(PartialReason::SizeCap));
+    assert_breakdowns_partition(&capped);
+    let (t22, t21) = (&capped.traces[0], &capped.traces[1]);
+    assert!(!t21.exact && !t22.exact);
+    assert_eq!(t21.service_breakdown, breakdown(&[("frontend", 2)], 0, 0, 0));
+    assert_eq!(t22.service_breakdown, breakdown(&[("alpha", 2)], 0, 0, 0));
 }
 
 /// The glm 7-trace construction (pin R2-1): losing resends inflate raw

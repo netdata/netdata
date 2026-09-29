@@ -979,6 +979,7 @@ pub struct TraceSummaryWire {
     pub duration_ns: i64,
     pub span_count: usize,
     pub error_count: usize,
+    pub service_breakdown: ServiceBreakdownWire,
     pub matched_count: usize,
     /// False when this trace's assembly was capped or degraded — its
     /// summary numbers may undercount. "Exact" means exact WITHIN the
@@ -988,6 +989,29 @@ pub struct TraceSummaryWire {
     /// The matched subset, `min(spans_per_trace, matched_count)` spans
     /// in the combiner's total order.
     pub matched_spans: Vec<SpanWire>,
+}
+
+/// One returned trace's spans by resource `service.name`, over the same
+/// spans as `span_count` — so it shares the `exact` caveat — and
+/// partitioning them exactly:
+/// `sum(top[].spans) + other + unattributed == span_count`.
+#[derive(Debug, Serialize)]
+pub struct ServiceBreakdownWire {
+    /// At most 5 services — span count DESC, name ASC.
+    pub top: Vec<ServiceSpansWire>,
+    /// Spans in the services beyond `top`.
+    pub other: u64,
+    /// How many services `other` covers.
+    pub other_services: usize,
+    /// Spans without a `service.name` — counted, never attributed to a
+    /// service.
+    pub unattributed: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ServiceSpansWire {
+    pub value: String,
+    pub spans: u64,
 }
 
 // ── Trace mode response ─────────────────────────────────────────────

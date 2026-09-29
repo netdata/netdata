@@ -524,6 +524,15 @@ async fn search_returns_most_recent_first_with_deterministic_ties() {
     assert_eq!(e["root_service"], "svc-a");
     assert_eq!(e["root_name"], "span-1");
     assert_eq!(e["span_count"], 3);
+    assert_eq!(
+        e["service_breakdown"],
+        json!({
+            "top": [{"value": "svc-a", "spans": 3}],
+            "other": 0,
+            "other_services": 0,
+            "unattributed": 0,
+        })
+    );
     assert_eq!(e["exact"], true);
     assert_eq!(e["matched_spans"].as_array().unwrap().len(), 1);
 }

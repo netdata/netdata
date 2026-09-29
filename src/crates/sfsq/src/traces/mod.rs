@@ -56,8 +56,8 @@ pub use predicate::{
     span_matches,
 };
 pub use search::{
-    DEFAULT_SEARCH_LIMIT, DEFAULT_SPANS_PER_TRACE, SPANS_PER_TRACE_MAX, SearchData, SearchQuery, SearchRequestError,
-    SearchSources, TraceSummary, search,
+    DEFAULT_SEARCH_LIMIT, DEFAULT_SPANS_PER_TRACE, SERVICE_BREAKDOWN_TOP_K, SPANS_PER_TRACE_MAX, SearchData,
+    SearchQuery, SearchRequestError, SearchSources, ServiceBreakdown, TraceSummary, search,
 };
 pub use sources::{
     SourceId, SourceSetError, TraceSfstCandidate, TraceSource, TraceUnavailable, TraceWalTail,

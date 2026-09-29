@@ -345,6 +345,12 @@ fn summary_ranked(id_byte: u8, envelope_ns: i64, rank_ns: i64) -> sfsq::traces::
         duration_ns: 100,
         span_count: 2,
         error_count: 0,
+        service_breakdown: sfsq::traces::ServiceBreakdown {
+            top: vec![("svc".into(), 2)],
+            other: 0,
+            other_services: 0,
+            unattributed: 0,
+        },
         matched_count: 2,
         matched_spans: vec![],
         exact: true,
@@ -399,6 +405,29 @@ fn cursor_freezes_the_original_window_while_coverage_declares_the_widened_range(
     );
     let cursor = parse_cursor(v["anchor"]["next"].as_str().unwrap()).unwrap();
     assert_eq!((cursor.after_s, cursor.before_s), WIN);
+}
+
+#[test]
+fn search_rows_carry_the_service_breakdown() {
+    let mut t = summary(1, 300);
+    t.span_count = 12;
+    t.service_breakdown = sfsq::traces::ServiceBreakdown {
+        top: vec![("frontend".into(), 6), ("cart".into(), 3)],
+        other: 2,
+        other_services: 2,
+        unattributed: 1,
+    };
+    let r = to_search_result(search_data(vec![t]), 2, None, WIN, WIN_COVERAGE);
+    let v = serde_json::to_value(&r).unwrap();
+    assert_eq!(
+        v["traces"][0]["service_breakdown"],
+        json!({
+            "top": [{"value": "frontend", "spans": 6}, {"value": "cart", "spans": 3}],
+            "other": 2,
+            "other_services": 2,
+            "unattributed": 1,
+        })
+    );
 }
 
 #[test]
