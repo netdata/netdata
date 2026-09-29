@@ -350,8 +350,6 @@ struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const
         rt->flavor = cachestat_runtime_flavor_from_path(path);
         struct bpf_object *obj = bpf_object__open_file(path, NULL);
         if (!obj || libbpf_get_error(obj)) {
-            if (obj && libbpf_get_error(obj))
-                bpf_object__close(obj);
             freez(rt);
             return NULL;
         }

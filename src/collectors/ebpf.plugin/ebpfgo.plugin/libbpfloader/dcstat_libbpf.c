@@ -328,8 +328,6 @@ struct netdata_ebpf_dcstat_runtime *netdata_dcstat_runtime_open_mode(const char 
         rt->flavor = dcstat_runtime_flavor_from_path(path);
         struct bpf_object *obj = bpf_object__open_file(path, NULL);
         if (!obj || libbpf_get_error(obj)) {
-            if (obj && libbpf_get_error(obj))
-                bpf_object__close(obj);
             freez(rt);
             return NULL;
         }
