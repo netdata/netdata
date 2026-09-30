@@ -239,6 +239,11 @@ Only jobs created through Dynamic Configuration can be removed. Other job types 
 
 :::
 
+Discovered collector jobs keep secret-reference text literal. Saving an edited discovered job adopts it as a dynamic
+configuration and enables `${env:...}`, `${file:...}`, `${cmd:...}`, and `${store:...}` throughout the submitted
+configuration. Review the complete configuration before saving, including fields you did not edit. Merely enabling
+or restarting a discovered job does not adopt it. See [Secrets Management](/src/collectors/SECRETS.md).
+
 ## Multi-Node Deployment
 
 :::tip

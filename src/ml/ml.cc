@@ -657,9 +657,37 @@ static void ml_dimension_serialize_kmeans(const ml_dimension_t *dim, BUFFER *wb)
     buffer_json_finalize(wb);
 }
 
-bool
-ml_dimension_deserialize_kmeans(const char *json_str)
+// Both machine-guids in the rejection log line below are untrusted input: the one in the received
+// payload, and the one stored for the host - the streaming handshake validates it with
+// regenerate_guid() but keeps the original string (rrdhost.c), so it is whatever the child sent.
+// A guid may only be echoed into a log line when it is at most GUID_LEN characters of hex digits
+// and hyphens, so that a crafted value cannot carry control characters or a newline into the
+// daemon log.
+//
+// uuid_parse() is NOT sufficient for this: libnetdata #defines it to uuid_parse_flexi(), whose
+// loop ends as soon as it has decoded 16 bytes and never checks that the string ended there, so
+// a valid UUID followed by arbitrary bytes parses successfully.
+static bool ml_machine_guid_is_loggable(const char *guid)
 {
+    for (size_t i = 0; guid[i]; i++) {
+        if (i >= GUID_LEN)
+            return false;
+
+        if (!isxdigit((uint8_t) guid[i]) && guid[i] != '-')
+            return false;
+    }
+
+    return true;
+}
+
+bool
+ml_dimension_deserialize_kmeans(RRDHOST *host, const char *json_str)
+{
+    if (!host) {
+        netdata_log_error("Failed to deserialize kmeans: no host is associated with this connection");
+        return false;
+    }
+
     if (!json_str) {
         netdata_log_error("Failed to deserialize kmeans: json string is null");
         return false;
@@ -716,6 +744,31 @@ ml_dimension_deserialize_kmeans(const char *json_str)
             }
             values[i] = json_object_get_string(tmp_obj);
         }
+    }
+
+    // The streaming connection is authenticated for exactly one host: JSON/ML_MODEL is a
+    // PARSER_INIT_STREAMING keyword and HOST (scope switching) is PARSER_INIT_PLUGINSD only, and a
+    // model is always sent on the sender of the host that owns the dimension - so on any hop the
+    // payload's machine-guid names the host of the connection that carries it. A payload naming
+    // another host is a child trying to write ML state it is not authorized for: it would let it
+    // pin another host's anomaly scores and suppress that host's training.
+    //
+    // The check does not bound the length of the guid: uuid_parse_flexi() accepts non-canonical
+    // spellings (32 hex digits without hyphens, for example) and the handshake stores what the
+    // child sent, so host->machine_guid - and a payload that matches it - can be shorter than
+    // GUID_LEN. The GUID copy in DimensionLookupInfo is bounded for that reason.
+    if (strcmp(values[0], host->machine_guid) != 0) {
+        const char *target = ml_machine_guid_is_loggable(values[0]) ? values[0] : "(not log-safe)";
+        const char *connected =
+            ml_machine_guid_is_loggable(host->machine_guid) ? host->machine_guid : "(not log-safe)";
+
+        nd_log_limit_static_global_var(erl, 1, 0);
+        nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
+                     "ML: rejecting a model received from host '%s' (%s): it targets machine guid '%s', "
+                     "which is not the host this connection is authenticated for",
+                     rrdhost_hostname(host), connected, target);
+        json_object_put(root);
+        return false;
     }
 
     DimensionLookupInfo DLI(values[0], values[1], values[2]);

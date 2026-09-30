@@ -225,8 +225,8 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         // v1 query
         RRDR *r = rrdr_create(owa, qt, qt->query.used, qt->window.points);
         if(unlikely(!r)) {
-            internal_error(true, "QUERY: cannot create RRDR for %s, after=%ld, before=%ld, dimensions=%u, points=%zu",
-                           qt->id, qt->window.after, qt->window.before, qt->query.used, qt->window.points);
+            internal_error(true, "QUERY: cannot create RRDR for %s, after=%" PRId64 ", before=%" PRId64 ", dimensions=%u, points=%zu",
+                           qt->id, (int64_t)qt->window.after, (int64_t)qt->window.before, qt->query.used, qt->window.points);
             return NULL;
         }
         r->group_by.r = NULL;
@@ -481,8 +481,8 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         RRDR *r = rrdr_create(owa, qt, added, qt->window.points);
         if (!r) {
             internal_error(true,
-                           "QUERY: cannot create group by RRDR for %s, after=%ld, before=%ld, dimensions=%zu, points=%zu",
-                           qt->id, qt->window.after, qt->window.before, added, qt->window.points);
+                           "QUERY: cannot create group by RRDR for %s, after=%" PRId64 ", before=%" PRId64 ", dimensions=%zu, points=%zu",
+                           qt->id, (int64_t)qt->window.after, (int64_t)qt->window.before, added, qt->window.points);
             goto cleanup;
         }
         // prevent double free at cleanup in case of error
@@ -587,8 +587,8 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     r_tmp = rrdr_create(owa, qt, 1, qt->window.points);
     if (!r_tmp) {
         internal_error(true,
-                       "QUERY: cannot create group by temporary RRDR for %s, after=%ld, before=%ld, dimensions=%d, points=%zu",
-                       qt->id, qt->window.after, qt->window.before, 1, qt->window.points);
+                       "QUERY: cannot create group by temporary RRDR for %s, after=%" PRId64 ", before=%" PRId64 ", dimensions=%d, points=%zu",
+                       qt->id, (int64_t)qt->window.after, (int64_t)qt->window.before, 1, qt->window.points);
         goto cleanup;
     }
     rrd2rrdr_set_timestamps(r_tmp);

@@ -3,13 +3,14 @@
 package ceph
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
-func (c *Collector) collectOsds(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathApiOsd)
+func (c *Collector) collectOsds(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathApiOsd)
 	if err != nil {
 		return err
 	}

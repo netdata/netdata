@@ -3,13 +3,14 @@
 package ceph
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
-func (c *Collector) collectPools(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathApiPool)
+func (c *Collector) collectPools(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathApiPool)
 	if err != nil {
 		return err
 	}

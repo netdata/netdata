@@ -117,6 +117,7 @@ func TestSecretRestartCommandReportsFailedPrecommitRestoration(t *testing.T) {
 			"name":   name,
 			"secret": "${store:vault:main:value}",
 		}
+		config.SetSourceType(confgroup.TypeDyncfg)
 		payload, err := yaml.Marshal(config)
 		require.NoError(t, err)
 		commit, err := index.PrepareJobChange(
@@ -164,6 +165,7 @@ func TestSecretRestartCommandRestoresStopAcknowledgedDuringCancellation(t *testi
 		"name":   "one",
 		"secret": "${store:vault:main:value}",
 	}
+	config.SetSourceType(confgroup.TypeDyncfg)
 	payload, err := yaml.Marshal(config)
 	require.NoError(t, err)
 	commitDependency, err := index.PrepareJobChange(
@@ -206,6 +208,7 @@ func TestSecretRestartTimeoutAfterAppliedMutationIsOperational(t *testing.T) {
 		"name":   "one",
 		"secret": "${store:vault:main:value}",
 	}
+	config.SetSourceType(confgroup.TypeDyncfg)
 	payload, err := yaml.Marshal(config)
 	require.NoError(t, err)
 	commitDependency, err := index.PrepareJobChange(
@@ -286,6 +289,7 @@ func TestSecretRestartCommandRedactsAppliedRestartFailure(t *testing.T) {
 		"name":   "one",
 		"secret": "${store:vault:main:value}",
 	}
+	config.SetSourceType(confgroup.TypeDyncfg)
 	payload, err := yaml.Marshal(config)
 	require.NoError(t, err)
 	commitDependency, err := index.PrepareJobChange(
@@ -343,6 +347,7 @@ func BenchmarkBSecretRestart(b *testing.B) {
 			"name":   name,
 			"secret": "${store:vault:main:value}",
 		}
+		config.SetSourceType(confgroup.TypeDyncfg)
 		payload, err := yaml.Marshal(config)
 		if err != nil {
 			require.FailNow(b, "benchmark failed", err)

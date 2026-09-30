@@ -90,10 +90,10 @@ func TestDiscoveredBusyRetainsPendingDesiredAndRetriesOnRelease(t *testing.T) {
 	release := make(chan struct{})
 	controller.factory.config.Attempts = busyPendingJobAuthority{release: release}
 	commands := &autoDetectionRetryTestCommands{}
-	require.NoError(t, controller.BindAutoDetectionRetries(commands, 9, func(error) {}))
+	require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(error) {}))
 	t.Cleanup(func() {
-		controller.scheduler.StopAutoDetectionRetries()
-		require.NoError(t, controller.scheduler.WaitAutoDetectionRetries(context.Background()))
+		controller.scheduler.StopBackgroundWorkers()
+		require.NoError(t, controller.scheduler.WaitBackgroundWorkers(context.Background()))
 	})
 
 	config := autoDetectionRetryTestConfig("job")
@@ -161,10 +161,10 @@ func TestDiscoveredStaleStoreCandidateRetainsPendingDesired(t *testing.T) {
 			return scopeState, nil
 		}
 	commands := &autoDetectionRetryTestCommands{}
-	require.NoError(t, controller.BindAutoDetectionRetries(commands, 9, func(error) {}))
+	require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(error) {}))
 	t.Cleanup(func() {
-		controller.scheduler.StopAutoDetectionRetries()
-		require.NoError(t, controller.scheduler.WaitAutoDetectionRetries(context.Background()))
+		controller.scheduler.StopBackgroundWorkers()
+		require.NoError(t, controller.scheduler.WaitBackgroundWorkers(context.Background()))
 	})
 
 	config := autoDetectionRetryTestConfig("job")

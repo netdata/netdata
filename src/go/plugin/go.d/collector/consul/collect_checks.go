@@ -2,7 +2,11 @@
 
 package consul
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
+import (
+	"context"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
+)
 
 const (
 	// https://www.consul.io/api-docs/agent/check#list-checks
@@ -19,8 +23,8 @@ type agentCheck struct {
 	ServiceTags []string
 }
 
-func (c *Collector) collectChecks(mx map[string]int64) error {
-	req, err := c.createRequest(urlPathAgentChecks)
+func (c *Collector) collectChecks(ctx context.Context, mx map[string]int64) error {
+	req, err := c.createRequest(ctx, urlPathAgentChecks)
 	if err != nil {
 		return err
 	}

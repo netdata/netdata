@@ -3,6 +3,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -23,8 +24,8 @@ const (
 )
 
 // New creates a new PowerStore REST API client.
-func New(client web.ClientConfig, request web.RequestConfig) (*Client, error) {
-	httpClient, err := web.NewHTTPClient(client)
+func New(ctx context.Context, client web.ClientConfig, request web.RequestConfig) (*Client, error) {
+	httpClient, err := web.NewHTTPClient(ctx, client)
 	if err != nil {
 		return nil, err
 	}
@@ -52,10 +53,10 @@ type Client struct {
 // Login authenticates with the PowerStore API.
 // GET /api/rest/login_session with Basic Auth.
 // Caches auth_cookie (via cookiejar) and DELL-EMC-TOKEN (from response header).
-func (c *Client) Login() error {
+func (c *Client) Login(ctx context.Context) error {
 	req := c.createRequest("/login_session")
 
-	resp, err := c.doOK(req)
+	resp, err := c.doOK(ctx, req)
 	defer web.CloseBody(resp)
 	if err != nil {
 		return fmt.Errorf("login failed: %v", err)
@@ -71,109 +72,109 @@ func (c *Client) Logout() {
 }
 
 // Clusters returns all clusters.
-func (c *Client) Clusters() ([]Cluster, error) {
-	return doGetAllPages[Cluster](c, "/cluster", nil)
+func (c *Client) Clusters(ctx context.Context) ([]Cluster, error) {
+	return doGetAllPages[Cluster](ctx, c, "/cluster", nil)
 }
 
 // Appliances returns all appliances.
-func (c *Client) Appliances() ([]Appliance, error) {
-	return doGetAllPages[Appliance](c, "/appliance", nil)
+func (c *Client) Appliances(ctx context.Context) ([]Appliance, error) {
+	return doGetAllPages[Appliance](ctx, c, "/appliance", nil)
 }
 
 // Volumes returns all volumes.
-func (c *Client) Volumes() ([]Volume, error) {
-	return doGetAllPages[Volume](c, "/volume", nil)
+func (c *Client) Volumes(ctx context.Context) ([]Volume, error) {
+	return doGetAllPages[Volume](ctx, c, "/volume", nil)
 }
 
 // AllHardware returns all hardware components.
-func (c *Client) AllHardware() ([]Hardware, error) {
-	return doGetAllPages[Hardware](c, "/hardware", nil)
+func (c *Client) AllHardware(ctx context.Context) ([]Hardware, error) {
+	return doGetAllPages[Hardware](ctx, c, "/hardware", nil)
 }
 
 // Alerts returns alerts filtered by state.
-func (c *Client) Alerts(state string) ([]Alert, error) {
-	return doGetAllPages[Alert](c, "/alert", url.Values{"state": {"eq." + state}})
+func (c *Client) Alerts(ctx context.Context, state string) ([]Alert, error) {
+	return doGetAllPages[Alert](ctx, c, "/alert", url.Values{"state": {"eq." + state}})
 }
 
 // FcPorts returns all Fibre Channel ports.
-func (c *Client) FcPorts() ([]FcPort, error) {
-	return doGetAllPages[FcPort](c, "/fc_port", nil)
+func (c *Client) FcPorts(ctx context.Context) ([]FcPort, error) {
+	return doGetAllPages[FcPort](ctx, c, "/fc_port", nil)
 }
 
 // EthPorts returns all Ethernet ports.
-func (c *Client) EthPorts() ([]EthPort, error) {
-	return doGetAllPages[EthPort](c, "/eth_port", nil)
+func (c *Client) EthPorts(ctx context.Context) ([]EthPort, error) {
+	return doGetAllPages[EthPort](ctx, c, "/eth_port", nil)
 }
 
 // FileSystems returns all file systems.
-func (c *Client) FileSystems() ([]FileSystem, error) {
-	return doGetAllPages[FileSystem](c, "/file_system", nil)
+func (c *Client) FileSystems(ctx context.Context) ([]FileSystem, error) {
+	return doGetAllPages[FileSystem](ctx, c, "/file_system", nil)
 }
 
 // NASServers returns all NAS servers.
-func (c *Client) NASServers() ([]NAS, error) {
-	return doGetAllPages[NAS](c, "/nas_server", nil)
+func (c *Client) NASServers(ctx context.Context) ([]NAS, error) {
+	return doGetAllPages[NAS](ctx, c, "/nas_server", nil)
 }
 
 // PerformanceMetricsByAppliance returns performance metrics for an appliance.
-func (c *Client) PerformanceMetricsByAppliance(id string) ([]PerformanceMetrics, error) {
-	return doMetrics[PerformanceMetrics](c, "performance_metrics_by_appliance", id, "Five_Mins")
+func (c *Client) PerformanceMetricsByAppliance(ctx context.Context, id string) ([]PerformanceMetrics, error) {
+	return doMetrics[PerformanceMetrics](ctx, c, "performance_metrics_by_appliance", id, "Five_Mins")
 }
 
 // PerformanceMetricsByVolume returns performance metrics for a volume.
-func (c *Client) PerformanceMetricsByVolume(id string) ([]PerformanceMetrics, error) {
-	return doMetrics[PerformanceMetrics](c, "performance_metrics_by_volume", id, "Five_Mins")
+func (c *Client) PerformanceMetricsByVolume(ctx context.Context, id string) ([]PerformanceMetrics, error) {
+	return doMetrics[PerformanceMetrics](ctx, c, "performance_metrics_by_volume", id, "Five_Mins")
 }
 
 // PerformanceMetricsByNode returns performance metrics for a node.
-func (c *Client) PerformanceMetricsByNode(id string) ([]PerformanceMetrics, error) {
-	return doMetrics[PerformanceMetrics](c, "performance_metrics_by_node", id, "Five_Mins")
+func (c *Client) PerformanceMetricsByNode(ctx context.Context, id string) ([]PerformanceMetrics, error) {
+	return doMetrics[PerformanceMetrics](ctx, c, "performance_metrics_by_node", id, "Five_Mins")
 }
 
 // PerformanceMetricsByFcPort returns performance metrics for an FC port.
-func (c *Client) PerformanceMetricsByFcPort(id string) ([]PerformanceMetrics, error) {
-	return doMetrics[PerformanceMetrics](c, "performance_metrics_by_fe_fc_port", id, "Five_Mins")
+func (c *Client) PerformanceMetricsByFcPort(ctx context.Context, id string) ([]PerformanceMetrics, error) {
+	return doMetrics[PerformanceMetrics](ctx, c, "performance_metrics_by_fe_fc_port", id, "Five_Mins")
 }
 
 // EthPortPerformanceMetrics returns performance metrics for an Ethernet port.
-func (c *Client) EthPortPerformanceMetrics(id string) ([]EthPortMetrics, error) {
-	return doMetrics[EthPortMetrics](c, "performance_metrics_by_fe_eth_port", id, "Five_Mins")
+func (c *Client) EthPortPerformanceMetrics(ctx context.Context, id string) ([]EthPortMetrics, error) {
+	return doMetrics[EthPortMetrics](ctx, c, "performance_metrics_by_fe_eth_port", id, "Five_Mins")
 }
 
 // PerformanceMetricsByFileSystem returns performance metrics for a file system.
-func (c *Client) PerformanceMetricsByFileSystem(id string) ([]FileSystemMetrics, error) {
-	return doMetrics[FileSystemMetrics](c, "performance_metrics_by_file_system", id, "Five_Mins")
+func (c *Client) PerformanceMetricsByFileSystem(ctx context.Context, id string) ([]FileSystemMetrics, error) {
+	return doMetrics[FileSystemMetrics](ctx, c, "performance_metrics_by_file_system", id, "Five_Mins")
 }
 
 // SpaceMetricsByCluster returns space metrics for a cluster.
-func (c *Client) SpaceMetricsByCluster(id string) ([]SpaceMetrics, error) {
-	return doMetrics[SpaceMetrics](c, "space_metrics_by_cluster", id, "One_Day")
+func (c *Client) SpaceMetricsByCluster(ctx context.Context, id string) ([]SpaceMetrics, error) {
+	return doMetrics[SpaceMetrics](ctx, c, "space_metrics_by_cluster", id, "One_Day")
 }
 
 // SpaceMetricsByAppliance returns space metrics for an appliance.
-func (c *Client) SpaceMetricsByAppliance(id string) ([]SpaceMetrics, error) {
-	return doMetrics[SpaceMetrics](c, "space_metrics_by_appliance", id, "One_Day")
+func (c *Client) SpaceMetricsByAppliance(ctx context.Context, id string) ([]SpaceMetrics, error) {
+	return doMetrics[SpaceMetrics](ctx, c, "space_metrics_by_appliance", id, "One_Day")
 }
 
 // SpaceMetricsByVolume returns space metrics for a volume.
-func (c *Client) SpaceMetricsByVolume(id string) ([]SpaceMetrics, error) {
-	return doMetrics[SpaceMetrics](c, "space_metrics_by_volume", id, "Five_Mins")
+func (c *Client) SpaceMetricsByVolume(ctx context.Context, id string) ([]SpaceMetrics, error) {
+	return doMetrics[SpaceMetrics](ctx, c, "space_metrics_by_volume", id, "Five_Mins")
 }
 
 // WearMetricsByDrive returns wear metrics for a drive.
-func (c *Client) WearMetricsByDrive(id string) ([]WearMetrics, error) {
-	return doMetrics[WearMetrics](c, "wear_metrics_by_drive", id, "Five_Mins")
+func (c *Client) WearMetricsByDrive(ctx context.Context, id string) ([]WearMetrics, error) {
+	return doMetrics[WearMetrics](ctx, c, "wear_metrics_by_drive", id, "Five_Mins")
 }
 
 // CopyMetricsByAppliance returns copy/replication metrics for an appliance.
-func (c *Client) CopyMetricsByAppliance(id string) ([]CopyMetrics, error) {
-	return doMetrics[CopyMetrics](c, "copy_metrics_by_appliance", id, "Five_Mins")
+func (c *Client) CopyMetricsByAppliance(ctx context.Context, id string) ([]CopyMetrics, error) {
+	return doMetrics[CopyMetrics](ctx, c, "copy_metrics_by_appliance", id, "Five_Mins")
 }
 
-func doMetrics[T any](c *Client, entity, entityID, interval string) ([]T, error) {
+func doMetrics[T any](ctx context.Context, c *Client, entity, entityID, interval string) ([]T, error) {
 	body := MetricsRequest{Entity: entity, EntityID: entityID, Interval: interval}
 	var v []T
-	if err := c.doPostWithRetry(&v, "/metrics/generate", body); err != nil {
+	if err := c.doPostWithRetry(ctx, &v, "/metrics/generate", body); err != nil {
 		return nil, err
 	}
 	return v, nil
@@ -230,16 +231,16 @@ func (c *Client) createPostRequest(urlPath string, body any) (web.RequestConfig,
 	return req, nil
 }
 
-func (c *Client) do(req web.RequestConfig) (*http.Response, error) {
-	httpReq, err := web.NewHTTPRequest(req)
+func (c *Client) do(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
+	httpReq, err := web.NewHTTPRequest(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error creating http request to %s: %v", req.URL, err)
 	}
 	return c.httpClient.Do(httpReq)
 }
 
-func (c *Client) doOK(req web.RequestConfig) (*http.Response, error) {
-	resp, err := c.do(req)
+func (c *Client) doOK(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
+	resp, err := c.do(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -249,19 +250,19 @@ func (c *Client) doOK(req web.RequestConfig) (*http.Response, error) {
 	return resp, err
 }
 
-func (c *Client) doOKWithRetry(req web.RequestConfig) (*http.Response, error) {
-	resp, err := c.do(req)
+func (c *Client) doOKWithRetry(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
+	resp, err := c.do(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	// PowerStore returns 403 when the session/token is stale (not 401)
 	if resp.StatusCode == http.StatusForbidden {
 		web.CloseBody(resp)
-		if err = c.Login(); err != nil {
+		if err = c.Login(ctx); err != nil {
 			return nil, fmt.Errorf("re-login after 403 failed: %v", err)
 		}
 		req = c.applyCSRF(req)
-		return c.doOK(req)
+		return c.doOK(ctx, req)
 	}
 	if err = checkStatusCode(resp); err != nil {
 		err = fmt.Errorf("%s returned %v", req.URL, err)
@@ -272,7 +273,7 @@ func (c *Client) doOKWithRetry(req web.RequestConfig) (*http.Response, error) {
 // doGetAllPages fetches all pages from a paginated GET endpoint.
 // PowerStore returns HTTP 206 (Partial Content) when more pages are available,
 // with a server-enforced maximum of 2000 items per page.
-func doGetAllPages[T any](c *Client, urlPath string, params url.Values) ([]T, error) {
+func doGetAllPages[T any](ctx context.Context, c *Client, urlPath string, params url.Values) ([]T, error) {
 	var all []T
 	offset := 0
 
@@ -285,7 +286,7 @@ func doGetAllPages[T any](c *Client, urlPath string, params url.Values) ([]T, er
 
 		req := c.createGetRequest(urlPath, reqParams)
 
-		resp, err := c.doOKWithRetry(req)
+		resp, err := c.doOKWithRetry(ctx, req)
 		if err != nil {
 			web.CloseBody(resp)
 			return nil, err
@@ -312,12 +313,12 @@ func doGetAllPages[T any](c *Client, urlPath string, params url.Values) ([]T, er
 	return all, nil
 }
 
-func (c *Client) doPostWithRetry(dst any, urlPath string, body any) error {
+func (c *Client) doPostWithRetry(ctx context.Context, dst any, urlPath string, body any) error {
 	req, err := c.createPostRequest(urlPath, body)
 	if err != nil {
 		return err
 	}
-	resp, err := c.doOKWithRetry(req)
+	resp, err := c.doOKWithRetry(ctx, req)
 	defer web.CloseBody(resp)
 	if err != nil {
 		return err

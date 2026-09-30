@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/common/model"
 	promlabels "github.com/prometheus/prometheus/model/labels"
 
+	"context"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -28,8 +29,8 @@ type interconnectThroughputTotals struct {
 	hasExplicitNvlinkTt bool
 }
 
-func (c *Collector) collect() (map[string]int64, error) {
-	mfs, err := c.prom.Scrape()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	mfs, err := c.prom.ScrapeContext(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -54,9 +55,13 @@ func (sdi *SecretDependencyIndex) PrepareJobChange(id string, postimage *dyncfg.
 		if config == nil || config.FullName() != id {
 			return nil, errors.New("jobmgr secrets: dependency configuration identity differs")
 		}
-		keys, err := secretresolver.StoreReferences(map[string]any(config))
-		if err != nil {
-			return nil, err
+		var keys []string
+		if policy.SecretReferencesAllowed(config.SourceType()) {
+			var referenceErr error
+			keys, referenceErr = secretresolver.StoreReferences(map[string]any(config))
+			if referenceErr != nil {
+				return nil, referenceErr
+			}
 		}
 		dependency := jobDependency{
 			display:   config.Module() + ":" + config.Name(),

@@ -5,6 +5,8 @@ package vcsa
 import (
 	"sync"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
@@ -22,14 +24,14 @@ type vcsaHealthStatus struct {
 	SoftwarePackages *string
 }
 
-func (c *Collector) collect() (map[string]int64, error) {
-	err := c.client.Ping()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	err := c.client.Ping(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	var status vcsaHealthStatus
-	c.scrapeHealth(&status)
+	c.scrapeHealth(ctx, &status)
 
 	mx := make(map[string]int64)
 
@@ -45,11 +47,11 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) scrapeHealth(status *vcsaHealthStatus) {
+func (c *Collector) scrapeHealth(ctx context.Context, status *vcsaHealthStatus) {
 	wg := &sync.WaitGroup{}
 
-	scrape := func(fn func() (string, error), value **string) {
-		v, err := fn()
+	scrape := func(fn func(context.Context) (string, error), value **string) {
+		v, err := fn(ctx)
 		if err != nil {
 			c.Error(err)
 			return

@@ -1049,6 +1049,12 @@ void aclk_create_node_instance_job(RRDHOST *host)
     query->data.bin_payload.payload = generate_node_instance_creation(&query->data.bin_payload.size, &node_instance_creation);
     rrdhost_identity_release(&identity);
 
+    if (unlikely(!query->data.bin_payload.payload)) {
+        nd_log_daemon(NDLP_ERR, "ACLK: failed to generate CreateNodeInstance payload for host=%s", host->machine_guid);
+        aclk_query_free(query);
+        return;
+    }
+
     nd_log_daemon(NDLP_DEBUG, "Queuing registration for host=%s, hops=%d", host->machine_guid, hops);
 
     aclk_add_job(query);
@@ -1089,6 +1095,13 @@ void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable, struc
     query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;
     query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
     query->data.bin_payload.payload = generate_node_instance_connection(&query->data.bin_payload.size, &node_state_update);
+    freez((void *)node_state_update.capabilities);
+
+    if (unlikely(!query->data.bin_payload.payload)) {
+        nd_log_daemon(NDLP_ERR, "ACLK: failed to generate UpdateNodeInstanceConnection payload for node=%s", node_id);
+        aclk_query_free(query); // also signals query->sync_completion
+        return;
+    }
 
     nd_log_daemon(
         NDLP_DEBUG,
@@ -1098,7 +1111,6 @@ void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable, struc
         hops,
         queryable);
 
-    freez((void *)node_state_update.capabilities);
     aclk_add_job(query);
 }
 

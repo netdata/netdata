@@ -1826,6 +1826,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrdfunctions-inline.c
         src/database/rrdfunctions-inline.h
         src/database/rrdhost.c
+        src/database/rrdhost-unittest.c
         src/database/rrdlabels.c
         src/database/rrdlabels-aggregated.c
         src/database/rrdlabels-aggregated.h
@@ -2881,11 +2882,12 @@ if(CAP_FOUND)
   set(HAVE_CAPABILITY True)
 endif()
 
-set(NDRUN_FILES src/collectors/utils/nd-run.c src/collectors/utils/exec-signals.h)
+set(NDRUN_FILES
+    src/collectors/utils/nd-run.c
+    src/collectors/utils/nd-file-reader.c
+    src/collectors/utils/nd-file-reader.h
+    src/collectors/utils/exec-signals.h)
 add_executable(nd-run ${NDRUN_FILES})
-if(CAP_FOUND)
-  target_link_libraries(nd-run PRIVATE PkgConfig::CAP)
-endif()
 target_include_directories(nd-run PRIVATE ${CONFIG_H_DIR})
 install(TARGETS nd-run
         COMPONENT netdata

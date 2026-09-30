@@ -595,10 +595,7 @@ impl ShmContext {
         // timeout_ms regardless of retries.
         if !observed {
             let deadline_ns: u64 = if timeout_ms > 0 {
-                let mut ts = libc::timespec {
-                    tv_sec: 0,
-                    tv_nsec: 0,
-                };
+                let mut ts = libc::timespec::default();
                 unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut ts) };
                 ts.tv_sec as u64 * 1_000_000_000 + ts.tv_nsec as u64 + timeout_ms as u64 * 1_000_000
             } else {
@@ -613,22 +610,21 @@ impl ShmContext {
                     break; // response arrived
                 }
 
-                // Compute remaining timeout for this futex_wait call
+                // Compute remaining timeout for this futex_wait call.
+                // Time64 libc can have private padding, preventing struct literals.
+                #[allow(clippy::field_reassign_with_default)]
                 let timeout = if deadline_ns > 0 {
-                    let mut now_ts = libc::timespec {
-                        tv_sec: 0,
-                        tv_nsec: 0,
-                    };
+                    let mut now_ts = libc::timespec::default();
                     unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut now_ts) };
                     let now_val = now_ts.tv_sec as u64 * 1_000_000_000 + now_ts.tv_nsec as u64;
                     if now_val >= deadline_ns {
                         return Err(ShmError::Timeout);
                     }
                     let remain = deadline_ns - now_val;
-                    Some(libc::timespec {
-                        tv_sec: (remain / 1_000_000_000) as libc::time_t,
-                        tv_nsec: (remain % 1_000_000_000) as libc::c_long,
-                    })
+                    let mut relative = libc::timespec::default();
+                    relative.tv_sec = (remain / 1_000_000_000) as _;
+                    relative.tv_nsec = (remain % 1_000_000_000) as _;
+                    Some(relative)
                 } else {
                     None
                 };
@@ -1035,10 +1031,26 @@ fn futex_wake(addr: *mut u32, count: i32) -> i32 {
 }
 
 fn futex_wait(addr: *mut u32, expected: u32, timeout: Option<&libc::timespec>) -> i32 {
-    let tsp = match timeout {
-        Some(ts) => ts as *const libc::timespec,
-        None => ptr::null(),
-    };
+    // SYS_futex consumes kernel words, not libc's timespec. In particular,
+    // 32-bit musl uses time64 even when SYS_futex is the legacy syscall.
+    // x32 uses 64-bit kernel words; riscv32 musl aliases SYS_futex to time64.
+    // Every u32 millisecond receive budget fits signed 32-bit relative seconds.
+    #[cfg(any(
+        target_arch = "x86_64",
+        all(target_arch = "riscv32", target_env = "musl")
+    ))]
+    type KernelTimeWord = i64;
+    #[cfg(not(any(
+        target_arch = "x86_64",
+        all(target_arch = "riscv32", target_env = "musl")
+    )))]
+    type KernelTimeWord = libc::c_long;
+
+    let kernel_timeout =
+        timeout.map(|ts| [ts.tv_sec as KernelTimeWord, ts.tv_nsec as KernelTimeWord]);
+    let tsp = kernel_timeout
+        .as_ref()
+        .map_or(ptr::null(), |ts| ts.as_ptr());
     unsafe {
         libc::syscall(
             libc::SYS_futex,
