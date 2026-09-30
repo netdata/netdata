@@ -20,7 +20,6 @@ struct net_framework_instances {
     ULONGLONG last_process_id;
     bool process_id_label_initialized;
     bool process_id_set_initialized;
-    bool process_id_set_complete;
     bool process_id_set_complete_this_cycle;
     bool process_id_set_seen_this_cycle;
     uint32_t process_id_set_count;
@@ -506,14 +505,12 @@ static bool netframework_get_instance_counter_with_aggregation(
     counter->backoff = sample.backoff;
 
     if (!found) {
-        netframework_current_process->counter_history_generation[netframework_current_object]++;
         counter->current = RAW_DATA_EMPTY;
         counter->updated = true;
         return false;
     }
 
     if (counter->updated && counter->current.CounterType != sample.current.CounterType) {
-        netframework_current_process->counter_history_generation[netframework_current_object]++;
         counter->current = RAW_DATA_EMPTY;
         counter->updated = true;
         return false;
@@ -542,7 +539,6 @@ static bool netframework_get_instance_counter_with_aggregation(
     }
     else if (!netframework_add_raw_sample(
                  &counter->current, &sample.current, aggregation == NETFRAMEWORK_AGGREGATE_MAX)) {
-        netframework_current_process->counter_history_generation[netframework_current_object]++;
         counter->current = RAW_DATA_EMPTY;
         counter->updated = true;
         return false;
@@ -913,20 +909,21 @@ static void netframework_prepare_process_id_sets(PERF_DATA_BLOCK *data, PERF_OBJ
         if (!p->process_id_set_seen_this_cycle)
             continue;
 
-        bool signature_changed = !p->process_id_set_initialized ||
-                                 !p->process_id_set_complete_this_cycle ||
-                                 p->process_id_set_complete != p->process_id_set_complete_this_cycle ||
-                                 (p->process_id_set_complete_this_cycle &&
-                                  (p->process_id_set_count != p->process_id_set_count_this_cycle ||
-                                   p->process_id_set_hash != p->process_id_set_hash_this_cycle));
+        // Keep the last complete signature while one or more PID reads are unavailable. This removes
+        // the affected label without resetting unrelated rate histories.
+        if (!p->process_id_set_complete_this_cycle)
+            continue;
 
-        if (p->process_id_set_initialized && signature_changed) {
+        bool signature_changed = p->process_id_set_initialized &&
+                                 (p->process_id_set_count != p->process_id_set_count_this_cycle ||
+                                  p->process_id_set_hash != p->process_id_set_hash_this_cycle);
+
+        if (signature_changed) {
             for (unsigned object_index = 0; object_index < NETDATA_NETFRAMEWORK_END; object_index++)
                 p->counter_history_generation[object_index]++;
         }
 
         p->process_id_set_initialized = true;
-        p->process_id_set_complete = p->process_id_set_complete_this_cycle;
         p->process_id_set_count = p->process_id_set_count_this_cycle;
         p->process_id_set_hash = p->process_id_set_hash_this_cycle;
     }

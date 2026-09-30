@@ -2525,8 +2525,9 @@ modules:
             numerators and bases. CLR Memory charts include a `process_id` label only while exactly one process has
             that name; the label is removed while the name is ambiguous. Different raw names remain separate series.
             Rate charts establish a new baseline for one collection after the number or process-ID set of same-name
-            instances changes, or when a process ID cannot be read. They assume the group does not advance by 2^32
-            or more between samples; an implausibly large delta is discarded as one lost sample.
+            instances changes. They assume the group does not advance by 2^31 or more between samples; an implausibly
+            large delta is discarded as one lost sample. A temporarily unreadable process ID removes its label
+            without resetting unrelated rate charts.
             The security stack walk depth chart reports the largest depth reported by any process in the group.
         performance_impact:
           description: |
