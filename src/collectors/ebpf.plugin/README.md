@@ -606,9 +606,14 @@ This will create the chart `disk_latency_io` for each disk on the host. The foll
 - `kprobe/blk_start_request`: IO request operation sent through the older single-queue path on kernels before 5.0.
 - `kprobe/blk_mq_end_request`: IO operation completed by the device.
 - `kprobe/__blk_mq_end_request`: IO operation completed by the SCSI layer (SCSI, SATA and SAS disks), which does not
-    call `blk_mq_end_request`. A request seen by both functions is counted once.
+    call `blk_mq_end_request`. If this symbol cannot be probed, `kprobe/blk_mq_free_request` is used as a fallback.
+    A request seen by multiple completion probes is counted once.
 - `blk_complete_request`: IO completion on the older request path. It is attached only when the running kernel
     provides this function (a `kprobe` with legacy code, `fentry` with CO-RE code).
+
+On generic kernels 6.8 and newer, disk latency is unavailable when the plugin must use legacy BPF objects. The
+plugin refuses the older 5.4 disk object because its compiled kernel structure offsets are not validated for these
+kernels. On builds with CO-RE support, kernel BTF allows the plugin to use the CO-RE object instead.
 
 Disk Latency is the single most important metric to focus on when it comes to storage performance, under most circumstances.
 For hard drives, an average latency somewhere between 10 to 20 ms can be considered acceptable. For SSD (Solid State Drives),

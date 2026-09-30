@@ -47,10 +47,11 @@ static netdata_idx_t *disk_hash_values = NULL;
 
 netdata_mutex_t plot_mutex;
 
-// SCSI (and so SATA/SAS) completes requests through __blk_mq_end_request() without calling
-// blk_mq_end_request(), the only completion target in the object. The completion program deletes
-// the in-flight entry, so a request seen by both functions is still counted once.
+// SCSI (and so SATA/SAS) can bypass blk_mq_end_request(). Attach the existing completion program
+// to the SCSI completion path, with blk_mq_free_request() as a fallback for kernels where the
+// lower-level __blk_mq_end_request() symbol cannot be probed.
 #define NETDATA_DISK_SCSI_COMPLETE_TARGET "__blk_mq_end_request"
+#define NETDATA_DISK_SCSI_COMPLETE_FALLBACK_TARGET "blk_mq_free_request"
 #define NETDATA_DISK_COMPLETE_PROGRAM "netdata_block_rq_complete"
 #define NETDATA_DISK_SINGLE_QUEUE_START_TARGET "blk_start_request"
 #define NETDATA_DISK_ISSUE_PROGRAM "netdata_block_rq_issue"
@@ -85,11 +86,22 @@ static struct bpf_link *ebpf_disk_attach_kprobe(struct bpf_program *prog, const 
  */
 static void ebpf_disk_attach_scsi_completion(struct bpf_program *prog)
 {
+    if (!prog || bpf_program__get_type(prog) != BPF_PROG_TYPE_KPROBE)
+        return;
+
     disk_scsi_complete_link = ebpf_disk_attach_kprobe(prog, NETDATA_DISK_SCSI_COMPLETE_TARGET);
-    if (prog && bpf_program__get_type(prog) == BPF_PROG_TYPE_KPROBE && !disk_scsi_complete_link) {
+    if (!disk_scsi_complete_link) {
+        disk_scsi_complete_link = ebpf_disk_attach_kprobe(prog, NETDATA_DISK_SCSI_COMPLETE_FALLBACK_TARGET);
+        if (disk_scsi_complete_link) {
+            netdata_log_info("Using %s as the disk completion fallback.", NETDATA_DISK_SCSI_COMPLETE_FALLBACK_TARGET);
+        }
+    }
+
+    if (!disk_scsi_complete_link) {
         netdata_log_info(
-            "Cannot attach disk completion to %s; latency of SCSI, SATA and SAS disks will not be collected.",
-            NETDATA_DISK_SCSI_COMPLETE_TARGET);
+            "Cannot attach disk completion to %s or %s; latency of SCSI, SATA and SAS disks will not be collected.",
+            NETDATA_DISK_SCSI_COMPLETE_TARGET,
+            NETDATA_DISK_SCSI_COMPLETE_FALLBACK_TARGET);
     }
 }
 
@@ -168,7 +180,7 @@ static inline int ebpf_disk_load_and_attach(struct disk_bpf *obj)
     const char *section = bpf_program__section_name(obj->progs.netdata_blk_complete_request);
     if (section && strncmp(section, "fentry/", 7) == 0) {
         int complete_id = ebpf_kernel_btf_find_by_name_kind("blk_complete_request", BTF_KIND_FUNC);
-        if (complete_id < 0)
+        if (complete_id <= 0)
             bpf_program__set_autoload(obj->progs.netdata_blk_complete_request, false);
     }
 
@@ -588,11 +600,10 @@ static void read_hard_disk_tables(int table, int maps_per_core)
         if (ebpf_plugin_stop())
             break;
 
+        key = next_key;
         int test = bpf_map_lookup_elem(table, &key, values);
-        if (test < 0) {
-            key = next_key;
+        if (test < 0)
             continue;
-        }
 
         netdata_ebpf_disks_t find;
         find.dev = key.dev;
@@ -602,15 +613,12 @@ static void read_hard_disk_tables(int table, int maps_per_core)
 
         // Disk was inserted after we parse /proc/partitions
         if (!ret) {
-            if (read_local_disks()) {
-                key = next_key;
+            if (read_local_disks())
                 continue;
-            }
 
             ret = (netdata_ebpf_disks_t *)avl_search_lock(&disk_tree, (avl_t *)&find);
             if (!ret) {
                 // We should never reach this point, but we are adding it to keep a safe code
-                key = next_key;
                 continue;
             }
         }
@@ -626,8 +634,6 @@ static void read_hard_disk_tables(int table, int maps_per_core)
 
         if (!(ret->flags & NETDATA_DISK_ADDED_TO_PLOT_LIST))
             ebpf_fill_plot_disks(ret);
-
-        key = next_key;
     }
 }
 
@@ -842,6 +848,19 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
     if (em->load & EBPF_LOAD_LEGACY) {
+        // The generic disk object set has no validated artifact for this kernel range. Do not load its 5.4
+        // fallback with baked-in structure offsets, which can attach successfully but silently collect nothing.
+        if (isrh == -1 && running_on_kernel >= NETDATA_EBPF_KERNEL_6_8) {
+            unsigned int kernel_major = (unsigned int)running_on_kernel >> 16;
+            unsigned int kernel_minor = ((unsigned int)running_on_kernel >> 8) & 0xff;
+            netdata_log_error(
+                "Disk latency is unavailable: no compatible generic legacy BPF object for kernel %u.%u; refusing "
+                "the 5.4 fallback. Use kernel BTF with CO-RE or a compatible legacy object.",
+                kernel_major,
+                kernel_minor);
+            return -1;
+        }
+
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
         if (!em->probe_links) {
             ret = -1;
