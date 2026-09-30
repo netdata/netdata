@@ -103,6 +103,7 @@ typedef struct query_engine_ops_cache {
 #define query_result_plan_should_switch_plan(ops, now) \
     ((now) >= (ops)->result_plan_expire_time && !(ops)->result_plan_expire_time_overflow)
 bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time);
+void query_planer_prefer_complete_head(QUERY_ENGINE_OPS *ops);
 void query_planer_finalize_remaining_plans(QUERY_ENGINE_OPS *ops);
 QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache, size_t query_metric_id);
 void rrd2rrdr_query_ops_release(QUERY_ENGINE_OPS_CACHE *cache, QUERY_ENGINE_OPS *ops);

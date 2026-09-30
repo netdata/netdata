@@ -199,6 +199,18 @@ static size_t query_planer_expand_duration_in_points(time_t this_update_every, t
     return points;
 }
 
+static void query_planer_initialize_plan(QUERY_ENGINE_OPS *ops, size_t p) {
+    QUERY_METRIC *qm = ops->qm;
+    size_t tier = qm->plan.array[p].tier;
+    ops->r->internal.qt->db.tiers[tier].queries++;
+    STORAGE_ENGINE *eng = query_metric_storage_engine(ops->r->internal.qt, qm, tier);
+    storage_engine_query_init(eng->seb, qm->tiers[tier].smh, &ops->plans[p].handle,
+                              ops->plans[p].expanded_after, ops->plans[p].expanded_before,
+                              ops->r->internal.qt->request.priority);
+    ops->plans[p].initialized = true;
+    ops->plans[p].finalized = false;
+}
+
 static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
     QUERY_METRIC *qm = ops->qm;
 
@@ -236,15 +248,7 @@ static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
         ops->plans[p].expanded_after = after;
         ops->plans[p].expanded_before = before;
 
-        ops->r->internal.qt->db.tiers[tier].queries++;
-
-        struct query_metric_tier *tier_ptr = &qm->tiers[tier];
-        STORAGE_ENGINE *eng = query_metric_storage_engine(ops->r->internal.qt, qm, tier);
-        storage_engine_query_init(eng->seb, tier_ptr->smh, &ops->plans[p].handle,
-                                  after, before, ops->r->internal.qt->request.priority);
-
-        ops->plans[p].initialized = true;
-        ops->plans[p].finalized = false;
+        query_planer_initialize_plan(ops, p);
     }
 }
 
@@ -531,6 +535,39 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
     }
 
     return true;
+}
+
+void query_planer_prefer_complete_head(QUERY_ENGINE_OPS *ops) {
+    // Storage reads belong to execution, after the other dimensions have been prefetched.
+    QUERY_TARGET *qt = ops->r->internal.qt;
+    size_t first_plan = 0;
+    QUERY_METRIC *qm = ops->qm;
+    size_t selected_tier = qm->plan.used > 1 ?
+        query_metric_best_tier_for_timeframe(qm, qt->window.after, qt->window.before, qt->window.points) :
+        qm->plan.array[0].tier;
+    size_t selected_plan = 0;
+    while(selected_plan < qm->plan.used && qm->plan.array[selected_plan].tier < selected_tier)
+        selected_plan++;
+    if(selected_plan > 0 && selected_plan < qm->plan.used &&
+       qm->plan.array[selected_plan].tier == selected_tier &&
+       qm->plan.array[selected_plan].after == qm->tiers[selected_tier].db_first_time_s) {
+        // A coarse retention timestamp is an endpoint, not the beginning of its first record.
+        // Read the actual interval: historical pages need not use the current collection interval.
+        STORAGE_POINT first = storage_engine_query_next_metric(&ops->plans[selected_plan].handle);
+        ops->db_points_read_per_tier[selected_tier]++;
+        ops->db_total_points_read++;
+        if(!storage_point_is_gap(first) && !storage_point_is_unset(first) &&
+           first.start_time_s <= qm->plan.array[0].after &&
+           first.end_time_s >= qm->plan.array[selected_plan - 1].before) {
+            for(size_t p = 0; p < selected_plan; p++)
+                query_planer_finalize_plan(ops, p);
+            first_plan = selected_plan;
+        }
+        query_planer_finalize_plan(ops, selected_plan);
+        query_planer_initialize_plan(ops, selected_plan);
+    }
+    if(first_plan)
+        query_planer_set_active_plan(ops, first_plan, 0);
 }
 
 
