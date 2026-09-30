@@ -482,6 +482,7 @@
 - Refactor(scripts.d): restructure native collector code and tests ([#24086](https://github.com/netdata/netdata/issues/24086))
 - Otel-traces: read evicted files back from remote storage, document traces ([#24088](https://github.com/netdata/netdata/issues/24088))
 - Build(deps): bump pyjwt from 2.13.0 to 2.14.0 in /packaging/tools/automation/mcp ([#24090](https://github.com/netdata/netdata/issues/24090))
+- Test(go.d): wait for discovery running status before shutdown ([#24092](https://github.com/netdata/netdata/issues/24092))
 
 ## [2.11.0] - 2026-08-12
 
