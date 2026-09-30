@@ -30,7 +30,7 @@ mod traces_pipeline;
 mod uploader;
 
 use file_lifecycle::Pipeline;
-pub(crate) use rpc::{OtelLogsHandler, RemoteRead};
+pub(crate) use rpc::OtelLogsHandler;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -162,6 +162,7 @@ impl Ledger {
     /// or an ingestor bind failure both leave the plugin un-advertised. A
     /// failure during `accept_writer` after Ready surfaces as a dropped
     /// supervisor connection.
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         mut supervisor: Connection<LedgerResponse, LedgerRequest>,
         writer_socket_path: &str,
@@ -188,6 +189,11 @@ impl Ledger {
         // owns it: it builds the storage handle / uploader / read cache from this
         // and decides upload+retention gating from whether that handle exists.
         remote_storage_config: &RemoteStorageConfig,
+        // The download cache every signal shares (`PluginConfig::read_cache_dir`),
+        // and where earlier versions kept the logs-only one
+        // (`PluginConfig::legacy_read_cache_dir`), migrated before opening.
+        read_cache_dir: &std::path::Path,
+        legacy_read_cache_dir: &std::path::Path,
     ) -> anyhow::Result<Self> {
         let cancel = CancellationToken::new();
 
@@ -236,18 +242,17 @@ impl Ledger {
             );
             tracing::info!(max_concurrent = UPLOAD_CONCURRENCY, "uploader spawned");
 
-            // Local read-through cache for fetching SFSTs back from remote
-            // storage to answer queries after local retention evicted them. The
-            // directory is derived per signal (`{base}/{signal}/remote-read`);
-            // the byte cap is the global storage setting. Opening it recovers any
-            // previously-cached files.
-            let cache_dir = lifecycle.read_cache_dir.clone();
+            // The download cache every signal reads remote files back through
+            // after local retention evicted them: one directory, one byte cap.
+            // An earlier version's logs-only cache is moved into place first;
+            // opening then recovers every previously-cached file.
+            file_lifecycle::remote_read::migrate_read_cache(legacy_read_cache_dir, read_cache_dir);
             let read_cache = file_cache::FileCache::open(
-                &cache_dir,
+                read_cache_dir,
                 remote_storage_config.read_cache_max_size.as_u64(),
             )?;
             tracing::info!(
-                dir = %cache_dir.display(),
+                dir = %read_cache_dir.display(),
                 capacity = remote_storage_config.read_cache_max_size.as_u64(),
                 "remote-read cache opened"
             );
@@ -289,11 +294,12 @@ impl Ledger {
         )
         .await?;
 
-        // The traces pipeline: shares the same cleaner/uploader/storage (and
-        // the chunk cache — seqs are process-global, so cache keys never
-        // collide across signals) but has its own `{base}/traces/...` dirs,
-        // the traces seal (`ng_index::build_sfst_traces_file`), and the
-        // `otel-traces` Function handler.
+        // The traces pipeline: shares the same cleaner/uploader/storage, the
+        // download cache and the chunk cache (seqs are process-global, so
+        // cache keys never collide across signals) but has its own
+        // `{base}/traces/...` dirs, the traces seal
+        // (`ng_index::build_sfst_traces_file`), and the `otel-traces`
+        // Function handler.
         let traces = traces_pipeline::build_traces_pipeline(
             Signal::Traces,
             traces_lifecycle,
@@ -304,6 +310,7 @@ impl Ledger {
             &mut cleaner,
             uploader.as_mut(),
             storage.as_ref(),
+            read_cache.as_ref(),
             chunk_cache.clone(),
             &pipeline_tx,
         )

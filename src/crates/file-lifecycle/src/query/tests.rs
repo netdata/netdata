@@ -113,43 +113,48 @@ fn full_range_query() -> Query {
     }
 }
 
-// ── remote_candidates (the evicted-but-cataloged set the read cache fetches) ──
+// ── remote-only selection (the evicted-but-cataloged set the read cache fetches) ──
 
 fn seqs(entries: &[otel_catalog::CatalogEntry]) -> Vec<u64> {
     entries.iter().map(|e| e.id.seq).collect()
 }
 
+/// The remote-only entries a one-range plan over `q` selects.
+fn remote_only(reg: &Registry, q: &Query) -> Vec<otel_catalog::CatalogEntry> {
+    reg.remote_plan_input(std::slice::from_ref(q))
+        .plan()
+        .per_range
+        .remove(0)
+}
+
 #[test]
-fn remote_candidates_returns_catalog_only_entries() {
+fn remote_only_returns_catalog_only_entries() {
     let mut reg = make_registry();
     track_remote(&mut reg, 1, 100, 200);
     track_remote(&mut reg, 2, 300, 400);
 
-    assert_eq!(
-        seqs(&reg.remote_candidates(&full_range_query())),
-        vec![1, 2]
-    );
+    assert_eq!(seqs(&remote_only(&reg, &full_range_query())), vec![1, 2]);
 }
 
 #[test]
-fn remote_candidates_excludes_locally_present_seqs() {
+fn remote_only_excludes_locally_present_seqs() {
     let mut reg = make_registry();
     // seq 1 has a local SFST → masked; seq 3 is catalog-only → remains.
     track_sfst(&mut reg, 1, 100, 200);
     track_remote(&mut reg, 1, 100, 200);
     track_remote(&mut reg, 3, 500, 600);
 
-    assert_eq!(seqs(&reg.remote_candidates(&full_range_query())), vec![3]);
+    assert_eq!(seqs(&remote_only(&reg, &full_range_query())), vec![3]);
 }
 
 #[test]
-fn remote_candidates_not_masked_by_different_identity_local_file() {
+fn remote_only_not_masked_by_different_identity_local_file() {
     // The query-time mask is keyed by full identity: a remote catalog entry at
     // seq X under identity A must NOT be hidden by a local SFST at the SAME seq
     // under identity B (the post-restore reused-seq shape). Contrast with
-    // `remote_candidates_excludes_locally_present_seqs`, where the SAME identity
+    // `remote_only_excludes_locally_present_seqs`, where the SAME identity
     // masks. Guards the query-plane SeqKey dedup (local_servable_seqs +
-    // remote_candidates_from).
+    // the planner's selection).
     let mut reg = make_registry();
     track_remote(&mut reg, 5, 100, 200); // remote entry under ident()
 
@@ -168,7 +173,7 @@ fn remote_candidates_not_masked_by_different_identity_local_file() {
     );
 
     // The remote entry survives — the foreign-identity local copy does not mask it.
-    assert_eq!(seqs(&reg.remote_candidates(&full_range_query())), vec![5]);
+    assert_eq!(seqs(&remote_only(&reg, &full_range_query())), vec![5]);
 
     // The mask itself holds the OTHER identity's key, not the remote entry's.
     let servable = reg.local_servable_seqs(&full_range_query());
@@ -177,29 +182,29 @@ fn remote_candidates_not_masked_by_different_identity_local_file() {
 }
 
 #[test]
-fn remote_candidates_kept_when_wal_has_no_durable_prefix() {
+fn remote_only_kept_when_wal_has_no_durable_prefix() {
     // A WAL with no durable prefix (`valid_up_to == 0`, as `track_wal` produces)
     // is not a servable local copy — `query_snapshot` skips it too — so it must
     // NOT mask the remote entry for the same seq. (Regression guard for the dedup
-    // divergence between `remote_candidates` and `query_snapshot`.)
+    // divergence between the remote plan and `query_snapshot`.)
     let mut reg = make_registry();
     track_wal(&mut reg, 2, 300, 400);
     track_remote(&mut reg, 2, 300, 400);
 
-    assert_eq!(seqs(&reg.remote_candidates(&full_range_query())), vec![2]);
+    assert_eq!(seqs(&remote_only(&reg, &full_range_query())), vec![2]);
 }
 
 #[test]
-fn remote_candidates_empty_when_all_local() {
+fn remote_only_empty_when_all_local() {
     let mut reg = make_registry();
     track_sfst(&mut reg, 1, 100, 200);
     track_remote(&mut reg, 1, 100, 200);
 
-    assert!(reg.remote_candidates(&full_range_query()).is_empty());
+    assert!(remote_only(&reg, &full_range_query()).is_empty());
 }
 
 #[test]
-fn remote_candidates_excluded_by_time_range() {
+fn remote_only_excluded_by_time_range() {
     let mut reg = make_registry();
     track_remote(&mut reg, 1, 1000, 2000);
 
@@ -207,23 +212,23 @@ fn remote_candidates_excluded_by_time_range() {
         time_range: 0..500,
         partition_keys: Vec::new(),
     };
-    assert!(reg.remote_candidates(&q).is_empty());
+    assert!(remote_only(&reg, &q).is_empty());
 }
 
 #[test]
-fn remote_candidates_empty_registry() {
+fn remote_only_empty_registry() {
     let reg = make_registry();
-    assert!(reg.remote_candidates(&full_range_query()).is_empty());
+    assert!(remote_only(&reg, &full_range_query()).is_empty());
 }
 
-// ── enumerate_streams_from (the window-scoped, remote-inclusive selector) ──
+// ── the window-scoped, remote-inclusive stream selector ──
 
-/// Drive the selector fold the way the handler does: parse the in-window catalog,
-/// fold into neutral `PartitionStat`s, then decode + sort by `(namespace, name)`
-/// the way the rpc adapter does for display (the substrate orders by `part_key`).
+/// Drive the selector the way the logs handler does: the local half from the
+/// registry, the remote-only half from a plan over the same window, then decode +
+/// sort by `(namespace, name)` the way the rpc adapter does for display (the
+/// substrate orders by `part_key`).
 fn enumerate(reg: &Registry, q: &Query) -> Vec<crate::registry::PartitionStat> {
-    let catalog: Vec<otel_catalog::CatalogEntry> = reg.catalog_files.candidates(q).collect();
-    let mut parts = reg.enumerate_streams_from(q, &catalog);
+    let mut parts = reg.local_streams(q).with_catalog(&remote_only(reg, q));
     parts.sort_by_key(|p| crate::test_helpers::decode_opaque(&p.content_meta));
     parts
 }
@@ -241,7 +246,7 @@ fn window(after: u32, before: u32) -> Query {
 }
 
 #[test]
-fn enumerate_streams_excludes_streams_outside_window() {
+fn stream_selector_excludes_streams_outside_window() {
     let mut reg = make_registry();
     track_sfst(&mut reg, 1, 100, 200);
     // Window misses the only file → the stream is not listed (window-scoped).
@@ -251,7 +256,7 @@ fn enumerate_streams_excludes_streams_outside_window() {
 }
 
 #[test]
-fn enumerate_streams_includes_remote_only_stream() {
+fn stream_selector_includes_remote_only_stream() {
     let mut reg = make_registry();
     // An evicted-but-cataloged stream with in-window data, no local copy.
     track_remote(&mut reg, 2, 100, 200);
@@ -262,7 +267,7 @@ fn enumerate_streams_includes_remote_only_stream() {
 }
 
 #[test]
-fn enumerate_streams_lists_local_and_remote_only_together() {
+fn stream_selector_lists_local_and_remote_only_together() {
     let mut reg = make_registry();
     track_sfst(&mut reg, 1, 100, 200); // local stream ns/a
     track_remote_as(&mut reg, 2, "ns", "b", 100, 200); // remote-only ns/b
@@ -274,7 +279,7 @@ fn enumerate_streams_lists_local_and_remote_only_together() {
 }
 
 #[test]
-fn enumerate_streams_dedups_local_and_remote_same_seq() {
+fn stream_selector_dedups_local_and_remote_same_seq() {
     let mut reg = make_registry();
     // Uploaded-but-not-yet-evicted: same seq exists locally AND in the catalog.
     track_sfst(&mut reg, 1, 100, 200);
@@ -286,7 +291,7 @@ fn enumerate_streams_dedups_local_and_remote_same_seq() {
 }
 
 #[test]
-fn enumerate_streams_dedups_wal_and_remote_same_seq() {
+fn stream_selector_dedups_wal_and_remote_same_seq() {
     let mut reg = make_registry();
     // `track_wal` produces a `valid_up_to == 0` WAL (Created+Closed, no Synced),
     // which is NOT in the servable mask. A catalog entry for the SAME seq+stream
@@ -300,4 +305,254 @@ fn enumerate_streams_dedups_wal_and_remote_same_seq() {
     assert_eq!(streams.len(), 1);
     assert_eq!(sid(&streams[0]), ss("ns", "svc"));
     assert_eq!(streams[0].file_count, 1);
+}
+
+// ── the two-step remote plan ────────────────────────────────────────
+
+/// A catalog entry for `seq` under `identity`, stream `("ns", "a")`.
+fn remote_entry(
+    identity: file_registry::Identity,
+    seq: u64,
+    min_s: u32,
+    max_s: u32,
+    size: u64,
+) -> otel_catalog::CatalogEntry {
+    let (part_key, content_meta) = crate::test_helpers::identity_for("ns", "a");
+    otel_catalog::CatalogEntry {
+        id: FileId::new(identity, 0, seq, part_key),
+        remote_key: format!("k{seq}"),
+        min_timestamp_s: min_s,
+        max_timestamp_s: max_s,
+        record_count: 1,
+        content_meta,
+        size: ByteSize(size),
+        uploaded_at_ns: TimestampNs(0),
+        remote_etag: None,
+    }
+}
+
+/// Write and track a catalog file named after `max_seq` holding `entries`;
+/// its filename bounds are the entries' union. Returns its path.
+fn track_catalog(
+    reg: &mut Registry,
+    max_seq: u64,
+    entries: Vec<otel_catalog::CatalogEntry>,
+) -> std::path::PathBuf {
+    use chrono::NaiveDate;
+    let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
+    let min_s = entries.iter().map(|e| e.min_timestamp_s).min().unwrap();
+    let max_s = entries.iter().map(|e| e.max_timestamp_s).max().unwrap();
+    let mut catalog = otel_catalog::Catalog::new(TenantId::from("tenant1"), date, ident());
+    for e in entries {
+        catalog.add(e);
+    }
+    let path = reg
+        .catalog_files
+        .file_path(date, ident(), max_seq, min_s, max_s);
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, catalog.to_container_bytes().unwrap()).unwrap();
+    let size = ByteSize(std::fs::metadata(&path).unwrap().len());
+    reg.catalog_files.track(
+        otel_catalog::File::new(date, ident(), max_seq, min_s, max_s, size),
+        path.clone(),
+    );
+    path
+}
+
+/// Another instance of the same machine (a prior process, say).
+fn foreign() -> file_registry::Identity {
+    file_registry::Identity::new(
+        machine(),
+        file_registry::InstanceId::new(Uuid::from_u128(0x9999_8888_7777_6666_5555_4444_3333_2222))
+            .unwrap(),
+    )
+}
+
+fn plan(reg: &Registry, ranges: &[Query], capacity: Option<u64>) -> Result<RemotePlan, TooLarge> {
+    let input = reg.remote_plan_input(ranges);
+    match capacity {
+        Some(capacity) => input.plan_within(capacity),
+        None => Ok(input.plan()),
+    }
+}
+
+fn range_seqs(plan: &RemotePlan) -> Vec<Vec<u64>> {
+    plan.per_range.iter().map(|r| seqs(r)).collect()
+}
+
+#[test]
+fn each_range_takes_only_its_window_of_the_hull() {
+    let mut reg = make_registry();
+    track_catalog(
+        &mut reg,
+        3,
+        vec![
+            remote_entry(ident(), 1, 100, 200, 1),
+            remote_entry(ident(), 2, 300, 400, 1),
+            remote_entry(ident(), 3, 500, 600, 1),
+        ],
+    );
+
+    let plan = plan(&reg, &[window(0, 250), window(450, 700)], None).unwrap();
+
+    assert_eq!(range_seqs(&plan), [vec![1], vec![3]]);
+    assert_eq!(seqs(&plan.union), [1, 3]);
+    assert!(plan.unreadable.is_empty());
+}
+
+#[test]
+fn local_copies_mask_their_own_identity_only() {
+    let mut reg = make_registry();
+    track_sfst(&mut reg, 1, 100, 200);
+    track_catalog(
+        &mut reg,
+        1,
+        vec![
+            remote_entry(ident(), 1, 100, 200, 1),
+            remote_entry(foreign(), 1, 100, 200, 1),
+        ],
+    );
+
+    let plan = plan(&reg, &[full_range_query()], None).unwrap();
+
+    let planned: Vec<FileId> = plan.union.iter().map(|e| e.id).collect();
+    assert_eq!(planned, [remote_entry(foreign(), 1, 100, 200, 1).id]);
+}
+
+#[test]
+fn the_union_holds_each_file_once() {
+    let mut reg = make_registry();
+    track_catalog(
+        &mut reg,
+        2,
+        vec![
+            remote_entry(ident(), 1, 100, 200, 1),
+            remote_entry(ident(), 2, 300, 400, 1),
+        ],
+    );
+
+    let plan = plan(&reg, &[window(0, 350), window(150, 500)], None).unwrap();
+
+    assert_eq!(range_seqs(&plan), [vec![1, 2], vec![1, 2]]);
+    assert_eq!(seqs(&plan.union), [1, 2]);
+}
+
+#[test]
+fn a_seq_cataloged_twice_is_planned_once_per_range() {
+    let mut reg = make_registry();
+    track_catalog(&mut reg, 1, vec![remote_entry(ident(), 1, 100, 200, 1)]);
+    track_catalog(
+        &mut reg,
+        2,
+        vec![
+            remote_entry(ident(), 1, 100, 200, 1),
+            remote_entry(ident(), 2, 150, 250, 1),
+        ],
+    );
+
+    let plan = plan(&reg, &[window(0, 300), window(0, 180)], None).unwrap();
+
+    assert_eq!(range_seqs(&plan), [vec![1, 2], vec![1, 2]]);
+    assert_eq!(seqs(&plan.union), [1, 2]);
+}
+
+#[test]
+fn planning_stops_the_moment_the_union_exceeds_the_capacity() {
+    let mut reg = make_registry();
+    for seq in 1..=3 {
+        track_catalog(
+            &mut reg,
+            seq,
+            vec![remote_entry(ident(), seq, 100, 200, 10)],
+        );
+    }
+    let all = [full_range_query()];
+
+    // 20 bytes after the second catalog: the third is never counted.
+    assert_eq!(
+        plan(&reg, &all, Some(15)).unwrap_err(),
+        TooLarge {
+            at_least: 20,
+            capacity: 15
+        }
+    );
+    // Exactly the capacity fits; no capacity means no limit.
+    assert_eq!(seqs(&plan(&reg, &all, Some(30)).unwrap().union), [1, 2, 3]);
+    assert_eq!(seqs(&plan(&reg, &all, None).unwrap().union), [1, 2, 3]);
+}
+
+#[test]
+fn an_unreadable_catalog_is_reported_and_the_rest_planned() {
+    let mut reg = make_registry();
+    track_catalog(&mut reg, 1, vec![remote_entry(ident(), 1, 100, 200, 1)]);
+    let corrupt = track_catalog(&mut reg, 2, vec![remote_entry(ident(), 2, 300, 400, 1)]);
+    std::fs::write(&corrupt, b"not a catalog").unwrap();
+
+    let plan = plan(&reg, &[full_range_query()], None).unwrap();
+
+    assert_eq!(seqs(&plan.union), [1]);
+    assert_eq!(
+        plan.unreadable,
+        [CatalogFile {
+            path: corrupt,
+            min_timestamp_s: 300,
+            max_timestamp_s: 400,
+        }]
+    );
+}
+
+#[test]
+fn a_catalog_removed_after_step_one_is_skipped() {
+    let mut reg = make_registry();
+    track_catalog(&mut reg, 1, vec![remote_entry(ident(), 1, 100, 200, 1)]);
+    let gone = track_catalog(&mut reg, 2, vec![remote_entry(ident(), 2, 300, 400, 1)]);
+
+    let input = reg.remote_plan_input(&[full_range_query()]);
+    std::fs::remove_file(&gone).unwrap();
+    let plan = input.plan();
+
+    assert_eq!(seqs(&plan.union), [1]);
+    assert!(plan.unreadable.is_empty());
+}
+
+#[test]
+fn step_one_reads_no_catalog_file() {
+    let mut reg = make_registry();
+    let path = track_catalog(&mut reg, 1, vec![remote_entry(ident(), 1, 100, 200, 1)]);
+    track_catalog(&mut reg, 2, vec![remote_entry(ident(), 2, 5_000, 6_000, 1)]);
+    std::fs::remove_dir_all(reg.catalog_files.base_dir()).unwrap();
+
+    let input = reg.remote_plan_input(&[window(0, 250), window(0, 300)]);
+
+    assert_eq!(
+        input.catalogs,
+        [CatalogFile {
+            path,
+            min_timestamp_s: 100,
+            max_timestamp_s: 200,
+        }],
+        "only the catalog inside the hull, known without reading it"
+    );
+    let plan = input.plan();
+    assert_eq!(range_seqs(&plan), [Vec::<u64>::new(), Vec::new()]);
+}
+
+#[test]
+fn an_unknown_tenant_plans_nothing() {
+    let registries = crate::registry::TenantRegistries::new(
+        tempfile::tempdir().unwrap().keep(),
+        tempfile::tempdir().unwrap().keep(),
+        tempfile::tempdir().unwrap().keep(),
+    );
+
+    let plan = registries
+        .remote_plan_input(
+            &TenantId::from("nobody"),
+            &[full_range_query(), window(0, 10)],
+        )
+        .plan_within(0)
+        .unwrap();
+
+    assert_eq!(range_seqs(&plan), [Vec::<u64>::new(), Vec::new()]);
+    assert!(plan.union.is_empty());
 }

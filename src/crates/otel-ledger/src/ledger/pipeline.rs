@@ -43,7 +43,8 @@ use file_lifecycle::recovery::{
 use file_lifecycle::registry::TenantRegistries;
 use file_lifecycle::storage::OpendalStorage;
 
-use super::{OtelLogsHandler, RemoteRead};
+use super::OtelLogsHandler;
+use file_lifecycle::remote_read::RemoteRead;
 
 /// Minimum records per chunk when indexing an active WAL's prefix at
 /// query time. A fixed default for now; made configurable with the rest
@@ -304,7 +305,7 @@ where
     let registries = Arc::new(RwLock::new(registries));
 
     // The caller's closure builds the signal's handler (capturing whatever it
-    // needs — e.g. the logs chunk/remote-read caches) and supplies the
+    // needs — e.g. the chunk cache and the download cache) and supplies the
     // args→payload shim; the declaration is read back off the boxed handler.
     let (handler, arg_shim) = make_handler(registries.clone());
     let declaration = handler.declaration();

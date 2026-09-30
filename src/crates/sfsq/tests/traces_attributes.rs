@@ -10,14 +10,15 @@
 
 mod common;
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio_util::sync::CancellationToken;
 
 use common::{
-    kv_double, kv_int, kv_null, kv_str, memory_source, req, req_with, sealed_source, sp,
-    tail_source, write_wal,
+    SpanSpec, kv_double, kv_int, kv_null, kv_str, memory_source, missing_source, req, req_with,
+    sealed_source, sp, tail_source, unavailable_source, write_wal,
 };
 use sfsq::Source;
 use sfsq::traces::{
@@ -372,13 +373,45 @@ fn builtin_values_serve_and_virtual_builtins_reject() {
         keys.keys
             .contains(&(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Status)))
     );
-    // But its VALUES are an empty Complete result — a data condition.
+    // Its spans were sent without a status or kind: the OTel defaults are
+    // stored, so they are the values.
     let sv = values(
         vec![sealed_source(dir.path(), &plain, "bare2")],
         AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Status)),
     );
-    assert!(sv.values.is_empty());
+    assert_eq!(value_strings(&sv), ["UNSET"]);
     assert_eq!(sv.status, QueryStatus::Complete);
+    let kv = values(
+        vec![sealed_source(dir.path(), &plain, "bare3")],
+        AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Kind)),
+    );
+    assert_eq!(value_strings(&kv), ["UNSPECIFIED"]);
+
+    // Defaults sit beside explicit values in one sorted list.
+    let mut ok = sp(2, 0, 2_000, "op-ok");
+    ok.status = Some((1, ""));
+    let mixed = write_wal(
+        dir.path(),
+        vec![req(&[a_error_server(), ok, sp(3, 0, 3_000, "op-default")])],
+        "m",
+    );
+    let status = values(
+        vec![sealed_source(dir.path(), &mixed, "mixed-status")],
+        AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Status)),
+    );
+    assert_eq!(value_strings(&status), ["ERROR", "OK", "UNSET"]);
+    let kind = values(
+        vec![sealed_source(dir.path(), &mixed, "mixed-kind")],
+        AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Kind)),
+    );
+    assert_eq!(value_strings(&kind), ["SERVER", "UNSPECIFIED"]);
+}
+
+fn a_error_server() -> SpanSpec {
+    let mut a = sp(1, 0, 1_000, "op-a");
+    a.kind = 2; // SERVER
+    a.status = Some((2, "boom")); // ERROR
+    a
 }
 
 /// The optional window prunes SFST candidates by summary overlap
@@ -662,4 +695,94 @@ fn empty_sources_still_yield_the_static_builtins() {
     );
     assert!(vals.values.is_empty());
     assert_eq!(vals.status, QueryStatus::Complete);
+}
+
+/// An in-window unavailable source reports its own reason beside a
+/// missing file's, for both operations, while the healthy source still
+/// serves; alone, it is never Complete and never a source failure.
+#[test]
+fn unavailable_sources_are_reported_and_the_rest_served() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(
+        dir.path(),
+        vec![req(&[{
+            let mut s = sp(1, 0, 1_000, "op");
+            s.attrs = vec![kv_str("k", "v")];
+            s
+        }])],
+        "ok",
+    );
+    let mixed = || {
+        vec![
+            sealed_source(dir.path(), &wal, "good"),
+            missing_source(dir.path(), "missing", 0, 10),
+            unavailable_source("remote", 0, 10),
+        ]
+    };
+    let both = QueryStatus::Partial(BTreeSet::from([
+        PartialReason::SourceFailure,
+        PartialReason::RemoteUnavailable,
+    ]));
+    let only_remote = QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]));
+    let k = || AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("k".into()));
+
+    let progress = Arc::new(AtomicUsize::new(0));
+    let keys = attribute_names(
+        mixed(),
+        AttributeNamesQuery::new(),
+        CancellationToken::new(),
+        Arc::clone(&progress),
+    )
+    .unwrap();
+    assert_eq!(owner_attrs(&keys, AttributeOwner::Span), ["k"]);
+    assert_eq!(keys.status, both);
+    assert_eq!(progress.load(Ordering::Relaxed), 3, "one tick per source");
+
+    let progress = Arc::new(AtomicUsize::new(0));
+    let vals = attribute_values(
+        mixed(),
+        k(),
+        CancellationToken::new(),
+        Arc::clone(&progress),
+    )
+    .unwrap();
+    assert_eq!(value_strings(&vals), ["v"]);
+    assert_eq!(vals.status, both);
+    assert_eq!(progress.load(Ordering::Relaxed), 3, "one tick per source");
+
+    let alone = || vec![unavailable_source("remote", 0, 10)];
+    assert_eq!(
+        names(alone(), AttributeNamesQuery::new()).status,
+        only_remote
+    );
+    let vals = values(alone(), k());
+    assert!(vals.values.is_empty());
+    assert_eq!(vals.status, only_remote);
+}
+
+/// The window prunes an unavailable source by its summary, like a
+/// sealed file: out of window it is irrelevant (Complete), in window it
+/// is missing data (the reason).
+#[test]
+fn window_prunes_unavailable_sources_by_their_summary() {
+    const NS: i64 = 1_000_000_000;
+    let remote = || vec![unavailable_source("remote", 100, 110)];
+    let k = || AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("k".into()));
+    let inside = TimeWindow::new(90 * NS, 120 * NS).unwrap();
+    let outside = TimeWindow::new(0, 10 * NS).unwrap();
+    let only_remote = QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]));
+
+    assert_eq!(values(remote(), k().window(inside)).status, only_remote);
+    assert_eq!(
+        values(remote(), k().window(outside)).status,
+        QueryStatus::Complete
+    );
+    assert_eq!(
+        names(remote(), AttributeNamesQuery::new().window(inside)).status,
+        only_remote
+    );
+    assert_eq!(
+        names(remote(), AttributeNamesQuery::new().window(outside)).status,
+        QueryStatus::Complete
+    );
 }

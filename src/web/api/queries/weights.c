@@ -1934,6 +1934,32 @@ static void rrdset_metric_correlations_volume(
 // ----------------------------------------------------------------------------
 // VALUE / ANOMALY RATE algorithm functions
 
+static NETDATA_DOUBLE weights_anomaly_rate_with_gaps(
+        NETDATA_DOUBLE value, const STORAGE_POINT *sp, RRDINSTANCE_ACQUIRED *ria,
+        time_t window_duration_s, RRDR_OPTIONS options, RRDR_TIME_GROUPING time_group_method) {
+    if(!(options & RRDR_OPTION_ANOMALY_BIT) || time_group_method != RRDR_GROUPING_AVERAGE ||
+       !netdata_double_isnumber(value) || !sp->count)
+        return value;
+
+    // These options return a transformed value, not a window anomaly rate.
+    if((options & RRDR_OPTION_DIMS_MIN2MAX) ||
+       ((options & RRDR_OPTION_PERCENTAGE) && !(options & RRDR_OPTION_RETURN_RAW)))
+        return value;
+
+    time_t update_every = rrdinstance_acquired_update_every(ria);
+    if(update_every <= 0 || window_duration_s <= 0)
+        return value;
+
+    // Use the executed bucket duration, including when natural points select
+    // a coarser tier. Missing collection slots contribute no anomalies, but
+    // still belong in the rate's denominator.
+    // Retained tier buckets may include boundary samples: never divide by fewer
+    // samples than were actually read.
+    NETDATA_DOUBLE expected = (NETDATA_DOUBLE)window_duration_s / update_every;
+    NETDATA_DOUBLE count = MAX(expected, (NETDATA_DOUBLE)sp->count);
+    return (NETDATA_DOUBLE)sp->anomaly_count * 100.0 / count;
+}
+
 static void rrdset_weights_value(
         ONEWAYALLOC *owa,
         RRDHOST *host, STRING *hostname,
@@ -1953,6 +1979,8 @@ static void rrdset_weights_value(
     onewayalloc_reset(owa);
 
     merge_query_value_to_stats(&qv, stats, 1);
+
+    qv.value = weights_anomaly_rate_with_gaps(qv.value, &qv.sp, ria, qv.window_duration_s, options, time_group_method);
 
     if(netdata_double_isnumber(qv.value))
         register_result(results, host, hostname, rca, ria, rma, qv.value, 0, &qv.sp, NULL, stats, register_zero, qv.duration_ut);
@@ -2023,6 +2051,10 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
             QUERY_INSTANCE *qi = query_instance(r->internal.qt, qm->link.query_instance_id);
             QUERY_CONTEXT *qc = query_context(r->internal.qt, qm->link.query_context_id);
             QUERY_NODE *qn = query_node(r->internal.qt, qm->link.query_node_id);
+
+            qv.value = weights_anomaly_rate_with_gaps(qv.value, &qm->query_points, qi->ria,
+                                                     r->view.update_every,
+                                                     qwd->qwr->options, qwd->qwr->time_group_method);
 
             if(!host_snapshot || qn->rrdhost != last_host) {
                 last_host = qn->rrdhost;

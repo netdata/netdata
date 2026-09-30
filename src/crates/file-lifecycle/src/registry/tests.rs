@@ -204,7 +204,7 @@ fn query_snapshot_is_scoped_to_one_tenant() {
 }
 
 #[test]
-fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
+fn local_streams_dedup_and_aggregate_sfst_and_unsealed_wal() {
     use file_registry::TimestampNs;
     use wal::FileEvent;
     const NS: u64 = 1_000_000_000;
@@ -246,7 +246,7 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
         // enabler), so it appears even with no SFST summary. Modeled as an
         // active, synced WAL: `Synced` sets the durable byte count and the
         // range but NOT `File.size` (that lands on close), so this also
-        // exercises the `valid_up_to` size proxy in `enumerate_streams`.
+        // exercises the `valid_up_to` size proxy in `local_streams`.
         let db_id = FileId::new(Identity::new(mid, bid), 0, 3, pk(db));
         let (_, db_content_meta) = crate::test_helpers::identity_for(db.0, db.1);
         r.wal
@@ -298,7 +298,7 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
     };
     // The substrate yields neutral `PartitionStat`s ordered by opaque `part_key`;
     // decode + sort by `(namespace, name)` the way the rpc adapter does for display.
-    let mut streams = tr.enumerate_streams(&tenant, &full);
+    let mut streams = tr.local_streams(&tenant, &full).with_catalog(&[]);
     let sid =
         |p: &crate::registry::PartitionStat| crate::test_helpers::decode_opaque(&p.content_meta);
     let ss = |(ns, name): (&str, &str)| (ns.to_owned(), name.to_owned());
@@ -321,7 +321,8 @@ fn enumerate_streams_dedups_and_aggregates_sfst_and_unsealed_wal() {
 
     // Unknown tenant → empty list, never a panic.
     assert!(
-        tr.enumerate_streams(&TenantId::from("nope"), &full)
+        tr.local_streams(&TenantId::from("nope"), &full)
+            .with_catalog(&[])
             .is_empty()
     );
 }

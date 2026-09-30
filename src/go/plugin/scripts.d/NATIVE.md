@@ -1,13 +1,14 @@
 # Native script development
 
 The `native` collector runs language-neutral executable packages through scripts.d.
-A package supplies a manifest, an executable, and optionally a V2 chart template.
+A package can be one executable or script with a `describe` operation, or a file-backed
+manifest with an executable and optional chart/configuration files.
 Scripts report labeled metrics and named service checks. The development health
 template turns warning and critical checks into notifications.
 
 This contract is WIP. It supports one-shot and persistent collection, scalar gauges
-and cumulative counters. Package-specific DynCfg forms are supported. Additional metric kinds
-and Functions are later steps. The manifest
+and cumulative counters, package-specific DynCfg forms, and script-provided Functions.
+Additional metric kinds and production delivery remain later steps. The manifest
 and wire format may change during the preview.
 
 ## Development build and configuration
@@ -54,8 +55,9 @@ jobs:
 ```
 
 Use the development binary for this configuration. There is no package
-auto-discovery. Explicit package registration below provides individual DynCfg forms. Initialization reads and validates local files without running
-the executable. Editing package files requires restarting or
+auto-discovery. Explicit package registration below provides individual DynCfg forms
+and self-contained executable packages. For the generic manifest job shown above,
+initialization reads and validates local files without running the executable. Editing package files requires restarting or
 reconfiguring the job; charts and declarations are fixed for that job instance.
 
 ## Manifest v1
@@ -80,7 +82,7 @@ checks:
 
 - `command` is an argv array, without shell expansion. Its first path is resolved
   relative to the manifest directory unless absolute. Subsequent arguments are
-  literal. Netdata appends `collect` for one-shot mode or `serve` for persistent mode.
+  literal. Netdata appends `collect` or `function` for one-shot calls, or `serve` for persistent mode.
 - `config_schema` optionally names a local JSON form, relative to the manifest
   directory. It enables configuration input on stdin in both modes; see below.
 - `mode` is `oneshot` (the default when omitted) or `persistent`. Persistent jobs
@@ -96,7 +98,12 @@ checks:
   With it, its autogen setting determines whether unmatched metrics get charts.
   The `native_check_` chart-ID prefix is reserved. Global chart selectors are
   rejected when checks are declared, so they cannot silently filter health data.
-- At least one metric or check MUST be declared. Unknown manifest fields are errors.
+- `functions` optionally declares interactive methods; see Functions below. Packages
+  with Functions MUST use startup registration in `scripts.d.packages.yaml`.
+- At least one metric, check or Function MUST be declared. Packages with Functions
+  and no metrics/checks are function-only: no periodic collection or charts run.
+  Function-only manifests MUST NOT specify `charts`.
+- Unknown manifest fields are errors.
 
 Example `charts.yaml`, using an identity label and changeable chart metadata:
 
@@ -145,10 +152,20 @@ beginning with a letter. Each entry registers module `native-<name>`, for exampl
 `native-queue`. Duplicate names or invalid packages reject startup. Ordinary
 production builds ignore this inventory entirely.
 
-The package's manifest, chart templates and configuration schema are read once at
-plugin startup. Changes to these files or the inventory require a plugin restart.
-The registered module binds that package: job configuration cannot replace its
-manifest or executable. Package registration never runs the executable and never
+Each entry MUST specify exactly one `manifest` path or `command` argv. A
+self-contained package uses an absolute executable path:
+
+```yaml
+version: v1
+packages:
+  - name: queue
+    command: [/usr/local/lib/netdata/custom/queue/queue-plugin]
+```
+
+The manifest source reads metadata files without executing the package. The command
+source executes `describe` once during plugin process startup. Both sources compile
+the same package definition before registration. The registered module binds its
+metadata and command: job configuration cannot replace them. Registration never
 creates a default job. Add a job through DynCfg or `scripts.d/native-queue.conf`:
 
 ```yaml
@@ -170,8 +187,82 @@ DynCfg serves the package form under `config`, alongside collection settings.
 GET preserves submitted secret references; effective configuration also includes
 package defaults. The generic `native` module remains usable with a manifest path
 and a `config` object, but its form cannot reflect a particular package schema.
-Generic jobs load package files during initialization; their pre-initialization
+The generic module accepts collection-only packages; Function declarations require
+startup registration. Generic jobs load package files during initialization; their pre-initialization
 configuration retrieval contains only submitted package values.
+
+### Self-contained executable packages
+
+The host appends the operation argument to the configured argv. For example,
+`command: [/usr/bin/python3, /protected/queue.py]` runs
+`/usr/bin/python3 /protected/queue.py describe`. The same configured command is used
+for `collect`, `serve` and `function`. The description MUST NOT contain `command`
+or select another executable.
+
+`describe` MUST print exactly one UTF-8 YAML or JSON document and exit zero. JSON
+strings support standard Unicode escapes, including surrogate pairs. Declaration
+field names are case-sensitive, and unknown fields and duplicate keys are rejected.
+It uses the manifest's `version`, `mode`, `metrics`, `checks` and `functions` declarations,
+with these inline assets:
+
+| Field | File manifest | Executable description |
+|---|---|---|
+| `charts` | Path to chart YAML | String containing the complete chart YAML |
+| `config_schema` | Path to the configuration form | Object containing `jsonSchema` and `uiSchema` |
+
+Both assets are optional under the same capability rules as file-backed packages.
+YAML block scalars make inline chart templates convenient; JSON producers encode
+the template as a string. Configuration forms use the same validation, default and
+local-reference rules described below. External asset paths are not supported in a
+description. Files are never extracted to disk.
+
+Description runs unprivileged through `nd-run`, with EOF on stdin, its minimal
+environment, and discarded stderr. It receives no job configuration or secrets.
+It MUST return static metadata without contacting the monitored service or starting
+background collection. This is an authoring contract, not a network sandbox.
+Execution occurs for every command entry in the selected inventory, even before a
+job exists or its module is enabled; only register trusted, administrator-controlled
+commands. Merely placing an executable in a directory does not register or run it.
+
+Each invocation has a five-second execution deadline and a separately defined
+**64 MiB** stdout limit, including whitespace. This startup-only cutoff bounds a
+broken producer while leaving generous room for embedded templates and forms;
+it is not derived from the size of existing packages. Operational messages have
+their own **64 MiB** ceiling. These are encoded-byte cutoffs, not memory budgets:
+buffers grow on demand, and copies plus decoded structures can use more memory.
+Timeout, nonzero exit, oversized output or invalid metadata rejects plugin startup;
+partial definitions are not registered. Command failures report safe categories,
+and metadata errors identify the failing document/declarations/form/template stage
+without echoing script-produced values. The host terminates contained descendants
+and joins its owned process/I/O before completing the operation.
+
+The validated metadata stays in memory for the plugin process lifetime. Creating
+jobs, DynCfg Test and configuration updates do not rerun `describe`. Replacing a
+binary or changing its metadata requires a **plugin process restart**, not only an
+in-process Agent restart. File-backed registered packages have the same metadata
+refresh rule. Scripts MUST keep the operational protocol compatible with the loaded
+description until that restart.
+
+Runnable single-file examples:
+
+- [`self-contained-bash/collect.sh`](development/self-contained-bash/collect.sh):
+  fixed labeled metrics and checks, with no JSON encoder dependency.
+- [`self-contained-python/collect.py`](development/self-contained-python/collect.py):
+  inline form, chart and interactive Function in one script.
+- [`self-contained-go`](development/self-contained-go/main.go): a Go binary using
+  `go:embed`; only the resulting executable is needed at runtime.
+
+All examples default to one-shot mode. Put `--persistent` before the appended
+operation by adding it to the configured argv to select persistent mode. For the
+Go example, build from `src/go` with:
+
+```sh
+go build -o native-queue ./plugin/scripts.d/development/self-contained-go
+```
+
+Install the resulting file under the protected path used in the inventory. Its
+build-time `description.yaml` is embedded and is not a runtime sidecar. The Bash
+example uses fixed values; use a proper JSON encoder when adding variable strings.
 
 ### Package configuration schema
 
@@ -234,7 +325,7 @@ persistent readiness:
 {"version":"v1","config":{"queue":"mail"}}
 ```
 
-The envelope is at most 1 MiB including LF. One-shot stdin then reaches EOF;
+The envelope is at most 64 MiB including LF. One-shot stdin then reaches EOF;
 persistent stdin continues with normal collection requests after readiness.
 Initialization has the same timeout as persistent startup. Blocking or failing to
 consume configuration fails startup/collection. Values are never passed through
@@ -251,11 +342,13 @@ Schema-free scripts keep their existing stdin and readiness behavior.
 ## Collection response
 
 In one-shot mode, each invocation MUST exit zero and print exactly one UTF-8 JSON
-object, at most 1 MiB including whitespace. Stdin is EOF for schema-free packages;
+object, at most 64 MiB including whitespace. Stdin is EOF for schema-free packages;
 configured packages receive one configuration envelope followed by EOF. In persistent mode, the
 same snapshot is carried in a correlated reply as described below. Stdout
 is exclusively the protocol; redirect command chatter to stderr. The collector
-discards stderr to avoid copying arbitrary script output into Agent logs.
+discards stderr to avoid copying arbitrary script output into Agent logs. One-shot
+Function failures log only safe command categories (including numeric exit status)
+or an invalid-reply diagnostic; script output and request data are never logged.
 
 ```json
 {
@@ -275,7 +368,8 @@ MUST be nonnegative cumulative totals, not interval deltas. Counter resets use
 the existing incremental chart behavior. Values use IEEE-754 double precision;
 integers above 2^53 may lose precision. Labels are string-to-string objects.
 
-Field names are case-sensitive; JSON null is invalid in every position.
+Collection field names are case-sensitive; JSON null is invalid in every position
+of a collection snapshot.
 Each response is a full snapshot. Omit unavailable metric samples rather than
 inventing zero. An empty metrics or checks array is valid; arrays may be omitted.
 A sample name MUST be declared. Duplicate JSON keys, duplicate metric identities
@@ -290,9 +384,12 @@ unknown. Netdata's existing `plugin_data_collection_status` owns execution failu
 its stock notification route is silent.
 
 The process MUST finish all children before returning and MUST NOT daemonize or
-escape its process group. Cancellation terminates the command group on Unix using
-the existing execution helper. One-shot scripts cannot retain process state across
-collection attempts.
+escape its process group. Each invocation is an owned process with the containment
+described under Persistent sessions: exit, timeout or cancellation terminates its
+contained descendants, so background work never outlives the invocation, and a
+descendant holding stdout cannot delay or fail the result. An invocation fails if
+containment cannot be established. One-shot scripts cannot retain process state
+across collection attempts.
 
 ## Persistent sessions
 
@@ -330,16 +427,22 @@ same process can answer the next request. It is not a health state. Use an expli
 `unknown` check when that is a valid observation of an existing service.
 
 Every handshake, request and reply MUST be one UTF-8 JSON object on one physical
-line, terminated by LF and flushed immediately. A frame is limited to 1 MiB,
+line, terminated by LF and flushed immediately. A frame is limited to 64 MiB,
 including LF and other whitespace. Embedded newlines in strings MUST be escaped.
 Exact field spelling, duplicate-key and null rules apply to envelopes as well as
 snapshots. A reply MUST contain exactly one of `result` or `error`; the only error
 code is `collection_failed`. There is one outstanding request and no push channel.
 Scripts MAY perform background work, but MUST NOT emit unsolicited frames.
 
-`timeout` bounds the ready handshake and each request/reply exchange independently;
-it is not a process lifetime limit. A mismatched ID, malformed/oversized frame,
-partial frame at EOF, timeout, closed stdout or process exit terminates the session.
+`timeout` bounds startup and the caller's collection wait, including time behind
+an active Function. An admitted collection exchange gets a full `timeout` to
+finish, independently of the caller's remaining wait budget. A caller timeout
+publishes no sample; the host still drains and validates the outstanding reply
+before accepting another request. An exchange exceeding its full budget stops
+the session. Function callers use their own deadline, with bounded reply draining
+after cancellation as described below. These are not process lifetime limits.
+A mismatched ID, malformed/oversized frame, partial frame at EOF, closed stdout
+or process exit terminates the session.
 After readiness this marks the job Failed and requires an explicit restart or
 reconfiguration. No private respawn loop retries it. Failures before readiness use
 the normal `autodetection_retry` policy. In either case, no synthetic healthy sample
@@ -351,6 +454,142 @@ or escape that group. On Windows 10 or later, the process starts inside an owned
 Job Object that contains its descendants. Startup fails if containment cannot be
 established. Discarded stderr uses the null device, so inherited stderr cannot keep
 a host-side copying goroutine alive. Descendant exits are not individually awaited.
+
+## Functions
+
+Declare methods in the manifest and register the package at startup:
+
+```yaml
+functions:
+  - id: items
+    name: Queue Items
+    help: Inspect the selected queue.
+    update_every: 10
+    response_type: table
+    accepted_params: [filter]
+    required_params:
+      - id: queue
+        name: Queue
+        type: select
+        options:
+          - {id: mail, name: Mail, defaultSelected: true}
+```
+
+IDs match `[a-z][a-z0-9_-]*` and are unique within the package. `name` and `help`
+are required. `update_every` is the UI refresh interval in seconds (default 10);
+`response_type` defaults to `table`. `has_history` advertises time-range support
+but does not implement history. Parameter IDs match `[A-Za-z_][A-Za-z0-9_-]*`.
+Selectors support `select` (default), `multiselect`, `help`, `unique_view`, and
+options with `id`, `name`, `defaultSelected` and `disabled`.
+
+For package `queue`, method `items` is published as `native-queue:items`. Netdata
+owns registration, removal, request deadlines and the reserved `__job` selector.
+Unscoped `info` is answered from the manifest without calling the script. Scoped
+`info` selects a running job and calls its script. With multiple jobs, callers
+select one through `__job`; a missing or invalid selection follows the standard
+Function interface. Restart the plugin after changing declarations.
+
+Scripts receive **raw input**. `required_params` and `accepted_params` describe
+the UI; they do not validate or default domain values on the host. The script
+MUST parse, default and validate its own args/payload, including duplicate or
+unknown selector values. Netdata validates `__job`; scripts MUST NOT declare it.
+This preview uses the existing read-oriented Function publication permissions.
+It does not provide a separate authorization contract for remote mutations.
+
+### Input and execution
+
+One-shot Function calls append `function` to `command`. Stdin contains the
+configuration envelope first, if `config_schema` is declared, then one Function
+request and EOF. Collection still appends `collect` and receives only optional
+configuration. Each Function call owns an independent process and may overlap
+one-shot collection or another Function call.
+
+Persistent packages use the existing `serve` startup and ready handshake. After
+readiness, collection and Function requests share one serial request/reply stream.
+A long Function delays collection; keep interactive work short or use one-shot
+mode when calls need independent execution. A function-only persistent package
+still starts and signals readiness when enabled, but never receives `collect`.
+
+Both modes receive this Function envelope as one compact JSON line:
+
+```json
+{"id":"1","method":"function","function":"items","info":false,"args":[],"payload_base64":"eyJzZWxlY3Rpb25zIjp7InF1ZXVlIjpbIm1haWwiXX19","content_type":"application/json","deadline_unix_ms":1800000000000,"permissions":"0xFFFF","source":"user=test"}
+```
+
+`args` is an array, empty when none were supplied. `payload_base64` preserves the
+original payload bytes; decode it before parsing according to `content_type`.
+The v3 UI sends selectors as `{"selections":{"queue":["mail"]}}` in its JSON
+payload, including arrays for single-select fields. Scripts MUST handle this
+shape when declaring selectors; see the [Function UI request flow](../../../plugins.d/FUNCTION_UI_REFERENCE.md#modern-flow-v3).
+Payload, content type, permissions and source are omitted when empty. The absolute
+Unix deadline in milliseconds is present when the caller supplies a deadline.
+Arguments, payload and configuration stay on stdin, never in host-generated argv,
+environment variables or diagnostics. Scripts MUST NOT expose credentials in
+Function output or error messages; those results are sent to the requesting UI.
+
+The request, including base64 expansion and terminating LF, MUST fit in 64 MiB.
+The host reserves space for the largest correlation ID when admitting a request;
+oversized requests fail before executing or writing to a script. Replies use the
+same 64 MiB bound. The Function context bounds how long the caller waits, including
+queue waiting. Cancellation before admission leaves the persistent peer usable.
+After admission, cancellation or deadline expiry returns to the caller promptly;
+the host allows up to `timeout` more seconds to finish writing and drain the
+matching reply. It validates and discards that reply before accepting another
+request. A missing, invalid or mismatched reply stops the session. While draining,
+other requests keep waiting under their own deadlines. A script SHOULD promptly
+return a valid error response when its supplied deadline expires. There is no
+script cancellation frame or private process restart. One-shot cancellation still
+terminates its owned process; job stop/replacement immediately terminates either mode.
+
+### Results
+
+Echo the request ID and return a `v1` result. One-shot scripts MUST exit zero;
+persistent scripts MUST flush a single LF-terminated reply:
+
+```json
+{"id":"1","result":{"version":"v1","status":200,"columns":{"queue":{"index":0,"name":"Queue","type":"string"},"depth":{"index":1,"name":"Depth","type":"integer"}},"data":[["mail",17]],"default_sort_column":"depth"}}
+```
+
+A managed result supplies `status`, plus `columns` and `data` for successful data
+requests. `data` is an array of rows ordered by column index. Scoped info can
+return just `version` and `status`; optionally return `required_params` to update
+domain selector options. Netdata adds metadata and the job selector, and merges
+dynamic selectors with declarations. Other managed fields are `message`, `help`,
+`type`, `default_sort_column`, `charts`, `default_charts`, and `group_by`, following
+[the Function UI schema](../../../plugins.d/FUNCTION_UI_SCHEMA.json).
+
+To report a request failure without destroying a healthy persistent session:
+
+```json
+{"id":"1","result":{"version":"v1","status":503,"message":"Queue is temporarily unavailable"}}
+```
+
+For formats requiring the complete UI envelope, use explicit raw response ownership:
+
+```json
+{"id":"1","result":{"version":"v1","raw_response":{"status":500,"errorMessage":"Queue is temporarily unavailable"}}}
+```
+
+`raw_response` MUST contain a JSON integer status from 100 through 599 and
+MUST NOT be combined with managed result fields. Netdata sends this complete
+object without adding metadata, selectors or table fields. The script owns its
+UI-schema validity, including scoped info. Use managed results for ordinary tables.
+
+Protocol field names are exact and duplicate JSON keys are rejected. Null values
+and arbitrary JSON numbers are allowed inside table data, column definitions and
+raw responses; integers are preserved through host serialization. The frontend's
+numeric precision may differ. Invalid envelopes, versions, field types, IDs or
+other protocol failures stop a persistent session. A valid script error status
+is an ordinary Function result and leaves it available for another request.
+
+Runnable examples are [`development/functions-bash`](development/functions-bash/collect.sh)
+(mixed collection and Functions, using jq) and
+[`development/functions-python`](development/functions-python/inspect.py)
+(function-only). Both support either manifest mode. Tests route their actual
+responses through Agent stdin dispatch and validate emitted info/data against the
+canonical UI schema. Function-only DynCfg forms omit the collection interval;
+the timeout field is shown only in persistent mode, for startup and reply draining
+after cancellation. Function callers always use their own deadline.
 
 ## Checks and automatic alerts
 
@@ -405,8 +644,14 @@ nd_end
 For persistent Bash, call `nd_ready` once and loop over `nd_next`. Each successful
 `nd_next` MUST be answered by `nd_begin` / observations / `nd_end`, or by `nd_fail`.
 `nd_end` automatically wraps a pending request's snapshot with its ID. `nd_next`
-reads the host's canonical request line; EOF or an invalid request ends the loop.
+reads the host's canonical **collection-only** request line; EOF or an invalid request ends the loop.
 Do not pipe the loop into a subshell if its state must survive.
+
+For packages with Functions, use `nd_read_request` to read a line into the shell
+variable `ND_REQUEST`, parse it with jq or another JSON decoder, and call
+`nd_reply ID COMPACT_RESULT_JSON`. This wraps a compact JSON object produced by
+an encoder; it does not validate that object's schema. Do not use `nd_next` for
+a mixed stream. `nd_read_config` still precedes request reading when configured.
 
 Runnable development packages are in
 [`development/persistent-bash`](development/persistent-bash/collect.sh) and
@@ -427,8 +672,10 @@ with `set -e` as above); do not emit a partial response after ignoring an error.
 
 ## Local validation
 
-Run the executable with the `collect` operation to inspect its JSON, then configure
-a scripts.d job. The collector tests run real Bash commands through the production
+For self-contained packages, run `describe` to inspect metadata without job input.
+For collection, supply the documented configuration envelope when a form is declared
+and invoke `collect`, or start `serve` and exchange framed requests. Then configure
+a development scripts.d job. The collector tests run real Bash commands through the production
 V2 job and command path with a test privilege-drop shim, and test encoding, complete
 snapshot validation, startup in a critical state, persistent state/recovery, terminal
 protocol failure, cancellation and descendant cleanup.

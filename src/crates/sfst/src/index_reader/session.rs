@@ -202,9 +202,10 @@ impl SpanSource for TraceFileSession<'_, '_> {
 
         // `kind` per position from the low-card `_kind` facet bitmaps
         // (materialize_field on a low field never touches stream
-        // batches). Absent field / value → 0 (UNSPECIFIED is skipped at
-        // flatten). A corrupt multi-valued row takes the first value —
-        // deterministic, and impossible from the production flattener.
+        // batches). Absent field / value → 0 (files written before
+        // UNSPECIFIED was stored skip it). A corrupt multi-valued row
+        // takes the first value — deterministic, and impossible from the
+        // production flattener.
         let missing: Vec<u32> = positions
             .iter()
             .copied()

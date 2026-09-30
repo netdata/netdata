@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Source from Bash 3.2 or newer. Protocol output goes only to stdout.
-# Collection helpers encode data; nd_next reads one canonical host request.
+# Collection helpers encode data; nd_next reads canonical collection requests.
 
 _nd_quote() {
     local _nd_value=$1 _nd_code _nd_char _nd_escape
@@ -125,4 +125,20 @@ nd_read_config() {
         printf '%s\n' 'native: missing configuration envelope' >&2
         return 1
     }
+}
+
+# For packages with Functions, parse ND_REQUEST using jq or another JSON decoder.
+# This also reads the one-shot Function request after optional nd_read_config.
+nd_read_request() {
+    IFS= read -r ND_REQUEST
+}
+
+# Emit a correlated reply. The caller supplies one compact JSON result object
+# produced by a JSON encoder; this helper only validates and quotes the host ID.
+nd_reply() {
+    if (( $# != 2 )) || [[ ! $1 =~ ^[1-9][0-9]*$ || $2 == *$'\n'* ]]; then
+        printf '%s\n' 'native: reply requires a request ID and compact JSON result' >&2
+        return 1
+    fi
+    printf '{"id":"%s","result":%s}\n' "$1" "$2"
 }

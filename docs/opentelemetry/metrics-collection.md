@@ -2,7 +2,7 @@
 
 Use these recipes when an OpenTelemetry Collector is already part of your observability pipeline or must fan metrics out to multiple backends. If Netdata is the only consumer, prefer the linked native Netdata collector: it requires fewer moving parts and provides purpose-built charts and alerts.
 
-Before you begin, complete [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md). The examples on this page use OpenTelemetry Collector Contrib `0.157.0` and the local, plaintext loopback endpoint from that guide. Use TLS when the Collector and Netdata Agent are on different hosts.
+Before you begin, complete [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md). The examples on this page use OpenTelemetry Collector Contrib `0.157.0` and the local, plaintext loopback endpoint from that guide. Use TLS when the Collector and Netdata Agent are on different hosts.
 
 ## Shared exporter
 

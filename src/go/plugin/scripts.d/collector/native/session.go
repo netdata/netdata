@@ -10,132 +10,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
+	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
-var _ collectorapi.CollectorV2Runner = (*Collector)(nil)
-
-type scriptRuntime struct {
-	requests chan collectionRequest
-	done     chan struct{}
-}
-
-type collectionRequest struct {
-	ctx   context.Context
-	reply chan collectionResult
-}
-
-type collectionResult struct {
-	response response
-	err      error
-}
-
-func (c *Collector) runPersistent(ctx context.Context, ready func()) error {
-	s, err := startSession(ctx, c.definition.Command)
-	if err != nil {
-		return err
-	}
-	defer s.close()
-	startupCtx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
-	if len(c.configInput) > 0 {
-		if err := s.write(startupCtx, c.configInput); err != nil {
-			cancel()
-			return fmt.Errorf("persistent configuration: %w", err)
-		}
-	}
-	frame, err := s.read(startupCtx)
-	cancel()
-	if err != nil {
-		return fmt.Errorf("persistent startup: %w", err)
-	}
-	if err := decodeReady(frame); err != nil {
-		return fmt.Errorf("persistent startup: %w", err)
-	}
-
-	r := &scriptRuntime{
-		requests: make(chan collectionRequest),
-		done:     make(chan struct{}),
-	}
-	c.runtimeMu.Lock()
-	c.runtime = r
-	c.runtimeMu.Unlock()
-	defer func() {
-		c.runtimeMu.Lock()
-		c.runtime = nil
-		c.runtimeMu.Unlock()
-		close(r.done)
-	}()
-	ready()
-
-	var sequence uint64
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-s.exited:
-			return s.exitError()
-		case frame := <-s.frames:
-			if frame.err != nil {
-				return s.transportError(ctx, frame.err)
-			}
-			return fmt.Errorf("unsolicited persistent response")
-		case request := <-r.requests:
-			sequence++
-			requestCtx, cancel := context.WithTimeout(request.ctx, c.Timeout.Duration())
-			data, err := s.exchange(requestCtx, strconv.FormatUint(sequence, 10))
-			cancel()
-			var result response
-			if err == nil {
-				result, err = c.definition.decodeReply(data, strconv.FormatUint(sequence, 10))
-			}
-			// A buffered reply lets Run finish teardown even if Collect was canceled.
-			request.reply <- collectionResult{
-				response: result,
-				err:      err,
-			}
-			if err != nil && !errors.Is(err, errCollectionFailed) {
-				return fmt.Errorf("persistent collection: %w", err)
-			}
-		}
-	}
-}
-
-func (c *Collector) collectPersistent(ctx context.Context) (response, error) {
-	c.runtimeMu.Lock()
-	r := c.runtime
-	c.runtimeMu.Unlock()
-	if r == nil {
-		return response{}, fmt.Errorf("persistent script is not running")
-	}
-	request := collectionRequest{
-		ctx:   ctx,
-		reply: make(chan collectionResult, 1),
-	}
-	select {
-	case <-ctx.Done():
-		return response{}, ctx.Err()
-	case <-r.done:
-		return response{}, fmt.Errorf("persistent script stopped")
-	case r.requests <- request:
-	}
-	select {
-	case <-ctx.Done():
-		return response{}, ctx.Err()
-	case result := <-request.reply:
-		return result.response, result.err
-	case <-r.done:
-		return response{}, fmt.Errorf("persistent script stopped")
-	}
-}
-
-type scriptFrame struct {
-	data []byte
-	err  error
-}
-
+// scriptSession owns a persistent script process and its LF-framed stdio.
+// Canceling the session context or closing it terminates contained processes.
 type scriptSession struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -148,9 +29,14 @@ type scriptSession struct {
 	waitErr    error // Published by closing exited.
 }
 
-func startSession(ctx context.Context, argv []string) (*scriptSession, error) {
+// scriptFrame is one stdout frame, or the terminal read error.
+type scriptFrame struct {
+	data []byte
+	err  error
+}
+
+func startSession(ctx context.Context, command []string) (*scriptSession, error) {
 	ctx, cancel := context.WithCancel(ctx)
-	args := append(append([]string(nil), argv[1:]...), "serve")
 	childStdin, stdin, err := os.Pipe()
 	if err != nil {
 		cancel()
@@ -168,7 +54,7 @@ func startSession(ctx context.Context, argv []string) (*scriptSession, error) {
 		Stdin:  childStdin,
 		Stdout: childStdout,
 	}
-	process, err := ndexec.StartUnprivilegedProcess(ctx, opts, argv[0], args...)
+	process, err := ndexec.StartUnprivilegedProcess(ctx, opts, command[0], operationArgs(command, opServe)...)
 	if err != nil {
 		if ctx.Err() != nil {
 			err = ctx.Err()
@@ -209,8 +95,9 @@ func (s *scriptSession) close() {
 	<-s.exited
 }
 
-// Cancellation can close pipes or reap a killed process before the select sees
-// ctx.Done. Normalize only transport errors, never an observed protocol error.
+// transportError normalizes transport errors only, never an observed protocol
+// error: cancellation can close pipes or reap a killed process before a select
+// observes ctx.Done.
 func (s *scriptSession) transportError(ctx context.Context, err error) error {
 	if err == nil || errors.Is(err, errResponseTooLarge) {
 		return err
@@ -231,7 +118,37 @@ func (s *scriptSession) exitError() error {
 	if s.waitErr != nil {
 		return fmt.Errorf("persistent command exited: %w", s.waitErr)
 	}
-	return fmt.Errorf("persistent command exited")
+	return errors.New("persistent command exited")
+}
+
+// exchange writes one request frame and reads its reply frame.
+func (s *scriptSession) exchange(ctx context.Context, frame []byte) ([]byte, error) {
+	if err := s.write(ctx, frame); err != nil {
+		return nil, fmt.Errorf("write request: %w", err)
+	}
+	return s.read(ctx)
+}
+
+// exchangeWithDrain lets a caller stop waiting without abandoning bytes already
+// owned by the session: after caller cancellation, the exchange has up to drain
+// to complete. Session shutdown still interrupts I/O immediately.
+func (s *scriptSession) exchangeWithDrain(caller context.Context, frame []byte, drain time.Duration) ([]byte, error) {
+	ctx, cancel := context.WithCancelCause(s.ctx)
+	stop := context.AfterFunc(caller, func() {
+		timer := time.NewTimer(drain)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+		case <-timer.C:
+			cancel(context.DeadlineExceeded)
+		}
+	})
+	defer func() { stop(); cancel(nil) }()
+	data, err := s.exchange(ctx, frame)
+	if errors.Is(err, context.Canceled) {
+		err = context.Cause(ctx)
+	}
+	return data, err
 }
 
 func (s *scriptSession) read(ctx context.Context) ([]byte, error) {
@@ -247,14 +164,12 @@ func (s *scriptSession) read(ctx context.Context) ([]byte, error) {
 	}
 }
 
-func (s *scriptSession) exchange(ctx context.Context, id string) ([]byte, error) {
-	if err := s.write(ctx, []byte(fmt.Sprintf("{\"id\":\"%s\",\"method\":\"collect\"}\n", id))); err != nil {
-		return nil, fmt.Errorf("write collection request: %w", err)
-	}
-	return s.read(ctx)
-}
-
+// write joins the writer goroutine on every path, closing stdin to unblock a
+// peer that stopped reading.
 func (s *scriptSession) write(ctx context.Context, data []byte) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	written := make(chan error, 1)
 	go func() {
 		_, err := s.stdin.Write(data)
@@ -262,9 +177,7 @@ func (s *scriptSession) write(ctx context.Context, data []byte) error {
 	}()
 	select {
 	case err := <-written:
-		if err != nil {
-			return s.transportError(ctx, err)
-		}
+		return s.transportError(ctx, err)
 	case <-ctx.Done():
 		_ = s.stdin.Close()
 		<-written
@@ -278,13 +191,12 @@ func (s *scriptSession) write(ctx context.Context, data []byte) error {
 		<-written
 		return s.exitError()
 	}
-	return nil
 }
 
 func (s *scriptSession) readFrames() {
 	defer close(s.readerDone)
 	scanner := bufio.NewScanner(s.stdout)
-	scanner.Buffer(make([]byte, 4096), maxResponseBytes+1)
+	scanner.Buffer(make([]byte, 4096), maxMessageBytes+1)
 	scanner.Split(splitFrame)
 	for scanner.Scan() {
 		frame := scriptFrame{
@@ -310,16 +222,17 @@ func (s *scriptSession) readFrames() {
 	}
 }
 
-// LF is mandatory, including for the last frame. Keep CR in the token so every
-// byte counts toward the limit (JSON whitespace is accepted by the decoder).
+// splitFrame requires LF, including after the last frame. It keeps CR in the
+// token so every byte counts toward the limit (JSON whitespace is accepted by
+// the decoder).
 func splitFrame(data []byte, atEOF bool) (int, []byte, error) {
 	if i := bytes.IndexByte(data, '\n'); i >= 0 {
-		if i+1 > maxResponseBytes {
+		if i+1 > maxMessageBytes {
 			return 0, nil, errResponseTooLarge
 		}
 		return i + 1, data[:i], nil
 	}
-	if len(data) >= maxResponseBytes {
+	if len(data) >= maxMessageBytes {
 		return 0, nil, errResponseTooLarge
 	}
 	if atEOF && len(data) != 0 {

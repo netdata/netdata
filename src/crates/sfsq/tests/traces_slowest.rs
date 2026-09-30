@@ -10,12 +10,13 @@
 
 mod common;
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio_util::sync::CancellationToken;
 
-use common::{req, sp, sealed_source, tail_source, write_wal};
+use common::{missing_source, req, sealed_source, sp, tail_source, unavailable_source, write_wal};
 use sfsq::traces::{
     PartialReason, QueryStatus, SLOWEST_LIMIT_MAX, SlowestData, SlowestQuery,
     SlowestRequestError, TimeWindow, TraceSource, slowest,
@@ -397,4 +398,49 @@ fn zero_and_oversized_limits_are_request_errors() {
     )
     .expect_err("oversized limit");
     assert!(matches!(err, SlowestRequestError::LimitTooLarge(n) if n == SLOWEST_LIMIT_MAX + 1));
+}
+
+/// An unavailable source reports its own reason beside a missing file's
+/// while the healthy source still ranks; alone, it is never Complete
+/// and never a source failure.
+#[test]
+fn unavailable_sources_are_reported_while_the_rest_rank() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&corpus())], "ok");
+    let progress = Arc::new(AtomicUsize::new(0));
+    let data = slowest(
+        vec![
+            sealed_source(dir.path(), &wal, "good"),
+            missing_source(dir.path(), "missing", 0, 20),
+            unavailable_source("remote", 0, 20),
+        ],
+        SlowestQuery::new(window()),
+        CancellationToken::new(),
+        Arc::clone(&progress),
+    )
+    .unwrap();
+    let got: Vec<_> = data.traces.iter().map(|t| t.trace_id).collect();
+    let expected: Vec<_> = [0xC, 0xD, 0xA, 0xB]
+        .into_iter()
+        .map(|b| sfst::TraceId::from([b; 16]))
+        .collect();
+    assert_eq!(got, expected, "the healthy source still ranks");
+    assert_eq!(
+        data.status,
+        QueryStatus::Partial(BTreeSet::from([
+            PartialReason::SourceFailure,
+            PartialReason::RemoteUnavailable,
+        ]))
+    );
+    assert_eq!(progress.load(Ordering::Relaxed), 3, "one tick per source");
+
+    let only = run(
+        vec![unavailable_source("remote", 0, 20)],
+        SlowestQuery::new(window()),
+    );
+    assert!(only.traces.is_empty());
+    assert_eq!(
+        only.status,
+        QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]))
+    );
 }

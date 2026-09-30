@@ -17,20 +17,23 @@
 
 mod common;
 
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio_util::sync::CancellationToken;
 
 use common::{
-    SpanSpec, kv_str, memory_source, req_with, sealed_source, sp, tail_source, write_wal,
+    SpanSpec, kv_str, memory_source, missing_source, req_with, sealed_source, sp, tail_source,
+    unavailable_source, write_wal,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use sfsq::traces::{
     CompareOp, Condition, PartialReason, Predicate, PredicateError, PredicateTarget,
-    PredicateValue, QueryStatus, SearchData, SearchQuery, SearchRequestError, SearchSources,
-    AttributeOwner, TimeWindow, BuiltinField, TraceSource, search,
+    PredicateValue, QueryStatus, SERVICE_BREAKDOWN_TOP_K, SearchData, SearchQuery,
+    SearchRequestError, SearchSources, ServiceBreakdown, AttributeOwner, TimeWindow, BuiltinField,
+    TraceSource, search,
 };
 
 const NS: u64 = 1_000_000_000;
@@ -87,6 +90,7 @@ type SummaryPrint = (
     usize,          // matched_count
     Vec<(String, i64, i64)>, // attached spans: (name, start, duration)
     bool,           // exact
+    (Vec<(String, u64)>, u64, usize, u64), // service breakdown
 );
 
 fn norm(data: &SearchData) -> (Vec<SummaryPrint>, QueryStatus) {
@@ -116,10 +120,50 @@ fn norm(data: &SearchData) -> (Vec<SummaryPrint>, QueryStatus) {
                     })
                     .collect(),
                 t.exact,
+                (
+                    t.service_breakdown.top.clone(),
+                    t.service_breakdown.other,
+                    t.service_breakdown.other_services,
+                    t.service_breakdown.unattributed,
+                ),
             )
         })
         .collect();
     (traces, data.status.clone())
+}
+
+fn breakdown(
+    top: &[(&str, u64)],
+    other: u64,
+    other_services: usize,
+    unattributed: u64,
+) -> ServiceBreakdown {
+    ServiceBreakdown {
+        top: top.iter().map(|&(s, n)| (s.to_string(), n)).collect(),
+        other,
+        other_services,
+        unattributed,
+    }
+}
+
+/// Every returned row's breakdown partitions exactly the spans its
+/// `span_count` counts, within the cap, with `other` and
+/// `other_services` empty together.
+fn assert_breakdowns_partition(data: &SearchData) {
+    for t in &data.traces {
+        let b = &t.service_breakdown;
+        let mut total = b.other + b.unattributed;
+        for (_, spans) in &b.top {
+            total += spans;
+        }
+        assert_eq!(total, t.span_count as u64, "trace {}", t.trace_id);
+        assert!(
+            b.top.len() <= SERVICE_BREAKDOWN_TOP_K,
+            "trace {}",
+            t.trace_id
+        );
+        assert_eq!(b.other == 0, b.other_services == 0, "trace {}", t.trace_id);
+    }
 }
 
 // ── The shared world (six traces, two services, two time halves) ──────
@@ -418,16 +462,50 @@ fn oracle_equivalence_under_relayouts() {
             vec![],
         ),
         (
-            // Negated builtin with skip-at-flatten absence: the kind
-            // LABEL exists only on T1's SERVER and T4's CONSUMER spans
-            // (UNSPECIFIED is skipped), so `kind != SERVER` = T4 alone.
+            // Negated builtin: every span stores its kind label, the
+            // UNSPECIFIED default included, so `kind != SERVER` matches
+            // every trace owning a non-SERVER span — all six (T1 through
+            // its UNSPECIFIED child).
             "negated-kind",
             SearchQuery::new(pred(vec![builtin(
                 BuiltinField::Kind,
                 CompareOp::NotEq,
                 vec![text("SERVER")],
             )])),
-            vec![hex(4)],
+            vec![hex(3), hex(5), hex(6), hex(4), hex(2), hex(1)],
+        ),
+        (
+            // The UNSPECIFIED default is a stored, selectable kind.
+            "kind-unspecified",
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::Kind,
+                CompareOp::Eq,
+                vec![text("UNSPECIFIED")],
+            )])),
+            vec![hex(3), hex(5), hex(6), hex(2), hex(1)],
+        ),
+        (
+            // The UNSET default is a stored, selectable status: every
+            // span sent without a status (T1's child, T3's late child,
+            // T4, T6's canonical copy).
+            "status-unset",
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::Status,
+                CompareOp::Eq,
+                vec![text("UNSET")],
+            )])),
+            vec![hex(3), hex(6), hex(4), hex(1)],
+        ),
+        (
+            // `status != ERROR` reaches UNSET spans too, not only OK ones
+            // (which alone would give T1 and T3).
+            "status-not-error",
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::Status,
+                CompareOp::NotEq,
+                vec![text("ERROR")],
+            )])),
+            vec![hex(3), hex(6), hex(4), hex(1)],
         ),
         (
             // The any-owner disjunction: `env` is a RESOURCE attribute of
@@ -753,6 +831,7 @@ fn summary_ground_truth() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
 
     let data = run(sources, SearchQuery::new(Predicate::all()).spans_per_trace(2));
+    assert_breakdowns_partition(&data);
     let by_id = |n: u8| {
         data.traces
             .iter()
@@ -767,6 +846,7 @@ fn summary_ground_truth() {
     assert_eq!(t1.start_ns, (1_000 * NS) as i64);
     assert_eq!(t1.duration_ns, 500_000);
     assert_eq!((t1.span_count, t1.error_count, t1.matched_count), (2, 0, 2));
+    assert_eq!(t1.service_breakdown, breakdown(&[("svc-a", 2)], 0, 0, 0));
     // spans_per_trace(2) attaches both, in combiner (chronological) order.
     assert_eq!(t1.matched_spans.len(), 2);
     assert!(t1.matched_spans[0].start_ns < t1.matched_spans[1].start_ns);
@@ -777,22 +857,131 @@ fn summary_ground_truth() {
     assert_eq!(t3.start_ns, (900 * NS) as i64);
     assert_eq!(t3.duration_ns, (1_000 * NS + 50) as i64);
     assert_eq!(t3.span_count, 2);
+    assert_eq!(t3.service_breakdown, breakdown(&[("svc-a", 2)], 0, 0, 0));
 
     // T5: all three spans carry ERROR.
     let t5 = by_id(5);
     assert_eq!((t5.span_count, t5.error_count), (3, 3));
+    assert_eq!(t5.service_breakdown, breakdown(&[("svc-b", 3)], 0, 0, 0));
     assert_eq!(t5.matched_spans.len(), 2, "spans_per_trace trims the attachment");
     assert_eq!(t5.matched_count, 3, "matched_count is not trimmed by spans_per_trace");
 
     // T6: the resend collapsed to the canonical copy.
     let t6 = by_id(6);
     assert_eq!((t6.span_count, t6.start_ns), (1, (1_300 * NS) as i64));
+    assert_eq!(t6.service_breakdown, breakdown(&[("svc-b", 1)], 0, 0, 0));
 
     // spans_per_trace = 0 attaches nothing, counts unaffected.
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let none = run(sources, SearchQuery::new(Predicate::all()).spans_per_trace(0));
     assert!(none.traces.iter().all(|t| t.matched_spans.is_empty()));
     assert_eq!(none.traces.iter().map(|t| t.matched_count).sum::<usize>(), 10);
+}
+
+/// The per-service breakdown over the retained canonical spans: ranked
+/// by span count then name (ties at the cut included), capped with the
+/// tail folded into `other`/`other_services`, service-less spans
+/// counted as `unattributed`, a resend from another service counted
+/// once under its canonical copy's service, and a capped trace
+/// partitioning only its retained spans.
+#[test]
+fn service_breakdown_partitions_the_retained_canonical_spans() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = |name: &str| vec![kv_str("service.name", name)];
+    // Trace 21: frontend 3, auth 2, cart 2 (a name tie), 2 spans with no
+    // service, and a later resend of a cart span from another service.
+    let mut reqs = vec![
+        req_with(svc("frontend"), None, &[
+            span_in(21, 0xA1, 0, 5_000 * NS, "root"),
+            span_in(21, 0xA2, 0xA1, 5_001 * NS, "op"),
+            span_in(21, 0xA3, 0xA1, 5_002 * NS, "op"),
+        ]),
+        req_with(svc("cart"), None, &[
+            span_in(21, 0xA4, 0xA1, 5_003 * NS, "op"),
+            span_in(21, 0xA5, 0xA1, 5_004 * NS, "op"),
+        ]),
+        req_with(svc("auth"), None, &[
+            span_in(21, 0xA6, 0xA1, 5_005 * NS, "op"),
+            span_in(21, 0xA7, 0xA1, 5_006 * NS, "op"),
+        ]),
+        req_with(vec![kv_str("env", "prod")], None, &[
+            span_in(21, 0xA8, 0xA1, 5_007 * NS, "op"),
+            span_in(21, 0xA9, 0xA1, 5_008 * NS, "op"),
+        ]),
+        req_with(svc("zz-resend"), None, &[span_in(21, 0xA4, 0xA1, 5_009 * NS, "op")]),
+    ];
+    // Trace 22: seven services, more than the cap. foxtrot ties delta and
+    // echo at the cut and is seen before them, yet folds by name.
+    let services = [
+        ("alpha", 4),
+        ("foxtrot", 2),
+        ("golf", 1),
+        ("echo", 2),
+        ("delta", 2),
+        ("charlie", 3),
+        ("bravo", 3),
+    ];
+    let mut id = 0xB0u8;
+    let mut start = 6_000 * NS;
+    for (service, spans) in services {
+        let mut specs = Vec::new();
+        for _ in 0..spans {
+            let parent = if id == 0xB0 { 0 } else { 0xB0 };
+            specs.push(span_in(22, id, parent, start, "op"));
+            id += 1;
+            start += NS;
+        }
+        reqs.push(req_with(svc(service), None, &specs));
+    }
+    let wal = write_wal(dir.path(), reqs, "breakdown");
+
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let data = run(sources, SearchQuery::new(Predicate::all()));
+    assert_eq!(ids(&data), vec![hex(22), hex(21)]);
+    assert_breakdowns_partition(&data);
+    let (t22, t21) = (&data.traces[0], &data.traces[1]);
+    assert_eq!(t21.span_count, 9);
+    assert_eq!(
+        t21.service_breakdown,
+        breakdown(&[("frontend", 3), ("auth", 2), ("cart", 2)], 0, 0, 2)
+    );
+    assert_eq!(t22.span_count, 17);
+    assert_eq!(
+        t22.service_breakdown,
+        breakdown(
+            &[("alpha", 4), ("bravo", 3), ("charlie", 3), ("delta", 2), ("echo", 2)],
+            3,
+            2,
+            0
+        )
+    );
+
+    // Filtered to cart: only trace 21 matches, on two spans, yet its
+    // breakdown still covers every retained span, not just the matched ones.
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let filtered = run(
+        sources,
+        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Resource, "service.name", "cart")])),
+    );
+    assert_eq!(ids(&filtered), vec![hex(21)]);
+    assert_breakdowns_partition(&filtered);
+    let t21 = &filtered.traces[0];
+    assert_eq!((t21.span_count, t21.matched_count), (9, 2));
+    assert_eq!(
+        t21.service_breakdown,
+        breakdown(&[("frontend", 3), ("auth", 2), ("cart", 2)], 0, 0, 2)
+    );
+
+    // Capped at 2 spans: each trace keeps its two earliest, inexact, and
+    // the breakdown partitions exactly those.
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let capped = run(sources, SearchQuery::new(Predicate::all()).span_cap_for_tests(2));
+    assert!(capped.status.has(PartialReason::SizeCap));
+    assert_breakdowns_partition(&capped);
+    let (t22, t21) = (&capped.traces[0], &capped.traces[1]);
+    assert!(!t21.exact && !t22.exact);
+    assert_eq!(t21.service_breakdown, breakdown(&[("frontend", 2)], 0, 0, 0));
+    assert_eq!(t22.service_breakdown, breakdown(&[("alpha", 2)], 0, 0, 0));
 }
 
 /// The glm 7-trace construction (pin R2-1): losing resends inflate raw
@@ -1510,4 +1699,123 @@ fn tail_only_search_matches_the_sealed_answer() {
         ]
     });
     assert_eq!(norm(&run(tails, q())), norm(&run(sealed, q())));
+}
+
+/// An unavailable completion source reports its own reason beside a
+/// missing file's; the reachable data still answers but no summary is
+/// exact (the missing bytes may hold spans of any candidate). Alone, it
+/// is never Complete and never a source failure.
+#[test]
+fn unavailable_sources_are_reported_and_degrade_every_summary() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal_early = write_wal(dir.path(), early_requests(), "early");
+    let progress = Arc::new(AtomicUsize::new(0));
+    let data = search(
+        both_roles(|| {
+            vec![
+                sealed_source(dir.path(), &wal_early, "early"),
+                missing_source(dir.path(), "missing", 1_000, 1_100),
+                unavailable_source("remote", 1_000, 1_100),
+            ]
+        }),
+        SearchQuery::new(Predicate::all()),
+        CancellationToken::new(),
+        Arc::clone(&progress),
+    )
+    .unwrap();
+    assert_eq!(ids(&data), vec![hex(6), hex(4), hex(2), hex(1), hex(3)]);
+    assert!(data.traces.iter().all(|t| !t.exact));
+    assert_eq!(
+        data.status,
+        QueryStatus::Partial(BTreeSet::from([
+            PartialReason::SourceFailure,
+            PartialReason::RemoteUnavailable,
+        ]))
+    );
+    assert_eq!(
+        progress.load(Ordering::Relaxed),
+        3,
+        "one tick per completion source"
+    );
+
+    let only = run(
+        both_roles(|| vec![unavailable_source("remote", 1_000, 1_100)]),
+        SearchQuery::new(Predicate::all()),
+    );
+    assert!(only.traces.is_empty());
+    assert_eq!(
+        only.status,
+        QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]))
+    );
+}
+
+/// An unavailable source outside the match window but inside the
+/// completion slack still matters: it may hold out-of-window spans of a
+/// matched trace, so the reason is reported and no summary is exact.
+#[test]
+fn an_unavailable_source_in_the_completion_slack_makes_every_summary_inexact() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal_early = write_wal(dir.path(), early_requests(), "early");
+    let data = run(
+        SearchSources {
+            window: vec![sealed_source(dir.path(), &wal_early, "early")],
+            completion: vec![
+                sealed_source(dir.path(), &wal_early, "early"),
+                unavailable_source("remote-slack", 5_000, 6_000),
+            ],
+        },
+        SearchQuery::new(Predicate::all())
+            .window(TimeWindow::new((800 * NS) as i64, (1_400 * NS) as i64).unwrap()),
+    );
+    assert!(!data.traces.is_empty());
+    assert!(data.traces.iter().all(|t| !t.exact));
+    assert_eq!(
+        data.status,
+        QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]))
+    );
+}
+
+/// Trace-level conditions need an exact assembly; with an unavailable
+/// source in the snapshot every candidate is indeterminate and excluded
+/// (never guessed), and the reason says why the list is empty.
+#[test]
+fn an_unavailable_source_makes_trace_level_candidates_indeterminate() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc")];
+    let reqs = vec![req_with(
+        svc,
+        None,
+        &[
+            span_in(9, 0x91, 0, 100 * NS, "root-9"),
+            span_in(8, 0x81, 0, 400 * NS, "root-8"),
+        ],
+    )];
+    let wal = write_wal(dir.path(), reqs, "tristate");
+    let root_name = || {
+        SearchQuery::new(pred(vec![builtin(
+            BuiltinField::RootName,
+            CompareOp::Regex,
+            vec![text("root-.*")],
+        )]))
+    };
+    let whole = run(
+        both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]),
+        root_name(),
+    );
+    assert_eq!(ids(&whole), vec![hex(8), hex(9)]);
+
+    let degraded = run(
+        both_roles(|| {
+            vec![
+                sealed_source(dir.path(), &wal, "one"),
+                unavailable_source("remote", 0, 1_000),
+            ]
+        }),
+        root_name(),
+    );
+    assert!(degraded.traces.is_empty());
+    assert_eq!(
+        degraded.status,
+        QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]))
+    );
 }
