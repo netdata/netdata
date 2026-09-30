@@ -12,7 +12,11 @@ typedef struct {
     size_t frame_count;     // Number of frames processed
     bool first_frame;       // Is this the first frame?
     bool found_signal_handler;  // Have we found the signal handler frame?
+    size_t max_length;      // Stop adding frames beyond this text length (0 = unlimited)
+    bool truncated;         // Were frames dropped because of max_length?
 } backtrace_data_t;
+
+#define STACKTRACE_TRUNCATED_MARKER "\n... (truncated)"
 
 // For collecting raw frames
 typedef struct {
@@ -55,6 +59,7 @@ static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char 
         buffer_flush(wb);
         bt_data->frame_count = 0;
         bt_data->first_frame = true;
+        bt_data->truncated = false;
         bt_data->found_signal_handler = true;
         root_cause_function[0] = '\0';
         return; // Skip adding the signal handler itself
@@ -67,6 +72,7 @@ static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char 
         buffer_flush(wb);
         bt_data->frame_count = 0;
         bt_data->first_frame = true;
+        bt_data->truncated = false;
         root_cause_function[0] = '\0';
         // continue to add the function to the stack trace
     }
@@ -75,6 +81,30 @@ static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char 
     // (but only if we haven't already stored one)
     if (!root_cause_function[0] && stacktrace_is_netdata_function(function, filename))
         stacktrace_keep_first_root_cause_function(function);
+
+    const char *f = NULL;
+    if (filename && *filename) {
+        f = strstr(filename, "/src/");
+        if (f) {
+            const char *f2 = strstr(f + 1, "/src/");
+            if(f2) f = f2;
+        }
+        if(!f) f = filename;
+    }
+
+    if (bt_data->max_length) {
+        // Never grow the buffer past max_length: in a signal handler after a glibc heap abort the arena lock
+        // may be held, and a realloc would deadlock. Worst case of this frame: "\n#N function [0xPC] (file:NNN)".
+        size_t frame_max_length = 1 + 1 + 20 + 1 + ((function && *function) ? strlen(function) : strlen("<unknown>"))
+            + 2 + 18 + 1
+            + (f ? 2 + strlen(f) + 1 + 20 + 1 : 0);
+
+        if (bt_data->truncated ||
+            buffer_strlen(wb) + frame_max_length + strlen(STACKTRACE_TRUNCATED_MARKER) >= bt_data->max_length) {
+            bt_data->truncated = true;
+            return;
+        }
+    }
 
     // Add a newline between frames
     if (!bt_data->first_frame)
@@ -98,16 +128,8 @@ static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char 
         buffer_putc(wb, ']');
     }
 
-    if (filename && *filename) {
+    if (f) {
         buffer_strcat(wb, " (");
-
-        const char *f = strstr(filename, "/src/");
-        if (f) {
-            const char *f2 = strstr(f + 1, "/src/");
-            if(f2) f = f2;
-        }
-        if(!f) f = filename;
-
         buffer_strcat(wb, f);
 
         if (lineno > 0) {
@@ -223,7 +245,8 @@ void stacktrace_capture(BUFFER *wb) {
         .wb = wb,
         .frame_count = 0,
         .first_frame = true,
-        .found_signal_handler = false
+        .found_signal_handler = false,
+        .max_length = STACKTRACE_MAX_TEXT_LENGTH,
     };
 
     // Skip one frame to hide stacktrace_capture() itself
@@ -234,6 +257,8 @@ void stacktrace_capture(BUFFER *wb) {
     if (bt_data.frame_count == 0) {
         buffer_strcat(wb, NO_STACK_TRACE_PREFIX "libbacktrace reports no frames");
     }
+    else if (bt_data.truncated)
+        buffer_strcat(wb, STACKTRACE_TRUNCATED_MARKER);
 }
 
 // Implementation-specific function to collect stack trace frames

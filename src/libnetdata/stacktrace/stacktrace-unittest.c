@@ -89,6 +89,47 @@ static void inline_function_to_capture_stack_trace(stacktrace_test_data_t *test_
     never_inline_function_to_capture_stack_trace(test_data);
 }
 
+// Recurse deep enough that the formatted stack exceeds STACKTRACE_MAX_TEXT_LENGTH, then capture it
+NEVER_INLINE
+static int deep_recursion_to_capture_stack_trace(int depth, BUFFER *wb) {
+    if (depth == 0) {
+        stacktrace_capture(wb);
+        return 0;
+    }
+
+    // a volatile local read after the call gives every level its own frame (no tail call, no loop)
+    volatile int frame_marker = depth;
+    int rc = deep_recursion_to_capture_stack_trace(depth - 1, wb);
+    return rc + frame_marker;
+}
+
+// libbacktrace captures from signal handlers must stay within STACKTRACE_MAX_TEXT_LENGTH and never grow the buffer
+static bool stacktrace_max_length_unittest(void) {
+    if (strncmp(stacktrace_backend(), "libbacktrace", strlen("libbacktrace")) != 0) {
+        fprintf(stderr, "\nSTACKTRACE MAX LENGTH TEST: SKIPPED (backend %s)\n", stacktrace_backend());
+        return true;
+    }
+
+    BUFFER *wb = buffer_create(STACKTRACE_CAPTURE_MIN_BUFFER_SIZE, NULL);
+    uint32_t size_before = wb->size;
+
+    deep_recursion_to_capture_stack_trace(300, wb);
+
+    size_t len = buffer_strlen(wb);
+    const char *marker = "... (truncated)";
+    size_t marker_len = strlen(marker);
+    bool fits = len < STACKTRACE_MAX_TEXT_LENGTH;
+    bool not_grown = wb->size == size_before;
+    bool marked = len >= marker_len && strcmp(buffer_tostring(wb) + len - marker_len, marker) == 0;
+
+    fprintf(stderr, "\nSTACKTRACE MAX LENGTH TEST: length %zu (limit %d), buffer size %u -> %u, marker %s: %s\n",
+            len, STACKTRACE_MAX_TEXT_LENGTH, size_before, wb->size, marked ? "present" : "missing",
+            fits && not_grown && marked ? "SUCCESS" : "FAILURE");
+
+    buffer_free(wb);
+    return fits && not_grown && marked;
+}
+
 // Run the stacktrace unittest
 int stacktrace_unittest(void) {
     // Initialize stacktrace subsystem
@@ -137,7 +178,9 @@ int stacktrace_unittest(void) {
     buffer_free(test_data.indirect_root_cause);
     
     // Report overall test status - success if both analyses succeed
-    bool test_success = cache_collision_test && direct_analysis && indirect_analysis;
+    bool max_length_test = stacktrace_max_length_unittest();
+
+    bool test_success = cache_collision_test && direct_analysis && indirect_analysis && max_length_test;
     fprintf(stderr, "\nSTACKTRACE TEST: Overall result: %s\n",
             test_success ? "SUCCESS" : "FAILURE");
     
