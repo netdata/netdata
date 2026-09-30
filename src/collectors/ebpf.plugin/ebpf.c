@@ -1015,16 +1015,82 @@ static void ebpf_set_global_variables()
     if (!ebpf_configured_log_dir)
         ebpf_configured_log_dir = LOG_DIR;
 
-    ebpf_nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
-    if (ebpf_nprocs < 0) {
+    ebpf_nprocs = libbpf_num_possible_cpus();
+    if (ebpf_nprocs < 1) {
         ebpf_nprocs = NETDATA_MAX_PROCESSOR;
-        netdata_log_error("Cannot identify number of process, using default value %d", ebpf_nprocs);
+        netdata_log_error("Cannot identify number of possible CPUs, using default value %d", ebpf_nprocs);
     }
 
     isrh = get_redhat_release();
     pid_max = os_get_system_pid_max();
     running_on_kernel = ebpf_get_kernel_version();
     ebpf_reset_pid_map_fds();
+}
+
+static const struct option ebpf_long_options[] = {
+    {"process", no_argument, 0, EBPF_MODULE_PROCESS_IDX},
+    {"sync", no_argument, 0, EBPF_MODULE_SYNC_IDX},
+    {"swap", no_argument, 0, EBPF_MODULE_SWAP_IDX},
+    {"vfs", no_argument, 0, EBPF_MODULE_VFS_IDX},
+    {"filesystem", no_argument, 0, EBPF_MODULE_FILESYSTEM_IDX},
+    {"disk", no_argument, 0, EBPF_MODULE_DISK_IDX},
+    {"mount", no_argument, 0, EBPF_MODULE_MOUNT_IDX},
+    {"hardirq", no_argument, 0, EBPF_MODULE_HARDIRQ_IDX},
+    {"softirq", no_argument, 0, EBPF_MODULE_SOFTIRQ_IDX},
+    {"oomkill", no_argument, 0, EBPF_MODULE_OOMKILL_IDX},
+    {"shm", no_argument, 0, EBPF_MODULE_SHM_IDX},
+    {"mdflush", no_argument, 0, EBPF_MODULE_MDFLUSH_IDX},
+    /* Add options with matching enum values; the table order is immaterial. */
+    {"all", no_argument, 0, EBPF_OPTION_ALL_CHARTS},
+    {"version", no_argument, 0, EBPF_OPTION_VERSION},
+    {"help", no_argument, 0, EBPF_OPTION_HELP},
+    {"global", no_argument, 0, EBPF_OPTION_GLOBAL_CHART},
+    {"return", no_argument, 0, EBPF_OPTION_RETURN_MODE},
+    {"legacy", no_argument, 0, EBPF_OPTION_LEGACY},
+    {"core", no_argument, 0, EBPF_OPTION_CORE},
+    {"unittest", no_argument, 0, EBPF_OPTION_UNITTEST},
+    {0, 0, 0, 0}};
+
+/**
+ * Handle informational options before initializing logging or collector state.
+ *
+ * getopt permutes argv on GNU systems, so parse a copied pointer array and restore its globals
+ * before handing the original arguments to the normal parser.
+ */
+static void ebpf_handle_early_info_options(int argc, char **argv)
+{
+    char **argv_copy = malloc(sizeof(*argv_copy) * (size_t)(argc + 1));
+    if (!argv_copy)
+        return;
+
+    memcpy(argv_copy, argv, sizeof(*argv_copy) * (size_t)(argc + 1));
+
+    int original_optind = optind;
+    int original_opterr = opterr;
+    int original_optopt = optopt;
+    char *original_optarg = optarg;
+    optind = 1;
+    opterr = 0;
+
+    int c;
+    while ((c = getopt_long_only(argc, argv_copy, "", ebpf_long_options, NULL)) != -1) {
+        if (c == EBPF_OPTION_VERSION) {
+            free(argv_copy);
+            printf("ebpf.plugin %s\n", NETDATA_VERSION);
+            exit(0);
+        }
+        if (c == EBPF_OPTION_HELP) {
+            free(argv_copy);
+            ebpf_print_help();
+            exit(0);
+        }
+    }
+
+    optind = original_optind;
+    opterr = original_opterr;
+    optopt = original_optopt;
+    optarg = original_optarg;
+    free(argv_copy);
 }
 
 /**
@@ -1037,31 +1103,7 @@ static void ebpf_parse_args(int argc, char **argv)
 {
     int disable_cgroups = 1;
     int freq = 0;
-    int option_index = 0;
     uint64_t select_threads = 0;
-    static struct option long_options[] = {
-        {"process", no_argument, 0, 0},
-        {"sync", no_argument, 0, 0},
-        {"swap", no_argument, 0, 0},
-        {"vfs", no_argument, 0, 0},
-        {"filesystem", no_argument, 0, 0},
-        {"disk", no_argument, 0, 0},
-        {"mount", no_argument, 0, 0},
-        {"hardirq", no_argument, 0, 0},
-        {"softirq", no_argument, 0, 0},
-        {"oomkill", no_argument, 0, 0},
-        {"shm", no_argument, 0, 0},
-        {"mdflush", no_argument, 0, 0},
-        /* INSERT NEW THREADS BEFORE THIS COMMENT TO KEEP COMPATIBILITY WITH enum ebpf_module_indexes */
-        {"all", no_argument, 0, 0},
-        {"version", no_argument, 0, 0},
-        {"help", no_argument, 0, 0},
-        {"global", no_argument, 0, 0},
-        {"return", no_argument, 0, 0},
-        {"legacy", no_argument, 0, 0},
-        {"core", no_argument, 0, 0},
-        {"unittest", no_argument, 0, 0},
-        {0, 0, 0, 0}};
 
     if (argc > 1) {
         int n = (int)str2l(argv[1]);
@@ -1085,11 +1127,11 @@ static void ebpf_parse_args(int argc, char **argv)
     ebpf_load_thread_config();
 
     while (1) {
-        int c = getopt_long_only(argc, argv, "", long_options, &option_index);
+        int c = getopt_long_only(argc, argv, "", ebpf_long_options, NULL);
         if (c == -1)
             break;
 
-        switch (option_index) {
+        switch (c) {
             case EBPF_MODULE_PROCESS_IDX: {
                 select_threads |= 1 << EBPF_MODULE_PROCESS_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -2015,6 +2057,8 @@ static bool ebpf_all_enabled_threads_stopped(void)
  */
 int main(int argc, char **argv)
 {
+    ebpf_handle_early_info_options(argc, argv);
+
     // Reduce memory footprint:
     // - Single malloc arena avoids fragmentation across 24+ threads
     // - Allocations >1MB use mmap so they're returned to OS on free,
