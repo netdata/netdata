@@ -44,10 +44,15 @@ type Collector struct {
 
 	// Generic jobs load definition from Manifest in Init; registered package
 	// jobs receive it at creation.
-	definition     packageDefinition
-	registered     bool
-	configEnvelope []byte
-	initialized    bool
+	definition       packageDefinition
+	registered       bool
+	configEnvelope   []byte
+	initialized      bool
+	templates        *chartengine.TemplateSet
+	checks           []checkDefinition // definitions in the current template set only
+	contracts        map[string]retainedContract
+	pendingContracts map[string]metricContract
+	contractCommit   uint64
 
 	runtimeMu sync.Mutex
 	runtime   *persistentRuntime // set while a persistent session accepts requests
@@ -68,6 +73,8 @@ func (c *Collector) Configuration() any {
 	cfg := c.Config
 	if c.registered {
 		cfg.Manifest = ""
+		cfg.Command = nil
+		cfg.Mode = ""
 		cfg.ScriptConfig = c.definition.effectiveSettings(cfg.ScriptConfig)
 	}
 	return cfg
@@ -75,7 +82,7 @@ func (c *Collector) Configuration() any {
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
-func (c *Collector) ChartTemplateSet() *chartengine.TemplateSet { return c.definition.templates }
+func (c *Collector) ChartTemplateSet() *chartengine.TemplateSet { return c.templates }
 
 func (c *Collector) Init(context.Context) error {
 	c.initialized = false
@@ -89,6 +96,8 @@ func (c *Collector) Init(context.Context) error {
 	if c.configEnvelope, err = c.definition.configEnvelope(c.ScriptConfig); err != nil {
 		return err
 	}
+	c.templates = c.definition.templates
+	c.checks = nil
 	c.initialized = true
 	return nil
 }
@@ -113,6 +122,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 }
 
 func (c *Collector) Collect(ctx context.Context) error {
+	c.reconcileContracts()
 	snap, err := c.collectSnapshot(ctx)
 	if err != nil {
 		return err
@@ -121,7 +131,14 @@ func (c *Collector) Collect(ctx context.Context) error {
 		return err
 	}
 	// The complete snapshot has been validated before staging any writes.
+	if err := c.validateContracts(snap.Metrics); err != nil {
+		return err
+	}
+	if err := c.updateCheckTemplates(snap.Checks); err != nil {
+		return err
+	}
 	c.writeSnapshot(snap)
+	c.stageContracts(snap.Metrics)
 	return nil
 }
 

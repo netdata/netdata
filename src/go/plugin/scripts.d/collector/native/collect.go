@@ -21,7 +21,7 @@ func (c *Collector) collectOneshot(ctx context.Context) (snapshot, error) {
 	if err != nil {
 		return snapshot{}, err
 	}
-	snap, err := c.definition.decodeSnapshot(data)
+	snap, err := decodeSnapshot(data)
 	if err != nil {
 		return snapshot{}, fmt.Errorf("invalid collect response: %w", err)
 	}

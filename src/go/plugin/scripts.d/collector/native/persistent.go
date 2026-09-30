@@ -129,7 +129,7 @@ func (c *Collector) serveRequest(
 		defer cancel()
 		data, err := s.exchange(exchangeCtx, encodeCollectRequest(id))
 		if err == nil {
-			result.snapshot, err = c.definition.decodeReply(data, id)
+			result.snapshot, err = decodeReply(data, id)
 		}
 		result.err = err
 		return result, err != nil && !errors.Is(err, errCollectionFailed)

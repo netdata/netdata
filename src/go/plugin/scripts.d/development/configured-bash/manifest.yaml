@@ -3,9 +3,3 @@ version: v1
 mode: oneshot
 command: [./collect.sh]
 config_schema: config_schema.json
-metrics:
-  - {name: depth, type: gauge, unit: jobs}
-checks:
-  - id: backlog
-    title: Queue Backlog
-    by_labels: [queue]

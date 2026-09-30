@@ -51,7 +51,7 @@ func TestRunDescribe_ContainsDescendants(t *testing.T) {
 			body := `dir=$(dirname "$0")
 (sleep 1; printf escaped > "$dir/escaped") &
 printf started > "$dir/started"
-printf '%s\n' 'version: v1' 'checks: [{id: ready, title: Ready}]'
+printf '%s\n' 'version: v1'
 `
 			if tc.callerCancels {
 				body += "wait\n"

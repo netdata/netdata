@@ -13,6 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -71,7 +72,7 @@ func TestConfigEnvelope_RoundTrip(t *testing.T) {
 	const peer = `import json, pathlib, sys
 config = json.loads(sys.stdin.readline())
 pathlib.Path(__file__).with_suffix('.received').write_text(json.dumps(config))
-result = {"version":"v1", "metrics":[{"name":"depth","value":config["config"]["count"],"labels":{"queue":"mail"}}]}
+result = {"version":"v1", "metrics":[{"name":"depth","unit":"jobs","samples":[{"value":config["config"]["count"],"labels":{"queue":"mail"}}]}]}
 if sys.argv[-1] == 'serve':
     print(json.dumps({"version":"v1","ready":True}), flush=True)
     for line in sys.stdin:
@@ -109,6 +110,38 @@ else:
 			require.NoError(t, json.Unmarshal(received, &got))
 			require.NoError(t, json.Unmarshal(c.configEnvelope, &want))
 			assert.Equal(t, want, got)
+		})
+	}
+}
+
+func TestGenericJobFormSources(t *testing.T) {
+	var form map[string]any
+	require.NoError(t, json.Unmarshal([]byte(configSchema), &form))
+	compiler := jsonschema.NewCompiler()
+	compiler.UseLoader(nil)
+	require.NoError(t, compiler.AddResource("urn:native-form", form["jsonSchema"]))
+	schema, err := compiler.Compile("urn:native-form")
+	require.NoError(t, err)
+	for name, tc := range map[string]struct {
+		config  map[string]any
+		wantErr bool
+	}{
+		"manifest":                    {config: map[string]any{"manifest": "/manifest.yaml"}},
+		"manifest with unset command": {config: map[string]any{"manifest": "/manifest.yaml", "command": nil}},
+		"unset command alone":         {config: map[string]any{"command": nil}, wantErr: true},
+		"direct one-shot default":     {config: map[string]any{"command": []any{"/collect"}}},
+		"direct persistent":           {config: map[string]any{"command": []any{"/collect"}, "mode": "persistent"}},
+		"no source":                   {config: map[string]any{}, wantErr: true},
+		"two sources":                 {config: map[string]any{"manifest": "/manifest.yaml", "command": []any{"/collect"}}, wantErr: true},
+		"manifest mode override":      {config: map[string]any{"manifest": "/manifest.yaml", "mode": "oneshot"}, wantErr: true},
+		"invalid mode":                {config: map[string]any{"command": []any{"/collect"}, "mode": "push"}, wantErr: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if tc.wantErr {
+				require.Error(t, schema.Validate(tc.config))
+			} else {
+				require.NoError(t, schema.Validate(tc.config))
+			}
 		})
 	}
 }

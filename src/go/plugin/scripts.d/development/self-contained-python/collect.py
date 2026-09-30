@@ -7,7 +7,6 @@ import sys
 DESCRIPTION = {
     "version": "v1",
     "mode": "persistent" if "--persistent" in sys.argv[1:-1] else "oneshot",
-    "metrics": [{"name": "depth", "type": "gauge", "unit": "jobs"}],
     "functions": [{"id": "items", "name": "Items", "help": "Show the synthetic queue."}],
     "charts": """version: v1
 context_namespace: selfcontained_python
@@ -42,7 +41,7 @@ def emit(value):
 
 
 def snapshot(count):
-    return {"version": "v1", "metrics": [{"name": "depth", "value": count}]}
+    return {"version": "v1", "metrics": [{"name": "depth", "unit": "jobs", "samples": [{"value": count}]}]}
 
 
 def answer(request, count):

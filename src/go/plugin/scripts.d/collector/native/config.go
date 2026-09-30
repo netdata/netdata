@@ -21,6 +21,8 @@ type Config struct {
 	ScriptConfig    Settings         `yaml:"config,omitempty"              json:"config,omitempty"`
 	UpdateEvery     int              `yaml:"update_every,omitempty"        json:"update_every,omitempty"`
 	AutoDetectEvery int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
+	Command         []string         `yaml:"command,omitempty"             json:"command,omitempty"`
+	Mode            string           `yaml:"mode,omitempty"                json:"mode,omitempty"`
 	Manifest        string           `yaml:"manifest,omitempty"            json:"manifest,omitempty"`
 	Timeout         confopt.Duration `yaml:"timeout,omitempty"             json:"timeout,omitempty"`
 }

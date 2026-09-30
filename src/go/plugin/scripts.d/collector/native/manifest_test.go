@@ -17,35 +17,26 @@ func TestLoadManifest(t *testing.T) {
 		manifest string
 		wantErr  bool
 	}{
-		"valid":           {manifest: fixtureManifest},
-		"mode":            {manifest: fixtureManifest + "mode: push\n", wantErr: true},
-		"version":         {manifest: strings.Replace(fixtureManifest, "version: v1", "version: v2", 1), wantErr: true},
-		"unknown field":   {manifest: fixtureManifest + "typo: true\n", wantErr: true},
-		"second document": {manifest: fixtureManifest + "---\nversion: v1\n", wantErr: true},
-		"duplicate metric": {
-			manifest: strings.Replace(
-				fixtureManifest,
-				"name: processed_total, type: counter",
-				"name: depth, type: gauge",
-				1,
-			),
-			wantErr: true,
-		},
-		"reserved metric": {
-			manifest: strings.Replace(fixtureManifest, "name: depth", "name: native.check.test", 1),
+		"valid": {manifest: fixtureManifest},
+		"mode":  {manifest: fixtureManifest + "mode: push\n", wantErr: true},
+		"version": {
+			manifest: strings.Replace(fixtureManifest, "version: v1", "version: v2", 1),
 			wantErr:  true,
 		},
-		"invalid type": {manifest: strings.Replace(fixtureManifest, "type: gauge", "type: typo", 1), wantErr: true},
-		"missing unit": {manifest: strings.Replace(fixtureManifest, "unit: jobs}", "unit: ' '}", 1), wantErr: true},
-		"duplicate identity label": {
-			manifest: strings.Replace(fixtureManifest, "by_labels: [queue]", "by_labels: [queue, queue]", 1),
+		"unknown field":                         {manifest: fixtureManifest + "typo: true\n", wantErr: true},
+		"second document":                       {manifest: fixtureManifest + "---\nversion: v1\n", wantErr: true},
+		"legacy metric declarations":            {manifest: fixtureManifest + "metrics: []\n", wantErr: true},
+		"legacy check declarations":             {manifest: fixtureManifest + "checks: []\n", wantErr: true},
+		"disabled collection without Functions": {manifest: fixtureManifest + "collect: false\n", wantErr: true},
+		"disabled collection with charts": {
+			manifest: fixtureManifest + "collect: false\nfunctions: [{id: items, name: Items, help: Show items.}]\n",
 			wantErr:  true,
 		},
 		"empty command": {
 			manifest: strings.Replace(fixtureManifest, "command: [./collect.sh]", "command: []", 1),
 			wantErr:  true,
 		},
-		"no declaration": {manifest: "version: v1\ncommand: [./collect.sh]\n", wantErr: true},
+		"no declaration": {manifest: "version: v1\ncommand: [./collect.sh]\n"},
 		"reserved chart ID": {
 			manifest: strings.Replace(fixtureManifest, "charts: charts.yaml", "charts: reserved.yaml", 1),
 			wantErr:  true,
@@ -77,7 +68,7 @@ func TestLoadManifest(t *testing.T) {
 				"command resolves against the manifest",
 			)
 			assert.Equal(t, modeOneshot, definition.Mode)
-			assert.NotNil(t, definition.templates)
+			assert.Equal(t, !definition.functionOnly(), definition.templates != nil)
 		})
 	}
 }
