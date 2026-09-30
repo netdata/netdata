@@ -25,6 +25,7 @@ struct config collector_config = APPCONFIG_INITIALIZER;
 
 int running_on_kernel = 0;
 int ebpf_nprocs;
+static bool ebpf_possible_cpus_unknown = false;
 int isrh = 0;
 int main_thread_id = 0;
 int process_pid_fd = -1;
@@ -1015,10 +1016,18 @@ static void ebpf_set_global_variables()
     if (!ebpf_configured_log_dir)
         ebpf_configured_log_dir = LOG_DIR;
 
-    ebpf_nprocs = (int)sysconf(_SC_NPROCESSORS_ONLN);
-    if (ebpf_nprocs < 0) {
+    // Per-CPU maps hold a value for every possible CPU, not only the online ones
+    int possible_cpus = libbpf_num_possible_cpus();
+    if (possible_cpus > 0) {
+        ebpf_nprocs = possible_cpus;
+    } else {
+        // No buffer size is safe for a per-CPU lookup without this count, so ebpf_parse_args() stops the plugin
+        ebpf_possible_cpus_unknown = true;
         ebpf_nprocs = NETDATA_MAX_PROCESSOR;
-        netdata_log_error("Cannot identify number of process, using default value %d", ebpf_nprocs);
+        netdata_log_error(
+            "libbpf_num_possible_cpus() returned %d instead of a positive CPU count: per-CPU maps cannot be read "
+            "safely, so eBPF collection will not start.",
+            possible_cpus);
     }
 
     isrh = get_redhat_release();
@@ -1037,30 +1046,29 @@ static void ebpf_parse_args(int argc, char **argv)
 {
     int disable_cgroups = 1;
     int freq = 0;
-    int option_index = 0;
     uint64_t select_threads = 0;
+    /* val is the enum ebpf_main_index constant handled by the switch below; the order of entries does not matter */
     static struct option long_options[] = {
-        {"process", no_argument, 0, 0},
-        {"sync", no_argument, 0, 0},
-        {"swap", no_argument, 0, 0},
-        {"vfs", no_argument, 0, 0},
-        {"filesystem", no_argument, 0, 0},
-        {"disk", no_argument, 0, 0},
-        {"mount", no_argument, 0, 0},
-        {"hardirq", no_argument, 0, 0},
-        {"softirq", no_argument, 0, 0},
-        {"oomkill", no_argument, 0, 0},
-        {"shm", no_argument, 0, 0},
-        {"mdflush", no_argument, 0, 0},
-        /* INSERT NEW THREADS BEFORE THIS COMMENT TO KEEP COMPATIBILITY WITH enum ebpf_module_indexes */
-        {"all", no_argument, 0, 0},
-        {"version", no_argument, 0, 0},
-        {"help", no_argument, 0, 0},
-        {"global", no_argument, 0, 0},
-        {"return", no_argument, 0, 0},
-        {"legacy", no_argument, 0, 0},
-        {"core", no_argument, 0, 0},
-        {"unittest", no_argument, 0, 0},
+        {"process", no_argument, 0, EBPF_MODULE_PROCESS_IDX},
+        {"sync", no_argument, 0, EBPF_MODULE_SYNC_IDX},
+        {"swap", no_argument, 0, EBPF_MODULE_SWAP_IDX},
+        {"vfs", no_argument, 0, EBPF_MODULE_VFS_IDX},
+        {"filesystem", no_argument, 0, EBPF_MODULE_FILESYSTEM_IDX},
+        {"disk", no_argument, 0, EBPF_MODULE_DISK_IDX},
+        {"mount", no_argument, 0, EBPF_MODULE_MOUNT_IDX},
+        {"hardirq", no_argument, 0, EBPF_MODULE_HARDIRQ_IDX},
+        {"softirq", no_argument, 0, EBPF_MODULE_SOFTIRQ_IDX},
+        {"oomkill", no_argument, 0, EBPF_MODULE_OOMKILL_IDX},
+        {"shm", no_argument, 0, EBPF_MODULE_SHM_IDX},
+        {"mdflush", no_argument, 0, EBPF_MODULE_MDFLUSH_IDX},
+        {"all", no_argument, 0, EBPF_OPTION_ALL_CHARTS},
+        {"version", no_argument, 0, EBPF_OPTION_VERSION},
+        {"help", no_argument, 0, EBPF_OPTION_HELP},
+        {"global", no_argument, 0, EBPF_OPTION_GLOBAL_CHART},
+        {"return", no_argument, 0, EBPF_OPTION_RETURN_MODE},
+        {"legacy", no_argument, 0, EBPF_OPTION_LEGACY},
+        {"core", no_argument, 0, EBPF_OPTION_CORE},
+        {"unittest", no_argument, 0, EBPF_OPTION_UNITTEST},
         {0, 0, 0, 0}};
 
     if (argc > 1) {
@@ -1085,11 +1093,11 @@ static void ebpf_parse_args(int argc, char **argv)
     ebpf_load_thread_config();
 
     while (1) {
-        int c = getopt_long_only(argc, argv, "", long_options, &option_index);
+        int c = getopt_long_only(argc, argv, "", long_options, NULL);
         if (c == -1)
             break;
 
-        switch (option_index) {
+        switch (c) {
             case EBPF_MODULE_PROCESS_IDX: {
                 select_threads |= 1 << EBPF_MODULE_PROCESS_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1239,6 +1247,10 @@ static void ebpf_parse_args(int argc, char **argv)
                 if (ebpf_adjust_memory_limit())
                     goto unittest;
 
+                // Buffers sized with ebpf_nprocs must hold a per-CPU map value
+                if (ebpf_ut_percpu_lookup_fits_nprocs())
+                    goto unittest;
+
                 // Load binary in entry mode
                 ebpf_ut_initialize_structure(MODE_ENTRY);
                 if (ebpf_ut_load_real_binary())
@@ -1262,6 +1274,12 @@ static void ebpf_parse_args(int argc, char **argv)
             }
         }
     }
+
+    // Not every loader can make the maps single-valued, so without the possible-CPU count no module may collect.
+    // This runs after the options, so --help, --version and --unittest still work.
+    // Plain exit(): ebpf_cleanup() would touch the mutex, PID file and shared memory that main() hasn't set up yet.
+    if (ebpf_possible_cpus_unknown)
+        exit(1);
 
     if (disable_cgroups) {
         ebpf_disable_cgroups();

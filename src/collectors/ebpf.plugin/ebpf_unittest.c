@@ -113,6 +113,69 @@ int ebpf_ut_load_fake_binary()
 }
 
 /**
+ * Per-CPU Lookup Fits Nprocs
+ *
+ * Collectors read per-CPU maps into buffers holding ebpf_nprocs values, but the kernel copies one value for every
+ * possible CPU. On hosts with hot-pluggable CPU slots (possible > online) those buffers overflow. Read a per-CPU
+ * array into a buffer followed by guard entries and fail when the kernel writes past ebpf_nprocs values. Hosts where
+ * possible and online CPUs match cannot expose the problem, so the test passes there.
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+int ebpf_ut_percpu_lookup_fits_nprocs()
+{
+    int possible = libbpf_num_possible_cpus();
+    if (possible <= 0) {
+        fprintf(stderr, "Cannot get the number of possible CPUs: %d\n", possible);
+        return -1;
+    }
+
+    // Room for everything the kernel writes plus one guard entry, so a mismatch never corrupts the heap
+    size_t entries = (size_t)MAX(possible, ebpf_nprocs) + 1;
+    netdata_idx_t *values = mallocz(entries * sizeof(netdata_idx_t));
+    const netdata_idx_t guard = 0xA5A5A5A5A5A5A5A5ULL;
+    for (size_t i = 0; i < entries; i++)
+        values[i] = guard;
+
+    uint32_t key = 0;
+#ifdef LIBBPF_MAJOR_VERSION
+    int fd = bpf_map_create(BPF_MAP_TYPE_PERCPU_ARRAY, "nd_ut_percpu", sizeof(key), sizeof(netdata_idx_t), 1, NULL);
+#else
+    int fd = bpf_create_map(BPF_MAP_TYPE_PERCPU_ARRAY, sizeof(key), sizeof(netdata_idx_t), 1, 0);
+#endif
+    if (fd < 0) {
+        fprintf(stderr, "Cannot create a per-CPU array: %s\n", strerror(errno));
+        freez(values);
+        return -1;
+    }
+
+    int ret = bpf_map_lookup_elem(fd, &key, values);
+    int lookup_errno = errno;
+    close(fd);
+    if (ret) {
+        fprintf(stderr, "Cannot read the per-CPU array: %s\n", strerror(lookup_errno));
+        freez(values);
+        return -1;
+    }
+
+    // A new map holds zeros, so every value the kernel copied replaced the guard pattern
+    size_t written = 0;
+    while (written < entries && values[written] != guard)
+        written++;
+    freez(values);
+
+    int fits = written <= (size_t)ebpf_nprocs;
+    fprintf(
+        stderr,
+        ">>> %s: per-CPU lookup wrote %zu values, buffers sized with ebpf_nprocs hold %d\n",
+        fits ? "PASSED" : "FAILED",
+        written,
+        ebpf_nprocs);
+
+    return fits ? 0 : -1;
+}
+
+/**
  * Test write_chart_dimension
  *
  * Tests the write_chart_dimension function to ensure it correctly
