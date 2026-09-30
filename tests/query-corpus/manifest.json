@@ -958,7 +958,8 @@
   },
   {
     "name": "CASE-040/inverted-tier-retention",
-    "proves": "automatic tier selection preserves every constant-valued bucket of history retained in a finer tier when the selected coarser tier was enabled later; forced-tier controls prove the stored history and coarser suffix independently"
+    "proves": "automatic tier selection preserves constant-valued history available across tiers, including late-enabled coarse tiers and isolated coarse head samples; forced-tier controls prove the stored values independently",
+    "components": ["late-tier", "isolated-head"]
   },
   {
     "name": "CASE-019/v1-json-name-escaping",
