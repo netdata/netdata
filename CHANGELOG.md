@@ -473,6 +473,15 @@
 - Feat(scripts.d): add persistent native script sessions ([#24076](https://github.com/netdata/netdata/issues/24076))
 - Fix ML memory accounting across C++ allocation paths ([#22477](https://github.com/netdata/netdata/issues/22477))
 - Feat(scripts.d): add native package configuration and DynCfg support ([#24078](https://github.com/netdata/netdata/issues/24078))
+- Feat(scripts.d): add native script Functions ([#24079](https://github.com/netdata/netdata/issues/24079))
+- Feat(scripts.d): support self-contained native script packages ([#24084](https://github.com/netdata/netdata/issues/24084))
+- Cluster Shared Volumes (Windows) ([#23720](https://github.com/netdata/netdata/issues/23720))
+- Upload stable release artifacts to R2 just like nightlies. ([#24013](https://github.com/netdata/netdata/issues/24013))
+- Fix: preserve URL-selected host for v1 weights ([#24080](https://github.com/netdata/netdata/issues/24080))
+- Fix: count missing samples as zero in average anomaly weights ([#24081](https://github.com/netdata/netdata/issues/24081))
+- Refactor(scripts.d): restructure native collector code and tests ([#24086](https://github.com/netdata/netdata/issues/24086))
+- Otel-traces: read evicted files back from remote storage, document traces ([#24088](https://github.com/netdata/netdata/issues/24088))
+- Build(deps): bump pyjwt from 2.13.0 to 2.14.0 in /packaging/tools/automation/mcp ([#24090](https://github.com/netdata/netdata/issues/24090))
 
 ## [2.11.0] - 2026-08-12
 
