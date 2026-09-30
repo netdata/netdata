@@ -1108,6 +1108,8 @@ _Static_assert(STATIC_SAVE_BUFFER_SIZE >= 6 * sizeof(DAEMON_STATUS_FILE) + 8192,
                "static_save_buffer must fit the worst-case status file JSON without growing");
 _Static_assert(STATIC_SAVE_BUFFER_SIZE >= STACKTRACE_CAPTURE_MIN_BUFFER_SIZE,
                "static_save_buffer must fit a full stack trace without growing");
+_Static_assert(sizeof(((DAEMON_STATUS_FILE *)0)->fatal.stack_trace) >= STACKTRACE_MAX_TEXT_LENGTH,
+               "the status file must store a full stack trace");
 
 static BUFFER *static_save_buffer = NULL;
 static void static_save_buffer_init(void) {

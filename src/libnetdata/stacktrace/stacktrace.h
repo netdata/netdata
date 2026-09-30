@@ -11,6 +11,9 @@
 // signal handlers (it also caps the stack traces attached to logs). Frames beyond it are dropped.
 #define STACKTRACE_MAX_TEXT_LENGTH 4096
 
+// Appended to a stack trace when frames were dropped to stay within STACKTRACE_MAX_TEXT_LENGTH
+#define STACKTRACE_TRUNCATED_MARKER "\n... (truncated)"
+
 // A buffer preallocated with at least this many bytes is never reallocated by stacktrace_capture() with libbacktrace
 // (buffer_strcat() reserves 100 bytes ahead of every copy). Required in signal handlers.
 #define STACKTRACE_CAPTURE_MIN_BUFFER_SIZE (STACKTRACE_MAX_TEXT_LENGTH + 1024)

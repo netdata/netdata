@@ -116,8 +116,8 @@ static bool stacktrace_max_length_unittest(void) {
     deep_recursion_to_capture_stack_trace(300, wb);
 
     size_t len = buffer_strlen(wb);
-    const char *marker = "... (truncated)";
-    size_t marker_len = strlen(marker);
+    const char *marker = STACKTRACE_TRUNCATED_MARKER;
+    size_t marker_len = sizeof(STACKTRACE_TRUNCATED_MARKER) - 1;
     bool fits = len < STACKTRACE_MAX_TEXT_LENGTH;
     bool not_grown = wb->size == size_before;
     bool marked = len >= marker_len && strcmp(buffer_tostring(wb) + len - marker_len, marker) == 0;

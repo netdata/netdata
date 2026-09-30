@@ -16,8 +16,6 @@ typedef struct {
     bool truncated;         // Were frames dropped because of max_length?
 } backtrace_data_t;
 
-#define STACKTRACE_TRUNCATED_MARKER "\n... (truncated)"
-
 // For collecting raw frames
 typedef struct {
     void **frames;
@@ -95,12 +93,14 @@ static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char 
     if (bt_data->max_length) {
         // Never grow the buffer past max_length: in a signal handler after a glibc heap abort the arena lock
         // may be held, and a realloc would deadlock. Worst case of this frame: "\n#N function [0xPC] (file:NNN)".
-        size_t frame_max_length = 1 + 1 + 20 + 1 + ((function && *function) ? strlen(function) : strlen("<unknown>"))
+        // strnlen(): any string reaching max_length cannot fit anyway, so the scan stays bounded
+        size_t frame_max_length = 1 + 1 + 20 + 1
+            + ((function && *function) ? strnlen(function, bt_data->max_length) : sizeof("<unknown>") - 1)
             + 2 + 18 + 1
-            + (f ? 2 + strlen(f) + 1 + 20 + 1 : 0);
+            + (f ? 2 + strnlen(f, bt_data->max_length) + 1 + 20 + 1 : 0);
 
         if (bt_data->truncated ||
-            buffer_strlen(wb) + frame_max_length + strlen(STACKTRACE_TRUNCATED_MARKER) >= bt_data->max_length) {
+            buffer_strlen(wb) + frame_max_length + sizeof(STACKTRACE_TRUNCATED_MARKER) - 1 >= bt_data->max_length) {
             bt_data->truncated = true;
             return;
         }
