@@ -19,12 +19,22 @@ enum netdata_netframework_metrics {
 struct net_framework_instances {
     ULONGLONG last_process_id;
     bool process_id_label_initialized;
+    bool process_id_set_initialized;
+    bool process_id_set_complete;
+    bool process_id_set_complete_this_cycle;
+    bool process_id_set_seen_this_cycle;
+    uint32_t process_id_set_count;
+    uint32_t process_id_set_count_this_cycle;
+    uint64_t process_id_set_hash;
+    uint64_t process_id_set_hash_this_cycle;
     uint32_t objects_seen;
     uint32_t objects_seen_this_cycle;
     uint32_t instances_seen_this_cycle[NETDATA_NETFRAMEWORK_END];
     uint32_t instances_seen_previous_cycle[NETDATA_NETFRAMEWORK_END];
     bool population_changed[NETDATA_NETFRAMEWORK_END];
     unsigned current_object;
+    DICTIONARY *counter_histories;
+    uint64_t counter_history_generation[NETDATA_NETFRAMEWORK_END];
 
     RRDSET *st_clrexception_thrown;
     RRDDIM *rd_clrexception_thrown;
@@ -248,10 +258,23 @@ static DICTIONARY *processes = NULL;
 static DICTIONARY *netframework_instance_groups = NULL;
 static bool netframework_chart_commit_allowed = true;
 static bool netframework_current_name_unique = true;
+static struct net_framework_instances *netframework_current_process = NULL;
+static unsigned netframework_current_object = 0;
+static uint64_t netframework_collection_cycle = 0;
 
 struct netframework_instance_group {
     unsigned count;
     PERF_INSTANCE_DEFINITION *last;
+};
+
+struct netframework_counter_history {
+    uint32_t previous_value;
+    uint32_t current_value;
+    uint32_t previous_counter_type;
+    uint64_t cycle;
+    uint64_t previous_cycle;
+    uint64_t previous_generation;
+    bool valid;
 };
 
 static void netframework_rrdset_done(RRDSET *st, struct net_framework_instances *p)
@@ -400,12 +423,73 @@ static bool netframework_add_raw_sample(RAW_DATA *total, const RAW_DATA *sample,
     return true;
 }
 
+static bool netframework_is_32bit_rate_counter(uint32_t counter_type)
+{
+    return counter_type == PERF_COUNTER_COUNTER || counter_type == PERF_SAMPLE_COUNTER;
+}
+
+enum netframework_aggregation {
+    NETFRAMEWORK_AGGREGATE_SUM,
+    NETFRAMEWORK_AGGREGATE_MAX,
+    NETFRAMEWORK_AGGREGATE_DELTA32,
+};
+
+static uint64_t netframework_add_group_sample(const COUNTER_DATA *counter, const RAW_DATA *sample)
+{
+    char key[RRD_ID_LENGTH_MAX + 1];
+
+    snprintfz(
+        key,
+        sizeof(key),
+        "%u:%s",
+        netframework_current_object,
+        counter->key);
+
+    struct netframework_counter_history *history = dictionary_set(
+        netframework_current_process->counter_histories,
+        key,
+        NULL,
+        sizeof(*history));
+
+    if (history->cycle != netframework_collection_cycle) {
+        history->current_value = 0;
+        history->cycle = netframework_collection_cycle;
+    }
+
+    history->current_value += (uint32_t)sample->Data;
+    if (!netframework_chart_commit_allowed)
+        return 0;
+
+    uint64_t delta = 0;
+    if (history->valid && history->previous_counter_type == sample->CounterType &&
+        history->previous_cycle + 1 == netframework_collection_cycle &&
+        history->previous_generation ==
+            netframework_current_process->counter_history_generation[netframework_current_object]) {
+        uint32_t previous = history->previous_value;
+        uint32_t current = history->current_value;
+        delta = current >= previous ? (uint64_t)(current - previous)
+                                    : (uint64_t)UINT32_MAX - previous + current + 1;
+
+        // A membership reset can look like a modulo-32-bit wrap. Reject an implausibly large
+        // interval delta instead of publishing a spike; the next sample establishes the baseline.
+        if (delta >= (UINT64_C(1) << 31))
+            delta = 0;
+    }
+
+    history->previous_value = history->current_value;
+    history->previous_counter_type = sample->CounterType;
+    history->previous_cycle = netframework_collection_cycle;
+    history->previous_generation = netframework_current_process->counter_history_generation[netframework_current_object];
+    history->valid = true;
+    return delta;
+}
+
 static bool netframework_get_instance_counter_with_aggregation(
     PERF_DATA_BLOCK *data,
     PERF_OBJECT_TYPE *object,
     PERF_INSTANCE_DEFINITION *instance,
     COUNTER_DATA *counter,
-    bool take_max)
+    enum netframework_aggregation aggregation)
 {
     // CounterType zero marks a group with at least one failed member read this cycle.
     if (counter->updated && !counter->current.CounterType)
@@ -422,16 +506,43 @@ static bool netframework_get_instance_counter_with_aggregation(
     counter->backoff = sample.backoff;
 
     if (!found) {
+        netframework_current_process->counter_history_generation[netframework_current_object]++;
         counter->current = RAW_DATA_EMPTY;
         counter->updated = true;
         return false;
     }
 
-    if (!counter->updated) {
+    if (counter->updated && counter->current.CounterType != sample.current.CounterType) {
+        netframework_current_process->counter_history_generation[netframework_current_object]++;
+        counter->current = RAW_DATA_EMPTY;
+        counter->updated = true;
+        return false;
+    }
+
+    bool use_instance_delta = aggregation == NETFRAMEWORK_AGGREGATE_DELTA32 ||
+                               (aggregation == NETFRAMEWORK_AGGREGATE_SUM &&
+                                netframework_is_32bit_rate_counter(sample.current.CounterType));
+    if (use_instance_delta) {
+        uint64_t delta = netframework_add_group_sample(counter, &sample.current);
+
+        if (!counter->updated) {
+            counter->current = sample.current;
+            counter->current.Data = counter->previous.CounterType == sample.current.CounterType
+                                        ? counter->previous.Data
+                                        : 0;
+            counter->current.Data += delta;
+            counter->updated = true;
+        }
+        else
+            counter->current.Data += delta;
+    }
+    else if (!counter->updated) {
         counter->current = sample.current;
         counter->updated = true;
     }
-    else if (!netframework_add_raw_sample(&counter->current, &sample.current, take_max)) {
+    else if (!netframework_add_raw_sample(
+                 &counter->current, &sample.current, aggregation == NETFRAMEWORK_AGGREGATE_MAX)) {
+        netframework_current_process->counter_history_generation[netframework_current_object]++;
         counter->current = RAW_DATA_EMPTY;
         counter->updated = true;
         return false;
@@ -446,7 +557,18 @@ static bool netframework_get_instance_counter(
     PERF_INSTANCE_DEFINITION *instance,
     COUNTER_DATA *counter)
 {
-    return netframework_get_instance_counter_with_aggregation(data, object, instance, counter, false);
+    return netframework_get_instance_counter_with_aggregation(
+        data, object, instance, counter, NETFRAMEWORK_AGGREGATE_SUM);
+}
+
+static bool netframework_get_instance_counter_delta32(
+    PERF_DATA_BLOCK *data,
+    PERF_OBJECT_TYPE *object,
+    PERF_INSTANCE_DEFINITION *instance,
+    COUNTER_DATA *counter)
+{
+    return netframework_get_instance_counter_with_aggregation(
+        data, object, instance, counter, NETFRAMEWORK_AGGREGATE_DELTA32);
 }
 
 static bool netframework_get_instance_counter_max(
@@ -455,7 +577,8 @@ static bool netframework_get_instance_counter_max(
     PERF_INSTANCE_DEFINITION *instance,
     COUNTER_DATA *counter)
 {
-    return netframework_get_instance_counter_with_aggregation(data, object, instance, counter, true);
+    return netframework_get_instance_counter_with_aggregation(
+        data, object, instance, counter, NETFRAMEWORK_AGGREGATE_MAX);
 }
 
 #undef NETFRAMEWORK_RESET_COUNTER
@@ -534,6 +657,10 @@ void dict_net_framework_processes_insert_cb(
 {
     struct net_framework_instances *p = value;
     initialize_net_framework_processes_keys(p);
+    p->counter_histories = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+        NULL,
+        sizeof(struct netframework_counter_history));
 }
 
 static void netframework_mark_chart_obsolete(RRDSET **st)
@@ -595,6 +722,9 @@ static void netframework_process_cleanup(struct net_framework_instances *p)
     netframework_mark_chart_obsolete(&p->st_clrlocksandthreads_recognized_threads);
     netframework_mark_chart_obsolete(&p->st_clrlocksandthreads_current_recognized_threads);
     netframework_mark_chart_obsolete(&p->st_clrlocksandthreads_contentions);
+
+    dictionary_destroy(p->counter_histories);
+    p->counter_histories = NULL;
 }
 
 static void netframework_update_process_id_label(RRDSET *st, const char *value)
@@ -634,6 +764,22 @@ static void netframework_remove_memory_process_id_label(RRDSET *st)
     rrdset_metadata_updated(st);
     rrdset_flag_set(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
     rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
+}
+
+static void netframework_remove_memory_process_id_labels(struct net_framework_instances *p)
+{
+    netframework_remove_memory_process_id_label(p->st_clrmemory_allocated_bytes);
+    netframework_remove_memory_process_id_label(p->st_clrmemory_finalization_survivors);
+    netframework_remove_memory_process_id_label(p->st_clrmemory_heap_size);
+    netframework_remove_memory_process_id_label(p->st_clrmemory_promoted_bytes);
+    netframework_remove_memory_process_id_label(p->st_clrmemory_gc_handles);
+    netframework_remove_memory_process_id_label(p->st_clrmemory_collections);
+    netframework_remove_memory_process_id_label(p->st_clrmemory_induced_gc);
+    netframework_remove_memory_process_id_label(p->st_clrmemory_pinned_objects);
+    netframework_remove_memory_process_id_label(p->st_clrmemory_sink_blocks_in_use);
+    netframework_remove_memory_process_id_label(p->st_clrmemory_committed_bytes);
+    netframework_remove_memory_process_id_label(p->st_clrmemory_reserved_bytes);
+    netframework_remove_memory_process_id_label(p->st_clrmemory_gc_time);
 }
 
 static void netframework_update_memory_process_id_labels(struct net_framework_instances *p, bool has_process_id)
@@ -705,14 +851,86 @@ static inline struct net_framework_instances *netframework_process_get(
     p->objects_seen_this_cycle |= 1U << object;
     struct netframework_instance_group *group = dictionary_get(netframework_instance_groups, name);
     unsigned name_instances = group ? group->count : 1;
-    if (p->instances_seen_this_cycle[object] == 0)
+    if (p->instances_seen_this_cycle[object] == 0) {
         p->population_changed[object] = p->instances_seen_previous_cycle[object] != name_instances;
+        if (p->population_changed[object])
+            p->counter_history_generation[object]++;
+
+    }
 
     netframework_begin_object_instance(p, object);
     netframework_chart_commit_allowed = !group || group->last == instance;
     netframework_current_name_unique = name_instances == 1;
+    netframework_current_process = p;
+    netframework_current_object = object;
     p->current_object = object;
     return p;
+}
+
+static uint64_t netframework_process_id_hash(ULONGLONG process_id)
+{
+    uint64_t value = (uint64_t)process_id + UINT64_C(0x9e3779b97f4a7c15);
+    value = (value ^ (value >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+    value = (value ^ (value >> 27)) * UINT64_C(0x94d049bb133111eb);
+    return value ^ (value >> 31);
+}
+
+static void netframework_prepare_process_id_sets(PERF_DATA_BLOCK *data, PERF_OBJECT_TYPE *object)
+{
+    struct net_framework_instances *p;
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < object->NumInstances; i++) {
+        pi = perflibForEachInstance(data, object, pi);
+        if (!pi)
+            break;
+
+        char name[RRD_ID_LENGTH_MAX + 1];
+        if (!getInstanceName(data, object, pi, name, sizeof(name)))
+            strncpyz(name, "[unknown]", sizeof(name) - 1);
+
+        if (strcasecmp(name, "_Global_") == 0)
+            continue;
+
+        p = dictionary_set(processes, name, NULL, sizeof(*p));
+        if (!p->process_id_set_seen_this_cycle) {
+            p->process_id_set_hash_this_cycle = 0;
+            p->process_id_set_count_this_cycle = 0;
+            p->process_id_set_complete_this_cycle = true;
+            p->process_id_set_seen_this_cycle = true;
+        }
+        COUNTER_DATA process_id = {.key = "Process ID"};
+
+        if (perflibGetInstanceCounter(data, object, pi, &process_id)) {
+            p->process_id_set_hash_this_cycle ^= netframework_process_id_hash(process_id.current.Data);
+            p->process_id_set_count_this_cycle++;
+        }
+        else
+            p->process_id_set_complete_this_cycle = false;
+    }
+
+    dfe_start_read(processes, p)
+    {
+        if (!p->process_id_set_seen_this_cycle)
+            continue;
+
+        bool signature_changed = !p->process_id_set_initialized ||
+                                 !p->process_id_set_complete_this_cycle ||
+                                 p->process_id_set_complete != p->process_id_set_complete_this_cycle ||
+                                 (p->process_id_set_complete_this_cycle &&
+                                  (p->process_id_set_count != p->process_id_set_count_this_cycle ||
+                                   p->process_id_set_hash != p->process_id_set_hash_this_cycle));
+
+        if (p->process_id_set_initialized && signature_changed) {
+            for (unsigned object_index = 0; object_index < NETDATA_NETFRAMEWORK_END; object_index++)
+                p->counter_history_generation[object_index]++;
+        }
+
+        p->process_id_set_initialized = true;
+        p->process_id_set_complete = p->process_id_set_complete_this_cycle;
+        p->process_id_set_count = p->process_id_set_count_this_cycle;
+        p->process_id_set_hash = p->process_id_set_hash_this_cycle;
+    }
+    dfe_done(p);
 }
 
 static void netframework_prepare_instance_groups(
@@ -961,7 +1179,8 @@ static void netdata_framework_clr_interop(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
             netframework_rrdset_done(p->st_clrinterop_com_callable_wrappers, p);
         }
 
-        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRInteropMarshalling)) {
+        if (netframework_get_instance_counter_delta32(
+                pDataBlock, pObjectType, pi, &p->NETFrameworkCLRInteropMarshalling)) {
             if (!p->st_clrinterop_marshalling) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrinterop_interop_marshalling", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1050,7 +1269,8 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
 
         struct net_framework_instances *p = netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_JIT, pi);
 
-        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITMethods)) {
+        if (netframework_get_instance_counter_delta32(
+                pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITMethods)) {
             if (!p->st_clrjit_methods) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_methods", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1141,7 +1361,8 @@ static void netdata_framework_clr_jit(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_T
             netframework_rrdset_done(p->st_clrjit_standard_failures, p);
         }
 
-        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITIlBytes)) {
+        if (netframework_get_instance_counter_delta32(
+                pDataBlock, pObjectType, pi, &p->NETFrameworkCLRJITIlBytes)) {
             if (!p->st_clrjit_il_bytes) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrjit_il_bytes", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1361,7 +1582,8 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
             netframework_rrdset_done(p->st_clrloading_app_domains_loaded, p);
         }
 
-        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingAppDomainsUnloaded)) {
+        if (netframework_get_instance_counter_delta32(
+                pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingAppDomainsUnloaded)) {
             if (!p->st_clrloading_app_domains_unloaded) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_appdomains_unloaded", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1396,7 +1618,8 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
             netframework_rrdset_done(p->st_clrloading_app_domains_unloaded, p);
         }
 
-        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingAssembliesLoaded)) {
+        if (netframework_get_instance_counter_delta32(
+                pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingAssembliesLoaded)) {
             if (!p->st_clrloading_assemblies_loaded) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_assemblies_loaded", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1428,7 +1651,8 @@ static void netdata_framework_clr_loading(PERF_DATA_BLOCK *pDataBlock, PERF_OBJE
             netframework_rrdset_done(p->st_clrloading_assemblies_loaded, p);
         }
 
-        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingClassesLoaded)) {
+        if (netframework_get_instance_counter_delta32(
+                pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLoadingClassesLoaded)) {
             if (!p->st_clrloading_classes_loaded) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrloading_classes_loaded", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -1499,6 +1723,8 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
     char id[RRD_ID_LENGTH_MAX + 1];
     PERF_INSTANCE_DEFINITION *pi = NULL;
 
+    netframework_prepare_process_id_sets(pDataBlock, pObjectType);
+
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
         pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
         if (!pi)
@@ -1518,8 +1744,10 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
         bool has_process_id =
             netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryProcessId);
         // Perflib may park this counter temporarily; force one relabel pass when it returns.
-        if (!has_process_id)
+        if (!has_process_id) {
+            netframework_remove_memory_process_id_labels(p);
             p->process_id_label_initialized = false;
+        }
         bool has_finalization_survivors =
             netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRMemoryFinalizationSurvivors);
         bool has_gen0_heap =
@@ -2026,18 +2254,7 @@ static void netdata_framework_clr_memory(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
             netframework_update_memory_process_id_labels(p, has_process_id);
 
         if (!netframework_current_name_unique && netframework_chart_commit_allowed) {
-            netframework_remove_memory_process_id_label(p->st_clrmemory_allocated_bytes);
-            netframework_remove_memory_process_id_label(p->st_clrmemory_finalization_survivors);
-            netframework_remove_memory_process_id_label(p->st_clrmemory_heap_size);
-            netframework_remove_memory_process_id_label(p->st_clrmemory_promoted_bytes);
-            netframework_remove_memory_process_id_label(p->st_clrmemory_gc_handles);
-            netframework_remove_memory_process_id_label(p->st_clrmemory_collections);
-            netframework_remove_memory_process_id_label(p->st_clrmemory_induced_gc);
-            netframework_remove_memory_process_id_label(p->st_clrmemory_pinned_objects);
-            netframework_remove_memory_process_id_label(p->st_clrmemory_sink_blocks_in_use);
-            netframework_remove_memory_process_id_label(p->st_clrmemory_committed_bytes);
-            netframework_remove_memory_process_id_label(p->st_clrmemory_reserved_bytes);
-            netframework_remove_memory_process_id_label(p->st_clrmemory_gc_time);
+            netframework_remove_memory_process_id_labels(p);
             p->process_id_label_initialized = false;
         }
     }
@@ -2227,7 +2444,8 @@ static void netdata_framework_clr_remoting(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
             netframework_rrdset_done(p->st_clrremoting_contexts, p);
         }
 
-        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRRemotingRemoteCalls)) {
+        if (netframework_get_instance_counter_delta32(
+                pDataBlock, pObjectType, pi, &p->NETFrameworkCLRRemotingRemoteCalls)) {
             if (!p->st_clrremoting_remote_calls) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrremoting_calls", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -2279,7 +2497,8 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
         struct net_framework_instances *p =
             netframework_process_get(windows_shared_buffer, NETDATA_NETFRAMEWORK_SECURITY, pi);
 
-        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityLinkTimeChecks)) {
+        if (netframework_get_instance_counter_delta32(
+                pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityLinkTimeChecks)) {
             if (!p->st_clrsecurity_link_time_checks) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrsecurity_link_time_checks", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -2376,7 +2595,8 @@ static void netdata_framework_clr_security(PERF_DATA_BLOCK *pDataBlock, PERF_OBJ
             netframework_rrdset_done(p->st_clrsecurity_stack_walk_depth, p);
         }
 
-        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityRunTimeChecks)) {
+        if (netframework_get_instance_counter_delta32(
+                pDataBlock, pObjectType, pi, &p->NETFrameworkCLRSecurityRunTimeChecks)) {
             if (!p->st_clrsecurity_run_time_checks) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrsecurity_runtime_checks", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -2616,7 +2836,7 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
             netframework_rrdset_done(p->st_clrlocksandthreads_current_recognized_threads, p);
         }
 
-        if (netframework_get_instance_counter(
+        if (netframework_get_instance_counter_delta32(
                 pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLocksAndThreadsRecognizedThreads)) {
             if (!p->st_clrlocksandthreads_recognized_threads) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrlocksandthreads_recognized_threads", windows_shared_buffer);
@@ -2652,7 +2872,8 @@ netdata_framework_clr_locks_and_threads(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT
             netframework_rrdset_done(p->st_clrlocksandthreads_recognized_threads, p);
         }
 
-        if (netframework_get_instance_counter(pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLocksAndThreadsContentions)) {
+        if (netframework_get_instance_counter_delta32(
+                pDataBlock, pObjectType, pi, &p->NETFrameworkCLRLocksAndThreadsContentions)) {
             if (!p->st_clrlocksandthreads_contentions) {
                 snprintfz(id, RRD_ID_LENGTH_MAX, "%s_clrlocksandthreads_contentions", windows_shared_buffer);
                 netdata_fix_chart_name(id);
@@ -2713,11 +2934,14 @@ int do_PerflibNetFramework(int update_every, usec_t dt __maybe_unused)
         initialized = true;
     }
 
+    netframework_collection_cycle++;
     uint32_t failed_objects = 0;
 
     struct net_framework_instances *p;
     int i;
-    for (i = 0; i < NETDATA_NETFRAMEWORK_END; i++) {
+    for (int order = 0; order < NETDATA_NETFRAMEWORK_END; order++) {
+        // Read CLR Memory first so its process-set signature can invalidate group histories before other objects.
+        i = order == 0 ? NETDATA_NETFRAMEWORK_MEMORY : order <= NETDATA_NETFRAMEWORK_MEMORY ? order - 1 : order;
         DWORD id = RegistryFindIDByName(netframewrk_obj[i].object);
         if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
             continue;
@@ -2744,7 +2968,11 @@ int do_PerflibNetFramework(int update_every, usec_t dt __maybe_unused)
         for (i = 0; i < NETDATA_NETFRAMEWORK_END; i++) {
             if (!(failed_objects & (1U << i)))
                 p->instances_seen_previous_cycle[i] = p->instances_seen_this_cycle[i];
+
+            p->population_changed[i] = false;
         }
+
+        p->process_id_set_seen_this_cycle = false;
 
         // CLR objects expose the same instance population. Drop a process when at least one object that has
         // reported it before succeeded this cycle and no object reported it. If every object that knows this
