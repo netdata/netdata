@@ -353,6 +353,11 @@ static int compare_query_plan_boundaries(const void *a, const void *b) {
     return (t1 > t2) - (t1 < t2);
 }
 
+static int compare_query_plan_entries(const void *a, const void *b) {
+    const QUERY_PLAN_ENTRY *p1 = a, *p2 = b;
+    return (p1->after > p2->after) - (p1->after < p2->after);
+}
+
 static bool query_plan_fill_coverage(QUERY_ENGINE_OPS *ops, size_t selected_tier,
                                      time_t after_wanted, time_t before_wanted) {
     QUERY_METRIC *qm = ops->qm;
@@ -382,9 +387,6 @@ static bool query_plan_fill_coverage(QUERY_ENGINE_OPS *ops, size_t selected_tier
         boundaries[boundaries_used++] = before;
     }
 
-    if(boundaries_used < 2)
-        return true;
-
     qsort(boundaries, boundaries_used, sizeof(*boundaries), compare_query_plan_boundaries);
     qm->plan.used = 0;
     for(size_t b = 1; b < boundaries_used; b++) {
@@ -413,6 +415,51 @@ static bool query_plan_fill_coverage(QUERY_ENGINE_OPS *ops, size_t selected_tier
             }
             break;
         }
+    }
+
+    // Retention timestamps are sample endpoints: a clipped single point is still data.
+    for(size_t p = 0; p < nd_profile.storage_tiers; p++) {
+        size_t tier = head_order[p];
+        if(!query_metric_tier_overlaps_timeframe(qm, tier, after_wanted, before_wanted))
+            continue;
+
+        time_t after = MAX(after_wanted, qm->tiers[tier].db_first_time_s);
+        time_t before = MIN(before_wanted, qm->tiers[tier].db_last_time_s);
+        if(after != before)
+            continue;
+
+        bool covered = false;
+        for(size_t i = 0; i < qm->plan.used; i++) {
+            if(qm->plan.array[i].after <= after && qm->plan.array[i].before >= before) {
+                covered = true;
+                break;
+            }
+        }
+        if(covered)
+            continue;
+
+        const size_t *order = after < qm->tiers[selected_tier].db_first_time_s ? head_order : tail_order;
+        for(size_t i = 0; i < nd_profile.storage_tiers; i++) {
+            size_t candidate = order[i];
+            if(query_metric_tier_overlaps_timeframe(qm, candidate, after, before)) {
+                tier = candidate;
+                break;
+            }
+        }
+
+        if(qm->plan.used >= QUERY_PLANS_MAX)
+            return false;
+        qm->plan.array[qm->plan.used++] = (QUERY_PLAN_ENTRY){
+            .tier = tier, .after = after, .before = before,
+        };
+    }
+    if(qm->plan.used > 1)
+        qsort(qm->plan.array, qm->plan.used, sizeof(*qm->plan.array), compare_query_plan_entries);
+
+    // Keep an isolated point readable until the next plan starts, including on coarse output grids.
+    for(size_t p = 0; p + 1 < qm->plan.used; p++) {
+        if(qm->plan.array[p].after == qm->plan.array[p].before)
+            qm->plan.array[p].before = qm->plan.array[p + 1].after;
     }
 
     return qm->plan.used != 0;
@@ -1175,6 +1222,59 @@ int query_plan_unittest(void) {
         errors += query_plan_unittest_expect_plan(
             "single timestamp retains existing plan", &qm, 0, 0,
             100, 100, 1, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 150, 250, 1);
+        query_plan_unittest_set_tier(&qm, 1, 50, 100, 10);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 1, .after = 50, .before = 100 },
+            { .tier = 0, .after = 150, .before = 150 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "sample exactly at query end remains available", &qm, 0, 0,
+            50, 150, 20, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 50, 100, 1);
+        query_plan_unittest_set_tier(&qm, 1, 150, 150, 60);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 0, .after = 50, .before = 100 },
+            { .tier = 1, .after = 150, .before = 150 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "isolated single-sample tier remains available", &qm, 0, 0,
+            50, 200, 100, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 100, 200, 1);
+        query_plan_unittest_set_tier(&qm, 1, 50, 50, 60);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 1, .after = 50, .before = 100 },
+            { .tier = 0, .after = 100, .before = 200 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "isolated head sample stays readable until the next tier", &qm, 0, 0,
+            40, 200, 100, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 150, 150, 1);
+        query_plan_unittest_set_tier(&qm, 1, 50, 100, 10);
+        query_plan_unittest_set_tier(&qm, 2, 150, 150, 60);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 1, .after = 50, .before = 100 },
+            { .tier = 0, .after = 150, .before = 150 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "isolated tail sample prefers a finer tier", &qm, 0, 0,
+            50, 200, 20, expected, _countof(expected));
     }
 
     {
