@@ -36,9 +36,11 @@ func TestServiceDiscovery_Run_WaitDecision(t *testing.T) {
 					Args: []string{sd.dyncfgJobID(testDiscovererTypeNetListeners, "job1"), "enable"},
 				}))
 
+				// Runtime ownership precedes the actor's Running status update.
 				require.Eventually(t, func() bool {
+					entry, ok := sd.exposed.LookupByKey(testDiscovererTypeNetListeners + ":job1")
 					return !sd.handler.WaitingForDecision() &&
-						exposedExistsByKey(sd.exposed, testDiscovererTypeNetListeners+":job1") &&
+						ok && entry.Status == dyncfg.StatusRunning &&
 						sd.mgr.IsRunning(pipelineKeyFromSource(cfg.source))
 				}, time.Second, 10*time.Millisecond)
 
