@@ -603,6 +603,7 @@ The eBPF plugin also shows a chart in the Disk section when the `disk` thread is
 This will create the chart `disk_latency_io` for each disk on the host. The following functions are monitored:
 
 - `kprobe/blk_mq_start_request`: IO request operation sent to a device driver.
+- `kprobe/blk_start_request`: IO request operation sent through the older single-queue path on kernels before 5.0.
 - `kprobe/blk_mq_end_request`: IO operation completed by the device.
 - `kprobe/__blk_mq_end_request`: IO operation completed by the SCSI layer (SCSI, SATA and SAS disks), which does not
     call `blk_mq_end_request`. A request seen by both functions is counted once.

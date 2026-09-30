@@ -52,8 +52,28 @@ netdata_mutex_t plot_mutex;
 // the in-flight entry, so a request seen by both functions is still counted once.
 #define NETDATA_DISK_SCSI_COMPLETE_TARGET "__blk_mq_end_request"
 #define NETDATA_DISK_COMPLETE_PROGRAM "netdata_block_rq_complete"
+#define NETDATA_DISK_SINGLE_QUEUE_START_TARGET "blk_start_request"
+#define NETDATA_DISK_ISSUE_PROGRAM "netdata_block_rq_issue"
+#define NETDATA_DISK_INFLIGHT_MAP "tmp_disk_tp_stat"
 
 static struct bpf_link *disk_scsi_complete_link = NULL;
+static struct bpf_link *disk_single_queue_start_link = NULL;
+
+static ebpf_local_maps_t disk_inflight_map_stats[] = {
+    {.name = NETDATA_DISK_INFLIGHT_MAP, .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
+    {.name = NULL, .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
+
+static struct bpf_link *ebpf_disk_attach_kprobe(struct bpf_program *prog, const char *target)
+{
+    if (!prog || bpf_program__get_type(prog) != BPF_PROG_TYPE_KPROBE)
+        return NULL;
+
+    struct bpf_link *link = bpf_program__attach_kprobe(prog, false, target);
+    if (!link || libbpf_get_error(link))
+        return NULL;
+
+    return link;
+}
 
 /**
  * Attach SCSI completion
@@ -65,18 +85,31 @@ static struct bpf_link *disk_scsi_complete_link = NULL;
  */
 static void ebpf_disk_attach_scsi_completion(struct bpf_program *prog)
 {
-    if (!prog)
-        return;
-
-    struct bpf_link *link = bpf_program__attach_kprobe(prog, false, NETDATA_DISK_SCSI_COMPLETE_TARGET);
-    if (!link || libbpf_get_error(link)) {
+    disk_scsi_complete_link = ebpf_disk_attach_kprobe(prog, NETDATA_DISK_SCSI_COMPLETE_TARGET);
+    if (prog && bpf_program__get_type(prog) == BPF_PROG_TYPE_KPROBE && !disk_scsi_complete_link) {
         netdata_log_info(
             "Cannot attach disk completion to %s; latency of SCSI, SATA and SAS disks will not be collected.",
             NETDATA_DISK_SCSI_COMPLETE_TARGET);
-        return;
     }
+}
 
-    disk_scsi_complete_link = link;
+/**
+ * Attach the existing issue probe to the legacy single-queue request path.
+ *
+ * @param prog the loaded request issue program.
+ */
+static void ebpf_disk_attach_single_queue_start(struct bpf_program *prog)
+{
+    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_0 || !prog ||
+        bpf_program__get_type(prog) != BPF_PROG_TYPE_KPROBE)
+        return;
+
+    disk_single_queue_start_link = ebpf_disk_attach_kprobe(prog, NETDATA_DISK_SINGLE_QUEUE_START_TARGET);
+    if (!disk_single_queue_start_link) {
+        netdata_log_info(
+            "Cannot attach disk issue probe to %s; latency for non-multiqueue devices will not be collected.",
+            NETDATA_DISK_SINGLE_QUEUE_START_TARGET);
+    }
 }
 
 /**
@@ -91,6 +124,22 @@ static void ebpf_disk_detach_scsi_completion(void)
     disk_scsi_complete_link = NULL;
 }
 
+static void ebpf_disk_detach_single_queue_start(void)
+{
+    if (!disk_single_queue_start_link)
+        return;
+
+    bpf_link__destroy(disk_single_queue_start_link);
+    disk_single_queue_start_link = NULL;
+}
+
+static void ebpf_disk_set_inflight_map_fd(struct bpf_object *obj)
+{
+    struct bpf_map *map = bpf_object__find_map_by_name(obj, NETDATA_DISK_INFLIGHT_MAP);
+    if (map)
+        disk_inflight_map_stats[0].map_fd = bpf_map__fd(map);
+}
+
 #ifdef LIBBPF_MAJOR_VERSION
 /**
  * Set hash table
@@ -102,6 +151,7 @@ static void ebpf_disk_detach_scsi_completion(void)
 static inline void ebpf_disk_set_hash_table(struct disk_bpf *obj)
 {
     disk_maps[NETDATA_DISK_IO].map_fd = bpf_map__fd(obj->maps.tbl_disk_iocall);
+    ebpf_disk_set_inflight_map_fd(obj->obj);
 }
 
 /**
@@ -122,14 +172,18 @@ static inline int ebpf_disk_load_and_attach(struct disk_bpf *obj)
             bpf_program__set_autoload(obj->progs.netdata_blk_complete_request, false);
     }
 
+    ebpf_update_map_type(obj->maps.tbl_disk_iocall, &disk_maps[NETDATA_DISK_IO]);
+
     int ret = disk_bpf__load(obj);
     if (ret) {
         return ret;
     }
 
     ret = disk_bpf__attach(obj);
-    if (!ret)
+    if (!ret) {
+        ebpf_disk_attach_single_queue_start(obj->progs.netdata_block_rq_issue);
         ebpf_disk_attach_scsi_completion(obj->progs.netdata_block_rq_complete);
+    }
 
     return ret;
 }
@@ -484,6 +538,7 @@ static void ebpf_disk_exit(void *pptr)
         ebpf_cleanup_disk_list();
 
     ebpf_disk_detach_scsi_completion();
+    ebpf_disk_detach_single_queue_start();
 
     if (!ebpf_plugin_stop() && em->functions.bpf_unload)
         em->functions.bpf_unload(em);
@@ -562,7 +617,7 @@ static void read_hard_disk_tables(int table, int maps_per_core)
 
         uint64_t total = 0;
         int i;
-        int end = (maps_per_core) ? 1 : ebpf_nprocs;
+        int end = maps_per_core ? ebpf_nprocs : 1;
         for (i = 0; i < end; i++) {
             total += values[i];
         }
@@ -791,6 +846,9 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
         if (!em->probe_links) {
             ret = -1;
         } else {
+            ebpf_disk_set_inflight_map_fd(em->objects);
+            ebpf_disk_attach_single_queue_start(
+                bpf_object__find_program_by_name(em->objects, NETDATA_DISK_ISSUE_PROGRAM));
             ebpf_disk_attach_scsi_completion(
                 bpf_object__find_program_by_name(em->objects, NETDATA_DISK_COMPLETE_PROGRAM));
         }
@@ -877,6 +935,7 @@ void ebpf_disk_thread(void *ptr)
     netdata_mutex_lock(&lock);
     ebpf_update_stats(&plugin_statistics, em);
     ebpf_update_kernel_memory_with_vector(&plugin_statistics, disk_maps, EBPF_ACTION_STAT_ADD);
+    ebpf_update_kernel_memory_with_vector(&plugin_statistics, disk_inflight_map_stats, EBPF_ACTION_STAT_ADD);
     netdata_mutex_unlock(&lock);
 
     disk_collector(em);

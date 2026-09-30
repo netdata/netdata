@@ -21,6 +21,24 @@ ebpf_module_t test_em;
 
 static int tests_failed = 0;
 
+static enum bpf_map_type ebpf_ut_map_type(const struct bpf_map *map)
+{
+#ifdef LIBBPF_MAJOR_VERSION
+    return bpf_map__type(map);
+#else
+    return bpf_map__def(map)->type;
+#endif
+}
+
+static uint32_t ebpf_ut_map_value_size(const struct bpf_map *map)
+{
+#ifdef LIBBPF_MAJOR_VERSION
+    return bpf_map__value_size(map);
+#else
+    return bpf_map__def(map)->value_size;
+#endif
+}
+
 #define EBPF_UT_ASSERT(test, msg)                                                                                      \
     do {                                                                                                               \
         if (!(test)) {                                                                                                 \
@@ -40,12 +58,12 @@ static int ebpf_ut_percpu_lookup_fits_nprocs(struct bpf_object *obj)
     }
 
     struct bpf_map *map = bpf_object__find_map_by_name(obj, "tbl_total_stats");
-    if (!map || bpf_map__type(map) != BPF_MAP_TYPE_PERCPU_ARRAY) {
+    if (!map || ebpf_ut_map_type(map) != BPF_MAP_TYPE_PERCPU_ARRAY) {
         fprintf(stderr, ">>> FAILED: process tbl_total_stats per-CPU array is unavailable\n");
         return -1;
     }
 
-    const size_t value_size = bpf_map__value_size(map);
+    const size_t value_size = ebpf_ut_map_value_size(map);
     const size_t stride = (value_size + sizeof(uint64_t) - 1) & ~(sizeof(uint64_t) - 1);
     if (!stride || (size_t)possible_cpus > (SIZE_MAX - 2 * sizeof(uint64_t)) / stride) {
         fprintf(stderr, ">>> FAILED: invalid per-CPU map value size\n");
