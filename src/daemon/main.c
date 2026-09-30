@@ -146,6 +146,8 @@ int help(int exitcode) {
             "  -W sqlite-compact        Reclaim metadata database unused space and exit.\n\n"
             "  -W sqlite-analyze        Run update statistics and exit.\n\n"
             "  -W sqlite-alert-cleanup  Perform maintenance on the alerts table.\n\n"
+            "  -W sqlite-lease-test     Test that a slow SQLite connection does not block unrelated\n"
+            "                           SQLite users, and exit.\n\n"
 #ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
             "  -W stresstest=A,B,C,D,E,F,G\n"
@@ -690,6 +692,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "uuidtest") == 0) {
                             unittest_running = true;
                             return uuid_unittest();
+                        }
+                        else if(strcmp(optarg, "sqlite-lease-test") == 0) {
+                            unittest_running = true;
+                            return sqlite_lease_unittest();
                         }
 #ifdef HAVE_LIBBACKTRACE
                         else if(strcmp(optarg, "stacktracetest") == 0) {
