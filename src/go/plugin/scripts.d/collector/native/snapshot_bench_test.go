@@ -62,3 +62,30 @@ func BenchmarkSnapshotPipeline(b *testing.B) {
 		})
 	}
 }
+
+// Domain validation scans names without allocating normalized copies. This
+// measures that path with decoding; time is a development-host trend only.
+func BenchmarkStateSetSnapshot(b *testing.B) {
+	for _, count := range []int{32, 512} {
+		b.Run(fmt.Sprintf("states=%d", count), func(b *testing.B) {
+			states := make([]string, count)
+			for i := range states {
+				states[i] = fmt.Sprintf("state %d", i)
+			}
+			data, err := json.Marshal(snapshot{
+				Version: "v1",
+				Checks:  []checkFamily{},
+				Metrics: []metricFamily{{Name: "state", Type: metricStateSet, States: states,
+					Samples: []metricSample{{Active: []string{states[0]}}}}},
+			})
+			require.NoError(b, err)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				if _, err := decodeSnapshot(data); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}

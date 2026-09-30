@@ -58,7 +58,47 @@ func TestCollector_AllMetricKindsAndAutogen(t *testing.T) {
 	assert.Contains(t, wire, "'incremental'")
 	assert.Contains(t, wire, "'absolute'")
 	assert.Contains(t, wire, "float")
+	assert.Contains(t, wire, "DIMENSION 'in progress' 'in progress' 'absolute'")
+	assert.Contains(t, wire, "SET 'in progress' = 1")
 	assert.NotContains(t, wire, "'native_script.check_state'", "ordinary StateSets have no built-in alerts")
+}
+
+func TestCollector_RejectsUnsafeStateDimensions(t *testing.T) {
+	setupRunner(t)
+	for name, family := range map[string]string{
+		"collision":       `{"name":"state","type":"stateset","states":["up"," up"],"samples":[{"active":[" up"]}]}`,
+		"empty dimension": `{"name":"state","type":"stateset","states":["'"],"samples":[{"active":["'"]}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			c, path := responseCollector(t)
+			replaceResponse(t, path, metricFrame(`{"name":"depth","samples":[{"value":7}]},`+family))
+			out := &wireOutput{}
+			job, _ := startTestJob(t, c, out)
+			tickUntil(t, job, func() bool {
+				wire := out.String()
+				return strings.Contains(wire, "SET 'failed' = 1") || strings.Contains(wire, "'native_script.state'")
+			})
+			job.Stop()
+			wire := out.String()
+			assert.Contains(t, wire, "SET 'failed' = 1")
+			assert.NotContains(t, wire, "'native_script.state'")
+			assert.NotContains(t, wire, "'native_script.depth'", "the entire snapshot must fail atomically")
+			assert.Empty(t, rawSeries(c))
+		})
+	}
+}
+
+func TestCollector_StateDimensionsPreserveText(t *testing.T) {
+	setupRunner(t)
+	c, path := responseCollector(t)
+	replaceResponse(t, path, metricFrame(
+		`{"name":"state","type":"stateset","states":["λ \"in progress\""],"samples":[{"active":["λ \"in progress\""]}]}`,
+	))
+	out := &wireOutput{}
+	job, _ := startTestJob(t, c, out)
+	tickUntil(t, job, func() bool { return strings.Contains(out.String(), "'native_script.state'") })
+	assert.Contains(t, out.String(), `DIMENSION 'λ "in progress"' 'λ "in progress"' 'absolute'`)
+	assert.Contains(t, out.String(), `SET 'λ "in progress"' = 1`)
 }
 
 func TestCollector_AuthoredChartsOwnPresentation(t *testing.T) {

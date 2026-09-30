@@ -101,7 +101,10 @@
           "type": "array",
           "items": {
             "type": "string",
-            "pattern": "\\S"
+            "minLength": 1,
+            "not": {
+              "pattern": "[\\\\'\\n\\r\u0000]|^[\t-\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]|[\t-\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]$"
+            }
           },
           "minItems": 1,
           "uniqueItems": true

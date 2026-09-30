@@ -154,8 +154,15 @@ func (f *metricFamily) validate() error {
 		}
 		domain = make(map[string]bool, len(f.States))
 		for _, state := range f.States {
-			if strings.TrimSpace(state) == "" || domain[state] {
-				return errors.New("states must be unique and nonblank")
+			// Autogen uses states as dimension IDs. Require names unchanged by
+			// chartemit's wire-ID sanitation so distinct states cannot collapse.
+			if state == "" || strings.TrimSpace(state) != state || strings.ContainsAny(state, "'\\\n\r\x00") {
+				return errors.New(
+					"states must be nonempty, without surrounding whitespace, apostrophes, backslashes, newlines, carriage returns or NUL",
+				)
+			}
+			if domain[state] {
+				return errors.New("states must be unique")
 			}
 			domain[state] = true
 		}

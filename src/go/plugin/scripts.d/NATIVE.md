@@ -427,6 +427,11 @@ MUST NOT declare `states` or a StateSet `mode`, and scalar samples MUST NOT cont
 `active`.
 
 A StateSet requires a complete nonempty `states` array of unique, nonblank strings.
+State names become chart dimension IDs. They MUST NOT contain apostrophes,
+backslashes, newlines, carriage returns, NUL, or surrounding whitespace; the
+output protocol changes these characters and could merge distinct states.
+Internal spaces, Unicode and double quotes are supported. Invalid names reject
+the entire response rather than being renamed.
 Its `mode` defaults to `enum`; use `bitset` for independent states. Each sample
 requires `active`, an array of unique members of that domain, and MUST NOT contain
 `value`. Enum samples select exactly one state. Bitset samples may select zero,
