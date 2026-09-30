@@ -299,10 +299,21 @@ static void query_planer_set_active_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, 
     ops->seqh = &ops->plans[plan_id].handle;
     ops->current_plan = plan_id;
 
-    if(plan_id + 1 < qm->plan.used && qm->plan.array[plan_id + 1].after < qm->plan.array[plan_id].before)
-        query_planer_set_expire_time(ops, qm->plan.array[plan_id + 1].after);
-    else
-        query_planer_set_expire_time(ops, qm->plan.array[plan_id].before);
+    time_t expire_time = qm->plan.array[plan_id].before;
+    ops->plan_switch_time_offset = ops->point_mode == QUERY_POINT_MODE_TOTAL ? ops->view_update_every : 0;
+    if(plan_id + 1 < qm->plan.used) {
+        QUERY_PLAN_ENTRY *next = &qm->plan.array[plan_id + 1];
+        expire_time = MIN(expire_time, next->after);
+        if(next->tier > ops->tier) {
+            // Read the fine prefix before switching, and hand over between complete coarse records.
+            ops->plan_switch_time_offset = ops->view_update_every;
+            time_t dt = qm->tiers[next->tier].db_update_every_s;
+            time_t first_start = qm->tiers[next->tier].db_first_time_s - dt;
+            if(dt > 0 && expire_time >= first_start)
+                expire_time -= (expire_time - first_start) % dt;
+        }
+    }
+    query_planer_set_expire_time(ops, expire_time);
 
     ops->plan_expanded_after = ops->plans[plan_id].expanded_after;
     ops->plan_expanded_before = ops->plans[plan_id].expanded_before;
@@ -1291,6 +1302,31 @@ int query_plan_unittest(void) {
 
     errors += query_plan_unittest_expect_ops_cache_is_local();
     errors += query_plan_unittest_expect_result_expiry();
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 1, 123, 1);
+        query_plan_unittest_set_tier(&qm, 1, 124, 324, 4);
+        qm.plan.used = 2;
+        qm.plan.array[0] = (QUERY_PLAN_ENTRY){ .tier = 0, .after = 1, .before = 123 };
+        qm.plan.array[1] = (QUERY_PLAN_ENTRY){ .tier = 1, .after = 124, .before = 324 };
+        QUERY_ENGINE_OPS ops = { .qm = &qm, .view_update_every = 8 };
+        query_planer_set_active_plan(&ops, 0, 0);
+        if(ops.current_plan_expire_time != 120 || ops.result_plan_expire_time != 128) {
+            fprintf(stderr, "FAILED fine-to-coarse handoff expiry\n");
+            errors++;
+        }
+        else
+            fprintf(stderr, "OK fine-to-coarse handoff expiry\n");
+
+        query_planer_set_active_plan(&ops, 1, 0);
+        if(ops.plan_switch_time_offset != 0 || ops.current_plan_expire_time != 324) {
+            fprintf(stderr, "FAILED handoff offset reset\n");
+            errors++;
+        }
+        else
+            fprintf(stderr, "OK handoff offset reset\n");
+    }
 
     nd_profile.storage_tiers = old_storage_tiers;
     nd_profile.update_every = old_update_every;

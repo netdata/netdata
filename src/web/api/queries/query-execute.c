@@ -84,7 +84,24 @@ static NETDATA_DOUBLE query_point_total_projection(
             &(point), (now) - (view_update_every), (now));                           \
 } while(0)
 
-#define query_add_point_to_group(r, point, ops, add_flush, now_end_time, source_end_time) do { \
+typedef struct {
+    NETDATA_DOUBLE sum;
+    time_t duration;
+    uint32_t tiers;
+} QUERY_SEAM_AVERAGE;
+
+static inline void query_seam_average_add(
+    QUERY_SEAM_AVERAGE *average, QUERY_POINT point, time_t row_start, time_t row_end) {
+    time_t start = MAX(row_start, point.sp.start_time_s);
+    time_t end = MIN(row_end, point.sp.end_time_s);
+    if(end > start && netdata_double_isnumber(point.value)) {
+        average->sum += point.value * (NETDATA_DOUBLE)(end - start);
+        average->duration += end - start;
+        average->tiers |= 1U << point.tier;
+    }
+}
+
+#define query_add_point_to_group(r, point, ops, add_flush, now_end_time, source_end_time, seam) do { \
     if(likely(netdata_double_isnumber((point).value))) {                \
         if(likely(fpclassify((point).value) != FP_ZERO))                \
             (ops)->group_points_non_zero++;                             \
@@ -97,6 +114,8 @@ static NETDATA_DOUBLE query_point_total_projection(
             (ops)->group_value_flags |= RRDR_VALUE_RESET;               \
                                                                         \
         time_grouping_add(r, (point).value, add_flush);                  \
+        if(seam)                                                       \
+            query_seam_average_add(seam, point, _row_start, now_end_time); \
                                                                         \
         if((point).tier != 0 || _sample_in_row)                          \
             storage_point_merge_to((ops)->group_point, (point).sp);     \
@@ -194,12 +213,16 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
     // to join them smoothly at the exact time the next plan begins
     STORAGE_POINT next1_point = STORAGE_POINT_UNSET;
     uint8_t next1_tier = 0;
+    NETDATA_DOUBLE next1_sum = 0;
 
     time_t now_start_time = after_wanted - ops->query_granularity;
     time_t now_end_time   = after_wanted + (ops->view_update_every - ops->query_granularity);
 
     size_t db_points_read_since_plan_switch = 0; (void)db_points_read_since_plan_switch;
     size_t query_is_finished_counter = 0;
+    QUERY_SEAM_AVERAGE seam_average = {0};
+    QUERY_SEAM_AVERAGE *seam = qm->plan.used > 1 && add_flush == RRDR_GROUPING_AVERAGE &&
+                              r->time_grouping.resampling_group == 1 ? &seam_average : NULL;
 
     // The main loop, based on the query granularity we need
     for( ; points_added < points_wanted && query_is_finished_counter <= 10 ;
@@ -235,6 +258,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             {
                 STORAGE_POINT sp;
                 uint8_t sp_tier;
+                NETDATA_DOUBLE prepared_sum;
                 if(likely(storage_point_is_unset(next1_point))) {
                     if(unlikely(storage_engine_query_is_finished(ops->seqh))) {
                         query_is_finished_counter++;
@@ -261,6 +285,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
 
                     if(unlikely(options & RRDR_OPTION_ABSOLUTE))
                         storage_point_make_positive(sp);
+                    prepared_sum = sp.sum;
                 }
                 else {
                     query_is_finished_counter = 0;
@@ -268,11 +293,10 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                     // ONE POINT READ-AHEAD
                     sp = next1_point;
                     sp_tier = next1_tier;
+                    prepared_sum = next1_sum;
                     storage_point_unset(next1_point);
                     db_points_read_since_plan_switch = 1;
                 }
-
-                NETDATA_DOUBLE prepared_sum = sp.sum;
 
                 // ONE POINT READ-AHEAD
                 if(unlikely(query_plan_should_switch_plan(ops, sp.end_time_s) &&
@@ -292,19 +316,43 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                     ops->db_points_read_per_tier[ops->tier]++;
                     ops->db_total_points_read++;
 
+                    if(sp2_tier > sp_tier) {
+                        // Expanded coarse queries may begin with records already read from the fine tier.
+                        while(sp2.end_time_s <= sp.end_time_s && !storage_engine_query_is_finished(ops->seqh)) {
+                            sp2 = storage_engine_query_next_metric(ops->seqh);
+                            ops->db_points_read_per_tier[ops->tier]++;
+                            ops->db_total_points_read++;
+                        }
+                        if(sp2.end_time_s <= sp.end_time_s)
+                            storage_point_unset(sp2);
+                    }
+
                     if(unlikely(options & RRDR_OPTION_ABSOLUTE))
                         storage_point_make_positive(sp2);
+
+                    NETDATA_DOUBLE sp2_sum = sp2.sum;
+                    if(sp2_tier > sp_tier && !storage_point_is_unset(sp2) &&
+                       sp2.start_time_s < new_point.sp.end_time_s) {
+                        // Historical pages may use a different interval than the planner's current grid.
+                        time_t duration = sp2.end_time_s - sp2.start_time_s;
+                        if(!qm->values_stored_as_rates && duration > 0)
+                            sp2_sum *= (NETDATA_DOUBLE)(sp2.end_time_s - new_point.sp.end_time_s) /
+                                       (NETDATA_DOUBLE)duration;
+                        sp2.start_time_s = new_point.sp.end_time_s;
+                    }
 
                     bool finer_total_overlap =
                         ops->point_mode == QUERY_POINT_MODE_TOTAL &&
                         sp2_tier < sp_tier && sp2.start_time_s < sp.end_time_s;
+                    bool coarser_overlap = sp2_tier > sp_tier && !storage_point_is_unset(sp2) &&
+                                           sp2.start_time_s < sp.end_time_s;
 
-                    if(sp.start_time_s > sp2.start_time_s ||
-                       (finer_total_overlap && sp2.start_time_s <= sp.start_time_s)) {
+                    if(!storage_point_is_unset(sp2) && (sp.start_time_s > sp2.start_time_s ||
+                       ((finer_total_overlap || coarser_overlap) && sp2.start_time_s <= sp.start_time_s))) {
                         // the point from the previous plan is useless
                         sp = sp2;
                         sp_tier = sp2_tier;
-                        prepared_sum = sp2.sum;
+                        prepared_sum = sp2_sum;
                     }
                     else {
                         // let the query run from the previous plan
@@ -312,8 +360,9 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                         // of the point from the previous plan
                         next1_point = sp2;
                         next1_tier = sp2_tier;
+                        next1_sum = sp2_sum;
 
-                        if(unlikely(finer_total_overlap)) {
+                        if(unlikely(finer_total_overlap || coarser_overlap)) {
                             time_t duration = sp.end_time_s - sp.start_time_s;
                             time_t retained = sp2.start_time_s - sp.start_time_s;
                             if(!qm->values_stored_as_rates && duration > 0)
@@ -410,7 +459,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                     // this db point ends after our now_start time
 
                     query_add_point_to_group(
-                        r, new_point, ops, add_flush, now_end_time, new_point.sp.end_time_s);
+                        r, new_point, ops, add_flush, now_end_time, new_point.sp.end_time_s, seam);
                     new_point.added = true;
                 }
                 else {
@@ -539,7 +588,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             }
 
             query_add_point_to_group(
-                r, current_point, ops, add_flush, now_end_time, source_end_time);
+                r, current_point, ops, add_flush, now_end_time, source_end_time, seam);
 
             rrdr_line = rrdr_line_init(r, now_end_time, rrdr_line);
             size_t rrdr_o_v_index = rrdr_line * r->d + dim_id_in_rrdr;
@@ -556,6 +605,10 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
 
             // store the group value
             NETDATA_DOUBLE group_value = time_grouping_flush(r, rrdr_value_options_ptr, add_flush);
+            // Only mixed-tier rows need duration weighting; preserve single-tier interpolation and resampling.
+            if(seam && seam->duration > 0 && (seam->tiers & (seam->tiers - 1)))
+                group_value = seam->sum / (NETDATA_DOUBLE)seam->duration;
+            seam_average = (QUERY_SEAM_AVERAGE){0};
             r->v[rrdr_o_v_index] = group_value;
 
             r->ar[rrdr_o_v_index] = storage_point_anomaly_rate(ops->group_point);
@@ -616,6 +669,8 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                         ops->group_value_flags |= RRDR_VALUE_RESET;
 
                     r->time_grouping.add(r, carried_value);
+                    if(seam)
+                        query_seam_average_add(seam, new_point, next_row_start_time, now_end_time);
                     if(!new_point.added)
                         storage_point_merge_to(ops->query_point, new_point.sp);
                 }
