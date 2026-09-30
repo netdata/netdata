@@ -962,6 +962,36 @@
     "components": ["late-tier", "isolated-head"]
   },
   {
+    "name": "CASE-040/handoff-sum",
+    "proves": "tier handoffs conserve the sum of a piecewise-constant series across output bucket widths without duplicate contributions",
+    "components": ["late-false", "late-true"]
+  },
+  {
+    "name": "CASE-040/handoff-average",
+    "proves": "tier handoffs preserve interval averages of a piecewise-constant series across output bucket widths",
+    "components": ["late-false", "late-true"]
+  },
+  {
+    "name": "CASE-040/handoff-min",
+    "proves": "tier handoffs preserve minima in fine prefixes of output buckets spanning a coarse-tier boundary",
+    "components": ["late-false", "late-true"]
+  },
+  {
+    "name": "CASE-040/handoff-max",
+    "proves": "tier handoffs preserve maxima in fine prefixes of output buckets spanning a coarse-tier boundary",
+    "components": ["late-false", "late-true"]
+  },
+  {
+    "name": "CASE-040/handoff-metadata",
+    "proves": "tier handoffs preserve the exact anomaly rate of complete nested records across output bucket widths",
+    "components": ["late-false", "late-true"]
+  },
+  {
+    "name": "CASE-040/handoff-rate-sum",
+    "proves": "tier handoffs conserve integrated rate-backed totals across output bucket widths without duplicate contributions",
+    "components": ["late-false", "late-true"]
+  },
+  {
     "name": "CASE-019/v1-json-name-escaping",
     "proves": "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) escape dimension names (was: raw between quotes — a double-quote in a name, or a label value via group_by=label, produced invalid JSON); the objectrows row keys are escaped like the header, and the google flavor (datatable+google_json) escapes the apostrophe of its single-quoted JavaScript labels while keeping the double quote raw",
     "fixed_by": "#23216"
