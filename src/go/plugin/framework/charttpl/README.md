@@ -607,9 +607,10 @@ are named by the bare `le` value and ordered numerically, with `+Inf` last.
 > violation at runtime; authoring validation and real-path tests must reject it rather than depend on first-observed
 > metadata.
 
-The runtime kind of a live metric identity must remain stable while its dimension is materialized. Changing the kind does
-not redefine an existing Netdata dimension; its creation-time wire algorithm remains until the dimension expires and is
-recreated.
+When the metric store accepts a changed runtime kind, chartengine updates an affected dimension's wire definition before
+emitting its values, without waiting for dimension expiry. Explicit authored algorithms remain authoritative. Metric
+identities should still represent stable semantics: redefinition does not reset stored history or guarantee continuity
+across the transition.
 
 **Example: MySQL queries — incremental counters displayed as rates**
 

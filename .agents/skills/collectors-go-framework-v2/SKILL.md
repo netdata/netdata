@@ -137,9 +137,10 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
 - Mixed counter and gauge dimensions MAY share one authored chart when they
   render as distinct dimensions; each omitted algorithm is resolved from that
   dimension's matched series kind.
-- A live metric identity MUST keep a stable runtime kind while its dimension is
-  materialized. A kind change does not redefine an existing Netdata dimension;
-  its creation-time wire algorithm remains until expiry and recreation.
+- Metric identities SHOULD retain stable semantics. When metrix accepts changed
+  metadata or kind, chartengine updates affected dimension definitions before
+  values without waiting for expiry; explicit algorithm overrides still apply.
+  This does not reset history or guarantee continuity across the transition.
 - Histogram bucket charts use range bucket values from `metrix.ReadFlatten()`
   and chartengine forces them to `heatmap`. Bucket dimensions are named by the
   bare `le` upper-bound value and ordered numerically with `+Inf` last. Do NOT

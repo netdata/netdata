@@ -94,8 +94,8 @@ func (c *materializedChartState) ensureDimension(
 	algorithm := state.algorithm.programAlgorithm()
 	dim, ok := c.dimensions[name]
 	if ok {
-		// Ordering follows the latest observation; creation settings describe the
-		// published dimension until it is recreated.
+		// The planner replaces changed wire definitions before this call.
+		// Ordering can follow the latest observation without redefinition.
 		if dim.static != state.static || dim.order != state.order || dim.sortKey != state.sortKey {
 			j.touchChart(c)
 			c.orderedDimsDirty = true

@@ -17,15 +17,16 @@ import (
 
 func TestExpiredChartDefinitionRevival(t *testing.T) {
 	for name, tc := range map[string]struct {
-		option  metrix.InstrumentOption
-		counter bool
+		option        metrix.InstrumentOption
+		counter       bool
+		dimensionOnly bool
 	}{
 		"title":                {option: metrix.WithDescription("New title")},
 		"units and chart type": {option: metrix.WithUnit("bytes")},
 		"family":               {option: metrix.WithChartFamily("New family")},
 		"priority":             {option: metrix.WithChartPriority(200)},
-		"float dimension":      {option: metrix.WithFloat(true)},
-		"resolved algorithm":   {counter: true},
+		"float dimension":      {option: metrix.WithFloat(true), dimensionOnly: true},
+		"resolved algorithm":   {counter: true, dimensionOnly: true},
 	} {
 		for _, changeBeforeExpiry := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/change_before_expiry=%t", name, changeBeforeExpiry), func(t *testing.T) {
@@ -59,8 +60,13 @@ func TestExpiredChartDefinitionRevival(t *testing.T) {
 					// The descriptor expires, but the chart returns exactly at its expiry boundary.
 					f.collect(t, nil).Abort()
 					wire := f.publish(t, f.collect(t, observe(true)))
-					assert.NotContains(t, wire, "CHART ")
-					assert.NotContains(t, wire, "DIMENSION ")
+					if tc.dimensionOnly {
+						assert.Contains(t, wire, "DIMENSION ", "dimension changes do not wait for expiry")
+						assert.Less(t, strings.Index(wire, "DIMENSION "), strings.Index(wire, "SET "))
+					} else {
+						assert.NotContains(t, wire, "CHART ")
+						assert.NotContains(t, wire, "DIMENSION ")
+					}
 				}
 				for range 3 {
 					f.collect(t, nil).Abort()
@@ -83,6 +89,10 @@ func TestExpiredChartDefinitionRevival(t *testing.T) {
 					assert.ObjectsAreEqual(oldCharts, wantCharts) && assert.ObjectsAreEqual(oldDims, wantDims),
 					"fixture must change an emitted definition",
 				)
+				alreadyPublished := changeBeforeExpiry && tc.dimensionOnly
+				if alreadyPublished {
+					wantCharts, wantDims = nil, nil
+				}
 
 				// Publication rejection must leave the old committed definition available for retry.
 				for range 2 {
@@ -94,10 +104,15 @@ func TestExpiredChartDefinitionRevival(t *testing.T) {
 					attempt = f.prepare(t)
 				}
 				wire := f.publish(t, attempt)
-				assert.Contains(t, wire, "CLABEL 'service' 'api'")
 				assert.NotContains(t, wire, "obsolete")
-				assert.Less(t, strings.Index(wire, "CHART "), strings.Index(wire, "SET "))
-				assert.Less(t, strings.Index(wire, "DIMENSION "), strings.Index(wire, "SET "))
+				if alreadyPublished {
+					assert.NotContains(t, wire, "CHART ")
+					assert.NotContains(t, wire, "DIMENSION ")
+				} else {
+					assert.Contains(t, wire, "CLABEL 'service' 'api'")
+					assert.Less(t, strings.Index(wire, "CHART "), strings.Index(wire, "SET "))
+					assert.Less(t, strings.Index(wire, "DIMENSION "), strings.Index(wire, "SET "))
+				}
 				wire = f.publish(t, f.collect(t, observe(true)))
 				assert.NotContains(t, wire, "CHART ")
 				assert.NotContains(t, wire, "DIMENSION ")
@@ -208,7 +223,7 @@ func TestChartRevivalUsesLastEmittedMetadata(t *testing.T) {
 	}
 }
 
-func TestExpiredDimensionRevivalWithLiveChart(t *testing.T) {
+func TestDimensionRedefinitionWithLiveChart(t *testing.T) {
 	for name, tc := range map[string]struct {
 		options             string
 		counter             bool
@@ -271,13 +286,10 @@ groups:
 				}
 				f.publish(t, f.collect(t, observe(false)))
 				f.publish(t, f.collect(t, keeper))
-				if changeBeforeExpiry {
-					wire := f.publish(t, f.collect(t, observe(true)))
-					assert.NotContains(t, wire, "CHART ")
-					assert.NotContains(t, wire, "DIMENSION ")
-				}
-				for range 2 {
-					f.collect(t, keeper).Abort()
+				if !changeBeforeExpiry {
+					for range 2 {
+						f.collect(t, keeper).Abort()
+					}
 				}
 				attempt := f.collect(t, observe(true))
 				charts, dims := revivalDefinitions(attempt.Plan())

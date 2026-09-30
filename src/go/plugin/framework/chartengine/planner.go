@@ -907,10 +907,6 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 	for _, chartID := range chartIDs {
 		cs := ctx.chartsByID[chartID]
 		previous := ctx.materialized.charts[chartID]
-		dimensionExpiry := cs.lifecycle.Dimensions.ExpireAfterCycles
-		if previous != nil {
-			dimensionExpiry = previous.lifecycle.Dimensions.ExpireAfterCycles
-		}
 		if previous != nil &&
 			(previous.templateID != cs.templateID || needsChartRevival(previous, cs, ctx.collectMeta.LastSuccessSeq)) {
 			// Caps may already have pruned staged dimensions and queued their removal.
@@ -974,8 +970,8 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 				continue
 			}
 			if dim := matChart.dimensions[name]; dim != nil &&
-				expiredBeforeCycle(dim.lastSeenSuccessSeq, ctx.collectMeta.LastSuccessSeq, dimensionExpiry) &&
 				dimensionDefinitionChanged(dim, entry.dimensionState) {
+				// Re-emit changed wire settings before values, even while the dimension is live.
 				matChart.removeDimension(ctx.journal, name)
 			}
 			matDim, dimCreated := matChart.ensureDimension(ctx.journal, name, entry.dimensionState)
