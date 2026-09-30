@@ -96,19 +96,19 @@ func TestCase040InvertedTierRetention(t *testing.T) {
 	}
 }
 
-// A rotated RAM tier and one completed coarse bucket leave an isolated head
+// A rotated ALLOC tier and one completed coarse bucket leave an isolated head
 // sample. Automatic planning must read it even when the first output row ends there.
 func TestCase040IsolatedCoarseHead(t *testing.T) {
 	trackContractComponent(t, "CASE-040/inverted-tier-retention", "isolated-head")
 	dd := startDedicatedStorageDaemon(t, daemon.Options{
-		StorageTiers: 2, StreamMemoryMode: "ram", TierGrouping: [3]int{0, 1200, 0},
+		StorageTiers: 2, StreamMemoryMode: "alloc", TierGrouping: [3]int{0, 1200, 0},
 	})
 	if err := dd.Stop(); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range []struct{ file, old, replacement string }{
 		{"netdata.conf", "[db]\n", "[db]\n    retention = 5\n"},
-		{"stream.conf", "    default memory mode = ram\n", "    default memory mode = ram\n    retention = 5\n"},
+		{"stream.conf", "    default memory mode = alloc\n", "    default memory mode = alloc\n    retention = 5\n"},
 	} {
 		path := filepath.Join(dd.Opts.RunDir, "etc", c.file)
 		conf, err := os.ReadFile(path)
@@ -127,9 +127,10 @@ func TestCase040IsolatedCoarseHead(t *testing.T) {
 	}
 	const host, context = "isolated-coarse-head", "fixture.isolated_coarse_head"
 	base := int64(fixture.T0 - fixture.T0%1200)
-	ch := fixture.Series(context, context, base, 2300, 1, func(int) string { return "7" }, notAnom)
+	ch := fixture.Series(context, context, base, 1400, 1, func(int) string { return "7" }, notAnom)
 	pushDedicatedChart(t, dd, host, guid(9602), ch)
 	waitDedicatedTierLastEntry(t, dd, host, context, 1, base+1200)
+	waitDedicatedTierLastEntry(t, dd, host, context, 0, base+1400)
 	for _, tc := range []struct {
 		name, tier            string
 		after, before, points int64
