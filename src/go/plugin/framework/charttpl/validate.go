@@ -46,6 +46,44 @@ func (v Validation) AutogenRules() []ValidatedAutogenRule {
 	return slices.Clone(v.autogenRules)
 }
 
+// ValidatedCounterRawCharts is the compiled engine.autogen.counter_raw_charts
+// pattern list. The zero value selects nothing.
+type ValidatedCounterRawCharts struct {
+	names matcher.Matcher
+}
+
+// Selects reports whether a scalar counter metric also gets a raw-value chart.
+func (v ValidatedCounterRawCharts) Selects(metricName string) bool {
+	return v.names != nil && v.names.MatchString(metricName)
+}
+
+// CompileCounterRawCharts validates and compiles counter raw-chart patterns.
+// Items are Netdata simple patterns in order (first match wins, `!` negates);
+// they must not be blank or carry surrounding whitespace, and at least one must
+// be positive. Errors name the offending item by its index.
+func CompileCounterRawCharts(patterns []string) (ValidatedCounterRawCharts, error) {
+	if len(patterns) == 0 {
+		return ValidatedCounterRawCharts{}, nil
+	}
+	var errs []error
+	for i, pattern := range patterns {
+		switch {
+		case strings.TrimSpace(pattern) == "":
+			errs = append(errs, fmt.Errorf("item %d: must not be blank", i))
+		case strings.TrimSpace(pattern) != pattern:
+			errs = append(errs, fmt.Errorf("item %d: must not have leading or trailing whitespace", i))
+		}
+	}
+	if err := errors.Join(errs...); err != nil {
+		return ValidatedCounterRawCharts{}, err
+	}
+	names, err := matcher.NewSimplePatternListMatcher(patterns)
+	if err != nil {
+		return ValidatedCounterRawCharts{}, err
+	}
+	return ValidatedCounterRawCharts{names: names}, nil
+}
+
 // Validate performs semantic checks for one chart template spec.
 func (s *Spec) Validate() error {
 	_, err := Validate(s)
@@ -344,6 +382,9 @@ func validateEngine(engine *Engine) ([]ValidatedAutogenRule, error) {
 		rules, err = CompileAutogenRules(engine.Autogen.Rules)
 		if err != nil {
 			errs = append(errs, err)
+		}
+		if _, err := CompileCounterRawCharts(engine.Autogen.CounterRawCharts); err != nil {
+			errs = append(errs, semErr("engine.autogen.counter_raw_charts", err.Error()))
 		}
 		if engine.Autogen.MaxTypeIDLen < 0 {
 			errs = append(errs, semErr("engine.autogen.max_type_id_len", "must be >= 0"))

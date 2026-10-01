@@ -357,6 +357,7 @@ collector's lost counter baseline.
 | Trigger               | Unmatched series only when autogen is enabled                                                                                                  |
 | Authored precedence   | All authored routes are resolved first; conditional rules and fallback apply only when none matched                                             |
 | Conditional rules     | `AutogenPolicy.Rules` scope fallback selectors by source family; all applicable selectors must accept, so any rejection suppresses fallback     |
+| Counter raw charts    | `AutogenPolicy.CounterRawCharts` adds a second, `absolute` route (`<metric>.raw` chart ID and context) to accepted scalar counter routes; see the chart-template `engine` section |
 | Context namespace     | Autogen context = top-level `context_namespace` + the full metric name (which includes any `SnapshotMeter` prefix); empty namespace leaves the bare name. A non-empty meter prefix stacks after `context_namespace`, so pair `context_namespace` with `SnapshotMeter("")` to avoid a doubled prefix |
 | Structured families   | Histogram/summary components use the base family and retain structural labels; StateSet keeps its name; MeasureSet fields use the source before `_<field>` |
 | Metric metadata usage | Uses `metrix.MetricMeta` hints for title/family/unit where allowed                                                                             |

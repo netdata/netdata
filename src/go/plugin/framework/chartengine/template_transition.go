@@ -23,6 +23,7 @@ func (t *templateTransition) install(state *engineState) {
 	state.routeCache = t.cache
 	state.cfg.autogen = t.set.policy.autogen
 	state.cfg.autogenRules = t.set.policy.autogenRules
+	state.cfg.autogenCounterRaw = t.set.policy.autogenCounterRaw
 	state.cfg.selector = t.set.policy.selector
 	state.cfg.autogenContextNamespace = t.set.global.namespace
 }
