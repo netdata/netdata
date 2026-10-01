@@ -346,14 +346,16 @@ store.
 
 `autogen.counter_raw_charts` adds a raw-value chart next to the rate chart of selected autogen counters:
 
-- Items are Netdata simple patterns over the series metric name, evaluated in order: the first match wins and a leading
-  `!` negates. Each term is a glob (`*`, `?`, `[...]`). Items must not be blank or carry surrounding whitespace, and at
-  least one must be positive.
+- Each item is one glob (`*`, `?`, `[...]`) over the series metric name, optionally negated with a leading `!`. Items
+  are evaluated in order like Netdata simple patterns: the first match wins. Items must not contain whitespace (put each
+  pattern in its own item), and at least one must be positive.
 - Only scalar counters on autogen routes qualify. Gauges, histogram/summary/StateSet/MeasureSet components and series
   routed to an authored chart get no raw chart; a series a rule rejects gets no autogen chart at all.
 - The raw chart reads the same series with the `absolute` algorithm: chart ID `<metric>.raw` plus the usual label
-  suffix, context `<namespace>.<metric>.raw`, title `<title> (raw)`, units without the rate `/s`. Dimension, family,
-  priority and lifecycle match the rate chart. A raw chart ID over the `type.id` budget is skipped.
+  suffix, context `<namespace>.<metric>.raw`, title `<title> (raw)`, and the collected units without the `/s` that
+  autogen adds to counter rate charts. Dimension, family, priority, chart type and lifecycle match the rate chart. A raw
+  chart ID over the `type.id` budget is skipped. Raw charts use their own template identity, so a series whose own chart
+  ID equals a raw chart ID (a metric literally named `<metric>.raw`) is rejected as a collision rather than merged.
 
 **Example: Nagios collector with autogeneration**
 
@@ -1204,7 +1206,7 @@ All rules below produce semantic validation errors unless noted:
 | `engine.autogen.max_type_id_len` must be `0` or `>= 4`                                  | semantic                        |
 | Every autogen rule requires a non-empty valid `scope` simple pattern                    | semantic                        |
 | Every autogen rule selector requires at least one non-empty valid `allow`/`deny` entry  | semantic                        |
-| `engine.autogen.counter_raw_charts` items are non-blank, unpadded, valid; one is positive | semantic                        |
+| `engine.autogen.counter_raw_charts` items are valid whitespace-free globs; one is positive | semantic                        |
 | Unknown YAML fields                                                                     | decode error (strict unmarshal) |
 
 ## Engine-Derived Behavior

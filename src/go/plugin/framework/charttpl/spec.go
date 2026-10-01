@@ -41,8 +41,9 @@ type EngineAutogen struct {
 	Rules []EngineAutogenRule `yaml:"rules,omitempty" json:"rules,omitempty"`
 
 	// CounterRawCharts selects scalar counters, by metric name, that also get a
-	// raw-value chart next to their rate chart. Items are Netdata simple patterns
-	// evaluated in order: the first match wins and a leading `!` negates.
+	// raw-value chart next to their rate chart. Each item is one glob, evaluated
+	// in order like Netdata simple patterns: the first match wins and a leading
+	// `!` negates.
 	CounterRawCharts []string `yaml:"counter_raw_charts,omitempty" json:"counter_raw_charts,omitempty"`
 
 	// MaxTypeIDLen is the max allowed full `type.id` length.

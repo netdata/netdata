@@ -125,7 +125,7 @@
           ],
           "items": {
             "type": "string",
-            "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+            "pattern": "^\\S+$"
           }
         },
         "max_type_id_len": {

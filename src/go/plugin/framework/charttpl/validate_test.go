@@ -1282,15 +1282,23 @@ func TestCompileCounterRawCharts(t *testing.T) {
 		},
 		"surrounding whitespace": {
 			patterns: []string{" app_*"},
-			wantErr:  "item 0: must not have leading or trailing whitespace",
+			wantErr:  `item 0 (" app_*"): must not contain whitespace`,
+		},
+		"several patterns in one item": {
+			patterns: []string{"app_*", "app_* !app_internal_*"},
+			wantErr:  `item 1 ("app_* !app_internal_*"): must not contain whitespace`,
+		},
+		"lone negation": {
+			patterns: []string{"app_*", "!"},
+			wantErr:  `item 1 ("!"): negation needs a pattern`,
 		},
 		"only negative patterns": {
 			patterns: []string{"!app_*"},
 			wantErr:  "at least one positive pattern",
 		},
 		"invalid glob": {
-			patterns: []string{"app_["},
-			wantErr:  "invalid pattern",
+			patterns: []string{"app_*", "!app_["},
+			wantErr:  `item 1 ("!app_["):`,
 		},
 	}
 

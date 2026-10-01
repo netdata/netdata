@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -58,20 +59,29 @@ func (v ValidatedCounterRawCharts) Selects(metricName string) bool {
 }
 
 // CompileCounterRawCharts validates and compiles counter raw-chart patterns.
-// Items are Netdata simple patterns in order (first match wins, `!` negates);
-// they must not be blank or carry surrounding whitespace, and at least one must
-// be positive. Errors name the offending item by its index.
+// Each item is one glob, optionally negated with a leading `!`; items are
+// evaluated in order and the first match wins. Items must not contain
+// whitespace (a space would be a literal character, so "a !b" in one item
+// silently matches nothing), and at least one item must be positive. Item
+// errors name the item by index and value.
 func CompileCounterRawCharts(patterns []string) (ValidatedCounterRawCharts, error) {
 	if len(patterns) == 0 {
 		return ValidatedCounterRawCharts{}, nil
 	}
 	var errs []error
 	for i, pattern := range patterns {
+		glob := strings.TrimPrefix(pattern, "!")
 		switch {
 		case strings.TrimSpace(pattern) == "":
 			errs = append(errs, fmt.Errorf("item %d: must not be blank", i))
-		case strings.TrimSpace(pattern) != pattern:
-			errs = append(errs, fmt.Errorf("item %d: must not have leading or trailing whitespace", i))
+		case strings.IndexFunc(pattern, unicode.IsSpace) >= 0:
+			errs = append(errs, fmt.Errorf("item %d (%q): must not contain whitespace; put each pattern in its own item", i, pattern))
+		case glob == "":
+			errs = append(errs, fmt.Errorf("item %d (%q): negation needs a pattern", i, pattern))
+		default:
+			if _, err := matcher.NewGlobMatcher(glob); err != nil {
+				errs = append(errs, fmt.Errorf("item %d (%q): %v", i, pattern, err))
+			}
 		}
 	}
 	if err := errors.Join(errs...); err != nil {

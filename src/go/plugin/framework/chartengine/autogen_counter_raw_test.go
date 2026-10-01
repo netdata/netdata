@@ -290,26 +290,109 @@ func TestTemplateSetCounterRawChartsPolicy(t *testing.T) {
 	require.ErrorContains(t, err, "autogen counter_raw_charts")
 }
 
-func TestPrepareTemplateSetCounterRawChartsOverride(t *testing.T) {
-	set, err := NewTemplateSetYAML([]byte(counterRawTemplate("", "")))
-	require.NoError(t, err)
-	prepared, err := PrepareTemplateSet(set,
-		WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{Enabled: true, CounterRawCharts: []string{"app_*"}}}))
-	require.NoError(t, err)
+func TestTemplateSetPathsPlanCounterRawCharts(t *testing.T) {
+	tests := map[string]struct {
+		newSet func(t *testing.T) *TemplateSet
+	}{
+		"native set policy": {
+			newSet: func(t *testing.T) *TemplateSet {
+				set, err := NewTemplateSet(TemplateSetSpec{
+					Policy: EnginePolicy{
+						Autogen: &AutogenPolicy{Enabled: true, CounterRawCharts: []string{"app_*"}},
+					},
+					FallbackContextNamespace: "ns",
+				})
+				require.NoError(t, err)
+				return set
+			},
+		},
+		"YAML document policy": {
+			newSet: func(t *testing.T) *TemplateSet {
+				set, err := NewTemplateSetYAML([]byte(counterRawTemplate("counter_raw_charts: [app_*]", "")))
+				require.NoError(t, err)
+				return set
+			},
+		},
+		"job policy override": {
+			newSet: func(t *testing.T) *TemplateSet {
+				set, err := NewTemplateSetYAML([]byte(counterRawTemplate("", "")))
+				require.NoError(t, err)
+				prepared, err := PrepareTemplateSet(set, WithEnginePolicy(EnginePolicy{
+					Autogen: &AutogenPolicy{Enabled: true, CounterRawCharts: []string{"app_*"}},
+				}))
+				require.NoError(t, err)
+				return prepared
+			},
+		},
+	}
 
-	e, err := New()
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			e, err := New()
+			require.NoError(t, err)
+			store := metrix.NewCollectorStore()
+			cc := mustCycleController(t, store)
+			cc.BeginCycle()
+			observeCounterRawRequests(store.Write().SnapshotMeter(""))
+			require.NoError(t, cc.CommitCycleSuccess())
+
+			attempt, err := e.PreparePlanWithOptions(store.Read(metrix.ReadFlatten()), PlanOptions{TemplateSet: tc.newSet(t)})
+			require.NoError(t, err)
+			charts := counterRawTestCharts(t, attempt.Plan())
+			require.NoError(t, attempt.Commit())
+
+			raw, ok := charts["app_requests_total.raw-code=200"]
+			require.True(t, ok, "raw chart missing; got %v", charts)
+			assert.Equal(t, "ns.app_requests_total.raw", raw.Context)
+			assert.Equal(t, program.AlgorithmAbsolute, raw.Algorithm)
+		})
+	}
+}
+
+func TestBuildPlanAutogenCounterRawSkipsOverBudgetChartID(t *testing.T) {
+	// With the "job" type ID, "job.app_requests_total" (22) fits a 24-byte budget
+	// and "job.app_requests_total.raw" (26) does not: only the raw chart is skipped.
+	e, err := New(WithEmitTypeIDBudgetPrefix("job"))
 	require.NoError(t, err)
+	require.NoError(t, e.LoadYAML([]byte(counterRawTemplate("counter_raw_charts: [app_*]", `
+    max_type_id_len: 24`)), 1))
+
 	store := metrix.NewCollectorStore()
 	cc := mustCycleController(t, store)
 	cc.BeginCycle()
-	observeCounterRawRequests(store.Write().SnapshotMeter(""))
+	store.Write().SnapshotMeter("").Counter("app_requests_total").ObserveTotal(7)
 	require.NoError(t, cc.CommitCycleSuccess())
 
-	attempt, err := e.PreparePlanWithOptions(store.Read(metrix.ReadFlatten()), PlanOptions{TemplateSet: prepared})
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
-	charts := counterRawTestCharts(t, attempt.Plan())
-	require.NoError(t, attempt.Commit())
-	assert.Contains(t, charts, "app_requests_total.raw-code=200")
+	charts := counterRawTestCharts(t, plan)
+	assert.Contains(t, charts, "app_requests_total")
+	assert.NotContains(t, charts, "app_requests_total.raw")
+}
+
+func TestBuildPlanAutogenCounterRawRejectsCollidingSeries(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+	require.NoError(t, e.LoadYAML([]byte(counterRawTemplate("counter_raw_charts: [app_requests_total]", "")), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	cc.BeginCycle()
+	store.Write().SnapshotMeter("").Counter("app_requests_total").ObserveTotal(7)
+	// A series literally named "app_requests_total.raw" owns the same chart ID.
+	store.Write().SnapshotMeter("app_requests_total").Counter("raw").ObserveTotal(3)
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	var dims []CreateDimensionAction
+	for _, action := range plan.Actions {
+		if dim, ok := action.(CreateDimensionAction); ok && dim.ChartID == "app_requests_total.raw" {
+			dims = append(dims, dim)
+		}
+	}
+	require.Len(t, dims, 1, "colliding routes must not merge into one chart")
 }
 
 func counterRawTemplate(counterRawCharts, extraAutogen string) string {

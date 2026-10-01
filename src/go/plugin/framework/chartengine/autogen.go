@@ -17,6 +17,10 @@ const (
 	// counterRawSuffix follows the metric name in the chart ID and context of a
 	// counter's raw-value chart (AutogenPolicy.CounterRawCharts).
 	counterRawSuffix = ".raw"
+	// counterRawTemplatePrefix gives raw charts their own template identity, so a
+	// series whose own chart ID equals a raw chart ID is a rejected collision
+	// instead of a dimension merged into the raw chart.
+	counterRawTemplatePrefix = autogenTemplatePrefix + "raw:"
 )
 
 // Autogen output also depends on current reader metadata and flattened kinds;
@@ -203,14 +207,13 @@ func (e *Engine) appendCounterRawAutogenRoute(
 	}
 
 	raw := routes[0]
-	raw.ChartTemplateID = autogenTemplatePrefix + chartID
+	raw.ChartTemplateID = counterRawTemplatePrefix + chartID
 	raw.ChartID = chartID
 	raw.Algorithm = program.AlgorithmAbsolute
 	raw.Meta.Title += " (raw)"
 	raw.Meta.Context += counterRawSuffix
 	raw.Meta.Units = units
 	raw.Meta.Algorithm = program.AlgorithmAbsolute
-	raw.Meta.Type = chartTypeFromUnits(units)
 	return append(routes, raw)
 }
 
