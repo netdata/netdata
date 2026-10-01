@@ -512,6 +512,7 @@ int netdata_main(int argc, char **argv) {
                             if (exporting_opentsdb_telnet_unittest()) return 1;
                             if (ringbuffer_unittest()) return 1;
                             if (onewayalloc_unittest()) return 1;
+                            if (timezone_windows_mapping_unittest()) return 1;
                             if (log_stack_unittest()) return 1;
                             if (clocks_unittest()) return 1;
                             if (ws_client_unittest()) return 1;
@@ -665,6 +666,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "owatest") == 0) {
                             unittest_running = true;
                             return onewayalloc_unittest();
+                        }
+                        else if(strcmp(optarg, "timezonemaptest") == 0) {
+                            unittest_running = true;
+                            return timezone_windows_mapping_unittest();
                         }
                         else if(strcmp(optarg, "wsclienttest") == 0) {
                             unittest_running = true;
