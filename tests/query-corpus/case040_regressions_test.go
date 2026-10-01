@@ -277,7 +277,9 @@ func TestCase040DisjointFineSelectedGap(t *testing.T) {
 // Preserve the pre-existing coarse-selected form under its own key. Moving
 // owned tier0 files simulates expired retention without deleting the evidence.
 func TestCase040DisjointCoarseSelectedGap(t *testing.T) {
-	trackContract(t, "CASE-040/coarse-selected-gap-null")
+	for _, key := range []string{"coarse-selected-gap-null", "coarse-gap-boundary-average", "coarse-gap-boundary-sum", "coarse-gap-resume-average", "coarse-gap-resume-sum"} {
+		registerContract(t, "CASE-040/"+key)
+	}
 	base := int64(fixture.T0 - fixture.T0%60)
 	const host, context = "coarse-selected-gap", "fixture.coarse_selected_gap"
 	dd := startDedicatedStorageDaemon(t, daemon.Options{StorageTiers: 2, TierGrouping: [3]int{0, 60, 0}})
@@ -295,7 +297,8 @@ func TestCase040DisjointCoarseSelectedGap(t *testing.T) {
 	if err := dd.Restart(); err != nil {
 		t.Fatal(err)
 	}
-	pushDedicatedChart(t, dd, host, guid(9914), c040Series(context, base, 1501, 1540, c040Flat, c040NotAnomalous, 0))
+	resumedValue := func(off int64) float64 { return float64(off - 1500) }
+	pushDedicatedChart(t, dd, host, guid(9914), c040Series(context, base, 1501, 1540, resumedValue, c040NotAnomalous, 0))
 	waitDedicatedTierLastEntry(t, dd, host, context, 0, base+1540)
 	doc, cols := c040Query(t, dd, host, context, base, base+1540, 20, "average", "")
 	c040Retention(t, doc, []daemon.Retention{{FirstEntry: base + 1501, LastEntry: base + 1540}, {FirstEntry: base + 60, LastEntry: base + 1200}})
@@ -303,8 +306,89 @@ func TestCase040DisjointCoarseSelectedGap(t *testing.T) {
 	for end := int64(1309); end <= 1463; end += 77 {
 		want = append(want, wantEmptyAt(base+end))
 	}
-	if !assertExactColumnValues(t, c040Rows(cols, base+1309, base+1463), "load", want, 0) {
-		t.Error("query fabricated coarse-selected gap data")
+	t.Run("gap", func(t *testing.T) {
+		trackContract(t, "CASE-040/coarse-selected-gap-null")
+		if !assertExactColumnValues(t, c040Rows(cols, base+1309, base+1463), "load", want, 0) {
+			t.Error("query fabricated coarse-selected gap data")
+		}
+	})
+	for _, group := range []string{"average", "sum"} {
+		t.Run("boundary-"+group, func(t *testing.T) {
+			trackContract(t, "CASE-040/coarse-gap-boundary-"+group)
+			_, rows := c040Query(t, dd, host, context, base, base+1540, 20, group, "")
+			value := 7.0
+			if group == "sum" {
+				value *= 1200 - 1155
+			}
+			if !assertExactColumnValues(t, c040Rows(rows, base+1232, base+1232), "load", []expectedColumnPoint{wantNumberAt(base+1232, value)}, 0) {
+				t.Error("last retained coarse record lost its partially overlapping row")
+			}
+		})
+		t.Run("resume-"+group, func(t *testing.T) {
+			trackContract(t, "CASE-040/coarse-gap-resume-"+group)
+			_, rows := c040Query(t, dd, host, context, base, base+1540, 20, group, "")
+			value := 40.0 * 41 / 2
+			if group == "average" {
+				value /= 40
+			}
+			if !assertExactColumnValues(t, c040Rows(rows, base+1540, base+1540), "load", []expectedColumnPoint{wantNumberAt(base+1540, value)}, 0) {
+				t.Error("first post-gap sample did not reach its own output row")
+			}
+		})
+	}
+}
+
+// The current coarse cadence may differ from the actual first stored interval.
+func TestCase040HistoricalHeadCadence(t *testing.T) {
+	trackContract(t, "CASE-040/historical-head-cadence")
+	base := int64(fixture.T0 - fixture.T0%16)
+	const host, context = "historical-head-cadence", "fixture.historical_head_cadence"
+	value := func(off int64) float64 {
+		if off >= 117 && off <= 120 {
+			return 100
+		}
+		return 7
+	}
+	dd := startDedicatedStorageDaemon(t, daemon.Options{StorageTiers: 1, TierGrouping: [3]int{0, 4, 0}})
+	closeFixture := pushDedicatedChart(t, dd, host, guid(9919), c040Series(context, base, 1, 120, value, c040NotAnomalous, 0))
+	waitDedicatedTierLastEntry(t, dd, host, context, 0, base+120)
+	c040Restart(t, dd, closeFixture, 2, "")
+	conn, err := stream.Connect(dd.Addr, dd.StreamKey, stream.HostInfo{Hostname: host, MachineGUID: guid(9919)}, stream.CapsLive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	ch := c040Series(context, base, 121, 200, value, c040NotAnomalous, 0)
+	ch.Define(conn)
+	ch.PushLive(conn)
+	if err := conn.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	waitDedicatedTierLastEntry(t, dd, host, context, 0, base+200)
+	ch.UpdateEvery = 2
+	ch.Dimensions[0].Points = nil
+	for off := int64(202); off <= 400; off += 2 {
+		ch.Dimensions[0].Points = append(ch.Dimensions[0].Points, fixture.Point{T: base + off, Collected: "7", Flags: stream.FlagNotAnomalous})
+	}
+	ch.Define(conn)
+	ch.PushLive(conn)
+	if err := conn.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	waitDedicatedTierLastEntry(t, dd, host, context, 1, base+392)
+	for _, tier := range []string{"0", ""} {
+		t.Run("tier-"+tier, func(t *testing.T) {
+			doc, cols := c040Query(t, dd, host, context, base+116, base+396, 35, "average", tier)
+			if tier == "" {
+				points, ok := strictTierPoints(t, doc)
+				if !ok || points[0] <= 0 || points[1] <= 0 {
+					t.Fatal("historical head control did not cross tiers")
+				}
+			}
+			if !assertExactColumnValues(t, c040Rows(cols, base+124, base+124), "load", []expectedColumnPoint{wantNumberAt(base+124, (4*100+4*7)/8.0)}, 0) {
+				t.Error("current coarse cadence replaced the shorter historical head interval")
+			}
+		})
 	}
 }
 

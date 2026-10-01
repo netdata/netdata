@@ -1374,5 +1374,25 @@
   {
     "name": "W/limit-mcp",
     "proves": "MCP weights preserve caller default and minimum limits and descending raw scores while reporting exact-boundary truncation truthfully"
+  },
+  {
+    "name": "CASE-040/coarse-gap-boundary-average",
+    "proves": "a partial output row overlapping the last retained coarse record keeps its exact constant average before a disconnected fine island"
+  },
+  {
+    "name": "CASE-040/coarse-gap-boundary-sum",
+    "proves": "a partial output row overlapping the last retained coarse record keeps its exact retained volume before a disconnected fine island"
+  },
+  {
+    "name": "CASE-040/coarse-gap-resume-average",
+    "proves": "the first fine sample after a retention hole reaches its own output row without changing the exact average"
+  },
+  {
+    "name": "CASE-040/coarse-gap-resume-sum",
+    "proves": "the first fine sample after a retention hole reaches its own output row without losing its exact volume"
+  },
+  {
+    "name": "CASE-040/historical-head-cadence",
+    "proves": "automatic head preference uses the actual historical coarse interval and preserves the fine prefix when current cadence is wider"
   }
 ]

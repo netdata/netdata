@@ -57,8 +57,9 @@ state where one stage changes another stage's inputs.
   CASE-040 independently checks late-enabled fine-to-coarse handoffs,
   conventional coarse-to-fine tails, missed seam collections, retained
   islands, empty retention gaps, partial initial records, isolated head/tail
-  rows, shifted constant intervals, anomaly metadata, and young-metric work
-  budgets. Its original normal-tier cases are single-tier controls; actual
+  rows, shifted constant intervals, anomaly metadata, historical head
+  cadence, supported boundary/post-gap rows, and young-metric work budgets.
+  Its original normal-tier cases are single-tier controls; actual
   conventional coverage requires reads from both tiers. These contracts
   assert fixture truth and remain failing while the engine violates it.
 - **Cloud boundary**: this repository does not run `cloud-charts-service` or
