@@ -140,8 +140,9 @@ Use a discriminator plus `dependencies` for mutually exclusive configurations (m
 - With tabs, branch keys MUST be listed on a tab (they render only while their mode is selected); an unlisted branch
   key is dropped like any other property.
 - Prefer top-level dependencies: the UI drops inactive-branch data only for top-level discriminators.
-- Do not use property-level `oneOf`/`anyOf` for alternatives; the UI renders a branch selector whose first option
-  cannot be selected reliably.
+- Do not use `oneOf`/`anyOf` outside `dependencies`, on a property or an object (including inside `allOf`); the UI
+  renders a branch selector, and on a tabbed object a second tab strip. Express a cross-field rule (fields set
+  together, one of two credentials) as `if`/`then` in `allOf`, as the redfish `tls_cert`/`tls_key` pairing does.
 
 ## 6. Secrets
 
