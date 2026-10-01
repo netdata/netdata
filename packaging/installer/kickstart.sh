@@ -57,7 +57,7 @@ STABLE_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/stable"
 NIGHTLY_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/edge"
 REPOCONFIG_URL_PREFIX="https://repository.netdata.cloud/repos/repoconfig"
 TELEMETRY_URL="https://us-east1-netdata-analytics-bi.cloudfunctions.net/ingest_agent_events"
-RELEASE_ARTIFACT_URL_PREFIX="https://artifacts.netdata.cloud/"
+RELEASE_ARTIFACT_URL_PREFIX="https://artifacts.netdata.cloud"
 
 # ======================================================================
 # Defaults for environment variables
@@ -570,6 +570,7 @@ _log_run_cmd() {
 
 _log_run_result() {
   ret="${1}"
+  shift 1
   if [ "${ret}" -ne 0 ]; then
     printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET}"
     printf "%s\n" "FAILED with exit code ${ret}" >> "${run_logfile}"
@@ -597,7 +598,7 @@ run() {
     ret=0
   fi
 
-  _log_run_result "${ret}"
+  _log_run_result "${ret}" "${@}"
 
   return "${ret}"
 }
@@ -955,14 +956,14 @@ verify_manifest() {
     progress "Verifying integrity of downloaded files."
 
     if [ -r "./Manifest" ]; then
-      files="$(awk '{ print $1 }')"
+      files="$(awk '{ print $1 }' ./Manifest)"
       for f in ${files} ; do
         if [ -r "${f}" ]; then
           file_info="$(grep -E "^${f} " ./Manifest)"
           file_size="$(echo "${file_info}" | awk '{ print $2 }')"
           file_hash="$(echo "${file_info}" | awk '{ print $3 }')"
 
-          actual_size="$(wc -c "${f}")"
+          actual_size="$(wc -c "${f}" | awk '{ print $1 }')"
           if [ "${actual_size}" -ne "${file_size}" ]; then
             failed="$((failed + 1))"
             warning "Invalid file size for ${dir}/${f}, expected ${file_size}, actual ${actual_size}"
@@ -2537,6 +2538,10 @@ prepare_offline_install_source() {
           fatal "Unable to download release manifest file. ${BADNET_MSG}" F0526
         fi
 
+        if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Version"
+          fatal "Unable to download release Version file. ${BADNET_MSG}" F0526
+        fi
+
         archive_info="$(grep -E "^netdata-.*-.*\\.run " ./Manifest)"
 
         if [ -z "${archive_info}" ]; then
@@ -2645,7 +2650,7 @@ prepare_offline_install_source() {
     rm -f Manifest
 
     for f in *; do
-      echo "${f} $(wc -c "${f}") $(safe_sha256sum "${f}" | awk '{ print $1 }')" >> ./Manifest
+      echo "${f} $(wc -c "${f}" | awk '{ print $1 }') $(safe_sha256sum "${f}" | awk '{ print $1 }')" >> ./Manifest
     done
   else
     progress "Would generate updated Manifest for offline install source directory."
