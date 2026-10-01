@@ -575,9 +575,10 @@ void ml_update_training_statistics_chart(ml_worker_t *worker, const ml_queue_sta
     }
 
     /*
-     * training pass: entries of the last sorted pass and how many of them had no usable page close (key 0)
+     * training pass: entries of the last sorted pass and how many of them had no usable page close (key 0);
+     * nothing is reported before the first pass is sorted, as there is no last pass yet
     */
-    {
+    if (stats.passes_sorted) {
         if (!worker->training_pass_rs) {
             char id_buf[1024];
             char name_buf[1024];
