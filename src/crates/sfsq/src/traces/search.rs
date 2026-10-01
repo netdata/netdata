@@ -118,7 +118,7 @@ use super::gate::{GateDecision, TraceGate};
 use super::predicate::{EvalPredicate, Predicate, PredicateError, TraceLevelEval};
 use super::sources::{SourceId, SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
-use super::vocab::BuiltinField;
+use super::vocab::{BuiltinField, span_field};
 use super::wal_scan::TraceWalScan;
 use super::window::{TimeWindow, WindowError};
 use crate::source::map_source;
@@ -133,6 +133,9 @@ pub const DEFAULT_SPANS_PER_TRACE: usize = 3;
 /// Library maximum for [`SearchQuery::spans_per_trace`]; beyond it is a request
 /// error (an unbounded attachment would defeat the summary shape).
 pub const SPANS_PER_TRACE_MAX: usize = 128;
+/// How many services a returned trace's [`ServiceBreakdown`] names (the
+/// rest fold into `other`). Fixed — a UI-default, not a tuning surface.
+pub const SERVICE_BREAKDOWN_TOP_K: usize = 5;
 /// Phase-1 over-collection: the initial per-file K is `limit ×` this;
 /// the demand-driven refill doubles it per round.
 const OVER_COLLECTION_FACTOR: usize = 3;
@@ -298,6 +301,8 @@ pub struct TraceSummary {
     pub span_count: usize,
     /// Retained canonical spans with ERROR status.
     pub error_count: usize,
+    /// The retained canonical spans by resource `service.name`.
+    pub service_breakdown: ServiceBreakdown,
     /// Canonical spans in the retained capped set satisfying the
     /// span-local predicate + window after phase-2 re-evaluation.
     pub matched_count: usize,
@@ -306,8 +311,27 @@ pub struct TraceSummary {
     pub matched_spans: Vec<sfst::TraceSpan>,
     /// `false` when this trace's assembly was capped or degraded (span
     /// cap hit, a source failed during its merge, or a completion source
-    /// failed to open at all) — its summary numbers may undercount.
+    /// failed to open or was unavailable) — its summary numbers may
+    /// undercount.
     pub exact: bool,
+}
+
+/// One returned trace's spans by resource `service.name`, over the same
+/// retained canonical spans as [`TraceSummary::span_count`] — so it
+/// shares the `exact` caveat, and the parts partition them exactly:
+/// `sum(top) + other + unattributed == span_count`.
+#[derive(Debug, PartialEq, Eq)]
+pub struct ServiceBreakdown {
+    /// At most [`SERVICE_BREAKDOWN_TOP_K`] services — span count DESC,
+    /// name ASC.
+    pub top: Vec<(String, u64)>,
+    /// Spans in the services beyond `top`.
+    pub other: u64,
+    /// How many services `other` covers.
+    pub other_services: usize,
+    /// Spans without a `service.name` — counted, never attributed to a
+    /// service.
+    pub unattributed: u64,
 }
 
 /// One search's results plus everything needed to interpret them
@@ -538,8 +562,9 @@ pub fn search(
     let window_ids: HashSet<&SourceId> =
         sources.window.iter().map(TraceSource::source_id).collect();
 
-    // Any completion source that fails to open degrades EVERY assembly
-    // (spans that may live there are missing), so no summary is exact.
+    // Any completion source that fails to open or is unavailable
+    // degrades EVERY assembly (spans that may live there are missing),
+    // so no summary is exact.
     let mut degraded_assembly = false;
     let mut mapped_sfsts: Vec<(crate::source::Mapped, &TraceSource)> = Vec::new();
     let mut tails: Vec<(SourceId, TraceWalScan)> = Vec::new();
@@ -564,6 +589,13 @@ pub fn search(
                     degraded_assembly = true;
                 }
             },
+            // The completion set is not pruned by summary, so an
+            // unavailable source — window role or slack — may hold
+            // spans of any candidate.
+            TraceSource::Unavailable(_) => {
+                status.add(PartialReason::RemoteUnavailable);
+                degraded_assembly = true;
+            }
         }
         progress.fetch_add(1, Ordering::Relaxed);
     }
@@ -725,11 +757,12 @@ pub fn search(
     // ── The trace-level pre-assembly gate (see the gate module) ──────
     // Engaged only when a prunable trace-level condition exists, the
     // candidate set is not pinned (a `trace:id =` lookup must always
-    // assemble), and no completion source failed during setup (every
-    // assembly is already degraded then — trace-level evaluation
-    // excludes all candidates as indeterminate, so there is nothing
-    // left to prune toward). Tail provenance is collected EAGERLY here
-    // — ids only, before `merged` takes its `&mut` tail borrows.
+    // assemble), and no completion source failed or was unavailable
+    // during setup (every assembly is already degraded then —
+    // trace-level evaluation excludes all candidates as indeterminate,
+    // so there is nothing left to prune toward). Tail provenance is
+    // collected EAGERLY here — ids only, before `merged` takes its
+    // `&mut` tail borrows.
     let mut gate = match &trace_level_eval {
         Some(tl)
             if query.gate_enabled
@@ -1077,14 +1110,6 @@ fn discovery_state(
     }))
 }
 
-/// One span field's first value, by storage field name.
-fn span_field(span: &sfst::TraceSpan, field: &str) -> Option<String> {
-    span.fields
-        .iter()
-        .find(|(k, _)| k == field)
-        .map(|(_, v)| v.clone())
-}
-
 /// The TRUE root's `(name, resource service)` — both `None` when the
 /// assembled trace has no unset-parent span. Decision 1D: trace-level
 /// FILTERS consume only these (the ecosystem's `trace:rootService`
@@ -1102,8 +1127,8 @@ fn true_root_fields(trace: &sfst::Trace) -> (Option<String>, Option<String>) {
         .dictionary_field()
         .expect("Name is dictionary-backed");
     (
-        span_field(root, name_field),
-        span_field(root, &super::vocab::resource_service_field()),
+        span_field(root, name_field).map(str::to_owned),
+        span_field(root, &super::vocab::resource_service_field()).map(str::to_owned),
     )
 }
 
@@ -1126,7 +1151,33 @@ fn summarize(
     let status_field = BuiltinField::Status
         .dictionary_field()
         .expect("Status is dictionary-backed");
-    let field_of = span_field;
+
+    // One pass over the retained canonical spans for the per-span counts.
+    let mut error_count = 0;
+    let mut spans_by_service: HashMap<&str, u64> = HashMap::new();
+    let mut unattributed = 0;
+    for span in &trace.spans {
+        if span_field(span, status_field) == Some("ERROR") {
+            error_count += 1;
+        }
+        match span_field(span, &service_field) {
+            Some(service) => *spans_by_service.entry(service).or_default() += 1,
+            None => unattributed += 1,
+        }
+    }
+    let (top, other) = super::overview::top_k(
+        spans_by_service.into_iter().collect(),
+        SERVICE_BREAKDOWN_TOP_K,
+    );
+    let service_breakdown = ServiceBreakdown {
+        top: top
+            .into_iter()
+            .map(|(service, spans)| (service.to_owned(), spans))
+            .collect(),
+        other: other.count,
+        other_services: other.entries,
+        unattributed,
+    };
 
     let root = trace.summary_root().map(|i| &trace.spans[i]);
     let start_ns = trace.spans.iter().map(|s| s.start_ns).min().unwrap_or(0);
@@ -1138,8 +1189,12 @@ fn summarize(
         .unwrap_or(0);
     TraceSummary {
         trace_id,
-        root_service: root.and_then(|r| field_of(r, &service_field)),
-        root_name: root.and_then(|r| field_of(r, name_field)),
+        root_service: root
+            .and_then(|r| span_field(r, &service_field))
+            .map(str::to_owned),
+        root_name: root
+            .and_then(|r| span_field(r, name_field))
+            .map(str::to_owned),
         start_ns,
         // Spans are in combiner total order (ascending start), so the
         // last matched index is the newest matched span — the same
@@ -1152,11 +1207,8 @@ fn summarize(
             .unwrap_or(start_ns),
         duration_ns: end_ns.saturating_sub(start_ns),
         span_count: trace.spans.len(),
-        error_count: trace
-            .spans
-            .iter()
-            .filter(|s| field_of(s, status_field).as_deref() == Some("ERROR"))
-            .count(),
+        error_count,
+        service_breakdown,
         matched_count: matched.len(),
         matched_spans: matched
             .iter()

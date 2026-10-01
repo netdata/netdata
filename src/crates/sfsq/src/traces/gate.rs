@@ -19,6 +19,11 @@
 //! divergence mechanisms (see [`search`](super::search)'s module docs):
 //! accepted, recall-miss only, by explicit ruling.
 //!
+//! The caller engages the gate only when every completion source opened
+//! at setup: a source that failed or was unavailable holds spans the
+//! gate cannot see, so every assembly is already degraded and nothing
+//! may be pruned toward.
+//!
 //! Prune preconditions, per candidate:
 //!
 //! - NOT in any tail's provenance (tails have no rollup; a tail span

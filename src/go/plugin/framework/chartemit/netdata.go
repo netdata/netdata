@@ -10,7 +10,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 )
 
+// Match the Agent's external-plugin backslash normalization. An unescaped
+// trailing backslash makes the plugins.d splitter consume the closing quote.
 var wireValueReplacer = strings.NewReplacer(
+	"\\", "/",
 	"'", "",
 	"\n", " ",
 	"\r", " ",

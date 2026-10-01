@@ -32,7 +32,9 @@
 //! Failure honesty matches [`trace_by_id`](super::trace_by_id): a source
 //! that fails to map, open, or read a dictionary is a
 //! [`SourceFailure`](PartialReason::SourceFailure) on the query status,
-//! never a silent skip. Under a `Partial` status the exact-`truncated`
+//! and an in-window unavailable source a
+//! [`RemoteUnavailable`](PartialReason::RemoteUnavailable) (pruned by its
+//! summary first, like a sealed file) — never a silent skip. Under a `Partial` status the exact-`truncated`
 //! guarantee is relative to the successfully observed sources.
 
 use std::collections::BTreeSet;
@@ -293,6 +295,11 @@ pub fn attribute_names(
                     status.add(PartialReason::SourceFailure);
                 }
             },
+            TraceSource::Unavailable(u) => {
+                if !pruned(query.window, &u.summary) {
+                    status.add(PartialReason::RemoteUnavailable);
+                }
+            }
         }
         progress.fetch_add(1, Ordering::Relaxed);
     }
@@ -420,6 +427,11 @@ pub fn attribute_values(
                     status.add(PartialReason::SourceFailure);
                 }
             },
+            TraceSource::Unavailable(u) => {
+                if !pruned(query.window, &u.summary) {
+                    status.add(PartialReason::RemoteUnavailable);
+                }
+            }
         }
         progress.fetch_add(1, Ordering::Relaxed);
     }

@@ -481,8 +481,7 @@ SYSLOG_SETUP = setup_block(
     'only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP '
     'endpoint reachable off-host must be protected with TLS or mutual TLS (`endpoint.tls_cert_path`, '
     '`endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path` for mTLS) plus network access controls — otherwise '
-    'anyone who can reach it can inject telemetry. Note that `auth.enabled` selects the tenant; it does not '
-    'authenticate the sender. Prefer keeping the Collector on the same host as the Agent.',
+    'anyone who can reach it can inject telemetry. Prefer keeping the Collector on the same host as the Agent.',
     [('The OpenTelemetry plugin',
       'The Netdata Agent must include the `otel` plugin, which is available on Linux and macOS. See the '
       'OpenTelemetry collector documentation for how it is enabled in each installation method.'),

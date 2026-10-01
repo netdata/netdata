@@ -18,6 +18,7 @@ modules:
         - grpc
         - metrics
         - logs
+        - traces
         - observability
       related_resources:
         integrations:
@@ -27,11 +28,11 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Receive OpenTelemetry metrics and logs over OTLP/gRPC from Collectors, SDKs, and instrumented applications. The plugin converts supported metrics into Netdata charts and indexes logs for exploration in the Logs tab.
+          Receive OpenTelemetry metrics, logs, and traces over OTLP/gRPC from Collectors, SDKs, and instrumented applications. The plugin converts supported metrics into Netdata charts, indexes logs for exploration in the Logs tab, and indexes traces for exploration in the Traces tab.
 
           The plugin accepts gauges, sums, explicit-bucket histograms, and summaries. It does not currently ingest exponential histograms. Monotonic cumulative and delta sums are rate-normalized; non-monotonic cumulative sums behave as gauges.
 
-          For a maintained Collector configuration and end-to-end verification steps, see [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md). The separate [OpenTelemetry Logs integration](/integrations/logs/integrations/opentelemetry_logs.md) explains how received logs appear in Netdata.
+          For a maintained Collector configuration and end-to-end verification steps, see [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md). The separate [OpenTelemetry Logs integration](/integrations/logs/integrations/opentelemetry_logs.md) explains how received logs appear in Netdata, and [Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md) explains how received traces are stored and kept.
         method_description: |
           The plugin starts automatically and listens on a configurable OTLP/gRPC endpoint. OTLP/HTTP is not supported, so senders must use the gRPC exporter and port `4317`, not the HTTP exporter and port `4318`.
 
@@ -60,10 +61,10 @@ modules:
             The plugin starts automatically and listens on `127.0.0.1:4317` for OTLP/gRPC connections.
         limits:
           description: |
-            Each export request can create at most 100 new charts by default. This is a per-request throttle, not a total cardinality limit. By default, log timestamps are accepted from up to 24 hours in the past through 10 minutes in the future; records without a timestamp use their arrival time. Log retention is configured per tenant and is bounded by whichever limit is reached first: retained file count, retained indexed-data size, or age.
+            Each export request can create at most 100 new charts by default. This is a per-request throttle, not a total cardinality limit. By default, log timestamps are accepted from up to 24 hours in the past through 10 minutes in the future; records without a timestamp use their arrival time. A span is accepted when it started no more than 24 hours ago and ends no more than 10 minutes in the future. Log and trace retention are each bounded by whichever limit is reached first: retained file count, retained indexed-data size, or age.
         performance_impact:
           description: |
-            Resource use depends on the number and cardinality of received metrics, log volume, retention, and query activity. Keep unbounded attributes out of metric identities and dimension names.
+            Resource use depends on the number and cardinality of received metrics, log and span volume, retention, and query activity. Keep unbounded attributes out of metric identities and dimension names.
     setup:
       prerequisites:
         list:
@@ -72,7 +73,7 @@ modules:
               Official Linux packages, static builds, containers, and supported macOS packages include the plugin. Linux source installs using `netdata-installer.sh` require a compatible Rust toolchain and `--enable-plugin-otel`; on macOS, the installer enables the plugin automatically when it finds a compatible Rust toolchain.
           - title: An OTLP/gRPC data source
             description: |
-              Configure an OpenTelemetry Collector, SDK, or instrumented application to export metrics or logs to the Agent endpoint. Use the gRPC exporter. The default loopback endpoint accepts only senders on the same host.
+              Configure an OpenTelemetry Collector, SDK, or instrumented application to export metrics, logs, or traces to the Agent endpoint. Use the gRPC exporter. The default loopback endpoint accepts only senders on the same host.
       configuration:
         file:
           name: otel.yaml
@@ -82,7 +83,7 @@ modules:
 
             The absolute paths shown below are the defaults for standard Linux packages. The installed stock configuration resolves its configuration and log directories for the installation layout, so macOS and custom-prefix installations use different paths. Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) with `otel.yaml` to inspect the installed values.
 
-            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Most names are the uppercase option path with dots replaced by underscores. For example, `endpoint.tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`. For the default log policies, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`. Named per-tenant policy overrides are YAML-only.
+            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Most names are the uppercase option path with dots replaced by underscores. For example, `endpoint.tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
 
             Configuration is strict. Unknown YAML fields, unknown `NETDATA_OTEL_CFG_*` variables, malformed values, and the former experimental schema prevent the plugin from starting. The effective configuration is logged at startup; `remote_storage.uri` is redacted in that log.
           folding:
@@ -136,15 +137,15 @@ modules:
               default_value: 100
               required: false
             - name: base_dir
-              description: Absolute root directory for locally stored OpenTelemetry log data.
+              description: Absolute root directory for locally stored OpenTelemetry logs and traces.
               detailed_description: |
-                Retention limits govern retained indexed files. Write-ahead logs, catalogs, and remote-read cache can make total usage below this directory exceed `logs.retention.*.max_total_size`.
+                Retention limits govern retained indexed files. Write-ahead logs, catalogs, and the download cache for offloaded data (`<base_dir>/remote-read`) can make total usage below this directory exceed the `retention.*.max_total_size` limits.
               default_value: "/var/log/netdata/otel/v2"
               required: false
             - name: remote_storage.enabled
-              description: Upload retained OpenTelemetry log data to configured remote object storage.
+              description: Upload retained OpenTelemetry logs and traces to configured remote object storage.
               detailed_description: |
-                Sealed indexed files are uploaded in addition to being kept under local retention. When a query needs a remotely cataloged file that is no longer local, the plugin downloads it through the bounded remote-read cache.
+                Sealed indexed files are uploaded in addition to being kept under local retention. When a query needs a remotely cataloged file that is no longer local, the plugin downloads it into the bounded download cache shared by logs and traces. Each download may take 30 seconds plus one second per MiB, at most 5 minutes; a file that takes longer or cannot be served is left out (traces report the answer as partial). A query needing more data than the cache holds fails with a message to narrow its time range.
               default_value: false
               required: false
             - name: remote_storage.uri
@@ -154,35 +155,51 @@ modules:
               default_value: "fs:///var/log/netdata/otel/v2/remote"
               required: false
             - name: remote_storage.read_cache_max_size
-              description: Maximum local cache size for data fetched back from remote storage during queries.
+              description: Maximum size of the local download cache, shared by logs and traces, for data fetched back from remote storage during queries.
               default_value: "1GB"
               required: false
-            - name: auth.enabled
-              description: Require the `X-Scope-OrgID` gRPC header to select a log tenant.
-              detailed_description: |
-                This is tenant selection, not credential authentication. When disabled, logs use the `default` tenant. When enabled, trust the header only behind TLS or mutual TLS and suitable network controls. Metrics are not tenant-scoped.
-              default_value: false
-              required: false
             - name: logs.rotation.default.max_file_size
-              description: Write-ahead log file size that triggers rotation for tenants without an override.
+              description: Write-ahead log file size that triggers rotation.
               default_value: "25MB"
               required: false
             - name: logs.rotation.default.max_entries
-              description: Write-ahead log entry count that triggers rotation for tenants without an override.
+              description: Write-ahead log entry count that triggers rotation.
               default_value: 50000
               required: false
             - name: logs.retention.default.max_files
-              description: Maximum retained indexed-file count for each tenant without an override.
+              description: Maximum retained indexed-file count.
               default_value: 100000
               required: false
             - name: logs.retention.default.max_total_size
-              description: Maximum retained indexed-data size for each tenant without an override.
+              description: Maximum retained indexed-data size.
               detailed_description: |
                 This is not a cap on all plugin disk use. Write-ahead logs, catalogs, and cache are additional.
               default_value: "1GB"
               required: false
             - name: logs.retention.default.max_age
-              description: Maximum retained indexed-file age for each tenant without an override.
+              description: Maximum retained indexed-file age.
+              default_value: "7 days"
+              required: false
+            - name: traces.rotation.default.max_file_size
+              description: Trace write-ahead log file size that triggers rotation.
+              default_value: "25MB"
+              required: false
+            - name: traces.rotation.default.max_entries
+              description: Trace write-ahead log span count that triggers rotation.
+              default_value: 50000
+              required: false
+            - name: traces.retention.default.max_files
+              description: Maximum retained indexed trace-file count.
+              default_value: 100000
+              required: false
+            - name: traces.retention.default.max_total_size
+              description: Maximum retained indexed trace-data size.
+              detailed_description: |
+                This is not a cap on all plugin disk use. Write-ahead logs, catalogs, and cache are additional.
+              default_value: "1GB"
+              required: false
+            - name: traces.retention.default.max_age
+              description: Maximum retained indexed trace-file age, measured on the start time of its newest span.
               default_value: "7 days"
               required: false
         examples:
@@ -201,20 +218,20 @@ modules:
                   tls_cert_path: /etc/netdata/ssl/server-cert.pem
                   tls_key_path: /etc/netdata/ssl/server-key.pem
                   tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
-            - name: Configure log retention for one tenant
+            - name: Configure log and trace retention
               folding:
                 enabled: true
               description: |
-                Per-tenant entries inherit omitted fields from `default`. The key must match the sender's `X-Scope-OrgID` value when tenant selection is enabled.
+                A user file needs only the fields that change; omitted fields keep their stock values. Logs and traces have separate settings.
               config: |
-                auth:
-                  enabled: true
                 logs:
-                  rotation:
-                    production:
-                      max_file_size: "100MB"
                   retention:
-                    production:
+                    default:
+                      max_total_size: "10GB"
+                      max_age: "30 days"
+                traces:
+                  retention:
+                    default:
                       max_total_size: "10GB"
                       max_age: "30 days"
             - name: Metric mapping file
@@ -264,13 +281,16 @@ modules:
               Check the Agent journal for `otel-plugin` configuration errors. User YAML and `NETDATA_OTEL_CFG_*` variables are validated strictly, so a typo or an option from the former experimental schema stops startup. For a source install, confirm that a compatible Rust toolchain is available; Linux installs using `netdata-installer.sh` also require `--enable-plugin-otel`.
           - name: The endpoint is reachable but no data appears
             description: |
-              A successful TCP connection proves only that something is listening. Confirm that the sender uses OTLP/gRPC on port `4317`; OTLP/HTTP on port `4318` is unsupported. With the default endpoint, use `127.0.0.1` explicitly if `localhost` resolves to IPv6. Then send a real OTLP record and verify the resulting chart or log entry.
+              A successful TCP connection proves only that something is listening. Confirm that the sender uses OTLP/gRPC on port `4317`; OTLP/HTTP on port `4318` is unsupported. With the default endpoint, use `127.0.0.1` explicitly if `localhost` resolves to IPv6. Then send a real OTLP record and verify the resulting chart, log entry, or trace.
           - name: A metric does not create the expected chart
             description: |
               Exponential histograms are not currently ingested. For other supported metrics, inspect the Agent journal for rejected user mapping files and verify the metric name, instrumentation scope, and `dimension_attribute_key`. The resulting chart context is `otel.<metric-name>`.
           - name: Some exported logs are missing
             description: |
               By default, the plugin rejects log records timestamped more than 24 hours in the past or more than 10 minutes in the future. It reports rejected records through OTLP `partial_success`; whether this is visible depends on the sender or exporter. Check the sender's clock, backfill age, sender logs, and Netdata Agent journal.
+          - name: Some exported spans are missing
+            description: |
+              By default, the plugin rejects a span that started more than 24 hours ago or ends more than 10 minutes in the future; a span without an end time is judged by its start. It reports rejected spans through OTLP `partial_success` (whether this is visible depends on the sender or exporter) and logs a warning in the Agent journal. Check the sender's clock, backfill age, sender logs, and Netdata Agent journal.
           - name: Logs from the former experimental plugin are not visible
             description: |
               A former-schema `otel.yaml` stops the current plugin and prints a migration guide. Replace it with a partial configuration based on the current stock file. The legacy `logs.journal_dir` key is accepted only to locate the former plugin's read-only journals; it is not part of the current storage layout.

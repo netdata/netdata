@@ -63,7 +63,7 @@ func (c *Collector) check(ctx context.Context) error {
 	if writable == 0 {
 		return fmt.Errorf("endpoint '%s' exposes no usable metrics", c.URL)
 	}
-	tmpl, err := buildMergedChartTemplate(c.resolveApp(candidate.profiles), candidate.profiles)
+	tmpl, err := buildMergedChartTemplate(c.resolveApp(candidate.profiles), c.CounterRawCharts, candidate.profiles)
 	if err != nil {
 		return err
 	}

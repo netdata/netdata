@@ -1879,7 +1879,7 @@ async fn startup_sync_restores_after_wipe() {
     assert_eq!(wal::read_seq_highwater(&hw_path), Some(42));
 
     // The installed catalogs are queryable: build a registry over the catalog dir
-    // and confirm remote_candidates serves an entry.
+    // and confirm a remote plan selects an entry.
     let wal_dir = tempfile::tempdir().unwrap();
     let idx_dir = tempfile::tempdir().unwrap();
     let mut regs = crate::registry::TenantRegistries::new(
@@ -1895,7 +1895,7 @@ async fn startup_sync_restores_after_wipe() {
         partition_keys: Vec::new(),
     };
     assert!(
-        !reg.remote_candidates(&q).is_empty(),
+        !reg.remote_plan_input(&[q]).plan().union.is_empty(),
         "installed catalog entries must be servable from remote"
     );
 }

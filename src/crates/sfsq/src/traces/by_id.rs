@@ -10,7 +10,9 @@
 //! Status honesty (the design-record contract): a source that fails to
 //! map, open, or decode surfaces as a
 //! [`SourceFailure`](PartialReason::SourceFailure) reason on the
-//! query-level [`QueryStatus`] — never a silent skip. Cancellation before
+//! query-level [`QueryStatus`], and an unavailable source as
+//! [`RemoteUnavailable`](PartialReason::RemoteUnavailable) — never a
+//! silent skip. Cancellation before
 //! all source heads are resolved returns an EMPTY result with
 //! [`Cancelled`](PartialReason::Cancelled); cancellation during the merge
 //! returns the deterministic merged prefix. The span cap yields
@@ -189,6 +191,9 @@ pub fn trace_by_id(
                     status.add(PartialReason::SourceFailure);
                 }
             },
+            // No summary pruning here (the bloom prunes a by-id probe),
+            // so any unavailable source may hold the trace's spans.
+            TraceSource::Unavailable(_) => status.add(PartialReason::RemoteUnavailable),
         }
         progress.fetch_add(1, Ordering::Relaxed);
     }

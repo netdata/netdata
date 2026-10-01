@@ -30,6 +30,18 @@ pub struct CatalogEntry {
     pub remote_etag: Option<String>,
 }
 
+impl CatalogEntry {
+    /// The summary of the file this entry describes, as recorded at upload.
+    pub fn summary(&self) -> file_registry::FileSummary {
+        file_registry::FileSummary {
+            min_timestamp_s: self.min_timestamp_s,
+            max_timestamp_s: self.max_timestamp_s,
+            record_count: self.record_count,
+            content_meta: self.content_meta.clone(),
+        }
+    }
+}
+
 /// Deterministic opaque partition key for tests. The catalog treats `part_key`
 /// as an opaque `u64` and never decodes it, so tests fabricate distinct keys
 /// per logical stream without depending on the content-plane identity codec —

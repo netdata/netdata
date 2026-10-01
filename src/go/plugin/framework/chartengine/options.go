@@ -14,9 +14,10 @@ import (
 )
 
 type engineConfig struct {
-	autogen       AutogenPolicy
-	autogenRules  []charttpl.ValidatedAutogenRule
-	autogenTypeID string
+	autogen           AutogenPolicy
+	autogenRules      []charttpl.ValidatedAutogenRule
+	autogenCounterRaw charttpl.ValidatedCounterRawCharts
+	autogenTypeID     string
 	// autogenContextNamespace prefixes autogen chart contexts (the spec's root
 	// context_namespace), so autogen and template charts share one namespace.
 	autogenContextNamespace string
@@ -98,8 +99,24 @@ func normalizeAutogenPolicyWithRules(
 			fmt.Errorf("autogen max type.id len must be >= 4, got %d", maxLen)
 	}
 	policy.Rules = cloneAutogenRules(policy.Rules)
+	// Absent and empty lists are the same policy; keep one form so policy
+	// comparison does not depend on how the caller spelled "none".
+	policy.CounterRawCharts = slices.Clone(policy.CounterRawCharts)
+	if len(policy.CounterRawCharts) == 0 {
+		policy.CounterRawCharts = nil
+	}
 	policy.MaxTypeIDLen = maxLen
 	return policy, slices.Clone(rules), nil
+}
+
+// compileAutogenCounterRaw compiles the policy's counter raw-chart patterns.
+// Every effective policy derives its compiled matcher from its own patterns.
+func compileAutogenCounterRaw(policy AutogenPolicy) (charttpl.ValidatedCounterRawCharts, error) {
+	compiled, err := charttpl.CompileCounterRawCharts(policy.CounterRawCharts)
+	if err != nil {
+		return charttpl.ValidatedCounterRawCharts{}, fmt.Errorf("autogen counter_raw_charts: %w", err)
+	}
+	return compiled, nil
 }
 
 func compileEngineSelector(expr metrixselector.Expr) (metrixselector.Selector, error) {
@@ -113,14 +130,18 @@ func compileEngineSelector(expr metrixselector.Expr) (metrixselector.Selector, e
 func WithEnginePolicy(policy EnginePolicy) Option {
 	policy = cloneEnginePolicy(policy)
 	var (
-		autogen          AutogenPolicy
-		autogenRules     []charttpl.ValidatedAutogenRule
-		autogenErr       error
-		compiledSelector metrixselector.Selector
-		selectorErr      error
+		autogen           AutogenPolicy
+		autogenRules      []charttpl.ValidatedAutogenRule
+		autogenCounterRaw charttpl.ValidatedCounterRawCharts
+		autogenErr        error
+		compiledSelector  metrixselector.Selector
+		selectorErr       error
 	)
 	if policy.Autogen != nil {
 		autogen, autogenRules, autogenErr = normalizeAutogenPolicy(*policy.Autogen)
+		if autogenErr == nil {
+			autogenCounterRaw, autogenErr = compileAutogenCounterRaw(autogen)
+		}
 	}
 	if policy.Selector != nil {
 		compiledSelector, selectorErr = compileEngineSelector(*policy.Selector)
@@ -140,6 +161,7 @@ func WithEnginePolicy(policy EnginePolicy) Option {
 			}
 			cfg.autogen = cloneAutogenPolicy(autogen)
 			cfg.autogenRules = slices.Clone(autogenRules)
+			cfg.autogenCounterRaw = autogenCounterRaw
 		}
 		if policy.Selector != nil {
 			cfg.selectorOverride = policyOverride[metrixselector.Selector]{set: true, value: compiledSelector}
@@ -168,6 +190,7 @@ func cloneEnginePolicy(policy EnginePolicy) EnginePolicy {
 func cloneAutogenPolicy(policy AutogenPolicy) AutogenPolicy {
 	out := policy
 	out.Rules = cloneAutogenRules(policy.Rules)
+	out.CounterRawCharts = slices.Clone(policy.CounterRawCharts)
 	return out
 }
 

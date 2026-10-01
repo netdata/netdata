@@ -560,12 +560,10 @@ pub struct TraceParams {
     pub span_cap: Option<usize>,
     /// Optional assembly bounds, unix seconds: only files whose
     /// summary range overlaps `[after, before)` are probed for the
-    /// trace's spans. Both-or-neither; `after < before`; width capped
-    /// at [`MAX_TRACE_BOUNDS_WIDTH_S`](super::adapter) — violations
-    /// are client errors (a clamp would ambiguously drop one end).
-    /// Absent = full retention, the only way to request it (an
-    /// explicit full range exceeds the cap). The response's `coverage`
-    /// declares the range actually used either way.
+    /// trace's spans. Both-or-neither; `after < before` — violations
+    /// are client errors. Any width is accepted. Absent = full
+    /// retention, local and remote. The response's `coverage` declares
+    /// the range actually used either way.
     #[serde(default)]
     pub after: Option<u32>,
     #[serde(default)]
@@ -784,8 +782,8 @@ pub struct AttributesResult {
 }
 
 /// One key's values. Values are the engine's STORAGE labels (`status` ∈
-/// `OK`/`ERROR`, `kind` ∈ `INTERNAL`/`SERVER`/…) — exactly what search
-/// `selections` match on.
+/// `UNSET`/`OK`/`ERROR`, `kind` ∈ `UNSPECIFIED`/`INTERNAL`/`SERVER`/…) —
+/// exactly what search `selections` match on.
 #[derive(Debug, Serialize)]
 pub struct AttributeValuesResult {
     /// The response's self-description: always `"attribute_values"`.
@@ -981,6 +979,7 @@ pub struct TraceSummaryWire {
     pub duration_ns: i64,
     pub span_count: usize,
     pub error_count: usize,
+    pub service_breakdown: ServiceBreakdownWire,
     pub matched_count: usize,
     /// False when this trace's assembly was capped or degraded — its
     /// summary numbers may undercount. "Exact" means exact WITHIN the
@@ -990,6 +989,30 @@ pub struct TraceSummaryWire {
     /// The matched subset, `min(spans_per_trace, matched_count)` spans
     /// in the combiner's total order.
     pub matched_spans: Vec<SpanWire>,
+}
+
+/// One returned trace's spans by resource `service.name`, over the same
+/// spans as `span_count` — so it shares the `exact` caveat — and
+/// partitioning them exactly:
+/// `sum(top[].spans) + other + unattributed == span_count`.
+#[derive(Debug, Serialize)]
+pub struct ServiceBreakdownWire {
+    /// At most [`sfsq::traces::SERVICE_BREAKDOWN_TOP_K`] services — span
+    /// count DESC, name ASC.
+    pub top: Vec<ServiceSpansWire>,
+    /// Spans in the services beyond `top`.
+    pub other: u64,
+    /// How many services `other` covers.
+    pub other_services: usize,
+    /// Spans without a `service.name` — counted, never attributed to a
+    /// service.
+    pub unattributed: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ServiceSpansWire {
+    pub value: String,
+    pub spans: u64,
 }
 
 // ── Trace mode response ─────────────────────────────────────────────
@@ -1190,6 +1213,7 @@ pub enum PartialReasonWire {
     OverviewCeiling,
     RollupAbsent,
     SlowestCeiling,
+    RemoteUnavailable,
 }
 
 impl From<PartialReason> for PartialReasonWire {
@@ -1202,6 +1226,7 @@ impl From<PartialReason> for PartialReasonWire {
             PartialReason::OverviewCeiling => PartialReasonWire::OverviewCeiling,
             PartialReason::RollupAbsent => PartialReasonWire::RollupAbsent,
             PartialReason::SlowestCeiling => PartialReasonWire::SlowestCeiling,
+            PartialReason::RemoteUnavailable => PartialReasonWire::RemoteUnavailable,
         }
     }
 }

@@ -2,6 +2,12 @@
 
 ### Merged Pull Requests:
 
+- Sync repos (netdata, ebpf-co-re, kernel-collector) ([#24008](https://github.com/netdata/netdata/issues/24008))
+
+## [2.12.0] - 2026-09-30
+
+### Merged Pull Requests:
+
 - Rework Ceph collector as a Prometheus complement ([#23357](https://github.com/netdata/netdata/issues/23357))
 - Improve the support bundle: streaming api key, encoding fidelity, Windows ETW logs, permissions ([#23452](https://github.com/netdata/netdata/issues/23452))
 - Fix: replace dynamic proc netdev format strings ([#23450](https://github.com/netdata/netdata/issues/23450))
@@ -440,6 +446,49 @@
 - Fix(go.d/jobmgr): keep discovery alive through process retirement ([#24023](https://github.com/netdata/netdata/issues/24023))
 - Fix(go.d): preserve vnode names and reject stale job candidates ([#24024](https://github.com/netdata/netdata/issues/24024))
 - Test(go.d): wait for Store release between secret CRUD steps ([#24025](https://github.com/netdata/netdata/issues/24025))
+- Fix live host label forwarding across streaming parents ([#24015](https://github.com/netdata/netdata/issues/24015))
+- Fix(go.d): preserve Function command identities before validation ([#24026](https://github.com/netdata/netdata/issues/24026))
+- Fix MCP query_metrics for explicitly requested hidden dimensions ([#24018](https://github.com/netdata/netdata/issues/24018))
+- Feat(statsd): add "both" listener protocol, duration idle timeout and confopt.Enum ([#24028](https://github.com/netdata/netdata/issues/24028))
+- Refactor(go): make secrets an optional host capability ([#24030](https://github.com/netdata/netdata/issues/24030))
+- Fix(go.d/snmp): do not fail on a wrong-typed sysObjectID ([#24031](https://github.com/netdata/netdata/issues/24031))
+- Fix dbengine flush deadlock in the libuv worker pool ([#24027](https://github.com/netdata/netdata/issues/24027))
+- Test(go.d/snmp_topology): wait for the diagnostic checkpoint in the lifecycle hook test ([#24033](https://github.com/netdata/netdata/issues/24033))
+- Test(go.d): count only initialized collectors in Store restart tests ([#24034](https://github.com/netdata/netdata/issues/24034))
+- Netflow-plugin: publish nothing until the UDP listeners are bound ([#24029](https://github.com/netdata/netdata/issues/24029))
+- Build(deps): bump github.com/bmatcuk/doublestar/v4 from 4.10.1 to 4.10.2 in /src/go ([#24037](https://github.com/netdata/netdata/issues/24037))
+- Build(deps): bump github.com/microsoft/go-mssqldb from 1.11.0 to 1.11.1 in /src/go ([#24036](https://github.com/netdata/netdata/issues/24036))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.113.1 to 1.113.2 in /src/go ([#24038](https://github.com/netdata/netdata/issues/24038))
+- Build(deps): bump github.com/catonetworks/cato-go-sdk from 0.4.1 to 0.4.2 in /src/go ([#24035](https://github.com/netdata/netdata/issues/24035))
+- Build(deps): bump github.com/microsoft/go-mssqldb from 1.11.1 to 1.11.2 in /src/go ([#24039](https://github.com/netdata/netdata/issues/24039))
+- Test(go/jobmgr/secrets): drain Store attempts before Close in pending activation test ([#24040](https://github.com/netdata/netdata/issues/24040))
+- Test(go.d): close stdin after the process stops in vnode round-trip test ([#24041](https://github.com/netdata/netdata/issues/24041))
+- Fix(go.d/smbios_memory): identify slots by bank and device locator ([#24043](https://github.com/netdata/netdata/issues/24043))
+- Regenerate integrations docs ([#24044](https://github.com/netdata/netdata/issues/24044))
+- Fix idle NetIPC CPU use on 32-bit time64 Linux ([#24049](https://github.com/netdata/netdata/issues/24049))
+- Build(deps): bump k8s.io/client-go from 0.37.0 to 0.37.1 in /src/go ([#24057](https://github.com/netdata/netdata/issues/24057))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.113.2 to 1.113.4 in /src/go ([#24055](https://github.com/netdata/netdata/issues/24055))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.33.5 to 1.33.6 in /src/go ([#24058](https://github.com/netdata/netdata/issues/24058))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.72.0 to 1.73.0 in /src/go ([#24059](https://github.com/netdata/netdata/issues/24059))
+- Fix(apps.plugin): serialize Function responses with chart output ([#24050](https://github.com/netdata/netdata/issues/24050))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.41.0 to 1.41.1 in /src/go ([#24061](https://github.com/netdata/netdata/issues/24061))
+- Fix(freeipmi.plugin): serialize Function responses with chart output ([#24052](https://github.com/netdata/netdata/issues/24052))
+- Fix use-after-free when queueing Function calls ([#24071](https://github.com/netdata/netdata/issues/24071))
+- Feat(scripts.d): add development-only native script collector ([#24075](https://github.com/netdata/netdata/issues/24075))
+- Fix(ndexec): add owned subprocess lifecycle and containment ([#24077](https://github.com/netdata/netdata/issues/24077))
+- Feat(scripts.d): add persistent native script sessions ([#24076](https://github.com/netdata/netdata/issues/24076))
+- Fix ML memory accounting across C++ allocation paths ([#22477](https://github.com/netdata/netdata/issues/22477))
+- Feat(scripts.d): add native package configuration and DynCfg support ([#24078](https://github.com/netdata/netdata/issues/24078))
+- Feat(scripts.d): add native script Functions ([#24079](https://github.com/netdata/netdata/issues/24079))
+- Feat(scripts.d): support self-contained native script packages ([#24084](https://github.com/netdata/netdata/issues/24084))
+- Cluster Shared Volumes (Windows) ([#23720](https://github.com/netdata/netdata/issues/23720))
+- Upload stable release artifacts to R2 just like nightlies. ([#24013](https://github.com/netdata/netdata/issues/24013))
+- Fix: preserve URL-selected host for v1 weights ([#24080](https://github.com/netdata/netdata/issues/24080))
+- Fix: count missing samples as zero in average anomaly weights ([#24081](https://github.com/netdata/netdata/issues/24081))
+- Refactor(scripts.d): restructure native collector code and tests ([#24086](https://github.com/netdata/netdata/issues/24086))
+- Otel-traces: read evicted files back from remote storage, document traces ([#24088](https://github.com/netdata/netdata/issues/24088))
+- Build(deps): bump pyjwt from 2.13.0 to 2.14.0 in /packaging/tools/automation/mcp ([#24090](https://github.com/netdata/netdata/issues/24090))
+- Test(go.d): wait for discovery running status before shutdown ([#24092](https://github.com/netdata/netdata/issues/24092))
 
 ## [2.11.0] - 2026-08-12
 

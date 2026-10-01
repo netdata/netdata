@@ -116,6 +116,9 @@ every cycle.
   Build the "before" test binaries at the base commit (`go test -c`), run them alternately with the new ones
   (`-count 6`), and compare with `benchstat`. Do not use `git stash` for the baseline: the stash is shared across
   worktrees and sessions.
+  - Without a second checkout, build the baseline with `go test -c -overlay <json>`: extract the base versions of the
+    changed files (`git archive <base> <paths> | tar -x -C <dir>`), map each changed path to its base copy, and map
+    each file added since the base to `""` (treated as deleted).
 - Allocation count is the gate: assert allocs stay within the intended envelope (for example a sparse commit stays
   ~O(touched), never O(retained)). `ns/op` is a dev-machine trend indicator, NOT a CI gate; label it as such inline
   and never record a personal name in the file.

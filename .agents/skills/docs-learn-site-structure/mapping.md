@@ -49,6 +49,11 @@ index their sentinel unguarded (`authentication`, `collectors`, `secretstore`, `
 and aborts the run whether or not pages exist for it; only `live_functions`, `flows`, and `service_discovery` are
 guarded.
 
+An integration page that also has an explicit row takes its Learn metadata from the first row carrying its
+`custom_edit_url` (`insert_and_read_hidden_metadata_from_doc`). An explicit row above the sentinel therefore decides
+the page's label, URL, position, and description, and the metadata's description and keywords never reach Learn. The
+OpenTelemetry Plugin Reference works this way (checked at `netdata/learn @ cca14be005faa957d52d4a6099484db70afd1c05`).
+
 ## The join key
 
 `insert_and_read_hidden_metadata_from_doc` looks a source file up by the URL

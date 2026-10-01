@@ -1,6 +1,7 @@
 use super::*;
 use crate::ledger::rpc::traces::fixtures::{
-    install_sfst, install_wal, make_registries, otlp_req, otlp_req_svc,
+    install_sealed, install_sfst, install_wal, make_registries, otlp_req, otlp_req_svc,
+    sealed_traces,
 };
 use bridge::function::ProgressState;
 use file_lifecycle::registry::TenantRegistries;
@@ -10,7 +11,12 @@ use tokio_util::sync::CancellationToken;
 fn make_handler_over(registries: Arc<RwLock<TenantRegistries>>) -> OtelTracesHandler {
     // Small min_entries so the WAL fixtures split into chunks + tail —
     // the end-to-end tests then cross the chunk-build path for real.
-    OtelTracesHandler::new(registries, Arc::new(ChunkCache::new(64 * 1024 * 1024)), 4)
+    OtelTracesHandler::new(
+        registries,
+        Arc::new(ChunkCache::new(64 * 1024 * 1024)),
+        4,
+        None,
+    )
 }
 
 fn make_handler() -> OtelTracesHandler {
@@ -140,6 +146,39 @@ async fn handler_with_fixture_wal() -> OtelTracesHandler {
 }
 
 #[tokio::test]
+async fn a_sealed_traces_fixture_serves_as_a_local_sealed_file() {
+    // The fixture is what the traces seal writes: its summary spans the
+    // spans' seconds and counts them, and the file answers a lookup alone.
+    let (summary, _) = sealed_traces(vec![otlp_req(0x11, 3, 1_000_000_000)]);
+    assert_eq!(
+        (
+            summary.min_timestamp_s,
+            summary.max_timestamp_s,
+            summary.record_count
+        ),
+        (1, 1, 3)
+    );
+
+    let registries = make_registries();
+    install_sealed(
+        &registries,
+        "default",
+        1,
+        vec![otlp_req(0x11, 3, 1_000_000_000)],
+    )
+    .await;
+    let h = make_handler_over(registries);
+    let v = serde_json::to_value(
+        call_on(&h, json!({"trace": {"id": FIXTURE_TRACE_ID}}))
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(v["status"], json!({"complete": true}));
+    assert_eq!(v["items"]["returned"], 3);
+}
+
+#[tokio::test]
 async fn trace_coverage_declares_the_full_range_for_absent_bounds() {
     let h = handler_with_fixture_wal().await;
     let resp = call_on(&h, json!({"trace": {"id": FIXTURE_TRACE_ID}}))
@@ -231,18 +270,24 @@ async fn bounds_excluding_every_file_yield_a_complete_empty_trace() {
 }
 
 #[tokio::test]
-async fn trace_bounds_width_at_the_cap_is_accepted() {
+async fn trace_bounds_of_any_width_are_accepted() {
+    // No width cap: a range far wider than any UI formula is served and
+    // declared as asked.
     let h = handler_with_fixture_wal().await;
     let v = serde_json::to_value(
         call_on(
             &h,
-            json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 0, "before": 172_800}}),
+            json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 1, "before": 4_000_000_000_u32}}),
         )
         .await
         .unwrap(),
     )
     .unwrap();
-    assert_eq!(v["coverage"], json!({"after": 0, "before": 172_800}));
+    assert_eq!(
+        v["coverage"],
+        json!({"after": 1, "before": 4_000_000_000_u32})
+    );
+    assert_eq!(v["status"], json!({"complete": true}));
     assert_eq!(v["items"]["returned"], 3);
 }
 
@@ -345,7 +390,7 @@ async fn semantically_invalid_trace_requests_are_clean_client_errors() {
             json!({"trace": {"id": FIXTURE_TRACE_ID, "span_cap": 65_537}}),
             "exceeds the maximum",
         ),
-        // Assembly bounds: both-or-neither, ordered, width-capped.
+        // Assembly bounds: both-or-neither, ordered.
         (
             json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 100}}),
             "both 'after' and 'before'",
@@ -361,10 +406,6 @@ async fn semantically_invalid_trace_requests_are_clean_client_errors() {
         (
             json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 100, "before": 100}}),
             "after 100 >= before 100",
-        ),
-        (
-            json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 0, "before": 172_901}}),
-            "exceeds the maximum 172800",
         ),
     ] {
         let err = call(body.clone()).await.expect_err("must be a client error");
@@ -483,6 +524,15 @@ async fn search_returns_most_recent_first_with_deterministic_ties() {
     assert_eq!(e["root_service"], "svc-a");
     assert_eq!(e["root_name"], "span-1");
     assert_eq!(e["span_count"], 3);
+    assert_eq!(
+        e["service_breakdown"],
+        json!({
+            "top": [{"value": "svc-a", "spans": 3}],
+            "other": 0,
+            "other_services": 0,
+            "unattributed": 0,
+        })
+    );
     assert_eq!(e["exact"], true);
     assert_eq!(e["matched_spans"].as_array().unwrap().len(), 1);
 }
@@ -513,6 +563,36 @@ async fn selections_narrow_by_service_operation_and_attributes() {
     body["selections"] = json!({"name": ["span-2"], "resource.service.name": ["svc-b"]});
     let v = serde_json::to_value(call_on(&h, as_mode("search", body)).await.unwrap()).unwrap();
     assert_eq!(ids(&v), vec!["0b"]);
+}
+
+#[tokio::test]
+async fn the_otel_defaults_are_selectable_in_the_functions_view() {
+    use crate::ledger::rpc::traces::fixtures::otlp_req_err;
+    let registries = make_registries();
+    install_wal(
+        &registries,
+        "default",
+        1,
+        vec![
+            otlp_req_err(0x0A, 1, base_ns(10), "svc"), // its only span is ERROR
+            otlp_req_svc(0x0B, 2, base_ns(20), "svc"), // no status, no kind
+        ],
+    )
+    .await;
+    let h = make_handler_over(registries);
+
+    let mut body = functions_body(20);
+    body["selections"] = json!({"status": ["UNSET"]});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v["data"]), ["0b"]);
+    let o = &v["data"]["overview"];
+    assert_eq!(o["scope"], "selection");
+    assert_eq!(o["totals"], json!({"traces": 1, "spans": 2, "errors": 0}));
+
+    let mut body = functions_body(20);
+    body["selections"] = json!({"kind": ["UNSPECIFIED"]});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v["data"]), ["0b", "0a"]);
 }
 
 #[tokio::test]
@@ -1078,6 +1158,49 @@ async fn overview_invalid_selectors_are_clean_client_errors() {
 }
 
 // ── The Functions view's window aggregate ────────────────────────────
+
+/// Run `body` with a progress state the test keeps; returns `(done, total)`.
+async fn progress_of(h: &OtelTracesHandler, body: serde_json::Value) -> (usize, usize) {
+    let progress = ProgressState::new();
+    let ctx = FunctionCallContext::new(
+        "tx-test".to_string(),
+        progress.clone(),
+        CancellationToken::new(),
+    );
+    let req: OtelTracesRequest = serde_json::from_value(body.clone()).unwrap();
+    h.on_call(ctx, req)
+        .await
+        .unwrap_or_else(|e| panic!("{body}: {e}"));
+    progress.load()
+}
+
+#[tokio::test]
+async fn every_mode_sets_its_progress_total_and_completes_it() {
+    // The corpus WAL resolves to two chunks at min_entries 4; every pass
+    // ticks once per source it walks. The Functions view walks the
+    // completion range for its page AND the grid's window for its
+    // aggregate.
+    let h = handler_with_search_corpus().await;
+    let windowed = |mode: &str, extra: serde_json::Value| {
+        let mut body = window_body();
+        merge(&mut body, extra);
+        as_mode(mode, body)
+    };
+    for (body, expected) in [
+        (
+            json!({"trace": {"id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"}}),
+            (2, 2),
+        ),
+        (windowed("search", json!({})), (2, 2)),
+        (functions_body(2), (4, 4)),
+        (windowed("overview", json!({})), (2, 2)),
+        (windowed("slowest", json!({})), (2, 2)),
+        (windowed("attributes", json!({})), (2, 2)),
+        (windowed("attribute_values", json!({"key": "name"})), (2, 2)),
+    ] {
+        assert_eq!(progress_of(&h, body.clone()).await, expected, "{body}");
+    }
+}
 
 /// The Functions request for the corpus window: the protocol's own
 /// top-level fields, no mode selector.

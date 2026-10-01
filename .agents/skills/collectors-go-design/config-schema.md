@@ -140,8 +140,10 @@ Use a discriminator plus `dependencies` for mutually exclusive configurations (m
 - With tabs, branch keys MUST be listed on a tab (they render only while their mode is selected); an unlisted branch
   key is dropped like any other property.
 - Prefer top-level dependencies: the UI drops inactive-branch data only for top-level discriminators.
-- Do not use property-level `oneOf`/`anyOf` for alternatives; the UI renders a branch selector whose first option
-  cannot be selected reliably.
+- Do not use `oneOf`/`anyOf` outside `dependencies`, on a property or an object (including inside `allOf`); the UI
+  renders a branch selector, and on a tabbed object a second tab strip. Express a cross-field rule as `if`/`then`,
+  several rules in `allOf` (redfish: `tls_cert` and `tls_key` set together; ceph: `bearer_token_file` or both
+  `username` and `password`).
 
 ## 6. Secrets
 
@@ -249,6 +251,7 @@ a wrong schema; they never restate a file, and a failure is fixed in the schema,
 | `TestConfigSchemasMaskOnlySecrets` | password widget on credentials only; no `sensitive` flag |
 | `TestConfigSchemasDoNotMaterializeOptionalArrays` | no `minItems` on optional arrays |
 | `TestConfigSchemasDoNotDeclareBranchKeysAsProperties` | branch keys are not sibling properties |
+| `TestConfigSchemasOfferAlternativesOnlyThroughDependencies` | no `oneOf`/`anyOf` outside `dependencies` |
 
 The file also asserts that its glob list covers every `config_schema*.json` under `src/go/plugin` except the ibm.d
 generated schemas and `framework/charttpl`, so a new schema outside the list fails the build.

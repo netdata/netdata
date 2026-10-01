@@ -9,7 +9,9 @@
 //! - Up-front + per-source cancellation polls (all-or-empty: a
 //!   cancelled merge returns `None`, never a partial map).
 //! - Per-source failure honesty
-//!   ([`SourceFailure`](PartialReason::SourceFailure)) and the
+//!   ([`SourceFailure`](PartialReason::SourceFailure); an unavailable
+//!   source is [`RemoteUnavailable`](PartialReason::RemoteUnavailable))
+//!   and the
 //!   no-mixed-units exclusion of pre-rollup sealed files
 //!   ([`RollupAbsent`](PartialReason::RollupAbsent)).
 //! - The visited budget: rollup rows (sealed) / decoded spans (tails)
@@ -399,6 +401,9 @@ pub(crate) fn merge_trace_sources(
                     break;
                 }
             }
+            // The callers' captures are already window-pruned, so an
+            // unavailable source here is in range: its traces are missing.
+            TraceSource::Unavailable(_) => status.add(PartialReason::RemoteUnavailable),
         }
         progress.fetch_add(1, Ordering::Relaxed);
     }

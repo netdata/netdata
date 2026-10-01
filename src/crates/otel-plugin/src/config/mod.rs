@@ -735,17 +735,11 @@ remote_storage:
         assert!(config.remote_storage.enabled);
         assert_eq!(config.remote_storage.uri, "fs:///data/remote");
         assert_eq!(config.remote_storage.read_cache_max_size, ByteSize::gib(2));
-        // Read-cache dir is derived per signal from base_dir (stock's default 4 GB
-        // size is asserted in stock_yaml_base_dir_and_globals_parsed).
-        let logs = config.lifecycle_for(bridge::signals::Signal::Logs);
-        let traces = config.lifecycle_for(bridge::signals::Signal::Traces);
+        // One download cache for every signal, derived from base_dir (stock's
+        // default size is asserted in stock_yaml_base_dir_and_globals_parsed).
         assert_eq!(
-            logs.read_cache_dir,
-            std::path::Path::new("/var/log/netdata/otel/v2/logs/remote-read")
-        );
-        assert_eq!(
-            traces.read_cache_dir,
-            std::path::Path::new("/var/log/netdata/otel/v2/traces/remote-read")
+            config.read_cache_dir(),
+            std::path::Path::new("/var/log/netdata/otel/v2/remote-read")
         );
     }
 

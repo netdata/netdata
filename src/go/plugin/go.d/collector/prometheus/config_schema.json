@@ -351,6 +351,20 @@
           }
         }
       },
+      "counter_raw_charts": {
+        "title": "Raw counter charts",
+        "description": "Counters whose raw cumulative value is also charted, next to their per-second rate chart, under the `prometheus.<app>.<metric>.raw` context. Leave empty to chart counters as rates only.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Pattern",
+          "type": "string",
+          "pattern": "^\\S+$"
+        },
+        "uniqueItems": true
+      },
       "username": {
         "title": "Username",
         "description": "The username for basic authentication.",
@@ -482,6 +496,12 @@
           ]
         },
         {
+          "title": "Raw counter charts",
+          "fields": [
+            "counter_raw_charts"
+          ]
+        },
+        {
           "title": "Auth",
           "fields": [
             "username",
@@ -543,6 +563,9 @@
     },
     "force_http2": {
       "ui:widget": "hidden"
+    },
+    "counter_raw_charts": {
+      "ui:help": "Each item holds one metric name pattern with the same `*`, `?` and `[...]` wildcards as Untyped metrics fallback; a leading `!` excludes. Items are checked in order and the first match decides. Every matched counter series adds one chart.\n\nPatterns match the final metric name, after job and profile relabeling. Only counters shown on generic autogen charts get a raw chart: gauges, histogram and summary series, and metrics charted by a profile are not affected. An untyped metric qualifies once it is processed as a counter: through its `_total` suffix, the Untyped metrics fallback As Counter list, or a selected profile's fallback rules."
     }
   }
 }

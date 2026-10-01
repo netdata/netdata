@@ -658,7 +658,8 @@
                   "cancelled",
                   "overview_ceiling",
                   "rollup_absent",
-                  "slowest_ceiling"
+                  "slowest_ceiling",
+                  "remote_unavailable"
                 ]
               }
             }
@@ -787,6 +788,7 @@
         "duration_ns",
         "span_count",
         "error_count",
+        "service_breakdown",
         "matched_count",
         "exact",
         "matched_spans"
@@ -800,12 +802,36 @@
         "duration_ns": { "type": "integer" },
         "span_count": { "type": "integer", "minimum": 0 },
         "error_count": { "type": "integer", "minimum": 0 },
+        "service_breakdown": { "$ref": "#/definitions/traces_service_breakdown" },
         "matched_count": { "type": "integer", "minimum": 0 },
         "exact": { "type": "boolean" },
         "matched_spans": {
           "type": "array",
           "items": { "$ref": "#/definitions/traces_span" }
         }
+      },
+      "additionalProperties": true
+    },
+    "traces_service_spans": {
+      "type": "object",
+      "required": ["value", "spans"],
+      "properties": {
+        "value": { "type": "string" },
+        "spans": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "traces_service_breakdown": {
+      "type": "object",
+      "required": ["top", "other", "other_services", "unattributed"],
+      "properties": {
+        "top": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/traces_service_spans" }
+        },
+        "other": { "type": "integer", "minimum": 0 },
+        "other_services": { "type": "integer", "minimum": 0 },
+        "unattributed": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": true
     },

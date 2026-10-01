@@ -608,6 +608,10 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
     if (!rt || !rt->obj)
         return -1;
 
+    int ncpu = libbpf_num_possible_cpus();
+    if (ncpu <= 0)
+        return -1;
+
     socket_prepare_autoload(rt->obj, rt->kind == NETDATA_SOCKET_RUNTIME_CORE);
     socket_update_map_types(rt->obj, maps_per_core);
 
@@ -628,10 +632,6 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
      * for libbpf_num_possible_cpus() so the post-load type query in the
      * snapshot path can safely use either ARRAY (count=1) or PERCPU_ARRAY
      * (count=percpu_u64_cap) without a buffer overflow. */
-    int ncpu = libbpf_num_possible_cpus();
-    if (ncpu <= 0)
-        ncpu = 1;
-
     rt->percpu_u64 = callocz((size_t)ncpu, sizeof(*rt->percpu_u64));
     if (!rt->percpu_u64)
         return -1;
@@ -640,19 +640,16 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
     /* tbl_lports may be HASH or PERCPU_HASH depending on the binary and libbpf
      * version.  Always allocate for the maximum possible CPU count so both
      * variants are handled without a buffer overflow on lookup. */
-    int lports_ncpu = libbpf_num_possible_cpus();
-    if (lports_ncpu <= 0)
-        lports_ncpu = 1;
-    rt->percpu_passive = callocz((size_t)lports_ncpu, sizeof(*rt->percpu_passive));
+    rt->percpu_passive = callocz((size_t)ncpu, sizeof(*rt->percpu_passive));
     if (!rt->percpu_passive)
         return -1;
-    rt->percpu_passive_cap = lports_ncpu;
+    rt->percpu_passive_cap = ncpu;
 
     /* tbl_nd_socket may also be PERCPU_HASH — allocate per-CPU value buffer. */
-    rt->percpu_nd_socket = callocz((size_t)lports_ncpu, sizeof(*rt->percpu_nd_socket));
+    rt->percpu_nd_socket = callocz((size_t)ncpu, sizeof(*rt->percpu_nd_socket));
     if (!rt->percpu_nd_socket)
         return -1;
-    rt->percpu_nd_socket_cap = lports_ncpu;
+    rt->percpu_nd_socket_cap = ncpu;
 
     /* Per-connection last-seen snapshot and deferred-delete buffer: sized at
      * 2× max(nd_socket_size, SOCKET_CONN_SNAP_MIN) for ~50% load factor.

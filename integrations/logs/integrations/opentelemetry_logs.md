@@ -21,7 +21,7 @@ The OpenTelemetry plugin lets you view, explore and analyze OpenTelemetry logs f
 
 It receives OTLP-formatted log data and indexes it for fast querying. The logs are explored from the "Logs" tab of the Netdata UI, using the same exploration interface used for systemd journal logs.
 
-Follow [Ingest OpenTelemetry Metrics and Logs](https://github.com/netdata/netdata/blob/master/docs/opentelemetry/otlp-ingestion.md) for a maintained Collector configuration and end-to-end verification steps.
+Follow [Ingest OpenTelemetry Metrics, Logs, and Traces](https://github.com/netdata/netdata/blob/master/docs/opentelemetry/otlp-ingestion.md) for a maintained Collector configuration and end-to-end verification steps.
 
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" alt="Maintained by Netdata" />

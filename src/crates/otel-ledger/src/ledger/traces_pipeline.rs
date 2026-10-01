@@ -32,6 +32,7 @@ use file_lifecycle::Pipeline;
 use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::component::ComponentHandle;
 use file_lifecycle::ipc::{CleanerRequest, CleanerResponse, UploaderRequest, UploaderResponse};
+use file_lifecycle::remote_read::RemoteRead;
 use file_lifecycle::storage::OpendalStorage;
 
 use super::pipeline::CHUNK_MIN_ENTRIES;
@@ -39,7 +40,8 @@ use super::rpc::OtelTracesHandler;
 
 /// Build the traces pipeline: spawn the shared [`Indexer`] with the traces
 /// seal, then delegate to [`super::pipeline::build_pipeline`] with a closure
-/// that wires the [`OtelTracesHandler`] (the `otel-traces` Function).
+/// that wires the [`OtelTracesHandler`] (the `otel-traces` Function, with the
+/// shared download cache when storage is enabled).
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn build_traces_pipeline(
     signal: Signal,
@@ -51,6 +53,7 @@ pub(crate) async fn build_traces_pipeline(
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
     uploader: Option<&mut ComponentHandle<UploaderRequest, UploaderResponse>>,
     storage: Option<&OpendalStorage>,
+    read_cache: Option<&file_cache::FileCache>,
     chunk_cache: Arc<ChunkCache>,
     pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
 ) -> anyhow::Result<Pipeline> {
@@ -60,6 +63,14 @@ pub(crate) async fn build_traces_pipeline(
         ng_index::build_sfst_traces_file as crate::indexer::SealFn,
         cancel.child_token(),
     );
+
+    // Owned clones for the handler closure (the builder borrows `storage` for
+    // recovery): reading evicted files back needs the storage client and the
+    // download cache the logs pipeline shares.
+    let remote = match (storage, read_cache) {
+        (Some(storage), Some(cache)) => Some(RemoteRead::new(storage.clone(), cache.clone())),
+        _ => None,
+    };
 
     super::pipeline::build_pipeline(
         signal,
@@ -75,7 +86,7 @@ pub(crate) async fn build_traces_pipeline(
         pipeline_tx,
         move |registries| {
             let traces_handler =
-                OtelTracesHandler::new(registries, chunk_cache, CHUNK_MIN_ENTRIES);
+                OtelTracesHandler::new(registries, chunk_cache, CHUNK_MIN_ENTRIES, remote);
             let handler: Arc<dyn RawFunctionHandler> =
                 Arc::new(HandlerAdapter::new(traces_handler));
             // The traces-own GET shim: `info` token → `{"info": {}}`,

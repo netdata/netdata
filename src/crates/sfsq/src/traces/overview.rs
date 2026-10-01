@@ -54,8 +54,9 @@
 //!
 //! Engine contracts mirrored from the siblings: sources process in
 //! `SourceId` order; a failed source is a
-//! [`SourceFailure`](PartialReason::SourceFailure) (the rest still
-//! count); cancellation is polled up front and between sources
+//! [`SourceFailure`](PartialReason::SourceFailure) and an unavailable
+//! one a [`RemoteUnavailable`](PartialReason::RemoteUnavailable) (the
+//! rest still count); cancellation is polled up front and between sources
 //! (all-or-empty); an OWN visited budget terminates with the
 //! deterministic prefix and
 //! [`OverviewCeiling`](PartialReason::OverviewCeiling). The budget
@@ -437,23 +438,37 @@ impl FacetCounts {
 /// Reduce a full count map to the bounded list: count DESC, value ASC,
 /// the tail folded into `other`.
 fn reduce(counts: std::collections::HashMap<String, u64>, unattributed: u64) -> FacetList {
-    let mut entries: Vec<(String, u64)> = counts.into_iter().collect();
-    let rank = |a: &(String, u64), b: &(String, u64)| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0));
-    // Select-then-sort, like the slowest top-K: O(n + K log K).
-    let mut other = 0u64;
-    if entries.len() > FACET_TOP_K {
-        entries.select_nth_unstable_by(FACET_TOP_K - 1, rank);
-        other = entries
-            .iter()
-            .skip(FACET_TOP_K)
-            .map(|(_, n)| n)
-            .sum::<u64>();
-        entries.truncate(FACET_TOP_K);
-    }
-    entries.sort_unstable_by(rank);
+    let (top, other) = top_k(counts.into_iter().collect(), FACET_TOP_K);
     FacetList {
-        top: entries,
-        other,
+        top,
+        other: other.count,
         unattributed,
     }
+}
+
+/// The entries [`top_k`] folded away.
+#[derive(Debug, Default)]
+pub(crate) struct FoldedTail {
+    /// Their summed counts.
+    pub count: u64,
+    /// How many entries they were.
+    pub entries: usize,
+}
+
+/// Keep the `k` (≥ 1) highest-count entries — count DESC, value ASC —
+/// and fold the rest into a [`FoldedTail`]. Shared by the root facets
+/// and the search rows' service breakdown so both rank identically.
+pub(crate) fn top_k<V: Ord>(mut entries: Vec<(V, u64)>, k: usize) -> (Vec<(V, u64)>, FoldedTail) {
+    let rank = |a: &(V, u64), b: &(V, u64)| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0));
+    // Select-then-sort, like the slowest top-K: O(n + K log K).
+    let mut tail = FoldedTail::default();
+    if entries.len() > k {
+        entries.select_nth_unstable_by(k - 1, rank);
+        for (_, n) in entries.drain(k..) {
+            tail.count += n;
+            tail.entries += 1;
+        }
+    }
+    entries.sort_unstable_by(rank);
+    (entries, tail)
 }
