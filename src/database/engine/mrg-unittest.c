@@ -1982,9 +1982,14 @@ static bool jv2_file_pwrite(const char *path, const void *buf, size_t size, off_
     return ok;
 }
 
+// A charge no journal of these tests holds, set before reloading so a loader that
+// does not set the charge cannot pass because it was already right.
+#define JV2_STALE_CHARGE 0xBADC0FFEEULL
+
 // Reloads the journal as startup does and checks what its datafile is charged.
 // Returns the number of errors found.
 static int jv2_expect_loaded_charge(struct jv2_journal_fixture *fx, uint64_t want, bool want_estimated, const char *when) {
+    rrdeng_datafile_samples_set(&fx->datafile, JV2_STALE_CHARGE, !want_estimated);
     journalfile_v2_populate_retention_to_mrg(&fx->ctx, fx->journalfile);
     if(fx->datafile.samples.charged != want || fx->datafile.samples.estimated != want_estimated) {
         fprintf(stderr, "ERROR: %s the loader charged %" PRIu64 " (estimated %d), expected %" PRIu64 " (estimated %d)\n",
@@ -1997,6 +2002,7 @@ static int jv2_expect_loaded_charge(struct jv2_journal_fixture *fx, uint64_t wan
 // Reloads the journal when it is the only datafile of the tier, and checks that both
 // the datafile and the tier hold exactly its samples. Returns the number of errors found.
 static int jv2_expect_reloaded_tier(struct jv2_journal_fixture *fx, uint64_t want, const char *when) {
+    rrdeng_datafile_samples_set(&fx->datafile, JV2_STALE_CHARGE, false);
     journalfile_v2_populate_retention_to_mrg(&fx->ctx, fx->journalfile);
     if(fx->ctx.atomic.samples != want || fx->datafile.samples.charged != want) {
         fprintf(stderr, "ERROR: %s the tier holds %" PRIu64 " (datafile %" PRIu64 "), expected %" PRIu64 "\n",
@@ -2007,13 +2013,14 @@ static int jv2_expect_reloaded_tier(struct jv2_journal_fixture *fx, uint64_t wan
 }
 
 // Checks whether the per-metric reader accepts the journal's samples section. A journal
-// that cannot be acquired is not checked, so this is never mistaken for a rejection.
-// Returns the number of errors found.
+// that cannot be acquired is an error, never a rejection. Returns the number of errors found.
 static int jv2_expect_samples_section(struct rrdengine_journalfile *journalfile, bool want_accepted, const char *when) {
     size_t data_size = 0;
     struct journal_v2_header *j2 = journalfile_v2_data_acquire(journalfile, &data_size, 0, 0);
-    if(!j2)
-        return 0;
+    if(!j2) {
+        fprintf(stderr, "ERROR: %s the v2 journal data cannot be acquired\n", when);
+        return 1;
+    }
 
     int errors = 0;
     bool accepted = journalfile_v2_samples_section((const uint8_t *)j2, data_size) != NULL;
