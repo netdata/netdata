@@ -139,6 +139,7 @@ set at the end.
 | CASE-022/latest-before-zero-v3 | v3 LATEST preserves before=0 as the database-end sentinel and returns the newest collector-cache sample on its established newest-sample grid | n/a | #23257 |
 | CASE-022/latest-before-zero-v1 | v1 natural-points LATEST with before=0 restores an off-cadence newest stored timestamp rather than rounding it away | n/a | #23257 |
 | CASE-022/latest-selected-tier-storage | selected-tier LATEST uses storage, preserves tier0 storage_number quantization and negative signs, and reports the engine-derived anomaly rate | n/a | #23257 |
+| CASE-023/mcp-hidden-dimension-selection | MCP query_metrics returns an explicitly requested hidden dimension series while leaving a visible peer query scoped to the requested dimension | n/a |  |
 | CASE-023/fleet-grouping-echo | all four fleet condition groupings and the countif alias echo their canonical grouping names | n/a |  |
 | CASE-023/percentage-of-samples | percentage-of-samples answers exact sample shares for numeric, gap and previous-sample expressions across bucket boundaries | n/a |  |
 | CASE-023/percentage-of-time | percentage-of-time answers exact duration shares for numeric, gap and previous-sample expressions across bucket boundaries | n/a |  |
@@ -224,13 +225,35 @@ set at the end.
 | CASE-038/higher-tier-only-rate-partial-evidence | archived dense and alternating-gap incremental metrics with no tier-0 retention or pre-restart live/cache state preserve exact row evidence from retained tier 1 in both forced-tier and automatic queries: dense numeric rows remain clean and every gapped numeric row is PARTIAL | n/a |  |
 | CASE-039/sparse-active-latest-table | a one-point LATEST query returns the newest value of an active gauge on the exact request-derived timestamp grid, without storage reads, for one-minute and fifteen-minute hot-edge windows through update_every=86400; the latest collection interval is eligible at its exact endpoint and expires one second later | n/a |  |
 | CASE-039/sparse-active-chart | an ordinary chart query keeps an active gauge visible for one-minute and fifteen-minute hot-edge windows through update_every=86400, carrying the newest value when the requested window starts after the sample but its next collection is not due | n/a |  |
-| CASE-040/inverted-tier-retention | automatic tier selection preserves constant-valued history available across tiers, including late-enabled coarse tiers and isolated coarse head samples; forced-tier controls prove the stored values independently | n/a |  |
-| CASE-040/handoff-sum | tier handoffs conserve the sum of a piecewise-constant series across output bucket widths without duplicate contributions | n/a |  |
-| CASE-040/handoff-average | tier handoffs preserve interval averages of a piecewise-constant series across output bucket widths | n/a |  |
-| CASE-040/handoff-min | tier handoffs preserve minima in fine prefixes of output buckets spanning a coarse-tier boundary | n/a |  |
-| CASE-040/handoff-max | tier handoffs preserve maxima in fine prefixes of output buckets spanning a coarse-tier boundary | n/a |  |
-| CASE-040/handoff-metadata | tier handoffs preserve the exact anomaly rate of complete nested records across output bucket widths | n/a |  |
-| CASE-040/handoff-rate-sum | tier handoffs conserve integrated rate-backed totals across output bucket widths without duplicate contributions | n/a |  |
+| CASE-040/inverted-tier-retention | automatic selection preserves constant-valued history when a coarse tier is enabled after retained fine-tier history; forced-tier queries independently check storage | n/a |  |
+| CASE-040/handoff-sum | fine-to-coarse handoffs conserve the sum of a piecewise-constant series across output bucket widths without duplicate contributions | n/a |  |
+| CASE-040/handoff-average | fine-to-coarse handoffs preserve interval averages of a piecewise-constant series across output bucket widths | n/a |  |
+| CASE-040/handoff-min | fine-to-coarse handoffs preserve minima in fine prefixes of output buckets spanning a coarse-tier boundary | n/a |  |
+| CASE-040/handoff-max | fine-to-coarse handoffs preserve maxima in fine prefixes of output buckets spanning a coarse-tier boundary | n/a |  |
+| CASE-040/handoff-metadata | fine-to-coarse handoffs preserve the exact anomaly rate of complete nested records across output bucket widths | n/a |  |
+| CASE-040/handoff-rate-sum | fine-to-coarse handoffs conserve integrated rate-backed totals across output bucket widths without duplicate contributions | n/a |  |
+| CASE-040/isolated-coarse-head | automatic selection preserves an isolated constant coarse head record when fine retention starts later | n/a |  |
+| CASE-040/isolated-coarse-tail | automatic selection reads the retained fine tail following an isolated coarse head record | n/a |  |
+| CASE-040/inverted-retention-annotations | complete constant retained rows carry no EMPTY or other point annotations across late-enabled and isolated coarse heads | n/a |  |
+| CASE-040/handoff-annotations | complete nested records carry no point annotations across fine-to-coarse handoffs and single-tier controls | n/a |  |
+| CASE-040/missed-seam-sum | a missed fine-tier collection at a fine-to-coarse seam contributes nothing to SUM and does not duplicate a coarse record | n/a |  |
+| CASE-040/late-tier-gap-null | wholly empty rows in restart-created late-tier page holes remain NULL with EMPTY annotations | n/a |  |
+| CASE-040/retained-island-average | every output row within a retained constant coarse-island record preserves its exact average before disconnected ALLOC fine retention | n/a |  |
+| CASE-040/retained-island-sum | every output row within a retained constant coarse-island record conserves its exact duration-proportional sum before disconnected ALLOC fine retention | n/a |  |
+| CASE-040/fine-selected-gap-null | fine-selected queries spanning disconnected ALLOC fine and coarse retention leave every wholly unretained row NULL with EMPTY annotations | n/a |  |
+| CASE-040/coarse-selected-gap-null | coarse-selected queries spanning disconnected dbengine retention leave wholly unretained tail rows NULL with EMPTY annotations | n/a |  |
+| CASE-040/partial-first-record-sum | automatic SUM includes all retained fine samples in a partially populated first coarse interval | n/a |  |
+| CASE-040/partial-first-record-average | automatic AVERAGE includes all retained fine samples in a partially populated first coarse interval | n/a |  |
+| CASE-040/partial-first-record-min | automatic MIN includes all retained fine samples in a partially populated first coarse interval | n/a |  |
+| CASE-040/partial-first-record-max | automatic MAX includes all retained fine samples in a partially populated first coarse interval | n/a |  |
+| CASE-040/partial-first-record-metadata | automatic queries preserve the fixture-derived anomaly rate of all retained fine samples in a partially populated first coarse interval | n/a |  |
+| CASE-040/conventional-tail-sum | a genuine conventional coarse-to-fine handoff conserves complete piecewise-constant SUM rows including the newest fine tail | n/a |  |
+| CASE-040/conventional-tail-average | a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant AVERAGE rows including the newest fine tail | n/a |  |
+| CASE-040/conventional-tail-min | a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant MIN rows including the newest fine tail | n/a |  |
+| CASE-040/conventional-tail-max | a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant MAX rows including the newest fine tail | n/a |  |
+| CASE-040/conventional-tail-metadata | a genuine conventional coarse-to-fine handoff preserves exact anomaly rates including anomalous newest fine-tail samples | n/a |  |
+| CASE-040/shifted-constant-seam | a shifted row containing only constant samples and lying within a constant coarse record preserves that constant across a fine-to-coarse seam | n/a |  |
+| CASE-040/young-tier-work | young-metric queries initialize each required tier at most once per dimension and do not reread a selected-tier record; mature and forced-tier controls bound work independently | n/a |  |
 | CASE-019/v1-json-name-escaping | v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) escape dimension names (was: raw between quotes — a double-quote in a name, or a label value via group_by=label, produced invalid JSON); the objectrows row keys are escaped like the header, and the google flavor (datatable+google_json) escapes the apostrophe of its single-quoted JavaScript labels while keeping the double quote raw | n/a | #23216 |
 | L10/roster-is-complete | the sweep classifies every requestable grouping declared by the explicitly paired source tree: the roster is parsed from RRDR_TIME_GROUPING and its name registry, so a declared grouping without a layer-10 rule fails by name instead of silently falling back to average | n/a |  |
 | L10/no-holes-inside-data | every grouping answers every exact bucket across fully collected data at tiers 0 and 1, with 10s, 60s, 300s and 600s buckets; only incremental-sum may leave its opening bucket empty because the query has no predecessor, and every later bucket must answer | n/a |  |
@@ -288,7 +311,7 @@ set at the end.
 | W/limit-node-ties | equal weights select physical metrics by stable node and metric identity while retaining metadata for nodes without selected metrics | n/a |  |
 | W/v1-host-scope | v1 weights respect the URL-selected host while v2/v3 retain explicit multi-node scope | n/a |  |
 | W/limit-mcp | MCP weights preserve caller default and minimum limits and descending raw scores while reporting exact-boundary truncation truthfully | n/a |  |
-| W/anomaly-gaps | Anomaly-rate weights count missing samples as zero without changing ordinary value weights | n/a | |
+| W/anomaly-gaps | anomaly-rate weights count missing samples as zero without changing ordinary value weights | n/a |  |
 
 ## Corpus-wide pusher discipline
 

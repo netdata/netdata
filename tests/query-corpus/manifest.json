@@ -958,38 +958,129 @@
   },
   {
     "name": "CASE-040/inverted-tier-retention",
-    "proves": "automatic tier selection preserves constant-valued history available across tiers, including late-enabled coarse tiers and isolated coarse head samples; forced-tier controls prove the stored values independently",
-    "components": ["late-tier", "isolated-head"]
+    "proves": "automatic selection preserves constant-valued history when a coarse tier is enabled after retained fine-tier history; forced-tier queries independently check storage"
   },
   {
     "name": "CASE-040/handoff-sum",
-    "proves": "tier handoffs conserve the sum of a piecewise-constant series across output bucket widths without duplicate contributions",
-    "components": ["late-false", "late-true"]
+    "proves": "fine-to-coarse handoffs conserve the sum of a piecewise-constant series across output bucket widths without duplicate contributions",
+    "components": ["single-tier-control", "fine-to-coarse"]
   },
   {
     "name": "CASE-040/handoff-average",
-    "proves": "tier handoffs preserve interval averages of a piecewise-constant series across output bucket widths",
-    "components": ["late-false", "late-true"]
+    "proves": "fine-to-coarse handoffs preserve interval averages of a piecewise-constant series across output bucket widths",
+    "components": ["single-tier-control", "fine-to-coarse"]
   },
   {
     "name": "CASE-040/handoff-min",
-    "proves": "tier handoffs preserve minima in fine prefixes of output buckets spanning a coarse-tier boundary",
-    "components": ["late-false", "late-true"]
+    "proves": "fine-to-coarse handoffs preserve minima in fine prefixes of output buckets spanning a coarse-tier boundary",
+    "components": ["single-tier-control", "fine-to-coarse"]
   },
   {
     "name": "CASE-040/handoff-max",
-    "proves": "tier handoffs preserve maxima in fine prefixes of output buckets spanning a coarse-tier boundary",
-    "components": ["late-false", "late-true"]
+    "proves": "fine-to-coarse handoffs preserve maxima in fine prefixes of output buckets spanning a coarse-tier boundary",
+    "components": ["single-tier-control", "fine-to-coarse"]
   },
   {
     "name": "CASE-040/handoff-metadata",
-    "proves": "tier handoffs preserve the exact anomaly rate of complete nested records across output bucket widths",
-    "components": ["late-false", "late-true"]
+    "proves": "fine-to-coarse handoffs preserve the exact anomaly rate of complete nested records across output bucket widths",
+    "components": ["single-tier-control", "fine-to-coarse"]
   },
   {
     "name": "CASE-040/handoff-rate-sum",
-    "proves": "tier handoffs conserve integrated rate-backed totals across output bucket widths without duplicate contributions",
-    "components": ["late-false", "late-true"]
+    "proves": "fine-to-coarse handoffs conserve integrated rate-backed totals across output bucket widths without duplicate contributions",
+    "components": ["single-tier-control", "fine-to-coarse"]
+  },
+  {
+    "name": "CASE-040/isolated-coarse-head",
+    "proves": "automatic selection preserves an isolated constant coarse head record when fine retention starts later"
+  },
+  {
+    "name": "CASE-040/isolated-coarse-tail",
+    "proves": "automatic selection reads the retained fine tail following an isolated coarse head record"
+  },
+  {
+    "name": "CASE-040/inverted-retention-annotations",
+    "proves": "complete constant retained rows carry no EMPTY or other point annotations across late-enabled and isolated coarse heads",
+    "components": ["late-tier", "isolated-head"]
+  },
+  {
+    "name": "CASE-040/handoff-annotations",
+    "proves": "complete nested records carry no point annotations across fine-to-coarse handoffs and single-tier controls",
+    "components": ["single-tier-control", "fine-to-coarse"]
+  },
+  {
+    "name": "CASE-040/missed-seam-sum",
+    "proves": "a missed fine-tier collection at a fine-to-coarse seam contributes nothing to SUM and does not duplicate a coarse record",
+    "components": ["grouping-4", "grouping-60"]
+  },
+  {
+    "name": "CASE-040/late-tier-gap-null",
+    "proves": "wholly empty rows in restart-created late-tier page holes remain NULL with EMPTY annotations",
+    "components": ["tier1", "tier2"]
+  },
+  {
+    "name": "CASE-040/retained-island-average",
+    "proves": "every output row within a retained constant coarse-island record preserves its exact average before disconnected ALLOC fine retention"
+  },
+  {
+    "name": "CASE-040/retained-island-sum",
+    "proves": "every output row within a retained constant coarse-island record conserves its exact duration-proportional sum before disconnected ALLOC fine retention"
+  },
+  {
+    "name": "CASE-040/fine-selected-gap-null",
+    "proves": "fine-selected queries spanning disconnected ALLOC fine and coarse retention leave every wholly unretained row NULL with EMPTY annotations"
+  },
+  {
+    "name": "CASE-040/coarse-selected-gap-null",
+    "proves": "coarse-selected queries spanning disconnected dbengine retention leave wholly unretained tail rows NULL with EMPTY annotations"
+  },
+  {
+    "name": "CASE-040/partial-first-record-sum",
+    "proves": "automatic SUM includes all retained fine samples in a partially populated first coarse interval"
+  },
+  {
+    "name": "CASE-040/partial-first-record-average",
+    "proves": "automatic AVERAGE includes all retained fine samples in a partially populated first coarse interval"
+  },
+  {
+    "name": "CASE-040/partial-first-record-min",
+    "proves": "automatic MIN includes all retained fine samples in a partially populated first coarse interval"
+  },
+  {
+    "name": "CASE-040/partial-first-record-max",
+    "proves": "automatic MAX includes all retained fine samples in a partially populated first coarse interval"
+  },
+  {
+    "name": "CASE-040/partial-first-record-metadata",
+    "proves": "automatic queries preserve the fixture-derived anomaly rate of all retained fine samples in a partially populated first coarse interval"
+  },
+  {
+    "name": "CASE-040/conventional-tail-sum",
+    "proves": "a genuine conventional coarse-to-fine handoff conserves complete piecewise-constant SUM rows including the newest fine tail"
+  },
+  {
+    "name": "CASE-040/conventional-tail-average",
+    "proves": "a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant AVERAGE rows including the newest fine tail"
+  },
+  {
+    "name": "CASE-040/conventional-tail-min",
+    "proves": "a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant MIN rows including the newest fine tail"
+  },
+  {
+    "name": "CASE-040/conventional-tail-max",
+    "proves": "a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant MAX rows including the newest fine tail"
+  },
+  {
+    "name": "CASE-040/conventional-tail-metadata",
+    "proves": "a genuine conventional coarse-to-fine handoff preserves exact anomaly rates including anomalous newest fine-tail samples"
+  },
+  {
+    "name": "CASE-040/shifted-constant-seam",
+    "proves": "a shifted row containing only constant samples and lying within a constant coarse record preserves that constant across a fine-to-coarse seam"
+  },
+  {
+    "name": "CASE-040/young-tier-work",
+    "proves": "young-metric queries initialize each required tier at most once per dimension and do not reread a selected-tier record; mature and forced-tier controls bound work independently"
   },
   {
     "name": "CASE-019/v1-json-name-escaping",

@@ -22,6 +22,13 @@ import (
 func TestCase040TierHandoff(t *testing.T) {
 	for _, late := range []bool{false, true} {
 		t.Run(fmt.Sprintf("late-%v", late), func(t *testing.T) {
+			component := "single-tier-control"
+			if late {
+				component = "fine-to-coarse"
+			}
+			for _, group := range []string{"sum", "rate-sum", "average", "min", "max", "metadata", "annotations"} {
+				registerContractComponent(t, "CASE-040/handoff-"+group, component)
+			}
 			const host, context = "tier-handoff", "fixture.tier_handoff"
 			base := int64(fixture.T0 - fixture.T0%4)
 			tiers, initial := 2, 360
@@ -76,9 +83,9 @@ func TestCase040TierHandoff(t *testing.T) {
 				pushDedicatedChart(t, dd, host, guid(9701), makeChart(base+120, 240))
 			}
 			waitDedicatedTierLastEntry(t, dd, host, context, 1, base+356)
-			for _, group := range []string{"sum", "rate-sum", "average", "min", "max", "metadata"} {
+			for _, group := range []string{"sum", "rate-sum", "average", "min", "max", "metadata", "annotations"} {
 				t.Run(group, func(t *testing.T) {
-					trackContractComponent(t, "CASE-040/handoff-"+group, fmt.Sprintf("late-%v", late))
+					trackContractComponent(t, "CASE-040/handoff-"+group, component)
 					for _, span := range []int64{4, 8, 16, 32, 64} {
 						for _, tier := range []string{"", "0"} {
 							t.Run(fmt.Sprintf("span-%d/tier-%s", span, tier), func(t *testing.T) {
@@ -91,7 +98,7 @@ func TestCase040TierHandoff(t *testing.T) {
 									p.Set("time_group", "sum")
 									dimension = "rate"
 								}
-								if group == "metadata" {
+								if group == "metadata" || group == "annotations" {
 									p.Set("time_group", "average")
 								}
 								if tier != "" {
@@ -125,9 +132,13 @@ func TestCase040TierHandoff(t *testing.T) {
 									case "max":
 										v = high
 									}
-									want = append(want, wantNumberWithARPAt(end, v, 100*float64(anomalyCount)/float64(span)))
+									if group == "annotations" {
+										want = append(want, wantNumberWithPAAt(end, v, 0))
+									} else {
+										want = append(want, wantNumberWithARPAt(end, v, 100*float64(anomalyCount)/float64(span)))
+									}
 								}
-								if group == "metadata" {
+								if group == "metadata" || group == "annotations" {
 									if !assertExactColumnMetadata(t, cols, "load", want) {
 										t.Error("tier handoff changed anomaly metadata")
 									}

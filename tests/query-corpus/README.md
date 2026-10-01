@@ -54,6 +54,13 @@ state where one stage changes another stage's inputs.
 - **Cross-cutting surfaces**: CASE regressions plus selector, option,
   anomaly-bit, rate, reset, update-every, and weights contracts complement
   the numbered layers.
+  CASE-040 independently checks late-enabled fine-to-coarse handoffs,
+  conventional coarse-to-fine tails, missed seam collections, retained
+  islands, empty retention gaps, partial initial records, isolated head/tail
+  rows, shifted constant intervals, anomaly metadata, and young-metric work
+  budgets. Its original normal-tier cases are single-tier controls; actual
+  conventional coverage requires reads from both tiers. These contracts
+  assert fixture truth and remain failing while the engine violates it.
 - **Cloud boundary**: this repository does not run `cloud-charts-service` or
   `DataV2Aggregator`; the manifest's Cloud column is reserved for external
   replay and status tracking.
@@ -84,6 +91,13 @@ layers; each layer declares which entries it consumes:
   first-principles correctness.
 - A new engine defect is first stated as the correct contract in a failing
   corpus case, then fixed in a separate focused branch/PR.
+- Dedicated fixtures sharing a host use one streaming connection for that
+  host's charts. A second connection with the same machine GUID can be
+  rejected while the first remains active; that handshake failure is a
+  fixture prerequisite failure, not evidence of a query defect.
+- An uninstalled native binary still needs its stock configuration and
+  asset directories at its configured filesystem prefix. If startup fails,
+  inspect the dedicated daemon logs before interpreting any corpus result.
 - **A broken contract fails. Always.** On master, on a feature branch, whether
   or not the break is already known. There is no recorded "expected failure"
   anywhere in this suite: a corpus that reports success on a broken engine is
