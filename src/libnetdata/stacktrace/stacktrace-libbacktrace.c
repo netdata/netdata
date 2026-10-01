@@ -182,7 +182,7 @@ static void bt_error_handler(void *data, const char *msg, int errnum) {
         print_uint64(errnum_buf, (uint64_t)errnum);
 
         len = strcatz(error_buf, len, msg ? ": errno " : "errno ", sizeof(error_buf));
-        len = strcatz(error_buf, len, errnum_buf, sizeof(error_buf));
+        strcatz(error_buf, len, errnum_buf, sizeof(error_buf));
     }
 
     add_stack_frame(bt_data, 0, function, error_buf, 0);
