@@ -840,9 +840,11 @@ void sqlite_close_databases(void)
     __atomic_store_n(&sqlite_databases_closed, true, __ATOMIC_RELEASE);
 
     // Stop admitting leases and wait for the admitted ones (prepares, statement cleanups) to leave SQLite.
+    // When the teardown is already suppressed nothing below is destroyed, so waiting would only spend the
+    // shutdown watchdog's budget.
     netdata_mutex_lock(&sqlite_lifetime_mutex);
     sqlite_teardown_gate = true;
-    bool drained = sqlite_leases_drain_locked(SQLITE_LEASE_DRAIN_TIMEOUT_UT);
+    bool drained = sqlite_teardown_is_unsafe() || sqlite_leases_drain_locked(SQLITE_LEASE_DRAIN_TIMEOUT_UT);
     size_t pending = sqlite_leases;
     netdata_mutex_unlock(&sqlite_lifetime_mutex);
 
@@ -1028,6 +1030,8 @@ void sqlite_library_shutdown(void)
     // sqlite_note_zombie_connection). That is sufficient only because ml_fini() and this function are
     // strictly ordered on the one shutdown thread.
     if (sqlite_teardown_is_unsafe() || __atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE)) {
+        // The library stays initialized, so re-admit thread-local closes instead of leaking every handle.
+        sqlite_library_gate = false;
         netdata_mutex_unlock(&sqlite_lifetime_mutex);
         nd_log_daemon(
             NDLP_WARNING,
