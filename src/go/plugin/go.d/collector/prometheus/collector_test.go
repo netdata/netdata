@@ -138,6 +138,41 @@ func TestCollector_Init(t *testing.T) {
 				FallbackType: promprofiles.FallbackType{Counter: []string{" app_requests "}},
 			},
 		},
+		"valid counter raw charts": {
+			wantFail: false,
+			config: Config{
+				HTTPConfig:       web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				CounterRawCharts: []string{"!app_internal_*", "app_*_total"},
+			},
+		},
+		"counter raw charts padded pattern": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig:       web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				CounterRawCharts: []string{" app_*"},
+			},
+		},
+		"counter raw charts several patterns in one item": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig:       web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				CounterRawCharts: []string{"app_* !app_internal_*"},
+			},
+		},
+		"counter raw charts invalid glob": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig:       web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				CounterRawCharts: []string{"app_["},
+			},
+		},
+		"counter raw charts only negative patterns": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig:       web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				CounterRawCharts: []string{"!app_*"},
+			},
+		},
 		"profiles mode none": {
 			wantFail: false,
 			config: Config{
@@ -692,7 +727,7 @@ func requireAutogenOnlyRuntime(t *testing.T, collr *Collector) {
 
 	require.NotNil(t, collr.runtime)
 	require.Empty(t, collr.runtime.profiles, "profiles.mode none must not retain a selected profile")
-	want, err := buildMergedChartTemplate(collr.resolveApp(nil), nil)
+	want, err := buildMergedChartTemplate(collr.resolveApp(nil), nil, nil)
 	require.NoError(t, err)
 	require.Equal(t, want, collr.runtime.chartTemplate, "profiles.mode none must use the pure autogen template")
 }

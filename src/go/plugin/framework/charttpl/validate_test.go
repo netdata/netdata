@@ -784,6 +784,35 @@ func TestSpecValidateScenarios(t *testing.T) {
 			wantErr: true,
 			errLike: "engine.autogen.max_type_id_len",
 		},
+		"fails on blank engine autogen counter_raw_charts item": {
+			spec: Spec{
+				Version: VersionV1,
+				Engine: &Engine{
+					Autogen: &EngineAutogen{
+						Enabled:          true,
+						CounterRawCharts: []string{"mysql_*", " "},
+					},
+				},
+				Groups: []Group{
+					{
+						Family:  "Database",
+						Metrics: []string{"mysql_queries_total"},
+						Charts: []Chart{
+							{
+								Title:   "Queries",
+								Context: "queries_total",
+								Units:   "queries/s",
+								Dimensions: []Dimension{
+									{Selector: "mysql_queries_total", Name: "total"},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errLike: "engine.autogen.counter_raw_charts",
+		},
 	}
 
 	for name, tc := range tests {
@@ -1218,5 +1247,74 @@ func validationSpec() Spec {
 				}},
 			}},
 		}},
+	}
+}
+
+func TestCompileCounterRawCharts(t *testing.T) {
+	tests := map[string]struct {
+		patterns []string
+		wantErr  string
+		selects  map[string]bool
+	}{
+		"no patterns select nothing": {
+			selects: map[string]bool{"app_requests_total": false},
+		},
+		"exact name": {
+			patterns: []string{"app_requests_total"},
+			selects:  map[string]bool{"app_requests_total": true, "app_errors_total": false},
+		},
+		"glob syntax shared with fallback_type": {
+			patterns: []string{"app_*_total", "db_query_[ab]_total"},
+			selects: map[string]bool{
+				"app_requests_total": true,
+				"db_query_a_total":   true,
+				"db_query_c_total":   false,
+				"app_requests":       false,
+			},
+		},
+		"first match wins and negation excludes": {
+			patterns: []string{"!app_internal_total", "app_*"},
+			selects:  map[string]bool{"app_requests_total": true, "app_internal_total": false},
+		},
+		"blank item": {
+			patterns: []string{"app_*", ""},
+			wantErr:  "item 1: must not be blank",
+		},
+		"surrounding whitespace": {
+			patterns: []string{" app_*"},
+			wantErr:  `item 0 (" app_*"): must not contain whitespace`,
+		},
+		"several patterns in one item": {
+			patterns: []string{"app_*", "app_* !app_internal_*"},
+			wantErr:  `item 1 ("app_* !app_internal_*"): must not contain whitespace`,
+		},
+		"lone negation": {
+			patterns: []string{"app_*", "!"},
+			wantErr:  `item 1 ("!"): negation needs a pattern`,
+		},
+		"only negative patterns": {
+			patterns: []string{"!app_*"},
+			wantErr:  "at least one positive pattern",
+		},
+		"invalid glob": {
+			patterns: []string{"app_*", "!app_["},
+			wantErr:  `item 1 ("!app_["):`,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			compiled, err := CompileCounterRawCharts(tc.patterns)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			got := make(map[string]bool, len(tc.selects))
+			for name := range tc.selects {
+				got[name] = compiled.Selects(name)
+			}
+			assert.Equal(t, tc.selects, got)
+		})
 	}
 }
