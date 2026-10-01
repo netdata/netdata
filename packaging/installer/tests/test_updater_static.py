@@ -47,8 +47,9 @@ update_static
                               env=dict(os.environ, TMPDIR=str(self.root)), cwd=str(self.root))
 
     def test_failed_installer_fails_update(self):
-        result = self.run_update_static(1)
+        result = self.run_update_static(7)
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('failed with exit status 7', result.stderr)
         self.assertFalse((self.prefix / 'etc' / 'netdata' / '.install-type').exists())
 
     def test_successful_installer_succeeds(self):

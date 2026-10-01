@@ -1210,7 +1210,8 @@ update_static() {
       rm -r "${ndtmpdir}"
       echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
     else
-      fatal "Static installer failed, Netdata was not updated." U002B
+      installer_status=$?
+      fatal "Static installer ${ndtmpdir}/netdata-${sysarch}-latest.gz.run failed with exit status ${installer_status}, Netdata was not updated." U002B
     fi
   fi
 
