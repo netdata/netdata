@@ -2,6 +2,12 @@
 
 ### Merged Pull Requests:
 
+- Sync repos (netdata, ebpf-co-re, kernel-collector) ([#24008](https://github.com/netdata/netdata/issues/24008))
+
+## [2.12.0] - 2026-09-30
+
+### Merged Pull Requests:
+
 - Rework Ceph collector as a Prometheus complement ([#23357](https://github.com/netdata/netdata/issues/23357))
 - Improve the support bundle: streaming api key, encoding fidelity, Windows ETW logs, permissions ([#23452](https://github.com/netdata/netdata/issues/23452))
 - Fix: replace dynamic proc netdev format strings ([#23450](https://github.com/netdata/netdata/issues/23450))

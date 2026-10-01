@@ -68,9 +68,10 @@ func NewTemplateSet(spec TemplateSetSpec) (*TemplateSet, error) {
 		namespace: strings.Join(normalizeOptional(spec.FallbackContextNamespace), "."),
 	}
 	policy := effectiveEnginePolicy{
-		autogen:      cfg.autogen,
-		autogenRules: cfg.autogenRules,
-		selector:     cfg.selector,
+		autogen:           cfg.autogen,
+		autogenRules:      cfg.autogenRules,
+		autogenCounterRaw: cfg.autogenCounterRaw,
+		selector:          cfg.selector,
 	}
 	return compileTemplateSet(spec.Entries, global, policy, false, false)
 }
@@ -258,6 +259,7 @@ func PrepareTemplateSet(set *TemplateSet, opts ...Option) (*TemplateSet, error) 
 		out.global.autogen.Rules = normalizedAutogenRules(out.global.autogen.Rules)
 		out.policy.autogen = out.global.autogen
 		out.policy.autogenRules = append(slices.Clone(cfg.autogenRulesOverride.value), set.entryRules...)
+		out.policy.autogenCounterRaw = cfg.autogenCounterRaw
 	}
 	if cfg.selectorOverride.set {
 		out.global.selector = normalizedSelectorExpr(cfg.selectorExprOverride)

@@ -40,6 +40,12 @@ type EngineAutogen struct {
 	// Rules constrain autogen fallback for matching unmatched metric families.
 	Rules []EngineAutogenRule `yaml:"rules,omitempty" json:"rules,omitempty"`
 
+	// CounterRawCharts selects scalar counters, by metric name, that also get a
+	// raw-value chart next to their rate chart. Each item is one glob, evaluated
+	// in order like Netdata simple patterns: the first match wins and a leading
+	// `!` negates.
+	CounterRawCharts []string `yaml:"counter_raw_charts,omitempty" json:"counter_raw_charts,omitempty"`
+
 	// MaxTypeIDLen is the max allowed full `type.id` length.
 	// Zero means default (1200).
 	MaxTypeIDLen int `yaml:"max_type_id_len,omitempty"             json:"max_type_id_len,omitempty"`

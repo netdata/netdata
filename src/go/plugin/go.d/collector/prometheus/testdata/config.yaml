@@ -53,3 +53,5 @@ fallback_type:
     - "ok"
   counter:
     - "ok"
+counter_raw_charts:
+  - "ok"

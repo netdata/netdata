@@ -118,6 +118,16 @@
             "$ref": "#/$defs/engine_autogen_rule"
           }
         },
+        "counter_raw_charts": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "pattern": "^\\S+$"
+          }
+        },
         "max_type_id_len": {
           "oneOf": [
             {
