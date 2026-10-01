@@ -207,9 +207,9 @@
       - If your IdP can pass the OIDC `sub` claim into provisioning, map SCIM `externalId` ← `sub`. Users link automatically with no extra steps.
       - If it cannot (e.g. Microsoft Entra), map `externalId` to any stable user identifier instead. Users are then linked by **e-mail address** — this requires the DNS TXT verification record for your e-mail domain (**Space settings → User Management → Authentication & Authorization → DNS TXT record**), and the provisioned e-mail must be the same address your IdP sends as the OIDC `email` claim. Without the DNS record, provisioning a user who already signed in with OIDC fails with `409 Conflict`.
 
-      Either way, users who signed in with OIDC before being provisioned are linked automatically. Users provisioned first confirm a one-time "link your account" e-mail at their first sign-in.
+      With the `sub` mapping, linking is automatic in both provisioning orders. With e-mail linking, users who signed in with OIDC before being provisioned are linked automatically; users provisioned first confirm a one-time "link your account" e-mail at their first sign-in.
 
-      ### Microsoft Entra ID
+      #### Microsoft Entra ID
 
       Entra cannot map `externalId` to the OIDC `sub` claim, so use e-mail linking:
 
