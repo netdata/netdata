@@ -100,6 +100,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Customization** | [fallback_type](#option-customization-fallback-type) | Job-level fallback type overrides for untyped metrics. |  | no |
 |  | [relabeling](#option-customization-relabeling) | Job-owned Prometheus-compatible metric relabeling, applied before profile selection. |  | no |
 |  | [profiles](#option-customization-profiles) | Curated, exporter-specific chart profiles with optional untyped classification, profile-owned normalization, and scoped fallback-chart policy. User profiles may constrain unmatched fallback charts; stock profiles preserve unknown future families. Disable profiles with mode `none`. | auto | no |
+| **Raw counter charts** | [counter_raw_charts](#option-raw-counter-charts-counter-raw-charts) | Counters whose raw cumulative value is also charted, next to their per-second rate chart, under the `prometheus.<app>.<metric>.raw` context. Leave empty to chart counters as rates only. |  | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -149,6 +150,9 @@ Job gauge rules take precedence over job counter rules, and both job rule sets t
 every profile rule. Use them for deployment-specific overrides rather than exporter behavior that
 belongs in a profile. Keep patterns narrow: a broad job rule such as `gauge: ['*']` overrides profile
 counter classifications. Blank patterns and patterns with leading or trailing whitespace are rejected.
+To keep a counter's rate chart and also chart its raw value on generic autogen charts, list the metric
+in `counter_raw_charts` instead of adding a gauge rule; an untyped metric without the `_total` suffix
+also needs a `counter` rule. Metrics charted by a profile get no raw chart.
 
 - Metric name pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match).
 - Option syntax:
@@ -231,6 +235,27 @@ profiles:
   mode_exact:
     entries:
       - name: haproxy
+```
+
+
+<a id="option-raw-counter-charts-counter-raw-charts"></a>
+##### counter_raw_charts
+
+Use this option when you need a counter's total as well as its rate, for example to read the absolute
+number of requests served since the exporter started. Each item holds one metric name pattern with the
+same syntax as `fallback_type` (`*`, `?`, `[...]`); a leading `!` excludes, and the first matching item
+decides. Patterns match the final metric name after job and profile relabeling. Every matched counter
+series adds one chart.
+
+Only counters shown on generic autogen charts get a raw chart. Gauges, histogram and summary series,
+and metrics charted by a profile are not affected. An untyped metric qualifies once it is processed as
+a counter: through its `_total` suffix, `fallback_type.counter`, or a selected profile's
+`fallback_type`.
+
+```yaml
+counter_raw_charts:
+  - '!myapp_internal_*'
+  - 'myapp_*_total'
 ```
 
 
