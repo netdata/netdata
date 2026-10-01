@@ -379,12 +379,15 @@ static bool query_plan_fill_coverage(QUERY_ENGINE_OPS *ops, size_t selected_tier
     time_t boundaries[2 * RRD_STORAGE_TIERS];
     size_t boundaries_used = 0;
     size_t head_order[RRD_STORAGE_TIERS], tail_order[RRD_STORAGE_TIERS];
+    size_t head_used = 0, tail_used = 0;
 
-    // Preserve each edge's search direction when wrapping past the configured tiers.
-    for(size_t offset = 0; offset < nd_profile.storage_tiers; offset++) {
-        head_order[offset] = (selected_tier + offset) % nd_profile.storage_tiers;
-        tail_order[offset] = (selected_tier + nd_profile.storage_tiers - offset) % nd_profile.storage_tiers;
-    }
+    head_order[head_used++] = tail_order[tail_used++] = selected_tier;
+    for(size_t tier = selected_tier + 1; tier < nd_profile.storage_tiers; tier++)
+        head_order[head_used++] = tier;
+    for(size_t tier = selected_tier; tier > 0; tier--)
+        head_order[head_used++] = tail_order[tail_used++] = tier - 1;
+    for(size_t tier = selected_tier + 1; tier < nd_profile.storage_tiers; tier++)
+        tail_order[tail_used++] = tier;
 
     for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         if(!query_metric_tier_overlaps_timeframe(qm, tier, after_wanted, before_wanted))
@@ -1192,13 +1195,14 @@ int query_plan_unittest(void) {
         query_plan_unittest_set_tier(&qm, 1, 50, 200, 10);
         query_plan_unittest_set_tier(&qm, 2, 100, 150, 20);
         QUERY_PLAN_ENTRY expected[] = {
-            { .tier = 0, .after = 10, .before = 100 },
+            { .tier = 0, .after = 10, .before = 50 },
+            { .tier = 1, .after = 50, .before = 100 },
             { .tier = 2, .after = 100, .before = 150 },
             { .tier = 1, .after = 150, .before = 200 },
             { .tier = 0, .after = 200, .before = 250 },
         };
         errors += query_plan_unittest_expect_plan(
-            "nested tiers follow circular edge preference", &qm, 0, 0,
+            "nested tiers fill both sides without losing segments", &qm, 0, 0,
             10, 250, 20, expected, _countof(expected));
     }
 
@@ -1332,41 +1336,6 @@ int query_plan_unittest(void) {
 
         errors += query_plan_unittest_expect_update_every(&qt, 1, 300);
     }
-
-    nd_profile.storage_tiers = 5;
-    for(size_t isolated = 0; isolated < 2; isolated++) {
-        QUERY_METRIC qm = {0};
-        query_plan_unittest_set_tier(&qm, 0, 10, isolated ? 10 : 250, 1);
-        query_plan_unittest_set_tier(&qm, 1, 10, isolated ? 10 : 250, 10);
-        query_plan_unittest_set_tier(&qm, 2, 100, 200, 20);
-        query_plan_unittest_set_tier(&qm, 3, 100, 200, 60);
-        query_plan_unittest_set_tier(&qm, 4, 100, 200, 120);
-        QUERY_PLAN_ENTRY expected[] = {
-            { .tier = 0, .after = 10, .before = 100 },
-            { .tier = 2, .after = 100, .before = 200 },
-            { .tier = 1, .after = 200, .before = 250 },
-        };
-        errors += query_plan_unittest_expect_plan(
-            isolated ? "isolated older sample wraps upward to tier zero" : "older coverage wraps upward to tier zero",
-            &qm, 0, 0, 10, 250, 20, expected, isolated ? 2 : 3);
-    }
-    for(size_t isolated = 0; isolated < 2; isolated++) {
-        QUERY_METRIC qm = {0};
-        query_plan_unittest_set_tier(&qm, 0, 100, 200, 1);
-        query_plan_unittest_set_tier(&qm, 1, 100, 200, 10);
-        query_plan_unittest_set_tier(&qm, 2, 100, 200, 20);
-        query_plan_unittest_set_tier(&qm, 3, isolated ? 250 : 10, 250, 60);
-        query_plan_unittest_set_tier(&qm, 4, isolated ? 250 : 10, 250, 120);
-        QUERY_PLAN_ENTRY expected[] = {
-            { .tier = 3, .after = 10, .before = 100 },
-            { .tier = 2, .after = 100, .before = 200 },
-            { .tier = 4, .after = isolated ? 250 : 200, .before = 250 },
-        };
-        errors += query_plan_unittest_expect_plan(
-            isolated ? "isolated newer sample wraps downward to highest tier" : "newer coverage wraps downward to highest tier",
-            &qm, 0, 0, 10, 250, 20, expected + isolated, isolated ? 2 : 3);
-    }
-    nd_profile.storage_tiers = 3;
 
     errors += query_plan_unittest_expect_ops_cache_is_local();
     errors += query_plan_unittest_expect_result_expiry();
