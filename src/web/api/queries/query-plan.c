@@ -211,7 +211,7 @@ static void query_planer_initialize_plan(QUERY_ENGINE_OPS *ops, size_t p) {
     ops->plans[p].finalized = false;
 }
 
-static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
+static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops, size_t first_plan) {
     QUERY_METRIC *qm = ops->qm;
 
     for(size_t p = 0; p < qm->plan.used ; p++) {
@@ -245,10 +245,20 @@ static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
         time_t after = qm->plan.array[p].after - (time_t)(update_every * points_to_add_to_after);
         time_t before = qm->plan.array[p].before + (time_t)(update_every * points_to_add_to_before);
 
+        if(p > 0 && tier < qm->plan.array[p - 1].tier &&
+           qm->plan.array[p].after > qm->plan.array[p - 1].before) {
+            // Inclusive read endpoints must not truncate a disconnected older island.
+            time_t floor;
+            if(__builtin_add_overflow(qm->plan.array[p - 1].before, update_every, &floor))
+                floor = nd_time_t_max();
+            after = MAX(after, MIN(floor, qm->plan.array[p].after));
+        }
+
         ops->plans[p].expanded_after = after;
         ops->plans[p].expanded_before = before;
 
-        query_planer_initialize_plan(ops, p);
+        if(p >= first_plan)
+            query_planer_initialize_plan(ops, p);
     }
 }
 
@@ -260,6 +270,8 @@ static void query_planer_finalize_plan(QUERY_ENGINE_OPS *ops, size_t plan_id) {
         ops->plans[plan_id].initialized = false;
         ops->plans[plan_id].finalized = true;
     }
+    if(ops->pending_head && ops->pending_head_plan == plan_id)
+        ops->pending_head = false;
 }
 
 void query_planer_finalize_remaining_plans(QUERY_ENGINE_OPS *ops) {
@@ -524,23 +536,8 @@ static bool query_plan_build_entries(QUERY_ENGINE_OPS *ops, time_t after_wanted,
     return true;
 }
 
-static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
-    if(!query_plan_build_entries(ops, after_wanted, before_wanted, points_wanted))
-        return false;
-
-    query_planer_initialize_plans(ops);
-    if(!query_planer_activate_plan(ops, 0, 0)) {
-        query_planer_finalize_remaining_plans(ops);
-        return false;
-    }
-
-    return true;
-}
-
-void query_planer_prefer_complete_head(QUERY_ENGINE_OPS *ops) {
-    // Storage reads belong to execution, after the other dimensions have been prefetched.
+static size_t query_planer_head_candidate(QUERY_ENGINE_OPS *ops) {
     QUERY_TARGET *qt = ops->r->internal.qt;
-    size_t first_plan = 0;
     QUERY_METRIC *qm = ops->qm;
     size_t selected_tier = qm->plan.used > 1 ?
         query_metric_best_tier_for_timeframe(qm, qt->window.after, qt->window.before, qt->window.points) :
@@ -550,24 +547,45 @@ void query_planer_prefer_complete_head(QUERY_ENGINE_OPS *ops) {
         selected_plan++;
     if(selected_plan > 0 && selected_plan < qm->plan.used &&
        qm->plan.array[selected_plan].tier == selected_tier &&
-       qm->plan.array[selected_plan].after == qm->tiers[selected_tier].db_first_time_s) {
+       qm->plan.array[selected_plan].after == qm->tiers[selected_tier].db_first_time_s)
+        return selected_plan;
+    return 0;
+}
+
+static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
+    if(!query_plan_build_entries(ops, after_wanted, before_wanted, points_wanted))
+        return false;
+
+    size_t first_plan = query_planer_head_candidate(ops);
+    query_planer_initialize_plans(ops, first_plan);
+    if(!query_planer_activate_plan(ops, first_plan, 0)) {
+        query_planer_finalize_remaining_plans(ops);
+        return false;
+    }
+
+    return true;
+}
+
+void query_planer_prefer_complete_head(QUERY_ENGINE_OPS *ops) {
+    // Storage reads belong to execution, after the other dimensions have been prefetched.
+    size_t selected_plan = ops->current_plan;
+    QUERY_METRIC *qm = ops->qm;
+    if(selected_plan > 0) {
         // A coarse retention timestamp is an endpoint, not the beginning of its first record.
         // Read the actual interval: historical pages need not use the current collection interval.
-        STORAGE_POINT first = storage_engine_query_next_metric(&ops->plans[selected_plan].handle);
-        ops->db_points_read_per_tier[selected_tier]++;
-        ops->db_total_points_read++;
-        if(!storage_point_is_gap(first) && !storage_point_is_unset(first) &&
-           first.start_time_s <= qm->plan.array[0].after &&
-           first.end_time_s >= qm->plan.array[selected_plan - 1].before) {
+        STORAGE_POINT first = query_planer_next_metric(ops);
+        ops->pending_head_point = first;
+        ops->pending_head_plan = selected_plan;
+        ops->pending_head = true;
+        if(storage_point_is_gap(first) || storage_point_is_unset(first) ||
+           first.start_time_s > qm->plan.array[0].after ||
+           first.end_time_s < qm->plan.array[selected_plan - 1].before) {
+            // Preserve the selected probe until the deferred fine prefix reaches that plan.
             for(size_t p = 0; p < selected_plan; p++)
-                query_planer_finalize_plan(ops, p);
-            first_plan = selected_plan;
+                query_planer_initialize_plan(ops, p);
+            query_planer_set_active_plan(ops, 0, 0);
         }
-        query_planer_finalize_plan(ops, selected_plan);
-        query_planer_initialize_plan(ops, selected_plan);
     }
-    if(first_plan)
-        query_planer_set_active_plan(ops, first_plan, 0);
 }
 
 
@@ -834,10 +852,15 @@ static int query_plan_unittest_expect_ops_cache_is_local(void) {
     QUERY_ENGINE_OPS_CACHE cache_b = { 0 };
 
     QUERY_ENGINE_OPS *a = rrd2rrdr_query_ops_get(&r_a, &cache_a);
+    a->pending_head = true;
+    a->pending_head_plan = QUERY_PLANS_MAX - 1;
+    a->pending_head_point = (STORAGE_POINT){.start_time_s = 10, .end_time_s = 20, .count = 1};
     rrd2rrdr_query_ops_release(&cache_a, a);
 
     QUERY_ENGINE_OPS *a_reused = rrd2rrdr_query_ops_get(&r_a, &cache_a);
     bool same_cache_reused = (a_reused == a);
+    bool pending_cleared = !a_reused->pending_head && a_reused->pending_head_plan == 0 &&
+                           a_reused->pending_head_point.end_time_s == 0;
     rrd2rrdr_query_ops_release(&cache_a, a_reused);
 
     QUERY_ENGINE_OPS *b = rrd2rrdr_query_ops_get(&r_b, &cache_b);
@@ -849,15 +872,15 @@ static int query_plan_unittest_expect_ops_cache_is_local(void) {
     onewayalloc_destroy(owa_a);
     onewayalloc_destroy(owa_b);
 
-    if(same_cache_reused && separate_cache_isolated) {
+    if(same_cache_reused && separate_cache_isolated && pending_cleared) {
         fprintf(stderr, "OK query ops cache locality\n");
         return 0;
     }
 
     fprintf(stderr,
-            "FAILED query ops cache locality: same_cache_reused=%s, separate_cache_isolated=%s\n",
+            "FAILED query ops cache locality: same_cache_reused=%s, separate_cache_isolated=%s, pending_cleared=%s\n",
             same_cache_reused ? "true" : "false",
-            separate_cache_isolated ? "true" : "false");
+            separate_cache_isolated ? "true" : "false", pending_cleared ? "true" : "false");
     return 1;
 }
 

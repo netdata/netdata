@@ -267,7 +267,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                 uint8_t sp_tier;
                 NETDATA_DOUBLE prepared_sum;
                 if(likely(storage_point_is_unset(next1_point))) {
-                    if(unlikely(storage_engine_query_is_finished(ops->seqh))) {
+                    if(unlikely(query_planer_is_finished(ops))) {
                         query_is_finished_counter++;
 
                         if(count_same_end_time != 0) {
@@ -286,9 +286,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                     query_is_finished_counter = 0;
                     db_points_read_since_plan_switch++;
                     sp_tier = (uint8_t)ops->tier;
-                    sp = storage_engine_query_next_metric(ops->seqh);
-                    ops->db_points_read_per_tier[ops->tier]++;
-                    ops->db_total_points_read++;
+                    sp = query_planer_next_metric(ops);
 
                     if(unlikely(options & RRDR_OPTION_ABSOLUTE))
                         storage_point_make_positive(sp);
@@ -318,20 +316,17 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                     // A. the entire point of the previous plan is to the future of point from the next plan
                     // B. part of the point of the previous plan overlaps with the point from the next plan
 
-                    STORAGE_POINT sp2 = storage_engine_query_next_metric(ops->seqh);
+                    STORAGE_POINT sp2 = query_planer_next_metric(ops);
                     uint8_t sp2_tier = (uint8_t)ops->tier;
-                    ops->db_points_read_per_tier[ops->tier]++;
-                    ops->db_total_points_read++;
 
+                    time_t covered_end = consumed_end_time;
                     if(sp2_tier > sp_tier) {
                         // Expanded coarse queries may begin with records already read from the fine tier.
-                        time_t covered_end = consumed_end_time;
-                        if(!storage_point_is_gap(sp) && !storage_point_is_unset(sp))
+                        // Empty stored intervals cover time too; count0 alone does not erase their bounds.
+                        if(!storage_point_is_unset(sp) || sp.start_time_s < sp.end_time_s)
                             covered_end = MAX(covered_end, sp.end_time_s);
-                        while(sp2.end_time_s <= covered_end && !storage_engine_query_is_finished(ops->seqh)) {
-                            sp2 = storage_engine_query_next_metric(ops->seqh);
-                            ops->db_points_read_per_tier[ops->tier]++;
-                            ops->db_total_points_read++;
+                        while(sp2.end_time_s <= covered_end && !query_planer_is_finished(ops)) {
+                            sp2 = query_planer_next_metric(ops);
                         }
                         if(sp2.end_time_s <= covered_end)
                             storage_point_unset(sp2);
@@ -342,23 +337,20 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
 
                     NETDATA_DOUBLE sp2_sum = sp2.sum;
                     if(sp2_tier > sp_tier && !storage_point_is_unset(sp2) &&
-                       sp2.start_time_s < consumed_end_time) {
+                       sp2.start_time_s < covered_end) {
                         // Historical pages may use a different interval than the planner's current grid.
                         time_t duration = sp2.end_time_s - sp2.start_time_s;
                         if(!qm->values_stored_as_rates && duration > 0)
-                            sp2_sum *= (NETDATA_DOUBLE)(sp2.end_time_s - consumed_end_time) /
+                            sp2_sum *= (NETDATA_DOUBLE)(sp2.end_time_s - covered_end) /
                                        (NETDATA_DOUBLE)duration;
-                        sp2.start_time_s = consumed_end_time;
+                        sp2.start_time_s = covered_end;
                     }
 
                     bool finer_total_overlap =
                         ops->point_mode == QUERY_POINT_MODE_TOTAL &&
                         sp2_tier < sp_tier && sp2.start_time_s < sp.end_time_s;
-                    bool coarser_overlap = sp2_tier > sp_tier && !storage_point_is_unset(sp2) &&
-                                           sp2.start_time_s < sp.end_time_s;
-
                     if(!storage_point_is_unset(sp2) && (sp.start_time_s > sp2.start_time_s ||
-                       ((finer_total_overlap || coarser_overlap) && sp2.start_time_s <= sp.start_time_s))) {
+                       (finer_total_overlap && sp2.start_time_s <= sp.start_time_s))) {
                         // the point from the previous plan is useless
                         sp = sp2;
                         sp_tier = sp2_tier;
@@ -372,7 +364,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                         next1_tier = sp2_tier;
                         next1_sum = sp2_sum;
 
-                        if(unlikely(finer_total_overlap || coarser_overlap)) {
+                        if(unlikely(finer_total_overlap)) {
                             time_t duration = sp.end_time_s - sp.start_time_s;
                             time_t retained = sp2.start_time_s - sp.start_time_s;
                             if(!qm->values_stored_as_rates && duration > 0)
@@ -538,7 +530,8 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             QUERY_POINT current_point;
             time_t source_end_time;
 
-            if(likely(now_end_time > new_point.sp.start_time_s)) {
+            if(likely(now_end_time > new_point.sp.start_time_s &&
+                      new_point.sp.end_time_s > now_end_time - ops->view_update_every)) {
                 // it is time for our NEW point to be used
                 current_point = new_point;
                 source_end_time = new_point.sp.end_time_s;
