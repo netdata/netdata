@@ -167,6 +167,7 @@ func TestCase040MissedSeamSum(t *testing.T) {
 // skipping the covered first record leaves a post-outage read-ahead point.
 func TestCase040LateTierGap(t *testing.T) {
 	const contract = "CASE-040/late-tier-gap-null"
+	const boundaryContract = "CASE-040/late-tier-boundary-average"
 	for name, tc := range map[string]struct {
 		initialTiers, finalTiers                         int
 		grouping                                         [3]int
@@ -177,7 +178,8 @@ func TestCase040LateTierGap(t *testing.T) {
 		"tier2": {2, 3, [3]int{0, 10, 6}, 1200, 1290, 3001, 4800, 600, 1380, 9911},
 	} {
 		t.Run(name, func(t *testing.T) {
-			trackContractComponent(t, contract, name)
+			registerContractComponent(t, contract, name)
+			registerContractComponent(t, boundaryContract, name)
 			base := int64(fixture.T0 - fixture.T0%60)
 			const host, context = "late-tier-gap", "fixture.late_tier_gap"
 			dd := startDedicatedStorageDaemon(t, daemon.Options{StorageTiers: tc.initialTiers, TierGrouping: tc.grouping})
@@ -193,14 +195,29 @@ func TestCase040LateTierGap(t *testing.T) {
 			for end := tc.firstEmpty; end < tc.resume; end += 60 {
 				want = append(want, wantEmptyAt(base+end))
 			}
-			for _, tier := range []string{"0", ""} {
-				t.Run("tier-"+tier, func(t *testing.T) {
-					_, cols := c040Query(t, dd, host, context, base+tc.after, base+tc.last, (tc.last-tc.after)/60, "average", tier)
-					if !assertExactColumnValues(t, c040Rows(cols, want[0].T, want[len(want)-1].T), "load", want, 0) {
-						t.Error("query fabricated values in a wholly empty coarse-page hole")
-					}
-				})
-			}
+			t.Run("gap", func(t *testing.T) {
+				trackContractComponent(t, contract, name)
+				for _, tier := range []string{"0", ""} {
+					t.Run("tier-"+tier, func(t *testing.T) {
+						_, cols := c040Query(t, dd, host, context, base+tc.after, base+tc.last, (tc.last-tc.after)/60, "average", tier)
+						if !assertExactColumnValues(t, c040Rows(cols, want[0].T, want[len(want)-1].T), "load", want, 0) {
+							t.Error("query fabricated values in a wholly empty coarse-page hole")
+						}
+					})
+				}
+			})
+			t.Run("retained-boundary", func(t *testing.T) {
+				trackContractComponent(t, boundaryContract, name)
+				end := base + tc.firstEmpty - 60
+				for _, tier := range []string{"0", ""} {
+					t.Run("tier-"+tier, func(t *testing.T) {
+						_, cols := c040Query(t, dd, host, context, base+tc.after, base+tc.last, (tc.last-tc.after)/60, "average", tier)
+						if !assertExactColumnValues(t, c040Rows(cols, end, end), "load", []expectedColumnPoint{wantNumberAt(end, c040Flat(0))}, 0) {
+							t.Error("coarse-page boundary discarded retained fine samples")
+						}
+					})
+				}
+			})
 		})
 	}
 }
@@ -392,13 +409,56 @@ func TestCase040HistoricalHeadCadence(t *testing.T) {
 	}
 }
 
+// A stored empty coarse read-ahead interval must delay the next real record
+// until its output row, even after covered seam records have been skipped.
+func TestCase040PostGapCoarseMin(t *testing.T) {
+	trackContract(t, "CASE-040/post-gap-coarse-min")
+	base := int64(fixture.T0 - fixture.T0%10)
+	const host, context = "post-gap-coarse", "fixture.post_gap_coarse"
+	value := func(off int64) float64 { return float64(((off-1)/10)%13 + 1) }
+	dd := startDedicatedStorageDaemon(t, daemon.Options{StorageTiers: 1, TierGrouping: [3]int{0, 10, 0}})
+	closeFixture := pushDedicatedChart(t, dd, host, guid(9920), c040Series(context, base, 1, 280, value, c040NotAnomalous, 0))
+	waitDedicatedTierLastEntry(t, dd, host, context, 0, base+280)
+	c040Restart(t, dd, closeFixture, 2, "")
+	ch := c040Series(context, base, 301, 901, value, c040NotAnomalous, 0)
+	for i := range ch.Dimensions[0].Points {
+		pt := &ch.Dimensions[0].Points[i]
+		if pt.T <= base+325 {
+			pt.Collected, pt.Flags = "0", stream.FlagEmpty
+		}
+	}
+	pushDedicatedChart(t, dd, host, guid(9920), ch)
+	waitDedicatedTierLastEntry(t, dd, host, context, 1, base+890)
+	want := math.Inf(1)
+	for off := int64(326); off <= 340; off++ {
+		want = math.Min(want, value(off))
+	}
+	for _, tier := range []string{"0", ""} {
+		t.Run("tier-"+tier, func(t *testing.T) {
+			doc, cols := c040Query(t, dd, host, context, base+200, base+400, 10, "min", tier)
+			if tier == "" && !assertTierPresence(t, doc, []bool{true, true}) {
+				t.Error("gap fixture did not read both fine and coarse tiers")
+			}
+			if !assertExactColumnValues(t, c040Rows(cols, base+340, base+340), "load", []expectedColumnPoint{wantNumberAt(base+340, want)}, 0) {
+				t.Error("empty coarse read-ahead lost the first real post-gap minimum")
+			}
+		})
+	}
+}
+
 func TestCase040PartialFirstRecord(t *testing.T) {
 	for _, group := range []string{"sum", "average", "min", "max", "metadata"} {
 		registerContract(t, "CASE-040/partial-first-record-"+group)
 	}
 	base := int64(fixture.T0 - fixture.T0%60)
 	const host, context = "partial-first-record", "fixture.partial_first_record"
-	value := func(off int64) float64 { return float64(off) }
+	value := func(off int64) float64 {
+		// The first coarse record omits this prefix; MAX must detect that loss.
+		if off == 620 {
+			return 2000
+		}
+		return float64(off)
+	}
 	anomalous := func(off int64) bool { return off >= 601 && off <= 615 }
 	dd := startDedicatedStorageDaemon(t, daemon.Options{StorageTiers: 1, TierGrouping: [3]int{0, 60, 0}})
 	closeFixture := pushDedicatedChart(t, dd, host, guid(9915), c040Series(context, base, 1, 630, value, anomalous, 0))
@@ -449,8 +509,8 @@ func TestCase040PartialFirstRecord(t *testing.T) {
 	}
 }
 
-// Both tiers are populated from inception. The final row contains a new
-// fine-tier value absent from the last completed coarse bucket.
+// Both tiers are populated from inception. On the aligned 4-second grid,
+// the final row contains a fine value absent from the last coarse bucket.
 func TestCase040ConventionalTail(t *testing.T) {
 	for _, group := range []string{"sum", "average", "min", "max", "metadata"} {
 		registerContract(t, "CASE-040/conventional-tail-"+group)
@@ -501,9 +561,9 @@ func TestCase040ConventionalTail(t *testing.T) {
 	}
 }
 
-// Only the named 45-second row is asserted: all its fine samples and the
-// containing coarse record are 200. No varying-record interpolation policy
-// is needed to rule out contamination by the preceding 2000 spike.
+// The ruled coarse estimate stays between adjacent coarse-record averages.
+// Fine samples still give exact truth; coarse interpolation may blend records
+// but must not amplify the seam using a single fine spike as its anchor.
 func TestCase040ShiftedConstantSeam(t *testing.T) {
 	trackContract(t, "CASE-040/shifted-constant-seam")
 	base := int64(fixture.T0 - fixture.T0%60)
@@ -526,11 +586,32 @@ func TestCase040ShiftedConstantSeam(t *testing.T) {
 		want += value(off)
 	}
 	want /= 45
-	for _, tier := range []string{"0", ""} {
+	coarseAverage := func(first, last int64) float64 {
+		total := 0.0
+		for off := first; off <= last; off++ {
+			total += value(off)
+		}
+		return total / float64(last-first+1)
+	}
+	previous := coarseAverage(3618, 3660)
+	current := coarseAverage(3661, 3720)
+	lower, upper := math.Min(previous, current), math.Max(previous, current)
+	for _, tier := range []string{"0", "1", ""} {
 		t.Run("tier-"+tier, func(t *testing.T) {
 			_, cols := c040Query(t, dd, host, context, base+3300, base+4200, 20, "average", tier)
-			if !assertExactColumnValues(t, c040Rows(cols, base+3705, base+3705), "load", []expectedColumnPoint{wantNumberAt(base+3705, want)}, 0) {
-				t.Error("preceding fine spike contaminated a constant coarse row")
+			row := c040Rows(cols, base+3705, base+3705)
+			if tier == "0" {
+				if !assertExactColumnValues(t, row, "load", []expectedColumnPoint{wantNumberAt(base+3705, want)}, 0) {
+					t.Error("fine control lost the exact constant-row truth")
+				}
+				return
+			}
+			if len(row["load"]) != 1 || row["load"][0].Value == nil {
+				t.Fatal("coarse estimate did not return the seam row")
+			}
+			got := *row["load"][0].Value
+			if math.IsNaN(got) || math.IsInf(got, 0) || got < lower || got > upper {
+				t.Errorf("coarse seam estimate %v outside fixture-derived interval [%v, %v]", got, lower, upper)
 			}
 		})
 	}
@@ -540,6 +621,18 @@ func TestCase040YoungTierWork(t *testing.T) {
 	trackContract(t, "CASE-040/young-tier-work")
 	base := int64(fixture.T0 - fixture.T0%3600)
 	const host = "young-tier-work"
+	const dimensions, coarseInterval, lastCoarse = 2, int64(60), int64(28800)
+	const queryAfter, queryBefore, outputRows = int64(21640), int64(28840), int64(60)
+	// Five-record lookbehind and inclusive start: netdata/netdata @ b5934b3784,
+	// src/web/api/queries/query-internal.h:11, query-plan.c:231-245,
+	// and src/web/api/queries/query-window.c:343-355.
+	const lookbehind = 5 * coarseInterval
+	expandedAfter := queryAfter + 1 - lookbehind
+	firstQueryRecord := (expandedAfter + coarseInterval - 1) / coarseInterval * coarseInterval
+	pointBudget := func(firstStoredRecord int64) int64 {
+		first := max(firstStoredRecord, firstQueryRecord)
+		return dimensions * ((lastCoarse-first)/coarseInterval + 1)
+	}
 	dd := startDedicatedStorageDaemon(t, daemon.Options{StorageTiers: 3})
 	conn, err := stream.Connect(dd.Addr, dd.StreamKey, stream.HostInfo{Hostname: host, MachineGUID: guid(9918)}, stream.CapsLive)
 	if err != nil {
@@ -562,12 +655,12 @@ func TestCase040YoungTierWork(t *testing.T) {
 		queryBudget         [3]int64
 		selectedPointBudget int64
 	}{
-		"young":  {"fixture.work_young", "", [3]int64{2, 2, 0}, 2 * ((28800-22680)/60 + 1)},
-		"forced": {"fixture.work_young", "1", [3]int64{0, 2, 0}, 2 * ((28800-22680)/60 + 1)},
-		"mature": {"fixture.work_mature", "", [3]int64{2, 2, 0}, 250},
+		"young":  {"fixture.work_young", "", [3]int64{dimensions, dimensions, 0}, pointBudget(22680)},
+		"forced": {"fixture.work_young", "1", [3]int64{0, dimensions, 0}, pointBudget(22680)},
+		"mature": {"fixture.work_mature", "", [3]int64{dimensions, dimensions, 0}, pointBudget(coarseInterval)},
 	} {
 		t.Run(name, func(t *testing.T) {
-			p := daemon.DataParams(tc.context, base+21640, base+28840, 60)
+			p := daemon.DataParams(tc.context, base+queryAfter, base+queryBefore, outputRows)
 			p.Set("options", "jsonwrap|unaligned")
 			if tc.tier != "" {
 				p.Set("tier", tc.tier)

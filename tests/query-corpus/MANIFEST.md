@@ -238,6 +238,8 @@ set at the end.
 | CASE-040/handoff-annotations | complete nested records carry no point annotations across fine-to-coarse handoffs and single-tier controls | n/a |  |
 | CASE-040/missed-seam-sum | a missed fine-tier collection at a fine-to-coarse seam contributes nothing to SUM and does not duplicate a coarse record | n/a |  |
 | CASE-040/late-tier-gap-null | wholly empty rows in restart-created late-tier page holes remain NULL with EMPTY annotations | n/a |  |
+| CASE-040/late-tier-boundary-average | retained constant fine samples at a late-tier page-hole boundary contribute their exact average independently of wholly empty rows | n/a |  |
+| CASE-040/post-gap-coarse-min | a stored empty coarse read-ahead interval preserves the first real post-gap record's minimum across an inverted fine-to-coarse seam | n/a |  |
 | CASE-040/retained-island-average | every output row within a retained constant coarse-island record preserves its exact average before disconnected ALLOC fine retention | n/a |  |
 | CASE-040/retained-island-sum | every output row within a retained constant coarse-island record conserves its exact duration-proportional sum before disconnected ALLOC fine retention | n/a |  |
 | CASE-040/fine-selected-gap-null | fine-selected queries spanning disconnected ALLOC fine and coarse retention leave every wholly unretained row NULL with EMPTY annotations | n/a |  |
@@ -247,12 +249,12 @@ set at the end.
 | CASE-040/partial-first-record-min | automatic MIN includes all retained fine samples in a partially populated first coarse interval | n/a |  |
 | CASE-040/partial-first-record-max | automatic MAX includes all retained fine samples in a partially populated first coarse interval | n/a |  |
 | CASE-040/partial-first-record-metadata | automatic queries preserve the fixture-derived anomaly rate of all retained fine samples in a partially populated first coarse interval | n/a |  |
-| CASE-040/conventional-tail-sum | a genuine conventional coarse-to-fine handoff conserves complete piecewise-constant SUM rows including the newest fine tail | n/a |  |
-| CASE-040/conventional-tail-average | a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant AVERAGE rows including the newest fine tail | n/a |  |
-| CASE-040/conventional-tail-min | a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant MIN rows including the newest fine tail | n/a |  |
-| CASE-040/conventional-tail-max | a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant MAX rows including the newest fine tail | n/a |  |
-| CASE-040/conventional-tail-metadata | a genuine conventional coarse-to-fine handoff preserves exact anomaly rates including anomalous newest fine-tail samples | n/a |  |
-| CASE-040/shifted-constant-seam | a shifted row containing only constant samples and lying within a constant coarse record preserves that constant across a fine-to-coarse seam | n/a |  |
+| CASE-040/conventional-tail-sum | a genuine conventional coarse-to-fine handoff conserves complete piecewise-constant SUM rows on an aligned 4-second grid including the newest fine tail | n/a |  |
+| CASE-040/conventional-tail-average | a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant AVERAGE rows on an aligned 4-second grid including the newest fine tail | n/a |  |
+| CASE-040/conventional-tail-min | a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant MIN rows on an aligned 4-second grid including the newest fine tail | n/a |  |
+| CASE-040/conventional-tail-max | a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant MAX rows on an aligned 4-second grid including the newest fine tail | n/a |  |
+| CASE-040/conventional-tail-metadata | a genuine conventional coarse-to-fine handoff preserves exact anomaly rates on an aligned 4-second grid including anomalous newest fine-tail samples | n/a |  |
+| CASE-040/shifted-constant-seam | under the ruled coarse-estimate envelope a shifted fine-to-coarse seam row stays between adjacent fixture-derived coarse-record averages while the fine control preserves exact raw truth | n/a |  |
 | CASE-040/young-tier-work | young-metric queries initialize each required tier at most once per dimension and do not reread a selected-tier record; mature and forced-tier controls bound work independently | n/a |  |
 | CASE-040/coarse-gap-boundary-average | a partial output row overlapping the last retained coarse record keeps its exact constant average before a disconnected fine island | n/a |  |
 | CASE-040/coarse-gap-boundary-sum | a partial output row overlapping the last retained coarse record keeps its exact retained volume before a disconnected fine island | n/a |  |

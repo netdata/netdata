@@ -1019,6 +1019,15 @@
     "components": ["tier1", "tier2"]
   },
   {
+    "name": "CASE-040/late-tier-boundary-average",
+    "proves": "retained constant fine samples at a late-tier page-hole boundary contribute their exact average independently of wholly empty rows",
+    "components": ["tier1", "tier2"]
+  },
+  {
+    "name": "CASE-040/post-gap-coarse-min",
+    "proves": "a stored empty coarse read-ahead interval preserves the first real post-gap record's minimum across an inverted fine-to-coarse seam"
+  },
+  {
     "name": "CASE-040/retained-island-average",
     "proves": "every output row within a retained constant coarse-island record preserves its exact average before disconnected ALLOC fine retention"
   },
@@ -1056,27 +1065,27 @@
   },
   {
     "name": "CASE-040/conventional-tail-sum",
-    "proves": "a genuine conventional coarse-to-fine handoff conserves complete piecewise-constant SUM rows including the newest fine tail"
+    "proves": "a genuine conventional coarse-to-fine handoff conserves complete piecewise-constant SUM rows on an aligned 4-second grid including the newest fine tail"
   },
   {
     "name": "CASE-040/conventional-tail-average",
-    "proves": "a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant AVERAGE rows including the newest fine tail"
+    "proves": "a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant AVERAGE rows on an aligned 4-second grid including the newest fine tail"
   },
   {
     "name": "CASE-040/conventional-tail-min",
-    "proves": "a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant MIN rows including the newest fine tail"
+    "proves": "a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant MIN rows on an aligned 4-second grid including the newest fine tail"
   },
   {
     "name": "CASE-040/conventional-tail-max",
-    "proves": "a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant MAX rows including the newest fine tail"
+    "proves": "a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant MAX rows on an aligned 4-second grid including the newest fine tail"
   },
   {
     "name": "CASE-040/conventional-tail-metadata",
-    "proves": "a genuine conventional coarse-to-fine handoff preserves exact anomaly rates including anomalous newest fine-tail samples"
+    "proves": "a genuine conventional coarse-to-fine handoff preserves exact anomaly rates on an aligned 4-second grid including anomalous newest fine-tail samples"
   },
   {
     "name": "CASE-040/shifted-constant-seam",
-    "proves": "a shifted row containing only constant samples and lying within a constant coarse record preserves that constant across a fine-to-coarse seam"
+    "proves": "under the ruled coarse-estimate envelope a shifted fine-to-coarse seam row stays between adjacent fixture-derived coarse-record averages while the fine control preserves exact raw truth"
   },
   {
     "name": "CASE-040/young-tier-work",
