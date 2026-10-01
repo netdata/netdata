@@ -155,6 +155,22 @@ class PrepareFleetTests(unittest.TestCase):
         self.assertEqual(manifest['strip_mode'], 'debug')
         self.assertEqual(len(manifest['stripped_files']), 1)
 
+    @unittest.skipUnless(shutil.which('objcopy') and shutil.which('cc'), 'native compiler or objcopy unavailable')
+    def test_user_state_and_unknown_elf_files_remain_byte_identical(self):
+        source = self.root / 'fixture.c'
+        source.write_text('int main(void) { return 0; }\n')
+        executable = self.root / 'debug-executable'
+        subprocess.run(['cc', '-g', str(source), '-o', str(executable)], check=True, capture_output=True)
+        names = ('etc/netdata/firmware', 'var/lib/netdata/saved-binary',
+                 'usr/libexec/netdata/plugins.d/custom.plugin')
+        for name in names:
+            path = self.source / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(executable, path)
+        target, _ = self.prepare('none', strip='all')
+        for name in names:
+            self.assertEqual((target / name).read_bytes(), (self.source / name).read_bytes(), name)
+
     def test_strip_failure_does_not_publish(self):
         shutil.copyfile('/bin/true', self.source / 'bin/srv/netdata')
         target, result = self.prepare(strip='debug', objcopy='/bin/false', success=False)

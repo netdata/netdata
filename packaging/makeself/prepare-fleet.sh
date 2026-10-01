@@ -66,6 +66,11 @@ CAPS = {
     'ioping': ([PLUGIN + 'ioping', PLUGIN + 'ioping.plugin', CONF + 'ioping.conf'], []),
     'log2journal': (['bin/log2journal', CONF + 'log2journal.d'], []),
 }
+STOCK_ELF = {
+    path for paths, _ in CAPS.values() for path in paths
+    if path.startswith(PLUGIN) or path.startswith('bin/')
+} | {'bin/bash', 'bin/curl', 'bin/netdatacli', 'bin/systemd-cat-native',
+     'bin/srv/netdata', PLUGIN + 'ndsudo'}
 REQUIRED_COMPANIONS = {
     'containers': [PLUGIN + 'cgroup-network', PLUGIN + 'cgroup-network-helper.sh'],
     'go': [PLUGIN + 'local-listeners', PLUGIN + 'snmp-trap-profile-gen', CONF + 'go.d.conf', CONF + 'go.d'],
@@ -361,7 +366,7 @@ def main():
                 shutil.copyfileobj(src, dest)
             if name == 'system/install-or-update.sh':
                 target.write_text(patch_permissions(target.read_text()))
-            if args.strip_mode != 'none':
+            if args.strip_mode != 'none' and name in STOCK_ELF:
                 before = elf_contract(target)
                 if before is not None:
                     stripped = work / 'stripped-file'
