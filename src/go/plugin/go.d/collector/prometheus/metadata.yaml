@@ -148,6 +148,8 @@ modules:
                 every profile rule. Use them for deployment-specific overrides rather than exporter behavior that
                 belongs in a profile. Keep patterns narrow: a broad job rule such as `gauge: ['*']` overrides profile
                 counter classifications. Blank patterns and patterns with leading or trailing whitespace are rejected.
+                To keep a counter's rate chart and also chart its raw value, use `counter_raw_charts` instead of a
+                gauge rule.
 
                 - Metric name pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match).
                 - Option syntax:
@@ -234,6 +236,27 @@ modules:
                   mode_exact:
                     entries:
                       - name: haproxy
+                ```
+
+            - name: counter_raw_charts
+              description: Counters whose raw cumulative value is also charted, next to their per-second rate chart, under the `<metric>.raw` context. Leave empty to chart counters as rates only.
+              default_value: ""
+              required: false
+              group: Raw counter charts
+              detailed_description: |
+                Use this option when you need a counter's total as well as its rate, for example to read the absolute
+                number of requests served since the exporter started. Each item is a metric name pattern with the same
+                syntax as `fallback_type` (`*`, `?`, `[...]`); a leading `!` excludes, and the first matching item
+                decides. Patterns match the final metric name after job and profile relabeling.
+
+                Only counters shown on generic autogen charts get a raw chart. Gauges, histogram and summary series,
+                and metrics charted by a profile are not affected. An untyped metric qualifies once it is processed as
+                a counter, through its `_total` suffix or `fallback_type.counter`.
+
+                ```yaml
+                counter_raw_charts:
+                  - '!myapp_internal_*'
+                  - 'myapp_*_total'
                 ```
 
             - name: username
