@@ -7,6 +7,10 @@ signing_key="${2:-}"
 event_type="${3:-}"
 build_type="${4:-nightly}"
 
+case "${build_type}" in
+    release) build_type='stable' ;;
+esac
+
 TOP="$(pwd)"
 DISTFILE_EXTENSIONS="gz zst"
 MSI_ARCHES="x64"
@@ -76,8 +80,8 @@ version_compare() {
     local v1 v2
     local IFS=.-
 
-    echo "$1" | read -ra v1
-    echo "$2" | read -ra v2
+    read -ra v1 <<< "$1"
+    read -ra v2 <<< "$2"
 
     if (( 10#${v1[0]} > 10#${v2[0]} )); then return 1; fi
     if (( 10#${v1[0]} < 10#${v2[0]} )); then return 0; fi
@@ -124,7 +128,7 @@ echo "::endgroup::"
 prepare_latest=0
 if [ "${event_type}" != 'pull_request' ] && [ "${build_type}" != 'nightly' ]; then
     if wget -Sv "https://artifacts.netdata.cloud/${build_type}/latest/Version"; then
-        if version_newer "$(cat Version)" "${VERSION}"; then
+        if version_compare "$(cat Version)" "${VERSION}"; then
             prepare_latest=0
         else
             prepare_latest=1
