@@ -18,6 +18,12 @@ Netdata provides pre-built static binaries for Linux systems where native packag
 
 ---
 
+## Prepare Reduced Fleet Images
+
+For constrained robots and other edge devices, use the [fleet preparation script](https://github.com/netdata/netdata/blob/master/packaging/makeself/prepare-fleet.sh) on a build host to strip symbols and select optional capabilities before deployment. It accepts a checksum-verified static installer or an offline staging tree and writes a fresh reduced output.
+
+See [Minimize the Disk Footprint of Fleet Devices](/docs/fleet-management/minimize-disk-footprint.md) for the capability policy, tools, validation and image-controlled updates. The standard static updater downloads the full package again, so reduced images need a fleet-managed release workflow.
+
 ## Build Process
 
 ### Requirements

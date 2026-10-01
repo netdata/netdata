@@ -314,6 +314,33 @@ sidebar:
       - meta:
           label: Anonymous telemetry events
           edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/anonymous-telemetry-events.md
+  # Fleet Management
+  - meta:
+      label: Fleet Management of Robots and Edge Devices
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/README.md
+      description: Deploy resource-conscious Netdata Children on robots and edge devices with centralized observability on Parents.
+    items:
+      - meta:
+          label: Deploy and Identify Fleet Devices
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/deployment-and-identity.md
+      - meta:
+          label: Minimize Disk Footprint
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/minimize-disk-footprint.md
+      - meta:
+          label: Minimize CPU and Memory
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/minimize-cpu-and-memory.md
+      - meta:
+          label: Minimize Cellular Traffic
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/minimize-cellular-traffic.md
+      - meta:
+          label: Disconnected Devices and Failover
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/disconnected-devices-and-failover.md
+      - meta:
+          label: Monitor the Fleet
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/monitor-the-fleet.md
+      - meta:
+          label: Updates and Troubleshooting
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/updates-and-troubleshooting.md
   # Netdata Parents
   - meta:
       label: Netdata Parents
