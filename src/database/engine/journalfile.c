@@ -1199,8 +1199,8 @@ _Static_assert(sizeof(struct journal_v2_samples_descriptor) == 24, "journal v2 s
 
 // The validated samples descriptor of a journal v2 file, or false when it has
 // none (older files) or an invalid one (then the caller estimates). Reads only
-// the header page: the caller must have validated the metric list bounds and be
-// inside a protected region, since this reads the mmap.
+// the header page: file_size must be the size of the mapping, and the caller
+// must be inside a protected region, since this reads the mmap.
 bool journalfile_v2_samples_descriptor(const uint8_t *data_start, size_t file_size, struct journal_v2_samples_descriptor *out) {
     const struct journal_v2_header *j2_header = (const void *)data_start;
 
@@ -1223,13 +1223,18 @@ bool journalfile_v2_samples_descriptor(const uint8_t *data_start, size_t file_si
     if (descriptor.count != j2_header->metric_count)
         return false;
 
-    size_t samples_bytes = (size_t)descriptor.count * sizeof(uint32_t);
-    size_t needed = samples_bytes + 2 * sizeof(struct journal_v2_block_trailer);
     if ((descriptor.offset % sizeof(uint32_t)) ||
         (size_t)descriptor.offset < (size_t)j2_header->metric_trailer_offset ||
         (size_t)descriptor.offset - (size_t)j2_header->metric_trailer_offset < sizeof(struct journal_v2_block_trailer) ||
         (size_t)descriptor.offset > file_size ||
-        file_size - (size_t)descriptor.offset != needed)
+        file_size - (size_t)descriptor.offset < 2 * sizeof(struct journal_v2_block_trailer))
+        return false;
+
+    // the array fills the space between its offset and the two trailers;
+    // compare by division, since count * sizeof(uint32_t) wraps size_t on
+    // 32-bit builds
+    size_t samples_bytes = file_size - (size_t)descriptor.offset - 2 * sizeof(struct journal_v2_block_trailer);
+    if (samples_bytes % sizeof(uint32_t) || samples_bytes / sizeof(uint32_t) != descriptor.count)
         return false;
 
     // the total cannot exceed one uint32_t per metric
