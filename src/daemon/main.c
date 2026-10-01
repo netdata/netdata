@@ -147,7 +147,8 @@ int help(int exitcode) {
             "  -W sqlite-analyze        Run update statistics and exit.\n\n"
             "  -W sqlite-alert-cleanup  Perform maintenance on the alerts table.\n\n"
             "  -W sqlite-lease-test     Test that a slow SQLite connection does not block unrelated\n"
-            "                           SQLite users, and exit.\n\n"
+            "                           SQLite users and that teardown waits for running SQLite\n"
+            "                           operations, and exit.\n\n"
 #ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
             "  -W stresstest=A,B,C,D,E,F,G\n"
@@ -580,8 +581,9 @@ int netdata_main(int argc, char **argv) {
 #ifdef OS_WINDOWS
                             if (perflibnamestest_main()) return 1;
 #endif
-                            sqlite_close_databases();
-                            sqlite_library_shutdown();
+                            // MUST stay last: it runs the real sqlite_close_databases() and
+                            // sqlite_library_shutdown(), after which no SQLite work is admitted
+                            if (sqlite_lease_teardown_unittest()) return 1;
                             rrdlabels_aral_destroy(false);
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
@@ -695,7 +697,13 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "sqlite-lease-test") == 0) {
                             unittest_running = true;
-                            return sqlite_lease_unittest();
+                            // the same SQLite setup as -W unittest; the teardown test runs the real teardown,
+                            // so it goes last, in this process only
+                            if (sqlite_library_init())
+                                return 1;
+                            int errors = sqlite_lease_unittest();
+                            errors += sqlite_lease_teardown_unittest();
+                            return errors ? 1 : 0;
                         }
 #ifdef HAVE_LIBBACKTRACE
                         else if(strcmp(optarg, "stacktracetest") == 0) {

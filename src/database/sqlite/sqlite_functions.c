@@ -1191,8 +1191,9 @@ int sqlite_lease_unittest(void)
     }
 
     // Handshake: wait until the waiting worker itself holds its database lease. The lease is taken immediately
-    // before sqlite3_prepare_v2(), so from here it is entering, or already waiting inside, the prepare; the margin
-    // covers the call itself. Without the handshake nothing below would prove the stall was exercised.
+    // before sqlite3_prepare_v2(), so from here it is entering, or already waiting inside, the prepare. The margin
+    // makes it all but certain that it is waiting by the time we measure; it is not proof - SQLite exposes no
+    // "a thread is waiting on this mutex" signal. Check 3 proves that the prepare did wait for the release.
     for (int i = 0; i < 5000 && !__atomic_load_n(&t.blocked_leased, __ATOMIC_ACQUIRE); i++)
         sleep_usec(1 * USEC_PER_MS);
     bool handshake = __atomic_load_n(&t.blocked_leased, __ATOMIC_ACQUIRE);
@@ -1256,5 +1257,198 @@ int sqlite_lease_unittest(void)
     sqlite3_close_v2(t.busy_db);
     sqlite3_close_v2(t.other_db);
     fprintf(stderr, "SQLITE LEASE TEST: %s\n", errors ? "FAILED" : "OK");
+    return errors ? 1 : 0;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// Teardown gates: sqlite_close_databases() and sqlite_library_shutdown() must refuse new leases, wait for the
+// admitted ones, and suppress the teardown when a live handle was refused. This runs the real teardown, so it
+// MUST be the last SQLite work of its process: the end of -W unittest, or -W sqlite-lease-test.
+
+struct sqlite_teardown_test {
+    bool holding;
+    bool done;             // set by the test once the teardown call returned: stop waiting for the gate
+    bool refused;          // the leases tried once the gate was up were all refused
+    usec_t released_ut;    // when the holder let go of its lease
+};
+
+static bool sqlite_teardown_test_gate_is_set(bool *gate)
+{
+    netdata_mutex_lock(&sqlite_lifetime_mutex);
+    bool set = *gate;
+    netdata_mutex_unlock(&sqlite_lifetime_mutex);
+    return set;
+}
+
+// Waits until *gate is set by the teardown running on the main thread. Returns false when the teardown returned
+// without setting it, or on the hang guard.
+static bool sqlite_teardown_test_wait_gate(struct sqlite_teardown_test *t, bool *gate)
+{
+    usec_t started = now_monotonic_usec();
+    while (!sqlite_teardown_test_gate_is_set(gate)) {
+        if (__atomic_load_n(&t->done, __ATOMIC_ACQUIRE) ||
+            now_monotonic_usec() - started >= SQLITE_LEASE_TEST_MAX_HOLD_UT)
+            return false;
+        sleep_usec(1 * USEC_PER_MS);
+    }
+    return true;
+}
+
+// Lets go of the held lease a little after the gate went up, so the drain demonstrably waited for it.
+static void sqlite_teardown_test_release(struct sqlite_teardown_test *t)
+{
+    sleep_usec(100 * USEC_PER_MS);
+    __atomic_store_n(&t->released_ut, now_monotonic_usec(), __ATOMIC_RELEASE);
+    sqlite_lease_release();
+}
+
+// Holds a database lease across the start of sqlite_close_databases().
+static void sqlite_teardown_test_database_holder(void *arg)
+{
+    struct sqlite_teardown_test *t = arg;
+    if (!sqlite_lease_acquire_database())
+        return;
+    __atomic_store_n(&t->holding, true, __ATOMIC_RELEASE);
+
+    bool gate = sqlite_teardown_test_wait_gate(t, &sqlite_teardown_gate);
+    bool database = sqlite_lease_acquire_database();
+    if (database)
+        sqlite_lease_release();
+    bool cleanup = sqlite_lease_acquire_cleanup();
+    if (cleanup)
+        sqlite_lease_release();
+    __atomic_store_n(&t->refused, gate && !database && !cleanup, __ATOMIC_RELEASE);
+
+    sqlite_teardown_test_release(t);
+}
+
+// Holds a library lease across the start of sqlite_library_shutdown(), then tries to close a thread-local
+// handle while it drains: that close is refused and must suppress the shutdown.
+static void sqlite_teardown_test_library_holder(void *arg)
+{
+    struct sqlite_teardown_test *t = arg;
+    if (!sqlite_lease_acquire_library())
+        return;
+    __atomic_store_n(&t->holding, true, __ATOMIC_RELEASE);
+
+    bool gate = sqlite_teardown_test_wait_gate(t, &sqlite_library_gate);
+    bool library = sqlite_lease_acquire_library();
+    if (library)
+        sqlite_lease_release();
+    __atomic_store_n(&t->refused, gate && !library, __ATOMIC_RELEASE);
+
+    sqlite_teardown_test_release(t);
+}
+
+// Starts a holder thread and waits until it holds its lease. Returns NULL when it could not take one.
+static ND_THREAD *sqlite_teardown_test_start(const char *tag, void (*holder)(void *), struct sqlite_teardown_test *t)
+{
+    ND_THREAD *thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DONT_LOG, holder, t);
+    if (!thread)
+        return NULL;
+
+    usec_t started = now_monotonic_usec();
+    while (!__atomic_load_n(&t->holding, __ATOMIC_ACQUIRE) &&
+           now_monotonic_usec() - started < 5 * USEC_PER_SEC)
+        sleep_usec(1 * USEC_PER_MS);
+
+    if (!__atomic_load_n(&t->holding, __ATOMIC_ACQUIRE)) {
+        nd_thread_join(thread);
+        return NULL;
+    }
+    return thread;
+}
+
+int sqlite_lease_teardown_unittest(void)
+{
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+    int errors = 0;
+
+    // 1. sqlite_close_databases() refuses new leases and waits for the admitted one, then tears down.
+    {
+        struct sqlite_teardown_test t = { 0 };
+        ND_THREAD *holder = sqlite_teardown_test_start("SQLTEST_GATE", sqlite_teardown_test_database_holder, &t);
+        sqlite_close_databases();
+        usec_t returned_ut = now_monotonic_usec();
+        __atomic_store_n(&t.done, true, __ATOMIC_RELEASE);
+        if (holder)
+            nd_thread_join(holder);
+
+        bool waited = holder && returned_ut >= __atomic_load_n(&t.released_ut, __ATOMIC_ACQUIRE);
+        bool ok = holder && t.refused && waited && !sqlite_teardown_is_unsafe() && sqlite_lease_test_leases() == 0;
+        fprintf(stderr, "SQLITE TEARDOWN TEST: closing the databases while a lease is held: %s%s%s%s%s\n",
+                ok ? "OK" : "FAILED",
+                holder ? "" : " - no lease taken",
+                holder && !t.refused ? " - new leases admitted after the gate" : "",
+                holder && !waited ? " - did not wait for the lease" : "",
+                sqlite_teardown_is_unsafe() ? " - teardown suppressed" : "");
+        errors += !ok;
+    }
+
+    // 2. The drain gives up at its deadline while a lease is still held.
+    {
+        bool leased = sqlite_lease_acquire_library();
+        usec_t started = now_monotonic_usec();
+        netdata_mutex_lock(&sqlite_lifetime_mutex);
+        bool drained_held = sqlite_leases_drain_locked(50 * USEC_PER_MS);
+        netdata_mutex_unlock(&sqlite_lifetime_mutex);
+        usec_t waited_ut = now_monotonic_usec() - started;
+        if (leased)
+            sqlite_lease_release();
+
+        netdata_mutex_lock(&sqlite_lifetime_mutex);
+        bool drained_free = sqlite_leases_drain_locked(50 * USEC_PER_MS);
+        netdata_mutex_unlock(&sqlite_lifetime_mutex);
+
+        bool ok = leased && !drained_held && waited_ut >= 50 * USEC_PER_MS && drained_free;
+        fprintf(stderr, "SQLITE TEARDOWN TEST: drain deadline with a lease held: %s after %llu ms, "
+                        "then %s with none: %s\n",
+                drained_held ? "drained" : "timed out", (unsigned long long)(waited_ut / USEC_PER_MS),
+                drained_free ? "drained" : "timed out", ok ? "OK" : "FAILED");
+        errors += !ok;
+    }
+
+    // 3. sqlite_library_shutdown() waits for the admitted lease; a close refused by its gate suppresses it.
+    // When the teardown is already suppressed (-W unittest closes METADATA with statements still attached, which
+    // leaves a zombie connection), the shutdown returns before its gate: then only check that it stayed up.
+    if (sqlite_teardown_is_unsafe() || __atomic_load_n(&sqlite_zombie_connection_created, __ATOMIC_ACQUIRE)) {
+        sqlite_library_shutdown();
+
+        netdata_mutex_lock(&sqlite_lifetime_mutex);
+        bool still_initialized = sqlite_library_initialized;
+        netdata_mutex_unlock(&sqlite_lifetime_mutex);
+
+        fprintf(stderr, "SQLITE TEARDOWN TEST: library shutdown with the teardown already suppressed: %s%s\n",
+                still_initialized ? "OK" : "FAILED", still_initialized ? "" : " - library shut down anyway");
+        errors += !still_initialized;
+    }
+    else {
+        struct sqlite_teardown_test t = { 0 };
+        ND_THREAD *holder = sqlite_teardown_test_start("SQLTEST_LIB", sqlite_teardown_test_library_holder, &t);
+        sqlite_library_shutdown();
+        usec_t returned_ut = now_monotonic_usec();
+        __atomic_store_n(&t.done, true, __ATOMIC_RELEASE);
+        if (holder)
+            nd_thread_join(holder);
+
+        netdata_mutex_lock(&sqlite_lifetime_mutex);
+        bool still_initialized = sqlite_library_initialized;
+        bool gate_reopened = !sqlite_library_gate;
+        netdata_mutex_unlock(&sqlite_lifetime_mutex);
+
+        bool waited = holder && returned_ut >= __atomic_load_n(&t.released_ut, __ATOMIC_ACQUIRE);
+        bool ok = holder && t.refused && waited && sqlite_teardown_is_unsafe() && still_initialized &&
+                  gate_reopened && sqlite_lease_test_leases() == 0;
+        fprintf(stderr, "SQLITE TEARDOWN TEST: library shutdown with a refused thread-local close: %s%s%s%s%s%s\n",
+                ok ? "OK" : "FAILED",
+                holder ? "" : " - no lease taken",
+                holder && !t.refused ? " - a lease was admitted after the gate" : "",
+                holder && !waited ? " - did not wait for the lease" : "",
+                !sqlite_teardown_is_unsafe() ? " - refusal did not latch" : "",
+                !still_initialized ? " - library shut down anyway" : "");
+        errors += !ok;
+    }
+
+    fprintf(stderr, "SQLITE TEARDOWN TEST: %s\n", errors ? "FAILED" : "OK");
     return errors ? 1 : 0;
 }
