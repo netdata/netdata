@@ -147,13 +147,14 @@ class PrepareFleetTests(unittest.TestCase):
     def test_successful_default_debug_strip_preserves_executable_mode(self):
         shutil.copyfile('/bin/true', self.source / 'bin/srv/netdata')
         (self.source / 'bin/srv/netdata').chmod(0o755)
+        shutil.copyfile('/bin/true', self.source / 'bin/nd-run')
         target = self.root / 'debug-output'
         self.run_script('--source', self.source, '--keep', 'apps', '--apply', '--output', target)
         binary = target / 'bin/srv/netdata'
         self.assertEqual(binary.stat().st_mode & 0o7777, 0o755)
         manifest = json.loads((target / 'usr/share/netdata/fleet-manifest.json').read_text())
         self.assertEqual(manifest['strip_mode'], 'debug')
-        self.assertEqual(len(manifest['stripped_files']), 1)
+        self.assertEqual(len(manifest['stripped_files']), 2)
 
     @unittest.skipUnless(shutil.which('objcopy') and shutil.which('cc'), 'native compiler or objcopy unavailable')
     def test_user_state_and_unknown_elf_files_remain_byte_identical(self):

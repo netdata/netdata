@@ -69,7 +69,7 @@ CAPS = {
 STOCK_ELF = {
     path for paths, _ in CAPS.values() for path in paths
     if path.startswith(PLUGIN) or path.startswith('bin/')
-} | {'bin/bash', 'bin/curl', 'bin/netdatacli', 'bin/systemd-cat-native',
+} | {'bin/bash', 'bin/curl', 'bin/nd-run', 'bin/netdatacli', 'bin/systemd-cat-native',
      'bin/srv/netdata', PLUGIN + 'ndsudo'}
 REQUIRED_COMPANIONS = {
     'containers': [PLUGIN + 'cgroup-network', PLUGIN + 'cgroup-network-helper.sh'],
