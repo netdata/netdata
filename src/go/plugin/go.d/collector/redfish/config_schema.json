@@ -143,32 +143,48 @@
         }
       },
       {
-        "oneOf": [
-          {
-            "properties": {
-              "tls_cert": {
-                "pattern": "^[\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
-              },
-              "tls_key": {
-                "pattern": "^[\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
-              }
+        "if": {
+          "properties": {
+            "tls_cert": {
+              "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
             }
           },
-          {
-            "properties": {
-              "tls_cert": {
-                "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
-              },
-              "tls_key": {
-                "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
-              }
-            },
-            "required": [
-              "tls_cert",
-              "tls_key"
-            ]
-          }
-        ]
+          "required": [
+            "tls_cert"
+          ]
+        },
+        "then": {
+          "properties": {
+            "tls_key": {
+              "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+            }
+          },
+          "required": [
+            "tls_key"
+          ]
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "tls_key": {
+              "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+            }
+          },
+          "required": [
+            "tls_key"
+          ]
+        },
+        "then": {
+          "properties": {
+            "tls_cert": {
+              "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+            }
+          },
+          "required": [
+            "tls_cert"
+          ]
+        }
       }
     ]
   },
