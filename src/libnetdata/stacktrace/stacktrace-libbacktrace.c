@@ -249,10 +249,11 @@ bool stacktrace_available(void) {
 }
 
 static void stacktrace_capture_finish(backtrace_data_t *bt_data) {
-    if (bt_data->frame_count == 0)
-        buffer_strcat(bt_data->wb, NO_STACK_TRACE_PREFIX "libbacktrace reports no frames");
-    else if (bt_data->truncated)
+    // truncated first: dropped frames must never read as "no frames"
+    if (bt_data->truncated)
         buffer_strcat(bt_data->wb, STACKTRACE_TRUNCATED_MARKER);
+    else if (bt_data->frame_count == 0)
+        buffer_strcat(bt_data->wb, NO_STACK_TRACE_PREFIX "libbacktrace reports no frames");
 }
 
 NEVER_INLINE
