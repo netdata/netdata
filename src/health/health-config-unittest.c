@@ -1382,6 +1382,117 @@ static int test_dyncfg_rejection_keeps_detail_in_response(int *passed) {
     return 0;
 }
 
+#define UNITTEST_EXEC_RULE                                                                                        \
+    "{\"enabled\":true,\"type\":\"template\","                                                                    \
+    "\"config\":{\"match\":{\"on\":\"system.cpu\",\"host_labels\":\"*\",\"instance_labels\":\"*\"},"            \
+    "\"value\":{\"database_lookup\":{\"after\":-600,\"before\":0,\"time_group\":\"average\","                     \
+    "\"dims_group\":\"sum\",\"data_source\":\"samples\",\"options\":[],\"dimensions\":\"\"},"                     \
+    "\"update_every\":60},\"conditions\":{\"warning_condition\":\"$this>1\",\"critical_condition\":\"\"}%s}}"
+
+// one 'action' member for a rule: NULL leaves 'execute' out of the payload
+static void unittest_exec_action(char *dst, size_t size, const char *exec) {
+    if(exec)
+        snprintfz(dst, size, ",\"action\":{\"execute\":\"%s\",\"recipient\":\"sysadmin\"}", exec);
+    else
+        snprintfz(dst, size, ",\"action\":{\"recipient\":\"sysadmin\"}");
+}
+
+static void unittest_exec_payload(BUFFER *wb, const char *exec1, const char *exec2) {
+    char action1[FILENAME_MAX + 100], action2[FILENAME_MAX + 100];
+    unittest_exec_action(action1, sizeof(action1), exec1);
+    unittest_exec_action(action2, sizeof(action2), exec2);
+
+    buffer_flush(wb);
+    buffer_strcat(wb, "{\"format_version\":1,\"name\":\"unittest\",\"rules\":[");
+    buffer_sprintf(wb, UNITTEST_EXEC_RULE, action1);
+    buffer_strcat(wb, ",");
+    buffer_sprintf(wb, UNITTEST_EXEC_RULE, action2);
+    buffer_strcat(wb, "]}");
+}
+
+static int test_dyncfg_exec_is_agent_local(int *passed) {
+    static const char custom[] = "/usr/bin/unittest-custom-notifier";
+
+    // the agent's default is only set when health starts; give the test one if needed
+    STRING *saved_default = health_globals.config.default_exec;
+    if(!saved_default)
+        health_globals.config.default_exec = string_strdupz("/usr/libexec/netdata/plugins.d/alarm-notify.sh");
+    const char *def = string2str(health_globals.config.default_exec);
+
+    struct {
+        const char *exec1;
+        const char *exec2;
+        bool replay;
+        bool allowed;
+        bool exec_cleared;  // a replayed custom program is replaced by the default
+    } tests[] = {
+        { NULL,   NULL,   false, true,  false },
+        { "",     "",     false, true,  false },
+        { def,    def,    false, true,  false },
+        { custom, NULL,   false, false, false },
+        { def,    custom, false, false, false },
+        { custom, NULL,   true,  true,  true  },
+        { NULL,   custom, true,  true,  true  },
+    };
+
+    int failed = 0;
+    CLEAN_BUFFER *payload = buffer_create(0, NULL);
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        CLEAN_BUFFER *error = buffer_create(0, NULL);
+        unittest_exec_payload(payload, tests[i].exec1, tests[i].exec2);
+
+        RRD_ALERT_PROTOTYPE *ap = health_prototype_payload_parse(
+            buffer_tostring(payload), buffer_strlen(payload), error, "unittest", JSONC_REQUIRED);
+        if(!ap) {
+            fprintf(stderr, "FAILED [dyncfg exec case %zu]: payload did not parse: %s\n", i, buffer_tostring(error));
+            failed++;
+            continue;
+        }
+
+        bool allowed = health_prototype_exec_is_allowed(ap, tests[i].replay, error);
+        bool custom_left = false;
+        for(RRD_ALERT_PROTOTYPE *t = ap; t; t = t->_internal.next)
+            if(t->config.exec && t->config.exec != health_globals.config.default_exec)
+                custom_left = true;
+
+        if(allowed != tests[i].allowed ||
+           (allowed && custom_left) ||
+           (!allowed && strstr(buffer_tostring(error), custom)) ||
+           (tests[i].exec_cleared && (ap->config.exec || ap->_internal.next->config.exec))) {
+            fprintf(stderr, "FAILED [dyncfg exec case %zu]: allowed=%d custom_left=%d error='%s'\n",
+                    i, allowed, custom_left, buffer_tostring(error));
+            failed++;
+        }
+        else
+            (*passed)++;
+
+        health_prototype_free(ap);
+    }
+
+    // through the dyncfg handler: a live add is refused and the program is not echoed back
+    {
+        CLEAN_BUFFER *result = buffer_create(0, NULL);
+        unittest_exec_payload(payload, custom, NULL);
+        int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_ADD, "unittest", payload, NULL, NULL,
+                                    result, HTTP_ACCESS_NONE, NULL, NULL);
+        if(code != HTTP_RESP_BAD_REQUEST || strstr(buffer_tostring(result), custom) ||
+           !strstr(buffer_tostring(result), "notification program")) {
+            fprintf(stderr, "FAILED [dyncfg live add with a custom program]: code=%d response='%s'\n",
+                    code, buffer_tostring(result));
+            failed++;
+        }
+        else
+            (*passed)++;
+    }
+
+    if(!saved_default) {
+        string_freez(health_globals.config.default_exec);
+        health_globals.config.default_exec = NULL;
+    }
+
+    return failed;
+}
+
 static int test_file_invalid_same_name_rule_is_skipped(int *passed) {
     const char *tmpdir = getenv("TMPDIR");
     if(!tmpdir || !*tmpdir)
@@ -1901,6 +2012,7 @@ int health_config_unittest(void) {
     failed += test_prototype_without_on_matches_nothing(&passed);
     failed += test_dyncfg_rejects_empty_on(&passed);
     failed += test_dyncfg_rejection_keeps_detail_in_response(&passed);
+    failed += test_dyncfg_exec_is_agent_local(&passed);
     failed += test_file_invalid_same_name_rule_is_skipped(&passed);
     failed += test_dyncfg_time_group_round_trip(&passed);
     failed += test_dyncfg_required_time_group_options(&passed);
