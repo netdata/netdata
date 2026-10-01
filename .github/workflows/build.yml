@@ -1090,7 +1090,7 @@ jobs:
         working-directory: artifacts
         run: |
           for dir in */ ; do
-            rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" "${dir}" "s3:netdata-agent-artifacts/nightly/${dir}" || exit 1
+            rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" "${dir}" "s3:netdata-agent-artifacts/stable/${dir}" || exit 1
           done
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
