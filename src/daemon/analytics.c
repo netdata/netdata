@@ -825,7 +825,8 @@ static int tz_windows_mapping_select(FILE *fp, const char *win_id, const char *g
         best_rank = rank;
     }
 
-    if (!best_rank)
+    // a read error may have hidden a better-ranked row; do not report a lower-ranked one as the answer
+    if (ferror(fp) || !best_rank)
         return -1;
 
     strncpyz(out, best, out_size - 1);
@@ -940,7 +941,12 @@ static int timezone_windows_mapping_write_and_select(const char *rows, const cha
     if (!fp)
         return -2;
 
-    fputs(rows, fp);
+    // a failed fixture write must fail the case, not let a no-match case pass without parsing anything
+    if (fputs(rows, fp) == EOF || fflush(fp) != 0) {
+        fclose(fp);
+        return -2;
+    }
+
     rewind(fp);
     int ret = tz_windows_mapping_select(fp, win_id, geo, out, out_size);
     fclose(fp);
