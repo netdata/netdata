@@ -140,10 +140,9 @@ Use a discriminator plus `dependencies` for mutually exclusive configurations (m
 - With tabs, branch keys MUST be listed on a tab (they render only while their mode is selected); an unlisted branch
   key is dropped like any other property.
 - Prefer top-level dependencies: the UI drops inactive-branch data only for top-level discriminators.
-- Do not use `oneOf`/`anyOf` outside `dependencies`, on a property or an object (including inside `allOf`); the UI
-  renders a branch selector, and on a tabbed object a second tab strip. Express a cross-field rule as `if`/`then`,
-  several rules in `allOf` (redfish: `tls_cert` and `tls_key` set together; ceph: `bearer_token_file` or both
-  `username` and `password`).
+- `oneOf`/`anyOf` MUST NOT appear outside `dependencies` (why, and the `if`/`then` alternative:
+  `src/plugins.d/DYNCFG.md#json-schema-for-configuration-ui`). Put several `if`/`then` rules in `allOf`; worked
+  examples: redfish `tls_cert`/`tls_key` set together, ceph `bearer_token_file` or both `username` and `password`.
 
 ## 6. Secrets
 
