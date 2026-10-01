@@ -274,11 +274,17 @@ struct thread_unittest {
     unsigned *done;
 };
 
+// returns -1 when the value is unavailable, which pulse turns into UINT64_MAX and skips
 int sql_metadata_cache_stats(int op)
 {
-    int count, dummy;
+    int count = 0, dummy;
 
-    sqlite3_db_status(db_meta, op, &count, &dummy, 0);
+    if (unlikely(!db_meta))
+        return -1;
+
+    if (sqlite3_db_status(db_meta, op, &count, &dummy, 0) != SQLITE_OK)
+        return -1;
+
     return count;
 }
 
@@ -1832,7 +1838,7 @@ static void cleanup_host_context_metadata(Pvoid_t CTX_JudyL, void *data)
 
     Word_t num_of_contexts = JudyLCount(CTX_JudyL, 0, -1, PJE0);
 
-    nd_log_daemon(NDLP_DEBUG, "Verifying the retention of %zu contexts for host %s", num_of_contexts, rrdhost_hostname(host));
+    nd_log_daemon(NDLP_DEBUG, "Verifying the retention of %zu contexts for host %s", (size_t)num_of_contexts, rrdhost_hostname(host));
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));

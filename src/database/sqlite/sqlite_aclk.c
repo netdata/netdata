@@ -172,12 +172,12 @@ static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
     if (is_ephemeral && ((!is_registered && last_connected == 1) ||
                          (rrdhost_free_ephemeral_time_s && age > rrdhost_free_ephemeral_time_s))) {
         netdata_log_info(
-            "%s ephemeral hostname \"%s\" with GUID \"%s\", age = %ld seconds (limit %ld seconds)",
+            "%s ephemeral hostname \"%s\" with GUID \"%s\", age = %" PRId64 " seconds (limit %" PRId64 " seconds)",
             is_registered ? "Loading registered" : "Skipping unregistered",
             hostname,
             guid,
-            age,
-            rrdhost_free_ephemeral_time_s);
+            (int64_t)age,
+            (int64_t)rrdhost_free_ephemeral_time_s);
 
         if (!is_registered)
            return NULL;

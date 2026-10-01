@@ -141,7 +141,7 @@ func (dcjc *DynCfgJobController) prepareJobConfigLifecycleReconcile(
 		}
 		return func() {
 			var runtime collectorapi.RuntimeJob
-			if prepared.identity == next.identity && prepared.runtime != nil {
+			if prepared.identity == next.identity && prepared.runtime != nil && postimage != nil && postimage.Status == dyncfg.StatusRunning.String() {
 				runtime = prepared.runtime
 			}
 			callJobConfigLifecycle(func() { next.hook.Reconcile(previous.identity, snapshot, runtime) })
@@ -211,7 +211,7 @@ func (dcjc *DynCfgJobController) jobConfigLifecycleHook(
 	module string,
 	status string,
 ) collectorapi.JobConfigLifecycle {
-	if status != dyncfg.StatusRunning.String() && status != dyncfg.StatusFailed.String() {
+	if status != dyncfg.StatusRunning.String() && status != dyncfg.StatusFailed.String() && status != dyncfg.StatusAccepted.String() {
 		return nil
 	}
 	creator, ok := dcjc.modules.Lookup(module)

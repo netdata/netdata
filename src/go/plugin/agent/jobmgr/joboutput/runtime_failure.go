@@ -8,7 +8,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 )
 
@@ -21,6 +20,9 @@ func (e *runtimeStartupFailure) Unwrap() error { return e.failure }
 
 func runtimeFailureFor(resources ConstructedJob, err *jobruntime.RunFailure, stage string) *autoDetectionFailure {
 	failure := autoDetectionFailureFor(resources, err)
+	failure.class = err.Class()
+	failure.retry = failure.retry && err.Retryable()
+	failure.runtime = true
 	failure.diagnosticFailure = jobConfigFailure(err, stage)
 	failure.diagnosticFailure.Reason = err.Reason()
 	failure.jobConfigLifecycle = resources.jobConfigSnapshot
@@ -28,6 +30,17 @@ func runtimeFailureFor(resources ConstructedJob, err *jobruntime.RunFailure, sta
 }
 
 func (dcjc *DynCfgJobController) bindRuntimeFailures(commands jobmgr.PreparedCommandPort, run uint64, fail func(error)) {
+	dcjc.factory.notifyRunReady = func(identity lifecycle.ResourceIdentity) {
+		err := commands.SubmitPrepared(context.Background(), jobmgr.Request{
+			UID:     fmt.Sprintf("jobmgr-run-ready-%d-%x-%d", run, jobAttemptIdentity(jobmgr.ProcessAttemptJobRuntime, identity.ID).Key, identity.Generation),
+			LaneKey: identity.ID,
+			Source:  lifecycle.SourceJobManager,
+			Route:   "internal/jobs/runtime-ready",
+		}, dcjc.planRuntimeReady(identity))
+		if err != nil && !lifecycle.ContainsOnlyCurrentStoppingRejections(err, run) {
+			fail(err)
+		}
+	}
 	dcjc.factory.notifyRunFailure = func(identity lifecycle.ResourceIdentity, failure *jobruntime.RunFailure) {
 		plan := dcjc.planRuntimeFailure(identity, failure)
 		err := commands.SubmitPrepared(context.Background(), jobmgr.Request{
@@ -42,32 +55,9 @@ func (dcjc *DynCfgJobController) bindRuntimeFailures(commands jobmgr.PreparedCom
 	}
 }
 
-func (dcjc *DynCfgJobController) planRuntimeFailure(identity lifecycle.ResourceIdentity, failure *jobruntime.RunFailure) jobmgr.WorkPlan {
-	return jobmgr.WorkPlan{
-		Claims:     []string{DynCfgJobGraphClaim},
-		NoResponse: true,
-		Transaction: &jobmgr.ResourceTransactionPlan{
-			ID: identity.ID,
-			Prepare: func(_ context.Context, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {
-				result := mustDynCfgMessage(204, "")
-				if current == nil || scope.Current != identity {
-					return dcjc.noop(scope, current, permit, result)
-				}
-				record, exists := dcjc.graph.Lookup(identity.ID)
-				if !exists || record.Status != dyncfg.StatusRunning.String() {
-					return dcjc.noop(scope, current, permit, result)
-				}
-				postimage := graphConfig(record, dyncfg.StatusFailed)
-				diagnostic := jobConfigFailure(failure, "runtime")
-				diagnostic.Reason = failure.Reason()
-				return dcjc.prepareMutationWithRetryAfterApply(
-					scope, current, nil, permit, lifecycle.ResourceTransactionRemoved,
-					&postimage, result, dcjc.configStatusCleanup(identity.ID, dyncfg.StatusFailed),
-					autoDetectionRetryToken{}, nil, diagnostic,
-				)
-			},
-		},
-	}
+func (dcjc *DynCfgJobController) planRuntimeFailure(identity lifecycle.ResourceIdentity, _ *jobruntime.RunFailure) jobmgr.WorkPlan {
+	// The event wakes settlement; the current generation supplies the outcome.
+	return dcjc.planRuntimeSettlement(identity, true)
 }
 
 // Do not absorb a joined structural or cleanup error merely because errors.As

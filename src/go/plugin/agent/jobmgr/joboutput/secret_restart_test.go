@@ -4,296 +4,219 @@ package joboutput
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/stretchr/testify/require"
 )
 
-func TestSecretDependentStartCommitsFailedAndWaitsForBusyRuntimeRelease(t *testing.T) {
-	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
-	delegate := controller.factory.config.Attempts.(*containment.Authority)
-	release := make(chan struct{})
-	controller.factory.config.Attempts = runtimeBusyPendingAuthority{
-		delegate: delegate,
-		release:  release,
+func TestSecretDependentStopQuiescesEnabledIntent(t *testing.T) {
+	for name, test := range map[string]struct {
+		status    dyncfg.Status
+		installed bool
+		stop      bool
+	}{
+		"running":  {dyncfg.StatusRunning, true, true},
+		"starting": {dyncfg.StatusAccepted, true, true},
+		"waiting":  {dyncfg.StatusAccepted, false, true},
+		"passive":  {dyncfg.StatusAccepted, false, false},
+		"disabled": {dyncfg.StatusDisabled, false, false},
+		"failed":   {dyncfg.StatusFailed, false, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
+			commands := bindHandoffTestWorkers(t, controller)
+			configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
+				return &runtimeTestCollector{run: func(ctx context.Context, ready func()) error {
+					if name == "running" {
+						ready()
+					}
+					<-ctx.Done()
+					return ctx.Err()
+				}}
+			})
+			config := factoryTestConfig(false).SetSourceType(confgroup.TypeDyncfg)
+			var current lifecycle.ReadyResource
+			t.Cleanup(func() { stopRuntimeTestResource(t, current) })
+			if test.stop {
+				if name == "waiting" {
+					config.Set("vnode", "missing")
+					controller.factory.config.Vnode = func(string) (jobruntime.VnodeSnapshot, bool) {
+						return jobruntime.VnodeSnapshot{}, false
+					}
+				}
+				seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusDisabled)
+				applyAcceptedEnableForTest(t, controller, graph, config, 1)
+				current = applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 2)
+				if test.installed {
+					require.NotNil(t, current)
+				} else {
+					require.Nil(t, current)
+				}
+				if name == "running" {
+					current = applyActivationTestSubmission(t, commands.next(t, "internal/jobs/runtime-ready"), current, 0)
+				} else {
+					require.True(t, controller.ActivationEnabled(config.FullName()))
+				}
+			} else {
+				seedDynCfgJobGraphRecord(t, graph, config, test.status)
+			}
+			record, exists := graph.Lookup(config.FullName())
+			require.True(t, exists)
+			require.Equal(t, test.status.String(), record.Status)
+			scope := lifecycle.ResourceTransactionScope{ID: config.FullName()}
+			if current != nil {
+				scope.Current = current.Identity()
+			}
+			work, stopped, err := controller.PlanSecretDependentStop(scope.ID)
+			require.NoError(t, err)
+			transaction, err := work.Transaction.Prepare(t.Context(), current, scope, lifecycle.LongLivedPermit{})
+			require.NoError(t, err)
+			applied, err := transaction.Apply(t.Context())
+			require.NoError(t, err)
+			didStop, err := stopped.Stopped()
+			require.NoError(t, err)
+			require.Equal(t, test.stop, didStop)
+			_, disposition, resource := applied.Ownership()
+			current = resource
+			require.Nil(t, resource)
+			if test.installed {
+				require.Equal(t, lifecycle.ResourceTransactionRemoved, disposition)
+			}
+			record, exists = graph.Lookup(scope.ID)
+			require.True(t, exists)
+			if test.stop {
+				require.Equal(t, dyncfg.StatusAccepted.String(), record.Status)
+				require.True(t, controller.ActivationEnabled(scope.ID))
+			} else {
+				require.Equal(t, test.status.String(), record.Status)
+				require.False(t, controller.ActivationEnabled(scope.ID))
+			}
+			requireNoHandoffActivation(t, commands)
+		})
 	}
-	creator := controller.modules["module"]
-	creator.Create = func() collectorapi.CollectorV1 {
-		module := state.module(nil, false)
-		charts := collectorapi.Charts{}
-		module.ChartsFunc = func() *collectorapi.Charts { return &charts }
-		return module
-	}
-	controller.modules["module"] = creator
-	controller.factory.config.Modules = controller.modules
-	controller.configModules.config.Modules = controller.modules
+}
 
+func TestSecretDependentStartResumesWithoutPreflight(t *testing.T) {
+	for _, deadline := range []bool{false, true} {
+		t.Run(map[bool]string{false: "apply", true: "child deadline"}[deadline], func(t *testing.T) {
+			controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+			var constructions atomic.Int32
+			creator := controller.modules["module"]
+			creator.Create = func() collectorapi.CollectorV1 {
+				constructions.Add(1)
+				return state.module(nil, false)
+			}
+			controller.modules["module"] = creator
+			commands := bindSecretRestartTestWorkers(t, controller)
+			config := factoryTestConfig(false).SetSourceType(confgroup.TypeDyncfg)
+			seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusAccepted)
+			spec, err := controller.configModules.newAcceptedActivationSpec(config)
+			require.NoError(t, err)
+			controller.scheduler.accepted.pause(spec)
+			work, started, err := controller.PlanSecretDependentStart(config.FullName())
+			require.NoError(t, err)
+			require.False(t, work.Transaction.AllocateSuccessor)
+			require.Empty(t, work.YieldClaimOnPrepare)
+			require.Zero(t, constructions.Load())
+			if deadline {
+				started.RetainPending()
+				started.RetainPending()
+			} else {
+				transaction, err := work.Transaction.Prepare(t.Context(), nil,
+					lifecycle.ResourceTransactionScope{ID: config.FullName()}, lifecycle.LongLivedPermit{})
+				require.NoError(t, err)
+				require.Zero(t, constructions.Load(), "resume preparation must not construct a collector")
+				_, err = transaction.Apply(t.Context())
+				require.NoError(t, err)
+			}
+			require.NoError(t, started.Err())
+			commands.waitForSubmissions(t, 1)
+			submissions, _, _ := commands.snapshot()
+			require.Len(t, submissions, 1)
+			require.Equal(t, "internal/jobs/accepted-activation", submissions[0].Route)
+			record, exists := graph.Lookup(config.FullName())
+			require.True(t, exists)
+			require.Equal(t, dyncfg.StatusAccepted.String(), record.Status)
+		})
+	}
+}
+
+func TestSecretDependentStartDoesNotEnablePassiveDisabledOrRemovedJobs(t *testing.T) {
+	for name, status := range map[string]dyncfg.Status{
+		"passive": dyncfg.StatusAccepted, "disabled": dyncfg.StatusDisabled, "removed": "",
+	} {
+		t.Run(name, func(t *testing.T) {
+			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
+			commands := bindSecretRestartTestWorkers(t, controller)
+			config := factoryTestConfig(false).SetSourceType(confgroup.TypeDyncfg)
+			if name != "removed" {
+				seedDynCfgJobGraphRecord(t, graph, config, status)
+			}
+			work, started, err := controller.PlanSecretDependentStart(config.FullName())
+			require.NoError(t, err)
+			transaction, err := work.Transaction.Prepare(t.Context(), nil,
+				lifecycle.ResourceTransactionScope{ID: config.FullName()}, lifecycle.LongLivedPermit{})
+			require.NoError(t, err)
+			_, err = transaction.Apply(t.Context())
+			require.NoError(t, err)
+			started.RetainPending()
+			commands.waitForSubmissions(t, 0)
+			record, exists := graph.Lookup(config.FullName())
+			require.Equal(t, name != "removed", exists)
+			if exists {
+				require.Equal(t, status.String(), record.Status)
+			}
+		})
+	}
+}
+
+func TestSecretDependentDeadlineCannotResumeRevokedGeneration(t *testing.T) {
+	for _, remove := range []bool{false, true} {
+		t.Run(map[bool]string{false: "disabled", true: "removed"}[remove], func(t *testing.T) {
+			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
+			commands := bindSecretRestartTestWorkers(t, controller)
+			config := factoryTestConfig(false).SetSourceType(confgroup.TypeDyncfg)
+			seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusAccepted)
+			spec, err := controller.configModules.newAcceptedActivationSpec(config)
+			require.NoError(t, err)
+			controller.scheduler.accepted.pause(spec)
+			_, started, err := controller.PlanSecretDependentStart(config.FullName())
+			require.NoError(t, err)
+			record, _ := graph.Lookup(config.FullName())
+			target := dynCfgTarget{module: config.Module(), name: config.Name(), resourceID: config.FullName()}
+			scope := lifecycle.ResourceTransactionScope{ID: config.FullName()}
+			var transaction lifecycle.PreparedResourceTransaction
+			if remove {
+				transaction, err = controller.prepareRemove(target, record, true, nil, scope)
+			} else {
+				transaction, err = controller.prepareDisable(target, record, true, nil, scope)
+			}
+			require.NoError(t, err)
+			_, err = transaction.Apply(t.Context())
+			require.NoError(t, err)
+			require.False(t, controller.ActivationEnabled(config.FullName()))
+			started.RetainPending()
+			commands.waitForSubmissions(t, 0)
+		})
+	}
+}
+
+func bindSecretRestartTestWorkers(t *testing.T, controller *DynCfgJobController) *autoDetectionRetryTestCommands {
+	t.Helper()
 	commands := &autoDetectionRetryTestCommands{}
-	require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(error) {}))
+	require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(err error) { t.Errorf("activation worker failed: %v", err) }))
 	t.Cleanup(func() {
 		controller.scheduler.StopBackgroundWorkers()
-		require.NoError(t, controller.scheduler.WaitBackgroundWorkers(context.Background()))
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		require.NoError(t, controller.scheduler.WaitBackgroundWorkers(ctx))
 	})
-
-	config := factoryTestConfig(false)
-	config.SetSourceType(confgroup.TypeDyncfg)
-	config.SetSource("user=test")
-	config.SetProvider(confgroup.TypeDyncfg)
-	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
-
-	work, startState, err := controller.PlanSecretDependentStart(config.FullName())
-	require.NoError(t, err)
-	permit, tasks := issueTestJobPermit(t, config.FullName(), 1)
-	scope := lifecycle.ResourceTransactionScope{
-		ID: config.FullName(),
-		Successor: lifecycle.ResourceIdentity{
-			ID:         config.FullName(),
-			Generation: 1,
-		},
-	}
-	transaction, err := work.Transaction.Prepare(
-		context.Background(),
-		nil,
-		scope,
-		permit,
-	)
-	require.NoError(t, err)
-	applied, err := transaction.Apply(context.Background())
-	require.NoError(t, err)
-	_, disposition, current := applied.Ownership()
-	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
-	require.Nil(t, current)
-	require.ErrorIs(t, startState.Err(), jobmgr.ErrProcessAttemptBusy)
-	record, exists := graph.Lookup(config.FullName())
-	require.True(t, exists)
-	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
-	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
-	require.Eventually(t, func() bool {
-		return delegate.Census() == (containment.Census{})
-	}, time.Second, time.Millisecond)
-	require.EqualValues(t, 1, state.collectorCleanup)
-
-	controller.scheduler.pending.mu.Lock()
-	pending := controller.scheduler.pending.entries[config.FullName()]
-	controller.scheduler.pending.mu.Unlock()
-	require.NotNil(t, pending)
-	commands.waitForSubmissions(t, 0)
-	close(release)
-	commands.waitForSubmissions(t, 1)
-}
-
-func TestSecretDependentStartCommitsFailedWithoutRetryForQuarantinedRuntime(t *testing.T) {
-	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
-	delegate := controller.factory.config.Attempts.(*containment.Authority)
-	controller.factory.config.Attempts = runtimeQuarantinedTestAuthority{delegate: delegate}
-	creator := controller.modules["module"]
-	creator.Create = func() collectorapi.CollectorV1 {
-		module := state.module(nil, false)
-		charts := collectorapi.Charts{}
-		module.ChartsFunc = func() *collectorapi.Charts { return &charts }
-		return module
-	}
-	controller.modules["module"] = creator
-	controller.factory.config.Modules = controller.modules
-	controller.configModules.config.Modules = controller.modules
-
-	config := factoryTestConfig(false)
-	config.SetSourceType(confgroup.TypeDyncfg)
-	config.SetSource("user=test")
-	config.SetProvider(confgroup.TypeDyncfg)
-	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
-
-	work, startState, err := controller.PlanSecretDependentStart(config.FullName())
-	require.NoError(t, err)
-	permit, tasks := issueTestJobPermit(t, config.FullName(), 1)
-	scope := lifecycle.ResourceTransactionScope{
-		ID: config.FullName(),
-		Successor: lifecycle.ResourceIdentity{
-			ID:         config.FullName(),
-			Generation: 1,
-		},
-	}
-	transaction, err := work.Transaction.Prepare(
-		context.Background(),
-		nil,
-		scope,
-		permit,
-	)
-	require.NoError(t, err)
-	applied, err := transaction.Apply(context.Background())
-	require.NoError(t, err)
-	_, disposition, current := applied.Ownership()
-	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
-	require.Nil(t, current)
-	require.ErrorIs(t, startState.Err(), jobmgr.ErrProcessAttemptQuarantined)
-	record, exists := graph.Lookup(config.FullName())
-	require.True(t, exists)
-	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
-	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
-	require.Eventually(t, func() bool {
-		return delegate.Census() == (containment.Census{})
-	}, time.Second, time.Millisecond)
-	require.EqualValues(t, 1, state.collectorCleanup)
-
-	controller.scheduler.pending.mu.Lock()
-	pending := controller.scheduler.pending.entries[config.FullName()]
-	controller.scheduler.pending.mu.Unlock()
-	require.Nil(t, pending)
-}
-
-func TestSecretDependentStopCommitsFailedBeforeRestart(t *testing.T) {
-	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-	config := factoryTestConfig(false)
-	config.SetSourceType(confgroup.TypeDyncfg)
-	config.SetSource("user=test")
-	config.SetProvider(confgroup.TypeDyncfg)
-	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
-
-	work, stopState, err := controller.PlanSecretDependentStop(config.FullName())
-	require.NoError(t, err)
-	var events []string
-	scope := lifecycle.ResourceTransactionScope{
-		ID: config.FullName(),
-		Current: lifecycle.ResourceIdentity{
-			ID:         config.FullName(),
-			Generation: 1,
-		},
-	}
-	current := &transactionTestReadyResource{
-		identity: scope.Current,
-		prefix:   "current",
-		events:   &events,
-	}
-	transaction, err := work.Transaction.Prepare(
-		context.Background(),
-		current,
-		scope,
-		lifecycle.LongLivedPermit{},
-	)
-	require.NoError(t, err)
-	applied, err := transaction.Apply(context.Background())
-	require.NoError(t, err)
-	_, disposition, active := applied.Ownership()
-	require.Equal(t, lifecycle.ResourceTransactionRemoved, disposition)
-	require.Nil(t, active)
-	stopped, err := stopState.Stopped()
-	require.NoError(t, err)
-	require.True(t, stopped)
-
-	record, exists := graph.Lookup(config.FullName())
-	require.True(t, exists)
-	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
-}
-
-func TestSecretDependentStartRetainsAbsentPendingAfterExternalDeadline(t *testing.T) {
-	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-	release := make(chan struct{})
-	controller.factory.config.Attempts = busyPendingJobAuthority{release: release}
-	commands := &autoDetectionRetryTestCommands{}
-	require.NoError(t, controller.BindBackgroundWorkers(commands, 9, func(error) {}))
-	t.Cleanup(func() {
-		controller.scheduler.StopBackgroundWorkers()
-		require.NoError(t, controller.scheduler.WaitBackgroundWorkers(context.Background()))
-	})
-
-	config := factoryTestConfig(false)
-	config.SetSourceType(confgroup.TypeDyncfg)
-	config.SetSource("user=test")
-	config.SetProvider(confgroup.TypeDyncfg)
-	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusFailed)
-
-	_, startState, err := controller.PlanSecretDependentStart(config.FullName())
-	require.NoError(t, err)
-	startState.RetainPending()
-
-	controller.scheduler.pending.mu.Lock()
-	pending := controller.scheduler.pending.entries[config.FullName()]
-	controller.scheduler.pending.mu.Unlock()
-	require.NotNil(t, pending)
-	require.True(t, pending.token.requireAbsent)
-
-	close(release)
-	commands.waitForSubmissions(t, 1)
-}
-
-type runtimeBusyPendingAuthority struct {
-	delegate jobmgr.ProcessAttemptAuthority
-	release  <-chan struct{}
-}
-
-type runtimeQuarantinedTestAuthority struct {
-	delegate jobmgr.ProcessAttemptAuthority
-}
-
-func (rqta runtimeQuarantinedTestAuthority) StartProcessAttempt(
-	ctx context.Context,
-	plan jobmgr.ProcessAttemptPlan,
-) (jobmgr.ProcessAttempt, error) {
-	if plan.Identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
-		return nil, jobmgr.ErrProcessAttemptQuarantined
-	}
-	return rqta.delegate.StartProcessAttempt(ctx, plan)
-}
-
-func (rqta runtimeQuarantinedTestAuthority) SupersedeProcessAttempt(
-	ctx context.Context,
-	identity jobmgr.ProcessAttemptIdentity,
-) error {
-	return rqta.delegate.SupersedeProcessAttempt(ctx, identity)
-}
-
-func (rqta runtimeQuarantinedTestAuthority) CutProcessAttempt(
-	identity jobmgr.ProcessAttemptIdentity,
-	cause error,
-) bool {
-	return rqta.delegate.CutProcessAttempt(identity, cause)
-}
-
-func (rqta runtimeQuarantinedTestAuthority) ProcessAttemptReleased(
-	identity jobmgr.ProcessAttemptIdentity,
-) (<-chan struct{}, bool) {
-	return rqta.delegate.ProcessAttemptReleased(identity)
-}
-
-func (rbpa runtimeBusyPendingAuthority) StartProcessAttempt(
-	ctx context.Context,
-	plan jobmgr.ProcessAttemptPlan,
-) (jobmgr.ProcessAttempt, error) {
-	if plan.Identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
-		return nil, jobmgr.ErrProcessAttemptBusy
-	}
-	return rbpa.delegate.StartProcessAttempt(ctx, plan)
-}
-
-func (rbpa runtimeBusyPendingAuthority) SupersedeProcessAttempt(
-	ctx context.Context,
-	identity jobmgr.ProcessAttemptIdentity,
-) error {
-	if identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
-		return jobmgr.ErrProcessAttemptBusy
-	}
-	return rbpa.delegate.SupersedeProcessAttempt(ctx, identity)
-}
-
-func (rbpa runtimeBusyPendingAuthority) CutProcessAttempt(
-	identity jobmgr.ProcessAttemptIdentity,
-	cause error,
-) bool {
-	return rbpa.delegate.CutProcessAttempt(identity, cause)
-}
-
-func (rbpa runtimeBusyPendingAuthority) ProcessAttemptReleased(
-	identity jobmgr.ProcessAttemptIdentity,
-) (<-chan struct{}, bool) {
-	if identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
-		return rbpa.release, true
-	}
-	return rbpa.delegate.ProcessAttemptReleased(identity)
+	return commands
 }

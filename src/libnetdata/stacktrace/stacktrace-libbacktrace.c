@@ -287,7 +287,7 @@ void impl_stacktrace_to_buffer(STACKTRACE trace, BUFFER *wb) {
             buffer_putc(wb, '#');
             buffer_print_uint64(wb, i);
             buffer_strcat(wb, " <unknown> [");
-            buffer_print_uint64_hex(wb, (uint64_t)st->frames[i]);
+            buffer_print_uint64_hex(wb, (uint64_t)(uintptr_t)st->frames[i]);
             buffer_putc(wb, ']');
         }
     }

@@ -10,6 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	jobsecrets "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/secrets"
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -58,21 +59,32 @@ func TestPipelineTrustControlsBothSecretConsumers(t *testing.T) {
 			resolver, err := secretresolver.NewAtomicResolver(providers)
 			require.NoError(t, err)
 			var module *collectorapi.MockCollectorV1
+			configs := testConfigResolver(t, resolver, func(keys []string) (secretresolver.AtomicScope, error) {
+				require.Equal(t, []string{"vault:main"}, keys)
+				calls["scope"]++
+				return &trustTestScope{calls: calls}, nil
+			})
 			factory, err := joboutput.NewConfigModuleFactory(joboutput.ConfigModuleFactoryConfig{
 				Modules: collectorapi.Registry{"module": {Create: func() collectorapi.CollectorV1 {
 					module = &collectorapi.MockCollectorV1{}
 					return module
 				}}},
-				Resolver: resolver,
-				StoreScope: func(keys []string) (secretresolver.AtomicScope, error) {
-					require.Equal(t, []string{"vault:main"}, keys)
-					calls["scope"]++
-					return &trustTestScope{calls: calls}, nil
-				},
+				Configs: configs,
 			})
 			require.NoError(t, err)
 			require.NoError(t, factory.Validate(t.Context(), config))
+			require.Empty(t, calls, "structural admission must not resolve references")
+			require.Equal(t, 1, module.Config.OptionInt)
+			require.True(t, module.CleanupDone)
+			if test.resolve {
+				require.Empty(t, module.Config.OptionStr, "authorized references are deferred until resolved testing")
+			} else {
+				require.Equal(t, refs, module.Config.OptionStr, "untrusted references remain literal during admission")
+			}
+
+			require.NoError(t, factory.Test(t.Context(), config))
 			require.Equal(t, refs, config.Get("option_str"))
+			require.True(t, module.CleanupDone)
 			if test.resolve {
 				require.Equal(t, "env-resolved|file-resolved|cmd-resolved|store-resolved", module.Config.OptionStr)
 				require.Equal(t, map[string]int{"env": 1, "file": 1, "cmd": 1, "scope": 1, "store": 1, "release": 1}, calls)
@@ -83,7 +95,7 @@ func TestPipelineTrustControlsBothSecretConsumers(t *testing.T) {
 
 			payload, err := yaml.Marshal(config)
 			require.NoError(t, err)
-			index := jobsecrets.NewSecretDependencyIndex()
+			index := jobsecrets.NewSecretDependencyIndex(configs)
 			commit, err := index.PrepareJobChange(config.FullName(), &dyncfg.GraphConfig{
 				ID:      config.FullName(),
 				Module:  config.Module(),
@@ -140,4 +152,11 @@ func (s *trustTestScope) Resolve(context.Context, string, string) ([]byte, error
 func (s *trustTestScope) Release(context.Context) error {
 	s.calls["release"]++
 	return nil
+}
+
+func testConfigResolver(t testing.TB, resolver *secretresolver.AtomicResolver, scope secretresolver.AtomicScopeAcquirer) *secretconfig.ConfigResolver {
+	t.Helper()
+	configs, err := secretconfig.NewConfigResolver(resolver, scope)
+	require.NoError(t, err)
+	return configs
 }

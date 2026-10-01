@@ -222,6 +222,7 @@ mark_as_advanced(ENABLE_DASHBOARD)
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
 cmake_dependent_option(ENABLE_ND_MCP "Build nd-mcp stdio-to-websocket bridge for MCP integration" ${DEFAULT_FEATURE_STATE} "ENABLE_PLUGIN_GO" False)
 option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" ON)
+option(ENABLE_PLUGIN_STATSD "Enable the experimental Go StatsD plugin (statsd.plugin)" OFF)
 cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_MACOS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETFLOW "Enable NetFlow/IPFIX/sFlow flow analysis plugin" False "NOT OS_WINDOWS" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
@@ -509,14 +510,14 @@ if(ENABLE_JEMALLOC)
 endif()
 
 set(ENABLE_PLUGIN_EBPF_GO OFF)
-if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_NETFLOW OR ENABLE_CGROUP_NAME)
+if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_STATSD OR ENABLE_PLUGIN_NETFLOW OR ENABLE_CGROUP_NAME)
     include(NetdataGoTools)
 
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
 
     find_package(Go "${MIN_GO_VERSION}" QUIET)
     if(NOT GO_FOUND)
-        if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_NETFLOW)
+        if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_STATSD OR ENABLE_PLUGIN_NETFLOW)
             find_package(Go "${MIN_GO_VERSION}" REQUIRED)
         endif()
     endif()
@@ -1843,6 +1844,7 @@ set(RRD_PLUGIN_FILES
         src/database/contexts/rrdcontext-worker.c
         src/database/rrddim.c
         src/database/rrdhost.c
+        src/database/rrdhost-unittest.c
         src/database/rrdlabels.c
         src/database/rrdlabels-aggregated.c
         src/database/rrdlabels-aggregated.h
@@ -3406,7 +3408,6 @@ if(ENABLE_PLUGIN_EBPF)
                         CGO_LDFLAGS=${EBPF_GO_CGO_LDFLAGS}
                         GOPROXY=https://proxy.golang.org,direct
                         "${GO_EXECUTABLE}" build -buildvcs=false
-                        -ldflags "-X github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin.netdataRuntimePrefix=${NETDATA_RUNTIME_PREFIX}"
                         -tags netdata_ebpf_libbpf
                         -o "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
                         "."
@@ -3943,6 +3944,33 @@ if(ENABLE_PLUGIN_SCRIPTS)
 
     install(DIRECTORY src/go/plugin/scripts.d/config/scripts.d
             COMPONENT plugin-scripts
+            DESTINATION usr/lib/netdata/conf.d
+            FILES_MATCHING PATTERN "*.conf")
+endif()
+
+#
+# Build the Go statsd.plugin
+#
+
+if(ENABLE_PLUGIN_STATSD)
+    if (OS_WINDOWS)
+        set(STATSD_GO_PLUGIN_BIN statsd.plugin.exe)
+    else()
+        set(STATSD_GO_PLUGIN_BIN statsd.plugin)
+    endif()
+
+    add_go_target(statsd-go-plugin ${STATSD_GO_PLUGIN_BIN} src/go cmd/statsdplugin)
+
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/${STATSD_GO_PLUGIN_BIN}
+            COMPONENT plugin-statsd
+            DESTINATION usr/libexec/netdata/plugins.d)
+
+    install(FILES src/go/plugin/statsd/config/statsd.conf
+            COMPONENT plugin-statsd
+            DESTINATION usr/lib/netdata/conf.d)
+
+    install(DIRECTORY src/go/plugin/statsd/config/statsd
+            COMPONENT plugin-statsd
             DESTINATION usr/lib/netdata/conf.d
             FILES_MATCHING PATTERN "*.conf")
 endif()

@@ -106,13 +106,16 @@ DynCfg uses HTTP-like codes verified against
 | Code | Meaning |
 |---|---|
 | 200 | Running -- accepted and active |
-| 202 | Accepted -- queued, not yet running |
+| 202 | Accepted -- configuration accepted; check `status` for current health |
 | 298 | Accepted but disabled |
 | 299 | Accepted but restart required |
 | 400 | Bad request / invalid configuration |
 | 404 | Configuration id not found |
 | 500 | Internal error |
 | 501 | Action not implemented for this object |
+
+For mutation replies, rejection versus indeterminate transport outcomes, and Go collector acceptance before runtime
+readiness, use `src/plugins.d/DYNCFG.md#3-process-commands-and-respond`.
 
 ---
 

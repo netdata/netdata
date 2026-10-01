@@ -14,21 +14,21 @@ import (
 )
 
 type ResourceTransactionSpec struct {
-	Scope                         lifecycle.ResourceTransactionScope               // identity of current + successor slots this txn spans
-	Disposition                   lifecycle.ResourceTransactionDisposition         // Unchanged / Installed / Removed / Replaced
-	Current                       lifecycle.ReadyResource                          // running resource to stop/finalize (Removed/Replaced)
-	Successor                     lifecycle.PreparedResource                       // prepared job to start/publish (Installed/Replaced)
-	UnusedPermit                  lifecycle.LongLivedPermit                        // permit to abort when a successor slot goes unused
-	Graph                         *dyncfg.Graph                                    // dyncfg graph whose postimage is committed on apply
-	Mutation                      dyncfg.GraphMutation                             // prepared graph mutation (valid when MutationPrepared)
-	MutationPrepared              bool                                             // Mutation is owned and must be committed or aborted
-	AfterGraphCommit              func()                                           // fires after the primary graph commit
-	AfterApply                    func()                                           // fires after the whole transaction applies
-	ActivationStartupFallback     func(error) (*ResourceActivationFallback, error) // constructs the source-specific startup failure postimage
-	ActivationBusyFallback        *ResourceActivationFallback                      // postimage after incumbent removal + busy promotion
-	ActivationQuarantinedFallback *ResourceActivationFallback                      // postimage after incumbent removal + quarantine
-	Result                        lifecycle.SealedResult                           // sealed dyncfg response for the caller
-	Cleanup                       lifecycle.TaskCleanup                            // protocol-frame cleanup emitted on success
+	Scope                         lifecycle.ResourceTransactionScope       // identity of current + successor slots this txn spans
+	Disposition                   lifecycle.ResourceTransactionDisposition // Unchanged / Installed / Removed / Replaced
+	Current                       lifecycle.ReadyResource                  // running resource to stop/finalize (Removed/Replaced)
+	Successor                     lifecycle.PreparedResource               // prepared job to start/publish (Installed/Replaced)
+	UnusedPermit                  lifecycle.LongLivedPermit                // permit to abort when a successor slot goes unused
+	Graph                         *dyncfg.Graph                            // dyncfg graph whose postimage is committed on apply
+	Mutation                      dyncfg.GraphMutation                     // prepared graph mutation (valid when MutationPrepared)
+	MutationPrepared              bool                                     // Mutation is owned and must be committed or aborted
+	AfterGraphCommit              func()                                   // fires after the primary graph commit
+	AfterApply                    func()                                   // fires after the whole transaction applies
+	ActivationBusyFallback        *ResourceActivationFallback              // postimage after incumbent removal + busy promotion
+	ActivationQuarantinedFallback *ResourceActivationFallback              // postimage after incumbent removal + quarantine
+	Result                        lifecycle.SealedResult                   // sealed response when reply is unset
+	Cleanup                       lifecycle.TaskCleanup                    // protocol-frame cleanup emitted on success
+	reply                         *jobReply                                // DynCfg reply intent sealed from the Apply outcome
 }
 
 // ResourceActivationFallback is the graph/resource outcome used when a
@@ -38,8 +38,16 @@ type ResourceActivationFallback struct {
 	Change              dyncfg.GraphChange // failed or removed graph postimage
 	AfterGraphReconcile func()             // reconciles projections after commit or confirmed equality
 	AfterApply          func()             // records pending/retry state
-	Result              lifecycle.SealedResult
 	Cleanup             lifecycle.TaskCleanup
+	failure             jobFailure // why the adopted change ended Failed; seals the reply
+}
+
+// result seals the transaction's response for the Apply outcome.
+func (spec ResourceTransactionSpec) result(outcome transactionOutcome) lifecycle.SealedResult {
+	if spec.reply == nil {
+		return spec.Result
+	}
+	return spec.reply.seal(outcome)
 }
 
 func resourceRemovalDisposition(current lifecycle.ReadyResource) lifecycle.ResourceTransactionDisposition {
@@ -47,13 +55,6 @@ func resourceRemovalDisposition(current lifecycle.ReadyResource) lifecycle.Resou
 		return lifecycle.ResourceTransactionUnchanged
 	}
 	return lifecycle.ResourceTransactionRemoved
-}
-
-func resourceInstallationDisposition(current lifecycle.ReadyResource) lifecycle.ResourceTransactionDisposition {
-	if current == nil {
-		return lifecycle.ResourceTransactionInstalled
-	}
-	return lifecycle.ResourceTransactionReplaced
 }
 
 // PreparedResourceTransaction owns one unpublished graph postimage and the
@@ -267,12 +268,19 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 			resultErr = errors.Join(resultErr, abortErr)
 		}
 		if resultErr != nil && !appliedSealed {
+			result, cleanup := spec.result(transactionOutcome{}), spec.Cleanup
+			if !graphCommitted {
+				// Nothing was committed, so neither the reply nor a status
+				// frame may claim the change.
+				result = spec.result(transactionOutcome{rolledBack: true})
+				cleanup = func() error { return nil }
+			}
 			failed, ownershipErr := lifecycle.NewAppliedResourceTransaction(
 				spec.Scope,
 				ownershipDisposition,
 				ownershipCurrent,
-				spec.Result,
-				spec.Cleanup,
+				result,
+				cleanup,
 			)
 			if ownershipErr != nil {
 				settlementProven = false
@@ -347,14 +355,10 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 		if err != nil {
 			var fallback *ResourceActivationFallback
 			if current == nil {
-				var fallbackErr error
-				fallback, fallbackErr = activationFallback(spec, err)
-				if fallbackErr != nil {
-					return lifecycle.AppliedResourceTransaction{}, errors.Join(err, fallbackErr)
-				}
+				fallback = activationFallback(spec, err)
 			}
 			if fallback != nil {
-				spec.Result = fallback.Result
+				fallbackResult := spec.result(transactionOutcome{fallback: &fallback.failure})
 				spec.Cleanup = fallback.Cleanup
 				if mutationOwned {
 					if abortErr := spec.Graph.Abort(spec.Mutation); abortErr != nil {
@@ -371,6 +375,7 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 					if commitErr := commitGraphMutation(spec.Graph, fallbackMutation); commitErr != nil {
 						return lifecycle.AppliedResourceTransaction{}, commitErr
 					}
+					graphCommitted = true
 					if fallback.AfterGraphReconcile != nil {
 						fallback.AfterGraphReconcile()
 					}
@@ -384,7 +389,7 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 					spec.Scope,
 					ownershipDisposition,
 					nil,
-					fallback.Result,
+					fallbackResult,
 					fallback.Cleanup,
 				)
 				if applyErr != nil {
@@ -405,8 +410,11 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 			return lifecycle.AppliedResourceTransaction{},
 				errors.New("job output: accepted transaction successor is nil")
 		}
-		if err := current.Publish(); err != nil {
-			return lifecycle.AppliedResourceTransaction{}, err
+		generation, starting := current.(*JobGeneration)
+		if !starting || generation.State() != JobActivating {
+			if err := current.Publish(); err != nil {
+				return lifecycle.AppliedResourceTransaction{}, err
+			}
 		}
 		if pendingInstallation != nil {
 			if err := pendingInstallation.reserveInstallation(); err != nil {
@@ -431,7 +439,7 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 		spec.Scope,
 		disposition,
 		current,
-		spec.Result,
+		spec.result(transactionOutcome{}),
 		spec.Cleanup,
 	)
 	if err != nil {
@@ -450,20 +458,17 @@ func (prt *PreparedResourceTransaction) Apply(ctx context.Context) (
 	return applied, nil
 }
 
-func activationFallback(spec ResourceTransactionSpec, err error) (*ResourceActivationFallback, error) {
+func activationFallback(spec ResourceTransactionSpec, err error) *ResourceActivationFallback {
 	if lifecycle.OwnershipRetained(err) {
-		return nil, nil
-	}
-	if _, ok := onlyRuntimeStartupFailure(err); ok && spec.ActivationStartupFallback != nil {
-		return spec.ActivationStartupFallback(err)
+		return nil
 	}
 	switch classifyActivationError(err).kind {
 	case activationFailureQuarantined:
-		return spec.ActivationQuarantinedFallback, nil
+		return spec.ActivationQuarantinedFallback
 	case activationFailureBusy:
-		return spec.ActivationBusyFallback, nil
+		return spec.ActivationBusyFallback
 	default:
-		return nil, nil
+		return nil
 	}
 }
 
@@ -560,9 +565,6 @@ func validateResourceTransactionSpec(spec ResourceTransactionSpec) error {
 	if spec.Successor != nil && spec.UnusedPermit.Valid() {
 		return errors.New("job output: transaction owns both successor and unused permit")
 	}
-	if spec.ActivationStartupFallback != nil && (spec.Successor == nil || spec.Graph == nil) {
-		return errors.New("job output: invalid startup activation fallback")
-	}
 	for _, fallback := range []*ResourceActivationFallback{
 		spec.ActivationBusyFallback,
 		spec.ActivationQuarantinedFallback,
@@ -570,7 +572,8 @@ func validateResourceTransactionSpec(spec ResourceTransactionSpec) error {
 		if fallback == nil {
 			continue
 		}
-		if spec.Successor == nil ||
+		if spec.reply == nil ||
+			spec.Successor == nil ||
 			spec.Graph == nil ||
 			fallback.Change.ID != spec.Scope.ID ||
 			fallback.Cleanup == nil {

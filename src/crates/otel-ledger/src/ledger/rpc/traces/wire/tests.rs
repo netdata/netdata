@@ -436,24 +436,77 @@ fn partial_status_serializes_reason_names_deterministically() {
     );
 }
 
+/// Every engine reason. The exhaustive match fails compilation when the
+/// engine gains a reason, so the pins below cannot silently miss it.
+fn every_partial_reason() -> Vec<PartialReason> {
+    let all = vec![
+        PartialReason::SizeCap,
+        PartialReason::SourceFailure,
+        PartialReason::WorkCeiling,
+        PartialReason::Cancelled,
+        PartialReason::OverviewCeiling,
+        PartialReason::RollupAbsent,
+        PartialReason::SlowestCeiling,
+        PartialReason::RemoteUnavailable,
+    ];
+    for reason in &all {
+        match reason {
+            PartialReason::SizeCap
+            | PartialReason::SourceFailure
+            | PartialReason::WorkCeiling
+            | PartialReason::Cancelled
+            | PartialReason::OverviewCeiling
+            | PartialReason::RollupAbsent
+            | PartialReason::SlowestCeiling
+            | PartialReason::RemoteUnavailable => {}
+        }
+    }
+    all
+}
+
 #[test]
 fn every_partial_reason_wire_name_is_pinned() {
     let mut b = StatusBuilder::new();
-    b.add(PartialReason::SizeCap);
-    b.add(PartialReason::SourceFailure);
-    b.add(PartialReason::WorkCeiling);
-    b.add(PartialReason::Cancelled);
-    b.add(PartialReason::OverviewCeiling);
-    b.add(PartialReason::RollupAbsent);
-    b.add(PartialReason::SlowestCeiling);
+    for reason in every_partial_reason() {
+        b.add(reason);
+    }
     let wire = StatusWire::from(&b.finish());
     assert_eq!(
         serde_json::to_value(&wire).unwrap(),
         json!({"partial": [
             "size_cap", "source_failure", "work_ceiling", "cancelled",
-            "overview_ceiling", "rollup_absent", "slowest_ceiling"
+            "overview_ceiling", "rollup_absent", "slowest_ceiling",
+            "remote_unavailable"
         ]})
     );
+}
+
+#[test]
+fn every_partial_reason_is_in_the_published_schema() {
+    // The published Functions schema closes the reason list; a wire name
+    // missing there makes a valid response fail schema validation.
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../plugins.d/FUNCTION_UI_SCHEMA.json"
+    );
+    let schema: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let published: Vec<&str> = schema["definitions"]["traces_status"]["oneOf"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|variant| variant["properties"]["partial"]["items"]["enum"].as_array())
+        .flatten()
+        .map(|name| name.as_str().unwrap())
+        .collect();
+    for reason in every_partial_reason() {
+        let wire = serde_json::to_value(PartialReasonWire::from(reason)).unwrap();
+        let name = wire.as_str().unwrap();
+        assert!(
+            published.contains(&name),
+            "{name} is not in {path}: {published:?}"
+        );
+    }
 }
 
 #[test]

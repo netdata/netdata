@@ -238,6 +238,7 @@ int mrg_unittest(void);
 int pluginsd_parser_unittest(void);
 int websocket_compression_unittest(void);
 int web_client_request_size_unittest(void);
+int rrdhost_machine_guid_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
 int unittest_stream_compressions(void);
@@ -512,6 +513,7 @@ int netdata_main(int argc, char **argv) {
                             if (pluginsd_parser_unittest()) return 1;
                             if (websocket_compression_unittest()) return 1;
                             if (web_client_request_size_unittest()) return 1;
+                            if (rrdhost_machine_guid_unittest()) return 1;
                             if (stream_conf_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
                             if (unit_test_buffer()) return 1;
@@ -524,6 +526,7 @@ int netdata_main(int argc, char **argv) {
                             if (exporting_opentsdb_telnet_unittest()) return 1;
                             if (ringbuffer_unittest()) return 1;
                             if (onewayalloc_unittest()) return 1;
+                            if (timezone_windows_mapping_unittest()) return 1;
                             if (log_stack_unittest()) return 1;
                             if (clocks_unittest()) return 1;
                             if (ws_client_unittest()) return 1;
@@ -684,6 +687,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "owatest") == 0) {
                             unittest_running = true;
                             return onewayalloc_unittest();
+                        }
+                        else if(strcmp(optarg, "timezonemaptest") == 0) {
+                            unittest_running = true;
+                            return timezone_windows_mapping_unittest();
                         }
                         else if(strcmp(optarg, "wsclienttest") == 0) {
                             unittest_running = true;

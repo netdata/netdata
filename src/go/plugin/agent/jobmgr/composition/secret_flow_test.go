@@ -99,10 +99,11 @@ jobs:
 	)
 	require.NoError(t, err)
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 	output := newProcessSynchronizedBuffer()
 	frames, err := lifecycle.NewFrameOwner(output)
 	require.NoError(t, err)
@@ -114,8 +115,9 @@ jobs:
 		Frames:          frames,
 		Modules:         modules,
 		Jobs:            jobs,
-		Secrets: runSecretServices{
-			Initial: initial,
+		Secrets: &SecretsConfig{
+			Providers: secretConfig.Providers,
+			Initial:   initial,
 		},
 		Discovery: testRunDiscoveryServices(t, jobConfig),
 	})
@@ -140,7 +142,7 @@ jobs:
 	require.Len(t, initial, 1)
 	require.Len(t, loadErrs, 2)
 	output.waitContains(t, "CONFIG go.d:secretstore:vault:valid create running job")
-	output.waitContains(t, "CONFIG go.d:collector:module:unrelated create running job")
+	output.waitContains(t, "CONFIG go.d:collector:module:unrelated status running")
 	require.NotContains(t, output.String(), "inferred_unknown")
 	require.NotContains(t, output.String(), "non_string_kind")
 	require.NoError(t, generation.run.DirtyCause())
@@ -195,12 +197,19 @@ func testProcessCoreSecretMutationDependentRestart(
 	modules := collectorapi.Registry{
 		"module": {
 			Create: func() collectorapi.CollectorV1 {
+				// Startup does not wait for initial Store acquisition, so discovery
+				// may build candidates that fail resolution and are cleaned before
+				// Init. Only collectors that reached Init are counted.
+				var initialized atomic.Bool
 				collector := &collectorapi.MockCollectorV1{
 					CleanupFunc: func(context.Context) {
-						cleanups.Add(1)
+						if initialized.Load() {
+							cleanups.Add(1)
+						}
 					},
 				}
 				collector.InitFunc = func(ctx context.Context) error {
+					initialized.Store(true)
 					starts <- collector.Config.OptionStr
 					if gateInitial && collector.Config.OptionStr == "initial" {
 						enterInitialOnce.Do(func() { close(initialEntered) })
@@ -245,6 +254,7 @@ func testProcessCoreSecretMutationDependentRestart(
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
@@ -258,7 +268,7 @@ func testProcessCoreSecretMutationDependentRestart(
 		}},
 	)
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 	initialStore := secretstore.Config{
 		"name":            "main",
 		"kind":            string(secretstore.KindVault),
@@ -276,8 +286,9 @@ func testProcessCoreSecretMutationDependentRestart(
 		ShutdownTimeout: time.Second,
 		Modules:         modules,
 		Jobs:            jobs,
-		Secrets: runSecretServices{
-			Initial: []secretstore.Config{initialStore},
+		Secrets: &SecretsConfig{
+			Providers: secretConfig.Providers,
+			Initial:   []secretstore.Config{initialStore},
 		},
 		Discovery:   testRunDiscoveryServices(t, jobConfig),
 		Diagnostics: testProcessDiagnostics(),
@@ -309,7 +320,7 @@ func testProcessCoreSecretMutationDependentRestart(
 			require.FailNow(t, "test failed", "initial collector did not enter its gated initialization")
 		}
 	} else {
-		output.waitContains(t, "CONFIG go.d:collector:module:job create running job")
+		output.waitContains(t, "CONFIG go.d:collector:module:job status running")
 	}
 
 	uid := "secret-" + command
@@ -336,7 +347,7 @@ func testProcessCoreSecretMutationDependentRestart(
 	}
 	waitSecretStart(t, starts, "replacement")
 	if gateInitial && !terminateAfterReplacementInit {
-		output.waitContains(t, "CONFIG go.d:collector:module:job create running job")
+		output.waitContains(t, "CONFIG go.d:collector:module:job status running")
 	}
 	if !gateInitial {
 		output.waitContains(t, "FUNCTION_RESULT_BEGIN "+uid+" 200 application/json")
@@ -346,7 +357,7 @@ func testProcessCoreSecretMutationDependentRestart(
 	} else {
 		output.waitContains(t, "CONFIG go.d:collector:module:job status failed")
 		wire := output.String()
-		require.Contains(t, wire, "dependent collector restarts failed for jobs: module:job")
+		require.NotContains(t, wire, "dependent collector restarts failed for jobs: module:job", "Store acceptance precedes later collector health")
 		require.NotContains(t, wire, "backend-sensitive-detail")
 	}
 	select {
@@ -378,8 +389,12 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 	modules := collectorapi.Registry{
 		"module": {
 			Create: func() collectorapi.CollectorV1 {
+				// Count only collectors that reached Init; see
+				// testProcessCoreSecretMutationDependentRestart.
+				var initialized atomic.Bool
 				collector := &collectorapi.MockCollectorV1{}
 				collector.InitFunc = func(context.Context) error {
+					initialized.Store(true)
 					starts <- collector.Config.OptionStr
 					if collector.Config.OptionStr == "replacement" {
 						replacementEnteredOnce.Do(func() { close(replacementEntered) })
@@ -388,7 +403,9 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 					return nil
 				}
 				collector.CleanupFunc = func(context.Context) {
-					cleanups.Add(1)
+					if initialized.Load() {
+						cleanups.Add(1)
+					}
 				}
 				return collector
 			},
@@ -418,6 +435,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
@@ -431,7 +449,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 		}},
 	)
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 	initialStore := secretstore.Config{
 		"name":            "main",
 		"kind":            string(secretstore.KindVault),
@@ -449,8 +467,9 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 		ShutdownTimeout: time.Second,
 		Modules:         modules,
 		Jobs:            jobs,
-		Secrets: runSecretServices{
-			Initial: []secretstore.Config{initialStore},
+		Secrets: &SecretsConfig{
+			Providers: secretConfig.Providers,
+			Initial:   []secretstore.Config{initialStore},
 		},
 		Discovery:   testRunDiscoveryServices(t, jobConfig),
 		Diagnostics: testProcessDiagnostics(),
@@ -477,7 +496,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 	}
 	// Collector Init precedes graph publication and dependency acknowledgement.
 	// The Running frame makes the initial dependent authoritative before update.
-	output.waitContains(t, "CONFIG go.d:collector:module:job create running job")
+	output.waitContains(t, "CONFIG go.d:collector:module:job status running")
 
 	_, writeStringErr := io.WriteString(
 		writer,
@@ -510,8 +529,10 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 	releaseOnce.Do(func() { close(releaseReplacement) })
 	waitSecretStart(t, starts, "replacement")
 	output.waitContains(t, "CONFIG go.d:collector:module:job status running")
-	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-cancel 499 application/json")
-	require.NotContains(t, output.String(), "FUNCTION_RESULT_BEGIN secret-cancel 200 application/json")
+	// The update applied, so it answers with its own result despite the
+	// cancellation; a 499 would make the daemon drop an applied change.
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-cancel 200 application/json")
+	require.NotContains(t, output.String(), "FUNCTION_RESULT_BEGIN secret-cancel 499 application/json")
 
 	require.EqualValues(t, 1, cleanups.Load())
 
@@ -527,6 +548,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 
 func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	var err error
 	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
@@ -538,11 +560,12 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 		}},
 	)
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -559,6 +582,10 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 	}()
 	output.waitContains(t, "CONFIG go.d:secretstore:vault create accepted template")
 
+	client := &secretAdoptionProcess{
+		t:       t,
+		process: process,
+	}
 	steps := []struct {
 		uid     string
 		command string
@@ -568,7 +595,7 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 		{
 			uid:     "secret-add",
 			command: "config go.d:secretstore:vault add main",
-			payload: `{"value":"initial"}`, status: 200,
+			payload: `{"value":"initial"}`, status: 202,
 		},
 		{
 			uid:     "secret-update-public-invalid",
@@ -592,10 +619,13 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 		{
 			uid:     "secret-invalid",
 			command: "config go.d:secretstore:vault add invalid",
-			payload: `{"value":"backend-sensitive-detail"}`, status: 400,
+			payload: `{"value":"backend-sensitive-detail"}`, status: 202,
 		},
 	}
 	for _, step := range steps {
+		// Responses and Running frames precede physical release of the Store attempt.
+		// Wait so contention cannot mask the next step's validation result.
+		client.waitStoreAttemptReleased("vault:main")
 		if step.payload == "" {
 
 			_, writeStringErr := io.WriteString(
@@ -615,8 +645,14 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 			require.NoError(t, err)
 		}
 		output.waitContains(t, "FUNCTION_RESULT_BEGIN "+step.uid+" "+strconv.Itoa(step.status)+" application/json")
+		if step.uid == "secret-add" {
+			output.waitContains(t, "CONFIG go.d:secretstore:vault:main create running job")
+		}
+		if step.uid == "secret-invalid" {
+			output.waitContains(t, "CONFIG go.d:secretstore:vault:invalid create failed job")
+		}
 	}
-	require.Contains(t, output.String(), `"Value":"initial"`)
+	require.Contains(t, output.String(), `"value":"initial"`)
 	require.Contains(
 		t,
 		output.String(),
@@ -672,11 +708,13 @@ func TestProcessCoreVaultOperationalTest(t *testing.T) {
 	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{vaultbackend.New()})
 	require.NoError(t, err)
 	jobs := testRunJobServices(t)
-	jobs.StoreCreators = creators
+	secretConfig := testRunSecrets(t)
+	secretConfig.Providers.Creators = creators
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -709,7 +747,7 @@ func TestProcessCoreVaultOperationalTest(t *testing.T) {
 			uid:     "vault-add",
 			command: "config go.d:secretstore:vault add main",
 			payload: validPayload,
-			status:  200,
+			status:  202,
 		},
 		{
 			uid:     "vault-test-stored",
@@ -753,6 +791,9 @@ func TestProcessCoreVaultOperationalTest(t *testing.T) {
 			t,
 			"FUNCTION_RESULT_BEGIN "+step.uid+" "+strconv.Itoa(step.status)+" application/json",
 		)
+		if step.uid == "vault-add" {
+			output.waitContains(t, "CONFIG go.d:secretstore:vault:main create running job")
+		}
 	}
 
 	wire := output.String()
@@ -803,11 +844,13 @@ func TestProcessCoreAWSOperationalTest(t *testing.T) {
 	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{awsbackend.New()})
 	require.NoError(t, err)
 	jobs := testRunJobServices(t)
-	jobs.StoreCreators = creators
+	secretConfig := testRunSecrets(t)
+	secretConfig.Providers.Creators = creators
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -836,7 +879,7 @@ func TestProcessCoreAWSOperationalTest(t *testing.T) {
 			uid:     "aws-add",
 			command: "config go.d:secretstore:aws-sm add main",
 			payload: storedPayload,
-			status:  200,
+			status:  202,
 		},
 		{
 			uid:     "aws-test-stored",
@@ -874,6 +917,9 @@ func TestProcessCoreAWSOperationalTest(t *testing.T) {
 			t,
 			"FUNCTION_RESULT_BEGIN "+step.uid+" "+strconv.Itoa(step.status)+" application/json",
 		)
+		if step.uid == "aws-add" {
+			output.waitContains(t, "CONFIG go.d:secretstore:aws-sm:main create running job")
+		}
 	}
 
 	wire := output.String()
@@ -892,7 +938,7 @@ func TestProcessCoreAWSOperationalTest(t *testing.T) {
 	}
 }
 
-func TestProcessCoreCancelledStoreMaterializationDoesNotHoldJobGraph(t *testing.T) {
+func TestProcessCoreAcceptedStoreSurvivesRequestCancellationWithoutHoldingJobGraph(t *testing.T) {
 	gate := newProcessBlockingStoreGate()
 	t.Cleanup(gate.release)
 	modules := collectorapi.Registry{
@@ -922,21 +968,27 @@ func TestProcessCoreCancelledStoreMaterializationDoesNotHoldJobGraph(t *testing.
 		},
 	}
 	jobs := testRunJobServices(t)
-	jobs.Defaults = confgroup.Registry{"module": {UpdateEvery: 1}}
+	secretConfig := testRunSecrets(t)
+	jobs.Defaults = confgroup.Registry{
+		"module": {UpdateEvery: 1},
+	}
 	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
 		Kind:   secretstore.KindVault,
 		Schema: `{}`,
 		Create: func() secretstore.Store {
-			return &processBlockingSecretStore{gate: gate}
+			return &processBlockingSecretStore{
+				gate: gate,
+			}
 		},
 	}})
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -1005,7 +1057,9 @@ release:
 		}
 	}
 	gate.release()
-	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-blocked 499 application/json")
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-blocked 202 application/json")
+	output.waitContains(t, "CONFIG go.d:secretstore:vault:main create running job")
+	require.NotContains(t, output.String(), "FUNCTION_RESULT_BEGIN secret-blocked 499 application/json")
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN job-add-while-store-blocked 202 application/json")
 
 	controls.sendTerminate(testProcessControl())
@@ -1022,20 +1076,24 @@ func TestProcessCoreRotationFencesLateStoreMaterializationAndFreshEpochProceeds(
 	gate := newProcessBlockingStoreGate()
 	t.Cleanup(gate.release)
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
 		Kind:   secretstore.KindVault,
 		Schema: `{}`,
 		Create: func() secretstore.Store {
-			return &processBlockingSecretStore{gate: gate}
+			return &processBlockingSecretStore{
+				gate: gate,
+			}
 		},
 	}})
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -1085,7 +1143,8 @@ func TestProcessCoreRotationFencesLateStoreMaterializationAndFreshEpochProceeds(
 			"FUNCTION_PAYLOAD_END\n",
 	)
 	require.NoError(t, err)
-	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-fresh-epoch 200 application/json")
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-fresh-epoch 202 application/json")
+	output.waitContains(t, "CONFIG go.d:secretstore:vault:main create running job")
 
 	_, err = io.WriteString(
 		writer,
@@ -1095,9 +1154,21 @@ func TestProcessCoreRotationFencesLateStoreMaterializationAndFreshEpochProceeds(
 	)
 	require.NoError(t, err)
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-fresh-get 200 application/json")
-	require.Contains(t, output.String(), `"Value":"replacement"`)
+	require.Contains(t, output.String(), `"value":"replacement"`)
 
 	gate.release()
+	require.Eventually(t, func() bool {
+		return process.attempts.Census().Active == 0
+	}, time.Second, 10*time.Millisecond)
+	client := &secretAdoptionProcess{
+		t:      t,
+		writer: writer,
+		output: output,
+	}
+	require.JSONEq(t, `{"value":"replacement"}`,
+		client.call("secret-after-old-release", "config go.d:secretstore:vault:main get", "", 200))
+	require.Equal(t, 1, strings.Count(output.String(), "CONFIG go.d:secretstore:vault:main create running job"),
+		"old epoch completion published over the fresh Store")
 	terminate := testProcessControl()
 	controls.sendTerminate(terminate)
 	require.NoError(t, <-terminate.result)
@@ -1105,7 +1176,7 @@ func TestProcessCoreRotationFencesLateStoreMaterializationAndFreshEpochProceeds(
 }
 
 func TestProcessCoreStoreRemovalCancelsPendingMaterializationAuthoritatively(t *testing.T) {
-	t.Run("running update", func(t *testing.T) {
+	t.Run("canceled running update", func(t *testing.T) {
 		testProcessCoreStoreRemovalCancelsPendingMaterialization(t, true)
 	})
 	t.Run("previously absent add", func(t *testing.T) {
@@ -1117,20 +1188,24 @@ func testProcessCoreStoreRemovalCancelsPendingMaterialization(t *testing.T, inst
 	gate := newProcessBlockingStoreGate()
 	t.Cleanup(gate.release)
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
 		Kind:   secretstore.KindVault,
 		Schema: `{}`,
 		Create: func() secretstore.Store {
-			return &processBlockingSecretStore{gate: gate}
+			return &processBlockingSecretStore{
+				gate: gate,
+			}
 		},
 	}})
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -1146,6 +1221,12 @@ func testProcessCoreStoreRemovalCancelsPendingMaterialization(t *testing.T, inst
 		done <- process.run(context.Background(), controls)
 	}()
 	output.waitContains(t, "CONFIG go.d:secretstore:vault create accepted template")
+	client := &secretAdoptionProcess{
+		t:       t,
+		writer:  writer,
+		output:  output,
+		process: process,
+	}
 
 	if installInitial {
 		_, err = io.WriteString(
@@ -1157,7 +1238,10 @@ func testProcessCoreStoreRemovalCancelsPendingMaterialization(t *testing.T, inst
 				"FUNCTION_PAYLOAD_END\n",
 		)
 		require.NoError(t, err)
-		output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove-initial 200 application/json")
+		output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove-initial 202 application/json")
+		output.waitContains(t, "CONFIG go.d:secretstore:vault:main create running job")
+		// Running publication precedes physical release of the acquisition attempt.
+		client.waitStoreAttemptReleased("vault:main")
 	}
 
 	command := "\"config go.d:secretstore:vault add main\" "
@@ -1179,6 +1263,16 @@ func testProcessCoreStoreRemovalCancelsPendingMaterialization(t *testing.T, inst
 		require.FailNow(t, "test failed", "Store update did not enter blocking Init")
 	}
 
+	if installInitial {
+		_, err = io.WriteString(writer, "FUNCTION_CANCEL secret-remove-blocked\n")
+		require.NoError(t, err)
+		output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove-blocked 499 application/json")
+		require.JSONEq(t, `{"value":"initial"}`,
+			client.call("secret-canceled-get", "config go.d:secretstore:vault:main get", "", 200))
+	} else {
+		output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove-blocked 202 application/json")
+	}
+
 	_, err = io.WriteString(
 		writer,
 		"FUNCTION secret-remove 30 "+
@@ -1186,7 +1280,6 @@ func testProcessCoreStoreRemovalCancelsPendingMaterialization(t *testing.T, inst
 			"0xFFFF \"user=test\"\n",
 	)
 	require.NoError(t, err)
-	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove-blocked 503 application/json")
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove 200 application/json")
 
 	gate.release()
@@ -1216,20 +1309,24 @@ func TestProcessCoreRetriesLatestPendingStoreAfterStuckIdentityReleases(t *testi
 	gate := newProcessBlockingStoreGate()
 	t.Cleanup(gate.release)
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
 		Kind:   secretstore.KindVault,
 		Schema: `{}`,
 		Create: func() secretstore.Store {
-			return &processBlockingSecretStore{gate: gate}
+			return &processBlockingSecretStore{
+				gate: gate,
+			}
 		},
 	}})
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
+		Secrets:         secretConfig,
 		Input:           reader,
 		Output:          output,
 		ShutdownTimeout: time.Second,
@@ -1270,20 +1367,21 @@ func TestProcessCoreRetriesLatestPendingStoreAfterStuckIdentityReleases(t *testi
 	)
 	require.NoError(t, err)
 
-	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-pending-v1 503 application/json")
-	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-pending-v2 503 application/json")
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-pending-v1 202 application/json")
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-pending-v2 202 application/json")
+	client := &secretAdoptionProcess{
+		t:      t,
+		writer: writer,
+		output: output,
+	}
+	client.call("secret-pending-rejected", "config go.d:secretstore:vault:main update", `{"value":"rejected"}`, 503)
+	require.JSONEq(t, `{"value":"replacement"}`,
+		client.call("secret-pending-before-release", "config go.d:secretstore:vault:main get", "", 200))
 	gate.release()
 	output.waitContains(t, "CONFIG go.d:secretstore:vault:main create running job")
 
-	_, err = io.WriteString(
-		writer,
-		"FUNCTION secret-pending-get 30 "+
-			"\"config go.d:secretstore:vault:main get\" "+
-			"0xFFFF \"user=test\"\n",
-	)
-	require.NoError(t, err)
-	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-pending-get 200 application/json")
-	require.Contains(t, output.String(), `"Value":"replacement"`)
+	require.JSONEq(t, `{"value":"replacement"}`,
+		client.call("secret-pending-get", "config go.d:secretstore:vault:main get", "", 200))
 
 	controls.sendTerminate(testProcessControl())
 	select {
@@ -1341,6 +1439,7 @@ func TestProcessCoreSecretUpdateYieldsJobGraphDuringRestartProbe(t *testing.T) {
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
@@ -1354,7 +1453,7 @@ func TestProcessCoreSecretUpdateYieldsJobGraphDuringRestartProbe(t *testing.T) {
 		}},
 	)
 	require.NoError(t, err)
-	jobs.StoreCreators = creators
+	secretConfig.Providers.Creators = creators
 	initialStore := secretstore.Config{
 		"name":            "main",
 		"kind":            string(secretstore.KindVault),
@@ -1371,8 +1470,9 @@ func TestProcessCoreSecretUpdateYieldsJobGraphDuringRestartProbe(t *testing.T) {
 		ShutdownTimeout: time.Second,
 		Modules:         modules,
 		Jobs:            jobs,
-		Secrets: runSecretServices{
-			Initial: []secretstore.Config{initialStore},
+		Secrets: &SecretsConfig{
+			Providers: secretConfig.Providers,
+			Initial:   []secretstore.Config{initialStore},
 		},
 		Discovery:   testRunDiscoveryServices(t, jobConfig),
 		Diagnostics: testProcessDiagnostics(),
@@ -1383,7 +1483,7 @@ func TestProcessCoreSecretUpdateYieldsJobGraphDuringRestartProbe(t *testing.T) {
 	go func() {
 		done <- process.run(context.Background(), controls)
 	}()
-	output.waitContains(t, "CONFIG go.d:collector:module:job create running job")
+	output.waitContains(t, "CONFIG go.d:collector:module:job status running")
 
 	_, writeStringErr := io.WriteString(
 		writer,
@@ -1414,8 +1514,8 @@ func TestProcessCoreSecretUpdateYieldsJobGraphDuringRestartProbe(t *testing.T) {
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN job-add 202 application/json")
 	output.waitContains(t, "CONFIG go.d:collector:module:other create accepted job")
 
-	releaseOnce.Do(func() { close(releaseRestart) })
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-rotation 200 application/json")
+	releaseOnce.Do(func() { close(releaseRestart) })
 
 	controls.sendTerminate(testProcessControl())
 	select {

@@ -16,19 +16,31 @@ func TestDynCfgResolveRequestReportsArgumentErrors(t *testing.T) {
 	}{
 		"empty Add name": {
 			args:        []string{"go.d:collector:module", "add", ""},
-			wantFailure: newDynCfgFailure(400, "invalid or missing job name."),
+			wantFailure: newDynCfgFailure(failureBadRequest, "invalid or missing job name."),
 		},
 		"missing Add name argument": {
 			args:        []string{"go.d:collector:module", "add"},
-			wantFailure: newDynCfgFailure(400, "missing required arguments: need 3, got 2"),
+			wantFailure: newDynCfgFailure(failureBadRequest, "missing required arguments: need 3, got 2"),
 		},
 		"invalid non-empty Add name": {
 			args:        []string{"go.d:collector:module", "add", "job.name"},
-			wantFailure: newDynCfgFailure(400, "Unacceptable job name 'job.name': contains '.'."),
+			wantFailure: newDynCfgFailure(failureBadRequest, "Unacceptable job name 'job.name': contains '.'."),
+		},
+		"Add name with a colon is not rewritten": {
+			args:        []string{"go.d:collector:module", "add", "a:b"},
+			wantFailure: newDynCfgFailure(failureBadRequest, "Unacceptable job name 'a:b': contains ':'."),
+		},
+		"Add name with a space is not rewritten": {
+			args:        []string{"go.d:collector:module", "add", "a b"},
+			wantFailure: newDynCfgFailure(failureBadRequest, "Unacceptable job name 'a b': contains spaces."),
+		},
+		"Test name with a colon is not rewritten": {
+			args:        []string{"go.d:collector:module", "test", "a:b"},
+			wantFailure: newDynCfgFailure(failureBadRequest, "Unacceptable job name 'a:b': contains ':'."),
 		},
 		"non-Add command missing ID name": {
 			args:        []string{"go.d:collector:module", "remove"},
-			wantFailure: newDynCfgFailure(400, "invalid config ID format."),
+			wantFailure: newDynCfgFailure(failureBadRequest, "invalid config ID format."),
 		},
 	}
 

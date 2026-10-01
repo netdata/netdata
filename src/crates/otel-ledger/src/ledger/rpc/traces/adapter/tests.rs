@@ -345,6 +345,12 @@ fn summary_ranked(id_byte: u8, envelope_ns: i64, rank_ns: i64) -> sfsq::traces::
         duration_ns: 100,
         span_count: 2,
         error_count: 0,
+        service_breakdown: sfsq::traces::ServiceBreakdown {
+            top: vec![("svc".into(), 2)],
+            other: 0,
+            other_services: 0,
+            unattributed: 0,
+        },
         matched_count: 2,
         matched_spans: vec![],
         exact: true,
@@ -399,6 +405,29 @@ fn cursor_freezes_the_original_window_while_coverage_declares_the_widened_range(
     );
     let cursor = parse_cursor(v["anchor"]["next"].as_str().unwrap()).unwrap();
     assert_eq!((cursor.after_s, cursor.before_s), WIN);
+}
+
+#[test]
+fn search_rows_carry_the_service_breakdown() {
+    let mut t = summary(1, 300);
+    t.span_count = 12;
+    t.service_breakdown = sfsq::traces::ServiceBreakdown {
+        top: vec![("frontend".into(), 6), ("cart".into(), 3)],
+        other: 2,
+        other_services: 2,
+        unattributed: 1,
+    };
+    let r = to_search_result(search_data(vec![t]), 2, None, WIN, WIN_COVERAGE);
+    let v = serde_json::to_value(&r).unwrap();
+    assert_eq!(
+        v["traces"][0]["service_breakdown"],
+        json!({
+            "top": [{"value": "frontend", "spans": 6}, {"value": "cart", "spans": 3}],
+            "other": 2,
+            "other_services": 2,
+            "unattributed": 1,
+        })
+    );
 }
 
 #[test]
@@ -491,6 +520,27 @@ fn partial_full_page_ends_the_walk_with_the_status_saying_why() {
     assert_eq!(
         serde_json::to_value(&r.status).unwrap(),
         json!({"partial": ["work_ceiling"]})
+    );
+}
+
+#[test]
+fn remote_unavailable_full_page_ends_the_walk() {
+    // A source that could not be downloaded may hold better-ranked
+    // traces: the page is not a stable prefix, so no cursor, and the
+    // status names the reason.
+    let mut b = sfsq::traces::StatusBuilder::new();
+    b.add(sfsq::traces::PartialReason::RemoteUnavailable);
+    let data = SearchData {
+        traces: vec![summary(1, 300), summary(2, 200)],
+        status: b.finish(),
+        field_kinds: FieldKinds::default(),
+    };
+    let r = to_search_result(data, 2, None, WIN, WIN_COVERAGE);
+    assert_eq!(r.items.returned, 2, "the page itself is full");
+    assert!(r.anchor.is_none());
+    assert_eq!(
+        serde_json::to_value(&r.status).unwrap(),
+        json!({"partial": ["remote_unavailable"]})
     );
 }
 

@@ -235,8 +235,14 @@ func TestCollectorStoreWarmPathAllocationShape(t *testing.T) {
 	largeReadAllocs := testing.AllocsPerRun(100, func() {
 		projectionReaderSink = large.Read(ReadFlatten())
 	})
-	require.LessOrEqual(t, smallReadAllocs, float64(3))
+	// A warm read through the interface allocates its reader and the variadic option
+	// array; resolving options allocates nothing beyond the host-scope option value.
+	require.LessOrEqual(t, smallReadAllocs, float64(2))
 	require.Equal(t, smallReadAllocs, largeReadAllocs)
+	scopedReadAllocs := testing.AllocsPerRun(100, func() {
+		projectionReaderSink = large.Read(ReadRaw(), ReadFlatten(), ReadHostScope("scope"))
+	})
+	require.LessOrEqual(t, scopedReadAllocs, float64(3))
 
 	smallReader := small.Read(ReadRaw())
 	largeReader := large.Read(ReadRaw())

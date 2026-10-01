@@ -6,7 +6,7 @@ artifacts="$(realpath "${1}")"
 signing_key="${2:-}"
 
 TOP="$(pwd)"
-DISTFILE_EXTENSIONS="gz"
+DISTFILE_EXTENSIONS="gz zst"
 MSI_ARCHES="x64"
 STATIC_ARCHES="x86_64 aarch64 armv6l armv7l"
 STATIC_EXTENSIONS="gz"

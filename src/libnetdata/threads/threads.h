@@ -14,6 +14,7 @@ typedef enum __attribute__((packed)) {
     NETDATA_THREAD_STATUS_STARTED          = 1 << 2,
     NETDATA_THREAD_STATUS_FINISHED         = 1 << 3,
     NETDATA_THREAD_STATUS_JOINED           = 1 << 4,
+    NETDATA_THREAD_STATUS_MANUAL_JOIN      = 1 << 5,
 } NETDATA_THREAD_OPTIONS;
 
 #define NETDATA_THREAD_OPTIONS_ALL (NETDATA_THREAD_OPTION_DONT_LOG_STARTUP | NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP)
@@ -76,6 +77,7 @@ void netdata_threads_init_for_external_plugins(size_t stacksize);
 
 ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, void (*start_routine) (void *), void *arg);
 int nd_thread_join(ND_THREAD * nti);
+void nd_thread_set_manual_join(ND_THREAD *nti);
 ND_THREAD *nd_thread_self(void);
 bool nd_thread_is_me(ND_THREAD *nti);
 

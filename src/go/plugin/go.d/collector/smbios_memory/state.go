@@ -14,13 +14,23 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smbios_memory/internal/inventory"
 )
 
-const stateVersion = 1
+// stateVersion 2 identifies slots by bank and device locator; version 1 used
+// the device locator alone and is upgraded on read.
+const stateVersion = 2
 
 // discrepancy is one accepted slot that is missing or smaller than accepted.
 type discrepancy struct {
+	Bank    string `json:"bank,omitempty"`
 	Locator string `json:"locator"`
 	Missing bool   `json:"missing"`
 	Deficit uint64 `json:"deficit_bytes"`
+}
+
+func (l discrepancy) slot() slotKey {
+	return slotKey{
+		bank:    l.Bank,
+		locator: l.Locator,
+	}
 }
 
 // persistentState is the private envelope saved under the Agent's varlib directory:
@@ -32,30 +42,85 @@ type persistentState struct {
 	Baseline   []inventory.Device `json:"baseline"`
 	Loss       []discrepancy      `json:"loss,omitempty"`
 	LossAt     time.Time          `json:"loss_at,omitempty"`
+
+	// locatorKeyed marks a state upgraded from version 1 until a comparable
+	// table has been matched with it; see adoptBanks.
+	locatorKeyed bool
 }
 
 func (s *persistentState) validate(owner string) error {
 	if s.Version != stateVersion || owner == "" || s.Owner != owner || s.AcceptedAt.IsZero() || len(s.Baseline) == 0 {
 		return errors.New("memory baseline has unsupported version, owner or content")
 	}
-	accepted := make(map[string]uint64, len(s.Baseline))
+	accepted := make(map[slotKey]uint64, len(s.Baseline))
 	for _, d := range s.Baseline {
-		if d.Locator == "" || accepted[d.Locator] != 0 || d.Capacity == nil || *d.Capacity == 0 ||
+		slot := slotOf(d)
+		if d.Locator == "" || accepted[slot] != 0 || d.Capacity == nil || *d.Capacity == 0 ||
 			d.Population != inventory.PopulationPopulated {
 			return errors.New("memory baseline contains an invalid slot")
 		}
-		accepted[d.Locator] = *d.Capacity
+		accepted[slot] = *d.Capacity
 	}
-	lost := make(map[string]bool, len(s.Loss))
+	lost := make(map[slotKey]bool, len(s.Loss))
 	for _, l := range s.Loss {
-		capacity := accepted[l.Locator]
-		if capacity == 0 || lost[l.Locator] || l.Deficit == 0 || l.Deficit > capacity ||
+		capacity := accepted[l.slot()]
+		if capacity == 0 || lost[l.slot()] || l.Deficit == 0 || l.Deficit > capacity ||
 			(l.Missing && l.Deficit != capacity) || s.LossAt.IsZero() {
 			return errors.New("memory baseline contains invalid loss evidence")
 		}
-		lost[l.Locator] = true
+		lost[l.slot()] = true
 	}
 	return nil
+}
+
+// upgrade converts a version 1 envelope in memory. Version 1 required unique
+// device locators, so each recorded loss names exactly one accepted slot, whose
+// bank it takes. The file itself is rewritten only by the next state change.
+func (s *persistentState) upgrade() {
+	if s.Version != 1 {
+		return
+	}
+	banks := make(map[string]string, len(s.Baseline))
+	for _, d := range s.Baseline {
+		if _, ok := banks[d.Locator]; ok {
+			return // not a valid version 1 baseline; validation rejects it
+		}
+		banks[d.Locator] = d.Bank
+	}
+	for i := range s.Loss {
+		s.Loss[i].Bank = banks[s.Loss[i].Locator]
+	}
+	s.Version = stateVersion
+	s.locatorKeyed = true
+}
+
+// adoptBanks matches an upgraded version 1 state with the first comparable
+// table the way version 1 did, by device locator, and takes the table's banks.
+// Version 1 kept the bank it first saw as descriptive metadata, so firmware may
+// have renamed it since. A table whose locators repeat cannot be matched that
+// way, and the saved banks remain.
+func (s *persistentState) adoptBanks(devices []inventory.Device) {
+	if !s.locatorKeyed {
+		return
+	}
+	s.locatorKeyed = false
+	banks := make(map[string]string, len(devices))
+	for _, d := range devices {
+		if _, ok := banks[d.Locator]; ok {
+			return
+		}
+		banks[d.Locator] = d.Bank
+	}
+	for i, d := range s.Baseline {
+		if bank, ok := banks[d.Locator]; ok {
+			s.Baseline[i].Bank = bank
+		}
+	}
+	for i, l := range s.Loss {
+		if bank, ok := banks[l.Locator]; ok {
+			s.Loss[i].Bank = bank
+		}
+	}
 }
 
 // baselineStore owns the state file of the running canonical job. A read-only
@@ -100,6 +165,9 @@ func (b *baselineStore) load() {
 func (b *baselineStore) reconcile(table *inventory.Table, now time.Time) error {
 	if b.err != nil || (b.current == nil && table.Populated == 0) {
 		return nil
+	}
+	if b.current != nil {
+		b.current.adoptBanks(table.Devices)
 	}
 	next := proposedState(b.current, table, b.owner, now)
 	if !b.dirty && reflect.DeepEqual(b.current, next) {
@@ -148,6 +216,7 @@ func readState(path, owner string) (*persistentState, error) {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return nil, fmt.Errorf("decode memory baseline: %w", err)
 	}
+	s.upgrade()
 	if err := s.validate(owner); err != nil {
 		return nil, err
 	}

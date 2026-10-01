@@ -188,6 +188,8 @@ Netdata generates a local MCP API key automatically on startup. Authentication b
 
 - **Bearer protection disabled (`no`)**: anonymous MCP access works for non-sensitive operations (metrics, alerts, node info). The API key unlocks sensitive operations.
 - **Bearer protection enabled (`yes`)**: anonymous MCP access is rejected on all MCP transports (HTTP, SSE, WebSocket). The API key is required for all MCP requests.
+- **Claiming required**: the Agent accepts the API key only while it is claimed to Netdata Cloud. On an unclaimed Agent every key is rejected, so with bearer protection enabled MCP is unavailable.
+- **MCP only**: the API key does not authorize the Agent's REST API (`/api/...`). With bearer protection enabled, those endpoints still require a Cloud-issued bearer token.
 
 ### Transport Options
 

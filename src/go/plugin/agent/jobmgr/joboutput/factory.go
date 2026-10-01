@@ -83,6 +83,7 @@ type Factory struct {
 	config           FactoryConfig
 	startupTimeout   time.Duration
 	notifyRunFailure func(lifecycle.ResourceIdentity, *jobruntime.RunFailure)
+	notifyRunReady   func(lifecycle.ResourceIdentity)
 	runtimeStaging   bool
 	runWithoutClaims func(context.Context, func(context.Context) error) (error, error)
 }
@@ -94,6 +95,7 @@ type factoryAttachment struct {
 	scheduler        *Scheduler
 	observer         lifecycle.RuntimeObserver
 	notifyRunFailure func(lifecycle.ResourceIdentity, *jobruntime.RunFailure)
+	notifyRunReady   func(lifecycle.ResourceIdentity)
 }
 
 func (f *Factory) attachment() factoryAttachment {
@@ -107,6 +109,7 @@ func (f *Factory) attachment() factoryAttachment {
 		scheduler:        f.config.Scheduler,
 		observer:         f.config.Observer,
 		notifyRunFailure: f.notifyRunFailure,
+		notifyRunReady:   f.notifyRunReady,
 	}
 }
 
@@ -135,6 +138,11 @@ func (fa factoryAttachment) attach(
 	owner.notifyTerminal = func(failure *jobruntime.RunFailure) {
 		if fa.notifyRunFailure != nil {
 			fa.notifyRunFailure(identity, failure)
+		}
+	}
+	owner.notifyStartup = func() {
+		if fa.notifyRunReady != nil {
+			fa.notifyRunReady(identity)
 		}
 	}
 	attached.Observer = fa.observer
@@ -228,9 +236,6 @@ func (f *Factory) ValidateConfig(ctx context.Context, config confgroup.Config) e
 		return invalidJobConfiguration(
 			fmt.Errorf("job output: function_only is set but module %q declares no Functions", config.Module()),
 		)
-	}
-	if _, err := f.lookupVNode(config); err != nil {
-		return err
 	}
 	return f.config.ConfigModules.Validate(ctx, config)
 }

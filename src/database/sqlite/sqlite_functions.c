@@ -674,7 +674,7 @@ void sql_close_database(sqlite3 *database, const char *database_name)
     netdata_log_info("%s: Closing sqlite database", database_name);
 
 #ifdef NETDATA_DEV_MODE
-    int t_count_used,t_count_hit,t_count_miss,t_count_full, dummy;
+    int t_count_used = 0, t_count_hit = 0, t_count_miss = 0, t_count_full = 0, dummy;
     (void) sqlite3_db_status(database, SQLITE_DBSTATUS_LOOKASIDE_USED, &dummy, &t_count_used, 0);
     (void) sqlite3_db_status(database, SQLITE_DBSTATUS_LOOKASIDE_HIT, &dummy,&t_count_hit, 0);
     (void) sqlite3_db_status(database, SQLITE_DBSTATUS_LOOKASIDE_MISS_SIZE, &dummy,&t_count_miss, 0);

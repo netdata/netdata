@@ -40,7 +40,16 @@ func (s *runtimeStoreView) Read(opts ...ReadOption) Reader {
 	if cfg.flatten {
 		snap = flattenSnapshot(snap)
 	}
-	return &storeReader{snap: snap, raw: cfg.raw, flattened: cfg.flatten, hostScopeKey: cfg.hostScopeKey}
+	return &storeReader{
+		snap:         snap,
+		raw:          cfg.raw,
+		flattened:    cfg.flatten,
+		hostScopeKey: cfg.hostScopeKey,
+	}
+}
+
+func (s *runtimeStoreView) WriteBatch(fn func()) {
+	s.backend.writeBatch(fn)
 }
 
 func (s *runtimeStoreView) Write() RuntimeWriter {
@@ -84,5 +93,6 @@ func (r *runtimeStoreBackend) registerInstrument(name string, kind metricKind, m
 }
 
 var _ RuntimeStore = (*runtimeStoreView)(nil)
+var _ RuntimeBatchWriter = (*runtimeStoreView)(nil)
 var _ RuntimeWriter = (*runtimeWriteView)(nil)
 var _ meterBackend = (*runtimeStoreBackend)(nil)

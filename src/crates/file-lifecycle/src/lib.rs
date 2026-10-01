@@ -12,6 +12,7 @@
 //! - [`storage`] — the opendal-backed [`storage::Storage`] trait + client;
 //! - [`remote_keys`] — the object-storage key scheme (signal-segmented);
 //! - [`chunk`] — the query-time chunk cache;
+//! - [`remote_read`] — reading evicted files back through the download cache;
 //! - [`query`] — neutral candidate selection over the registry;
 //! - [`recovery`] — startup reconciliation (local + remote);
 //! - [`upload_retry`] — the failed-upload backoff queue;
@@ -34,6 +35,7 @@ pub mod recovery;
 pub(crate) mod redact;
 pub mod registry;
 pub mod remote_keys;
+pub mod remote_read;
 pub mod storage;
 pub mod upload_retry;
 pub mod uploader;

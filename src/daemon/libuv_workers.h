@@ -147,6 +147,7 @@ typedef struct {
 
 
 void register_libuv_worker_jobs();
+bool libuv_worker_thread_is_current(void);
 void libuv_close_callback(uv_handle_t *handle, void *data __maybe_unused);
 
 void init_worker_pool(WorkerPool *pool);

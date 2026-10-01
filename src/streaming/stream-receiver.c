@@ -456,7 +456,7 @@ static void stream_receiver_log_poll_error(
             stream_receiver_automatic_keepalive_idle(rpt) :
             rpt->config.tcp_keepalive.idle_s;
         snprintfz(keepalive, sizeof(keepalive),
-                  "enabled policy=%s idle=%us interval=%us probes=%u",
+                  "enabled policy=%s idle=%us interval=%ds probes=%d",
                   rpt->config.tcp_keepalive.automatic ? "automatic" : "configured",
                   idle_s, CONNECTION_PROBE_INTERVAL_SECONDS, CONNECTION_PROBE_COUNT);
 #else

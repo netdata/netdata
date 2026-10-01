@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
@@ -127,6 +126,7 @@ func (p *Pipeline) Test(ctx context.Context) (bool, error) {
 func (p *Pipeline) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	p.Info("instance is started")
 	defer p.Info("instance is stopped")
+	ctx, cancel := context.WithCancel(ctx)
 
 	p.accum.discoverers = p.discoverers
 
@@ -134,14 +134,16 @@ func (p *Pipeline) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	done := make(chan struct{})
 
 	go func() { defer close(done); p.accum.run(ctx, updates) }()
+	defer func() {
+		// Panic recovery belongs to the runtime owner. Its reservation may only
+		// release after all children exit, including during panic unwinding.
+		cancel()
+		<-done
+	}()
 
 	for {
 		select {
 		case <-ctx.Done():
-			select {
-			case <-done:
-			case <-time.After(time.Second * 10):
-			}
 			return
 		case <-done:
 			return
@@ -150,7 +152,7 @@ func (p *Pipeline) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 			if cfggs := p.processGroups(tggs); len(cfggs) > 0 {
 				select {
 				case <-ctx.Done():
-				case in <- cfggs: // FIXME: potentially stale configs if upstream cannot receive (blocking)
+				case in <- cfggs: // The SD state owner fences the runtime before forwarding.
 				}
 			}
 		}
@@ -176,7 +178,9 @@ func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 		}
 		delete(p.configs, tgg.Source())
 
-		return &confgroup.Group{Source: tgg.Source()}
+		return &confgroup.Group{
+			Source: tgg.Source(),
+		}
 	}
 
 	targetsCache, ok := p.configs[tgg.Source()]
@@ -237,7 +241,9 @@ func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 	}
 
 	// TODO: deepcopy?
-	cfgGroup := &confgroup.Group{Source: tgg.Source()}
+	cfgGroup := &confgroup.Group{
+		Source: tgg.Source(),
+	}
 
 	for _, cfgs := range targetsCache {
 		cfgGroup.Configs = append(cfgGroup.Configs, cfgs...)

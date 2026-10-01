@@ -61,8 +61,9 @@ remote_storage:
   uri: "fs://@logdir_POST@/otel/v2/remote"
 
   # Data deleted from local disk by retention but still in remote storage is
-  # fetched back into a bounded local cache when a query needs it. Cap for
-  # that cache:
+  # downloaded back into a local cache (<base_dir>/remote-read) when a query
+  # needs it. One cache serves logs and traces; a query needing more than it
+  # holds fails with a narrow-the-range error. Cap for that cache:
   read_cache_max_size: "1GB"
 
 auth:

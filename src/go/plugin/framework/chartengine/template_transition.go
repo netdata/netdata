@@ -23,6 +23,7 @@ func (t *templateTransition) install(state *engineState) {
 	state.routeCache = t.cache
 	state.cfg.autogen = t.set.policy.autogen
 	state.cfg.autogenRules = t.set.policy.autogenRules
+	state.cfg.autogenCounterRaw = t.set.policy.autogenCounterRaw
 	state.cfg.selector = t.set.policy.selector
 	state.cfg.autogenContextNamespace = t.set.global.namespace
 }
@@ -33,7 +34,8 @@ func (e *Engine) prepareTemplateTransition(opts PlanOptions) (*Engine, *template
 		return e, nil, nil, nil
 	}
 	// Copy the state value, not the engine's mutex. Shared program data is immutable;
-	// materialized state is copied by buildPlan before any mutation.
+	// the view shares committed materialized state, which buildPlan stages in place and
+	// records in the attempt's journal.
 	view := &Engine{
 		state: e.state,
 	}

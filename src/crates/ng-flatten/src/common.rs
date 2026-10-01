@@ -582,11 +582,12 @@ impl Flattener {
     ///   **int** — lossless and forward-compatible, so an unknown future enum
     ///   variant still survives and stays queryable.
     ///
-    /// The default variant is treated as absence (skipped). Only the *skip* mirrors
-    /// logs' `severity_number != 0`; the dual label+raw-int *representation* is
-    /// span-specific (`SpanKind`/`StatusCode` are closed enums whose readable label
-    /// is worth indexing, unlike the open numeric `severity_number`). For a
-    /// non-default value the raw int is always emitted; the label only when the
+    /// Every span stores both facets, default variants included (`UNSPECIFIED`
+    /// kind, `UNSET` status), so the defaults stay filterable and enumerable; an
+    /// absent status object is the OTel default, `UNSET`. The dual label+raw-int
+    /// *representation* is span-specific (`SpanKind`/`StatusCode` are closed enums
+    /// whose readable label is worth indexing, unlike the open numeric
+    /// `severity_number`). The raw int is always emitted; the label only when the
     /// variant is known. `trace_state` is carried **verbatim** (it embeds the W3C
     /// sampling threshold `ot=th:`); `status_message` is emitted whenever
     /// non-empty, independent of the status code.
@@ -597,31 +598,25 @@ impl Flattener {
             self.scalar("name", Value::Str(span.name), &mut out);
         }
 
-        // kind: 0 = UNSPECIFIED ⇒ absence, skip. (A consumer MAY treat UNSPECIFIED
-        // as INTERNAL; we do not synthesize INTERNAL here — we emit nothing.)
-        if span.kind != 0 {
-            if let Some(label) = span_kind_label(span.kind) {
-                self.scalar("kind", Value::Str(label.to_string()), &mut out);
-            }
-            self.scalar("_kind", Value::Int(span.kind as i64), &mut out);
+        // UNSPECIFIED is stored as itself, never synthesized into INTERNAL.
+        if let Some(label) = span_kind_label(span.kind) {
+            self.scalar("kind", Value::Str(label.to_string()), &mut out);
         }
+        self.scalar("_kind", Value::Int(span.kind as i64), &mut out);
 
         if !span.trace_state.is_empty() {
             self.scalar("trace_state", Value::Str(span.trace_state), &mut out);
         }
 
-        // status.code: 0 = UNSET ⇒ absence, skip. The message round-trips whenever
-        // non-empty, even alongside an UNSET code (rare but wire-legal).
-        if let Some(status) = span.status {
-            if status.code != 0 {
-                if let Some(label) = status_code_label(status.code) {
-                    self.scalar("status_code", Value::Str(label.to_string()), &mut out);
-                }
-                self.scalar("_status_code", Value::Int(status.code as i64), &mut out);
-            }
-            if !status.message.is_empty() {
-                self.scalar("status_message", Value::Str(status.message), &mut out);
-            }
+        // An absent status object is the OTel default: UNSET. The message
+        // round-trips whenever non-empty, even alongside an UNSET code.
+        let status = span.status.unwrap_or_default();
+        if let Some(label) = status_code_label(status.code) {
+            self.scalar("status_code", Value::Str(label.to_string()), &mut out);
+        }
+        self.scalar("_status_code", Value::Int(status.code as i64), &mut out);
+        if !status.message.is_empty() {
+            self.scalar("status_message", Value::Str(status.message), &mut out);
         }
 
         if !span.attributes.is_empty() {
@@ -695,10 +690,11 @@ impl Flattener {
     }
 }
 
-/// Readable label for an OTLP `SpanKind`, or `None` for `UNSPECIFIED(0)` and any
-/// unknown (future) variant — the caller still stores the raw int for those.
+/// Readable label for an OTLP `SpanKind`, or `None` for an unknown (future)
+/// variant — the caller still stores the raw int for those.
 fn span_kind_label(kind: i32) -> Option<&'static str> {
     match kind {
+        0 => Some("UNSPECIFIED"),
         1 => Some("INTERNAL"),
         2 => Some("SERVER"),
         3 => Some("CLIENT"),
@@ -708,10 +704,11 @@ fn span_kind_label(kind: i32) -> Option<&'static str> {
     }
 }
 
-/// Readable label for an OTLP `Status.StatusCode`, or `None` for `UNSET(0)` and
-/// any unknown variant — the caller still stores the raw int for those.
+/// Readable label for an OTLP `Status.StatusCode`, or `None` for an unknown
+/// variant — the caller still stores the raw int for those.
 fn status_code_label(code: i32) -> Option<&'static str> {
     match code {
+        0 => Some("UNSET"),
         1 => Some("OK"),
         2 => Some("ERROR"),
         _ => None,

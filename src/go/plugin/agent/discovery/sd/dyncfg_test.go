@@ -38,10 +38,18 @@ func mustDiscovererPayload(typ string, cfg any) pipeline.DiscovererPayload {
 	if err != nil {
 		panic(err)
 	}
-	return pipeline.DiscovererPayload{Kind: typ, Config: payload}
+	return pipeline.DiscovererPayload{
+		Kind:   typ,
+		Config: payload,
+	}
 }
 
-func newTestNetListenersConfig(name string, interval confopt.LongDuration, timeout confopt.Duration, services []pipeline.ServiceRuleConfig) pipeline.Config {
+func newTestNetListenersConfig(
+	name string,
+	interval confopt.LongDuration,
+	timeout confopt.Duration,
+	services []pipeline.ServiceRuleConfig,
+) pipeline.Config {
 	return pipeline.Config{
 		Name: name,
 		Discoverer: mustDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{
@@ -52,7 +60,11 @@ func newTestNetListenersConfig(name string, interval confopt.LongDuration, timeo
 	}
 }
 
-func newTestDockerConfig(name, address string, timeout confopt.Duration, services []pipeline.ServiceRuleConfig) pipeline.Config {
+func newTestDockerConfig(
+	name, address string,
+	timeout confopt.Duration,
+	services []pipeline.ServiceRuleConfig,
+) pipeline.Config {
 	return pipeline.Config{
 		Name: name,
 		Discoverer: mustDiscovererPayload(testDiscovererTypeDocker, testDockerConfig{
@@ -109,18 +121,23 @@ func (s *dyncfgSim) run(t *testing.T) {
 		}
 	}
 	sd := &ServiceDiscovery{
-		epoch:       1,
-		attempts:    newTestAttemptAuthority(t),
-		Logger:      logger.New(),
-		pluginName:  testPluginName,
-		dyncfgApi:   dyncfg.NewResponder(dyncfg.NewProtocolOutput(safewriter.New(&buf))),
-		seen:        dyncfg.NewSeenCache[sdConfig](),
-		exposed:     dyncfg.NewExposedCache[sdConfig](),
-		dyncfgCh:    make(chan dyncfg.Function, 1),
+		epoch:         1,
+		attempts:      newTestAttemptAuthority(t),
+		Logger:        logger.New(),
+		pluginName:    testPluginName,
+		dyncfgApi:     dyncfg.NewResponder(dyncfg.NewProtocolOutput(safewriter.New(&buf))),
+		seen:          dyncfg.NewSeenCache[sdConfig](),
+		exposed:       dyncfg.NewExposedCache[sdConfig](),
+		actorCommands: make(chan sdActorCommand),
+		confProv: &mockConfigProvider{
+			ch: make(chan confFile),
+		},
 		discoverers: testDiscovererRegistry(),
 		newPipeline: newPipeline,
 	}
-	sd.sdCb = &sdCallbacks{sd: sd}
+	sd.sdCb = &sdCallbacks{
+		sd: sd,
+	}
 	sd.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
 		API:       sd.dyncfgApi,
 		Seen:      sd.seen,
@@ -142,42 +159,27 @@ func (s *dyncfgSim) run(t *testing.T) {
 	done := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Create output channel (we don't need to capture output for dyncfg tests)
-	out := make(chan<- []*confgroup.Group)
-
-	// Create send function
-	send := func(ctx context.Context, groups []*confgroup.Group) {
-		select {
-		case <-ctx.Done():
-		case out <- groups:
-		}
-	}
-
 	sd.ctx = ctx
-	sd.mgr = NewPipelineManager(sd.Logger, send)
-
-	// Register dyncfg templates (creates CONFIG entries for templates)
+	sd.mgr = NewPipelineManager(sd.Logger)
+	sd.mgr.bind(sd)
 	sd.registerDyncfgTemplates(ctx)
-
-	// Start processing dyncfg commands
-	go func() {
-		defer close(done)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case fn := <-sd.dyncfgCh:
-				sd.dyncfgSeqExec(fn)
-				sd.completeDyncfg(fn)
-			}
-		}
-	}()
+	go func() { defer close(done); sd.run(ctx) }()
 
 	timeout := time.Second * 5
 
 	// Run the test scenario
 	s.do(sd)
-
+	// Activation is asynchronous after Accepted publication. Wait for the expected
+	// terminal statuses before inspecting the completed scenario.
+	for _, want := range s.wantExposed {
+		if want.status == dyncfg.StatusRunning || want.status == dyncfg.StatusFailed {
+			require.Eventually(t, func() bool {
+				entry, ok := sd.exposed.LookupByKey(want.discovererType + ":" + want.name)
+				return ok && entry.Status == want.status
+			}, time.Second, time.Millisecond)
+		}
+	}
+	gotRunning := runningPipelineKeys(sd.mgr)
 	cancel()
 
 	select {
@@ -216,14 +218,27 @@ func (s *dyncfgSim) run(t *testing.T) {
 		for _, want := range s.wantExposed {
 			entry, ok := sd.exposed.LookupByKey(want.discovererType + ":" + want.name)
 			require.Truef(t, ok, "exposedConfigs: config '%s:%s' not found", want.discovererType, want.name)
-			assert.Equal(t, want.sourceType, entry.Cfg.SourceType(), "exposedConfigs: wrong sourceType for '%s:%s'", want.discovererType, want.name)
-			assert.Equal(t, want.status, entry.Status, "exposedConfigs: wrong status for '%s:%s'", want.discovererType, want.name)
+			assert.Equal(
+				t,
+				want.sourceType,
+				entry.Cfg.SourceType(),
+				"exposedConfigs: wrong sourceType for '%s:%s'",
+				want.discovererType,
+				want.name,
+			)
+			assert.Equal(
+				t,
+				want.status,
+				entry.Status,
+				"exposedConfigs: wrong status for '%s:%s'",
+				want.discovererType,
+				want.name,
+			)
 		}
 	}
 
 	// Verify running pipelines
 	if s.wantRunning != nil {
-		gotRunning := runningPipelineKeys(sd.mgr)
 		assert.ElementsMatch(t, s.wantRunning, gotRunning, "running pipelines")
 	}
 }
@@ -238,7 +253,44 @@ func sendDyncfgCmd(sd *ServiceDiscovery, uid string, args []string, payload []by
 		ContentType: "application/json",
 	})
 
-	sd.dyncfgConfig(fn)
+	switch fn.Command() {
+	case dyncfg.CommandSchema, dyncfg.CommandGet, dyncfg.CommandUserconfig, dyncfg.CommandTest:
+		sd.dyncfgConfig(fn)
+	default:
+		prepared, err := sd.prepareDyncfgCommand(fn)
+		if err != nil {
+			panic(err)
+		}
+		applied, err := prepared.Apply(context.Background())
+		if err != nil {
+			panic(err)
+		}
+		var result struct {
+			Message string `json:"message"`
+			Error   string `json:"errorMessage"`
+		}
+		_ = json.Unmarshal([]byte(applied.Result.Payload), &result)
+		if result.Error != "" {
+			result.Message = result.Error
+		}
+		sd.dyncfgApi.SendCodef(fn, applied.Result.Code, "%s", result.Message)
+		for _, n := range applied.Notifications {
+			emitTestNotification(sd, n)
+		}
+		applied.Published()
+		if applied.Result.Code == 202 &&
+			(fn.Command() == dyncfg.CommandEnable || fn.Command() == dyncfg.CommandUpdate) {
+			deadline := time.Now().Add(time.Second)
+			key, _, _ := sd.sdCb.ExtractKey(fn)
+			for time.Now().Before(deadline) {
+				entry, ok := sd.exposed.LookupByKey(key)
+				if ok && entry.Status != dyncfg.StatusAccepted {
+					break
+				}
+				time.Sleep(time.Millisecond)
+			}
+		}
+	}
 }
 
 func runningPipelineKeys(mgr *PipelineManager) []string {
@@ -497,9 +549,11 @@ FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
-FUNCTION_RESULT_BEGIN 2-enable 200 application/json
-{"status":200,"message":""}
+FUNCTION_RESULT_BEGIN 2-enable 202 application/json
+{"status":202,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job status accepted
 
 CONFIG test:sd:net_listeners:test-job status running
 `,
@@ -544,9 +598,11 @@ FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
-FUNCTION_RESULT_BEGIN 2-enable 200 application/json
-{"status":200,"message":""}
+FUNCTION_RESULT_BEGIN 2-enable 202 application/json
+{"status":202,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job status accepted
 
 CONFIG test:sd:net_listeners:test-job status running
 
@@ -594,7 +650,12 @@ func TestServiceDiscovery_DyncfgUpdate(t *testing.T) {
 				cfg := newTestNetListenersConfig("test-job", 0, 0, defaultTestServices())
 				payload, _ := json.Marshal(cfg)
 
-				updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
+				updatedCfg := newTestNetListenersConfig(
+					"test-job",
+					confopt.LongDuration(10*time.Second),
+					0,
+					defaultTestServices(),
+				)
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -633,9 +694,11 @@ FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
-FUNCTION_RESULT_BEGIN 2-enable 200 application/json
-{"status":200,"message":""}
+FUNCTION_RESULT_BEGIN 2-enable 202 application/json
+{"status":202,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job status accepted
 
 CONFIG test:sd:net_listeners:test-job status running
 
@@ -659,7 +722,12 @@ CONFIG test:sd:net_listeners:test-job status disabled
 				cfg := newTestNetListenersConfig("test-job", 0, 0, defaultTestServices())
 				payload, _ := json.Marshal(cfg)
 
-				updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
+				updatedCfg := newTestNetListenersConfig(
+					"test-job",
+					confopt.LongDuration(10*time.Second),
+					0,
+					defaultTestServices(),
+				)
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -797,9 +865,11 @@ FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
-FUNCTION_RESULT_BEGIN 2-enable 200 application/json
-{"status":200,"message":""}
+FUNCTION_RESULT_BEGIN 2-enable 202 application/json
+{"status":202,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job status accepted
 
 CONFIG test:sd:net_listeners:test-job status running
 
@@ -844,7 +914,12 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 	}{
 		"userconfig for template": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("serialized-name", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig(
+					"serialized-name",
+					confopt.LongDuration(5*time.Second),
+					0,
+					defaultTestServices(),
+				)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -867,7 +942,12 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 		},
 		"userconfig for existing job": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("serialized-name", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig(
+					"serialized-name",
+					confopt.LongDuration(5*time.Second),
+					0,
+					defaultTestServices(),
+				)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -896,7 +976,12 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 		},
 		"userconfig for docker template": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestDockerConfig("docker-test", "unix:///var/run/docker.sock", confopt.Duration(5*time.Second), defaultTestServices())
+				cfg := newTestDockerConfig(
+					"docker-test",
+					"unix:///var/run/docker.sock",
+					confopt.Duration(5*time.Second),
+					defaultTestServices(),
+				)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -965,7 +1050,12 @@ func TestServiceDiscovery_DyncfgUserconfig(t *testing.T) {
 		},
 		"userconfig fails on mismatched discoverer type": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestDockerConfig("docker-test", "unix:///var/run/docker.sock", confopt.Duration(5*time.Second), defaultTestServices())
+				cfg := newTestDockerConfig(
+					"docker-test",
+					"unix:///var/run/docker.sock",
+					confopt.Duration(5*time.Second),
+					defaultTestServices(),
+				)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1009,7 +1099,10 @@ func TestServiceDiscovery_DyncfgFileConfig(t *testing.T) {
 							ikeySource:         "/etc/netdata/sd/test.conf",
 							ikeySourceType:     "file",
 						}
-						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: cfg, Status: dyncfg.StatusRunning})
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{
+							Cfg:    cfg,
+							Status: dyncfg.StatusRunning,
+						})
 
 						// Try to remove
 						sendDyncfgCmd(sd, "1-remove",
@@ -1028,6 +1121,8 @@ func TestServiceDiscovery_DyncfgFileConfig(t *testing.T) {
 FUNCTION_RESULT_BEGIN 1-remove 405 application/json
 {"status":405,"errorMessage":"removing configurations of source type 'file' is not supported, only 'dyncfg' configurations can be removed."}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:file-config status running
 `,
 				}
 			},
@@ -1048,9 +1143,14 @@ func TestServiceDiscovery_DyncfgDockerConfig(t *testing.T) {
 	}{
 		"add docker job": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestDockerConfig("docker-test", "unix:///var/run/docker.sock", confopt.Duration(5*time.Second), []pipeline.ServiceRuleConfig{
-					{ID: "nginx", Match: `{{ glob .Image "*nginx*" }}`},
-				})
+				cfg := newTestDockerConfig(
+					"docker-test",
+					"unix:///var/run/docker.sock",
+					confopt.Duration(5*time.Second),
+					[]pipeline.ServiceRuleConfig{
+						{ID: "nginx", Match: `{{ glob .Image "*nginx*" }}`},
+					},
+				)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1214,7 +1314,11 @@ CONFIG test:sd:k8s:k8s-test create accepted job /collectors/test/ServiceDiscover
 		},
 		"get k8s job config": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestK8sConfig("k8s-test", []testK8sConfig{{Role: "pod", Namespaces: []string{"default"}}}, defaultTestServices())
+				cfg := newTestK8sConfig(
+					"k8s-test",
+					[]testK8sConfig{{Role: "pod", Namespaces: []string{"default"}}},
+					defaultTestServices(),
+				)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1376,10 +1480,20 @@ func TestServiceDiscovery_DyncfgUpdateWhileRunning(t *testing.T) {
 	}{
 		"update running pipeline restarts it": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig(
+					"test-job",
+					confopt.LongDuration(5*time.Second),
+					0,
+					defaultTestServices(),
+				)
 				payload, _ := json.Marshal(cfg)
 
-				updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
+				updatedCfg := newTestNetListenersConfig(
+					"test-job",
+					confopt.LongDuration(10*time.Second),
+					0,
+					defaultTestServices(),
+				)
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -1415,15 +1529,19 @@ FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
-FUNCTION_RESULT_BEGIN 2-enable 200 application/json
-{"status":200,"message":""}
+FUNCTION_RESULT_BEGIN 2-enable 202 application/json
+{"status":202,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job status accepted
 
 CONFIG test:sd:net_listeners:test-job status running
 
-FUNCTION_RESULT_BEGIN 3-update 200 application/json
-{"status":200,"message":""}
+FUNCTION_RESULT_BEGIN 3-update 202 application/json
+{"status":202,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job status accepted
 
 CONFIG test:sd:net_listeners:test-job status running
 `,
@@ -1471,7 +1589,7 @@ CONFIG test:sd:net_listeners:test-job status running
 					wantRunning: []string{"dyncfg:docker:docker-job"},
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						// Verify update response
-						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 3-update 200 application/json")
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 3-update 202 application/json")
 						// Verify config was updated to new address
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 4-get 200 application/json")
 						assert.Contains(t, got, `"address":"tcp://localhost:2375"`)
@@ -1495,7 +1613,12 @@ func TestServiceDiscovery_DyncfgTest(t *testing.T) {
 	}{
 		"test valid config succeeds": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig(
+					"test-job",
+					confopt.LongDuration(5*time.Second),
+					0,
+					defaultTestServices(),
+				)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1516,7 +1639,12 @@ FUNCTION_RESULT_END
 		},
 		"test operational check succeeds": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig(
+					"test-job",
+					confopt.LongDuration(5*time.Second),
+					0,
+					defaultTestServices(),
+				)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1529,9 +1657,12 @@ FUNCTION_RESULT_END
 						if cfg.Source != "dyncfg=user=test" {
 							return nil, fmt.Errorf("unexpected pipeline source %q", cfg.Source)
 						}
-						return &testPipeline{name: cfg.Name, test: func(context.Context) error {
-							return nil
-						}}, nil
+						return &testPipeline{
+							name: cfg.Name,
+							test: func(context.Context) error {
+								return nil
+							},
+						}, nil
 					},
 					wantExposed: []wantExposedConfig{},
 					wantRunning: []string{},
@@ -1545,7 +1676,12 @@ FUNCTION_RESULT_END
 		},
 		"test operational check fails": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig(
+					"test-job",
+					confopt.LongDuration(5*time.Second),
+					0,
+					defaultTestServices(),
+				)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -1555,11 +1691,14 @@ FUNCTION_RESULT_END
 							payload, "")
 					},
 					newPipeline: func(cfg pipeline.Config) (sdPipeline, error) {
-						return &testPipeline{name: cfg.Name, test: func(context.Context) error {
-							return errors.New(
-								"dial tcp://user:[REDACTED_SECRET]@[PRIVATE_ENDPOINT]:2375: daemon response",
-							)
-						}}, nil
+						return &testPipeline{
+							name: cfg.Name,
+							test: func(context.Context) error {
+								return errors.New(
+									"dial tcp://user:[REDACTED_SECRET]@[PRIVATE_ENDPOINT]:2375: daemon response",
+								)
+							},
+						}, nil
 					},
 					wantExposed: []wantExposedConfig{},
 					wantRunning: []string{},
@@ -1657,10 +1796,20 @@ FUNCTION_RESULT_END
 		},
 		"test existing job config succeeds": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig(
+					"test-job",
+					confopt.LongDuration(5*time.Second),
+					0,
+					defaultTestServices(),
+				)
 				payload, _ := json.Marshal(cfg)
 
-				updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
+				updatedCfg := newTestNetListenersConfig(
+					"test-job",
+					confopt.LongDuration(10*time.Second),
+					0,
+					defaultTestServices(),
+				)
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -1796,15 +1945,19 @@ FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:job2 create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
-FUNCTION_RESULT_BEGIN 3-enable 200 application/json
-{"status":200,"message":""}
+FUNCTION_RESULT_BEGIN 3-enable 202 application/json
+{"status":202,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:job1 status accepted
 
 CONFIG test:sd:net_listeners:job1 status running
 
-FUNCTION_RESULT_BEGIN 4-enable 200 application/json
-{"status":200,"message":""}
+FUNCTION_RESULT_BEGIN 4-enable 202 application/json
+{"status":202,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:job2 status accepted
 
 CONFIG test:sd:net_listeners:job2 status running
 
@@ -1854,14 +2007,13 @@ func TestServiceDiscovery_DyncfgPriority(t *testing.T) {
 							ikeySourceType:     confgroup.TypeUser,
 						}
 						sd.seen.Add(fileCfg)
-						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: fileCfg, Status: dyncfg.StatusRunning})
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{
+							Cfg:    fileCfg,
+							Status: dyncfg.StatusRunning,
+						})
 
 						// Start the pipeline to simulate running state
-						_ = sd.mgr.StartPrepared(
-							sd.ctx,
-							fileCfg.PipelineKey(),
-							newTestPipeline("test-job"),
-						)
+						publishTestPipeline(sd, fileCfg, newTestPipeline("test-job"))
 
 						// Dyncfg add with same name - should replace file config
 						sendDyncfgCmd(sd, "1-add",
@@ -1902,7 +2054,10 @@ func TestServiceDiscovery_DyncfgPriority(t *testing.T) {
 							ikeySourceType:     confgroup.TypeStock,
 						}
 						sd.seen.Add(fileCfg)
-						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: fileCfg, Status: dyncfg.StatusAccepted})
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{
+							Cfg:    fileCfg,
+							Status: dyncfg.StatusAccepted,
+						})
 
 						// Dyncfg add with same name - should replace stock config
 						sendDyncfgCmd(sd, "1-add",
@@ -1943,14 +2098,13 @@ func TestServiceDiscovery_DyncfgPriority(t *testing.T) {
 							ikeySourceType:     confgroup.TypeDyncfg,
 						}
 						sd.seen.Add(dyncfgCfg)
-						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: dyncfgCfg, Status: dyncfg.StatusRunning})
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{
+							Cfg:    dyncfgCfg,
+							Status: dyncfg.StatusRunning,
+						})
 
 						// Start the pipeline to simulate running state
-						_ = sd.mgr.StartPrepared(
-							sd.ctx,
-							dyncfgCfg.PipelineKey(),
-							newTestPipeline("test-job"),
-						)
+						publishTestPipeline(sd, dyncfgCfg, newTestPipeline("test-job"))
 
 						// Another dyncfg add with same name - should replace (matching jobmgr pattern)
 						sendDyncfgCmd(sd, "1-add",
@@ -1989,7 +2143,12 @@ func TestServiceDiscovery_DyncfgUpdateSameConfig(t *testing.T) {
 	}{
 		"update running pipeline with same config skips restart": {
 			createSim: func() *dyncfgSim {
-				cfg := newTestNetListenersConfig("test-job", confopt.LongDuration(5*time.Second), 0, defaultTestServices())
+				cfg := newTestNetListenersConfig(
+					"test-job",
+					confopt.LongDuration(5*time.Second),
+					0,
+					defaultTestServices(),
+				)
 				payload, _ := json.Marshal(cfg)
 
 				return &dyncfgSim{
@@ -2025,9 +2184,11 @@ FUNCTION_RESULT_END
 
 CONFIG test:sd:net_listeners:test-job create accepted job /collectors/test/ServiceDiscovery dyncfg 'type=dyncfg,user=test' 'schema get enable disable update test userconfig remove' 0x0000 0x0000
 
-FUNCTION_RESULT_BEGIN 2-enable 200 application/json
-{"status":200,"message":""}
+FUNCTION_RESULT_BEGIN 2-enable 202 application/json
+{"status":202,"message":""}
 FUNCTION_RESULT_END
+
+CONFIG test:sd:net_listeners:test-job status accepted
 
 CONFIG test:sd:net_listeners:test-job status running
 
@@ -2056,7 +2217,12 @@ func TestServiceDiscovery_DyncfgUpdateFailedState(t *testing.T) {
 	}{
 		"update config in failed state restarts pipeline": {
 			createSim: func() *dyncfgSim {
-				updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
+				updatedCfg := newTestNetListenersConfig(
+					"test-job",
+					confopt.LongDuration(10*time.Second),
+					0,
+					defaultTestServices(),
+				)
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -2070,7 +2236,10 @@ func TestServiceDiscovery_DyncfgUpdateFailedState(t *testing.T) {
 							ikeySourceType:     confgroup.TypeDyncfg,
 						}
 						sd.seen.Add(failedCfg)
-						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: failedCfg, Status: dyncfg.StatusFailed})
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{
+							Cfg:    failedCfg,
+							Status: dyncfg.StatusFailed,
+						})
 
 						// Update should restart the pipeline
 						sendDyncfgCmd(sd, "1-update",
@@ -2087,7 +2256,7 @@ func TestServiceDiscovery_DyncfgUpdateFailedState(t *testing.T) {
 					},
 					wantRunning: []string{"dyncfg:net_listeners:test-job"},
 					wantDyncfgFunc: func(t *testing.T, got string) {
-						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-update 200 application/json")
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-update 202 application/json")
 						assert.Contains(t, got, "CONFIG test:sd:net_listeners:test-job status running")
 					},
 				}
@@ -2126,7 +2295,10 @@ func TestServiceDiscovery_DyncfgEnableFromFailed(t *testing.T) {
 							},
 						}
 						sd.seen.Add(failedCfg)
-						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: failedCfg, Status: dyncfg.StatusFailed})
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{
+							Cfg:    failedCfg,
+							Status: dyncfg.StatusFailed,
+						})
 
 						// Enable should start the pipeline
 						sendDyncfgCmd(sd, "1-enable",
@@ -2143,7 +2315,7 @@ func TestServiceDiscovery_DyncfgEnableFromFailed(t *testing.T) {
 					},
 					wantRunning: []string{"dyncfg:net_listeners:test-job"},
 					wantDyncfgFunc: func(t *testing.T, got string) {
-						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-enable 200 application/json")
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-enable 202 application/json")
 						assert.Contains(t, got, "CONFIG test:sd:net_listeners:test-job status running")
 					},
 				}
@@ -2165,7 +2337,12 @@ func TestServiceDiscovery_DyncfgConversionUpdate(t *testing.T) {
 	}{
 		"update file config converts to dyncfg": {
 			createSim: func() *dyncfgSim {
-				updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
+				updatedCfg := newTestNetListenersConfig(
+					"test-job",
+					confopt.LongDuration(10*time.Second),
+					0,
+					defaultTestServices(),
+				)
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -2185,14 +2362,13 @@ func TestServiceDiscovery_DyncfgConversionUpdate(t *testing.T) {
 							},
 						}
 						sd.seen.Add(fileCfg)
-						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: fileCfg, Status: dyncfg.StatusRunning})
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{
+							Cfg:    fileCfg,
+							Status: dyncfg.StatusRunning,
+						})
 
 						// Start the file pipeline
-						_ = sd.mgr.StartPrepared(
-							sd.ctx,
-							fileCfg.PipelineKey(),
-							newTestPipeline("test-job"),
-						)
+						publishTestPipeline(sd, fileCfg, newTestPipeline("test-job"))
 
 						// Update via dyncfg - should convert to dyncfg source
 						sendDyncfgCmd(sd, "1-update",
@@ -2210,16 +2386,21 @@ func TestServiceDiscovery_DyncfgConversionUpdate(t *testing.T) {
 					wantRunning: []string{"dyncfg:net_listeners:test-job"}, // New pipeline key
 					wantDyncfgFunc: func(t *testing.T, got string) {
 						// ConfigCreate acts as upsert (no delete needed)
-						assert.Contains(t, got, "CONFIG test:sd:net_listeners:test-job create running job")
+						assert.Contains(t, got, "CONFIG test:sd:net_listeners:test-job create accepted job")
 						assert.Contains(t, got, "dyncfg") // New source type
-						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-update 200 application/json")
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-update 202 application/json")
 					},
 				}
 			},
 		},
 		"update disabled file config converts to dyncfg without starting": {
 			createSim: func() *dyncfgSim {
-				updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
+				updatedCfg := newTestNetListenersConfig(
+					"test-job",
+					confopt.LongDuration(10*time.Second),
+					0,
+					defaultTestServices(),
+				)
 				updatedPayload, _ := json.Marshal(updatedCfg)
 
 				return &dyncfgSim{
@@ -2239,7 +2420,10 @@ func TestServiceDiscovery_DyncfgConversionUpdate(t *testing.T) {
 							},
 						}
 						sd.seen.Add(fileCfg)
-						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: fileCfg, Status: dyncfg.StatusDisabled})
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{
+							Cfg:    fileCfg,
+							Status: dyncfg.StatusDisabled,
+						})
 
 						// Update via dyncfg - should convert but stay disabled
 						sendDyncfgCmd(sd, "1-update",
@@ -2303,7 +2487,12 @@ func TestServiceDiscovery_DyncfgRestartErrorHandling(t *testing.T) {
 							nil, "")
 
 						// Update - pipeline creation will fail
-						updatedCfg := newTestNetListenersConfig("test-job", confopt.LongDuration(10*time.Second), 0, defaultTestServices())
+						updatedCfg := newTestNetListenersConfig(
+							"test-job",
+							confopt.LongDuration(10*time.Second),
+							0,
+							defaultTestServices(),
+						)
 						updatedPayload, _ := json.Marshal(updatedCfg)
 
 						sendDyncfgCmd(sd, "3-update",
@@ -2322,9 +2511,14 @@ func TestServiceDiscovery_DyncfgRestartErrorHandling(t *testing.T) {
 					// old pipeline stays running and handler rolls back to old running state.
 					wantRunning: []string{"dyncfg:net_listeners:test-job"},
 					wantDyncfgFunc: func(t *testing.T, got string) {
-						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 3-update 200 application/json")
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 3-update 422 application/json")
 						line := "CONFIG test:sd:net_listeners:test-job status running"
-						assert.GreaterOrEqual(t, strings.Count(got, line), 2, "expected running status to be re-notified after update failure")
+						assert.GreaterOrEqual(
+							t,
+							strings.Count(got, line),
+							2,
+							"expected running status to be re-notified after update failure",
+						)
 						assert.NotContains(t, got, "CONFIG test:sd:net_listeners:test-job status failed")
 					},
 				}
@@ -2367,17 +2561,18 @@ func TestServiceDiscovery_DyncfgFileRemovalWithDyncfgOverride(t *testing.T) {
 							ikeySourceType:     confgroup.TypeDyncfg,
 						}
 						sd.seen.Add(dyncfgCfg)
-						sd.exposed.Add(&dyncfg.Entry[sdConfig]{Cfg: dyncfgCfg, Status: dyncfg.StatusRunning})
+						sd.exposed.Add(&dyncfg.Entry[sdConfig]{
+							Cfg:    dyncfgCfg,
+							Status: dyncfg.StatusRunning,
+						})
 
 						// Start the dyncfg pipeline
-						_ = sd.mgr.StartPrepared(
-							sd.ctx,
-							dyncfgCfg.PipelineKey(),
-							newTestPipeline("test-job"),
-						)
+						publishTestPipeline(sd, dyncfgCfg, newTestPipeline("test-job"))
 
 						// Simulate file removal by calling removePipeline
-						sd.removePipeline(confFile{source: "/etc/netdata/sd.d/test.conf"})
+						sd.removePipeline(confFile{
+							source: "/etc/netdata/sd.d/test.conf",
+						})
 					},
 					wantExposed: []wantExposedConfig{
 						{
@@ -2408,7 +2603,9 @@ type testPipeline struct {
 }
 
 func newTestPipeline(name string) *testPipeline {
-	return &testPipeline{name: name}
+	return &testPipeline{
+		name: name,
+	}
 }
 
 func (p *testPipeline) Test(ctx context.Context) (bool, error) {

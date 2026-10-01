@@ -41,6 +41,69 @@ func decisionIndexCensus(index *DecisionIndex) decisionTestCensus {
 	return census
 }
 
+func TestDecisionIndexProcessRetirementDoesNotAcknowledgeOrReject(t *testing.T) {
+	unexpected := errors.New("independent preparation failure")
+	tests := map[string]struct {
+		err  error
+		want error
+	}{
+		"process stopped":    {err: jobmgr.ErrProcessAttemptStopped},
+		"target retired":     {err: jobmgr.ErrProcessAttemptRetired},
+		"wrapped retirement": {err: fmt.Errorf("prepare: %w", jobmgr.ErrProcessAttemptRetired)},
+		"joined retirement":  {err: errors.Join(jobmgr.ErrProcessAttemptStopped, jobmgr.ErrProcessAttemptRetired)},
+		"mixed failure":      {err: errors.Join(jobmgr.ErrProcessAttemptStopped, unexpected), want: unexpected},
+		"unrelated failure":  {err: unexpected, want: unexpected},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			commands := &decisionTestCommands{err: test.err}
+			index := newDecisionTestIndex(t, commands, func(DiscoveredChange) (jobmgr.WorkPlan, error) {
+				return jobmgr.WorkPlan{}, nil
+			})
+			config := decisionTestConfig("job", confgroup.TypeStock, "source")
+			batch := []*confgroup.Group{{Source: "source", Configs: []confgroup.Config{config}}}
+			for revision := uint64(1); revision <= 2; revision++ {
+				err := index.Apply(t.Context(), batch)
+				if test.want == nil {
+					require.NoError(t, err)
+				} else {
+					require.ErrorIs(t, err, test.want)
+				}
+				require.Equal(t, decisionTestCensus{
+					sources:    1,
+					candidates: 1,
+					revision:   revision,
+				}, decisionIndexCensus(index))
+				require.Len(t, commands.requests, int(revision), "retirement must not acknowledge the selection")
+			}
+		})
+	}
+}
+
+func TestDecisionIndexRetirementDoesNotHideAnotherReconciliationFailure(t *testing.T) {
+	unexpected := errors.New("independent preparation failure")
+	index := newDecisionTestIndex(t, &decisionTestCommands{err: unexpected},
+		func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
+			if change.Config.Name() == "a-retired" {
+				return jobmgr.WorkPlan{}, jobmgr.ErrProcessAttemptStopped
+			}
+			return jobmgr.WorkPlan{}, nil
+		})
+	err := index.Apply(t.Context(), []*confgroup.Group{{
+		Source: "source",
+		Configs: []confgroup.Config{
+			decisionTestConfig("a-retired", confgroup.TypeStock, "source"),
+			decisionTestConfig("b-failed", confgroup.TypeStock, "source"),
+		},
+	}})
+	require.ErrorIs(t, err, unexpected)
+	require.Equal(t, decisionTestCensus{
+		sources:    1,
+		candidates: 2,
+		revision:   1,
+	}, decisionIndexCensus(index))
+}
+
 func TestDecisionIndexQuarantinesTypedProposalAndContinuesBatch(t *testing.T) {
 	commands := &decisionTestCommands{}
 	index := newDecisionTestIndex(

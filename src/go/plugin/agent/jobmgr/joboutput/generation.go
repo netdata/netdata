@@ -11,13 +11,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 )
 
 var (
 	ErrPreparedJobConsumed   = errors.New("job output: prepared job consumed")
 	ErrJobGenerationMismatch = errors.New("job output: job generation mismatch")
+	ErrJobStartupPending     = errors.New("job output: startup is pending")
 	ErrStaleStoreGeneration  = errors.New("job output: Store changed during candidate preparation")
 )
 
@@ -26,9 +26,16 @@ type autoDetectionFailure struct {
 	cause              error
 	retry              bool
 	retryAfter         int
-	coded              bool
-	code               int
+	class              collectorapi.LifecycleErrorClass // collector classification of the failure
+	runtime            bool                             // Run startup failed after the incumbent was stopped
 	jobConfigLifecycle collectorapi.JobConfigLifecycleSnapshot
+}
+
+// keepsFailedStockListed reports whether a failed plain stock job stays listed
+// instead of being removed: the collector classified the failure, so it is not
+// the expected absence of a service at a stock endpoint.
+func (adf *autoDetectionFailure) keepsFailedStockListed() bool {
+	return adf.class != collectorapi.LifecycleErrorUnclassified
 }
 
 func (adf *autoDetectionFailure) Error() string {
@@ -108,6 +115,7 @@ type ConstructedJob struct {
 	retryAutoDetection func() bool                 // whether a failed auto-detection should be rescheduled
 	resolvedReferences bool                        // lifecycle failures may contain resolved secret values
 	stageFunctions     bool                        // job Function lifecycle still needs post-probe staging
+	publishRuntime     func() error                // scheduler publication after readiness
 	attachProjections  func() error                // binds external runtime/vnode projections before acceptance
 	attach             func(lifecycle.ResourceIdentity, *stagedJobOwner) (constructedJobAttachment, error)
 	candidateJob       RuntimeJob
@@ -387,17 +395,15 @@ func autoDetectionFailureFor(constructed ConstructedJob, err error) *autoDetecti
 	if constructed.autoDetectionEvery != nil {
 		failure.retryAfter = constructed.autoDetectionEvery()
 	}
-	if coded, ok := errors.AsType[dyncfg.CodedError](err); ok {
-		failure.coded = true
-		failure.code = coded.DyncfgCode()
-		if !dyncfg.IsRetryableError(err) {
-			failure.retry = false
-		}
+	failure.class = collectorapi.ClassifyLifecycleError(err)
+	if failure.class == collectorapi.LifecycleErrorPermanent {
+		failure.retry = false
 	}
 	return failure
 }
 
 type JobGeneration struct {
+	opMu           sync.Mutex                // serializes bounded initiation, publication and retirement
 	resources      ConstructedJob            // the constructed job this generation owns
 	permit         lifecycle.LongLivedPermit // long-lived permit backing the generation
 	stopErr        error                     // memoized result of the terminal Stop path
@@ -463,13 +469,15 @@ func (jg *JobGeneration) settleFailedInstallation(
 	if jg == nil || ctx == nil {
 		return jg, errors.New("job output: invalid pending installation settlement")
 	}
+	jg.opMu.Lock()
+	defer jg.opMu.Unlock()
 	jg.mu.Lock()
 	if jg.owner == nil {
 		jg.mu.Unlock()
 		return jg, errors.New("job output: pending installation lost its process owner")
 	}
 	switch jg.state {
-	case JobReady, JobActive:
+	case JobActivating, JobReady, JobActive:
 	case JobRetained:
 		jg.mu.Unlock()
 		return jg, nil
@@ -512,6 +520,8 @@ func (jg *JobGeneration) Start(ctx context.Context) error {
 	if jg == nil || ctx == nil {
 		return errors.New("job output: invalid JobGeneration start")
 	}
+	jg.opMu.Lock()
+	defer jg.opMu.Unlock()
 	jg.mu.Lock()
 	if jg.state != JobAllocated {
 		state := jg.state
@@ -534,9 +544,43 @@ func (jg *JobGeneration) Start(ctx context.Context) error {
 		}
 		return jg.finish(state, errors.Join(err, cleanupErr))
 	}
-	jg.mu.Lock()
-	jg.state = JobReady
-	jg.mu.Unlock()
+	return nil
+}
+
+func (jg *JobGeneration) StartupResult() error {
+	if jg == nil {
+		return errors.New("job output: nil startup result")
+	}
+	run := jg.processOwner.managedRun()
+	if run == nil {
+		return ErrJobStartupPending
+	}
+	select {
+	case <-run.StartupDone():
+	default:
+		return ErrJobStartupPending
+	}
+	if failure := run.Failure(); failure != nil {
+		stage := "startup"
+		if failure.AfterReady() {
+			stage = "runtime"
+		}
+		return &runtimeStartupFailure{failure: runtimeFailureFor(jg.resources, failure, stage)}
+	}
+	if err := run.StartupErr(); err != nil {
+		return err
+	}
+	if !run.Running() {
+		// Complete clears Running under the settlement lock before recording
+		// its failure. Re-read through that lock before interpreting the cut.
+		if failure := run.Failure(); failure != nil {
+			return &runtimeStartupFailure{failure: runtimeFailureFor(jg.resources, failure, "runtime")}
+		}
+		if cause := context.Cause(run.Context()); cause != nil {
+			return cause
+		}
+		return errors.New("job output: ready runtime is no longer running")
+	}
 	return nil
 }
 
@@ -544,8 +588,13 @@ func (jg *JobGeneration) Publish() error {
 	if jg == nil {
 		return errors.New("job output: nil JobGeneration")
 	}
+	jg.opMu.Lock()
+	defer jg.opMu.Unlock()
+	if err := jg.StartupResult(); err != nil {
+		return err
+	}
 	jg.mu.Lock()
-	if jg.state != JobReady {
+	if jg.state != JobActivating && jg.state != JobReady {
 		state := jg.state
 		jg.mu.Unlock()
 		return fmt.Errorf("job output: publish from state %s", state)
@@ -553,6 +602,14 @@ func (jg *JobGeneration) Publish() error {
 	jg.state = JobPublishing
 	handlers := jg.resources.Handlers
 	jg.mu.Unlock()
+	if publish := jg.resources.publishRuntime; publish != nil {
+		if err := callJobLifecycle("runtime publication", publish); err != nil {
+			jg.mu.Lock()
+			jg.state = JobReady
+			jg.mu.Unlock()
+			return err
+		}
+	}
 	if handlers != nil {
 		if err := callJobLifecycle("job publication", handlers.Publish); err != nil {
 			if jg.resources.resolvedReferences {
@@ -579,8 +636,10 @@ func (jg *JobGeneration) AbortReady(ctx context.Context) error {
 	if jg == nil || ctx == nil {
 		return errors.New("job output: invalid ready abort")
 	}
+	jg.opMu.Lock()
+	defer jg.opMu.Unlock()
 	jg.mu.Lock()
-	if jg.state != JobReady {
+	if jg.state != JobActivating && jg.state != JobReady {
 		state := jg.state
 		jg.mu.Unlock()
 		return fmt.Errorf("job output: ready abort from state %s", state)
@@ -599,6 +658,8 @@ func (jg *JobGeneration) Stop(ctx context.Context) error {
 	if jg == nil || ctx == nil {
 		return errors.New("job output: invalid JobGeneration stop")
 	}
+	jg.opMu.Lock()
+	defer jg.opMu.Unlock()
 	jg.mu.Lock()
 	switch jg.state {
 	case JobStopped:
@@ -621,7 +682,7 @@ func (jg *JobGeneration) Stop(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		}
-	case JobActive:
+	case JobActivating, JobReady, JobActive:
 		jg.state = JobStopping
 		observer := jg.resources.Observer
 		wasActive := jg.observedActive
@@ -640,7 +701,7 @@ func (jg *JobGeneration) Stop(ctx context.Context) error {
 }
 
 func (jg *JobGeneration) stopProcessOwned(ctx context.Context) error {
-	jg.resources.outputGate.Fence()
+	jg.resources.outputGate.RevokeAdmissions()
 	var detachErr error
 	if handlers := jg.resources.Handlers; handlers != nil {
 		detachErr = callJobLifecycle("handler detach", func() error {
@@ -675,7 +736,7 @@ func (jg *JobGeneration) stopProcessOwned(ctx context.Context) error {
 }
 
 func (jg *JobGeneration) abortProcessOwned(ctx context.Context) error {
-	jg.resources.outputGate.Fence()
+	jg.resources.outputGate.RevokeAdmissions()
 	jg.processOwner.Retire()
 	var detachErr error
 	if handlers := jg.resources.Handlers; handlers != nil {

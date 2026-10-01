@@ -54,31 +54,35 @@ const (
 	storeOperationMutation storeOperationMode = iota + 1
 	storeOperationValidation
 	storeOperationRemoval
+	storeOperationAdmission
 )
 
 type storeOperationSpec struct {
-	target         secretTarget
-	input          CommandInput
-	config         secretstore.Config
-	expected       uint64
-	mode           storeOperationMode
-	validationOnly bool
-	supersede      bool
-	testIdentity   bool
-	desiredVersion uint64
+	target          secretTarget
+	input           CommandInput
+	config          secretstore.Config
+	coalesceConfig  secretstore.Config
+	expected        uint64
+	mode            storeOperationMode
+	validationOnly  bool
+	testIdentity    bool
+	desiredVersion  uint64
+	acceptedVersion uint64
 }
 
 type storeOperationResult struct {
-	config         secretstore.Config
-	mutation       *secretstore.PreparedSecretMutation
-	release        <-chan struct{}
-	err            error
-	expected       uint64
-	desiredVersion uint64
-	validationOnly bool
-	operational    bool
-	retryable      bool
-	removal        bool
+	config          secretstore.Config
+	mutation        *secretstore.PreparedSecretMutation
+	release         <-chan struct{}
+	err             error
+	expected        uint64
+	desiredVersion  uint64
+	acceptedVersion uint64
+	validationOnly  bool
+	operational     bool
+	retryable       bool
+	removal         bool
+	coalesced       bool
 }
 
 // preparedMutationOwner keeps a prepared mutation abortable until a prepared
@@ -182,7 +186,7 @@ func (so *StoreOperations) prepare(
 	if so == nil ||
 		spec.target.key == "" ||
 		spec.mode < storeOperationMutation ||
-		spec.mode > storeOperationRemoval {
+		spec.mode > storeOperationAdmission {
 		return nil, errors.New("jobmgr secrets: invalid Store operation preparation")
 	}
 	ctx, cancel := context.WithCancelCause(context.Background())
@@ -253,7 +257,9 @@ func (pso *PreparedStoreOperation) Release() {
 		close(pso.release)
 	})
 	if !started {
-		_ = pso.publish(storeOperationResult{err: context.Canceled})
+		_ = pso.publish(storeOperationResult{
+			err: context.Canceled,
+		})
 	}
 }
 
@@ -268,21 +274,16 @@ func (pso *PreparedStoreOperation) start() {
 		return
 	}
 	if err := context.Cause(pso.ctx); err != nil {
-		_ = pso.publish(storeOperationResult{err: err})
+		_ = pso.publish(storeOperationResult{
+			err: err,
+		})
 		return
 	}
 	if pso.spec.mode == storeOperationRemoval {
-		identity := pso.operations.identity(pso.spec.target.key, false, nil)
-		pso.mu.Lock()
-		pso.identity = identity
-		pso.mu.Unlock()
-		// This logically contains and cancels physical preparation, which may
-		// continue until Released. prepareRemove commits the desired-version
-		// fence that invalidates older retained ADDs.
-		pso.operations.attempts.CutProcessAttempt(identity, jobmgr.ErrProcessAttemptSuperseded)
 		_ = pso.publish(storeOperationResult{
-			desiredVersion: pso.spec.desiredVersion,
-			removal:        true,
+			desiredVersion:  pso.spec.desiredVersion,
+			acceptedVersion: pso.spec.acceptedVersion,
+			removal:         true,
 		})
 		return
 	}
@@ -293,9 +294,37 @@ func (pso *PreparedStoreOperation) start() {
 		config, err = materializeSecretConfig(pso.spec.input, pso.spec.target)
 		if err != nil {
 			_ = pso.publish(storeOperationResult{
-				err:            err,
-				desiredVersion: pso.spec.desiredVersion,
-				validationOnly: pso.spec.validationOnly,
+				err:             err,
+				desiredVersion:  pso.spec.desiredVersion,
+				acceptedVersion: pso.spec.acceptedVersion,
+				validationOnly:  pso.spec.validationOnly,
+			})
+			return
+		}
+	}
+	if pso.spec.coalesceConfig != nil && sameSecretPayload(config, pso.spec.coalesceConfig) {
+		_ = pso.publish(storeOperationResult{
+			config:          config,
+			expected:        pso.spec.expected,
+			coalesced:       true,
+			desiredVersion:  pso.spec.desiredVersion,
+			acceptedVersion: pso.spec.acceptedVersion,
+		})
+		return
+	}
+	if pso.spec.mode == storeOperationAdmission ||
+		pso.spec.mode == storeOperationMutation && pso.spec.input.HasPayload {
+		err := pso.operations.store.ValidateStructure(pso.operations.creators, config)
+		if err != nil || pso.spec.mode == storeOperationAdmission {
+			if err != nil {
+				config = nil
+			}
+			_ = pso.publish(storeOperationResult{
+				config:          config,
+				err:             err,
+				expected:        pso.spec.expected,
+				desiredVersion:  pso.spec.desiredVersion,
+				acceptedVersion: pso.spec.acceptedVersion,
 			})
 			return
 		}
@@ -318,13 +347,14 @@ func (pso *PreparedStoreOperation) start() {
 	if err != nil {
 		released, _ := pso.operations.attempts.ProcessAttemptReleased(identity)
 		_ = pso.publish(storeOperationResult{
-			config:         config,
-			release:        released,
-			err:            err,
-			expected:       pso.spec.expected,
-			desiredVersion: pso.spec.desiredVersion,
-			validationOnly: pso.spec.validationOnly,
-			retryable:      errors.Is(err, jobmgr.ErrProcessAttemptBusy),
+			config:          config,
+			release:         released,
+			err:             err,
+			expected:        pso.spec.expected,
+			desiredVersion:  pso.spec.desiredVersion,
+			acceptedVersion: pso.spec.acceptedVersion,
+			validationOnly:  pso.spec.validationOnly,
+			retryable:       errors.Is(err, jobmgr.ErrProcessAttemptBusy),
 		})
 		return
 	}
@@ -341,31 +371,13 @@ func (pso *PreparedStoreOperation) startAttempt(
 	identity jobmgr.ProcessAttemptIdentity,
 	config secretstore.Config,
 ) (jobmgr.ProcessAttempt, error) {
-	start := func() (jobmgr.ProcessAttempt, error) {
-		attempt, err := pso.operations.attempts.StartProcessAttempt(pso.ctx, jobmgr.ProcessAttemptPlan{
-			Identity: identity,
-			Target:   pso.operations.epoch,
-			Work: func(
-				ctx context.Context,
-				admission jobmgr.ProcessAttemptAdmission,
-			) error {
-				return pso.runAttempt(ctx, admission, config)
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-		return attempt, nil
-	}
-
-	attempt, err := start()
-	if !errors.Is(err, jobmgr.ErrProcessAttemptBusy) || !pso.spec.supersede {
-		return attempt, err
-	}
-	if err := pso.operations.attempts.SupersedeProcessAttempt(pso.ctx, identity); err != nil {
-		return nil, err
-	}
-	return start()
+	return pso.operations.attempts.StartProcessAttempt(pso.ctx, jobmgr.ProcessAttemptPlan{
+		Identity: identity,
+		Target:   pso.operations.epoch,
+		Work: func(ctx context.Context, admission jobmgr.ProcessAttemptAdmission) error {
+			return pso.runAttempt(ctx, admission, config)
+		},
+	})
 }
 
 func (pso *PreparedStoreOperation) runAttempt(
@@ -374,10 +386,11 @@ func (pso *PreparedStoreOperation) runAttempt(
 	config secretstore.Config,
 ) error {
 	result := storeOperationResult{
-		config:         config,
-		expected:       pso.spec.expected,
-		desiredVersion: pso.spec.desiredVersion,
-		validationOnly: pso.spec.validationOnly,
+		config:          config,
+		expected:        pso.spec.expected,
+		desiredVersion:  pso.spec.desiredVersion,
+		acceptedVersion: pso.spec.acceptedVersion,
+		validationOnly:  pso.spec.validationOnly,
 	}
 	if pso.spec.mode == storeOperationValidation {
 		result.operational, result.err = pso.operations.store.Test(
@@ -416,13 +429,14 @@ func (pso *PreparedStoreOperation) runAttempt(
 func (pso *PreparedStoreOperation) observeAttempt(attempt jobmgr.ProcessAttempt, config secretstore.Config) {
 	err := attempt.Await(context.Background())
 	_ = pso.publish(storeOperationResult{
-		config:         config,
-		release:        attempt.Released(),
-		err:            err,
-		expected:       pso.spec.expected,
-		desiredVersion: pso.spec.desiredVersion,
-		validationOnly: pso.spec.validationOnly,
-		retryable:      containmentRetryable(err),
+		config:          config,
+		release:         attempt.Released(),
+		err:             err,
+		expected:        pso.spec.expected,
+		desiredVersion:  pso.spec.desiredVersion,
+		acceptedVersion: pso.spec.acceptedVersion,
+		validationOnly:  pso.spec.validationOnly,
+		retryable:       containmentRetryable(err),
 	})
 }
 

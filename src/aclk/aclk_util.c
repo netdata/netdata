@@ -455,7 +455,7 @@ void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd,
     char **log_proxy, enum mqtt_wss_proxy_type *type)
 {
     ACLK_PROXY_TYPE pt;
-    const char *ptr = aclk_get_proxy(&pt, false);
+    const char *proxy_src = aclk_get_proxy(&pt, false);
     *log_proxy = (char *) aclk_get_proxy(&pt, true);
     char *tmp;
     const char *prefix = NULL;
@@ -468,8 +468,8 @@ void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd,
     *pwd = NULL;
     *port = 0;
 
-    char *proxy = strdupz(ptr);
-    ptr = proxy;
+    char *proxy = strdupz(proxy_src);
+    char *ptr = proxy;
 
     switch (pt) {
         case PROXY_TYPE_HTTP:

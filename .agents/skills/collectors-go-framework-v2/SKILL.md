@@ -276,6 +276,8 @@ applicable coverage and required validation evidence without creating a new PR/S
 
 - config YAML/JSON serialization compatibility;
 - `Init`, `Check`, `Collect`, and `Cleanup` lifecycle coverage;
+- for a `CollectorV2Runner`: readiness only after acquisition, startup rollback, cancellation and terminal failure;
+  `jobruntime.NewJobV2` with `jobruntime.NewManagedRun` drives the real `Run`/tick/emission path from a collector test;
 - explicit metric-store cycle tests with `BeginCycle`, success commit, and abort
   on expected collection errors;
 - chart-template schema/decode/validate/compile coverage and the artifact drift checks in

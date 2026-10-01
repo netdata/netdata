@@ -19,6 +19,17 @@ terminal-once behavior, and runtime metrics. Those responsibilities live under `
 Collector method declarations, raw input versus response passthrough, and managed job-scoped metadata are documented
 in [`pkg/funcapi`](../../../pkg/funcapi/README.md).
 
+## Wire field identity
+
+The daemon sanitizes command and source text, then emits it literally inside double quotes. These fields are not Go
+or JSON string literals: backslashes do not escape characters or the closing quote. Embedded double quotes are
+replaced with apostrophes by the daemon before framing.
+
+Command words are separated only by ASCII whitespace. Unicode whitespace, including NBSP, remains in the argument
+so the configuration owner can reject the original invalid name. Literal escapes such as `d\x62` must likewise reach
+validation unchanged. Parsing must never turn either into a different configuration's identity. Payload bytes are
+independent of command tokenization. Wire test fixtures must use the daemon's literal quoting rather than Go `%q`.
+
 ## Input ownership
 
 `InputCapsule` owns only the payload currently being parsed. A complete call is transferred to `Consumer`; a partial

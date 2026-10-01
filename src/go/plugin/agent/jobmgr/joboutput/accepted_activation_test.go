@@ -108,7 +108,7 @@ func TestAcceptedActivationInstallsV1AndV2Collectors(t *testing.T) {
 			require.NotNil(t, active)
 			record, exists := graph.Lookup(config.FullName())
 			require.True(t, exists)
-			require.Equal(t, dyncfg.StatusRunning.String(), record.Status)
+			require.Equal(t, dyncfg.StatusAccepted.String(), record.Status)
 
 			releaseOnce.Do(func() { close(releaseSubmission) })
 			controller.scheduler.StopBackgroundWorkers()
@@ -253,7 +253,7 @@ func TestAcceptedActivationFailsRunWhenTerminalSubmissionFails(t *testing.T) {
 	require.True(t, waited)
 }
 
-func TestAcceptedActivationCurrentContentionConvergesToFailed(t *testing.T) {
+func TestAcceptedActivationCurrentContentionRetainsAcceptedIntent(t *testing.T) {
 	tests := map[string]func(*DynCfgJobController, *factoryTestState, confgroup.Config){
 		"busy candidate identity": func(controller *DynCfgJobController, _ *factoryTestState, _ confgroup.Config) {
 			controller.factory.config.Attempts = busySupersessionAuthority{
@@ -277,11 +277,10 @@ func TestAcceptedActivationCurrentContentionConvergesToFailed(t *testing.T) {
 				return module
 			}
 			controller.modules["module"] = creator
-			controller.factory.config.ConfigModules.config.StoreScope =
-				func([]string) (secretresolver.AtomicScope, error) {
-					scopeState.current.Store(true)
-					return scopeState, nil
-				}
+			controller.factory.config.ConfigModules.config.Configs = testConfigResolver(t, testAtomicResolver(t), func([]string) (secretresolver.AtomicScope, error) {
+				scopeState.current.Store(true)
+				return scopeState, nil
+			})
 			config["option_str"] = "${store:vault:test:key}"
 		},
 	}
@@ -331,13 +330,14 @@ func TestAcceptedActivationCurrentContentionConvergesToFailed(t *testing.T) {
 			require.Nil(t, current)
 			record, exists := graph.Lookup(config.FullName())
 			require.True(t, exists)
-			require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+			require.Equal(t, dyncfg.StatusAccepted.String(), record.Status)
 			require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 
 			controller.scheduler.retries.mu.Lock()
 			_, retryScheduled := controller.scheduler.retries.entries[config.FullName()]
 			controller.scheduler.retries.mu.Unlock()
-			require.True(t, retryScheduled)
+			require.False(t, retryScheduled)
+			require.True(t, controller.ActivationEnabled(config.FullName()))
 			releaseOnce.Do(func() { close(releaseSubmission) })
 		})
 	}

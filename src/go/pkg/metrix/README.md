@@ -120,7 +120,12 @@ A `CollectorStore` write only exists inside a cycle. The job runtime drives the 
 | Failure | `AbortCycle` discards all staged writes and staged registrations — the committed state is untouched. |
 
 `RuntimeStore` has **no cycle API**: writes commit immediately, each producing a new overlay snapshot, and it is
-**stateful-only** (snapshot-mode registration returns an error; calling snapshot record methods panics).
+**stateful-only** (snapshot-mode registration returns an error; calling snapshot record methods panics). A producer
+that records many series at once can use the optional `RuntimeBatchWriter` (type assertion): writes made during
+`WriteBatch(fn)` are published together as one snapshot when `fn` returns or panics, and readers see none of them
+earlier. A store has one batch at a time, owned by the goroutine that opened it: any write made while it is open joins
+it, and a nested or concurrent `WriteBatch` only runs its `fn`, whose writes after the batch ends commit immediately.
+The chartengine runtime aggregator publishes each job cycle's rollup this way.
 
 ## Metric Identity: Names, Series, and Descriptors
 
@@ -260,9 +265,13 @@ The `Reader` interface exposes typed getters (`Value/Delta/Histogram/Summary/Sta
 - A successful commit and a failed/aborted attempt each publish a new exact snapshot, so freshness metadata and cached
   projections cannot cross the boundary.
 - Scalar gauge/counter series are shared with the canonical snapshot because committed series are immutable. Structured
-  families allocate their synthetic flattened series once per snapshot.
-- Raw and flattened readers use immutable per-scope name indexes. Scoped lookup and iteration therefore depend on that
-  scope's series, not on peer-scope cardinality.
+  families' synthetic series are built once per snapshot into shared series, descriptor and label blocks; each family
+  allocates one text buffer for its children's names, label keys and series keys, and bucket/quantile label values
+  come from the descriptor. A projection therefore allocates O(1) per structured family, not per synthetic series.
+- Text is per family, not per snapshot: consumers keep series IDs and label values across snapshots (chartengine route
+  caches, dimension names), so a retained ID pins only its own family's text.
+- Raw and flattened readers use immutable per-scope name indexes, built by one sort of the scalar series by scope, name
+  and labels key. Scoped lookup and iteration therefore depend on that scope's series, not on peer-scope cardinality.
 
 `RuntimeStore` deliberately keeps per-read flattening because its immediate-write overlay snapshots have a different
 lifetime and reuse profile. It still uses the same deterministic reader indexes within each read.
@@ -500,10 +509,10 @@ For a complete collector integration pattern (cycle management, error handling),
 | Area | Implementation pattern |
 |------|------------------------|
 | Snapshot publish | Read snapshots are immutable and atomically swapped. |
-| Collector commit | Staged frame → descriptor resolution → retention → single canonical pass → publish, all success-path; abort discards staged state. |
-| Descriptor resolution | Observed authorities per name are grouped in a fingerprint-indexed map (no cap); one canonical descriptor per accepted name. |
+| Collector commit | Staged frame → descriptor resolution → retention → single canonical pass → publish, all success-path; abort discards staged state. The frame allocates a staging map on the first write of its kind. |
+| Descriptor resolution | Observed authorities per name are grouped in a value-typed map sized by the cycle's writes; the first authority is inline and further ones are fingerprint-indexed (no cap); one canonical descriptor per accepted name. |
 | Descriptor eviction | One O(descriptor-universe) sweep at commit, after retention; `instrumentZeroSince` tracks idle-since on the successful-commit clock. |
-| Runtime commit | Overlay/compaction strategy with its own retention pruning. |
+| Runtime commit | Overlay/compaction strategy with its own retention pruning; a single-write overlay holds its series inline, and a batch publishes one overlay for all its writes. |
 | Collector read projection | One failure-safe lazy flattened projection per exact published snapshot; concurrent first users synchronize on one complete build. |
 | Iteration | Immutable per-scope name indexes and pre-sorted names; scoped traversal is independent of foreign-scope series. |
 | Identity | Canonical metric+labels key with a stable `SeriesIdentity` hash. |
