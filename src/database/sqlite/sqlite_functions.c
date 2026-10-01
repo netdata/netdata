@@ -1172,8 +1172,16 @@ int sqlite_lease_unittest(void)
         sqlite3_close_v2(t.other_db);
         return 1;
     }
-    while (!__atomic_load_n(&t.holding, __ATOMIC_ACQUIRE))
+    for (int i = 0; i < 5000 && !__atomic_load_n(&t.holding, __ATOMIC_ACQUIRE); i++)
         sleep_usec(1 * USEC_PER_MS);
+    if (!__atomic_load_n(&t.holding, __ATOMIC_ACQUIRE)) {
+        fprintf(stderr, "SQLITE LEASE TEST: the holder thread did not take the busy connection within 5 s\n");
+        __atomic_store_n(&t.release, true, __ATOMIC_RELEASE);
+        nd_thread_join(holder);
+        sqlite3_close_v2(t.busy_db);
+        sqlite3_close_v2(t.other_db);
+        return 1;
+    }
 
     __atomic_store_n(&sqlite_lease_test_running, &t, __ATOMIC_RELEASE);
     __atomic_store_n(&sqlite_lease_acquired_test_hook, sqlite_lease_test_hook, __ATOMIC_RELEASE);
