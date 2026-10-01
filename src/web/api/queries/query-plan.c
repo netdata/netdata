@@ -388,7 +388,7 @@ static int compare_query_plan_entries(const void *a, const void *b) {
 static bool query_plan_fill_coverage(QUERY_ENGINE_OPS *ops, size_t selected_tier,
                                      time_t after_wanted, time_t before_wanted) {
     QUERY_METRIC *qm = ops->qm;
-    time_t boundaries[2 * RRD_STORAGE_TIERS];
+    time_t boundaries[2 * RRD_STORAGE_TIERS] = { 0 };
     size_t boundaries_used = 0;
     size_t head_order[RRD_STORAGE_TIERS], tail_order[RRD_STORAGE_TIERS];
     size_t head_used = 0, tail_used = 0;
@@ -1386,6 +1386,39 @@ int query_plan_unittest(void) {
         }
         else
             fprintf(stderr, "OK handoff offset reset\n");
+    }
+
+    {
+        nd_profile.storage_tiers = 5;
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 100, 800, 1);
+        query_plan_unittest_set_tier(&qm, 1, 200, 700, 5);
+        query_plan_unittest_set_tier(&qm, 2, 500, 600, 10);
+        query_plan_unittest_set_tier(&qm, 3, 400, 900, 20);
+        query_plan_unittest_set_tier(&qm, 4, 300, 1000, 40);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 0, .after = 100, .before = 200 },
+            { .tier = 1, .after = 200, .before = 300 },
+            { .tier = 4, .after = 300, .before = 400 },
+            { .tier = 3, .after = 400, .before = 500 },
+            { .tier = 2, .after = 500, .before = 600 },
+            { .tier = 1, .after = 600, .before = 700 },
+            { .tier = 0, .after = 700, .before = 800 },
+            { .tier = 3, .after = 800, .before = 900 },
+            { .tier = 4, .after = 900, .before = 1000 },
+        };
+        errors += query_plan_unittest_expect_best_tier(
+            "five-tier capacity fixture selects tier2", &qm, 100, 1000, 100, 2);
+        errors += query_plan_unittest_expect_plan(
+            "five-tier older coverage preserves fallback order", &qm, 0, 2,
+            100, 600, 100, expected, 5);
+        errors += query_plan_unittest_expect_plan(
+            "five-tier newer coverage preserves fallback order", &qm, 0, 2,
+            500, 1000, 100, &expected[4], 5);
+        errors += query_plan_unittest_expect_plan(
+            "five-tier coverage uses all nine plan entries", &qm, 0, 2,
+            100, 1000, 100, expected, _countof(expected));
+        nd_profile.storage_tiers = 3;
     }
 
     nd_profile.storage_tiers = old_storage_tiers;

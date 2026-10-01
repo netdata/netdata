@@ -330,6 +330,9 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
                         }
                         if(sp2.end_time_s <= covered_end)
                             storage_point_unset(sp2);
+                        else if(storage_point_is_unset(sp2) && sp2.start_time_s < sp2.end_time_s)
+                            // Preserve a stored empty interval in the count-based read-ahead slot.
+                            storage_point_empty(sp2, sp2.start_time_s, sp2.end_time_s);
                     }
 
                     if(unlikely(options & RRDR_OPTION_ABSOLUTE))
