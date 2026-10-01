@@ -152,6 +152,20 @@ func TestCollector_Init(t *testing.T) {
 				CounterRawCharts: []string{" app_*"},
 			},
 		},
+		"counter raw charts several patterns in one item": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig:       web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				CounterRawCharts: []string{"app_* !app_internal_*"},
+			},
+		},
+		"counter raw charts invalid glob": {
+			wantFail: true,
+			config: Config{
+				HTTPConfig:       web.HTTPConfig{RequestConfig: web.RequestConfig{URL: "http://127.0.0.1:9090/metric"}},
+				CounterRawCharts: []string{"app_["},
+			},
+		},
 		"counter raw charts only negative patterns": {
 			wantFail: true,
 			config: Config{
