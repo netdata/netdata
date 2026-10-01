@@ -1208,11 +1208,10 @@ update_static() {
     # shellcheck disable=SC2086
     if sh "${ndtmpdir}/netdata-${sysarch}-latest.gz.run" --accept -- ${REINSTALL_OPTIONS} >&3 2>&3; then
       rm -r "${ndtmpdir}"
+      echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
     else
-      info "NOTE: did not remove: ${ndtmpdir}"
+      fatal "Static installer failed, Netdata was not updated." U002B
     fi
-
-    echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
   fi
 
   if [ -e "${PREVDIR}" ]; then
