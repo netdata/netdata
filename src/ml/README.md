@@ -124,7 +124,7 @@ train back to back, so the extents loaded for one dimension are still in the ext
 trained, instead of being reloaded and decompressed once per dimension hours apart. Dimensions with no open page at
 the start of a pass, or whose open page is idle and already past its expected completion (a collection gap), or
 that are not stored in the database engine, are trained first, as one group. The per-thread `netdata.ml_training_pass` chart shows the size of the last sorted pass and how many of its
-dimensions fell into that first group; `netdata.ml_training_time_stats` shows the time spent resolving and sorting a pass.
+dimensions fell into that first group (it appears once a thread has sorted its first pass); `netdata.ml_training_time_stats` shows the time spent resolving and sorting a pass.
 
 ### Anomaly Bit
 
