@@ -4,6 +4,8 @@ set -euo pipefail
 
 artifacts="$(realpath "${1}")"
 signing_key="${2:-}"
+event_type="${3:-}"
+build_type="${4:-nightly}"
 
 TOP="$(pwd)"
 DISTFILE_EXTENSIONS="gz zst"
@@ -70,6 +72,25 @@ create_manifest() {
     fi
 }
 
+version_compare() {
+    local v1 v2
+    local IFS=.-
+
+    echo "$1" | read -ra v1
+    echo "$2" | read -ra v2
+
+    if (( 10#${v1[0]} > 10#${v2[0]} )); then return 1; fi
+    if (( 10#${v1[0]} < 10#${v2[0]} )); then return 0; fi
+
+    if (( 10#${v1[1]} > 10#${v2[1]} )); then return 1; fi
+    if (( 10#${v1[1]} < 10#${v2[1]} )); then return 0; fi
+
+    if (( 10#${v1[2]} > 10#${v2[2]} )); then return 1; fi
+    if (( 10#${v1[2]} < 10#${v2[2]} )); then return 0; fi
+
+    return 1
+}
+
 echo "Using ${artifacts} as source directory for artifacts"
 echo "::group::Files currently in ${artifacts}"
 ls -l "${artifacts}"
@@ -100,14 +121,39 @@ cat Manifest
 cd "${TOP}"
 echo "::endgroup::"
 
-echo "::group::Preparing R2 latest release artifacts"
-mkdir -p artifacts/r2/latest
-cd artifacts/r2/latest
-copy_source_tarball latest
-copy_static_builds latest
-copy_msi_packages latest
-echo "${VERSION}" > Version
-create_manifest
-cat Manifest
-cd "${TOP}"
-echo "::endgroup::"
+prepare_latest=0
+if [ "${event_type}" != 'pull_request' ] && [ "${build_type}" != 'nightly' ]; then
+    if wget -Sv "https://artifacts.netdata.cloud/${build_type}/latest/Version"; then
+        if version_newer "$(cat Version)" "${VERSION}"; then
+            prepare_latest=0
+        else
+            prepare_latest=1
+        fi
+    else
+        echo "::warning::Failed to determine latest published ${build_type} version."
+        prepare_latest=1
+    fi
+
+    if [ "${build_type}" != "release-candidate" ]; then
+        echo "::group::Preparing R2 secondary version release artifacts"
+        cp -va "artifacts/r2/${VERSION}" "artifacts/r2/$(echo "${VERSION}" | tr -d 'v' | cut -f 1 -d '.')"
+        cp -va "artifacts/r2/${VERSION}" "artifacts/r2/$(echo "${VERSION}" | tr -d 'v' | cut -f 1,2 -d '.')"
+        echo "::endgroup::"
+    fi
+else
+    prepare_latest=1
+fi
+
+if [ "${prepare_latest}" -eq 1 ]; then
+    echo "::group::Preparing R2 latest release artifacts"
+    mkdir -p artifacts/r2/latest
+    cd artifacts/r2/latest
+    copy_source_tarball latest
+    copy_static_builds latest
+    copy_msi_packages latest
+    echo "${VERSION}" > Version
+    create_manifest
+    cat Manifest
+    cd "${TOP}"
+    echo "::endgroup::"
+fi
