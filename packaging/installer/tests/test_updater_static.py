@@ -32,11 +32,14 @@ exec 3>&2
 info() { echo "INFO: $1" >&2; }
 fatal() { echo "FATAL: $1" >&2; exit 1; }
 update_available() { return 0; }
-download() { cat > "$2" <<EOS
-exit %(rc)d
-EOS
+printf 'exit %(rc)d\\n' > "%(root)s/stub.run"
+download() {
+  case "$2" in
+    *sha256sum.txt) printf '%%s  netdata-x86_64-latest.gz.run\\n' "$(sha256sum "%(root)s/stub.run" | cut -d' ' -f1)" > "$2" ;;
+    *) cp "%(root)s/stub.run" "$2" ;;
+  esac
 }
-safe_sha256sum() { return 0; }
+safe_sha256sum() { sha256sum "$@"; }
 create_exec_tmp_directory() { ndtmpdir="$(mktemp -d "%(root)s/tmp.XXXXXX")"; }
 NETDATA_TARBALL_CHECKSUM_URL=sum NETDATA_TARBALL_URL=run PREBUILT_ARCH=x86_64
 REINSTALL_OPTIONS= logfile=
