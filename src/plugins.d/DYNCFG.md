@@ -372,9 +372,10 @@ Behavior an author must design around:
   plugin blocks legitimate configs; a looser one offers configs the plugin rejects.
 - `dependencies` with `oneOf` on a `const` discriminator reveals the matching branch's properties inline (no selector
   widget); the UI drops the form data of inactive branches for TOP-LEVEL dependencies only. A key that is both a
-  branch property and a plain sibling property renders unconditionally. Avoid property-level `oneOf`/`anyOf` (rendered
-  as a branch selector whose first option cannot be selected reliably) and avoid `0`, `false`, and `""` as `enum`
-  values in select-rendered fields.
+  branch property and a plain sibling property renders unconditionally. Avoid `oneOf`/`anyOf` outside `dependencies`,
+  on a property or on an object (including inside `allOf`): it renders as a branch selector whose first option cannot
+  be selected reliably, and on a tabbed object it repeats the tab strip. Express cross-field rules with `if`/`then`
+  instead. Avoid `0`, `false`, and `""` as `enum` values in select-rendered fields.
 - Nullable fields: a two-member union such as `["string", "null"]` renders as the non-null type; any other union
   (three or more members, or two members without `null`) collapses to its first member.
 - Maps: `additionalProperties: {type: ...}` renders a key/value list with an add button; `patternProperties` alone
