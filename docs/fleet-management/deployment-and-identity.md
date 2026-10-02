@@ -57,6 +57,8 @@ In the Parent's `stream.conf`:
     tcp keepalive idle = auto
 ```
 
+The Parent uses automatic TCP keepalives by default. The explicit `auto` line above documents that default; you can omit it. It adapts keepalive frequency to the fastest streamed chart interval, as explained in the [cellular guide](./minimize-cellular-traffic.md#match-keepalives-to-collection).
+
 Use the same UUID for `YOUR_STREAMING_API_KEY` on both sides. Replace `YOUR_DEVICE_NETWORK` with the permitted source addresses or network pattern. A shared streaming key can authorize a device group while each device keeps its own identity and history. Per-device authorization is available when you need finer control.
 
 Enable centralized alerting and anomaly detection in the Parent's `netdata.conf`:
