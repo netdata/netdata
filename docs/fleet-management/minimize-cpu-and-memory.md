@@ -84,7 +84,7 @@ Local history lets the Child fill coverage gaps after reconnecting:
 | `none` | Current streaming with the smallest local history footprint |
 | `dbengine` | Persistent history that survives Agent restarts and device power loss |
 
-In RAM mode, `retention` sets sample entries per dimension. With 120 entries, five-second collection provides roughly ten minutes of history, five-minute collection roughly ten hours, and ten-minute collection roughly twenty hours. Each chart's interval and memory-page allocation determine its exact window.
+In RAM mode, `retention` requests sample entries per dimension, rounded up to whole memory pages. On devices with 4 KiB pages, `retention = 120` allocates 1,024 entries per dimension—the same memory as requesting 1,024. That provides about 85 minutes at five-second collection, 3.6 days at five-minute collection or 7.1 days at ten-minute collection. Each chart's interval determines its window; devices with larger memory pages retain more entries at this setting.
 
 On Pi 1, choosing `none` instead of `ram` saved about 5 MiB of memory at one-second collection. Choose RAM when you want to backfill network outages, or DBengine when recovery must also cover restarts. The [disconnection guide](./disconnected-devices-and-failover.md) shows the replication configuration; [Agent sizing](../netdata-agent/sizing-netdata-agents/README.md) covers persistent storage limits.
 
@@ -121,7 +121,7 @@ Select plugin bundles when [preparing the package](./minimize-disk-footprint.md)
 
 ## Plan the device's monitoring budget
 
-The examples below use Netdata **v2.12.0-2-nightly**, `apps` and `debugfs`, compressed streaming and 120 RAM entries per dimension, with StatsD disabled. CPU covers the Agent and persistent plugins as a percentage of one core; memory covers their combined process footprint (PSS).
+The examples below use Netdata **v2.12.0-2-nightly**, `apps` and `debugfs`, compressed streaming and `[db] retention = 120` rounded to memory pages, with StatsD disabled. CPU covers the Agent and persistent plugins as a percentage of one core; memory covers their combined process footprint (PSS).
 
 | Device | Package / device OS | One-second collection: CPU / memory | Five-second collection: CPU / memory |
 |:--|:--|--:|--:|

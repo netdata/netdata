@@ -86,7 +86,7 @@ Alert on the conditions that affect the workload: temperature, storage capacity,
 
 Enable machine learning on the Parent and keep history for its training window. Anomaly detection becomes available as models train on incoming samples. With sparse collection, allow time for samples to accumulate and for scheduled training; the defaults use a six-hour history window and retrain every three hours.
 
-Use Cloud [node states](../netdata-cloud/node-states-and-transitions.md#states-on-netdata-cloud) to follow connectivity and data availability: **Live** nodes provide current metrics, **Stale** nodes have history available through a connected Parent, **Offline** nodes have no available data source, and **Unseen** nodes have been claimed but have never connected. Use labels to apply different connectivity expectations to always-on devices and those that sleep or operate intermittently. The [disconnection guide](./disconnected-devices-and-failover.md) shows how to recover history after an outage.
+Use Cloud [node states](../netdata-cloud/node-states-and-transitions.md#states-on-netdata-cloud) to follow connectivity and data availability: **Live** nodes provide current metrics, **Stale** nodes have history available through a connected Parent, **Offline** nodes have no available data source, and **Unseen** nodes have been claimed but have never connected. Use labels to distinguish always-on and sleeping devices in fleet views. The [disconnection guide](./disconnected-devices-and-failover.md) covers ephemerality for planned disconnections and history recovery after an outage.
 
 ## Automate actions on the device
 

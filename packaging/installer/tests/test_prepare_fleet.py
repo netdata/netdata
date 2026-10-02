@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import struct
 import subprocess
 import tarfile
 import tempfile
@@ -48,8 +49,23 @@ class PrepareFleetTests(unittest.TestCase):
         path.write_text(data)
         return path
 
-    def run_script(self, *args, success=True):
-        result = subprocess.run([str(SCRIPT), *map(str, args)], cwd=self.root, capture_output=True, text=True)
+    def elf_fixture(self, name):
+        # Linux package fixtures must also work on non-ELF build hosts.
+        path = self.put(name, '')
+        names = b'\0.text\0.shstrtab\0'
+        section_offset = 88
+        header = struct.pack('<16sHHIQQQIHHHHHH', b'\x7fELF\x02\x01\x01' + bytes(9),
+                             2, 62, 1, 0x1000, 0, section_offset, 0, 64, 0, 0, 64, 3, 2)
+        data = header + b'\xc3' + names
+        data += bytes(section_offset - len(data))
+        data += bytes(64)
+        data += struct.pack('<IIQQQQIIQQ', 1, 1, 6, 0x1000, 64, 1, 0, 0, 1, 0)
+        data += struct.pack('<IIQQQQIIQQ', 7, 3, 0, 0, 65, len(names), 0, 0, 1, 0)
+        path.write_bytes(data)
+        return path
+
+    def run_script(self, *args, success=True, env=None):
+        result = subprocess.run([str(SCRIPT), *map(str, args)], cwd=self.root, capture_output=True, text=True, env=env)
         self.assertEqual(result.returncode == 0, success, result.stderr)
         return result
 
@@ -82,12 +98,63 @@ class PrepareFleetTests(unittest.TestCase):
         result = self.run_script('--source', other, '--keep', 'go', success=False)
         self.assertIn('incomplete capability go', result.stderr)
 
+    def test_netflow_downloader_follows_capability(self):
+        paths = ('usr/libexec/netdata/plugins.d/netflow-plugin',
+                 'usr/sbin/topology-ip-intel-downloader')
+        for path in paths:
+            self.put(path, 'netflow helper')
+        target, _ = self.prepare()
+        for path in paths:
+            self.assertFalse((target / path).exists())
+        self.run_script('--source', self.source, '--keep', 'netflow',
+                        '--strip-mode', 'none', '--apply', '--output', self.root / 'netflow')
+        for path in paths:
+            self.assertTrue((self.root / 'netflow' / path).is_file())
+
+    def test_ebpf_stock_bundle_follows_capability(self):
+        paths = ('usr/libexec/netdata/plugins.d/ebpf.plugin',
+                 'usr/lib/netdata/conf.d/ebpf.d.conf',
+                 'usr/lib/netdata/conf.d/ebpf.d/socket.conf')
+        for path in paths:
+            self.put(path, 'ebpf stock')
+        self.put('etc/netdata/ebpf.d/socket.conf', 'custom user configuration')
+        target, _ = self.prepare()
+        for path in paths:
+            self.assertFalse((target / path).exists())
+        self.assertTrue((target / 'etc/netdata/ebpf.d/socket.conf').is_file())
+        self.run_script('--source', self.source, '--keep', 'ebpf', '--strip-mode', 'none',
+                        '--apply', '--output', self.root / 'ebpf')
+        for path in paths:
+            self.assertTrue((self.root / 'ebpf' / path).is_file())
+
+    @unittest.skipUnless(shutil.which('objcopy'), 'native objcopy unavailable')
+    def test_retained_netflow_downloader_is_stripped(self):
+        self.put('usr/libexec/netdata/plugins.d/netflow-plugin', 'plugin')
+        downloader = self.elf_fixture('usr/sbin/topology-ip-intel-downloader')
+        downloader.chmod(0o755)
+        target, _ = self.prepare('netflow', strip='debug')
+        manifest = json.loads((target / 'usr/share/netdata/fleet-manifest.json').read_text())
+        self.assertIn('usr/sbin/topology-ip-intel-downloader',
+                      [item['path'] for item in manifest['stripped_files']])
+        self.assertEqual((target / 'usr/sbin/topology-ip-intel-downloader').stat().st_mode & 0o7777, 0o755)
+
     def test_preview_does_not_publish(self):
         result = self.run_script('--source', self.source, '--keep', 'none', '--output', self.root / 'preview')
         self.assertIn('Preview only', result.stderr)
         self.assertFalse((self.root / 'preview').exists())
         self.assertIn('Keep: none', result.stdout)
         self.assertNotIn('removed_paths', result.stdout)
+
+    @unittest.skipUnless(os.name == 'posix' and os.geteuid() != 0, 'requires unprivileged POSIX permissions')
+    def test_unreadable_source_subtree_refused(self):
+        directory = self.put('usr/share/netdata/private-source/config', 'must survive').parent
+        directory.chmod(0)
+        try:
+            target, result = self.prepare(success=False)
+            self.assertFalse(target.exists())
+            self.assertIn('Permission denied', result.stderr)
+        finally:
+            directory.chmod(0o755)
 
     def test_default_output_summarizes_large_inventory(self):
         for index in range(100):
@@ -170,9 +237,9 @@ class PrepareFleetTests(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which('objcopy'), 'native objcopy unavailable')
     def test_successful_default_debug_strip_preserves_executable_mode(self):
-        shutil.copyfile('/bin/true', self.source / 'bin/srv/netdata')
+        self.elf_fixture('bin/srv/netdata')
         (self.source / 'bin/srv/netdata').chmod(0o755)
-        shutil.copyfile('/bin/true', self.source / 'bin/nd-run')
+        self.elf_fixture('bin/nd-run')
         target = self.root / 'debug-output'
         result = self.run_script('--source', self.source, '--keep', 'apps', '--apply', '--output', target)
         self.assertIn('Stripped bin/srv/netdata:', result.stdout)
@@ -201,19 +268,39 @@ class PrepareFleetTests(unittest.TestCase):
             self.assertEqual((target / name).read_bytes(), (self.source / name).read_bytes(), name)
 
     def test_strip_failure_does_not_publish(self):
-        shutil.copyfile('/bin/true', self.source / 'bin/srv/netdata')
-        target, result = self.prepare(strip='debug', objcopy='/bin/false', success=False)
+        self.elf_fixture('bin/srv/netdata')
+        tool = self.root / 'fail-objcopy'
+        tool.write_text('#!/bin/sh\nexit 1\n')
+        tool.chmod(0o755)
+        target, result = self.prepare(strip='debug', objcopy=tool, success=False)
         self.assertFalse(target.exists())
         self.assertIn('command failed (1)', result.stderr)
 
     def test_allocated_section_mutation_refused(self):
-        shutil.copyfile('/bin/true', self.source / 'bin/srv/netdata')
+        self.elf_fixture('bin/srv/netdata')
         tool = self.root / 'bad-objcopy'
         tool.write_text('#!/usr/bin/env python3\nimport pathlib,sys\np=pathlib.Path(sys.argv[2]); d=bytearray(p.read_bytes()); d[24]^=1; pathlib.Path(sys.argv[3]).write_bytes(d)\n')
         tool.chmod(0o755)
         target, result = self.prepare(strip='all', objcopy=tool, success=False)
         self.assertFalse(target.exists())
         self.assertIn('changed allocated sections or ELF identity', result.stderr)
+
+    def test_concurrent_installer_publication_leaves_no_checksum(self):
+        path, sha = self.installer()
+        target = self.root / 'racing.gz.run'
+        tools = self.root / 'tools'
+        tools.mkdir()
+        cksum = tools / 'cksum'
+        cksum.write_text('#!/usr/bin/env python3\nimport os,pathlib\n'
+                         'pathlib.Path(os.environ["FLEET_RACE_OUTPUT"]).write_text("other publisher")\n'
+                         'print("1 1")\n')
+        cksum.chmod(0o755)
+        env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ['PATH'],
+                   FLEET_RACE_OUTPUT=str(target))
+        self.run_script('--input', path, '--sha256', sha, '--keep', 'none', '--strip-mode', 'none',
+                        '--apply', '--output', target, success=False, env=env)
+        self.assertEqual(target.read_text(), 'other publisher')
+        self.assertFalse(Path(str(target) + '.sha256').exists())
 
     def installer(self, extra=None, omit_directories=False):
         data = io.BytesIO()

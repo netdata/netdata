@@ -39,7 +39,8 @@ CAPS = {
                  CONF + 'schema.d/systemd-journal%3Amonitored-directories.json'], []),
     'otel': ([PLUGIN + 'otel-plugin', CONF + 'otel.yaml', CONF + 'otel.d'], []),
     'netflow': ([PLUGIN + 'netflow-plugin', CONF + 'netflow.yaml',
-                 CONF + 'topology-ip-intel.yaml', 'usr/share/netdata/topology-ip-intel'], []),
+                 CONF + 'topology-ip-intel.yaml', 'usr/share/netdata/topology-ip-intel',
+                 'usr/sbin/topology-ip-intel-downloader'], []),
     'dashboard': (['usr/share/netdata/web'], []),
     'python': ([PLUGIN + 'python.d.plugin', 'usr/libexec/netdata/python.d',
                 CONF + 'python.d.conf', CONF + 'python.d'], []),
@@ -52,14 +53,15 @@ CAPS = {
     'ipmi': ([PLUGIN + 'freeipmi.plugin'], []),
     'xen': ([PLUGIN + 'xenstat.plugin'], []),
     'cups': ([PLUGIN + 'cups.plugin'], []),
-    'ebpf': ([PLUGIN + 'ebpf.plugin', PLUGIN + 'ebpf-go.plugin'], []),
+    'ebpf': ([PLUGIN + 'ebpf.plugin', PLUGIN + 'ebpf-go.plugin',
+              CONF + 'ebpf.d.conf', CONF + 'ebpf.d'], []),
     'systemd-units': ([PLUGIN + 'systemd-units.plugin'], []),
     'ioping': ([PLUGIN + 'ioping', PLUGIN + 'ioping.plugin', CONF + 'ioping.conf'], []),
     'log2journal': (['bin/log2journal', CONF + 'log2journal.d'], []),
 }
 STOCK_ELF = {
     path for paths, _ in CAPS.values() for path in paths
-    if path.startswith(PLUGIN) or path.startswith('bin/')
+    if path.startswith(PLUGIN) or path.startswith(('bin/', 'usr/sbin/'))
 } | {'bin/bash', 'bin/curl', 'bin/nd-run', 'bin/netdatacli', 'bin/systemd-cat-native',
      'bin/srv/netdata', PLUGIN + 'ndsudo'}
 REQUIRED_COMPANIONS = {
@@ -150,7 +152,8 @@ def validate_members(members):
 
 def tree_members(root):
     result = []
-    for directory, dirs, files in os.walk(root, followlinks=False):
+    for directory, dirs, files in os.walk(root, followlinks=False,
+                                          onerror=lambda error: fail(f'cannot read source directory: {error}')):
         for name in sorted(dirs + files):
             path = Path(directory) / name
             info = path.lstat()
@@ -465,8 +468,8 @@ def main():
             fail('checksum output already exists')
         checksum = work / 'installer.sha256'
         checksum.write_text(f'{digest(prepared)}  {output.name}\n')
-        publish_file(checksum, checksum_path)
         publish_file(prepared, output)
+        publish_file(checksum, checksum_path)
     final_bytes = report['output_regular_bytes_without_manifest']
     show(f'Prepared payload: {size_text(final_bytes)}')
     if original_bytes:

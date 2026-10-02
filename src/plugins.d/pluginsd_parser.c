@@ -1736,31 +1736,43 @@ static int pluginsd_parser_unittest_slot_bounds(size_t max_slot) {
 }
 
 #ifndef OS_WINDOWS
+struct pluginsd_unittest_writer {
+    int fd;
+    bool success;
+};
+
 static void pluginsd_unittest_delayed_output(void *arg) {
-    int fd = *(int *)arg;
-    usleep(150000);
-    ssize_t written = write(fd, "\n", 1);
-    (void)written;
+    struct pluginsd_unittest_writer *writer = arg;
+    usec_t started_ut = now_monotonic_usec();
+    sleep_usec(150000);
+    if(now_monotonic_usec() - started_ut < 150000)
+        return;
+    ssize_t written;
+    do {
+        written = write(writer->fd, "\n", 1);
+    } while(written < 0 && errno == EINTR);
+    writer->success = written == 1;
 }
 #endif
 
 static int pluginsd_parser_unittest_read_timeout(void) {
 #ifndef OS_WINDOWS
-    // Scale seconds to milliseconds while exercising the production pipe reader.
+    // Scale seconds to milliseconds; allow scheduling slack while exceeding the old timeout.
     int fds[2];
     if(pipe(fds) != 0)
         return 1;
 
+    struct pluginsd_unittest_writer writer_result = { .fd = fds[1] };
     ND_THREAD *writer = nd_thread_create("pluginsd-ut", NETDATA_THREAD_OPTION_DONT_LOG,
-                                         pluginsd_unittest_delayed_output, &fds[1]);
+                                         pluginsd_unittest_delayed_output, &writer_result);
     struct buffered_reader reader;
     buffered_reader_init(&reader);
     buffered_reader_ret_t ret = buffered_reader_read_timeout(
-        &reader, fds[0], pluginsd_read_timeout_ms(300) / MSEC_PER_SEC, false);
+        &reader, fds[0], pluginsd_read_timeout_ms(3000) / MSEC_PER_SEC, false);
     nd_thread_join(writer);
     close(fds[0]);
     close(fds[1]);
-    if(ret != BUFFERED_READER_READ_OK || reader.read_len != 1 || reader.read_buffer[0] != '\n') {
+    if(!writer_result.success || ret != BUFFERED_READER_READ_OK || reader.read_len != 1 || reader.read_buffer[0] != '\n') {
         netdata_log_error("PLUGINSD: sparse plugin output disconnected before its next sample");
         return 1;
     }
@@ -1783,7 +1795,7 @@ static int pluginsd_parser_unittest_read_timeout(void) {
         int expected_ms;
     } cases[] = {
         { INT_MIN, 120000 }, { 0, 120000 }, { 1, 120000 },
-        { 60, 120000 }, { 61, 122000 }, { 300, 600000 }, { 600, 1200000 },
+        { 60, 120000 }, { 61, 122000 }, { 300, 600000 }, { 600, 1200000 }, { 3000, 6000000 },
         { INT_MAX / 2000, (INT_MAX / 2000) * 2000 },
         { INT_MAX / 2000 + 1, INT_MAX }, { INT_MAX, INT_MAX },
     };
