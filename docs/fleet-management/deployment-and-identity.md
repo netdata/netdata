@@ -1,38 +1,41 @@
 # Deploy and Identify Fleet Devices
 
-Connect each edge device to a Netdata Parent so your team can monitor and troubleshoot the fleet centrally. Use a shared device image for installation and configuration, then provision each device's identity and credentials on first boot.
+Give every device a place in your fleet's monitoring view. Install a small Netdata Agent in your device image, connect it to a Parent, and attach the labels your team uses to organize customers, sites and releases. The Parent brings the devices' charts, alerts and live troubleshooting into one interface.
 
-## Choose the device package
+## Prepare a package for each device class
 
-Use a Linux static package compatible with the device's CPU and operating system. Netdata provides `armv6l` and `armv7l` packages for 32-bit ARM devices, alongside packages for other supported architectures.
+Netdata provides static Linux packages for 32-bit ARM devices, including `armv6l` and `armv7l`. Choose the package for your device's CPU and operating system, then use the [disk-footprint guide](./minimize-disk-footprint.md) to retain the capabilities your team needs.
 
-Prepare your reduced package on a build host and install it into the device image. The [disk-footprint guide](./minimize-disk-footprint.md) explains how to select plugins and strip symbols. For installation details, see [static installations](../../packaging/makeself/README.md).
+For example, a signage player may need system and process metrics; a robot may also need hardware sensors, container monitoring and application telemetry. Use the same package and runtime configuration across devices with the same role.
 
-Create a package and configuration policy for each device class. A signage player might need process metrics and display-service monitoring; a robot might also need hardware sensors, containers and application telemetry. Retain the collectors and live Functions your team uses for that class.
+## Preserve each device's identity
 
-## Give each device its own identity
+Generate the Agent identity on first boot and preserve it through image updates. Each device then appears as its own node, with monitoring history that follows it across releases.
 
-Generate an Agent identity on first boot so every device appears as a separate node. Keep that identity across normal image updates so its monitoring history stays associated with the same device.
+Prepare shared images before claiming or commissioning their Agents. The [VM template guide](../learn/vm-templates.md) explains which identity and Cloud credentials to initialize separately on each device.
 
-Prepare the shared image before claiming or commissioning the Agent. Follow the [VM template guidance](../learn/vm-templates.md) to avoid copying an existing device's identity or Cloud credentials into new devices.
+## Attach customer and location labels
 
-Assign a stable hostname and [host labels](../netdata-agent/configuration/organize-systems-metrics-and-alerts.md) for:
+Add a `[host labels]` section to the device's `netdata.conf`:
 
-- Customer name or tenant identifier.
-- Location, building and room.
-- Device class, model and hardware revision.
-- Software version or release.
-- Deployment ring, such as pilot or production.
+```ini
+[host labels]
+    customer = tenant-a
+    location = north-campus
+    building = warehouse-2
+    room = loading-bay
+    model = robot-r2
+    software-version = 2026.10.1
+    deployment-ring = pilot
+```
 
-These labels let you find devices, organize dashboards and apply alerts to the right groups. Store credentials in your provisioning system rather than in labels.
+Populate these values through your provisioning system. The labels travel with the device's metrics, so operators can filter and group by customer, site, room, hardware or software release. Use a stable hostname to make individual devices easy to recognize.
 
-## Connect to a Parent
+The [label configuration guide](../netdata-agent/configuration/organize-systems-metrics-and-alerts.md) also shows how to populate labels from environment variables. The [fleet monitoring guide](./monitor-the-fleet.md) shows how to use them in maps and investigations.
 
-In the Child's `stream.conf`, configure the `[stream]` section with streaming enabled, the Parent destination and a streaming API key. On the Parent, configure the matching API-key receiver section and the allowed source addresses.
+## Connect devices to a Parent
 
-For a controlled private network, the minimum configuration is:
-
-Child `stream.conf`:
+Start with this configuration on a private network. In the Child's `stream.conf`:
 
 ```ini
 [stream]
@@ -42,7 +45,7 @@ Child `stream.conf`:
     enable compression = yes
 ```
 
-Parent `stream.conf`:
+In the Parent's `stream.conf`:
 
 ```ini
 [YOUR_STREAMING_API_KEY]
@@ -54,9 +57,9 @@ Parent `stream.conf`:
     tcp keepalive idle = auto
 ```
 
-Replace `YOUR_STREAMING_API_KEY` on both sides with the same UUID and `YOUR_DEVICE_NETWORK` with the allowed source addresses or pattern for your private network. Each device also has its own persistent machine identity; sharing a streaming authorization key does not merge device identities. Follow the streaming reference for more restrictive per-device authorization.
+Use the same UUID for `YOUR_STREAMING_API_KEY` on both sides. Replace `YOUR_DEVICE_NETWORK` with the permitted source addresses or network pattern. A shared streaming key can authorize a device group while each device keeps its own identity and history. Per-device authorization is available when you need finer control.
 
-On the Parent, enable health and machine learning in `netdata.conf`:
+Enable centralized alerting and anomaly detection in the Parent's `netdata.conf`:
 
 ```ini
 [health]
@@ -66,21 +69,32 @@ On the Parent, enable health and machine learning in `netdata.conf`:
     enabled = yes
 ```
 
-Keep the Parent's own profile and storage settings appropriate for its capacity. The Child can disable these features while the Parent evaluates the received metrics. Claim the Parent to your Netdata Cloud Space when your operators use Cloud; live sensitive-data Functions such as process inspection require an authorized signed-in session. A streaming key authorizes ingestion and does not grant operators access to these Functions.
+Apply the [lightweight Child configuration](./minimize-cpu-and-memory.md#configure-a-lightweight-child) on the devices. The Children collect; the Parent stores history, evaluates alerts and runs machine learning.
 
-Use TLS with certificate verification for devices connecting over cellular or other untrusted networks. Provision the Parent certificate and the required CA trust alongside your device configuration. Streaming API keys authorize the Child-to-Parent connection; Cloud claiming credentials connect an Agent to Netdata Cloud.
+## Secure the connection and operator access
 
-For fleets with changing cellular addresses, configure access through your fleet's network or VPN and the appropriate Parent source-address policy. Netdata streaming uses its own protocol; configure direct connectivity to the streaming port.
+For cellular or other untrusted networks, provision the Parent's server certificate and private key, and make them readable by its Agent. Set their paths in the Parent's `netdata.conf`:
 
-The [Parent-Child configuration reference](../../src/streaming/README.md) covers destination syntax, authorization and TLS settings.
+```ini
+[web]
+    ssl key = /etc/fleet/parent-key.pem
+    ssl certificate = /etc/fleet/parent-cert.pem
+```
 
-## Bring devices online
+Provision the trusted CA certificate on each device and add these settings to the Child's `[stream]` section:
 
-Start with a small deployment ring. In the Parent dashboard, check that:
+```ini
+    destination = parent.example:19999:SSL
+    ssl skip certificate verification = no
+    CAfile = /etc/fleet/parent-ca.pem
+```
 
-- Each device appears with its own identity and expected labels.
-- System and application metrics are updating.
-- The live Functions your team needs are available.
-- Parent-side alerts and anomaly detection are enabled as intended.
+Place the trusted CA certificate at the configured path. Allow outbound access to the Parent's streaming port, directly or through your fleet VPN. See [TLS certificate configuration](../../src/web/server/README.md) for Parent certificates and the [Parent-Child reference](../../src/streaming/README.md) for destination syntax and authorization.
 
-Once the device class is ready, roll the same package and configuration out to the rest of that group. Use the [update guide](./updates-and-troubleshooting.md) to keep the image and monitoring policy together through future releases.
+Claim the Parent to your Netdata Cloud Space to give your team a central operating view. Manage customer access through Cloud permissions and Rooms, and use authorized signed-in sessions for sensitive live Functions such as process inspection. Streaming keys authorize device connections; Cloud permissions authorize your operators.
+
+## Roll out the device image
+
+Start with a pilot group. Open the Parent dashboard to see the devices, labels and incoming charts, and run the live Functions your team will use. Enable the Parent's alerts and anomaly detection, then deploy the same image and configuration to the rest of the device class.
+
+Use the [update guide](./updates-and-troubleshooting.md) to keep each device's identity, reduced package and monitoring policy together through future releases.

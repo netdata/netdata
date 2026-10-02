@@ -2,19 +2,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Prepare new fleet images without changing an installed Agent or the source package.
 set -eu
-run() {
-  printf >&2 '%q > ' "$PWD"
-  printf >&2 '%q ' "$@"
-  printf >&2 '\n'
-  if "$@"; then return 0; else
-    local status=$?
-    printf >&2 'ERROR: command failed (%s), working directory %q: ' "$status" "$PWD"
-    printf >&2 '%q ' "$@"
-    printf >&2 '\n'
-    return "$status"
-  fi
-}
-run python3 - "$@" <<'PY'
+printf >&2 '%q > ' "$PWD"
+printf >&2 '%q ' bash "${BASH_SOURCE[0]}" "$@"
+printf >&2 '\n'
+python3 - "$@" <<'PY'
 import argparse
 import copy
 import gzip
@@ -273,6 +264,7 @@ def main():
     parser.add_argument('--objcopy', default='objcopy', help='objcopy supporting the target architecture')
     parser.add_argument('--apply', action='store_true', help='write the new output; default only previews removal policy')
     parser.add_argument('--list-capabilities', action='store_true')
+    parser.add_argument('--verbose', action='store_true', help='include the detailed file report')
     args = parser.parse_args()
     if args.list_capabilities:
         print('\n'.join(f'{name}: {", ".join(paths)}' + (f' (requires {", ".join(deps)})' if deps else '')
@@ -350,9 +342,26 @@ def main():
                   strip_mode=args.strip_mode, source_sha256=digest(input_path) if args.input else None,
                   original_regular_bytes=original_bytes, removed_regular_bytes=removed_bytes,
                   removed_paths=removed, stripped_files=[])
-    print(json.dumps(report, indent=2))
+    def show(message):
+        print(message, flush=True)
+
+    def size_text(size):
+        if size < 1024 * 1024:
+            return f'{size / 1024:.1f} KiB'
+        return f'{size / (1024 * 1024):.1f} MiB'
+
+    omitted_capabilities = sorted(name for name in CAPS if name not in selected and present(CAPS[name][0][0]))
+    show(f'Input: {input_path.name}')
+    show(f'Keep: {", ".join(sorted(available)) or "none"}')
+    show(f'Remove: {", ".join(omitted_capabilities) or "none"}')
+    show(f'Strip mode: {args.strip_mode}')
+    show(f'Original payload: {size_text(original_bytes)}')
+    show(f'Removed bundles: {size_text(removed_bytes)}')
+    show(f'Payload before stripping: {size_text(original_bytes - removed_bytes)}')
     if not args.apply:
-        print('Preview only. Stripping savings are measured with --apply; no output published.', file=sys.stderr)
+        if args.verbose:
+            show(json.dumps(report, indent=2))
+        print('Preview only. Add --apply --output NEW_OUTPUT to prepare this package.', file=sys.stderr)
         if archive:
             archive.close()
         return
@@ -388,7 +397,9 @@ def main():
                         fail(f'stripping changed allocated sections or ELF identity: {name}')
                     old_size = target.stat().st_size
                     os.replace(stripped, target)
-                    report['stripped_files'].append(dict(path=name, before=old_size, after=target.stat().st_size))
+                    new_size = target.stat().st_size
+                    report['stripped_files'].append(dict(path=name, before=old_size, after=new_size))
+                    show(f'Stripped {name}: {size_text(old_size)} -> {size_text(new_size)}')
             m.size = target.stat().st_size
             os.chmod(target, m.mode)
             os.utime(target, (m.mtime, m.mtime))
@@ -456,7 +467,18 @@ def main():
         checksum.write_text(f'{digest(prepared)}  {output.name}\n')
         publish_file(checksum, checksum_path)
         publish_file(prepared, output)
-    print(f'Prepared {output}: {report["output_regular_bytes_without_manifest"]} regular-file bytes before manifest', file=sys.stderr)
+    final_bytes = report['output_regular_bytes_without_manifest']
+    show(f'Prepared payload: {size_text(final_bytes)}')
+    if original_bytes:
+        show(f'Disk reduction: {100 * (original_bytes - final_bytes) / original_bytes:.1f}%')
+    if args.input:
+        show(f'Installer: {output.name} ({size_text(output.stat().st_size)})')
+        show(f'Checksum: {output.name}.sha256')
+    else:
+        show(f'Prepared tree: {output}')
+    show(f'Manifest: {MANIFEST}')
+    if args.verbose:
+        show(json.dumps(report, indent=2))
 
 
 try:

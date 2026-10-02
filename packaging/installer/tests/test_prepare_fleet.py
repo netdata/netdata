@@ -86,7 +86,23 @@ class PrepareFleetTests(unittest.TestCase):
         result = self.run_script('--source', self.source, '--keep', 'none', '--output', self.root / 'preview')
         self.assertIn('Preview only', result.stderr)
         self.assertFalse((self.root / 'preview').exists())
-        self.assertEqual(json.loads(result.stdout)['stripped_files'], [])
+        self.assertIn('Keep: none', result.stdout)
+        self.assertNotIn('removed_paths', result.stdout)
+
+    def test_default_output_summarizes_large_inventory(self):
+        for index in range(100):
+            self.put(f'usr/share/netdata/web/asset-{index}.js', 'dashboard asset')
+        result = self.run_script('--source', self.source, '--keep', 'network')
+        self.assertIn('Keep: apps, network', result.stdout)
+        self.assertIn('Original payload:', result.stdout)
+        self.assertIn('Payload before stripping:', result.stdout)
+        self.assertNotIn('asset-99.js', result.stdout + result.stderr)
+        self.assertLess(len(result.stdout.splitlines()), 15)
+
+    def test_verbose_retains_detailed_removal_report(self):
+        result = self.run_script('--source', self.source, '--keep', 'none', '--verbose')
+        self.assertIn('"removed_paths":', result.stdout)
+        self.assertIn('usr/share/netdata/web/index.html', result.stdout)
 
     def test_unknown_or_missing_capability_fails(self):
         for name in ('unrecognized', 'journal'):
@@ -158,7 +174,10 @@ class PrepareFleetTests(unittest.TestCase):
         (self.source / 'bin/srv/netdata').chmod(0o755)
         shutil.copyfile('/bin/true', self.source / 'bin/nd-run')
         target = self.root / 'debug-output'
-        self.run_script('--source', self.source, '--keep', 'apps', '--apply', '--output', target)
+        result = self.run_script('--source', self.source, '--keep', 'apps', '--apply', '--output', target)
+        self.assertIn('Stripped bin/srv/netdata:', result.stdout)
+        self.assertIn('Prepared payload:', result.stdout)
+        self.assertIn('Disk reduction:', result.stdout)
         binary = target / 'bin/srv/netdata'
         self.assertEqual(binary.stat().st_mode & 0o7777, 0o755)
         manifest = json.loads((target / 'usr/share/netdata/fleet-manifest.json').read_text())
@@ -239,7 +258,7 @@ class PrepareFleetTests(unittest.TestCase):
     def test_archive_with_implicit_directories_keeps_directory_capabilities(self):
         path, sha = self.installer(omit_directories=True)
         result = self.run_script('--input', path, '--sha256', sha, '--keep', 'dashboard,go')
-        self.assertEqual(json.loads(result.stdout)['resolved'], ['dashboard', 'go'])
+        self.assertIn('Keep: dashboard, go', result.stdout)
 
     def test_archive_with_implicit_directories_retains_empty_web_directory(self):
         path, sha = self.installer(omit_directories=True)

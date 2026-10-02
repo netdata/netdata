@@ -1,33 +1,37 @@
 # Edge Device Monitoring
 
-Monitor robots, digital signage, gateways and autonomous vehicles from one place, with a small Netdata Agent on each device. Stream their metrics to Netdata Parents to bring fleet-wide dashboards, historical data, alerts, anomaly detection and live troubleshooting together while reducing work on the devices.
+Monitor thousands of robots, digital signage players, gateways and autonomous vehicles from one place. Netdata gives your team fleet-wide visibility, alerts, anomaly detection and live troubleshooting while keeping monitoring lightweight on each device—even on 32-bit ARM hardware.
 
-Netdata separates collection from analysis. The Agent on an edge device is a **Child**: it collects system and application metrics and sends them to a **Parent**. The Parent stores history and provides the monitoring experience for your fleet. You can also run live troubleshooting Functions through the Parent to inspect a connected device's processes, network connections and logs.
+A small Agent on each device collects system and application metrics and streams them to a Netdata Parent. The Parent provides the storage and analysis capacity. Your operators get the monitoring experience they need, while the devices stay focused on their workloads.
 
-## Fit monitoring to your devices
+## Full fleet visibility with a small device footprint
 
-Use the same architecture across a fleet while adapting each device's Agent to its hardware and workload. For constrained Linux systems, including 32-bit ARM devices, you can:
+You can tailor Netdata to the hardware, connectivity and operational needs of each device class:
 
-- **Reduce installed size** by removing debugging symbols and packaging only the plugins your devices use.
-- **Reduce CPU and memory use** by moving storage, alerting and anomaly detection to Parents and collecting at an appropriate interval.
-- **Protect SD cards from continuous monitoring writes** by keeping metric history in RAM, disabling local logs and storing long-term history on the Parent. See [SD-card protection settings](./minimize-cpu-and-memory.md#protect-sd-cards-from-continuous-writes).
-- **Reduce cellular traffic** with less frequent metric updates, compression and keepalive settings suited to intermittent connections.
-- **Recover data after an outage** by keeping local history and replicating it when the device reconnects.
-- **See the fleet your way** by filtering and grouping devices with customer, location, model and software labels, and using system or custom application metrics to annotate and color the Nodes Map.
-- **Troubleshoot centrally** with dashboards and live Functions, without installing a dashboard on every device.
+- **Fit your device image.** Keep the collectors you need and remove debug symbols and unused plugins. The ARMv7 example in this guide reduces the package payload from 676 MiB to **41 MiB**, retaining system metrics, process monitoring and hardware sensors.
+- **Keep CPU and memory available for your application.** Move historical storage, alert evaluation and machine learning to Parents. A Raspberry Pi 3 B+ example with five-minute system collection and one-minute process and sensor collection used **under 1% of a CPU core and about 30 MiB of memory**.
+- **Protect SD cards.** Keep metric history in RAM and disable local Agent logs to avoid continuous monitoring writes to the card. The Parent stores long-term history.
+- **Stay connected on cellular.** Sparse collection, compression and automatic keepalives keep devices available for live troubleshooting between updates. A compact metric workload illustrates a budget of **about 4–7 MiB per device per month** with five- or ten-minute collection.
+- **Recover through coverage gaps.** Buffer history locally and send it to the Parent when connectivity returns. Configure alternative Parents for automatic connection failover.
 
-Keep the collectors that supply your operational metrics and live Functions. For example, retain the apps plugin for process monitoring, the network viewer for network inspection, and the journal plugin for journal access. Your Parent brings these capabilities into one interface.
+The [disk](./minimize-disk-footprint.md), [CPU and memory](./minimize-cpu-and-memory.md) and [cellular](./minimize-cellular-traffic.md) guides show the configurations and example results behind these footprints.
 
-## Set up edge monitoring
+## See the fleet the way your business operates
 
-Follow these guides to prepare and operate your fleet:
+Attach customer, location, building, room, model and software-version labels to each device. Use them to filter and group thousands of devices in the Nodes Map, compare deployment groups and investigate a customer's fleet.
 
-1. [Deploy and identify devices](./deployment-and-identity.md): provision unique identities, labels and secure Parent connections.
-2. [Minimize disk footprint](./minimize-disk-footprint.md): prepare a smaller static package for your device image.
-3. [Minimize CPU and memory](./minimize-cpu-and-memory.md): choose the Child's collection interval and local storage.
-4. [Minimize cellular traffic](./minimize-cellular-traffic.md): configure sparse updates, compression and connection keepalives.
-5. [Handle disconnections and failover](./disconnected-devices-and-failover.md): retain data through coverage gaps and provide alternative Parents.
-6. [Monitor fleet health](./monitor-the-fleet.md): track device health, connectivity and monitoring resource use.
-7. [Update and troubleshoot devices](./updates-and-troubleshooting.md): deliver reduced packages through your image pipeline and recover quickly.
+Bring your application's operating values into the same view: whether a robot is working, a vehicle's speed, a drone's altitude or a motor's RPM. Applications can send these metrics to the local Agent through StatsD. Use labels and metrics to group devices, choose the information shown in their inspectors, and color hexagons by operating values and alert status.
 
-For deployment automation, see [Fleet Deployment and Configuration Management](../fleet-configuration-management.md). For the central monitoring layer, see [deployment with centralization points](../deployment-guides/deployment-with-centralization-points.md) and [Parent best practices](../observability-centralization-points/best-practices.md).
+When a device needs attention, open its charts or run live troubleshooting Functions through the Parent. Inspect processes, network connections, services and logs using the collectors included in that device's package. Your team can investigate centrally without maintaining a dashboard on every device.
+
+## Deploy and operate your fleet
+
+1. [Deploy and identify devices](./deployment-and-identity.md): connect devices to Parents, preserve their identities and attach business labels.
+2. [Minimize disk footprint](./minimize-disk-footprint.md): prepare and install a smaller static package for 32-bit ARM devices.
+3. [Minimize CPU and memory](./minimize-cpu-and-memory.md): configure a lightweight Child and protect local storage.
+4. [Minimize cellular traffic](./minimize-cellular-traffic.md): keep devices connected with a small monthly data budget.
+5. [Handle disconnections and failover](./disconnected-devices-and-failover.md): recover history after coverage gaps and provide alternative Parents.
+6. [Monitor fleet health](./monitor-the-fleet.md): organize the fleet, add application metrics and troubleshoot from one interface.
+7. [Update and troubleshoot devices](./updates-and-troubleshooting.md): preserve your package policy through image updates.
+
+For automated provisioning, see [Fleet Deployment and Configuration Management](../fleet-configuration-management.md). For the central monitoring layer, see [deployment with centralization points](../deployment-guides/deployment-with-centralization-points.md) and [Parent best practices](../observability-centralization-points/best-practices.md).

@@ -1,31 +1,57 @@
 # Handle Disconnected Devices and Parent Failover
 
-Keep monitoring history available when devices lose coverage, enter tunnels or switch networks. Netdata Children collect locally during a connection outage and can send retained history to a Parent when they reconnect.
+Keep your fleet's monitoring history through cellular coverage gaps, tunnels and network changes. A Netdata Child continues collecting while disconnected, then sends its retained history to the Parent when the connection returns. Operators can still explore the history already on the Parent while a device is offline.
 
-## Keep history for coverage gaps
+## Recover history after a coverage gap
 
-Choose local storage according to the device's recovery needs:
+For lightweight devices, keep a recovery buffer in RAM. Set these values in the Child's `netdata.conf`:
 
-- **RAM history** keeps samples through a network outage while the Agent continues running.
-- **DBengine history** keeps samples across Agent restarts and device power loss.
-- **No local history** resumes current monitoring after reconnection, without backfilling the disconnected period.
+```ini
+[db]
+    db = ram
+    update every = 300
+    retention = 120
+```
 
-Configure retention for the coverage gaps you want to recover and enable historical replication. The Parent requests available history after reconnection. See [CPU and memory settings](./minimize-cpu-and-memory.md) for database choices and the [Parent-Child reference](../../src/streaming/README.md) for replication periods and steps.
+At five-minute collection, 120 samples cover roughly ten hours per dimension. At ten-minute collection, the same entry count covers roughly twenty hours. Size this window for the outages your devices encounter; each chart's own interval determines its coverage.
 
-The streaming send buffer handles short delays while sending. Use local history for outage recovery, rather than increasing the send buffer to cover a long disconnection.
+Enable replication in the Parent's API-key section of `stream.conf`:
 
-## Provide alternative Parents
+```ini
+[YOUR_STREAMING_API_KEY]
+    enabled = yes
+    enable replication = yes
+    replication period = 1d
+    replication step = 10m
+```
 
-Configure a list of Parent destinations on the Child. It connects to the first available destination and can use another Parent when the current one is unavailable.
+Add these settings to your existing receiver configuration. After reconnection, the Parent requests available history within the replication period and fills the gap in steps. A one-day replication period accommodates the example RAM history above.
 
-Provision matching streaming authorization and TLS trust on each Parent, and allow the device's network sources. Use the [centralization architecture guide](../deployment-guides/deployment-with-centralization-points.md) to arrange Parent replication and retention when your team needs shared historical coverage across Parents.
+Choose the storage mode that matches the device's recovery needs:
 
-A destination list provides connection failover; history on each Parent follows your centralization and replication configuration.
+| Child storage | Recovery capability |
+|:--|:--|
+| `ram` | Backfills network outages while the Agent stays running, with metric history kept off the SD card |
+| `dbengine` | Backfills from persistent history that survives Agent restarts and device power loss |
+| `none` | Resumes current monitoring on reconnection, with the smallest local history footprint |
 
-## Keep the fleet understandable during outages
+Use local retention to cover outages. The streaming send buffer handles short sending delays. See [CPU and memory settings](./minimize-cpu-and-memory.md#choose-local-history) for retention choices and the [streaming reference](../../src/streaming/README.md) for replication settings.
 
-The Parent continues to serve the history it has received while a device is offline. Live Functions become available again when the Child reconnects.
+## Connect automatically to another Parent
 
-Organize alerts around how your devices operate. A sleeping device and a device that should be online need different connectivity expectations. Use labels and alert routing to distinguish planned offline periods from unexpected loss of monitoring.
+Give the Child multiple destinations in `stream.conf`:
 
-For cellular devices, combine the recovery policy with [keepalive and traffic settings](./minimize-cellular-traffic.md). After reconnecting a device, check that its current metrics and retained history appear at the Parent.
+```ini
+[stream]
+    destination = parent1.example:19999:SSL parent2.example:19999:SSL
+```
+
+The Child connects to an available Parent and tries alternative destinations when it loses the connection. Provision the streaming key, permitted source addresses and TLS trust on each Parent.
+
+For shared historical coverage across Parents, configure their storage and replication topology using the [centralization architecture guide](../deployment-guides/deployment-with-centralization-points.md). Connection failover and Parent history work together to keep your monitoring service available.
+
+## Distinguish sleeping devices from failures
+
+Use device labels to separate always-on devices from those that sleep or operate intermittently. Apply connectivity alerts and routing to those groups so your team responds to unexpected outages while allowing planned offline periods.
+
+When a Child reconnects, current monitoring resumes and live troubleshooting Functions become available again. Combine the recovery policy with [cellular traffic settings](./minimize-cellular-traffic.md) to budget for the history sent after an outage.

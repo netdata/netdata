@@ -1,24 +1,24 @@
 # Minimize Cellular Traffic from Fleet Devices
 
-Keep centralized device monitoring affordable on cellular links by sending only the metrics you need, at a suitable interval. Netdata supports five- and ten-minute collection, compressed streaming and cadence-aware connection keepalives, so you can reduce background traffic while keeping your fleet visible on Parents.
+Keep devices connected to their Parent and available for live troubleshooting with a small cellular data budget. Netdata combines sparse metric collection, compressed streaming and collection-aware TCP keepalives to reduce routine traffic between updates.
 
-## Stay connected with a small monthly data budget
+For a compact metric workload, five- or ten-minute collection can bring connected streaming down to **about 4–7 MiB per device per month**. Your team retains the connection for device status and on-demand troubleshooting, while routine telemetry follows the interval you choose.
 
-Your Child keeps its TCP connection to the Parent open between metric updates. Your team can continue to see the device's connection status and request live troubleshooting Functions through that connection. Five- or ten-minute collection reduces routine telemetry; it does not require disconnecting the device between updates.
+## Keep the connection, reduce the background traffic
 
-Three controls work together:
+A Child keeps its TCP connection to the Parent open between collections. Operators can request live Functions through that connection to investigate a device whenever they need to.
 
-- **Select the metrics** your team needs on the cellular link.
-- **Set their collection intervals** to match how quickly you need new values.
-- **Reduce unnecessary TCP keepalives** while preserving the connection on your modem and carrier network.
+Three settings determine routine traffic:
 
-For a small operational metric set, connected streaming can use only a few MiB per month. The following example gives you a starting budget for a device class.
+- **Metric selection:** collect and stream the information your team uses.
+- **Collection interval:** send updates as often as the workload needs them.
+- **TCP keepalives:** maintain the connection with a cadence suited to those updates.
 
-### Monthly traffic example
+## Set a monthly streaming budget
 
-A packet-capture test streamed **46 metric dimensions** over TLS with ZSTD level 1. The Child used Netdata **v2.10.4**; the test Parent included the cadence-aware receiver timeout and keepalive changes. The measurements counted IPv4 bytes in **both directions**, including IP/TCP headers, TLS, acknowledgements and Netdata control traffic.
+This example streams 46 metric dimensions over compressed TLS. It includes traffic in both directions and illustrates the effect of changing keepalive frequency:
 
-| Collection interval | Parent TCP keepalive idle | Projected streaming traffic per 31-day month |
+| Collection interval | Parent keepalive idle | Monthly streaming budget |
 |:--|:--|--:|
 | Ten minutes | 30 seconds | 11.56 MiB |
 | Ten minutes | 60 seconds | 6.87 MiB |
@@ -26,58 +26,56 @@ A packet-capture test streamed **46 metric dimensions** over TLS with ZSTD level
 | Ten minutes | 300 seconds | **4.27 MiB** |
 | Five minutes | 150 seconds | **6.72 MiB** |
 
-At ten-minute collection, changing only the Parent keepalive idle from 30 to 300 seconds reduced total measured traffic by **63%**. The TCP connections stayed open throughout the measured steady windows.
+At ten-minute collection, extending keepalive idle from 30 to 300 seconds reduced total traffic by **63% while keeping the connection open**.
 
-These are monthly projections from packet captures covering two complete collection intervals after warmup, rather than month-long carrier measurements. The tests had no reconnects or retransmissions, excluded connection setup and had historical replication disabled. Use them to size a starting configuration, then measure your device class on its actual cellular network. The table is a selected operational workload, not the bandwidth of every built-in metric or of the reduced packages' default configuration.
+These are 31-day projections for steady connected streaming with this compact workload. Budget additional traffic for reconnects, history recovery and live troubleshooting; your metric set and cellular network determine actual usage.
 
-Metric count, metric changes and compression affect the result. Live Functions, log inspection, reconnects, retransmissions and historical replication add traffic. Other applications on the device also consume the SIM's allowance. Compare measured interface traffic with carrier usage when commissioning the fleet.
+## Choose the collection interval
 
-A connected socket provides a path for live requests between collections. Detection of a broken link still depends on TCP keepalive and application-idle timeouts; five-minute data collection does not imply immediate detection of every failure.
+Set the Child's default in `netdata.conf`:
 
-## Send fewer metric updates
+```ini
+[db]
+    update every = 600
+```
 
-Set the Child's `[db] update every` to `300` for five-minute collection or `600` for ten-minute collection. Use these intervals for slowly changing status and capacity metrics. Keep faster collection for conditions that require quick detection.
+Use `300` for five-minute collection. These intervals suit slowly changing status and capacity metrics. Keep faster collection for rapid workload changes or failures that need quick detection.
 
-Apply the same policy to collector-specific intervals. The fastest chart on a connection influences keepalive behavior, so check actual chart intervals at the Parent, including the Agent's own monitoring charts.
+Set collector-specific intervals to match your policy. For the **v2.12.0-2-nightly** package used in the preparation example, use the [one-minute apps and debugfs overrides](./minimize-cpu-and-memory.md#collect-every-five-or-ten-minutes) to retain those plugins. An Agent with cadence-aware plugin read timeouts supports longer intervals for them.
 
-Remove unused collection jobs to reduce both device work and traffic. Use streaming chart filters when you want to collect a metric locally without sending it to the Parent. See [CPU and memory settings](./minimize-cpu-and-memory.md) for the collection policy.
+Remove unused collector jobs to reduce device work and traffic together. Streaming chart filters let you keep a metric locally while excluding it from the Parent stream; see the [streaming reference](../../src/streaming/README.md).
 
 ## Match keepalives to collection
 
-Set `tcp keepalive idle = auto` in the Parent's API-key receiver section of `stream.conf`, or in the device's per-machine override. Netdata adjusts the idle time to half the fastest observed chart interval, between 30 seconds and one hour.
+On the Parent, add this setting to the receiver's API-key section of `stream.conf`:
 
-| Fastest chart interval | Automatic keepalive idle time |
+```ini
+[YOUR_STREAMING_API_KEY]
+    tcp keepalive idle = auto
+```
+
+Automatic keepalives use half the fastest streamed chart interval, bounded between 30 seconds and one hour:
+
+| Fastest streamed interval | Automatic keepalive idle |
 |:--|:--|
+| One minute | 30 seconds |
 | Five minutes | 150 seconds |
 | Ten minutes | 300 seconds |
 
-These values apply when **all streamed charts** use those intervals. In the pinned **v2.12.0-2-nightly** package, external plugins such as `apps` and `debugfs` need a shorter collection interval to avoid a two-minute plugin-read timeout. Follow the [per-plugin overrides](./minimize-cpu-and-memory.md#configure-a-lightweight-child); their one-minute charts keep automatic TCP keepalive idle at 30 seconds. Sparse built-in system collection remains available.
+For the five- and ten-minute savings above, apply that interval to all streamed charts, including collector overrides and Agent monitoring charts. A one-minute chart keeps automatic keepalive idle at 30 seconds. Reconnect the Child after changing the interval policy so the Parent starts with the new cadence.
 
-This reduces unnecessary TCP keepalive traffic on sparse connections. A faster chart reduces the automatic idle time for that connection; after changing the chart policy, reconnect the Child so the Parent starts with the new intervals.
+Automatic keepalives are a good starting configuration for cellular fleets: they maintain idle connections through gateways while avoiding unnecessary packets. Use a fixed `tcp keepalive idle` value when your fleet requires a specific policy; `off` disables keepalives on the Parent's receiving socket.
 
-For a fleet that needs a fixed policy, configure an explicit idle interval. `tcp keepalive idle = off` disables TCP keepalives on the Parent's receiving socket. Prefer automatic keepalives as a starting point: cellular gateways may expire idle connections, and frequent reconnects add traffic.
-
-The Parent also accommodates sparse updates in its application-level liveness handling: its application-idle timeout is the greater of ten minutes and twice the fastest observed chart interval. Configure these settings on the Parent that receives the stream. See the [streaming configuration reference](../../src/streaming/README.md) for the full connection settings.
+The Parent also adjusts its application-idle timeout for sparse updates: it waits at least ten minutes, or twice the fastest chart interval when that is longer. Together, these settings support sparse telemetry while detecting lost connections.
 
 ## Keep compression enabled
 
-Stream compression reduces the bytes sent over the link. Use the IoT profile on constrained Children for lower compression effort, and retain streaming compression on both sides. Netdata negotiates a supported algorithm for the connection.
+Use `enable compression = yes` on both sides of the stream. Netdata negotiates a supported compression algorithm. The Child's `iot` profile selects lower compression effort for constrained hardware, helping keep both cellular traffic and CPU use small.
 
-Review compression settings together with device CPU use when selecting the configuration for a device class.
+## Budget for recovery and maintenance
 
-## Plan for reconnects and updates
+Include history sent after coverage gaps, live Functions and log inspection, and Agent or image downloads in the device's cellular allowance. Use [local retention and replication](./disconnected-devices-and-failover.md) to recover the gaps that matter, and schedule large image updates on the fleet's preferred network.
 
-Include these activities in your cellular plan:
+Follow per-Child streaming statistics on the Parent to see transferred bytes, reconnects and replication. Repeated reconnects or an unexpectedly fast chart can explain rising traffic. Use interface counters and carrier reports to follow the SIM's total usage, including your applications.
 
-- Initial provisioning and Agent or image downloads.
-- Reconnection and TLS setup.
-- Historical data sent after a coverage gap.
-- Live troubleshooting Functions and log access.
-
-Set local retention to cover the outages you want to recover, using the [disconnection guide](./disconnected-devices-and-failover.md). Distribute large image updates through your fleet's preferred network or maintenance window.
-
-## Track traffic centrally
-
-Use per-Child streaming statistics on the Parent to track bytes transferred, connection changes and replication. Watch for unexpectedly frequent reconnects or faster chart intervals, and adjust the device class's settings accordingly.
-
-Use device interface counters and the carrier's usage reports for the complete cellular bill, which includes other applications and network overhead. See [monitoring fleet health](./monitor-the-fleet.md) for the central operational view.
+The [fleet monitoring guide](./monitor-the-fleet.md) brings connectivity, traffic and device health into the central operating view.

@@ -1,46 +1,42 @@
 # Update and Troubleshoot Reduced Fleet Images
 
-Keep edge devices current through your fleet image pipeline. Prepare a reduced Netdata package for each release, apply the device class's runtime configuration, and deliver both together as part of the image update.
+Keep monitoring lightweight through every device release. Prepare a reduced Netdata package with the same capability policy, deliver it through your image pipeline, and preserve each device's identity so its history stays with the same node.
 
-## Prepare each release
+## Build and deliver each release
 
-1. Download the upstream installer for each device architecture and verify its published checksum.
-2. Run the [preparation script](./minimize-disk-footprint.md) with your saved capability and stripping policy into a fresh output.
-3. Keep the generated manifest and checksum with the image release.
-4. Install the reduced package into a clean image and apply streaming, collection and local-storage settings.
-5. Bring a pilot group online, check its metrics and live Functions, then expand the rollout.
+1. Download the upstream installer for each architecture and verify its published checksum.
+2. Run the [preparation script](./minimize-disk-footprint.md) with your saved plugin selection and stripping mode.
+3. Install the prepared package into a clean device image and apply the device class's streaming, collection and storage settings.
+4. Preserve the device identity and provision any updated labels or credentials.
+5. Deploy to a pilot group, open its charts and live Functions, then roll out to the rest of the group.
 
-Keep each device's identity and required configuration through normal updates so its history remains associated with the same node.
+Build each image from a clean filesystem so the installed plugins match your selection. For existing devices, use your fleet platform's migration process to preserve identity and configuration when switching to the reduced image.
 
-## Manage updates through one pipeline
+## Keep one update authority
 
-Use the image pipeline as the update authority for reduced installations. The standard Netdata auto-updater installs the full upstream package, so configure [updater controls](../../packaging/installer/UPDATE.md) as part of device provisioning. Include existing updater schedules when migrating a previously commissioned device to image-managed updates.
+Use your image pipeline to deliver both Netdata and its configuration. The standard Netdata updater installs the full upstream package, so disable its schedule when provisioning a reduced installation. For the static package:
 
-Deliver security updates through the same pipeline and maintain a release schedule for each device class.
+```bash
+sudo /opt/netdata/usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
+```
 
-## Install into a clean image
+Include existing schedules when migrating devices already in service. See [updater controls](../../packaging/installer/UPDATE.md) for scheduler and installation-specific settings.
 
-Prepare a clean image filesystem for each reduced package. The installer extracts its files into the destination; it does not remove files left by an older, larger installation. Building a clean image ensures that the installed components match the capability policy.
+Deliver security updates through the same pipeline. Save the selected capabilities, preparation-script revision, package manifest and checksums with each image release so you can rebuild the package and identify what is installed.
 
-For existing devices, use your fleet platform's migration and state-preservation process when moving to the reduced image.
+## Roll back and diagnose issues
 
-## Keep recovery straightforward
+Keep the preceding working image and configuration available for rollback. Retain the matching original upstream binaries on the build host when stripping symbols, so crash diagnostics can use them.
 
-Retain the preceding working image and its runtime configuration for rollback. Keep the original upstream installer, preparation script revision, capability policy and generated manifest in the release inventory.
-
-When stripping all removable symbols, keep the matching original binaries on the build host for crash diagnosis. If package preparation fails, resolve the reported error and retry with a fresh output rather than deploying the incomplete result.
-
-## Troubleshoot common issues
-
-| Issue | Action |
+| Symptom | What to do |
 |:--|:--|
-| The stripping tool fails | Select an `objcopy` implementation that supports the device architecture |
-| A requested capability is unavailable | Use a package that includes that plugin or adjust the device class's selection |
+| The stripping tool fails | Select an `objcopy` that supports the device architecture and rerun preparation into a fresh output |
+| A selected plugin is unavailable | Choose a package containing it or adjust the device class's selection |
 | Metrics or live Functions are missing | Check the retained collector, job settings, permissions and Child connection |
-| The package is larger than expected | Review retained bundles such as `go`, dashboard files and IP-intelligence data |
-| Removed files return after an update | Check the stock updater and other deployment agents; build the next image from a clean filesystem |
-| Device CPU or memory increases | Check newly discovered metrics, collector intervals and local retention |
-| Cellular traffic increases | Check reconnects, chart intervals, replication and image downloads |
-| A device does not reconnect | Check network access, Parent destinations, TLS trust and streaming authorization |
+| The package is larger than expected | Review retained bundles such as `go`, dashboard assets and IP-intelligence data |
+| Removed plugins return after an update | Disable the stock updater and build the next reduced image from a clean filesystem |
+| CPU or memory use increases | Review new collector jobs, discovered metrics, collection intervals and retention |
+| Cellular traffic increases | Inspect reconnects, chart intervals, replication and image downloads |
+| A device cannot reconnect | Check Parent destinations, network access, TLS trust and streaming authorization |
 
-Use the [support bundle tool](../developer-and-contributor-corner/netdata-support-bundle.md) to collect diagnostics for unresolved issues. Handle bundles through your organization's normal process for operational data.
+Use the [support bundle tool](../developer-and-contributor-corner/netdata-support-bundle.md) to collect diagnostics when you need further help.

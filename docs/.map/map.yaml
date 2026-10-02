@@ -920,13 +920,6 @@ sidebar:
       - meta:
           label: Minimize Disk Footprint
           edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/minimize-disk-footprint.md
-        items:
-          - meta:
-              label: ARMv6 Preparation Output
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/armv6l-preparation-output.md
-          - meta:
-              label: ARMv7 Preparation Output
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/armv7l-preparation-output.md
       - meta:
           label: Minimize CPU and Memory
           edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/minimize-cpu-and-memory.md

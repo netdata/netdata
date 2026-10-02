@@ -1,111 +1,110 @@
 # Monitor Fleet Health and Observability Cost
 
-Use Netdata Parents as the fleet's operational view: see which devices are online, inspect their system and application health, and troubleshoot connected devices from the same interface. Group devices by labels so your team can work by site, hardware class or software release.
+Turn thousands of devices into a fleet your team can understand and operate. Use Netdata Cloud and Parents to see device health, organize customers and sites, follow your application's operating values, and investigate a device from the same interface.
 
-## Organize devices around your business
+## Organize the fleet around your business
 
-Host labels turn a fleet into the groups your team works with. Attach a customer name or tenant identifier, location, building, room, device model, hardware revision and software version to each device. These labels travel with the device's metrics to its Parent.
+Host labels give each device business context. Attach customer, location, building, room, model and software-version labels through your provisioning system. They travel with the metrics to the Parent, so the same groups are available throughout your monitoring workflow.
 
-Use consistent label names across your images. For example:
-
-| Host label | Example | Use it to |
+| Label | Example | Operator use |
 |:--|:--|:--|
-| `customer` | `tenant-a` | Select one customer's devices |
+| `customer` | `tenant-a` | Work with one customer's fleet |
 | `location` | `north-campus` | Review a site |
-| `building` | `warehouse-2` | Find devices in a building |
-| `room` | `loading-bay` | Narrow an incident to a room or area |
+| `building` | `warehouse-2` | Locate affected devices in a building |
+| `room` | `loading-bay` | Narrow an incident to an area |
 | `model` | `robot-r2` | Compare devices with the same hardware |
-| `software-version` | `2026.10.1` | Check a rollout or investigate a release |
-| `deployment-ring` | `pilot` | Separate pilot and production devices |
+| `software-version` | `2026.10.1` | Follow a rollout or investigate a release |
+| `deployment-ring` | `pilot` | Separate pilot and production groups |
 
-Customer labels support a multi-tenant operating view. Configure Cloud permissions and Room access for the people who should see each tenant's devices; a label or a map filter does not grant or restrict access by itself.
+Use customer labels for a multi-tenant operating view, and Cloud permissions and Room access to control which operators can see each customer's devices. Labels organize the fleet; permissions govern access.
 
-See [deployment and identity](./deployment-and-identity.md) for provisioning labels and unique device identities, and [organizing systems](../netdata-agent/configuration/organize-systems-metrics-and-alerts.md) for label configuration.
+See [device provisioning](./deployment-and-identity.md#attach-customer-and-location-labels) for an example and [label configuration](../netdata-agent/configuration/organize-systems-metrics-and-alerts.md) for additional options.
 
 ## See the fleet in the Nodes Map
 
-Open the **Nodes** view in Netdata Cloud and select **Map**. Devices appear as hexagons, arranged into the groups you choose. The map gives your team a compact view of thousands of devices, with controls for the questions you need to answer:
+Open **Nodes** in Netdata Cloud and select **Map**. Each device appears as a hexagon. Choose the grouping, information and colors that answer your team's operational questions:
 
-1. **Filter** to the devices you need: a customer, location, building, room, model or software version. Combine filters to investigate, for example, one model running one release at one site.
-2. **Group** devices with **Group By**. Use host labels for business and deployment groups, or a metric with numeric ranges for operational groups such as stopped, moving slowly and moving quickly.
-3. **Annotate the view** with the labels and metric fields your team needs. Use **Edit columns** to choose those fields; they are available in the device inspector. Inspect a hexagon to see its identity, operating values and supporting details before opening its charts.
-4. **Color** hexagons with **Fill Color** and **Border Color**. These are independent: use a workload metric for the fill and node or alert status for the border, so operational values and monitoring health stay visible together.
+- **Filter by labels** to focus on a customer, location, building, room, model or software release. Combine filters to investigate one model running one release at one site.
+- **Group by labels or metrics** with **Group By**. Arrange devices by customer and building, or use metric ranges to separate stopped vehicles from those moving slowly or quickly.
+- **Choose labels and metrics for inspection** with **Edit columns**. Open a hexagon's inspector to see its identity, operating values and the context your team selected.
+- **Color fill and border independently** with **Fill Color** and **Border Color**. For example, color the fill by motor speed and the border by alert status, showing operating conditions and device health together.
 
-For metric colors, set the warning and critical thresholds and choose whether higher or lower values indicate a problem. A motor's excessive RPM and a battery's low charge need opposite severity directions. Map color thresholds control the presentation; configure health alerts separately when you also need notifications.
+For metric colors, choose warning and critical thresholds and whether higher or lower values indicate a problem. Excessive motor RPM and low battery charge need opposite severity directions. Configure health alerts for the same conditions when your team also needs notifications.
 
-### Investigate a device or a group
+### Move from the overview to an investigation
 
-Group summaries show the number of devices, node and alert status distributions, and the values used for fill and border colors. Expand a group to inspect its devices, or collapse it to keep the fleet overview compact. Use search and zoom to find a device in a large fleet.
+Group summaries show device counts, connection and alert status distributions, and the values used for fill and border colors. Collapse groups for a compact overview, expand a group to inspect its devices, and use search and zoom to find a particular node.
 
-Select a device to open its inspector. You can see its connection and alert status, the metric behind each color, trends for the selected time window, and the label and metric fields chosen with **Edit columns**. For example, keep customer, building, room, model and software version next to operating-state and motor-speed values. Your team gets both the business context and the measurements needed to investigate.
+Select a device to see its connection state, alerts, color metrics, trends and selected label fields. Keep customer, building, room, model and release beside working-state and speed values, then open the device's charts for more detail.
 
-Node notes add human context, such as a maintenance observation or an issue under investigation. Where your permissions allow it, use the device's **Add note** or **Edit note** action. Notes complement host labels and metrics: labels describe the device, metrics describe its operation, and notes explain what your team knows about it.
+Add a node note to record maintenance observations or an issue under investigation. Labels describe the device, metrics show its operation, and notes capture what the team knows about it.
 
-Choose a time range and aggregation that match the question. An average over an hour answers a different question from the most recent operating state. Missing metric values are shown separately; they are not equivalent to a healthy zero.
+Choose the time range and aggregation for the question: recent values show current operation; longer averages show patterns. The inspector also distinguishes unavailable readings so you can recognize missing telemetry.
 
-The [Home tab](../dashboards-and-charts/home-tab.md) also provides a Room overview and a node-status map. Use the Nodes Map for the label and custom-metric workflow described here.
+The [Home tab](../dashboards-and-charts/home-tab.md) provides a Room overview and node-status map. Use the Nodes Map for the label and custom-metric workflows described here.
 
 ## Add your application's operating metrics
 
-Your application can send custom metrics to the device's Netdata Agent using [StatsD](../../src/collectors/statsd.plugin/README.md). The Agent collects them locally and streams them to the Parent alongside system metrics. Your team can use them in charts, alerts and the Nodes Map.
+Bring your application's state and measurements into the same charts, alerts and maps as system metrics. Send simple StatsD messages to the local Netdata Agent, which collects and streams the values to the Parent.
+
+Enable the built-in collector in the Child's `netdata.conf`:
+
+```ini
+[plugins]
+    statsd = yes
+```
+
+Use the local listener, normally `localhost:8125`. StatsD is built into the standard static Agent, so it remains available in packages prepared with optional plugins removed. The [StatsD guide](../../src/collectors/statsd.plugin/README.md) covers listener settings and organizing custom charts.
 
 Use gauges for current states and measurements:
 
-| Operational question | Example gauge | Values |
+| What operators need to know | Gauge | Value |
 |:--|:--|:--|
 | Is the robot working? | `robot.working` | `0` for idle, `1` for working |
-| Is the safety interlock engaged? | `robot.interlock` | `0` for disengaged, `1` for engaged |
-| How fast is the vehicle moving? | `vehicle.speed` | Current speed in your chosen unit |
-| How high is the drone? | `drone.altitude` | Current altitude, with a defined reference and unit |
+| Is the interlock engaged? | `robot.interlock` | `0` for disengaged, `1` for engaged |
+| How fast is the vehicle moving? | `vehicle.speed` | Current speed in a consistent unit |
+| How high is the drone? | `drone.altitude` | Altitude with a consistent reference and unit |
 | How fast is the motor turning? | `motor.rpm` | Revolutions per minute |
 
-A StatsD gauge message such as `robot.working:1|g` sets the value to one; send `robot.working:0|g` when it becomes idle. Send numeric measurements the same way, such as `motor.rpm:1450|g`. Keep metric names and units consistent across devices so the same map settings apply throughout the fleet.
+Send `robot.working:1|g` when working and `robot.working:0|g` when idle. Send measurements in the same form, such as `motor.rpm:1450|g`.
 
-Use the local StatsD listener, normally port `8125` on localhost, when the application runs on the device. The built-in StatsD collector is part of the standard static Agent executable and remains available when optional external plugins are removed. Enable and configure it using the StatsD guide, and confirm that the resulting charts arrive at the Parent before selecting them as map metrics.
+Publish current values regularly and pair them with application heartbeat or freshness monitoring so your team can detect an application that stops reporting. Use faster collection for short state changes or motion that operators need to inspect; use sparse collection for slowly changing status.
 
-Publish the state regularly as well as when it changes. Gauges can retain their previous value when the application stops sending; use application heartbeat or freshness monitoring alongside operating-state gauges. At sparse collection intervals, short state transitions may be averaged or missed. Keep faster collection for vehicle motion, safety-related diagnostics or other behavior where your team needs that detail.
+For example, filter to `customer=tenant-a`, group by `building`, color the fill by `robot.working` and the border by alert status. Your team can see which robots are active and which need attention without opening thousands of charts. Keep metric names and units consistent across devices so one map configuration works across the fleet.
 
-For example, filter to `customer=tenant-a`, group by `building`, color the fill by `robot.working`, and color the border by alert status. Your team can see which robots are active and which need attention without opening thousands of individual charts.
+## Locate devices geographically
 
-## Place devices on a geographic map
+Attach decimal-degree `latitude` and `longitude` host labels to place devices on the geographic map. It shows node status and active alerts at their locations, helping operators identify affected sites and open the relevant device.
 
-For geographically distributed fleets, attach `latitude` and `longitude` host labels with decimal-degree coordinates. The geographic map places devices at those coordinates and shows node status and active alerts. Use it to locate affected sites, then open the device for investigation. The Nodes hexagon map provides the label and metric organization described above; geographic coordinates are not required for that view.
+Use the hexagon Nodes Map to organize the same fleet by labels and operating metrics. Both views work with ordinary device monitoring. Add `network-viewer.plugin` when you also want live connection inspection and network-connection topology.
 
-Neither map requires `network-viewer.plugin`. Retain that plugin when you also want live network-connection inspection and connection topology on the device.
+## Centralize alerts and anomaly detection
 
-## Alert on device health
+Run alert evaluation and machine learning on the Parent to keep that work off the devices. Operators get centralized notifications and anomaly visibility alongside the same fleet charts and maps.
 
-Run alert evaluation on Parents to centralize notifications and reduce work on devices. Include the metrics that matter to your workload, such as temperature, storage space, service availability and sustained CPU or memory pressure.
+Alert on the conditions that affect the workload: temperature, storage capacity, service availability and sustained CPU or memory pressure. Match alert lookup windows to collection cadence—for example, allow a 15-minute window for five-minute samples and a 30-minute window for ten-minute samples. Use faster collection when failures need faster detection.
 
-Configure alert lookups and delays for the collection interval. With five-minute samples, use alert windows that cover those samples. Keep faster collection for failures that require faster detection. During commissioning, check the alert values and statuses at the Parent after at least two collections. Investigate alerts that remain undefined and adjust their lookup windows and delays to cover the device cadence. A short window that works for one-second collection may need to be extended for five- or ten-minute collection.
+Enable machine learning on the Parent and keep history for its training window. Anomaly detection becomes available as models train on incoming samples. With sparse collection, allow time for samples to accumulate and for scheduled training; the defaults use a six-hour history window and retrain every three hours.
 
-Set connectivity expectations for always-on devices separately from devices that sleep or operate intermittently. The [disconnection guide](./disconnected-devices-and-failover.md) covers history and recovery.
+Use labels to apply different connectivity expectations to always-on devices and those that sleep or operate intermittently. The [disconnection guide](./disconnected-devices-and-failover.md) shows how to recover history after an outage.
 
-## Allow anomaly detection to train
+## Troubleshoot devices through the Parent
 
-Enable machine learning on the Parent and retain enough history for its training window. Moving the analysis off the device keeps that work centralized; the Parent still needs valid collected samples before it can train a model.
+Run live Functions to inspect a connected device without opening a local dashboard or establishing an SSH session:
 
-The defaults use a six-hour training window and a three-hour retraining interval. At five- and ten-minute collection, the default preprocessing needs at least seven valid values. Allow roughly 35 or 70 minutes to accumulate those values, plus time for scheduled training; gaps can extend the warmup. Verify model coverage and anomaly scores for the dimensions your team relies on before treating the device class as commissioned.
+| Retained capability | What operators can inspect |
+|:--|:--|
+| `apps` | Processes and their resource use |
+| `network` | Network connections and process attribution |
+| `journal` | Local systemd journal records |
+| Application collector bundles | Their supported application-specific Functions |
 
-## Troubleshoot live devices
+The Child executes the request and returns results through the Parent. Historical charts remain available while the device is offline; live Functions return when it reconnects.
 
-Use live Functions through the Parent to inspect a connected device:
+## Follow connectivity, traffic and monitoring overhead
 
-- Retain `apps` for process metrics and live process inspection.
-- Retain `network` for live network connections and process information.
-- Retain `journal` for journal inspection.
-- Retain the relevant application collectors for their metrics and supported Functions.
+Use per-Child streaming statistics on the Parent to follow bytes transferred, reconnects and historical replication, including statistics for disconnected Children. Repeated reconnects, unexpectedly fast charts or large recovery transfers help explain rising cellular use.
 
-The device executes the Function and returns its results through the Parent. Your team gets central access to detailed diagnostics without maintaining a local dashboard on each device. Historical charts remain available when the device is offline.
+Follow Agent and plugin CPU, memory, errors and metric counts after image updates or new collector jobs. Apply changes to the relevant device class, keeping the package selection, runtime configuration and image release together.
 
-## Track connection and cellular traffic
-
-Use per-Child streaming statistics on the Parent to follow transferred bytes, reconnects and historical replication. Statistics for disconnected Children help your team investigate intermittent coverage.
-
-Look for repeated reconnects and unexpected increases in traffic. Check the actual collection intervals, keepalive policy and amount of history being replicated. Use the [cellular guide](./minimize-cellular-traffic.md) to adjust those settings.
-
-## Keep monitoring lightweight
-
-Monitor the Agent and its plugins for CPU, memory, local storage growth and errors. Watch collected metric counts when devices discover new containers, interfaces or application instances.
-
-Review these signals after an image update and apply changes to the relevant device class. Keep the package policy, runtime configuration and image release together in your fleet inventory, using the [update workflow](./updates-and-troubleshooting.md).
+Use the [cellular guide](./minimize-cellular-traffic.md) to tune traffic and the [update workflow](./updates-and-troubleshooting.md) to preserve the monitoring policy through releases.
