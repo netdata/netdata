@@ -169,7 +169,9 @@ func packageForm(name string, definition packageDefinition) (string, error) {
 	}
 	schema := form["jsonSchema"].(map[string]any)
 	schema["title"] = name + " collector configuration."
-	delete(schema, "oneOf")
+	delete(schema, "if")
+	delete(schema, "then")
+	delete(schema, "else")
 	properties := schema["properties"].(map[string]any)
 	delete(properties, "manifest")
 	delete(properties, "command")

@@ -23,12 +23,14 @@
       },
       "mode": {
         "title": "Execution mode",
-        "description": "Execution mode for a direct command. Omit to start a process per collection; persistent keeps one process per job. Leave unset when using a manifest.",
+        "description": "Auto uses the manifest's mode or runs a direct command once per collection. Choose oneshot or persistent only for a direct command.",
         "type": "string",
         "enum": [
+          "auto",
           "oneshot",
           "persistent"
-        ]
+        ],
+        "default": "auto"
       },
       "update_every": {
         "title": "Update every",
@@ -60,32 +62,21 @@
         ]
       }
     },
-    "oneOf": [
-      {
-        "required": [
-          "manifest"
-        ],
-        "properties": {
-          "command": {"type": "null"}
-        },
-        "not": {
-          "required": ["mode"]
-        }
-      },
-      {
-        "required": [
-          "command"
-        ],
-        "properties": {
-          "command": {"type": "array"}
-        },
-        "not": {
-          "required": [
-            "manifest"
-          ]
-        }
+    "if": {
+      "required": ["manifest"]
+    },
+    "then": {
+      "properties": {
+        "command": {"type": "null"},
+        "mode": {"const": "auto"}
       }
-    ]
+    },
+    "else": {
+      "required": ["command"],
+      "properties": {
+        "command": {"type": "array"}
+      }
+    }
   },
   "uiSchema": {
     "manifest": {

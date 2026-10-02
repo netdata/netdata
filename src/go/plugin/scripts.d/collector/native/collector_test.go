@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,10 +20,10 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 		t,
 		New(),
 		[]byte(
-			`{"manifest":"/opt/custom/manifest.yaml","update_every":15,"timeout":3.5,"autodetection_retry":60,"config":{"enabled":false,"count":0,"nested":{"optional":null}}}`,
+			`{"manifest":"/opt/custom/manifest.yaml","mode":"auto","update_every":15,"timeout":3.5,"autodetection_retry":60,"config":{"enabled":false,"count":0,"nested":{"optional":null}}}`,
 		),
 		[]byte(
-			"manifest: /opt/custom/manifest.yaml\nupdate_every: 15\ntimeout: 3.5\nautodetection_retry: 60\nconfig:\n  enabled: false\n  count: 0\n  nested:\n    optional: null\n",
+			"manifest: /opt/custom/manifest.yaml\nmode: auto\nupdate_every: 15\ntimeout: 3.5\nautodetection_retry: 60\nconfig:\n  enabled: false\n  count: 0\n  nested:\n    optional: null\n",
 		),
 	)
 }
@@ -153,7 +154,9 @@ func TestCollector_InitDirectCommand(t *testing.T) {
 		wantErr  string
 		wantMode string
 	}{
-		"default one-shot": {wantMode: modeOneshot},
+		"default one-shot":  {wantMode: modeOneshot},
+		"empty mode":        {prepare: func(c *Collector) { c.Mode = "" }, wantMode: modeOneshot},
+		"explicit one-shot": {prepare: func(c *Collector) { c.Mode = modeOneshot }, wantMode: modeOneshot},
 		"persistent": {
 			prepare:  func(c *Collector) { c.Mode = modePersistent },
 			wantMode: modePersistent,
@@ -182,7 +185,7 @@ func TestCollector_InitDirectCommand(t *testing.T) {
 		},
 		"manifest with mode override": {
 			prepare: func(c *Collector) { c.Command = nil; c.Manifest = "/manifest.yaml"; c.Mode = modePersistent },
-			wantErr: "only supported with a direct command",
+			wantErr: "mode must be auto",
 		},
 	}
 	for name, tc := range tests {
@@ -227,14 +230,14 @@ else:
     assert sys.stdin.read() == ''
     print(json.dumps(result))
 `
-	for _, mode := range []string{modeOneshot, modePersistent} {
+	for _, mode := range []string{modeAuto, modeOneshot, modePersistent} {
 		t.Run(mode, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "peer.py")
 			require.NoError(t, os.WriteFile(path, []byte(peer), 0644))
 			c := New()
 			c.validateExecutable = statExecutable
 			c.Command = []string{python, path, "fixed argument"}
-			c.Mode = mode
+			c.Mode = confopt.Enum[jobModeSpec](mode)
 			require.NoError(t, c.Init(context.Background()))
 			if mode == modePersistent {
 				startRuntime(t, c).waitReady(t)

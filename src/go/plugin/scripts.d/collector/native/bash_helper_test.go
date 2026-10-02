@@ -127,6 +127,27 @@ nd_end`)
 }`, string(out))
 }
 
+func TestBashHelper_RejectsActiveCountWithoutErrexit(t *testing.T) {
+	for _, count := range []string{"1", "01", "-1", "1+0", "9223372036854775808", "18446744073709551616"} {
+		t.Run(count, func(t *testing.T) {
+			out, err := runBashHelper(t, `nd_begin
+nd_stateset flags bitset read write
+set +e
+nd_state_sample "$ND_FAMILY" "$2"
+status=$?
+set -e
+[[ $status != 0 ]] || exit 1
+nd_state_sample "$ND_FAMILY" 1 read
+nd_end`, count)
+			require.NoError(t, err, "invalid counts must return failure without aborting the caller")
+			snap, err := decodeSnapshot(out)
+			require.NoError(t, err)
+			require.Len(t, snap.Metrics[0].Samples, 1, "failed calls must not append observations")
+			assert.Equal(t, []string{"read"}, snap.Metrics[0].Samples[0].Active)
+		})
+	}
+}
+
 func TestBashHelper_ResetsInterleavedSnapshot(t *testing.T) {
 	out, err := runBashHelper(t, `nd_begin
 for ((i=0;i<64;i++)); do nd_metric "metric_$i"; done

@@ -72,8 +72,8 @@ modules:
               default_value: ""
               required: false
             - name: mode
-              description: Execution mode for a direct command. Omit to start a process per collection; persistent keeps one process per job. Leave unset when using a manifest.
-              default_value: ""
+              description: Auto uses the manifest's mode or runs a direct command once per collection. Choose oneshot or persistent only for a direct command.
+              default_value: auto
               required: false
             - name: config
               description: Values for the package configuration schema. Leave empty to use package defaults.

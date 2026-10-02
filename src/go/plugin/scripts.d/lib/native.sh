@@ -161,14 +161,17 @@ nd_sample() {
 }
 
 nd_state_sample() {
-    if (( $# < 2 )) || [[ ! $2 =~ ^(0|[1-9][0-9]*)$ ]] || (( $2 > $# - 2 )); then
+    local _nd_available=$(($# - 2))
+    # Bound decimal length before arithmetic, as with family handles.
+    if (( $# < 2 )) || [[ ! $2 =~ ^(0|[1-9][0-9]*)$ ]] ||
+        (( ${#2} > ${#_nd_available} || $2 > _nd_available )); then
         printf '%s\n' 'native: state sample requires handle, active count and active states' >&2; return 1
     fi
     _nd_handle "$1" stateset || return
     local _nd_handle=$1 _nd_count=$2 _nd_labels_json _nd_strings_json
     shift 2
     _nd_strings "${@:1:$_nd_count}"
-    shift "$_nd_count"
+    shift "$_nd_count" || return
     _nd_labels "$@" || return
     _nd_sample "$_nd_handle" "{\"active\":$_nd_strings_json,\"labels\":$_nd_labels_json}"
 }

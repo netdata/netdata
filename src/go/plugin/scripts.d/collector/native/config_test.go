@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
@@ -127,14 +128,18 @@ func TestGenericJobFormSources(t *testing.T) {
 		wantErr bool
 	}{
 		"manifest":                    {config: map[string]any{"manifest": "/manifest.yaml"}},
+		"manifest auto":               {config: map[string]any{"manifest": "/manifest.yaml", "mode": "auto"}},
 		"manifest with unset command": {config: map[string]any{"manifest": "/manifest.yaml", "command": nil}},
 		"unset command alone":         {config: map[string]any{"command": nil}, wantErr: true},
 		"direct one-shot default":     {config: map[string]any{"command": []any{"/collect"}}},
+		"direct auto":                 {config: map[string]any{"command": []any{"/collect"}, "mode": "auto"}},
+		"direct one-shot":             {config: map[string]any{"command": []any{"/collect"}, "mode": "oneshot"}},
 		"direct persistent":           {config: map[string]any{"command": []any{"/collect"}, "mode": "persistent"}},
 		"no source":                   {config: map[string]any{}, wantErr: true},
 		"two sources":                 {config: map[string]any{"manifest": "/manifest.yaml", "command": []any{"/collect"}}, wantErr: true},
 		"manifest mode override":      {config: map[string]any{"manifest": "/manifest.yaml", "mode": "oneshot"}, wantErr: true},
 		"invalid mode":                {config: map[string]any{"command": []any{"/collect"}, "mode": "push"}, wantErr: true},
+		"empty mode":                  {config: map[string]any{"command": []any{"/collect"}, "mode": ""}, wantErr: true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if tc.wantErr {
@@ -143,5 +148,66 @@ func TestGenericJobFormSources(t *testing.T) {
 				require.NoError(t, schema.Validate(tc.config))
 			}
 		})
+	}
+}
+
+// DynCfg can return configuration before Init. Its default must round-trip for
+// either source without replacing a manifest's execution mode.
+func TestJobModeDefaultRoundTrip(t *testing.T) {
+	assert.Equal(t, modeAuto, string(New().Mode))
+	assert.Equal(t, modeAuto, string(collectorapi.DefaultRegistry["native"].Config().(*Config).Mode))
+	for format, codec := range map[string]struct {
+		marshal   func(any) ([]byte, error)
+		unmarshal func([]byte, any) error
+	}{
+		"json": {marshal: json.Marshal, unmarshal: json.Unmarshal},
+		"yaml": {marshal: yaml.Marshal, unmarshal: yaml.Unmarshal},
+	} {
+		for _, source := range []string{"command", "manifest", "registered"} {
+			for _, mode := range []string{"omitted", "null", "", modeAuto} {
+				t.Run(format+"/"+source+"/"+mode, func(t *testing.T) {
+					c, dir := fixtureCollector(t, "exit 0\n")
+					appendFile(t, c.Manifest, "mode: persistent\n")
+					newCollector := New
+					wantMode := modePersistent
+					if source == "command" {
+						c.Manifest = ""
+						c.Command = []string{filepath.Join(dir, "collect.sh")}
+						wantMode = modeOneshot
+					} else if source == "registered" {
+						registry, _ := configuredFixture(t, "exit 0\n", modePersistent)
+						newCollector = func() *Collector { return registry["native-fixture"].CreateV2().(*Collector) }
+						c = newCollector()
+						c.ScriptConfig["text"] = "synthetic"
+					}
+					c.Mode = "" // Also cover decoding into a zero-valued option.
+					input := map[string]any{}
+					switch mode {
+					case "omitted":
+					case "null":
+						input["mode"] = nil
+					default:
+						input["mode"] = mode
+					}
+					data, err := codec.marshal(input)
+					require.NoError(t, err)
+					require.NoError(t, codec.unmarshal(data, &c.Config))
+					data, err = codec.marshal(c.Configuration())
+					require.NoError(t, err)
+					var returned map[string]any
+					require.NoError(t, codec.unmarshal(data, &returned))
+					if source == "registered" {
+						assert.NotContains(t, returned, "mode")
+					} else {
+						assert.Equal(t, modeAuto, returned["mode"])
+					}
+					reloaded := newCollector()
+					reloaded.validateExecutable = statExecutable
+					require.NoError(t, codec.unmarshal(data, &reloaded.Config))
+					require.NoError(t, reloaded.Init(context.Background()))
+					assert.Equal(t, wantMode, reloaded.definition.Mode)
+				})
+			}
+		}
 	}
 }

@@ -2,13 +2,20 @@
 
 package native
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // initDefinition loads a generic job's manifest or direct command. Registered
 // jobs keep their startup definition, even if package files change.
 func (c *Collector) initDefinition() error {
+	if err := c.Mode.Validate(); err != nil {
+		return fmt.Errorf("mode %w", err)
+	}
+	mode := c.Mode.Normalized()
 	if c.registered {
-		if c.Manifest != "" || c.Command != nil || c.Mode != "" {
+		if c.Manifest != "" || c.Command != nil || mode != modeAuto {
 			return errors.New("registered packages cannot override manifest, command or mode")
 		}
 		return nil
@@ -21,9 +28,12 @@ func (c *Collector) initDefinition() error {
 		if err != nil {
 			return err
 		}
+		if mode == modeAuto {
+			mode = modeOneshot
+		}
 		definition, err := newPackageDefinition(packageSpec{
 			Version: "v1",
-			Mode:    c.Mode,
+			Mode:    string(mode),
 		}, command)
 		if err != nil {
 			return err
@@ -34,8 +44,8 @@ func (c *Collector) initDefinition() error {
 		c.definition = definition
 		return nil
 	}
-	if c.Mode != "" {
-		return errors.New("mode is only supported with a direct command")
+	if mode != modeAuto {
+		return errors.New("mode must be auto when using a manifest")
 	}
 	definition, err := loadManifest(c.Manifest, c.validateExecutable)
 	if err != nil {

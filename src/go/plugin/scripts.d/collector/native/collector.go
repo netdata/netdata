@@ -25,7 +25,11 @@ func init() {
 			UpdateEvery: defaultUpdateEvery,
 		},
 		CreateV2: func() collectorapi.CollectorV2 { return New() },
-		Config:   func() any { return &Config{} },
+		Config: func() any {
+			return &Config{
+				Mode: modeAuto,
+			}
+		},
 	})
 }
 
@@ -61,6 +65,7 @@ type Collector struct {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
+			Mode:        modeAuto,
 			UpdateEvery: defaultUpdateEvery,
 			Timeout:     confopt.Duration(defaultTimeout),
 		},
@@ -76,6 +81,8 @@ func (c *Collector) Configuration() any {
 		cfg.Command = nil
 		cfg.Mode = ""
 		cfg.ScriptConfig = c.definition.effectiveSettings(cfg.ScriptConfig)
+	} else {
+		cfg.Mode = cfg.Mode.Normalized()
 	}
 	return cfg
 }

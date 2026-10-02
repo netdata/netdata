@@ -94,7 +94,9 @@ func TestDynamicChecksFailedFramesDoNotPublishDefinitions(t *testing.T) {
 			fault := &commitFaultCollector{
 				Collector: c,
 			}
-			fault.fail.Store(failure == "commit")
+			if failure == "commit" {
+				fault.failCheckTitle = "Failed Alpha"
+			}
 			failed := checksFrame(strings.Replace(alphaCheck, "Check Alpha", "Failed Alpha", 1))
 			if failure == "collect" {
 				failed = failed[:len(failed)-1] + `,"metrics":[{"name":"bad","samples":[{"value":null}]}]}`
@@ -107,7 +109,6 @@ func TestDynamicChecksFailedFramesDoNotPublishDefinitions(t *testing.T) {
 			assert.Equal(t, uint64(0), c.store.(metrix.DescriptorRetention).SuccessfulCommits())
 			assert.NotContains(t, out.String(), "Failed Alpha")
 			replaceResponse(t, path, checksFrame(betaCheck))
-			fault.fail.Store(false)
 			out.Reset()
 			tickUntil(t, job, func() bool { return strings.Contains(out.String(), "'Check Beta'") })
 			assert.NotContains(
@@ -169,16 +170,20 @@ func TestContractsOutputRejectionStillCommitsContract(t *testing.T) {
 
 type commitFaultCollector struct {
 	*Collector
-	fail atomic.Bool
+	failCheckTitle string
 }
 
 func (c *commitFaultCollector) Collect(ctx context.Context) error {
-	fail := c.fail.Load()
 	if err := c.Collector.Collect(ctx); err != nil {
 		return err
 	}
-	if fail {
-		injectCommitConflict(c.store)
+	// Bind the fault to this response. A separately toggled flag can be read
+	// before a test replaces the response file, letting the new frame commit.
+	for _, check := range c.checks {
+		if check.Title == c.failCheckTitle {
+			injectCommitConflict(c.store)
+			break
+		}
 	}
 	return nil
 }
@@ -187,7 +192,8 @@ func TestDynamicChecksFailedReplacementPreservesCharts(t *testing.T) {
 	setupRunner(t)
 	c, path := responseCollector(t)
 	fault := &commitFaultCollector{
-		Collector: c,
+		Collector:      c,
+		failCheckTitle: "Failed replacement",
 	}
 	original := checksFrame(alphaCheck, betaCheck)
 	replaceResponse(t, path, original)
@@ -198,14 +204,12 @@ func TestDynamicChecksFailedReplacementPreservesCharts(t *testing.T) {
 	alphaID, betaID := chartWithTitle(first, "Check Alpha"), chartWithTitle(first, "Check Beta")
 	require.NotEmpty(t, alphaID)
 	require.NotEmpty(t, betaID)
-	fault.fail.Store(true)
 	replaceResponse(t, path, checksFrame(strings.Replace(alphaCheck, "Check Alpha", "Failed replacement", 1)))
 	out.Reset()
 	tickUntil(t, job, func() bool { return strings.Contains(out.String(), "SET 'failed' = 1") })
 	assert.NotContains(t, out.String(), "Failed replacement")
 	assert.False(t, obsoleteChart(out.String(), betaID), "failed omission must not obsolete a sibling")
 	replaceResponse(t, path, original)
-	fault.fail.Store(false)
 	out.Reset()
 	tickUntil(t, job, func() bool { return strings.Contains(out.String(), "SET 'critical' = 1") })
 	assert.NotContains(

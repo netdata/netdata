@@ -56,8 +56,9 @@ jobs:
 
 A direct `command` is an argv array with an absolute executable as its first element;
 subsequent arguments are literal and there is no shell expansion. Netdata appends
-`collect` for one-shot collection or `serve` for persistent mode. The default is
-one-shot; set `mode: persistent` on the job to retain one process. Initialization and
+`collect` for one-shot collection or `serve` for persistent mode. Job `mode` accepts
+`auto` (the default), `oneshot`, or `persistent`. For a direct command, `auto` means
+one-shot; set `mode: persistent` to retain one process. Initialization and
 configuration tests validate the executable without running it, and never probe
 `describe`. A script that prints this object when invoked with `collect` is sufficient:
 
@@ -80,7 +81,8 @@ jobs:
 ```
 
 Every generic job MUST select exactly one `manifest` or `command`. A manifest owns
-its execution mode, so a job using it MUST NOT set `mode`. A direct command has no
+its execution mode, so a job using it MUST leave `mode` omitted or set to `auto`;
+concrete mode overrides are rejected. Auto does not probe the script. A direct command has no
 configuration schema and rejects a nonempty `config` object; use a package to supply
 validated configuration on stdin. Use the development binary for these configurations.
 There is no package auto-discovery. Explicit registration below provides individual

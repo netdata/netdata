@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
@@ -45,7 +46,7 @@ func TestExamples_Direct(t *testing.T) {
 				c := New()
 				c.validateExecutable = statExecutable
 				c.Command = []string{executable, path}
-				c.Mode = mode
+				c.Mode = confopt.Enum[jobModeSpec](mode)
 				require.NoError(t, c.Init(context.Background()))
 				t.Cleanup(func() { c.Cleanup(context.Background()) })
 				require.NoError(t, c.Check(context.Background()))
