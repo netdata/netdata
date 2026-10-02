@@ -155,7 +155,7 @@ modules:
             - name: base_dir
               description: Absolute root directory for locally stored OpenTelemetry logs and traces.
               detailed_description: |
-                Retention limits govern retained indexed files. Write-ahead logs, catalogs, and the download cache for offloaded data (`<base_dir>/remote-read`) can make total usage below this directory exceed the `retention.*.max_total_size` limits.
+                Retention limits govern retained indexed files. Write-ahead logs, catalogs, and the download cache for offloaded data (in the `remote-read` subdirectory under your configured base directory) can make total usage below this directory exceed the `retention.*.max_total_size` limits.
               default_value: "/var/log/netdata/otel/v2"
               required: false
             # Cache and download claims are file-lifecycle behavior: the shared
