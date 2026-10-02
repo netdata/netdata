@@ -63,7 +63,7 @@ func chartID(wire, contextName string) string {
 }
 
 // startTestJob drives the real job runtime: autodetection, Run readiness, ticks and emission.
-func startTestJob(t *testing.T, c *Collector, out *wireOutput) (*jobruntime.JobV2, *jobruntime.ManagedRun) {
+func startTestJob(t *testing.T, c collectorapi.CollectorV2, out io.Writer) (*jobruntime.JobV2, *jobruntime.ManagedRun) {
 	t.Helper()
 	job := jobruntime.NewJobV2(jobruntime.JobV2Config{
 		PluginName:  "scripts.d",

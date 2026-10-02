@@ -134,11 +134,11 @@ func TestRunDescribe(t *testing.T) {
 
 func TestRunDescribe_LargeDescription(t *testing.T) {
 	setupRunner(t)
-	const header = "version: v1\nchecks: [{id: ready, title: Ready}]\n"
+	const header = "version: v1\n"
 	for _, size := range []int{(4 << 20) + 1, maxDescriptionBytes} {
 		t.Run(fmt.Sprint(size), func(t *testing.T) {
 			body := fmt.Sprintf(
-				"printf '%%s\\n' 'version: v1' 'checks: [{id: ready, title: Ready}]'\nprintf '%%*s' %d ''\n",
+				"printf '%%s\\n' 'version: v1'\nprintf '%%*s' %d ''\n",
 				size-len(header),
 			)
 			c, _ := fixtureCollector(t, body)

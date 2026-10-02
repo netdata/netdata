@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
@@ -26,6 +27,44 @@ func exampleManifest(t *testing.T, name string) string {
 	path, err := filepath.Abs(filepath.Join("../../development", name, "manifest.yaml"))
 	require.NoError(t, err)
 	return path
+}
+
+func TestExamples_Direct(t *testing.T) {
+	setupRunner(t)
+	for name, tc := range map[string]struct {
+		tool string
+		file string
+	}{
+		"bash":   {tool: "bash", file: "collect.sh"},
+		"python": {tool: "python3", file: "collect.py"},
+	} {
+		for _, mode := range []string{modeOneshot, modePersistent} {
+			t.Run(name+"/"+mode, func(t *testing.T) {
+				executable := requireTool(t, tc.tool)
+				path, err := filepath.Abs(filepath.Join("../../development", "direct-"+name, tc.file))
+				require.NoError(t, err)
+				c := New()
+				c.validateExecutable = statExecutable
+				c.Command = []string{executable, path}
+				c.Mode = confopt.Enum[jobModeSpec](mode)
+				require.NoError(t, c.Init(context.Background()))
+				t.Cleanup(func() { c.Cleanup(context.Background()) })
+				require.NoError(t, c.Check(context.Background()))
+				if mode == modePersistent {
+					startRuntime(t, c).waitReady(t)
+				}
+				values, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+				require.NoError(t, err)
+				assert.Equal(t, float64(21.5), values["temperature"])
+				if name == "python" {
+					assert.Equal(t, float64(1), values[`worker{worker="in progress"}`])
+					assert.Equal(t, float64(0), values[`worker{worker="stopped"}`])
+					assert.Equal(t, float64(1), values[`features{features="read"}`])
+					assert.Equal(t, float64(1), values[`features{features="write"}`])
+				}
+			})
+		}
+	}
 }
 
 func TestExamples_Persistent(t *testing.T) {

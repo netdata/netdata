@@ -1,15 +1,15 @@
 # Native script development
 
-The `native` collector runs language-neutral executable packages through scripts.d.
-A package can be one executable or script with a `describe` operation, or a file-backed
-manifest with an executable and optional chart/configuration files.
-Scripts report labeled metrics and named service checks. The development health
-template turns warning and critical checks into notifications.
+The `native` collector runs executables through scripts.d. A script can report
+labeled metrics and service checks using ordinary JSON, without a manifest, an SDK,
+a `describe` operation, or a chart file. Packages can add static chart templates,
+configuration forms, and interactive Functions.
 
-This contract is WIP. It supports one-shot and persistent collection, scalar gauges
-and cumulative counters, package-specific DynCfg forms, and script-provided Functions.
-Additional metric kinds and production delivery remain later steps. The manifest
-and wire format may change during the preview.
+This contract is WIP. It supports one-shot and persistent collection, floating-point
+gauges, cumulative counters, enum and bitset StateSets, package-specific DynCfg forms,
+and script-provided Functions. The development health template turns warning and
+critical checks into notifications. Additional metric kinds and production delivery
+remain later steps. The package and wire formats may change during the preview.
 
 ## Development build and configuration
 
@@ -49,16 +49,48 @@ Enable `native` in `scripts.d.conf` and add a job in `scripts.d/native.conf`:
 ```yaml
 jobs:
   - name: queue
+    command: [/usr/local/lib/netdata/custom/queue/collect.sh]
+    update_every: 10
+    timeout: 5
+```
+
+A direct `command` is an argv array with an absolute executable as its first element;
+subsequent arguments are literal and there is no shell expansion. Netdata appends
+`collect` for one-shot collection or `serve` for persistent mode. Job `mode` accepts
+`auto` (the default), `oneshot`, or `persistent`. For a direct command, `auto` means
+one-shot; set `mode: persistent` to retain one process. Initialization and
+configuration tests validate the executable without running it, and never probe
+`describe`. A script that prints this object when invoked with `collect` is sufficient:
+
+```json
+{"version":"v1","metrics":[{"name":"queue_depth","samples":[{"value":17.5}]}]}
+```
+
+This creates a floating-point gauge with units `value` and an automatic chart. Use a
+meaningful `unit`, such as `jobs`, when the measurement has one. No special library is
+required; use your language's JSON encoder.
+
+For a file-backed package, replace `command` with its manifest path:
+
+```yaml
+jobs:
+  - name: queue
     manifest: /usr/local/lib/netdata/custom/queue/manifest.yaml
     update_every: 10
     timeout: 5
 ```
 
-Use the development binary for this configuration. There is no package
-auto-discovery. Explicit package registration below provides individual DynCfg forms
-and self-contained executable packages. For the generic manifest job shown above,
-initialization reads and validates local files without running the executable. Editing package files requires restarting or
-reconfiguring the job; charts and declarations are fixed for that job instance.
+Every generic job MUST select exactly one `manifest` or `command`. A manifest owns
+its execution mode, so a job using it MUST leave `mode` omitted or set to `auto`;
+concrete mode overrides are rejected. Auto does not probe the script. A direct command has no
+configuration schema and rejects a nonempty `config` object; use a package to supply
+validated configuration on stdin. Use the development binary for these configurations.
+There is no package auto-discovery. Explicit registration below provides individual
+DynCfg forms and self-contained executable packages.
+
+Generic manifest initialization reads local package files without running the
+executable. Editing static package assets requires restarting or reconfiguring the
+job. Metric and check families come from each collection response, not those assets.
 
 ## Manifest v1
 
@@ -67,17 +99,6 @@ version: v1
 mode: oneshot
 command: [./collect.sh]
 charts: charts.yaml
-metrics:
-  - name: queue_depth
-    type: gauge
-    unit: jobs
-  - name: processed_total
-    type: counter
-    unit: jobs
-checks:
-  - id: backlog
-    title: Queue Backlog
-    by_labels: [queue]
 ```
 
 - `command` is an argv array, without shell expansion. Its first path is resolved
@@ -87,22 +108,19 @@ checks:
   directory. It enables configuration input on stdin in both modes; see below.
 - `mode` is `oneshot` (the default when omitted) or `persistent`. Persistent jobs
   retain one process across collection attempts; their state resets on restart.
-- `metrics` declares each name, type (`gauge` or `counter`) and nonempty unit.
-  Names match `[A-Za-z_][A-Za-z0-9_.]*`; the `native.` prefix is reserved.
-- `checks` declares each check ID, title, and stable identity label names.
-  IDs and label keys match `[A-Za-z_][A-Za-z0-9_]*`. Omit `by_labels` for one
-  instance of a check per job. Identity labels MUST be present and nonempty in
-  each observation. Changing identity creates a different check instance.
 - `charts` is an optional path to the existing [V2 chart-template language](../framework/charttpl/README.md),
   resolved relative to the manifest. Without it, metrics get automatic charts.
   With it, its autogen setting determines whether unmatched metrics get charts.
   The `native_check_` chart-ID prefix is reserved. Global chart selectors are
-  rejected when checks are declared, so they cannot silently filter health data.
+  always rejected, so dynamically reported checks cannot be silently filtered.
 - `functions` optionally declares interactive methods; see Functions below. Packages
   with Functions MUST use startup registration in `scripts.d.packages.yaml`.
-- At least one metric, check or Function MUST be declared. Packages with Functions
-  and no metrics/checks are function-only: no periodic collection or charts run.
-  Function-only manifests MUST NOT specify `charts`.
+- `collect` is an optional boolean, defaulting to true. Set `collect: false` for a
+  Function-only package: it MUST declare at least one Function and MUST NOT specify
+  `charts`. There is no job-level `collect` override. Merely declaring Functions
+  does not disable collection.
+- Metric and check declarations do not belong in the manifest; `metrics` and
+  `checks` are rejected. Each response carries its complete families instead.
 - Unknown manifest fields are errors.
 
 Example `charts.yaml`, using an identity label and changeable chart metadata:
@@ -165,7 +183,8 @@ packages:
 The manifest source reads metadata files without executing the package. The command
 source executes `describe` once during plugin process startup. Both sources compile
 the same package definition before registration. The registered module binds its
-metadata and command: job configuration cannot replace them. Registration never
+metadata and command: job configuration MUST NOT set `manifest`, `command`, or
+`mode` to replace them. Registration never
 creates a default job. Add a job through DynCfg or `scripts.d/native-queue.conf`:
 
 ```yaml
@@ -185,8 +204,8 @@ module does not enable package modules. `-m native-queue` selects that module.
 
 DynCfg serves the package form under `config`, alongside collection settings.
 GET preserves submitted secret references; effective configuration also includes
-package defaults. The generic `native` module remains usable with a manifest path
-and a `config` object, but its form cannot reflect a particular package schema.
+package defaults. The generic `native` module accepts direct commands, or a manifest path and a
+`config` object, but its form cannot reflect a particular package schema.
 The generic module accepts collection-only packages; Function declarations require
 startup registration. Generic jobs load package files during initialization; their pre-initialization
 configuration retrieval contains only submitted package values.
@@ -202,7 +221,7 @@ or select another executable.
 `describe` MUST print exactly one UTF-8 YAML or JSON document and exit zero. JSON
 strings support standard Unicode escapes, including surrogate pairs. Declaration
 field names are case-sensitive, and unknown fields and duplicate keys are rejected.
-It uses the manifest's `version`, `mode`, `metrics`, `checks` and `functions` declarations,
+It uses the manifest's `version`, `mode`, `collect` and `functions` fields,
 with these inline assets:
 
 | Field | File manifest | Executable description |
@@ -337,7 +356,8 @@ variable `ND_CONFIG`, then use a JSON decoder such as `jq`. Python can use
 `json.loads(sys.stdin.readline())["config"]`. See the runnable synthetic examples
 in `development/configured-bash` and `development/configured-python`; the Bash
 example requires `jq`. Both example scripts support `collect` and `serve`.
-Schema-free scripts keep their existing stdin and readiness behavior.
+Schema-free scripts, including direct commands, receive no configuration envelope.
+A nonempty job `config` without a declared schema is rejected.
 
 ## Collection response
 
@@ -354,28 +374,116 @@ or an invalid-reply diagnostic; script output and request data are never logged.
 {
   "version": "v1",
   "metrics": [
-    {"name": "queue_depth", "value": 17, "labels": {"queue": "mail", "region": "east"}},
-    {"name": "processed_total", "value": 100, "labels": {"queue": "mail"}}
+    {
+      "name": "queue_depth",
+      "unit": "jobs",
+      "chart_meta": {"title": "Queue depth", "family": "Queues", "priority": 1000},
+      "samples": [
+        {"value": 17.5, "labels": {"queue": "mail", "region": "east"}},
+        {"value": 4, "labels": {"queue": "batch", "region": "east"}}
+      ]
+    },
+    {
+      "name": "processed_total",
+      "type": "counter",
+      "unit": "jobs",
+      "samples": [{"value": 100, "labels": {"queue": "mail"}}]
+    },
+    {
+      "name": "worker_state",
+      "type": "stateset",
+      "states": ["starting", "running", "stopped"],
+      "samples": [{"active": ["running"], "labels": {"worker": "alpha"}}]
+    }
   ],
   "checks": [
-    {"id": "backlog", "state": "critical", "labels": {"queue": "mail"}}
+    {
+      "id": "backlog",
+      "title": "Queue backlog",
+      "by_labels": ["queue"],
+      "samples": [{"state": "critical", "labels": {"queue": "mail"}}]
+    }
   ]
 }
 ```
 
-Values MUST be finite JSON numbers; zero is a real observation. Counter values
-MUST be nonnegative cumulative totals, not interval deltas. Counter resets use
-the existing incremental chart behavior. Values use IEEE-754 double precision;
-integers above 2^53 may lose precision. Labels are string-to-string objects.
+### Metric families
+
+Each `metrics` entry defines one named family and all of its samples. `name` and
+`samples` are required. `type` defaults to `gauge`; supported types are `gauge`,
+`counter`, and `stateset`. Scalar `unit` defaults to `value`; use a meaningful unit
+when available. Optional `chart_meta` supplies automatic-chart `title`, `family`,
+and a positive integer `priority`. Authored chart templates control their own chart
+presentation and take precedence over automatic charts.
+
+Metric names match `[A-Za-z_][A-Za-z0-9_.]*`. Prefixes `native.` and `native_check_`,
+and the exact name `check_state`, are reserved for built-in checks. Labels are
+string-to-string objects whose keys match `[A-Za-z_][A-Za-z0-9_]*`; `_collect_job`
+is reserved. Sample identity is the metric name plus all supplied labels.
+
+Gauge and counter samples require a finite JSON number in `value`; zero is a real
+observation. Counter values MUST be nonnegative cumulative totals, not interval
+deltas. Counter resets use the existing incremental chart behavior. Values use
+IEEE-754 double precision; integers above 2^53 may lose precision. Scalar families
+MUST NOT declare `states` or a StateSet `mode`, and scalar samples MUST NOT contain
+`active`.
+
+A StateSet requires a complete nonempty `states` array of unique, nonblank strings.
+State names become chart dimension IDs. They MUST NOT contain apostrophes,
+backslashes, newlines, carriage returns, NUL, or surrounding whitespace; the
+output protocol changes these characters and could merge distinct states.
+Internal spaces, Unicode and double quotes are supported. Invalid names reject
+the entire response rather than being renamed.
+Its `mode` defaults to `enum`; use `bitset` for independent states. Each sample
+requires `active`, an array of unique members of that domain, and MUST NOT contain
+`value`. Enum samples select exactly one state. Bitset samples may select zero,
+one, or several states; `active: []` records that every state is inactive. StateSet
+units are fixed to `state`, so omit `unit`. A label key matching the StateSet's
+metric name is reserved for its generated state label. StateSets alone do not
+create severity alerts; use checks for built-in service health.
+
+For example, these are independent capability flags:
+
+```json
+{"name":"worker_capabilities","type":"stateset","mode":"bitset","states":["read","write"],"samples":[{"active":["read","write"],"labels":{"worker":"alpha"}}]}
+```
+
+A metric name MUST retain its type and meaning, including unit, StateSet domain
+and mode, and chart metadata. Use a new name for a different contract. This applies
+after omissions, descriptor expiry, and process or Agent restarts. The collector
+rejects known conflicts while the metric descriptor is retained; expiry of that
+validation history does not authorize incompatible reuse. Failed collections or
+failed metric commits do not establish a new contract. An empty family's metadata
+does not establish a contract without a successfully committed sample.
+
+The [snapshot JSON Schema](collector/native/snapshot_schema.json) supports editor
+validation. The host additionally checks family/series uniqueness, active-state
+membership, identity label values, floating-point range, duplicate JSON keys, and
+retained metric contracts.
+
+### Check families and complete snapshots
+
+Each `checks` entry requires `id`, a nonblank `title`, and `samples`. IDs match
+`[A-Za-z_][A-Za-z0-9_]*`. Optional `by_labels` lists unique identity-label keys;
+each sample MUST supply a nonblank value for every such key. Omit `by_labels` for
+one instance of that check per job. Changing identity creates a different check
+instance. Extra sample labels are accepted but ignored for built-in check series
+and charts. Titles and identity definitions are supplied by the current response;
+no manifest declaration is required.
 
 Collection field names are case-sensitive; JSON null is invalid in every position
-of a collection snapshot.
-Each response is a full snapshot. Omit unavailable metric samples rather than
-inventing zero. An empty metrics or checks array is valid; arrays may be omitted.
-A sample name MUST be declared. Duplicate JSON keys, duplicate metric identities
-(name plus all labels), duplicate check identities (ID plus `by_labels`), unknown
-fields, missing/null values and unknown states invalidate the complete response.
-Checks may have extra labels, but the built-in charts promote only identity labels.
+of a collection snapshot. Each response is a full snapshot. Omit unavailable
+samples rather than inventing zero. `metrics` and `checks` may be omitted or empty.
+Every included family MUST contain `samples`, which may be empty. Family metadata
+without samples is not an observation and does not keep a chart alive.
+
+Duplicate JSON keys, duplicate metric names or check IDs, duplicate sample
+identities within a family, unknown fields or states, missing/null required values,
+and invalid scalar/StateSet sample shapes invalidate the complete response. Check
+identity is its ID plus `by_labels`. No partial metric cycle is published when
+validation fails, and failed responses cannot retain check definitions for a later
+frame. Empty successful snapshots remove prior observations through the normal
+chart lifecycle.
 
 A valid `warning`, `critical`, or `unknown` is a successful collection. In one-shot
 mode the script MUST exit zero. Nonzero exit, timeout, oversized or malformed output fails collection
@@ -393,7 +501,8 @@ across collection attempts.
 
 ## Persistent sessions
 
-Set `mode: persistent` in the manifest. Netdata starts the command with `serve`
+Set `mode: persistent` in the manifest, executable description, or direct command
+job. Netdata starts the command with `serve`
 after the preceding job has stopped. Local initialization and configuration tests
 never start the process. After fallible local setup, the script MUST emit and flush:
 
@@ -457,7 +566,9 @@ a host-side copying goroutine alive. Descendant exits are not individually await
 
 ## Functions
 
-Declare methods in the manifest and register the package at startup:
+Declare methods in the manifest or executable description and register the package
+at startup. Set `collect: false` alongside `functions` only when periodic collection
+is not supported:
 
 ```yaml
 functions:
@@ -593,7 +704,7 @@ after cancellation. Function callers always use their own deadline.
 
 ## Checks and automatic alerts
 
-Each declared check plus identity labels produces a chart in
+Each reported check plus its identity labels produces a chart in
 `native_script.check_state`. It exposes `ok`, `warning`, `critical`, and `unknown`
 as explicit zero/one dimensions. The development `native_script_check` template
 evaluates every 10 seconds and routes warning/critical notifications to `sysadmin`.
@@ -617,17 +728,33 @@ cadence and notification policy; they do not emulate Nagios retries.
 
 The pure Bash library stays in the source tree at `lib/native.sh`; it is not
 installed. Source it using an absolute path in development scripts. It requires
-no `jq`, Python, or helper subprocess per sample. Use `nd_begin`,
-`nd_metric NAME VALUE [KEY VALUE ...]`, `nd_check ID STATE [KEY VALUE ...]`, and
-`nd_end`. These functions encode strings, including quotes, backslashes and control
-characters supported by Bash; Bash variables cannot represent NUL bytes.
+no `jq`, Python, or helper subprocess per sample. `nd_begin` starts one snapshot and
+`nd_end` emits its grouped JSON. Declare families, save their handles from
+`ND_FAMILY`, and add observations to those handles:
+
+| Helper | Purpose |
+|---|---|
+| `nd_metric NAME [TYPE [UNIT]]` | Declare a scalar family; defaults are `gauge` and `value` |
+| `nd_sample HANDLE VALUE [KEY VALUE ...]` | Add a scalar observation and optional labels |
+| `nd_stateset NAME MODE STATE...` | Declare an `enum` or `bitset` family with its complete domain |
+| `nd_state_sample HANDLE ACTIVE_COUNT ACTIVE... [KEY VALUE ...]` | Add active states followed by optional labels |
+| `nd_check ID TITLE [BY_LABEL...]` | Declare a check family and its identity-label keys |
+| `nd_check_sample HANDLE STATE [KEY VALUE ...]` | Add an `ok`, `warning`, `critical`, or `unknown` observation |
+| `nd_chart HANDLE TITLE FAMILY PRIORITY` | Add metric chart metadata; blank arguments are omitted |
+
+Family declarations set `ND_FAMILY`. Copy it immediately into a variable in the
+current shell; command substitution runs a subshell and loses the declaration.
+Handles belong to one snapshot and MUST NOT be reused after the next `nd_begin`.
+Samples of different families may be interleaved. These helpers encode strings,
+including quotes, backslashes and control characters supported by Bash; Bash
+variables cannot represent NUL bytes. The collector validates the full response.
 
 JSON string round-trips are separate from chart-label display: the Agent applies
 its standard label normalization, including backslash-to-slash conversion and
 normalization of punctuation and control characters. Choose stable entity IDs
 that remain distinct after chart-ID and label normalization.
 
-A runnable synthetic example for the manifest above:
+A runnable synthetic script for a direct command job or the manifest above:
 
 ```bash
 #!/bin/bash
@@ -635,9 +762,20 @@ set -eu
 source /absolute/path/to/netdata/src/go/plugin/scripts.d/lib/native.sh
 [[ ${1:-} == collect ]] || exit 2
 nd_begin
-nd_metric queue_depth 17 queue mail region east
-nd_metric processed_total 100 queue mail
-nd_check backlog critical queue mail
+nd_metric queue_depth gauge jobs
+depth=$ND_FAMILY
+nd_chart "$depth" "Queue depth" Queues 1000
+nd_sample "$depth" 17.5 queue mail region east
+nd_sample "$depth" 4 queue batch region east
+nd_metric processed_total counter jobs
+processed=$ND_FAMILY
+nd_sample "$processed" 100 queue mail
+nd_stateset worker_state enum starting running stopped
+worker=$ND_FAMILY
+nd_state_sample "$worker" 1 running worker alpha
+nd_check backlog "Queue backlog" queue
+backlog=$ND_FAMILY
+nd_check_sample "$backlog" critical queue mail
 nd_end
 ```
 
