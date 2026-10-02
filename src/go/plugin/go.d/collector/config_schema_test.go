@@ -421,6 +421,26 @@ func TestConfigSchemasOfferAlternativesOnlyThroughDependencies(t *testing.T) {
 	}
 }
 
+// TestConfigSchemasKeepDependentObjectsOpen forbids additionalProperties: false on an object with
+// dependencies. Draft-07 checks additionalProperties against the object's own properties only, so a
+// standard validator rejects every key a branch reveals, and with it every configuration that selects
+// that branch; the form validates the branch-merged schema and hides the conflict.
+func TestConfigSchemasKeepDependentObjectsOpen(t *testing.T) {
+	for _, doc := range loadConfigSchemas(t) {
+		forEachObject(doc, doc.schema, doc.ui, "", func(path string, schema, _ map[string]any) {
+			if mapField(schema["dependencies"]) == nil {
+				return
+			}
+			where := doc.file
+			if path != "" {
+				where += ": " + path
+			}
+			assert.NotEqualf(t, false, schema["additionalProperties"],
+				"%s: additionalProperties: false next to dependencies rejects every key a branch reveals", where)
+		})
+	}
+}
+
 // configSchema is one loaded schema document.
 type configSchema struct {
 	file     string
