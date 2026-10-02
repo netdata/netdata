@@ -2,13 +2,76 @@
 
 Use Netdata Parents as the fleet's operational view: see which devices are online, inspect their system and application health, and troubleshoot connected devices from the same interface. Group devices by labels so your team can work by site, hardware class or software release.
 
-## Find devices and organize the fleet
+## Organize devices around your business
 
-Use stable host labels for device class, location, hardware revision and deployment ring. Keep a software-release label alongside them so you can identify devices running a particular image.
+Host labels turn a fleet into the groups your team works with. Attach a customer name or tenant identifier, location, building, room, device model, hardware revision and software version to each device. These labels travel with the device's metrics to its Parent.
 
-Build views around these groups. For example, use one view for robots at a site and another for signage players on a particular software release. Start with device connectivity, recent metric updates and active alerts, then drill into the affected system or application.
+Use consistent label names across your images. For example:
 
-See [deployment and identity](./deployment-and-identity.md) for provisioning labels and unique device identities.
+| Host label | Example | Use it to |
+|:--|:--|:--|
+| `customer` | `tenant-a` | Select one customer's devices |
+| `location` | `north-campus` | Review a site |
+| `building` | `warehouse-2` | Find devices in a building |
+| `room` | `loading-bay` | Narrow an incident to a room or area |
+| `model` | `robot-r2` | Compare devices with the same hardware |
+| `software-version` | `2026.10.1` | Check a rollout or investigate a release |
+| `deployment-ring` | `pilot` | Separate pilot and production devices |
+
+Customer labels support a multi-tenant operating view. Configure Cloud permissions and Room access for the people who should see each tenant's devices; a label or a map filter does not grant or restrict access by itself.
+
+See [deployment and identity](./deployment-and-identity.md) for provisioning labels and unique device identities, and [organizing systems](../netdata-agent/configuration/organize-systems-metrics-and-alerts.md) for label configuration.
+
+## See the fleet in the Nodes Map
+
+Open the **Nodes** view in Netdata Cloud and select **Map**. Devices appear as hexagons, arranged into the groups you choose. The map gives your team a compact view of thousands of devices, with controls for the questions you need to answer:
+
+1. **Filter** to the devices you need: a customer, location, building, room, model or software version. Combine filters to investigate, for example, one model running one release at one site.
+2. **Group** devices with **Group By**. Use host labels for business and deployment groups, or a metric with numeric ranges for operational groups such as stopped, moving slowly and moving quickly.
+3. **Annotate the view** with the labels and metric fields your team needs. Use **Edit columns** to choose those fields; they are available in the device inspector. Inspect a hexagon to see its identity, operating values and supporting details before opening its charts.
+4. **Color** hexagons with **Fill Color** and **Border Color**. These are independent: use a workload metric for the fill and node or alert status for the border, so operational values and monitoring health stay visible together.
+
+For metric colors, set the warning and critical thresholds and choose whether higher or lower values indicate a problem. A motor's excessive RPM and a battery's low charge need opposite severity directions. Map color thresholds control the presentation; configure health alerts separately when you also need notifications.
+
+### Investigate a device or a group
+
+Group summaries show the number of devices, node and alert status distributions, and the values used for fill and border colors. Expand a group to inspect its devices, or collapse it to keep the fleet overview compact. Use search and zoom to find a device in a large fleet.
+
+Select a device to open its inspector. You can see its connection and alert status, the metric behind each color, trends for the selected time window, and the label and metric fields chosen with **Edit columns**. For example, keep customer, building, room, model and software version next to operating-state and motor-speed values. Your team gets both the business context and the measurements needed to investigate.
+
+Node notes add human context, such as a maintenance observation or an issue under investigation. Where your permissions allow it, use the device's **Add note** or **Edit note** action. Notes complement host labels and metrics: labels describe the device, metrics describe its operation, and notes explain what your team knows about it.
+
+Choose a time range and aggregation that match the question. An average over an hour answers a different question from the most recent operating state. Missing metric values are shown separately; they are not equivalent to a healthy zero.
+
+The [Home tab](../dashboards-and-charts/home-tab.md) also provides a Room overview and a node-status map. Use the Nodes Map for the label and custom-metric workflow described here.
+
+## Add your application's operating metrics
+
+Your application can send custom metrics to the device's Netdata Agent using [StatsD](../../src/collectors/statsd.plugin/README.md). The Agent collects them locally and streams them to the Parent alongside system metrics. Your team can use them in charts, alerts and the Nodes Map.
+
+Use gauges for current states and measurements:
+
+| Operational question | Example gauge | Values |
+|:--|:--|:--|
+| Is the robot working? | `robot.working` | `0` for idle, `1` for working |
+| Is the safety interlock engaged? | `robot.interlock` | `0` for disengaged, `1` for engaged |
+| How fast is the vehicle moving? | `vehicle.speed` | Current speed in your chosen unit |
+| How high is the drone? | `drone.altitude` | Current altitude, with a defined reference and unit |
+| How fast is the motor turning? | `motor.rpm` | Revolutions per minute |
+
+A StatsD gauge message such as `robot.working:1|g` sets the value to one; send `robot.working:0|g` when it becomes idle. Send numeric measurements the same way, such as `motor.rpm:1450|g`. Keep metric names and units consistent across devices so the same map settings apply throughout the fleet.
+
+Use the local StatsD listener, normally port `8125` on localhost, when the application runs on the device. The built-in StatsD collector is part of the standard static Agent executable and remains available when optional external plugins are removed. Enable and configure it using the StatsD guide, and confirm that the resulting charts arrive at the Parent before selecting them as map metrics.
+
+Publish the state regularly as well as when it changes. Gauges can retain their previous value when the application stops sending; use application heartbeat or freshness monitoring alongside operating-state gauges. At sparse collection intervals, short state transitions may be averaged or missed. Keep faster collection for vehicle motion, safety-related diagnostics or other behavior where your team needs that detail.
+
+For example, filter to `customer=tenant-a`, group by `building`, color the fill by `robot.working`, and color the border by alert status. Your team can see which robots are active and which need attention without opening thousands of individual charts.
+
+## Place devices on a geographic map
+
+For geographically distributed fleets, attach `latitude` and `longitude` host labels with decimal-degree coordinates. The geographic map places devices at those coordinates and shows node status and active alerts. Use it to locate affected sites, then open the device for investigation. The Nodes hexagon map provides the label and metric organization described above; geographic coordinates are not required for that view.
+
+Neither map requires `network-viewer.plugin`. Retain that plugin when you also want live network-connection inspection and connection topology on the device.
 
 ## Alert on device health
 

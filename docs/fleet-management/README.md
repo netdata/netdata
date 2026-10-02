@@ -12,6 +12,7 @@ Use the same architecture across a fleet while adapting each device's Agent to i
 - **Reduce CPU and memory use** by moving storage, alerting and anomaly detection to Parents and collecting at an appropriate interval.
 - **Reduce cellular traffic** with less frequent metric updates, compression and keepalive settings suited to intermittent connections.
 - **Recover data after an outage** by keeping local history and replicating it when the device reconnects.
+- **See the fleet your way** by filtering and grouping devices with customer, location, model and software labels, and using system or custom application metrics to annotate and color the Nodes Map.
 - **Troubleshoot centrally** with dashboards and live Functions, without installing a dashboard on every device.
 
 Keep the collectors that supply your operational metrics and live Functions. For example, retain the apps plugin for process monitoring, the network viewer for network inspection, and the journal plugin for journal access. Your Parent brings these capabilities into one interface.

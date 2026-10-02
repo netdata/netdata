@@ -2,6 +2,38 @@
 
 Keep centralized device monitoring affordable on cellular links by sending only the metrics you need, at a suitable interval. Netdata supports five- and ten-minute collection, compressed streaming and cadence-aware connection keepalives, so you can reduce background traffic while keeping your fleet visible on Parents.
 
+## Stay connected with a small monthly data budget
+
+Your Child keeps its TCP connection to the Parent open between metric updates. Your team can continue to see the device's connection status and request live troubleshooting Functions through that connection. Five- or ten-minute collection reduces routine telemetry; it does not require disconnecting the device between updates.
+
+Three controls work together:
+
+- **Select the metrics** your team needs on the cellular link.
+- **Set their collection intervals** to match how quickly you need new values.
+- **Reduce unnecessary TCP keepalives** while preserving the connection on your modem and carrier network.
+
+For a small operational metric set, connected streaming can use only a few MiB per month. The following example gives you a starting budget for a device class.
+
+### Monthly traffic example
+
+A packet-capture test streamed **46 metric dimensions** over TLS with ZSTD level 1. The Child used Netdata **v2.10.4**; the test Parent included the cadence-aware receiver timeout and keepalive changes. The measurements counted IPv4 bytes in **both directions**, including IP/TCP headers, TLS, acknowledgements and Netdata control traffic.
+
+| Collection interval | Parent TCP keepalive idle | Projected streaming traffic per 31-day month |
+|:--|:--|--:|
+| Ten minutes | 30 seconds | 11.56 MiB |
+| Ten minutes | 60 seconds | 6.87 MiB |
+| Ten minutes | 120 seconds | 4.78 MiB |
+| Ten minutes | 300 seconds | **4.27 MiB** |
+| Five minutes | 150 seconds | **6.72 MiB** |
+
+At ten-minute collection, changing only the Parent keepalive idle from 30 to 300 seconds reduced total measured traffic by **63%**. The TCP connections stayed open throughout the measured steady windows.
+
+These are monthly projections from packet captures covering two complete collection intervals after warmup, rather than month-long carrier measurements. The tests had no reconnects or retransmissions, excluded connection setup and had historical replication disabled. Use them to size a starting configuration, then measure your device class on its actual cellular network. The table is a selected operational workload, not the bandwidth of every built-in metric or of the reduced packages' default configuration.
+
+Metric count, metric changes and compression affect the result. Live Functions, log inspection, reconnects, retransmissions and historical replication add traffic. Other applications on the device also consume the SIM's allowance. Compare measured interface traffic with carrier usage when commissioning the fleet.
+
+A connected socket provides a path for live requests between collections. Detection of a broken link still depends on TCP keepalive and application-idle timeouts; five-minute data collection does not imply immediate detection of every failure.
+
 ## Send fewer metric updates
 
 Set the Child's `[db] update every` to `300` for five-minute collection or `600` for ten-minute collection. Use these intervals for slowly changing status and capacity metrics. Keep faster collection for conditions that require quick detection.
@@ -25,7 +57,7 @@ This reduces unnecessary TCP keepalive traffic on sparse connections. A faster c
 
 For a fleet that needs a fixed policy, configure an explicit idle interval. `tcp keepalive idle = off` disables TCP keepalives on the Parent's receiving socket. Prefer automatic keepalives as a starting point: cellular gateways may expire idle connections, and frequent reconnects add traffic.
 
-The Parent also accommodates sparse updates in its application-level liveness handling. Configure these settings on the Parent that receives the stream. See the [streaming configuration reference](../../src/streaming/README.md) for the full connection settings.
+The Parent also accommodates sparse updates in its application-level liveness handling: its application-idle timeout is the greater of ten minutes and twice the fastest observed chart interval. Configure these settings on the Parent that receives the stream. See the [streaming configuration reference](../../src/streaming/README.md) for the full connection settings.
 
 ## Keep compression enabled
 

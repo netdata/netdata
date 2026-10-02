@@ -18,9 +18,10 @@ Prepare the shared image before claiming or commissioning the Agent. Follow the 
 
 Assign a stable hostname and [host labels](../netdata-agent/configuration/organize-systems-metrics-and-alerts.md) for:
 
-- Device class and hardware revision.
-- Site or location.
-- Software release.
+- Customer name or tenant identifier.
+- Location, building and room.
+- Device class, model and hardware revision.
+- Software version or release.
 - Deployment ring, such as pilot or production.
 
 These labels let you find devices, organize dashboards and apply alerts to the right groups. Store credentials in your provisioning system rather than in labels.
