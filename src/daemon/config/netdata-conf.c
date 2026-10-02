@@ -7,6 +7,7 @@
 static struct {
     char *primary;      // the -c file, or the user netdata.conf
     char *fallback;     // the stock netdata.conf, NULL when -c is given
+    bool primary_loaded;
 } netdata_conf_files = { 0 };
 
 static bool netdata_conf_path_is_absolute(const char *path) {
@@ -43,6 +44,7 @@ bool netdata_conf_load(char *filename, char overwrite_used, const char **user) {
         netdata_conf_files.primary = netdata_conf_path_absolute_strdupz(filename);
 
         ret = inicfg_load(&netdata_config, filename, overwrite_used, NULL);
+        netdata_conf_files.primary_loaded = ret;
         if(!ret)
             netdata_log_error("CONFIG: cannot load config file '%s'.", filename);
     }
@@ -51,6 +53,7 @@ bool netdata_conf_load(char *filename, char overwrite_used, const char **user) {
         netdata_conf_files.fallback = filename_from_path_entry_strdupz(netdata_configured_stock_config_dir, "netdata.conf");
 
         ret = inicfg_load(&netdata_config, netdata_conf_files.primary, overwrite_used, NULL);
+        netdata_conf_files.primary_loaded = ret;
         if(!ret) {
             netdata_log_info("CONFIG: cannot load user config '%s'. Will try the stock version.", netdata_conf_files.primary);
 
@@ -68,13 +71,18 @@ bool netdata_conf_load(char *filename, char overwrite_used, const char **user) {
 }
 
 bool netdata_conf_reload_section(const char *section) {
-    if(inicfg_load(&netdata_config, netdata_conf_files.primary, 1, section))
+    if(inicfg_load(&netdata_config, netdata_conf_files.primary, 1, section)) {
+        netdata_conf_files.primary_loaded = true;
+        return true;
+    }
+
+    // the stock file stands in only for a user file that was never read: once it was, the stock
+    // file (normally without the section) would wipe the values the user file gave
+    bool try_fallback = netdata_conf_files.fallback && !netdata_conf_files.primary_loaded;
+    if(try_fallback && inicfg_load(&netdata_config, netdata_conf_files.fallback, 1, section))
         return true;
 
-    if(netdata_conf_files.fallback && inicfg_load(&netdata_config, netdata_conf_files.fallback, 1, section))
-        return true;
-
-    if(netdata_conf_files.fallback)
+    if(try_fallback)
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "CONFIG: cannot reload section [%s] from '%s' or '%s', using the values in memory",
                section, netdata_conf_files.primary, netdata_conf_files.fallback);
