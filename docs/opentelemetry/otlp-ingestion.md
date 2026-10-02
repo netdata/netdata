@@ -58,7 +58,7 @@ exporters:
 
 Both transports work: `otlp_grpc` sends to port `4317`; `otlphttp` sends OTLP/HTTP to port `4318`, where the `endpoint` is a full URL. The HTTP receiver serves `POST /v1/logs`, `POST /v1/traces`, and `POST /v1/metrics` and accepts `application/x-protobuf` or `application/json` bodies. Use `127.0.0.1` rather than `localhost` if the latter resolves to IPv6.
 
-An SDK exporting directly can keep its OTLP/HTTP default: set `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318` with `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf` (or `http/json`). For gRPC, use `http://127.0.0.1:4317` with `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`. Because the HTTP receiver is plain HTTP POST, it is also easy to probe with `curl` — post an OTLP JSON body to `/v1/logs` with `Content-Type: application/json`.
+An SDK exporting directly can keep its OTLP/HTTP default: set `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318` with `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf` (or `http/json`). For gRPC, use `http://127.0.0.1:4317` with `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`. Because the HTTP receiver is plain HTTP POST, it is also easy to probe with `curl` — post an OTLP JSON body to `/v1/logs` with `Content-Type: application/json`. JSON bodies must use canonical proto3 JSON encoding, with 64-bit integers as strings (`"timeUnixNano": "1700000000000000000"`); every OTLP SDK exporter emits this form.
 
 ## Smoke-test Host Metrics
 

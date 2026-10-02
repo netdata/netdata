@@ -119,8 +119,9 @@ remote_storage:
   read_cache_max_size: "1GB"
 
 auth:
-  # Require senders to identify a tenant via the X-Scope-OrgID gRPC header.
-  # This is tenant selection, not user authentication — trust the header only
+  # Require senders to identify a tenant via the X-Scope-OrgID header on
+  # either transport (gRPC metadata or HTTP header). This is tenant
+  # selection, not user authentication — trust the header only
   # on a protected endpoint (TLS and network controls). When disabled, all
   # data belongs to a single "default" tenant. Applies to logs and traces;
   # metrics have no tenants.

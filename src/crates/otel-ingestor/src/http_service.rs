@@ -27,6 +27,13 @@
 //! - success replies `200` with the response encoded in the SAME encoding and
 //!   a mirrored `Content-Type`.
 //!
+//! One accepted-input deviation from the collector's protojson decoder: JSON
+//! bodies must be in canonical proto3 JSON form — 64-bit integers as strings,
+//! enums as numbers, `NaN`/`Infinity` unsupported — because the codec is the
+//! `opentelemetry-proto` `with-serde` derives. Every OTLP SDK exporter emits
+//! this form (as does the collector itself); non-canonical hand-written JSON
+//! is rejected with a `400` naming the offending field.
+//!
 //! The listener binds during startup with the same strict fail-fast rule as
 //! the gRPC endpoint (user decision D4): a bind or TLS failure aborts the
 //! worker before `Ready`, rather than advertising an endpoint that cannot
@@ -463,8 +470,11 @@ where
             let mut out = Vec::new();
             // `take` caps the EXPANDED size (the wire cap alone does not bound
             // a gzip stream), reading one extra byte to notice the overflow.
+            // `MultiGzDecoder` (not `GzDecoder`) so a concatenated-members
+            // stream — legal gzip that Go's compress/gzip also reads whole —
+            // is not silently truncated after its first member.
             let mut reader =
-                flate2::read::GzDecoder::new(wire.as_ref()).take((MAX_BODY_BYTES + 1) as u64);
+                flate2::read::MultiGzDecoder::new(wire.as_ref()).take((MAX_BODY_BYTES + 1) as u64);
             match reader.read_to_end(&mut out) {
                 // Ok(n) with n <= cap: EOF ended the stream inside the limit.
                 Ok(_) if out.len() <= MAX_BODY_BYTES => out.into(),
@@ -610,7 +620,9 @@ async fn method_not_allowed() -> Response<Body> {
 }
 
 async fn not_found() -> Response<Body> {
-    plain_text(StatusCode::NOT_FOUND, "404 page not found")
+    // net/http's mux writes this body with a trailing newline; keep byte
+    // parity with what the collector's 404 looks like on the wire.
+    plain_text(StatusCode::NOT_FOUND, "404 page not found\n")
 }
 
 #[cfg(test)]
@@ -1053,7 +1065,7 @@ mod tests {
             .unwrap();
         let resp = router(state).oneshot(request).await.unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-        assert_eq!(body_bytes(resp).await, b"404 page not found");
+        assert_eq!(body_bytes(resp).await, b"404 page not found\n");
     }
 
     #[tokio::test]
@@ -1204,6 +1216,28 @@ mod tests {
         .await;
         assert_eq!(resp.status(), StatusCode::OK);
         assert!(any_file_under(&tmp.path().join("logs/wal")));
+    }
+
+    #[tokio::test]
+    async fn concatenated_gzip_members_all_decode() {
+        // `cat a.gz b.gz` is legal gzip with two members; Go's compress/gzip
+        // reads every member. Split ONE valid request across two members so
+        // the reassembled body is a single JSON document — a first-member-
+        // only decoder would see truncated JSON and 400 it.
+        let (state, _tmp) = test_state(AuthConfig::default());
+        let json = serde_json::to_vec(&logs_req(1)).unwrap();
+        let split = json.len() / 2;
+        let body = [gzip(&json[..split]), gzip(&json[split..])].concat();
+        let resp = post(
+            state,
+            "/v1/logs",
+            Some("application/json"),
+            Some("gzip"),
+            None,
+            body,
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
     }
 
     #[tokio::test]

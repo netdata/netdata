@@ -856,8 +856,8 @@ sidebar:
   - meta:
       label: OpenTelemetry
       edit_url: https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/opentelemetry.md
-      description: The Netdata Agent as an OTLP/gRPC receiver — metrics become charts, logs and traces are stored indexed on the Agent, with TLS and Collector recipes.
-      keywords: [opentelemetry, otel, otlp, grpc, metrics, logs, traces, collector]
+      description: The Netdata Agent as an OTLP receiver over gRPC and HTTP — metrics become charts, logs and traces are stored indexed on the Agent, with TLS and Collector recipes.
+      keywords: [opentelemetry, otel, otlp, grpc, http, metrics, logs, traces, collector]
     items:
       - meta:
           label: OTLP Ingestion
