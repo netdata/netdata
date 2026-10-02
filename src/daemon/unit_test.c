@@ -2145,9 +2145,13 @@ static int inicfg_section_check(struct config *cfg, const char *section, const c
     return 0;
 }
 
+// rewrites the fixture mkstemp() created; never creates a file, so a missing fixture is a failure
 static int inicfg_section_write_file(const char *filename, const char *contents) {
-    FILE *fp = fopen(filename, "w");
+    int fd = open(filename, O_WRONLY | O_TRUNC);
+    FILE *fp = (fd == -1) ? NULL : fdopen(fd, "w");
     if(!fp) {
+        if(fd != -1)
+            close(fd);
         fprintf(stderr, "test_inicfg_section_reload: cannot write '%s'\n", filename);
         return 1;
     }
