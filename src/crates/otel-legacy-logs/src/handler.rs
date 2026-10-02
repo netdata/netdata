@@ -41,11 +41,13 @@ type LegacyLogsResponseBody = netdata::JournalResponse;
 
 /// Synthesize a JSON request payload from legacy GET-style URL args
 /// (`info`, `after:N`, `before:M`), mirroring the ledger's shim
-/// (otel-ledger/src/ledger/rpc/mod.rs:44). The rt-level GET shim only
-/// rewrites `otel-logs` calls (netdata-plugin/rt/src/lib.rs:1187), but the
+/// (`otel-ledger/src/ledger/rpc/mod.rs` `patch_args_into_payload`). The
+/// rt-level GET shim only rewrites `otel-logs` calls
+/// (`netdata-plugin/rt/src/lib.rs` `handle_function_call`), but the
 /// logs UI issues this function the same GET way, and the bridge builds the
-/// typed request from the payload alone (bridge/src/function.rs:253) — so
-/// without this translation GET args would never reach `JournalRequest`.
+/// typed request from the payload alone
+/// (`netdata-plugin/bridge/src/function.rs` `HandlerAdapter::handle_raw`) —
+/// so without this translation GET args would never reach `JournalRequest`.
 /// Returns `None` when there are no args or a payload already exists (the
 /// caller then keeps the original).
 ///
@@ -123,8 +125,9 @@ fn accepted_params() -> Vec<netdata::RequestParam> {
     use netdata::RequestParam;
 
     // Advertise only what this handler deserializes and honors — the
-    // ledger's list (otel-ledger/src/ledger/rpc/logs/wire.rs:39) minus
-    // `tenant` (single journal directory, no storage tenants). `DataOnly`
+    // ledger's list (`otel-ledger/src/ledger/rpc/logs/wire.rs`
+    // `ACCEPTED_PARAMS`) minus `tenant` (single journal directory, no
+    // storage tenants). `DataOnly`
     // is deliberately omitted: the UI computes
     // `dataOnly = data_only && accepted_params.includes(..)`, so advertising
     // it would make the UI preserve stale columns/facets/pagination instead
@@ -426,9 +429,9 @@ impl FunctionHandler for LegacyLogsHandler {
         let filter_expr = build_filter_from_selections(&request.selections);
         let facets = Facets::new(&request.facets);
 
-        // Entry-timestamp field for indexes and queries — LogQuery::new
-        // defaults to the same field (journal-engine/src/logs/query.rs:81).
-        // It is part of FileIndexKey, so cached indexes are keyed per
+        // Entry-timestamp field for indexes and queries — the default of
+        // `LogQuery::new` (`journal-engine/src/logs/query.rs`) is the same
+        // field. It is part of FileIndexKey, so cached indexes are keyed per
         // timestamp field as well as per file and facet set.
         let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
         let keys: Vec<FileIndexKey> = files
@@ -535,7 +538,7 @@ impl FunctionHandler for LegacyLogsHandler {
             // The UI reads before/after as 0/1 flags in display order, not
             // chronology: "before" = newer rows exist (scroll up), "after"
             // = older rows exist (scroll down). Same crossover as the
-            // ledger (otel-ledger/src/ledger/rpc/logs/adapter.rs:291-293).
+            // ledger (`otel-ledger/src/ledger/rpc/logs/adapter.rs` `to_result`).
             before: if has_after { 1 } else { 0 },
             after: if has_before { 1 } else { 0 },
             returned: log_entries.len(),

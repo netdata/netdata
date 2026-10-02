@@ -27,7 +27,7 @@
 //! stream selector's window, 1 = the fetch), runs the unbounded
 //! [`RemotePlanInput::plan`] under `spawn_blocking`, and feeds
 //! `per_range[0]` to `LocalStreams::with_catalog` and `per_range[1]` to
-//! [`remote_read::RemoteRead::fetch`]. `rpc/traces/sources.rs` plans the
+//! [`crate::remote_read::RemoteRead::fetch`]. `rpc/traces/sources.rs` plans the
 //! distinct capture ranges with [`RemotePlanInput::plan_within`] bounded
 //! by the download cache's capacity, turns [`RemotePlan::unreadable`]
 //! catalogs overlapping a range into unavailable sources over their span,

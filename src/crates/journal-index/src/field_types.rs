@@ -2,30 +2,32 @@
 //!
 //! Two newtypes give the index a typed vocabulary:
 //! - [`FieldName`] is a bare field name ("PRIORITY"). It keys the
-//!   `FileIndex::file_fields`/`indexed_fields` sets (file_index.rs:37,39),
+//!   `FileIndex::file_fields`/`indexed_fields` sets (`src/file_index.rs`),
 //!   lists the fields an index or histogram covers
-//!   (journal-engine/src/facets.rs:21), and names the source-timestamp field
-//!   that orders entries at index time (file_indexer.rs:624) and timestamps
-//!   them at query time (file_index.rs:406).
+//!   (`journal-engine/src/facets.rs`), and names the source-timestamp field
+//!   that orders entries at index time (`collect_source_field_info` in
+//!   `src/file_indexer.rs`) and timestamps them at query time
+//!   (`get_timestamp_field` in `src/file_index.rs`).
 //! - [`FieldValuePair`] is a "field=value" string with the '=' position
-//!   cached. It is the key type of `FileIndex::bitmaps` (file_index.rs:41),
+//!   cached. It is the key type of `FileIndex::bitmaps` (`src/file_index.rs`),
 //!   so its derived `Eq`/`Hash` are load-bearing: two pairs are equal iff
 //!   their "field=value" strings are equal (struct doc below).
 //!
 //! Values come verbatim from the journal: the indexer lossily-decodes each
 //! field data object's raw "field=value" payload and parses it
-//! (file_indexer.rs:330-331); nothing here normalizes, trims or case-folds.
+//! (`build_entries_index` in `src/file_indexer.rs`); nothing here
+//! normalizes, trims or case-folds.
 //! [`parse_timestamp`] re-reads one field's data-object payload as a u64
 //! (the `_SOURCE_REALTIME_TIMESTAMP` path). Other consumers: journal-engine
-//! aggregates per-pair counts under these keys (journal-engine/src/
-//! histogram.rs:100,348) and carries query-result fields as pairs
-//! (journal-engine/src/logs/query.rs:530); otel-legacy-logs parses request
-//! selections into filters (otel-legacy-logs/src/handler.rs:80);
+//! aggregates per-pair counts under these keys (`journal-engine/src/
+//! histogram.rs`) and carries query-result fields as pairs
+//! (`journal-engine/src/logs/query.rs`); otel-legacy-logs parses request
+//! selections into filters (`otel-legacy-logs/src/handler.rs`);
 //! journal-function counts facet values per pair
-//! (journal-function/src/netdata/facets.rs:21).
+//! (`journal-function/src/netdata/facets.rs`).
 //!
 //! Both types derive `Serialize`/`Deserialize` - pairs and names travel
-//! inside the serialized `FileIndex` (file_index.rs:23) - and, under the
+//! inside the serialized [`crate::FileIndex`] - and, under the
 //! crate's `allocative` feature, `allocative::Allocative`.
 
 use serde::{Deserialize, Serialize};
@@ -46,8 +48,8 @@ impl FieldName {
     /// Wrap a string as a FieldName without validating it.
     ///
     /// For strings the code already trusts: field-table names during
-    /// indexing (file_indexer.rs:237,385) and hardcoded names such as the
-    /// default facet list (journal-engine/src/facets.rs:92). An embedded
+    /// indexing (`src/file_indexer.rs`) and hardcoded names such as the
+    /// default facet list (`journal-engine/src/facets.rs`). An embedded
     /// '=' is not rejected here; [`FieldValuePair::new_unchecked`] treats
     /// it as a split point.
     pub fn new_unchecked(name: impl Into<String>) -> Self {
@@ -59,7 +61,7 @@ impl FieldName {
     /// Returns None for an empty name or one containing '=' (the name must
     /// stay splittable from its value). Used wherever a name's content is
     /// not already trusted, e.g. configured facet names
-    /// (journal-engine/src/facets.rs:102).
+    /// (`journal-engine/src/facets.rs`).
     pub fn new(name: impl Into<String>) -> Option<Self> {
         let name = name.into();
         if name.is_empty() || name.contains('=') {
@@ -114,9 +116,9 @@ impl AsRef<str> for FieldName {
 /// exactly when the "field=value" strings are equal, as long as field
 /// names are '='-free ([`FieldName::new`] enforces this). That equivalence
 /// is what lets this type stand in for the plain string as the key of
-/// `FileIndex::bitmaps` (file_index.rs:41), journal-engine's per-bucket
-/// `fv_counts` (journal-engine/src/histogram.rs:100) and journal-function's
-/// facet counts (journal-function/src/netdata/facets.rs:21). Ordering is
+/// `FileIndex::bitmaps` (`src/file_index.rs`), journal-engine's per-bucket
+/// `fv_counts` (`journal-engine/src/histogram.rs`) and journal-function's
+/// facet counts (`journal-function/src/netdata/facets.rs`). Ordering is
 /// the string's lexicographic order ("PRIORITY=debug" < "PRIORITY=error").
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
@@ -137,7 +139,7 @@ impl FieldValuePair {
     /// the first '=' of the key and the pair stops comparing equal to
     /// `parse` of the same string. The indexer re-keys a parsed pair under
     /// the requested (remapped) field name this way
-    /// (file_indexer.rs:385-386).
+    /// (`build_entries_index` in `src/file_indexer.rs`).
     pub fn new_unchecked(field: FieldName, value: String) -> Self {
         let split_pos = field.as_str().len();
         let key = format!("{}={}", field.as_str(), value);
@@ -149,8 +151,8 @@ impl FieldValuePair {
     /// Returns None when there is no '=' or the field name would be empty
     /// ("=value"); everything after the first '=' stays in the value,
     /// further '=' included. The indexer parses journal payloads with this
-    /// (file_indexer.rs:331); the engine re-parses serialized bitmap keys
-    /// with it (journal-engine/src/histogram.rs:348).
+    /// (`build_entries_index` in `src/file_indexer.rs`); the engine re-parses
+    /// serialized bitmap keys with it (`journal-engine/src/histogram.rs`).
     pub fn parse(s: impl AsRef<str>) -> Option<Self> {
         let s = s.as_ref();
         let split_pos = s.find('=')?;
@@ -290,12 +292,15 @@ impl From<&FieldName> for String {
 /// its `IndexError` variant (`InvalidFieldPrefix`, `NonUtf8Payload`,
 /// `NonIntegerPayload`). The payload is used as-is - no decompression - so
 /// a compressed data object normally fails to parse and its entries fall
-/// back to another timestamp source (file_index.rs:415).
+/// back to another timestamp source (`get_entry_timestamp` in
+/// `src/file_index.rs`).
 ///
 /// Used for the source timestamp field (typically
 /// `_SOURCE_REALTIME_TIMESTAMP`, microseconds since the epoch): the
-/// indexer orders entries by it (file_indexer.rs:549) and per-entry
-/// timestamp lookups reuse it (file_index.rs:390).
+/// indexer orders entries by it (`collect_source_field_info` in
+/// `src/file_indexer.rs`) and per-entry
+/// timestamp lookups reuse it (`get_timestamp_field` in
+/// `src/file_index.rs`).
 pub fn parse_timestamp(
     field_name: &[u8],
     data_object: &journal_core::file::DataObject<&[u8]>,

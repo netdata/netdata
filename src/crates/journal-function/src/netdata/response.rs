@@ -3,15 +3,17 @@
 //! ...]`.
 //!
 //! Input is the transformed table from netdata/builder.rs - cells keep their
-//! raw value beside the display string (journal-engine/src/logs/table.rs:23),
+//! raw value beside the display string (`CellValue::with_display` in
+//! `journal-engine/src/logs/table.rs`),
 //! so the timestamp renders from the raw µs value while fields render their
 //! display strings - plus the column schema from netdata/columns.rs
-//! (`generate_column_schema`, columns.rs:238), which selects and orders the
+//! ([`crate::netdata::columns::generate_column_schema`]), which selects and orders the
 //! rendered columns.
 //!
-//! Sole caller (grep-verified): netdata/builder.rs:102 inside
-//! `build_ui_response`; otel-legacy-logs/src/handler.rs:469 puts the result
-//! into `JournalResponse.data` (netdata/types.rs:182).
+//! Sole caller (grep-verified): [`crate::netdata::builder::build_ui_response`]
+//! (its table-rendering step); `otel-legacy-logs/src/handler.rs`
+//! (`LegacyLogsHandler::on_call`) puts the result
+//! into the `data` field of [`crate::netdata::types::JournalResponse`].
 
 use super::columns::ColumnSchema;
 use super::severity::Severity;
@@ -20,7 +22,7 @@ use serde_json::json;
 use std::collections::HashMap;
 
 /// Renders one table into the logs UI's row arrays, to be read against the
-/// schema serialized by `columns_to_sorted_json` (netdata/columns.rs:280).
+/// schema serialized by [`crate::netdata::columns::columns_to_sorted_json`].
 ///
 /// Row shape:
 /// ```json
@@ -35,7 +37,7 @@ use std::collections::HashMap;
 ///    by column name, index-0 fallback), parsed as u64 microseconds; 0 when
 ///    missing or unparseable
 /// 2. The rowOptions object `{"severity": ...}` - from the PRIORITY column's
-///    raw value (`Severity::from_priority`, netdata/severity.rs:65; missing
+///    raw value ([`Severity::from_priority`]; missing
 ///    or invalid PRIORITY renders "normal")
 /// 3. One display value per remaining schema column (`timestamp`/`rowOptions`
 ///    excluded), in index order - a column renders when visible or present
@@ -50,8 +52,8 @@ use std::collections::HashMap;
 ///
 /// # Returns
 ///
-/// One JSON array per table row, ready for `JournalResponse.data`
-/// (netdata/types.rs:182).
+/// One JSON array per table row, ready for the `data` field of
+/// [`crate::netdata::types::JournalResponse`].
 ///
 /// # Example
 ///

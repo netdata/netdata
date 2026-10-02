@@ -22,7 +22,8 @@
 //!   the module path, not re-exported here.
 //!
 //! Feature `allocative` gates an `allocative::Allocative` derive on the
-//! `time` units (src/time.rs:13,20); journal-index and journal-registry
+//! [`time`] units [`Seconds`] and [`Microseconds`] (the `cfg_attr` derives on
+//! their definitions in `src/time.rs`); journal-index and journal-registry
 //! forward their own `allocative` features to it.
 
 pub mod collections;
@@ -33,8 +34,8 @@ pub mod time;
 // The import surface the stack uses for the time types: no consumer
 // references the `journal_common::time` module path.
 // - `Seconds`: journal-registry (time ranges, repositories), journal-engine
-//   (tests, examples); re-exported onward by journal-index
-//   (journal-index/src/lib.rs:9).
+//   (tests, examples); re-exported onward by `journal-index/src/lib.rs`
+//   (`pub use journal_common::{Microseconds, Seconds}`).
 // - `Microseconds`: journal-log-writer (entry timestamps); re-exported
 //   onward by journal-index.
 // - `RealtimeClock`, `monotonic_now`: journal-log-writer only — the writer's
@@ -45,7 +46,7 @@ pub use time::{Microseconds, RealtimeClock, Seconds, monotonic_now};
 // Flat re-export of the collection aliases; unused on this path. The stack
 // reaches them via the `collections` module instead: journal-registry
 // imports it directly, journal-core wraps it in a re-export shim
-// (journal-core/src/collections.rs:6) that the rest of the stack consumes.
+// (`journal-core/src/collections.rs`) that the rest of the stack consumes.
 pub use collections::{HashMap, HashSet, VecDeque};
 
 // Host-identity loaders; like `time`, reached only through this re-export

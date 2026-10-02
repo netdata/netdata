@@ -1,6 +1,6 @@
 //! Hard dependency guard: the manifest of `file-lifecycle` — the
-//! content-agnostic file substrate (file-lifecycle/Cargo.toml:14-17),
-//! reused by both signals through `otel-ledger` — must never declare a
+//! content-agnostic file substrate (the `Cargo.toml` header comment says
+//! so), reused by both signals through `otel-ledger` — must never declare a
 //! log-content crate, so the traces signal never compiles the logs
 //! ones. Cargo already makes importing an undeclared crate impossible;
 //! this test backstops the declaration side: the whole manifest, read
@@ -9,8 +9,9 @@
 //! substrate.
 
 /// The log-content crates: `sfsq` (the logs/traces query engines over
-/// SFST — sfsq/src/lib.rs:3-10) and `otel-logs-identity` (OTel logs
-/// content-plane identity — otel-logs-identity/src/lib.rs:1-5). The
+/// SFST; see the `sfsq/src/lib.rs` crate docs) and `otel-logs-identity`
+/// (OTel logs content-plane identity; see the
+/// `otel-logs-identity/src/lib.rs` crate docs). The
 /// neutral crates `sfst` and `otel-catalog` stay allowed; they are not
 /// listed here.
 const FORBIDDEN: &[&str] = &["sfsq", "otel-logs-identity"];
@@ -19,8 +20,8 @@ const FORBIDDEN: &[&str] = &["sfsq", "otel-logs-identity"];
 fn manifest_declares_no_content_crate() {
     // Truncate each line at the first `#`, then substring-match the
     // forbidden names against what is left. Stripping is required: the
-    // manifest's own header comment deliberately names both crates
-    // (file-lifecycle/Cargo.toml:18). After stripping, a plain substring
+    // manifest's own header comment deliberately names both crates.
+    // After stripping, a plain substring
     // check sees every declaration shape — dependency key,
     // `[dependencies.<name>]` table header, `package = "…"` rename —
     // across the whole manifest (not just the dependency tables), and

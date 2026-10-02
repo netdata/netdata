@@ -6,9 +6,9 @@
 //! `handle_indexer_resp` registers the sealed SFST (or suppresses an empty
 //! one), drops the WAL's query-time chunks, queues the WAL delete, optionally
 //! queues an upload, and runs retention. Dispatched from the run loop
-//! (src/crates/otel-ledger/src/ledger/mod.rs:429) and from the shutdown flush
-//! drain (src/crates/otel-ledger/src/ledger/catalog_builder.rs:164), so a seal
-//! completing during shutdown is still applied.
+//! ([`crate::Ledger::run`]) and from the shutdown flush drain
+//! (`Ledger::flush_catalogs_on_shutdown`), so a seal completing during
+//! shutdown is still applied.
 
 use std::path::PathBuf;
 
@@ -27,8 +27,8 @@ enum Indexed {
     /// re-discovered at the next restart. An empty file carries no queryable
     /// data; tracking it would only add a bogus `(0, 0)` timestamp range to
     /// the inventory. A frame-less WAL reaches here after a crash/rotation
-    /// (startup recovery suppresses those the same way: `recover_unindexed`,
-    /// src/crates/file-lifecycle/src/recovery/local.rs:26).
+    /// (startup recovery suppresses those the same way:
+    /// `recover_unindexed`, `file-lifecycle/src/recovery/local.rs`).
     Empty {
         tenant_id: TenantId,
         file_id: FileId,
@@ -101,8 +101,8 @@ impl Ledger {
                 // summary field — and the selector and the `files:true` inventory
                 // both read `id.part_key` and cannot disagree. The summary's
                 // timestamps/record_count/content_meta land on the registry
-                // entry; the uploader response handler reads them back
-                // (src/crates/otel-ledger/src/ledger/uploader.rs:66).
+                // entry; the uploader response handler
+                // (`Ledger::handle_uploader_resp`) reads them back.
                 registry.sfst.track(file_id, size, summary);
 
                 let upload = if storage_enabled {

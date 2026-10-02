@@ -14,8 +14,8 @@
 //! implemented here is the ascending `Iter` below. Every path keeps the
 //! blob canonical — every byte non-zero, no empty subtrees — which is
 //! what makes `is_empty` a blob-emptiness check and ties the length to
-//! `estimate_data_size` (the fuzz target asserts the tie after arbitrary
-//! op sequences, fuzz/fuzz_targets/against_roaring.rs:199-204).
+//! `estimate_data_size` (the `fuzz/fuzz_targets/against_roaring.rs` fuzz
+//! target asserts the tie after arbitrary op sequences).
 //! Consumers: bitmap.rs wraps the descriptor in the inverted-aware
 //! `Bitmap`; roaring.rs (feature `roaring`) adds `RoaringBitmap` bridges;
 //! sfst, sfsq and otel-ledger only ever touch `Bitmap` (grep-verified),
@@ -37,7 +37,7 @@ use crate::ops::{
 /// descriptors of the same universe are interchangeable — which is why
 /// the set ops below return either operand's. The optional `serde` derive
 /// covers the descriptor only; tree bytes travel beside it in the
-/// consumer's payload (sfst/src/schema.rs:619-632).
+/// consumer's payload (`BitmapValue` in `sfst/src/schema.rs`).
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RawBitmap {

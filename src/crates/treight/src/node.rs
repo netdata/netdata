@@ -159,7 +159,7 @@ impl NodeReader<'_> {
     /// a leaf byte counts its set bits, an inner node sums its present
     /// children.
     ///
-    /// Mirrors `skip_hits` in GNU idutils' `src/fid.c:281-293`; the C
+    /// Mirrors `skip_hits` in GNU idutils' `src/fid.c`; the C
     /// original only skips — returning the population is this
     /// implementation's addition.
     pub(crate) fn skip_subtree(&mut self, level: u32) -> u64 {

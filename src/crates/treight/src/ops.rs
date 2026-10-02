@@ -1,5 +1,6 @@
 //! Recursive subtree walkers behind `RawBitmap`'s query, mutation and
-//! set-op methods. `raw` is the only importer (raw.rs:5-8); bitmap.rs and
+//! set-op methods. `raw` is the only importer (`raw.rs`'s `use crate::ops`
+//! block); bitmap.rs and
 //! sfst reach these through `RawBitmap`/`Bitmap` methods. Everything here
 //! is `pub(crate)`.
 //!
@@ -13,10 +14,10 @@
 //!   subtree and later children are reached by skipping the preceding
 //!   ones.
 //! - Bytes appended to `out` are the result subtree's serialization,
-//!   appended at the end of `out`; the set-op callers snapshot
-//!   `out.len()` around the call (raw.rs:430,454,488,523) and treat the
+//!   appended at the end of `out`; [`RawBitmap`]'s set-op methods snapshot
+//!   `out.len()` around the call (see `raw.rs`) and treat the
 //!   growth as the result's tree bytes — the convention sfst's set ops
-//!   build on (sfst/src/index_reader.rs:1762-1786).
+//!   build on (`PosSet::or_assign`/`and_assign` in `sfst/src/index_reader.rs`).
 use crate::node::{child_index, NodeReader};
 
 /// Walk the tree to `value`, reading one node byte per level: take the

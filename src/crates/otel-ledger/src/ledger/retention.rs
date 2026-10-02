@@ -3,13 +3,13 @@
 //! the deletions to the shared cleaner.
 //!
 //! There is no timer: `evaluate_retention` runs on the ledger's indexer
-//! response path after every WAL rotation
-//! (src/crates/otel-ledger/src/ledger/indexer.rs:151,184). Each pass collects
+//! response path after every WAL rotation (both call sites in
+//! `Ledger::handle_indexer_resp`, `ledger/indexer.rs`). Each pass collects
 //! decisions under the tenant registry's write lock, then marks entries
 //! pending deletion and dispatches the `CleanerRequest`s after dropping the
 //! lock. The cleaner's response handler completes the flow — success removes
 //! the entry from the registry, failure un-marks it
-//! (`handle_cleaner_resp`, src/crates/otel-ledger/src/ledger/cleaner.rs:16).
+//! (`Ledger::handle_cleaner_resp`, `ledger/cleaner.rs`).
 
 use bridge::signals::Signal;
 use file_registry::{SeqKey, TenantId};
@@ -23,7 +23,8 @@ use file_lifecycle::helpers::{catalog_retention_days, sfst_retention_policy};
 impl Ledger {
     /// Cancel-safety invariant: the mark-then-send-then-clear-on-failure
     /// pattern below is only safe because `self.cleaner.send` is non-awaiting
-    /// (unbounded mpsc send, src/crates/file-lifecycle/src/component.rs:62).
+    /// (`ComponentHandle::send`, an unbounded mpsc send —
+    /// `file-lifecycle/src/component.rs`).
     /// If this ever becomes awaiting (bounded channel with backpressure, RPC,
     /// etc.), a dropped task between `mark_pending_deletion` and the matching
     /// `clear_pending_deletion` would leave the file marked — hidden from
@@ -41,7 +42,7 @@ impl Ledger {
             .retention
             .resolve(tenant_id.as_str());
         // Remote storage is process-global: enabled iff the ledger shell built
-        // an uploader (src/crates/otel-ledger/src/ledger/mod.rs:207).
+        // an uploader in `Ledger::new`.
         let storage_enabled = self.uploader.is_some();
         let registries = pipeline.registries().clone();
 
@@ -58,8 +59,9 @@ impl Ledger {
             };
 
             // The resolved config is lowered onto sfst's plain-data policy
-            // (src/crates/file-lifecycle/src/helpers.rs:42); the registry walks
-            // eligible files oldest-first and returns the seqs to evict.
+            // (`sfst_retention_policy`, `file-lifecycle/src/helpers.rs`); the
+            // registry walks eligible files oldest-first and returns the seqs
+            // to evict.
             let to_evict = registry
                 .sfst
                 .evaluate_retention(&sfst_retention_policy(&retention), now_ns());
@@ -97,8 +99,8 @@ impl Ledger {
         };
 
         // Send outside the lock. A failed send rolls back the mark here; a
-        // failed deletion is un-marked later by the cleaner's failure response
-        // (src/crates/otel-ledger/src/ledger/cleaner.rs:62).
+        // failed deletion is un-marked later by the cleaner's failure
+        // response (`Ledger::handle_cleaner_resp`).
         for req in sfst_reqs {
             let key = match &req {
                 CleanerRequest::DeleteIndexFile { sequence, .. } => *sequence,
@@ -140,7 +142,7 @@ impl Ledger {
         };
 
         // Same dispatch pattern as the SFST pass, with the catalog failure
-        // rollback in the cleaner (src/crates/otel-ledger/src/ledger/cleaner.rs:81).
+        // rollback in `Ledger::handle_cleaner_resp`.
         for req in catalog_reqs {
             let path = match &req {
                 CleanerRequest::DeleteCatalogFile { path, .. } => path.clone(),

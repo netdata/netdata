@@ -1,9 +1,10 @@
 //! Severity levels for the systemd-journal logs UI: the `Severity` each
 //! rendered row carries in its rowOptions `{"severity": ...}` object,
 //! derived per row from the journal `PRIORITY` field. Mirrors the C
-//! implementation `syslog_priority_to_facet_severity()`
-//! (systemd-journal-annotations.c:256-281). Sole consumer
-//! (grep-verified): netdata/response.rs:97.
+//! implementation `syslog_priority_to_facet_severity()` in
+//! `src/collectors/systemd-journal.plugin/systemd-journal-annotations.c`.
+//! Sole consumer (grep-verified):
+//! [`crate::netdata::response::table_to_netdata_response`].
 
 use serde::{Deserialize, Serialize};
 
@@ -33,7 +34,7 @@ impl Severity {
     /// Maps a journal `PRIORITY` string to a severity.
     ///
     /// Missing or unparseable values count as LOG_INFO (6). The C mirror
-    /// (`str2i()`, systemd-journal-annotations.c:266) parses garbage as 0
+    /// (`str2i()`, same file) parses garbage as 0
     /// and reports Critical instead.
     pub fn from_priority(priority: Option<&str>) -> Self {
         let priority_num = priority.and_then(|s| s.parse::<i32>().ok()).unwrap_or(6); // Default to LOG_INFO if missing or invalid

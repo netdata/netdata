@@ -1,7 +1,7 @@
 //! The shared trace combiner — the ONE implementation of span dedup,
 //! canonical ordering, capping, and forest building for every path that
 //! assembles a trace. Consumers (grep-verified): the single-file
-//! [`IndexReader::trace_by_id`] (index_reader.rs:751) and the
+//! [`IndexReader::trace_by_id`] (`index_reader.rs`) and the
 //! cross-source engine `sfsq::traces` (by_id.rs, search.rs). Shared with
 //! `sfsq` deliberately — dedup, ordering, and root rules must not drift
 //! between consumers.
@@ -79,8 +79,9 @@ impl SpanRef {
 
 /// A source of one trace's spans for the combiner: cheap refs up front,
 /// payloads on demand. Implementors: the SFST file session
-/// ([`TraceFileSession`](crate::TraceFileSession), session.rs:186) and
-/// the sfsq traces WAL tail scan (sfsq/src/traces/wal_scan.rs:303).
+/// ([`TraceFileSession`](crate::TraceFileSession),
+/// `index_reader/session.rs`) and the sfsq traces WAL tail scan
+/// (`sfsq/src/traces/wal_scan.rs` `TraceWalScan`).
 pub trait SpanSource {
     /// This source's candidates for `trace_id` (any order; the combiner
     /// sorts). An id absent from the source yields an empty vec.

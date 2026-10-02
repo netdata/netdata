@@ -23,14 +23,16 @@
 //!   and checksum characters A-Z/0-9; neither alphabet contains `_`.
 //!
 //! Consumers: journal-log-writer remaps non-journald-compatible field names
-//! at write time (journal-log-writer/src/log/mod.rs:372) and persists the
-//! otel→systemd mapping as `ND_REMAPPING=1` entries
-//! (journal-log-writer/src/log/mod.rs:522-557); journal-core's reader
-//! rebuilds the reverse mapping by accepting only fields that start with
-//! `ND_` and are exactly 35 bytes (journal-core/src/file/reader.rs:442), so
+//! at write time (`journal-log-writer/src/log/mod.rs`
+//! `write_entry_with_timestamps`) and persists the otel→systemd mapping as
+//! `ND_REMAPPING=1` entries (same file, `write_remapping_entry`);
+//! journal-core's reader rebuilds the reverse mapping by accepting only
+//! fields that start with `ND_` and are exactly 35 bytes
+//! (`journal-core/src/file/reader.rs` `parse_remapping_entry`), so
 //! normal-shape mappings are written but silently dropped on load — only
 //! MD5-fallback mappings round-trip; journal-core's FieldMap tests drive
-//! `encode_full` directly (journal-core/src/field_map.rs:163,185). The
+//! `encode_full` directly (`journal-core/src/field_map.rs` test
+//! `test_remapping_registry`). The
 //! published systemd-journal-sdk-* crates carry no twin (grep-verified
 //! 0.8.1; their engine's cache notes v3 dropped ND_REMAPPING-specific
 //! indexing). The `rdp` bin (main.rs) prints the encodings of a fixed key
@@ -72,7 +74,7 @@ fn char_type(c: u8) -> Option<CharType> {
 /// encoding can never start with `ND_` — structure characters are lowercase
 /// a-x and checksum characters A-Z/0-9, and neither alphabet contains `_`.
 /// journal-core's reader gate keys on this shape to recognize remapping
-/// fields (journal-core/src/file/reader.rs:442).
+/// fields (`journal-core/src/file/reader.rs` `parse_remapping_entry`).
 const REMAPPED_PREFIX: &str = "ND_";
 
 // Word shapes as `tokenize` sees them: all-lowercase, all-uppercase-class
@@ -804,7 +806,7 @@ fn compress_runs(s: &str) -> String {
 /// Encodes a field name into a systemd-journal-compatible field name: the
 /// single public entry point of this crate. journal-log-writer calls it for
 /// every field name that is not already journald-compatible
-/// (journal-log-writer/src/log/mod.rs:372).
+/// (`journal-log-writer/src/log/mod.rs` `write_entry_with_timestamps`).
 ///
 /// The result has one of two shapes:
 ///

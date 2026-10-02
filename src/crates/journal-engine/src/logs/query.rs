@@ -1,7 +1,7 @@
 //! Multi-file log queries over indexed journal files.
 //!
 //! [`LogQuery`] fans a query out to each file's `find_log_entries`
-//! (journal-index/src/file_index.rs:546), merges the per-file results
+//! (`journal-index/src/file_index.rs` `FileIndex::find_log_entries`), merges the per-file results
 //! into one direction-ordered vector capped at the limit, and — for
 //! `execute_page` — threads a [`PaginationState`] so the next page
 //! resumes each file where this one stopped. `retrieve_log_entries`
@@ -14,9 +14,9 @@
 //! Pagination and merge contracts are pinned by
 //! tests/multi_file_pagination.rs. Production callers: the legacy-logs
 //! handler builds a `LogQuery` per request and calls `execute()`
-//! (otel-legacy-logs/src/handler.rs:243-259); `LogQuery` and
-//! `LogEntryData` are re-exported at the crate root (lib.rs:38) and by
-//! journal-function (journal-function/src/lib.rs:12-18) for its
+//! (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::query_logs_from_indexes`); `LogQuery` and
+//! `LogEntryData` are re-exported at the crate root and by
+//! journal-function (`journal-function/src/lib.rs`) for its
 //! netdata table rendering. `PaginationState` is not re-exported.
 
 use crate::error::Result;
@@ -37,18 +37,18 @@ use tracing::warn;
 /// Resume positions for paged queries, keyed by journal file.
 ///
 /// Each value is a `LogEntryId.position`
-/// (journal-index/src/file_index.rs:521-523): the index into that
+/// (`journal-index/src/file_index.rs` `LogEntryId::position`): the index into that
 /// file's filtered, time-ordered entry list where the previous page
 /// stopped. `execute_page` feeds it back as `resume_position`
-/// (journal-index/src/file_index.rs:322), and `find_log_entries`
+/// (`journal-index/src/file_index.rs` `LogQueryParamsBuilder::with_resume_position`), and `find_log_entries`
 /// restarts from there instead of the anchor binary search — forward
 /// at position + 1, backward at position - 1, with 0 meaning the file
-/// is exhausted (journal-index/src/file_index.rs:613-616,695-707).
+/// is exhausted (`journal-index/src/file_index.rs` `FileIndex::find_log_entries`).
 ///
 /// Positions are list indexes: querying with a different filter
 /// re-selects the list they point into, so pages must replay the same
 /// query configuration. Changed parameters silently read the wrong
-/// entries rather than erroring (journal-index/src/file_index.rs:197-199).
+/// entries rather than erroring (`journal-index/src/file_index.rs` `LogEntryId::position`).
 #[derive(Debug, Clone, Default)]
 pub struct PaginationState {
     /// Maps each file to the last position we read from it
@@ -119,7 +119,7 @@ impl<'a> LogQuery<'a> {
     /// Pass `None` to use the entry's realtime timestamp from the journal header.
     /// Pass `Some(field_name)` to use a custom timestamp field from the entry data.
     /// An entry missing that field falls back to its header realtime
-    /// timestamp (journal-index/src/file_index.rs:405-406).
+    /// timestamp (`journal-index/src/file_index.rs` `LogQueryParams`'s `source_timestamp_field`).
     pub fn with_source_timestamp_field(mut self, field: Option<FieldName>) -> Self {
         self.builder = self.builder.with_source_timestamp_field(field);
         self
@@ -179,7 +179,7 @@ impl<'a> LogQuery<'a> {
     /// cancellation is not counted) plus one per file excluded by the
     /// anchor pre-filter. The legacy-logs handler sets its progress
     /// total to the file count and reads this counter against it
-    /// (otel-legacy-logs/src/handler.rs:402,418).
+    /// (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::on_call`).
     pub fn with_progress(mut self, counter: Arc<AtomicUsize>) -> Self {
         self.progress = Some(counter);
         self
@@ -560,13 +560,13 @@ fn is_projected(
 /// Raw field data extracted from one journal entry.
 ///
 /// The intermediate form between a `LogEntryId` (a file plus offset)
-/// and the render layer: `entry_data_to_table` (table.rs:174) lays a
+/// and the render layer: [`crate::entry_data_to_table`] lays a
 /// slice of these into a `Table`, and journal-function's netdata
 /// builder wraps that for the Functions response
-/// (journal-function/src/netdata/builder.rs:14).
+/// (`journal-function/src/netdata/builder.rs` `build_ui_response`).
 ///
 /// `fields` holds the entry's `field=value` pairs as `FieldValuePair`s
-/// (journal-index/src/field_types.rs:80, which caches the split
+/// (`journal-index/src/field_types.rs` `FieldValuePair`, which caches the split
 /// position for fast field/value access), names already reverse-mapped
 /// to their OTEL forms where the file records a mapping, values
 /// verbatim. `timestamp` is the query timestamp carried by the
@@ -589,7 +589,7 @@ pub struct LogEntryData {
 /// includes them. Remapping bookkeeping entries are dropped instead of
 /// converted, so the result preserves the input order but can be
 /// shorter than it. The indexer already keeps those entries out of
-/// query results (journal-index/src/file_indexer.rs:654); this is the
+/// query results (`journal-index/src/file_indexer.rs` `FileIndexer::build_histogram`); this is the
 /// second line of defense.
 fn extract_entry_data(
     log_entries: &[LogEntryId],
@@ -639,7 +639,7 @@ fn extract_entry_data(
             // Extract all field=value pairs, skipping field remapping entries.
             // A remapping entry holds the file's field-name mappings as
             // "ND_<md5>=otel.name" pairs plus an ND_REMAPPING=1 marker
-            // (journal-log-writer/src/log/mod.rs:522). Converted as log
+            // (`journal-log-writer/src/log/mod.rs` `write_remapping_entry`). Converted as log
             // data, each OTEL name would surface as a cell value — a
             // column name masquerading as data — so the whole entry is
             // dropped as soon as its marker pair is seen.

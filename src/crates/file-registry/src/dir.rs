@@ -19,12 +19,14 @@
 //! Everything here is synchronous blocking `std::fs` with no locks, run
 //! inline by today's callers as one-shot startup or offline work on their
 //! own thread — otel-ledger's pipeline startup recovery
-//! (src/crates/otel-ledger/src/ledger/pipeline.rs:126-133), otel-ingestor's
-//! seq seed (src/crates/otel-ingestor/src/lib.rs:372-377), sfsq-cli's
-//! discovery (sfsq-cli/src/discover.rs:60,90). The `spawn_blocking` sites
-//! the crate root cites (file-lifecycle catalog_builder.rs:307,
-//! recovery/startup.rs:309) wrap `durable::write_atomic` writes, not these
-//! scans.
+//! (`src/crates/otel-ledger/src/ledger/pipeline.rs` `build_pipeline`),
+//! otel-ingestor's seq seed (`src/crates/otel-ingestor/src/lib.rs`
+//! `create_shared_writer_state`), sfsq-cli's discovery
+//! (`src/crates/sfsq-cli/src/discover.rs` `discover`). The
+//! `spawn_blocking` sites the crate root cites (file-lifecycle's
+//! `catalog_builder.rs` `write_local_atomic`, `recovery/startup.rs`
+//! `download_and_install`) wrap `durable::write_atomic` writes, not
+//! these scans.
 //!
 //! Consumers (grep-verified): the wal and sfst registries (recovery scans
 //! and per-directory max seq; [`FileRegistry`](crate::FileRegistry) composes
@@ -34,7 +36,7 @@
 //! `wal::`/`sfst::` `scan_max_sequence_recursive` wrappers). otel-catalog
 //! deliberately does not use [`scan_max_sequence_recursive`] — its
 //! date-partitioned layout gets its own filename-only scan
-//! (otel-catalog/src/registry.rs:327).
+//! (`src/crates/otel-catalog/src/registry.rs` `scan_max_sequence`).
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -190,10 +192,11 @@ impl FileDir {
 /// tree where seq-tagged files can survive, so no restart reissues a
 /// seq that still exists — otel-ingestor's seq seed walks the wal and
 /// sfst trees here and folds in the date-partitioned catalog scan and
-/// the persisted high-water mark
-/// (src/crates/otel-ingestor/src/lib.rs:372-382). The catalog layout
-/// cannot use this walk; `otel-catalog` scans it filename-only over
-/// `layout::date_tenant_dirs` instead (otel-catalog/src/registry.rs:327).
+/// the persisted high-water mark (`src/crates/otel-ingestor/src/lib.rs`
+/// `create_shared_writer_state`). The catalog layout cannot use this
+/// walk; `otel-catalog` scans it filename-only over
+/// `layout::date_tenant_dirs` instead
+/// (`src/crates/otel-catalog/src/registry.rs` `scan_max_sequence`).
 pub fn scan_max_sequence_recursive(base: &Path, ext: &'static str) -> io::Result<u64> {
     let mut max_seq: u64 = 0;
     let entries = match fs::read_dir(base) {

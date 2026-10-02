@@ -1,6 +1,8 @@
 //! Type-safe time units for the journal stack: `Seconds`/`Microseconds`
 //! newtypes, the strictly monotonic `RealtimeClock`, and `monotonic_now`;
-//! imported via the flat crate-root re-export (lib.rs:11), not this path.
+//! imported via the flat crate-root re-export ([`crate::Seconds`],
+//! [`crate::Microseconds`], [`crate::RealtimeClock`],
+//! [`crate::monotonic_now`]), not this path.
 
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
@@ -74,9 +76,11 @@ impl Seconds {
     /// A zero divisor yields `false` rather than panicking (unlike
     /// `journal_common::compat::is_multiple_of`, which panics); zero is a
     /// multiple of every non-zero divisor. Used for bucket-duration
-    /// compatibility (journal-engine/src/indexing.rs:234); journal-index
-    /// instead checks histogram alignment through the compat function on raw
-    /// integers (journal-index/src/histogram.rs:181).
+    /// compatibility in `journal-engine/src/indexing.rs`
+    /// (`batch_compute_file_indexes`); journal-index instead checks histogram
+    /// alignment through the compat function on raw integers
+    /// (`journal-index/src/histogram.rs`
+    /// `Histogram::count_entries_in_time_range`).
     pub fn is_multiple_of(self, other: Self) -> bool {
         other.0 != 0 && self.0 % other.0 == 0
     }
@@ -251,7 +255,8 @@ impl RealtimeClock {
     ///
     /// Values at or below `initial` are bumped to `initial + 1µs` on the next
     /// read. journal-log-writer seeds this from the persisted chain's tail
-    /// realtime timestamp on open (journal-log-writer/src/log/mod.rs:287).
+    /// realtime timestamp on open (`journal-log-writer/src/log/mod.rs`
+    /// `Log::new`).
     pub fn with_initial(initial: Microseconds) -> Self {
         Self {
             max_seen: Cell::new(initial.get()),
@@ -282,7 +287,8 @@ impl RealtimeClock {
     /// Returns `candidate` when it is ahead of the floor; otherwise
     /// `floor + 1µs` (saturating). Shares the floor with `now()`.
     /// journal-log-writer routes caller-supplied entry realtime overrides
-    /// through this (journal-log-writer/src/log/mod.rs:254).
+    /// through this (`journal-log-writer/src/log/mod.rs`
+    /// `Log::capture_dual_timestamp`).
     pub fn observe(&self, candidate: Microseconds) -> Microseconds {
         let max = self.max_seen.get();
         let next = if candidate.get() > max {
@@ -314,7 +320,8 @@ impl Default for RealtimeClock {
 /// half of systemd's journal dual timestamps. Consecutive calls can repeat
 /// within one microsecond, so per-entry distinctness needs clamping —
 /// journal-log-writer clamps against the last written monotonic value for the
-/// boot (journal-log-writer/src/log/mod.rs:263-266).
+/// boot (`journal-log-writer/src/log/mod.rs`
+/// `Log::capture_dual_timestamp`).
 ///
 /// The error carries the raw `clock_gettime` errno as `io::Error`;
 /// effectively unreachable for `CLOCK_MONOTONIC` on Linux.

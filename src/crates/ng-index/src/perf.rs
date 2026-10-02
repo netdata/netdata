@@ -46,7 +46,7 @@ pub fn read_rss() -> Option<Rss> {
 /// Per-run phase timings and throughput counters.
 ///
 /// Single-threaded by construction (`Cell`/`RefCell` are not `Sync`). Every method
-/// takes `&self` (interior mutability) so a live [`Scope`] guard and counter
+/// takes `&self` (interior mutability) so a live `Scope` guard and counter
 /// updates coexist without borrow conflicts.
 pub struct Metrics {
     start: Instant,

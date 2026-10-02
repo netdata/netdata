@@ -18,7 +18,7 @@
 //! [`Predicate::to_trace_plan`] lowers the span-local conditions into
 //! the neutral [`sfst::TracePlan`] (storage names constructed ONLY
 //! through the vocabulary), and the span-side evaluator
-//! ([`span_matches`] / [`EvalPredicate`]) is built from that same plan —
+//! ([`span_matches`] / `EvalPredicate`) is built from that same plan —
 //! the raw index path and the canonical span path cannot disagree on
 //! what a condition means, because there is exactly one lowering.
 
@@ -1257,7 +1257,7 @@ impl TraceLevelEval {
 /// Whether one span (with its resource/scope context — a span's fields
 /// carry the flattened resource and scope entries) satisfies the
 /// SPAN-LOCAL `predicate` and the optional window. The pinned span-side
-/// seam (R2-9); engine loops use the pre-compiled [`EvalPredicate`] this
+/// seam (R2-9); engine loops use the pre-compiled `EvalPredicate` this
 /// delegates to, so the two can never diverge.
 ///
 /// `predicate` must be validated and span-local (partitioned); a

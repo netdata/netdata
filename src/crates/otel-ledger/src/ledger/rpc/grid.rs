@@ -6,9 +6,9 @@
 //! wall-clock multiples, and the exact [`sfst::Grid`] the engine
 //! queries against.
 //!
-//! Consumers: the logs adapter's `into_query` (rpc/logs/adapter.rs:89),
-//! the traces `overview` (rpc/traces/handler.rs:662) and the aggregate
-//! section of the traces Functions view (rpc/traces/handler.rs:329).
+//! Consumers: the logs adapter's `into_query` (`rpc/logs/adapter.rs`),
+//! the traces `overview` and the aggregate section of the traces
+//! Functions view (`rpc/traces/handler.rs`).
 //! A change here re-grids every otel Function view at once.
 
 /// Aim for at least this many buckets across the window when picking
@@ -17,8 +17,9 @@
 const TARGET_BUCKETS: u32 = 60;
 
 /// "Nice" bucket widths in seconds, mirroring journal-engine's
-/// `calculate_bucket_duration` (histogram.rs:30) so otel charts land on
-/// the same wall-clock-friendly intervals (1s, 2s, 5s, 10s, 15s, 30s,
+/// `calculate_bucket_duration` (`journal-engine/src/histogram.rs`) so
+/// otel charts land on the same wall-clock-friendly intervals
+/// (1s, 2s, 5s, 10s, 15s, 30s,
 /// 1m, 5m, …) as the journal histograms. Only the density target
 /// differs: journal-engine settles for ≥ 50 buckets, this picks the
 /// largest entry that still meets [`TARGET_BUCKETS`] (see
@@ -68,8 +69,9 @@ pub(crate) fn align_window(after: u32, before: u32, width_s: u32) -> (u32, u32) 
 /// the grid's own range), never the raw request.
 ///
 /// `after < before` is the caller's job; the wire adapters' window
-/// canonicalizers guarantee it (rpc/logs/adapter.rs:253,
-/// rpc/traces/adapter.rs:681). Given that, the result always holds at
+/// canonicalizers guarantee it (`effective_window` in
+/// `rpc/logs/adapter.rs`, `validate_trace_bounds` in
+/// `rpc/traces/adapter.rs`). Given that, the result always holds at
 /// least one bucket, horizon saturation included.
 pub(crate) fn grid_for_window_s(after: u32, before: u32) -> (sfst::Grid, u32, u32) {
     const NS_PER_S: i64 = 1_000_000_000;

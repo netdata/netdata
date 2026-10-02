@@ -1,17 +1,19 @@
 //! Function-call dispatch on the ledger run-loop: the handlers behind the
-//! `SupervisorReq` / `OutboundResp` select arms (ledger/mod.rs:444-447,
-//! 456-460) and the per-call spawn backing `LedgerRequest::Call`.
+//! `SupervisorReq` / `OutboundResp` select arms of [`crate::Ledger::run`]
+//! and the per-call spawn backing `LedgerRequest::Call`.
 //!
 //! A `Call` routes by declared function name — the dispatch key,
-//! clash-checked at startup (ledger/mod.rs:326-330) — to the owning
+//! clash-checked at startup in `Ledger::new` — to the owning
 //! pipeline, so this dispatcher stays signal-neutral: each pipeline
 //! contributes its own `RawFunctionHandler` + args shim
-//! (ledger/pipeline.rs:406-409, ledger/traces_pipeline.rs:88-94). The call
+//! (`build_logs_pipeline` in `ledger/pipeline.rs`, `build_traces_pipeline`
+//! in `ledger/traces_pipeline.rs`). The call
 //! gets a per-call `CancellationToken` registered in `Ledger::transactions`
-//! (ledger/mod.rs:135) and is spawned onto a task running the
-//! `bridge::function` engine's `handle_raw` (bridge/src/function.rs:250).
-//! Results and progress funnel back through `Ledger::outbound_tx`
-//! (ledger/mod.rs:422). The transaction map is only touched from the single
+//! and is spawned onto a task running the
+//! `bridge::function` engine's `RawFunctionHandler::handle_raw`
+//! (`bridge/src/function.rs`).
+//! Results and progress funnel back through `Ledger::outbound_tx` into
+//! [`crate::Ledger::run`]. The transaction map is only touched from the single
 //! run-loop task, so it needs no lock.
 
 use std::sync::Arc;
@@ -26,12 +28,12 @@ use crate::ledger::Ledger;
 
 impl Ledger {
     /// Handle a `SupervisorReq` event; the run loop is the only caller
-    /// (ledger/mod.rs:444-447). `Call` spawns the handler task, `Cancel`
+    /// ([`crate::Ledger::run`]). `Call` spawns the handler task, `Cancel`
     /// triggers its token, `Shutdown` is the only `Ok(true)` — the run loop
-    /// then flushes in-flight catalogs and exits (ledger/mod.rs:448-453) —
-    /// and a repeat `Configure` is a protocol-order violation that is logged
-    /// and ignored (`Configure` is consumed once in the handshake,
-    /// lib.rs:36-45).
+    /// then flushes in-flight catalogs (`Ledger::flush_catalogs_on_shutdown`)
+    /// and exits — and a repeat `Configure` is a protocol-order violation
+    /// that is logged and ignored (`Configure` is consumed once in the
+    /// [`crate::run_worker`] handshake).
     pub(in crate::ledger) async fn handle_supervisor_req(
         &mut self,
         req: LedgerRequest,
@@ -65,8 +67,8 @@ impl Ledger {
                 Ok(true)
             }
             LedgerRequest::Configure(_) => {
-                // Configure is consumed exactly once, in the run_worker
-                // handshake (lib.rs:36-45); a repeat means the supervisor
+                // Configure is consumed exactly once, in the `run_worker`
+                // handshake (`lib.rs`); a repeat means the supervisor
                 // broke the protocol order. Log and keep running.
                 tracing::warn!("unexpected late Configure message");
                 Ok(false)
@@ -74,15 +76,16 @@ impl Ledger {
         }
     }
 
-    /// Forward an `OutboundResp` event to the supervisor (run-loop arm
-    /// ledger/mod.rs:456-460). This is the funnel for everything dispatch
+    /// Forward an `OutboundResp` event to the supervisor (the run-loop arm
+    /// in [`crate::Ledger::run`]). This is the funnel for everything dispatch
     /// spawns — handler results, the unknown-function 404, and progress.
     /// The transaction entry is dropped on `Result`, before the send, so a
     /// later Cancel finds nothing.
     ///
     /// An oversized message is degraded to a per-request failure rather
     /// than propagated: ferryboat checks the size limit *before* writing
-    /// any bytes (ferryboat/src/lib.rs:342), so the connection is still
+    /// any bytes (`Error::MessageTooLarge`, `ferryboat/src/lib.rs`), so
+    /// the connection is still
     /// intact, and one outsized function response must not tear down the
     /// whole ledger (it did — a ~10 MB dashboard response crash-looped the
     /// plugin). The oversized result is replaced with a small status-500
@@ -128,7 +131,8 @@ impl Ledger {
     /// args→payload shim, 404 for unknown names, and the `transactions`
     /// registration that lets Cancel reach the in-flight call; the engine
     /// owns JSON deserialization, progress reporting, cancellation, and JSON
-    /// serialization of the response (bridge/src/function.rs:250-379).
+    /// serialization of the response (`HandlerAdapter::handle_raw`,
+    /// `bridge/src/function.rs`).
     fn dispatch_function_call(
         &mut self,
         transaction: String,
@@ -137,8 +141,9 @@ impl Ledger {
         args: Vec<String>,
         payload: Option<Vec<u8>>,
     ) {
-        // Route by declared function name (`declaration.name`,
-        // file-lifecycle/src/pipeline.rs:147-150) to the owning pipeline.
+        // Route by declared function name (`declaration.name`, surfaced by
+        // `Pipeline::function_name`, `file-lifecycle/src/pipeline.rs`) to
+        // the owning pipeline.
         // Each pipeline owns its handler and its pre-handler args→payload
         // shim (a per-signal provision), so this dispatcher stays
         // signal-neutral.

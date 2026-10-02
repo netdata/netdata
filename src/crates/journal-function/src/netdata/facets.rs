@@ -4,21 +4,27 @@
 //!
 //! Counts are the filtered half of each bucket's
 //! `fv_counts: FieldValuePair -> (unfiltered, filtered)`
-//! (journal-engine/src/histogram.rs:98-105), summed across buckets, so they
+//! (`BucketResponse::fv_counts` in `journal-engine/src/histogram.rs`),
+//! summed across buckets, so they
 //! track the same selections-filtered result set the logs table shows (one
-//! filter feeds both: otel-legacy-logs/src/handler.rs:423,443). Which
+//! filter feeds both: `LegacyLogsHandler::on_call` in
+//! `otel-legacy-logs/src/handler.rs`). Which
 //! fields can appear is fixed upstream - the file indexes hold bitmaps only
-//! for the query's requested facet fields
-//! (journal-engine/src/indexing.rs:317) - so a facet exists for each
+//! for the query's requested facet fields (the file indexer records
+//! bitmaps only for the `FileIndexKey`'s requested facet fields - see
+//! `batch_compute_file_indexes` in `journal-engine/src/indexing.rs`) - so a
+//! facet exists for each
 //! requested field that has indexed values.
 //!
 //! Unlike the histogram chart, these options never include an "(unset)"
 //! slice; entries lacking the field are counted only there
-//! (netdata/histogram.rs:129-147).
+//! (`chart_result_from_histogram` in `netdata/histogram.rs`).
 //!
-//! Sole consumer (grep-verified): otel-legacy-logs/src/handler.rs:503, which
-//! puts the result into `JournalResponse.facets` (netdata/types.rs:177) via
-//! the re-export in netdata/mod.rs:31.
+//! Sole consumer (grep-verified): `otel-legacy-logs/src/handler.rs`
+//! (`LegacyLogsHandler::on_call`), which
+//! puts the result into the `facets` field of
+//! [`crate::netdata::types::JournalResponse`] via
+//! the `facets` re-export in `netdata/mod.rs`.
 
 use super::transformations::TransformationRegistry;
 use super::ui_types::{Facet, FacetOption};
@@ -33,12 +39,13 @@ use journal_index::FieldValuePair;
 /// 2. Group the pairs by field; sort fields alphabetically, then each
 ///    field's values alphabetically - `order` follows that position.
 /// 3. Option `name` is the registry-transformed display value
-///    (`transform_value`, netdata/transformations.rs:56); option `id` and
-///    the facet's `id`/`name` stay raw (netdata/ui_types.rs:24-39).
+///    ([`TransformationRegistry::transform_value`]); option `id` and
+///    the facet's `id`/`name` stay raw ([`Facet`]/[`FacetOption`]).
 ///
 /// A value excluded by the active selections still appears, with count 0:
 /// the per-bucket entry is created before the filtered count is added
-/// (journal-engine/src/histogram.rs:349-351).
+/// (`fv_counts.entry(pair).or_insert((0, 0))` in
+/// `HistogramEngine::compute_from_indexes`, `journal-engine/src/histogram.rs`).
 pub fn facets(
     histogram_response: &Histogram,
     transformations: &TransformationRegistry,

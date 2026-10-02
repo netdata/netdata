@@ -79,8 +79,9 @@ impl TraceQuery {
 #[derive(Debug, thiserror::Error)]
 pub enum TraceRequestError {
     /// The all-zero trace id is the OTLP "unset/invalid" sentinel: TIDX
-    /// never indexes it (trace_index.rs:14) while a tail scan would
-    /// still serve its spans — the answer would depend on data layout.
+    /// never indexes it (`sfst/src/trace_index.rs` `TraceIdIndex::build`
+    /// excludes unset ids) while a tail scan would still serve its
+    /// spans — the answer would depend on data layout.
     #[error("the all-zero (unset) trace id cannot be looked up")]
     UnsetTraceId,
     /// A zero cap accepts nothing and truncates on the first group —

@@ -1,16 +1,18 @@
 //! Read-only legacy OTel logs viewer worker.
 //!
 //! Runs as the `legacy-logs` worker subprocess of the otel-plugin supervisor
-//! (otel-plugin/src/supervisor.rs:104). It serves logs stored by the former
-//! otel plugin — distinct from otel-ledger, which serves the current
-//! `otel-logs` Function — by declaring a single `legacy-otel-logs` function
-//! that the supervisor registers on the agent (supervisor.rs:234), served
-//! through the restored `journal-function` query stack. It never writes to
-//! the files it serves.
+//! (`otel-plugin/src/supervisor.rs` `spawn_worker`). It serves logs stored by
+//! the former otel plugin — distinct from otel-ledger, which serves the
+//! current `otel-logs` Function — by declaring a single `legacy-otel-logs`
+//! function that the supervisor registers on the agent
+//! (`otel-plugin/src/supervisor.rs` `configure_legacy`), served through the
+//! restored `journal-function` query stack. It never writes to the files it
+//! serves.
 //!
 //! When the journal directory is absent or the handler fails to initialize,
 //! the worker reports `Disabled` and exits instead of lingering idle; the
-//! supervisor reaps it (otel-plugin/src/supervisor.rs:237-244). The worker
+//! supervisor reaps it (`otel-plugin/src/supervisor.rs` `disable_legacy` +
+//! `reap_legacy`). The worker
 //! lifecycle (Disabled, empty-dir keep-alive, graceful Shutdown) is pinned
 //! by tests/handshake.rs.
 
@@ -164,14 +166,15 @@ impl LegacyLogs {
     /// entry on `Result`.
     ///
     /// An oversized message is degraded to a per-request failure rather than
-    /// propagated: ferryboat checks the size limit *before* writing any bytes
-    /// (ferryboat/src/lib.rs:175-181), so the connection is intact, and one
+    /// propagated: ferryboat checks the size limit *before* writing any
+    /// bytes (`ferryboat/src/lib.rs` `Connection::send`), so the connection
+    /// is intact, and one
     /// outsized response must not kill the worker (a large dashboard result
     /// would otherwise crash the legacy viewer for every subsequent query
     /// until restart). The oversized result is replaced with a small status-500
     /// so the agent gets an answer instead of a timeout. All other errors
     /// remain fatal. Mirrors the ledger worker's `handle_outbound_resp`
-    /// (otel-ledger/src/ledger/rpc/dispatch.rs:66).
+    /// (`otel-ledger/src/ledger/rpc/dispatch.rs` `handle_outbound_resp`).
     async fn handle_outbound_resp(
         &mut self,
         resp: LegacyLogsResponse,
@@ -244,7 +247,7 @@ impl LegacyLogs {
     /// Handle a `Call`: unknown function names get an inline 404 result; known
     /// ones spawn a function-handler task. The bridge engine owns JSON
     /// (de)serialization, progress reporting, and cancellation
-    /// (netdata-plugin/bridge/src/function.rs:194).
+    /// (`netdata-plugin/bridge/src/function.rs` `HandlerAdapter`).
     fn dispatch_function_call(
         &mut self,
         transaction: String,

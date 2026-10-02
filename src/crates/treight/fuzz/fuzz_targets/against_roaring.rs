@@ -5,15 +5,16 @@
 // results and the serialize roundtrip.
 //
 // A treight bitmap is a `Copy` descriptor whose tree bytes live in an
-// external blob (src/crates/treight/src/raw.rs:10-17), so each side is a
-// (descriptor, data) pair and the blob is passed into every call.
+// external blob (src/crates/treight/src/raw.rs `RawBitmap`), so each side
+// is a (descriptor, data) pair and the blob is passed into every call.
 //
 // Run with `cargo fuzz run against_roaring` from src/crates/treight/fuzz
-// (nightly pinned by src/crates/treight/fuzz/rust-toolchain.toml:2). The
-// fuzz workspace pins the same netdata/roaring-rs fork as the main
-// workspace so both sides test one roaring implementation
-// (src/crates/treight/fuzz/Cargo.toml:13-16); the in-crate proptest twin
-// of this file is src/crates/treight/src/tests_roaring.rs.
+// (nightly pinned by src/crates/treight/fuzz/rust-toolchain.toml
+// `channel`). The fuzz workspace pins the same netdata/roaring-rs fork as
+// the main workspace so both sides test one roaring implementation
+// (src/crates/treight/fuzz/Cargo.toml, the `roaring` dependency); the
+// in-crate proptest twin of this file is
+// src/crates/treight/src/tests_roaring.rs.
 #![no_main]
 
 use libfuzzer_sys::arbitrary::{self, Arbitrary, Unstructured};
@@ -21,7 +22,7 @@ use libfuzzer_sys::fuzz_target;
 use std::mem;
 
 // Universe sizes hitting the minimum and maximum value at every tree depth
-// 1-8, per treight::ceil_log8 (src/crates/treight/src/lib.rs:21).
+// 1-8, per treight::ceil_log8 (src/crates/treight/src/lib.rs).
 const UNIVERSES: [u32; 16] = [
     1,           // 1 level
     8,           // 1 level (max)
@@ -98,8 +99,10 @@ fn check_equal(t: &treight::RawBitmap, td: &[u8], r: &roaring::RoaringBitmap) {
 }
 
 /// Build one side's (treight descriptor, tree data, roaring bitmap) triple
-/// from the same values; callers must pass ascending, deduped values
-/// (src/crates/treight/src/raw.rs:37).
+/// from the same values; callers must pass values in ascending order
+/// (src/crates/treight/src/raw.rs `from_sorted_iter` corrupts the pre-order
+/// layout on descending input and merely tolerates duplicates), deduped so
+/// both sides hold identical sets.
 fn make_pair(vals: &[u32], universe: u32) -> (treight::RawBitmap, Vec<u8>, roaring::RoaringBitmap) {
     let mut data = Vec::new();
     let t = treight::RawBitmap::from_sorted_iter(vals.iter().copied(), universe, &mut data);
@@ -112,8 +115,9 @@ fuzz_target!(|input: FuzzInput| {
 
     // Mask the seeded values into the universe, then sort and dedup:
     // `from_sorted_iter` needs ascending values on both sides
-    // (src/crates/treight/src/raw.rs:37), and treight insert/remove panic
-    // on out-of-universe values (src/crates/treight/src/raw.rs:260,316).
+    // (src/crates/treight/src/raw.rs `from_sorted_iter`), and treight
+    // insert/remove panic on out-of-universe values (same file, `insert`
+    // and `remove`).
     let mut lhs_vals: Vec<u32> = input.initial_lhs.iter().map(|n| n.0 % universe).collect();
     lhs_vals.sort_unstable();
     lhs_vals.dedup();
@@ -144,8 +148,9 @@ fuzz_target!(|input: FuzzInput| {
                 lhs_r.remove(v);
             }
             Operation::Clear => {
-                // An empty blob IS an empty treight bitmap (`is_empty` just
-                // tests the blob, src/crates/treight/src/raw.rs:170).
+                // An empty blob IS an empty treight bitmap — the emptiness
+                // check is just a blob check (src/crates/treight/src/raw.rs
+                // `is_empty`).
                 lhs_d.clear();
                 lhs_r.clear();
             }
@@ -221,8 +226,9 @@ fuzz_target!(|input: FuzzInput| {
             }
             Operation::SerializeRoundtrip => {
                 // Wire format is [universe_size: u32 LE][data_len: u32 LE]
-                // [data bytes] (src/crates/treight/src/raw.rs:220); the
-                // restored pair must iterate identically to the original.
+                // [data bytes] (src/crates/treight/src/raw.rs
+                // `serialize_into`); the restored pair must iterate
+                // identically to the original.
                 let mut buf = Vec::new();
                 lhs_t.serialize_into(&lhs_d, &mut buf).unwrap();
                 let (restored, restored_data) = treight::RawBitmap::deserialize_from(&buf[..]).unwrap();
@@ -240,7 +246,8 @@ fuzz_target!(|input: FuzzInput| {
 
     // The final LHS blob must still be exactly the size `estimate_data_size`
     // predicts for its contents: canonical storage, no dead bytes, whichever
-    // mutation path built it (src/crates/treight/src/lib.rs:49).
+    // mutation path built it (src/crates/treight/src/lib.rs
+    // `estimate_data_size`).
     let lhs_final_vals: Vec<u32> = lhs_t.iter(&lhs_d).collect();
     let est = treight::estimate_data_size(universe, lhs_final_vals.iter().copied());
     assert_eq!(

@@ -524,7 +524,7 @@ impl<'a> IndexReader<'a> {
     /// scan, MF FST, or HF arena) — never stream batches, per-row
     /// columns, or the trace index/bloom — which is what makes tag-value
     /// enumeration affordable across whole retention. A field absent
-    /// from this file's field table is [`Error::UnknownField`] (callers
+    /// from this file's field table is [`crate::Error::UnknownField`] (callers
     /// consult [`field_table`](Self::field_table) first; filtering-style
     /// absent-matches-nothing is the caller's call to make, not this
     /// accessor's).

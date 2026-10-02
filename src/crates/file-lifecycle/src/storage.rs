@@ -29,7 +29,7 @@
 //! `remote_read`'s per-download deadline).
 //!
 //! Journal safety: `StorageError`'s `Display` and the retry layer's notify
-//! pass error text through [`crate::redact`], so rendering an error into a
+//! pass error text through `crate::redact`, so rendering an error into a
 //! log line is credential-safe by construction; the `redact` module docs own
 //! that contract.
 //!
@@ -70,13 +70,13 @@ pub struct WriteMeta {
 /// it into `Other` would turn "transient -> skip" into "missing -> re-upload".
 ///
 /// `Display` renders the FULL error source chain with URL query strings
-/// stripped (see [`crate::redact`]) — safe to log, and complete enough to
+/// stripped (see `crate::redact`) — safe to log, and complete enough to
 /// diagnose (reqwest renders only a generic top-level message such as "error
 /// sending request"; the cause is visible only deeper in the chain). `Debug`
 /// is derived and UNREDACTED — it exists for test assertions and must not be
 /// used to log real backend errors. Converting the error into another type
 /// MUST flatten through this `Display` (`remote_read::read_error_to_anyhow`
-/// is the pattern); the [`crate::redact`] module docs own the rationale.
+/// is the pattern); the `crate::redact` module docs own the rationale.
 #[derive(Debug)]
 pub enum StorageError {
     NotFound,
@@ -141,7 +141,7 @@ const STORAGE_PROBE_KEY: &str = ".netdata-otel-storage-probe";
 /// Startup connectivity probe: confirm the configured backend is reachable and
 /// the credentials are accepted, without requiring any object to exist.
 ///
-/// A `stat` on [`STORAGE_PROBE_KEY`] returning `Ok` or `NotFound` both mean the
+/// A `stat` on `STORAGE_PROBE_KEY` returning `Ok` or `NotFound` both mean the
 /// request reached the backend and was authorized — `NotFound` is the expected
 /// case, since the sentinel is never written. Only `Other` signals a real
 /// problem (bad credentials, wrong bucket, unreachable endpoint).

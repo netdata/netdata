@@ -6,26 +6,26 @@
 //! `bucket_duration`). Only buckets containing entries are stored, and
 //! each carries a running count - the index of the last entry up to and
 //! including that bucket - so a time-range query is two binary searches
-//! plus one bitmap range count (`count_entries_in_time_range`,
-//! histogram.rs:169-229). The counts index the time-ordered entry list the
-//! histogram was built from (file_indexer.rs:217-221), the same index
-//! space as `FileIndex`'s entry offsets and bitmaps (file_index.rs:33-35),
+//! plus one bitmap range count
+//! ([`Histogram::count_entries_in_time_range`]). The counts index the
+//! time-ordered entry list the histogram was built from
+//! ([`crate::FileIndexer`]), the same index
+//! space as [`crate::FileIndex`]'s entry offsets and bitmaps,
 //! and the covered range `[first bucket start, last bucket start +
 //! bucket_duration)` becomes the file's recorded start/end time
-//! (file_index.rs:106-113).
+//! ([`crate::FileIndex::start_time`]/[`crate::FileIndex::end_time`]).
 //!
-//! Flow: `FileIndexer::index` is the only producer, through
-//! `from_timestamp_offset_pairs` (file_indexer.rs:714); `FileIndex` wraps
-//! the accessors and the range count (file_index.rs:70-72, 106-124,
-//! 141-149); the engine reads `total_entries` and
+//! Flow: [`crate::FileIndexer::index`] is the only producer, through
+//! [`Histogram::from_timestamp_offset_pairs`]; [`crate::FileIndex`] wraps
+//! the accessors and the range count; the engine reads `total_entries` and
 //! `count_entries_in_time_range` per file and per bucket for
-//! unfiltered/filtered counts (journal-engine/src/histogram.rs:291-344).
+//! unfiltered/filtered counts (`journal-engine/src/histogram.rs`).
 //! That same-named file is a different module - per-bucket facet counting
 //! on top of this histogram - not this crate's. Constructor failures
-//! surface as `IndexError::ZeroBucketDuration` / `EmptyHistogramInput`
-//! (error.rs:8, error.rs:12). The alignment check uses
+//! surface as [`IndexError::ZeroBucketDuration`] /
+//! [`IndexError::EmptyHistogramInput`]. The alignment check uses
 //! `journal_common::compat::is_multiple_of`, a polyfill for the std method
-//! (journal-common/src/compat.rs:34).
+//! (`journal-common/src/compat.rs`).
 //!
 //! Serialization: `Serialize`/`Deserialize` for the engine's index cache;
 //! under the crate's `allocative` feature both types also derive
@@ -178,7 +178,7 @@ impl Histogram {
     /// Equals the number of (timestamp, entry-offset) pairs the histogram
     /// was built from - the upper bound of the bitmap entry-index space.
     /// journal-engine builds a full-coverage bitmap from it
-    /// (journal-engine/src/histogram.rs:291).
+    /// (`journal-engine/src/histogram.rs`).
     pub fn total_entries(&self) -> usize {
         let last_bucket = self.buckets.last().expect("histogram to have buckets");
         // Not off-by-one: `count` is the 0-based index of the last entry,
@@ -201,7 +201,7 @@ impl Histogram {
     /// `[start_time, end_time)`.
     ///
     /// The bitmap's bits are entry indices in the same space as the running
-    /// counts (file_indexer.rs:217-221).
+    /// counts (the time-ordered entry list `src/file_indexer.rs` builds).
     ///
     /// # Algorithm
     ///
@@ -257,7 +257,7 @@ impl Histogram {
         // or before the histogram's first bucket counts bucket 0's entries
         // instead of returning 0. Callers stay in range: the engine skips
         // files that do not overlap the query
-        // (journal-engine/src/histogram.rs:273-274).
+        // (`journal-engine/src/histogram.rs`).
         let end_bucket_idx = self
             .buckets
             .partition_point(|b| b.start_time < end_time)

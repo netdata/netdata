@@ -246,7 +246,7 @@ impl<'a> StepRef<'a> {
 }
 
 /// Owned intern-map key. `name == None` is `Step::ArrayElem`. The manual
-/// `Hash` MUST stay field-for-field identical to [`InternProbe`]'s so a
+/// `Hash` MUST stay field-for-field identical to `InternProbe`'s so a
 /// borrowed probe finds the owned key.
 #[derive(PartialEq, Eq)]
 struct InternKey {
@@ -263,7 +263,7 @@ impl std::hash::Hash for InternKey {
     }
 }
 
-/// Borrowed, allocation-free probe for [`InternKey`].
+/// Borrowed, allocation-free probe for `InternKey`.
 struct InternProbe<'a> {
     parent: NodeId,
     kind: Kind,
@@ -291,7 +291,7 @@ pub struct Flattener {
     lookup: hashbrown::HashMap<InternKey, NodeId>,
     /// Collapsed path per node, built incrementally at interning time (the
     /// parent's path is always cached first) — must render exactly like
-    /// [`SchemaTree::path`]. Lets [`emit_one`](Self::emit_one) hash
+    /// [`SchemaTree::path`]. Lets `emit_one` hash
     /// `key=value` with no second pass over the entries.
     paths: Vec<String>,
     /// Reused `key=value` render buffer for the emit-time hash.
@@ -534,7 +534,7 @@ impl Flattener {
 
         // Queryable scalar fields; OTLP encodes unset as 0/"" → treated as
         // absent. Identifier/timing fields are NOT emitted as entries — they
-        // ride as columns on [`Record`] (normalized at ingest), used for row
+        // ride as columns on `Record` (normalized at ingest), used for row
         // ordering or per-row retrieval, not indexed facets:
         // `time_unix_nano`/`observed_time_unix_nano` (→ `ts`/`observed_ts`),
         // `trace_id`/`span_id` (near-unique identifiers), `flags`,
@@ -872,7 +872,7 @@ fn frame_config() -> impl bincode::config::Config {
 
 /// Bincode-encode any flattened-frame payload `T`. The single codec the
 /// per-signal `encode_*_frame` wrappers delegate to, so logs and traces ride the
-/// identical [`frame_config`] — the two cannot drift apart.
+/// identical `frame_config` — the two cannot drift apart.
 pub(crate) fn encode<T: Serialize>(req: &T) -> Result<Vec<u8>, bincode::error::EncodeError> {
     bincode::serde::encode_to_vec(req, frame_config())
 }

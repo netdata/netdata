@@ -3,34 +3,39 @@
 //! scanning. One array is an `OffsetArrayObject` - an object header plus
 //! `Option<NonZeroU64>` (compact: `Option<NonZeroU32>`) slots of
 //! entry-object offsets, linked to the next array through
-//! `OffsetArrayObjectHeader::next_offset_array` (file/object.rs:450-453).
+//! `OffsetArrayObjectHeader::next_offset_array` (`file/object.rs`).
 //! A chain is addressed by [`List`]: head array offset plus the number
 //! of entries it logically holds. Arrays grow by doubling when full -
 //! 4096 slots for the first file-global array, 64 for a data object's
-//! first one (file/writer.rs:424,442,509,548).
+//! first one (allocated by `JournalWriter::append_to_entry_array` and
+//! `link_data_to_entry`).
 //!
 //! Two producers build chains, and both list entry offsets in file
 //! write order, strictly increasing end to end - each entry is written
-//! at the writer's advancing append offset (file/writer.rs:212,251):
+//! at the writer's advancing append offset (`JournalWriter`'s
+//! `add_entry`):
 //! - the file-global entry chain: every entry of the file, head in
 //!   `JournalHeader::entry_array_offset`, `total_items = n_entries`
-//!   (`JournalFile::entry_list`, file/file.rs:358; appended per entry,
-//!   file/writer.rs:234);
+//!   ([`JournalFile::entry_list`]; appended per entry by
+//!   `JournalWriter::add_entry`);
 //! - a data object's entry chain: the entries carrying that payload.
 //!   The first entry is inlined in the data object itself
 //!   (`DataObjectHeader::entry_offset`), the linked array holds the
-//!   remaining `n_entries - 1` (file/object.rs:810-812,832-844; built
-//!   by `JournalWriter::link_data_to_entry`, file/writer.rs:536,548-577),
+//!   remaining `n_entries - 1` (the links live in `DataObjectHeader`;
+//!   built by `JournalWriter::link_data_to_entry`),
 //!   and [`InlinedCursor`] walks the pair - inlined entry first, arrays
-//!   after - as the scan state inside `FilterExpr::Match`
-//!   (file/filter.rs:9).
+//!   after - as the scan state inside
+//!   [`FilterExpr::Match`](crate::file::filter::FilterExpr::Match).
 //!
 //! [`Node`] is a re-read view of one array; [`Cursor`] is a position in
-//! a chain, the value `JournalCursor::array_cursor` keeps for the
-//! unfiltered path (file/cursor.rs:27). `next_until`/`previous_until`
+//! a chain, the value
+//! [`JournalCursor::array_cursor`](crate::file::cursor::JournalCursor::array_cursor)
+//! keeps for the
+//! unfiltered path. `next_until`/`previous_until`
 //! continue from the current scan position and clamp to a needle (see
-//! their docs) - the contract the filtered resolution in
-//! file/cursor.rs:178-186,205-211 obeys by rewinding with `head()`/
+//! their docs) - the contract the filtered resolution
+//! (`JournalCursor::resolve_filter_location`) obeys by rewinding with
+//! `head()`/
 //! `tail()` first. Errors: `InvalidOffsetArrayIndex` past a position's
 //! logical length, `InvalidOffset` when a binary search probes an unset
 //! slot, `EmptyOffsetArrayNode` for a zero-capacity array, and
@@ -38,10 +43,11 @@
 //! array linked from the chain's head.
 //!
 //! Consumers (grep-verified): `List` also parses remapping entries
-//! (file/reader.rs:474) and `Direction` is flat re-exported beside
-//! `Location` (file/mod.rs:46, lib.rs:32); cross-crate, journal-index
+//! (`JournalReader::parse_remapping_entries_from_array`) and `Direction`
+//! is flat re-exported beside `Location` (`file/mod.rs`, lib.rs);
+//! cross-crate, journal-index
 //! imports `InlinedCursor` and walks it outside its data-object value
-//! guards (src/crates/journal-index/src/file_indexer.rs:16,481-508).
+//! guards (src/crates/journal-index/src/file_indexer.rs).
 //!
 //! Near twin: src/crates/jf/journal_file/src/offset_array.rs - same
 //! types and stepping logic; only this copy adds the three
@@ -52,7 +58,7 @@ use crate::file::JournalFile;
 use std::num::{NonZeroU64, NonZeroUsize};
 
 /// Walk direction shared by the stepping and partition-point APIs.
-/// Flat re-exported beside `Location` (file/mod.rs:46, lib.rs:32).
+/// Flat re-exported beside `Location` (`file/mod.rs`, lib.rs).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
     Forward,
@@ -160,7 +166,8 @@ impl Node {
     ///
     /// `predicate` means "keep scanning", so it must be monotone -
     /// true entries before false ones - matching the array's
-    /// strictly increasing entry offsets (file/writer.rs:212,251).
+    /// strictly increasing entry offsets (the writer appends entries
+    /// at a growing offset).
     /// Probes re-read the array through the file; an unset slot
     /// mid-search reports `InvalidOffset`.
     pub fn partition_point<M, F>(
@@ -253,12 +260,12 @@ impl std::fmt::Debug for Node {
 /// (`total_items`). `Copy` and cheap - arrays are resolved from the
 /// file on demand.
 ///
-/// Built for the file-global entry chain by `JournalFile::entry_list`
-/// (file/file.rs:358) and for a data object's entry chain by
-/// `DataObjectHeader::inlined_cursor` (file/object.rs:832-844). The
+/// Built for the file-global entry chain by [`JournalFile::entry_list`]
+/// and for a data object's entry chain by
+/// `DataObjectHeader::inlined_cursor` (`file/object.rs`). The
 /// writer fills both in entry-write order, so entries sit at
 /// strictly increasing offsets along the chain
-/// (file/writer.rs:234,548-577).
+/// (appended by `JournalWriter` as entries are written).
 #[derive(Copy, Clone)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct List {
@@ -430,7 +437,7 @@ impl List {
 /// (`array_offset`), the slot (`array_index`), and how many chain
 /// entries remain from this array onward (`remaining_items`).
 /// `Copy`; `JournalCursor` keeps one as the unfiltered stepping
-/// engine's position (file/cursor.rs:27).
+/// engine's position (its `array_cursor` field).
 #[derive(Clone, Copy)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct Cursor {
@@ -596,7 +603,7 @@ impl Cursor {
     /// derived from the previous node's remaining count rather than
     /// the next node's own - wider than needed at the chain's tail,
     /// but correct because unwritten slots read as `None` and are
-    /// skipped (file/object.rs:557).
+    /// skipped (`OffsetArrayObject::collect_offsets`).
     pub fn collect_offsets<M: MemoryMap>(
         &self,
         journal_file: &JournalFile<M>,
@@ -636,13 +643,14 @@ impl std::fmt::Debug for Cursor {
 /// A data object's entry chain as a step cursor: the inlined first
 /// entry (`DataObjectHeader::entry_offset`) plus, when the object
 /// holds more than one entry, a [`Cursor`] over the linked array
-/// with the rest (file/object.rs:832-844). `at_inlined_offset`
+/// with the rest (linked by `DataObjectHeader::inlined_cursor`).
+/// `at_inlined_offset`
 /// says which side it is parked on; `value` switches accordingly.
 ///
 /// `Copy`, so callers can detach it from a borrowed data object and
 /// step it after the borrow is dropped - journal-index does
 /// exactly that
-/// (src/crates/journal-index/src/file_indexer.rs:481-508).
+/// (src/crates/journal-index/src/file_indexer.rs).
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct InlinedCursor {
@@ -774,9 +782,10 @@ impl InlinedCursor {
     /// clamps to the needle: the first position at/after it, which
     /// may be the position already held, returned without moving.
     /// Callers resolving a location from scratch rewind with
-    /// `head()` first - the contract `FilterExpr::head` + `next`
-    /// live by (file/filter.rs:90,138) and the cursor's filtered
-    /// path obeys (file/cursor.rs:178-186,205-211). Entries are
+    /// `head()` first - the contract
+    /// [`FilterExpr::head`](crate::file::filter::FilterExpr::head) +
+    /// `next` live by and the cursor's filtered
+    /// path (`JournalCursor::resolve_filter_location`) obeys. Entries are
     /// visited in ascending offset order.
     pub fn next_until<M: MemoryMap>(
         &mut self,
@@ -813,7 +822,8 @@ impl InlinedCursor {
     /// Mirror of `next_until`: the scan continues from the current
     /// position and clamps to the needle, a position already at or
     /// below it being returned without moving, so fresh resolutions
-    /// rewind with `tail()` first (file/filter.rs:111,184). Entries
+    /// rewind with `tail()` first
+    /// ([`FilterExpr::tail`](crate::file::filter::FilterExpr::tail)). Entries
     /// are visited in descending offset order.
     pub fn previous_until<M: MemoryMap>(
         &mut self,

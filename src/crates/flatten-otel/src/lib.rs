@@ -28,7 +28,7 @@
 //!
 //! Stateless synchronous functions, infallible — no `Result`: missing or
 //! unsupported values become `null`, and non-finite doubles collapse to
-//! `0`. Flattening rules: [`flatten_and_strip`].
+//! `0`. Flattening rules: `flatten_and_strip`.
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use serde_json::{Map as JsonMap, Value as JsonValue};
 
@@ -44,7 +44,7 @@ pub use metrics::flatten_metrics_request;
 /// Converts an OTel attribute list into a flattened JSON map: each attribute
 /// key becomes a map key, nested `KvlistValue`s flatten into dot-joined
 /// paths, and same-level duplicate keys keep the last value. The result
-/// holds only scalar, array, and `null` values (see [`flatten_and_strip`]).
+/// holds only scalar, array, and `null` values (see `flatten_and_strip`).
 pub fn json_from_key_value_list(kvl: &Vec<KeyValue>) -> JsonMap<String, JsonValue> {
     flatten_and_strip(&json_map_from_key_value_list(kvl))
 }

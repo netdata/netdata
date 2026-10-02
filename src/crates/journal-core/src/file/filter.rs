@@ -6,24 +6,27 @@
 //! expression.
 //!
 //! Data flow: `JournalReader::add_match` feeds a pending [`JournalFilter`]
-//! (field-name remapping happens there, file/reader.rs:189-210); the first
+//! (field-name remapping happens there); the first
 //! `step` or `build_filter` resolves it against the file and installs the
-//! result on the cursor (file/reader.rs:140-144, file/reader.rs:162). From
+//! result on the cursor. From
 //! then on the cursor's filtered path drives the expression one entry at a
-//! time (file/cursor.rs:170-236), rewinding with `head`/`tail` before
+//! time (`JournalCursor::resolve_filter_location`), rewinding with
+//! `head`/`tail` before
 //! resolving a location from scratch, because `next`/`previous` continue
 //! from the scan position instead of seeking
-//! (file/cursor.rs:179,185,206,210).
+//! (the resolver's fresh-resolution arms rewind first).
 //!
 //! A match is an exact, case-sensitive byte match of one full `FIELD=VALUE`
 //! payload: hash lookup in the data hash table plus raw-payload comparison
-//! (file/file.rs:73,485). A payload the file does not contain - or whose
+//! ([`JournalFile::find_data_offset`]). A payload the file does not contain - or whose
 //! data object has no entry chain - resolves to [`FilterExpr::None`], which
 //! matches nothing: every step then ends the iteration (`Ok(None)` here,
-//! `Ok(false)` from `JournalCursor::step`, file/cursor.rs:162-167).
+//! `Ok(false)` from
+//! [`JournalCursor::step`](crate::file::cursor::JournalCursor::step)).
 //!
 //! Entry chains list their entries in write order, and entry offsets share
-//! one file-global, write-ordered space (file/writer.rs:212), so offsets
+//! one file-global, write-ordered space (every object is appended at
+//! `JournalWriter`'s single growing `append_offset`), so offsets
 //! from different chains are comparable - what the disjunction min/max and
 //! the conjunction fixed-point gallop below rely on.
 //!
@@ -33,8 +36,8 @@
 //!
 //! Consumers (grep-verified): `file/cursor.rs` and `file/reader.rs` only.
 //! Publicly reachable as `journal_core::file::{FilterExpr, JournalFilter,
-//! LogicalOp}` (file/mod.rs:26) but absent from lib.rs's flat re-exports
-//! (lib.rs:31-35). Same-shape relatives: the near twin
+//! LogicalOp}` (the `pub use` in `file/mod.rs`) but absent from lib.rs's
+//! flat re-exports. Same-shape relatives: the near twin
 //! src/crates/jf/journal_file/src/filter.rs (stateless `lookup` instead of
 //! this file's stepping API) and this crate's index_filter.rs (bitmap-based
 //! `JournalFilter` analog).
@@ -52,7 +55,7 @@ use std::num::NonZeroU64;
 /// which may be the position the scan already holds. A caller resolving a
 /// location from scratch must rewind with `head`/`tail` first, or the step
 /// re-reports the current entry; the filtered resolution path that lives by
-/// this contract is file/cursor.rs:170-236.
+/// this contract is `JournalCursor::resolve_filter_location`.
 #[derive(Clone, Debug)]
 pub enum FilterExpr {
     /// Matches nothing. Produced when a matched payload is absent from the
@@ -206,9 +209,9 @@ impl FilterExpr {
     /// which may be the position already held - returned without moving.
     /// Callers resolving a location from scratch must rewind with `head`
     /// first, or `next` re-reports the current entry; see
-    /// file/cursor.rs:170-236 for the consumer side. Per arm:
+    /// `JournalCursor::resolve_filter_location` for the consumer side. Per arm:
     /// - `Match`: walks the payload's entry chain forward
-    ///   (`InlinedCursor::next_until`, file/offset_array.rs:615).
+    ///   ([`InlinedCursor::next_until`]).
     /// - `Conjunction`: gallops to a fixed point - sub-expressions advance
     ///   in order, ratcheting the needle upward, until a full pass leaves it
     ///   unchanged; the first sub-expression without a later match ends the
@@ -329,8 +332,8 @@ pub enum LogicalOp {
 
 /// Accumulates `KEY=VALUE` matches into a [`FilterExpr`], the pending stage
 /// between `JournalReader::add_match`/`add_conjunction`/`add_disjunction`
-/// and filter installation (built per step at file/reader.rs:140-144;
-/// handed to cursor-driven callers at file/reader.rs:162).
+/// and filter installation (built per step by `JournalReader::step`, which
+/// installs it on the cursor).
 ///
 /// Grouping mirrors systemd-journal's match semantics: matches accumulate
 /// in groups; within a group the values of a shared field name OR together
@@ -380,10 +383,12 @@ impl JournalFilter {
     /// [`FilterExpr::Disjunction`] over the value set, and the per-key
     /// results combine in a [`FilterExpr::Conjunction`].
     ///
-    /// Every payload is resolved against `journal_file` here: hash it (the
-    /// keyed-hash flag comes from the file header, file/file.rs:342), look
-    /// it up in the data hash table (file/file.rs:485), and take the matched
-    /// data object's entry-chain cursor (file/object.rs:832). A payload the
+    /// Every payload is resolved against `journal_file` here: hash it
+    /// ([`JournalFile::hash`] reads the header's keyed-hash flag), look
+    /// it up in the data hash table ([`JournalFile::find_data_offset`]), and
+    /// take the matched data object's entry-chain cursor
+    /// ([`DataObject::inlined_cursor`](crate::file::DataObject::inlined_cursor)).
+    /// A payload the
     /// file does not contain, or a data object without an entry chain
     /// (missing first entry, count or entry-array offset), becomes
     /// [`FilterExpr::None`] - it matches nothing instead of failing the

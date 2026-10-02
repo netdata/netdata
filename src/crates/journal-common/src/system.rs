@@ -7,16 +7,18 @@
 //! startup and pass the value around rather than re-querying per entry.
 //!
 //! Consumers (grep-verified): journal-log-writer imports the functions flat
-//! via the crate-root re-export (lib.rs:17) — machine ID becomes the journal
-//! directory name `<path>/<machine-id>` (journal-log-writer/src/log/mod.rs:51)
-//! and boot ID resumes the per-boot monotonic tail
-//! (journal-log-writer/src/log/mod.rs:278-283); ng-ingest calls
-//! `journal_common::load_machine_id`/`load_boot_id` directly for its
-//! file-registry identity (ng-ingest/src/main.rs:148-156 and
-//! ng-ingest/src/bin/traces.rs:119-127). `load_hostname` is re-exported at
-//! the root but no crate calls it.
+//! via the crate-root re-export ([`crate::load_machine_id`],
+//! [`crate::load_boot_id`], [`crate::load_hostname`]) — machine ID becomes
+//! the journal directory name `<path>/<machine-id>`
+//! (`journal-log-writer/src/log/mod.rs` `create_chain`) and boot ID resumes
+//! the per-boot monotonic tail (`journal-log-writer/src/log/mod.rs`
+//! `Log::new`); ng-ingest calls `journal_common::load_machine_id`/
+//! `load_boot_id` directly for its file-registry identity
+//! (`ng-ingest/src/main.rs` `main` and `ng-ingest/src/bin/traces.rs` `main`).
+//! `load_hostname` is re-exported at the root but no crate calls it.
 //!
-//! `jf/journal_file/src/file.rs:22-142` carries a near-identical copy of the
+//! `src/crates/jf/journal_file/src/file.rs` (`read_host_file`,
+//! `load_machine_id`, `load_boot_id`) carries a near-identical copy of the
 //! same lookups (same `/host` fallback and macOS parsing, but `[u8; 16]` +
 //! `JournalError` instead of `Uuid` + `io::Error`); the two must be edited in
 //! step by hand.
@@ -111,8 +113,9 @@ pub fn load_machine_id() -> io::Result<uuid::Uuid> {
 /// Linux and macOS: `nix::unistd::gethostname()`; a failed lookup wraps the
 /// `nix` errno as `ErrorKind::Other`, and a hostname that is not valid
 /// UTF-8 is rejected as `ErrorKind::InvalidData` (the raw bytes are dropped).
-/// This is the only user of the crate's `nix` `hostname` feature
-/// (Cargo.toml:18); currently no crate outside this module calls it.
+/// This is the only user of the crate's `nix` `hostname` feature (enabled on
+/// the `nix` dependency in `Cargo.toml`); currently no crate outside this
+/// module calls it.
 ///
 /// Other platforms: `ErrorKind::Unsupported`.
 #[cfg(any(target_os = "linux", target_os = "macos"))]

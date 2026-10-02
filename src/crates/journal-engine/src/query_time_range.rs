@@ -3,7 +3,9 @@
 //! [`QueryTimeRange`] snaps a requested `[start, end)` window onto a
 //! bucket width and outward-aligned boundaries, so histogram buckets,
 //! file-index granularity and log-query bounds all land on one grid:
-//! histogram.rs:226, indexing.rs:202, otel-legacy-logs/src/handler.rs:220.
+//! [`crate::histogram::HistogramEngine::compute_from_indexes`],
+//! [`crate::indexing::batch_compute_file_indexes`],
+//! `otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::on_call`.
 
 use crate::EngineError;
 use crate::histogram::calculate_bucket_duration;
@@ -12,7 +14,7 @@ use journal_index::Seconds;
 /// A query window snapped onto the shared bucket grid.
 ///
 /// [`QueryTimeRange::new`] keeps the requested boundaries as given, picks
-/// the bucket width with `calculate_bucket_duration` (histogram.rs:30) and
+/// the bucket width with [`calculate_bucket_duration`] and
 /// rounds both boundaries outward onto width multiples, so every query
 /// shares one grid no matter what timestamps callers send. The
 /// `requested_*` accessors and `aligned_duration()` have no tree callers
@@ -39,10 +41,10 @@ impl QueryTimeRange {
     /// Errors with [`EngineError::InvalidTimeRange`] when `start >= end`;
     /// this is the only construction site of that variant in the tree, so
     /// callers that may receive a degenerate window substitute one first
-    /// (otel-legacy-logs/src/handler.rs:362). Otherwise the bucket width
+    /// (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::on_call`). Otherwise the bucket width
     /// is picked for the range duration and both boundaries are rounded
     /// outward (see the field docs). There is no default window; callers
-    /// choose one, e.g. the last 24h (examples/index.rs:111).
+    /// choose one, e.g. the last 24h (see `examples/index.rs` `main`).
     ///
     /// # Example
     /// ```
@@ -87,7 +89,7 @@ impl QueryTimeRange {
     ///
     /// Also the granularity file indexes are built and cached at:
     /// `batch_compute_file_indexes` reuses a cached index only when its
-    /// own width divides this one (indexing.rs:233).
+    /// own width divides this one.
     pub fn bucket_duration(&self) -> u32 {
         self.bucket_duration
     }
@@ -123,12 +125,12 @@ impl QueryTimeRange {
     /// half-open, exactly `bucket_duration` wide, contiguous from
     /// `aligned_start` through `aligned_end`. At least one bucket always
     /// results: a qualifying width splits the requested duration into
-    /// >= 50 buckets (histogram.rs:70), and the 1s fallback is <= any
+    /// >= 50 buckets ([`calculate_bucket_duration`]'s threshold), and the 1s fallback is <= any
     /// valid duration, so the aligned span (>= the requested duration)
     /// always contains whole widths.
     ///
     /// `HistogramEngine::compute_from_indexes` turns each pair into a
-    /// `BucketRequest` (histogram.rs:226).
+    /// [`crate::histogram::BucketRequest`].
     ///
     /// # Example
     /// ```

@@ -15,14 +15,15 @@
 //! journal-engine import `std::collections` hash types directly.
 //!
 //! Consumers (grep-verified). Via the `journal_core::collections` re-export
-//! (journal-core/src/collections.rs:6): journal-core `field_map.rs` (HashMap,
-//! HashSet), `file/file.rs` (HashMap); journal-index `file_index.rs`,
-//! `file_indexer.rs`; journal-function `netdata/facets.rs`,
+//! shim (`journal-core/src/collections.rs`): journal-core `field_map.rs`
+//! (HashMap, HashSet), `file/file.rs` (HashMap); journal-index
+//! `file_index.rs`, `file_indexer.rs`; journal-function `netdata/facets.rs`,
 //! `netdata/histogram.rs`; journal-engine `histogram.rs`; journal-log-writer
 //! `log/chain.rs`. Direct `journal_common::collections` imports:
 //! journal-registry `registry/mod.rs`, `repository/collection.rs`,
 //! `repository/mod.rs`. The crate root also re-exports the three aliases flat
-//! (lib.rs:14); no external importer of that flat path was found.
+//! ([`crate::HashMap`], [`crate::HashSet`], [`crate::VecDeque`]); no external
+//! importer of that flat path was found.
 
 /// Hash map backed by `rustc_hash::FxHasher`; same API as `std::collections::HashMap`.
 pub type HashMap<K, V> = rustc_hash::FxHashMap<K, V>;

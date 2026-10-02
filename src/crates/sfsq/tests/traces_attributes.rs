@@ -6,34 +6,43 @@
 //! and the WAL tail — plus the two failure shapes (a missing file, an
 //! unavailable remote).
 //!
-//! Pinned contracts (line numbers in src/traces/attributes.rs unless
-//! another file is named):
+//! Pinned contracts (each citing the engine symbol that owns it):
 //!
 //! - Keys come back as the typed, wire-neutral vocabulary: sorted,
 //!   partitioned by owner (each key under exactly one), the full static
-//!   builtin set present regardless of data (:241-250), and the internal
+//!   builtin set present regardless of data (seeded up front by
+//!   [`sfsq::traces::attribute_names`]), and the internal
 //!   facets (`_kind`/`_status_code`) plus the bare `trace_state` field
-//!   never surfacing (src/traces/vocab.rs:148-177) — while a span
-//!   ATTRIBUTE literally named `trace_state` does.
+//!   never surfacing ([`sfsq::traces::storage_to_attribute`]) — while a
+//!   span ATTRIBUTE literally named `trace_state` does.
 //! - Values merge the dictionaries of every tier and the tail's pair
 //!   table: deduplicated, sorted by value bytes, one exact `truncated`
-//!   flag (:439-448). Merge-then-limit makes source order irrelevant
-//!   (:307-313), so results are identical under permutation.
-//! - Cancellation is ALL-OR-EMPTY (pin C2, :235-237): an empty result
+//!   flag ([`sfsq::traces::attribute_values`]). Merge-then-limit makes
+//!   source order irrelevant (the same rule in both entry points), so
+//!   results are identical under permutation.
+//! - Cancellation is ALL-OR-EMPTY (pin C2; the cancel checks at the head
+//!   of [`sfsq::traces::attribute_names`] and
+//!   [`sfsq::traces::attribute_values`]): an empty result
 //!   with `Cancelled` — even the static builtins are withheld.
 //! - The optional window prunes files by summary overlap, file-granular
-//!   and conservative (pin C3, :199-203); the tail is never pruned.
+//!   and conservative (pin C3; `pruned` in `src/traces/attributes.rs`);
+//!   the tail is never pruned.
 //! - Failure honesty (src/traces/status.rs): a source that fails is a
 //!   `SourceFailure` reason, an in-window unavailable remote a distinct
 //!   `RemoteUnavailable` — never a silent skip; the rest still serve.
 //! - Bad requests (zero limits, pin C4 owner/key pairings, duplicate
-//!   source ids) are errors before anything is queried (:122-146).
+//!   source ids) are errors before anything is queried — the validation
+//!   heads of [`sfsq::traces::attribute_names`] and
+//!   [`sfsq::traces::attribute_values`].
 //! - A null-only attribute stays in the vocabulary, its values carrying
-//!   `kind: None` (pin C1, :353-371).
+//!   `kind: None` (pin C1; [`sfsq::traces::storage_to_attribute`] keeps
+//!   the key, [`sfsq::traces::attribute_values`] folds `kind` to `None`).
 //!
 //! Not pinned here: WHICH storage chunks the enumeration reads — the
 //! suite sees results, not access paths (sfst pins per-tier dictionary
-//! enumeration next to the reader, sfst/src/tests/materialize.rs:170);
+//! enumeration next to the reader:
+//! `field_values_per_tier_prefix_stripped_by_length` in
+//! `sfst/src/tests/materialize.rs`);
 //! values under the Event/Link owners (only their keys are enumerated).
 
 mod common;
@@ -145,7 +154,8 @@ fn keys_partition_scopes_deterministically_under_permutation() {
     assert_eq!(owner_attrs(&data, AttributeOwner::Resource), ["host", "service.name"]);
     // The span attribute named trace_state IS vocabulary: the
     // exclusion drops only the BARE `trace_state` storage field
-    // (src/traces/vocab.rs:151-177), so typed keys cannot collide.
+    // (`storage_to_attribute` in `src/traces/vocab.rs`), so typed keys
+    // cannot collide.
     assert_eq!(
         owner_attrs(&data, AttributeOwner::Span),
         ["ratio", "retries", "trace_state"]
@@ -154,7 +164,8 @@ fn keys_partition_scopes_deterministically_under_permutation() {
     assert_eq!(owner_attrs(&data, AttributeOwner::Event), ["attempt"]);
     assert_eq!(owner_attrs(&data, AttributeOwner::Link), ["rel"]);
 
-    // The Builtin owner is the full static set (src/traces/vocab.rs:96)
+    // The Builtin owner is the full static set (`BuiltinField::ALL` in
+    // `src/traces/vocab.rs`)
     // and holds no attributes; the internal facets never surface
     // anywhere.
     let builtins: Vec<BuiltinField> = data
@@ -190,7 +201,8 @@ fn keys_partition_scopes_deterministically_under_permutation() {
 
 /// Values merge across a low-tier file, a mid-tier file (>100 distinct
 /// values), a high-tier file (>1000 — the tier cutoffs are cardinality
-/// thresholds, sfst/src/schema.rs:104-123), and the tail's pair table:
+/// thresholds: `FieldTier` / `DEFAULT_CARDINALITY_THRESHOLD` in
+/// `sfst/src/schema.rs`), and the tail's pair table:
 /// deduplicated, sorted by value bytes, exact truncation. Also pins the
 /// resource `service.name` values — the service-list lookup.
 #[test]
@@ -242,7 +254,7 @@ fn values_merge_all_tiers_across_sources_with_exact_truncation() {
     assert_eq!(got, sorted, "values must be sorted by value bytes");
 
     // High tier enumerates through the HF arena
-    // (sfst/src/index_reader.rs:503-516).
+    // (`IndexReader::field_values` in `sfst/src/index_reader.rs`).
     let hi = values(
         sources(),
         AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("hi".into())),
@@ -268,10 +280,10 @@ fn values_merge_all_tiers_across_sources_with_exact_truncation() {
 }
 
 /// Kinds are field-coalesced across exactly the contributing sources
-/// (Int ⊔ Double → Double, Int ⊔ Str → Str via sfst's shared lattice,
-/// sfst/src/schema.rs:544-562), and a null-only attribute stays in the
-/// vocabulary with `kind: None` (pin C1) — its stored value is the
-/// empty rendering.
+/// (Int ⊔ Double → Double, Int ⊔ Str → Str via sfst's shared lattice —
+/// `join_value_kinds` in `sfst/src/schema.rs`), and a null-only
+/// attribute stays in the vocabulary with `kind: None` (pin C1) — its
+/// stored value is the empty rendering.
 #[test]
 fn kinds_coalesce_and_kindless_values_carry_none() {
     let dir = tempfile::tempdir().unwrap();
@@ -338,8 +350,9 @@ fn kinds_coalesce_and_kindless_values_carry_none() {
 }
 
 /// Dictionary-backed builtins serve values as the STORAGE labels
-/// (mapping them to a wire vocabulary is the adapter's job,
-/// src/traces/vocab.rs:116-140); virtual builtins are a request error
+/// (mapping them to a wire vocabulary is the adapter's job —
+/// [`sfsq::traces::BuiltinField::dictionary_field`]); virtual builtins
+/// are a request error
 /// (the virtual/dictionary split is static); the builtin key list never
 /// depends on the data — a status-less corpus still lists `Status`.
 #[test]
@@ -461,8 +474,8 @@ fn a_error_server() -> SpanSpec {
 /// The optional window prunes SFST candidates by summary overlap
 /// (span-start seconds expanded to nanoseconds, file-granular) and
 /// never prunes the tail; a sub-second window inside a file's range
-/// still takes the whole file (pin C3 conservatism,
-/// src/traces/attributes.rs:199-203).
+/// still takes the whole file (pin C3 conservatism; `pruned` in
+/// `src/traces/attributes.rs`).
 #[test]
 fn window_prunes_files_but_never_the_tail() {
     let dir = tempfile::tempdir().unwrap();
@@ -518,8 +531,8 @@ fn window_prunes_files_but_never_the_tail() {
 /// A source whose bytes fail to parse is a `SourceFailure` reason while
 /// the healthy source still serves — for both operations. The engine
 /// documents exact `truncated` as relative to the observed sources
-/// under a Partial status (src/traces/attributes.rs:32-38); not pinned
-/// here — no limits are set.
+/// under a Partial status (the `src/traces/attributes.rs` module
+/// docs); not pinned here — no limits are set.
 #[test]
 fn failed_sources_reported_and_the_rest_served() {
     let dir = tempfile::tempdir().unwrap();
@@ -599,7 +612,7 @@ fn cancellation_is_all_or_empty() {
 
 /// A key absent from every source is a data condition, not an error:
 /// empty values, `Complete`, not truncated (the engine skips files
-/// without the field, src/traces/attributes.rs:383-402).
+/// without the field — [`sfsq::traces::attribute_values`]).
 #[test]
 fn absent_key_is_a_complete_empty() {
     let dir = tempfile::tempdir().unwrap();
@@ -618,7 +631,9 @@ fn absent_key_is_a_complete_empty() {
 
 /// Request validation: zero limits, an empty or inverted window, the
 /// invalid owner/key pairings of pin C4, and duplicate source ids are
-/// errors — nothing is queried (src/traces/attributes.rs:122-146).
+/// errors — nothing is queried (the validation heads of
+/// [`sfsq::traces::attribute_names`] and
+/// [`sfsq::traces::attribute_values`]).
 #[test]
 fn request_validation_rejects_bad_requests() {
     let cancel = CancellationToken::new;
@@ -715,9 +730,9 @@ fn request_validation_rejects_bad_requests() {
 
 /// An empty source set with a live token is a Complete result: the
 /// static builtin vocabulary does not depend on sources existing
-/// (src/traces/attributes.rs:241-250), and attribute scopes are simply
-/// empty — pinned so a future change cannot gate the static set on
-/// "saw a source".
+/// ([`sfsq::traces::attribute_names`] seeds it unconditionally), and
+/// attribute scopes are simply empty — pinned so a future change
+/// cannot gate the static set on "saw a source".
 #[test]
 fn empty_sources_still_yield_the_static_builtins() {
     let data = names(Vec::new(), AttributeNamesQuery::new());
@@ -753,7 +768,7 @@ fn empty_sources_still_yield_the_static_builtins() {
 /// (`RemoteUnavailable`) beside a missing file's (`SourceFailure`), for
 /// both operations, while the healthy source still serves; alone, it is
 /// never Complete and never a source failure — the two reasons are
-/// distinct (src/traces/status.rs:70-79).
+/// distinct ([`sfsq::traces::PartialReason::RemoteUnavailable`]).
 #[test]
 fn unavailable_sources_are_reported_and_the_rest_served() {
     let dir = tempfile::tempdir().unwrap();
@@ -817,7 +832,8 @@ fn unavailable_sources_are_reported_and_the_rest_served() {
 }
 
 /// The window prunes an unavailable source by its summary, exactly like
-/// a sealed file (src/traces/attributes.rs:430-434): out of window it
+/// a sealed file (`pruned` in `src/traces/attributes.rs` guards both
+/// source kinds): out of window it
 /// is irrelevant (Complete), in window it is missing data (the reason).
 #[test]
 fn window_prunes_unavailable_sources_by_their_summary() {

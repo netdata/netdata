@@ -7,7 +7,8 @@
 //! catalog `AddEntry` — the entry's summary fields come straight from the
 //! registry's `sfst::File`, no pending-metadata cache. `CatalogUploaded`
 //! marks the covered seqs remote-cataloged, the stage retention's
-//! SFST-eviction gate waits for (retention.rs:64). `*Failed` responses are
+//! SFST-eviction gate waits for (`ledger/retention.rs`
+//! `evaluate_retention`). `*Failed` responses are
 //! re-queued in the shared `upload_retry`
 //! (src/crates/file-lifecycle/src/upload_retry.rs) while their local file
 //! still exists; `handle_retry_tick` re-issues due entries with capped
@@ -71,7 +72,8 @@ impl Ledger {
                             };
                             // Catalog partition date; empty/unrepresentable
                             // summaries fall back to today at the call site
-                            // (src/crates/file-lifecycle/src/helpers.rs:8).
+                            // (`src/crates/file-lifecycle/src/helpers.rs`
+                            // `date_from_summary`).
                             let date = date_from_summary(&sfst_file.summary)
                                 .unwrap_or_else(|| chrono::Utc::now().date_naive());
                             let uploaded_at_ns = TimestampNs(now_ns());
@@ -92,7 +94,8 @@ impl Ledger {
                 // A failed send is only logged: the seq is in no catalog file,
                 // so it never reaches the rotated stage and the next restart's
                 // remote reconcile re-sends the AddEntry from the local summary
-                // (src/crates/file-lifecycle/src/recovery/remote.rs:140).
+                // (`src/crates/file-lifecycle/src/recovery/remote.rs`
+                // `reconcile_remote_uploads`).
                 if let Err(e) = catalog_builder_tx.send(req) {
                     tracing::error!("failed to send catalog add entry seq={seq}: {e}");
                 }
@@ -139,7 +142,8 @@ impl Ledger {
                 self.upload_retry.clear_catalog(&remote_key);
                 // The catalog is durably remote, so the SFSTs it covers become
                 // evictable — this mark is what retention's gate waits for
-                // (retention.rs:64). Route each seq separately: an already
+                // (`ledger/retention.rs` `evaluate_retention`). Route each seq
+                // separately: an already
                 // evicted sibling (its route is forgotten on eviction) must not
                 // block marking the rest. Key each mark by the catalog's OWN
                 // echoed identity, not this process's.
@@ -203,11 +207,11 @@ impl Ledger {
 
     /// Re-issue failed uploads whose backoff has elapsed, then log the pending
     /// backlog — `warn` normally, escalating to `error` once an item has been
-    /// retried `PERSISTENT_FAILURE_ATTEMPTS` times
-    /// (src/crates/file-lifecycle/src/upload_retry.rs:28): the remote is then
+    /// retried `PERSISTENT_FAILURE_ATTEMPTS` times (the threshold constant in
+    /// `src/crates/file-lifecycle/src/upload_retry.rs`): the remote is then
     /// treated as persistently unreachable and local files accumulate until it
-    /// recovers. Fired every 30s by the ledger's retry timer (mod.rs:352,
-    /// missed ticks skipped).
+    /// recovers. Fired every 30s by the ledger's retry timer (created in
+    /// [`Ledger::new`](super::Ledger::new), missed ticks skipped).
     pub(super) async fn handle_retry_tick(&mut self) {
         if self.upload_retry.is_empty() {
             return;
@@ -224,9 +228,9 @@ impl Ledger {
             if let Err(e) = uploader.send(req) {
                 // The uploader is gone (closed channel); re-arm so the item
                 // isn't stranded `in_flight`. The run loop exits on the same
-                // closed channel (mod.rs:415) and the next restart's recovery
-                // re-drives un-uploaded files idempotently (deterministic
-                // remote keys; uploads overwrite).
+                // closed channel (`ledger/mod.rs` `Ledger::run`) and the next
+                // restart's recovery re-drives un-uploaded files idempotently
+                // (deterministic remote keys; uploads overwrite).
                 tracing::error!("failed to re-issue upload: {e}");
                 self.upload_retry.record_failure(e.0, Instant::now());
             }

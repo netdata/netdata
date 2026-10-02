@@ -20,9 +20,9 @@
 //! UUID is a parseable all-zero segment; each tail owner rejects it when
 //! wrapping the parsed UUIDs into the `MachineId`/`InstanceId` newtypes.
 //!
-//! Consumers: `crate::types` — [`FileId::to_stem`] formats through
-//! [`format_uuid_pair`]; [`FileId::parse_stem`] (and path-based
-//! [`FileId::parse`]) parse through [`parse_uuid_pair`]. `otel-catalog`
+//! Consumers: `crate::types` — [`crate::FileId::to_stem`] formats through
+//! [`format_uuid_pair`]; [`crate::FileId::parse_stem`] (and path-based
+//! [`crate::FileId::parse`]) parse through [`parse_uuid_pair`]. `otel-catalog`
 //! is the only external user (above).
 
 use uuid::Uuid;

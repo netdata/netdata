@@ -3,7 +3,7 @@
 //! (node.rs/ops.rs match the fid.c routines they port). Each internal node
 //! is one byte whose 8 bits say which of its 8 children exist, and empty
 //! subtrees are pruned entirely. The serialized form IS the in-memory form
-//! (raw.rs:10-17): queries walk the stored bytes directly in O(levels),
+//! (`raw.rs`'s blob-shape contract): queries walk the stored bytes directly in O(levels),
 //! and the blob is canonical — exactly [`estimate_data_size`] bytes for
 //! the values it holds, whichever mutation path built it.
 //!
@@ -40,11 +40,11 @@
 //!
 //! Consumers (grep-verified): `sfst` is the only real dependency — on-disk
 //! log-index bitmaps as `treight::Bitmap`, set ops native, no roaring
-//! round-trip (src/crates/sfst/src/index_reader.rs:1702). `sfsq` and
+//! round-trip (`PosSet` in `sfst/src/index_reader.rs`). `sfsq` and
 //! `otel-ledger` use treight in tests only. The fuzz workspace pins the
 //! same netdata/roaring-rs fork as the main workspace
-//! (src/crates/Cargo.toml:118) so both sides test one roaring
-//! implementation.
+//! (the `roaring` git pin in `src/crates/Cargo.toml`) so both sides test one
+//! roaring implementation.
 mod bitmap;
 mod node;
 mod ops;
@@ -107,8 +107,8 @@ pub fn ceil_log8(universe_size: u32) -> u32 {
 /// ```
 ///
 /// Pinned exact by the `estimate_data_size_is_exact` proptest
-/// (src/crates/treight/src/tests_roaring.rs:76) and by the fuzz target
-/// (src/crates/treight/fuzz/fuzz_targets/against_roaring.rs:241), which
+/// (`tests_roaring.rs`) and by the fuzz target's closing size check
+/// (`fuzz/fuzz_targets/against_roaring.rs`), which
 /// asserts a blob stays exactly this size after arbitrary mutation
 /// sequences.
 pub fn estimate_data_size(universe_size: u32, sorted_values: impl Iterator<Item = u32>) -> usize {

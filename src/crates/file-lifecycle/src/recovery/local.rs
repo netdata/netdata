@@ -387,7 +387,7 @@ pub async fn recover_retention(
 ///
 /// - body-parse failure, storage enabled: corruption of an immutable,
 ///   atomically-written file; quarantine and re-fetch from remote (see
-///   [`super::startup::heal_corrupt_catalog`]).
+///   `startup::heal_corrupt_catalog`).
 /// - body-parse failure, storage disabled: logged and skipped, the file left
 ///   in place as the operator's evidence.
 /// - a newer, unsupported FORMAT version: not corruption — the file is left

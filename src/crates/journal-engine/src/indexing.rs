@@ -1,11 +1,12 @@
 //! Journal file indexing: the cache builder and the batch indexer driver.
 //!
 //! [`FileIndex`] is the searchable snapshot of one journal file
-//! (journal-index/src/file_index.rs:25); this module builds and caches
+//! (in `journal-index/src/file_index.rs`); this module builds and caches
 //! them. Two pieces:
 //!
 //! - [`FileIndexCacheBuilder`] — the only constructor of the
-//!   `FileIndexCache` handle over foyer's hybrid cache (cache.rs:44).
+//!   `FileIndexCache` handle over foyer's hybrid cache
+//!   ([`crate::cache::FileIndexCache`]).
 //! - [`batch_compute_file_indexes`] — the per-query pipeline callers
 //!   drive: look up every key in the cache, reuse fresh hits whose
 //!   bucket duration divides the query's, rayon-index the misses, then
@@ -14,21 +15,22 @@
 //! Freshness and bucket fit are judged here, not in the cache: both
 //! depend on the query — now vs. indexed-at, and query bucket vs. index
 //! bucket. An online file's cached index goes stale after 1s
-//! (journal-index/src/file_index.rs:94-102) and is re-indexed; an
+//! (`journal-index/src/file_index.rs` `FileIndex::is_fresh`) and is re-indexed; an
 //! archived one stays fresh until eviction or a `CACHE_VERSION` bump
-//! (cache.rs:17).
+//! (`cache.rs` `CACHE_VERSION`).
 //!
 //! Error split: per-file failures and cache-lookup errors are logged
-//! and their files dropped from the batch (indexing.rs:255-257,368-374);
+//! and their files dropped from the batch (both inside
+//! `batch_compute_file_indexes`);
 //! cancellation and pool-build/panic/foyer-build failures propagate
-//! (`Cancelled` / `Io` / `Foyer`, error.rs:11,43,51).
+//! ([`EngineError::Cancelled`] / [`EngineError::Io`] / [`EngineError::Foyer`]).
 //!
 //! Consumers (grep-verified): otel-legacy-logs builds the cache at
-//! handler startup (otel-legacy-logs/src/handler.rs:147-153), finds the
-//! query's files and keys them (handler.rs:381,395-397), and calls the
-//! batch through journal-function's re-export (handler.rs:404;
-//! journal-function/src/lib.rs:15); examples/index.rs is the second
-//! caller (examples/index.rs:122).
+//! handler startup (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::new`), finds the
+//! query's files and keys them (`LegacyLogsHandler::on_call`), and calls the
+//! batch through journal-function's re-export
+//! (`journal-function/src/lib.rs`); examples/index.rs is the second
+//! caller (`examples/index.rs` `main`).
 
 use crate::{
     cache::{FileIndexCache, FileIndexKey},
@@ -42,8 +44,8 @@ use std::sync::atomic::AtomicUsize;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, trace};
 
-// Cap on the per-batch rayon pool regardless of core count; sizing at
-// indexing.rs:275-280.
+// Cap on the per-batch rayon pool regardless of core count; sized in
+// `batch_compute_file_indexes`.
 const MAX_BATCH_INDEX_THREADS: usize = 4;
 
 // ============================================================================
@@ -51,7 +53,7 @@ const MAX_BATCH_INDEX_THREADS: usize = 4;
 // ============================================================================
 
 /// Builder for a file index cache — the only constructor of
-/// `FileIndexCache` in the tree (cache.rs:44 is a bare type alias).
+/// `FileIndexCache` in the tree ([`crate::cache::FileIndexCache`] is a bare type alias).
 /// Unset options fall back to the [`FileIndexCacheBuilder::new`]
 /// defaults; the disk tier is on unless
 /// [`FileIndexCacheBuilder::without_disk_cache`] turns it off.
@@ -114,16 +116,16 @@ impl FileIndexCacheBuilder {
     /// Builds the cache.
     ///
     /// Without the disk tier this is a memory-only hybrid cache.
-    /// Otherwise the cache directory is created first (`EngineError::Io`
-    /// on failure, indexing.rs:108-113), then a psync I/O engine and a
+    /// Otherwise the cache directory is created first
+    /// ([`EngineError::Io`]
+    /// on failure), then a psync I/O engine and a
     /// block engine on an fs device are stacked over it; foyer failures
-    /// propagate as `EngineError::Foyer` (indexing.rs:94,117,122,127;
-    /// error.rs:43).
+    /// propagate as [`EngineError::Foyer`].
     ///
     /// Inserts enter the memory tier immediately and are enqueued for
-    /// the disk tier in the background (`WriteOnInsertion`,
-    /// indexing.rs:89); `FileIndexCache::close` flushes pending disk
-    /// writes on shutdown (examples/index.rs:138).
+    /// the disk tier in the background (the `WriteOnInsertion`
+    /// policy set below); `FileIndexCache::close` flushes pending disk
+    /// writes on shutdown (see `examples/index.rs` `main`).
     pub async fn build(self) -> Result<FileIndexCache> {
         use foyer::HybridCacheBuilder;
 
@@ -218,39 +220,37 @@ mod tests {
 ///
 /// Pipeline:
 /// 1. Looks up every key in the cache concurrently; one `tokio::select!`
-///    guards the sweep, so cancellation drops it mid-flight
-///    (indexing.rs:216-219).
+///    guards the sweep, so cancellation drops it mid-flight.
 /// 2. Splits the results. A hit is reused only while `FileIndex::is_fresh`
 ///    holds and the index's bucket duration divides the query's — a
-///    finer cached histogram serves a coarser query, never the reverse
-///    (gate at indexing.rs:232-248). Misses and stale or incompatible
+///    finer cached histogram serves a coarser query, never the reverse.
+///    Misses and stale or incompatible
 ///    hits go to step 3; a cache-backend error is logged and its key
-///    dropped from the batch (indexing.rs:255-257).
+///    dropped from the batch.
 /// 3. Computes the misses inside one blocking task that installs a
-///    bounded rayon pool (indexing.rs:270-300); each item re-checks
+///    bounded rayon pool; each item re-checks
 ///    cancellation and is indexed at the query's bucket duration.
 /// 4. On each success, updates the registry's time-range metadata for
-///    the file (journal-registry/src/registry/mod.rs:304) and re-inserts
-///    the index into the cache. Per-file failures are logged and dropped
-///    (indexing.rs:368-374).
+///    the file (`journal-registry/src/registry/mod.rs` `Registry::update_time_range`) and re-inserts
+///    the index into the cache. Per-file failures are logged and dropped.
 ///
 /// # Arguments
 /// * `cache` - File index cache: read hits from it, fill it with misses.
 /// * `registry` - Updated with each successfully indexed file's time
 ///   range, which is what `find_files_in_range` filters on
-///   (journal-registry/src/registry/mod.rs:79-119).
+///   (`journal-registry/src/registry/mod.rs` `Registry::find_files_in_range`).
 /// * `keys` - One key per (file, facets, source timestamp field); callers
-///   build them with `FileIndexKey::new` (cache.rs:33).
+///   build them with [`FileIndexKey::new`].
 /// * `time_range` - Query range whose bucket duration indexes the misses
 ///   and gates the cached hits.
 /// * `cancellation` - Aborts the batch with `EngineError::Cancelled`;
 ///   checked around each phase, around each file, and around the compute
-///   task (indexing.rs:218,262,309,348).
+///   task.
 /// * `indexing_limits` - Cardinality and payload caps handed to every
-///   `FileIndexer` (journal-index/src/file_indexer.rs:32-46).
+///   `FileIndexer` (`journal-index/src/file_indexer.rs` `IndexingLimits`).
 /// * `progress_counter` - Incremented once per successfully indexed
 ///   file, for caller-side progress bars
-///   (otel-legacy-logs/src/handler.rs:411).
+///   (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::on_call`).
 ///
 /// # Returns
 /// One (key, index) pair per cache hit and per successfully computed
@@ -267,7 +267,7 @@ pub async fn batch_compute_file_indexes(
 ) -> Result<Vec<(FileIndexKey, FileIndex)>> {
     let bucket_duration = time_range.bucket_duration_seconds();
     // The query's histogram granularity, fixed by `QueryTimeRange::new`
-    // (query_time_range.rs:62,94-95).
+    // (which calls `calculate_bucket_duration`).
     // Phase 1: look up every key in the cache concurrently.
     let cache_lookup_futures = keys.iter().map(|key| {
         let key_clone = key.clone();
@@ -303,11 +303,11 @@ pub async fn batch_compute_file_indexes(
             Ok(Some(file_index)) => {
                 // Reuse gate: `is_fresh` covers still-active files,
                 // whose cached index goes stale after 1s
-                // (journal-index/src/file_index.rs:94-102); the bucket
+                // (`journal-index/src/file_index.rs` `FileIndex::is_fresh`); the bucket
                 // check covers query granularity — a finer index serves
                 // a coarser query because the histogram engine sums
                 // index buckets into query buckets
-                // (journal-index/src/histogram.rs:169-183), while a
+                // (`journal-index/src/histogram.rs` `Histogram::count_entries_in_time_range`), while a
                 // coarser or misaligned one cannot be split and would
                 // answer finer buckets with zero, so it is re-indexed.
                 let fresh = file_index.is_fresh();
@@ -401,7 +401,7 @@ pub async fn batch_compute_file_indexes(
 
                     // A fresh indexer per file, indexing at the query's
                     // bucket duration so the miss's granularity matches
-                    // this query (journal-index/src/file_indexer.rs:145).
+                    // this query (`journal-index/src/file_indexer.rs` `FileIndexer::index`).
                     let mut file_indexer = FileIndexer::new(indexing_limits);
                     let result = file_indexer
                         .index(
@@ -456,7 +456,7 @@ pub async fn batch_compute_file_indexes(
                 // `find_files_in_range` filters on — files with Unknown
                 // or Active ranges are always included, a Bounded one
                 // only when it overlaps the query
-                // (journal-registry/src/registry/mod.rs:96-114).
+                // (`journal-registry/src/registry/mod.rs` `Registry::find_files_in_range`).
                 registry.update_time_range(
                     &key.file,
                     index.start_time(),

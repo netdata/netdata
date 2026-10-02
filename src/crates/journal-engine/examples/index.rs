@@ -1,5 +1,5 @@
 //! Example: scan a journal directory via the registry, build a foyer index
-//! cache, and warm it with batch_compute_file_indexes (indexing.rs:193)
+//! cache, and warm it with [`batch_compute_file_indexes`]
 //! for the last 24h. Run from src/crates: cargo run -p journal-engine --example index [dir]
 
 // The default directory (/mnt/slow-disk/otel-aws) is a deliberately slow mount,
@@ -59,13 +59,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("scanning directory: {}", dir.display());
 
-    // Registry + notify monitor (journal-registry/src/registry/mod.rs:171): watch_directory scans recursively; events stay unread.
+    // Registry + notify monitor (`journal-registry/src/registry/monitor.rs` `Monitor`): watch_directory scans recursively; events stay unread.
     let (monitor, _event_receiver) = Monitor::new()?;
     let registry = Registry::new(monitor);
 
     registry.watch_directory(dir.to_str().unwrap())?;
 
-    // Find all scanned files: find_files_in_range over the full 0..u32::MAX range (registry/mod.rs:298).
+    // Find all scanned files: find_files_in_range over the full 0..u32::MAX range (`journal-registry/src/registry/mod.rs` `Registry::find_files_in_range`).
     let files = registry.find_files_in_range(
         journal_common::Seconds(0),
         journal_common::Seconds(u32::MAX),
@@ -77,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     // Debug toggle: keep only the first file (uncomment).
 
-    // Foyer hybrid cache (indexing.rs:26): 1000 in-memory entries + 2 GiB disk cache; the disk path persists across runs.
+    // Foyer hybrid cache (`indexing.rs` `FileIndexCacheBuilder`): 1000 in-memory entries + 2 GiB disk cache; the disk path persists across runs.
     let cache = FileIndexCacheBuilder::new()
         // Alternative: keep the disk cache on the slow disk too (swap with the line below).
         .with_cache_path("/tmp/foyer-cache")
@@ -89,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("created file index cache");
 
-    // Indexing inputs: which fields become facets (facets.rs:95) and the source timestamp field.
+    // Indexing inputs: which fields become facets (`facets.rs` `Facets::new`) and the source timestamp field.
     let facets = Facets::new(&["log.severity_number".to_string()]);
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
 
@@ -104,7 +104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .collect();
 
-    // Index only the last 24h; QueryTimeRange derives the aligned bucket duration (query_time_range.rs:56).
+    // Index only the last 24h; QueryTimeRange derives the aligned bucket duration (`query_time_range.rs` `QueryTimeRange::new`).
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs() as u32;

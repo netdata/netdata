@@ -10,33 +10,34 @@
 //!   `journal-common` (shim; rationale in collections.rs).
 //! - `file`: the journal file layer - mmap-backed `JournalFile`, reader,
 //!   writer, format helpers. Its public surface is the re-exports in
-//!   file/mod.rs:16-35; this file flattens only the subset below.
+//!   file/mod.rs; this file flattens only the subset below.
 //! - `field_map`: remapping between original log field names and systemd
 //!   journal field names (field_map.rs).
 //! - `repository`: inline alias of `journal-registry`'s repository
 //!   namespace (comment above its declaration).
 //!
 //! The crate's only cargo feature is `allocative`, enabled by journal-index
-//! (journal-index/Cargo.toml:14); it only derives `allocative::Allocative`
-//! memory-profiling impls on `FieldMap` (field_map.rs:29) and the
-//! offset-array types (file/offset_array.rs:175).
+//! (journal-index/Cargo.toml); it only derives `allocative::Allocative`
+//! memory-profiling impls on [`field_map::FieldMap`] and the
+//! offset-array types ([`file::offset_array::List`],
+//! [`file::offset_array::Cursor`], [`file::offset_array::InlinedCursor`]).
 //!
-//! Consumers: journal-index (journal-index/Cargo.toml:27), journal-engine
-//! (:28), journal-function (:23) and journal-log-writer (:12) - all depend
+//! Consumers: journal-index, journal-engine, journal-function and
+//! journal-log-writer (each one's Cargo.toml) - all depend
 //! on this crate directly. What each adds: high-level writing with rotation
 //! and retention (journal-log-writer), indexing and querying (journal-index),
 //! and the query engine and Functions APIs (journal-engine, journal-function;
 //! both also build on journal-index and journal-registry).
 //!
 //! `journal-registry` is the reverse edge: a dependency of this crate
-//! (journal-core/Cargo.toml:14), not a consumer. It discovers, tracks and
+//! (journal-core/Cargo.toml), not a consumer. It discovers, tracks and
 //! monitors journal files, and supplies the repository types the
 //! `repository` alias below re-exports.
 
 // Crate-wide error type: every fallible file-layer call returns its
 // `Result` alias, and the consumers' error enums wrap `JournalError` -
-// through `journal_core::error::` in journal-index/src/error.rs:44 and
-// journal-log-writer/src/error.rs:32, flat in journal-engine/src/error.rs:15.
+// through `journal_core::error::` in journal-index/src/error.rs and
+// journal-log-writer/src/error.rs, flat in journal-engine/src/error.rs.
 pub mod error;
 
 // Collection type aliases re-exported from journal-common; journal-function
@@ -56,32 +57,33 @@ pub mod field_map;
 // Thin alias module: re-exports journal-registry's whole repository
 // namespace under `journal_core::repository` (File, Chain, Repository, ...).
 // Pure convenience: the consumers also depend on journal-registry directly
-// (journal-index/src/file_indexer.rs:17 imports journal_registry::File), and
-// only journal-index/src/file_index.rs:6 and the stack's tests import
-// through this path.
+// (journal-index/src/file_indexer.rs imports journal_registry::File
+// directly), and only journal-index/src/file_index.rs (repository::File)
+// and the stack's tests import through this path.
 pub mod repository {
     pub use journal_registry::repository::*;
 }
 
 // Flat re-exports - the short list consumers can name without a module
 // path. The error pair: journal-engine folds JournalError into EngineError
-// (journal-engine/src/error.rs:15) and builds a JournalError variant itself
-// (journal-engine/src/logs/query.rs:582); the Result alias is imported flat
-// by journal-engine (src/logs/table.rs:2) and journal-function
-// (src/netdata/builder.rs:7).
+// (journal-engine/src/error.rs) and builds a JournalError variant itself
+// (journal-engine/src/logs/query.rs); the Result alias is imported flat
+// by journal-engine (src/logs/table.rs) and journal-function
+// (src/netdata/builder.rs).
 pub use error::{JournalError, Result};
 
 // File-layer re-exports: a flat subset of file/mod.rs's surface, mirroring
 // the published twin (src/crates/jf/journal_file/src/lib.rs). Code usually
 // imports these via `journal_core::file::...` instead; the only flat import
 // in code today is journal-log-writer's `use journal_core::JournalFile`
-// (journal-log-writer/src/log/chain.rs:4).
+// (journal-log-writer/src/log/chain.rs).
 pub use file::{
     BucketUtilization, Direction, JournalCursor, JournalFile, JournalFileOptions, JournalReader,
     JournalWriter, Location,
 };
 
-// SIGBUS handler, renamed on the way out (file/sigbus.rs:37). Public setup
+// SIGBUS handler, renamed on the way out (`install_handler` in
+// file/sigbus.rs). Public setup
 // entry for the mmap layer; nothing in this repo installs this copy - the
 // live installers are the SDK and jf twins (details in file/sigbus.rs).
 pub use file::sigbus::install_handler as install_sigbus_handler;

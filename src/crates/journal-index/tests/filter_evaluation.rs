@@ -5,12 +5,13 @@
 //! Fixture: one journal per test at `<tmp>/<machine-id>/system.journal`,
 //! the registry path grammar `File::from_path` parses (absolute path,
 //! `.journal` suffix, `system` source dir, machine-id dir above it —
-//! journal-registry/src/repository/file.rs:238-283). Every entry is
+//! `journal-registry/src/repository/file.rs`). Every entry is
 //! stamped with `_SOURCE_REALTIME_TIMESTAMP=<microseconds>` and
 //! `add_entry` receives the same value as realtime and monotonic
-//! (journal-core/src/file/writer.rs:182-188), so indexing with
+//! (`journal-core/src/file/writer.rs` `add_entry`), so indexing with
 //! `Some(&source_field)` orders entries by that field while `None`
-//! falls back to the journal realtime (file_indexer.rs:596-603,645-672).
+//! falls back to the journal realtime (`src/file_indexer.rs`
+//! `collect_source_field_info`/`build_histogram`).
 //! Indexing always uses 3600 s histogram buckets and builds bitmaps
 //! only for the requested fields.
 //!
@@ -18,21 +19,23 @@
 //!
 //! - Bitmap bits are entry indices into `FileIndex::entry_offsets` —
 //!   positions in the index's time-ordered entry list, not file order
-//!   (file_indexer.rs:217-221; consumed at file_index.rs:575-580).
+//!   (`src/file_indexer.rs` ordering pass; consumed in
+//!   `src/file_index.rs` `find_log_entries`).
 //! - Leaves match exactly: a field=value pair matches only that pair, a
 //!   field-name leaf matches every value the field takes (the union of
-//!   its pair bitmaps, filter.rs:177-190). An unknown field or pair
-//!   matches nothing and never errors (filter.rs:192-199).
+//!   its pair bitmaps, `src/filter.rs` resolve-time `Field` leaf). An
+//!   unknown field or pair matches nothing and never errors
+//!   (`src/filter.rs` resolve-time `Pair` leaf).
 //! - AND intersects, OR unions, and nested compounds resolve
 //!   recursively before folding into one bitmap
-//!   (filter.rs:172-233,270-296).
+//!   (`src/filter.rs` `FilterExpr::resolve`/`FilterExpr::evaluate`).
 //! - `Filter::none()` is the no-filter sentinel: `is_none()` reports
 //!   the marker, evaluating it yields an empty bitmap
-//!   (filter.rs:67-77,272) — a filter that matches nothing is not
-//!   necessarily the sentinel.
+//!   (`src/filter.rs` `Filter::none` and `FilterExpr::evaluate`) — a
+//!   filter that matches nothing is not necessarily the sentinel.
 //! - Empty AND and empty OR both collapse to `none()` at construction
-//!   and match nothing (filter.rs:147-148,165-166) — an OR with no
-//!   branches is not match-all.
+//!   and match nothing (`src/filter.rs` `FilterExpr::and`/`or` collapse
+//!   arms) — an OR with no branches is not match-all.
 //! - The three non-filter tests pin the index surface the bitmaps rest
 //!   on: bucketed seconds time range, `file_fields` vs indexed fields,
 //!   entry count, and entry ordering (source-timestamp order when
@@ -40,11 +43,13 @@
 //!
 //! Not pinned here: case sensitivity (no mixed-case fixture; names and
 //! values match verbatim — nothing in the index normalizes case,
-//! field_types.rs:32-39,101-112); the resolve-time None-child rules
+//! `src/field_types.rs` `FieldName`/`FieldValuePair` derive the inner
+//! string's `Eq`); the resolve-time None-child rules
 //! (an AND with a `None` child is `None` outright, an OR skips `None`
-//! children — filter.rs:205-207,221-223; only construction-time
+//! children — `src/filter.rs` `FilterExpr::resolve`; only construction-time
 //! flattening is exercised); time bounds, regex and pagination,
-//! applied after the bitmap stage (file_index.rs:559-563,666); a
+//! applied after the bitmap stage (`src/file_index.rs`
+//! `find_log_entries`); a
 //! field present in the journal but left out of the indexed list; and
 //! consumers' `is_none()` skip path (journal-engine, otel-legacy-logs).
 
@@ -92,7 +97,7 @@ impl TestEntry {
 /// Journal path in the registry layout `<dir>/<machine-id>/system.journal`:
 /// `File::from_path` reads status from the suffix, source from the parent
 /// dir and machine id from the dir above
-/// (journal-registry/src/repository/file.rs:238-283).
+/// (`journal-registry/src/repository/file.rs` `File::from_path`).
 fn create_test_journal_path(temp_dir: &TempDir) -> PathBuf {
     let machine_id = Uuid::from_u128(0x12345678_1234_1234_1234_123456789abc);
     let machine_dir = temp_dir.path().join(machine_id.to_string());
@@ -107,7 +112,7 @@ fn create_test_journal_path(temp_dir: &TempDir) -> PathBuf {
 ///
 /// Each entry carries `_SOURCE_REALTIME_TIMESTAMP=<microseconds>` and
 /// `add_entry` receives the same value as realtime and monotonic
-/// (journal-core/src/file/writer.rs:182-188): the field is the
+/// (`journal-core/src/file/writer.rs` `add_entry`): the field is the
 /// source-ordering input, the header timestamps the realtime fallback.
 fn create_test_journal(
     entries: Vec<TestEntry>,
@@ -201,7 +206,8 @@ fn test_filter_field_name_matches_all_values() {
         .unwrap();
 
     // Field-presence leaf: matches entries carrying PRIORITY under any
-    // value — the leaf unions the field's pair bitmaps (filter.rs:177-190).
+    // value — the leaf unions the field's pair bitmaps (`src/filter.rs`
+    // resolve-time `Field` leaf).
     let filter = Filter::match_field_name(priority_field);
     let bitmap = filter.evaluate(&file_index);
 
@@ -309,7 +315,8 @@ fn test_filter_none() {
 
     // none() is the no-filter sentinel: consumers check is_none(), not the
     // result. Evaluating it directly yields an empty bitmap
-    // (filter.rs:67-77,272); the unknown-pair test below pins the contrast —
+    // (`src/filter.rs` `Filter::none` and `FilterExpr::evaluate`); the
+    // unknown-pair test below pins the contrast —
     // empty without being the sentinel.
     let filter = Filter::none();
     let bitmap = filter.evaluate(&file_index);
@@ -334,7 +341,8 @@ fn test_filter_nonexistent_field() {
 
     // A pair absent from both the journal and the index: evaluation is
     // infallible — the leaf resolves to "match nothing", not an error
-    // (filter.rs:192-199). is_none() stays false: it reports the filter
+    // (`src/filter.rs` resolve-time `Pair` leaf). is_none() stays false:
+    // it reports the filter
     // shape, not matchability.
     let filter =
         Filter::match_field_value_pair(FieldValuePair::parse("NONEXISTENT_FIELD=value").unwrap());
@@ -376,7 +384,8 @@ fn test_filter_complex_nested() {
     let file_index = indexer.index(&file, None, &fields, Seconds(3600)).unwrap();
 
     // Nested tree: an AND compound as an OR operand — resolve recurses
-    // through compounds, not just flat leaves (filter.rs:172-233).
+    // through compounds, not just flat leaves (`src/filter.rs`
+    // `FilterExpr::resolve`).
     let filter = Filter::or(vec![
         Filter::and(vec![
             Filter::match_field_value_pair(FieldValuePair::parse("PRIORITY=3").unwrap()),
@@ -412,7 +421,7 @@ fn test_filter_empty_and() {
         .unwrap();
 
     // and() collapses an empty operand list to none() at construction
-    // (filter.rs:147-148) — before any evaluation.
+    // (`src/filter.rs` `FilterExpr::and` collapse arm) — before any evaluation.
     let filter = Filter::and(vec![]);
     let bitmap = filter.evaluate(&file_index);
 
@@ -434,8 +443,8 @@ fn test_filter_empty_or() {
         .index(&file, None, &[priority_field], Seconds(3600))
         .unwrap();
 
-    // Same collapse for or() (filter.rs:165-166): an OR with no branches
-    // matches nothing, not everything.
+    // Same collapse for or() (`src/filter.rs` `FilterExpr::or` collapse
+    // arm): an OR with no branches matches nothing, not everything.
     let filter = Filter::or(vec![]);
     let bitmap = filter.evaluate(&file_index);
 
@@ -479,7 +488,8 @@ fn test_file_index_metadata() {
     // The index keeps the exact File handle it was built from.
     assert_eq!(file_index.file(), &file);
 
-    // Time range: histogram seconds over 3600 s buckets (histogram.rs:123-133).
+    // Time range: histogram seconds over 3600 s buckets (`src/histogram.rs`
+    // `Histogram::start_time`/`end_time`).
     // Start = first bucket start; midnight is already bucket-aligned.
     assert_eq!(file_index.start_time().0, 1704067200); // Exact start
     // End = last occupied bucket start + bucket duration.
@@ -530,7 +540,8 @@ fn test_source_timestamp_ordering() {
     let source_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
 
     // Indexing with the source field: positions come from the
-    // source-timestamp-sorted list (file_indexer.rs:596-603), not write order.
+    // source-timestamp-sorted list (`src/file_indexer.rs`
+    // `collect_source_field_info`), not write order.
     let file_index = indexer
         .index(&file, Some(&source_field), &[priority_field], Seconds(3600))
         .unwrap();
@@ -574,7 +585,8 @@ fn test_indexing_without_source_timestamp() {
     // No source-timestamp field passed to index(), though the fixture still
     // wrote _SOURCE_REALTIME_TIMESTAMP — indexing is just not told to use
     // it. Every entry's position falls back to the journal realtime
-    // timestamp (file_indexer.rs:645-672).
+    // timestamp (`src/file_indexer.rs` `build_histogram` realtime
+    // fallback).
     let entries = vec![
         TestEntry::new(add_time(JAN_1_2024_MIDNIGHT, hours(0))).with_field("PRIORITY", "3"),
         TestEntry::new(add_time(JAN_1_2024_MIDNIGHT, hours(1))).with_field("PRIORITY", "6"),

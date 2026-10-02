@@ -1,9 +1,9 @@
 /// A dense bitset over `u32` values, stored as plain `Vec<u64>` words.
-/// Scratch sort for `remap_one_bitmap` in build.rs (build.rs:604-633):
+/// Scratch sort for `remap_one_bitmap` in `build.rs`:
 /// set a bit per remapped value, then replay the set (or unset) bits in
 /// ascending order — O(n) to set + O(universe/64) to scan, cheaper than
 /// `sort_unstable()` once cardinality reaches the max(universe/64, 256)
-/// threshold at build.rs:605. Unrelated to `treight::Bitmap`: no shared
+/// threshold in `build.rs` `remap_one_bitmap`. Unrelated to `treight::Bitmap`: no shared
 /// layout or conversion — the iterators only feed
 /// `Bitmap::from_sorted_iter` and `Bitmap::from_sorted_iter_complemented`.
 pub struct Bitset {

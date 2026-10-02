@@ -1,8 +1,9 @@
 //! Seek-and-step cursor over a journal file's entry chain: the iteration
-//! engine behind `JournalReader`, which delegates `step` to
-//! [`JournalCursor::step`] and reads [`JournalCursor::position`] for
-//! `get_realtime_usec`/`get_seqnum`/`get_entry_offset` (file/reader.rs:146,
-//! 229-244). A cursor holds a [`Location`] - a seek anchor or a resolved
+//! engine behind [`JournalReader`](crate::file::JournalReader), which
+//! delegates `step` to [`JournalCursor::step`] and reads
+//! [`JournalCursor::position`] for `get_realtime_usec`/`get_seqnum`/
+//! `get_entry_offset` (in `file/reader.rs`). A cursor holds a
+//! [`Location`] - a seek anchor or a resolved
 //! entry - plus, depending on mode, a filter expression or a position in
 //! the file's entry-array chain.
 //!
@@ -11,7 +12,8 @@
 //!   [`offset_array::Cursor`]. The chain lists every entry-object file
 //!   offset in write order, so stepping forward/backward is later/earlier
 //!   entries; entry offsets strictly increase along it (the writer
-//!   appends each entry at a growing offset, file/writer.rs:212,251).
+//!   appends each entry at a growing offset -
+//!   [`JournalWriter::add_entry`](crate::file::JournalWriter::add_entry)).
 //! - filtered: the chain position is ignored; the filter expression is
 //!   asked for the first entry offset >= (or <=) a needle derived from
 //!   the current location. Needles are offset+1/offset-1 to move strictly
@@ -22,18 +24,18 @@
 //! all cursor state is left untouched, so a caller can switch direction
 //! and continue from the same entry. Branches that need the entry array
 //! report an empty journal as `Err(InvalidOffsetArrayOffset)` instead of
-//! `Ok(false)`, because `JournalFile::entry_list` returns `None` when
-//! `n_entries` is 0 (file/file.rs:358).
+//! `Ok(false)`, because [`JournalFile::entry_list`] returns `None` when
+//! `n_entries` is 0.
 //!
 //! [`Location::Monotonic`], [`Location::Seqnum`] and [`Location::XorHash`]
 //! are declared seek keys but resolve through `unimplemented!()`.
 //!
 //! Consumers (grep-verified): the only in-repo user is `JournalReader`;
-//! `file/mod.rs:25` and `lib.rs:32` re-export both types. Near-identical
+//! `file/mod.rs` and lib.rs re-export both types. Near-identical
 //! twin: src/crates/jf/journal_file/src/cursor.rs (same code modulo
 //! imports); netflow-plugin instead queries through the published
 //! `systemd-journal-sdk-core` crate carrying this same design
-//! (src/crates/Cargo.toml:183).
+//! (src/crates/Cargo.toml).
 use super::mmap::MemoryMap;
 use crate::error::{JournalError, Result};
 use crate::file::{file::JournalFile, filter::FilterExpr, offset_array, offset_array::Direction};
@@ -51,14 +53,14 @@ pub enum Location {
     /// Sentinel after the last entry.
     Tail,
     /// Seek by wall-clock time in microseconds since the epoch, the unit
-    /// of `EntryObjectHeader::realtime` (file/file.rs:688 treats it as
-    /// `Duration::from_micros`). Resolution snaps to the first entry
+    /// of `EntryObjectHeader::realtime` ([`JournalFile::duration`]
+    /// treats it as `Duration::from_micros`). Resolution snaps to the first entry
     /// whose realtime is at or after the requested time, or to the
     /// newest entry when every entry is older; the step direction is
     /// ignored. The entry-array binary search behind this assumes
     /// realtime does not decrease along the chain, which only holds
     /// while writers pass non-decreasing times (the writer stores the
-    /// realtime it is given, file/writer.rs:221).
+    /// realtime it is given).
     Realtime(u64),
     /// Seek by monotonic time within the boot identified by the 16-byte
     /// boot id, mirroring `EntryObjectHeader`. Declared but
@@ -124,7 +126,8 @@ impl JournalCursor {
     /// Installs a filter expression without moving the cursor: the next
     /// `step` continues from the current position under the new filter,
     /// because the filter path reads `location` only. That is what lets
-    /// `JournalReader::step` add matches mid-iteration (file/reader.rs:142).
+    /// [`JournalReader::step`](crate::file::JournalReader::step) add
+    /// matches mid-iteration.
     pub fn set_filter(&mut self, filter_expr: FilterExpr) {
         self.filter_expr = Some(filter_expr);
         // TODO: decide whether the cursor state should be reset instead
@@ -133,8 +136,8 @@ impl JournalCursor {
 
     /// Drops the filter and rewinds to `Head`, clearing the chain
     /// position - unlike `set_filter`, this moves the cursor.
-    /// `JournalReader::flush_matches` resets through it
-    /// (file/reader.rs:224).
+    /// [`JournalReader::flush_matches`](crate::file::JournalReader::flush_matches)
+    /// resets through it.
     pub fn clear_filter(&mut self) {
         self.filter_expr = None;
         self.array_cursor = None;
@@ -183,7 +186,7 @@ impl JournalCursor {
     /// previous step: a location set directly through `set_location` has
     /// none, and the `array_cursor.unwrap()` below panics. An unset
     /// (zero) chain slot reads back as `Ok(None)` from `Cursor::value`
-    /// (file/object.rs:482) and ends iteration; `Head`+`Backward` and
+    /// (`OffsetArrayObject::get`) and ends iteration; `Head`+`Backward` and
     /// `Tail`+`Forward` have nothing to resolve.
     fn resolve_array_cursor<M: MemoryMap>(
         &mut self,
@@ -289,8 +292,8 @@ impl JournalCursor {
     /// entry. Needles 1/`u64::MAX` select the first/last match overall;
     /// the +1/-1 needles at the `ResolvedEntry` arms move strictly past
     /// the current entry, relying on entry offsets strictly increasing
-    /// along the chain. A filter that built to `FilterExpr::None` - no
-    /// match survived construction - matches nothing (file/filter.rs:137):
+    /// along the chain. A filter that built to [`FilterExpr::None`] - no
+    /// match survived construction - matches nothing:
     /// every step reports the end of iteration.
     fn resolve_filter_location<M: MemoryMap>(
         &mut self,

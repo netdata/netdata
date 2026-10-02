@@ -1,12 +1,13 @@
 //! `RoaringBitmap` interop for [`RawBitmap`]: two thin delegation methods,
-//! behind the optional `roaring` feature (module gate in lib.rs:5-6; the
-//! dep is the netdata/roaring-rs fork, src/crates/Cargo.toml:118). Only
+//! behind the optional `roaring` feature (the `#[cfg(feature = "roaring")]`
+//! module gate in `lib.rs`; the dep is the netdata/roaring-rs fork pinned in
+//! `src/crates/Cargo.toml`). Only
 //! sfst enables the feature in the workspace
-//! (src/crates/sfst/Cargo.toml:31); the standalone fuzz workspace turns it
-//! on too, so cargo unifies the two roaring copies (fuzz/Cargo.toml:12-16).
+//! (`sfst/Cargo.toml`'s `treight` dependency); the standalone fuzz workspace turns it
+//! on too, so cargo unifies the two roaring copies (`fuzz/Cargo.toml`'s pins).
 //! No wrapper type, no `From`/`Into` impls, no bridge on inverted `Bitmap`.
 //! Grep-verified callers: treight's own differential tests only
-//! (tests_roaring.rs:526-582) — no production call site.
+//! (`tests_roaring.rs`) — no production call site.
 use crate::raw::RawBitmap;
 use roaring::RoaringBitmap;
 
@@ -31,8 +32,8 @@ impl RawBitmap {
     /// fails only on non-ascending input — the `unwrap` asserts that
     /// iterator invariant, it cannot fire on a well-formed tree. An empty
     /// blob yields an empty `RoaringBitmap`, and the conversion round-trips
-    /// [`from_roaring`](Self::from_roaring) exactly
-    /// (tests_roaring.rs:571).
+    /// [`from_roaring`](Self::from_roaring) exactly (the `roaring_roundtrip`
+    /// proptest and `test_roaring_roundtrip` in `tests_roaring.rs`).
     pub fn to_roaring(&self, data: &[u8]) -> RoaringBitmap {
         RoaringBitmap::from_sorted_iter(self.iter(data)).unwrap()
     }

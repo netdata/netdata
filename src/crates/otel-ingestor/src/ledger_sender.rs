@@ -1,9 +1,10 @@
 //! Writer→ledger event forwarding. The ingestor is "the writer" in the
 //! ledger's terms: this module owns its side of the single ferryboat IPC
 //! connection the ledger accepts on `writer_socket_path` (both processes
-//! derive that path from the plugin config: otel-ingestor/src/lib.rs:179,
-//! otel-ledger/src/lib.rs:64; the accept:
-//! otel-ledger/src/ledger/mod.rs:346).
+//! pass that path down from the plugin config: the ingestor's
+//! `create_shared_writer_state` in `otel-ingestor/src/lib.rs`, the ledger's
+//! `Ledger::new` in `otel-ledger/src/lib.rs`; the accept: the
+//! `accept_writer` call in `otel-ledger/src/ledger/mod.rs`).
 //!
 //! What crosses is notification, not data: a per-signal `frame_seq`, a tenant
 //! id, and a `wal::FileEvent` (a WAL file was Created/Synced/Closed). The
@@ -16,10 +17,10 @@
 //! never waits on the ledger. Connecting retries forever, but a connection
 //! lost once established is never re-established: the task exits and later
 //! events are silently dropped. Nothing recovers in-process — the ledger
-//! exits on the same failure (otel-ledger/src/ledger/mod.rs:383-386) and the
-//! supervisor never restarts workers; the agent restarts the whole plugin
-//! (otel-plugin/src/supervisor.rs:521-522), which is what closes the loss
-//! window.
+//! exits on the same failure (`Ledger::run` in
+//! `otel-ledger/src/ledger/mod.rs`) and the supervisor never restarts
+//! workers; the agent restarts the whole plugin (`Supervisor::run` in
+//! `otel-plugin/src/supervisor.rs`), which is what closes the loss window.
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -30,15 +31,15 @@ use tokio::sync::mpsc;
 /// Sends WAL events to the ledger over that one IPC connection. Shared via a
 /// single `Arc` by both ingestion services and the idle-rotation sweeps —
 /// the ledger accepts a single writer connection, so there is no alternative
-/// (otel-ingestor/src/lib.rs:353-356) — and sending needs only `&self` and
-/// never blocks: a seq bump under a short-lived `Mutex`, then an
-/// unbounded-channel push.
+/// (`create_shared_writer_state` in `otel-ingestor/src/lib.rs`) — and
+/// sending needs only `&self` and never blocks: a seq bump under a
+/// short-lived `Mutex`, then an unbounded-channel push.
 ///
-/// The ledger gap-checks `frame_seq` per signal (otel-ledger/src/ledger/
-/// ingestor.rs:25-37), and the one connection carries both signals, so the
-/// counters are keyed by `pipeline_id`: each signal gets its own monotonic
-/// stream, and inter-signal interleaving can neither trigger nor mask the
-/// gap-check.
+/// The ledger gap-checks `frame_seq` per signal (`handle_ingestor_msg` in
+/// `otel-ledger/src/ledger/ingestor.rs`), and the one connection carries
+/// both signals, so the counters are keyed by `pipeline_id`: each signal
+/// gets its own monotonic stream, and inter-signal interleaving can neither
+/// trigger nor mask the gap-check.
 pub struct LedgerSender {
     tx: mpsc::UnboundedSender<wal::Message>,
     frame_seq: Mutex<HashMap<u16, u64>>,
@@ -60,7 +61,7 @@ impl LedgerSender {
 
     /// Queues every event of a [`wal::FileEvent`] slice for delivery to the
     /// ledger, tagged with `tenant_id`. Callers drain their writers with
-    /// `wal::Writer::take_all_events` (wal/src/writer.rs:499) and forward
+    /// `wal::Writer::take_all_events` (`wal/src/writer.rs`) and forward
     /// while still holding the writer lock, so one file's
     /// Created→Synced→Closed events are enqueued in lifecycle order. Each
     /// event's `frame_seq` comes from its own signal's counter
@@ -77,9 +78,9 @@ impl LedgerSender {
     }
 
     /// Next sequence number of a signal's stream. Streams start at 1 — the
-    /// value the ledger seeds its next-expected with
-    /// (otel-ledger/src/ledger/mod.rs:363-365) — so the first event checks
-    /// clean against the gap-check.
+    /// value the ledger seeds its next-expected with (`expected_frame_seq`
+    /// in `Ledger::new`, `otel-ledger/src/ledger/mod.rs`) — so the first
+    /// event checks clean against the gap-check.
     fn next_frame_seq(&self, pipeline_id: u16) -> u64 {
         let mut counters = self.frame_seq.lock().unwrap();
         let counter = counters.entry(pipeline_id).or_insert(1);
@@ -110,7 +111,8 @@ async fn sender_task(mut rx: mpsc::UnboundedReceiver<wal::Message>, socket_path:
         }
         Err(e) => {
             // Unreachable in practice: `max_retries(None)` makes the IPC
-            // connect loop retry forever (ferryboat/src/lib.rs:478-490).
+            // connect loop retry forever (`connect_ipc_with_retry` in
+            // `ferryboat/src/lib.rs`).
             tracing::error!("failed to connect to ledger at {socket_path}: {e}");
             return;
         }

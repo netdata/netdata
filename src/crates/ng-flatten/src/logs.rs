@@ -165,7 +165,7 @@ pub struct LogNormalization {
     pub rejected: usize,
     /// String bodies that were a JSON object and got rewritten in place into
     /// an OTLP kvlist (raw string dropped) so the flattener emits typed
-    /// `body.*` columns. See [`try_parse_json_body`]. Deliberately not
+    /// `body.*` columns. See `try_parse_json_body`. Deliberately not
     /// forwarded into [`PreparedLogFrame`] or logged: unlike [`Self::bad_ids`]
     /// or `sanitized_keys`, this counts desired behavior, not malformed input.
     pub parsed_bodies: usize,
@@ -188,7 +188,7 @@ pub struct LogNormalization {
 ///    the spec width becomes absent (the SFST id columns later store it as the
 ///    all-zero "unset" sentinel); conformant and absent ids pass untouched.
 /// 4. **Rewrites JSON-object string bodies** in place (see
-///    [`try_parse_json_body`]) so the flattener emits typed `body.*` columns
+///    `try_parse_json_body`) so the flattener emits typed `body.*` columns
 ///    instead of one opaque string; any other body is left verbatim.
 ///
 /// Scopes and resources the window filter empties are pruned too, so their
@@ -295,7 +295,7 @@ pub fn normalize_log_request(
 ///   stay verbatim — object-only gate, decision 2A).
 ///
 /// Only the top level is gated on being an object; nested values convert by
-/// their own JSON type via [`json_to_any_value`].
+/// their own JSON type via `json_to_any_value`.
 fn try_parse_json_body(s: &str) -> Option<AnyValue> {
     let trimmed = s.trim();
     if !(trimmed.starts_with('{') && trimmed.ends_with('}')) {

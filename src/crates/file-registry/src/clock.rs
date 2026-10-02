@@ -19,8 +19,9 @@
 //! this clock orders timestamps and never seeds from disk.
 //!
 //! Consumers (grep-verified): `otel-ingestor` (the shared clock above,
-//! src/crates/otel-ingestor/src/lib.rs:183 — frame stamps, the
-//! ingestion-window base, fallback stamps, idle-rotation sweeps),
+//! created in `src/crates/otel-ingestor/src/lib.rs` `run_ingestor` —
+//! frame stamps, the ingestion-window base, fallback stamps,
+//! idle-rotation sweeps),
 //! `ng-ingest` (per-binary instances feeding `write_request`), `wal`
 //! (consumes the resulting `TimestampNs` values; docs-only reference to this
 //! type), and test/fixture code in `sfsq`, `otel-ledger`, `ng-index`, and

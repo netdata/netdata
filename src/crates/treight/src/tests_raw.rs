@@ -14,11 +14,11 @@
 //! - The four set ops as pure blob-to-blob functions, with
 //!   set-theoretic identities across 1-4 level trees.
 //! - In-place `insert`/`remove` — the crate's only tree-byte splice and
-//!   drain (raw.rs:306/:374) — `remove_range`'s rebuild, the panic
-//!   guards, and the serialize wire format.
+//!   drain (the `splice` in `insert`, the `drain` in `remove`) —
+//!   `remove_range`'s rebuild, the panic guards, and the serialize wire format.
 //! - `estimate_data_size`'s exactness against real builds (the fuzz
 //!   target re-asserts the tie after arbitrary op sequences,
-//!   fuzz/fuzz_targets/against_roaring.rs:199-204).
+//!   `fuzz/fuzz_targets/against_roaring.rs`).
 //!
 //! Not pinned here: descending or out-of-range values fed to
 //! `from_sorted_iter` (both undefined; no test feeds them), and roaring
@@ -892,7 +892,7 @@ fn test_heap_bytes() {
 }
 
 // In-place patchers: insert/remove are the crate's only tree-byte
-// splice/drain (raw.rs:306/:374) — they edit the existing blob rather
+// splice/drain — they edit the existing blob rather
 // than rebuild it, and panic on values at or past the universe. The
 // first insert into an empty blob lays down a whole root-to-leaf
 // chain; removing the last value prunes it back to nothing.

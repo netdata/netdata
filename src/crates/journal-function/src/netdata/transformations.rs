@@ -1,7 +1,8 @@
 //! Display-only field transformations for the journal/OTel logs Functions.
 //!
 //! The query engine returns raw field=value pairs, untransformed
-//! (journal-engine/src/logs/query.rs:537); display formatting lives here. A
+//! (`LogEntryData` in `journal-engine/src/logs/query.rs`); display
+//! formatting lives here. A
 //! [`FieldTransformation`] maps one raw field value to its display form.
 //! [`TransformationRegistry`] keys mappers by field name and offers two
 //! lookups: `transform_field` for table cells (keeps raw + display side by
@@ -9,8 +10,9 @@
 //! (display string only). Both echo the input back unchanged when a field is
 //! not registered — the normal case, because [`systemd_transformations`]
 //! pre-registers only the journal field set listed there. All mappers live
-//! in this file; the only construction sites are netdata/builder.rs:97 and
-//! otel-legacy-logs/src/handler.rs:470. The duplicate at
+//! in this file; the only construction sites are
+//! [`crate::netdata::build_ui_response`] and `otel-legacy-logs/src/handler.rs`
+//! (`LegacyLogsHandler::on_call`). The duplicate at
 //! journal-engine/src/logs/transformations.rs is not compiled.
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -51,10 +53,11 @@ impl TransformationRegistry {
 
     /// Builds a table cell for `field_name`: an empty cell for `None`, and
     /// for `Some(raw)` a cell carrying the raw value and its display form
-    /// side by side (`CellValue::with_display`,
-    /// journal-engine/src/logs/table.rs:23). Display is the registered
+    /// side by side (`CellValue::with_display` in
+    /// `journal-engine/src/logs/table.rs`). Display is the registered
     /// mapper's output, or `raw` itself when the field has no registration.
-    /// Sole caller: the logs-table builder (netdata/builder.rs:37,43).
+    /// Sole caller: `entry_data_to_table_with_transformations` in
+    /// `netdata/builder.rs`.
     pub fn transform_field(
         &self,
         field_name: &str,
@@ -76,7 +79,8 @@ impl TransformationRegistry {
 
     /// Display string for `field_name`; the input comes back unchanged when
     /// the field is not registered. Sole callers: facet options
-    /// (netdata/facets.rs:55) and chart labels (netdata/histogram.rs:104).
+    /// (`facets()` in `netdata/facets.rs`) and chart labels
+    /// (`chart_result_from_histogram` in `netdata/histogram.rs`).
     pub fn transform_value(&self, field_name: &str, value: &str) -> String {
         self.transformations
             .get(field_name)
@@ -450,7 +454,8 @@ impl FieldTransformation for CapEffectiveTransformation {
 /// Microseconds since the Unix epoch → RFC3339 with microsecond precision,
 /// rendered in the host's local timezone ("…Z" when that is UTC). Registered
 /// twice: as the synthetic first-column key "timestamp" the table builder
-/// feeds (netdata/builder.rs:37) and as the raw journal field
+/// feeds (`entry_data_to_table_with_transformations` in `netdata/builder.rs`)
+/// and as the raw journal field
 /// _SOURCE_REALTIME_TIMESTAMP. Unparseable or unrepresentable input passes through.
 pub struct SourceRealtimeTimestampTransformation;
 
@@ -640,7 +645,8 @@ impl FieldTransformation for MessageIdTransformation {
 /// "ERRNO"; the passthrough stub "_BOOT_ID"; "_UID"/"_GID" plus their
 /// OBJECT_*/audit aliases; "_CAP_EFFECTIVE"; "MESSAGE_ID". Fields outside
 /// this list keep display = raw (`transform_field` / `transform_value`).
-/// Sole callers: netdata/builder.rs:97 and otel-legacy-logs/src/handler.rs:470.
+/// Sole callers: [`crate::netdata::build_ui_response`] and
+/// `otel-legacy-logs/src/handler.rs` (`LegacyLogsHandler::on_call`).
 pub fn systemd_transformations() -> TransformationRegistry {
     let mut registry = TransformationRegistry::new();
 

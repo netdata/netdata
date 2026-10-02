@@ -16,7 +16,8 @@
 //! All rejections — collisions, oversized identities, out-of-window records —
 //! are reported to the sender via OTLP `partial_success` instead of failing
 //! the RPC, and the ack is only returned after the WAL sync. The periodic
-//! [`Self::sweep_expired_rotations`] seals quiet streams between exports.
+//! [`NetdataLogsService::sweep_expired_rotations`] seals quiet streams
+//! between exports.
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::path::PathBuf;

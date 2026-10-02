@@ -6,36 +6,37 @@
 //! Module map - every submodule is `pub`; the re-exports below are the
 //! flat surface (nothing here is `doc(hidden)`):
 //! - builder - `build_ui_response`: query histogram + matched entries ->
-//!   the `(columns, data)` JSON pair (builder.rs:79)
-//! - columns - logs-table column schema: `FilterType`, `ColumnSchema`,
-//!   `generate_column_schema` (columns.rs:13,45,238)
-//! - facets - facet filter options from the histogram (facets.rs:16)
+//!   the `(columns, data)` JSON pair ([`build_ui_response`])
+//! - columns - logs-table column schema: [`FilterType`],
+//!   [`columns::ColumnSchema`], [`columns::generate_column_schema`]
+//! - facets - facet filter options from the histogram ([`facets()`])
 //! - histogram - histogram chart + available-histogram lists
-//!   (histogram.rs:18,50)
-//! - response - table -> row arrays (`table_to_netdata_response`,
-//!   response.rs:50)
-//! - severity - syslog PRIORITY -> `Severity` (severity.rs:14)
+//!   ([`available_histograms`], [`histogram()`])
+//! - response - table -> row arrays
+//!   ([`response::table_to_netdata_response`])
+//! - severity - syslog PRIORITY -> [`Severity`]
 //! - transformations - field-value transforms + the systemd registry
-//!   (`systemd_transformations`, transformations.rs:609)
-//! - types - Functions-protocol types: `JournalRequest`,
-//!   `JournalResponse` (types.rs:13,168)
-//! - ui_types - the flat serde types the builders emit: `Facet`,
-//!   `Histogram`, `Chart` (ui_types.rs:24,44,59)
+//!   ([`systemd_transformations`])
+//! - types - Functions-protocol types: [`JournalRequest`],
+//!   [`JournalResponse`]
+//! - ui_types - the flat serde types the builders emit: [`Facet`],
+//!   [`Histogram`], [`Chart`]
 //!
 //! Sole external consumer (grep-verified; journal-function has no other
-//! dependent, otel-legacy-logs/Cargo.toml:19):
-//! otel-legacy-logs/src/handler.rs imports `netdata` (handler.rs:23) and
-//! takes everything through the re-exports below (handler.rs:29-32,
-//! 469-517) to assemble one `JournalResponse` - its `facets`/`histogram`/
+//! dependent, see the `journal-function` dep in
+//! `otel-legacy-logs/Cargo.toml`):
+//! `otel-legacy-logs/src/handler.rs` imports `netdata` and
+//! takes everything through the re-exports below
+//! to assemble one `JournalResponse` - its `facets`/`histogram`/
 //! `columns`/`data` fields are filled from these builders
-//! (types.rs:177-182).
+//! (the `JournalResponse` fields, filled in `LegacyLogsHandler::on_call`).
 //!
-//! Not re-exported: the column-schema builders (`generate_column_schema`,
-//! `columns_to_sorted_json`, columns.rs:238,280) and
-//! `table_to_netdata_response` (response.rs:50) are reachable only via
+//! Not re-exported: the column-schema builders
+//! ([`columns::generate_column_schema`], [`columns::columns_to_sorted_json`]) and
+//! [`response::table_to_netdata_response`] are reachable only via
 //! their module paths (`netdata::columns::`, `netdata::response::`). And
 //! the `Histogram` here is the UI chart type; the crate-root `Histogram`
-//! is journal-engine's bucket histogram (lib.rs:14).
+//! is journal-engine's bucket histogram ([`crate::Histogram`]).
 
 pub mod builder;
 pub mod columns;

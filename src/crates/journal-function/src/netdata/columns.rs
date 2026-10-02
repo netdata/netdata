@@ -6,17 +6,20 @@
 //! `generate_column_schema` builds the schema map - the special
 //! `timestamp`/`rowOptions` columns at indexes 0-1, then one column per
 //! discovered journal field - from the histogram's discovered fields
-//! (journal-engine/src/histogram.rs:166); `columns_to_sorted_json`
-//! serializes it with keys in index order into `JournalResponse.columns`
-//! (netdata/types.rs:181). netdata/response.rs renders the row arrays
-//! against the same schema (`table_to_netdata_response`,
-//! netdata/response.rs:50). Sole in-tree caller (grep-verified):
-//! netdata/builder.rs:93,95, whose `build_ui_response` output
-//! otel-legacy-logs/src/handler.rs:469 puts into the response.
+//! (`discovered_fields` of `journal-engine/src/histogram.rs`'s
+//! `Histogram`); `columns_to_sorted_json`
+//! serializes it with keys in index order into the `columns` field of
+//! [`crate::netdata::types::JournalResponse`]. `netdata/response.rs`
+//! renders the row arrays against the same schema
+//! ([`crate::netdata::response::table_to_netdata_response`]). Sole
+//! in-tree caller (grep-verified):
+//! [`crate::netdata::builder::build_ui_response`], whose output
+//! `otel-legacy-logs/src/handler.rs` (`LegacyLogsHandler::on_call`) puts
+//! into the response.
 //!
 //! Outside this crate, otel-ledger's logs adapter hand-builds the same
-//! column shape for its tables
-//! (otel-ledger/src/ledger/rpc/logs/adapter.rs:455-467).
+//! column shape for its tables (`build_columns` in
+//! `otel-ledger/src/ledger/rpc/logs/adapter.rs`).
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -36,7 +39,7 @@ pub enum FilterType {
 }
 
 /// Cell-formatting instructions the UI applies to a column's values
-/// (otel-ledger/src/ledger/rpc/logs/adapter.rs:459).
+/// (see `build_columns` in `otel-ledger/src/ledger/rpc/logs/adapter.rs`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValueOptions {
     /// UI-side transform for the cell value: "datetime_usec" renders µs
@@ -69,8 +72,9 @@ pub struct ColumnSchema {
     pub index: usize,
 
     /// The column's identifier: the map key here, the JSON object key in
-    /// `columns_to_sorted_json`, and the value response.rs matches on
-    /// (netdata/response.rs:73). Skipped in serialization - `id` mirrors it.
+    /// [`columns_to_sorted_json`], and the value
+    /// [`crate::netdata::response::table_to_netdata_response`] matches on.
+    /// Skipped in serialization - `id` mirrors it.
     #[serde(skip)]
     pub key: String,
 
@@ -161,8 +165,8 @@ impl ColumnSchema {
 
     /// The special "rowOptions" column (index 1): an invisible dummy
     /// column that reserves row position 1, where the rendered rows carry
-    /// the per-row options object `{"severity": ...}`
-    /// (netdata/response.rs:93).
+    /// the per-row options object `{"severity": ...}` that
+    /// [`crate::netdata::response::table_to_netdata_response`] emits.
     pub fn row_options() -> Self {
         Self {
             index: 1,
@@ -200,7 +204,7 @@ impl ColumnSchema {
 
         // Filter type mirrors the C implementation: FACET for every field,
         // NONE for the ones registered FACET_KEY_OPTION_NEVER_FACET there
-        // (facets.c:2861).
+        // (src/libnetdata/facets/facets.c).
         let filter = match name.as_str() {
             // Fields with FACET_KEY_OPTION_NEVER_FACET in C code
             "MESSAGE" | "ND_JOURNAL_PROCESS" | "ND_JOURNAL_FILE" => FilterType::None,
@@ -213,7 +217,8 @@ impl ColumnSchema {
         let visible = name == "MESSAGE";
 
         // Filters shown expanded on first view, mirroring the C plugin's
-        // EXPANDED_FILTER registrations (systemd-journal.c:183,190,207-208).
+        // EXPANDED_FILTER registrations (FACET_KEY_OPTION_EXPANDED_FILTER in
+        // src/collectors/systemd-journal.plugin/systemd-journal.c).
         let default_expanded_filter =
             matches!(name.as_str(), "PRIORITY" | "SYSLOG_FACILITY" | "MESSAGE_ID");
 
@@ -257,8 +262,8 @@ impl ColumnSchema {
 ///
 /// * `discovered_fields` - Sorted field names from
 ///   `journal_engine::Histogram::discovered_fields()`
-///   (journal-engine/src/histogram.rs:166), as passed by
-///   netdata/builder.rs:93. Names matching the special columns are skipped.
+///   (in `journal-engine/src/histogram.rs`), as passed by
+///   [`crate::netdata::builder::build_ui_response`]. Names matching the special columns are skipped.
 ///
 /// # Returns
 ///
@@ -293,7 +298,7 @@ pub fn generate_column_schema(discovered_fields: &[String]) -> StdHashMap<String
 /// Serializes the schema map into the response's `columns` object with the
 /// keys in index order, as the UI expects. Insertion order survives
 /// because journal-function enables serde_json's `preserve_order` feature
-/// (journal-function/Cargo.toml:15); without it `serde_json::Map`
+/// (`journal-function/Cargo.toml`); without it `serde_json::Map`
 /// alphabetizes keys.
 pub fn columns_to_sorted_json(columns: &StdHashMap<String, ColumnSchema>) -> Value {
     let mut entries: Vec<_> = columns.iter().collect();

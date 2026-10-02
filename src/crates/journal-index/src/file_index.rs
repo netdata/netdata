@@ -3,32 +3,33 @@
 //! [`FileIndex`] is the searchable snapshot of one journal file: a
 //! [`Histogram`] with running counts per time bucket, the file's entry
 //! offsets in time order, and one [`Bitmap`] per indexed field=value pair
-//! whose bits index into that offset list. `FileIndexer::index` is the
-//! only producer (file_indexer.rs:145-151, 240-249). This file holds the
+//! whose bits index into that offset list. [`crate::FileIndexer::index`] is the
+//! only producer. This file holds the
 //! query side: `LogQueryParams` (built by `LogQueryParamsBuilder`), the
 //! anchor/direction vocabulary, the entry/timestamp/regex helpers
 //! `find_log_entries` uses, and the `LogEntryId` results.
 //!
 //! Lifecycle: journal-engine caches built indexes in a foyer HybridCache
 //! keyed by (file, facets, source timestamp field, schema version)
-//! (journal-engine/src/cache.rs:17-44). A cached index is reused only
+//! (`journal-engine/src/cache.rs`). A cached index is reused only
 //! while `is_fresh` holds and its histogram granularity divides the
-//! query's bucket duration (journal-engine/src/indexing.rs:232-236);
+//! query's bucket duration (`journal-engine/src/indexing.rs` reuse gate);
 //! after each build the engine feeds `start_time`/`end_time`/
 //! `indexed_at`/`online` back into the registry's per-file time-range
-//! overlay (journal-engine/src/indexing.rs:357-363). Queries therefore
+//! overlay (`journal-engine/src/indexing.rs`). Queries therefore
 //! run in two stages: the registry picks files by their recorded time
-//! ranges (journal-registry/src/registry/mod.rs:298), then each
+//! ranges (`journal-registry/src/registry/mod.rs` `find_files_in_range`),
+//! then each
 //! surviving file's index answers `find_log_entries` and the caller
-//! merges results in time order (journal-engine/src/logs/query.rs:
-//! 249-422). otel-legacy-logs drives the same stages through the
-//! engine's `LogQuery` (otel-legacy-logs/src/handler.rs:204).
+//! merges results in time order (`journal-engine/src/logs/query.rs`
+//! `LogQuery`). otel-legacy-logs drives the same stages through the
+//! engine's `LogQuery` (`otel-legacy-logs/src/handler.rs`).
 //!
 //! Serialization: the struct derives `Serialize`/`Deserialize` for the
 //! engine's cache; bitmaps ride along serde-transparently (bitmap.rs),
 //! field names and pairs as plain strings (field_types.rs), and the
 //! `File` identity through its hand-written serde impl
-//! (journal-registry/src/repository/file.rs:199-216). Under the crate's
+//! (`journal-registry/src/repository/file.rs`). Under the crate's
 //! `allocative` feature the struct also derives `allocative::Allocative`.
 use crate::{
     Bitmap, FieldName, FieldValuePair, Histogram, IndexError, Microseconds, Result, Seconds,
@@ -44,9 +45,9 @@ use tracing::{error, trace};
 /// Searchable snapshot of a single journal file.
 ///
 /// Everything a query needs is precomputed at index time and packed by
-/// `FileIndexer::index` (file_indexer.rs:240-249):
+/// [`crate::FileIndexer::index`]:
 /// - `histogram`: running-count time buckets over the entries
-///   (histogram.rs:30-43), which also defines the file's covered range
+///   ([`Histogram`]), which also defines the file's covered range
 /// - `entry_offsets`: the file's entry offsets in time order; bitmaps
 ///   address entries by index into this vector
 /// - `bitmaps`: one [`Bitmap`] per indexed field=value pair
@@ -54,41 +55,43 @@ use tracing::{error, trace};
 ///   caller asked to index
 ///
 /// The index is immutable after creation and snapshots the file up to the
-/// tail offset captured when indexing started (file_indexer.rs:163-173),
+/// tail offset captured when indexing started ([`crate::FileIndexer::index`]
+/// snapshot bound),
 /// so an actively-written file's index lags behind and gets rebuilt when
-/// stale (`is_fresh`, journal-engine/src/indexing.rs:232-248).
+/// stale (`is_fresh`; the engine's cache reuse gate in
+/// `journal-engine/src/indexing.rs`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct FileIndex {
     // The repository file this index describes; also the identity carried
     // back in results (LogEntryId.file, journal-engine pagination state)
     file: File,
-    // Wall-clock seconds when indexing started (file_indexer.rs:176); feeds
+    // Wall-clock seconds when indexing started (`src/file_indexer.rs`); feeds
     // is_fresh and the registry's time-range overlay
     indexed_at: Seconds,
     // Whether the file was treated as actively written when indexed: journal
-    // header state == 1, or an "active" filename (file_indexer.rs:196)
+    // header state == 1, or an "active" filename (`src/file_indexer.rs`)
     was_online: bool,
-    // Time histogram with running counts per bucket (histogram.rs:30-43);
+    // Time histogram with running counts per bucket (`Histogram`);
     // its covered range is this index's start_time/end_time
     histogram: Histogram,
     // Entry offsets (u32) in the file, ordered by timestamp: the source
     // timestamp field where present, the entry's realtime otherwise
-    // (file_indexer.rs:217-221). Bitmaps hold indices into this vector
+    // (`src/file_indexer.rs` ordering pass). Bitmaps hold indices into this vector
     entry_offsets: Vec<u32>,
-    // Every field name the file's field table carries (file_indexer.rs:235-238)
+    // Every field name the file's field table carries (`src/file_indexer.rs`)
     file_fields: HashSet<FieldName>,
     // Fields the caller asked to index - requested names even when the file
-    // does not have them (file_indexer.rs:233)
+    // does not have them (`src/file_indexer.rs`)
     indexed_fields: HashSet<FieldName>,
     // One bitmap per indexed field=value pair; bits are entry indices into
-    // entry_offsets (file_indexer.rs:359-368)
+    // entry_offsets (`build_entries_index` in `src/file_indexer.rs`)
     bitmaps: HashMap<FieldValuePair, Bitmap>,
 }
 
 impl FileIndex {
-    /// Pack an index from the indexer's results; `FileIndexer::index` is
-    /// the only caller (file_indexer.rs:240-249).
+    /// Pack an index from the indexer's results; [`crate::FileIndexer::index`] is
+    /// the only caller.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         file: File,
@@ -114,7 +117,7 @@ impl FileIndex {
 
     /// Bucket granularity of the histogram; journal-engine reuses a cached
     /// index only when this divides the query's bucket duration
-    /// (journal-engine/src/indexing.rs:233-234).
+    /// (`journal-engine/src/indexing.rs` reuse gate).
     pub fn bucket_duration(&self) -> Seconds {
         Seconds(self.histogram.bucket_duration.get())
     }
@@ -151,13 +154,13 @@ impl FileIndex {
     }
 
     /// Start of the covered time range: the first bucket's start, aligned
-    /// to the bucket grid (histogram.rs:123-126).
+    /// to the bucket grid ([`Histogram::start_time`]).
     pub fn start_time(&self) -> Seconds {
         self.histogram.start_time()
     }
 
     /// End of the covered time range, exclusive: last bucket start plus
-    /// bucket_duration (histogram.rs:129-132).
+    /// bucket_duration ([`Histogram::end_time`]).
     pub fn end_time(&self) -> Seconds {
         self.histogram.end_time()
     }
@@ -168,7 +171,7 @@ impl FileIndex {
     }
 
     /// Number of entries the histogram covers; the upper bound of bitmap
-    /// entry indices (journal-engine/src/histogram.rs:291 builds full
+    /// entry indices (`journal-engine/src/histogram.rs` builds full
     /// coverage with it).
     pub fn total_entries(&self) -> usize {
         self.histogram.total_entries()
@@ -192,9 +195,9 @@ impl FileIndex {
     }
 
     /// Count bitmap entries whose entry indices fall in the given time
-    /// range's index window (histogram.rs:169-174). Returns None unless
-    /// both bounds are multiples of the bucket duration and start < end
-    /// (histogram.rs:176-185).
+    /// range's index window ([`Histogram::count_entries_in_time_range`]).
+    /// Returns None unless
+    /// both bounds are multiples of the bucket duration and start < end.
     pub fn count_entries_in_time_range(
         &self,
         bitmap: &Bitmap,
@@ -221,7 +224,7 @@ pub enum Direction {
 ///
 /// Per file, `find_log_entries` resolves Head/Tail to that index's own
 /// start/end time; multi-file callers take the minimum start / maximum end
-/// across their indexes (journal-engine/src/logs/query.rs:262-280).
+/// across their indexes (`journal-engine/src/logs/query.rs`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Anchor {
@@ -238,7 +241,7 @@ pub enum Anchor {
 /// Construct with [`LogQueryParamsBuilder`], which validates boundaries and
 /// compiles the regex at `build()`. Consumed per file by
 /// `FileIndex::find_log_entries` and by journal-engine's multi-file merge
-/// (journal-engine/src/logs/query.rs:249).
+/// (`journal-engine/src/logs/query.rs` `LogQuery`).
 #[derive(Debug, Clone)]
 pub struct LogQueryParams {
     /// Starting point for the query
@@ -251,7 +254,7 @@ pub struct LogQueryParams {
     /// an entry, uses the entry's realtime timestamp)
     source_timestamp_field: Option<super::FieldName>,
     /// Filter resolved against the file's bitmaps to pre-select candidate
-    /// entries before any I/O (filter.rs:80)
+    /// entries before any I/O ([`crate::Filter::evaluate`])
     filter: Option<super::Filter>,
     /// Optional lower time boundary (inclusive) in microseconds
     after: Option<Microseconds>,
@@ -603,8 +606,7 @@ pub struct LogEntryId {
     pub timestamp: Microseconds,
     /// Index into this query's candidate entry list (the bitmap-selected
     /// entry offsets). Pagination feeds it back as `resume_position` to
-    /// continue at the exact position (journal-engine/src/logs/query.rs:
-    /// 408-419).
+    /// continue at the exact position (`journal-engine/src/logs/query.rs`).
     pub position: usize,
 }
 
@@ -612,7 +614,7 @@ impl FileIndex {
     /// Retrieve this file's log entries matching `params`.
     ///
     /// The `Filter` is resolved against this index's bitmaps into the set
-    /// of candidate entries before any I/O (filter.rs:80); without a
+    /// of candidate entries before any I/O ([`crate::Filter::evaluate`]); without a
     /// filter every entry is a candidate. The anchor is then resolved
     /// (`Timestamp` as given, `Head`/`Tail` to this index's start/end
     /// time), a binary search positions the scan, and the time boundaries,
@@ -645,7 +647,7 @@ impl FileIndex {
     ) -> Result<Vec<LogEntryId>> {
         // Resolve the anchor: Timestamp as given; Head/Tail to this index's
         // own start/end time (multi-file min/max happens in the caller,
-        // journal-engine/src/logs/query.rs:262-280)
+        // `journal-engine/src/logs/query.rs`)
         let anchor_usec = match params.anchor() {
             Anchor::Timestamp(ts) => ts,
             Anchor::Head => self.start_time().to_microseconds(),
@@ -653,7 +655,7 @@ impl FileIndex {
         };
 
         // Candidate set: the filter resolved against this file's bitmaps
-        // (filter.rs:80), or a full-coverage bitmap over all entry indices
+        // (`src/filter.rs` `Filter::evaluate`), or a full-coverage bitmap over all entry indices
         let bitmap = params
             .filter()
             .map(|f| f.evaluate(self))
@@ -664,7 +666,7 @@ impl FileIndex {
             return Ok(Vec::new());
         }
 
-        // Same mmap window size the indexer uses (file_indexer.rs:160)
+        // Same mmap window size the indexer uses (`src/file_indexer.rs`)
         let window_size = 32 * 1024 * 1024;
         let journal_file = JournalFile::open(file, window_size)?;
 

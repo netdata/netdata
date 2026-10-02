@@ -2,21 +2,21 @@
 //! `RecommendedWatcher` and forwards every event it produces to the
 //! unbounded tokio channel whose receiver `Monitor::new` returns. Events
 //! arrive raw — unfiltered, no debouncing at this layer;
-//! `Registry::process_event` (registry/mod.rs:224) does the filtering,
+//! [`crate::Registry::process_event`] does the filtering,
 //! folding create/remove/rename into the repository and ignoring the rest.
 //! notify's own error results are dropped silently by the `Ok` filter in
 //! `new`. The notify callback runs on notify's event-loop thread
-//! (notify-rs/notify 8.2, inotify.rs:125), not on a tokio worker, so the
+//! (notify-rs/notify 8.2), not on a tokio worker, so the
 //! handoff cannot await and uses the unbounded channel's synchronous,
 //! never-blocking `send`: events pile up until a tokio task drains the
-//! receiver (otel-legacy-logs/src/handler.rs:185-191; constructing the
+//! receiver (`otel-legacy-logs/src/handler.rs`; constructing the
 //! monitor needs no runtime). Dropping the receiver turns every later send
 //! into the `warn!` in `new`, losing events. All three fallible calls
-//! propagate `notify::Error` as `RegistryError::Notify`
-//! (registry/error.rs:24-25). Consumers: otel-legacy-logs drives the
+//! propagate `notify::Error` as [`crate::RegistryError::Notify`].
+//! Consumers: otel-legacy-logs drives the
 //! watch → process_event → find_files_in_range loop
-//! (otel-legacy-logs/src/handler.rs:144-190,381) and journal-function
-//! re-exports `Monitor` (journal-function/src/lib.rs:25).
+//! (`otel-legacy-logs/src/handler.rs`) and journal-function
+//! re-exports `Monitor` (`journal-function/src/lib.rs`).
 use super::error::Result;
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::Path;
@@ -52,7 +52,8 @@ impl Monitor {
     }
 
     /// Recursively watches `path`, its subdirectories included. `Registry`
-    /// scans the directory first and calls this (registry/mod.rs:184).
+    /// scans the directory first and calls this
+    /// ([`crate::Registry::watch_directory`]).
     pub fn watch_directory(&mut self, path: &str) -> Result<()> {
         self.watcher
             .watch(Path::new(path), RecursiveMode::Recursive)?;
@@ -60,8 +61,8 @@ impl Monitor {
         Ok(())
     }
 
-    /// Stops watching `path` (repository cleanup is `Registry`'s job,
-    /// registry/mod.rs:213-215).
+    /// Stops watching `path` (repository cleanup is
+    /// [`crate::Registry::unwatch_directory`]'s job).
     pub fn unwatch_directory(&mut self, path: &str) -> Result<()> {
         self.watcher.unwatch(Path::new(path))?;
         Ok(())

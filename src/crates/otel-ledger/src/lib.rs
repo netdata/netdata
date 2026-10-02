@@ -10,7 +10,8 @@
 //!
 //! One ledger worker process per plugin run: the supervisor re-execs the
 //! plugin binary as a `worker ledger` subprocess and its main dispatches to
-//! [`run_worker`] (otel-plugin/src/main.rs:67 — the crate's only importer),
+//! [`run_worker`] (`otel-plugin/src/main.rs` `run_worker` — the crate's only
+//! importer),
 //! alongside the `otel-ingestor` producer that writes the per-tenant WALs and
 //! forwards their events over the writer socket this crate accepts.
 //! `event`/`indexer` are reached only via `crate::` from `ledger/`, and
@@ -34,8 +35,9 @@ use ferryboat::{Connection, Endpoint};
 /// Ledger worker entry point.
 ///
 /// Spawned by the supervisor re-exec (`worker ledger --socket …`,
-/// otel-plugin/src/supervisor.rs:647-648). Connects to the supervisor's IPC
-/// socket, performs the Configure → Ready handshake — `Configure` received
+/// `otel-plugin/src/supervisor.rs` `spawn_worker`). Connects to the
+/// supervisor's IPC socket, performs the Configure → Ready handshake —
+/// `Configure` received
 /// here, `Ready` sent from `Ledger::new` — then runs the ledger event loop.
 pub async fn run_worker(socket_path: &str) -> Result<()> {
     tracing::info!("connecting to supervisor socket={socket_path}");
@@ -88,9 +90,11 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
 
     // Log the error while `ledger` is still in scope: returning drops its
     // supervisor connection. The supervisor treats a worker disconnect as
-    // fatal (otel-plugin/src/supervisor.rs:558) and tears the whole plugin
-    // down — graceful `Shutdown` + ≤2s exit wait (supervisor.rs:330-367),
-    // ChildGuard SIGKILL only as last resort (:70-86) — so an error logged
+    // fatal (`otel-plugin/src/supervisor.rs` `Supervisor::run`) and tears
+    // the whole plugin down — graceful `Shutdown` + ≤2s exit wait
+    // (`otel-plugin/src/supervisor.rs` `shutdown_workers`), ChildGuard
+    // SIGKILL only as last resort
+    // (`otel-plugin/src/supervisor.rs` `ChildGuard`) — so an error logged
     // after the drop (e.g. in main) races that teardown and may never be
     // recorded.
     let result = ledger.run().await;

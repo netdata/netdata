@@ -2,7 +2,7 @@
 //!
 //! [`Registry`] composes one tenant's three source registries — [`wal::Registry`]
 //! (the `wal` crate), [`sfst::Registry`], and [`otel_catalog::Registry`] — plus
-//! the per-[`SeqKey`] lifecycle map ([`SeqState`]: the remote-upload and
+//! the per-[`SeqKey`] lifecycle map (`SeqState`: the remote-upload and
 //! catalog-stage axes) that neither source registry owns. [`TenantRegistries`]
 //! owns all tenants of one signal: one [`Registry`] per tenant directory
 //! (lazily created by [`TenantRegistries::get_or_create`], disk-recovered by
@@ -83,7 +83,7 @@ pub struct PartitionStat {
     /// Number of files holding this partition.
     pub file_count: u64,
     /// Earliest known log second across the partition's files; `None` when no
-    /// contributing file reported a nonzero bound (see [`PartitionStat::add`]).
+    /// contributing file reported a nonzero bound (see `PartitionStat::add`).
     pub min_timestamp_s: Option<u32>,
     /// Latest known log second across the partition's files.
     pub max_timestamp_s: Option<u32>,

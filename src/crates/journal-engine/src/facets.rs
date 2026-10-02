@@ -1,11 +1,11 @@
 //! Which journal fields get per-value bitmaps in a file index.
 //!
 //! A facet is a field whose distinct values get a `Bitmap` at index time
-//! (journal-index/src/file_indexer.rs:143,254-275; each FileIndex stores
+//! (`journal-index/src/file_indexer.rs` `FileIndexer`; each FileIndex stores
 //! one `HashMap<FieldValuePair, Bitmap>`,
-//! journal-index/src/file_index.rs:41). Fields outside the set are not
-//! indexed and surface as `unindexed_fields` in bucket responses
-//! (histogram.rs:101-102).
+//! `journal-index/src/file_index.rs` `FileIndex`). Fields outside the set are not
+//! indexed and surface as `unindexed_fields` in
+//! [`crate::histogram::BucketResponse`]s.
 //!
 //! [`Facets`] holds that set canonicalized — validated, sorted, deduped —
 //! so the value is order-insensitive and any two instances over the same
@@ -17,12 +17,13 @@
 //! `precomputed_hash == hash(fields)` invariant by construction.
 //!
 //! [`Facets`] is the facet component of the file-index cache key
-//! (cache.rs:28) and reaches indexing as a slice (indexing.rs:314-317).
+//! ([`crate::cache::FileIndexKey`]) and reaches indexing as a slice via
+//! [`Facets::as_slice`].
 //! In-tree builders: the legacy-logs handler from the request's facet
-//! list (otel-legacy-logs/src/handler.rs:392), the histogram engine
-//! (histogram.rs:224), and the example (examples/index.rs:93).
-//! Re-exported by journal-engine (lib.rs:32) and journal-function
-//! (journal-function/src/lib.rs:13).
+//! list (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::on_call`), the histogram engine
+//! ([`crate::histogram::HistogramEngine::compute_from_indexes`]), and the example (`examples/index.rs` `main`).
+//! Re-exported by journal-engine (crate root) and journal-function
+//! (`journal-function/src/lib.rs`).
 
 use journal_index::FieldName;
 use std::hash::Hash;
@@ -35,7 +36,7 @@ use std::sync::Arc;
 /// invalid names dropped, sorted, deduped — so input order cannot leak
 /// into the value, and two instances over the same fields always compare
 /// equal. That is what lets the same field set hit the same file-index
-/// cache entry regardless of input order (cache.rs:25-30).
+/// cache entry regardless of input order ([`crate::cache::FileIndexKey`]).
 ///
 /// # Serialization
 ///
@@ -45,11 +46,11 @@ use std::sync::Arc;
 /// `precomputed_hash == hash(fields)` invariant by construction.
 #[derive(Debug, Clone)]
 pub struct Facets {
-    /// The field names in canonical order: sorted (FieldName derives
-    /// Ord, journal-index/src/field_types.rs:16-18), deduped, caller
-    /// names validated (journal-index/src/field_types.rs:32-40). Shared
+    /// The field names in canonical order: sorted (`FieldName` derives
+    /// Ord, `journal-index/src/field_types.rs` `FieldName`), deduped, caller
+    /// names validated (`journal-index/src/field_types.rs` `FieldName::new`). Shared
     /// behind an `Arc` so the per-file cache keys cloned from one
-    /// `Facets` copy a pointer, not the list (cache.rs:37).
+    /// `Facets` copy a pointer, not the list ([`crate::cache::FileIndexKey::new`]).
     fields: Arc<Vec<FieldName>>,
     /// Cached hash of the canonical names, taken at construction;
     /// consumed by the `Hash` and `PartialEq` impls below.
@@ -87,7 +88,7 @@ impl Facets {
     ///
     /// Trusted constants, so they skip validation via
     /// `FieldName::new_unchecked`
-    /// (journal-index/src/field_types.rs:25-29). Commented-out entries
+    /// (`journal-index/src/field_types.rs` `FieldName::new_unchecked`). Commented-out entries
     /// are candidates kept disabled in the default set; the list is
     /// unsorted here — `Facets::new` canonicalizes it.
     fn default_facets() -> Vec<FieldName> {
@@ -144,7 +145,7 @@ impl Facets {
     /// Builds the canonical facet set from field-name strings.
     ///
     /// An empty list selects the default set. Names are validated
-    /// (journal-index/src/field_types.rs:32-40) and invalid ones — empty,
+    /// (`journal-index/src/field_types.rs` `FieldName::new`) and invalid ones — empty,
     /// or containing `=` — are dropped silently, so an all-invalid list
     /// yields an empty set. Names are matched verbatim (no case folding),
     /// sorted and deduped before hashing, so input order is irrelevant.
@@ -186,7 +187,7 @@ impl Facets {
     }
 
     /// The facet fields as a slice, in canonical order — what
-    /// FileIndexer::index receives (indexing.rs:314-317).
+    /// `FileIndexer::index` receives in `batch_compute_file_indexes`.
     pub fn as_slice(&self) -> &[FieldName] {
         &self.fields
     }

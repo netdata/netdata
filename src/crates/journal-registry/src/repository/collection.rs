@@ -1,10 +1,10 @@
 //! The query side of the repository data model: `Chain` and `Repository`.
 //!
 //! `Chain` holds the files of one journal origin (machine-id + namespace +
-//! source, repository/file.rs:172-183) in rotation order. The sort key is
+//! source — the [`Origin`] fields) in rotation order. The sort key is
 //! `File`'s `Ord`: status first — disposed → archived → active, archived
-//! files by head_realtime (repository/file.rs:34-78) — then path for
-//! stability (repository/file.rs:357-365), so `insert_file` binary-searches
+//! files by head_realtime ([`Status`]'s `Ord`) — then path for
+//! stability ([`File`]'s `Ord`), so `insert_file` binary-searches
 //! with `partition_point` and never reorders existing entries. The queries
 //! rely on what that buys: one active file at the end (the loop stops at
 //! the first active file) and disposed files only at the front. A disposed
@@ -17,39 +17,42 @@
 //! successor relation is the sort order itself, nothing is stored — while
 //! the last archived file and the active file run to u64::MAX. Unknown
 //! bounds are deliberately over-inclusive; `Registry` trims the result
-//! with indexed `TimeRange` metadata afterwards (registry/mod.rs:95-117),
+//! with indexed `TimeRange` metadata afterwards
+//! ([`crate::Registry::find_files_in_range`]),
 //! so chain queries may return files whose indexed bounds miss the window.
 //! The active file's head is approximated as the last archived file's head
 //! (u64::MIN when there is none), its tail is u64::MAX. Disposed files are
 //! never returned: their entry bounds are unknowable. `Seconds` arguments
-//! are u32 seconds since epoch (journal-common/src/time.rs:14), widened to
+//! are u32 seconds since epoch (`journal-common/src/time.rs`), widened to
 //! microseconds here for comparison against head_realtime values.
 //!
-//! Mutators are idempotent on exact matches (`File` equality covers path,
-//! origin and status, repository/file.rs:193): `insert_file` skips an
+//! Mutators are idempotent on exact matches ([`File`] equality covers path,
+//! origin and status): `insert_file` skips an
 //! equal file, `remove_file` no-ops when absent, and `Repository::insert`
 //! / `remove` create or prune their containers as needed. In `Repository`
-//! the directory key is `File::dir()` — the machine-id directory's parent
+//! the directory key is [`File::dir`] — the machine-id directory's parent
 //! when the file's machine-id parsed, else the file's immediate parent
-//! (repository/file.rs:285-299) — so one directory collects the chains of
+//! — so one directory collects the chains of
 //! every machine-id subdirectory under a base journal directory, and
 //! `Origin` keeps them apart. insert/remove fail only through
-//! `File::dir()`, surfaced as `RepositoryError::InvalidUtf8`
-//! (repository/error.rs:16-17); `Registry` logs and skips such per-file
-//! failures (registry/mod.rs:191-193). The queries and `remove_directory`
+//! `File::dir()`, surfaced as
+//! [`crate::repository::RepositoryError::InvalidUtf8`]; `Registry`
+//! ([`crate::Registry`]) logs and skips such per-file
+//! failures. The queries and `remove_directory`
 //! are infallible.
 //!
 //! Concurrency and consumers: both types mutate only through `&mut self`;
-//! `Registry` serializes its `Repository` behind `Arc<parking_lot::RwLock>`
-//! (registry/mod.rs:10,33-36,151) and is its only consumer;
+//! `Registry` ([`crate::Registry`]) serializes its `Repository` behind
+//! `Arc<parking_lot::RwLock>` and is its only consumer;
 //! journal-log-writer drives a `Chain` inside its `OwnedChain`, reading the
 //! live file's header through `back` and pruning with `pop_front`/`drain`
-//! (journal-log-writer/src/log/chain.rs:96,107,123,234,270). Both types are
+//! (`journal-log-writer/src/log/chain.rs`). Both types are
 //! `#[doc(hidden)]` re-exports reached by full path
-//! (repository/mod.rs:43-44) and through journal-core's repository shim
-//! (journal-core/src/lib.rs:23-25). Containers use the
+//! ([`crate::repository::Chain`], [`crate::repository::Repository`]) and
+//! through journal-core's repository shim
+//! (`journal-core/src/lib.rs`). Containers use the
 //! `journal_common::collections` aliases — `FxHashMap` and `std::VecDeque`
-//! (journal-common/src/collections.rs:7-9); journal-registry's only
+//! (`journal-common/src/collections.rs`); journal-registry's only
 //! workspace dependency is journal-common (journal-registry/Cargo.toml).
 //! The `allocative` feature derives memory-profiling impls on both types.
 use crate::repository::error::Result;
@@ -242,8 +245,7 @@ impl Chain {
 #[derive(Default, Debug)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub(super) struct Directory {
-    /// The chains of one journal directory, keyed by origin
-    /// (repository/file.rs:172-183).
+    /// The chains of one journal directory, keyed by [`Origin`].
     pub(super) chains: HashMap<Origin, Chain>,
 }
 

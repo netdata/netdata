@@ -8,17 +8,17 @@
 //! engine, keyed by [`BucketRequest`].
 //!
 //! Not to be confused with journal-index's same-named `Histogram`
-//! (journal-index/src/histogram.rs:38) - the per-file time-coverage
+//! (`journal-index/src/histogram.rs`) - the per-file time-coverage
 //! running-count structure these counts are read through; this module is
 //! the query-level facet aggregation on top of it.
 //!
 //! Production flow: otel-legacy-logs keeps one shared engine
-//! (otel-legacy-logs/src/handler.rs:130,163) and calls
-//! `compute_from_indexes` per query (handler.rs:423); journal-function
+//! (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandlerInner`) and calls
+//! `compute_from_indexes` per query (`LegacyLogsHandler::on_call`); journal-function
 //! turns the result into the viewer's facets, charts and column schema
-//! (journal-function/src/netdata/facets.rs:16,
-//! journal-function/src/netdata/histogram.rs:18 and
-//! journal-function/src/netdata/builder.rs:79).
+//! (`journal-function/src/netdata/facets.rs` `facets`,
+//! `journal-function/src/netdata/histogram.rs` `available_histograms` and
+//! `journal-function/src/netdata/builder.rs` `build_ui_response`).
 
 use crate::{cache::FileIndexKey, error::Result, facets::Facets};
 use journal_core::collections::HashSet;
@@ -38,10 +38,10 @@ use tracing::{debug, error};
 /// a 1s range yields a single 1s bucket).
 ///
 /// `QueryTimeRange::new` is the only internal caller
-/// (query_time_range.rs:62) and aligns the range onto this width, so query
+/// ([`crate::QueryTimeRange::new`]) and aligns the range onto this width, so query
 /// buckets are always `[multiple of width, + width)`. otel-ledger's ledger
 /// grid independently mirrors this width set
-/// (otel-ledger/src/ledger/rpc/grid.rs:15-17).
+/// (`otel-ledger/src/ledger/rpc/grid.rs` `TARGET_BUCKETS`/`VALID_BUCKET_WIDTHS_S`).
 pub fn calculate_bucket_duration(time_range_duration: u32) -> u32 {
     const MINUTE: Duration = Duration::from_secs(60);
     const HOUR: Duration = Duration::from_secs(60 * MINUTE.as_secs());
@@ -90,13 +90,13 @@ pub fn calculate_bucket_duration(time_range_duration: u32) -> u32 {
 /// One query bucket: the engine's unit of computation, caching and result.
 ///
 /// `[start, end)` is one window of the query grid
-/// (`QueryTimeRange::buckets`, query_time_range.rs:138): `start`
+/// ([`crate::QueryTimeRange::buckets`]): `start`
 /// inclusive, `end` exclusive, `end - start` the query's bucket width. The
 /// derived `Eq`/`Hash` make a whole request the identity of a cached
 /// response, so the same window, facet set and filter reuse one entry:
 /// `facets` hashes its canonical, order-insensitive field set
-/// (facets.rs:25-31) and `filter_expr` hashes its expression tree
-/// (journal-index/src/filter.rs:99).
+/// ([`Facets`]) and `filter_expr` hashes its expression tree
+/// (`journal-index/src/filter.rs` `Hash for FilterExpr`).
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct BucketRequest {
     /// Bucket start: inclusive, a multiple of the query's bucket width
@@ -122,8 +122,8 @@ impl BucketRequest {
 /// and entries that additionally match the request's `filter_expr`. The
 /// two are equal when no filter applies. Consumers read the filtered
 /// member: journal-function's facet options
-/// (journal-function/src/netdata/facets.rs:22-24) and chart dimensions
-/// (journal-function/src/netdata/histogram.rs:120,130).
+/// (`journal-function/src/netdata/facets.rs` `facets`) and chart dimensions
+/// (`journal-function/src/netdata/histogram.rs` `histogram`).
 #[derive(Debug, Clone)]
 pub struct BucketResponse {
     /// Counts per indexed field=value pair: (unfiltered, filtered)
@@ -158,13 +158,13 @@ impl BucketResponse {
 /// in time order.
 ///
 /// For engine output `buckets` is never empty - `QueryTimeRange` yields at
-/// least one bucket (query_time_range.rs:138-146) and every request
+/// least one bucket ([`crate::QueryTimeRange::buckets`]) and every request
 /// resolves to a response (see `compute_from_indexes`) - so the accessors'
 /// `expect`s below cannot fire on it. journal-function walks the pairs
 /// directly for the viewer's facets, charts and columns
-/// (journal-function/src/netdata/facets.rs:16,
-/// journal-function/src/netdata/histogram.rs:50 and
-/// journal-function/src/netdata/builder.rs:79).
+/// (`journal-function/src/netdata/facets.rs` `facets`,
+/// `journal-function/src/netdata/histogram.rs` `histogram` and
+/// `journal-function/src/netdata/builder.rs` `build_ui_response`).
 #[derive(Debug, Clone)]
 pub struct Histogram {
     pub buckets: Vec<(BucketRequest, BucketResponse)>,
@@ -202,7 +202,7 @@ impl Histogram {
 
     /// Every field seen in any bucket - indexed (from `fv_counts` keys) or
     /// unindexed - deduplicated and sorted. journal-function feeds this to the
-    /// viewer's column schema (journal-function/src/netdata/builder.rs:89).
+    /// viewer's column schema (`journal-function/src/netdata/builder.rs` `build_ui_response`).
     pub fn discovered_fields(&self) -> Vec<FieldName> {
         let mut fields = HashSet::default();
         for (_, bucket_response) in &self.buckets {
@@ -222,11 +222,12 @@ impl Histogram {
 /// [`BucketRequest`] behind a `parking_lot` lock, making it `Send + Sync`
 /// and shareable: otel-legacy-logs keeps a single engine in `Arc`-shared
 /// handler state, so all concurrent queries hit the same cache
-/// (otel-legacy-logs/src/handler.rs:130,163). Counting runs outside the
+/// (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandlerInner`). Counting runs outside the
 /// lock; the lock guards only membership checks and inserts.
 /// `compute_from_indexes` is synchronous and runs on the caller's thread -
 /// in the handler, on a runtime worker between the `spawn_blocking`
-/// indexing and log-query steps (otel-legacy-logs/src/handler.rs:404,439).
+/// indexing and log-query steps
+/// (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::on_call`).
 pub struct HistogramEngine {
     responses: RwLock<LruCache<BucketRequest, BucketResponse>>,
 }
@@ -251,26 +252,26 @@ impl HistogramEngine {
     /// Builds a [`Histogram`] over `time_range` from already-indexed files.
     ///
     /// Produces one [`BucketResponse`] per bucket of `time_range` (aligned
-    /// windows, query_time_range.rs:138-146) by counting, in every file that
+    /// windows from [`crate::QueryTimeRange::buckets`]) by counting, in every file that
     /// overlaps a bucket: total entries and per field=value pair entries,
     /// unfiltered and filtered; plus the file's non-facet fields. Callers
     /// normally pass the output of `batch_compute_file_indexes` built with
     /// this same `time_range`, whose cache gate keeps every index's histogram
-    /// width a divisor of the query's (indexing.rs:233-234) - so no index
+    /// width a divisor of the query's (the gate in `batch_compute_file_indexes`) - so no index
     /// bucket straddles a query-bucket edge and the whole-bucket counting
     /// below equals counting by entry timestamp.
     ///
     /// The `Result` never carries an `Err`: nothing here is fallible. The
     /// `None` cases of `count_entries_in_time_range` (inverted or misaligned
-    /// bounds, journal-index/src/histogram.rs:176-186) are unreachable given
+    /// bounds, `journal-index/src/histogram.rs` `Histogram::count_entries_in_time_range`) are unreachable given
     /// the gate above and would coalesce to 0 via `unwrap_or` regardless; the
     /// type exists for symmetry with the crate's other fallible calls, and the
-    /// caller's `map_err` (otel-legacy-logs/src/handler.rs:424-426) is dead in
+    /// caller's `map_err` (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::on_call`) is dead in
     /// practice.
     ///
     /// Caching: a bucket touched by an online file is recomputed on every call
     /// (online indexes go stale within 1s,
-    /// journal-index/src/file_index.rs:94-102); a bucket whose overlapping
+    /// `journal-index/src/file_index.rs` `FileIndex::is_fresh`); a bucket whose overlapping
     /// files were all archived is cached and frozen until LRU eviction.
     /// Concurrent identical computations are not deduplicated - both run,
     /// results are equal.
@@ -341,14 +342,15 @@ impl HistogramEngine {
                     // count_entries_in_time_range selects whole index buckets by start time
                     // and its end-bucket search treats the first bucket as the end bucket
                     // when the query ends at or before it
-                    // (journal-index/src/histogram.rs:200-207) - unreachable here, since a
+                    // (`journal-index/src/histogram.rs` `Histogram::count_entries_in_time_range`) - unreachable here, since a
                     // file reaching this point starts before bucket.end.
                     if file_start >= bucket_request.end || file_end <= bucket_request.start {
                         continue;
                     }
 
                     // An online file overlapping the bucket makes it uncacheable: online
-                    // indexes go stale within 1s (journal-index/src/file_index.rs:94-102)
+                    // indexes go stale within 1s
+                    // (`journal-index/src/file_index.rs` `FileIndex::is_fresh`)
                     // and are re-indexed per query, so their contribution must be
                     // recomputed too. The overlap skip above runs first, so a
                     // non-overlapping online file leaves the bucket cacheable.
@@ -358,7 +360,7 @@ impl HistogramEngine {
 
                     // `Filter::none()` is the "no filter" sentinel, not "match nothing":
                     // evaluating it would return an empty bitmap
-                    // (journal-index/src/filter.rs:272) and zero every filtered count.
+                    // (`journal-index/src/filter.rs` `Filter::evaluate`) and zero every filtered count.
                     // Skipping it leaves `filter_bitmap` None and every filtered count
                     // equal to its unfiltered count.
                     let filter_bitmap = if !bucket_request.filter_expr.is_none() {
@@ -398,7 +400,7 @@ impl HistogramEngine {
                     // Fields the file carries but that are outside the facet set: no
                     // bitmaps, so they surface only as names for the viewer's column
                     // schema. Journal field names are recorded unvalidated
-                    // (journal-index/src/file_indexer.rs:237), so the `FieldName::new`
+                    // (`journal-index/src/file_indexer.rs` `FileIndexer::build_entries_index`), so the `FieldName::new`
                     // guard below drops any that cannot round-trip (empty, or containing
                     // '=').
                     for field in file_index.fields() {
@@ -447,7 +449,7 @@ impl HistogramEngine {
             // Only cacheable buckets enter the LRU. A cached response is never
             // refreshed - there is no invalidation short of LRU eviction - so it
             // must hold archived-file counts only: archived files never change
-            // (journal-index/src/file_index.rs:94-102). A bucket no file overlapped
+            // (`journal-index/src/file_index.rs` `FileIndex::is_fresh`). A bucket no file overlapped
             // is cached empty; entries a later-growing online file brings into it
             // stay hidden until that response is evicted.
             let mut responses_guard = self.responses.write();

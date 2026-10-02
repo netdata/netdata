@@ -10,12 +10,14 @@
 //! Shape, shared by every stored object: a 16-byte [`ObjectHeader`] (type
 //! byte, per-object flags, reserved, size), the family header, then the
 //! payload. Objects sit at 8-byte-aligned offsets in the arena after the
-//! file header (file/file.rs:19-25), and `size` covers the whole object,
+//! file header (the `OBJECT_ALIGNMENT` checks in `file/file.rs`), and
+//! `size` covers the whole object,
 //! rounded up to 8 ([`ObjectHeader::aligned_size`]). [`JournalHeader`] is
 //! only the leading prefix of systemd's header: `open()` maps exactly
 //! `size_of::<JournalHeader>()` bytes and checks the magic, so files whose
 //! on-disk `header_size` is larger (see the commented-out fields below)
-//! still parse (file/file.rs:307-310).
+//! still parse
+//! ([`JournalFile::open`](crate::file::JournalFile::open)).
 //!
 //! The two hash tables are objects too ([`DataHashTable`],
 //! [`FieldHashTable`]): an [`ObjectHeader`] plus one [`HashItem`] (head/
@@ -36,18 +38,20 @@
 //!   systemd still parse.
 //!
 //! Consumers (grep-verified): file/file.rs parses and bounds-checks every
-//! object through [`JournalObject`] (`from_data` at file/file.rs:456,939,
-//! with `is_compact` taken from the header at file/file.rs:422,888) and
-//! stamps/validates the type byte (file/file.rs:907,917);
-//! file/writer.rs builds and chains the objects (imports at
-//! file/writer.rs:6-12); file/value_guard.rs:70 forwards the traits
+//! object through [`JournalObject`] (its `from_data`/`from_data_mut` run
+//! inside `JournalFile::journal_object_ref`/`journal_object_mut`, with
+//! `is_compact` taken from the file header) and
+//! stamps/validates the type byte (in `journal_object_mut`);
+//! file/writer.rs builds and chains the objects (via its flat
+//! `file/mod.rs` imports); file/value_guard.rs forwards the traits
 //! through its one-borrow guard. `mod object` is private; other crates get
 //! `EntryItemsType`, `HashableObject`, `HeaderIncompatibleFlags` and
-//! `JournalState` (file/mod.rs:29) plus `DataObject` (file/mod.rs:41),
-//! the rest only through the crate-internal glob (file/mod.rs:38);
+//! `JournalState` (re-exported in `file/mod.rs`) plus `DataObject`
+//! (also re-exported there),
+//! the rest only through the crate-internal glob;
 //! journal-index parses `DataObject` payloads for field values
-//! (journal-index/src/field_types.rs:231, decompressing at
-//! journal-index/src/file_index.rs:488-489).
+//! (journal-index/src/field_types.rs, decompressing in
+//! journal-index/src/file_index.rs).
 use crate::error::{JournalError, Result};
 use crate::file::offset_array::{Cursor, InlinedCursor, List};
 use std::num::{NonZeroU32, NonZeroU64, NonZeroUsize};
@@ -58,8 +62,8 @@ use zerocopy::{
 
 /// Read-side view of an object that lives in a hash table: what bucket
 /// walks and dedup-on-write need. The writer side is
-/// [`HashableObjectMut`]; `ValueGuard<T>` implements it too
-/// (file/value_guard.rs:72), so bucket visitors can work on guards.
+/// `HashableObjectMut`; `ValueGuard<T>` implements it too
+/// (file/value_guard.rs), so bucket visitors can work on guards.
 pub trait HashableObject {
     /// Hash stored in the object header at write time, over the payload
     /// bytes (keyed or legacy per the file's `KeyedHash` flag, file/hash.rs).
@@ -67,7 +71,8 @@ pub trait HashableObject {
 
     /// The payload bytes as stored - compressed form when the object's
     /// compression flags say so. Dedup compares these raw bytes plus the
-    /// recomputed hash (file/file.rs:73), so a compressed object cannot
+    /// recomputed hash (the `PayloadMatcher` comparison in `file/file.rs`),
+    /// so a compressed object cannot
     /// match a fresh uncompressed payload.
     fn raw_payload(&self) -> &[u8];
 
@@ -83,14 +88,14 @@ pub trait HashableObject {
     fn next_hash_offset(&self) -> Option<NonZeroU64>;
 
     /// The object type byte this family stamps and validates
-    /// (file/file.rs:907,917).
+    /// (stamped/required by `JournalFile::journal_object_mut`).
     fn object_type() -> ObjectType;
 }
 
 /// Write-side counterpart of [`HashableObject`]: link a freshly appended
 /// object into its bucket chain and fill its payload slot. The writer
 /// links tail-to-new through `set_next_hash_offset`
-/// (file/file.rs:1026,1037).
+/// (the writer's `*_hash_table_set_tail_offset` append path).
 pub trait HashableObjectMut: HashableObject {
     /// Set the offset to the next object in the hash chain
     fn set_next_hash_offset(&mut self, offset: NonZeroU64);
@@ -102,7 +107,8 @@ pub trait HashableObjectMut: HashableObject {
 
 /// Bucket access over a file-backed hash table: `hash_item_ref` selects
 /// the bucket for `hash % len` - the format's bucket rule - and callers
-/// walk its object chain from there (file/file.rs:270-291).
+/// walk its object chain from there
+/// ([`JournalFile::visit_bucket`](crate::file::JournalFile::visit_bucket)).
 pub trait HashTable {
     /// The type of objects stored in this hash table
     type Object: HashableObject;
@@ -121,7 +127,8 @@ pub trait HashTable {
 }
 
 /// Mutable bucket access for appends: the writer updates a bucket's
-/// head/tail here when chaining a new object (file/file.rs:1034-1037).
+/// head/tail here when chaining a new object (its
+/// `*_hash_table_set_tail_offset` appends).
 pub trait HashTableMut: HashTable {
     /// Get a mutable reference to the hash item for a given hash value
     fn hash_item_mut(&mut self, hash: u64) -> &mut HashItem;
@@ -129,8 +136,11 @@ pub trait HashTableMut: HashTable {
 
 /// The data hash table object: an [`ObjectHeader`] followed by one
 /// [`HashItem`] per bucket. Buckets index [`DataObject`]s by the hash of
-/// their full `NAME=VALUE` payload (file/writer.rs:294); lookups walk a
-/// bucket from its `head_hash_offset` (file/file.rs:281). The layout is
+/// their full `NAME=VALUE` payload (hashed by `JournalWriter::add_data`);
+/// lookups walk a
+/// bucket from its `head_hash_offset`
+/// ([`JournalFile::visit_bucket`](crate::file::JournalFile::visit_bucket)).
+/// The layout is
 /// identical with or without the COMPACT flag (`from_data` ignores it).
 pub struct DataHashTable<B: ByteSlice> {
     pub header: Ref<B, ObjectHeader>,
@@ -139,7 +149,7 @@ pub struct DataHashTable<B: ByteSlice> {
 
 /// The field hash table object, same shape as [`DataHashTable`] but
 /// indexing [`FieldObject`]s by the hash of the bare field name
-/// (file/writer.rs:364).
+/// (hashed by `JournalWriter::add_field`).
 pub struct FieldHashTable<B: ByteSlice> {
     pub header: Ref<B, ObjectHeader>,
     pub items: Ref<B, [HashItem]>,
@@ -296,7 +306,7 @@ impl<B: ByteSlice> HashableObject for DataObject<B> {
 }
 
 /// `set_payload` fills the slot the object was sized for
-/// (file/writer.rs:310-315); compact objects write after the
+/// (the writer's `add_data`); compact objects write after the
 /// [`CompactDataFields`] prefix and leave it untouched. A length mismatch
 /// panics in `copy_from_slice`.
 impl HashableObjectMut for DataObject<&mut [u8]> {
@@ -321,7 +331,7 @@ impl HashableObjectMut for DataObject<&mut [u8]> {
 /// selects the payload/item encoding (see the family docs); hash-table
 /// objects ignore it. `None` means the slice is too short or misaligned -
 /// callers surface that as `JournalError::ZerocopyFailure`
-/// (file/file.rs:456,939).
+/// (`JournalFile::journal_object_ref`/`journal_object_mut`).
 pub trait JournalObject<B: SplitByteSlice>: Sized {
     /// Create a new journal object from a byte slice
     fn from_data(data: B, is_compact: bool) -> Option<Self>;
@@ -336,8 +346,10 @@ pub trait JournalObjectMut<B: SplitByteSliceMut>: JournalObject<B> {
 /// HEADER_INCOMPATIBLE_*): features a reader must understand to open the
 /// file. [`HeaderIncompatibleFlags::KeyedHash`] switches object hashing to
 /// SipHash-2-4 keyed by the header `file_id` (file/hash.rs); set at create
-/// (file/file.rs:757), read to pick the hash mode (file/file.rs:342-356)
-/// and asserted on every entry write (file/writer.rs:190).
+/// ([`JournalFile::create`](crate::file::JournalFile::create)), read to
+/// pick the hash mode ([`JournalFile::hash`](crate::file::JournalFile::hash))
+/// and asserted on every entry write
+/// ([`JournalWriter::add_entry`](crate::file::JournalWriter::add_entry)).
 /// [`HeaderIncompatibleFlags::Compact`] selects the compact encodings
 /// (module docs). The compressed-Xz/Lz4/Zstd bits are set only by writers
 /// that compress - not this crate's - and are consumed by
@@ -363,11 +375,12 @@ pub enum HeaderCompatibleFlags {
 /// The journal header's state byte: offline (no writer attached), online
 /// (open), archived (rotated away). [`TryFrom`] rejects anything else with
 /// `InvalidJournalFileState`; [`Display`](std::fmt::Display) prints the
-/// uppercase names. Set to Online at create (file/file.rs:799);
+/// uppercase names. Set to Online at create
+/// ([`JournalFile::create`](crate::file::JournalFile::create));
 /// journal-log-writer sets Archived on rotation
-/// (journal-log-writer/src/log/mod.rs:611,766) and journal-index reads it
+/// (journal-log-writer/src/log/mod.rs) and journal-index reads it
 /// when opening a file for indexing
-/// (journal-index/src/file_indexer.rs:556-558).
+/// (journal-index/src/file_indexer.rs).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JournalState {
     Offline = 0,
@@ -400,39 +413,43 @@ impl std::fmt::Display for JournalState {
 
 /// The journal file header, the first bytes of the file. `open()` maps
 /// exactly `size_of::<JournalHeader>()` bytes and checks the signature
-/// (file/file.rs:307-310), so a file whose on-disk `header_size` is larger
+/// ([`JournalFile::open`](crate::file::JournalFile::open)), so a file whose
+/// on-disk `header_size` is larger
 /// - systemd appended fields over the years, see the block below - still
-/// parses; arena bounds use the on-disk value (file/file.rs:423). At
+/// parses; arena bounds use the on-disk value (read by
+/// `journal_object_ref`/`journal_object_mut`). At
 /// create the writer lays out header, data hash table, field hash table
-/// and sets `header_size` to this struct's size (file/file.rs:745-772).
-/// The writer resumes appends from `tail_object_offset` (file/writer.rs:152).
+/// and sets `header_size` to this struct's size
+/// ([`JournalFile::create`](crate::file::JournalFile::create)).
+/// The writer resumes appends from `tail_object_offset`
+/// ([`JournalWriter::new`](crate::file::JournalWriter::new)).
 #[derive(Default, Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
 #[repr(C)]
 pub struct JournalHeader {
-    pub signature: [u8; 8],                          // magic "LPKSHHRH" (file/file.rs:310)
+    pub signature: [u8; 8],                          // magic "LPKSHHRH" (validated on open)
     pub compatible_flags: u32,                       // optional features: HeaderCompatibleFlags
     pub incompatible_flags: u32,                     // required features: HeaderIncompatibleFlags
     pub state: u8,                                   // JournalState: 0/1/2
     pub reserved: [u8; 7],                           // Reserved
     pub file_id: [u8; 16],                           // file id; the keyed-hash key (file/hash.rs)
-    pub machine_id: [u8; 16],                        // machine id, from options (file/file.rs:775)
-    pub tail_entry_boot_id: [u8; 16],                // last entry's boot id (file/writer.rs:279)
-    pub seqnum_id: [u8; 16],                         // seqnum-space id (file/reader.rs:236-243)
-    pub header_size: u64,                            // header size; arena after (file/file.rs:423)
-    pub arena_size: u64,                             // arena size (file/writer.rs:256)
-    pub data_hash_table_offset: Option<NonZeroU64>,  // data hash table offset (file/file.rs:745)
+    pub machine_id: [u8; 16],                        // machine id, from JournalFileOptions
+    pub tail_entry_boot_id: [u8; 16],                // last entry's boot id (stamped by JournalWriter)
+    pub seqnum_id: [u8; 16],                         // seqnum-space id (returned by JournalReader::get_seqnum)
+    pub header_size: u64,                            // header size; arena after
+    pub arena_size: u64,                             // arena size (advanced per object by JournalWriter)
+    pub data_hash_table_offset: Option<NonZeroU64>,  // data hash table offset (laid out by JournalFile::create)
     pub data_hash_table_size: Option<NonZeroU64>,    // buckets * sizeof(HashItem)
-    pub field_hash_table_offset: Option<NonZeroU64>, // field hash table offset (file/file.rs:747)
+    pub field_hash_table_offset: Option<NonZeroU64>, // field hash table offset (laid out by JournalFile::create)
     pub field_hash_table_size: Option<NonZeroU64>,   // buckets * sizeof(HashItem)
-    pub tail_object_offset: Option<NonZeroU64>,      // last object (file/writer.rs:152)
-    pub n_objects: u64,                              // object count (file/writer.rs:262)
-    pub n_entries: u64,                              // entry count (file/writer.rs:261)
-    pub tail_entry_seqnum: u64,                      // newest entry's seqnum (file/writer.rs:276)
-    pub head_entry_seqnum: u64,                      // oldest entry's seqnum (file/writer.rs:267)
-    pub entry_array_offset: Option<NonZeroU64>,      // entry-array chain head (file/file.rs:358)
-    pub head_entry_realtime: u64,                    // oldest entry's realtime (file/writer.rs:270)
-    pub tail_entry_realtime: u64,                    // newest entry's realtime (file/writer.rs:277)
-    pub tail_entry_monotonic: u64,                   // newest entry monotonic (file/writer.rs:278)
+    pub tail_object_offset: Option<NonZeroU64>,      // last object (committed by JournalWriter::new)
+    pub n_objects: u64,                              // object count (committed per entry by JournalWriter)
+    pub n_entries: u64,                              // entry count (committed per entry by JournalWriter)
+    pub tail_entry_seqnum: u64,                      // newest entry's seqnum (stamped per entry)
+    pub head_entry_seqnum: u64,                      // oldest entry's seqnum (stamped on the first entry)
+    pub entry_array_offset: Option<NonZeroU64>,      // entry-array chain head (read by JournalFile::entry_list)
+    pub head_entry_realtime: u64,                    // oldest entry's realtime (stamped on the first entry)
+    pub tail_entry_realtime: u64,                    // newest entry's realtime (stamped per entry)
+    pub tail_entry_monotonic: u64,                   // newest entry monotonic (stamped per entry)
 }
 
 /*
@@ -477,7 +494,8 @@ pub enum ObjectFlags {
 
 /// The type byte at the head of every object ([`ObjectHeader::type_`]),
 /// matching systemd's OBJECT_* values. Each family's accessors stamp it on
-/// append and require it back on reopen (file/file.rs:907,917); unknown
+/// append and require it back on reopen
+/// (`JournalFile::journal_object_mut`); unknown
 /// values are rejected by the `TryFrom` below.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -514,7 +532,7 @@ impl TryFrom<u8> for ObjectType {
 /// [`ObjectType`]), per-object flags ([`ObjectFlags`]), 6 reserved bytes,
 /// then the full object size including this header. The writer stamps
 /// type and size on append and re-validates them on reopen
-/// (file/file.rs:907,917).
+/// (`JournalFile::journal_object_mut`).
 #[derive(Debug, Copy, Clone, FromBytes, IntoBytes, KnownLayout, Immutable)]
 #[repr(C)]
 pub struct ObjectHeader {
@@ -542,15 +560,16 @@ impl ObjectHeader {
     }
 
     /// The object's on-disk footprint: `size` rounded up to the 8-byte
-    /// object alignment (OBJECT_ALIGNMENT, file/file.rs:19). Writers
-    /// advance the append offset by this (file/writer.rs:251).
+    /// object alignment (`OBJECT_ALIGNMENT` in `file/file.rs`). Writers
+    /// advance the append offset by this.
     pub fn aligned_size(&self) -> u64 {
         (self.size + 7) & !7
     }
 
     /// Rejects a size smaller than the header itself before callers map or
     /// parse the object - the corruption guard used by the generic object
-    /// readers (file/file.rs:440,920). Returns the size on success.
+    /// readers (`journal_object_ref`/`journal_object_mut`). Returns the
+    /// size on success.
     pub fn validated_size(&self) -> crate::error::Result<u64> {
         let min_size = std::mem::size_of::<ObjectHeader>() as u64;
 
@@ -566,7 +585,8 @@ impl ObjectHeader {
 /// its field-hash-table bucket; `head_data_offset` points at the newest
 /// data object sharing this field name, the head of the list threaded
 /// through `DataObjectHeader::next_field_offset`
-/// (file/writer.rs:324-341, walked at file/file.rs:1135). The payload that
+/// (maintained by `JournalWriter::add_data`, walked by
+/// `JournalFile::field_data_objects`). The payload that
 /// follows is the bare field name, e.g. `MESSAGE`.
 #[derive(Debug, Copy, Clone, FromBytes, IntoBytes, KnownLayout, Immutable)]
 #[repr(C)]
@@ -589,7 +609,7 @@ pub struct OffsetArrayObjectHeader {
 /// One hash-table bucket: head and tail offsets of the chain of objects
 /// hashing to this bucket. A zero (unset) pair is an empty bucket;
 /// appends link the old tail to the new object and move the tail
-/// (file/file.rs:1026,1034-1037).
+/// (the writer's `*_hash_table_set_tail_offset` appends).
 #[derive(Debug, Copy, Clone, FromBytes, IntoBytes, KnownLayout, Immutable)]
 #[repr(C)]
 pub struct HashItem {
@@ -623,7 +643,7 @@ impl<B: SplitByteSliceMut> JournalObjectMut<B> for FieldObject<B> {
 /// The offset slots of an entry-array object: u64 offsets in regular
 /// files, u32 in compact ones (the header COMPACT flag). A zero slot reads
 /// as `None` - the format's unset pointer - and ends iteration there
-/// (file/offset_array.rs:86-88).
+/// (unset slots are skipped by `file/offset_array.rs`'s collects).
 pub enum OffsetsType<B: ByteSlice> {
     Regular(Ref<B, [Option<NonZeroU64>]>),
     Compact(Ref<B, [Option<NonZeroU32>]>),
@@ -660,7 +680,8 @@ impl<B: ByteSlice> std::fmt::Debug for OffsetsType<B> {
 }
 
 /// One entry-array object: a chain node listing offsets - the file's
-/// entry chain (from `JournalHeader::entry_array_offset`, file/file.rs:358)
+/// entry chain (from `JournalHeader::entry_array_offset`, via
+/// `JournalFile::entry_list`)
 /// or a data object's referencing-entry chain
 /// ([`DataObjectHeader::inlined_cursor`]). `next_offset_array` links to
 /// the next node and the [`OffsetsType`] slots follow. Chains are full
@@ -681,7 +702,7 @@ impl<B: ByteSlice> OffsetArrayObject<B> {
 
     /// Valid items in this node: its capacity, capped by
     /// `remaining_items` because only the chain's last node may be
-    /// partially filled (file/offset_array.rs:52).
+    /// partially filled (see `remaining_items` in `file/offset_array.rs`).
     pub fn len(&self, remaining_items: usize) -> usize {
         self.capacity().min(remaining_items)
     }
@@ -797,7 +818,8 @@ impl<B: SplitByteSliceMut> JournalObjectMut<B> for OffsetArrayObject<B> {
 /// Entry-object header: the entry's sequence number and timestamps, the
 /// boot it happened in, and `xor_hash` - the XOR of the items' Jenkins
 /// payload hashes, computed key-independently so it matches across keyed
-/// and legacy files (file/writer.rs:194-218, file/hash.rs).
+/// and legacy files (computed in `JournalWriter::add_entry`; algorithms in
+/// file/hash.rs).
 #[derive(Debug, Copy, Clone, FromBytes, IntoBytes, KnownLayout, Immutable)]
 #[repr(C)]
 pub struct EntryObjectHeader {
@@ -827,7 +849,7 @@ pub struct CompactEntryItem {
     pub object_offset: u32,
 }
 
-/// The item array of an [`EntryObject`], regular or compact per the
+/// The item array of an `EntryObject`, regular or compact per the
 /// header COMPACT flag.
 pub enum EntryItemsType<B: ByteSlice> {
     Regular(Ref<B, [RegularEntryItem]>),
@@ -980,8 +1002,8 @@ impl<B: SplitByteSliceMut> JournalObjectMut<B> for EntryObject<B> {
 
 /// Data-object header: the object's hash and bucket-chain link, the
 /// same-field list link (`next_field_offset`; head in
-/// `FieldObjectHeader::head_data_offset`, linked newest-first at
-/// file/writer.rs:324-341), and the links to the entries referencing this
+/// `FieldObjectHeader::head_data_offset`, linked newest-first by
+/// `JournalWriter::add_data`), and the links to the entries referencing this
 /// payload (see [`DataObjectHeader::inlined_cursor`]).
 #[derive(Debug, Copy, Clone, FromBytes, IntoBytes, KnownLayout, Immutable)]
 #[repr(C)]
@@ -1017,8 +1039,9 @@ impl DataObjectHeader {
     /// `entry_offset` plus an entry-array chain holding the remaining
     /// `n_entries - 1` offsets. `None` when the links are unset (zero),
     /// i.e. the data object is not referenced by any entry yet. Consumed
-    /// by file/file.rs:508,546, file/filter.rs:284,298 and
-    /// file/reader.rs:395.
+    /// by `JournalFile::data_object_directed_partition_point`,
+    /// `JournalFile::load_fields`, the filter's match resolution
+    /// (`file/filter.rs`) and journal-index's indexer.
     pub fn inlined_cursor(&self) -> Option<InlinedCursor> {
         let inlined_offset = self.entry_offset?;
         let cursor = match self.n_entries?.get() {
@@ -1078,7 +1101,7 @@ impl<B: ByteSlice> std::fmt::Debug for DataPayloadType<B> {
 }
 
 /// A data object: the payload is one `NAME=VALUE` record (the writer
-/// splits the field name off at the first `=`, file/writer.rs:324), stored
+/// splits the field name off at the first `=` in `add_data`), stored
 /// possibly compressed per the object-header flags, with the header
 /// linking it into its hash bucket, its field's data list and its
 /// referencing entries.

@@ -5,15 +5,16 @@
 //!
 //! Fixture: one journal per test at `<tmp>/<machine-id>/system.journal`
 //! — the registry path grammar `File::from_path` parses
-//! (journal-registry/src/repository/file.rs:238-283). Every entry is
+//! (`journal-registry/src/repository/file.rs`). Every entry is
 //! stamped with `_SOURCE_REALTIME_TIMESTAMP=<microseconds>` and
 //! `add_entry` receives the same value as realtime and monotonic
-//! (journal-core/src/file/writer.rs:182-188). The same-timestamp and
+//! (`journal-core/src/file/writer.rs` `add_entry`). The same-timestamp and
 //! mixed-timestamp tests index with `Some(&source_timestamp_field)`,
 //! the rest with `None` (realtime fallback); both must paginate
 //! identically because the two values coincide. Entries sharing a
 //! timestamp keep their (timestamp, offset) sort order
-//! (file_indexer.rs:597), so a run's internal order is deterministic.
+//! (`src/file_indexer.rs` `collect_source_field_info` sort), so a run's
+//! internal order is deterministic.
 //!
 //! Pinned contracts:
 //!
@@ -21,27 +22,35 @@
 //!   query walks — the full list unless a filter narrows it — and is
 //!   the pagination cursor: a forward page starts at
 //!   `resume_position + 1`, a backward page at `resume_position - 1`
-//!   (file_index.rs:613-617,696-707). Positions are absolute, not
+//!   (`src/file_index.rs` `find_log_entries` resume handling).
+//!   Positions are absolute, not
 //!   window-relative, so time-boundary queries report the entries'
 //!   real indices.
 //! - `Anchor::Timestamp` is inclusive in both directions: the entry at
-//!   exactly the anchor starts the walk (file_index.rs:618-633,
-//!   708-737). `Anchor::Head`/`Tail` resolve to the histogram's
-//!   first-bucket start and exclusive end (file_index.rs:555-556,
-//!   histogram.rs:123-132).
-//! - `after` is inclusive, `before` exclusive (file_index.rs:654-664,
-//!   754-764); `limit` is an upper bound, never padded; limit 0
-//!   returns empty without error (file_index.rs:583-587).
+//!   exactly the anchor starts the walk (`src/file_index.rs`
+//!   `find_log_entries` anchor search).
+//!   `Anchor::Head`/`Tail` resolve to the histogram's
+//!   first-bucket start and exclusive end (`src/file_index.rs`
+//!   `find_log_entries` Head/Tail arms, `src/histogram.rs`
+//!   `Histogram::start_time`/`end_time`).
+//! - `after` is inclusive, `before` exclusive (`src/file_index.rs`
+//!   `find_log_entries` boundary checks); `limit` is an upper bound,
+//!   never padded; limit 0
+//!   returns empty without error (`src/file_index.rs` `find_log_entries`
+//!   limit-0 check).
 //! - Out-of-bounds resume positions return empty, never panic:
-//!   forward clamps at the end-of-list check (file_index.rs:641-645),
-//!   backward rejects 0 and >= len up front (file_index.rs:698-707).
+//!   forward clamps at the end-of-list check (`src/file_index.rs`
+//!   `find_log_entries` Forward arm),
+//!   backward rejects 0 and >= len up front (`src/file_index.rs`
+//!   `find_log_entries` Backward arm).
 //! - Same-timestamp runs are the hard case: the anchor search can only
 //!   locate the run's edge, so stepping within a run works only
 //!   through resume_position.
 //!
 //! Not pinned here: pagination with an active filter (positions then
 //! index the filtered list and resume requires the filter to stay
-//! unchanged between pages — file_index.rs:197-200), regex filtering,
+//! unchanged between pages — the `resume_position` contract in
+//! `src/file_index.rs`), regex filtering,
 //! unlimited queries (every test sets a limit), and multi-file
 //! pagination (one file per index throughout).
 
@@ -84,7 +93,7 @@ impl TestEntry {
 /// Journal path in the registry layout `<dir>/<machine-id>/system.journal`:
 /// `File::from_path` reads status from the suffix, source from the parent
 /// dir and machine id from the dir above
-/// (journal-registry/src/repository/file.rs:238-283).
+/// (`journal-registry/src/repository/file.rs` `File::from_path`).
 fn create_test_journal_path(temp_dir: &TempDir) -> PathBuf {
     let machine_id = Uuid::from_u128(0x12345678_1234_1234_1234_123456789abc);
     let machine_dir = temp_dir.path().join(machine_id.to_string());
@@ -98,7 +107,7 @@ fn create_test_journal_path(temp_dir: &TempDir) -> PathBuf {
 ///
 /// Each entry carries `_SOURCE_REALTIME_TIMESTAMP=<microseconds>` and
 /// `add_entry` receives the same value as realtime and monotonic
-/// (journal-core/src/file/writer.rs:182-188): the field feeds the
+/// (`journal-core/src/file/writer.rs` `add_entry`): the field feeds the
 /// source-timestamp ordering path, the header timestamps the realtime
 /// fallback.
 fn create_test_journal(
@@ -144,7 +153,8 @@ fn create_test_journal(
 #[test]
 fn test_pagination_forward_with_same_timestamps() {
     // All 300 entries share one timestamp: the anchor search can only
-    // locate where the run starts (file_index.rs:618-633), so stepping
+    // locate where the run starts (`src/file_index.rs` `find_log_entries`
+    // anchor search), so stepping
     // within the run works only through resume_position.
     const TOTAL_ENTRIES: usize = 300;
     const PAGE_SIZE: usize = 200;
@@ -268,7 +278,8 @@ fn test_pagination_forward_with_same_timestamps() {
 #[test]
 fn test_pagination_backward_with_same_timestamps() {
     // Anchor::Tail resolves to the histogram's exclusive end
-    // (file_index.rs:555-556, histogram.rs:129-132), so the search lands
+    // (`src/file_index.rs` `find_log_entries` Tail arm, `src/histogram.rs`
+    // `Histogram::end_time`), so the search lands
     // on the last entry of the same-timestamp run and pagination walks
     // it newest to oldest.
     const TOTAL_ENTRIES: usize = 300;
@@ -481,7 +492,8 @@ fn test_pagination_empty_journal() {
     let mut indexer = FileIndexer::default();
 
     // No entries means no (timestamp, offset) pairs, and the histogram
-    // build rejects empty input (histogram.rs:73-75) — an empty journal
+    // build rejects empty input (`src/histogram.rs`
+    // `Histogram::from_timestamp_offset_pairs` empty-input check) — an empty journal
     // is an indexing error, not an empty index.
     let result = indexer.index(&file, None, &[], Seconds(3600));
     assert!(result.is_err(), "Empty journal should fail to index");
@@ -640,7 +652,8 @@ fn test_pagination_limit_zero() {
     let file_index = indexer.index(&file, None, &[], Seconds(3600)).unwrap();
 
     // Limit 0 is a valid query returning empty, rejected before the
-    // scan (file_index.rs:583-587) — no error, no entries.
+    // scan (`src/file_index.rs` `find_log_entries` limit-0 check) — no
+    // error, no entries.
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(0)
         .build()
@@ -745,8 +758,9 @@ fn test_pagination_limit_exceeds_total() {
 fn test_pagination_resume_out_of_bounds() {
     // Out-of-bounds resume positions must yield empty results, never a
     // panic or error: forward clamps at the end-of-list check
-    // (file_index.rs:641-645), backward rejects 0 and >= len up front
-    // (file_index.rs:698-707).
+    // (`src/file_index.rs` `find_log_entries` Forward arm), backward
+    // rejects 0 and >= len up front
+    // (`src/file_index.rs` `find_log_entries` Backward arm).
     const TOTAL_ENTRIES: usize = 10;
     let timestamp = JAN_1_2024_MIDNIGHT;
 
@@ -1119,7 +1133,8 @@ fn test_pagination_with_time_boundaries() {
     assert_eq!(all_results.len(), 10);
 
     // Window edges pinned: after inclusive, before exclusive, in both
-    // walk directions (file_index.rs:654-664,754-764).
+    // walk directions (`src/file_index.rs` `find_log_entries` boundary
+    // checks).
     for entry in &all_results {
         assert!(
             entry.timestamp.0 >= after.0,
@@ -1148,7 +1163,8 @@ fn test_pagination_backward_with_time_boundaries() {
     let file_index = indexer.index(&file, None, &[], Seconds(3600)).unwrap();
 
     // Same window walked backward: entries 14 down to 5, with the same
-    // after-inclusive/before-exclusive edges (file_index.rs:754-764).
+    // after-inclusive/before-exclusive edges (`src/file_index.rs`
+    // `find_log_entries` Backward boundary checks).
     let after = Microseconds(base_timestamp.0 + 5 * 3600_000_000);
     let before = Microseconds(base_timestamp.0 + 15 * 3600_000_000);
 
@@ -1214,7 +1230,8 @@ fn test_pagination_backward_with_time_boundaries() {
     assert_eq!(all_results.len(), 10);
 
     // Window edges pinned: after inclusive, before exclusive, in both
-    // walk directions (file_index.rs:654-664,754-764).
+    // walk directions (`src/file_index.rs` `find_log_entries` boundary
+    // checks).
     for entry in &all_results {
         assert!(
             entry.timestamp.0 >= after.0,

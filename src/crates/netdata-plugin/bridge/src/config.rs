@@ -507,7 +507,7 @@ pub struct RotationEntry {
     /// Optional even in the `default` entry (unlike the two fields above,
     /// which the default must set): the knob is hidden from the stock file,
     /// so an absent value inherits the code default (see
-    /// [`default_rotation_max_file_duration`]) — same pattern as
+    /// `default_rotation_max_file_duration`) — same pattern as
     /// [`RetentionEntry::horizon`].
     #[serde(default, with = "opt_duration")]
     pub max_file_duration: Option<Duration>,
@@ -675,7 +675,7 @@ pub struct RetentionEntry {
     pub max_age: Option<Duration>,
     /// How long catalog (index) files are kept — the remote archive horizon,
     /// decoupled from SFST `max_age`. Optional in YAML: an absent value inherits
-    /// the code default (see [`default_retention_horizon`]), so existing
+    /// the code default (see `default_retention_horizon`), so existing
     /// hand-written retention blocks keep parsing after upgrade.
     #[serde(default, with = "opt_duration")]
     pub horizon: Option<Duration>,

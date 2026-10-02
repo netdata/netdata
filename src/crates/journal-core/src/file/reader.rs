@@ -23,16 +23,16 @@
 //! names back on read - entries expose the stored names as written.
 //!
 //! Consumers (grep-verified): no caller outside this crate yet - the
-//! type is re-exported at file/mod.rs:17 and lib.rs:32, and only the
+//! type is re-exported in `file/mod.rs` and lib.rs, and only the
 //! tests below call it. The same surface lives on as the near twin
 //! src/crates/jf/journal_file/src/reader.rs (which adds
 //! `entry_data_enumerate` and a working `dump`, and has no remapping
 //! support), wrapped by src/crates/jf/journal_reader_ffi/src/lib.rs
 //! into the `rsd_journal_*` C API; netflow-plugin instead uses the
 //! published systemd-journal-sdk-core crate with the same design
-//! (src/crates/Cargo.toml:182). journal-engine and journal-index read
-//! through [`JournalFile`] directly (journal-engine/src/logs/query.rs:9,
-//! journal-index/src/file_index.rs:5), not through this reader.
+//! (src/crates/Cargo.toml). journal-engine and journal-index read
+//! through [`JournalFile`] directly (journal-engine/src/logs/query.rs,
+//! journal-index/src/file_index.rs), not through this reader.
 use super::mmap::MemoryMap;
 use crate::error::Result;
 use crate::field_map::{FieldMap, REMAPPING_MARKER, extract_field_name};
@@ -58,7 +58,7 @@ use std::num::NonZeroU64;
 /// - the `*_iterator` + `*_guard` slots: enumeration positions and the
 ///   guard the last advance left behind - at most one guard is live at
 ///   a time, and every advance drops it first because the file's
-///   window manager admits one object at a time (file/file.rs:227).
+///   window manager admits one object at a time (its `GuardedCell` flag).
 /// - `remapping_registry`: original -> stored field names, read by
 ///   [`Self::add_match`], rebuilt by [`Self::load_remappings`].
 pub struct JournalReader<'a, M: MemoryMap> {
@@ -176,7 +176,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     /// "no filter expr" while the cursor has none, panics with
     /// `todo!()` once it has. No in-repo caller (grep-verified); the
     /// near twin implements it via `FilterExpr::dump`
-    /// (src/crates/jf/journal_file/src/reader.rs:50).
+    /// (src/crates/jf/journal_file/src/reader.rs).
     pub fn dump(&self, _journal_file: &'a JournalFile<M>) -> Result<String> {
         if let Some(_filter_expr) = self.cursor.filter_expr.as_ref() {
             todo!();
@@ -188,7 +188,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     /// Re-anchors the cursor for the next [`Self::step`] without
     /// touching any filter; discards the entry-array chain position,
     /// so the next step re-establishes it from the new anchor
-    /// ([`JournalCursor::set_location`], file/cursor.rs:40).
+    /// ([`JournalCursor::set_location`]).
     pub fn set_location(&mut self, location: Location) {
         self.cursor.set_location(location)
     }
@@ -200,12 +200,12 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     /// `add_conjunction`/`add_disjunction` have queued a pending
     /// filter - resolves it against `journal_file` and installs the
     /// resulting expression on the cursor (replacing any earlier one;
-    /// the cursor's position stays the stepping anchor,
-    /// file/cursor.rs:45) and consumes the pending filter. A
+    /// [`JournalCursor::set_filter`] keeps the cursor's position as the
+    /// stepping anchor) and consumes the pending filter. A
     /// resolution error propagates without stepping and leaves the
     /// pending filter queued for a retry.
     ///
-    /// Then delegates to [`JournalCursor::step`] (file/cursor.rs:56):
+    /// Then delegates to [`JournalCursor::step`]:
     /// `Ok(true)` resolves an entry - read it through
     /// [`Self::get_entry_offset`] and friends; `Ok(false)` ends
     /// iteration in that direction with the cursor untouched, so the
@@ -244,7 +244,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     }
 
     /// Queues one `FIELD=VALUE` match into the pending filter (items
-    /// without `=` are ignored by the filter itself, filter.rs:318).
+    /// without `=` are ignored by [`JournalFilter::add_match`]).
     ///
     /// When the field name is an original name that
     /// [`Self::load_remappings`] has mapped to a stored journal name,
@@ -292,7 +292,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     /// under `Conjunction` ([`JournalFilter::set_operation`]): matches
     /// are resolved against `journal_file` right away, so lookup errors
     /// surface here. With nothing accumulated, only the operation is
-    /// recorded for the next resolution (filter.rs:258, 342).
+    /// recorded for the next resolution ([`JournalFilter::set_operation`]).
     pub fn add_conjunction(&mut self, journal_file: &'a JournalFile<M>) -> Result<()> {
         self.filter
             .get_or_insert_default()
@@ -309,7 +309,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     /// Clears both filter states - the pending filter queued by the
     /// `add_match` family and the filter installed on the cursor - and
     /// rewinds the cursor to `Head`, forgetting its chain position
-    /// ([`JournalCursor::clear_filter`], file/cursor.rs:50).
+    /// ([`JournalCursor::clear_filter`]).
     pub fn flush_matches(&mut self) {
         self.cursor.clear_filter();
         self.filter = None;
@@ -318,7 +318,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     /// Wall-clock time (microseconds since the epoch) of the current
     /// entry, read from its entry object at the cursor position. Fails
     /// with `UnsetCursor` until a [`Self::step`] has resolved an entry
-    /// (file/cursor.rs:75).
+    /// ([`JournalCursor::position`]).
     pub fn get_realtime_usec(&self, journal_file: &'a JournalFile<M>) -> Result<u64> {
         let entry_offset = self.cursor.position()?;
         let entry_object = journal_file.entry_ref(entry_offset)?;
@@ -360,11 +360,11 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     /// [`Self::fields_restart`] (or on a fresh reader); once exhausted
     /// it keeps returning `None` until restarted. Order is bucket
     /// order, then hash-chain order within each bucket
-    /// (file/file.rs:519).
+    /// ([`JournalFile::fields`]).
     ///
     /// The returned guard borrows the reader and holds the file's
-    /// one-object-at-a-time access slot (file/file.rs:227); every call
-    /// first drops the previous guard.
+    /// one-object-at-a-time access slot (the window manager's in-use
+    /// flag); every call first drops the previous guard.
     pub fn fields_enumerate(
         &mut self,
         journal_file: &'a JournalFile<M>,
@@ -386,7 +386,8 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     /// Binds the data enumeration to `field_name`: creates a fresh
     /// iterator over every DATA object carrying that field. Hash-table
     /// lookup; a field the file does not have yields an iterator that
-    /// ends immediately (file/file.rs:603). This is the only way to
+    /// ends immediately ([`JournalFile::field_data_objects`]). This is the
+    /// only way to
     /// start (or restart) the enumeration -
     /// [`Self::field_data_restart`] does not reset it.
     pub fn field_data_query_unique(
@@ -430,7 +431,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     /// Drops the held guards and clears `entry_data_iterator` - a field
     /// no method in this file ever sets (the near twin's
     /// `entry_data_enumerate` does,
-    /// src/crates/jf/journal_file/src/reader.rs:176). Per-entry data
+    /// src/crates/jf/journal_file/src/reader.rs). Per-entry data
     /// access here goes through [`Self::entry_data_offsets`].
     pub fn entry_data_restart(&mut self) {
         self.drop_guards();
@@ -475,7 +476,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
 
     /// Rebuilds the reader's remapping registry from this file's
     /// remapping entries - the read-side mirror of what
-    /// journal-log-writer writes (journal-log-writer/src/log/mod.rs:372).
+    /// journal-log-writer writes (journal-log-writer/src/log/mod.rs).
     /// Finds the `ND_REMAPPING` field (the name part of
     /// `REMAPPING_MARKER`) through the field hash table, collects the
     /// entries referencing its data objects, and parses each entry's
@@ -484,14 +485,14 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     /// Name-shape gate: only stored names shaped like
     /// `rdp::encode_full`'s MD5 fallback are accepted (see the body) -
     /// normal-shape names are silently dropped, while
-    /// `JournalFile::load_fields` (file/file.rs:538) parses the same
+    /// [`JournalFile::load_fields`] parses the same
     /// entries without any gate and loads both shapes. The two paths
     /// disagree.
     ///
     /// Skipped without error: the marker payload itself, and every
     /// payload the gate rejects - including the `_BOOT_ID=...` item the
     /// writer adds to every remapping entry
-    /// (journal-log-writer/src/log/mod.rs:530). Errors: a failing
+    /// (journal-log-writer/src/log/mod.rs). Errors: a failing
     /// marker lookup is swallowed and treated as "no remappings in this
     /// file"; failures while reading marker data objects, entry chains
     /// or payloads propagate. First mapping per original name wins
@@ -534,15 +535,15 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
             // payloads of the entries referencing it.
             while let Some(data_guard) = data_iter.next().transpose()? {
                 // Referencing entries: the first is inlined in the
-                // header, the rest hang off the entry-array chain
-                // (file/object.rs:810).
+                // header (`DataObjectHeader::entry_offset`), the rest hang
+                // off the entry-array chain.
                 let n_entries = data_guard.header.n_entries;
 
                 if let Some(entry_count) = n_entries {
                     match entry_count.get() {
                         0 => {
                             // Unreachable: n_entries is NonZeroU64
-                            // (file/object.rs:812).
+                            // (`DataObjectHeader::n_entries`).
                             continue;
                         }
                         1 => {
@@ -610,13 +611,13 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
                 if field_name.starts_with(b"ND_") && field_name.len() == 35 {
                     // Gate: only rdp::encode_full's MD5-fallback shape
                     // passes - "ND_" + 32 hex chars = 35 bytes
-                    // (rdp/src/lib.rs:35,811). Normal-shape names
+                    // (rdp/src/lib.rs). Normal-shape names
                     // (ND<checksum><structure>_<NAME>) never start with
                     // "ND_": chars after "ND" come from the checksum
                     // (A-Z/0-9) or the structure alphabet (A-X/0-9 after
-                    // uppercasing), never '_' (rdp/src/lib.rs:484-493) -
+                    // uppercasing), never '_' (rdp's structure alphabet) -
                     // so such mappings are silently dropped here, while
-                    // JournalFile::load_fields (file/file.rs:538) has no
+                    // JournalFile::load_fields has no
                     // gate.
                     //
                     // '=' exists: extract_field_name found it.

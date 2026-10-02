@@ -15,20 +15,21 @@
 //!
 //! This module holds the data and the regex entry points; the position
 //! bitmaps live in the reader. [`compile_filter`](crate::IndexReader::compile_filter)
-//! (index_reader.rs:916) ORs each field's matchers into a value bitmap,
+//! ORs each field's matchers into a value bitmap,
 //! ANDs the fields together, and folds in the field-less full-text
 //! [`compile_query`] term. The same [`Matcher`]s and compilers drive
-//! sfsq's WAL-scan path (src/crates/sfsq/src/logs/wal_scan.rs:415), so
+//! sfsq's WAL-scan path (`sfsq/src/logs/wal_scan.rs` `field_matches`), so
 //! on-disk and WAL queries share these semantics.
 //!
 //! # Consumer-side filter scoping
 //!
-//! The reader scopes the filter differently per result kind
-//! (index_reader.rs:1027, index_reader.rs:1088): a facet *for* a field is
+//! The reader scopes the filter differently per result kind: a facet
+//! *for* a field ([`IndexReader::facets`](crate::IndexReader::facets)) is
 //! computed with that field's own selection excluded — selecting
 //! `level=error` doesn't collapse the `level` facet to a single value —
-//! while a [`Timeline`] keeps the full filter, histogram field included,
-//! so the chart shows exactly the matched logs (the legacy `facets.c`
+//! while a [`Timeline`] keeps the full filter, histogram field included
+//! ([`IndexReader::timeline`](crate::IndexReader::timeline)), so the
+//! chart shows exactly the matched logs (the legacy `facets.c`
 //! contract the consuming UI renders against).
 
 use std::collections::{BTreeMap, HashMap};
@@ -228,7 +229,7 @@ pub struct Timestamps(Vec<i64>);
 impl Timestamps {
     /// Wrap the decoded per-log timestamps. They must be ascending — the
     /// on-disk TIMS chunk stores them in chronological order
-    /// (reader.rs:280).
+    /// ([`ChunkReader::timestamps`](crate::ChunkReader::timestamps)).
     pub(crate) fn new(timestamps: Vec<i64>) -> Self {
         Self(timestamps)
     }
@@ -300,10 +301,10 @@ impl Timeline {
     /// An empty timeline aligned to `grid`: no dimensions, one all-zero
     /// bucket per grid bucket (a zero-bucket grid yields an empty bucket
     /// list). This is the well-formed zero-count fallback a query over no
-    /// sources gets (src/crates/sfsq/src/logs/engine.rs:250) — the chart
-    /// still receives a full grid of zero counts; merging no per-file
+    /// sources gets (`sfsq/src/logs/engine.rs` `LogSource::run`) — the
+    /// chart still receives a full grid of zero counts; merging no per-file
     /// timelines yields `None` instead
-    /// (src/crates/sfsq/src/logs/merge.rs:76).
+    /// (`sfsq/src/logs/merge.rs` `merge_timelines`).
     pub fn empty(grid: Grid) -> Self {
         Self {
             grid,
@@ -326,7 +327,8 @@ impl Timeline {
 /// logs in this bucket that don't have the field set at all.
 ///
 /// `unset` is `bucket_total − |logs having the field|`, computed from the
-/// union of the field's value bitmaps (index_reader.rs:1162) — **not**
+/// union of the field's value bitmaps in
+/// [`IndexReader::timeline`](crate::IndexReader::timeline) — **not**
 /// `bucket_total − sum(counts)`. The two differ for multi-valued fields
 /// (e.g. flattened scalar arrays): a log carrying two values of the field
 /// counts in two dimensions, so `sum(counts)` can exceed the number of

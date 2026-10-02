@@ -3,17 +3,17 @@
 //! NOT COMPILED — orphan file: journal-engine/src/logs/mod.rs declares only
 //! `query` and `table`, so nothing here is in the module tree. The live
 //! counterpart is journal-function/src/netdata/transformations.rs (declared
-//! at journal-function/src/netdata/mod.rs:12), a superset of this file; both
+//! in `journal-function/src/netdata/mod.rs`), a superset of this file; both
 //! were added in commit d0905d9b99 ("OTEL logs", PR #21356).
 //!
 //! A [`FieldTransformation`] maps one raw field value to its display form
 //! (e.g. `PRIORITY` "3" → "error"); implementations echo unknown or
 //! unparseable values back unchanged. [`TransformationRegistry`] keys
 //! mappers by field name; `transform_field` builds a `CellValue`
-//! (journal-engine/src/logs/table.rs:23) that keeps raw and display side by
+//! (`logs/table.rs` `CellValue`) that keeps raw and display side by
 //! side, echoing the raw value when a field has no registration — the
 //! normal case, because the query engine returns raw values only
-//! (journal-engine/src/logs/query.rs:537). Nothing in-tree calls
+//! (`logs/query.rs` `extract_entry_data`). Nothing in-tree calls
 //! `create_systemd_journal_transformations`.
 use std::collections::HashMap;
 use std::sync::Arc;

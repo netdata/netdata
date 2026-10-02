@@ -237,7 +237,7 @@ struct Root {
 /// Insertion-order accumulator for [`TraceRollup`]. The indexer's span
 /// walk (`ng-index/src/sfst_build.rs`) calls
 /// [`record_span`](Self::record_span) once per stored span; the seal
-/// calls [`sealed`](Self::sealed), translating interner [`KvSlot`]s to
+/// calls `sealed`, translating interner [`KvSlot`]s to
 /// file [`KvId`]s and emitting rows sorted by trace id.
 #[derive(Debug, Clone, Default)]
 pub struct TraceRollupRows {

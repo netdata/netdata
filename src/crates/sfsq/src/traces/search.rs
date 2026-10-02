@@ -24,8 +24,8 @@
 //!
 //! Consumers (grep-verified): the ledger's otel-traces Search mode —
 //! the Functions view pages it beside an optional aggregate section
-//! (otel-ledger/src/ledger/rpc/traces/handler.rs:379) — and the
-//! sfsq-cli traces tool (sfsq-cli/src/traces.rs:645).
+//! (`otel-ledger/src/ledger/rpc/traces/handler.rs` `search_result`) —
+//! and the sfsq-cli traces tool (`sfsq-cli/src/traces.rs` `run_search`).
 //!
 //! # Ranking and refill (pins C-1, R2-1)
 //!

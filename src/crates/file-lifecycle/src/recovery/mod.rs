@@ -3,19 +3,19 @@
 //! the run loop starts. The ledger's pipeline assembly drives them per signal
 //! (`otel-ledger/src/ledger/pipeline.rs`, which also fixes the order):
 //!
-//! 1. [`startup`] — with storage enabled, before tenant discovery: the
-//!    fail-closed catalog diff-sync ([`startup::startup_catalog_sync`], P7)
+//! 1. `startup` — with storage enabled, before tenant discovery: the
+//!    fail-closed catalog diff-sync (`startup::startup_catalog_sync`, P7)
 //!    makes the local catalog set complete — LIST the remote, raise the WAL
 //!    seq high-water to the remote max, download every own-machine catalog
 //!    missing locally — and returns the remote-discovered tenant set.
-//! 2. [`local`] — per tenant: local-disk replay through the normal component
+//! 2. `local` — per tenant: local-disk replay through the normal component
 //!    path ([`crate::component::batch_recover`] /
 //!    [`crate::component::drain_pending`], so recovery and steady state share
 //!    one code path): delete WALs that already have an SFST, index WALs that
 //!    do not (unindexable ones stay on disk as untracked orphans), drain the
 //!    cleaner's WAL-delete responses, seed uploaded/rotated state from local
 //!    catalog files, and evict per retention policy.
-//! 3. [`remote`] — per tenant, only with storage enabled: object-storage
+//! 3. `remote` — per tenant, only with storage enabled: object-storage
 //!    reconciliation — queue un-uploaded SFST uploads fire-and-forget (never
 //!    blocks startup), LIST the remote to mark uploaded SFSTs and re-send
 //!    uploaded-but-uncataloged ones as `AddEntry`, and re-upload local
@@ -30,7 +30,7 @@
 //!   ledger's steady-state retention scan and uploader share (its doc lists
 //!   the grep-verified consumers).
 //! - The `#[cfg(test)]` import block below: test scaffolding, not a public
-//!   contract; [`tests`] is its only reader (see the comment above it).
+//!   contract; `tests` is its only reader (see the comment above it).
 //!
 //! Error semantics are per phase: a closed worker channel during component
 //! replay is a fatal `anyhow` error that fails startup; the diff-sync is

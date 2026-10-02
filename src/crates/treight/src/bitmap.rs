@@ -10,7 +10,7 @@
 //! `and`/`or`/`and_not` dispatch on the two `inverted` flags (De Morgan
 //! tables on those methods) to compute over the stored trees and return the
 //! result in whichever form is natural. The convention callers can build on
-//! — sfst's `PosSet` does (sfst/src/index_reader.rs:1762-1786) — is that the
+//! — sfst's `PosSet` does (sfst/src/index_reader.rs `PosSet`) — is that the
 //! bytes a call appends to `out` are exactly the result's tree bytes, so the
 //! caller can swap its buffer wholesale after every call.
 //!
@@ -18,11 +18,13 @@
 //! serialize/deserialize pair live on `RawBitmap` (raw.rs), which knows
 //! nothing about inversion; this layer adds the inverted-aware query and
 //! boolean surface instead. Consumers (grep-verified): sfst encodes value
-//! bitmaps with `from_sorted_iter`/`from_sorted_iter_complemented`/
-//! `from_range` (sfst/src/build.rs:593-638) and persists them as
-//! descriptor + tree bytes (sfst/src/schema.rs:625-632); sfsq and
-//! otel-ledger touch `Bitmap` from tests only (sfsq/tests/common/mod.rs:395,
-//! otel-ledger/src/ledger/rpc/logs/handler/tests.rs:38). The `serde` derive
+//! bitmaps with `from_sorted_iter`/`from_sorted_iter_complemented`
+//! (sfst/src/build.rs `remap_one_bitmap`) and `from_range`
+//! (sfst/src/index_reader.rs `PosSet::range`), and persists them as
+//! descriptor + tree bytes (sfst/src/schema.rs `BitmapValue`); sfsq and
+//! otel-ledger touch `Bitmap` from tests only (sfsq/tests/common/mod.rs
+//! `legacy_sfst_source`, otel-ledger/src/ledger/rpc/logs/handler/tests.rs
+//! `bitmap_with`). The `serde` derive
 //! covers the descriptor only — tree bytes ride along in the consumer's
 //! payload beside it; the `roaring` feature (roaring.rs) bridges
 //! `RoaringBitmap` and feeds the differential fuzz target

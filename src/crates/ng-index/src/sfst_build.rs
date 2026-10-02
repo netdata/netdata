@@ -149,7 +149,7 @@ fn intern_entries_into(
     }
 }
 
-/// The allocating form of [`intern_entries_into`]: interns `entries` into a
+/// The allocating form of `intern_entries_into`: interns `entries` into a
 /// fresh `Vec`. Used for the resource/scope/record entry groups; the resource
 /// and scope results are reused across their records.
 fn intern_entries(
@@ -383,7 +383,7 @@ pub fn build_sfst_traces_range(
     Ok((summary, cursor.into_inner()))
 }
 
-/// The traces analog of [`populate_row_index`]: decode `FlattenedTraceRequest` frames,
+/// The traces analog of `populate_row_index`: decode `FlattenedTraceRequest` frames,
 /// intern each span's entries (resource ++ scope ++ span), feed one row per span keyed
 /// on the span's start `ts`, and accumulate the span per-row columns — `trace_id`,
 /// `span_id`, `parent_span_id`, `duration`, `flags`, `dropped_attributes_count`. There

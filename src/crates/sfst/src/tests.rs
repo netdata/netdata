@@ -1,11 +1,11 @@
 //! Test-module root for the sfst crate — the `#[cfg(test)] mod tests;`
-//! target (lib.rs:260-261), so everything under here is test-only. Each
+//! target in `lib.rs`, so everything under here is test-only. Each
 //! child module is one test group; see its own header for the exact
 //! contracts it pins.
 //!
 //! - `fixture` — shared buffer-all test scaffolding (`FixtureWriter`),
 //!   holding no tests itself. Deliberately `pub`: sibling test modules
-//!   outside this tree import it (`registry/tests.rs:3` —
+//!   outside this tree import it (`registry/tests.rs` —
 //!   `crate::tests::fixture::FixtureWriter`), which a private `mod`
 //!   could not serve.
 //! - `materialize` — materialized-row label correctness

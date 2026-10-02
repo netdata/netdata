@@ -1,7 +1,7 @@
 // Table rendering for query results: the render types shared by
 // journal-engine and journal-function - `Table`, `CellValue`, `ColumnInfo` -
 // plus `entry_data_to_table`, which arranges the `LogEntryData` vectors
-// query.rs' `extract_entry_data` produces (query.rs:546) into that shape.
+// query.rs' `extract_entry_data` produces into that shape.
 // `Table`'s doc below maps the pipeline and its consumers.
 use super::query::LogEntryData;
 use journal_core::Result;
@@ -13,12 +13,12 @@ use std::fmt;
 ///
 /// `new` fills both with the same string; the transformation registries
 /// split them via `with_display`
-/// (journal-function/src/netdata/transformations.rs:48), so `raw` stays
+/// (`journal-function/src/netdata/transformations.rs` `TransformationRegistry::transform_field`), so `raw` stays
 /// verbatim while `display` carries the user-facing form. Consumers read
 /// them differently: `table_to_netdata_response` parses the timestamp
 /// column's `raw` as u64 microseconds and reads PRIORITY's `raw` for
 /// severity, but renders field values from `display`
-/// (journal-function/src/netdata/response.rs:86-96,103-106). `None` means
+/// (`journal-function/src/netdata/response.rs` `table_to_netdata_response`). `None` means
 /// the entry has no such field: `Display` below prints "-", the UI
 /// conversion emits `null`.
 #[derive(Debug, Clone)]
@@ -50,7 +50,7 @@ impl CellValue {
 ///
 /// `Table::new` assigns `index` from position, so it always matches the
 /// cell offset; consumers map names back to indexes through it
-/// (journal-function/src/netdata/response.rs:57-61).
+/// (`journal-function/src/netdata/response.rs` `table_to_netdata_response`).
 #[derive(Debug, Clone)]
 pub struct ColumnInfo {
     /// Column name as shown in output.
@@ -73,11 +73,12 @@ impl ColumnInfo {
 /// Pipeline position: `entry_data_to_table` below fills it verbatim from
 /// `LogEntryData`; journal-function's
 /// `entry_data_to_table_with_transformations`
-/// (journal-function/src/netdata/builder.rs:14) rebuilds the same row shape
+/// (`journal-function/src/netdata/builder.rs`) rebuilds the same row shape
 /// with transformations applied - the path production queries take - and
-/// `table_to_netdata_response` (journal-function/src/netdata/response.rs:50)
+/// `table_to_netdata_response`
+/// (`journal-function/src/netdata/response.rs`)
 /// renders a `Table` into the logs UI's JSON rows. All names here are
-/// re-exported flat (lib.rs:38, journal-function/src/lib.rs:12-17).
+/// re-exported flat (crate root; `journal-function/src/lib.rs`).
 ///
 /// Nothing enforces the row/column shape: constructors keep row width at
 /// `columns.len()`, and `Display` renders whatever a row carries. The
@@ -215,20 +216,20 @@ impl fmt::Display for Table {
 /// field, plus a leading `timestamp` column at index 0 holding the entry
 /// time as a decimal-microseconds string - exactly what
 /// `table_to_netdata_response` parses back as u64
-/// (journal-function/src/netdata/response.rs:86-90).
+/// (`journal-function/src/netdata/response.rs`).
 ///
 /// Cells are verbatim (`CellValue::new`: `raw` == `display`); fields
 /// outside `column_names` are dropped, fields an entry lacks stay `None`,
 /// and rows keep `entry_data`'s order. The body never fails - the
 /// `Result` is journal-core's alias, kept for the extraction path this
-/// mirrors (query.rs:546) - and nothing in-repo calls this function:
+/// mirrors (`logs/query.rs` `extract_entry_data`) - and nothing in-repo calls this function:
 /// production renders through journal-function's transformation wrapper
-/// (journal-function/src/netdata/builder.rs:14).
+/// (`journal-function/src/netdata/builder.rs`
+/// `entry_data_to_table_with_transformations`).
 ///
 /// # Arguments
 ///
 /// * `entry_data` - Extracted entries, already in output order
-///   (query.rs:526)
 /// * `column_names` - Fields to include; `timestamp` is prepended
 ///   automatically
 ///

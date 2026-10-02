@@ -406,7 +406,7 @@ impl<W: Write + Seek> StreamingWriter<W> {
     /// likewise refuses a zero `num_chunks` header.
     ///
     /// The container starts wherever the sink is currently positioned;
-    /// the position is captured (see [`Self::base`]) and the TOC patch
+    /// the position is captured (see `base`) and the TOC patch
     /// seeks relative to it, so a container can be written at a
     /// non-zero offset within a larger file. TOC offsets stay
     /// container-relative either way — the reader opens the sub-slice

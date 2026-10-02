@@ -1796,7 +1796,7 @@ async fn reconcile_local_catalog_marks_under_catalog_own_identity() {
 
 // ── P7: startup catalog diff-sync ────────────────────────────
 
-/// A [`Storage`] whose every op never resolves — solely for the timeout
+/// A `Storage` whose every op never resolves — solely for the timeout
 /// fail-closed test (`std::future::pending()`).
 #[derive(Clone)]
 struct HangingStorage;
@@ -2172,7 +2172,7 @@ async fn startup_sync_sanitizer_skips_hostile_keys() {
     );
 }
 
-/// A [`Storage`] for the short-circuit test only: one key's `read` errors
+/// A `Storage` for the short-circuit test only: one key's `read` errors
 /// instantly, every other `read` hangs (`pending()`). With `buffer_unordered`
 /// plus `try_collect`, the instant error must abort the phase before the hung
 /// downloads (or any later ones) complete.

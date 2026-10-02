@@ -5,7 +5,7 @@
 //! (fuzz/fuzz_targets/against_roaring.rs), which runs the same oracle over
 //! long random op sequences and tree depths up to 8 levels. These tests
 //! are also the bridges' only callers in the tree. Compiled only under
-//! `all(test, feature = "roaring")` (lib.rs:12-13). By area:
+//! `all(test, feature = "roaring")` (the module gate in `lib.rs`). By area:
 //!
 //! - Queries (`contains`/`iter`/`len`/`min`/`max`/`range_cardinality`),
 //!   in-place `insert`/`remove`/`remove_range`, the serialize roundtrip
@@ -19,8 +19,9 @@
 //! - The inverted-flag `Bitmap` wrapper's `and`/`or` match a membership
 //!   oracle across all flag combinations (the per-row unit pins live in
 //!   tests_bitmap.rs).
-//! - The bridges themselves (unit tests :526-582 and the
-//!   `roaring_roundtrip` proptest :471-478): explicit universe adoption,
+//! - The bridges themselves (the `test_rawbitmap_from_roaring*` /
+//!   `test_roaring_*` unit tests and the `roaring_roundtrip`
+//!   proptest): explicit universe adoption,
 //!   empty in both directions, exact treight↔roaring roundtrip.
 //!
 //! Universes stay ≤ `MAX_UNIVERSE` so each generated case is checked
@@ -115,7 +116,7 @@ proptest! {
     /// `estimate_data_size` predicts the exact blob length a real build
     /// appends (its documented contract in lib.rs); the fuzz target
     /// re-asserts it after op sequences
-    /// (fuzz/fuzz_targets/against_roaring.rs:199-204).
+    /// (`fuzz/fuzz_targets/against_roaring.rs`).
     #[test]
     fn estimate_data_size_is_exact((universe, vals) in arb_bitmap()) {
         let est = estimate_data_size(universe, vals.iter().copied());

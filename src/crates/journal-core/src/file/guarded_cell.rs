@@ -5,14 +5,17 @@
 //! the flag while the returned reference (or anything derived from it) is
 //! live and clears it when done - normally through the RAII `ValueGuard`
 //! (file/value_guard.rs), whose `Drop` clears it. A conflicting borrow fails
-//! with [`JournalError::ValueGuardInUse`] (error.rs:28; produced at
-//! guarded_cell.rs:134 and guarded_cell.rs:216) instead of racing or
+//! with [`JournalError::ValueGuardInUse`] (produced by the borrow checks in
+//! [`GuardedCell::borrow_mut_checked`] and [`GuardedCell::with_guarded`])
+//! instead of racing or
 //! panicking.
 //!
-//! The only consumer is `JournalFile.window_manager` (file/file.rs:245): the
+//! The only consumer is `JournalFile`'s `window_manager` field
+//! (`file/file.rs`): the
 //! window manager (file/mmap.rs) remaps its windows on demand and thereby
 //! invalidates slices handed out earlier, so at most one window-backed
-//! object view may be live at a time. The module is private (file/mod.rs:5)
+//! object view may be live at a time. The module is private (`file/mod.rs`
+//! declares it without `pub`)
 //! and neither `GuardedCell` nor `ValueGuard` is re-exported from lib.rs.
 //!
 //! Threading: `!Sync` for every `T` (`UnsafeCell` and `RefCell` are both
@@ -35,11 +38,14 @@ use std::num::NonZeroU64;
 /// live, clear it when done. `ValueGuard` is the RAII wrapper that automates
 /// the last two steps.
 ///
-/// The flag is a protocol, not type-level enforcement: [`borrow_mut_checked`]
+/// The flag is a protocol, not type-level enforcement:
+/// [`GuardedCell::borrow_mut_checked`]
 /// only checks it and never raises it, so a caller that returns references
-/// without raising the flag (the object-header helpers at file/file.rs:412
-/// and file/file.rs:871) bypasses the gate. In-crate callers should prefer
-/// [`with_guarded`], which runs the full protocol and returns a `ValueGuard`.
+/// without raising the flag (the object-header helpers
+/// [`JournalFile::object_header_ref`](crate::file::JournalFile::object_header_ref)
+/// and `object_header_mut` in `file/file.rs`) bypasses the gate. In-crate
+/// callers should prefer
+/// [`GuardedCell::with_guarded`], which runs the full protocol and returns a `ValueGuard`.
 pub struct GuardedCell<T> {
     value: UnsafeCell<T>,
     guard: RefCell<bool>,
@@ -70,8 +76,9 @@ impl<T> GuardedCell<T> {
     /// raised while that reference is live, and clear it afterwards - the
     /// contract `ValueGuard`'s `Drop` implements. While the flag is clear,
     /// no later borrow is blocked, so this escape hatch fits only immediate,
-    /// scope-bound uses like the header read at file/file.rs:412 and header
-    /// writes at file/file.rs:871.
+    /// scope-bound uses like the header read in
+    /// [`JournalFile::object_header_ref`](crate::file::JournalFile::object_header_ref)
+    /// and header writes in `object_header_mut`.
     ///
     /// Returns `Err(JournalError::ValueGuardInUse)` when the flag is raised.
     #[allow(clippy::mut_from_ref)]
@@ -114,8 +121,8 @@ impl<T> GuardedCell<T> {
     ///
     /// `offset` is caller-defined metadata stored in the guard for later
     /// retrieval via `ValueGuard::offset`; `JournalFile` passes the object
-    /// offset (file/file.rs:433, file/file.rs:897) so readers can identify
-    /// the guarded object.
+    /// offset (from `journal_object_ref`/`journal_object_mut`) so readers
+    /// can identify the guarded object.
     ///
     /// ```ignore
     /// let object = self.window_manager.with_guarded(offset, |wm| {

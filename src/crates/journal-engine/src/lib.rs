@@ -4,41 +4,42 @@
 //!
 //! Position: journal-core supplies the journal-file reads, journal-index
 //! the per-file `FileIndex`/`FileIndexer` pair, journal-registry the
-//! `File`/`Registry` identities (Cargo.toml:28-30); `journal-common` is a
+//! `File`/`Registry` identities (crate `Cargo.toml` `[dependencies]`); `journal-common` is a
 //! dev-only dependency, consumed just by the example and the integration
-//! test (Cargo.toml:41). The crate itself stays Netdata-agnostic: the only
-//! in-tree dependent is journal-function (journal-function/Cargo.toml:25),
+//! test (crate `Cargo.toml` `[dev-dependencies]`). The crate itself stays Netdata-agnostic: the only
+//! in-tree dependent is journal-function (`journal-function/Cargo.toml`),
 //! which holds the Netdata integration and re-exports most of this surface
-//! (journal-function/src/lib.rs:12-17); otel-legacy-logs reaches those
-//! types through journal_function (otel-legacy-logs/src/handler.rs:21-24).
+//! (`journal-function/src/lib.rs`); otel-legacy-logs reaches those
+//! types through journal_function (`otel-legacy-logs/src/handler.rs`).
 //!
 //! What it does not do: there is no background indexing worker - indexing
-//! runs when a caller asks: `batch_compute_file_indexes` (indexing.rs:193),
-//! once per query in otel-legacy-logs (otel-legacy-logs/src/handler.rs:404),
-//! with journal-index's `FileIndexer` doing the per-file work
-//! (indexing.rs:312). `HistogramEngine` (histogram.rs:184) aggregates
-//! pre-built indexes through `compute_from_indexes` (histogram.rs:216)
+//! runs when a caller asks: [`crate::indexing::batch_compute_file_indexes`],
+//! once per query in otel-legacy-logs
+//! (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::on_call`),
+//! with journal-index's `FileIndexer` doing the per-file work.
+//! [`crate::histogram::HistogramEngine`] aggregates
+//! pre-built indexes through [`crate::histogram::HistogramEngine::compute_from_indexes`]
 //! instead of reading raw journal entries; raw-entry reads belong to
-//! `LogQuery` (logs/query.rs:55) over journal-core's `JournalFile`s
-//! (logs/query.rs:9).
+//! [`crate::logs::LogQuery`] over journal-core's `JournalFile`s
+//! (opened in `logs/query.rs` `extract_entry_data`).
 
 // Module map, as declared below:
 // - cache: the foyer cache of `FileIndex` snapshots, keyed by
-//   `FileIndexKey` (cache.rs:25,44)
+//   `FileIndexKey` (`cache.rs`)
 // - error: `EngineError`/`Result`, the crate's error vocabulary
-//   (error.rs:8,61)
+//   (`error.rs`)
 // - facets: `Facets`, the validated, order-insensitive facet-field set
-//   fed to indexing (facets.rs:20)
+//   fed to indexing (`facets.rs`)
 // - histogram: bucket aggregation - `HistogramEngine`,
 //   `BucketRequest`/`BucketResponse`, `Histogram` and
-//   `calculate_bucket_duration` (histogram.rs:30,78,98,131,184,216)
+//   `calculate_bucket_duration` (`histogram.rs`)
 // - indexing: the cache builder `FileIndexCacheBuilder` and the batch
-//   driver `batch_compute_file_indexes` (indexing.rs:26,193)
+//   driver `batch_compute_file_indexes` (`indexing.rs`)
 // - logs: `LogQuery`/`LogEntryData` plus the `Table`/`CellValue`/
 //   `ColumnInfo` formatting and `entry_data_to_table`
-//   (logs/query.rs:55,526, logs/table.rs:8,30,43,173)
+//   (`logs/query.rs`, `logs/table.rs`)
 // - query_time_range: `QueryTimeRange`, the query window with aligned,
-//   bucket-duration boundaries (query_time_range.rs:17,56)
+//   bucket-duration boundaries (`query_time_range.rs`)
 pub mod cache;
 pub mod error;
 pub mod facets;
@@ -48,15 +49,15 @@ pub mod logs;
 pub mod query_time_range;
 
 // Flat re-exports - the names consumers use without a module path
-// (tests/multi_file_pagination.rs:6 instead imports logs::query::LogQuery
+// (tests/multi_file_pagination.rs instead imports `logs::query::LogQuery`
 // by path). journal-function re-exports all of them except `EngineError`,
 // which has no external importer (grep-verified): errors cross the boundary
-// inside this crate's `Result` alias (error.rs:61).
+// inside this crate's `Result` alias (`error.rs` `Result`).
 //
 // One entry is a pass-through, not a crate type: `IndexingLimits` lives
-// in journal-index (journal-index/src/lib.rs:23-26) and rides through
+// in journal-index (`journal-index/src/file_indexer.rs` `IndexingLimits`) and rides through
 // here to the journal-function/otel-legacy-logs callers
-// (journal-function/src/lib.rs:14, otel-legacy-logs/src/handler.rs:22).
+// (`journal-function/src/lib.rs`, `otel-legacy-logs/src/handler.rs`).
 pub use cache::{FileIndexCache, FileIndexKey};
 pub use error::{EngineError, Result};
 pub use facets::Facets;

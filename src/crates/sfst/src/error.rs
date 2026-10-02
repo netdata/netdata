@@ -12,27 +12,28 @@ pub enum Error {
     /// Underlying I/O failed — file open/read/seek, chunk and TOC writes,
     /// flush/fsync — lifted through the derived `#[from]`; the index build
     /// re-wraps `Io` with an op + temp-path annotation before it escapes
-    /// (build.rs:274). Transparent: `Display` and `source()` delegate to
+    /// (the `annotate_io` closure in `build.rs` `build_and_write`).
+    /// Transparent: `Display` and `source()` delegate to
     /// the wrapped error, so embedding it in a message too would print it
     /// twice in anyhow chains.
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
-    /// `bincode::serde::encode_to_vec` rejected a typed payload at `pack`
-    /// (writer.rs:33) — the only lift site. Chunk payloads are plain owned
+    /// `bincode::serde::encode_to_vec` rejected a typed payload at
+    /// `writer.rs`'s `pack` — the only lift site. Chunk payloads are plain owned
     /// data, so this fires only if a future chunk struct outgrows bincode.
     #[error(transparent)]
     BincodeEncode(#[from] bincode::error::EncodeError),
 
-    /// `bincode::serde::decode_from_slice` failed at `unpack` (reader.rs:61)
+    /// `bincode::serde::decode_from_slice` failed at `reader.rs`'s `unpack`
     /// — the only lift site: the decompressed bytes don't match the chunk's
     /// expected shape, or are truncated. zstd failures are reclassified to
     /// [`Error::Zstd`] before this can see them.
     #[error(transparent)]
     BincodeDecode(#[from] bincode::error::DecodeError),
 
-    /// zstd compression or decompression failed inside `pack`/`unpack`
-    /// (writer.rs:34, reader.rs:59) — e.g. a bad or truncated frame, a
+    /// zstd compression or decompression failed inside `writer.rs`'s `pack`
+    /// or `reader.rs`'s `unpack` — e.g. a bad or truncated frame, a
     /// checksum mismatch. Intercepted before `?` would lift it to
     /// [`Error::Io`], so a compressor failure stays distinguishable from
     /// real file I/O. Message-only: the error's Display is inlined.
@@ -41,7 +42,7 @@ pub enum Error {
 
     /// An open ([`read_summary`](crate::read_summary) or
     /// [`IndexReader::open`](crate::IndexReader::open), both via
-    /// [`ChunkReader::open`](crate::ChunkReader::open)) found the first 4
+    /// `ChunkReader::open`) found the first 4
     /// bytes aren't `"SFST"`: the byte stream is not an SFST file, or is
     /// corrupted ahead of the header.
     #[error("invalid magic (expected \"SFST\")")]
@@ -55,15 +56,16 @@ pub enum Error {
 
     /// An index-addressed chunk accessor (mid/high field, stream batch)
     /// got an index with no matching chunk — past the file's count for
-    /// that kind, or past the global stream-batch cap (reader.rs:556).
+    /// that kind, or past the global stream-batch cap
+    /// (`ChunkReader::stream_batch_raw`).
     /// Carries the caller's index.
     #[error("chunk not found: index {0}")]
     ChunkNotFound(u16),
 
-    /// [`ChunkWriter`](crate::ChunkWriter) was driven outside its
+    /// `ChunkWriter` was driven outside its
     /// contract: a chunk out of the canonical order, past its declared
     /// count, an undeclared or duplicate per-row column, an inconsistent
-    /// [`ChunkCounts`](crate::ChunkCounts) declaration at `new`, or
+    /// `ChunkCounts` declaration at `new`, or
     /// `finish` before the file was complete. A producer bug, never a
     /// data condition; the message names the violated step.
     #[error("writer misuse: {0}")]
@@ -78,17 +80,17 @@ pub enum Error {
     #[error("{0}")]
     PrefixMapBuild(String),
 
-    /// [`ChunkWriter::new`](crate::ChunkWriter::new) was given a
+    /// `ChunkWriter::new` was given a
     /// stream-batch count outside
-    /// `1..=`[`MAX_STREAM_BATCHES`](crate::MAX_STREAM_BATCHES). The only
-    /// raise site (writer.rs:224); the Display hardcodes the 8. Carries
-    /// the actual count that was rejected.
+    /// `1..=`[`MAX_STREAM_BATCHES`](crate::MAX_STREAM_BATCHES) — the
+    /// variant's only raise site, that constructor check. The Display
+    /// hardcodes the 8. Carries the actual count that was rejected.
     #[error("invalid stream-batch count: {0} (expected 1..=8)")]
     InvalidStreamBatchCount(u8),
 
     /// A per-row column handed to the index build has a length other than
-    /// the row count, so it cannot be aligned per row (`check_column_len`,
-    /// build.rs:576; the event/link structures are checked the same way).
+    /// the row count, so it cannot be aligned per row (`check_column_len`
+    /// in `build.rs`; the event/link structures are checked the same way).
     /// A caller bug (each column must hold exactly one value per row);
     /// recoverable, not a panic.
     #[error("per-row column {column} has {got} values, expected {expected} (one per row)")]
@@ -100,8 +102,9 @@ pub enum Error {
 
     /// A per-row column accessor rejected the file: the META manifest
     /// lacks the column or declares a type different from the accessor's
-    /// expected one (reader.rs:310), the decoded row count disagrees with
-    /// `SUMR.record_count` (reader.rs:326), or a fixed-stride arena
+    /// expected one (`reader.rs` `require_column`), the decoded row count
+    /// disagrees with `SUMR.record_count` (`reader.rs` `check_rows`), or a
+    /// fixed-stride arena
     /// (trace_ids / span_ids / parent_span_id) is not a whole number of
     /// entries. Carries a describing message — the String names the
     /// failed check.
@@ -145,9 +148,11 @@ pub enum Error {
 
     /// A regex source failed to compile: a
     /// [`Matcher::Pattern`](crate::Matcher) carried in a
-    /// [`Filter`](crate::Filter) (compiled full-value-anchored,
-    /// query.rs:55) or the field-less full-text query regex (unanchored,
-    /// query.rs:67). A malformed pattern is a hard failure — the whole
+    /// [`Filter`](crate::Filter) (compiled full-value-anchored by
+    /// [`compile_pattern`](crate::compile_pattern)) or the field-less
+    /// full-text query regex (unanchored,
+    /// [`compile_query`](crate::compile_query)). A malformed pattern is a
+    /// hard failure — the whole
     /// filter fails to compile rather than being treated as "matches
     /// nothing"; [`Filter::validate`](crate::Filter::validate) surfaces
     /// bad patterns up front so a multi-file query degrades no file.
@@ -155,14 +160,15 @@ pub enum Error {
     InvalidPattern(String),
 
     /// [`IndexReader::timeline`](crate::IndexReader::timeline) was called
-    /// with a non-positive bucket width (index_reader.rs:1095). Carries
+    /// with a non-positive bucket width. Carries
     /// the rejected width.
     #[error("invalid bucket width: {0} (must be > 0)")]
     InvalidBucketWidth(i64),
 
     /// A trace lookup was asked for the all-zero (UNSET) trace id — the
     /// OTLP/W3C "unset/invalid" sentinel — through the trace session's
-    /// batch primitive, its only raise site (session.rs:192). TIDX
+    /// `span_refs`, the variant's only raise site
+    /// ([`TraceFileSession`](crate::TraceFileSession)). TIDX
     /// deliberately omits UNSET ids, so serving one would depend on file
     /// layout; request boundaries reject the id up front, and
     /// [`trace_by_id`](crate::IndexReader::trace_by_id) resolves it to an

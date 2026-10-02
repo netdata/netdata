@@ -50,7 +50,7 @@ use std::sync::Mutex;
 use moka::future::Cache;
 
 /// A process-wide memo of built chunk SFST byte images, keyed
-/// `(wal_seq, chunk_index)` — see [`ChunkKey`].
+/// `(wal_seq, chunk_index)` — see `ChunkKey`.
 ///
 /// Values are `Arc<Vec<u8>>` — a self-contained SFST parseable by
 /// [`sfst::IndexReader::open`]. The cache validates nothing itself; the

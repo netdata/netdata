@@ -17,7 +17,8 @@
 //!
 //! - exact [`SourceId`] duplicates are rejected — a duplicated source
 //!   would double UNSET-span-id spans, which deliberately never
-//!   deduplicate (`sfst/src/trace_combine.rs:295`);
+//!   deduplicate (`sfst/src/trace_combine.rs` `combine` skips unset
+//!   span ids in its dedup check);
 //! - WAL-derived sources (in-memory chunks and tails) carry
 //!   [`WalCoverage`], and byte ranges of the same WAL must not
 //!   intersect (half-open; adjacent is fine) — overlapping coverage
@@ -47,8 +48,8 @@ use crate::source::Source;
 /// instance and is NOT sufficient.
 ///
 /// Also the ops' iteration key: sources are visited in `SourceId` order
-/// (fold.rs:261), so the caller's vector order can never change a
-/// result.
+/// (`fold.rs` `merge_trace_sources` sorts them), so the caller's vector
+/// order can never change a result.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SourceId(Arc<str>);
 
@@ -88,10 +89,12 @@ pub struct TraceSfstCandidate {
     pub source_id: SourceId,
     /// Cheap time/stream/size facts ([`sfst::Summary`]). Consumed only by
     /// the operations that summary-prune: search's phase-1 file-granular
-    /// window prune (`search.rs:666`) and attribute enumeration's window
-    /// prune (`attributes.rs:268`). Trace-by-id never reads it — the
-    /// TBLM bloom prunes a by-id probe better than time ranges — and no
-    /// completion-role source is pruned by it at all.
+    /// window prune ([`search`](super::search::search)) and attribute
+    /// enumeration's window prune
+    /// ([`attribute_names`](super::attribute_names) /
+    /// [`attribute_values`](super::attribute_values)). Trace-by-id never
+    /// reads it — the TBLM bloom prunes a by-id probe better than time
+    /// ranges — and no completion-role source is pruned by it at all.
     pub summary: sfst::Summary,
     /// Where the bytes come from ([`Source::File`] sealed on disk,
     /// [`Source::Memory`] an in-memory chunk image).
@@ -110,7 +113,8 @@ pub struct TraceSfstCandidate {
 /// The scanned byte range IS `coverage.range` — one field, one truth: a
 /// separate scan range could silently diverge from the validated
 /// coverage and bypass the overlap protection. Every consumer scans
-/// exactly this field (e.g. `search.rs:584`).
+/// exactly this field (e.g. [`search`](super::search::search)'s
+/// completion assembly).
 #[derive(Clone)]
 pub struct TraceWalTail {
     pub source_id: SourceId,
@@ -132,7 +136,8 @@ pub struct TraceUnavailable {
     /// The known time range and counts of the missing data (for a
     /// remote file, its catalog entry). One summary-pruning consumer:
     /// attribute enumeration applies its sealed-candidate window prune
-    /// to an unavailable source too (`attributes.rs:299`), so one
+    /// to an unavailable source too
+    /// ([`attribute_names`](super::attribute_names)), so one
     /// outside the window is irrelevant rather than reported;
     /// operations without a summary prune always report it.
     pub summary: sfst::Summary,

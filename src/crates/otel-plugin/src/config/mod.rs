@@ -6,7 +6,7 @@
 //! 3. Stock config file (`$NETDATA_STOCK_CONFIG_DIR/otel.yaml`)
 //!
 //! [`load_config`] wires the layers together; the supervisor calls it once at
-//! startup (supervisor.rs:679) and sends the effective config to the workers
+//! startup (`supervisor.rs` `run`) and sends the effective config to the workers
 //! over IPC. Only the stock file is parsed directly into the full
 //! [`PluginConfig`]: the other two layers produce a [`ConfigOverride`] applied
 //! on top. The submodules hold the override parsers this file merges:
@@ -291,9 +291,10 @@ fn redact_uri(uri: &str) -> String {
 /// absolute (the per-signal dirs join onto it); `remote_storage.uri` must be
 /// non-empty when storage is enabled; `endpoint.path` must contain a `:port` —
 /// a shape check only, the ingestor does the full `SocketAddr` parse when it
-/// binds (otel-ingestor/src/lib.rs:89); TLS cert and key must come as a pair,
-/// with the CA requiring both; and each signal's retention must satisfy the
-/// catalog-horizon invariant (netdata-plugin/bridge/src/config.rs:714).
+/// binds (`otel-ingestor/src/lib.rs` `run_ingestor`); TLS cert and key must
+/// come as a pair, with the CA requiring both; and each signal's retention
+/// must satisfy the catalog-horizon invariant
+/// (`netdata-plugin/bridge/src/config.rs` `RetentionPolicy::validate`).
 fn validate(config: &PluginConfig) -> Result<()> {
     if config.base_dir.as_os_str().is_empty() {
         anyhow::bail!("base_dir must be set (the mandatory root for all signal storage)");

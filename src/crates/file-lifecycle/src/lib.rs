@@ -91,7 +91,7 @@
 //! - [`helpers`] — pure mapping helpers: the config ↔ storage-type
 //!   conversions, summary → date, registry → upload request, and the
 //!   retention-policy builders.
-//! - [`redact`] (crate-private) — journal-safety redaction of
+//! - `redact` (crate-private) — journal-safety redaction of
 //!   remote-storage error text, wired into [`storage::StorageError`]'s
 //!   `Display`.
 //! - `test_helpers` (`cfg(test)`, crate-private) — content-agnostic test

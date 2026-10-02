@@ -23,17 +23,17 @@
 //! `Arc<parking_lot::RwLock<RegistryInner>>`; methods take `&self` and lock
 //! internally, so handles are freely shareable across tasks (`Send` +
 //! `Sync`; the event forwarder runs on a shared handle,
-//! otel-legacy-logs/src/handler.rs:184-194). Only watch/unwatch and the
+//! `otel-legacy-logs/src/handler.rs`). Only watch/unwatch and the
 //! initial scan propagate errors; per-file insert/remove failures are
 //! logged and skipped, so `process_event` and `find_files_in_range` always
 //! return `Ok`.
 //!
 //! Consumers: journal-engine's batch indexer drives `Registry` and reports
-//! bounds back with `update_time_range` (journal-engine/src/indexing.rs:13,357);
-//! journal-function re-exports `Monitor`/`Registry` (journal-function/src/lib.rs:25)
+//! bounds back with `update_time_range` (`journal-engine/src/indexing.rs`);
+//! journal-function re-exports `Monitor`/`Registry` (`journal-function/src/lib.rs`)
 //! for otel-legacy-logs' watch → process_event → find_files_in_range loop
-//! (otel-legacy-logs/src/handler.rs:144-190,381); journal-log-writer folds
-//! `RegistryError` (journal-log-writer/src/error.rs:36).
+//! (`otel-legacy-logs/src/handler.rs`); journal-log-writer folds
+//! `RegistryError` (`journal-log-writer/src/error.rs`).
 
 pub mod error;
 pub use error::RegistryError;
@@ -42,7 +42,7 @@ use crate::registry::error::Result;
 use crate::repository::{Repository as BaseRepository, scan_journal_files};
 use crate::{File, FileInfo, TimeRange};
 // Seconds and the collection aliases come from journal-common, this crate's
-// only journal-stack dependency (journal-registry/Cargo.toml:21); the
+// only journal-stack dependency (journal-registry/Cargo.toml); the
 // repository types are local.
 use journal_common::Seconds;
 use journal_common::collections::{HashMap, HashSet};
@@ -56,7 +56,7 @@ use tracing::{error, info, trace, warn};
 
 // monitor.rs: `Monitor` wraps notify's RecommendedWatcher and streams
 // filesystem events into an unbounded channel; the caller feeds them back
-// into `Registry::process_event` (registry/monitor.rs:16-31).
+// into `Registry::process_event` (registry/monitor.rs).
 mod monitor;
 pub use monitor::Monitor;
 
@@ -67,10 +67,11 @@ pub use monitor::Monitor;
 ///
 /// The base (the `repository` module) owns the files: `File`s in
 /// per-directory, per-origin chains that answer the coarse "which files
-/// could overlap" query (repository/collection.rs:78-171). The
+/// could overlap" query ([`crate::repository::Chain::find_files_in_range`]).
+/// The
 /// `file_metadata` map adds one `TimeRange` per file for the finer filter
-/// in `find_files_in_range`; inserted files start at `TimeRange::Unknown`
-/// (time_range.rs:8-10) and indexing overwrites them via
+/// in `find_files_in_range`; inserted files start at [`TimeRange::Unknown`]
+/// and indexing overwrites them via
 /// `update_file_info`.
 struct Repository {
     base: BaseRepository,
@@ -88,7 +89,7 @@ impl Repository {
 
     /// Register a file: the base chain takes it and its metadata starts at
     /// `TimeRange::Unknown`. The only failure is the base rejecting the file -
-    /// its directory cannot be resolved (repository/file.rs:285) - and then
+    /// its directory cannot be resolved ([`File::dir`]) - and then
     /// nothing is recorded.
     fn insert(&mut self, file: File) -> Result<()> {
         let file_info = FileInfo {
@@ -114,8 +115,8 @@ impl Repository {
     /// Remove every tracked file whose `File::dir()` equals `path`, metadata
     /// included.
     ///
-    /// `File::dir()` maps machine-id origins up to the journal root
-    /// (repository/file.rs:285-294), so files under `<path>/<machine-id>/` are
+    /// [`File::dir`] maps machine-id origins up to the journal root,
+    /// so files under `<path>/<machine-id>/` are
     /// removed too; files whose directory cannot be resolved are kept.
     fn remove_directory(&mut self, path: &str) {
         self.base.remove_directory(path);
@@ -128,7 +129,8 @@ impl Repository {
     /// The chains return the files they consider overlapping - each archived
     /// file covers [its head, the next head), the last archived file and the
     /// active file run to infinity, disposed files are skipped
-    /// (repository/collection.rs:78-171) - then the filter below drops Bounded
+    /// ([`crate::repository::Chain::find_files_in_range`]) - then the filter
+    /// below drops Bounded
     /// entries whose indexed bounds miss the window. The overlay only ever
     /// drops files; it cannot resurrect one the chains rejected.
     fn find_files_in_range(&self, start: Seconds, end: Seconds) -> Vec<FileInfo> {
@@ -153,8 +155,9 @@ impl Repository {
                         true
                     }
                     TimeRange::Active { end: _file_end, .. } => {
-                        // An Active file keeps growing past its recorded end (time_range.rs:12-19),
-                        // so a bounds check like `file_end >= start` would drop it exactly while
+                        // An Active file keeps growing past its recorded end
+                        // (`TimeRange::Active` in time_range.rs), so a bounds
+                        // check like `file_end >= start` would drop it exactly while
                         // the indexer lags behind the newest entries - think of panning away and
                         // back to `now` with a small range. Pass it unconditionally.
                         true
@@ -164,7 +167,8 @@ impl Repository {
                         end: file_end,
                         ..
                     } => {
-                        // Archived files have final bounds (time_range.rs:21-26), so prune exactly:
+                        // Archived files have final bounds (`TimeRange::Bounded` in
+                        // time_range.rs), so prune exactly:
                         // keep only when [file_start, file_end) overlaps the half-open [start, end).
                         file_start.0 < end.0 && file_end.0 > start.0
                     }
@@ -232,7 +236,8 @@ impl Registry {
     /// Start tracking a directory: scan its existing files, then watch it.
     ///
     /// Idempotent per path - an already-watched root logs a warning and returns
-    /// `Ok`. The recursive scan (repository/file.rs:374) runs before the watch
+    /// `Ok`. The recursive scan ([`crate::repository::file::scan_journal_files`])
+    /// runs before the watch
     /// is registered, so a file created in the gap stays untracked until its
     /// next event arrives (e.g. the rotation rename). The scan and the watch
     /// registration propagate errors; inserting the scanned files does not -
@@ -250,7 +255,8 @@ impl Registry {
         let files = scan_journal_files(path)?;
         info!("found {} journal files in {}", files.len(), path);
 
-        // Register the notify watch (recursive, registry/monitor.rs:34); failures propagate.
+        // Register the notify watch (recursive, `Monitor::watch_directory` in
+        // registry/monitor.rs); failures propagate.
         inner.monitor.watch_directory(path)?;
         inner.watched_directories.insert(String::from(path));
 
@@ -380,7 +386,8 @@ impl Registry {
     ///
     /// Two filters apply. The base chains first: each archived file covers [its
     /// head, the next head), the last archived file and the active file run to
-    /// infinity, disposed files are skipped (repository/collection.rs:78-171);
+    /// infinity, disposed files are skipped
+    /// ([`crate::repository::Chain::find_files_in_range`]);
     /// results are chronological within each chain, unordered across chains.
     /// Then the metadata overlay drops Bounded files whose indexed bounds miss
     /// the window; Unknown and Active pass it unfiltered - but they are still
@@ -395,10 +402,10 @@ impl Registry {
     /// Bounded (archived).
     ///
     /// Called after the indexer computes a file's bounds
-    /// (journal-engine/src/indexing.rs:357): `online` means the file was still
-    /// being written when it was indexed (journal-index/src/file_index.rs:84-87),
+    /// (`journal-engine/src/indexing.rs`): `online` means the file was still
+    /// being written when it was indexed (`journal-index/src/file_index.rs`),
     /// so `end` is the newest entry seen at index time and the file keeps
-    /// growing (time_range.rs:12-19); otherwise the bounds are final.
+    /// growing ([`TimeRange::Active`]); otherwise the bounds are final.
     /// `indexed_at` records when the bounds were computed. Overwrites any
     /// previous row for the file.
     pub fn update_time_range(

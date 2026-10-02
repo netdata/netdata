@@ -1,7 +1,7 @@
 //! The logs-UI wire types: the flat serde shapes the netdata builders emit
-//! and `JournalResponse` carries as `facets`, `available_histograms`, and
-//! `histogram` (netdata/types.rs:177-180; flat re-exports in
-//! netdata/mod.rs:35-38).
+//! and [`crate::netdata::types::JournalResponse`] carries as `facets`,
+//! `available_histograms`, and
+//! `histogram` (flat re-exports in `netdata/mod.rs`).
 //!
 //! This file only defines the shapes - the builders own the semantics:
 //! netdata/facets.rs builds `Vec<Facet>` (raw ids, registry-transformed
@@ -10,13 +10,13 @@
 //! is the `count()` chain and the `DataPoint` serde impls below.
 //!
 //! Consumers (grep-verified): the two builder modules above and
-//! netdata/types.rs (`use super::ui_types as ui`, types.rs:6). The response
+//! `netdata/types.rs` (via its `use super::ui_types as ui`). The response
 //! reaches the logs dashboard by serialization; the only code call is
-//! `Items.matched` = `Histogram::count()` at
-//! otel-legacy-logs/src/handler.rs:487.
+//! `Items.matched` = `Histogram::count()` in
+//! `LegacyLogsHandler::on_call` (`otel-legacy-logs/src/handler.rs`).
 //!
 //! Same-named but independent copies exist in the otel-logs pipeline
-//! (otel-ledger/src/ledger/rpc/logs/wire.rs:284-359); they do not consume
+//! (`otel-ledger/src/ledger/rpc/logs/wire.rs`); they do not consume
 //! this file.
 
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,8 @@ use serde::{Deserialize, Serialize};
 
 /// One available-histogram option: `id`/`name` are the field name
 /// (identical), `order` the 0-based position after sorting by id; one per
-/// field with indexed values in the buckets (netdata/histogram.rs:18-42).
+/// field with indexed values in the buckets
+/// ([`crate::netdata::available_histograms`]).
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct AvailableHistogram {
@@ -39,7 +40,7 @@ pub struct AvailableHistogram {
 /// One facet filter for the logs UI: a field with its filterable values.
 /// `id`/`name` are the raw field name (identical, not registry-transformed),
 /// `order` the field's alphabetical position, `options` its values sorted
-/// alphabetically (netdata/facets.rs:42-99).
+/// alphabetically (by [`crate::netdata::facets::facets`]).
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct Facet {
@@ -52,8 +53,10 @@ pub struct Facet {
 /// One filterable value of a `Facet`: `id` the raw value, `name` the
 /// registry-transformed display value, `order` the alphabetical position,
 /// `count` the post-filter total summed across buckets. Values the active
-/// selections exclude still appear, with count 0 (netdata/facets.rs:51-91;
-/// the zero entries are pre-created in journal-engine/src/histogram.rs:349-351).
+/// selections exclude still appear, with count 0 (as built by `facets()`
+/// in `netdata/facets.rs`;
+/// the zero entries are pre-created by `HistogramEngine::compute_from_indexes`
+/// in `journal-engine/src/histogram.rs`).
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct FacetOption {
@@ -64,7 +67,8 @@ pub struct FacetOption {
 }
 
 /// The UI histogram chart for one field: `id`/`name` are the field name
-/// (identical), `chart` the rendered chart (netdata/histogram.rs:50-61).
+/// (identical), `chart` the rendered chart (built by the `histogram()` fn
+/// in `netdata/histogram.rs`).
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct Histogram {
@@ -75,14 +79,14 @@ pub struct Histogram {
 
 impl Histogram {
     /// Total events the chart represents; feeds `Items.matched`
-    /// (otel-legacy-logs/src/handler.rs:487).
+    /// (`LegacyLogsHandler::on_call` in `otel-legacy-logs/src/handler.rs`).
     pub fn count(&self) -> usize {
         self.chart.count()
     }
 }
 
 /// The rendered chart: `view` the display metadata, `result` the data; both
-/// filled by chart_from_histogram (netdata/histogram.rs:64-74).
+/// filled by `chart_from_histogram` (`netdata/histogram.rs`).
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct Chart {
@@ -97,8 +101,8 @@ impl Chart {
     }
 }
 
-/// Display metadata, filled with fixed strings by chart_view_from_histogram
-/// (netdata/histogram.rs:167-188): title "Events distribution by {field}",
+/// Display metadata, filled with fixed strings by `chart_view_from_histogram`
+/// (`netdata/histogram.rs`): title "Events distribution by {field}",
 /// `after`/`before` the histogram's time span (first bucket start / last
 /// bucket end) in seconds, `update_every` the bucket width in seconds,
 /// `units` the literal "units" (the per-dimension units below are
@@ -118,7 +122,7 @@ pub struct ChartView {
 /// Parallel per-dimension arrays, aligned with `ChartResult`: `ids` the raw
 /// field values ("(unset)" last), `names` the display labels
 /// (`ChartResult.labels[1..]`), `units` "events" for every dimension
-/// (netdata/histogram.rs:173-177).
+/// (built by `chart_view_from_histogram` in `netdata/histogram.rs`).
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct ChartDimensions {
@@ -130,7 +134,8 @@ pub struct ChartDimensions {
 /// The chart's data. `labels` is ["time", transformed values..., "(unset)"]:
 /// `labels[i + 1]` pairs with `ChartDimensions.ids[i]` and
 /// `DataPoint.items[i]`; `point` names the item-triple indexes; `data` is
-/// one `DataPoint` per bucket, in bucket order (netdata/histogram.rs:79-158).
+/// one `DataPoint` per bucket, in bucket order (`chart_result_from_histogram`
+/// in `netdata/histogram.rs`).
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct ChartResult {
@@ -157,9 +162,11 @@ impl ChartResult {
 
 /// Indexes into each item's [value, arp, pa] triple: 0 = event count,
 /// 1 = anomaly rate, 2 = point annotation. The chart builder only ever
-/// writes [count, 0, 0] (netdata/histogram.rs:126,131); the field meanings
+/// writes [count, 0, 0] (`chart_result_from_histogram` in
+/// `netdata/histogram.rs`); the field meanings
 /// come from the former C implementation
-/// (libnetdata/facets/facets.c:1594-1595).
+/// (`src/libnetdata/facets/facets.c` histogram point emit:
+/// `arp` anomaly rate, `pa` point annotation).
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct ChartPoint {
@@ -169,7 +176,8 @@ pub struct ChartPoint {
 }
 
 /// One histogram bucket: `timestamp` the bucket start in ms, `items[i]` the
-/// triple for dimension `i` (netdata/histogram.rs:110-137). Serde flattens
+/// triple for dimension `i` (`chart_result_from_histogram` in
+/// `netdata/histogram.rs`). Serde flattens
 /// the struct to a plain array - see the impls below.
 #[derive(Debug)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
@@ -180,7 +188,8 @@ pub struct DataPoint {
 
 /// Serializes as a flat array - [timestamp, [value, arp, pa], ...] - rather
 /// than a {timestamp, items} object, matching the chart wire format the
-/// former C implementation wrote (libnetdata/facets/facets.c:1577-1606).
+/// former C implementation wrote (the histogram `data` emit in
+/// `src/libnetdata/facets/facets.c`).
 ///
 /// The deserializer below accepts the same shape.
 impl Serialize for DataPoint {

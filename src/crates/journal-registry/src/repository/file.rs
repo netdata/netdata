@@ -4,9 +4,9 @@
 //! `File` (path + `Origin` + `Status` in an `Arc`) is the unit everything
 //! else is built on: `Chain`/`Repository` order and group it
 //! (repository/collection.rs), `Registry` pairs it with `TimeRange` metadata
-//! (repository/metadata.rs:11-16), and the journal stack passes it around as
+//! ([`crate::FileInfo`]), and the journal stack passes it around as
 //! a key — `Eq`/`Hash` cover the full path, origin and status, which
-//! journal-engine keys its index cache on (journal-engine/src/cache.rs:25-29).
+//! journal-engine keys its index cache on (`journal-engine/src/cache.rs`).
 //!
 //! Naming scheme parsed right to left (`File::from_str`), by suffix first:
 //!
@@ -15,9 +15,9 @@
 //!   `system@<seqnum_id>-<head_seqnum>-<head_realtime>.journal`, with
 //!   `seqnum_id` a UUID (the writer emits its 32-hex-char simple form) and
 //!   the numbers hex u64s (writer side:
-//!   journal-log-writer/src/log/chain.rs:23-28).
+//!   `journal-log-writer/src/log/chain.rs`).
 //! - `.journal~` — disposed: `system@<timestamp>-<number>.journal~`, both
-//!   hex u64s; a corrupted file renamed with the `~` suffix (README.md:51-54).
+//!   hex u64s; a corrupted file renamed with the `~` suffix (README.md).
 //! - source basename: `system`, `user-<uid>` (u32), `remote-<host>`, or
 //!   anything else → `Unknown`. The basename must sit in a directory.
 //! - machine-id directory: the component above the basename's directory is
@@ -27,28 +27,31 @@
 //!   file.
 //!
 //! Every parse mismatch is a silent `None` — path errors never become
-//! `RepositoryError` (`InvalidPath` has no producing call site,
-//! repository/error.rs:24-27). The errors that do exist come from the scan
+//! `RepositoryError` ([`RepositoryError::InvalidPath`] has no producing
+//! call site). The errors that do exist come from the scan
 //! (`WalkDir`) and from `File::dir()` (`InvalidUtf8`).
 //!
 //! Ordering: `Status`'s `Ord` puts disposed → archived (by head_realtime,
 //! the rotation boundary) → active, which is what keeps the chains in
-//! rotation order for the range-coverage model (repository/collection.rs:26,
-//! 78-171); `File`'s `Ord` adds a path tiebreak. `File::dir()` — the
+//! rotation order for the range-coverage model
+//! ([`crate::repository::Chain::find_files_in_range`]);
+//! `File`'s `Ord` adds a path tiebreak. `File::dir()` — the
 //! machine-id directory's parent when the machine-id parsed, else the file's
-//! immediate parent — is the key `Repository` groups chains by
-//! (repository/collection.rs:203,229) and what `Registry::remove_directory`
-//! matches against (registry/mod.rs:68-72).
+//! immediate parent — is the key [`crate::repository::Repository`] groups
+//! chains by and what [`crate::Registry::unwatch_directory`]
+//! matches against.
 //!
-//! `scan_journal_files` is re-exported crate-internally
-//! (repository/mod.rs:49) and is the initial scan of
-//! `Registry::watch_directory` (registry/mod.rs:180).
+//! [`crate::repository::file::scan_journal_files`] is re-exported
+//! crate-internally (`repository/mod.rs`) and is the initial scan of
+//! [`crate::Registry::watch_directory`].
 //!
-//! Consumers: journal-index (file_indexer.rs:17,196 — `is_active` guards the
-//! header-state check), journal-engine (cache.rs:6, logs/query.rs:14),
+//! Consumers: journal-index (`journal-index/src/file_indexer.rs` —
+//! `is_active` guards the header-state check), journal-engine
+//! (`journal-engine/src/cache.rs`, `journal-engine/src/logs/query.rs`),
 //! journal-log-writer (builds these names and parses them back,
-//! src/log/chain.rs:24,32,79), the journal-core repository re-export
-//! (src/lib.rs:24) and journal-function's re-export (src/lib.rs:25).
+//! `journal-log-writer/src/log/chain.rs`), the journal-core repository
+//! re-export (`journal-core/src/lib.rs`) and journal-function's re-export
+//! (`journal-function/src/lib.rs`).
 //! netflow-plugin runs the same API through the published twin
 //! `journal-sdk-registry`. The `allocative` feature adds memory-profiling
 //! derives, skipping the `Uuid` fields (the uuid type has no Allocative
@@ -79,13 +82,14 @@ pub enum Status {
         /// Seqnum of the file's first entry (hex u64 in the file name).
         head_seqnum: u64,
         /// Realtime timestamp of the first entry, microseconds since epoch —
-        /// the chain's rotation-boundary key (`Ord` and the range queries
-        /// use it, repository/collection.rs:78-171).
+        /// the chain's rotation-boundary key (`Ord` and
+        /// [`crate::repository::Chain::find_files_in_range`] use it).
         head_realtime: u64,
     },
     /// Disposed journal file — corrupted or incomplete, renamed with the
     /// `~` suffix — awaiting cleanup. Its entry bounds are unknowable, so
-    /// range queries skip it (repository/collection.rs:165-169).
+    /// range queries skip it
+    /// ([`crate::repository::Chain::find_files_in_range`]).
     Disposed {
         /// When the file was disposed, microseconds since epoch (hex in the
         /// file name).
@@ -134,7 +138,8 @@ impl Ord for Status {
                 .then_with(|| lhs_head_seqnum.cmp(rhs_head_seqnum)),
 
             // Archived before active: the live file sorts last (the chain
-            // scans stop there, repository/collection.rs:162-163).
+            // scans stop there, `Chain::find_files_in_range` in
+            // repository/collection.rs).
             (Status::Archived { .. }, Status::Active) => Ordering::Less,
             (Status::Active, Status::Archived { .. }) => Ordering::Greater,
 
@@ -253,7 +258,7 @@ impl Source {
 
 /// Where a journal file comes from: machine, namespace and stream, parsed
 /// from the path (module docs). The chains inside a repository directory
-/// are keyed by this value (repository/collection.rs:176-177).
+/// are keyed by this value (`Directory::chains` in repository/collection.rs).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct Origin {
@@ -336,7 +341,7 @@ impl File {
     /// Parses the naming scheme right to left into a `File`; see the module
     /// docs. Absolute paths only — the journal-log-writer rejects relative
     /// directories for exactly this reason
-    /// (journal-log-writer/src/log/mod.rs:26-32). Every mismatch is a
+    /// (`journal-log-writer/src/log/mod.rs`). Every mismatch is a
     /// silent `None`; nothing here raises an error.
     //
     // Not `FromStr::from_str` — this parses a path; `from_path` is the
@@ -476,7 +481,7 @@ impl Ord for File {
     fn cmp(&self, other: &Self) -> Ordering {
         // Status first — the chain order — then the path, so equal-status
         // files get a deterministic slot for the binary search in
-        // `Chain::insert_file` (collection.rs:26).
+        // `Chain::insert_file` (repository/collection.rs).
         self.inner
             .status
             .cmp(&other.inner.status)
@@ -497,11 +502,12 @@ impl PartialOrd for File {
 /// entries whose path parses as a journal file (`File::from_path`) are
 /// collected, everything else is skipped silently. Results come back in
 /// walk order, unsorted — chains sort on insert
-/// (repository/collection.rs:25-33). The walk is the only error source: any
+/// ([`crate::repository::Chain::insert_file`]). The walk is the only error
+/// source: any
 /// `walkdir::Error` (including a missing or unreadable root) becomes
 /// `RepositoryError::WalkDir`, which is what makes the initial scan in
-/// `Registry::watch_directory` fallible (registry/mod.rs:180) — its only
-/// workspace caller (repository/mod.rs:49 re-exports the fn internally;
+/// [`crate::Registry::watch_directory`] fallible — its only
+/// workspace caller (`repository/mod.rs` re-exports the fn internally;
 /// outside crates reach it by full path).
 pub fn scan_journal_files(path: &str) -> Result<Vec<File>> {
     let mut files = Vec::new();

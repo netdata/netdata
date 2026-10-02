@@ -532,7 +532,7 @@ impl Writer {
     /// sequence counter — in the otel path one allocator spans every tenant
     /// and signal writer. The directory is created if it doesn't exist.
     ///
-    /// Errors: the reserved `payload_format` ([`Error::InvalidHeader`]) and
+    /// Errors: the reserved `payload_format` (`Error::InvalidHeader`) and
     /// directory-creation I/O.
     pub fn new(
         path: &Path,

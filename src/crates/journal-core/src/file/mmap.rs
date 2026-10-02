@@ -25,7 +25,9 @@
 //! opens a new window, evicting the oldest at `max_windows`. Sizing is
 //! caller policy: JournalFile passes 64 KiB chunks and 16 windows after
 //! `open` / 32 after `create`, 8 MiB chunks on rotation
-//! (file/file.rs:102,327,803,723).
+//! ([`JournalFile::open`](crate::file::JournalFile::open),
+//! [`JournalFile::create`](crate::file::JournalFile::create),
+//! [`JournalFile::create_successor`](crate::file::JournalFile::create_successor)).
 //!
 //! Load-bearing contract: any access can unmap or move windows, so a slice
 //! handed out earlier dangles once its window goes. Through `&mut self` the
@@ -36,7 +38,8 @@
 //! `JournalError::ValueGuardInUse`.
 //!
 //! Errors: mmap, `set_len`, `metadata`, `flush` and `sync_data` all
-//! surface as `JournalError::Io` (error.rs:31) - the only error this
+//! surface as [`JournalError::Io`](crate::error::JournalError::Io) - the
+//! only error this
 //! module raises. There is no runtime bounds validation beyond debug
 //! assertions: a bad position/size panics on slice indexing, never UB.
 //!
@@ -47,17 +50,18 @@
 //! Consumers (grep-verified): `JournalFile` (file/file.rs) is the only
 //! `WindowManager` user; cursor/reader/writer/offset-array only carry the
 //! trait bounds through `JournalFile<M>`, and journal-log-writer imports
-//! `MmapMut` from here directly (journal-log-writer/src/log/mod.rs:13).
+//! `MmapMut` from here directly (journal-log-writer/src/log/mod.rs).
 //! netflow-plugin instead queries the published sdk twin
 //! (systemd-journal-sdk-core); this module's near-twin is
 //! src/crates/jf/window_manager/src/lib.rs (keeps the old window start on
 //! remap, no `flush`/`sync`, no failure logging).
 //!
 //! For the SIGBUS hazard above, the crate ships a recovery handler
-//! (file/sigbus.rs, re-exported `install_sigbus_handler`, lib.rs:37) but
+//! (file/sigbus.rs, re-exported
+//! [`install_sigbus_handler`](crate::install_sigbus_handler)) but
 //! nothing in this repo installs it: netflow-plugin installs the published
-//! twin's copy (netflow-plugin/src/main.rs:47) and the FFI reader its own
-//! (jf/journal_reader_ffi/src/lib.rs:114).
+//! twin's copy (netflow-plugin/src/main.rs) and the FFI reader its own
+//! (jf/journal_reader_ffi/src/lib.rs).
 use crate::error::Result;
 use journal_common::compat::is_multiple_of;
 use std::fs::File;
@@ -210,7 +214,8 @@ impl<M: MemoryMap> WindowManager<M> {
     /// `u64::is_multiple_of`) and `max_windows` caps the window count
     /// (debug-asserted non-zero). Callers set both: JournalFile passes
     /// 64 KiB chunks with 16 (open) / 32 (create) windows
-    /// (file/file.rs:327,803).
+    /// ([`JournalFile::open`](crate::file::JournalFile::open) /
+    /// [`JournalFile::create`](crate::file::JournalFile::create)).
     pub fn new(file: File, chunk_size: u64, max_windows: usize) -> Result<Self> {
         debug_assert!(chunk_size != 0 && is_multiple_of(chunk_size, PAGE_SIZE));
         debug_assert!(max_windows != 0);
@@ -380,8 +385,9 @@ impl<M: MemoryMapMut> WindowManager<M> {
     }
 
     /// fdatasync of the file through the fd the manager owns. Windows and
-    /// hash-table maps reach disk only through this; `JournalFile::sync`
-    /// additionally msyncs the header map first (file/file.rs:698).
+    /// hash-table maps reach disk only through this;
+    /// [`JournalFile::sync`](crate::file::JournalFile::sync)
+    /// additionally msyncs the header map first.
     pub fn sync(&self) -> Result<()> {
         self.file.sync_data()?;
         Ok(())

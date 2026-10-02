@@ -1,6 +1,6 @@
 //! Histogram charts for the Netdata logs UI: the per-field `Histogram`
 //! chart and the `available_histograms` list, built from the query
-//! engine's bucket histogram (journal-engine/src/histogram.rs:131,
+//! engine's bucket histogram (`Histogram` in `journal-engine/src/histogram.rs`,
 //! imported here as `QueryHistogram` - `Histogram` is the UI chart type).
 
 use super::transformations::TransformationRegistry;
@@ -12,7 +12,7 @@ use journal_core::collections::HashSet;
 use journal_engine::Histogram as QueryHistogram;
 use journal_index::FieldName;
 
-/// One `AvailableHistogram` (ui_types.rs:15) per indexed field in the buckets.
+/// One [`AvailableHistogram`] per indexed field in the buckets.
 ///
 /// Sorted by id, 0-based `order` - the FxHashSet union is unordered.
 pub fn available_histograms(histogram_response: &QueryHistogram) -> Vec<AvailableHistogram> {
@@ -41,7 +41,7 @@ pub fn available_histograms(histogram_response: &QueryHistogram) -> Vec<Availabl
     available_histograms
 }
 
-/// Builds the UI `Histogram` (ui_types.rs:44) for one field; id/name = field.
+/// Builds the UI [`Histogram`] for one field; id/name = field.
 ///
 /// # Arguments
 /// * `histogram_response` - The engine's bucket histogram (QueryHistogram)
@@ -60,7 +60,7 @@ pub fn histogram(
     }
 }
 
-/// Builds the `Chart` (ui_types.rs:59): result data plus view metadata.
+/// Builds the [`Chart`]: result data plus view metadata.
 fn chart_from_histogram(
     histogram_response: &QueryHistogram,
     field: &FieldName,
@@ -73,7 +73,7 @@ fn chart_from_histogram(
     Chart { view, result }
 }
 
-/// Builds the `ChartResult` (ui_types.rs:95) for one field.
+/// Builds the [`ChartResult`] for one field.
 ///
 /// Returns the raw values (dimension IDs) and transformed labels ("time" first).
 fn chart_result_from_histogram(
@@ -157,7 +157,7 @@ fn chart_result_from_histogram(
     )
 }
 
-/// Builds the `ChartView` (ui_types.rs:73): a stacked "events" bar chart.
+/// Builds the [`ChartView`]: a stacked "events" bar chart.
 ///
 /// # Arguments
 /// * `histogram_response` - The after/before (seconds) span and update_every

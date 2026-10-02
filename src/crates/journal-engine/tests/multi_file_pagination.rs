@@ -1,45 +1,48 @@
 //! Integration tests for multi-file pagination through the engine's
-//! `LogQuery::execute_page` (src/logs/query.rs:215-231): each test
+//! [`LogQuery::execute_page`]: each test
 //! writes 2-3 fresh journal files, indexes them with
 //! `FileIndexer::index`, and pages across the merged result, threading
 //! `PaginationState` from page to page. The state type is never named
-//! here - it is not re-exported from `logs` (src/logs/mod.rs:9) and
+//! here - it is not re-exported from `logs` and
 //! only arrives through `execute_page`'s return value.
 //!
 //! Fixture: `file1.journal`..`fileN.journal` in one machine-id dir.
 //! Any `<name>.journal` parses as an active journal whose source is
 //! derived from the basename
-//! (journal-registry/src/repository/file.rs:104-108,147-170,236-283),
-//! and distinct names give distinct `File` identities (file.rs:185-197)
+//! (`journal-registry/src/repository/file.rs` `File::from_path`),
+//! and distinct names give distinct `File` identities (its derived
+//! `Eq`/`Hash`, `journal-registry/src/repository/file.rs`)
 //! - what keeps the per-file positions in
-//! `PaginationState.file_positions` (src/logs/query.rs:33) separate.
+//! `PaginationState.file_positions` (`logs/query.rs` `PaginationState`) separate.
 //! Most tests chain disjoint entry runs across the files (typically
 //! 100 entries per file); overlaps, shared timestamps, an empty file,
 //! a filter, time windows and boundary anchors are called out per
 //! test. Every entry is stamped with
 //! `_SOURCE_REALTIME_TIMESTAMP=<microseconds>` - the tests index that
 //! field explicitly, so each file's entry list is time-ordered by it
-//! (journal-index/src/file_indexer.rs:592-601) - and carries a unique
+//! (`journal-index/src/file_indexer.rs` `FileIndexer::index`) - and carries a unique
 //! `ENTRY_ID=fileN_<i>`: the prefix identifies the source file in the
 //! distribution assertions, the value is the dedup key wherever
 //! timestamps repeat. Several tests also stamp and index a per-file
 //! `FILE` field that no assertion reads back.
 //!
-//! How a page is built (src/logs/query.rs:330-421): files are
+//! How a page is built (`logs/query.rs` `retrieve_log_entries`): files are
 //! processed in stable temporal sort order - start_time ascending
-//! forward, end_time descending backward (src/logs/query.rs:309-319).
+//! forward, end_time descending backward (the sort in
+//! `retrieve_log_entries`).
 //! Each file walks only its own entry list from the per-file-resolved
-//! anchor (Head/Tail map to that file's own histogram bounds,
-//! journal-index/src/file_index.rs:555-556; Timestamp is the anchor
-//! value, inclusive in both directions, file_index.rs:618-633,708-737),
+//! anchor (Head/Tail map to that file's own histogram bounds;
+//! Timestamp is the anchor value, inclusive in both directions; see
+//! `journal-index/src/file_index.rs` `FileIndex::find_log_entries`),
 //! and each per-file merge re-interleaves the results into one
 //! globally timestamp-ordered page capped at the limit
-//! (src/logs/query.rs:447-505; ties go to the already-collected side,
-//! query.rs:489-492). Page order is global regardless of processing
+//! (`logs/query.rs` `merge_log_entries`; ties go to the
+//! already-collected side).
+//! Page order is global regardless of processing
 //! order; processing order only decides which entries survive the cap
 //! - a file whose fetch is wholly displaced by the cap keeps no resume
 //! position and is re-walked from its anchor on the next page
-//! (src/logs/query.rs:405-419,327-328), which the per-entry dedup
+//! (the state merge in `retrieve_log_entries`), which the per-entry dedup
 //! assertions prove loses nothing. The fixtures use microsecond-scale
 //! timestamps inside one 3600 s histogram bucket, so every file's
 //! Head/Tail bounds coincide and the walks effectively start at each
@@ -50,35 +53,40 @@
 //! - `PaginationState` holds one position per file - the max
 //!   (forward) / min (backward) `LogEntryId.position` among entries
 //!   that actually landed in the page
-//!   (journal-index/src/file_index.rs:521-523; src/logs/query.rs:405-419),
-//!   merged over the previous state (src/logs/query.rs:328) so
+//!   (`journal-index/src/file_index.rs` `LogEntryId::position`; the
+//!   state merge in `retrieve_log_entries`),
+//!   merged over the previous state so
 //!   positions persist across pages where a file contributed nothing.
 //! - Resume is per file, not global: forward starts at
 //!   `resume_position + 1`, backward at `resume_position - 1`
-//!   (src/logs/query.rs:361-389;
-//!   journal-index/src/file_index.rs:613-617,695-707).
+//!   (the per-file params rebuild in `retrieve_log_entries`;
+//!   `journal-index/src/file_index.rs` `FileIndex::find_log_entries`).
 //! - `Anchor::Head`/`Tail` take the minimum start / maximum end across
-//!   all files (src/logs/query.rs:264-279).
+//!   all files (the anchor resolution in `retrieve_log_entries`).
 //! - Time boundaries apply during each file's walk: `after` inclusive,
-//!   `before` exclusive (src/logs/query.rs:119-131;
-//!   journal-index/src/file_index.rs:655-664).
+//!   `before` exclusive (`LogQuery::with_after_usec`/`with_before_usec`;
+//!   the boundary checks in `journal-index/src/file_index.rs`
+//!   `FileIndex::find_log_entries`).
 //! - A filtered query paginates each file's FILTERED entry list
-//!   (journal-index/src/file_index.rs:521-523) and every page
-//!   re-applies the current query's filter (src/logs/query.rs:373-375),
+//!   (`journal-index/src/file_index.rs` `LogEntryId::position`) and every page
+//!   re-applies the current query's filter (the per-file params
+//!   rebuild in `retrieve_log_entries`),
 //!   so the filter must not change between pages.
 //!
 //! Not pinned here: unlimited queries (every test sets a limit),
-//! limit 0 (src/logs/query.rs:256-259), regex search, cancellation and
-//! progress counters (src/logs/query.rs:145-161), output-field
-//! projection (src/logs/query.rs:163-174), per-file read errors (logged
-//! and skipped, src/logs/query.rs:393-396), the per-direction relevance
-//! pre-filter (src/logs/query.rs:283-298 - every file qualifies in
+//! limit 0 (the early return in `retrieve_log_entries`), regex search,
+//! cancellation and
+//! progress counters (`LogQuery::with_cancellation`/`with_progress`),
+//! output-field
+//! projection (`LogQuery::with_output_fields`), per-file read errors (logged
+//! and skipped in `retrieve_log_entries`), the per-direction relevance
+//! pre-filter (the anchor pre-filter in `retrieve_log_entries` - every file qualifies in
 //! these fixtures), the prune/skip path (its break condition is never
-//! met here, src/logs/query.rs:346-356,424-445), which file leads a
+//! met here, `logs/query.rs` `can_prune_file`), which file leads a
 //! page when timestamps tie (assertions count per-file totals, not
 //! page layout), and changing any query parameter between pages - the
 //! state is bound to the configuration that produced it
-//! (src/logs/query.rs:27-29).
+//! (`PaginationState`'s `logs/query.rs` docs).
 
 use journal_common::Seconds;
 use journal_core::file::{JournalFile, JournalFileOptions, JournalWriter};
@@ -115,7 +123,7 @@ impl TestEntry {
 
 /// Path of a test journal: `<tmp>/<machine-id>/<filename>` - the
 /// registry grammar `File::from_path` parses
-/// (journal-registry/src/repository/file.rs:236-283). All of a test's
+/// (`journal-registry/src/repository/file.rs`). All of a test's
 /// files share the machine-id dir; distinct names keep their `File`
 /// identities - and `PaginationState`'s per-file positions - separate.
 fn create_test_journal_path(temp_dir: &TempDir, filename: &str) -> PathBuf {
@@ -131,7 +139,7 @@ fn create_test_journal_path(temp_dir: &TempDir, filename: &str) -> PathBuf {
 /// Every entry is stamped with
 /// `_SOURCE_REALTIME_TIMESTAMP=<microseconds>` and `add_entry`
 /// receives the same value as realtime and monotonic
-/// (journal-core/src/file/writer.rs:182-188). Zero entries still
+/// (`journal-core/src/file/writer.rs` `JournalWriter::add_entry`). Zero entries still
 /// writes a valid journal - one that cannot be indexed (the
 /// empty-file test relies on that).
 fn create_test_journal(
@@ -329,8 +337,8 @@ fn test_multi_file_pagination_same_timestamps() {
     // 150 entries per file, all at timestamp 1000 - one 300-entry run
     // split across two files. The anchor can only locate the run's
     // edge, so in-file stepping runs on resume positions
-    // (journal-index/src/file_index.rs:613-617) and the merge
-    // tie-break (src/logs/query.rs:489-492), not on time.
+    // (`journal-index/src/file_index.rs` `FileIndex::find_log_entries`) and the merge
+    // tie-break (`logs/query.rs` `merge_log_entries`), not on time.
     let entries_file1: Vec<TestEntry> = (0..150)
         .map(|i| {
             TestEntry::new(Microseconds(1000))
@@ -1128,10 +1136,11 @@ fn test_multi_file_pagination_with_empty_file() {
     let file3 = create_test_journal(&temp_dir, "file3.journal", entries_file3).unwrap();
 
     // Indexing an empty journal fails with EmptyHistogramInput
-    // (journal-index/src/histogram.rs:73-75), so file2 is simply left
+    // (`journal-index/src/histogram.rs` `Histogram::from_timestamp_offset_pairs`),
+    // so file2 is simply left
     // out of the query list.
     // Production behaves the same: per-file indexing failures are
-    // logged and the file omitted (src/indexing.rs:353-374).
+    // logged and the file omitted (`indexing.rs` `batch_compute_file_indexes`).
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
@@ -1295,11 +1304,11 @@ fn test_multi_file_pagination_reverse_file_order() {
         .unwrap();
 
     // The files are handed to the query newest-first; the temporal
-    // re-sort (src/logs/query.rs:309-319) must undo that.
+    // re-sort (`logs/query.rs` `retrieve_log_entries`) must undo that.
     let file_indexes = vec![index3, index2, index1];
 
     // Each page is still globally ascending: every per-file merge
-    // re-interleaves by timestamp (src/logs/query.rs:447-505), so
+    // re-interleaves by timestamp (`logs/query.rs` `merge_log_entries`), so
     // processing order never leaks into page order.
     let (first_page, state1) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_limit(150)
@@ -1461,7 +1470,7 @@ fn test_multi_file_pagination_backward_non_overlapping() {
 
     // Second page draws only from file1: file2's resume reached
     // position 0, where the backward walk ends
-    // (journal-index/src/file_index.rs:698-700).
+    // (`journal-index/src/file_index.rs` `FileIndex::find_log_entries`).
     let (second_page, state2) = LogQuery::new(&file_indexes, Anchor::Tail, Direction::Backward)
         .with_limit(150)
         .execute_page(Some(&state1))
@@ -1846,7 +1855,7 @@ fn test_multi_file_pagination_anchor_timestamp_forward() {
     let file_indexes = vec![index1, index2];
 
     // Anchor 150 sits mid-file1: each file starts its walk at the
-    // anchor, inclusive (journal-index/src/file_index.rs:618-633).
+    // anchor, inclusive (`journal-index/src/file_index.rs` `FileIndex::find_log_entries`).
     let anchor = Anchor::Timestamp(Microseconds(150));
 
     // First page: limit=80, should get 50 from file1 (150-199) + 30 from file2 (200-229)
@@ -1988,7 +1997,7 @@ fn test_multi_file_pagination_anchor_timestamp_backward() {
     let file_indexes = vec![index1, index2];
 
     // Anchor 250 sits mid-file2: each file walks backward from the
-    // anchor, inclusive (journal-index/src/file_index.rs:708-737) -
+    // anchor, inclusive (`journal-index/src/file_index.rs` `FileIndex::find_log_entries`) -
     // file2 from its 250 entry, file1 from its 199.
     let anchor = Anchor::Timestamp(Microseconds(250));
 
@@ -2133,7 +2142,8 @@ fn test_multi_file_pagination_anchor_timestamp_same_timestamps() {
     let file_indexes = vec![index1, index2];
 
     // Anchor 150 equals every entry's timestamp: each file's walk
-    // starts at its run edge (journal-index/src/file_index.rs:618-633),
+    // starts at its run edge (`journal-index/src/file_index.rs`
+    // `FileIndex::find_log_entries`),
     // so progress rests entirely on resume positions and the merge.
     let anchor = Anchor::Timestamp(Microseconds(150));
 
@@ -2304,8 +2314,10 @@ fn test_multi_file_pagination_forward_with_time_boundaries() {
 
     // Window [150, 350) across three files: file1 contributes 150-199
     // (50), file2 200-299 (100), file3 300-349 (50) - 200 entries.
-    // after is inclusive, before exclusive (src/logs/query.rs:119-131;
-    // journal-index/src/file_index.rs:655-664).
+    // after is inclusive, before exclusive
+    // (`LogQuery::with_after_usec`/`with_before_usec`;
+    // the boundary checks in `journal-index/src/file_index.rs`
+    // `FileIndex::find_log_entries`).
 
     // First page (limit 80): 150-229.
     let (first_page, state1) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
@@ -2945,7 +2957,7 @@ fn test_multi_file_pagination_with_filter() {
 
     // LEVEL=ERROR matches 50 entries per file - 150 total. Pagination
     // runs over each file's FILTERED entry list
-    // (journal-index/src/file_index.rs:521-523), so resume positions
+    // (`journal-index/src/file_index.rs` `LogEntryId::position`), so resume positions
     // index the filtered order.
     let filter = Filter::match_field_value_pair(FieldValuePair::parse("LEVEL=ERROR").unwrap());
 
@@ -3209,7 +3221,7 @@ fn test_multi_file_pagination_anchor_at_file_boundary() {
     );
 
     // Same anchor backward: file2's 200 entry is included (backward is
-    // inclusive, journal-index/src/file_index.rs:708-737) and file1
+    // inclusive, `journal-index/src/file_index.rs` `FileIndex::find_log_entries`) and file1
     // continues below it.
     let (first_page_bwd, state1_bwd) = LogQuery::new(&file_indexes, anchor, Direction::Backward)
         .with_limit(80)

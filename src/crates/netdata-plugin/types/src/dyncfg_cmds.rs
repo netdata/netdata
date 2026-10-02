@@ -157,7 +157,7 @@ impl DynCfgCmds {
         parts.join(" ")
     }
 
-    /// Render pipe-separated ("get | schema") — the form [`Display`]
+    /// Render pipe-separated ("get | schema") — the form [`std::fmt::Display`]
     /// prints. Names come out in the fixed flag order of the array below,
     /// like [`Self::to_space_separated`]; the empty set renders as "".
     pub fn to_pipe_separated(&self) -> String {

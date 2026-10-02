@@ -30,7 +30,7 @@
 //! [`migrate_read_cache`] is blocking std-fs work, run once at startup.
 //!
 //! Downloads are sequential (the cache fetches one reserved object at a
-//! time) and each runs under its own deadline ([`download_deadline`]): the
+//! time) and each runs under its own deadline (`download_deadline`): the
 //! storage client's retry layer alone can spend minutes on one object, and
 //! a query should not wait that out. Every object gets its own attempt: a
 //! failure of any kind — missing object, storage error, timeout, size
@@ -121,7 +121,7 @@ impl<S: Storage> RemoteRead<S> {
 
     /// Materialize `entries` in the download cache and return the obtained
     /// files with their pins. The cache key is the entry's `FileId`
-    /// data-file name with the [`SFST_EXT`] extension, so entries naming the
+    /// data-file name with the `SFST_EXT` extension, so entries naming the
     /// same file are fetched once.
     ///
     /// `progress` ticks once per planned download, completed or failed; a

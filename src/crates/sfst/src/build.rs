@@ -478,8 +478,8 @@ pub(crate) fn build_into<W: Write + Seek>(
     // one skipped; a present column whose length != row count is a caller bug
     // (checked, not panicked). Which columns appear is whatever the producer
     // filled — the logs seal supplies the five log columns
-    // (ng-index/src/sfst_build.rs:265-269), the traces seal the span set
-    // (ng-index/src/sfst_build.rs:608-613).
+    // (`ng-index/src/sfst_build.rs` `populate_row_index`), the traces seal the
+    // span set (`sfst_build.rs` `populate_trace_row_index`).
     let n = total_rows as usize;
     let by_time = || time_order.iter_by_time().map(|ins| ins as usize);
     if let Some(c) = &row_index.observed_timestamps {

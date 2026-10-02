@@ -1,35 +1,37 @@
 //! The query filter over a [`FileIndex`]'s per-pair bitmaps.
 //!
-//! [`Filter`] is the only public item here (lib.rs:32): an expression
+//! [`Filter`] is the only public item here: an expression
 //! tree of field-name and field=value predicates combined with AND/OR.
 //! Predicates are exact string matches - no ranges, globs or regex.
-//! Time bounds and free-text regex are separate `LogQueryParams` inputs
-//! (file_index.rs:194,196; builder `with_regex` at file_index.rs:335)
-//! applied per entry after the bitmap stage (file_index.rs:666).
+//! Time bounds and free-text regex are separate [`crate::LogQueryParams`]
+//! inputs (builder [`crate::LogQueryParamsBuilder::with_regex`])
+//! applied per entry after the bitmap stage by
+//! [`crate::FileIndex::find_log_entries`].
 //! Matching is case-sensitive: names and values are used verbatim, the
-//! index normalizes nothing (field_types.rs:32-39,101-112).
+//! index normalizes nothing (`src/field_types.rs` `FieldName`/
+//! `FieldValuePair` derive the inner string's `Eq`).
 //!
 //! Evaluation is infallible. `Filter::evaluate` resolves each leaf to
 //! its bitmap (`FilterExpr::resolve`) and folds the result into one
-//! entry set with `&=`/`|=` (`FilterExpr<Bitmap>::evaluate`,
-//! filter.rs:268-297). An unknown field or pair yields an empty bitmap,
-//! never an error. The resulting bits are entry indices into
-//! `FileIndex::entry_offsets`, which `find_log_entries` turns into file
-//! offsets (file_index.rs:575).
+//! entry set with `&=`/`|=` (`FilterExpr::evaluate`). An unknown field or
+//! pair yields an empty bitmap, never an error. The resulting bits are
+//! entry indices into `FileIndex::entry_offsets`, which
+//! [`crate::FileIndex::find_log_entries`] turns into file offsets.
 //!
 //! Consumers: otel-legacy-logs builds one from request selections, ORing
 //! the values within a field and ANDing the fields together
-//! (otel-legacy-logs/src/handler.rs:63-95); journal-engine applies the
-//! same `Filter` per histogram bucket (journal-engine/src/histogram.rs:
-//! 285) and carries it through per-file query params (journal-engine/src/
-//! logs/query.rs:373-374). `Filter::none()` evaluates to an empty bitmap;
-//! callers check `is_none()` and skip applying it (journal-engine/src/
-//! histogram.rs:284, otel-legacy-logs/src/handler.rs:256), leaving
+//! (`otel-legacy-logs/src/handler.rs` `build_filter_from_selections`);
+//! journal-engine applies the
+//! same `Filter` per histogram bucket (`journal-engine/src/histogram.rs`)
+//! and carries it through per-file query params (`journal-engine/src/
+//! logs/query.rs`). `Filter::none()` evaluates to an empty bitmap;
+//! callers check `is_none()` and skip applying it (`journal-engine/src/
+//! histogram.rs`, `otel-legacy-logs/src/handler.rs`), leaving
 //! `LogQueryParams::filter` as `None` for the unfiltered full-coverage
-//! path (file_index.rs:559-563).
+//! path ([`crate::FileIndex::find_log_entries`]).
 //!
 //! Same-named but unrelated: journal-core/src/file/filter.rs has its own
-//! `FilterExpr` (journal-core/src/file/filter.rs:7-13), and
+//! `FilterExpr` (`journal-core/src/file/filter.rs`), and
 //! journal-core/src/file/index_filter.rs is an older orphan that
 //! file/mod.rs never declares - neither is this type.
 use crate::{Bitmap, FieldName, FieldValuePair, FileIndex};
@@ -37,13 +39,16 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 /// What a `Match` leaf tests: a field's presence or one exact pair.
-/// Both match exactly and case-sensitively (field_types.rs:32-39,101-112).
+/// Both match exactly and case-sensitively (the `src/field_types.rs`
+/// newtypes compare their inner strings verbatim).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 enum FilterTarget {
-    /// Any entry having this field, whatever the value (filter.rs:177-191)
+    /// Any entry having this field, whatever the value (a resolve-time
+    /// union of the field's pair bitmaps)
     Field(FieldName),
-    /// Entries having this exact pair (filter.rs:192-199)
+    /// Entries having this exact pair (an exact key lookup in the
+    /// pair-bitmap map)
     Pair(FieldValuePair),
 }
 
@@ -110,11 +115,11 @@ impl Filter {
     /// Create a filter that matches nothing.
     ///
     /// Callers also read this as "no filter": they check
-    /// [`Filter::is_none`] and skip applying it (journal-engine/src/
-    /// histogram.rs:284, otel-legacy-logs/src/handler.rs:256). Evaluated
+    /// [`Filter::is_none`] and skip applying it (`journal-engine/src/
+    /// histogram.rs`, `otel-legacy-logs/src/handler.rs`). Evaluated
     /// directly it yields an empty bitmap; the unfiltered case is
     /// expressed by leaving `LogQueryParams::filter` unset, which gets a
-    /// full-coverage bitmap instead (file_index.rs:559-563).
+    /// full-coverage bitmap instead ([`FileIndex::find_log_entries`]).
     pub fn none() -> Self {
         Self {
             inner: Arc::new(FilterExpr::None),
@@ -129,7 +134,8 @@ impl Filter {
     /// Evaluate this filter against a file index.
     ///
     /// Returns the matching entries as a [`Bitmap`] of entry indices -
-    /// the bits index the file's `entry_offsets` (file_index.rs:575); an
+    /// the bits index the file's `entry_offsets` list, which
+    /// [`FileIndex::find_log_entries`] maps to file offsets; an
     /// empty bitmap means nothing matched. Infallible: unknown fields and
     /// pairs match nothing rather than erroring.
     pub fn evaluate(&self, file_index: &FileIndex) -> Bitmap {

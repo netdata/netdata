@@ -322,7 +322,7 @@ fn registry() -> &'static Mutex<HashMap<String, Box<dyn Any + Send + Sync>>> {
 pub enum Error {
     /// Transport-level I/O error: socket failures, codec frame-limit
     /// rejections, and the LZ4 decompression mismatch from
-    /// [`deserialize_ipc`]. Transparent (as are the bincode error variants
+    /// `deserialize_ipc`. Transparent (as are the bincode error variants
     /// below): embedding the source in the message while also chaining it
     /// would print it twice in anyhow chains.
     #[error(transparent)]
