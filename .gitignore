@@ -249,6 +249,9 @@ install.sh
 .claude/settings.json
 .codex
 .mcpregistry_github_token
+
+# Kiro local settings; .kiro/settings/mcp.json holds MCP bearer tokens
+.kiro/settings/
 .mcpregistry_registry_token
 .playwright-mcp/
 
