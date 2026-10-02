@@ -1,3 +1,25 @@
+//! The supervisor process — the agent-facing half of the otel-plugin.
+//!
+//! The agent runs the plugin as `otel-plugin <update_every>` (no subcommand;
+//! see `main.rs`), which enters [`run`]. The supervisor re-execs the same
+//! binary as three worker subprocesses — ingestor, ledger, legacy-logs
+//! (`WorkerKind` in `main.rs`) — over ferryboat Unix-socket IPC using the
+//! typed messages from the `bridge` crate (the Configure → Ready handshake
+//! contract is documented there), and owns the agent connection: it
+//! translates pluginsd stdin/stdout (`netdata_plugin_protocol`) into
+//! Configure/Call/Cancel/Shutdown per worker and relays results, progress,
+//! and raw chart data back. The workers themselves live in the
+//! `otel-ingestor`, `otel-ledger`, and `otel-legacy-logs` crates.
+//!
+//! Lifecycle: resolve identity + config, spawn and handshake each worker,
+//! then one event loop ([`Supervisor::run`]) until the agent sends QUIT,
+//! stdin closes, or SIGINT/SIGTERM arrives — followed by IPC Shutdown with a
+//! bounded wait and a SIGKILL fallback (`ChildGuard`).
+//!
+//! Failure model: ingestor and ledger failures are fatal to the plugin (the
+//! agent restarts the whole process); the legacy-logs viewer is best-effort
+//! and is disabled at runtime without affecting the pipeline.
+
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::time::Duration;
@@ -22,22 +44,22 @@ const WORKER_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 /// Bound on reaping the legacy-logs child after it reports `Disabled`. The
 /// worker exits right after sending it, so this only fires if the worker
 /// wedges mid-exit; distinct from the shutdown budget in `shutdown_workers`,
-/// which is sized to the agent's 3s QUIT→SIGTERM window.
+/// which is sized to the agent's 3s SIGTERM→SIGKILL grace.
 const LEGACY_REAP_TIMEOUT: Duration = Duration::from_secs(2);
 
 use crate::config;
 
-/// Parse a required identity env var into a [`uuid::Uuid`], hard-erroring with a
-/// clear message naming the variable if it is missing, empty, not a valid UUID,
-/// or the nil UUID. Used for the machine GUID (`NETDATA_REGISTRY_UNIQUE_ID`) —
-/// the one identity the plugin cannot invent for itself (the instance id is
-/// self-generated). `Uuid::parse_str` accepts both dashed (`550e8400-...`) and
-/// compact (`550e8400...`) forms; the registry file is dashed.
+/// Parse a required identity env var into a non-nil [`MachineId`],
+/// hard-erroring with a message naming the variable if it is missing, empty,
+/// not a valid UUID, or the nil UUID. Used for the machine GUID
+/// (`NETDATA_REGISTRY_UNIQUE_ID`) — the one identity the plugin cannot invent
+/// for itself (the instance id is self-generated). `Uuid::parse_str` accepts
+/// both dashed (`550e8400-...`) and compact (`550e8400...`) forms; the
+/// registry file is dashed.
 ///
-/// The nil rejection is load-bearing: without it the supervisor's stated
-/// contract ("hard-error before spawning workers") would silently pass a nil
-/// value through to the worker, where `wal::Writer::new` would catch it as a
-/// per-tenant error rather than a clean startup abort.
+/// The nil UUID is rejected by `MachineId::new` — resolving it here keeps
+/// startup fail-closed: an unusable machine GUID aborts the plugin before any
+/// worker is spawned instead of surfacing as a per-worker configure error.
 fn resolve_identity(value: Option<&str>, var_name: &str) -> anyhow::Result<MachineId> {
     let raw =
         value.ok_or_else(|| anyhow::anyhow!("{var_name} is not set; the agent must export it"))?;
@@ -55,7 +77,8 @@ fn resolve_identity(value: Option<&str>, var_name: &str) -> anyhow::Result<Machi
     })
 }
 
-/// Guard that kills a child process on drop.
+/// Guard that kills a still-running child process on drop — the SIGKILL
+/// fallback when IPC shutdown did not work.
 struct ChildGuard {
     child: tokio::process::Child,
     name: &'static str,
@@ -106,6 +129,9 @@ impl Worker {
     }
 }
 
+/// All supervisor IPC state: the agent connection, one ferryboat connection
+/// plus child process per worker, and the function/transaction routing
+/// tables. Held for the plugin's lifetime.
 struct Supervisor {
     // Field order is load-bearing. Rust drops fields in declaration order, so
     // each worker `Connection` is declared immediately before its `*_child`
@@ -124,23 +150,23 @@ struct Supervisor {
     /// Reaped on `Disabled` (`reap_legacy`) and waited on during shutdown;
     /// SIGKILL fallback on drop.
     legacy_child: ChildGuard,
-    /// Whether the legacy-logs worker is usable. The legacy viewer is a
-    /// best-effort backward-compat surface and is fully decoupled from the new
-    /// pipeline: a `Disabled` handshake (nothing to serve — the worker exits),
-    /// a configure failure, or a runtime crash flips this to `false`
-    /// and the supervisor keeps serving ingestor + ledger. The
-    /// ingestor/ledger remain fatal on failure by design. Monotonic: once
-    /// `false` it stays `false` — workers are never restarted (see `run`).
+    /// Whether the legacy-logs worker is usable. The viewer is a best-effort
+    /// backward-compat surface, decoupled from the new pipeline: a `Disabled`
+    /// handshake (nothing to serve — the worker exits), a configure failure,
+    /// or a runtime crash sets this to `false` and the supervisor keeps
+    /// running; an ingestor/ledger failure, by contrast, is fatal (see
+    /// `Supervisor::run`). Monotonic: once `false` it stays `false` —
+    /// workers are never restarted.
     legacy_alive: bool,
     /// Maps function name → owning worker.
     routing: HashMap<String, Worker>,
     /// In-flight transaction id → owning worker, so a later Cancel or Result
-    /// routes back to the right worker without fanning out to all of them.
-    /// Bounded: an entry is removed on the worker's Result, the agent's Cancel,
-    /// a failed send, or (for legacy-logs) `disable_legacy`; an ingestor/ledger
-    /// disconnect is fatal and discards the whole map. Only a worker that
-    /// accepts a Call yet never replies and is never cancelled could leak an
-    /// entry — not observed in practice.
+    /// routes back to the right worker instead of fanning out to all of them.
+    /// Entries are removed on the worker's Result, the agent's Cancel, a
+    /// failed send, or (legacy-logs) `disable_legacy`; an ingestor/ledger
+    /// disconnect is fatal and discards the map with the supervisor. The only
+    /// leak path is a worker that accepts a Call but never replies and is
+    /// never cancelled.
     transactions: HashMap<String, Worker>,
     reader: MessageReader<tokio::io::Stdin>,
     writer: MessageWriter<tokio::io::Stdout>,
@@ -152,12 +178,13 @@ struct Supervisor {
 impl Supervisor {
     /// Record a worker's function declarations in the routing table and forward
     /// each one to the agent. The ledger's and ingestor's declarations are held
-    /// by `run()` until BOTH handshakes succeeded, because the ingestor's Ready
-    /// means "the gRPC endpoint is bound and startup completed": a Function the
-    /// agent has seen outlives the plugin as a restartable collector, so a plugin
-    /// that declared and then died on a bind error would be restarted by the
-    /// agent forever. Legacy-logs registers as soon as it is ready; it is
-    /// configured after the ingestor and is best-effort anyway.
+    /// by the startup sequence in [`run`] until BOTH handshakes succeeded,
+    /// because the ingestor's Ready means "the gRPC endpoint is bound and
+    /// startup completed": a Function the agent has seen outlives the plugin as
+    /// a restartable collector, so a plugin that declared and then died on a
+    /// bind error would leave the agent holding declarations for a collector
+    /// it keeps restarting. Legacy-logs registers as soon as it is ready; it
+    /// is configured after the ingestor and is best-effort anyway.
     async fn register_declarations(
         &mut self,
         worker: Worker,
@@ -185,10 +212,12 @@ impl Supervisor {
         Ok(())
     }
 
-    /// Send Configure to the ingestor and return the functions it reports. The
-    /// ingestor sends Ready only once its gRPC endpoint is bound and every
-    /// startup step succeeded, so a failure here (typically the port already in
-    /// use) surfaces before anything has been declared to the agent.
+    /// Send Configure to the ingestor and return the functions it reports
+    /// (none today — the ingestor's Ready exists to gate the ledger's
+    /// declarations, see `register_declarations`). The ingestor sends Ready
+    /// only once its gRPC endpoint is bound and every startup step succeeded,
+    /// so a failure here (typically the port already in use) surfaces before
+    /// anything has been declared to the agent.
     async fn configure_ingestor(
         &mut self,
         config: PluginConfig,
@@ -222,7 +251,9 @@ impl Supervisor {
         }
     }
 
-    /// Send Configure to the legacy-logs worker and register the functions it reports.
+    /// Send Configure to the legacy-logs worker and register the functions it
+    /// reports. A `Disabled` response is handled here (`disable_legacy` +
+    /// `reap_legacy`) and does not propagate as an error.
     async fn configure_legacy(&mut self, config: LegacyLogsConfig) -> anyhow::Result<()> {
         self.legacy
             .send(LegacyLogsRequest::Configure(config))
@@ -247,12 +278,13 @@ impl Supervisor {
         Ok(())
     }
 
-    /// Disable the legacy-logs worker: mark it dead and drop its
-    /// routing + in-flight transaction entries. The agent keeps the declaration
-    /// (we do not FUNCTION_DEL) so a later call resolves to "no handler" and
-    /// times out, but the supervisor no longer attempts dead sends or logs an
-    /// error per post-crash call. Idempotent and a no-op when nothing is routed
-    /// to legacy (e.g. a configure failure before any declaration registered).
+    /// Disable the legacy-logs worker: mark it dead and drop its routing +
+    /// in-flight transaction entries. The agent keeps the declaration (this
+    /// protocol has no FUNCTION_DEL message) so a later call resolves to
+    /// "no handler" and times out, but the supervisor no longer attempts dead
+    /// sends or logs an error per post-crash call. Idempotent and a no-op when
+    /// nothing is routed to legacy (e.g. a configure failure before any
+    /// declaration registered).
     fn disable_legacy(&mut self) {
         self.legacy_alive = false;
         self.routing.retain(|_, w| !matches!(w, Worker::LegacyLogs));
@@ -275,15 +307,17 @@ impl Supervisor {
         }
     }
 
-    /// Route a function call from the agent to the appropriate worker.
+    /// Route a function call from the agent to the owning worker, recording
+    /// the transaction for later Cancel/Result routing (see `transactions`).
+    /// With no route — e.g. a call for a function whose legacy-logs worker was
+    /// disabled — the call is logged and ignored, so the agent's call times
+    /// out.
     async fn handle_function_call(&mut self, call: netdata_plugin_types::FunctionCall) {
         let Some(&worker) = self.routing.get(&call.name) else {
             tracing::warn!("no handler for function: {}", call.name);
             return;
         };
 
-        // Record the transaction so subsequent Cancel / Result events
-        // can route to the right worker without fan-out.
         self.transactions.insert(call.transaction.clone(), worker);
 
         let send_result = match worker {
@@ -345,8 +379,9 @@ impl Supervisor {
             }
         }
 
-        // The agent waits 3 seconds after sending QUIT before sending SIGTERM.
-        // Use 2 seconds here to leave headroom for the supervisor's own cleanup.
+        // The agent SIGTERMs the plugin right after QUIT and SIGKILLs it if it
+        // has not exited within 3 seconds (`spawn_popen_kill`'s grace). Budget
+        // 2s here so the supervisor finishes its own cleanup before the SIGKILL.
         let timeout = std::time::Duration::from_secs(2);
         let _ = tokio::time::timeout(timeout, async {
             let (r1, r2, r3) = tokio::join!(
@@ -521,6 +556,9 @@ impl Supervisor {
     /// We intentionally do not restart workers — the Netdata agent is
     /// responsible for restarting the entire plugin.
     async fn run(&mut self) -> anyhow::Result<&'static str> {
+        // PLUGIN_KEEPALIVE is a benign no-op on the agent side; the point is
+        // regular stdout traffic so the agent's 2-minute idle read on this
+        // plugin never fires while nothing else is being emitted.
         let mut keepalive = tokio::time::interval(tokio::time::Duration::from_secs(60));
         let mut sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
             .context("failed to register SIGINT handler")?;
@@ -585,7 +623,9 @@ impl Supervisor {
     }
 }
 
-/// Guard that removes a socket file on drop.
+/// Guard for one IPC socket file: `new` removes any stale file at the path
+/// (e.g. left by a crashed previous run) and `drop` removes the file again
+/// when the supervisor exits.
 struct SocketGuard(std::path::PathBuf);
 
 impl SocketGuard {
@@ -628,6 +668,11 @@ fn socket_dir() -> anyhow::Result<std::path::PathBuf> {
     Ok(dir)
 }
 
+/// Bind a listener at `sock`, spawn a `worker <name>` subprocess of this
+/// binary against that socket, and accept the worker's connection, bounded by
+/// [`WORKER_CONNECT_TIMEOUT`]. The child is wrapped in a [`ChildGuard`]
+/// immediately, so a failed or timed-out accept still kills it. Both sides
+/// cap messages at `bridge::IPC_MAX_MESSAGE_SIZE`.
 async fn spawn_worker<S, R>(
     self_exe: &std::path::Path,
     sock: &SocketGuard,
@@ -665,7 +710,12 @@ where
     Ok((conn, guard))
 }
 
-/// Entry point for the supervisor mode.
+/// Entry point for the supervisor mode (the agent runs the plugin with no
+/// subcommand; see `main.rs`).
+///
+/// Resolves the agent environment and node identity, loads the config, spawns
+/// and handshakes the three workers, then runs [`Supervisor::run`] until the
+/// agent quits; workers are shut down on both the graceful and error paths.
 pub async fn run() -> anyhow::Result<()> {
     tracing::info!("starting otel-plugin");
     let nd_env = rt::NetdataEnv::from_environment();
@@ -678,7 +728,6 @@ pub async fn run() -> anyhow::Result<()> {
 
     let mut plugin_config = config::load_config().context("failed to load configuration")?;
 
-    // Socket guards — cleaned up when the supervisor exits.
     let sock_dir = socket_dir()?;
     let writer_sock = SocketGuard::new(&sock_dir, "writer");
     let ledger_sock = SocketGuard::new(&sock_dir, "ledger");
@@ -689,9 +738,10 @@ pub async fn run() -> anyhow::Result<()> {
 
     // Machine GUID: the permanent node identity, the one id the plugin cannot
     // invent. Fatal if missing/invalid — fail-closed before any worker is
-    // spawned. The WAL writer stamps it into every filename and the catalog
-    // references it, so a nil value would silently corrupt provenance in
-    // never-GC'd remote storage (the `MachineId` newtype refuses nil).
+    // spawned. The WAL writer embeds it in every filename and FileId, and the
+    // ledger's remote reconciliation filters remote objects by it, so a nil
+    // GUID would stamp unattributable files (the `MachineId` newtype refuses
+    // nil).
     let machine_id = resolve_identity(
         nd_env.registry_unique_id.as_deref(),
         "NETDATA_REGISTRY_UNIQUE_ID",
@@ -725,7 +775,8 @@ pub async fn run() -> anyhow::Result<()> {
     // Resolve the former otel plugin's read-only journal directory (read
     // `logs.journal_dir` in place from otel.yaml, falling back to
     // <NETDATA_LOG_DIR>/otel/v1 or /var/log/netdata/otel/v1) and a private
-    // viewer cache dir under the agent cache directory.
+    // viewer cache dir under the agent cache directory (or /var/cache/netdata
+    // when unset).
     let legacy_journal_dir = config::resolve_legacy_journal_dir();
     let legacy_cache_dir = nd_env
         .cache_dir
@@ -763,13 +814,14 @@ pub async fn run() -> anyhow::Result<()> {
         .await
         .context("failed to write TRUST_DURATIONS to agent")?;
 
-    // The ledger is configured first (it must be listening on the writer socket
-    // before the ingestor connects to it), but its Functions are not forwarded to
-    // the agent until the ingestor has bound its endpoint: bind before declare.
-    // A handshake failure here returns straight out and ChildGuard SIGKILLs the
-    // remaining workers: the ledger does not read its supervisor connection
-    // while it waits in `accept_writer`, so a graceful Shutdown would not reach
-    // it anyway, and legacy-logs treats a pre-Configure Shutdown as an error.
+    // The ledger is configured first: it must be listening on the writer
+    // socket before the ingestor connects to it. Its declarations are
+    // forwarded only after the ingestor's handshake also succeeded — bind
+    // before declare (see `register_declarations`). A handshake failure here
+    // returns straight out and ChildGuard SIGKILLs the remaining workers on
+    // unwind: the ledger does not read its supervisor connection while it
+    // waits in `accept_writer`, so a graceful Shutdown would not reach it
+    // anyway, and legacy-logs treats a pre-Configure Shutdown as an error.
     let ledger_declarations = supervisor
         .configure_ledger(plugin_config.clone())
         .await
@@ -803,11 +855,10 @@ pub async fn run() -> anyhow::Result<()> {
             Ok(())
         }
         Err(e) => {
-            // Log and attempt a graceful worker shutdown on the error path
-            // too: bailing straight out (the old `?`) meant ChildGuard
-            // SIGKILLed the workers within ~1ms of a worker connection
-            // dropping — killing a worker that was mid-way through logging
-            // its own fatal error, leaving no record of what went wrong.
+            // Attempt a graceful worker shutdown on the error path too: the
+            // worker that caused the failure may still be writing its own
+            // fatal error to the shared stderr, and an immediate ChildGuard
+            // SIGKILL would cut it off, leaving no record of what went wrong.
             tracing::error!("supervisor event loop error: {e:#}");
             supervisor.shutdown_workers().await;
             Err(e)
@@ -898,9 +949,9 @@ mod tests {
 
     #[test]
     fn resolve_identity_rejects_nil_uuid() {
-        // A nil UUID parses but would silently corrupt provenance if it reached
-        // the writer; reject it at the supervisor boundary, before any worker
-        // is spawned, matching the stated startup contract.
+        // A nil UUID parses; `MachineId::new` is the gate that refuses it, so
+        // the supervisor fails closed before any worker is spawned instead of
+        // stamping a nil machine id into WAL filenames downstream.
         let err = resolve_identity(
             Some("00000000-0000-0000-0000-000000000000"),
             "NETDATA_REGISTRY_UNIQUE_ID",

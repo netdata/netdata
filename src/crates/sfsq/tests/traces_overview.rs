@@ -1,11 +1,35 @@
-//! Integration suite for the TRACE-level overview: exact
-//! trace-density grids over known multi-trace corpora, the cross-source
-//! straddle (one trace across sources counts once, envelope merged),
-//! the stored-row resend divergence from canonical assembly, the
-//! legacy (pre-rollup) exclusion
-//! (a pre-rollup file is flagged, never mixed in), shard-merge
-//! associativity, ceiling termination, cancellation, and per-source
-//! failure honesty.
+//! Integration suite for the traces overview (src/traces/overview.rs)
+//! — the traces Function's heatmap: a time bucket × log-scale duration
+//! bin grid over merged cross-source traces. Pinned here:
+//!
+//! - Exact grids and STORED-row totals over hand-computed corpora,
+//!   including the resend divergence from canonical assembly, shown
+//!   side by side with `trace_by_id`.
+//! - The shared fold's engine contracts (src/traces/fold.rs): a trace
+//!   straddling sources counts once with its envelope merged; legacy
+//!   pre-rollup files are excluded and flagged `RollupAbsent`, never
+//!   mixed in; shard merge is associative across source shapes (the
+//!   tail/seal parity underneath is tests/traces_rollup_tail.rs's
+//!   contract); ceiling termination with the deterministic prefix;
+//!   all-or-empty cancellation; per-source failure honesty while the
+//!   rest count.
+//! - Exact nearest-rank per-bucket percentiles (observed durations,
+//!   never interpolated from the decade-wide bins) and the opt-in root
+//!   facets with their partition identity
+//!   `sum(top) + other + unattributed == total_traces`.
+//! - The filtered grid: a span-local predicate matches STORED rows and
+//!   selects whole traces — under the search engine's start-in-window
+//!   rule and the fold's one ceiling, and agreeing with `search`'s
+//!   list population.
+//!
+//! Fixtures: tests/common/mod.rs — real WALs through the production
+//! write/seal pipeline, mixed sealed/tail source shapes, and the
+//! hand-built legacy no-rollup file. Grids are tiny (one-second
+//! buckets, [`grid`]); ceilings are forced with
+//! `visited_rows_ceiling_for_tests`, so the 4M default budget is never
+//! what's under test. Not pinned: the bins' wire labels, error cells
+//! and percentiles under every partial path, and progress ticking
+//! beyond the one-per-source count.
 
 mod common;
 
@@ -26,13 +50,14 @@ use sfsq::traces::{
     TraceQuery, TraceSource, overview, search, trace_by_id,
 };
 
-/// One second-wide bucket per second, 10 buckets from t=0.
+/// The suite's standard grid: 10 one-second buckets covering [0s, 10s).
 fn grid() -> sfst::Grid {
     sfst::Grid::new(0, 1_000_000_000, 10)
 }
 
-/// An overflowing width x count is rejected with ITS OWN reason — not
-/// the empty-grid message, which would misdiagnose a valid-looking grid.
+/// The request boundary refuses a grid whose width × count overflows
+/// i64 with its OWN variant (`GridOverflow`), never the empty-grid
+/// one — the two failure modes stay distinguishable to the caller.
 #[test]
 fn grid_overflow_is_rejected_with_a_distinct_reason() {
     let err = overview(
@@ -49,6 +74,8 @@ fn grid_overflow_is_rejected_with_a_distinct_reason() {
     assert!(err.to_string().contains("overflows"), "{err}");
 }
 
+/// `overview` with a fresh token and progress counter, unwrapped —
+/// the success path every test but the error and cancellation ones takes.
 fn run(sources: Vec<TraceSource>, query: OverviewQuery) -> OverviewData {
     overview(
         sources,
@@ -59,7 +86,8 @@ fn run(sources: Vec<TraceSource>, query: OverviewQuery) -> OverviewData {
     .unwrap()
 }
 
-/// A span of trace `t` with an explicit envelope contribution.
+/// A root span of trace `t` with an explicit end — the envelope
+/// building block every corpus here assembles from.
 fn tspan(t: u8, id: u8, start_ns: u64, end_ns: u64, name: &'static str) -> common::SpanSpec {
     let mut s = sp(id, 0, start_ns, name);
     s.trace = [t; 16];
@@ -67,10 +95,13 @@ fn tspan(t: u8, id: u8, start_ns: u64, end_ns: u64, name: &'static str) -> commo
     s
 }
 
-/// Three traces with distinct envelopes:
-///  - A: spans [1.0s..1.2s] and [1.1s..1.4s] → bucket 1, dur 400ms → bin 3
+/// Three traces with distinct envelopes (bucket of the merged start,
+/// duration bin of the merged span):
+///  - A: spans [1.0s..1.2s] and [1.1s..1.4s] → bucket 1, 400ms → bin 3
 ///  - B: one ERROR span [3.0s..3.000_000_5s] → bucket 3, 500ns → bin 0
 ///  - C: spans [5.0s..5.1s] and [5.05s..17s] → bucket 5, 12s → bin 5
+///
+/// 5 stored spans in total; B's status is the corpus's only error.
 fn corpus() -> Vec<common::SpanSpec> {
     let mut b = tspan(0xB, 3, 3_000_000_000, 3_000_000_500, "b-err");
     b.status = Some((2, "boom"));
@@ -83,6 +114,7 @@ fn corpus() -> Vec<common::SpanSpec> {
     ]
 }
 
+/// The [`corpus`] grid: one trace in bucket 1/3/5, bins 3/0/5.
 fn expected_cells() -> Vec<[u64; DURATION_BIN_COUNT]> {
     let mut cells = vec![[0u64; DURATION_BIN_COUNT]; 10];
     cells[1][3] = 1; // A: 400ms
@@ -91,6 +123,9 @@ fn expected_cells() -> Vec<[u64; DURATION_BIN_COUNT]> {
     cells
 }
 
+/// The exact grid and totals over the corpus: cells count TRACES by
+/// merged envelope (the cell sum equals `total_traces`), the totals
+/// count stored rows.
 #[test]
 fn sealed_grid_counts_traces_by_merged_envelope() {
     let dir = tempfile::tempdir().unwrap();
@@ -219,6 +254,10 @@ fn legacy_file_without_the_rollup_is_excluded_and_flagged_never_mixed() {
     assert_eq!(data.cells, expected_cells(), "nothing leaked from legacy");
 }
 
+/// Where the data is split cannot change the aggregate: the corpus
+/// split across a sealed file and a tail gives the same cells and
+/// totals as the whole corpus sealed — the overview-level face of the
+/// tail/seal parity tests/traces_rollup_tail.rs pins per trace.
 #[test]
 fn shard_merge_is_associative_across_source_shapes() {
     let (half_a, half_b) = {
@@ -249,8 +288,10 @@ fn shard_merge_is_associative_across_source_shapes() {
 
 #[test]
 fn ceiling_terminates_with_the_deterministic_prefix_and_the_partial() {
-    // Ceiling 0: source 1 (SourceId order) processes and overshoots;
-    // source 2 never runs.
+    // The ceiling is checked BETWEEN sources: source 1 (SourceId
+    // order) folds whole — overshooting the 0 budget by its own cost —
+    // and source 2 never runs. The result is the deterministic prefix
+    // plus the OverviewCeiling partial.
     let dir = tempfile::tempdir().unwrap();
     let wal_a = write_wal(dir.path(), vec![req(&corpus()[..2])], "a"); // trace A
     let wal_b = write_wal(dir.path(), vec![req(&corpus()[2..])], "b"); // traces B, C
@@ -265,6 +306,8 @@ fn ceiling_terminates_with_the_deterministic_prefix_and_the_partial() {
     assert_eq!(data.total_traces, 1, "only the first source's trace");
 }
 
+/// Cancellation is all-or-empty: a pre-cancelled call returns the
+/// empty grid plus the Cancelled reason, never a partial fold.
 #[test]
 fn cancelled_call_returns_the_empty_grid_with_the_reason() {
     let dir = tempfile::tempdir().unwrap();
@@ -283,6 +326,8 @@ fn cancelled_call_returns_the_empty_grid_with_the_reason() {
     assert!(data.cells.iter().flatten().all(|&c| c == 0));
 }
 
+/// The cancellation poll is up front, before any source work — so even
+/// a zero-source call reports Cancelled instead of Complete.
 #[test]
 fn cancelled_zero_source_call_still_reports_cancelled() {
     let cancel = CancellationToken::new();
@@ -297,6 +342,8 @@ fn cancelled_zero_source_call_still_reports_cancelled() {
     assert!(data.status.has(PartialReason::Cancelled));
 }
 
+/// A source that fails to open is a SourceFailure on the result; the
+/// healthy source's numbers are unaffected.
 #[test]
 fn a_failed_source_degrades_honestly_while_the_rest_count() {
     let dir = tempfile::tempdir().unwrap();
@@ -321,6 +368,7 @@ fn a_failed_source_degrades_honestly_while_the_rest_count() {
     assert_eq!(data.total_traces, 3, "the healthy source still counts");
 }
 
+/// A zero-bucket grid is a request error, not an empty result.
 #[test]
 fn empty_grid_is_a_request_error() {
     let err = overview(
@@ -364,9 +412,10 @@ fn per_bucket_percentiles_are_exact_nearest_rank_durations() {
     );
     assert_eq!(data.total_traces, 11);
     assert_eq!(data.bucket_percentiles.len(), 10, "one per time bucket");
-    // n=10, nearest rank ceil(p/100 x n) - 1: p50 is the 5th smallest,
-    // p95 and p99 the largest. Every answer is an OBSERVED duration —
-    // no interpolation over the decade-wide "1-10ms" bin could name 5ms.
+    // n=10, nearest rank ceil(p/100 x n) - 1 (0-based): p50 is the 5th
+    // smallest, p95 and p99 the largest. Every answer is an OBSERVED
+    // duration — the ranks select from the bucket's real durations,
+    // they are not interpolated from the decade-wide "1-10ms" bin.
     assert_eq!(
         data.bucket_percentiles[2],
         Some(DurationPercentiles {
@@ -416,12 +465,16 @@ fn fspan(t: u8, id: u8, parent: u8, start_ns: u64, name: &'static str) -> common
     s
 }
 
-/// Five traces across services (brute-force expectations inline):
+/// Five traces across three requests, one expected root each — the
+/// facet tests below assert these mappings brute-force:
 ///  - A (svc-a): root "op-a" + a child          → svc-a / op-a
 ///  - B (svc-a): root "op-b"                    → svc-a / op-b
 ///  - C (svc-b): root "op-a"                    → svc-b / op-a
-///  - D (svc-b): only a child span (parent set) → Indeterminate
-///  - E (no service resource): root "op-e"      → service-less root
+///  - D (svc-b): only a child span (its parent is nowhere in the
+///    corpus) → no true root (Indeterminate): unattributed on BOTH
+///    dimensions
+///  - E (request with no resource attributes): root "op-e" →
+///    service-less root: unattributed service, op-e operation
 fn facet_wal(dir: &std::path::Path) -> std::path::PathBuf {
     use common::{kv_str, req_with};
     write_wal(
@@ -454,6 +507,9 @@ fn facet_wal(dir: &std::path::Path) -> std::path::PathBuf {
     )
 }
 
+/// Root facets are opt-in, and asking changes nothing else: without the
+/// flag the section is absent; with it, grid, totals and status are
+/// identical to the plain run.
 #[test]
 fn facets_are_absent_unless_requested_and_change_nothing_else() {
     let dir = tempfile::tempdir().unwrap();
@@ -709,6 +765,7 @@ fn service_eq(value: &str) -> Predicate {
     }
 }
 
+/// `run` with the predicate attached — the filtered-grid driver below.
 fn filtered(sources: Vec<TraceSource>, predicate: Predicate) -> OverviewData {
     run(sources, OverviewQuery::new(grid()).predicate(predicate))
 }
@@ -802,7 +859,7 @@ fn filtered_grid_selects_straddling_traces_from_either_source() {
         assert_eq!(data.total_spans, 2, "{name}: both stored spans of C");
     }
     // A trace held by ONE source only (B, sealed) is selected by its
-    // own match; the tail-only counterpart runs in
+    // own match; the match-past-the-grid case is pinned in
     // `filtered_grid_requires_the_match_to_start_inside_the_grid`.
     let data = filtered(src(), name_in(&["b-err"]));
     assert_eq!((data.total_traces, data.total_errors), (1, 1));
@@ -851,9 +908,9 @@ fn filtered_grid_selects_by_any_stored_copy() {
     }
 }
 
-/// The filter's scans share the fold's ceiling: an exhausted budget
-/// stops the merge with the overview's own partial, and nothing
-/// half-flagged is binned.
+/// The filter's scans share the fold's ONE ceiling: an exhausted budget
+/// stops the merge with the overview's own `OverviewCeiling` partial,
+/// and nothing half-flagged is binned.
 #[test]
 fn filtered_grid_charges_the_visited_ceiling() {
     let dir = tempfile::tempdir().unwrap();

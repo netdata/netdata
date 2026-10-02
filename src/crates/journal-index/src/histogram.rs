@@ -1,9 +1,35 @@
-//! Sparse histogram with running counts for time-based aggregation.
+//! Sparse running-count histogram over a file's time-ordered entries: the
+//! time-coverage core of the journal index.
 //!
-//! The histogram stores only bucket boundaries where entries exist. Each
-//! bucket contains a running count: the total number of entries from the
-//! start up to and including that bucket. This enables efficient range
-//! queries via binary search on bucket boundaries.
+//! [`Histogram`] maps time to entry counts in fixed-width buckets on an
+//! epoch-aligned grid (every bucket start is a multiple of
+//! `bucket_duration`). Only buckets containing entries are stored, and
+//! each carries a running count - the index of the last entry up to and
+//! including that bucket - so a time-range query is two binary searches
+//! plus one bitmap range count
+//! ([`Histogram::count_entries_in_time_range`]). The counts index the
+//! time-ordered entry list the histogram was built from
+//! ([`crate::FileIndexer`]), the same index
+//! space as [`crate::FileIndex`]'s entry offsets and bitmaps,
+//! and the covered range `[first bucket start, last bucket start +
+//! bucket_duration)` becomes the file's recorded start/end time
+//! ([`crate::FileIndex::start_time`]/[`crate::FileIndex::end_time`]).
+//!
+//! Flow: [`crate::FileIndexer::index`] is the only producer, through
+//! [`Histogram::from_timestamp_offset_pairs`]; [`crate::FileIndex`] wraps
+//! the accessors and the range count; the engine reads `total_entries` and
+//! `count_entries_in_time_range` per file and per bucket for
+//! unfiltered/filtered counts (`journal-engine/src/histogram.rs`).
+//! That same-named file is a different module - per-bucket facet counting
+//! on top of this histogram - not this crate's. Constructor failures
+//! surface as [`IndexError::ZeroBucketDuration`] /
+//! [`IndexError::EmptyHistogramInput`]. The alignment check uses
+//! `journal_common::compat::is_multiple_of`, a polyfill for the std method
+//! (`journal-common/src/compat.rs`).
+//!
+//! Serialization: `Serialize`/`Deserialize` for the engine's index cache;
+//! under the crate's `allocative` feature both types also derive
+//! `allocative::Allocative`.
 
 use crate::{Bitmap, IndexError, Microseconds, Result, Seconds};
 use journal_common::compat::is_multiple_of;
@@ -11,48 +37,51 @@ use journal_common::compat::is_multiple_of;
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroU32;
 
-/// A bucket boundary storing a time and running count.
+/// One stored bucket: a bucket start plus the running count at its end.
 ///
-/// The `count` is the 0-based index of the last entry in this bucket. For
-/// example, if bucket at time 0 has count=4 and bucket at time 60 has count=9,
-/// then:
-/// - Bucket [0, 60) contains entries with indices 0-4 (5 entries)
-/// - Bucket [60, 120) contains entries with indices 5-9 (5 entries)
+/// `count` is the 0-based index of the bucket's last entry in the
+/// time-ordered entry list the histogram was built from. Example: with
+/// count=4 at bucket 0 and count=9 at bucket 60,
+/// - bucket [0, 60) holds entry indices 0-4 (5 entries)
+/// - bucket [60, 120) holds entry indices 5-9 (5 entries)
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct Bucket {
-    /// Start time of this bucket (aligned to bucket_duration)
+    /// Bucket start: a multiple of `bucket_duration` (epoch-aligned grid)
     pub start_time: Seconds,
-    /// 0-based index of the last entry in this bucket
+    /// 0-based index of the bucket's last entry (entry-list index space)
     pub count: u32,
 }
 
-/// Sparse histogram storing only bucket boundaries with running counts.
+/// Sparse histogram storing only the buckets that contain entries, each
+/// with a running count.
 ///
-/// Invariants:
+/// Invariants (established by `from_timestamp_offset_pairs`, the only
+/// producer):
 /// - `buckets` is sorted by `start_time`
-/// - `start_time % bucket_duration == 0` for all buckets
-/// - Always contains at least one bucket
+/// - every `start_time` is a multiple of `bucket_duration`
+/// - at least one bucket, so `start_time`/`end_time`/`total_entries` never
+///   face an empty `buckets`
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct Histogram {
-    /// Fixed size of each time bucket in seconds
+    /// Fixed width of every bucket, in seconds
     pub bucket_duration: NonZeroU32,
-    /// Sorted sparse vector of bucket boundaries
+    /// One `Bucket` per populated bucket, sorted by `start_time`
     pub buckets: Vec<Bucket>,
 }
 
 impl Histogram {
-    /// Constructs a histogram from sorted timestamp-offset pairs.
+    /// Builds a histogram from (timestamp, entry-offset) pairs sorted by
+    /// time.
     ///
-    /// # Algorithm
-    ///
-    /// 1. Convert each timestamp to seconds and compute its bucket:
-    ///    `(timestamp_secs / bucket_duration) * bucket_duration`
-    /// 2. Track bucket boundaries: when an entry falls into a new bucket,
-    ///    store the previous bucket with the index of its last entry (running
-    ///    count)
-    /// 3. Only buckets containing entries are stored (sparse representation)
+    /// Only the timestamps are read: the offsets ride along in the
+    /// signature but are ignored. Each timestamp is truncated to whole
+    /// seconds and floored onto the bucket grid
+    /// (`(secs / bucket_duration) * bucket_duration`); a bucket is stored
+    /// once it has entries, carrying the index of its last entry (the
+    /// running count). The last stored bucket's count is the index of the
+    /// final entry overall.
     ///
     /// # Errors
     ///
@@ -61,7 +90,9 @@ impl Histogram {
     ///
     /// # Panics
     ///
-    /// Debug builds panic if `timestamp_offset_pairs` is not sorted.
+    /// Debug builds panic if `timestamp_offset_pairs` is not sorted;
+    /// release builds skip the check, and unsorted input silently yields
+    /// wrong buckets.
     pub fn from_timestamp_offset_pairs(
         bucket_duration: Seconds,
         timestamp_offset_pairs: &[(Microseconds, std::num::NonZeroU64)],
@@ -80,29 +111,30 @@ impl Histogram {
         let mut current_bucket = None;
 
         for (offset_index, &(timestamp, _offset)) in timestamp_offset_pairs.iter().enumerate() {
-            // Calculate which bucket this timestamp falls into
+            // Truncated seconds floored onto the bucket grid
             let bucket =
                 Seconds((timestamp.to_seconds().0 / bucket_duration.0) * bucket_duration.0);
 
             match current_bucket {
                 None => {
-                    // First entry - don't create bucket yet, just track the bucket
+                    // First entry: record the bucket, not yet its count
                     debug_assert_eq!(offset_index, 0);
                     current_bucket = Some(bucket);
                 }
                 Some(prev_bucket) if bucket.0 > prev_bucket.0 => {
-                    // New bucket boundary - save the LAST index of the previous bucket
+                    // New bucket begins: the previous bucket's last entry
+                    // is offset_index - 1
                     buckets.push(Bucket {
                         start_time: prev_bucket,
                         count: offset_index as u32 - 1,
                     });
                     current_bucket = Some(bucket);
                 }
-                _ => {} // Same bucket, continue
+                _ => {} // same bucket, keep accumulating
             }
         }
 
-        // Handle last bucket
+        // The final bucket: its count is the last entry's index overall
         if let Some(last_bucket) = current_bucket {
             buckets.push(Bucket {
                 start_time: last_bucket,
@@ -110,7 +142,7 @@ impl Histogram {
             });
         }
 
-        // Now that we are done, we can convert to non-zero
+        // Checked non-zero above, so this cannot fail
         let bucket_duration = NonZeroU32::new(bucket_duration.0).expect("non-zero bucket duration");
 
         Ok(Histogram {
@@ -119,115 +151,142 @@ impl Histogram {
         })
     }
 
-    /// Get the start time of the histogram.
+    /// Start of the covered range: the first bucket's start (inclusive).
     pub fn start_time(&self) -> Seconds {
         let first_bucket = self.buckets.first().expect("histogram to have buckets");
         first_bucket.start_time
     }
 
-    /// Get the end time of the histogram.
+    /// End of the covered range, exclusive: last bucket start + `bucket_duration`.
     pub fn end_time(&self) -> Seconds {
         let last_bucket = self.buckets.last().expect("histogram to have buckets");
         Seconds(last_bucket.start_time.0 + self.bucket_duration.get())
     }
 
-    /// Get the time range covered by the histogram.
+    /// The covered range `(start_time(), end_time())`; end exclusive.
     pub fn time_range(&self) -> (Seconds, Seconds) {
         (self.start_time(), self.end_time())
     }
 
-    /// Returns the number of buckets in the histogram.
+    /// Number of stored buckets: populated buckets only, not the grid span.
     pub fn num_buckets(&self) -> usize {
         self.buckets.len()
     }
 
-    /// Get the total number of entries in the histogram.
+    /// Total entries covered: the last running count plus one.
+    ///
+    /// Equals the number of (timestamp, entry-offset) pairs the histogram
+    /// was built from - the upper bound of the bitmap entry-index space.
+    /// journal-engine builds a full-coverage bitmap from it
+    /// (`journal-engine/src/histogram.rs`).
     pub fn total_entries(&self) -> usize {
         let last_bucket = self.buckets.last().expect("histogram to have buckets");
-        // FIXME: Off-by-one error
+        // Not off-by-one: `count` is the 0-based index of the last entry,
+        // so +1 turns it into a total (set to entries - 1 by construction)
         last_bucket.count as usize + 1
     }
 
-    /// Check if the file histogram is empty.
+    /// True when no buckets are stored.
+    ///
+    /// `from_timestamp_offset_pairs` never returns an empty histogram (it
+    /// errors on empty input instead), so emptiness only arises from
+    /// hand-built or deserialized values; `start_time`/`end_time`/
+    /// `total_entries` panic on it, `count_entries_in_time_range` returns
+    /// `Some(0)`.
     pub fn is_empty(&self) -> bool {
         self.buckets.is_empty()
     }
 
-    /// Count entries (from a bitmap) that fall within a time range using the histogram's bucket structure.
+    /// Count the bitmap's entries whose bucket starts in
+    /// `[start_time, end_time)`.
+    ///
+    /// The bitmap's bits are entry indices in the same space as the running
+    /// counts (the time-ordered entry list `src/file_indexer.rs` builds).
     ///
     /// # Algorithm
     ///
-    /// 1. Binary search to find the first bucket at or after `start_time`
-    /// 2. Binary search to find the last bucket before `end_time`
-    /// 3. Extract entry index range from running counts:
-    ///    - Start index: running count of previous bucket + 1 (or 0 if first bucket)
-    ///    - End index: running count of last bucket (inclusive)
-    /// 4. Count bitmap entries in the index range
+    /// 1. Binary search: the first bucket starting at or after `start_time`
+    /// 2. Binary search: the last bucket starting before `end_time`
+    /// 3. Convert that bucket span to an entry index range via the running
+    ///    counts: `previous.count + 1` (0 for the first bucket) through
+    ///    `last.count`, inclusive
+    /// 4. Count bitmap bits in that index range
     ///
-    /// Returns `None` if the time range is not aligned to `bucket_duration` or
-    /// invalid.
+    /// Because both bounds must be multiples of `bucket_duration`, every
+    /// selected bucket lies entirely inside the queried range.
+    ///
+    /// Returns `None` when `start_time >= end_time` or either bound is not
+    /// a multiple of `bucket_duration`. Otherwise `Some(count)`, including
+    /// `Some(0)` for an empty bitmap, an empty histogram, or a range that
+    /// overlaps no stored bucket.
     pub fn count_entries_in_time_range(
         &self,
         bitmap: &Bitmap,
         start_time: Seconds,
         end_time: Seconds,
     ) -> Option<usize> {
-        // Validate inputs
         if start_time >= end_time {
             return None;
         }
 
-        // Verify alignment to bucket_duration
+        // Both bounds on the bucket grid, so no bucket straddles a range edge
         if !is_multiple_of(start_time.0, self.bucket_duration.get())
             || !is_multiple_of(end_time.0, self.bucket_duration.get())
         {
             return None;
         }
 
-        // Handle empty histogram or bitmap
+        // No buckets or no bits: always zero
         if self.buckets.is_empty() || bitmap.is_empty() {
             return Some(0);
         }
 
-        // Find the bucket indices for start and end times using binary search
-        // partition_point returns the index of the first bucket with start_time >= start_time
+        // Binary search over the sorted buckets: the first bucket with
+        // start_time >= start_time
         let start_bucket_idx = self.buckets.partition_point(|b| b.start_time < start_time);
 
-        // If start_bucket_idx is beyond all buckets, no matches possible
+        // Every bucket starts before start_time: the range is past the histogram
         if start_bucket_idx >= self.buckets.len() {
             return Some(0);
         }
 
-        // Find the last bucket that starts before end_time
-        // partition_point returns the index of the first bucket with start_time >= end_time,
-        // so we need to subtract 1 to get the last bucket before end_time
+        // Last bucket starting before end_time: partition_point returns the
+        // first bucket with start_time >= end_time, so subtract 1. Caveat:
+        // with no bucket before end_time, saturating_sub clamps to 0 and
+        // the first bucket is treated as the end bucket - a query ending at
+        // or before the histogram's first bucket counts bucket 0's entries
+        // instead of returning 0. Callers stay in range: the engine skips
+        // files that do not overlap the query
+        // (`journal-engine/src/histogram.rs`).
         let end_bucket_idx = self
             .buckets
             .partition_point(|b| b.start_time < end_time)
             .saturating_sub(1);
 
-        // If start is after end, the range doesn't contain any buckets
+        // No stored bucket starts in [start_time, end_time)
         if start_bucket_idx > end_bucket_idx {
             return Some(0);
         }
 
-        // Get the running count boundaries
-        // For start: we want entries AFTER the previous bucket's running count
+        // Index range start: one past the previous bucket's last entry
+        // (0 when the span begins at the first stored bucket)
         let start_running_count = if start_bucket_idx == 0 {
             0
         } else {
             self.buckets[start_bucket_idx - 1].count + 1
         };
 
-        // For end: we want entries UP TO AND INCLUDING this bucket's running count
+        // Index range end: the last bucket's running count, inclusive
         let end_running_count = self.buckets[end_bucket_idx].count;
 
-        // Range is [start_running_count, end_running_count + 1) since range_cardinality is exclusive on the end
+        // Exclusive end for range_cardinality: +1 keeps the last entry's index in
         let count = bitmap.range_cardinality(start_running_count..(end_running_count + 1));
 
         Some(count as usize)
     }
 
+    /// Deprecated alias of `count_entries_in_time_range`; nothing in this
+    /// workspace calls it.
     #[deprecated(since = "0.1.0", note = "Use count_entries_in_time_range() instead")]
     pub fn count_bitmap_entries_in_range(
         &self,
@@ -243,22 +302,15 @@ impl Histogram {
 mod tests {
     use super::*;
 
-    /// Helper to create a test histogram with known buckets
-    ///
-    /// Creates a histogram with:
-    /// - bucket_duration: 60 seconds
-    /// - Entries at indices 0-4 in bucket starting at time 0
-    /// - Entries at indices 5-9 in bucket starting at time 60
-    /// - Entries at indices 10-14 in bucket starting at time 120
-    /// - Entries at indices 15-19 in bucket starting at time 180
+    /// Test histogram: 60-second buckets, 20 entries in four fully
+    /// populated buckets - indices 0-4 at [0,60), 5-9 at [60,120),
+    /// 10-14 at [120,180), 15-19 at [180,240).
     fn create_test_histogram() -> Histogram {
-        // Create 20 entries across 4 buckets (60 second buckets)
         let pairs: Vec<(Microseconds, std::num::NonZeroU64)> = (0..20)
             .map(|i| {
-                // Distribute entries: 0-4 -> [0,60), 5-9 -> [60,120), etc.
                 let bucket_index = i / 5;
                 let offset_in_bucket = i % 5;
-                // Spread entries within each bucket at 10 second intervals
+                // 10-second steps inside each bucket
                 let timestamp_secs = bucket_index * 60 + offset_in_bucket * 10;
                 (
                     Microseconds(timestamp_secs * 1_000_000),
@@ -307,7 +359,6 @@ mod tests {
 
     #[test]
     fn test_from_timestamp_offset_pairs_exact_boundaries() {
-        // Test entries at exact bucket boundaries
         let pairs = vec![
             (Microseconds(0), std::num::NonZeroU64::new(1).unwrap()),
             (
@@ -374,7 +425,6 @@ mod tests {
 
     #[test]
     fn test_from_timestamp_offset_pairs_sparse_buckets() {
-        // Test with gaps between buckets
         let pairs = vec![
             (Microseconds(0), std::num::NonZeroU64::new(1).unwrap()),
             (
@@ -394,7 +444,6 @@ mod tests {
 
     #[test]
     fn test_from_timestamp_offset_pairs_large_bucket_duration() {
-        // Test with larger bucket duration
         let pairs = vec![
             (Microseconds(0), std::num::NonZeroU64::new(1).unwrap()),
             (
@@ -523,9 +572,9 @@ mod tests {
         let histogram = create_test_histogram();
         let bitmap = Bitmap::from_sorted_iter([5, 6, 7]).unwrap();
 
-        // Range completely before histogram
+        // [0, 60) is this histogram's first bucket, so this is an ordinary
+        // in-range query, not an out-of-range one
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(0), Seconds(60));
-        // This will actually work since 0-60 is the first bucket
         assert!(count.is_some());
 
         // Range completely after histogram (histogram ends at 240)
@@ -581,7 +630,7 @@ mod tests {
     #[test]
     fn test_bitmap_with_indices_beyond_histogram_range() {
         let histogram = create_test_histogram();
-        // Histogram has entries 0-19, bitmap has indices beyond that
+        // Bitmap mixes in-range indices (5, 6, 7) with out-of-range ones
         let bitmap = Bitmap::from_sorted_iter([5, 6, 7, 25, 30, 100]).unwrap();
 
         // Query bucket 60-120 (entries 5-9)
@@ -631,7 +680,7 @@ mod tests {
         // Bitmap with indices all beyond the histogram's range
         let bitmap = Bitmap::from_sorted_iter([25, 30, 50, 100]).unwrap();
 
-        // Query any valid range
+        // Query the first bucket: none of the bitmap's indices fall in it
         let count = histogram.count_entries_in_time_range(&bitmap, Seconds(0), Seconds(60));
         assert_eq!(count, Some(0));
     }

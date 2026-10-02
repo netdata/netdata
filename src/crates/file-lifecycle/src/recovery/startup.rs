@@ -1,15 +1,35 @@
 //! Startup catalog diff-sync (P7): the required, fail-closed phase that makes
 //! the local catalog set complete before per-tenant recovery. Runs per signal
 //! when storage is enabled, BEFORE tenant discovery, inside the ledger
-//! configuration path.
+//! configuration path — `build_pipeline` in otel-ledger/src/ledger/pipeline.rs
+//! is the grep-verified sole production caller (it imports through the glob
+//! re-export at the recovery root). `recovery/mod.rs` orders the phase first
+//! of the three recovery groups; unlike the two per-tenant remote reconciles
+//! (`recovery::remote`) it is deliberately NOT wrapped in the caller's
+//! STARTUP_REMOTE_BUDGET — it must not be skipped.
 //!
-//! Contract: it either completes (local catalog dir now holds every own-machine
-//! catalog the remote knows about, the seq highwater covers the remote max, and
-//! the remote-discovered tenant set is returned) or it returns an error and the
-//! ledger fails to configure (fail-closed — the agent's restart loop is the
-//! outer retry). Infrastructure failures (LIST error, download transport error,
-//! per-op timeout) are hard errors; a single bad/absent OBJECT is skipped loudly
-//! (retrying cannot heal it, and one bad object must not brick startup).
+//! Contract: the phase either completes — the local catalog dir now holds
+//! every own-machine catalog the remote knows about, the WAL seq high-water
+//! covers the remote max, and the remote-discovered tenant set is returned
+//! for per-tenant registry instantiation — or it errors and the ledger fails
+//! to configure (the agent's restart loop is the outer retry). Infrastructure
+//! failures (LIST error, download transport error, per-op timeout) are hard
+//! errors; a single bad/absent OBJECT is skipped loudly (a restart cannot
+//! heal it, and one bad object must not brick startup).
+//!
+//! Items: [`startup_catalog_sync`] is the phase; [`heal_corrupt_catalog`] is
+//! the corrupt-catalog startup heal (D-P8.1), called only by
+//! `recovery::local::seed_from_catalog_files`; [`validate_catalog`] is the
+//! downloaded-body oracle whose `Err` makes its only caller
+//! [`download_and_install`] skip the object; [`DOWNLOAD_CONCURRENCY`] is the
+//! fixed diff-download budget whose short-circuit bound the tests pin;
+//! `local_catalog_path` is the private path helper.
+//!
+//! Async context: the phase runs inside the ledger's configure task, before
+//! the ledger's event loop starts; every remote op is individually
+//! timeout-bounded while local I/O deliberately is not (see the seq-seed
+//! comment below), and the blocking atomic installs run off-runtime under
+//! `spawn_blocking`.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -28,21 +48,25 @@ use crate::storage::{Storage, StorageError};
 /// (otel-ledger/src/ledger/mod.rs) — same rationale: one global budget, no knob.
 pub(crate) const DOWNLOAD_CONCURRENCY: usize = 8;
 
-/// LIST → filter → seed highwater → diff-download+install the signal's catalogs.
-/// Returns the set of tenants discovered from the (own-machine) remote keys, so
-/// the caller can instantiate per-tenant registries for remote-only tenants.
+/// LIST → filter → seed high-water → diff-download+install the signal's
+/// catalogs. Returns the set of tenants discovered from the (own-machine)
+/// remote keys, so the caller can instantiate per-tenant registries for
+/// remote-only tenants (local discovery is the caller's
+/// `TenantRegistries::discover_tenants` dir scan).
 ///
 /// `op_timeout` bounds every individual remote operation (LIST and each GET), so
 /// a hung connection cannot stall startup; there is deliberately no phase-total
-/// cap, so a large restore stays work-proportional (D-P7.1).
+/// cap, so a large restore stays work-proportional (D-P7.1) — the caller wraps
+/// its optional reconciles in `STARTUP_REMOTE_BUDGET`, never this phase.
 ///
 /// Memory: the LIST result is the WHOLE prefix — every catalog key under
-/// `v2/{signal}/catalog/`, including other machines sharing the bucket, since the
-/// D6 own-machine filter runs AFTER materialization. That `Vec<String>` is
-/// bounded by the whole bucket's catalog cardinality; the derived `kept`/`missing`
-/// sets are own-machine only. ~100 MB at 10^6 keys — fine at expected scale; the
-/// shared-bucket LIST cost is the recorded D6 trade-off (streaming the LIST is a
-/// deferred perf option, not done here).
+/// `v2/{signal}/catalog/` (`remote_keys::catalog_prefix`), including other
+/// machines sharing the bucket, since the D6 own-machine filter runs AFTER
+/// materialization (D6 puts the whole fleet under one shared prefix, so every
+/// consumer must filter). That `Vec<String>` is bounded by the whole bucket's
+/// catalog cardinality — order 100 MB at 10^6 keys — while the derived
+/// `kept`/`missing` sets are own-machine only. Streaming the LIST instead of
+/// materializing it is a possible future optimization, not done here.
 pub async fn startup_catalog_sync<S: Storage>(
     storage: &S,
     signal: &str,
@@ -51,7 +75,8 @@ pub async fn startup_catalog_sync<S: Storage>(
     seq_highwater_path: &Path,
     op_timeout: Duration,
 ) -> anyhow::Result<HashSet<TenantId>> {
-    // 1. Recursive LIST of the whole catalog prefix for this signal.
+    // 1. Recursive LIST of the whole catalog prefix for this signal
+    //    (`remote_keys::catalog_prefix`), bounded by `op_timeout`.
     let prefix = crate::remote_keys::catalog_prefix(signal);
     let keys = match tokio::time::timeout(op_timeout, storage.list(&prefix)).await {
         Ok(Ok(keys)) => keys,
@@ -65,16 +90,16 @@ pub async fn startup_catalog_sync<S: Storage>(
 
     // 2. Parse + sanitize each key; drop DIR entries, garbage, and (D6) any
     //    key not owned by this machine (any instance — prior ones are ours).
-    //    (Step 3 — the tenant-set union with local discovery — is the caller's:
-    //    build_pipeline unions `remote_tenants` (returned below) with
-    //    `discover_tenants`.)
+    //    Tenant discovery is the caller's: `build_pipeline` scans local dirs
+    //    via `discover_tenants`, then instantiates only the remote-only
+    //    tenants from the set returned below.
     let mut kept: Vec<(String, ParsedCatalogKey)> = Vec::new();
     let mut remote_tenants: HashSet<TenantId> = HashSet::new();
     let mut remote_max: u64 = 0;
     let mut dir_skipped: usize = 0;
     for key in keys {
         if key.ends_with('/') {
-            dir_skipped += 1; // directory placeholder, not an object (numerous by construction)
+            dir_skipped += 1; // directory placeholder, not an object (the Storage contract allows them)
             continue;
         }
         let Some(parsed) = crate::remote_keys::parse_catalog_key(&key, signal) else {
@@ -89,21 +114,28 @@ pub async fn startup_catalog_sync<S: Storage>(
         kept.push((key, parsed));
     }
 
-    // 4. Seq seed. Raise the highwater to cover the remote max so a post-wipe
-    //    ingestor never reissues a seq the remote already holds. Done before the
-    //    downloads: the ceiling must hold regardless of download outcome. The
-    //    read-modify-write is single-writer by lifecycle, not by lock: the two
-    //    signals' phases run sequentially in `Ledger::new`, and a ledger-configure
-    //    failure kills the whole plugin (both workers), so the ingestor — the only
-    //    other writer — is never live concurrently; it is configured strictly
-    //    after ledger Ready and seeds max(local scans, highwater).
-    //    Design note: a catalog LIST can miss the uploaded-but-uncataloged SFST
-    //    crash-window tail — accepted, because post-P6 under-seeding cannot
-    //    corrupt (fresh instance_id + identity-keyed state; DESIGN §7-D5).
-    //    This highwater read/write — like all startup LOCAL I/O (catalog reads,
-    //    atomic installs) — is deliberately NOT wrapped in `op_timeout`, which
-    //    bounds only REMOTE ops; a hung local filesystem is bounded by the agent's
-    //    plugin-restart loop, the same outer bound the whole configure path uses.
+    // 3. Seq seed. Raise the high-water to the remote max so a post-wipe
+    //    ingestor never reissues a seq the remote already holds. Done before
+    //    the downloads: the ceiling must hold regardless of download outcome.
+    //    A missing or invalid high-water file reads as `None` (→ 0) and never
+    //    errors — the `wal` envelope contract; the ingestor's seed is
+    //    `max(local scans, highwater)` either way. The read-modify-write is
+    //    single-writer by lifecycle, not by lock: the two signals' phases run
+    //    sequentially in `Ledger::new`, and a ledger-configure failure kills
+    //    the whole plugin (both workers), so the ingestor — the only other
+    //    writer — is never live concurrently; it is configured strictly after
+    //    ledger Ready.
+    //    Design note: a catalog LIST cannot cover the uploaded-but-uncataloged
+    //    SFST crash-window tail (a seq uploaded after its last catalog
+    //    rotation is invisible to the LIST until the entry lands) — accepted,
+    //    because post-P6 under-seeding cannot corrupt: the fresh per-process
+    //    instance_id keeps reissued seqs from reproducing an existing FileId,
+    //    and cross-restart state is keyed on the full identity (`SeqKey`).
+    //    This high-water read/write — like all startup LOCAL I/O (the replay
+    //    passes' local-catalog reads, the atomic installs below) — is
+    //    deliberately NOT wrapped in `op_timeout`, which bounds only REMOTE
+    //    ops; a hung local filesystem is bounded by the agent's plugin-restart
+    //    loop, the same outer bound the whole configure path uses.
     if remote_max > 0 {
         let current = wal::read_seq_highwater(seq_highwater_path).unwrap_or(0);
         if remote_max > current {
@@ -112,7 +144,7 @@ pub async fn startup_catalog_sync<S: Storage>(
         }
     }
 
-    // 5. Diff-download the bodies missing locally, bounded to DOWNLOAD_CONCURRENCY.
+    // 4. Diff-download the bodies missing locally, bounded to DOWNLOAD_CONCURRENCY.
     let missing: Vec<(String, ParsedCatalogKey)> = kept
         .into_iter()
         .filter(|(_, p)| !local_catalog_path(catalog_base_dir, p).exists())
@@ -120,13 +152,15 @@ pub async fn startup_catalog_sync<S: Storage>(
     let total = missing.len();
     let installed = AtomicUsize::new(0);
 
-    // Bounded to DOWNLOAD_CONCURRENCY and SHORT-CIRCUITING: `try_collect` stops at
-    // the first Err (a transport error / timeout is fail-closed) and drops the
-    // stream, so a hung backend fails the phase after ~one op_timeout, not
-    // ceil(total / concurrency) of them. Dropping the in-flight downloads is
-    // safe: each holds an `AtomicFile` whose guard reaps its `.tmp` on drop, so
-    // nothing is left half-installed. A skipped object (404 / invalid) returned
-    // `Ok` above and does not stop the stream.
+    // Bounded to DOWNLOAD_CONCURRENCY and SHORT-CIRCUITING: `try_collect` stops
+    // at the first Err (a transport error / timeout is fail-closed) and drops
+    // the stream, so a hung backend fails the phase after ~one op_timeout, not
+    // ceil(total / concurrency) of them. Dropping in-flight downloads is safe:
+    // a download that has not reached its install holds no local state at all,
+    // and an install already inside `spawn_blocking` is detached, not
+    // cancelled — `write_atomic`'s own `AtomicFile` guard reaps its `.tmp` on
+    // failure, so nothing is left half-installed. A skipped object (404 /
+    // invalid) returned `Ok` above and does not stop the stream.
     futures::stream::iter(missing.iter())
         .map(|(key, parsed)| {
             download_and_install(
@@ -157,20 +191,23 @@ pub async fn startup_catalog_sync<S: Storage>(
     Ok(remote_tenants)
 }
 
-/// Heal one corrupt-present local catalog (D-P8.1): its body failed to parse at
-/// seeding time. Quarantine it, then re-fetch + validate + atomically install
-/// the single remote object via the diff-sync helper, and return the re-parsed
+/// Heal one corrupt-present local catalog (D-P8.1): its body failed to parse
+/// at seeding time (`recovery::local::seed_from_catalog_files`, the sole
+/// caller). Quarantine it, then re-fetch + validate + atomically install the
+/// single remote object via the diff-sync helper, and return the re-parsed
 /// [`Catalog`](otel_catalog::Catalog) so the caller can seed it.
 ///
-/// Returns `None` — and boot continues — when storage is disabled, quarantine
-/// fails, or the re-fetch/validation fails (a bad archive object must not brick
-/// startup, same policy as the diff-sync). The ERROR-level logs here are loud by
-/// design even when the heal succeeds: corruption of an atomically-written,
-/// immutable file signals disk damage and must never be masked.
+/// Returns `None` — and boot continues — when storage is disabled, the
+/// quarantine rename fails, the re-fetch errors or skips, or the re-read of
+/// the installed file fails to parse (a bad archive object must not brick
+/// startup, same skip policy as the diff-sync). The ERROR-level logs here are
+/// loud by design even when the heal succeeds: corruption of an
+/// atomically-written, immutable file signals disk damage and must never be
+/// masked.
 ///
-/// `parsed` is rebuilt by the caller from the catalog registry's filename-derived
-/// [`File`](otel_catalog::registry::File) fields plus its tenant, so no remote
-/// key is trusted from the corrupt body.
+/// `parsed` is rebuilt by the caller from the catalog registry's
+/// filename-derived [`File`](otel_catalog::registry::File) fields plus its
+/// tenant, so no remote key is trusted from the corrupt body.
 pub(crate) async fn heal_corrupt_catalog<S: Storage>(
     storage: Option<&S>,
     path: &Path,
@@ -188,13 +225,14 @@ pub(crate) async fn heal_corrupt_catalog<S: Storage>(
         return None;
     };
 
-    // Quarantine: `{path}` → `{path}.corrupt.{unix-ns}`. Recovery/scan sweeps
-    // match only the `.catalog` suffix, so the quarantine file is ignored by them
-    // while kept for forensics; the freed path lets the re-fetch install cleanly.
-    // The `{unix-ns}` uniqueness suffix keeps a second corruption of the same
-    // scope from overwriting the first forensic file (Unix `rename` replaces the
-    // destination) or hard-failing the rename (Windows `rename` onto an existing
-    // path errors).
+    // Quarantine: `{path}` → `{path}.corrupt.{unix-ns}`. The catalog scans
+    // (`otel-catalog`'s registry) and the recovery sweeps match only the
+    // `.catalog` suffix, so the quarantine file is ignored by them while kept
+    // for forensics; the freed path lets the re-fetch install cleanly. The
+    // `{unix-ns}` suffix keeps a second corruption of the same scope from
+    // overwriting the first forensic file — `std::fs::rename` replaces the
+    // destination whenever it exists (POSIX rename; Windows MoveFileExW
+    // REPLACE_EXISTING), so only the name makes the copies distinct.
     let mut corrupt = path.as_os_str().to_owned();
     corrupt.push(format!(".corrupt.{}", super::now_ns()));
     let corrupt_path = PathBuf::from(corrupt);
@@ -208,8 +246,9 @@ pub(crate) async fn heal_corrupt_catalog<S: Storage>(
 
     // Rebuild the remote key from the trusted (filename-derived) fields and
     // re-fetch that ONE object. A transport error/timeout returns Err (boot
-    // continues); a 404 or validation failure is a skip → the file stays absent
-    // and the re-read below fails.
+    // continues); a 404 or validation failure is a skip — the destination
+    // stays absent (the corrupt body is quarantined away) and the re-read
+    // below fails.
     let key = crate::remote_keys::catalog(
         signal,
         parsed.date,
@@ -257,7 +296,12 @@ pub(crate) async fn heal_corrupt_catalog<S: Storage>(
     }
 }
 
-/// The canonical local path for a catalog: `{base}/{date}/{tenant}/{filename}`.
+/// The canonical local path for a catalog: `{base}/{date}/{tenant}/{filename}`
+/// — the twin of `catalog_builder::scope_path` over the same signal's derived
+/// catalog dir, so a catalog installed from remote at startup lands exactly
+/// where the builder would have written it and the registry scans it
+/// identically. Directory from `file_registry::layout::date_tenant_dir`,
+/// filename from `otel_catalog::filename`.
 fn local_catalog_path(base: &Path, p: &ParsedCatalogKey) -> PathBuf {
     file_registry::layout::date_tenant_dir(base, p.date, p.tenant_id.as_str()).join(
         otel_catalog::filename(p.identity, p.max_seq, p.min_timestamp_s, p.max_timestamp_s),
@@ -265,10 +309,16 @@ fn local_catalog_path(base: &Path, p: &ParsedCatalogKey) -> PathBuf {
 }
 
 /// Download one catalog object, validate it against its key, and atomically
-/// install it. A 404 (object gone) or a validation failure is logged and
-/// SKIPPED (`Ok(())`) — neither is healable by retry, and a hard error would
-/// brick startup on one bad object. A transport error or timeout IS returned
-/// (fail-closed).
+/// install it. Shared by the diff-download stream and the single-object
+/// corrupt-catalog re-fetch (`heal_corrupt_catalog`).
+///
+/// A 404 (object gone) or a validation failure is logged and SKIPPED
+/// (`Ok(())`) — neither is healable by retry, and a hard error would brick
+/// startup on one bad object. A transport error, per-op timeout, or a failed
+/// install (I/O or join error) IS returned (fail-closed). `installed`/`total`
+/// feed the coarse progress log only.
+// Nine distinct primitives (the last two feed progress logging only); a
+// one-off struct would add indirection for the two call sites.
 #[allow(clippy::too_many_arguments)]
 async fn download_and_install<S: Storage>(
     storage: &S,
@@ -284,8 +334,9 @@ async fn download_and_install<S: Storage>(
     let bytes = match tokio::time::timeout(op_timeout, storage.read(key)).await {
         Ok(Ok(bytes)) => bytes,
         Ok(Err(StorageError::NotFound)) => {
-            // The listed object is gone (raced by a lifecycle rule / another
-            // node). A restart would not bring it back — treat as never listed.
+            // The listed object is gone. The `Storage` trait has no delete —
+            // only bucket-side lifecycle rules age objects out — and a
+            // restart would not bring it back, so skip as if never listed.
             tracing::warn!(key = %key, "startup sync: catalog object 404 on download, skipping");
             return Ok(());
         }
@@ -302,8 +353,10 @@ async fn download_and_install<S: Storage>(
         return Ok(());
     }
 
-    // Off-runtime: the atomic install fsyncs the file and its parent dir, so
-    // 8 download workers must not block the runtime on that I/O.
+    // Off-runtime (`spawn_blocking`): the atomic install fsyncs the file and
+    // its parent dir, so the DOWNLOAD_CONCURRENCY workers must not block the
+    // runtime on that I/O. `AtomicFile::create` makes the missing date/tenant
+    // dirs, so installs fill in an empty tree after a wipe.
     let dest = local_catalog_path(catalog_base_dir, parsed);
     let write_dest = dest.clone();
     tokio::task::spawn_blocking(move || file_registry::durable::write_atomic(&write_dest, &bytes))
@@ -319,15 +372,20 @@ async fn download_and_install<S: Storage>(
     Ok(())
 }
 
-/// Validate a downloaded catalog body against its remote key. Returns
-/// `Err(reason)` (a description for the skip log) on any mismatch. Checks:
+/// Validate a downloaded catalog body against its remote key — the tenant
+/// oracle for installs. The key's segments (date, tenant, filename
+/// identity/fold) are trusted — `remote_keys::parse_catalog_key` produced them
+/// from the LIST — the body is not, so every identifying axis must agree.
+/// Returns `Err(reason)` (a description for the skip log) on any mismatch; the
+/// caller then skips the install. Checks:
 /// container magic/CRC + framing-version, then the JSON envelope's
 /// format-version (via `from_container_bytes`); envelope tenant/date/identity
 /// equal the key's segments + filename fields; the entries fold (max seq,
 /// min/max ts) equals the filename fields; and every entry's `remote_key` is a
 /// well-formed SFST key on this machine AND this tenant AND this signal, whose
 /// embedded `FileId` matches the entry's own `id` AND whose date matches the
-/// catalog's date.
+/// catalog's date. Test-pinned in `recovery/tests.rs`: the arm-priority order
+/// below and a real builder-rotation round-trip.
 pub(crate) fn validate_catalog(
     bytes: &[u8],
     parsed: &ParsedCatalogKey,
@@ -347,9 +405,9 @@ pub(crate) fn validate_catalog(
         return Err("body identity != filename identity".into());
     }
 
-    // Re-derive the filename fold fields from the entries via the shared
-    // `Catalog::fold` (the same fold the builder used to stamp the filename) and
-    // compare against the key's filename fields.
+    // Recompute the fold via the shared `Catalog::fold` — the single source
+    // of the filename fields (the builder stamps, the validator checks; see
+    // otel-catalog) — and compare against the key's filename fields.
     if catalog.fold() != (parsed.max_seq, parsed.min_timestamp_s, parsed.max_timestamp_s) {
         return Err("entries fold != filename fields".into());
     }

@@ -1,33 +1,60 @@
-//! `ng-flatten`: flatten OTLP log/trace data into a typed schema tree + per-row
-//! entries — the OTLP analogue of the JSON flattener at `~/repos/tmp/schema`.
+//! `ng-flatten`: flatten OTLP log/trace data into a typed schema tree plus
+//! per-row entries, and own the flattened-frame format those entries travel in.
 //!
-//! The crate is split by signal boundary:
+//! Pipeline position: an OTLP receiver normalizes + flattens each export request
+//! here and appends the bincode frame to a WAL — `otel-ingestor` (the production
+//! receiver) and `ng-ingest` (a standalone receiver), both via
+//! [`prepare_log_frame`]/[`prepare_trace_frame`]. Downstream, `ng-index` merges
+//! the per-frame trees into one global tree ([`Flattener::merge_tree`]) and seals
+//! it into an SFST index; `sfsq` scans frames straight off the WAL tail for live
+//! queries.
+//!
+//! # Modules
+//!
 //! - [`common`] — the signal-neutral substrate: the value model
 //!   ([`Kind`]/[`Value`]), the [`SchemaTree`] + [`Flattener`], the W3C id newtypes
 //!   ([`TraceId`]/[`SpanId`]), the canonical `key=value` rendering ([`build_kv`]),
 //!   and the bincode frame codec.
 //! - [`logs`] — OTel logs: [`FlattenedLogRequest`]/[`Record`], [`flatten_log_request`],
-//!   the log normalizers, and the log frame codec ([`encode_log_frame`]).
+//!   the log normalizers, and the log frame codec ([`encode_log_frame`], versioned
+//!   by [`LOG_FRAME_PAYLOAD_FORMAT`]).
 //! - [`traces`] — OTel traces: [`FlattenedTraceRequest`]/[`SpanRecord`],
 //!   [`flatten_trace_request`], the span normalizers, and the trace frame codec.
 //!
+//! # Flattening contract
+//!
 //! A [`Flattener`] builds one [`SchemaTree`] (an arena of nodes interned by
 //! `(parent, step, kind)`) while flattening a resource, a scope, and its records or
-//! spans into it. Each leaf occurrence becomes an [`Entry`] `{ node, value }` — the
-//! path is *not* stored per entry; it is recovered on demand from the tree
+//! spans into it. Each leaf occurrence becomes an [`Entry`] `{ node, value, hash }` —
+//! the path is *not* stored per entry; it is recovered on demand from the tree
 //! ([`SchemaTree::path`]). A node id is therefore a stable typed-column identity
-//! (collapsed path + kind), shared across every row that has that column.
+//! (collapsed path + kind), shared across every row that has that column — which is
+//! what lets `ng-index` merge per-frame trees into one column space.
 //!
-//! A row's resource attributes, scope, scalar facets, body, and attributes fold
-//! into one namespace with prefixes (`resource.attributes.*`, `scope.*`,
+//! Naming: a row's resource attributes, scope, scalar facets, body, and attributes
+//! fold into one namespace with prefixes (`resource.attributes.*`, `scope.*`,
 //! `attributes.*`, `body…`); array elements collapse to `[]`; every leaf keeps its
-//! OTLP type. The path *string* can alias across different structures (a kvlist
-//! `a:{b}` and a literal key `"a.b"` both render `a.b`), but their **nodes** differ
-//! (distinct `steps`), so index by node id and display by path.
+//! OTLP type. User-controlled keys are sanitized at the single `flatten_kv` choke
+//! point (counted for one aggregated warning per request): `=` → `_` (the
+//! `key=value` delimiter) and an empty key → `_`. The path *string* can alias
+//! across structures (a kvlist `a:{b}` and a literal key `"a.b"` both render
+//! `a.b`), but their **nodes** differ (distinct `steps`), so index by node id and
+//! display by path.
 //!
-//! This crate also owns the on-WAL **flattened-frame format**: the writer
-//! (`ng-ingest`) and the reader (`ng-index`) share the canonical `key=value` bytes,
-//! so a producer hashes exactly what the SFST builder keys on — one source of truth.
+//! Hashing: the flattener stamps every [`Entry`] at emit time with
+//! `xxhash64("path=value", seed 0)` (`hash_kv` in `common`) over exactly the bytes
+//! [`build_kv`] renders — identical key=value pairs hash identically, so the SFST
+//! interner keys occurrences without re-hashing. Writer and reader share those
+//! bytes: one source of truth.
+//!
+//! Ordering: a row's `ts` — resolved by the per-signal normalizers, which run
+//! before flattening — is the row-ordering key; entries keep document order.
+//! Per-row identifiers/scalars ride on [`Record`]/[`SpanRecord`], not entries.
+//!
+//! The `tests` module at the bottom of this file is the crate's only test suite:
+//! integration-style tests over the public surface — typed facets, key
+//! sanitization, normalization and time bounds, tree sharing/merging, frame
+//! round-trips, and the JSON-object string body rewrite.
 
 pub mod common;
 pub mod logs;
@@ -440,7 +467,7 @@ mod tests {
     /// `fallback_base + k` — past that edge — so they MUST NOT face the
     /// future bound through their own clamp (the value is ours, not the
     /// client's); only a RAW client end does. Mirrors the logs zero-skew
-    /// exemption; review round 1 finding 2.
+    /// exemption.
     #[test]
     fn normalize_trace_request_zero_future_skew_keeps_synthesized_starts() {
         let base: u64 = 1_000_000;
@@ -1430,7 +1457,7 @@ mod tests {
     fn json_object_string_body_flattens_to_typed_columns() {
         // A body string holding a JSON object explodes into typed `body.*`
         // leaves; every JSON type maps to the matching `Value`, and the raw
-        // string is dropped (decision 1B).
+        // string is dropped.
         let body = r#"{
             "int": 7,
             "double": 3.5,
@@ -1509,7 +1536,7 @@ mod tests {
     #[test]
     fn no_recursive_reparse_of_string_values_inside_the_object() {
         // A string VALUE that itself looks like JSON stays a StringValue leaf —
-        // only the top-level body string is parsed (decision 2A).
+        // only the top-level body string is parsed.
         let (norm, leaves) = flatten_string_body(r#"{"nested": "{\"x\": 1}"}"#);
         assert_eq!(norm.parsed_bodies, 1);
         assert_eq!(
@@ -1524,7 +1551,7 @@ mod tests {
     #[test]
     fn number_edges_map_to_int_or_double() {
         // i64 range stays Int (including i64::MAX and negatives); a u64 past
-        // i64::MAX becomes a Double (decision 4B).
+        // i64::MAX becomes a Double.
         let body = format!(
             r#"{{"max_i64": {}, "neg": -5, "over_i64": {}}}"#,
             i64::MAX,

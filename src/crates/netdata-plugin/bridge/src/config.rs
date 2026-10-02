@@ -1,8 +1,26 @@
-//! Configuration types shared between the supervisor and its workers.
+//! The plugin configuration model, shared between the supervisor and its
+//! workers: [`PluginConfig`] for the ingestor and ledger workers,
+//! [`LegacyLogsConfig`] for the legacy-logs viewer.
 //!
-//! These types are used both for YAML config loading (by the supervisor)
-//! and for IPC serialization (via ferryboat/bincode). They use human-readable
-//! types (`ByteSize`, `humantime_serde`) so the YAML format works naturally.
+//! The supervisor resolves the config (otel-plugin's `config` module layers
+//! the stock, user, then env YAML sources, then validates) and sends the
+//! result to each worker in its `Configure` handshake ([`crate::IngestorRequest::Configure`]
+//! / [`crate::LedgerRequest::Configure`]). The same types therefore serve two
+//! serializations: human-readable YAML on disk and bincode over the ferryboat
+//! IPC link. Fields keep human-friendly types (`ByteSize`, `Duration`); the
+//! `duration` / `opt_duration` / `opt_bytesize` serde helpers in this file
+//! switch the wire form per format (humantime string for YAML, compact
+//! tuple/integer for bincode).
+//!
+//! Operators set one mandatory [`PluginConfig::base_dir`] plus per-signal
+//! tuning; positions are derived — [`PluginConfig::lifecycle_for`] yields each
+//! signal's `{base_dir}/{signal}/...` subtree as the [`LifecycleConfig`] the
+//! file-lifecycle substrate consumes, while remote storage and auth are
+//! process-global. Every YAML section rejects unknown keys, so a typo in a
+//! config file refuses startup instead of silently keeping defaults. A
+//! malformed rotation/retention policy is rejected at deserialize, so a
+//! resolved value is always complete and [`RotationPolicy::resolve`] /
+//! [`RetentionPolicy::resolve`] cannot fail.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -47,13 +65,14 @@ pub struct PluginConfig {
     /// storage (global).
     pub logs: SignalConfig,
     /// Per-signal tuning for traces. Same shape as `logs`, but optional in
-    /// YAML (the shipped stock config documents it since the phase-3 cutover);
-    /// an absent section falls back to code defaults mirroring the shipped
-    /// logs tuning.
+    /// YAML; an absent section falls back to code defaults mirroring the
+    /// shipped stock logs tuning.
     #[serde(default)]
     pub traces: SignalConfig,
-    /// Socket path for WAL event IPC between ingestor and ledger.
-    /// Set by the supervisor at runtime, not present in YAML config.
+    /// Socket path for WAL event IPC between ingestor and ledger: the
+    /// ingestor connects to it and the ledger accepts its single writer
+    /// connection. Set by the supervisor at runtime, not present in YAML
+    /// config.
     #[serde(default)]
     pub writer_socket_path: String,
     /// Producer identity stamped into every WAL FileId: the Netdata machine GUID
@@ -77,9 +96,10 @@ impl PluginConfig {
     /// both are global to the process (the coordinator shell owns remote storage;
     /// auth is tenant-scoped), not per-signal file-lifecycle concerns.
     ///
-    /// Total over [`Signal`]: the signal axis is a closed enum, so there is no
-    /// unknown-signal error path here (a bad numeric `pipeline_id` is rejected
-    /// earlier, at the [`Signal::try_from`](crate::signals::Signal) boundary).
+    /// Exhaustive over [`Signal`]: the signal axis is a closed enum, so there
+    /// is no unknown-signal error path here (a bad numeric `pipeline_id` is
+    /// rejected earlier, at the [`Signal::try_from`](crate::signals::Signal)
+    /// boundary).
     pub fn lifecycle_for(&self, signal: Signal) -> LifecycleConfig {
         let tuning = match signal {
             Signal::Logs => &self.logs,
@@ -146,14 +166,16 @@ pub struct LegacyLogsConfig {
     pub memory_capacity: usize,
     /// Disk cache capacity for file indexes.
     pub disk_capacity: ByteSize,
-    /// Max distinct values indexed per field (cardinality cap).
+    /// Max distinct values indexed per field; fields exceeding the cap have
+    /// their value indexing truncated (cardinality cap).
     pub max_unique_values_per_field: usize,
-    /// Max indexed field payload size in bytes.
+    /// Max field-value payload size (bytes) that gets indexed; larger values
+    /// (and compressed ones) are skipped.
     pub max_field_payload_size: usize,
 }
 
 impl LegacyLogsConfig {
-    /// Build with the former viewer's stock indexing defaults; the supervisor
+    /// Build with the viewer's stock indexing defaults; the supervisor
     /// supplies the resolved directories.
     pub fn new(journal_dir: PathBuf, cache_dir: PathBuf) -> Self {
         Self {
@@ -188,10 +210,12 @@ pub struct EndpointConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MetricsConfig {
-    /// Directory containing metric chart config files.
+    /// Directory of user per-metric chart-config YAML files. A load failure
+    /// is logged and the built-in stock configs stay in effect.
     #[serde(default)]
     pub chart_configs_dir: Option<String>,
-    /// Collection interval in seconds.
+    /// Chart collection interval in seconds. When set without
+    /// `grace_period_secs`, the grace period derives as `5 * interval`.
     #[serde(default)]
     pub interval_secs: Option<u64>,
     /// Grace period before gap-filling.
@@ -200,16 +224,16 @@ pub struct MetricsConfig {
     /// Seconds before removing inactive charts.
     #[serde(default)]
     pub expiry_duration_secs: Option<u64>,
-    /// Maximum new charts per request (cardinality limit).
+    /// New-chart budget per gRPC request (cardinality limit): once exhausted,
+    /// data points for not-yet-existing charts are dropped until the next
+    /// request; existing charts keep ingesting.
     pub max_new_charts_per_request: usize,
 }
 
 /// Per-signal tuning, operator-facing. Carries no directories (they are derived
 /// from [`PluginConfig::base_dir`]) and no storage (global). The same shape is
 /// used for every signal (logs, traces); [`PluginConfig::lifecycle_for`] turns
-/// it into a runtime [`LifecycleConfig`] by injecting the derived dirs. Remote
-/// storage is process-global and owned by the coordinator shell — NOT injected
-/// here.
+/// it into a runtime [`LifecycleConfig`] by injecting the derived dirs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SignalConfig {
@@ -227,15 +251,18 @@ pub struct SignalConfig {
     /// Per-tenant retention policy — how much data is kept (same validated
     /// map shape).
     pub retention: RetentionPolicy,
-    /// Catalog tuning (rotation count) — no dir.
+    /// Catalog tuning (rotation count and period) — no dir.
     #[serde(default)]
     pub catalog: CatalogTuning,
-    /// Ingestion time-bounds (P3): reject out-of-window records per-record.
+    /// Ingestion time-bounds: reject out-of-window records per-record.
     #[serde(default)]
     pub ingest: IngestConfig,
 }
 
 impl Default for SignalConfig {
+    /// Code default for an absent signal section (e.g. `traces` omitted from
+    /// YAML): crc/compression on, plus the stock-mirroring rotation/retention/
+    /// catalog/ingest defaults.
     fn default() -> Self {
         Self {
             crc_enabled: true,
@@ -256,9 +283,10 @@ pub struct CatalogTuning {
     /// rotates an in-memory accumulator to an immutable catalog file.
     #[serde(default = "default_catalog_rotation_count")]
     pub rotation_count: usize,
-    /// Age at which a non-empty accumulator rotates even before reaching
-    /// `rotation_count` — the time trigger that bounds how long a quiet host's
-    /// uploaded SFSTs stay uncataloged.
+    /// Age (since the accumulator's first entry) at which a non-empty
+    /// accumulator rotates even before reaching `rotation_count` — the time
+    /// trigger that bounds how long a quiet host's uploaded SFSTs stay
+    /// uncataloged.
     #[serde(with = "duration", default = "default_catalog_rotation_period")]
     pub rotation_period: Duration,
 }
@@ -272,7 +300,7 @@ impl Default for CatalogTuning {
     }
 }
 
-/// Ingestion time-bounds for one signal (P3). Out-of-window data is rejected
+/// Ingestion time-bounds for one signal. Out-of-window data is rejected
 /// at ingestion and reported via OTLP `partial_success`. Global for the
 /// signal — not per-tenant.
 ///
@@ -342,7 +370,7 @@ pub struct LifecycleConfig {
     pub index: IndexConfig,
     /// Catalog file configuration (derived dir, rotation count).
     pub catalog: CatalogConfig,
-    /// Ingestion time-bounds (P3): the ingestor enforces them per record; the
+    /// Ingestion time-bounds: the ingestor enforces them per record; the
     /// ledger derives its reconcile LIST window from `ingest.max_age`.
     pub ingest: IngestConfig,
 }
@@ -354,7 +382,8 @@ pub struct LifecycleConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteStorageConfig {
-    /// Whether remote storage is enabled.
+    /// Whether remote storage is enabled. When true, `uri` must be set
+    /// (checked at config load).
     #[serde(default)]
     pub enabled: bool,
     /// OpenDAL URI for the remote storage backend.
@@ -364,17 +393,17 @@ pub struct RemoteStorageConfig {
     /// Default 1 GB.
     #[serde(default = "default_read_cache_max_size")]
     pub read_cache_max_size: ByteSize,
-    /// Per-operation timeout for the required startup catalog diff-sync (each
-    /// LIST and each download is bounded by it). Default 5 min. It SHOULD exceed
-    /// the storage retry layer's ~3-min in-op backoff ceiling so inner retries
-    /// still run; a lower value cuts those retries short and can crash-loop the
-    /// plugin under a flaky remote (fail-closed is still safe, just noisy). Not
-    /// enforced — a lab/test operator may legitimately want a fast fail. There is
-    /// no phase-total cap, so a large restore stays work-proportional; the per-op
-    /// bound alone makes a hung connection impossible. It also bounds the single
-    /// recursive LIST, which scales with the whole bucket's catalog cardinality
-    /// (shared buckets list every machine's objects), so very large fleets may
-    /// need a higher value.
+    /// Per-operation timeout for the required startup catalog diff-sync: the
+    /// recursive LIST and each download are each bounded by it, as is the
+    /// corrupt-catalog remote re-fetch. Default 5 min. It SHOULD exceed the
+    /// storage retry layer's ~3-min in-op backoff ceiling so inner retries
+    /// still run; a lower value cuts those retries short and can crash-loop
+    /// the plugin under a flaky remote (fail-closed is still safe, just
+    /// noisy). Not enforced — a lab/test operator may legitimately want a fast
+    /// fail. There is no phase-total cap, so a large restore stays
+    /// work-proportional. It also bounds the single recursive LIST, which
+    /// scales with the whole bucket's catalog cardinality (shared buckets list
+    /// every machine's objects), so very large fleets may need a higher value.
     #[serde(with = "duration", default = "default_startup_op_timeout")]
     pub startup_op_timeout: Duration,
 }
@@ -412,14 +441,17 @@ pub struct CatalogConfig {
     pub rotation_period: Duration,
 }
 
+/// Default ingest `max_age`: 24 hours.
 fn default_ingest_max_age() -> Duration {
     Duration::from_secs(24 * 3600)
 }
 
+/// Default ingest `future_skew`: 10 minutes.
 fn default_ingest_future_skew() -> Duration {
     Duration::from_secs(10 * 60)
 }
 
+/// Default catalog `rotation_count`: 10.
 fn default_catalog_rotation_count() -> usize {
     10
 }
@@ -463,14 +495,19 @@ pub struct WalConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct RotationEntry {
+    /// Max bytes per data file before it rotates.
     #[serde(default, with = "opt_bytesize")]
     pub max_file_size: Option<ByteSize>,
+    /// Max entries per data file before it rotates.
     #[serde(default)]
     pub max_entries: Option<usize>,
+    /// Max wall time a data file stays open; idle streams seal on the
+    /// ingestor's periodic sweep even with no new frames.
+    ///
     /// Optional even in the `default` entry (unlike the two fields above,
     /// which the default must set): the knob is hidden from the stock file,
     /// so an absent value inherits the code default (see
-    /// [`default_rotation_max_file_duration`]) — same pattern as
+    /// `default_rotation_max_file_duration`) — same pattern as
     /// [`RetentionEntry::horizon`].
     #[serde(default, with = "opt_duration")]
     pub max_file_duration: Option<Duration>,
@@ -485,10 +522,10 @@ pub struct RotationConfig {
 }
 
 /// A validated rotation policy: a complete `default` plus partial per-tenant
-/// overrides. The only constructors are the serde `TryFrom<HashMap<String,
-/// RotationEntry>>` (used at config load), override patching, and `Default`
-/// (the absent-signal fallback) — each keeps the `default` complete, so
-/// [`RotationPolicy::resolve`] cannot panic. A malformed
+/// overrides. The only ways to build one are the serde `TryFrom<HashMap<String,
+/// RotationEntry>>` (config load), [`RotationPolicy::apply_overrides`] patching,
+/// and `Default` (the absent-signal fallback) — each keeps the `default`
+/// complete, so [`RotationPolicy::resolve`] cannot panic. A malformed
 /// or missing default is rejected at deserialize (parse-don't-validate), not at first
 /// runtime resolve. Serializes back to the `{ "default": {...}, "<tenant>": {...} }`
 /// map shape, so operator YAML, JSON logging, and IPC are unchanged.
@@ -520,10 +557,11 @@ impl RotationPolicy {
         }
     }
 
-    /// Patch this policy from a partial override map (the config override layer): the
-    /// `"default"` entry's set fields patch the complete default; any other key
-    /// upserts a partial tenant override. Only `Some` fields replace, so the default
-    /// stays complete and the policy stays valid.
+    /// Patch this policy from a partial override map (the config override
+    /// layer: `otel-plugin`'s user-file/env merge): the `"default"` entry's
+    /// set fields patch the complete default; any other key upserts a partial
+    /// tenant override. Only `Some` fields replace, so the default stays
+    /// complete and the policy stays valid.
     pub fn apply_overrides(&mut self, raw: &HashMap<String, RotationEntry>) {
         for (key, entry) in raw {
             if key == "default" {
@@ -561,9 +599,8 @@ fn default_rotation_max_file_duration() -> Duration {
 }
 
 /// Code default mirroring the shipped stock logs rotation (plus the hidden
-/// `max_file_duration`), used when a signal section is absent from YAML
-/// (traces, while under active development). The otel-plugin stock-file test
-/// pins these against the shipped values.
+/// `max_file_duration`), used when a signal section is absent from YAML. The
+/// otel-plugin stock-file test pins these against the shipped values.
 impl Default for RotationPolicy {
     fn default() -> Self {
         Self {
@@ -626,15 +663,19 @@ impl From<RotationPolicy> for HashMap<String, RotationEntry> {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct RetentionEntry {
+    /// Max SFST files kept per tenant.
     #[serde(default)]
     pub max_files: Option<usize>,
+    /// Max total bytes of SFST files kept per tenant.
     #[serde(default, with = "opt_bytesize")]
     pub max_total_size: Option<ByteSize>,
+    /// Max age of an SFST file — measured from its latest data timestamp —
+    /// before eviction.
     #[serde(default, with = "opt_duration")]
     pub max_age: Option<Duration>,
     /// How long catalog (index) files are kept — the remote archive horizon,
     /// decoupled from SFST `max_age`. Optional in YAML: an absent value inherits
-    /// the code default (see [`default_retention_horizon`]), so existing
+    /// the code default (see `default_retention_horizon`), so existing
     /// hand-written retention blocks keep parsing after upgrade.
     #[serde(default, with = "opt_duration")]
     pub horizon: Option<Duration>,
@@ -646,16 +687,17 @@ pub struct RetentionConfig {
     pub max_files: usize,
     pub max_total_size: ByteSize,
     pub max_age: Duration,
-    /// Catalog retention horizon (see [`RetentionEntry::horizon`]). Always
-    /// `>` `max_age` in day units by construction — enforced at config load by
-    /// [`RetentionPolicy::validate`].
+    /// Catalog retention horizon (see [`RetentionEntry::horizon`]). Kept
+    /// strictly greater than `max_age` in day units by
+    /// [`RetentionPolicy::validate`], which the supervisor's config load calls
+    /// after every override layer.
     pub horizon: Duration,
 }
 
 /// A validated retention policy: a complete `default` plus partial per-tenant
-/// overrides. Constructed only via the serde `TryFrom<HashMap<String,
-/// RetentionEntry>>` (config load), override patching, or `Default` (the
-/// absent-signal fallback) — each keeps the
+/// overrides. The only ways to build one are the serde `TryFrom<HashMap<String,
+/// RetentionEntry>>` (config load), [`RetentionPolicy::apply_overrides`]
+/// patching, and `Default` (the absent-signal fallback) — each keeps the
 /// `default` complete — so [`RetentionPolicy::resolve`] cannot panic. A malformed or
 /// missing default is rejected at deserialize, not at first runtime resolve.
 /// Serializes back to the map shape, so operator YAML / logging / IPC are unchanged.
@@ -731,9 +773,11 @@ impl RetentionPolicy {
         Ok(())
     }
 
-    /// Patch this policy from a partial override map: the `"default"` entry's set
-    /// fields patch the complete default; any other key upserts a partial tenant
-    /// override. Only `Some` fields replace, so the default stays complete.
+    /// Patch this policy from a partial override map (the config override
+    /// layer: `otel-plugin`'s user-file/env merge): the `"default"` entry's
+    /// set fields patch the complete default; any other key upserts a partial
+    /// tenant override. Only `Some` fields replace, so the default stays
+    /// complete.
     pub fn apply_overrides(&mut self, raw: &HashMap<String, RetentionEntry>) {
         for (key, entry) in raw {
             if key == "default" {
@@ -813,11 +857,14 @@ impl From<RetentionPolicy> for HashMap<String, RetentionEntry> {
     }
 }
 
-/// Tenant authentication configuration.
+/// Tenant authentication configuration, applied to the logs and traces
+/// ingestion services (metrics have no tenants).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AuthConfig {
-    /// When false, all data routes to the "default" tenant.
+    /// When false, all data routes to the "default" tenant. When true, every
+    /// logs/traces request must carry [`AuthConfig::TENANT_HEADER`] (missing
+    /// or invalid values are gRPC errors).
     #[serde(default)]
     pub enabled: bool,
 }
@@ -831,6 +878,8 @@ fn default_true() -> bool {
     true
 }
 
+/// Serde for an optional `ByteSize`: a size string (`"25MB"`) in human-readable
+/// formats (YAML), raw `u64` bytes otherwise (bincode IPC).
 mod opt_bytesize {
     use bytesize::ByteSize;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -861,9 +910,9 @@ mod tests {
     use super::*;
     use crate::signals::Signal;
 
-    /// A full plugin config in the new schema: one base dir, global storage +
-    /// auth, per-signal tuning for logs and traces (different rotation/retention
-    /// so the derivation per signal is observable).
+    /// A full plugin config: one base dir, global storage + auth, per-signal
+    /// tuning for logs and traces (different rotation/retention so the
+    /// derivation per signal is observable).
     const FULL_YAML: &str = r#"
 endpoint:
   path: "127.0.0.1:4317"
@@ -968,8 +1017,8 @@ traces:
         // Tuning carried from the logs section.
         assert!(!logs.wal.compression_enabled);
         assert_eq!(logs.catalog.rotation_count, 7);
-        // Storage is NOT carried per-signal — it is global on PluginConfig, owned
-        // by the coordinator shell (see the storage-redundancy SOW).
+        // Storage is NOT carried per-signal — it is global on PluginConfig,
+        // owned by the coordinator shell.
 
         let traces = c.lifecycle_for(Signal::Traces);
         assert_eq!(
@@ -1142,6 +1191,9 @@ mod duration {
     }
 }
 
+/// Serde for an optional `Duration`, dual-mode like [`duration`]: a humantime
+/// string in human-readable formats (YAML), a `(secs, nanos)` tuple otherwise
+/// (bincode IPC — a humantime string would not round-trip through bincode).
 mod opt_duration {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use std::time::Duration;

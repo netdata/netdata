@@ -1,18 +1,20 @@
 //! Netdata function wire types for `otel-logs`.
 //!
-//! This is the transport layer between the netdata function protocol and
-//! the wire-neutral [`sfsq::logs`] engine. The request type
-//! ([`OtelLogsRequest`]) deserializes the function-call JSON; the
-//! response types ([`OtelLogsResponse`] / [`LogsResult`]) serialize back
-//! into the v3 function-table envelope the cloud-frontend renders. The
+//! The transport layer between the netdata function protocol and the
+//! wire-neutral [`sfsq::logs`] engine. [`OtelLogsRequest`] deserializes
+//! the function-call JSON: `info` selects a capability descriptor,
+//! `files` a storage inventory, anything else is a log query whose
+//! response ([`OtelLogsResponse`] / [`LogsResult`]) serializes back into
+//! the v3 function-table envelope the cloud-frontend renders. The
 //! mapping to and from the engine's neutral types lives in
 //! [`super::adapter`].
 //!
-//! The cloud-frontend transform reads:
+//! What the cloud-frontend reads from a query response:
 //!
-//! - `facets` → sidebar filter options (when `data_only:false`).
-//! - `histogram` → main time-series chart.
-//! - `data` + `columns` → log-row table.
+//! - `facets` → sidebar filter options.
+//! - `histogram` → the main time-series chart.
+//! - `data` + `columns` → the log-row table.
+//! - `required_params` → the stream selector control in the sidebar.
 //! - `items` → pagination footer counts.
 //! - `accepted_params` → which request params the UI may send.
 
@@ -23,19 +25,19 @@ use sfsq::logs::Direction;
 // ── Request ─────────────────────────────────────────────────────────
 
 /// Request param names accepted by this function, advertised to the UI
-/// in [`InfoResponse::accepted_params`] and echoed in the non-info
-/// [`LogsResult`]'s same field. The UI gates which params it sends on
-/// this list.
+/// in [`InfoResponse::accepted_params`] and echoed in each
+/// [`LogsResult`]'s `accepted_params`. Every listed param is honored
+/// except `slice` — listed for parity with the legacy request shape,
+/// never read. Conversely, `selections` is honored though not listed:
+/// it is how the stream selector's picks ([`STREAM_SELECTION_PARAM`])
+/// travel.
 ///
-/// We advertise only what we actually honor. Notably `data_only` is
-/// **omitted**: the UI computes its `dataOnly` flag as
-/// `data_only && accepted_params.includes("data_only")`, so leaving it
-/// out forces `dataOnly=false`. That makes the UI refresh columns /
-/// pagination / facets from each full response (which we recompute every
-/// call) instead of preserving stale prior state; infinite scroll still
-/// works off `merge` + the row anchors. `if_modified_since`, `delta`,
-/// `tail`, and `sampling` are likewise omitted — they drive incremental
-/// / live-tail / sampling modes we don't implement.
+/// `data_only` is deliberately **omitted**: the UI derives its
+/// `dataOnly` flag from this list's membership, so omission forces the
+/// full-response mode (fresh columns / facets / pagination on every
+/// call). `if_modified_since`, `delta`, `tail`, and `sampling` are
+/// likewise omitted — they select incremental / live-tail / sampling
+/// modes this function doesn't implement.
 pub const ACCEPTED_PARAMS: &[&str] = &[
     "info",
     "after",
@@ -52,32 +54,34 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
 
 /// Request payload. The field set follows the netdata function wire
 /// contract (mirrors the legacy `JournalRequest`), so the agent's
-/// existing wiring works unchanged. [`super::adapter::to_query`] maps it
-/// onto the engine's [`sfsq::logs::LogsQuery`].
+/// existing wiring works unchanged. [`Self::into_query`] (defined in
+/// `super::adapter`) maps it onto the engine's
+/// [`sfsq::logs::LogsQuery`].
 ///
-/// Only `info` selects between the two response modes; every other field
-/// is optional and falls back to its `#[serde(default)]` value when the
-/// UI omits it.
+/// `info` and `files` each select a non-query response mode (`info`
+/// wins when both are set); every other field feeds the query path and
+/// falls back to its `#[serde(default)]` value when the UI omits it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OtelLogsRequest {
-    /// `info: true` requests a capability descriptor; `info: false` (the
-    /// default) requests a data query. The UI's POST bodies omit this
-    /// field on every data request, so the default must be `false` for
-    /// them to reach the query path. Info discovery is sent either as an
-    /// explicit POST `{"info": true}` or as a GET with the literal `info`
-    /// token in the URL args (translated by the rt-level shim).
+    /// `info: true` asks for the capability descriptor ([`InfoResponse`]);
+    /// the default `false` asks for a data query — data POSTs omit the
+    /// field, so omission must deserialize as `false`. GETs carry no
+    /// body: the logs GET shim (`rpc::patch_args_into_payload`)
+    /// synthesizes `info` from the literal `info` URL token.
     #[serde(default)]
     pub info: bool,
-    /// `files: true` requests a snapshot of the storage files the ledger
+    /// `files: true` asks for a snapshot of the storage files the ledger
     /// is tracking (WAL / SFST / catalog) instead of a log query — see
-    /// [`FilesResponse`]. Like `info`, defaults to `false` so ordinary
-    /// data requests reach the query path. `info` takes precedence when both
-    /// are set. POST-body only: unlike `info`, it is not synthesized from a
-    /// URL-arg token (it is an MCP/operator mode, absent from ACCEPTED_PARAMS).
+    /// [`FilesResponse`]. Defaults to `false`; `info` wins when both are
+    /// set. POST-body only: the GET shim never synthesizes it, and it is
+    /// absent from [`ACCEPTED_PARAMS`], so UI traffic never sends it.
     #[serde(default)]
     pub files: bool,
+    /// Window start, unix seconds.
     #[serde(default)]
     pub after: u32,
+    /// Window end, unix seconds. A `(0, 0)` or inverted window falls
+    /// back to a default recent one (`super::adapter::effective_window`).
     #[serde(default)]
     pub before: u32,
     /// Pagination anchor, in one of two forms (see [`AnchorParam`]): the
@@ -86,34 +90,48 @@ pub struct OtelLogsRequest {
     /// the user clicks a histogram bar ("jump to this time").
     #[serde(default)]
     pub anchor: Option<AnchorParam>,
-    /// Maximum number of log entries to return.
+    /// Maximum number of log entries to return (default 200).
     #[serde(default = "default_last")]
     pub last: usize,
+    /// Fields to compute facet value counts for; empty → the engine's
+    /// default field.
     #[serde(default)]
     pub facets: Vec<String>,
+    /// Field to bucket the histogram by (e.g. `severity_text`); empty →
+    /// the engine's default field.
     #[serde(default)]
     pub histogram: String,
+    /// Page direction relative to the anchor; `Backward` (toward older
+    /// rows) by default.
     #[serde(default)]
     pub direction: Direction,
+    /// Accepted for parity with the legacy request shape; never read by
+    /// the query path.
     #[serde(default)]
     pub slice: Option<bool>,
+    /// Free-text search: an unanchored regex over `key=value` tokens.
     #[serde(default)]
     pub query: String,
+    /// Per-field value filters the engine applies as row filters; the
+    /// reserved [`STREAM_SELECTION_PARAM`] key carries the stream
+    /// selector's picks and is stripped before the query.
     #[serde(default)]
     pub selections: std::collections::HashMap<String, Vec<String>>,
+    /// Accepted for parity with the legacy request shape; never read by
+    /// the query path.
     #[serde(default)]
     pub timeout: Option<u32>,
-    /// Tenant whose data the query reads. A **scoping selector**
-    /// supplied by the caller (the Cloud UI), not a security boundary —
-    /// the agent has no trusted per-caller tenant identity to enforce
-    /// with; enforcement is the UI's responsibility. Omitted → the
-    /// literal `"default"` tenant ([`file_registry::TenantId::DEFAULT`],
-    /// the id ingest uses when auth is
-    /// disabled), never an implicit all-tenant union.
+    /// Tenant whose data the query reads. A **scoping selector** supplied
+    /// by the caller, not a security boundary; omitted / invalid falls
+    /// back to the literal `"default"` tenant
+    /// ([`file_registry::TenantId::DEFAULT`] — what ingest uses when auth
+    /// is disabled), never an implicit all-tenant union
+    /// (`resolve_query_tenant` in `super::handler`).
     #[serde(default)]
     pub tenant: Option<String>,
 }
 
+/// Page size when the request omits `last`.
 fn default_last() -> usize {
     200
 }
@@ -132,9 +150,10 @@ pub enum AnchorParam {
 
 // ── Response ────────────────────────────────────────────────────────
 
-/// Two response shapes — `Info` for capability discovery, `Logs` for
-/// actual queries. Untagged: the JSON payload is just one shape or the
-/// other, so the agent / UI doesn't have to learn a new envelope.
+/// One of three response shapes, per the request's mode: `Info` for
+/// capability discovery, `Files` for the storage inventory, `Logs` for
+/// actual queries. Untagged: the JSON payload is just the shape itself,
+/// so the agent / UI doesn't have to learn a new envelope.
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum OtelLogsResponse {
@@ -143,6 +162,8 @@ pub enum OtelLogsResponse {
     Files(FilesResponse),
 }
 
+/// The `info: true` capability descriptor. The handler answers every
+/// info request with the [`Default`] value — nothing in it is dynamic.
 #[derive(Debug, Serialize)]
 pub struct InfoResponse {
     version: u32,
@@ -166,10 +187,10 @@ impl Default for InfoResponse {
 
 // ── Files inventory (the `files: true` mode) ─────────────────────────
 
-/// Snapshot of the storage files the ledger is tracking, per tenant.
-/// Reports the in-memory registry state — including the `rotated` /
-/// `uploaded` / `remote_cataloged` flags that have no on-disk equivalent
-/// (a locally-evicted SFST can still be cataloged on the remote).
+/// Snapshot of the storage files the ledger is tracking, per tenant,
+/// read from the in-memory registries — including the `rotated` /
+/// `uploaded` / `remote_cataloged` lifecycle flags, which only exist
+/// there (a locally-evicted SFST can still be cataloged on the remote).
 #[derive(Debug, Serialize)]
 pub struct FilesResponse {
     pub version: u32,
@@ -184,6 +205,7 @@ pub struct StreamId {
     pub name: String,
 }
 
+/// One tenant's tracked files by kind.
 #[derive(Debug, Serialize)]
 pub struct TenantFiles {
     pub tenant: String,
@@ -246,8 +268,16 @@ pub struct CatalogFileEntry {
 
 // ── Top-level envelope ───────────────────────────────────────────────
 
+/// The v3 function-table envelope for a log query. Everything is
+/// recomputed per call — `columns` / `data` shaped from the page by
+/// `super::adapter::build_table`, the rest from the engine result — and
+/// several fields are fixed legacy-envelope constants. `required_params`
+/// is left empty here; the handler fills it with the stream selector on
+/// every data response, cancellation path included.
 #[derive(Debug, Serialize)]
 pub struct LogsResult {
+    /// Always 100 in this final payload; incremental progress travels
+    /// out-of-band as FUNCTION_PROGRESS events (see `super::handler`).
     pub progress: u32,
     #[serde(rename = "v")]
     pub version: Version,
@@ -269,6 +299,7 @@ pub struct LogsResult {
     pub pagination: Pagination,
 }
 
+/// Envelope schema version; always `3` via [`Default`].
 #[derive(Debug, Serialize)]
 pub struct Version(u32);
 
@@ -280,6 +311,7 @@ impl Default for Version {
 
 // ── Facets ──────────────────────────────────────────────────────────
 
+/// One sidebar facet: a field with its value options and match counts.
 #[derive(Debug, Serialize)]
 pub struct Facet {
     pub id: String,
@@ -298,6 +330,8 @@ pub struct FacetOption {
 
 // ── Histogram ───────────────────────────────────────────────────────
 
+/// A field the UI can switch the histogram to — its `id` is what the
+/// request's `histogram` param carries.
 #[derive(Debug, Serialize)]
 pub struct AvailableHistogram {
     pub id: String,
@@ -305,6 +339,7 @@ pub struct AvailableHistogram {
     pub order: usize,
 }
 
+/// The event-distribution chart for one dimension field.
 #[derive(Debug, Serialize)]
 pub struct Histogram {
     pub id: String,
@@ -318,6 +353,8 @@ pub struct Chart {
     pub result: ChartResult,
 }
 
+/// Chart frame; `after` / `before` are unix seconds and `update_every`
+/// a bucket width in seconds (legacy chart contract).
 #[derive(Debug, Serialize)]
 pub struct ChartView {
     pub title: String,
@@ -343,6 +380,9 @@ pub struct ChartResult {
     pub data: Vec<DataPoint>,
 }
 
+/// Which slot of each [`DataPoint`] triple carries the value, `arp`, and
+/// `pa` — always `0/1/2` here, and logs fills only the value slot
+/// (`arp` / `pa` stay 0).
 #[derive(Debug, Serialize)]
 pub struct ChartPoint {
     pub value: u64,
@@ -412,6 +452,11 @@ impl<'de> serde::Deserialize<'de> for DataPoint {
 
 // ── Items / pagination ──────────────────────────────────────────────
 
+/// Pagination footer counts. `evaluated` / `estimated` mirror `matched`
+/// and `unsampled` is always 0 — this function does no sampling.
+/// `before` / `after` are 1 when rows exist beyond the page in the
+/// newer / older direction, `returned` is this page's row count, and
+/// `max_to_return` echoes the request's `last`.
 #[derive(Debug, Serialize)]
 pub struct Items {
     pub evaluated: usize,
@@ -424,6 +469,8 @@ pub struct Items {
     pub max_to_return: usize,
 }
 
+/// How the UI paginates: `key` is the request param it sets, `column`
+/// the row column whose value feeds it.
 #[derive(Debug, Serialize)]
 pub struct Pagination {
     pub enabled: bool,

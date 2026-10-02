@@ -3,27 +3,62 @@
 //! An SFST file holds one **primary** FST of
 //! low-cardinality `key=value` pairs, zero or more **secondary** chunks
 //! (mid-cardinality per-field FSTs, high-cardinality per-field sorted lists),
-//! and one stream-log-entries chunk, all keyed by a [`chunk_file`] TOC for
-//! O(1) random access via mmap. Each SFST covers exactly one content
-//! stream — the producer's partition, opaque to this crate.
+//! and one or more **stream-batch** chunks carrying the log entries
+//! themselves — every chunk addressed by id through a [`chunk_file`] TOC,
+//! so a reader can mmap the file and fetch any chunk in O(1). Each SFST
+//! covers exactly one content stream — the producer's partition, opaque to
+//! this crate.
 //!
 //! The complete on-disk specification — chunk layout, ids, encoding,
 //! version compatibility, and reader access patterns — lives in
 //! `FORMAT.md` alongside this crate. Treat it as the source of truth;
 //! the rustdoc here covers only the public API.
 //!
-//! # Crate boundaries
+//! # Two planes
 //!
-//! This crate owns the format **and** its build: a producer fills a
-//! [`RowIndex`] with interned `(timestamp, key=value)` rows and writes
-//! through [`IndexWriter`]; reading goes through [`IndexReader`] (the
-//! query API) or [`read_summary`] (the cheap scan that also serves
-//! summary-only files), with the query vocabulary in [`query`] and the
-//! per-directory file registry in [`registry`]. Decoding WAL frames
-//! into rows is the producer's concern (`ng-index` is the in-tree
-//! producer), so this crate never compiles the WAL/Arrow stack. The
-//! chunk-level writer and reader are internal — test fixtures can
-//! reach them via the `test-util` feature.
+//! **Build/write** — a producer fills a [`RowIndex`] with interned
+//! `(timestamp, key=value)` rows, and `build` turns them into chunks
+//! through the container-level `ChunkWriter`, wrapped by [`IndexWriter`].
+//! Decoding WAL frames into rows is the producer's concern (`ng-index`
+//! is the in-tree producer), so that stack stays out of this crate's
+//! dependency graph.
+//!
+//! **Read/query** — [`IndexReader`] is the query API; [`read_summary`]
+//! the cheap header+TOC+`SUMR` scan (it also serves summary-only files,
+//! which [`IndexReader::open`](IndexReader::open) rejects); [`query`]
+//! the query vocabulary; [`registry`] the per-directory file registry.
+//!
+//! The chunk-level writer and reader stay internal — test fixtures and
+//! the `inspect` example reach them via the `test-util` feature.
+//!
+//! Per-value bitmaps are [`treight::Bitmap`]s embedded in the on-disk
+//! payloads — one `Copy` descriptor plus tree-bytes blob per distinct
+//! `key=value`, over the file's time-sorted positions. This crate
+//! enables treight's `roaring` + `serde` features for them.
+//!
+//! # Modules
+//!
+//! - Write plane: `row_index` (the Phase-1 index the producer fills),
+//!   `kv_interner` (xxhash64 `key=value` interner), `prefix_map` (the
+//!   FST-backed prefix map the primary and mid-card chunks build on),
+//!   `bitset` (O(n) ordering of dense u32 values), `build` (Phase 2,
+//!   private), `writer` (container mechanics), `index_writer`.
+//! - Read plane: `reader` (chunk decode + [`read_summary`]),
+//!   `index_reader` ([`IndexReader`]), `query` (public query types).
+//! - Shared: `schema` (typed chunk payloads), `error` ([`Error`]),
+//!   `registry`.
+//! - Traces signal: `trace_index`, `trace_bloom`, `span_extras`,
+//!   `trace_rollup` (the TIDX / TBLM / EVNB+LNKB / TRSU chunks),
+//!   `trace_combine` (the one trace assembler, shared with `sfsq`).
+//!
+//! The re-exports below are the public surface: those entry points plus
+//! the data vocabulary they exchange.
+//!
+//! Consumers (grep-verified): `ng-index` produces SFSTs from the
+//! flattened WAL; `sfsq` / `sfsq-cli` query them; `otel-ledger` composes
+//! the per-tenant registries; `file-lifecycle` embeds [`Registry`];
+//! `otel-ingestor` recovers the startup seq via
+//! [`scan_max_sequence_recursive`].
 //!
 //! # Example
 //!
@@ -249,10 +284,10 @@ fn high_field_id(index: u16) -> chunk_file::ChunkId {
 /// Encodes the index as a single ASCII digit in the trailing byte, e.g.
 /// `b"SB00"` through `b"SB07"`.
 fn stream_batch_id(index: u8) -> chunk_file::ChunkId {
-    // An out-of-range index would silently produce a non-digit trailing
-    // byte (`b'0' + 8` is `b'8'`, but `b'0' + 10` is `b':'`) — an id no
-    // reader looks for. The cap is a format invariant, so catch misuse
-    // in debug rather than at runtime cost.
+    // Out of range, `b'0' + index` still yields plausible bytes — index 8
+    // gives `b"SB08"`, index 10 a non-digit `b':'` — but no reader ever
+    // asks for those ids. The cap is a format invariant, so catch misuse
+    // in debug rather than pay for it at runtime.
     debug_assert!(index < MAX_STREAM_BATCHES, "batch index out of range");
     [b'S', b'B', b'0', b'0' + index]
 }

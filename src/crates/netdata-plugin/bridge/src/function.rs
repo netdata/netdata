@@ -1,17 +1,30 @@
-//! Handler engine for function calls.
+//! The plugin Functions engine: typed handler traits plus the adapter that
+//! runs one routed function call to completion.
 //!
-//! This module hosts the protocol-agnostic pieces of the
-//! `FunctionHandler` machinery: the trait developers implement, the
-//! per-call context they receive, the atomic progress state, and the
-//! adapter that translates between typed handlers and the raw
-//! `FunctionCall` / `FunctionResult` IPC variants.
+//! Plugin authors implement [`FunctionHandler`] (a typed request/response pair
+//! plus a declaration). [`HandlerAdapter`] wraps it behind
+//! [`RawFunctionHandler`], the erased wire-level surface: it deserializes the
+//! request from the call's JSON payload, runs the handler under a 250ms
+//! progress ticker and the call's cancellation token, and maps the outcome to
+//! a `FunctionResult` (status/format mapping documented on
+//! `HandlerAdapter::handle_raw`).
 //!
-//! The engine deliberately knows nothing about the wire it runs on.
-//! `rt` drives it from a stdin/stdout `MessageReader`/`MessageWriter`
-//! pair (the legacy plugin path); the supervisor → ledger IPC drives
-//! it from `LedgerRequest::Call` / `LedgerResponse::Result`. Either
-//! way the runtime owns an `mpsc::UnboundedSender<Message>` that the
-//! ticker uses to deliver `FunctionProgressResponse` events.
+//! The engine is protocol-agnostic. Its drivers are the run loops that receive
+//! function calls: the `otel-ledger` worker (`LedgerRequest::Call`, dispatched
+//! in its `rpc::dispatch`) and the `otel-legacy-logs` worker
+//! (`LegacyLogsRequest::Call`, dispatched in its own run loop). Both build a
+//! [`FunctionContext`] per call with the transaction id, a fresh
+//! [`CancellationToken`], and a per-call `mpsc::UnboundedSender<Message>` the
+//! ticker writes `FunctionProgressResponse` into; each translates those
+//! messages into its own `Progress` response, and the supervisor forwards
+//! results and progress to the agent's pluginsd channel
+//! (`FUNCTION_RESULT_BEGIN`/`FUNCTION_RESULT_END` blocks and `FUNCTION_PROGRESS`
+//! lines). Cancellation is keyed on the same transaction id via the drivers'
+//! per-transaction token maps.
+//!
+//! The `rt` crate carries an independent copy of this engine for plugins that
+//! speak pluginsd directly on stdin/stdout (the netflow plugin); the two are
+//! not wired together.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -29,40 +42,42 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
-/// How often the runtime emits `FUNCTION_PROGRESS`. Same 250ms cadence as the
-/// `systemd-journal.plugin` reference (`ND_SD_JOURNAL_PROGRESS_EVERY_UT`; that
-/// one is an accumulated-work threshold, this is a wall-clock interval) and
-/// stays well under the UI's 1s staleness threshold so the "taking longer"
-/// modal doesn't flicker.
+/// Progress-emission cadence: 250ms wall-clock, matching the 250ms
+/// `ND_SD_JOURNAL_PROGRESS_EVERY_UT` of the systemd-journal reference plugin
+/// (which instead fires after 250ms of accumulated per-file query work).
+///
+/// Progress also keeps a call alive: the agent extends a function's deadline
+/// by 10s on every progress update (`functions_evloop.h`'s
+/// `FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT`, applied on both the plugin and
+/// nrpc paths), so steady progress keeps the agent from timing the call out.
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
 
-/// Fixed denominator we put on the wire: progress is always emitted as
-/// `FUNCTION_PROGRESS … <pct> 100`, so the agent reports `pct` directly as the
-/// percentage. We never send a real work-unit total.
+/// The fixed denominator progress always travels with: the wire carries
+/// `done = <percent>`, `all = 100`, so the agent reports the percent directly.
+/// Raw work-unit totals never leave the handler (see `ProgressState`).
 const PROGRESS_DENOMINATOR: usize = 100;
 
-/// The progress percent to put on the wire, always in `[1, 99]`.
+/// The progress percent to put on the wire for `(done, total)` work units,
+/// always in `[1, 99]`.
 ///
-/// We report a self-computed percent rather than raw work units, and bound it to
-/// `[1, 99]` for two reasons:
-/// - **Never 0 and never absent.** The UI reads a missing or zero progress as
-///   100% complete (it does `progress || 100`, and `0` is falsy) and stops
-///   polling. Emitting a truthy percent with a fixed denominator of 100 means
-///   the agent always returns a real `progress` field, so the UI keeps polling
-///   while we run. (This also avoids the agent's ignore-zero quirk in
-///   `query_progress_functions_update`, since neither field is ever 0.)
-/// - **Never 100 while running.** An in-flight call must not read as complete;
-///   completion is signaled by the function RESULT, not by progress reaching
-///   100. So a finished-looking `done == total` is capped at 99.
+/// Both bounds protect the polling loop:
+/// - **Never 0 and never absent.** The agent drops zero-valued progress
+///   updates (`query_progress_functions_update` in `libnetdata/query_progress`)
+///   and the UI reads a zero or missing progress as already complete and stops
+///   polling; a truthy percent with the fixed denominator keeps `done`/`all`
+///   nonzero for the whole call.
+/// - **Never 100 while running.** Completion is signaled by the function
+///   RESULT, not by progress reaching 100, so `done == total` (and any torn
+///   `done > total`) caps at 99.
 ///
 /// During the indeterminate phase (`total == 0`, before the handler calls
-/// `set_total`) we report 1%: we can't compute a real percent yet, and an early
-/// or torn-read `done` must not surface as a premature 100%.
+/// `set_total`) the percent is 1: nothing real is computable yet, and an early
+/// or torn-read `done` must not surface as near-complete.
 ///
-/// `done`/`total` are expected monotonic non-decreasing — the agent's functions
-/// path does an unconditional set (`query_progress_functions_update`), so the
-/// producer is the only guardrail against a backwards or >100 reading. The
-/// `saturating_mul` guards `done * 100` against overflow on byte-scale totals.
+/// The agent assigns whatever nonzero `done`/`all` arrive (an unconditional
+/// set, no monotonicity check), so the producer is the only guardrail against
+/// a backwards or >100 reading. `saturating_mul` keeps `done * 100` from
+/// wrapping on byte-scale totals.
 fn progress_percent(done: usize, total: usize) -> usize {
     if total == 0 {
         return 1;
@@ -70,11 +85,13 @@ fn progress_percent(done: usize, total: usize) -> usize {
     (done.saturating_mul(100) / total).clamp(1, 99)
 }
 
-/// Atomic progress state shared between handlers and the runtime ticker.
+/// Raw work-unit counters (`done`, `total`) shared between a handler and the
+/// adapter's progress ticker.
 ///
-/// Handlers write counters from any context (async, `spawn_blocking`,
-/// rayon), and the runtime sends progress to the agent every `PROGRESS_INTERVAL`
-/// (250ms).
+/// Handlers store real work units from any thread (async, `spawn_blocking`,
+/// rayon); the ticker reads them every `PROGRESS_INTERVAL` (250ms) and converts
+/// them to the percent/denominator pair that goes on the wire (see
+/// `progress_percent`) — the raw counters never leave the worker.
 ///
 /// # Example
 ///
@@ -123,7 +140,9 @@ impl ProgressState {
         self.done.clone()
     }
 
-    /// Read the current `(done, total)` snapshot.
+    /// Read the current `(done, total)` snapshot. The two loads are not atomic
+    /// as a pair, so a concurrent `update` can be observed half-applied (see
+    /// `progress_percent` for why that must stay harmless).
     pub fn load(&self) -> (usize, usize) {
         (
             self.done.load(Ordering::Relaxed),
@@ -138,15 +157,18 @@ impl Default for ProgressState {
     }
 }
 
-/// Context provided to function handlers during execution.
+/// Per-call context handed to a [`FunctionHandler::on_call`].
 ///
-/// Contains the transaction identifier, atomic progress state, and a
-/// cancellation token that signals when the function should stop.
+/// Carries the transaction id, the call's progress counters, and the
+/// cancellation token the driver armed for this call: cancelling it aborts the
+/// handler and ends the call with an error result.
 pub struct FunctionCallContext {
-    /// Unique identifier for this function call.
+    /// Transaction id echoed verbatim on every progress report and result
+    /// for this call; the engine never interprets it.
     transaction: String,
-    /// Atomic progress state. The runtime reads these counters every
-    /// `PROGRESS_INTERVAL` (250ms) and sends progress to the agent automatically.
+    /// Atomic progress state. The adapter's ticker reads these counters every
+    /// `PROGRESS_INTERVAL` (250ms) and reports progress to the agent
+    /// automatically; the handler only sets the counters.
     pub progress: ProgressState,
     /// Token that signals when the function should stop.
     /// Check `is_cancelled()` in sync code, or `await cancelled()` in async code.
@@ -169,71 +191,93 @@ impl FunctionCallContext {
         }
     }
 
-    /// Returns the transaction identifier for this function call.
+    /// The transaction id this call was dispatched with.
     pub fn transaction(&self) -> &str {
         &self.transaction
     }
 }
 
-/// Execution context handed to the adapter layer.
-///
-/// Carries the raw `FunctionCall`, the per-call `CancellationToken`,
-/// and the outbound message channel the progress ticker writes to.
+/// Per-call input the driver hands to [`RawFunctionHandler::handle_raw`],
+/// built by the run loops that receive function calls (the ledger's
+/// `rpc::dispatch`, the legacy-logs worker's dispatcher).
 pub struct FunctionContext {
-    /// The original function call request.
+    /// The routed call; `timeout` is not enforced by the engine (see
+    /// [`RawFunctionHandler::handle_raw`]).
     pub function_call: Box<FunctionCall>,
-    /// Token for detecting cancellation requests.
+    /// The driver's per-call token: cancelling it drops the handler future and
+    /// makes the call end with an error result.
     pub cancellation_token: CancellationToken,
-    /// Sender for outbound messages (e.g., progress reports).
+    /// Per-call channel the progress ticker writes
+    /// `Message::FunctionProgressResponse` into; the driver translates them
+    /// into its own `Progress` responses. The final result is `handle_raw`'s
+    /// return value, never a channel message.
     pub outbound_tx: mpsc::UnboundedSender<Message>,
 }
 
-/// Trait for implementing function handlers.
+/// A typed function handler: one implementor per servable function.
 ///
-/// Implementors expose a typed request/response pair; the engine handles
-/// the JSON round-trip, cancellation, and progress reporting.
+/// [`HandlerAdapter`] supplies everything else — the JSON round-trip,
+/// cancellation, and progress reporting — so the implementor provides only the
+/// request/response types and the logic.
+///
+/// One handler instance serves every call: each call runs on its own task
+/// through the same `Arc<H>`, so implementors must be thread-safe and either
+/// stateless or internally synchronized across concurrent calls.
 #[async_trait]
 pub trait FunctionHandler: Send + Sync + 'static {
-    /// The request payload type, deserialized from JSON.
+    /// Request payload, deserialized from the call's JSON payload (an absent
+    /// payload is deserialized from `{}`).
     type Request: DeserializeOwned + Send;
 
-    /// The response type, serialized to JSON.
+    /// Response payload, pretty-printed as `application/json` into the result.
     type Response: Serialize + Send;
 
-    /// Main function logic executed when the function is called.
+    /// Execute the call.
     ///
-    /// When cancelled, the runtime cancels `ctx.cancellation` and drops
-    /// this future. Check `ctx.cancellation.is_cancelled()` in
-    /// synchronous code paths.
+    /// The future is selected against the cancellation token: once the driver
+    /// cancels, the future is dropped at its next suspension point. Check
+    /// `ctx.cancellation.is_cancelled()` in synchronous stretches that never
+    /// await. An `Err` is surfaced to the caller as a 500 result (mapping on
+    /// `HandlerAdapter::handle_raw`).
     async fn on_call(
         &self,
         ctx: FunctionCallContext,
         request: Self::Request,
     ) -> Result<Self::Response>;
 
-    /// Provide the function's declaration metadata.
+    /// The function's declaration, advertised to the supervisor at `Ready`;
+    /// its `name` is the key drivers dispatch calls by.
     fn declaration(&self) -> FunctionDeclaration;
 }
 
-/// Internal trait for handling raw function calls with serialization.
+/// The erased, wire-level counterpart of [`FunctionHandler`], so drivers and
+/// `file-lifecycle`'s per-signal `Pipeline` can hold heterogeneous handlers as
+/// `Arc<dyn RawFunctionHandler>` and dispatch by declaration name.
 ///
-/// Bridges the typed [`FunctionHandler`] surface to the raw
-/// `FunctionCall` / `FunctionResult` IPC variants.
+/// [`HandlerAdapter`] is the standard implementor, bridging a typed
+/// [`FunctionHandler`] to the raw `FunctionCall` / `FunctionResult` variants.
 #[async_trait]
 pub trait RawFunctionHandler: Send + Sync {
-    /// Handle a raw function call. Returns the `FunctionResult` to
-    /// send back to the caller.
+    /// Run one function call to completion and return its `FunctionResult`.
+    ///
+    /// Progress is emitted as `Message::FunctionProgressResponse` on
+    /// `ctx.outbound_tx` every 250ms until this returns; the result itself is
+    /// the return value, never a channel message. `ctx.function_call.timeout`
+    /// is not enforced here: a call ends when the handler returns or the
+    /// driver cancels its token.
     async fn handle_raw(&self, ctx: Arc<FunctionContext>) -> FunctionResult;
 
-    /// Get the function declaration for this handler.
+    /// The function declaration; its `name` is the drivers' routing key.
     fn declaration(&self) -> FunctionDeclaration;
 }
 
-/// Adapter that bridges typed handlers with the raw protocol.
-///
-/// Provides automatic JSON serialization/deserialization for the request
-/// and response payloads, plus a 250ms progress ticker.
+/// [`RawFunctionHandler`] adapter around a typed [`FunctionHandler`]:
+/// deserializes `H::Request` from the call payload, runs `H::on_call` under
+/// the 250ms progress ticker and the cancellation select, and maps the outcome
+/// to a `FunctionResult` (200 `application/json`, or 400/500 error results —
+/// mapping on `handle_raw` below).
 pub struct HandlerAdapter<H: FunctionHandler> {
+    /// The wrapped handler, shared by every concurrent call.
     pub handler: Arc<H>,
 }
 
@@ -250,6 +294,9 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
     async fn handle_raw(&self, ctx: Arc<FunctionContext>) -> FunctionResult {
         let transaction = ctx.function_call.transaction.clone();
 
+        // Deserialize the request from the call's JSON payload; an absent
+        // payload is deserialized from `{}` so request types whose fields all
+        // default still work. Either failure becomes a 400 result.
         let payload: H::Request = match &ctx.function_call.payload {
             Some(bytes) => match serde_json::from_slice(bytes) {
                 Ok(p) => p,
@@ -267,6 +314,8 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
             None => match serde_json::from_slice(b"{}") {
                 Ok(p) => p,
                 Err(e) => {
+                    // The body below is JSON although the result says
+                    // text/plain (unlike the malformed-payload arm above).
                     let payload =
                         serde_json::to_vec(&json!({ "error": "Request payload is empty" }))
                             .expect("serializing a json value to work");
@@ -294,16 +343,14 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
         let ticker_tx = ctx.outbound_tx.clone();
         let ticker_transaction = transaction.clone();
 
-        // Emit FUNCTION_PROGRESS every 250ms (the same cadence as the
-        // systemd-journal reference, well under the UI's 1s staleness threshold).
-        // We emit on every tick — even before the handler knows the total — so a
-        // slow pre-`set_total` phase (e.g. WAL/source resolution) still keeps the
-        // UI polling and the call from looking stalled. We report a self-computed
-        // percent as `(pct, 100)` with `pct` in `[1, 99]` (see `progress_percent`):
-        // never 0/absent (the UI would read that as 100% complete) and never 100
-        // (completion is the RESULT, not progress). The first tick is delayed by
-        // one interval so sub-250ms calls (the ticker is aborted on completion)
-        // emit no spurious progress.
+        // The progress ticker: emits a percent on every 250ms tick, from call
+        // start until it is aborted right after the select below — so even a
+        // slow pre-`set_total` phase (e.g. WAL/source resolution) keeps the UI
+        // polling instead of reading the call as stalled. The percent model is
+        // `progress_percent`'s (`(pct, 100)`, always `[1, 99]`). The first tick
+        // is delayed one full interval, so a call that finishes inside 250ms
+        // emits no spurious progress. `MissedTickBehavior::Skip` drops missed
+        // ticks rather than burst-emitting stale progress after a stall.
         let first = tokio::time::Instant::now() + PROGRESS_INTERVAL;
         let ticker = tokio::spawn(async move {
             let mut interval = tokio::time::interval_at(first, PROGRESS_INTERVAL);
@@ -341,9 +388,11 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
 
         ticker.abort();
 
-        // Fall back to 0 if the system clock is somehow before the
-        // epoch — losing the cache TTL is preferable to crashing the
-        // worker on a clock adjustment.
+        // `expires` is the epoch-seconds expiry the agent puts on the proxied
+        // response (its HTTP `Expires` header): success grants a short 2s TTL,
+        // error results carry 0. Fall back to epoch 0 if the system clock is
+        // somehow before the epoch — losing the cache TTL is preferable to
+        // crashing the worker on a clock adjustment.
         let current_timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -372,6 +421,11 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                 }
             },
             Err(e) => {
+                // A cancellation is the driver's normal teardown (e.g. the
+                // user closed the query), so log it as info; anything else is
+                // a real handler failure. Either way the caller gets a 500
+                // result with a JSON error body — cancellation does not get a
+                // distinct status here.
                 if ctx.cancellation_token.is_cancelled() {
                     info!("function handler cancelled: {}", e);
                 } else {

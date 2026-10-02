@@ -1,4 +1,5 @@
-//! A bounded, read-through cache of remote objects on the local filesystem.
+//! The shared download cache of the OTel storage stack: a bounded, read-through
+//! cache of remote objects on the local filesystem.
 //!
 //! The cache exists so a consumer can fetch large immutable objects (e.g. index
 //! files in object storage) back to local disk and then read them as ordinary
@@ -7,7 +8,10 @@
 //! knows nothing about its consumer: an entry is keyed by its local **filename**
 //! (the identity of immutable content); the supplied **size** is used for budget
 //! accounting and a fetch-time integrity check, not as part of the key; and the
-//! bytes are materialized by a caller-supplied async **fetch closure**.
+//! bytes are materialized by a caller-supplied async **fetch closure**. Disk
+//! layout is flat: one directory, one file per entry (the cache filename), with
+//! interrupted writes under the reserved `.tmp` suffix of
+//! [`file_registry::durable`].
 //!
 //! Design (clean-room, informed by Quickwit's `SplitCache` and SlateDB's
 //! `CachedObjectStore`):
@@ -15,12 +19,15 @@
 //! - **Hard byte cap.** The *accounted* total never exceeds the configured
 //!   capacity. A query atomically *reserves* the footprint it needs before
 //!   fetching, so concurrent queries share one budget rather than each blowing
-//!   past it. Actual bytes on disk can transiently exceed the cap only by orphans
-//!   from a write whose parent call was cancelled/dropped mid-write: the durable
-//!   write runs on a detached blocking thread and may complete after the
-//!   reservation is released, leaving an unaccounted file. Such orphans are
-//!   reconciled into the accounting (or overwritten) by the next [`FileCache::open`]
-//!   recovery sweep or a re-fetch of the same filename; see [`FileCache::acquire`].
+//!   past it. Actual bytes on disk can exceed the cap only in two windows:
+//!   orphans from a write whose parent call was cancelled/dropped mid-write —
+//!   the durable write runs on a detached blocking thread and may complete
+//!   after the reservation is released, leaving an unaccounted file — and the
+//!   best-effort evict-back when recovery starts over a shrunken capacity
+//!   (a failed unlink leaves the cache over cap until later evictions heal it).
+//!   Orphans are reconciled into the accounting (or overwritten) by the next
+//!   [`FileCache::open`] recovery sweep or a re-fetch of the same filename; see
+//!   [`FileCache::acquire`].
 //! - **Deadlock-free admission.** A query commits to *all* of its files at once or
 //!   waits holding nothing. Because a consumer typically needs every file of a
 //!   query available together, partial holds would deadlock; atomic all-or-nothing
@@ -37,6 +44,25 @@
 //!   producer. On [`open`] stray temp files (interrupted writes) are swept,
 //!   surviving files are re-registered, and the cache is evicted back under
 //!   capacity if it shrank.
+//!
+//! Failure semantics: an object that fails to fetch, arrives at the wrong
+//! size, or fails to write **degrades** — it is omitted from the result and the
+//! caller treats it as a missing source; only the query-wide [`CacheError`]
+//! variants are errors. A fetched object's error chain is logged verbatim with
+//! `{e:#}`, so the fetch closure owns what ends up in the journal.
+//!
+//! Async and blocking context:
+//!
+//! - [`FileCache::open`] is synchronous startup work (directory creation,
+//!   chmod, temp sweep, survivor walk, evict-back), never a hot path.
+//! - [`FileCache::acquire`] is async and fetches its reserved misses
+//!   sequentially, one object at a time; a fetch closure runs inline on the
+//!   runtime and owns its own deadline (file-lifecycle's `remote_read` wraps
+//!   each download in one), while the durable write runs under `spawn_blocking`
+//!   — the contract [`file_registry::durable`] requires of async consumers.
+//! - State lives under one mutex held only across short sections, never across
+//!   `.await`; see the `State` docs for the single blocking I/O allowed under
+//!   it.
 //!
 //! Scope / preconditions:
 //!
@@ -56,6 +82,32 @@
 //!   `0700` on Unix). Eviction unlinks happen synchronously under the state lock,
 //!   which assumes fast local unlinks; and recovery/writes are not symlink-hardened,
 //!   so a shared/writable cache dir is out of scope.
+//! - **One cache instance per directory.** Each [`FileCache`] owns private
+//!   accounting (budget, reservations, pins, in-flight markers) with no
+//!   cross-instance coordination; a second instance over the same directory
+//!   would keep a second budget over the same files and evict or overwrite
+//!   entries the other still holds.
+//!
+//! Consumers (grep-verified):
+//!
+//! - `file-lifecycle::remote_read` — the primary user. `RemoteRead::fetch`
+//!   materializes remote catalog entries into one download cache shared by
+//!   every signal, building cache filenames from `file_registry::FileId`
+//!   data-file names with the `.sfst` extension, and returns pins that must
+//!   stay alive until the bytes are read (the pin-lifetime rule documented on
+//!   `file_registry::SelectedFile::path`). Each download runs under its own
+//!   deadline, and the consumer flattens storage errors through `Display`
+//!   precisely because this crate logs the anyhow chain verbatim.
+//! - `otel-ledger` — the only opener. `ledger/mod.rs` opens the cache at
+//!   `{base_dir}/remote-read` (after `remote_read::migrate_read_cache` moves
+//!   the legacy logs-only cache there), with the capacity from the
+//!   remote-storage config and only when remote storage is enabled. It threads
+//!   the cache as `Option<&FileCache>` into the logs and traces query
+//!   pipelines; the logs handler (`rpc/logs/handler.rs`) and the traces
+//!   capture (`rpc/traces/sources.rs`) map the three [`CacheError`] variants to
+//!   user-facing errors and move the pins into their blocking query runs.
+//!
+//! No ferryboat dependency; no IPC.
 //!
 //! [`open`]: FileCache::open
 
@@ -131,7 +183,8 @@ pub struct CachedFile {
 }
 
 impl CachedFile {
-    /// Absolute path to the cached file — open/`mmap` it directly.
+    /// Filesystem path of the cached file — open/`mmap` it directly (the cache
+    /// root as configured, joined with the filename).
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -450,13 +503,18 @@ pub struct FileCache {
 
 impl FileCache {
     /// Open (or create) a cache rooted at `dir` with a hard byte `capacity`.
+    /// Synchronous startup work (directory creation, chmod, sweep, walk,
+    /// evict-back), not a hot path.
     ///
     /// The directory is created `0700` on Unix (it MUST be owner-private — see the
-    /// crate docs). Recovery: stray `*.tmp` files (torn writes) are swept via
-    /// [`file_registry::durable::sweep_tmp`]; every surviving file with a safe name
-    /// is re-registered (size from disk, recency from mtime); unsafe recovered
-    /// names are ignored; if the configured capacity is now smaller than what is on
-    /// disk, the cache is evicted back under it.
+    /// crate docs); a failed chmod is logged and open continues with the
+    /// directory's existing mode. Recovery: stray `*.tmp` files (torn writes) are
+    /// swept via [`file_registry::durable::sweep_tmp`]; every surviving file with
+    /// a safe name is re-registered (size from disk, recency from mtime); unsafe
+    /// recovered names are ignored; if the configured capacity is now smaller
+    /// than what is on disk, the cache is evicted back under it, best-effort — a
+    /// failed unlink leaves it starting over capacity (self-healing as entries
+    /// are later evicted; see the `State::total` docs).
     pub fn open(dir: impl Into<PathBuf>, capacity: u64) -> std::io::Result<Self> {
         let dir = dir.into();
         std::fs::create_dir_all(&dir)?;
@@ -564,11 +622,13 @@ impl FileCache {
     /// `fetch(filename)` is invoked at most once per object **per attempt** (a
     /// coalesced object that vanishes before this call pins it — owner failed, or
     /// it was evicted in the lost-race window — is re-fetched on a later attempt,
-    /// bounded by `MAX_ATTEMPTS`). Single-flight coalesces concurrent demand. A
-    /// fetch that errors, or returns the wrong number of bytes, **degrades**:
-    /// that object is
-    /// omitted from the result (the caller treats it as a missing source) rather
-    /// than failing the whole call. The only `Err`s are [`CacheError::TooLarge`]
+    /// bounded by `MAX_ATTEMPTS`). Single-flight coalesces concurrent demand.
+    /// Misses reserved by this query are fetched sequentially, one object at a
+    /// time, so concurrent remote load is bounded by concurrent `acquire` calls,
+    /// not by the object count. A fetch that errors, or returns the wrong number
+    /// of bytes, **degrades**: that object is omitted from the result (the
+    /// caller treats it as a missing source) rather than failing the whole call.
+    /// The only `Err`s are [`CacheError::TooLarge`]
     /// (footprint exceeds capacity), [`CacheError::EvictionFailed`] (the cache
     /// directory could not be evicted to make room — a broken dir), and
     /// [`CacheError::Cancelled`].
@@ -738,6 +798,9 @@ impl FileCache {
         let bytes = match bytes {
             Ok(b) => b,
             Err(e) => {
+                // `{e:#}` logs the full anyhow chain verbatim; the consumer owns
+                // what ends up in it (file-lifecycle's remote_read keeps
+                // credential-bearing URL queries out of the chain text).
                 tracing::warn!("file-cache: fetch failed for {}: {e:#}", want.filename);
                 return FetchOutcome::Degrade;
             }
@@ -762,7 +825,9 @@ impl FileCache {
     }
 
     /// Await an object being fetched by another query: pin it once present, or
-    /// degrade (return `None`) if that fetch failed.
+    /// return `None` when it is neither on disk nor in flight (the owner's
+    /// fetch failed, or the file was evicted before this call could pin it) —
+    /// the caller retries it as a fresh miss.
     async fn await_inflight(
         &self,
         name: &str,
@@ -839,7 +904,9 @@ impl FileCache {
         self.shared.lock().capacity
     }
 
-    /// Bytes currently on disk.
+    /// Accounted bytes on disk — the sum of registered entries' sizes.
+    /// Unaccounted orphans from writes interrupted after their reservation was
+    /// released are excluded (see the crate docs).
     pub fn total_bytes(&self) -> u64 {
         self.shared.lock().total
     }
@@ -849,7 +916,7 @@ impl FileCache {
         self.shared.lock().entries.len()
     }
 
-    /// Whether `filename` is currently cached on disk.
+    /// Whether `filename` is currently a registered cache entry.
     pub fn is_cached(&self, filename: &str) -> bool {
         self.shared.lock().entries.contains_key(filename)
     }
@@ -1173,7 +1240,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let cache = FileCache::open(dir.path(), 10).unwrap();
         let (_c, fetch) = counting_fetch(10);
-        // A token cancelled before the call returns at Phase 1's first check.
+        // A pre-cancelled token: Phase 1's first check returns immediately.
         let cancel = CancellationToken::new();
         cancel.cancel();
 

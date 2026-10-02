@@ -1,49 +1,77 @@
 # OpenTelemetry Plugin Configuration
-# This file configures the OpenTelemetry metrics, logs, and traces ingestion
-# for Netdata
+# Configures how Netdata ingests OpenTelemetry metrics, logs, and traces over
+# OTLP/gRPC.
 #
 # To customize, run: edit-config otel.yaml
-# Only include the fields you want to change — missing fields keep their defaults.
+# Include only the fields you want to change — everything left out keeps its
+# default. Parsing is strict: an unknown field, a malformed value, or a
+# conflicting combination (such as a TLS certificate without its key) stops
+# the plugin from starting.
+#
+# Settings resolve in this order: installed stock file < your otel.yaml copy
+# < NETDATA_OTEL_CFG_* environment variables. Variable names mirror the
+# option path (endpoint.path -> NETDATA_OTEL_CFG_ENDPOINT_PATH); see the
+# plugin README for the exact naming rules. Restart the Netdata Agent after
+# changing this file or any of the variables.
 
 endpoint:
-  # gRPC endpoint to listen on for OpenTelemetry data
+  # Bind address (host:port) for the OTLP/gRPC listener — the key is named
+  # "path" but it is a network address, not a filesystem path. The loopback
+  # default accepts only local senders; to receive from other hosts, bind a
+  # non-loopback address and protect the endpoint with TLS and network
+  # access controls.
   path: "127.0.0.1:4317"
 
-  # Path to TLS certificate file (enables TLS when provided)
+  # Server TLS certificate (PEM). TLS is enabled only when both this and
+  # tls_key_path are set; providing either one alone fails at startup.
   tls_cert_path: null
 
-  # Path to TLS private key file (required when TLS certificate is provided)
+  # Server TLS private key (PEM). Required when tls_cert_path is set.
   tls_key_path: null
 
-  # Path to TLS CA certificate file for client authentication (optional)
+  # CA certificate (PEM) for mutual TLS: senders must present a client
+  # certificate signed by this CA. Requires both tls_cert_path and
+  # tls_key_path to be set.
   tls_ca_cert_path: null
 
 metrics:
-  # Directory with configuration files for mapping OTEL metrics to Netdata charts
+  # Directory holding optional per-metric mapping files that shape how OTEL
+  # metrics become Netdata charts. They load on top of the mappings built
+  # into the plugin (user mappings win); an invalid file is logged and
+  # skipped, it does not stop the plugin.
   chart_configs_dir: @configdir_POST@/otel.d/v1/metrics
 
-  # Collection interval in seconds (1–3600). Defines the Netdata chart update frequency.
+  # Chart update interval in seconds (1–3600).
   interval_secs: 10
 
-  # Grace period in seconds. After the last data point, the plugin waits this long
-  # before gap-filling. When interval_secs is overridden, this auto-derives as
-  # 5 * interval_secs unless explicitly set.
+  # Seconds to wait after a metric's last data point before gap-filling.
+  # When interval_secs is overridden and this is not, it auto-derives as
+  # 5 * interval_secs. The three timing values must satisfy
+  # interval < grace <= expiry — an invalid resolved timing logs a warning
+  # and falls back to built-in defaults, so change them together.
   grace_period_secs: 60
 
-  # Expiry duration in seconds. Charts with no data for this long are removed.
+  # Seconds without data after which a chart is removed.
   expiry_duration_secs: 900
 
-  # Maximum number of new charts that can be created per gRPC request.
-  # Limits cardinality explosion from high-cardinality label combinations.
+  # Maximum number of new charts a single OTLP export request may create —
+  # the guard against cardinality explosion from high-cardinality label
+  # combinations. Points for charts beyond this budget are dropped (with a
+  # warning); later requests get a fresh budget, so the total chart count
+  # is not capped by this.
   max_new_charts_per_request: 100
 
-# Directory where OpenTelemetry logs and traces are stored.
-# Must be an absolute path.
+# Root directory under which all OpenTelemetry log and trace data is stored:
+# each signal gets its own subtree below it (for example .../logs and
+# .../traces). Must be an absolute path. Note that write-ahead, index, and
+# catalog files under this tree can push total disk usage above the
+# retention caps, which count the retained data files only.
 base_dir: @logdir_POST@/otel/v2
 
 remote_storage:
   # Upload data to remote object storage, in addition to keeping it on local
-  # disk. One backend is shared by logs and traces.
+  # disk (local retention still applies). One backend is shared by logs and
+  # traces.
   enabled: false
 
   # NEVER put credentials in this file or in the URI below. Credentials are
@@ -53,8 +81,9 @@ remote_storage:
   # To pass environment variables to the netdata service, use a root-only
   # systemd EnvironmentFile.
 
-  # Remote storage location. The scheme selects the backend (fs, s3);
-  # non-secret backend options go in the query string. Examples:
+  # Remote storage location, required when enabled is true. The scheme
+  # selects the backend (fs, s3); non-secret backend options go in the query
+  # string. Examples:
   #   fs:///var/lib/netdata/otel/remote
   #   s3://bucket/prefix?region=us-east-1
   #   s3://bucket/prefix?region=us-east-1&endpoint=https://minio.example:9000
@@ -68,14 +97,17 @@ remote_storage:
 
 auth:
   # Require senders to identify a tenant via the X-Scope-OrgID gRPC header.
-  # When disabled, all data belongs to a single "default" tenant.
-  # Applies to logs and traces; metrics have no tenants.
+  # This is tenant selection, not user authentication — trust the header only
+  # on a protected endpoint (TLS and network controls). When disabled, all
+  # data belongs to a single "default" tenant. Applies to logs and traces;
+  # metrics have no tenants.
   enabled: false
 
 logs:
   rotation:
     # Incoming logs are appended to a current file; a new file starts when
-    # any of these limits is reached.
+    # any of these limits is reached. The "default" entry applies to every
+    # tenant without its own entry below.
     default:
       max_file_size: "25MB"
       max_entries: 50000
@@ -86,7 +118,8 @@ logs:
 
   retention:
     # How much log data to keep on local disk; the oldest files are deleted
-    # when any of these limits is exceeded.
+    # when any of these limits is exceeded. The "default" entry applies to
+    # every tenant without its own entry below.
     default:
       max_files: 100000
       max_total_size: "1GB"
@@ -99,7 +132,8 @@ logs:
 traces:
   rotation:
     # Incoming spans are appended to a current file; a new file starts when
-    # any of these limits is reached.
+    # any of these limits is reached. The "default" entry applies to every
+    # tenant without its own entry below.
     default:
       max_file_size: "25MB"
       max_entries: 50000
@@ -110,7 +144,8 @@ traces:
 
   retention:
     # How much trace data to keep on local disk; the oldest files are deleted
-    # when any of these limits is exceeded.
+    # when any of these limits is exceeded. The "default" entry applies to
+    # every tenant without its own entry below.
     default:
       max_files: 100000
       max_total_size: "1GB"

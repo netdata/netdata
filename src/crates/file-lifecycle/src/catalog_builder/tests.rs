@@ -1,3 +1,25 @@
+//! Tests for the catalog builder: each test spawns the real `CatalogBuilder`
+//! through `ComponentHandle` and drives it with the requests the ledger sends,
+//! pinning the parent module's contract end to end.
+//!
+//! - `AddEntry` below `rotation_count` is accepted and writes no catalog file;
+//!   at `rotation_count` the scope rotates to a file at its `scope_path`
+//!   location that parses back through `Catalog::from_container_bytes` and
+//!   holds exactly that scope's entries.
+//! - Rotation drains the accumulator: the next rotation holds only the
+//!   post-rotation entries, under a new filename.
+//! - A `rotation_count` of 1 rotates on every `AddEntry`.
+//! - A failed rotation returns `RotationFailed` and keeps the accumulator; the
+//!   next trigger retries with every entry still in it.
+//! - Scopes `(tenant, date, machine, instance)` accumulate and rotate
+//!   independently: a foreign-identity entry neither joins nor triggers
+//!   another scope's rotation.
+//! - The time trigger rotates a non-empty scope once its age reaches
+//!   `rotation_period`, on a check tick; the count trigger needs no clock
+//!   progress — both pinned on a paused tokio clock.
+//! - `Flush` rotates every non-empty scope and then replies `FlushComplete`
+//!   exactly once — on an idle builder too, and after a `RotationFailed`
+//!   ("done", not "all succeeded").
 use super::*;
 use uuid::Uuid;
 use crate::component::ComponentHandle;
@@ -14,6 +36,10 @@ fn date() -> NaiveDate {
     NaiveDate::from_ymd_opt(2026, 4, 17).unwrap()
 }
 
+/// One entry for `ident()` at the given seq. Only the fields the builder acts
+/// on matter — the `FileId` (scope + seq) and the timestamps folded into the
+/// filename (the below-threshold test recomputes the expected path from them);
+/// everything else rides along verbatim.
 fn entry_for(seq: u64) -> CatalogEntry {
     let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
     CatalogEntry {
@@ -40,14 +66,15 @@ fn add_request(seq: u64) -> CatalogBuilderRequest {
 struct Harness {
     handle: ComponentHandle<CatalogBuilderRequest, CatalogBuilderResponse>,
     cancel: CancellationToken,
+    /// Keeps the temp dir alive for the harness's lifetime.
     _tmp: tempfile::TempDir,
     base: PathBuf,
 }
 
 impl Harness {
-    /// Count-trigger harness: a long `rotation_period` (1h) keeps the 30s time
-    /// ticker from firing during these fast tests, so only the count trigger is
-    /// exercised.
+    /// Count-trigger harness: `rotation_period` is pinned at 1h, longer than
+    /// these fast tests run, so no accumulator reaches the age threshold and
+    /// only the count trigger rotates. `with_period` overrides the period.
     fn new(rotation_count: usize) -> Self {
         Self::with_period(rotation_count, std::time::Duration::from_secs(3600))
     }
@@ -84,6 +111,8 @@ impl Harness {
     }
 }
 
+/// Cancel the builder's token on drop — the only way to stop the spawned
+/// task, whose `JoinHandle` was dropped at spawn (component contract).
 impl Drop for Harness {
     fn drop(&mut self) {
         self.cancel.cancel();
@@ -134,6 +163,8 @@ async fn rotation_fires_at_threshold_and_writes_file() {
         } => {
             assert_eq!(tenant_id.as_str(), "tenant1");
             assert_eq!(max_seq, 3);
+            // `Rotated.seqs` carries no ordering contract — it follows the
+            // catalog's map key — so sort before comparing.
             let mut seen = seqs.clone();
             seen.sort();
             assert_eq!(seen, vec![1, 2, 3]);
@@ -153,7 +184,6 @@ async fn accumulator_is_drained_on_rotation() {
         h.send_recv(add_request(1)).await,
         CatalogBuilderResponse::EntryAccepted { .. }
     ));
-    // Hits threshold
     let r = h.send_recv(add_request(2)).await;
     let first_path = match r {
         CatalogBuilderResponse::Rotated { path, .. } => path,
@@ -247,8 +277,8 @@ async fn distinct_scopes_rotate_independently() {
         CatalogBuilderResponse::EntryAccepted { .. }
     ));
 
-    // A different scope (different machine_id) — shouldn't trigger
-    // tenant1's rotation.
+    // A different scope (different machine_id), carrying the same seq 1 —
+    // must neither join nor trigger the original scope's rotation.
     let other_machine = file_registry::MachineId::new(Uuid::from_u128(0x1111)).unwrap();
     let other_entry = CatalogEntry {
         id: FileId::new(file_registry::Identity::new(other_machine, instance()), 0, 1, 0),
@@ -306,8 +336,9 @@ async fn time_trigger_rotates_non_empty_after_period() {
 
 #[tokio::test(start_paused = true)]
 async fn count_trigger_wins_when_reached_before_period() {
-    // With a real rotation_period set but never advanced past, hitting the count
-    // threshold rotates immediately — the count trigger fires first.
+    // Paused clock, never advanced: the accumulator's age stays below the 1h
+    // period, so reaching the count threshold rotates immediately, with no
+    // wait on time.
     let mut h = Harness::with_period(2, std::time::Duration::from_secs(3600));
     assert!(matches!(
         h.send_recv(add_request(1)).await,

@@ -1,29 +1,29 @@
-//! Cross-source trace-by-id — the phase-4a operation.
+//! Cross-source trace-by-id: assemble ONE trace from many sources.
 //!
-//! [`trace_by_id`] assembles ONE trace from a validated set of
-//! [`TraceSource`]s (sealed SFSTs, in-memory chunk SFSTs, WAL tails)
-//! through the shared combiner (`sfst::trace_combine`): per-file sessions
-//! decode the TBLM bloom once and test the id against it, surviving
-//! sources feed lightweight span refs into the comparator-ordered k-way
-//! merge, and payloads materialize only as the merge accepts them.
+//! [`trace_by_id`] walks a validated set of [`TraceSource`]s (sealed
+//! SFSTs, in-memory chunk SFSTs, WAL tails) through the shared combiner
+//! (`sfst::trace_combine`): per-file sessions decode the TBLM bloom once
+//! and test the id against it, surviving sources feed lightweight span
+//! refs into the comparator-ordered k-way merge, and payloads
+//! materialize only as the merge accepts them.
 //!
 //! Status honesty (the design-record contract): a source that fails to
 //! map, open, or decode surfaces as a
 //! [`SourceFailure`](PartialReason::SourceFailure) reason on the
 //! query-level [`QueryStatus`], and an unavailable source as
 //! [`RemoteUnavailable`](PartialReason::RemoteUnavailable) — never a
-//! silent skip. Cancellation before
-//! all source heads are resolved returns an EMPTY result with
-//! [`Cancelled`](PartialReason::Cancelled); cancellation during the merge
-//! returns the deterministic merged prefix. The span cap yields
-//! [`SizeCap`](PartialReason::SizeCap) with the globally earliest spans
-//! kept (cap+1 detection — an exactly-cap trace is `Complete`).
+//! silent skip. Cancellation before all source heads are resolved
+//! returns an EMPTY result with
+//! [`Cancelled`](PartialReason::Cancelled); cancellation during the
+//! merge returns the deterministic merged prefix. The span cap yields
+//! [`SizeCap`](PartialReason::SizeCap) keeping the globally earliest
+//! spans (cap+1 detection — an exactly-cap trace is `Complete`).
 //!
-//! The result carries a cross-source coalesced field→schema-kind map for
-//! typed reconstruction (the phase-5 consumer parses by schema kind,
-//! never inferring from rendered strings): kinds merge — via the
-//! [`sfst::join_value_kinds`] lattice — from exactly the sources that
-//! contributed retained canonical spans.
+//! The result also carries a field→schema-kind map, so consumers type
+//! values from the declared schema kinds instead of inferring them from
+//! rendered strings. Its sectioning and the cross-source coalescing
+//! rule (the [`sfst::join_value_kinds`] lattice over exactly the
+//! sources that contributed retained spans) live on [`FieldKinds`].
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -78,11 +78,14 @@ impl TraceQuery {
 /// queried.
 #[derive(Debug, thiserror::Error)]
 pub enum TraceRequestError {
-    /// The all-zero trace id is the OTLP "unset/invalid" sentinel, and
-    /// TIDX deliberately omits it while a tail scan could serve it — a
-    /// lookup would be layout-dependent, so it is rejected outright.
+    /// The all-zero trace id is the OTLP "unset/invalid" sentinel: TIDX
+    /// never indexes it (`sfst/src/trace_index.rs` `TraceIdIndex::build`
+    /// excludes unset ids) while a tail scan would still serve its
+    /// spans — the answer would depend on data layout.
     #[error("the all-zero (unset) trace id cannot be looked up")]
     UnsetTraceId,
+    /// A zero cap accepts nothing and truncates on the first group —
+    /// the answer would be a guaranteed-empty `SizeCap` partial.
     #[error("a zero span cap would return nothing; omit the cap or raise it")]
     ZeroSpanCap,
     #[error(transparent)]
@@ -93,10 +96,11 @@ pub enum TraceRequestError {
 /// SECTIONED to mirror how the trace exposes names: span-level `fields`
 /// keep their storage names; event/link attribute keys are the
 /// prefix-stripped names [`sfst::TraceEvent`]/[`sfst::TraceLink`] expose
-/// (a flat map would collide an event attr `foo` with a link attr `foo`
-/// whose kinds differ). Every section is FILTERED to exactly the names
-/// the returned trace exposes — the map describes the returned data, not
-/// whatever else lives in the contributing files. Sorted by name.
+/// (a flat result map would collide an event attr `foo` with a link
+/// attr `foo` whose kinds differ). Every section is FILTERED to exactly
+/// the names the returned trace exposes; the KINDS coalesce — via the
+/// [`sfst::join_value_kinds`] lattice — from exactly the sources whose
+/// spans the result retained. Sorted by name.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct FieldKinds {
     pub fields: Vec<(String, sfst::ValueKind)>,
@@ -114,18 +118,20 @@ pub struct TraceData {
     pub trace: sfst::Trace,
     /// Query-level completeness.
     pub status: QueryStatus,
-    /// Field → coalesced scalar kind (see [`FieldKinds`]), merged — via
-    /// the [`sfst::join_value_kinds`] lattice — from exactly the sources
-    /// that contributed retained spans.
+    /// Field → coalesced scalar kind for the returned trace; see
+    /// [`FieldKinds`] for the sectioning and coalescing contract.
     pub field_kinds: FieldKinds,
 }
 
 /// Run a cross-source trace-by-id. See the module docs for the status
-/// and cancellation contract. `progress` ticks once per source during
-/// setup, success or failure (the caller advertises `sources.len()` out
-/// of band);
-/// callers that don't report pass a fresh counter, callers that don't
-/// cancel pass `CancellationToken::new()`.
+/// and cancellation contract.
+///
+/// `progress` ticks once per source during setup, success or failure
+/// alike; the caller advertises the `sources.len()` total out of band
+/// (the otel-ledger handler sets it on the capture and runs this
+/// through `spawn_blocking`). Callers that don't report pass a fresh
+/// counter; callers that don't cancel pass `CancellationToken::new()`
+/// (as `sfsq-cli` does).
 ///
 /// Pure sync — reads and decompresses files; invoke off any async
 /// runtime thread (the logs-engine contract).
@@ -157,17 +163,17 @@ pub fn trace_by_id(
         }
     };
     // Pre-heads cancellation returns EMPTY + Cancelled — polled up front
-    // so a zero-source or already-cancelled call can never report
-    // Complete.
+    // so an already-cancelled call (a zero-source one included) can
+    // never report Complete. The combiner re-polls identically.
     if cancel.is_cancelled() {
         return Ok(cancelled_empty(status));
     }
 
-    // ── Setup: resolve every source head ─────────────────────────────
+    // ── Setup: obtain every source's bytes ────────────────────────────
     // Map SFST bytes and decode tail frames. A failure is reported
     // (SourceFailure) and the source dropped; cancellation HERE returns
     // the empty result — no deterministic prefix exists before every
-    // head is known.
+    // source is ready.
     let mut mapped_sfsts: Vec<(crate::source::Mapped, &TraceSource)> = Vec::new();
     let mut tails: Vec<(super::sources::SourceId, TraceWalScan)> = Vec::new();
     for source in &sources {
@@ -223,8 +229,9 @@ pub fn trace_by_id(
         .map(|(reader, _)| sfst::TraceFileSession::open(reader))
         .collect();
 
-    // The combiner's input slice: sessions first, tails after; `origin`
-    // maps a merge index back to a diagnostic label.
+    // The combiner's input slice: sessions first, tails after — the
+    // index split the field-kind pass below relies on. `origin` maps a
+    // merge index back to a diagnostic label.
     let session_count = sessions.len();
     let mut origin: Vec<String> = readers
         .iter()
@@ -242,6 +249,8 @@ pub fn trace_by_id(
     let outcome = combine(&mut merged, query.trace_id, query.span_cap, &|| {
         cancel.is_cancelled()
     });
+    // Release the merge's &mut borrows (each session, each tail) so the
+    // field-kind pass below can read tails by index again.
     drop(merged);
 
     if outcome.truncated {

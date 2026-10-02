@@ -1,9 +1,34 @@
+//! Tests for the otel-logs wire adapter ([`super::adapter`]) — the pure
+//! mapping between the netdata function wire types and the [`sfsq::logs`]
+//! engine, consumed by `handler.rs`. Fixtures are synthetic `sfst` values
+//! and JSON request bodies; nothing here touches files or a runtime.
+//!
+//! Pins:
+//!
+//! - [`OtelLogsRequest::into_query`] mapping and validation: an empty
+//!   histogram falls to the engine's default field, a cursor anchor decodes
+//!   to its four fields (a malformed one degrades to "no anchor"), a µs
+//!   anchor becomes ns, and a bad query regex fails the request at the
+//!   boundary;
+//! - the legacy chart contract on the wire: the `"(unset)"` trailer
+//!   dimension, the leading "time" label, per-dimension `[value, arp, pa]`
+//!   triples, and grid-derived view bounds — including the all-zero
+//!   envelope degenerate handler paths return (`to_result` over
+//!   `LogsData::empty`);
+//! - the row table: fixed `[timestamp_µs, severity, cursor]` columns plus
+//!   one cell per field, with multi-value joining and last-severity-wins;
+//! - the stream selector: `__streams` hex decode (garbage skipped) and the
+//!   all-preselected multiselect built from decoded stream identities.
+//!
+//! Not pinned here: `effective_window`'s system-time fallback, `to_result`
+//! over a non-empty page (its converters are exercised directly instead),
+//! and `humanize_span_s` beyond the one-unit form.
 use super::*;
 
 #[test]
 fn into_query_maps_histogram_and_anchor_forms() {
-    // Empty histogram → the builder's default; a cursor string parses to
-    // Anchor::Cursor.
+    // Empty histogram string → the builder's default field
+    // (`severity_text`); a cursor string decodes to its four fields.
     let req: OtelLogsRequest =
         serde_json::from_slice(br#"{"histogram":"","anchor":"100:2:0:3"}"#).unwrap();
     let q = req.into_query().unwrap();
@@ -22,7 +47,8 @@ fn into_query_maps_histogram_and_anchor_forms() {
     assert_eq!(q.histogram_field(), "service");
     assert!(matches!(q.anchor(), Some(Anchor::Timestamp(5_000_000))));
 
-    // A malformed cursor string is dropped → no anchor.
+    // A malformed cursor string is dropped → no anchor (degrade, not
+    // fail — the query just starts at the page edge).
     let req: OtelLogsRequest = serde_json::from_slice(br#"{"anchor":"not-a-cursor"}"#).unwrap();
     let q = req.into_query().unwrap();
     assert!(q.anchor().is_none());
@@ -38,14 +64,17 @@ fn into_query_wires_and_validates_full_text_query() {
     let req: OtelLogsRequest = serde_json::from_slice(br#"{}"#).unwrap();
     assert_eq!(req.into_query().unwrap().query(), None);
 
-    // A malformed query regex is a hard error at the boundary.
+    // A malformed query regex fails the whole request — validated once
+    // here at the boundary, not degraded per file.
     let req: OtelLogsRequest = serde_json::from_slice(br#"{"query":"("}"#).unwrap();
     assert!(req.into_query().is_err());
 }
 
 #[test]
 fn window_secs_recovers_the_grid_window() {
-    // 60 buckets × 15s starting at 1_700_000_000s.
+    // 60 buckets × 15s starting at 1_700_000_000s — window_secs must
+    // recover the grid's [start, start + width × buckets) span in whole
+    // seconds.
     let after = 1_700_000_000i64;
     let grid = sfst::Grid::new(after * NS_PER_S, 15 * NS_PER_S, 60);
     let win = window_secs(&grid);
@@ -54,6 +83,9 @@ fn window_secs_recovers_the_grid_window() {
 
 #[test]
 fn facet_preserves_value_order_and_counts() {
+    // FST value order survives verbatim; the facet's `order` is the
+    // caller-supplied index, each option's `order` its position within
+    // the facet.
     let f = sfst::FacetResult {
         field: "level".into(),
         values: vec![("error".into(), 3), ("info".into(), 5)],
@@ -73,6 +105,7 @@ fn facet_preserves_value_order_and_counts() {
 
 #[test]
 fn facet_with_no_values_yields_empty_options() {
+    // No values → a well-formed Facet with an empty options list.
     let f = sfst::FacetResult {
         field: "service".into(),
         values: Vec::new(),
@@ -119,7 +152,8 @@ fn histogram_emits_one_datapoint_per_bucket() {
         vec!["events", "events", "events"]
     );
 
-    // labels: ["time", value dims..., "(unset)"].
+    // Legacy label shape: leading "time" header, then the value dims,
+    // then the "(unset)" trailer.
     assert_eq!(
         h.chart.result.labels,
         vec!["time", "error", "info", "(unset)"]
@@ -127,7 +161,8 @@ fn histogram_emits_one_datapoint_per_bucket() {
 
     let dps = &h.chart.result.data;
     assert_eq!(dps.len(), 3);
-    // Each DataPoint carries value dims + "(unset)" as the trailing triple.
+    // Each bucket → one DataPoint: one [count, 0, 0] triple per value
+    // dim (arp/pa always 0) plus the trailing "(unset)" triple.
     assert_eq!(dps[0].items, vec![[1, 0, 0], [4, 0, 0], [2, 0, 0]]);
     assert_eq!(dps[1].items, vec![[0, 0, 0], [3, 0, 0], [1, 0, 0]]);
     assert_eq!(dps[2].items, vec![[2, 0, 0], [2, 0, 0], [0, 0, 0]]);
@@ -151,12 +186,13 @@ fn histogram_with_zero_buckets_still_well_formed() {
 
 #[test]
 fn empty_logs_data_shapes_a_full_zero_count_envelope() {
-    // The empty envelope every degenerate handler path returns (empty
-    // window, cancelled remote fetch, failed blocking task) — shaped by
-    // `to_result` over `LogsData::empty`, never hand-rolled. The chart
-    // contract must hold: real id/title, grid-derived bounds and
-    // update_every, the "(unset)" label invariant, one zero DataPoint
-    // per bucket, and the three fixed table columns.
+    // The empty envelope every degenerate handler path returns (an
+    // empty source set, a cancelled remote fetch, a failed blocking
+    // task) — shaped by `to_result` over `LogsData::empty`, never
+    // hand-rolled. The chart contract must hold: real id/title,
+    // grid-derived bounds and update_every, the "(unset)" label
+    // invariant, one zero DataPoint per bucket, and the three fixed
+    // table columns.
     let grid = sfst::Grid::new(1_700_000_000 * NS_PER_S, 15 * NS_PER_S, 4);
     let r = to_result(sfsq::logs::LogsData::empty("severity_text", grid), 200);
 
@@ -249,6 +285,8 @@ fn build_table_joins_multivalued_fields_and_keeps_last_severity() {
     assert_eq!(cells[4], serde_json::json!("x"));
 }
 
+/// A cursor at `timestamp_ns` with fixed file_seq/part/position — the
+/// row tests vary only the timestamp.
 fn dummy_cursor(timestamp_ns: i64) -> sfsq::logs::Cursor {
     sfsq::logs::Cursor {
         timestamp_ns,
@@ -380,11 +418,15 @@ fn stream_required_params_builds_all_default_selected_selector() {
 
 #[test]
 fn stream_required_params_empty_when_no_streams() {
+    // No streams → no selector at all (empty `required_params`), not an
+    // empty multiselect control.
     assert!(stream_required_params(Vec::new()).is_empty());
 }
 
 #[test]
 fn humanize_bytes_uses_binary_units() {
+    // 1024-step binary units, one decimal; below 1 KiB the plain byte
+    // count with no fraction.
     assert_eq!(humanize_bytes(0), "0 B");
     assert_eq!(humanize_bytes(512), "512 B");
     assert_eq!(humanize_bytes(2048), "2.0 KiB");

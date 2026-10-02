@@ -1,42 +1,40 @@
-//! The per-file rollup root-ref resolver — the trace-level gate's
-//! string seam.
-//!
-//! The gate (in `sfsq`) tests a rollup row's root refs
-//! ([`TraceRollup::root_service_refs`](crate::TraceRollup::root_service_refs) /
-//! [`root_name_refs`](crate::TraceRollup::root_name_refs)) against a
-//! compiled matcher. Those refs are file-interner [`KvId`](crate::KvId)s
-//! into the root fields' dictionaries; this resolver maps a ref to its
-//! value string, decoding each root-field chunk at most once per file —
-//! the state a cross-crate caller cannot build from the private tier
-//! internals.
+//! The per-file rollup root-ref resolver — the string seam behind the
+//! sfsq trace-level gate. The gate tests a rollup row's root refs
+//! ([`TraceRollup::root_service_refs`](crate::TraceRollup::root_service_refs)
+//! and [`root_name_refs`](crate::TraceRollup::root_name_refs),
+//! file-interner [`KvId`](crate::KvId)s into the root fields'
+//! dictionaries) against a compiled matcher; this resolver maps each
+//! ref to its value string, decoding each root-field chunk at most once
+//! per file — state a cross-crate caller cannot reach through the
+//! private tier internals.
 //!
 //! Resolution is a CLOSED partition, not a case list. Exactly three
 //! outcomes exist for a root ref:
 //!
-//! - `ROLLUP_NO_REF` is proven absence — the writer's sentinel. It
-//!   never reaches this resolver (the caller handles it).
-//! - A ref that maps to an entry INSIDE the target field's own KvId
-//!   range is a proven [`Value`](RollupRefOutcome::Value).
-//! - ANYTHING else — a ref outside the field's range (chunk validation
-//!   checks only `< kv_total`, so a corrupted ref can point into
-//!   another field), an in-range ref past the decoded entries (a gap),
-//!   an entry whose key does not literally carry the
-//!   `"{field_name}="` prefix (a decodable chunk holding another
-//!   field's keys), or an undecodable chunk — is
-//!   [`Corrupt`](RollupRefOutcome::Corrupt): the file has proven it
-//!   cannot be trusted. The caller escalates per the corrupt-file
-//!   principle (skip the file as a failed source AND surface the skip);
-//!   it must never treat `Corrupt` as absence or as a non-match.
+//! - [`ROLLUP_NO_REF`](crate::ROLLUP_NO_REF) is proven absence — the
+//!   writer's sentinel, handled by callers; it never reaches this
+//!   resolver.
+//! - A ref inside the target field's own KvId range whose entry's key
+//!   literally carries the `"{field_name}="` prefix is a proven
+//!   [`Value`](RollupRefOutcome::Value).
+//! - Anything else is [`Corrupt`](RollupRefOutcome::Corrupt): a ref in
+//!   another field's range (chunk validation checks only `< kv_total`,
+//!   so corruption can point across fields), an in-range ref past the
+//!   decoded entries (a gap), an entry whose key names another field,
+//!   or an undecodable chunk. The file has proven it cannot be
+//!   trusted; the caller escalates per the corrupt-file principle
+//!   (skip the file as a failed source AND surface the skip), never
+//!   treating `Corrupt` as absence or a non-match.
 //!
 //! Values render through the same lossy-UTF-8 render the canonical row
 //! path uses, and the prefix strip is value-identical to
 //! [`kv_value`](super::kv_value)'s first-`=` split on every proven key
-//! (field names carry no `=`, and value-embedded `=` bytes survive
-//! both), so the gate and the post-assembly truth cannot diverge on
-//! rendering. Low/mid
+//! (field names carry no `=` — a flattener invariant — and
+//! value-embedded `=` bytes survive both), so the gate and the
+//! post-assembly truth cannot diverge on rendering. Low/mid
 //! dictionaries decode as one table (their decode is a walk anyway);
-//! high-card chunks stay random-access with a per-ref memo — the gate
-//! only ever tests the few refs recorded roots carry, never the
+//! high-card chunks stay random-access with a per-offset memo — the
+//! gate tests only the few refs recorded roots carry, never the
 //! dictionary.
 
 use std::collections::HashMap;
@@ -45,9 +43,8 @@ use crate::index_reader::{field_table_tiered, IndexReader};
 use crate::schema::{FieldTier, HighField};
 use crate::trace_rollup::ROLLUP_NO_REF;
 
-/// Outcome of resolving one root ref in one field. See the module docs
-/// for the closed three-way partition (the `ROLLUP_NO_REF` absence arm
-/// is the caller's and never constructed here).
+/// Outcome of resolving one root ref in one field — the two
+/// non-absence arms of the closed partition in the module docs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RollupRefOutcome<'s> {
     /// The ref's value half, proven to live in the target field.
@@ -66,8 +63,9 @@ enum FieldState {
         cardinality: u32,
         values: Vec<Option<String>>,
     },
-    /// High tier: the decoded chunk plus a per-offset memo of the refs
-    /// actually asked about.
+    /// High tier: the decoded chunk plus a per-offset memo; a memoized
+    /// `None` is a proven-corrupt offset (gap or shapeless key), not an
+    /// unprobed one.
     High {
         start: u32,
         cardinality: u32,
@@ -88,6 +86,7 @@ pub struct RollupRootResolver<'r, 'a> {
 }
 
 impl<'r, 'a> RollupRootResolver<'r, 'a> {
+    /// An empty resolver; a field's dictionary decodes on first use.
     pub fn new(reader: &'r IndexReader<'a>) -> Self {
         Self {
             reader,

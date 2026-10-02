@@ -1,9 +1,25 @@
-//! A prefix-searchable associative map, backed by a finite state transducer.
+//! An in-memory, prefix-searchable associative map, backed by a finite
+//! state transducer.
 //!
-//! [`PrefixMap<T>`] maps byte-string keys to values of type `T`, using an FST
-//! for compact, sorted key storage and a parallel `Vec<T>` for the values —
-//! giving O(key_length) exact lookups and efficient prefix scans with far less
-//! key overhead than a `HashMap`.
+//! [`PrefixMap<T>`] maps byte-string keys to values of type `T`: the FST
+//! stores each key mapped to its entry index, and a parallel `Vec<T>`
+//! holds the values in that same sorted-key order — O(key_length) exact
+//! lookups and prefix scans in key order, at a fraction of a `HashMap`'s
+//! per-key overhead.
+//!
+//! # Role in this crate
+//!
+//! Crate-internal (`pub(crate)` re-export in `lib.rs`). In-tree it is
+//! always used as `PrefixMap<BitmapValue>` (`schema.rs`): keys are
+//! `key=value` strings of low- and mid-cardinality fields, values are
+//! the row bitmaps where each pair occurs. The writer builds one map per
+//! chunk — `PRIM` via `writer.rs::primary`, fed by
+//! `build.rs::build_primary_fst`, and one `MF{hi}{lo}` chunk per
+//! mid-card field — serializing it bincode+zstd at `ZSTD_LEVEL_FST`
+//! (`writer.rs::pack`). The reader unpacks them back into this map
+//! (`reader.rs::primary` / `mid_field`); `IndexReader`
+//! (`index_reader.rs`) keeps the primary map resident for exact lookups
+//! and field-prefix scans.
 
 // Not every accessor is used in-tree yet; the unit tests exercise the full API.
 #![allow(dead_code)]
@@ -11,6 +27,7 @@
 use fst::automaton::Automaton;
 use fst::{IntoStreamer, Streamer};
 
+/// Serde wire form: the raw FST bytes plus the parallel values vec.
 mod serde_impl {
     use super::PrefixMap;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -65,10 +82,11 @@ impl From<fst::Error> for BuildError {
 
 /// A prefix-searchable associative map, backed by a finite state transducer.
 ///
-/// Maps byte-string keys to values of type `T`: keys live in a compressed FST,
-/// values in a `Vec<T>` ordered by sorted key. Supports exact lookup and prefix
-/// search. The key set is fixed at construction (no insert/remove), though
-/// individual values can be updated in place via [`get_mut`](Self::get_mut).
+/// The FST maps each key to its entry index; `values` holds the values in
+/// that same sorted-key order, so every lookup is one FST hit plus one vec
+/// index. Exact lookup and prefix search only — the key set is fixed at
+/// construction (no insert/remove), though individual values can be
+/// updated in place via [`get_mut`](Self::get_mut).
 pub struct PrefixMap<T> {
     map: fst::Map<Vec<u8>>,
     values: Vec<T>,
@@ -96,8 +114,9 @@ impl<T: Clone> Clone for PrefixMap<T> {
 impl<T> PrefixMap<T> {
     /// Build a map from an unsorted iterator of `(key, value)` pairs.
     ///
-    /// Keys are sorted internally before FST construction. Duplicate keys
-    /// are an error.
+    /// Keys are sorted internally before FST construction; the sorted
+    /// order also fixes the order of the `values` vec. Duplicate keys
+    /// are an error — the FST builder requires strictly increasing keys.
     pub fn build<K: Ord + AsRef<[u8]>>(
         iter: impl IntoIterator<Item = (K, T)>,
     ) -> Result<Self, BuildError> {
@@ -209,6 +228,10 @@ impl<T> PrefixMap<T> {
 }
 
 /// Automaton that matches keys starting with a given byte prefix.
+///
+/// State is `Some(pos)` = the first `pos` prefix bytes matched so far,
+/// or `None` — the dead state after a mismatching byte. Once the whole
+/// prefix is consumed, every further byte is accepted unchanged.
 struct Prefix<'a>(&'a [u8]);
 
 impl Automaton for Prefix<'_> {

@@ -1,71 +1,98 @@
-//! Error type for SFST operations — the format layer (chunk read/write)
-//! and the index build ([`IndexWriter`](crate::IndexWriter)).
+//! SFST's one error type: the container/format read-write layer
+//! ([`ChunkWriter`](crate::ChunkWriter), [`ChunkReader`](crate::ChunkReader)),
+//! the index build ([`IndexWriter`](crate::IndexWriter)), and the query/trace
+//! APIs on [`IndexReader`](crate::IndexReader). Three variants are lifted
+//! implicitly — `Io` and the two bincode wrappers ride `#[from]` on `?` —
+//! every other variant is raised by name at the sites its doc comment lists
+//! (grep-verified). The `String` payloads are message-only: each is already
+//! rendered into the Display text, so no `source()` survives construction.
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    /// Underlying I/O failed during read/write/flush/sync. Auto-lifted
-    /// from [`std::io::Error`]. Transparent: embedding the source in the
-    /// message while also chaining it would print it twice in anyhow chains.
+    /// Underlying I/O failed — file open/read/seek, chunk and TOC writes,
+    /// flush/fsync — lifted through the derived `#[from]`; the index build
+    /// re-wraps `Io` with an op + temp-path annotation before it escapes
+    /// (the `annotate_io` closure in `build.rs` `build_and_write`).
+    /// Transparent: `Display` and `source()` delegate to
+    /// the wrapped error, so embedding it in a message too would print it
+    /// twice in anyhow chains.
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
-    /// `bincode::encode_to_vec` rejected a value while packing a chunk
-    /// payload.
+    /// `bincode::serde::encode_to_vec` rejected a typed payload at
+    /// `writer.rs`'s `pack` — the only lift site. Chunk payloads are plain owned
+    /// data, so this fires only if a future chunk struct outgrows bincode.
     #[error(transparent)]
     BincodeEncode(#[from] bincode::error::EncodeError),
 
-    /// `bincode::decode_from_slice` failed while unpacking a chunk
-    /// payload — the bytes don't match the expected shape, or are
-    /// truncated.
+    /// `bincode::serde::decode_from_slice` failed at `reader.rs`'s `unpack`
+    /// — the only lift site: the decompressed bytes don't match the chunk's
+    /// expected shape, or are truncated. zstd failures are reclassified to
+    /// [`Error::Zstd`] before this can see them.
     #[error(transparent)]
     BincodeDecode(#[from] bincode::error::DecodeError),
 
-    /// `zstd` compression or decompression failed without surfacing as
-    /// [`std::io::Error`] — e.g., invalid frame header, truncated
-    /// frame, checksum mismatch.
+    /// zstd compression or decompression failed inside `writer.rs`'s `pack`
+    /// or `reader.rs`'s `unpack` — e.g. a bad or truncated frame, a
+    /// checksum mismatch. Intercepted before `?` would lift it to
+    /// [`Error::Io`], so a compressor failure stays distinguishable from
+    /// real file I/O. Message-only: the error's Display is inlined.
     #[error("zstd error (not std::io): {0}")]
     Zstd(String),
 
-    /// Opening an SFST (any entry — [`read_summary`](crate::read_summary),
-    /// [`IndexReader::open`](crate::IndexReader::open)) found the first 4
-    /// bytes aren't `"SFST"`. The byte stream is either not an SFST file or
-    /// has been corrupted before the header.
+    /// An open ([`read_summary`](crate::read_summary) or
+    /// [`IndexReader::open`](crate::IndexReader::open), both via
+    /// `ChunkReader::open`) found the first 4
+    /// bytes aren't `"SFST"`: the byte stream is not an SFST file, or is
+    /// corrupted ahead of the header.
     #[error("invalid magic (expected \"SFST\")")]
     InvalidMagic,
 
-    /// Opening an SFST found a header `version` field this build of `sfst`
-    /// doesn't recognize.
+    /// The header's version field doesn't equal this build's `VERSION`
+    /// (the container layer checks equality) — a file from a different
+    /// format version than this build reads. Carries the file's value.
     #[error("unsupported version: {0}")]
     UnsupportedVersion(u32),
 
-    /// A chunk lookup by index found no matching id — e.g., a mid-card
-    /// field accessor called with an index past the file's mid-card
-    /// field count.
+    /// An index-addressed chunk accessor (mid/high field, stream batch)
+    /// got an index with no matching chunk — past the file's count for
+    /// that kind, or past the global stream-batch cap
+    /// (`ChunkReader::stream_batch_raw`).
+    /// Carries the caller's index.
     #[error("chunk not found: index {0}")]
     ChunkNotFound(u16),
 
-    /// The chunk writer was driven against the canonical chunk order — a
-    /// chunk out of order, beyond its declared count, or `finish` before
-    /// every declared chunk was written. A producer bug, never a data
-    /// condition; the message names the violated step.
+    /// `ChunkWriter` was driven outside its
+    /// contract: a chunk out of the canonical order, past its declared
+    /// count, an undeclared or duplicate per-row column, an inconsistent
+    /// `ChunkCounts` declaration at `new`, or
+    /// `finish` before the file was complete. A producer bug, never a
+    /// data condition; the message names the violated step.
     #[error("writer misuse: {0}")]
     WriterMisuse(String),
 
-    /// Building the primary or a mid-field FST failed — almost always a
-    /// duplicate `key=value` in the entries handed to the chunk writer's
-    /// `primary` / `add_mid_field`. A producer bug, never a data condition.
+    /// FST construction for the primary or a mid-field chunk failed — in
+    /// practice a duplicate `key=value` among the entries handed to the
+    /// chunk writer's `primary` / `add_mid_field` (the only two
+    /// `PrefixMap::build` callers). A producer bug, never a data
+    /// condition. Carries the crate-private `BuildError` stringified (see
+    /// the `From` impl below).
     #[error("{0}")]
     PrefixMapBuild(String),
 
-    /// The chunk writer was given a stream-batch count outside
-    /// `1..=`[`MAX_STREAM_BATCHES`](crate::MAX_STREAM_BATCHES).
-    /// Carries the actual count that was rejected.
+    /// `ChunkWriter::new` was given a
+    /// stream-batch count outside
+    /// `1..=`[`MAX_STREAM_BATCHES`](crate::MAX_STREAM_BATCHES) — the
+    /// variant's only raise site, that constructor check. The Display
+    /// hardcodes the 8. Carries the actual count that was rejected.
     #[error("invalid stream-batch count: {0} (expected 1..=8)")]
     InvalidStreamBatchCount(u8),
 
-    /// A per-row column handed to the index build has a different length than
-    /// the row count, so it cannot be aligned per row. A caller bug (each
-    /// column must hold exactly one value per row); recoverable, not a panic.
+    /// A per-row column handed to the index build has a length other than
+    /// the row count, so it cannot be aligned per row (`check_column_len`
+    /// in `build.rs`; the event/link structures are checked the same way).
+    /// A caller bug (each column must hold exactly one value per row);
+    /// recoverable, not a panic.
     #[error("per-row column {column} has {got} values, expected {expected} (one per row)")]
     ColumnLengthMismatch {
         column: &'static str,
@@ -73,14 +100,24 @@ pub enum Error {
         expected: usize,
     },
 
-    /// A per-row column accessor found the column absent from the
-    /// [`ColumnsTable`](crate::ColumnsTable), or present with a type that does not
-    /// match the accessor's expected one. Carries a describing message.
+    /// A per-row column accessor rejected the file: the META manifest
+    /// lacks the column or declares a type different from the accessor's
+    /// expected one (`reader.rs` `require_column`), the decoded row count
+    /// disagrees with `SUMR.record_count` (`reader.rs` `check_rows`), or a
+    /// fixed-stride arena
+    /// (trace_ids / span_ids / parent_span_id) is not a whole number of
+    /// entries. Carries a describing message — the String names the
+    /// failed check.
     #[error("per-row column mismatch: {0}")]
     ColumnMismatch(String),
 
-    /// The TOC failed to parse (on open) or lay out (on write).
-    /// Carries the chunk-file layer's own error message.
+    /// The container layer rejected the file's framing on open: the TOC
+    /// failed to parse, the framing is malformed beyond the TOC (a
+    /// chunkless header, an implausible chunk count, a chunk span too
+    /// short for its crc32), or a fixed-id chunk lookup missed the TOC —
+    /// all reshaped in the `From` impl below. sfst's own writer reserves
+    /// and patches the TOC without producing this variant, so it is an
+    /// open-side error. Carries the layer's error message.
     #[error("TOC error: {0}")]
     Toc(String),
 
@@ -90,45 +127,63 @@ pub enum Error {
     #[error("file too short ({0} bytes, need at least {1})")]
     FileTooShort(usize, usize),
 
-    /// A facet/aggregation was asked for a field name that doesn't appear in
-    /// this file's field table. (Filtering treats an absent field as matching
-    /// nothing rather than erroring.)
+    /// A value-enumeration/aggregation accessor —
+    /// [`IndexReader::facets`](crate::IndexReader::facets) or
+    /// [`field_values`](crate::IndexReader::field_values) — was asked for
+    /// a field name that doesn't appear in this file's field table.
+    /// Filtering keeps the opposite convention: an absent field matches
+    /// nothing (and timeline routes its logs to `unset`) rather than
+    /// erroring.
     #[error("unknown field: {0}")]
     UnknownField(String),
 
     /// [`IndexReader::facets`](crate::IndexReader::facets) or
     /// [`IndexReader::timeline`](crate::IndexReader::timeline) was asked
-    /// to aggregate over a high-cardinality field. Per-value counts on
-    /// high-card fields would require scanning stream batches, which is
-    /// out of scope for the facet/timeline API.
+    /// to aggregate over a high-cardinality field. Per-value counts would
+    /// require scanning stream batches, which the facet/timeline API —
+    /// dictionary chunks only — deliberately doesn't do. Carries the
+    /// field name.
     #[error("facet/timeline not supported for high-cardinality field: {0}")]
     HighCardFacet(String),
 
-    /// A [`Filter`](crate::Filter) carried a regex pattern matcher
-    /// ([`Matcher::Pattern`](crate::Matcher)) that failed to compile. A
-    /// malformed pattern is a hard failure — the whole filter fails to
-    /// compile rather than being treated as "matches nothing".
+    /// A regex source failed to compile: a
+    /// [`Matcher::Pattern`](crate::Matcher) carried in a
+    /// [`Filter`](crate::Filter) (compiled full-value-anchored by
+    /// [`compile_pattern`](crate::compile_pattern)) or the field-less
+    /// full-text query regex (unanchored,
+    /// [`compile_query`](crate::compile_query)). A malformed pattern is a
+    /// hard failure — the whole
+    /// filter fails to compile rather than being treated as "matches
+    /// nothing"; [`Filter::validate`](crate::Filter::validate) surfaces
+    /// bad patterns up front so a multi-file query degrades no file.
     #[error("invalid filter pattern: {0}")]
     InvalidPattern(String),
 
     /// [`IndexReader::timeline`](crate::IndexReader::timeline) was called
-    /// with a non-positive bucket width.
+    /// with a non-positive bucket width. Carries
+    /// the rejected width.
     #[error("invalid bucket width: {0} (must be > 0)")]
     InvalidBucketWidth(i64),
 
     /// A trace lookup was asked for the all-zero (UNSET) trace id — the
-    /// OTLP/W3C "unset/invalid" sentinel. TIDX deliberately omits UNSET
-    /// ids, so the id is not queryable; callers reject it at their request
-    /// boundary rather than getting layout-dependent emptiness.
+    /// OTLP/W3C "unset/invalid" sentinel — through the trace session's
+    /// `span_refs`, the variant's only raise site
+    /// ([`TraceFileSession`](crate::TraceFileSession)). TIDX
+    /// deliberately omits UNSET ids, so serving one would depend on file
+    /// layout; request boundaries reject the id up front, and
+    /// [`trace_by_id`](crate::IndexReader::trace_by_id) resolves it to an
+    /// empty [`Trace`](crate::Trace).
     #[error("the all-zero (unset) trace id is not queryable")]
     UnsetTraceId,
 
-    /// A consumer found the file's chunks internally inconsistent — e.g. a
-    /// matched log position has no corresponding entry in the timestamps
-    /// chunk, or a chunk's crc32 trailer doesn't match its payload.
-    /// Indicates a corrupt SFST (bit-rot or a producer bug); a
-    /// well-formed file never triggers this. The query layer skips the
-    /// file rather than serving corrupted rows.
+    /// A consumer found the file's chunks internally inconsistent — e.g.
+    /// a matched position with no timestamp, a stream batch whose row
+    /// lengths disagree with its kv bytes, a trace session/plan structure
+    /// short of its range — or a chunk's crc32 trailer didn't match its
+    /// payload (via the `From` impl below). Indicates a corrupt SFST
+    /// (bit-rot or a producer bug); a well-formed file never triggers
+    /// this. The query layer logs and skips the file rather than serving
+    /// corrupted rows.
     #[error("corrupt index: {0}")]
     CorruptIndex(String),
 }

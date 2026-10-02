@@ -1,3 +1,20 @@
+//! Tests for the `otel-logs` Function handler as reached through
+//! `on_call`: the data/info/files wire responses, facet + histogram
+//! assembly, pagination, tenant scoping, and the remote-read path that
+//! fetches evicted SFSTs back from object storage.
+//!
+//! Fixtures are real SFST bytes written in memory by the production
+//! [`sfst::ChunkWriter`] and installed into a real [`TenantRegistries`]
+//! over throwaway temp dirs; WAL and catalog state is driven through
+//! the registry event APIs, and remote fixtures are real files behind
+//! an `fs://` storage backend. What the engine and adapter already pin
+//! (grid building, wire mapping, cursor ordering — `adapter/tests.rs`
+//! and the `sfsq` crates) is not re-tested here.
+//!
+//! Not pinned here: the active-WAL query path (`resolve_wal`'s chunk
+//! indexing and tail scan — no test drives a WAL through a query),
+//! cancellation, the TooLarge/EvictionFailed fetch errors, and the
+//! free-text `query` regex path.
 use super::*;
 use file_registry::{ByteSize, FileId, TenantId, TimestampNs};
 use otel_logs_identity::ServiceStream;
@@ -8,6 +25,8 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 use file_registry::{test_identity, Identity, InstanceId, MachineId};
 
+/// Fresh registries rooted at three throwaway temp dirs (WAL / SFST
+/// index / catalog): each test builds its own isolated storage.
 fn make_tenant_registries() -> TenantRegistries {
     TenantRegistries::new(
         tempfile::tempdir().unwrap().keep(),
@@ -16,6 +35,8 @@ fn make_tenant_registries() -> TenantRegistries {
     )
 }
 
+/// A handler over `tr` with a 64 MiB chunk cache, 16_384-min-entry WAL
+/// chunks, and remote read disabled.
 fn make_handler(tr: TenantRegistries) -> OtelLogsHandler {
     OtelLogsHandler::new(
         Arc::new(RwLock::new(tr)),
@@ -25,6 +46,8 @@ fn make_handler(tr: TenantRegistries) -> OtelLogsHandler {
     )
 }
 
+/// A minimal call context: the transaction id is arbitrary, progress
+/// starts empty, and nothing is ever cancelled.
 fn make_ctx(transaction: &str) -> FunctionCallContext {
     FunctionCallContext::new(
         transaction.to_string(),
@@ -33,6 +56,7 @@ fn make_ctx(transaction: &str) -> FunctionCallContext {
     )
 }
 
+/// A treight-encoded bitmap of sorted `positions` within `[0, universe)`.
 fn bitmap_with(positions: &[u32], universe: u32) -> BitmapValue {
     let mut data = Vec::new();
     let desc = treight::Bitmap::from_sorted_iter(positions.iter().copied(), universe, &mut data);
@@ -119,7 +143,10 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
     std::fs::write(path, &buf).unwrap();
 }
 
-/// Install a single SFST file under tenant `t`.
+/// Install one 6-log SFST under tenant `t` at sequence `seq`. The
+/// fixed part key (7) never matters here: these tests never select a
+/// stream, so the query's partition filter stays empty. (The remote
+/// tests below do select — hence their stream-derived ids.)
 fn install_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, min_s: u32) {
     let id = FileId::new(test_identity(), 0, seq, 7);
 
@@ -267,6 +294,7 @@ fn write_same_ts_sfst(path: &std::path::Path, ts_s: u32, n: usize) {
     std::fs::write(path, &buf).unwrap();
 }
 
+/// Install an `n`-log same-timestamp SFST (see [`write_same_ts_sfst`]).
 fn install_same_ts_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, ts_s: u32, n: usize) {
     let id = FileId::new(test_identity(), 0, seq, 7);
     let reg = tr.get_or_create(&TenantId::from(tenant));
@@ -322,6 +350,9 @@ async fn same_timestamp_rows_paginate_without_dup_or_skip() {
     assert_eq!(seen, vec![4, 3, 2, 1, 0]);
 }
 
+/// `files: true` inventory: SFST entries carry the tracked summary's
+/// fields and the registry's per-seq lifecycle flags — a snapshot built
+/// from registry state alone, never from the files on disk.
 #[tokio::test]
 async fn files_request_returns_inventory_with_upload_state() {
     let mut tr = make_tenant_registries();
@@ -372,6 +403,9 @@ async fn files_request_returns_inventory_with_upload_state() {
     assert_eq!(sfst[1]["pending_deletion"], true);
 }
 
+/// `files: true` also lists WAL entries — status/entry-count/time-range
+/// as accumulated from the event stream — and tracked catalog files,
+/// both sorted for stable output.
 #[tokio::test]
 async fn files_request_includes_wal_and_catalog_entries() {
     use chrono::NaiveDate;
@@ -467,6 +501,8 @@ async fn files_request_includes_wal_and_catalog_entries() {
     assert_eq!(catalog[0]["pending_deletion"], false);
 }
 
+/// `info: true` returns the capability descriptor — accepted params
+/// advertised, no data keys — regardless of registered data.
 #[tokio::test]
 async fn info_request_returns_capability_descriptor() {
     let h = make_handler(make_tenant_registries());
@@ -498,6 +534,8 @@ async fn empty_payload_defaults_to_data_request() {
     assert_eq!(v["items"]["matched"], 0);
 }
 
+/// A data query with nothing registered still answers 200 with the
+/// well-formed empty envelope — empty facets, matched 0 — never an error.
 #[tokio::test]
 async fn no_sfst_yields_empty_envelope() {
     let h = make_handler(make_tenant_registries());
@@ -566,7 +604,8 @@ async fn populated_response_carries_facets_and_histogram() {
     assert_eq!(counts.get("info"), Some(&3));
     assert_eq!(counts.get("error"), Some(&3));
 
-    // Histogram defaulted to severity_text (one of DEFAULT_HISTOGRAM_FIELDS).
+    // No histogram requested → the engine's default field
+    // (`severity_text`, same as the default facet field).
     assert_eq!(v["histogram"]["id"], "severity_text");
     // 6 logs spread across 6 seconds, all in-window.
     assert_eq!(v["items"]["matched"], 6);
@@ -604,7 +643,8 @@ async fn populated_response_carries_facets_and_histogram() {
     let row0 = data[0].as_array().unwrap();
     assert_eq!(row0[0], (min_s as i64 + 5) * 1_000_000); // µs
     assert_eq!(row0[1], "error");
-    // The cursor cell is the opaque "{ts_ns}:{seq}:{pos}" string.
+    // The cursor cell is the opaque "{ts_ns}:{file_seq}:{part}:{pos}"
+    // string (here: seq 1, indexed part 0, position 5).
     assert_eq!(
         row0[2],
         format!("{}:1:0:5", (min_s as i64 + 5) * 1_000_000_000)
@@ -658,9 +698,8 @@ async fn selection_filter_narrows_facet_counts_with_self_exclusion() {
 
 #[tokio::test]
 async fn only_overlapping_file_contributes() {
-    // Two files in the same tenant. The window matches only the
-    // newer file's span — the older one's range is filtered out by
-    // the candidate planner.
+    // Two files in the same tenant; the window overlaps only the newer
+    // file's span, so the older file never becomes a query candidate.
     let mut tr = make_tenant_registries();
     install_sfst(&mut tr, "tenant-a", 1, 1_600_000_000);
     install_sfst(&mut tr, "tenant-a", 99, 1_700_000_000);
@@ -815,9 +854,9 @@ async fn no_time_bound_falls_back_to_recent_window() {
 #[tokio::test]
 async fn no_time_bound_with_only_stale_data_yields_empty_envelope() {
     // `(after=0, before=0)` defaults to the last 15 minutes. The only
-    // SFST is from 2024, so nothing overlaps the defaulted window. The
-    // handler returns the empty envelope — it does not reach back to a
-    // stale file just because the window came up empty.
+    // SFST is from Nov 2023, so nothing overlaps the defaulted window.
+    // The handler returns the empty envelope — it does not reach back
+    // to a stale file just because the window came up empty.
     let mut tr = make_tenant_registries();
     let file_min_s = 1_700_000_000u32; // far in the past
     install_sfst(&mut tr, "tenant-a", 1, file_min_s);
@@ -845,6 +884,10 @@ fn row_ts_cursor(row: &Value) -> (i64, String) {
     )
 }
 
+/// Backward paging: page 2 anchors at page 1's oldest row, the anchor
+/// row itself is excluded (no overlap) and pos 2 follows it directly
+/// (no gap), with `items.after`/`before` reporting the rows remaining
+/// on each side.
 #[tokio::test]
 async fn backward_pagination_pages_without_overlap_or_gap() {
     let mut tr = make_tenant_registries();
@@ -964,6 +1007,9 @@ fn patched_args_payload_parses_as_a_logs_request() {
     assert_eq!(req.before, 200);
 }
 
+/// The Function declaration keeps the legacy shape: global visibility,
+/// the `logs` tag, and the SIGNED_ID | SAME_SPACE | SENSITIVE_DATA
+/// access mask.
 #[test]
 fn declaration_carries_legacy_flags() {
     let h = make_handler(make_tenant_registries());
@@ -977,7 +1023,7 @@ fn declaration_carries_legacy_flags() {
     assert!(access.contains(HttpAccess::SENSITIVE_DATA));
 }
 
-// ── Tenant scoping (OTL-1) ───────────────────────────────────────
+// ── Tenant scoping ────────────────────────────────────────────────
 
 #[tokio::test]
 async fn tenant_scoping_isolates_unions_nothing_and_defaults() {
@@ -1067,6 +1113,7 @@ fn track_remote_catalog(
     crate::test_helpers::track_catalog_entry(tr, tenant, entry)
 }
 
+/// Like [`make_handler`], with remote read enabled.
 fn make_handler_with_remote(tr: TenantRegistries, remote: RemoteRead) -> OtelLogsHandler {
     OtelLogsHandler::new(
         Arc::new(RwLock::new(tr)),
@@ -1185,7 +1232,7 @@ async fn remote_only_sfst_is_fetched_and_served() {
         v["items"]["matched"], 6,
         "evicted remote SFST should be fetched and queried: {v:#}"
     );
-    // #5: the remote-only stream is advertised in the window-scoped selector
+    // The remote-only stream is advertised in the window-scoped selector
     // (its data is fetchable, so the user can filter to it).
     let streams = stream_options(&v);
     assert!(

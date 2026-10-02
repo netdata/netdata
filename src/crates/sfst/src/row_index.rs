@@ -1,14 +1,36 @@
-//! The [`RowIndex`] type — in-memory index built during Phase 1 (reading).
+//! Phase 1 of the SFST build: the in-memory [`RowIndex`] a producer fills
+//! while reading its source — for the in-tree producer, decoding WAL frames
+//! (`src/crates/ng-index/src/sfst_build.rs`) — before Phase 2 (`build.rs`,
+//! behind [`crate::IndexWriter`]) streams it out as on-disk chunks.
 //!
-//! Holds four data structures:
+//! Core structures, plus the optional per-row columns on [`RowIndex`]:
 //!
 //! 1. **KeyValueInterner** — assigns a [`KvSlot`] to each unique `key=value` string.
-//! 2. **Vec\<RoaringBitmap\>** — indexed by [`KvSlot`]; each bitmap tracks which
-//!    row positions contain that `key=value` pair (insertion order).
-//! 3. **Vec\<Vec\<KvSlot\>\>** — row entries: for each row position, the list
-//!    of key=value slots it contains (needed for stream-batch serialization in Phase 2).
-//! 4. **Vec\<i64\>** — nanosecond timestamp per row position, used to build the
-//!    time-sort remap and sparse histogram.
+//! 2. **kv_bitmaps: Vec\<RoaringBitmap\>** — one bitmap per [`KvSlot`], tracking
+//!    which row positions contain that `key=value` pair.
+//! 3. **row_entries: Vec\<Vec\<KvSlot\>\>** — per row position, the slots its
+//!    attributes produced (the Phase-2 stream-batch serialization input).
+//! 4. **timestamps: Vec\<i64\>** — nanosecond timestamp per row position, feeding
+//!    the time-sort remap and the sparse histogram.
+//!
+//! # Insertion order
+//!
+//! [`row`](RowIndex::row) appends each row at the next position, so positions
+//! number rows in read order, not by time. Every bitmap, row entry, and
+//! column is parallel to that numbering, and Phase 2 relies on it: it builds
+//! the [`TimeOrder`] remap from the timestamps and translates every structure
+//! to chronological order, so contiguous positions mean contiguous time on
+//! disk.
+//!
+//! # Lifecycle
+//!
+//! [`RowIndex::new`] → intern pairs (`lookup_hash`/`intern`) and call `row`
+//! per record → attach whichever optional columns/accumulators apply → hand
+//! the value to [`crate::IndexWriter::write_file`]. Only `build.rs` reads the
+//! struct's fields. Interned strings live in the caller's [`Bump`] arena, so
+//! the index borrows it for the whole build; Phase 1 materializes every row
+//! in memory, and Phase 2's peak beyond the `RowIndex` itself is a single
+//! packed chunk.
 
 use bumpalo::Bump;
 use roaring::RoaringBitmap;
@@ -19,47 +41,55 @@ use crate::{
     SpanIds, TraceIds,
 };
 
-/// The output of Phase 1: everything the frame loop extracts from the WAL.
-///
-/// Bundles the four data structures described in the module doc into a single
-/// value, making the Phase 1 → Phase 2 handoff explicit.
+/// The output of Phase 1: everything a producer extracts from its source,
+/// handed to Phase 2 as one value. See the module docs for the structure
+/// list, the insertion-order contract, and the lifecycle.
 pub struct RowIndex<'a> {
+    /// The `key=value` interner: a unique [`KvSlot`] per distinct string, plus
+    /// the per-field grouping and cardinality tiers the `*_fields` and
+    /// [`tier_assignment`](Self::tier_assignment) queries read.
     pub(crate) kv_interner: KeyValueInterner<'a>,
-    /// One bitmap per key=value slot. `kv_bitmaps[slot.idx()]` tracks which row
-    /// positions (insertion order) contain that `key=value` pair.
+    /// One bitmap per key=value slot: `kv_bitmaps[slot.idx()]` holds the row
+    /// positions (insertion order) that contain that pair.
     pub(crate) kv_bitmaps: Vec<RoaringBitmap>,
-    /// Per-row key=value slots: `row_entries[pos]` lists all key=value slots
-    /// for that row's attributes. Used for stream-batch serialization in Phase 2.
+    /// Per-row slot lists: `row_entries[pos]` holds every key=value slot the
+    /// row at that position carries — the input Phase 2 serializes into
+    /// stream batches.
     pub(crate) row_entries: Vec<Vec<KvSlot>>,
     /// Nanosecond timestamp per row position (insertion order).
     pub(crate) timestamps: Vec<i64>,
-    /// Optional per-row columns in **insertion order**, parallel to `timestamps`.
-    /// Each is **independently** optional — a caller fills whichever it has, in any
-    /// combination (or none). `None` for a producer that only feeds rows via
-    /// [`row`](RowIndex::row) and sets no columns. Phase 2 reorders each
-    /// present column to chronological order and writes its chunk
-    /// (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`, plus the traces-only `PSPN`/`DURN`) in
-    /// the cold region; absent columns write no chunk and add no manifest entry.
-    /// Every present column MUST have length equal to the row count
-    /// ([`crate::Error::ColumnLengthMismatch`] at build).
+    /// Optional per-row columns, **insertion order**, parallel to `timestamps`.
+    /// Each field below is independently optional — a producer fills whichever
+    /// it has, in any combination (or none, feeding rows only via
+    /// [`row`](RowIndex::row)). Phase 2 reorders each present column to
+    /// chronological order and writes its chunk (`OBTS`/`TRCE`/`SPAN`/`FLAG`/
+    /// `DRAC`, plus the traces-only `PSPN`/`DURN`) in the cold region; an
+    /// absent column writes no chunk and gets no manifest entry. Every present
+    /// column MUST have one value per row ([`crate::Error::ColumnLengthMismatch`]
+    /// at build).
     pub observed_timestamps: Option<ObservedTimestamps>,
+    /// Per-row trace ids (`TRCE`).
     pub trace_ids: Option<TraceIds>,
+    /// Per-row span ids (`SPAN`).
     pub span_ids: Option<SpanIds>,
+    /// Per-row flag words (`FLAG`).
     pub flags: Option<Flags>,
+    /// Per-row dropped-attribute counts (`DRAC`).
     pub dropped_attribute_counts: Option<DroppedAttributeCounts>,
-    /// Span `parent_span_id` column (traces signal; logs leave it `None`).
+    /// Span `parent_span_id` column (`PSPN`; traces signal; logs leave it `None`).
     pub parent_span_ids: Option<ParentSpanIds>,
-    /// Span `duration` column (traces signal; logs leave it `None`).
+    /// Span `duration` column (`DURN`; traces signal; logs leave it `None`).
     pub durations: Option<Durations>,
-    /// Producer signal: build the `trace_id` index (`TIDX`) at seal. The index is
-    /// built in Phase 2 from the chronological `trace_ids` column, so this MUST
-    /// only be set together with `trace_ids`. The logs path leaves it `false` (its
-    /// `trace_ids` are near-unique-free log correlation ids, not a trace key).
+    /// Producer signal: build the `trace_id` index (`TIDX`) at seal. The index
+    /// is built in Phase 2 from the chronological `trace_ids` column, so this
+    /// MUST only be set together with `trace_ids` (enforced in `build.rs`).
+    /// The logs path leaves it `false` — its `trace_ids` are per-record
+    /// correlation ids, not a trace key to group rows by.
     pub build_trace_id_index: bool,
     /// Producer signal: build the per-file trace-id bloom (`TBLM`) at seal.
     /// Derived from the trace-id index, so this MUST only be set together with
-    /// [`build_trace_id_index`](Self::build_trace_id_index) (and the chunk is
-    /// skipped when the file has no set trace ids). The logs path leaves it
+    /// [`build_trace_id_index`](Self::build_trace_id_index); the chunk is also
+    /// skipped when the file has no set trace id. The logs path leaves it
     /// `false`.
     pub build_trace_id_bloom: bool,
     /// Span event structure accumulator (`EVNB` chunk; traces seal only). When
@@ -85,6 +115,9 @@ pub struct RowIndex<'a> {
 }
 
 impl<'a> RowIndex<'a> {
+    /// An empty index. `arena` owns the interned strings for the build's
+    /// lifetime; `cardinality_threshold` sets the interner's low/mid/high
+    /// field tiers.
     pub fn new(arena: &'a Bump, cardinality_threshold: u32) -> Self {
         Self {
             kv_interner: KeyValueInterner::new(arena, cardinality_threshold),
@@ -122,6 +155,7 @@ impl<'a> RowIndex<'a> {
     }
 
     /// Build a sparse histogram from the timestamps in chronological order.
+    /// Phase 2 reuses it for both the `Summary` min/max and the `META` payload.
     pub(crate) fn sparse_histogram(&self, time_order: &TimeOrder) -> Histogram {
         build_sparse_histogram(&self.timestamps, time_order)
     }
@@ -131,7 +165,8 @@ impl<'a> RowIndex<'a> {
         self.kv_interner.resolve(slot)
     }
 
-    /// Get the roaring bitmap for a key=value slot.
+    /// The per-slot bitmap: which row positions (insertion order) contain the
+    /// pair interned under `slot`.
     pub(crate) fn bitmap(&self, slot: KvSlot) -> &RoaringBitmap {
         &self.kv_bitmaps[slot.idx()]
     }
@@ -151,7 +186,10 @@ impl<'a> RowIndex<'a> {
         self.kv_interner.high_fields()
     }
 
-    /// Tier-aligned assignment of key=value IDs.
+    /// All slots in canonical order — low → mid → high tier, fields by name,
+    /// values sorted — the ordering `build.rs`'s `KvId` translation depends
+    /// on. Delegates to the interner; the [`FieldTier`](crate::FieldTier)
+    /// labels themselves are assigned in `build.rs`.
     pub(crate) fn tier_assignment(&self) -> [Vec<KvSlot>; 3] {
         self.kv_interner.tier_assignment()
     }
@@ -165,9 +203,9 @@ impl<'a> RowIndex<'a> {
     }
 }
 
-/// Row ingestion: a producer interns each `key=value` pair to a [`KvSlot`]
-/// and hands the slots back per row. Tokens are interner slots, and each
-/// row lands in the four Phase-1 structures.
+/// Row ingestion: the producer interns each `key=value` pair to a [`KvSlot`]
+/// (directly or via the hash fast path) and hands the per-row slot list back;
+/// each call lands the row in the four Phase-1 structures.
 impl<'a> RowIndex<'a> {
     /// Hash-only fast-path lookup: returns the slot a `key=value` was
     /// interned under if the producer's `xxhash64` is unambiguous, letting
@@ -242,41 +280,19 @@ impl TimeOrder {
 /// Build a permutation table that maps insertion-order positions to
 /// time-sorted positions.
 ///
-/// During indexing, each row gets a position based on the order it was read
-/// from the WAL (insertion order). But for time-range queries we need
-/// positions to correspond to chronological order, so that a contiguous
-/// range of positions like `[100..200]` maps to a contiguous time window.
+/// Rows are numbered in the order the producer read them (insertion order),
+/// but time-range queries need positions to correspond to chronology, so a
+/// contiguous range like `[100..200]` maps to a contiguous time window.
+/// Phase 2 translates every bitmap and row list through this remap.
 ///
 /// # Example
 ///
-/// Suppose we indexed 5 rows with these timestamps:
-///
-/// ```text
-///   insertion pos:  0     1     2     3     4
-///   timestamp:     10:03  10:01  10:05  10:00  10:02
-/// ```
-///
-/// After sorting by timestamp, the chronological order is:
-///
-/// ```text
-///   sorted pos:     0      1      2      3      4
-///   original pos:   3      1      4      0      2
-///   timestamp:     10:00  10:01  10:02  10:03  10:05
-/// ```
-///
-/// This gives us the remap table `remap[original] = sorted`:
-///
-/// ```text
-///   remap[0] = 3   (10:03 is 4th chronologically)
-///   remap[1] = 1   (10:01 is 2nd chronologically)
-///   remap[2] = 4   (10:05 is 5th chronologically)
-///   remap[3] = 0   (10:00 is 1st chronologically)
-///   remap[4] = 2   (10:02 is 3rd chronologically)
-/// ```
-///
-/// A bitmap that had bits `{0, 2}` (rows at 10:03 and 10:05 in insertion
-/// order) becomes `{3, 4}` (positions 3 and 4 in chronological order —
-/// the last two events).
+/// Five rows indexed in insertion order carry timestamps
+/// `10:03, 10:01, 10:05, 10:00, 10:02`. Chronologically they sort to
+/// positions `3, 1, 4, 0, 2`, so `sorted_position[0] = 3` (the 10:03 row is
+/// 4th in time) and `insertion_position[0] = 3` (the earliest row, 10:00,
+/// sits at insertion position 3). A bitmap holding `{0, 2}` — the 10:03 and
+/// 10:05 rows — translates to `{3, 4}`, the last two events chronologically.
 ///
 fn build_time_order(timestamps: &[i64]) -> TimeOrder {
     let n = timestamps.len();
@@ -295,11 +311,11 @@ fn build_time_order(timestamps: &[i64]) -> TimeOrder {
     }
 }
 
-/// Build a sparse histogram from chronologically sorted row timestamps.
+/// Build a sparse histogram from the rows in chronological order.
 ///
-/// Each entry records (second, running_count) — the cumulative number of
-/// rows up to and including that second. One entry per second that has at
-/// least one row.
+/// Timestamps truncate to whole seconds; each entry records
+/// (second, cumulative count of rows up to and including that second) — one
+/// entry per second that has at least one row.
 fn build_sparse_histogram(timestamps: &[i64], time_order: &TimeOrder) -> Histogram {
     if timestamps.is_empty() {
         return Histogram {
@@ -323,7 +339,8 @@ fn build_sparse_histogram(timestamps: &[i64], time_order: &TimeOrder) -> Histogr
         }
     }
 
-    // Emit final bucket.
+    // Emit the final bucket — the loop above only flushes a second once the
+    // next differing second appears.
     hist_ts.push(prev_sec);
     hist_counts.push(timestamps.len() as u32);
 

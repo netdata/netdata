@@ -1,11 +1,15 @@
-//! Chart management for Netdata metrics.
+//! Per-chart aggregation and emission for the OTLP metrics pipeline.
 //!
-//! A `Chart` manages dimensions and slot-based aggregation, mapping OpenTelemetry's
-//! event-based metrics to Netdata's fixed-interval collection model.
+//! A `Chart` is one Netdata chart: it maps each incoming OTLP data point to a
+//! dimension and an `update_every`-second slot, accumulates points per slot
+//! (see [`crate::aggregation`] for the flavor-specific state machines), and
+//! on each tick emits ready slots in chronological order — finalizing slots
+//! with data, gap-filling slots without, and writing the `CHART` definition
+//! plus `BEGIN`/`SET`/`END` blocks via [`crate::output`].
 //!
-//! Ingestion is purely additive: data points are recorded into per-slot
-//! accumulators within a `BTreeMap`. Emission drains ready slots in order,
-//! handling finalization, gap-filling, and output.
+//! Consumers: `metrics_service.rs`'s `ChartManager` owns one `Chart` per
+//! chart name and drives [`Chart::emit`] from lib.rs's per-second tick loop;
+//! `chart_config.rs` reuses only the [`ChartConfig`] timing struct.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::{Duration, Instant};
@@ -18,19 +22,11 @@ use crate::aggregation::{
 use crate::iter::MetricDataKind;
 use crate::output::{ChartDefinition, ChartType, DimensionValue, write_data_slot};
 
-/// A dimension with its cross-slot context and per-slot accumulators.
+/// One dimension of a chart: a cross-slot context plus per-slot accumulators.
 ///
-/// # Multi-Slot Architecture
-///
-/// Unlike the previous design which tracked only a single active slot, this
-/// implementation maintains a `BTreeMap` of slot accumulators. This enables:
-///
-/// - Out-of-order ingestion: Data points can arrive for any slot that
-///   hasn't been emitted yet, not just the "current" slot.
-/// - Batch emission: Multiple ready slots can be emitted in a single tick,
-///   in chronological order.
-/// - Late data acceptance: Data arriving late (but before emission) is
-///   properly accumulated rather than dropped.
+/// Slots live in a `BTreeMap`, so points can land in any slot that has not
+/// been emitted yet (out-of-order or late arrivals), and one tick can drain
+/// several ready slots in chronological order.
 struct Dimension<Ctx: CrossSlotContext> {
     /// The name of the dimension.
     name: String,
@@ -81,6 +77,9 @@ pub enum ChartAggregationType {
 
 impl ChartAggregationType {
     /// Determine the aggregation type from metric metadata.
+    ///
+    /// Returns `None` for kinds other than Gauge/Sum, and for sums without a
+    /// usable temporality.
     pub fn from_metric(
         data_kind: MetricDataKind,
         temporality: Option<AggregationTemporality>,
@@ -155,7 +154,7 @@ impl DefinitionState {
 pub struct Chart {
     /// The chart name used in Netdata protocol commands.
     chart_name: String,
-    /// The Netdata chart type (line, heatmap, etc.).
+    /// The Netdata chart type (line or heatmap).
     chart_type: ChartType,
     /// Collection interval in seconds.
     update_every: u64,
@@ -185,7 +184,8 @@ fn normalize(value: Option<f64>, interval_divisor: Option<u64>) -> Option<f64> {
     }
 }
 
-/// Type-erased dimension storage for different aggregator types.
+/// Per-flavor dimension storage: one map per aggregation type, so a chart
+/// only ever holds dimensions of its own flavor.
 enum DimensionStore {
     Gauge(HashMap<String, Dimension<GaugeContext>>),
     DeltaSum(HashMap<String, Dimension<DeltaSumContext>>),
@@ -193,6 +193,7 @@ enum DimensionStore {
 }
 
 impl DimensionStore {
+    /// Number of dimensions; no production caller today.
     #[allow(dead_code)]
     fn len(&self) -> usize {
         match self {
@@ -232,7 +233,8 @@ impl Chart {
 
     /// Create a chart from metric metadata.
     ///
-    /// Returns `None` if the metric type is not supported.
+    /// Returns `None` if the metric type is not supported; created charts are
+    /// [`ChartType::Line`] (heatmaps go through [`Chart::new`]).
     pub fn from_metric(
         name: &str,
         data_kind: MetricDataKind,
@@ -278,6 +280,7 @@ impl Chart {
         }
     }
 
+    /// Number of dimensions; no production caller today.
     #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.dimensions.len()
@@ -306,10 +309,8 @@ impl Chart {
             return;
         }
 
-        // A slot S is ready when tick_timestamp > S + update_every, i.e.,
-        // at least 1 second has passed since the slot ended (integer seconds).
-        // Using this as the exclusive upper bound for ready_slots means:
-        // slot < cutoff  ⟹  slot + update_every < tick_timestamp.
+        // Exclusive upper bound for ready slots: slot < cutoff means the slot
+        // ended at least 1 second ago (integer seconds).
         let cutoff = tick_timestamp.saturating_sub(self.update_every);
 
         // Nothing can be ready if the cutoff hasn't advanced past the last emission.
@@ -353,7 +354,8 @@ impl Chart {
             // No data anywhere, grace period expired — gap-fill one slot.
             let fill_slot = last + self.update_every;
 
-            // Don't gap-fill a slot whose end time hasn't passed the cutoff.
+            // Same readiness rule as real slots: only emit fill slots that
+            // are ready (fill_slot < cutoff).
             if fill_slot < cutoff {
                 let values = self.dimensions.gap_fill(self.update_every);
                 write_data_slot(buf, &self.chart_name, self.update_every, fill_slot, &values)
@@ -363,9 +365,9 @@ impl Chart {
             }
         }
 
-        // Unconditionally drain slots at or below the last emission point.
-        // Late-arriving data for already-emitted slots is silently discarded
-        // to prevent unbounded BTreeMap growth and stale `has_any_data()`.
+        // Drain slots at or below the last emission point: late data for
+        // emitted slots is dropped to bound the BTreeMap and keep
+        // `has_any_data()` truthful.
         if let Some(last) = self.last_emission_slot {
             self.dimensions.drain_up_to(last);
         }
@@ -398,8 +400,8 @@ impl Chart {
 
     /// Initialize the chart definition from metric metadata.
     ///
-    /// Caller should check [`has_definition()`](Self::has_definition) first
-    /// to avoid unnecessary allocations.
+    /// Debug-asserts the definition is still unset; callers gate on
+    /// [`has_definition()`](Self::has_definition) first.
     pub fn init_definition(
         &mut self,
         metric_name: &str,
@@ -409,6 +411,7 @@ impl Chart {
     ) {
         debug_assert!(matches!(self.definition, DefinitionState::Unset));
 
+        // Rate-normalized charts emit per-second values; reflect that in the units.
         let units = if self.is_rate_normalized() && !units.is_empty() {
             format!("{units}/s")
         } else {

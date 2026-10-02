@@ -1,5 +1,23 @@
-//! Tests for `IndexReader::trace_by_id` trace reconstruction: span dedup,
-//! root detection, and the cycle -> forest reachability guard.
+//! Tests for [`IndexReader::trace_by_id`], the single-file entry into the
+//! shared trace combiner (`trace_combine.rs`, driven through the per-file
+//! session in session.rs) — exercised end to end over in-memory SFST files
+//! this module builds with the crate's own writer (see `trace_file`).
+//!
+//! Pins:
+//!
+//! - a corrupt `TBLM` bloom degrades to the exact `TIDX` lookup instead of
+//!   hiding a findable trace; the raw accessor still surfaces the error;
+//! - an id absent from the file resolves to the empty trace, not an error;
+//! - dedup: duplicate `(span_id, kind)` rows collapse to one span, UNSET
+//!   span ids never do;
+//! - graph: unset or absent-from-set parents are roots; `children` is
+//!   node-index adjacency parallel to `spans`;
+//! - a parent cycle with no external entry stays a walkable forest: a
+//!   root is promoted, and walkers must guard revisits (`children` keeps
+//!   the cycle edges).
+//!
+//! Not pinned here: attribute facets, events, and links materialization —
+//! fixture files carry empty attribute fields on purpose.
 
 use crate::writer::{ChunkCounts, ChunkWriter, ColumnsPresent};
 use crate::{
@@ -14,15 +32,18 @@ fn sid(b: u8) -> SpanId {
     SpanId::from([b; 8])
 }
 
-/// Build a minimal traces SFST whose rows all share one `trace_id`, from a list
-/// of `(span_id, parent_span_id)` pairs in chronological (row) order. Fields are
-/// empty (the tree logic under test reads ids/timestamps, not attributes).
+/// Build a minimal traces SFST whose rows all share one `trace_id`, from
+/// `(span_id, parent_span_id)` pairs given in row order (ascending
+/// timestamps are assigned, so row order == start order). Attribute
+/// fields stay empty — the tests exercise ids, parents, and row scalars,
+/// not facets.
 fn trace_file(rows: &[(SpanId, SpanId)]) -> Vec<u8> {
     trace_file_with_bloom(rows, None)
 }
 
-/// Like [`trace_file`], optionally carrying a caller-supplied `TBLM` payload
-/// (which may be deliberately malformed — the writer packs, it does not vet).
+/// Like [`trace_file`], optionally writing a caller-supplied `TBLM`
+/// (trace-id bloom) payload — which may be deliberately malformed: the
+/// writer packs it as-is, validation happens on read.
 fn trace_file_with_bloom(
     rows: &[(SpanId, SpanId)],
     bloom: Option<&crate::TraceIdBloom>,
@@ -155,6 +176,9 @@ fn corrupt_bloom_degrades_to_the_exact_lookup() {
 
 #[test]
 fn absent_trace_yields_empty() {
+    // An id the TIDX doesn't carry is not an error: trace_by_id resolves
+    // it to the empty trace (no spans, no roots). No bloom in this
+    // fixture, so the miss comes from the exact lookup.
     let buf = trace_file(&[(sid(1), SpanId::from([0; 8]))]);
     let reader = IndexReader::open(&buf).unwrap();
     let trace = reader.trace_by_id(TraceId::from([0xEE; 16])).unwrap();
@@ -170,10 +194,11 @@ fn duplicate_span_id_is_collapsed_to_first() {
     let reader = IndexReader::open(&buf).unwrap();
     let trace = reader.trace_by_id(TraceId::from(TRACE)).unwrap();
 
-    // The two A rows collapse to one span; B remains → 2 spans, both roots.
+    // Both A rows share the dedup key (span_id, kind) → one span; B is a
+    // distinct key.
     assert_eq!(trace.spans.len(), 2);
     assert_eq!(trace.roots.len(), 2);
-    // `children` is parallel to `spans` — no edges means all-empty lists.
+    // `children` is node-index adjacency parallel to `spans`.
     assert!(trace.children.iter().all(|kids| kids.is_empty()));
 }
 
@@ -191,18 +216,17 @@ fn unset_span_ids_are_not_collapsed() {
 #[test]
 fn parent_edges_and_missing_parent_root() {
     let unset = SpanId::from([0; 8]);
-    // A(root), B(child of A), C(parent = X which is absent from this file → root).
+    // A (unset parent → root), B (child of A), C (parent X not in this
+    // file's span set → root: a partial trace still forms a forest).
     let buf = trace_file(&[(sid(1), unset), (sid(2), sid(1)), (sid(3), sid(9))]);
     let reader = IndexReader::open(&buf).unwrap();
     let trace = reader.trace_by_id(TraceId::from(TRACE)).unwrap();
 
     assert_eq!(trace.spans.len(), 3);
-    // A and C are roots; B is A's child.
     assert_eq!(trace.roots.len(), 2);
     let a_idx = trace.spans.iter().position(|s| s.span_id == sid(1)).unwrap();
     let a_children = &trace.children[a_idx];
     assert_eq!(a_children.len(), 1);
-    // The edge points at B.
     assert_eq!(trace.spans[a_children[0]].span_id, sid(2));
 }
 
@@ -219,7 +243,8 @@ fn parent_cycle_stays_a_forest_and_terminates() {
     // At least one span is promoted to a root so the forest is walkable.
     assert!(!trace.roots.is_empty());
 
-    // Every span is reachable from some root via a revisit-guarded walk.
+    // The cycle's edges remain in `children`, so the walk guards against
+    // revisits — and still reaches every span from the promoted root(s).
     let mut seen = vec![false; trace.spans.len()];
     let mut stack = trace.roots.clone();
     while let Some(i) = stack.pop() {

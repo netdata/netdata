@@ -1,13 +1,34 @@
+//! Display-only transformations for systemd-journal field values.
+//!
+//! NOT COMPILED — orphan file: journal-engine/src/logs/mod.rs declares only
+//! `query` and `table`, so nothing here is in the module tree. The live
+//! counterpart is journal-function/src/netdata/transformations.rs (declared
+//! in `journal-function/src/netdata/mod.rs`), a superset of this file; both
+//! were added in commit d0905d9b99 ("OTEL logs", PR #21356).
+//!
+//! A [`FieldTransformation`] maps one raw field value to its display form
+//! (e.g. `PRIORITY` "3" → "error"); implementations echo unknown or
+//! unparseable values back unchanged. [`TransformationRegistry`] keys
+//! mappers by field name; `transform_field` builds a `CellValue`
+//! (`logs/table.rs` `CellValue`) that keeps raw and display side by
+//! side, echoing the raw value when a field has no registration — the
+//! normal case, because the query engine returns raw values only
+//! (`logs/query.rs` `extract_entry_data`). Nothing in-tree calls
+//! `create_systemd_journal_transformations`.
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Trait for field transformations
+/// Maps one raw field value to its display form. Implementations are
+/// stateless unit types that echo unknown or unparseable values back
+/// unchanged; `Send + Sync` lets `Arc`-wrapped mappers be shared across
+/// threads.
 pub trait FieldTransformation: Send + Sync {
-    /// Transform a raw field value to a display representation
+    /// Returns the display string for `raw_value`.
     fn transform(&self, raw_value: &str) -> String;
 }
 
-/// Registry of field transformations
+/// Field-name keyed set of [`FieldTransformation`] mappers. Cloning shares
+/// the mappers (`Arc`).
 #[derive(Clone)]
 pub struct TransformationRegistry {
     transformations: HashMap<String, Arc<dyn FieldTransformation>>,
@@ -21,12 +42,15 @@ impl TransformationRegistry {
         }
     }
 
-    /// Register a transformation for a specific field
+    /// Registers the mapper for `field_name`, replacing any previous one.
     pub fn register(&mut self, field_name: impl Into<String>, transform: Arc<dyn FieldTransformation>) {
         self.transformations.insert(field_name.into(), transform);
     }
 
-    /// Transform a field value using the registered transformation
+    /// Builds a table cell for `field_name`: an empty cell for `None`; for
+    /// `Some(raw)`, a cell holding the raw value and its display form side
+    /// by side (`CellValue::with_display`). Display is the registered
+    /// mapper's output, or `raw` itself when the field is not registered.
     pub fn transform_field(&self, field_name: &str, raw: Option<String>) -> super::table::CellValue {
         match raw {
             None => super::table::CellValue::new(None),
@@ -49,7 +73,7 @@ impl Default for TransformationRegistry {
     }
 }
 
-/// PRIORITY: 0-7 → human-readable names
+/// PRIORITY: syslog severity "0".."7" → name ("panic".."debug").
 pub struct PriorityTransformation;
 
 impl FieldTransformation for PriorityTransformation {
@@ -247,33 +271,31 @@ impl FieldTransformation for ErrnoTransformation {
     }
 }
 
-/// _BOOT_ID: UUID → "UUID (timestamp)"
-/// Note: Full implementation would require boot_id cache lookup
+/// _BOOT_ID: placeholder — echoes the UUID back unchanged. No boot-start
+/// timestamp lookup is implemented, so no "(timestamp)" is ever appended.
 pub struct BootIdTransformation;
 
 impl FieldTransformation for BootIdTransformation {
     fn transform(&self, raw_value: &str) -> String {
-        // For now, just return the UUID
-        // Full implementation would look up first boot timestamp from cache
+        // Placeholder: first-boot-timestamp cache lookup not implemented.
         raw_value.to_string()
     }
 }
 
-/// _UID: numeric → username
+/// _UID: numeric UID → "uid (username)"; unknown UID or lookup error echoes
+/// the raw value.
 pub struct UidTransformation;
 
 impl FieldTransformation for UidTransformation {
     fn transform(&self, raw_value: &str) -> String {
         use nix::unistd::{Uid, User};
 
-        // Parse the UID
         let Ok(uid_num) = raw_value.parse::<u32>() else {
             return raw_value.to_string();
         };
 
         let uid = Uid::from_raw(uid_num);
 
-        // Look up the user
         match User::from_uid(uid) {
             Ok(Some(user)) => format!("{} ({})", raw_value, user.name),
             Ok(None) => raw_value.to_string(), // User not found
@@ -282,21 +304,20 @@ impl FieldTransformation for UidTransformation {
     }
 }
 
-/// _GID: numeric → groupname
+/// _GID: numeric GID → "gid (groupname)"; unknown GID or lookup error echoes
+/// the raw value.
 pub struct GidTransformation;
 
 impl FieldTransformation for GidTransformation {
     fn transform(&self, raw_value: &str) -> String {
         use nix::unistd::{Gid, Group};
 
-        // Parse the GID
         let Ok(gid_num) = raw_value.parse::<u32>() else {
             return raw_value.to_string();
         };
 
         let gid = Gid::from_raw(gid_num);
 
-        // Look up the group
         match Group::from_gid(gid) {
             Ok(Some(group)) => format!("{} ({})", raw_value, group.name),
             Ok(None) => raw_value.to_string(), // Group not found
@@ -305,12 +326,13 @@ impl FieldTransformation for GidTransformation {
     }
 }
 
-/// _CAP_EFFECTIVE: hex → "hex (capability names)"
+/// _CAP_EFFECTIVE: hex ("0x" prefix) or decimal capability bitmask →
+/// "value (comma-separated CAP_* names)", "(none)" when no bits are set.
 pub struct CapEffectiveTransformation;
 
 impl FieldTransformation for CapEffectiveTransformation {
     fn transform(&self, raw_value: &str) -> String {
-        // Parse hex value
+        // Optional "0x" prefix; parsed as plain decimal otherwise.
         let caps_value = if let Some(hex) = raw_value.strip_prefix("0x") {
             u64::from_str_radix(hex, 16).ok()
         } else {
@@ -381,36 +403,33 @@ impl FieldTransformation for CapEffectiveTransformation {
     }
 }
 
-/// _SOURCE_REALTIME_TIMESTAMP: microseconds → "microseconds (ISO8601)"
+/// _SOURCE_REALTIME_TIMESTAMP: epoch microseconds → "usec (RFC3339, local
+/// time, microsecond precision)".
 pub struct SourceRealtimeTimestampTransformation;
 
 impl FieldTransformation for SourceRealtimeTimestampTransformation {
     fn transform(&self, raw_value: &str) -> String {
-        // Parse microseconds since epoch
         let Ok(usec) = raw_value.parse::<i64>() else {
             return raw_value.to_string();
         };
 
-        // Convert to seconds and nanoseconds
         let secs = usec / 1_000_000;
         let nsecs = ((usec % 1_000_000) * 1000) as u32;
 
-        // Create DateTime in UTC, then convert to local timezone
         use chrono::{Local, TimeZone, Utc};
         let dt_utc = match Utc.timestamp_opt(secs, nsecs) {
             chrono::LocalResult::Single(dt) => dt,
             _ => return raw_value.to_string(),
         };
 
-        // Convert to local time
         let dt_local = dt_utc.with_timezone(&Local);
 
-        // Format as RFC3339 with microsecond precision in local timezone
         format!("{} ({})", raw_value, dt_local.to_rfc3339_opts(chrono::SecondsFormat::Micros, true))
     }
 }
 
-/// MESSAGE_ID: UUID → "UUID (description)"
+/// MESSAGE_ID: journal MESSAGE_ID UUID → "uuid (description)" for well-known
+/// systemd and Netdata message IDs; unknown UUIDs unchanged.
 pub struct MessageIdTransformation;
 
 impl FieldTransformation for MessageIdTransformation {
@@ -561,7 +580,8 @@ impl FieldTransformation for MessageIdTransformation {
 pub fn create_systemd_journal_transformations() -> TransformationRegistry {
     let mut registry = TransformationRegistry::new();
 
-    // Timestamp transformation (used for the first column)
+    // "timestamp" is the synthetic first-column key; same mapper as the real
+    // journal field _SOURCE_REALTIME_TIMESTAMP registered below.
     registry.register("timestamp", Arc::new(SourceRealtimeTimestampTransformation));
 
     registry.register("PRIORITY", Arc::new(PriorityTransformation));
@@ -577,7 +597,8 @@ pub fn create_systemd_journal_transformations() -> TransformationRegistry {
     );
     registry.register("MESSAGE_ID", Arc::new(MessageIdTransformation));
 
-    // Also register variations that exist in the wild
+    // UID/GID field-name variants seen in real journals, all mapped by the
+    // same mappers.
     registry.register("OBJECT_UID", Arc::new(UidTransformation));
     registry.register("OBJECT_GID", Arc::new(GidTransformation));
     registry.register("_SYSTEMD_OWNER_UID", Arc::new(UidTransformation));

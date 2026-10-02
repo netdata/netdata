@@ -1,10 +1,40 @@
 #![allow(dead_code)]
+//! The dyncfg command vocabulary: [`DynCfgCmds`], the bitflag set naming the
+//! operations a dynamic-configuration entry supports. It is the `cmds` field
+//! of [`ConfigDeclaration`](crate::ConfigDeclaration), parsed from a schema's
+//! `configDeclaration.cmds` JSON string and emitted as one word of the
+//! pluginsd CONFIG line.
+//!
+//! Wire form: lowercase names, pipe-separated ("get | schema") — what the
+//! schema crate writes into the `cmds` JSON member and what
+//! netdata-plugin-protocol's CONFIG encoder puts in the `cmds` word (run
+//! through the encoder's `quote_if_needed`, which quotes it when it contains
+//! spaces). The agent parses that word with
+//! `dyncfg_cmds2id` (src/libnetdata/inicfg/dyncfg.c), which splits on spaces
+//! and silently ignores the "|" tokens, so it reads both the Rust
+//! pipe-separated form and the C agent's own space-separated form
+//! (`dyncfg_cmds2buffer`) identically. The bit layout mirrors the agent's
+//! `DYNCFG_CMDS` enum (src/libnetdata/inicfg/dyncfg.h) bit-for-bit, so the
+//! u32 conversions interoperate.
+//!
+//! Parsing here is stricter than the agent: an unknown name rejects the
+//! whole input, while `dyncfg_cmds2id` silently skips unrecognized words.
+//! Registration caveat, outside this type: the CONFIG encoder sends the
+//! action word uppercase ("CREATE"), while the agent matches it
+//! case-sensitively against lowercase "create" (pluginsd_config,
+//! src/plugins.d/pluginsd_dyncfg.c), so those declarations are logged as an
+//! unknown action and never registered — see the protocol crate's encoder
+//! (tokio_codec).
 
 use bitflags::bitflags;
 use std::fmt;
 use std::str::FromStr;
 
 bitflags! {
+    /// The dyncfg operations a configuration entry supports, as a bitflag
+    /// set. Carried by [`ConfigDeclaration`](crate::ConfigDeclaration) and
+    /// rendered on the wire by `Display` / [`Self::to_pipe_separated`] (the
+    /// CONFIG line contract is in the module docs).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
     pub struct DynCfgCmds: u32 {
         const GET = 1 << 0;
@@ -21,7 +51,9 @@ bitflags! {
 }
 
 impl DynCfgCmds {
-    /// Get the string name for a single command flag
+    /// Wire name of a single command flag, lowercase as the agent's `cmd_map`
+    /// spells it (src/libnetdata/inicfg/dyncfg.c). `None` unless exactly that
+    /// one flag is set — multi-flag sets and the empty set have no single name.
     pub fn flag_name(flag: Self) -> Option<&'static str> {
         match flag {
             Self::GET => Some("get"),
@@ -38,7 +70,8 @@ impl DynCfgCmds {
         }
     }
 
-    /// Parse a single command name to its flag
+    /// Parse a single command name to its flag. Matching is lowercase and
+    /// exact (whitespace is trimmed first); anything else is `None`.
     pub fn from_cmd_name(name: &str) -> Option<Self> {
         match name.trim() {
             "get" => Some(Self::GET),
@@ -55,8 +88,11 @@ impl DynCfgCmds {
         }
     }
 
-    /// Parse from string with space or pipe-separated command names
-    /// Examples: "get | schema | restart", "get schema restart", "get|schema|restart"
+    /// Parse a command list that separates names with spaces, pipes, or both:
+    /// "get | schema", "get schema restart" and "get|schema|restart" all
+    /// parse. Unknown names reject the whole input; an empty (or
+    /// all-whitespace) string yields the empty set. (Why both separators are
+    /// accepted, and how the agent parses the result, is in the module docs.)
     pub fn from_str_multi(s: &str) -> Option<Self> {
         let s = s.trim();
         if s.is_empty() {
@@ -65,7 +101,6 @@ impl DynCfgCmds {
 
         let mut result = Self::empty();
 
-        // Split by both spaces and pipes, then filter out empty parts
         for part in s.split([' ', '|']) {
             let part = part.trim();
             if part.is_empty() {
@@ -81,13 +116,18 @@ impl DynCfgCmds {
         Some(result)
     }
 
-    /// Parse from byte slice
+    /// Parse from raw bytes (a wire word before UTF-8 decoding): invalid
+    /// UTF-8 is `None`, otherwise as [`Self::from_str_multi`].
     pub fn from_slice(bytes: &[u8]) -> Option<Self> {
         let s = std::str::from_utf8(bytes).ok()?;
         Self::from_str_multi(s)
     }
 
-    /// Convert to a space-separated string representation
+    /// Render space-separated ("get schema restart"), the form the C agent
+    /// uses for the `cmds` word of its own CONFIG lines
+    /// (`dyncfg_cmds2buffer`). Names come out in the fixed flag order of the
+    /// array below, so the output for a given set is deterministic; the
+    /// empty set renders as "".
     pub fn to_space_separated(&self) -> String {
         if self.is_empty() {
             return String::new();
@@ -95,7 +135,6 @@ impl DynCfgCmds {
 
         let mut parts = Vec::new();
 
-        // Check each flag in order
         for &flag in &[
             Self::GET,
             Self::SCHEMA,
@@ -118,7 +157,9 @@ impl DynCfgCmds {
         parts.join(" ")
     }
 
-    /// Convert to a pipe-separated string representation
+    /// Render pipe-separated ("get | schema") — the form [`std::fmt::Display`]
+    /// prints. Names come out in the fixed flag order of the array below,
+    /// like [`Self::to_space_separated`]; the empty set renders as "".
     pub fn to_pipe_separated(&self) -> String {
         if self.is_empty() {
             return String::new();
@@ -126,7 +167,6 @@ impl DynCfgCmds {
 
         let mut parts = Vec::new();
 
-        // Check each flag in order
         for &flag in &[
             Self::GET,
             Self::SCHEMA,
@@ -150,12 +190,18 @@ impl DynCfgCmds {
     }
 }
 
+/// Prints pipe-separated: this is the `cmds` word the protocol CONFIG
+/// encoder writes (passed through its `quote_if_needed`, which quotes it
+/// when it contains spaces) and the string the schema crate emits as the
+/// `configDeclaration.cmds` JSON member.
 impl fmt::Display for DynCfgCmds {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.to_pipe_separated())
     }
 }
 
+/// Delegates to [`Self::from_str_multi`]; `Err` is the unit type, so a
+/// failure carries no diagnostic detail.
 impl FromStr for DynCfgCmds {
     type Err = ();
 
@@ -164,12 +210,18 @@ impl FromStr for DynCfgCmds {
     }
 }
 
+/// Build from raw bits. The layout matches the agent's `DYNCFG_CMDS` enum
+/// (src/libnetdata/inicfg/dyncfg.h: GET = 1<<0 ... USERCONFIG = 1<<9), so
+/// the values interoperate; unknown bits are silently dropped by
+/// `from_bits_truncate`.
 impl From<u32> for DynCfgCmds {
     fn from(value: u32) -> Self {
         Self::from_bits_truncate(value)
     }
 }
 
+/// The raw bit pattern, identical to the agent's `DYNCFG_CMDS` bitmask for
+/// the same commands.
 impl From<DynCfgCmds> for u32 {
     fn from(cmds: DynCfgCmds) -> Self {
         cmds.bits()
