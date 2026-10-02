@@ -1,0 +1,4 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"@PLUGINS_DIR@/dem-install-health.sh" "@VARLIB_DIR@" "@CONFIG_DIR@" "@netdata_user_POST@" "@netdata_group_POST@"

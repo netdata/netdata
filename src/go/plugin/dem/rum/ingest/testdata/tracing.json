@@ -1,0 +1,303 @@
+{
+    "meta": {
+        "sdk": {
+            "name": "faro-web",
+            "version": "2.11.0"
+        },
+        "app": {
+            "name": "trace-test"
+        },
+        "browser": {
+            "name": "Chrome",
+            "version": "124.0.0.0",
+            "os": "Linux unknown",
+            "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "language": "en-US",
+            "mobile": false,
+            "brands": [
+                {
+                    "brand": "Chromium",
+                    "version": "124"
+                },
+                {
+                    "brand": "Google Chrome",
+                    "version": "124"
+                },
+                {
+                    "brand": "Not-A.Brand",
+                    "version": "99"
+                }
+            ],
+            "viewportWidth": "800",
+            "viewportHeight": "460"
+        },
+        "os": {
+            "name": "Linux"
+        },
+        "page": {
+            "url": "http://127.0.0.1:8801/test.html"
+        },
+        "session": {
+            "id": "c1LeYbJunm"
+        }
+    },
+    "traces": {
+        "resourceSpans": [
+            {
+                "resource": {
+                    "attributes": [
+                        {
+                            "key": "service.name",
+                            "value": {
+                                "stringValue": "trace-test"
+                            }
+                        },
+                        {
+                            "key": "browser.brands",
+                            "value": {
+                                "arrayValue": {
+                                    "values": [
+                                        {
+                                            "stringValue": "Chromium"
+                                        },
+                                        {
+                                            "stringValue": "Google Chrome"
+                                        },
+                                        {
+                                            "stringValue": "Not-A.Brand"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "key": "browser.language",
+                            "value": {
+                                "stringValue": "en-US"
+                            }
+                        },
+                        {
+                            "key": "browser.mobile",
+                            "value": {
+                                "boolValue": false
+                            }
+                        },
+                        {
+                            "key": "browser.platform",
+                            "value": {
+                                "stringValue": "Linux unknown"
+                            }
+                        },
+                        {
+                            "key": "user_agent.original",
+                            "value": {
+                                "stringValue": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                            }
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "value": {
+                                "stringValue": "browser"
+                            }
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "value": {
+                                "stringValue": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                            }
+                        },
+                        {
+                            "key": "telemetry.distro.name",
+                            "value": {
+                                "stringValue": "faro-web-sdk"
+                            }
+                        },
+                        {
+                            "key": "telemetry.distro.version",
+                            "value": {
+                                "stringValue": "2.11.0"
+                            }
+                        },
+                        {
+                            "key": "telemetry.sdk.language",
+                            "value": {
+                                "stringValue": "webjs"
+                            }
+                        },
+                        {
+                            "key": "telemetry.sdk.name",
+                            "value": {
+                                "stringValue": "opentelemetry"
+                            }
+                        },
+                        {
+                            "key": "telemetry.sdk.version",
+                            "value": {
+                                "stringValue": "2.10.0"
+                            }
+                        }
+                    ],
+                    "droppedAttributesCount": 0
+                },
+                "scopeSpans": [
+                    {
+                        "scope": {
+                            "name": "@opentelemetry/instrumentation-fetch",
+                            "version": "0.221.0"
+                        },
+                        "spans": [
+                            {
+                                "traceId": "360b7dd27710ac98272283e6f1f29102",
+                                "spanId": "17c20d0ec32b813e",
+                                "name": "GET",
+                                "kind": 3,
+                                "startTimeUnixNano": "1790535888754000000",
+                                "endTimeUnixNano": "1790535888765000000",
+                                "attributes": [
+                                    {
+                                        "key": "http.request.method",
+                                        "value": {
+                                            "stringValue": "GET"
+                                        }
+                                    },
+                                    {
+                                        "key": "url.full",
+                                        "value": {
+                                            "stringValue": "http://127.0.0.1:8801/api/hello?user=secret"
+                                        }
+                                    },
+                                    {
+                                        "key": "session.id",
+                                        "value": {
+                                            "stringValue": "c1LeYbJunm"
+                                        }
+                                    },
+                                    {
+                                        "key": "http.response.status_code",
+                                        "value": {
+                                            "intValue": 200
+                                        }
+                                    },
+                                    {
+                                        "key": "server.address",
+                                        "value": {
+                                            "stringValue": "127.0.0.1"
+                                        }
+                                    },
+                                    {
+                                        "key": "server.port",
+                                        "value": {
+                                            "intValue": 8801
+                                        }
+                                    }
+                                ],
+                                "droppedAttributesCount": 0,
+                                "events": [],
+                                "droppedEventsCount": 0,
+                                "status": {
+                                    "code": 0
+                                },
+                                "links": [],
+                                "droppedLinksCount": 0,
+                                "flags": 257
+                            },
+                            {
+                                "traceId": "8b9ca749ac1b1e624a746f223b3442a5",
+                                "spanId": "ef0fce3f642d57d9",
+                                "name": "GET",
+                                "kind": 3,
+                                "startTimeUnixNano": "1790535888762000000",
+                                "endTimeUnixNano": "1790535888769000000",
+                                "attributes": [
+                                    {
+                                        "key": "http.request.method",
+                                        "value": {
+                                            "stringValue": "GET"
+                                        }
+                                    },
+                                    {
+                                        "key": "url.full",
+                                        "value": {
+                                            "stringValue": "http://127.0.0.1:8802/api/orders?id=42"
+                                        }
+                                    },
+                                    {
+                                        "key": "session.id",
+                                        "value": {
+                                            "stringValue": "c1LeYbJunm"
+                                        }
+                                    },
+                                    {
+                                        "key": "http.response.status_code",
+                                        "value": {
+                                            "intValue": 200
+                                        }
+                                    },
+                                    {
+                                        "key": "server.address",
+                                        "value": {
+                                            "stringValue": "127.0.0.1"
+                                        }
+                                    },
+                                    {
+                                        "key": "server.port",
+                                        "value": {
+                                            "intValue": 8802
+                                        }
+                                    }
+                                ],
+                                "droppedAttributesCount": 0,
+                                "events": [],
+                                "droppedEventsCount": 0,
+                                "status": {
+                                    "code": 0
+                                },
+                                "links": [],
+                                "droppedLinksCount": 0,
+                                "flags": 257
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    "events": [
+        {
+            "name": "faro.tracing.fetch",
+            "domain": "browser",
+            "attributes": {
+                "http.request.method": "GET",
+                "url.full": "http://127.0.0.1:8801/api/hello?user=secret",
+                "session.id": "c1LeYbJunm",
+                "http.response.status_code": "200",
+                "server.address": "127.0.0.1",
+                "server.port": "8801",
+                "duration_ns": "11000064"
+            },
+            "timestamp": "2026-09-27T19:04:48.765Z",
+            "trace": {
+                "trace_id": "360b7dd27710ac98272283e6f1f29102",
+                "span_id": "17c20d0ec32b813e"
+            }
+        },
+        {
+            "name": "faro.tracing.fetch",
+            "domain": "browser",
+            "attributes": {
+                "http.request.method": "GET",
+                "url.full": "http://127.0.0.1:8802/api/orders?id=42",
+                "session.id": "c1LeYbJunm",
+                "http.response.status_code": "200",
+                "server.address": "127.0.0.1",
+                "server.port": "8802",
+                "duration_ns": "7000064"
+            },
+            "timestamp": "2026-09-27T19:04:48.769Z",
+            "trace": {
+                "trace_id": "8b9ca749ac1b1e624a746f223b3442a5",
+                "span_id": "ef0fce3f642d57d9"
+            }
+        }
+    ]
+}

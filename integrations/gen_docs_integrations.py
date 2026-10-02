@@ -51,6 +51,7 @@ def cleanup(only_base_paths=None):
     targets = [
         "src/go/plugin/go.d/collector",
         "src/go/plugin/scripts.d/collector",
+        "src/go/plugin/dem/collector",
         "src/go/plugin/ibm.d/modules",
         "src/crates/otel-plugin",
         "src/crates/netflow-plugin",

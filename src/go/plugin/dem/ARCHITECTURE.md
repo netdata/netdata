@@ -1,0 +1,30 @@
+# Native DEM ownership
+
+The command owns SQLite and the plugin-wide retention service. It closes SQLite only after `agenthost.Result` reports
+`Err == nil` and `ExitRequired == false`. An error or recovery requiring process exit may leave consumers alive; process
+exit owns their handles. Process-service finalizers run before job retirement and cannot close resources used by jobs.
+
+The framework owns desired configuration, preflight, scheduling, admission, retries, status and DynCfg. The constructor
+injects a runtime hub into collectors and a domain-only source into process Functions. The hub contains actual admitted
+site registrations and receiver availability. It has no desired config mirror, scheduler or job status.
+
+Receiver `Init` / `Check` validate and prepare without binding. `Run` binds the listener, publishes availability and
+signals readiness. Each site initializes its immutable policy, then independently admits its aggregator, route, redactor
+and runtime generation. Site readiness does not depend on receiver readiness. Receiver replacement preserves site
+aggregation and pending investigation/export queues.
+
+An HTTP request acquires one exact site registration containing both policy and sinks. Bootstrap, preflight, demo and
+beacon endpoints use this same admission. Retirement removes future admission, cancels admitted request contexts and
+joins their leases. Cancellation interrupts socket reads through a response-controller deadline before closing bodies;
+closing a net/http request body alone can wait behind a stalled read. Cancellation callbacks join before leases release.
+Function reads lease domain state only while copying snapshots, and historical queries use caller-aware SQL contexts.
+
+A retiring site joins its HTTP and Function readers before cancelling the history/export worker context. Export queues
+drain using one shared fixed shutdown budget, and accepted history contributions flush under a detached five-second SQL
+budget. Session contributions are deltas, allowing persistence to accumulate across site generations and session cache
+replacement. Publication uses typed metrix snapshots and static chart templates, with no V1 map bridge.
+
+Each site owns its exact generated health file. At command startup, before admission, recovery removes abandoned regular
+files only in the reserved RUM output namespace; subsequent process-service work retries health reload and never sweeps
+files while jobs are active. Health reload uses the existing nd-run command containment with the application environment
+preserved, including a customized Agent pipe name. Template selectors bind native chart labels rather than host labels.
