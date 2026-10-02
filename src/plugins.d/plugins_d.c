@@ -83,6 +83,34 @@ static void pluginsd_worker_thread_handle_success(struct plugind *cd) {
     }
 }
 
+// The policy for a failed run, whether the plugin exited with an error or we
+// disconnected it because we could not parse its output: disable it if it never
+// produced useful output, otherwise restart it with backoff until too many
+// consecutive runs fail without useful output.
+static void pluginsd_worker_thread_handle_failure(struct plugind *cd, const char *failure) {
+    if (!cd->successful_collections) {
+        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) %s and haven't collected any data. Disabling it.",
+              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, failure);
+        plugin_set_disabled(cd);
+        return;
+    }
+
+    if (cd->serial_failures <= SERIAL_FAILURES_THRESHOLD) {
+        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) %s, but has given useful output in the past (%zu times). %s",
+              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, failure, cd->successful_collections,
+              plugin_is_enabled(cd) ? "Waiting a bit before starting it again." : "Will not start it again - it is disabled.");
+
+        pluginsd_sleep(cd->update_every * 10);
+        return;
+    }
+
+    netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) %s, but has given useful output in the past (%zu times)."
+          "We tried to restart it %zu times, but it failed to generate data. Disabling it.",
+          rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, failure,
+          cd->successful_collections, cd->serial_failures);
+    plugin_set_disabled(cd);
+}
+
 static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_ret_code) {
     if (worker_ret_code == -1) {
         netdata_log_info("PLUGINSD: 'host:%s', '%s' (pid %d) exited abnormally. Disabling it.",
@@ -91,30 +119,9 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
         return;
     }
 
-    if (!cd->successful_collections) {
-        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d and haven't collected any data. Disabling it.",
-              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, worker_ret_code);
-        plugin_set_disabled(cd);
-        return;
-    }
-
-    if (cd->serial_failures <= SERIAL_FAILURES_THRESHOLD) {
-        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s",
-              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, worker_ret_code, cd->successful_collections,
-              plugin_is_enabled(cd) ? "Waiting a bit before starting it again." : "Will not start it again - it is disabled.");
-
-        pluginsd_sleep(cd->update_every * 10);
-        return;
-    }
-
-    if (cd->serial_failures > SERIAL_FAILURES_THRESHOLD) {
-        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times)."
-              "We tried to restart it %zu times, but it failed to generate data. Disabling it.",
-              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, worker_ret_code,
-              cd->successful_collections, cd->serial_failures);
-        plugin_set_disabled(cd);
-        return;
-    }
+    char failure[50];
+    snprintfz(failure, sizeof(failure), "exited with error code %d", worker_ret_code);
+    pluginsd_worker_thread_handle_failure(cd, failure);
 }
 
 #undef SERIAL_FAILURES_THRESHOLD
@@ -159,11 +166,11 @@ static void pluginsd_worker_thread(void *arg) {
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        bool retry = false;
+        bool retry = false, protocol_error = false;
         count = pluginsd_process(cd->host, cd,
                                  spawn_popen_read_fd(cd->unsafe.pi),
                                  spawn_popen_write_fd(cd->unsafe.pi),
-                                 0, &retry);
+                                 0, &retry, &protocol_error);
 
         nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections.",
@@ -174,6 +181,10 @@ static void pluginsd_worker_thread(void *arg) {
 
         if (retry && worker_ret_code != -1)
             pluginsd_sleep(cd->update_every);
+        else if (protocol_error && worker_ret_code != -1)
+            // after the disconnect the plugin usually exits cleanly or on SIGTERM/SIGPIPE,
+            // so its exit code cannot tell that the run failed
+            pluginsd_worker_thread_handle_failure(cd, "sent output that could not be parsed");
         else if(likely(worker_ret_code == 0))
             pluginsd_worker_thread_handle_success(cd);
         else

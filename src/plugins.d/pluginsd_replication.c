@@ -43,10 +43,10 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *
     const char *wall_clock_time_txt = get_word(words, num_words, 3);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END, PLUGINSD_KEYWORD_CHART);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     time_t first_entry_child = (first_entry_txt && *first_entry_txt) ? (time_t)str2ul(first_entry_txt) : 0;
     time_t last_entry_child = (last_entry_txt && *last_entry_txt) ? (time_t)str2ul(last_entry_txt) : 0;
@@ -120,7 +120,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
     char *child_now_str = get_word(words, num_words, idx++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st;
     if (likely(!id || !*id))
@@ -128,10 +128,10 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
     else
         st = pluginsd_rrdset_cache_get_from_slot(parser, host, id, slot, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_REPLAY_BEGIN))
-        return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+        return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     if(start_time_str && end_time_str) {
         time_t start_time = (time_t) str2ull_encoded(start_time_str);
@@ -224,10 +224,10 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARS
     char *flags_str = get_word(words, num_words, idx++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_SET);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_SET, PLUGINSD_KEYWORD_REPLAY_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     if(!parser->user.replay.rset_enabled) {
         nd_log_limit_static_thread_var(erl, 1, 0);
@@ -240,7 +240,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARS
     }
 
     RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, slot, PLUGINSD_KEYWORD_REPLAY_SET);
-    if(!rd) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!rd) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     st->pluginsd.set = true;
 
@@ -252,7 +252,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARS
             rrdhost_hostname(host), rrdset_id(st), dimension, PLUGINSD_KEYWORD_REPLAY_SET,
             (int64_t)parser->user.replay.start_time, (int64_t)parser->user.replay.end_time, PLUGINSD_KEYWORD_REPLAY_BEGIN);
         
-        return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+        return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
     }
 
     if (unlikely(!value_str || !*value_str))
@@ -294,10 +294,10 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, si
     char *last_stored_value_str = get_word(words, num_words, idx++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, PLUGINSD_KEYWORD_REPLAY_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     if(st->pluginsd.set) {
         // reset pos to reuse the same RDAs
@@ -306,7 +306,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, si
     }
 
     RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, slot, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
-    if(!rd) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!rd) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     usec_t dim_last_collected_ut = (usec_t)rd->collector.last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->collector.last_collected_time.tv_usec;
     usec_t last_collected_ut = last_collected_ut_str ? str2ull_encoded(last_collected_ut_str) : 0;
@@ -338,11 +338,11 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, si
     char *last_updated_ut_str = get_word(words, num_words, 2);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE,
                                               PLUGINSD_KEYWORD_REPLAY_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     usec_t chart_last_collected_ut = (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec;
     usec_t last_collected_ut = last_collected_ut_str ? str2ull_encoded(last_collected_ut_str) : 0;
@@ -394,11 +394,11 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
             child_world_time_txt) : now_realtime_sec();
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_END);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
     __atomic_add_fetch(&host->stream.rcv.status.replication.counter_in, 1, __ATOMIC_RELAXED);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END, PLUGINSD_KEYWORD_REPLAY_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     internal_error(true,
