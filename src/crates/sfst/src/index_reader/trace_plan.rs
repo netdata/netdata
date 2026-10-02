@@ -2,12 +2,13 @@
 //! (phase-4c decision 22A).
 //!
 //! The cross-source engine (`sfsq::traces::search`) lowers its predicate
-//! AST per candidate file into a neutral [`TracePlan`] — a conjunction of
-//! terms in STORAGE field names — and this module executes it: one
-//! compilation resolving every term to a position set, then any number
-//! of RANK-BOUNDED extractions of the newest-K matched positions.
-//! Position algebra ([`super::PosSet`]) stays private to the format
-//! crate; the seam is plan in, positions + work out.
+//! AST once into a neutral [`TracePlan`] — a conjunction of terms in
+//! STORAGE field names — and this module executes it against each
+//! candidate file: one compilation resolving every term to a position
+//! set, then any number of RANK-BOUNDED extractions of the newest-K
+//! matched positions. Position algebra ([`super::PosSet`]) stays
+//! private to the format crate; the seam is plan in, positions + work
+//! out.
 //!
 //! # The term algebra
 //!
@@ -36,13 +37,16 @@
 //!
 //! - each row of a stream batch scanned for high-card probes — counted
 //!   ONCE per compilation however many probes share the pass;
+//! - each candidate row AND each event/link record a subgroup refine
+//!   visits ([`refine_rows`]);
 //! - each EMITTED matched position (rank-bounded extraction makes
 //!   emission itself the bounded unit).
 //!
-//! The caller's `ceiling` is enforced INSIDE the stream-batch scan (a
-//! counter alone could overshoot by a whole file): a compilation whose
-//! scan would exceed it stops and returns `Ok(None)` — a truncated
-//! plan must never be used, it would under-approximate.
+//! The caller's `ceiling` is enforced INSIDE each budgeted pass — the
+//! stream-batch scan and the subgroup refines (a counter alone could
+//! overshoot by a whole file): a compilation that would exceed it stops
+//! and returns `Ok(None)` — a truncated plan must never be used, it
+//! would under-approximate.
 //!
 //! Deliberately EXCLUDED (bounded by construction): dictionary walks
 //! (FST/arena — dictionary-sized), the DURN column pass (clipped to the
@@ -61,6 +65,22 @@
 //! positions, never the full matched set. `TracePlan::default()` (match
 //! all) compiles to the full-range set, so extraction costs O(K) per
 //! file — the most common UI query stays bounded.
+//!
+//! Aggregating consumers that need the WHOLE matched population (the
+//! traces overview's filtered grid) use `matched_in_range` instead:
+//! one intersection with the caller's range and a full iteration, with
+//! emission charged to `work` and a `count_in_range` probe available to
+//! refuse an extraction that would breach the budget.
+//!
+//! # Failure modes
+//!
+//! Errors mean the FILE contradicts its own metadata, never the query:
+//! a bad regex source raises `InvalidPattern` (via
+//! [`crate::query::compile_pattern`]); a SPAN/PSPN/DURN column shorter
+//! than the caller's range end raises `CorruptIndex` — the plan-side
+//! mirrors of the session's bound checks (`index_reader/session.rs`),
+//! each side re-deriving the same file-vs-bounds agreement. Budget
+//! exhaustion is not an error: it is the `Ok(None)` above.
 
 use super::{FieldLocation, IndexReader, KvId, KvIdSet, PosSet};
 
@@ -75,8 +95,8 @@ pub enum PlanMatcher {
     },
     /// Distinct stored values parsed as numbers and compared to ANY of
     /// `values` (the pinned dictionary-numeric rule; several values =
-    /// the grammar's multi-value numeric equality); stored values that
-    /// do not parse never match. See [`numeric_token_matches`].
+    /// the grammar's multi-value numeric equality). See
+    /// [`numeric_token_matches`].
     Number { cmp: NumberCmp, values: Vec<f64> },
 }
 
@@ -116,9 +136,8 @@ pub enum PlanTerm {
     /// STORAGE field name, or several for the unscoped resource ∪ span
     /// disjunction — the caller constructs names through its vocabulary
     /// mapping; this crate does not interpret them). `negated` applies
-    /// `presence(fields) ∩ complement(match)` — a field absent from the
-    /// file contributes nothing to presence, so an absent attribute
-    /// never satisfies a negated comparison; a positive term on an
+    /// the pinned rule in the module docs
+    /// (`presence(fields) ∩ complement(match)`); a positive term on an
     /// absent field matches nothing (the `compile_filter` precedent).
     Fields {
         fields: Vec<String>,
@@ -231,6 +250,7 @@ pub struct ScanWork {
 #[derive(Debug)]
 pub struct CompiledTracePlan {
     set: PosSet,
+    /// The file's record count — the hard clamp on extraction ranges.
     universe: u32,
 }
 
@@ -331,9 +351,10 @@ impl IndexReader<'_> {
     /// budget ran out inside the shared stream-batch scan; a truncated
     /// plan is never returned (it would under-approximate).
     ///
-    /// The compiled plan answers `count_in_range`/`newest_in_range`
-    /// correctly only for sub-ranges of `[lo, hi)` (duration positions
-    /// outside it were never collected).
+    /// The compiled plan answers `count_in_range`/`newest_in_range`/
+    /// `matched_in_range` correctly only for sub-ranges of `[lo, hi)`
+    /// (duration and id-column positions outside it were never
+    /// collected).
     pub fn compile_trace_plan(
         &self,
         plan: &TracePlan,
@@ -346,8 +367,8 @@ impl IndexReader<'_> {
 
         // ── Resolve every term: dictionary work only (uncounted) ─────
         let mut probes: Vec<(KvIdSet, u8)> = Vec::new();
-        let mut resolved: Vec<Option<ResolvedTerm>> = Vec::new(); // None = Duration slot
-        let mut durations: Vec<Option<PosSet>> = Vec::new(); // parallel, ugly-free zip below
+        let mut resolved: Vec<Option<ResolvedTerm>> = Vec::new(); // None = non-Fields slot
+        let mut durations: Vec<Option<PosSet>> = Vec::new(); // parallel to `resolved`, zipped below
         let mut groups: Vec<GroupSlot> = Vec::new(); // event/link subgroups (refined post-pass)
         for term in &plan.terms {
             match term {
@@ -391,7 +412,7 @@ impl IndexReader<'_> {
                     // (excluded from the work units, like DURN).
                     let ids_match = |id: crate::SpanId| -> bool {
                         if id.is_unset() {
-                            return false; // UNSET = absent, both polarities
+                            return false; // UNSET = absent: never matches, either polarity
                         }
                         ids.contains(&id) != *negated
                     };
@@ -586,6 +607,9 @@ impl IndexReader<'_> {
             combine_ready(term).is_some_and(|set| set.is_empty())
         }) || durations.iter().flatten().any(PosSet::is_empty)
             || groups.iter().any(group_ready_empty);
+        // When short-circuiting, the scan is skipped and the probe
+        // slots get throwaway empty sets — every consumer of
+        // `probe_sets` sits behind the early return below.
         let probe_sets: Vec<PosSet> = if probes.is_empty() || ready_empty {
             probes.iter().map(|_| PosSet::empty(total)).collect()
         } else {
@@ -965,6 +989,26 @@ impl CompiledTracePlan {
         band.and_assign(&self.set);
         let out: Vec<u32> = band.iter().collect();
         debug_assert_eq!(out.len() as u64, target, "band holds exactly `target`");
+        work.rows_visited += out.len() as u64;
+        out
+    }
+
+    /// EVERY matched position within `[lo, hi)`, ascending. The
+    /// whole-set counterpart of [`Self::newest_in_range`] for consumers
+    /// that aggregate over the matched population instead of ranking
+    /// it (the traces overview's filtered grid). Emission is the whole
+    /// match count, so it is the caller's ceiling unit: probe
+    /// [`Self::count_in_range`] first (a tree walk, not a row visit)
+    /// and skip the extraction when it would breach the budget. Every
+    /// emitted position counts into `work`.
+    pub fn matched_in_range(&self, lo: u32, hi: u32, work: &mut ScanWork) -> Vec<u32> {
+        let hi = hi.min(self.universe);
+        if lo >= hi {
+            return Vec::new();
+        }
+        let mut band = PosSet::range(lo, hi, self.universe);
+        band.and_assign(&self.set);
+        let out: Vec<u32> = band.iter().collect();
         work.rows_visited += out.len() as u64;
         out
     }

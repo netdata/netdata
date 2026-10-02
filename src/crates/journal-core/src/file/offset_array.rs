@@ -1,25 +1,89 @@
+//! Entry-array cursors for the journal file: the chain machinery behind
+//! `JournalCursor`'s unfiltered stepping and `FilterExpr`'s per-match
+//! scanning. One array is an `OffsetArrayObject` - an object header plus
+//! `Option<NonZeroU64>` (compact: `Option<NonZeroU32>`) slots of
+//! entry-object offsets, linked to the next array through
+//! `OffsetArrayObjectHeader::next_offset_array` (`file/object.rs`).
+//! A chain is addressed by [`List`]: head array offset plus the number
+//! of entries it logically holds. Arrays grow by doubling when full -
+//! 4096 slots for the first file-global array, 64 for a data object's
+//! first one (allocated by `JournalWriter::append_to_entry_array` and
+//! `link_data_to_entry`).
+//!
+//! Two producers build chains, and both list entry offsets in file
+//! write order, strictly increasing end to end - each entry is written
+//! at the writer's advancing append offset (`JournalWriter`'s
+//! `add_entry`):
+//! - the file-global entry chain: every entry of the file, head in
+//!   `JournalHeader::entry_array_offset`, `total_items = n_entries`
+//!   ([`JournalFile::entry_list`]; appended per entry by
+//!   `JournalWriter::add_entry`);
+//! - a data object's entry chain: the entries carrying that payload.
+//!   The first entry is inlined in the data object itself
+//!   (`DataObjectHeader::entry_offset`), the linked array holds the
+//!   remaining `n_entries - 1` (the links live in `DataObjectHeader`;
+//!   built by `JournalWriter::link_data_to_entry`),
+//!   and [`InlinedCursor`] walks the pair - inlined entry first, arrays
+//!   after - as the scan state inside
+//!   [`FilterExpr::Match`](crate::file::filter::FilterExpr::Match).
+//!
+//! [`Node`] is a re-read view of one array; [`Cursor`] is a position in
+//! a chain, the value
+//! [`JournalCursor::array_cursor`](crate::file::cursor::JournalCursor::array_cursor)
+//! keeps for the
+//! unfiltered path. `next_until`/`previous_until`
+//! continue from the current scan position and clamp to a needle (see
+//! their docs) - the contract the filtered resolution
+//! (`JournalCursor::resolve_filter_location`) obeys by rewinding with
+//! `head()`/
+//! `tail()` first. Errors: `InvalidOffsetArrayIndex` past a position's
+//! logical length, `InvalidOffset` when a binary search probes an unset
+//! slot, `EmptyOffsetArrayNode` for a zero-capacity array, and
+//! `InvalidOffsetArrayOffset` when `Cursor::previous` cannot find its
+//! array linked from the chain's head.
+//!
+//! Consumers (grep-verified): `List` also parses remapping entries
+//! (`JournalReader::parse_remapping_entries_from_array`) and `Direction`
+//! is flat re-exported beside `Location` (`file/mod.rs`, lib.rs);
+//! cross-crate, journal-index
+//! imports `InlinedCursor` and walks it outside its data-object value
+//! guards (src/crates/journal-index/src/file_indexer.rs).
+//!
+//! Near twin: src/crates/jf/journal_file/src/offset_array.rs - same
+//! types and stepping logic; only this copy adds the three
+//! `collect_offsets` helpers and the `allocative` derives.
 use super::mmap::MemoryMap;
 use crate::error::{JournalError, Result};
 use crate::file::JournalFile;
 use std::num::{NonZeroU64, NonZeroUsize};
 
+/// Walk direction shared by the stepping and partition-point APIs.
+/// Flat re-exported beside `Location` (`file/mod.rs`, lib.rs).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
     Forward,
     Backward,
 }
 
-/// A reference to a single array of offsets in the journal file
+/// A view of one array in a chain, re-read from the file through
+/// `JournalFile::offset_array_ref` on every construction. Helper for
+/// the cursors below; nothing outside this file constructs one.
+///
+/// `remaining_items` is the count of chain entries from this array's
+/// first slot to the chain's end - it turns the on-disk slot count
+/// into a logical length (`len`) and decides whether entries
+/// continue into a linked array (`has_next`).
 pub struct Node {
     offset: NonZeroU64,
     next_offset: Option<NonZeroU64>,
     capacity: NonZeroUsize,
-    // Number of items remaining in this array and subsequent arrays
+    // Chain entries from this array's first slot onward
     remaining_items: NonZeroUsize,
 }
 
 impl Node {
-    /// Create a new offset array reference
+    /// Reads the array at `offset`; `EmptyOffsetArrayNode` if its
+    /// capacity is zero.
     fn new<M: MemoryMap>(
         journal_file: &JournalFile<M>,
         offset: NonZeroU64,
@@ -47,22 +111,29 @@ impl Node {
         self.capacity
     }
 
-    /// Get the number of items available in this array
+    /// Logical length: how many of the chain's remaining entries this
+    /// array holds - `min(capacity, remaining_items)`.
     pub fn len(&self) -> NonZeroUsize {
         self.capacity.min(self.remaining_items)
     }
 
-    /// Check if this array has a next array in the chain
+    /// Whether entries logically continue past this array: true when
+    /// `remaining_items` exceeds the capacity and the header links a
+    /// next array. A missing link while items remain ends the chain
+    /// early.
     pub fn has_next(&self) -> bool {
         self.next_offset.is_some() && self.remaining_items > self.len()
     }
 
-    /// Get the next array in the chain, if any
+    /// The next array, carrying the chain entries left after this
+    /// one; `None` at the end of the chain.
     pub fn next<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Option<Self>> {
         if !self.has_next() {
             return Ok(None);
         }
 
+        // `has_next` guarantees remaining_items > len, so the
+        // subtraction cannot underflow; the guard is defensive.
         let next_offset = self.next_offset.unwrap();
         let remaining_items = {
             let n = self.remaining_items.get().saturating_sub(self.len().get());
@@ -73,7 +144,9 @@ impl Node {
         Some(node).transpose()
     }
 
-    /// Get an item at the specified index
+    /// The entry offset at `index`; `Ok(None)` for a slot not
+    /// written yet, `InvalidOffsetArrayIndex` past the logical
+    /// length.
     pub fn get<M: MemoryMap>(
         &self,
         journal_file: &JournalFile<M>,
@@ -87,8 +160,16 @@ impl Node {
         array.get(index, self.remaining_items.get())
     }
 
-    /// Returns the first index where the predicate returns false, or array length if
-    /// the predicate is true for all elements
+    /// Upper-bound binary search over `[left, right)`: the first
+    /// index where `predicate` returns false, or `right` when it is
+    /// true throughout.
+    ///
+    /// `predicate` means "keep scanning", so it must be monotone -
+    /// true entries before false ones - matching the array's
+    /// strictly increasing entry offsets (the writer appends entries
+    /// at a growing offset).
+    /// Probes re-read the array through the file; an unset slot
+    /// mid-search reports `InvalidOffset`.
     pub fn partition_point<M, F>(
         &self,
         journal_file: &JournalFile<M>,
@@ -122,7 +203,11 @@ impl Node {
         Ok(left)
     }
 
-    /// Find the forward or backward (depending on direction) position that matches the predicate.
+    /// Where scanning stops in `direction` within `[left, right)`:
+    /// forward, the first index whose `predicate` is false (the
+    /// first match for callers that match on `!predicate`);
+    /// backward, the last index whose `predicate` is true. `None`
+    /// when the range holds no such index.
     pub fn directed_partition_point<M, F>(
         &self,
         journal_file: &JournalFile<M>,
@@ -170,7 +255,17 @@ impl std::fmt::Debug for Node {
     }
 }
 
-/// A linked list of offset arrays
+/// A handle to a chain of offset arrays: the head array's file
+/// offset plus how many entries the chain logically holds
+/// (`total_items`). `Copy` and cheap - arrays are resolved from the
+/// file on demand.
+///
+/// Built for the file-global entry chain by [`JournalFile::entry_list`]
+/// and for a data object's entry chain by
+/// `DataObjectHeader::inlined_cursor` (`file/object.rs`). The
+/// writer fills both in entry-write order, so entries sit at
+/// strictly increasing offsets along the chain
+/// (appended by `JournalWriter` as entries are written).
 #[derive(Copy, Clone)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct List {
@@ -196,12 +291,13 @@ impl List {
         }
     }
 
-    /// Get the head array of this chain
+    /// The head array, with the whole chain's `total_items` as its
+    /// remaining count.
     pub fn head<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Node> {
         Node::new(journal_file, self.head_offset, self.total_items)
     }
 
-    /// Get the tail array of this list by traversing from head to tail
+    /// The tail array, found by walking the chain - O(chain length).
     pub fn tail<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Node> {
         let mut current = self.head(journal_file)?;
 
@@ -212,22 +308,32 @@ impl List {
         Ok(current)
     }
 
-    /// Get a cursor at the first position in the chain
+    /// A cursor at the chain's first entry.
     pub fn cursor_head(self) -> Cursor {
         Cursor::at_head(self)
     }
 
-    /// Get a cursor at the last position in the chain
+    /// A cursor at the chain's last entry (walks the chain to find
+    /// the tail array).
     pub fn cursor_tail<M: MemoryMap>(self, journal_file: &JournalFile<M>) -> Result<Cursor> {
         Cursor::at_tail(journal_file, self)
     }
 
-    /// Finds the first/last array item position where the predicate function becomes false
-    /// in a chain of offset arrays.
+    /// The chain position where scanning stops in `direction`, as a
+    /// cursor: forward, the first entry whose `predicate` is false;
+    /// backward, the last entry whose `predicate` is true. `None`
+    /// when no such entry exists in the arrays.
     ///
-    /// # Parameters
-    /// * `predicate` - Function that takes an array item value and returns true if the search should continue.
-    /// * `direction` - Direction of the search (Forward or Backward)
+    /// `predicate` means "keep scanning" (`Node::partition_point`).
+    /// Each array is binary-searched; the walk stops at the first
+    /// array with a forward match, or after the last backward one -
+    /// valid because the predicate is monotone across the whole
+    /// chain, matching its strictly increasing entry offsets. Under
+    /// that same monotonicity, a backward array without a match also
+    /// ends the scan.
+    ///
+    /// Arrays only: a data object's inlined entry is out of scope
+    /// here; `InlinedCursor::directed_partition_point` folds it in.
     pub fn directed_partition_point<M, F>(
         self,
         journal_file: &JournalFile<M>,
@@ -262,21 +368,24 @@ impl List {
                         return Ok(Some(cursor));
                     }
                     Direction::Backward => {
-                        // In backward direction, save this match and continue
-                        // to ensure we'll find the last match
+                        // Backward: remember this match and keep
+                        // going - a later array may hold a later one.
                         last_cursor = Some(cursor);
 
-                        // If this match is at the end of the array and there's a next array,
-                        // we should check the next array as well
+                        // A match on the array's last slot can still
+                        // be beaten by the next array's first slots;
+                        // anything earlier cannot, so stop here.
                         if index == node.len().get() - 1 && node.has_next() {
-                            // continue;
+                            // Fall through to the next-array advance
+                            // at the bottom of the loop.
                         } else {
                             return Ok(last_cursor);
                         }
                     }
                 }
             } else if direction == Direction::Backward {
-                // No match in this array for backward direction
+                // No true position in this array: under a monotone
+                // predicate none can follow, so the scan is done.
                 return Ok(last_cursor);
             }
 
@@ -296,7 +405,8 @@ impl List {
         Ok(None)
     }
 
-    /// Collect all offsets in the entire list into the given vector
+    /// Append every entry offset of the chain, head to tail, to
+    /// `offsets`; capacity is reserved up front from `total_items`.
     pub fn collect_offsets<M: MemoryMap>(
         &self,
         journal_file: &JournalFile<M>,
@@ -323,7 +433,11 @@ impl List {
     }
 }
 
-/// A cursor pointing to a specific position within an offset array chain
+/// A position in an offset-array chain: the chain (`list`), the array
+/// (`array_offset`), the slot (`array_index`), and how many chain
+/// entries remain from this array onward (`remaining_items`).
+/// `Copy`; `JournalCursor` keeps one as the unfiltered stepping
+/// engine's position (its `array_cursor` field).
 #[derive(Clone, Copy)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct Cursor {
@@ -348,7 +462,8 @@ impl Cursor {
         }
     }
 
-    /// Create a cursor at the tail of the chain
+    /// A cursor at the chain's last entry; walks the chain to find
+    /// the tail array.
     pub fn at_tail<M: MemoryMap>(journal_file: &JournalFile<M>, list: List) -> Result<Self> {
         let mut current_array = list.head(journal_file)?;
 
@@ -364,7 +479,11 @@ impl Cursor {
         })
     }
 
-    /// Create a cursor at a specific position
+    /// A cursor at `array_index` of the array at `array_offset`,
+    /// with the caller's `remaining_items`. Validates both: an
+    /// unreadable or zero-capacity array is `Err`, an out-of-range
+    /// index is `InvalidOffsetArrayIndex`. Used by
+    /// `List::directed_partition_point` to pin a found position.
     pub fn at_position<M: MemoryMap>(
         journal_file: &JournalFile<M>,
         offset_array_list: List,
@@ -390,16 +509,22 @@ impl Cursor {
         })
     }
 
-    /// Get the current array this cursor points to
+    /// A fresh `Node` view of the array under the cursor; nothing is
+    /// cached between calls.
     pub fn node<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Node> {
         Node::new(journal_file, self.array_offset, self.remaining_items)
     }
 
+    /// The entry offset at the cursor's position; `Ok(None)` for an
+    /// unset slot.
     pub fn value<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Option<NonZeroU64>> {
         self.node(journal_file)?.get(journal_file, self.array_index)
     }
 
-    /// Move to the next position
+    /// The next chain position: the following slot, or the next
+    /// array's first slot; `None` at the chain's end. Stepping
+    /// within an array is cheap; crossing into the next array
+    /// re-reads its header.
     pub fn next<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Option<Self>> {
         let array_node = self.node(journal_file)?;
 
@@ -435,7 +560,12 @@ impl Cursor {
         }
     }
 
-    /// Move to the previous position
+    /// The previous chain position: the preceding slot, the previous
+    /// array's last slot, or `None` at the chain's head. Crossing
+    /// arrays walks from the head to find the predecessor -
+    /// O(chain length) per step, unlike `next` - and reports
+    /// `InvalidOffsetArrayOffset` if the cursor's array is not
+    /// linked from this chain's head.
     pub fn previous<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Option<Self>> {
         if self.array_index > 0 {
             // Previous item is in the same array
@@ -468,6 +598,12 @@ impl Cursor {
         Err(JournalError::InvalidOffsetArrayOffset)
     }
 
+    /// Append the entry offsets from the cursor's position to the
+    /// chain's end. For each later array the collect range is
+    /// derived from the previous node's remaining count rather than
+    /// the next node's own - wider than needed at the chain's tail,
+    /// but correct because unwritten slots read as `None` and are
+    /// skipped (`OffsetArrayObject::collect_offsets`).
     pub fn collect_offsets<M: MemoryMap>(
         &self,
         journal_file: &JournalFile<M>,
@@ -504,6 +640,17 @@ impl std::fmt::Debug for Cursor {
     }
 }
 
+/// A data object's entry chain as a step cursor: the inlined first
+/// entry (`DataObjectHeader::entry_offset`) plus, when the object
+/// holds more than one entry, a [`Cursor`] over the linked array
+/// with the rest (linked by `DataObjectHeader::inlined_cursor`).
+/// `at_inlined_offset`
+/// says which side it is parked on; `value` switches accordingly.
+///
+/// `Copy`, so callers can detach it from a borrowed data object and
+/// step it after the borrow is dropped - journal-index does
+/// exactly that
+/// (src/crates/journal-index/src/file_indexer.rs).
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct InlinedCursor {
@@ -513,6 +660,8 @@ pub struct InlinedCursor {
 }
 
 impl InlinedCursor {
+    /// Parked on the inlined entry, with the optional array chain
+    /// for the remaining entries.
     pub fn new(inlined_offset: NonZeroU64, cursor: Option<Cursor>) -> Self {
         Self {
             inlined_offset,
@@ -521,6 +670,8 @@ impl InlinedCursor {
         }
     }
 
+    /// Rewind to the inlined entry, resetting the array cursor to
+    /// its chain's head.
     pub fn head(&self) -> Self {
         Self {
             inlined_offset: self.inlined_offset,
@@ -529,6 +680,9 @@ impl InlinedCursor {
         }
     }
 
+    /// Park on the chain's last entry (walks the chain); a
+    /// single-entry object - no array cursor - stays on the inlined
+    /// entry.
     pub fn tail<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Self> {
         // Start with a copy of the current cursor
         let mut result = *self;
@@ -542,6 +696,8 @@ impl InlinedCursor {
         Ok(result)
     }
 
+    /// The next entry: inlined -> array start, then slot by slot;
+    /// `None` at the end.
     fn next<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Option<Self>> {
         // Case 1: We're at the inlined entry, move to the first array entry
         if self.at_inlined_offset {
@@ -575,6 +731,8 @@ impl InlinedCursor {
         Ok(None)
     }
 
+    /// The previous entry: slot by slot down to the array start,
+    /// then the inlined entry; `None` before that.
     fn previous<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Option<Self>> {
         if self.at_inlined_offset {
             return Ok(None);
@@ -595,9 +753,13 @@ impl InlinedCursor {
             }
         }
 
+        // Not at the inlined entry and no array cursor: impossible
+        // by construction.
         unreachable!();
     }
 
+    /// The entry offset under the cursor: the inlined entry, or the
+    /// array slot.
     pub fn value<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Option<NonZeroU64>> {
         // Case 1: We're at the inlined entry
         if self.at_inlined_offset {
@@ -612,6 +774,19 @@ impl InlinedCursor {
         unreachable!();
     }
 
+    /// Advance until an entry offset at or after `offset` sits under
+    /// the cursor and return it; `None` when the chain runs out
+    /// first.
+    ///
+    /// The scan continues from the cursor's current position and
+    /// clamps to the needle: the first position at/after it, which
+    /// may be the position already held, returned without moving.
+    /// Callers resolving a location from scratch rewind with
+    /// `head()` first - the contract
+    /// [`FilterExpr::head`](crate::file::filter::FilterExpr::head) +
+    /// `next` live by and the cursor's filtered
+    /// path (`JournalCursor::resolve_filter_location`) obeys. Entries are
+    /// visited in ascending offset order.
     pub fn next_until<M: MemoryMap>(
         &mut self,
         journal_file: &JournalFile<M>,
@@ -640,6 +815,16 @@ impl InlinedCursor {
         Ok(None)
     }
 
+    /// Retreat until an entry offset at or before `offset` sits
+    /// under the cursor and return it; `None` when the chain is
+    /// exhausted first.
+    ///
+    /// Mirror of `next_until`: the scan continues from the current
+    /// position and clamps to the needle, a position already at or
+    /// below it being returned without moving, so fresh resolutions
+    /// rewind with `tail()` first
+    /// ([`FilterExpr::tail`](crate::file::filter::FilterExpr::tail)). Entries
+    /// are visited in descending offset order.
     pub fn previous_until<M: MemoryMap>(
         &mut self,
         journal_file: &JournalFile<M>,
@@ -668,6 +853,17 @@ impl InlinedCursor {
         Ok(None)
     }
 
+    /// The best matching position across the inlined entry and the
+    /// array chain: forward, the first entry whose `predicate` is
+    /// false; backward, the last entry whose `predicate` is true.
+    /// `None` when no such entry exists. `self` is not moved; the
+    /// returned cursor is parked on the match.
+    ///
+    /// Forward short-circuits: a false predicate on the inlined
+    /// entry is itself the first match, so the arrays are not
+    /// searched. Backward keeps the inlined entry as a candidate
+    /// and still searches the arrays, keeping the match at the
+    /// higher offset.
     pub fn directed_partition_point<M, F>(
         &self,
         journal_file: &JournalFile<M>,
@@ -715,7 +911,9 @@ impl InlinedCursor {
                 if best_match.is_none() {
                     best_match = Some(array_match);
                 } else {
-                    // Choose the better match based on direction
+                    // Only Backward gets here with a candidate in
+                    // hand (forward sets the array match directly or
+                    // short-circuited): keep the higher offset.
                     let best_offset = best_match.as_ref().unwrap().value(journal_file)?;
                     let array_offset = array_match.value(journal_file)?;
 
@@ -738,6 +936,11 @@ impl InlinedCursor {
         Ok(best_match)
     }
 
+    /// Append entry offsets to `offsets`: parked on the inlined
+    /// entry, it comes first and then the whole chain from its
+    /// head; parked in the array, only the chain from the current
+    /// position on. A cursor-less single-entry object contributes
+    /// just the inlined offset.
     pub fn collect_offsets<M: MemoryMap>(
         &self,
         journal_file: &JournalFile<M>,

@@ -1,42 +1,88 @@
+//! The substrate's query filter: [`Query`], the time-range + partition
+//! request parameter handed to every candidate-selection function, and
+//! [`range_overlaps`], the single overlap predicate they all share.
+//!
+//! A `Query` is answerable from cheap inline summaries alone — a file's
+//! `[min, max]` timestamps and its partition key — without opening the
+//! file; within-file predicate pushdown is the readers' concern, and
+//! selected files travel as [`SelectedFile`](crate::SelectedFile), not
+//! through this type.
+//!
+//! Contracts owned here:
+//!
+//! - Time units and bounds: `time_range` is a half-open `[start, end)`
+//!   window in seconds since the Unix epoch — the
+//!   [`FileSummary`](crate::FileSummary) unit (`types.rs` owns the summary
+//!   fields and unit conventions). Data ranges are inclusive `[min, max]`, so overlap is
+//!   `max >= start && min < end`, and a degenerate window
+//!   (`start >= end`) matches nothing.
+//! - Partition filter: an empty `partition_keys` set matches every
+//!   partition; a non-empty set is membership-only over the opaque
+//!   [`FileId::part_key`](crate::FileId#structfield.part_key). For OTel
+//!   logs the keys are the content plane's service-stream hashes, driven
+//!   by the `__streams` selector — one stream identity per key within a
+//!   tenant via the ingestor's collision table.
+//! - Plain in-process value: `Clone`, no serde; the predicates here are
+//!   pure and infallible — no I/O. Every caller constructs the query at
+//!   its own boundary (RPC handler, CLI discovery, tests).
+//!
+//! Consumers (grep-verified): `wal::registry` (scales `time_range` to ns
+//! and re-applies [`range_overlaps`] over `u64` bounds), `sfst::registry`,
+//! `otel-catalog` (`Catalog::find` and the registry-side file filter), and
+//! `file-lifecycle` (the candidate pass-throughs in `registry.rs`;
+//! `query.rs::select_remote_only` is the only `matches_partition` caller).
+//! `otel-ledger`'s logs/traces RPC handlers build the queries; `sfsq-cli`
+//! discovers offline SFST candidates with one.
 use std::ops::Range;
 
-/// A time-range + optional partition filter, used by `Registry::candidates`
-/// implementations across the file-registry-backed sources (`sfst`,
-/// `wal`, …) to identify which files satisfy a read.
+/// A time-range + optional partition filter identifying which files can
+/// serve a read.
 ///
-/// The query is intentionally minimal: it carries only what the
-/// registries can answer from their cheap inline summaries (per-file
-/// `(min, max)` timestamps and the opaque partition key), without opening
-/// any file. Predicate pushdown for within-file selection is a separate
-/// concern handled by the readers.
+/// Intentionally minimal: it carries only what a registry or catalog can
+/// answer from its cheap inline summaries (per-file `(min, max)`
+/// timestamps and the opaque partition key) without opening any file.
+/// Predicate pushdown for within-file selection is a separate concern,
+/// handled by the readers. Taken by the per-source candidate functions
+/// (`wal::Registry::candidates`, `sfst::Registry::candidates`,
+/// `otel_catalog::Catalog::find`) and composed over them by
+/// `file-lifecycle`.
 #[derive(Debug, Clone)]
 pub struct Query {
-    /// Time window of interest, in seconds since the Unix epoch.
-    /// Inclusive lower bound, exclusive upper bound. A registry treats a
-    /// file as a candidate if its `[min_timestamp, max_timestamp]` range
-    /// overlaps `[start, end)`.
+    /// Half-open `[start, end)` window in seconds since the Unix epoch
+    /// (the [`FileSummary`](crate::FileSummary) unit). A file is a
+    /// candidate when its inclusive `[min, max]` range overlaps the
+    /// window — [`range_overlaps`] is the rule; `start >= end` matches
+    /// nothing.
     pub time_range: Range<u32>,
-    /// Partition filter, as a set of opaque [`FileId::part_key`](crate::FileId#structfield.part_key) values.
+    /// Partition filter over the opaque
+    /// [`FileId::part_key`](crate::FileId#structfield.part_key) values.
     /// **Empty matches every partition**; a non-empty set keeps only files
-    /// whose `part_key` is one of these values. The substrate compares the
-    /// key as an opaque `u64` and ascribes it no meaning; the content plane
-    /// supplies the set (for OTel logs, these are the content plane's
-    /// service-stream hashes, driven by the `__streams` selector — one stream
-    /// per key within a tenant via the ingestor's collision table).
+    /// whose `part_key` is one of these values
+    /// ([`matches_partition`](Query::matches_partition)). The substrate
+    /// compares the key as an opaque `u64` and ascribes it no meaning; the
+    /// content plane supplies the set (for OTel logs, the service-stream
+    /// hashes driven by the `__streams` selector — one stream per key
+    /// within a tenant via the ingestor's collision table).
     pub partition_keys: Vec<u64>,
 }
 
 impl Query {
-    /// Whether a file whose data spans `[min_s, max_s]` overlaps this
-    /// query's window — see [`range_overlaps`] for the rule.
+    /// Whether a file whose data spans the inclusive `[min_s, max_s]`
+    /// seconds overlaps this query's window — see [`range_overlaps`] for
+    /// the rule.
     pub fn overlaps(&self, min_s: u32, max_s: u32) -> bool {
         range_overlaps(&self.time_range, min_s, max_s)
     }
 
     /// Whether a file with partition key `part_key` passes the partition
-    /// filter. An empty [`Query::partition_keys`] matches every partition;
-    /// otherwise the file's key must be in the set. Centralized so the
-    /// per-source `candidates` filters cannot drift on the empty=all rule.
+    /// filter: an empty [`Query::partition_keys`] matches every partition,
+    /// otherwise the key must be in the set.
+    ///
+    /// The per-source candidate filters (`wal`, `sfst`, `otel-catalog`)
+    /// inline the same empty-or-contains test over their entries instead of
+    /// calling this; the method is the rule's canonical statement and the
+    /// form used where filtering runs after a registry scan
+    /// (file-lifecycle's remote-only catalog selection).
     pub fn matches_partition(&self, part_key: u64) -> bool {
         self.partition_keys.is_empty() || self.partition_keys.contains(&part_key)
     }
@@ -44,13 +90,16 @@ impl Query {
 
 /// The one time-overlap rule every registry and catalog uses: a data
 /// range `[min, max]` (inclusive on both ends) overlaps a query window
-/// `[start, end)` (half-open) iff `max >= start && min < end`; an empty
-/// window (`start >= end`) matches nothing.
+/// `[start, end)` (half-open) iff `max >= start && min < end`; a window
+/// with `start >= end` matches nothing — the early return guards this,
+/// since the comparison alone would still match a containing range.
 ///
-/// Centralized because a drift between copies of this predicate means
-/// silent query gaps — one source skipping files another would serve.
 /// Generic over the unit so second-based (`u32`) and nanosecond-based
-/// (`u64`) candidates share it.
+/// (`u64`) candidates share one predicate: `sfst` and the catalog compare
+/// summary seconds directly, the WAL registry scales
+/// [`Query::time_range`] to ns and calls this with `u64` bounds.
+/// Centralized because a drift between copies of this rule means silent
+/// query gaps — one source skipping files another would serve.
 pub fn range_overlaps<T: Ord + Copy>(window: &Range<T>, min: T, max: T) -> bool {
     if window.start >= window.end {
         return false;

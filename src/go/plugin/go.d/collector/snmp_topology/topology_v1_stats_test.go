@@ -259,9 +259,10 @@ func newTopologyStatsCensusRouterCache(t *testing.T, sysName, chassisID, managem
 		},
 	}})
 	cache.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: ifIndex,
-		tagTopoIPAddr:  ifIP,
-		tagTopoIPMask:  "255.255.255.252",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  ifIndex,
+		tagTopoIPAddr:   ifIP,
+		tagTopoIPMask:   "255.255.255.252",
 	})
 	return cache
 }

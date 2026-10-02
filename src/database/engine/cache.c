@@ -562,7 +562,12 @@ static ALWAYS_INLINE void evict_on_page_release_when_permitted(PGC *cache) {
 }
 
 static ALWAYS_INLINE void flush_inline(PGC *cache, bool on_release) {
-    if(!(cache->config.options & PGC_OPTIONS_FLUSH_PAGES_NO_INLINE) && flushing_critical(cache)) {
+    // Never flush inline on a libuv pool thread (query / extent workers, ACLK query jobs).
+    // The main cache save callback waits for an EXTENT_WRITE that needs a pool thread itself,
+    // so a pool thread waiting here counts against the pool without being bounded by the
+    // dbengine extent-waiters budget (rrdengine.c), and enough of them deadlock the pool.
+    // Inline flushing is opportunistic; the dbengine flushers drain these pages anyway.
+    if(!(cache->config.options & PGC_OPTIONS_FLUSH_PAGES_NO_INLINE) && flushing_critical(cache) && !libuv_worker_thread_is_current()) {
         if (on_release)
             p2_add_fetch(&cache->stats.p2_waste_flush_on_release, 1);
         else
@@ -1970,7 +1975,22 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
             continue;
         }
 
-        if(cache->config.pgc_save_init_cb)
+        // Only for a non-empty batch. The gate above is
+        // `all_of_them || pages_added == optimal_flush_size`, so on the all_of_them path
+        // (flush-all, quiesce, shutdown) pages_added can be 0 - the loop above only adds pages
+        // that win page_acquire() and page_transition_trylock(), and during shutdown concurrent
+        // flushers hold transition locks on exactly those pages.
+        //
+        // The init callback is what tells the user "a flush is starting", and main_cache pairs
+        // it with ctx->atomic.extents_currently_being_flushed, which is decremented once per
+        // extent write enqueued by the save callback. That callback returns immediately for an
+        // empty batch, so nothing is enqueued, and it cannot rebalance the counter itself
+        // because it recovers ctx from entries_array[0].section. The increment would leak, and
+        // shutdown waits on that counter forever - ctx_shutdown_tp_worker() (rrdengine.c) and
+        // finalize_data_files() (datafile.c).
+        //
+        // A batch of zero pages is not a flush.
+        if(cache->config.pgc_save_init_cb && pages_added)
             cache->config.pgc_save_init_cb(cache, last_section);
 
         pgc_queue_unlock(cache, &cache->dirty);

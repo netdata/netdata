@@ -1,7 +1,32 @@
+//! Tests for the pagination cursor (`cursor.rs`) at the value level —
+//! no fixtures or I/O: plain `Cursor` values, wire strings, comparisons.
+//!
+//! Pins:
+//!
+//! - `encode` emits `"{timestamp_ns}:{file_seq}:{part}:{position}"` and
+//!   `decode` inverts it; `Tail` rides the wire as the `u32::MAX`
+//!   sentinel;
+//! - the largest legal index, `u32::MAX - 1`, stays `Indexed` across the
+//!   round-trip instead of decoding back as the sentinel's `Tail`;
+//! - `decode` accepts exactly four integer fields and rejects every other
+//!   shape — including the legacy 3-field form — so a malformed anchor
+//!   degrades to "no anchor" at the wire adapter
+//!   (otel-ledger `src/ledger/rpc/logs/adapter.rs`);
+//! - the derived `Ord` orders by timestamp, then `file_seq`, then `part`,
+//!   then `position`, with every `Indexed` before `Tail` (the wire order
+//!   `0 < … < u32::MAX`) — the global order the page merge relies on.
+//!
+//! Not pinned here: negative `timestamp_ns` or extreme `file_seq` /
+//! `position` values, [`Cursor::synthetic_max`], and pagination over real
+//! files (only incidental via `tests/ng_wal_equivalence.rs` — no anchor
+//! paging or has-more pinning exists in-tree; `page/tests.rs` is
+//! value-level and reads no files).
 use super::*;
 
 #[test]
 fn round_trips() {
+    // Canonical round-trip: a full-precision nanosecond timestamp and an
+    // indexed part pin the exact wire string; decode returns an equal cursor.
     let c = Cursor {
         timestamp_ns: 1_700_000_000_123_456_789,
         file_seq: 42,
@@ -30,7 +55,7 @@ fn tail_round_trips_via_sentinel() {
 #[test]
 fn indexed_high_value_round_trips() {
     // A large indexed value must stay `Indexed` across encode/decode — not
-    // get swallowed by the `u32::MAX` tail sentinel. Pins the `from_wire`
+    // be swallowed by the `u32::MAX` tail sentinel. Pins the `from_wire`
     // boundary: the largest legal index is `u32::MAX - 1`.
     let c = Cursor {
         timestamp_ns: 1,
@@ -46,12 +71,15 @@ fn indexed_high_value_round_trips() {
 
 #[test]
 fn decode_rejects_malformed() {
+    // Decode is strict: exactly four integer fields, everything else is
+    // `None`. Callers treat `None` as "no anchor" (page from the edge),
+    // so every malformed shape below must land on `None`.
     assert_eq!(Cursor::decode(""), None);
-    assert_eq!(Cursor::decode("1:2:3"), None); // too few fields (legacy 3-field)
+    assert_eq!(Cursor::decode("1:2:3"), None); // too few fields — the legacy 3-field form
     assert_eq!(Cursor::decode("1:2:3:4:5"), None); // too many fields
     assert_eq!(Cursor::decode("x:2:3:4"), None); // non-integer timestamp
     assert_eq!(Cursor::decode("1:2:3:-4"), None); // negative u32 position
-    assert_eq!(Cursor::decode("1:2:3:4 "), None); // trailing whitespace
+    assert_eq!(Cursor::decode("1:2:3:4 "), None); // trailing whitespace (parse does not trim)
 }
 
 #[test]

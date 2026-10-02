@@ -18,9 +18,9 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/relabel"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 func TestCollector_ProfileRelabelingAppliesAutomatically(t *testing.T) {
@@ -800,7 +800,7 @@ type countingPrometheus struct {
 	sampleCalls int
 }
 
-func (p *countingPrometheus) ScrapeSeries() (prompkg.Series, error) { return nil, nil }
+func (p *countingPrometheus) ScrapeSeries(context.Context) (prompkg.Series, error) { return nil, nil }
 
 func (p *countingPrometheus) Scrape() (prompkg.MetricFamilies, error) {
 	return p.ScrapeContext(context.Background())

@@ -6,8 +6,11 @@
 #include "libnetdata/libnetdata.h"
 #include "rrdlabels.h"
 
+struct rrdhost;
+
 void reload_host_labels(void);
 void rrdhost_set_is_parent_label(void);
+void rrdhost_labels_changed(struct rrdhost *host);
 int rrdhost_labels_unittest(void);
 
 #endif //NETDATA_RRDHOST_LABELS_H

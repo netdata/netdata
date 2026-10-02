@@ -622,6 +622,9 @@ func applyTargetRetirementTransaction(
 		processOwner: owner,
 	}
 	require.NoError(t, generation.Start(context.Background()))
+	// Exercise retirement during publication of an already-ready resource.
+	// Start only initiates activation; ordinary starting jobs publish later.
+	require.NoError(t, generation.AwaitReady(t.Context()))
 
 	graph, err := dyncfg.NewGraph(nil)
 	require.NoError(t, err)
@@ -717,10 +720,6 @@ func TestPreparedResourceTransactionCommitsBusyFallbackAfterIncumbentRemoval(t *
 	require.NoError(t, err)
 	failed := running
 	failed.Status = dyncfg.StatusFailed.String()
-	result, err := lifecycle.NewSealedResult(200, "application/json", nil)
-	require.NoError(t, err)
-	busyResult, err := lifecycle.NewSealedResult(503, "application/json", nil)
-	require.NoError(t, err)
 	transactionScope := lifecycle.ResourceTransactionScope{
 		ID:        "job",
 		Current:   currentIdentity,
@@ -742,11 +741,11 @@ func TestPreparedResourceTransactionCommitsBusyFallbackAfterIncumbentRemoval(t *
 			AfterApply: func() {
 				events = append(events, "fallback-after-apply")
 			},
-			Result:  busyResult,
+			failure: jobFailure{class: failureUnavailable, message: "busy"},
 			Cleanup: func() error { return nil },
 		},
-		Result:  result,
 		Cleanup: func() error { return nil },
+		reply:   &jobReply{command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning},
 	})
 	require.NoError(t, err)
 
@@ -756,7 +755,7 @@ func TestPreparedResourceTransactionCommitsBusyFallbackAfterIncumbentRemoval(t *
 	require.Equal(t, transactionScope, scope)
 	require.Equal(t, lifecycle.ResourceTransactionRemoved, disposition)
 	require.Nil(t, owned)
-	require.Equal(t, 503, applied.ResultStatus())
+	require.Equal(t, 202, applied.ResultStatus())
 	record, ok := graph.Lookup("job")
 	require.True(t, ok)
 	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
@@ -800,10 +799,6 @@ func TestPreparedResourceTransactionReconcilesBusyFallbackWhenGraphAlreadyMatche
 	running.Status = dyncfg.StatusRunning.String()
 	mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{ID: "job", Config: &running}})
 	require.NoError(t, err)
-	result, err := lifecycle.NewSealedResult(200, "application/json", nil)
-	require.NoError(t, err)
-	busyResult, err := lifecycle.NewSealedResult(503, "application/json", nil)
-	require.NoError(t, err)
 	transaction, err := PrepareResourceTransaction(ResourceTransactionSpec{
 		Scope: lifecycle.ResourceTransactionScope{
 			ID:        "job",
@@ -821,11 +816,11 @@ func TestPreparedResourceTransactionReconcilesBusyFallbackWhenGraphAlreadyMatche
 			AfterGraphReconcile: func() {
 				events = append(events, "fallback-reconcile")
 			},
-			Result:  busyResult,
+			failure: jobFailure{class: failureUnavailable, message: "busy"},
 			Cleanup: func() error { return nil },
 		},
-		Result:  result,
 		Cleanup: func() error { return nil },
+		reply:   &jobReply{command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning},
 	})
 	require.NoError(t, err)
 
@@ -869,10 +864,6 @@ func TestPreparedResourceTransactionCommitsQuarantineFallbackWithoutPending(t *t
 	require.NoError(t, err)
 	failed := running
 	failed.Status = dyncfg.StatusFailed.String()
-	result, err := lifecycle.NewSealedResult(200, "application/json", nil)
-	require.NoError(t, err)
-	quarantinedResult, err := lifecycle.NewSealedResult(503, "application/json", nil)
-	require.NoError(t, err)
 	transactionScope := lifecycle.ResourceTransactionScope{
 		ID:        "job",
 		Current:   currentIdentity,
@@ -891,7 +882,7 @@ func TestPreparedResourceTransactionCommitsQuarantineFallbackWithoutPending(t *t
 			AfterApply: func() {
 				events = append(events, "busy-pending")
 			},
-			Result:  result,
+			failure: jobFailure{class: failureUnavailable, message: "busy"},
 			Cleanup: func() error { return nil },
 		},
 		ActivationQuarantinedFallback: &ResourceActivationFallback{
@@ -902,11 +893,11 @@ func TestPreparedResourceTransactionCommitsQuarantineFallbackWithoutPending(t *t
 			AfterApply: func() {
 				events = append(events, "quarantine-settled")
 			},
-			Result:  quarantinedResult,
+			failure: jobFailure{class: failureUnavailable, message: "quarantined"},
 			Cleanup: func() error { return nil },
 		},
-		Result:  result,
 		Cleanup: func() error { return nil },
+		reply:   &jobReply{command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning},
 	})
 	require.NoError(t, err)
 
@@ -916,7 +907,7 @@ func TestPreparedResourceTransactionCommitsQuarantineFallbackWithoutPending(t *t
 	require.Equal(t, transactionScope, scope)
 	require.Equal(t, lifecycle.ResourceTransactionRemoved, disposition)
 	require.Nil(t, owned)
-	require.Equal(t, 503, applied.ResultStatus())
+	require.Equal(t, 202, applied.ResultStatus())
 	record, ok := graph.Lookup("job")
 	require.True(t, ok)
 	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)

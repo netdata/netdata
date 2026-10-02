@@ -126,6 +126,20 @@ See [Configuration → Per-tier retention](/docs/npm/network-flows/configuration
 - **The city map can't go back as far as the country map.** The city map needs the city/lat/lon fields (raw-only); the country map only needs `SRC_COUNTRY`/`DST_COUNTRY` (preserved in rollups).
 - **Tier files use short names** (`1m`, `5m`, `1h` on disk) but YAML uses the explicit names (`minute_1`, `minute_5`, `hour_1`). Mind the difference.
 
+## Reading the files with journalctl
+
+The tier directories under the flows journal directory (`/var/cache/netdata/flows` by default) contain journal files
+that Netdata writes itself, without `systemd-journald`. On Linux hosts with systemd 252 or later, `journalctl` reads
+them; the files use the compact journal format, which older `journalctl` versions refuse. Flow entries carry the flow
+fields and no `MESSAGE=`, so use a structured output:
+
+```bash
+sudo journalctl --file='/var/cache/netdata/flows/1m/*/*.journal' --output=json --no-pager | head
+```
+
+Netdata reads the same files on every platform it writes them on; the Network Flows view and the `flows:netflow`
+Function do not depend on `journalctl`.
+
 ## What's next
 
 - [Configuration → Per-tier retention](/docs/npm/network-flows/configuration.md#per-tier-retention) — `netflow.yaml` schema for per-tier retention.

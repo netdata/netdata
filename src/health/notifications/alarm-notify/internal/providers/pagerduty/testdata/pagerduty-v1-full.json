@@ -1,0 +1,25 @@
+{
+  "service_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "event_type": "trigger",
+  "incident_key": "1532eea2c9f6a386140992fc18e52fbde95854d42a4bfa2e46d1c0c5d280c456",
+  "description": "test-node WARNING: Temperature is high",
+  "details": {
+    "version": 1,
+    "incident_id": "test-incident",
+    "timestamp": "2026-09-14T12:00:00Z",
+    "node": "test-node",
+    "alert": "test_alert",
+    "chart": "test.chart",
+    "context": "test.context",
+    "status": "WARNING",
+    "previous_status": "CLEAR",
+    "summary": "Temperature is high",
+    "info": "A quote: \"hot\"\nUnicode: θερμοκρασία",
+    "value": 42.5,
+    "previous_value": 0,
+    "units": "C",
+    "url": "https://example.com/alert?id=1&view=chart#details"
+  },
+  "client": "Netdata",
+  "client_url": "https://example.com/alert?id=1&view=chart#details"
+}

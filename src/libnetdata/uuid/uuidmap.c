@@ -62,7 +62,10 @@ static void uuidmap_init_aral(void) {
 }
 
 static UUIDMAP_ID get_next_id_unsafe(struct uuidmap_partition *partition) {
-    // Check if we've reached the maximum ID value
+    // Exhaustion is fatal rather than wrapping, and that is load-bearing: uuidmap_peek_id()'s
+    // borrowed-id contract (uuidmap.h) promises a stale id can only ever MISS, never resolve to a
+    // different uuid while the map lives. Recycling ids here would silently turn that promise -
+    // and uuidmap_uuid() on a borrowed id - into a wrong-uuid lookup with no warning.
     if (unlikely(partition->next_id >= UUIDMAP_ID_SEQ_MASK))
         fatal("UUIDMAP: Maximum ID limit reached for partition %u. UUIDs exhausted.",
               (unsigned int)(partition - uuid_map.p));

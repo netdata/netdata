@@ -7,266 +7,436 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/contract"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check/internal/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/awsauth"
 )
 
 const (
-	modeSingle    = "single"
-	modeMultisite = "multisite"
-
 	defaultUpdateEvery = 120
 	defaultPrefix      = "netdata-s3check/"
-	defaultMaxRetries  = 1
-	defaultTimeout     = time.Second * 2
-	// Keep retry delay small and include the SDK retry-after ceiling in deadlines.
-	maxRetryBackoff = time.Second
-	maxRetryAfter   = 5 * time.Second
+	defaultTimeout     = 10 * time.Second
 
-	cycleProcessingMargin = 5 * time.Second
-	jobLockPollInterval   = 20 * time.Millisecond
+	defaultWriteObjective  = 15 * time.Minute
+	defaultWriteTimeout    = 30 * time.Minute
+	defaultDeleteObjective = 5 * time.Minute
+	defaultDeleteTimeout   = 15 * time.Minute
 
-	defaultRPOThresholdMS       = int64(15 * time.Minute / time.Millisecond)
-	defaultReplicationTimeoutMS = int64(30 * time.Minute / time.Millisecond)
-	defaultDeleteThresholdMS    = int64(5 * time.Minute / time.Millisecond)
-	defaultDeleteTimeoutMS      = int64(15 * time.Minute / time.Millisecond)
-	maxRetries                  = 2
-	maxTimeout                  = time.Second * 10
-	probePayloadBytes           = 4096
-	cleanupBatchSize            = 2
-	maxNormalAPIOperations      = 11 // owner LIST plus two keyed version/DELETE/absence-proof cleanups
-	maxMultisiteAPIOperations   = 11 // immediate lifecycle; reconciliation and cleanup remain within the same bound
-	shutdownAPIOperations       = 5  // HEAD, DELETE, final HEAD, bucket proof
-	multisiteShutdownOperations = 8  // active exact keys only; pending batches recover on the next runtime cycle
-	destructiveRetryOperations  = 6  // two keyed proofs/DELETEs plus both final owner-prefix LIST proofs
-	minBucketNameLength         = 3
-	maxBucketNameLength         = 63
-	maxPrefixLength             = 256
-	maxLatencyThresholdMS       = int64(3600000)
-	maxMultisiteObjectiveMS     = int64(24 * time.Hour / time.Millisecond)
-	minSiteLabelLength          = 1
-	maxSiteLabelLength          = 64
-)
-
-var (
-	bucketNameRE        = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
-	multisiteProbeKeyRE = regexp.MustCompile(`^probe-[0-9]{1,20}-[a-f0-9]{16}-[a-f0-9]{32}\.bin$`)
-	siteLabelRE         = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
+	maxRequestTimeout       = time.Minute
+	maxProbeHorizon         = 24 * time.Hour
+	maxPrefixBytes          = 900
+	maxConnectionNameLength = 64
 )
 
 type Config struct {
 	Name               string `yaml:"name,omitempty"                json:"name,omitempty"`
-	Vnode              string `yaml:"vnode,omitempty"              json:"vnode,omitempty"`
-	UpdateEvery        int    `yaml:"update_every,omitempty"       json:"update_every,omitempty"`
+	Vnode              string `yaml:"vnode,omitempty"               json:"vnode,omitempty"`
+	UpdateEvery        int    `yaml:"update_every,omitempty"        json:"update_every,omitempty"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
 
-	Mode        string             `yaml:"mode,omitempty" json:"mode,omitempty"`
-	SourceSite  string             `yaml:"source_site,omitempty" json:"source_site,omitempty"`
-	Destination *DestinationConfig `yaml:"destination,omitempty" json:"destination,omitempty"`
-
-	Endpoint string `yaml:"endpoint" json:"endpoint"`
-	Region   string `yaml:"region"   json:"region"`
-	Bucket   string `yaml:"bucket"   json:"bucket"`
-	Prefix   string `yaml:"prefix,omitempty" json:"prefix,omitempty"`
-
-	AccessKeyID     string `yaml:"access_key_id" json:"access_key_id"`
-	SecretAccessKey string `yaml:"secret_access_key" json:"secret_access_key"`
-	SessionToken    string `yaml:"session_token,omitempty" json:"session_token,omitempty"`
-
-	PathStyle          bool  `yaml:"path_style,omitempty" json:"path_style,omitempty"`
-	MaxRetries         int   `yaml:"max_retries,omitempty" json:"max_retries,omitempty"`
-	LatencyThresholdMS int64 `yaml:"latency_threshold_ms,omitempty" json:"latency_threshold_ms,omitempty"`
-
-	RPOThresholdMS       int64 `yaml:"rpo_threshold_ms,omitempty" json:"rpo_threshold_ms,omitempty"`
-	ReplicationTimeoutMS int64 `yaml:"replication_timeout_ms,omitempty" json:"replication_timeout_ms,omitempty"`
-	DeleteThresholdMS    int64 `yaml:"delete_threshold_ms,omitempty" json:"delete_threshold_ms,omitempty"`
-	DeleteTimeoutMS      int64 `yaml:"delete_timeout_ms,omitempty" json:"delete_timeout_ms,omitempty"`
-	VerifyDelete         bool  `yaml:"verify_delete" json:"verify_delete"`
-
-	web.ClientConfig `yaml:",inline" json:""`
+	Mode               string                 `yaml:"mode"                           json:"mode"`
+	ModeLifecycle      *LifecycleModeConfig   `yaml:"mode_lifecycle,omitempty"       json:"mode_lifecycle,omitempty"`
+	ModeCephMultisite  *ReplicationModeConfig `yaml:"mode_ceph_multisite,omitempty"  json:"mode_ceph_multisite,omitempty"`
+	ModeAWSReplication *ReplicationModeConfig `yaml:"mode_aws_replication,omitempty" json:"mode_aws_replication,omitempty"`
 }
 
-type DestinationConfig struct {
-	Site string `yaml:"site" json:"site"`
-
-	Endpoint string `yaml:"endpoint" json:"endpoint"`
-	Region   string `yaml:"region"   json:"region"`
-	Bucket   string `yaml:"bucket"   json:"bucket"`
-	Prefix   string `yaml:"prefix,omitempty" json:"prefix,omitempty"`
-
-	AccessKeyID     string `yaml:"access_key_id" json:"access_key_id"`
-	SecretAccessKey string `yaml:"secret_access_key" json:"secret_access_key"`
-	SessionToken    string `yaml:"session_token,omitempty" json:"session_token,omitempty"`
-
-	PathStyle         *bool            `yaml:"path_style,omitempty" json:"path_style,omitempty"`
-	Timeout           confopt.Duration `yaml:"timeout,omitempty" json:"timeout,omitempty"`
-	NotFollowRedirect *bool            `yaml:"not_follow_redirects,omitempty" json:"not_follow_redirects,omitempty"`
-	ProxyURL          string           `yaml:"proxy_url,omitempty" json:"proxy_url,omitempty"`
-	tlscfg.TLSConfig  `yaml:",inline"    json:""`
-	ForceHTTP2        *bool `yaml:"force_http2,omitempty" json:"-"`
+type LifecycleModeConfig struct {
+	Prefix string   `yaml:"prefix,omitempty" json:"prefix,omitempty"`
+	Source S3Config `yaml:"source"           json:"source"`
 }
 
-type endpointConfig struct {
-	Endpoint string
-	Region   string
-	Bucket   string
-	Prefix   string
+type ReplicationModeConfig struct {
+	Prefix      string   `yaml:"prefix,omitempty" json:"prefix,omitempty"`
+	Source      S3Config `yaml:"source"           json:"source"`
+	Destination S3Config `yaml:"destination"      json:"destination"`
 
-	AccessKeyID     string
-	SecretAccessKey string
-	SessionToken    string
-
-	PathStyle bool
-
-	web.ClientConfig
+	WriteObjective  confopt.LongDuration `yaml:"write_objective,omitempty"  json:"write_objective,omitempty"`
+	WriteTimeout    confopt.LongDuration `yaml:"write_timeout,omitempty"    json:"write_timeout,omitempty"`
+	DeleteObjective confopt.LongDuration `yaml:"delete_objective,omitempty" json:"delete_objective,omitempty"`
+	DeleteTimeout   confopt.LongDuration `yaml:"delete_timeout,omitempty"   json:"delete_timeout,omitempty"`
 }
 
-func isValidBucketName(bucket string) bool {
-	if len(bucket) < minBucketNameLength || len(bucket) > maxBucketNameLength || !bucketNameRE.MatchString(bucket) {
-		return false
+type selectedModeConfig struct {
+	Mode        contract.Mode
+	Prefix      string
+	Source      S3Config
+	Destination *S3Config
+
+	WriteObjective  confopt.LongDuration
+	WriteTimeout    confopt.LongDuration
+	DeleteObjective confopt.LongDuration
+	DeleteTimeout   confopt.LongDuration
+}
+
+// S3Config describes one source or destination connection. Name is presentation-only.
+type S3Config struct {
+	Name     string `yaml:"name,omitempty"     json:"name,omitempty"`
+	Endpoint string `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
+	Region   string `yaml:"region"             json:"region"`
+	Bucket   string `yaml:"bucket"             json:"bucket"`
+
+	Credentials *awsauth.StaticCredentialConfig `yaml:"credentials,omitempty" json:"credentials,omitempty"`
+	AssumeRole  *awsauth.AssumeRoleConfig       `yaml:"assume_role,omitempty" json:"assume_role,omitempty"`
+
+	PathStyle        *bool                `yaml:"path_style,omitempty" json:"path_style,omitempty"`
+	Timeout          confopt.LongDuration `yaml:"timeout,omitempty"    json:"timeout,omitempty"`
+	ProxyURL         string               `yaml:"proxy_url,omitempty"  json:"proxy_url,omitempty"`
+	tlscfg.TLSConfig `yaml:",inline" json:""`
+}
+
+func (c *Config) applyDefaults() {
+	if c.UpdateEvery <= 0 {
+		c.UpdateEvery = defaultUpdateEvery
 	}
-	if strings.Contains(bucket, "..") || strings.Contains(bucket, ".-") || strings.Contains(bucket, "-.") {
-		return false
+	if c.Mode == "" {
+		c.Mode = string(contract.ModeLifecycle)
 	}
-	if net.ParseIP(bucket) != nil {
-		return false
-	}
-	return true
-}
-
-func isValidSiteLabel(site string) bool {
-	return len(site) >= minSiteLabelLength && len(site) <= maxSiteLabelLength && siteLabelRE.MatchString(site)
-}
-
-func (c *Collector) sourceEndpoint() endpointConfig {
-	return endpointConfig{
-		Endpoint:        c.Endpoint,
-		Region:          c.Region,
-		Bucket:          c.Bucket,
-		Prefix:          c.Prefix,
-		AccessKeyID:     c.AccessKeyID,
-		SecretAccessKey: c.SecretAccessKey,
-		SessionToken:    c.SessionToken,
-		PathStyle:       c.PathStyle,
-		ClientConfig:    c.ClientConfig,
+	switch contract.Mode(c.Mode) {
+	case contract.ModeLifecycle:
+		if c.ModeLifecycle == nil {
+			c.ModeLifecycle = &LifecycleModeConfig{}
+		}
+		c.ModeLifecycle.applyDefaults()
+	case contract.ModeCephMultisite:
+		if c.ModeCephMultisite == nil {
+			c.ModeCephMultisite = &ReplicationModeConfig{}
+		}
+		c.ModeCephMultisite.applyDefaults()
+	case contract.ModeAWSReplication:
+		if c.ModeAWSReplication == nil {
+			c.ModeAWSReplication = &ReplicationModeConfig{}
+		}
+		c.ModeAWSReplication.applyDefaults()
 	}
 }
 
-func destinationEndpointConfig(destination DestinationConfig) endpointConfig {
-	pathStyle := true
-	if destination.PathStyle != nil {
-		pathStyle = *destination.PathStyle
+func (c Config) withDefaults() Config {
+	result := c
+	if c.ModeLifecycle != nil {
+		mode := *c.ModeLifecycle
+		result.ModeLifecycle = &mode
 	}
-	rejectRedirects := true
-	if destination.NotFollowRedirect != nil {
-		rejectRedirects = *destination.NotFollowRedirect
+	if c.ModeCephMultisite != nil {
+		mode := *c.ModeCephMultisite
+		result.ModeCephMultisite = &mode
 	}
-	timeout := destination.Timeout
-	if timeout == 0 {
-		timeout = confopt.Duration(defaultTimeout)
+	if c.ModeAWSReplication != nil {
+		mode := *c.ModeAWSReplication
+		result.ModeAWSReplication = &mode
 	}
-	return endpointConfig{
-		Endpoint:        destination.Endpoint,
-		Region:          destination.Region,
-		Bucket:          destination.Bucket,
-		Prefix:          destination.Prefix,
-		AccessKeyID:     destination.AccessKeyID,
-		SecretAccessKey: destination.SecretAccessKey,
-		SessionToken:    destination.SessionToken,
-		PathStyle:       pathStyle,
-		ClientConfig: web.ClientConfig{
-			Timeout:           timeout,
-			NotFollowRedirect: rejectRedirects,
-			ProxyURL:          destination.ProxyURL,
-			TLSConfig:         destination.TLSConfig,
-		},
+	result.applyDefaults()
+	return result
+}
+
+func (c *LifecycleModeConfig) applyDefaults() {
+	if c.Prefix == "" {
+		c.Prefix = defaultPrefix
+	}
+	c.Source.applyDefaults("source")
+}
+
+func (c *ReplicationModeConfig) applyDefaults() {
+	if c.Prefix == "" {
+		c.Prefix = defaultPrefix
+	}
+	c.Source.applyDefaults("source")
+	c.Destination.applyDefaults("destination")
+	if c.WriteObjective.Duration() == 0 {
+		c.WriteObjective = confopt.LongDuration(defaultWriteObjective)
+	}
+	if c.WriteTimeout.Duration() == 0 {
+		c.WriteTimeout = confopt.LongDuration(defaultWriteTimeout)
+	}
+	if c.DeleteObjective.Duration() == 0 {
+		c.DeleteObjective = confopt.LongDuration(defaultDeleteObjective)
+	}
+	if c.DeleteTimeout.Duration() == 0 {
+		c.DeleteTimeout = confopt.LongDuration(defaultDeleteTimeout)
 	}
 }
 
-func validateProxyURL(raw, label string) error {
-	if raw == "" {
-		return nil
+func (c *S3Config) applyDefaults(name string) {
+	if c.Name == "" {
+		c.Name = name
 	}
-	proxy, err := url.Parse(raw)
-	if err != nil || proxy.Scheme == "" || proxy.Host == "" {
-		return fmt.Errorf("%s proxy_url is not a valid absolute URL", label)
+	if c.PathStyle == nil {
+		c.PathStyle = new(true)
 	}
-	return nil
+	if c.Timeout.Duration() == 0 {
+		c.Timeout = confopt.LongDuration(defaultTimeout)
+	}
 }
 
-func validateEndpointConfig(endpoint *endpointConfig, label string) error {
-	switch {
-	case endpoint.Endpoint == "":
-		return fmt.Errorf("%s endpoint is not set", label)
-	case endpoint.Region == "":
-		return fmt.Errorf("%s region is not set", label)
-	case endpoint.Bucket == "":
-		return fmt.Errorf("%s bucket is not set", label)
-	case endpoint.AccessKeyID == "":
-		return fmt.Errorf("%s access_key_id is not set", label)
-	case endpoint.SecretAccessKey == "":
-		return fmt.Errorf("%s secret_access_key is not set", label)
-	}
+func (c *Config) validate() error {
+	_, err := c.validatedModeConfig()
+	return err
+}
 
-	parsed, err := url.Parse(endpoint.Endpoint)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return fmt.Errorf("%s endpoint must be an absolute HTTP(S) URL", label)
+func (c *Config) validatedModeConfig() (*selectedModeConfig, error) {
+	var errs []error
+	// The framework assigns the job name before Init. Direct construction must
+	// provide it explicitly because it scopes the durable ownership journal.
+	if strings.TrimSpace(c.Name) == "" {
+		errs = append(errs, errors.New("name is required"))
+	} else if c.Name != strings.TrimSpace(c.Name) {
+		errs = append(errs, errors.New("name must not contain surrounding whitespace"))
 	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return fmt.Errorf("%s endpoint must use http or https", label)
+	if c.UpdateEvery <= 0 {
+		errs = append(errs, errors.New("update_every must be positive"))
 	}
-	if parsed.User != nil || (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return fmt.Errorf(
-			"%s endpoint must contain only a scheme and host, without credentials, path, query, or fragment",
-			label,
-		)
+	mode := contract.Mode(c.Mode)
+	switch mode {
+	case contract.ModeLifecycle, contract.ModeCephMultisite, contract.ModeAWSReplication:
+	default:
+		errs = append(errs, fmt.Errorf(
+			"mode %q is invalid: expected %q, %q, or %q",
+			c.Mode, contract.ModeLifecycle, contract.ModeCephMultisite, contract.ModeAWSReplication,
+		))
 	}
-	endpoint.Endpoint = strings.TrimSuffix(endpoint.Endpoint, "/")
+	selected, err := c.selectedModeConfig()
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if selected != nil {
+		if err := selected.validate(c.UpdateEvery); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return selected, errors.Join(errs...)
+}
 
-	if !isValidBucketName(endpoint.Bucket) {
-		return fmt.Errorf("%s bucket is not a valid S3 bucket name", label)
+func (c *selectedModeConfig) validate(updateEvery int) error {
+	var errs []error
+	if err := validatePrefix(c.Prefix); err != nil {
+		errs = append(errs, err)
 	}
+	if err := c.Source.validate("source"); err != nil {
+		errs = append(errs, err)
+	}
+	if c.Destination != nil {
+		if err := c.Destination.validate("destination"); err != nil {
+			errs = append(errs, err)
+		}
+		if sameS3Location(c.Source, *c.Destination) {
+			errs = append(errs, errors.New("source and destination must identify different S3 locations"))
+		}
+		if err := c.validateObjectives(updateEvery); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
 
-	if endpoint.Prefix == "" {
-		endpoint.Prefix = defaultPrefix
+func (c selectedModeConfig) validateObjectives(updateEvery int) error {
+	writeObjective := c.WriteObjective.Duration()
+	writeTimeout := c.WriteTimeout.Duration()
+	deleteObjective := c.DeleteObjective.Duration()
+	deleteTimeout := c.DeleteTimeout.Duration()
+	interval := time.Duration(updateEvery) * time.Second
+	var errs []error
+	if writeObjective < interval || writeObjective > maxProbeHorizon {
+		errs = append(errs, fmt.Errorf("write_objective must be between update_every and %s", maxProbeHorizon))
 	}
-	if len(endpoint.Prefix) > maxPrefixLength || strings.HasPrefix(endpoint.Prefix, "/") || !strings.HasSuffix(endpoint.Prefix, "/") ||
-		strings.Contains(endpoint.Prefix, "//") {
-		return fmt.Errorf("%s prefix must end with '/', must not start with '/', and must not contain an empty segment", label)
+	if writeTimeout < writeObjective || writeTimeout > maxProbeHorizon {
+		errs = append(errs, fmt.Errorf("write_timeout must be between write_objective and %s", maxProbeHorizon))
 	}
-	for part := range strings.SplitSeq(strings.Trim(endpoint.Prefix, "/"), "/") {
-		if part == "" || part == "." || part == ".." {
-			return fmt.Errorf("%s prefix must not contain '.', '..', or empty segments", label)
+	if deleteObjective < interval || deleteObjective > maxProbeHorizon {
+		errs = append(errs, fmt.Errorf("delete_objective must be between update_every and %s", maxProbeHorizon))
+	}
+	if deleteTimeout < deleteObjective || deleteTimeout > maxProbeHorizon {
+		errs = append(errs, fmt.Errorf("delete_timeout must be between delete_objective and %s", maxProbeHorizon))
+	}
+	return errors.Join(errs...)
+}
+
+func (c *Config) selectedModeConfig() (*selectedModeConfig, error) {
+	var errs []error
+	reject := func(name string, configured bool) {
+		if configured {
+			errs = append(errs, fmt.Errorf("%s is only valid when mode is %s", name, strings.TrimPrefix(name, "mode_")))
 		}
 	}
 
-	if endpoint.Timeout.Duration() < 500*time.Millisecond || endpoint.Timeout.Duration() > maxTimeout {
-		return fmt.Errorf("%s timeout must be between 0.5 and 10 seconds", label)
+	var selected *selectedModeConfig
+	switch contract.Mode(c.Mode) {
+	case contract.ModeLifecycle:
+		if c.ModeLifecycle == nil {
+			errs = append(errs, errors.New("mode_lifecycle is required when mode is lifecycle"))
+		} else {
+			selected = &selectedModeConfig{
+				Mode:   contract.ModeLifecycle,
+				Prefix: c.ModeLifecycle.Prefix,
+				Source: c.ModeLifecycle.Source,
+			}
+		}
+		reject("mode_ceph_multisite", c.ModeCephMultisite != nil)
+		reject("mode_aws_replication", c.ModeAWSReplication != nil)
+	case contract.ModeCephMultisite:
+		if c.ModeCephMultisite == nil {
+			errs = append(errs, errors.New("mode_ceph_multisite is required when mode is ceph_multisite"))
+		} else {
+			selected = selectedReplicationConfig(contract.ModeCephMultisite, c.ModeCephMultisite)
+		}
+		reject("mode_lifecycle", c.ModeLifecycle != nil)
+		reject("mode_aws_replication", c.ModeAWSReplication != nil)
+	case contract.ModeAWSReplication:
+		if c.ModeAWSReplication == nil {
+			errs = append(errs, errors.New("mode_aws_replication is required when mode is aws_replication"))
+		} else {
+			selected = selectedReplicationConfig(contract.ModeAWSReplication, c.ModeAWSReplication)
+		}
+		reject("mode_lifecycle", c.ModeLifecycle != nil)
+		reject("mode_ceph_multisite", c.ModeCephMultisite != nil)
 	}
-	if err := validateProxyURL(endpoint.ProxyURL, label); err != nil {
-		return err
+	return selected, errors.Join(errs...)
+}
+
+func selectedReplicationConfig(mode contract.Mode, config *ReplicationModeConfig) *selectedModeConfig {
+	return &selectedModeConfig{
+		Mode:            mode,
+		Prefix:          config.Prefix,
+		Source:          config.Source,
+		Destination:     &config.Destination,
+		WriteObjective:  config.WriteObjective,
+		WriteTimeout:    config.WriteTimeout,
+		DeleteObjective: config.DeleteObjective,
+		DeleteTimeout:   config.DeleteTimeout,
+	}
+}
+
+func (c *S3Config) validate(path string) error {
+	var errs []error
+	if strings.TrimSpace(c.Name) == "" || c.Name != strings.TrimSpace(c.Name) {
+		errs = append(errs, fmt.Errorf("%s.name must be non-empty and have no surrounding whitespace", path))
+	} else if utf8.RuneCountInString(c.Name) > maxConnectionNameLength {
+		errs = append(errs, fmt.Errorf("%s.name must not exceed %d characters", path, maxConnectionNameLength))
+	}
+	if strings.TrimSpace(c.Region) == "" || c.Region != strings.TrimSpace(c.Region) {
+		errs = append(errs, fmt.Errorf("%s.region must be non-empty and have no surrounding whitespace", path))
+	}
+	if strings.TrimSpace(c.Bucket) == "" || c.Bucket != strings.TrimSpace(c.Bucket) {
+		errs = append(errs, fmt.Errorf("%s.bucket must be non-empty and have no surrounding whitespace", path))
+	}
+	if err := validateEndpoint(c.Endpoint, path+".endpoint"); err != nil {
+		errs = append(errs, err)
+	}
+	if c.Timeout.Duration() <= 0 || c.Timeout.Duration() > maxRequestTimeout {
+		errs = append(errs, fmt.Errorf("%s.timeout must be between 1ns and %s", path, maxRequestTimeout))
+	}
+	if err := validateProxyURL(c.ProxyURL, path+".proxy_url"); err != nil {
+		errs = append(errs, err)
+	}
+	if c.Credentials != nil {
+		if err := c.Credentials.ValidateWithPath(path + ".credentials"); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if err := validateAssumeRole(c.AssumeRole, path+".assume_role"); err != nil {
+		errs = append(errs, err)
+	}
+	if (c.TLSCert == "") != (c.TLSKey == "") {
+		errs = append(errs, fmt.Errorf("%s.tls_cert and %s.tls_key must be configured together", path, path))
+	}
+	return errors.Join(errs...)
+}
+
+func (c S3Config) credentialConfig() awsauth.CredentialConfig {
+	if c.Credentials == nil {
+		return awsauth.CredentialConfig{
+			Type: awsauth.CredentialTypeDefault,
+		}
+	}
+	return awsauth.CredentialConfig{
+		Type:       awsauth.CredentialTypeStatic,
+		TypeStatic: c.Credentials,
+	}
+}
+
+func validatePrefix(prefix string) error {
+	switch {
+	case prefix == "":
+		return errors.New("prefix is required")
+	case len(prefix) > maxPrefixBytes:
+		return fmt.Errorf("prefix must not exceed %d bytes", maxPrefixBytes)
+	case strings.HasPrefix(prefix, "/"):
+		return errors.New("prefix must not start with '/'")
+	case !strings.HasSuffix(prefix, "/"):
+		return errors.New("prefix must end with '/'")
+	default:
+		return nil
+	}
+}
+
+func validateEndpoint(value, path string) error {
+	if value == "" {
+		return nil
+	}
+	if value != strings.TrimSpace(value) {
+		return errors.New(path + " must not contain surrounding whitespace")
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return errors.New(path + " must be an absolute HTTP(S) URL")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return errors.New(path + " must use http or https")
+	}
+	if parsed.User != nil || (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" ||
+		parsed.Fragment != "" {
+		return errors.New(path + " must contain only a scheme and host")
 	}
 	return nil
 }
 
-func canonicalEndpointKey(endpoint string) string {
-	parsed, err := url.Parse(endpoint)
+func validateProxyURL(value, path string) error {
+	if value == "" {
+		return nil
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return errors.New(path + " must be an absolute URL")
+	}
+	return nil
+}
+
+func validateAssumeRole(role *awsauth.AssumeRoleConfig, path string) error {
+	if role == nil {
+		return nil
+	}
+	return role.ValidateWithPath(path)
+}
+
+func sameS3Location(left, right S3Config) bool {
+	return s3LocationKey(left, true) == s3LocationKey(right, true)
+}
+
+func s3LocationKey(config S3Config, resolveZone bool) string {
+	parsed, err := url.Parse(config.Endpoint)
 	if err != nil {
-		return endpoint
+		return config.Endpoint + "/" + config.Bucket
+	}
+	host := canonicalHostname(parsed.Hostname(), resolveZone)
+	bucketPrefix := strings.ToLower(config.Bucket) + "."
+	if !boolValue(config.PathStyle) && strings.HasPrefix(host, bucketPrefix) {
+		host = strings.TrimPrefix(host, bucketPrefix)
 	}
 	scheme := strings.ToLower(parsed.Scheme)
-	host := canonicalConfigHostname(parsed.Hostname())
 	port := canonicalPort(scheme, parsed.Port())
-	if port != "" {
-		host = net.JoinHostPort(host, port)
+	if port == "" {
+		if scheme == "https" {
+			port = "443"
+		} else {
+			port = "80"
+		}
 	}
-	return scheme + "://" + host
+	return net.JoinHostPort(host, port) + "/" + config.Bucket
 }
 
 func canonicalPort(scheme, port string) string {
@@ -283,16 +453,18 @@ func canonicalPort(scheme, port string) string {
 	return strconv.FormatUint(number, 10)
 }
 
-func canonicalConfigHostname(host string) string {
+func canonicalHostname(host string, resolveZone bool) string {
 	host = strings.TrimSuffix(host, ".")
-	// The durable route fingerprint keeps the operator's interface-name spelling.
-	// Runtime interface indexes can change across reboot, so they are resolved only
-	// for same-service validation, never for persisted ownership identity.
 	host = strings.Replace(host, "%25", "%", 1)
 	address, zone, hasZone := strings.Cut(host, "%")
 	if hasZone && zone != "" {
 		if ip := net.ParseIP(strings.ToLower(address)); ip != nil && ip.To4() == nil {
-			if number, numErr := strconv.ParseUint(zone, 10, 32); numErr == nil {
+			if resolveZone {
+				if iface, err := net.InterfaceByName(zone); err == nil {
+					zone = strconv.FormatUint(uint64(iface.Index), 10)
+				}
+			}
+			if number, err := strconv.ParseUint(zone, 10, 32); err == nil {
 				zone = strconv.FormatUint(number, 10)
 			}
 			return ip.String() + "%" + zone
@@ -304,203 +476,18 @@ func canonicalConfigHostname(host string) string {
 	return strings.ToLower(host)
 }
 
-func canonicalRuntimeHostname(host string) string {
-	host = strings.TrimSuffix(host, ".")
-	// RFC 6874 URLs escape the IPv6 zone separator as %25. net.ParseIP rejects
-	// zoned addresses, and the zone itself is case-sensitive on many platforms.
-	host = strings.Replace(host, "%25", "%", 1)
-	address, zone, hasZone := strings.Cut(host, "%")
-	if hasZone && zone != "" {
-		if ip := net.ParseIP(strings.ToLower(address)); ip != nil && ip.To4() == nil {
-			// Go resolves an interface name to its index and otherwise interprets
-			// the textual zone as a decimal index.
-			if iface, nameErr := net.InterfaceByName(zone); nameErr == nil {
-				zone = strconv.FormatUint(uint64(iface.Index), 10)
-			} else if number, numErr := strconv.ParseUint(zone, 10, 32); numErr == nil {
-				zone = strconv.FormatUint(number, 10)
-			}
-			return ip.String() + "%" + zone
-		}
+func (c *selectedModeConfig) ownershipFingerprint() string {
+	parts := []string{
+		string(c.Mode),
+		s3LocationKey(c.Source, false),
+		c.Prefix,
 	}
-	if ip := net.ParseIP(host); ip != nil {
-		return ip.String()
+	if c.Destination != nil {
+		parts = append(parts, s3LocationKey(*c.Destination, false))
 	}
-	return strings.ToLower(host)
+	return journal.Fingerprint(parts...)
 }
 
-func endpointBucketKey(endpoint endpointConfig) string {
-	parsed, _ := url.Parse(endpoint.Endpoint)
-	host := canonicalRuntimeHostname(parsed.Hostname())
-	bucketPrefix := strings.ToLower(endpoint.Bucket) + "."
-	if !endpoint.PathStyle && strings.HasPrefix(host, bucketPrefix) {
-		host = strings.TrimPrefix(host, bucketPrefix)
-	}
-	port := canonicalPort(strings.ToLower(parsed.Scheme), parsed.Port())
-	if port == "" {
-		if parsed.Scheme == "https" {
-			port = "443"
-		} else {
-			port = "80"
-		}
-	}
-	return net.JoinHostPort(host, port) + "/" + endpoint.Bucket
-}
-
-func (c *Collector) validateConfig() error {
-	if c.UpdateEvery <= 0 {
-		c.UpdateEvery = defaultUpdateEvery
-	}
-	if c.Mode == "" {
-		c.Mode = modeSingle
-	}
-	if c.Mode != modeSingle && c.Mode != modeMultisite {
-		return fmt.Errorf("mode must be %s or %s", modeSingle, modeMultisite)
-	}
-
-	if c.ClientConfig.ForceHTTP2 {
-		return errors.New("force_http2 is not supported because it bypasses proxy configuration")
-	}
-
-	source := c.sourceEndpoint()
-	if err := validateEndpointConfig(&source, "source"); err != nil {
-		return err
-	}
-	c.Endpoint, c.Region, c.Bucket, c.Prefix = source.Endpoint, source.Region, source.Bucket, source.Prefix
-	c.PathStyle = source.PathStyle
-	c.ClientConfig = source.ClientConfig
-
-	if c.Mode == modeSingle {
-		if c.Destination != nil {
-			return errors.New("destination is accepted only in multisite mode")
-		}
-	} else {
-		if c.Name == "" {
-			return errors.New("name is not set")
-		}
-		if c.Destination == nil {
-			return errors.New("destination is not set")
-		}
-		if !isValidSiteLabel(c.SourceSite) {
-			return errors.New("source_site must be 1-64 characters and start with a letter or digit")
-		}
-		if !isValidSiteLabel(c.Destination.Site) {
-			return errors.New("destination.site must be 1-64 characters and start with a letter or digit")
-		}
-		if c.Destination.ForceHTTP2 != nil && *c.Destination.ForceHTTP2 {
-			return errors.New("destination force_http2 is not supported because it bypasses proxy configuration")
-		}
-		if strings.EqualFold(c.SourceSite, c.Destination.Site) {
-			return errors.New("source_site and destination.site must identify different sites")
-		}
-		destination := c.destinationEndpoint()
-		if err := validateEndpointConfig(&destination, "destination"); err != nil {
-			return err
-		}
-		c.Destination.Endpoint, c.Destination.Region = destination.Endpoint, destination.Region
-		c.Destination.Bucket, c.Destination.Prefix = destination.Bucket, destination.Prefix
-		c.Destination.Timeout = destination.Timeout
-		if c.Destination.PathStyle == nil {
-			c.Destination.PathStyle = &destination.PathStyle
-		}
-		if c.Destination.NotFollowRedirect == nil {
-			c.Destination.NotFollowRedirect = &destination.NotFollowRedirect
-		}
-		if endpointBucketKey(source) == endpointBucketKey(destination) {
-			return errors.New("source and destination must not use the same endpoint and bucket")
-		}
-
-		if c.RPOThresholdMS <= 0 || c.RPOThresholdMS > maxMultisiteObjectiveMS {
-			return fmt.Errorf("rpo_threshold_ms must be between 1 and %d", maxMultisiteObjectiveMS)
-		}
-		if c.ReplicationTimeoutMS <= 0 || c.ReplicationTimeoutMS > maxMultisiteObjectiveMS {
-			return fmt.Errorf("replication_timeout_ms must be between 1 and %d", maxMultisiteObjectiveMS)
-		}
-		if c.RPOThresholdMS > c.ReplicationTimeoutMS {
-			return errors.New("rpo_threshold_ms must not exceed replication_timeout_ms")
-		}
-		if c.RPOThresholdMS < int64(c.UpdateEvery)*1000 {
-			return errors.New("rpo_threshold_ms must be at least update_every because visibility is polled once per cycle")
-		}
-		if c.DeleteThresholdMS <= 0 || c.DeleteThresholdMS > maxMultisiteObjectiveMS {
-			return fmt.Errorf("delete_threshold_ms must be between 1 and %d", maxMultisiteObjectiveMS)
-		}
-		if c.DeleteTimeoutMS <= 0 || c.DeleteTimeoutMS > maxMultisiteObjectiveMS {
-			return fmt.Errorf("delete_timeout_ms must be between 1 and %d", maxMultisiteObjectiveMS)
-		}
-		if c.DeleteThresholdMS > c.DeleteTimeoutMS {
-			return errors.New("delete_threshold_ms must not exceed delete_timeout_ms")
-		}
-		if c.DeleteThresholdMS < int64(c.UpdateEvery)*1000 {
-			return errors.New("delete_threshold_ms must be at least update_every because disappearance is polled once per cycle")
-		}
-	}
-
-	if c.MaxRetries < 0 || c.MaxRetries > maxRetries {
-		return fmt.Errorf("max_retries must be between 0 and %d", maxRetries)
-	}
-	if c.LatencyThresholdMS < 0 || c.LatencyThresholdMS > maxLatencyThresholdMS {
-		return fmt.Errorf("latency_threshold_ms must be between 0 and %d", maxLatencyThresholdMS)
-	}
-
-	if c.worstCaseDuration() > time.Duration(c.UpdateEvery)*time.Second {
-		return fmt.Errorf(
-			"worst-case probe duration %s does not fit update_every %ds; increase update_every or reduce timeout/max_retries",
-			c.worstCaseDuration(), c.UpdateEvery,
-		)
-	}
-	return nil
-}
-
-func (c *Collector) perOperationDuration() time.Duration {
-	return operationDeadline(c.Timeout.Duration(), c.MaxRetries)
-}
-
-func operationDeadline(timeout time.Duration, retries int) time.Duration {
-	attempts := retries + 1
-	return timeout*time.Duration(attempts) + time.Duration(retries)*(maxRetryBackoff+maxRetryAfter)
-}
-
-func (c *Collector) worstCaseDuration() time.Duration {
-	deadline := operationDeadline(c.Timeout.Duration(), c.MaxRetries)
-	operations := maxNormalAPIOperations
-	if c.Mode == modeMultisite {
-		destinationDeadline := operationDeadline(c.Destination.Timeout.Duration(), c.MaxRetries)
-		deadline = max(deadline, destinationDeadline)
-		operations = maxMultisiteAPIOperations
-	}
-	return deadline*time.Duration(operations) + cycleProcessingMargin
-}
-
-func (c *Collector) multisiteDestructiveRetryGrace() time.Duration {
-	deadline := operationDeadline(c.Timeout.Duration(), c.MaxRetries)
-	if destinationDeadline := operationDeadline(c.Destination.Timeout.Duration(), c.MaxRetries); destinationDeadline > deadline {
-		deadline = destinationDeadline
-	}
-	return deadline*time.Duration(destructiveRetryOperations) + cycleProcessingMargin
-}
-
-func (c *Collector) multisiteCleanupHorizon() time.Duration {
-	horizon := time.Duration(c.ReplicationTimeoutMS) * time.Millisecond
-	if deleteHorizon := time.Duration(c.DeleteTimeoutMS) * time.Millisecond; deleteHorizon > horizon {
-		horizon = deleteHorizon
-	}
-	if minimum := time.Duration(c.UpdateEvery) * time.Second; minimum > horizon {
-		horizon = minimum
-	}
-	return horizon
-}
-
-func (c *Collector) shutdownCleanupDuration() time.Duration {
-	deadline := operationDeadline(c.Timeout.Duration(), c.MaxRetries)
-	operations := shutdownAPIOperations
-	if c.Mode == modeMultisite {
-		destinationDeadline := operationDeadline(c.Destination.Timeout.Duration(), c.MaxRetries)
-		deadline = max(deadline, destinationDeadline)
-		operations = multisiteShutdownOperations
-	}
-	return deadline*time.Duration(operations) + cycleProcessingMargin
-}
-
-func (c *Collector) destinationEndpoint() endpointConfig {
-	return destinationEndpointConfig(*c.Destination)
+func boolValue(value *bool) bool {
+	return value != nil && *value
 }

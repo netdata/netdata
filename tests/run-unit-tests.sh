@@ -30,19 +30,22 @@ system_info_unit_test() {
   /bin/sh "$(dirname "$0")/system-info-test.sh"
 }
 
+kickstart_path_unit_test() {
+  echo "Running kickstart path shell tests"
+  /bin/sh "$(dirname "$0")/kickstart-path-sanitizer-test.sh"
+}
+
 spawn_server_unit_tests() {
-  echo "Running spawn-server unit tests"
+  # Shared with the macOS CI job, which builds netdata and then runs only this suite.
+  bash "$(dirname "$0")/spawn-server-tests.sh"
+}
 
-  local run_dir
-  run_dir="$(mktemp -d "${TMPDIR:-/tmp}/netdata-spawn-tester.XXXXXX")" || return 1
-
-  NETDATA_RUN_DIR="${run_dir}" \
-  ASAN_OPTIONS=detect_leaks=0 \
-  "${NETDATA_BUILD_DIR:-./build}/spawn-tester" test
-  local ret=$?
-
-  rm -rf -- "${run_dir}"
-  return "${ret}"
+acl_tests() {
+  echo "Running ACL and bearer protection shell tests"
+  # acl.sh reads its netdata.cfg templates from the working directory
+  (cd "$(dirname "$0")/acls" &&
+    ASAN_OPTIONS=detect_leaks=0 \
+    bash "$HOME"/netdata/usr/libexec/netdata/plugins.d/acl.sh)
 }
 
 install_netdata || exit 1
@@ -51,4 +54,8 @@ c_unit_tests || exit 1
 
 system_info_unit_test || exit 1
 
+kickstart_path_unit_test || exit 1
+
 spawn_server_unit_tests || exit 1
+
+acl_tests || exit 1

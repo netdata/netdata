@@ -1,0 +1,15 @@
+# Palo Alto documents LLDP-V2 support for firewalls. The sysDescr guard keeps
+# Panorama, WildFire, and M-series appliances outside this activation boundary.
+# The enterprise-root identity covers PAN-OS virtual-system agents proven by
+# the real fixture; normal firewall product identities use the .2.3 subtree.
+
+extends:
+  - _std-topology-lldp-v2-mib.yaml
+
+selector:
+  - sysobjectid:
+      include:
+        - '^1\.3\.6\.1\.4\.1\.25461(\.2\.3\.[0-9]+)?$'
+    sysdescr:
+      include:
+        - firewall

@@ -174,5 +174,6 @@ func (s *ebpfSharedMemoryStore) RemoveCachestatPIDs(pids []uint32) {
 		delete(s.cachestatPrevCt, pid)
 		delete(s.cachestatMiss, pid)
 	}
+	s.cachestatPIDs = removeFromSortedPIDs(s.cachestatPIDs, pids)
 	s.rebuildEntriesLocked()
 }

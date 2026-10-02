@@ -2,7 +2,7 @@
 
 Use Collector processors when several receivers need the same normalization, enrichment, or filtering before they export to Netdata. Prefer a receiver's built-in parser for source-specific work; use the `transform` processor for reusable OTTL changes and the `filter` processor to drop records.
 
-Before you begin, complete [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md). These examples use the `transform` and `filter` processors from OpenTelemetry Collector Contrib `0.157.0`.
+Before you begin, complete [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md). These examples use the `transform` and `filter` processors from OpenTelemetry Collector Contrib `0.157.0`.
 
 ## Parse a JSON log body
 
@@ -113,7 +113,7 @@ Transform and filter processors stay within one signal pipeline; they do not tur
 - Processor order matters. Parse before reading parsed attributes, normalize before filtering on normalized values, and filter before connectors or exporters that should not receive discarded records.
 - OTTL and processor configuration evolve. Check the documentation for the exact Collector release you deploy.
 
-See the pinned upstream [OTTL documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/pkg/ottl), [transform processor documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/processor/transformprocessor), and [filter processor documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.157.0/processor/filterprocessor) for the complete language and configuration surface.
+See the upstream [OTTL documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/pkg/ottl), [transform processor documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/transformprocessor), and [filter processor documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/filterprocessor) for the complete language and configuration surface.
 
 ## Troubleshoot transformations
 

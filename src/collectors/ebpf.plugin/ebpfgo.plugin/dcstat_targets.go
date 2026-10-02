@@ -1,13 +1,5 @@
 package main
 
-import (
-	"bufio"
-	"fmt"
-	"io"
-	"os"
-	"strings"
-)
-
 // DCStatTarget is the kernel symbol one dcstat probe attaches to.  There is no
 // mode field: which of the two probes is a return probe is fixed by the BPF
 // programs themselves (d_lookup reads PT_REGS_RC), not by configuration, so a
@@ -32,15 +24,6 @@ func defaultDCStatTargets() DCStatTargets {
 		LookupFast: DCStatTarget{Name: "lookup_fast"},
 		DLookup:    DCStatTarget{Name: "d_lookup"},
 	}
-}
-
-// kallsymsOpener opens the kernel symbol table.  It exists so the degrade path
-// (unreadable or truncated symbol table) is reachable from tests without
-// depending on the host's /proc.
-type kallsymsOpener func() (io.ReadCloser, error)
-
-func openProcKallsyms() (io.ReadCloser, error) {
-	return os.Open("/proc/kallsyms")
 }
 
 // resolveDCStatTargets returns the attach targets for this kernel.
@@ -70,7 +53,7 @@ func resolveDCStatTargetsFrom(open kallsymsOpener) DCStatTargets {
 	}
 	defer symbols.Close()
 
-	name, err := selectDCStatKallsymsPrefixFromReader(targets.LookupFast.Name, symbols)
+	name, err := selectKallsymsPrefix(targets.LookupFast.Name, symbols)
 	if err != nil {
 		warn(err)
 		return targets
@@ -87,34 +70,4 @@ func (t *DCStatTargets) ResolveLookupFastTarget(resolved string) {
 	if resolved != "" {
 		t.LookupFast.Name = resolved
 	}
-}
-
-// selectDCStatKallsymsPrefixFromReader returns the first probeable symbol whose
-// name starts with prefix, or "" when none matches.
-func selectDCStatKallsymsPrefixFromReader(prefix string, r io.Reader) (string, error) {
-	if prefix == "" {
-		return "", fmt.Errorf("no dcstat kallsyms prefix configured")
-	}
-
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) < 3 {
-			continue
-		}
-
-		if !isProbeableKallsymsType(fields[1]) {
-			continue
-		}
-
-		if strings.HasPrefix(fields[2], prefix) {
-			return fields[2], nil
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return "", err
-	}
-
-	return "", nil
 }

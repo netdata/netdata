@@ -118,6 +118,25 @@ func (c *Collector) collect() (map[string]int64, error) {
 }
 
 func (c *Collector) openConnection() (*sql.DB, error) {
+	db, err := c.newConnectionPool()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("error pinging database: %v", err)
+	}
+
+	return db, nil
+}
+
+// newConnectionPool configures a single-connection pool without dialing. Metrics ping it
+// under the metrics timeout; Functions connect lazily under their own request contexts.
+func (c *Collector) newConnectionPool() (*sql.DB, error) {
 	driverName, dsn, err := c.resolveConnectionParams()
 	if err != nil {
 		return nil, err
@@ -131,14 +150,6 @@ func (c *Collector) openConnection() (*sql.DB, error) {
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(10 * time.Minute)
-
-	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
-	defer cancel()
-
-	if err := db.PingContext(ctx); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("error pinging database: %v", err)
-	}
 
 	return db, nil
 }
@@ -160,7 +171,7 @@ func (c *Collector) queryVersion() (string, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
-	return c.queryServerProperties(ctx)
+	return queryServerProperties(ctx, c.db)
 }
 
 func (c *Collector) collectInstanceMetrics(mx map[string]int64) error {

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
 )
 
@@ -75,8 +75,10 @@ func disableAutoDetection(autoDetectEvery *int) {
 	*autoDetectEvery = 0
 }
 
-func isRetryableError(err error) bool {
-	return dyncfg.IsRetryableError(err)
+// keepsInitRetry reports whether an Init error keeps autodetection retries:
+// only a collectorapi.TemporaryError does.
+func keepsInitRetry(err error) bool {
+	return collectorapi.ClassifyLifecycleError(err) == collectorapi.LifecycleErrorTemporary
 }
 
 func sanitizeLifecycleError(sanitize func(error) error, err error) (sanitized error) {

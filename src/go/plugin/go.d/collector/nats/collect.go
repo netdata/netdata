@@ -3,6 +3,7 @@
 package nats
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -13,9 +14,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	if c.srvMeta.id == "" {
-		if err := c.getServerMeta(); err != nil {
+		if err := c.getServerMeta(ctx); err != nil {
 			return nil, err
 		}
 	}
@@ -24,25 +25,25 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 	c.cache.resetUpdated()
 
-	if err := c.collectHealthz(mx); err != nil {
+	if err := c.collectHealthz(ctx, mx); err != nil {
 		return nil, err
 	}
-	if err := c.collectVarz(mx); err != nil {
+	if err := c.collectVarz(ctx, mx); err != nil {
 		return mx, err
 	}
-	if err := c.collectAccstatz(mx); err != nil {
+	if err := c.collectAccstatz(ctx, mx); err != nil {
 		return mx, err
 	}
-	if err := c.collectRoutez(mx); err != nil {
+	if err := c.collectRoutez(ctx, mx); err != nil {
 		return mx, err
 	}
-	if err := c.collectGatewayz(mx); err != nil {
+	if err := c.collectGatewayz(ctx, mx); err != nil {
 		return mx, err
 	}
-	if err := c.collectLeafz(mx); err != nil {
+	if err := c.collectLeafz(ctx, mx); err != nil {
 		return mx, err
 	}
-	if err := c.collectJsz(mx); err != nil {
+	if err := c.collectJsz(ctx, mx); err != nil {
 		return mx, err
 	}
 
@@ -51,8 +52,8 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) getServerMeta() error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathVarz)
+func (c *Collector) getServerMeta(ctx context.Context) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathVarz)
 	if err != nil {
 		return err
 	}
@@ -76,8 +77,8 @@ func (c *Collector) getServerMeta() error {
 	return nil
 }
 
-func (c *Collector) collectHealthz(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathHealthz)
+func (c *Collector) collectHealthz(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathHealthz)
 	if err != nil {
 		return err
 	}
@@ -104,8 +105,8 @@ func (c *Collector) collectHealthz(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectVarz(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathVarz)
+func (c *Collector) collectVarz(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathVarz)
 	if err != nil {
 		return err
 	}
@@ -138,8 +139,8 @@ func (c *Collector) collectVarz(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectAccstatz(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAccstatz)
+func (c *Collector) collectAccstatz(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAccstatz)
 	if err != nil {
 		return err
 	}
@@ -170,8 +171,8 @@ func (c *Collector) collectAccstatz(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectRoutez(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathRoutez)
+func (c *Collector) collectRoutez(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathRoutez)
 	if err != nil {
 		return err
 	}
@@ -196,8 +197,8 @@ func (c *Collector) collectRoutez(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectGatewayz(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathGatewayz)
+func (c *Collector) collectGatewayz(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathGatewayz)
 	if err != nil {
 		return err
 	}
@@ -240,8 +241,8 @@ func (c *Collector) collectGatewayz(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectLeafz(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathLeafz)
+func (c *Collector) collectLeafz(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathLeafz)
 	if err != nil {
 		return err
 	}
@@ -267,8 +268,8 @@ func (c *Collector) collectLeafz(mx map[string]int64) error {
 	return nil
 }
 
-func (c *Collector) collectJsz(mx map[string]int64) error {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathJsz)
+func (c *Collector) collectJsz(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathJsz)
 	if err != nil {
 		return err
 	}

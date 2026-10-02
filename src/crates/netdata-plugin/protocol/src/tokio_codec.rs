@@ -1,23 +1,68 @@
-//! tokio_util::codec implementations for the Netdata protocol
+//! `tokio_util::codec` adapter between this crate's parser state machine and
+//! framed stdin/stdout I/O: implements [`Decoder`]/[`Encoder`] for
+//! [`MessageParser`] so `tokio_util::codec::FramedRead`/`FramedWrite` can drive
+//! them. The only user is `transport`: `MessageReader` wraps a `FramedRead`
+//! over `MessageParser::input()`, `MessageWriter` a `FramedWrite` over
+//! `MessageParser::output()`. The `Encoder` impl ignores the parser's
+//! direction and state; it switches only on the [`Message`] variant.
+//!
+//! Decoder semantics: `decode` consumes complete lines as it goes and yields
+//! at most one `Message` per call; the details (partial reads, dropped lines,
+//! error handling) are on the `impl Decoder` below. All protocol state lives
+//! in the `MessageParser` (payload mode in its `LineParser` plus the in-flight
+//! message), so one instance must see the stream in order.
+//!
+//! Encoder semantics: each `Message` is appended to the output buffer as its
+//! newline-terminated keyword line(s). Payload bodies go in raw between the
+//! begin header and the `..._END` marker, with a `\n` appended when the body
+//! does not end in one, so the marker stays alone on its line — the agent
+//! ends a deferred block on the first line whose first word is the end
+//! keyword (`parser_action` in `src/plugins.d/pluginsd_parser.h`) and stops
+//! the plugin when the block exceeds `PLUGINSD_MAX_DEFERRED_SIZE` (100 MiB,
+//! `src/libnetdata/libnetdata.h`).
+//!
+//! The agent-side counterparts of the emitted lines are the keyword handlers
+//! dispatched from `parser_execute` in `src/plugins.d/pluginsd_parser.c`:
+//! `pluginsd_function` and `pluginsd_function_result_begin` (both in
+//! `src/plugins.d/pluginsd_functions.c`), `pluginsd_function_progress`
+//! (FUNCTION_PROGRESS) and `pluginsd_config` (CONFIG,
+//! `src/plugins.d/pluginsd_dyncfg.c`); see the per-variant comments for the
+//! direction each one actually flows in.
 
 use crate::message_parser::{Message, MessageParser};
 use bytes::{Buf, BytesMut};
 use netdata_plugin_types::FunctionCall;
 use tokio_util::codec::{Decoder, Encoder};
 
-/// Helper function to quote strings if needed
+/// Quote a value for a pluginsd field when it cannot travel bare: the empty
+/// string becomes `''`, and anything containing a space, tab, `'` or `"` is
+/// wrapped in single quotes with embedded `'` escaped as `\'`.
+///
+/// The agent splits fields with `quoted_strings_splitter`
+/// (`src/libnetdata/line_splitter/line_splitter.h`): only the quote character
+/// the field opened with closes it, and a backslash before any byte is skipped
+/// as a pair without being removed — so `\'` protects the quote but the agent
+/// still sees the literal backslash in the value. Note the pluginsd map also
+/// splits unquoted words on `\r`, `\f`, `\v` and `=`, which this function does
+/// not guard against.
 fn quote_if_needed(s: &str) -> String {
     if s.is_empty() {
         "''".to_string()
     } else if s.contains([' ', '\t', '\'', '"']) {
-        // Use single quotes and escape any single quotes within
+        // the agent never unescapes, so the backslash stays in the value
         format!("'{}'", s.replace('\'', "\\'"))
     } else {
         s.to_string()
     }
 }
 
-/// Helper function to build function command parts
+/// Trailing fields of the FUNCTION / FUNCTION_PAYLOAD call header, after the
+/// keyword: quoted transaction, timeout in seconds, quoted function name
+/// (`FunctionCall::args`, the words after the name, are not re-encoded), then
+/// optional access (hex, as `HttpAccess` prints) and source. Access and source
+/// are appended independently, so a source without access shifts fields for a
+/// positional reader. Mirrors the call format the agent sends to plugins in
+/// `pluginsd_calls_insert_cb` (`src/plugins.d/pluginsd_functions.c`).
 fn build_function_parts(func_call: &FunctionCall, command: &str) -> Vec<String> {
     let mut parts = vec![
         command.to_string(),
@@ -37,7 +82,17 @@ fn build_function_parts(func_call: &FunctionCall, command: &str) -> Vec<String> 
     parts
 }
 
-/// Decoder implementation for MessageParser
+/// `tokio_util::codec::Decoder` for [`MessageParser`], driven by the
+/// `FramedRead<R, MessageParser>` inside `transport::MessageReader`.
+///
+/// Eats complete lines until [`MessageParser::process_command`] yields a
+/// message, then consumes the buffer through the bytes that produced it and
+/// yields it. An incomplete line is not an error: `Error::IncompleteLine`
+/// makes the call return `Ok(None)` with the partial line left in the buffer
+/// until a later read completes it, so messages may straddle reads. Only
+/// `Error::IncompleteLine` is ever produced today (`line_parser::parse` has no
+/// other failure path), but any other error would end the `MessageReader`
+/// stream — `transport` maps every error to `NetdataPluginError::Protocol`.
 impl Decoder for MessageParser {
     type Item = Message;
     type Error = crate::line_parser::Error;
@@ -55,12 +110,13 @@ impl Decoder for MessageParser {
             let parsed_line = match self.line_parser.parse(remaining) {
                 Ok(parsed_line) => parsed_line,
                 Err(crate::line_parser::Error::IncompleteLine) => {
-                    // Need more data - advance buffer by what we consumed so far
+                    // Line incomplete: keep the tail for the next call, drop
+                    // the lines consumed so far
                     src.advance(total_consumed);
                     return Ok(None);
                 }
                 Err(e) => {
-                    // Advance buffer and return error
+                    // Propagate the error after dropping the consumed lines
                     src.advance(total_consumed);
                     return Err(e);
                 }
@@ -73,19 +129,31 @@ impl Decoder for MessageParser {
             };
 
             if let Some(message) = self.process_command(command) {
-                // Found a complete message - advance buffer and return it
+                // Message complete: consume everything up to and including
+                // this line and yield it; what follows stays for later calls
                 src.advance(total_consumed);
                 return Ok(Some(message));
             }
         }
 
-        // Processed all available data but no complete message yet
+        // No complete message in the available data: drop what was consumed
+        // and ask for more bytes
         src.advance(total_consumed);
         Ok(None)
     }
 }
 
-/// Encoder implementation for MessageParser to serialize Messages back to protocol format
+/// `tokio_util::codec::Encoder` for [`MessageParser`], driven by the
+/// `FramedWrite<W, MessageParser>` inside `transport::MessageWriter` (which
+/// `MessageWriter::send` flushes after each message). Appends the
+/// newline-terminated wire form of each [`Message`] to `dst`, taking the
+/// message by value; the parser's direction is irrelevant. Inbound-only
+/// variants encode to nothing.
+///
+/// Current senders exercise only the declaration, result and progress arms
+/// (`rt`'s event loop, `otel-plugin`'s supervisor and the bridge all go
+/// through `MessageWriter`); see the per-variant comments for which arms have
+/// an agent-side consumer at all.
 impl Encoder<Message> for MessageParser {
     type Error = std::io::Error;
 
@@ -96,7 +164,21 @@ impl Encoder<Message> for MessageParser {
     ) -> std::result::Result<(), Self::Error> {
         match item {
             Message::ConfigDeclaration(cfg_decl) => {
-                // CONFIG <id> CREATE <status> <type> <path> <source_type> <source> <cmds> <view_access> <edit_access>
+                // dyncfg registration, parsed by pluginsd_config
+                // (src/plugins.d/pluginsd_dyncfg.c):
+                // CONFIG <id> CREATE <status> <type> <path> <source_type>
+                // <source> <cmds> <view_access> <edit_access>
+                // status/type/source_type print their lowercase vocabulary
+                // names and access flags as hex; cmds prints pipe-separated
+                // with spaces ("get | schema"), which the agent's
+                // space-splitting dyncfg_cmds2id parses by ignoring the "|"
+                // words. Caveat: the agent matches the action word
+                // case-sensitively against PLUGINSD_KEYWORD_CONFIG_ACTION_CREATE
+                // ("create", src/libnetdata/functions_evloop/functions_evloop.h),
+                // so this uppercase CREATE is logged as an unknown action and
+                // the declaration is not registered. No Rust sender exercises
+                // the message outside
+                // protocol/examples/config_declaration_encode.rs.
                 let parts = vec![
                     "CONFIG".to_string(),
                     quote_if_needed(&cfg_decl.id),
@@ -114,7 +196,13 @@ impl Encoder<Message> for MessageParser {
                 dst.extend_from_slice(format!("{}\n", parts.join(" ")).as_bytes());
             }
             Message::FunctionDeclaration(func_decl) => {
-                // FUNCTION [GLOBAL] name timeout help [tags [access [priority [version]]]
+                // Function registration, parsed by pluginsd_function
+                // (src/plugins.d/pluginsd_functions.c), which reads the words
+                // positionally — hence the strictly nested optional fields:
+                // FUNCTION [GLOBAL] <name> <timeout_s> <help>
+                //   [<tags> [<access> [<priority> [<version>]]]]
+                // timeout is in seconds; access prints as hex
+                // (HTTP_ACCESS_FORMAT); help/name/tags are quote_if_needed.
                 let mut parts = Vec::with_capacity(8);
                 parts.push("FUNCTION".to_string());
 
@@ -146,7 +234,21 @@ impl Encoder<Message> for MessageParser {
             }
 
             Message::FunctionCall(func_call) => match &func_call.payload {
+                // A function call the plugin sends to the agent. No Rust code
+                // currently sends one — the Decoder produces these inbound —
+                // and the agent has no consumer for it either: its plugin-facing
+                // parser reads a plugin-sent FUNCTION as a declaration
+                // (pluginsd_function) and has no FUNCTION_PAYLOAD keyword
+                // (src/plugins.d/gperf-hashtable.h), so such a line is an
+                // unknown keyword that stops the plugin's parser
+                // (src/plugins.d/pluginsd_parser.c). The wire form mirrors the
+                // call the agent sends to plugins.
                 Some(payload) => {
+                    // FUNCTION_PAYLOAD <transaction> <timeout_s> <name>
+                    // [access [source]], then the raw payload, then the END
+                    // marker. The agent's own payload-call header carries a
+                    // content_type word (pluginsd_functions.c) that this
+                    // header omits.
                     let parts = build_function_parts(&func_call, "FUNCTION_PAYLOAD");
                     dst.extend_from_slice(format!("{}\n", parts.join(" ")).as_bytes());
 
@@ -159,13 +261,23 @@ impl Encoder<Message> for MessageParser {
                     dst.extend_from_slice(b"FUNCTION_PAYLOAD_END\n");
                 }
                 None => {
+                    // FUNCTION <transaction> <timeout_s> <name> [access [source]]
                     let parts = build_function_parts(&func_call, "FUNCTION");
                     dst.extend_from_slice(format!("{}\n", parts.join(" ")).as_bytes());
                 }
             },
 
             Message::FunctionResult(func_result) => {
-                // FUNCTION_RESULT_BEGIN [transaction_id] [status_code] [content_type] [expires]
+                // Function result, parsed by pluginsd_function_result_begin
+                // (src/plugins.d/pluginsd_functions.c), which puts the agent
+                // into deferred mode collecting raw lines until
+                // FUNCTION_RESULT_END (parser_action in
+                // src/plugins.d/pluginsd_parser.h):
+                // FUNCTION_RESULT_BEGIN <transaction> <status> <format> <expires>
+                // Header fields are not quoted, so the transaction must not
+                // contain spaces (the agent treats it as a UUID); status is an
+                // HTTP status code, format the canonical MIME name
+                // (http_content) and expires unix epoch seconds.
                 dst.extend_from_slice(
                     format!(
                         "FUNCTION_RESULT_BEGIN {} {} {} {}\n",
@@ -177,7 +289,9 @@ impl Encoder<Message> for MessageParser {
                     .as_bytes(),
                 );
 
-                // Function payload data
+                // Payload body, `\n`-terminated so the END marker below stays
+                // alone on its line (see the Encoder contract in the module
+                // docs)
                 if !func_result.payload.is_empty() {
                     dst.extend_from_slice(func_result.payload.as_slice());
                     if !func_result.payload.ends_with(b"\n") {
@@ -185,12 +299,17 @@ impl Encoder<Message> for MessageParser {
                     }
                 }
 
-                // FUNCTION_RESULT_END
+                // Closes the deferred block; must be alone on its line
                 dst.extend_from_slice(b"FUNCTION_RESULT_END\n");
             }
 
             Message::FunctionCancel(func_cancel) => {
-                // FUNCTION_CANCEL transaction
+                // FUNCTION_CANCEL <transaction> — the agent sends this keyword
+                // to plugins (PLUGINSD_CALL_FUNCTION_CANCEL,
+                // src/plugins.d/pluginsd_functions.c); its plugin-facing
+                // parser has no FUNCTION_CANCEL keyword of its own
+                // (src/plugins.d/gperf-hashtable.h), so a plugin-sent line
+                // like this one has no agent-side handler
                 dst.extend_from_slice(
                     format!(
                         "FUNCTION_CANCEL {}\n",
@@ -200,6 +319,10 @@ impl Encoder<Message> for MessageParser {
                 );
             }
             Message::FunctionProgressResponse(progress) => {
+                // Progress on a call the agent is waiting on, parsed by
+                // pluginsd_function_progress
+                // (src/plugins.d/pluginsd_functions.c): done and all are
+                // unit counts of the same call, not percentages.
                 dst.extend_from_slice(
                     format!(
                         "FUNCTION_PROGRESS {} {} {}\n",
@@ -211,7 +334,10 @@ impl Encoder<Message> for MessageParser {
                 );
             }
             Message::FunctionProgressRequest(_) | Message::Quit => {
-                // Inbound-only messages, not encoded for output
+                // Inbound-only, agent→plugin: FunctionProgressRequest is the
+                // agent's nudge for a progress report
+                // (PLUGINSD_CALL_FUNCTION_PROGRESS) and Quit its shutdown
+                // request (PLUGINSD_CALL_QUIT); nothing is written for them
             }
         }
 

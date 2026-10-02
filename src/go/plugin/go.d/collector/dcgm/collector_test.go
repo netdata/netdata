@@ -162,10 +162,10 @@ func TestCollector_Collect(t *testing.T) {
 		makeID(makeID("dcgm.gpu.reliability.xid", gpuKey), "xid"):                                      31000,
 		makeID(makeID("dcgm.gpu.reliability.row_remap_status", gpuKey), "row_remap_failure"):           1000,
 		makeID(makeID("dcgm.gpu.reliability.row_remap_events", gpuKey), "uncorrectable_remapped_rows"): 7000,
-		makeID(makeID("dcgm.gpu.throttle.violations", gpuKey), "power_violation"):                      2000,
-		makeID(makeID("dcgm.gpu.throttle.violations", gpuKey), "thermal_violation"):                    5000,
+		makeID(makeID("dcgm.gpu.throttle.duration", gpuKey), "power_violation"):                        200,
+		makeID(makeID("dcgm.gpu.throttle.duration", gpuKey), "thermal_violation"):                      500,
 		makeID(makeID("dcgm.gpu.interconnect.pcie.throughput", gpuKey), "pcie_tx"):                     123456000,
-		makeID(makeID("dcgm.gpu.interconnect.total.throughput", gpuKey), "pcie"):                       123456000,
+		makeID(makeID("dcgm.gpu.reliability.remapped_rows", gpuKey), "uncorrectable_remapped_rows"):    7000,
 		makeID(makeID("dcgm.nvlink.interconnect.error_rate", linkKey), "nvlink_replay_error"):          4000,
 	}
 
@@ -192,9 +192,9 @@ func TestCollector_Collect(t *testing.T) {
 	assert.True(t, seenCtx["dcgm.gpu.reliability.xid"])
 	assert.True(t, seenCtx["dcgm.gpu.reliability.row_remap_status"])
 	assert.True(t, seenCtx["dcgm.gpu.reliability.row_remap_events"])
-	assert.True(t, seenCtx["dcgm.gpu.throttle.violations"])
+	assert.True(t, seenCtx["dcgm.gpu.throttle.duration"])
 	assert.True(t, seenCtx["dcgm.gpu.interconnect.pcie.throughput"])
-	assert.True(t, seenCtx["dcgm.gpu.interconnect.total.throughput"])
+	assert.False(t, seenCtx["dcgm.gpu.interconnect.total.throughput"])
 	assert.True(t, seenCtx["dcgm.nvlink.interconnect.error_rate"])
 	assert.False(t, seenCtx["dcgm.gpu.thermal.temperature"])
 }
@@ -242,8 +242,8 @@ DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL{gpu="0",UUID="GPU-aaa"} 400
 	assert.Equal(t, int64(22000), mx[makeID(makeID(nvlinkEntityCtxID, linkKey), "nvlink_tx")])
 	assert.NotContains(t, mx, makeID(makeID(nvlinkEntityCtxID, linkKey), "nvlink_rx_bytes"))
 	assert.NotContains(t, mx, makeID(makeID(nvlinkEntityCtxID, linkKey), "nvlink_tx_bytes"))
-	// Explicit NVLink total metric should win over rx+tx aggregation for overview.
-	assert.Equal(t, int64(400000), mx[makeID(makeID(totalCtxID, gpuKey), "nvlink")])
+	// Prefer the complete profiling direction pair over legacy totals and link details.
+	assert.Equal(t, int64(30000), mx[makeID(makeID(totalCtxID, gpuKey), "nvlink")])
 }
 
 func TestCollector_Collect_XIDErrorCodeCreatesCleanDimensions(t *testing.T) {
@@ -345,7 +345,7 @@ DCGM_FI_DEV_BAR1_TOTAL{gpu="0",UUID="GPU-aaa"} 256
 
 	gpuKey := "gpu=0|uuid=GPU-aaa"
 	expect := map[string]int64{
-		makeID(makeID("dcgm.gpu.compute.activity", gpuKey), "sm_active"):      25000,
+		makeID(makeID("dcgm.gpu.compute.sm.utilization", gpuKey), "activity"): 25000,
 		makeID(makeID("dcgm.gpu.memory.utilization", gpuKey), "used_percent"): 92135,
 		makeID(makeID("dcgm.gpu.memory.usage", gpuKey), "used"):               1073741824000,
 		makeID(makeID("dcgm.gpu.memory.capacity", gpuKey), "total"):           34359738368000,
@@ -362,7 +362,7 @@ DCGM_FI_DEV_BAR1_TOTAL{gpu="0",UUID="GPU-aaa"} 256
 	for _, ch := range *collr.Charts() {
 		seenUnits[ch.Ctx] = ch.Units
 	}
-	assert.Equal(t, "percentage", seenUnits["dcgm.gpu.compute.activity"])
+	assert.Equal(t, "percentage", seenUnits["dcgm.gpu.compute.sm.utilization"])
 	assert.Equal(t, "percentage", seenUnits["dcgm.gpu.memory.utilization"])
 	assert.Equal(t, "bytes", seenUnits["dcgm.gpu.memory.usage"])
 	assert.Equal(t, "bytes", seenUnits["dcgm.gpu.memory.capacity"])
@@ -425,12 +425,12 @@ DCGM_FI_DEV_CLOCKS_EVENT_REASON_SW_POWER_CAP_NS{gpu="0",UUID="GPU-aaa"} 1000000
 	assert.True(t, seenCtx["dcgm.gpu.power.usage"])
 	assert.True(t, seenCtx["dcgm.gpu.interconnect.pcie.link.generation"])
 	assert.True(t, seenCtx["dcgm.gpu.interconnect.pcie.link.width"])
-	assert.True(t, seenCtx["dcgm.gpu.throttle.violations"])
+	assert.True(t, seenCtx["dcgm.gpu.throttle.duration"])
 	assert.False(t, seenCtx["dcgm.gpu.other.gauge"])
 	assert.False(t, seenCtx["dcgm.gpu.other.counter"])
 }
 
-func TestCollector_Collect_HidesThresholdDimensionsByDefault(t *testing.T) {
+func TestCollector_Collect_VisibleReferencesAndSeparateHeadroom(t *testing.T) {
 	metrics := []byte(`
 # HELP DCGM_FI_DEV_SM_CLOCK SM clock in MHz.
 # TYPE DCGM_FI_DEV_SM_CLOCK gauge
@@ -492,44 +492,50 @@ DCGM_FI_DEV_POWER_MGMT_LIMIT_MAX{gpu="0",UUID="GPU-aaa"} 650
 		return false, false
 	}
 
-	clock := findChartByCtx("dcgm.gpu.clock.frequency")
+	clock := findChartByCtx("dcgm.gpu.clock.sm.frequency")
 	require.NotNil(t, clock)
-	hidden, ok := dimHiddenByName(clock, "sm")
+	hidden, ok := dimHiddenByName(clock, "current")
 	require.True(t, ok)
 	assert.False(t, hidden)
-	hidden, ok = dimHiddenByName(clock, "max_sm_clock")
+	hidden, ok = dimHiddenByName(clock, "maximum")
 	require.True(t, ok)
-	assert.True(t, hidden)
-	hidden, ok = dimHiddenByName(clock, "app_sm_clock")
+	assert.False(t, hidden)
+	hidden, ok = dimHiddenByName(clock, "application")
 	require.True(t, ok)
-	assert.True(t, hidden)
+	assert.False(t, hidden)
 
 	thermal := findChartByCtx("dcgm.gpu.thermal.temperature")
 	require.NotNil(t, thermal)
 	hidden, ok = dimHiddenByName(thermal, "gpu")
 	require.True(t, ok)
 	assert.False(t, hidden)
-	hidden, ok = dimHiddenByName(thermal, "gpu_temp_limit")
+	_, ok = dimHiddenByName(thermal, "gpu_temp_limit")
+	assert.False(t, ok)
+	headroom := findChartByCtx("dcgm.gpu.thermal.headroom")
+	require.NotNil(t, headroom)
+	hidden, ok = dimHiddenByName(headroom, "gpu")
 	require.True(t, ok)
-	assert.True(t, hidden)
-	hidden, ok = dimHiddenByName(thermal, "shutdown_temp")
+	assert.False(t, hidden)
+	hidden, ok = dimHiddenByName(thermal, "gpu_shutdown")
 	require.True(t, ok)
-	assert.True(t, hidden)
+	assert.False(t, hidden)
 
 	power := findChartByCtx("dcgm.gpu.power.usage")
 	require.NotNil(t, power)
 	hidden, ok = dimHiddenByName(power, "draw")
 	require.True(t, ok)
 	assert.False(t, hidden)
-	hidden, ok = dimHiddenByName(power, "power_usage_instant")
+	hidden, ok = dimHiddenByName(power, "instantaneous")
 	require.True(t, ok)
 	assert.False(t, hidden)
 	hidden, ok = dimHiddenByName(power, "enforced_limit")
 	require.True(t, ok)
-	assert.True(t, hidden)
-	hidden, ok = dimHiddenByName(power, "power_mgmt_limit_max")
+	assert.False(t, hidden)
+	limits := findChartByCtx("dcgm.gpu.power.limits")
+	require.NotNil(t, limits)
+	hidden, ok = dimHiddenByName(limits, "maximum")
 	require.True(t, ok)
-	assert.True(t, hidden)
+	assert.False(t, hidden)
 }
 
 func TestCollector_Collect_UsesNVSwitchEntityContextToken(t *testing.T) {
@@ -555,7 +561,7 @@ DCGM_FI_DEV_NVSWITCH_THROUGHPUT_RX{nvswitch="0"} 42
 		seenCtx[ch.Ctx] = true
 	}
 
-	assert.True(t, seenCtx["dcgm.nvswitch.interconnect.nvswitch.throughput"])
+	assert.True(t, seenCtx["dcgm.nvswitch.raw.dcgm_fi_dev_nvswitch_throughput_rx"])
 	assert.False(t, seenCtx["dcgm.switch.interconnect.nvswitch.throughput"])
 }
 
@@ -598,105 +604,43 @@ DCGM_FI_DEV_FAKE_HIST_count{gpu="0",UUID="GPU-aaa"} 6
 	}
 }
 
-func TestClassifier_StrictNIDLSplitsForRareFamilies(t *testing.T) {
-	tests := []struct {
-		name  string
-		typ   sampleKind
-		group string
-	}{
-		{name: "DCGM_FI_DEV_NVLINK_BANDWIDTH_TOTAL", typ: sampleCounter, group: "interconnect.nvlink.throughput"},
-		{name: "DCGM_FI_DEV_NVLINK_COUNT_TX_PACKETS", typ: sampleCounter, group: "interconnect.nvlink.traffic"},
-		{name: "DCGM_FI_DEV_NVLINK_COUNT_SYMBOL_BER", typ: sampleGauge, group: "interconnect.nvlink.ber"},
-		{name: "DCGM_FI_DEV_NVSWITCH_LINK_LATENCY_HIGH_VC0", typ: sampleCounter, group: "interconnect.nvswitch.latency"},
-		{name: "DCGM_FI_DEV_NVSWITCH_LINK_REMOTE_PCIE_BUS", typ: sampleGauge, group: "interconnect.nvswitch.topology"},
-		{name: "DCGM_FI_DEV_CONNECTX_CORRECTABLE_ERR_STATUS", typ: sampleGauge, group: "interconnect.connectx.error_status"},
-		{name: "DCGM_FI_DEV_CLOCKS_EVENT_REASONS", typ: sampleGauge, group: "throttle.reasons"},
-		{name: "DCGM_FI_DEV_CLOCKS_EVENT_REASON_SYNC_BOOST_NS", typ: sampleCounter, group: "throttle.violations"},
-		{name: "DCGM_FI_DEV_VGPU_MEMORY_USAGE", typ: sampleGauge, group: "virtualization.vgpu.memory"},
-		{name: "DCGM_FI_DEV_VGPU_FRAME_RATE_LIMIT", typ: sampleGauge, group: "virtualization.vgpu.frame_rate"},
-		{name: "DCGM_FI_DEV_VGPU_TYPE_NAME", typ: sampleGauge, group: "virtualization.vgpu.type"},
-		{name: "DCGM_FI_DEV_VGPU_VM_NAME", typ: sampleGauge, group: "virtualization.vgpu.vm"},
-		{name: "DCGM_FI_DEV_VGPU_INSTANCE_IDS", typ: sampleGauge, group: "virtualization.vgpu.instance"},
-		{name: "DCGM_FI_DEV_VGPU_LICENSE_STATUS", typ: sampleGauge, group: "virtualization.vgpu.license"},
-		{name: "DCGM_FI_DEV_VGPU_UTILIZATIONS", typ: sampleGauge, group: "virtualization.vgpu.utilization"},
-		{name: "DCGM_FI_DEV_VGPU_ENC_SESSIONS_INFO", typ: sampleGauge, group: "virtualization.vgpu.sessions"},
-		{name: "DCGM_FI_DEV_FB_TOTAL", typ: sampleGauge, group: "memory.capacity"},
-		{name: "DCGM_FI_DEV_BAR1_TOTAL", typ: sampleGauge, group: "memory.bar1_capacity"},
-	}
-
-	for _, tc := range tests {
-		got := classifyMetricGroup(entityGPU, tc.name, tc.typ)
-		assert.Equal(t, tc.group, got, tc.name)
+func TestClassifier_UnknownFieldsHaveIndependentRawContexts(t *testing.T) {
+	for _, name := range []string{"DCGM_FI_DEV_FUTURE_CLOCK", "DCGM_FI_DEV_FUTURE_ECC_MODE", "DCGM_FI_DEV_NVSWITCH_THROUGHPUT_RX"} {
+		for _, kind := range []sampleKind{sampleGauge, sampleCounter} {
+			spec := classifyMetric(entityGPU, name, "", kind)
+			assert.Equal(t, "dcgm.gpu.raw."+strings.ToLower(name), spec.Context.ID)
+			assert.Equal(t, kind, spec.Kind)
+			assert.Equal(t, "value", spec.DimName)
+			assert.True(t, spec.Raw)
+			assert.NotEqual(t, "MHz", spec.Context.Units)
+			assert.NotEqual(t, "errors", spec.Context.Units)
+		}
 	}
 }
 
-func TestClassifier_AllKnownFieldsAvoidOtherContexts(t *testing.T) {
-	lines := strings.Split(string(dataAllFieldsList), "\n")
-	var unmapped []string
-	for _, line := range lines {
+func TestCatalog_ExplicitDefinitionsAndRawFallback(t *testing.T) {
+	for name, def := range fieldCatalog {
+		if def.Raw {
+			continue
+		}
+		spec := classifyMetric(entityGPU, name, "", sampleCounter)
+		require.NotEmpty(t, spec.Context.ID, name)
+		assert.Greater(t, def.Precision, 0.0, name)
+		assert.LessOrEqual(t, def.Precision, float64(1<<31-1), name)
+		assert.Positive(t, def.Scale, name)
+		assert.NotEmpty(t, def.Group, name)
+	}
+	// A historical field list is coverage evidence, not permission to guess semantics.
+	for line := range strings.SplitSeq(string(dataAllFieldsList), "\n") {
 		name := strings.TrimSpace(line)
 		if name == "" || strings.HasPrefix(name, "#") {
 			continue
 		}
 		for _, kind := range []sampleKind{sampleGauge, sampleCounter} {
-			group := classifyMetricGroup(entityGPU, name, kind)
-			if group == "other.gauge" || group == "other.counter" {
-				unmapped = append(unmapped, name)
-				break
-			}
-		}
-	}
-
-	assert.Empty(t, unmapped, "unmapped DCGM fields fell into other contexts")
-}
-
-func TestClassifier_NIDLInterconnectAndVGPUSplits(t *testing.T) {
-	lines := strings.SplitSeq(string(dataAllFieldsList), "\n")
-
-	for line := range lines {
-		name := strings.TrimSpace(line)
-		if name == "" || strings.HasPrefix(name, "#") {
-			continue
-		}
-
-		for _, kind := range []sampleKind{sampleGauge, sampleCounter} {
-			group := classifyMetricGroup(entityGPU, name, kind)
-
-			if group == "interconnect.throughput" {
-				assert.True(t,
-					containsAny(name, "C2C_"),
-					"generic throughput grouping should only contain C2C-style throughput fields: %s", name)
-			}
-
-			if group == "interconnect.pcie.throughput" {
-				assert.True(t,
-					strings.Contains(name, "PCIE") && containsAny(name, "BYTES", "THROUGHPUT", "BANDWIDTH"),
-					"pcie throughput grouping got non-PCIe throughput field: %s", name)
-			}
-
-			if group == "interconnect.nvlink.throughput" {
-				assert.True(t,
-					strings.Contains(name, "NVLINK") &&
-						containsAny(name, "BYTES", "THROUGHPUT", "BANDWIDTH"),
-					"nvlink throughput grouping got non-NVLink throughput field: %s", name)
-			}
-
-			if group == "interconnect.pcie.traffic" || group == "interconnect.nvlink.traffic" || group == "interconnect.traffic" {
-				assert.True(t, containsAny(name, "PACKETS", "CODES"), "traffic grouping got non-traffic field: %s", name)
-			}
-
-			if group == "interconnect.pcie.ber" || group == "interconnect.nvlink.ber" || group == "interconnect.ber" {
-				assert.True(t, containsAny(name, "BER"), "BER grouping got non-BER field: %s", name)
-			}
-
-			if group == "virtualization.vgpu.utilization" {
-				assert.True(t,
-					containsAny(name, "UTILIZATION"),
-					"vGPU utilization grouping got non-utilization field: %s", name)
-			}
-
-			if group == "virtualization.vgpu.memory" {
-				assert.True(t, containsAny(name, "MEMORY_USAGE"), "vGPU memory grouping got non-memory field: %s", name)
+			spec := classifyMetric(entityGPU, name, "", kind)
+			require.NotEmpty(t, spec.Context.ID, name)
+			if spec.Raw {
+				assert.True(t, strings.Contains(spec.Context.ID, ".raw."), name)
 			}
 		}
 	}

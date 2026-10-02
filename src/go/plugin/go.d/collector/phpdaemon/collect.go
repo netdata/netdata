@@ -3,6 +3,7 @@
 package phpdaemon
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
@@ -14,28 +15,28 @@ import (
 
 type fullStatus struct {
 	// Alive is sum of Idle, Busy and Reloading
-	Alive    int64 `json:"alive" stm:"alive"`
+	Alive    int64 `json:"alive"    stm:"alive"`
 	Shutdown int64 `json:"shutdown" stm:"shutdown"`
 
 	// Idle that the worker is not in the middle of execution valuable callback (e.g. request) at this moment of time.
 	// It does not mean that worker not have any pending operations.
 	// Idle is sum of Preinit, Init and Initialized.
-	Idle int64 `json:"idle" stm:"idle"`
+	Idle int64 `json:"idle"      stm:"idle"`
 	// Busy means that the worker is in the middle of execution valuable callback.
-	Busy      int64 `json:"busy" stm:"busy"`
+	Busy      int64 `json:"busy"      stm:"busy"`
 	Reloading int64 `json:"reloading" stm:"reloading"`
 
-	Preinit int64 `json:"preinit" stm:"preinit"`
+	Preinit int64 `json:"preinit"     stm:"preinit"`
 	// Init means that worker is starting right now.
-	Init int64 `json:"init" stm:"init"`
+	Init int64 `json:"init"        stm:"init"`
 	// Initialized means that the worker is in Idle state.
 	Initialized int64 `json:"initialized" stm:"initialized"`
 
 	Uptime *int64 `json:"uptime" stm:"uptime"`
 }
 
-func (c *Collector) collect() (map[string]int64, error) {
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request to '%s': %w", c.URL, err)
 	}

@@ -1,34 +1,67 @@
-//! Type-safe wrappers for field names and field=value pairs.
+//! Typed field-name and field=value strings for the journal index.
 //!
-//! This module provides newtypes that distinguish between:
-//! - Field names (e.g., "PRIORITY")
-//! - Field=value pairs (e.g., "PRIORITY=error")
+//! Two newtypes give the index a typed vocabulary:
+//! - [`FieldName`] is a bare field name ("PRIORITY"). It keys the
+//!   `FileIndex::file_fields`/`indexed_fields` sets (`src/file_index.rs`),
+//!   lists the fields an index or histogram covers
+//!   (`journal-engine/src/facets.rs`), and names the source-timestamp field
+//!   that orders entries at index time (`collect_source_field_info` in
+//!   `src/file_indexer.rs`) and timestamps them at query time
+//!   (`get_timestamp_field` in `src/file_index.rs`).
+//! - [`FieldValuePair`] is a "field=value" string with the '=' position
+//!   cached. It is the key type of `FileIndex::bitmaps` (`src/file_index.rs`),
+//!   so its derived `Eq`/`Hash` are load-bearing: two pairs are equal iff
+//!   their "field=value" strings are equal (struct doc below).
 //!
-//! These types are used throughout the journal indexing system to ensure
-//! type safety and prevent mixing different concepts.
+//! Values come verbatim from the journal: the indexer lossily-decodes each
+//! field data object's raw "field=value" payload and parses it
+//! (`build_entries_index` in `src/file_indexer.rs`); nothing here
+//! normalizes, trims or case-folds.
+//! [`parse_timestamp`] re-reads one field's data-object payload as a u64
+//! (the `_SOURCE_REALTIME_TIMESTAMP` path). Other consumers: journal-engine
+//! aggregates per-pair counts under these keys (`journal-engine/src/
+//! histogram.rs`) and carries query-result fields as pairs
+//! (`journal-engine/src/logs/query.rs`); otel-legacy-logs parses request
+//! selections into filters (`otel-legacy-logs/src/handler.rs`);
+//! journal-function counts facet values per pair
+//! (`journal-function/src/netdata/facets.rs`).
+//!
+//! Both types derive `Serialize`/`Deserialize` - pairs and names travel
+//! inside the serialized [`crate::FileIndex`] - and, under the
+//! crate's `allocative` feature, `allocative::Allocative`.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// A field name (e.g., "PRIORITY", "SYSLOG_IDENTIFIER").
+/// A journal field name (e.g. "PRIORITY", "SYSLOG_IDENTIFIER"), with no
+/// value attached.
 ///
-/// This represents just the field name without any associated value.
+/// Wrapper over `String` (tuple field 0). `new` validates user-provided
+/// strings; `new_unchecked` wraps names the code already trusts. Derived
+/// `Eq`/`Hash`/`Ord` are the inner string's (lexicographic order, so
+/// "_HOSTNAME" sorts after uppercase-letter names).
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct FieldName(String);
 
 impl FieldName {
-    /// Create a new FieldName without validation.
+    /// Wrap a string as a FieldName without validating it.
     ///
-    /// Use this when you know the string is a valid field name
-    /// (e.g., from trusted sources like hardcoded constants).
+    /// For strings the code already trusts: field-table names during
+    /// indexing (`src/file_indexer.rs`) and hardcoded names such as the
+    /// default facet list (`journal-engine/src/facets.rs`). An embedded
+    /// '=' is not rejected here; [`FieldValuePair::new_unchecked`] treats
+    /// it as a split point.
     pub fn new_unchecked(name: impl Into<String>) -> Self {
         Self(name.into())
     }
 
-    /// Create a FieldName with validation.
+    /// Wrap a string as a FieldName, rejecting invalid names.
     ///
-    /// Returns None if the name contains '=' or is empty.
+    /// Returns None for an empty name or one containing '=' (the name must
+    /// stay splittable from its value). Used wherever a name's content is
+    /// not already trusted, e.g. configured facet names
+    /// (`journal-engine/src/facets.rs`).
     pub fn new(name: impl Into<String>) -> Option<Self> {
         let name = name.into();
         if name.is_empty() || name.contains('=') {
@@ -71,33 +104,55 @@ impl AsRef<str> for FieldName {
     }
 }
 
-/// A field=value pair (e.g., "PRIORITY=error", "SYSLOG_IDENTIFIER=systemd").
+/// A "field=value" string (e.g. "PRIORITY=error"), the unit the index is
+/// keyed on.
 ///
-/// Invariant: Always in the format "field=value". The value portion may contain '=' characters.
-/// The split is always at the first '=' character.
+/// Stored as the full `key` string plus `split_pos`, the offset of the '='
+/// between field and value, so field()/value() are plain slices. The value
+/// part may itself contain '='; the split is the first '=' (parse) or the
+/// field-name length (the unchecked constructors).
+///
+/// `Eq`/`Hash`/`Ord` derive over `(key, split_pos)`, which compares equal
+/// exactly when the "field=value" strings are equal, as long as field
+/// names are '='-free ([`FieldName::new`] enforces this). That equivalence
+/// is what lets this type stand in for the plain string as the key of
+/// `FileIndex::bitmaps` (`src/file_index.rs`), journal-engine's per-bucket
+/// `fv_counts` (`journal-engine/src/histogram.rs`) and journal-function's
+/// facet counts (`journal-function/src/netdata/facets.rs`). Ordering is
+/// the string's lexicographic order ("PRIORITY=debug" < "PRIORITY=error").
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Ord, PartialOrd)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct FieldValuePair {
-    // Store the formatted string for efficient HashMap lookups
+    // The full "field=value" string: what Eq/Hash/Ord effectively compare
+    // and what gets serialized inside FileIndex.
     key: String,
-    // Cache the split position for fast field/value extraction
+    // Offset of the '=' between field and value, so field()/value() are
+    // slices instead of a fresh search for '='.
     split_pos: usize,
 }
 
 impl FieldValuePair {
-    /// Create a new FieldValuePair from field and value components.
+    /// Build a pair from an already-separated field name and value.
     ///
-    /// This is unchecked - assumes field doesn't contain '='.
+    /// Unchecked: split_pos is taken to be the field name's length, so
+    /// `field` must not contain '='; otherwise the cached position is not
+    /// the first '=' of the key and the pair stops comparing equal to
+    /// `parse` of the same string. The indexer re-keys a parsed pair under
+    /// the requested (remapped) field name this way
+    /// (`build_entries_index` in `src/file_indexer.rs`).
     pub fn new_unchecked(field: FieldName, value: String) -> Self {
         let split_pos = field.as_str().len();
         let key = format!("{}={}", field.as_str(), value);
         Self { key, split_pos }
     }
 
-    /// Parse a "field=value" string into a FieldValuePair.
+    /// Parse a "field=value" string, splitting at the first '='.
     ///
-    /// Returns None if the string doesn't contain '=' or if the field name is empty.
-    /// The value portion may contain '=' characters - parsing splits on the first '=' only.
+    /// Returns None when there is no '=' or the field name would be empty
+    /// ("=value"); everything after the first '=' stays in the value,
+    /// further '=' included. The indexer parses journal payloads with this
+    /// (`build_entries_index` in `src/file_indexer.rs`); the engine re-parses
+    /// serialized bitmap keys with it (`journal-engine/src/histogram.rs`).
     pub fn parse(s: impl AsRef<str>) -> Option<Self> {
         let s = s.as_ref();
         let split_pos = s.find('=')?;
@@ -150,10 +205,12 @@ impl FieldValuePair {
         (field, value)
     }
 
-    /// Extract the value portion from a field=value byte slice.
+    /// Extract the value bytes from a "field=value" payload, zero-copy.
     ///
-    /// Returns the value bytes if the payload is in the format "field_name=value",
-    /// where `field_name` matches the provided bytes. This is a zero-copy operation.
+    /// Returns the subslice after '=' when `payload` starts with exactly
+    /// `field_name` followed by '=' (a name run-on like "PRIORITYX=6" is
+    /// rejected), and None otherwise. Backs [`parse_timestamp`] on journal
+    /// data-object payloads.
     ///
     /// # Examples
     ///
@@ -171,19 +228,19 @@ impl FieldValuePair {
     /// assert_eq!(FieldValuePair::strip_field_prefix(b"PRIORITY", b"PRIORITY6"), None);
     /// ```
     pub fn strip_field_prefix<'a>(field_name: &[u8], payload: &'a [u8]) -> Option<&'a [u8]> {
-        // Check that payload starts with field_name
+        // The payload must start with the exact field name
         if !payload.starts_with(field_name) {
             return None;
         }
 
         let offset = field_name.len();
 
-        // Check that there's an '=' after the field name
+        // ...followed by '=' ("PRIORITYX=6" is a different field)
         if payload.len() <= offset || payload[offset] != b'=' {
             return None;
         }
 
-        // Return the value portion after '='
+        // Everything after '=' is the value
         Some(&payload[offset + 1..])
     }
 }
@@ -200,7 +257,9 @@ impl AsRef<str> for FieldValuePair {
     }
 }
 
-// Conversion helpers for backward compatibility
+// String conversions for string-expecting call sites: the by-value forms
+// hand over the inner String, the by-reference forms copy through
+// `to_string()`.
 impl From<FieldValuePair> for String {
     fn from(pair: FieldValuePair) -> String {
         pair.into_inner()
@@ -225,7 +284,23 @@ impl From<&FieldName> for String {
     }
 }
 
-/// Parse a u64 timestamp from a field data object.
+/// Parse a u64 timestamp out of a field's data object.
+///
+/// Takes the object's raw payload (the stored "field=value" bytes), strips
+/// the "field_name=" prefix with [`FieldValuePair::strip_field_prefix`],
+/// requires the value to be UTF-8 and parses it as u64; each step maps to
+/// its `IndexError` variant (`InvalidFieldPrefix`, `NonUtf8Payload`,
+/// `NonIntegerPayload`). The payload is used as-is - no decompression - so
+/// a compressed data object normally fails to parse and its entries fall
+/// back to another timestamp source (`get_entry_timestamp` in
+/// `src/file_index.rs`).
+///
+/// Used for the source timestamp field (typically
+/// `_SOURCE_REALTIME_TIMESTAMP`, microseconds since the epoch): the
+/// indexer orders entries by it (`collect_source_field_info` in
+/// `src/file_indexer.rs`) and per-entry
+/// timestamp lookups reuse it (`get_timestamp_field` in
+/// `src/file_index.rs`).
 pub fn parse_timestamp(
     field_name: &[u8],
     data_object: &journal_core::file::DataObject<&[u8]>,

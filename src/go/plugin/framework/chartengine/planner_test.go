@@ -3010,7 +3010,7 @@ groups:
 			}
 			reader := store.Read()
 			meta := reader.CollectMeta()
-			materialized := e.state.materialized.clone()
+			materialized := e.state.materialized
 			ctx, err := e.preparePlanBuildContext(reader, &out, meta, meta.LastSuccessSeq, &materialized)
 			require.NoError(t, err)
 			require.NoError(t, e.scanPlanSeries(ctx))
@@ -3061,7 +3061,7 @@ groups:
 			}
 			reader := store.Read()
 			meta := reader.CollectMeta()
-			materialized := e.state.materialized.clone()
+			materialized := e.state.materialized
 			ctx, err := e.preparePlanBuildContext(reader, &out, meta, meta.LastSuccessSeq, &materialized)
 			require.NoError(t, err)
 			require.NoError(t, e.scanPlanSeries(ctx))
@@ -3131,11 +3131,11 @@ groups:
 			}
 
 			state := newMaterializedState()
-			oldChart, created := state.ensureChart("svc_old", "tpl.requests", meta, lifecycle)
+			oldChart, created := state.ensureChart(nil, "svc_old", "tpl.requests", meta, lifecycle)
 			require.True(t, created)
 			oldChart.lastSeenSuccessSeq = 1
 
-			removeDims, removeCharts := enforceLifecycleCapsWithObserver(2, chartsByID, &state, nil)
+			removeDims, removeCharts := enforceLifecycleCapsWithObserver(2, chartsByID, &state, nil, nil)
 			assert.Empty(t, removeDims)
 			require.Len(t, removeCharts, 1)
 			assert.Equal(t, "svc_old", removeCharts[0].ChartID)
@@ -3150,12 +3150,12 @@ groups:
 				Title:   "Service mode",
 				Context: "service_mode",
 			}
-			liveChart, created := state.ensureChart("svc_mode", "tpl.mode", liveMeta, program.LifecyclePolicy{
+			liveChart, created := state.ensureChart(nil, "svc_mode", "tpl.mode", liveMeta, program.LifecyclePolicy{
 				Dimensions: program.DimensionLifecyclePolicy{ExpireAfterCycles: 1},
 			})
 			require.True(t, created)
 			liveChart.lastSeenSuccessSeq = 3
-			liveDim, dimCreated := liveChart.ensureDimension("stale_mode", dimensionState{
+			liveDim, dimCreated := liveChart.ensureDimension(nil, "stale_mode", dimensionState{
 				static:     false,
 				order:      1,
 				algorithm:  dimensionAlgorithmAbsolute,
@@ -3169,13 +3169,13 @@ groups:
 				Title:   "Old chart",
 				Context: "old_chart",
 			}
-			oldChart, oldCreated := state.ensureChart("old_chart", "tpl.old", oldMeta, program.LifecyclePolicy{
+			oldChart, oldCreated := state.ensureChart(nil, "old_chart", "tpl.old", oldMeta, program.LifecyclePolicy{
 				ExpireAfterCycles: 1,
 			})
 			require.True(t, oldCreated)
 			oldChart.lastSeenSuccessSeq = 1
 
-			removeDims, removeCharts := collectExpiryRemovals(3, &state)
+			removeDims, removeCharts := collectExpiryRemovals(3, &state, nil)
 			require.Len(t, removeDims, 1)
 			assert.Equal(t, "svc_mode", removeDims[0].ChartID)
 			assert.Equal(t, "stale_mode", removeDims[0].Name)

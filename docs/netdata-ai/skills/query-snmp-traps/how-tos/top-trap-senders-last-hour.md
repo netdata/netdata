@@ -12,11 +12,16 @@ Which source devices sent the most SNMP traps in the last hour?
 
 ## Steps
 
+Run from the repository root in one Bash session. The private run directory retains raw responses for local
+inspection; token-safe request logging does not sanitize their contents. Start a new run for another execution.
+
 1. Load the token-safe wrappers:
 
    ```bash
    source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
    agents_load_env
+   mkdir -p .local/audits/query-snmp-traps
+   TRAP_QUERY_DIR="$(mktemp -d .local/audits/query-snmp-traps/query.XXXXXX)"
    ```
 
 2. Request source facets for recent trap entries:
@@ -39,47 +44,58 @@ Which source devices sent the most SNMP traps in the last hour?
      facets: ["TRAP_SOURCE_IP", "_HOSTNAME", "TRAP_DEVICE_VENDOR", "TRAP_SEVERITY"]
    }')"
 
-   mkdir -p .local/audits/query-snmp-traps
-
    agents_call_function \
      --via cloud \
      --node "$NODE_UUID" \
      --function "$SNMP_TRAPS_FUNCTION" \
      --body "$BODY" \
-     > .local/audits/query-snmp-traps/top-senders.json
+     > "$TRAP_QUERY_DIR/top-senders.json"
+
+   if jq -e '.partial == true' "$TRAP_QUERY_DIR/top-senders.json" >/dev/null; then
+     printf 'WARN: partial query response; sender counts and rankings may be incomplete.\n' >&2
+   fi
    ```
 
-3. Print the top source-IP facet values without exposing them in a
-   durable report:
+3. Save the top source-IP facet values privately and print their ranked counts:
 
    ```bash
-   jq '
-     .facets[]?
+   jq -e '
+     if type == "object" and .status == 200
+        and (.data | type == "array") and (.facets | type == "array")
+     then . else error("Expected a successful trap query response") end
+     | .facets[]?
      | select((.id // .name) == "TRAP_SOURCE_IP")
      | .options
      | sort_by(-(.count // 0))
      | .[:20]
      | map({source_ip: (.id // .name), count})
-   ' .local/audits/query-snmp-traps/top-senders.json
+   ' "$TRAP_QUERY_DIR/top-senders.json" > "$TRAP_QUERY_DIR/top-source-ips.json"
+
+   jq 'to_entries | map({rank: (.key + 1), count: .value.count})' \
+     "$TRAP_QUERY_DIR/top-source-ips.json"
    ```
 
-4. If hostnames are available, inspect the `_HOSTNAME` facet too:
+4. Optionally inspect the `_HOSTNAME` facet. Because `BODY` requests this facet, successful responses include
+   it with `options: []` when no hostname values are available; the ranking is then `[]`:
 
    ```bash
-   jq '
-     .facets[]?
+   jq -e '
+     if type == "object" and .status == 200
+        and (.data | type == "array") and (.facets | type == "array")
+     then . else error("Expected a successful trap query response") end
+     | .facets[]?
      | select((.id // .name) == "_HOSTNAME")
      | .options
      | sort_by(-(.count // 0))
      | .[:20]
      | map({hostname: (.id // .name), count})
-   ' .local/audits/query-snmp-traps/top-senders.json
+   ' "$TRAP_QUERY_DIR/top-senders.json" > "$TRAP_QUERY_DIR/top-hostnames.json"
    ```
 
 ## Output
 
-Return the top sender counts. In durable artifacts, redact or
-summarize source identities unless they are local/private examples.
+Return the ranked sender counts. You MAY inspect the private source-IP and hostname files locally to identify
+the senders. These files contain raw identities; review and redact them before copying details into durable artifacts.
 
 ## Notes / gotchas
 

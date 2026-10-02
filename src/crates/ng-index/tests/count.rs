@@ -1,9 +1,28 @@
-//! End-to-end round trip: build OTLP requests, flatten them into a flattened-frame
-//! WAL via the shared `ng-flatten` path (the same encoding `ng-ingest` writes at
-//! ingest), then build a standard SFST index from that WAL (`build_sfst`) and query
-//! the record count back. Exercises flatten (emit-time hashes) + encode_log_frame, the `wal`
-//! round trip (LZ4 on), the typed-entry interning, and the SFST emit. Independent of
-//! `ng-ingest`: frames are written here with the raw `wal::Writer`.
+//! End-to-end logs round trip, all fixtures synthetic: OTLP requests built
+//! in-process, flattened through the shared `ng-flatten` path, and written as
+//! flattened-frame WAL frames with the raw `wal::Writer` — the same flatten +
+//! emit-time hashes + bincode frame encoding `ng-ingest` writes at ingest,
+//! minus its normalization step. `build_sfst` / `build_sfst_range` index the
+//! WAL and `sfst::IndexReader` reads the sealed file back.
+//!
+//! Pins:
+//!
+//! - the payload-format gate (`check_payload_format` in ng-index's
+//!   `sfst_build.rs`): a WAL stamped with the traces codec is refused by the
+//!   logs build before any frame decode (`Error::PayloadFormat`);
+//! - rows in = rows indexed: frame/record counts survive the build and re-open;
+//! - the five per-row log columns (observed_ts, trace_id, span_id, flags,
+//!   dropped_attributes_count) are persisted and permuted to chronological
+//!   order, row-aligned with the timestamps;
+//! - the typed schema tree + coalesced scalar kinds (an Int+Str path coalesces
+//!   to Str) and the derived field table;
+//! - `build_sfst_range` parity: the in-memory build is byte-identical to the
+//!   file build, and frame-aligned splits partition record counts;
+//! - '=' in an attribute key is sanitized at flatten and stays queryable.
+//!
+//! Not pinned here: the traces pipeline (`tests/traces_seal.rs`), SFST query
+//! semantics (the `sfst` crate's own tests), and the standalone spike
+//! (`tests/sfst_build_spike.rs`).
 
 use std::sync::Arc;
 
@@ -15,8 +34,8 @@ use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Valu
 use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
 use sfst::{IndexReader, SpanId, TraceId};
 
-/// A batch of `n` minimal log records, each with one attribute so flattening
-/// yields entries beyond the scalar fields.
+/// A batch of `n` minimal log records with distinct timestamps; the lone `k=i`
+/// attribute gives the schema tree a real leaf beyond the bare record fields.
 fn request(n: usize) -> ExportLogsServiceRequest {
     let log_records = (0..n)
         .map(|i| LogRecord {
@@ -78,8 +97,9 @@ fn write_flattened_wal(dir: &std::path::Path, counts: &[usize]) {
 
 #[test]
 fn wrong_payload_format_refuses_to_build() {
-    // A WAL stamped with the traces frame codec must be refused by the LOGS
-    // build before any bincode decode — the format check, not a decode error.
+    // A WAL stamped with the traces codec must be refused by the logs build
+    // before any frame decode: `Error::PayloadFormat` carrying the two format
+    // ids — the header check, not a decode error.
     let flat = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(
@@ -122,33 +142,34 @@ fn wrong_payload_format_refuses_to_build() {
 
 #[test]
 fn flattened_wal_builds_and_roundtrips_an_sfst() {
-    // 1. Write a flattened WAL of three batches (10 records total).
+    // Three batches — 3 + 5 + 2 records — into a fresh WAL.
     let flat = tempfile::tempdir().unwrap();
     write_flattened_wal(flat.path(), &[3, 5, 2]);
 
-    // 2. Build a standard SFST index from it.
+    // The build summary counts what went in: 3 frames, 10 records.
     let out_dir = tempfile::tempdir().unwrap();
     let out = out_dir.path().join("count.sfst");
     let sfst = build_sfst(flat.path(), &out, &Metrics::new()).unwrap();
     assert_eq!(sfst.frames, 3);
     assert_eq!(sfst.records, 10);
 
-    // 3. Re-open the SFST and confirm the record count round-trips.
+    // Re-open the sealed file through the format reader: the record count
+    // survives the round trip.
     let bytes = std::fs::read(&out).unwrap();
     let reader = IndexReader::open(&bytes).unwrap();
     assert_eq!(reader.total_logs(), 10);
 }
 
-/// `n` records in reverse-chronological insertion order: record `i` gets the
-/// `(n - i)`-th timestamp, so insertion order is the opposite of chronological
-/// order — the build-time reorder must permute the columns to match. Each record
-/// tags its `observed_ts`/`trace_id`/`span_id` with its insertion index `i` so the
-/// permutation is verifiable.
+/// `n` records inserted in reverse-chronological order: record `i` gets the
+/// `(n - i)`-th timestamp, so the build's insertion→chronological remap must
+/// permute every column. Each record tags its `observed_ts`, `trace_id`,
+/// `span_id`, `flags` and `dropped_attributes_count` with its insertion index
+/// `i` (flags keep a `0x100` prefix) so the permutation is verifiable.
 fn request_cols(n: usize) -> ExportLogsServiceRequest {
     const BASE: u64 = 1_700_000_000_000_000_000;
     let log_records = (0..n)
         .map(|i| LogRecord {
-            time_unix_nano: BASE + (n - i) as u64, // i=0 latest, i=n-1 earliest
+            time_unix_nano: BASE + (n - i) as u64, // i=0 has the latest ts, i=n-1 the earliest
             observed_time_unix_nano: BASE + 1000 + i as u64,
             trace_id: vec![i as u8; 16],
             span_id: vec![i as u8; 8],
@@ -204,14 +225,15 @@ fn per_row_columns_roundtrip_in_chronological_order() {
         .unwrap();
     writer.shutdown_all().unwrap();
 
-    // Build the SFST and re-open it through the format reader (COLS access).
+    // Build the SFST and re-open the sealed file through the format reader.
     let out_dir = tempfile::tempdir().unwrap();
     let out = out_dir.path().join("cols.sfst");
     build_sfst(flat.path(), &out, &Metrics::new()).unwrap();
     let data = std::fs::read(&out).unwrap();
     let reader = IndexReader::open(&data).unwrap();
 
-    // The file carries the per-row column chunks; each is decoded independently.
+    // The sealed file carries all five per-row column chunks, each loaded
+    // independently.
     assert!(reader.has_per_row_columns());
     assert_eq!(
         reader.columns_table().names().collect::<Vec<_>>(),
@@ -236,11 +258,9 @@ fn per_row_columns_roundtrip_in_chronological_order() {
     assert_eq!(flags.len(), N);
     assert_eq!(drac.len(), N);
 
-    // Every column is row-aligned with the chronological timestamps. At
+    // Every column is row-aligned with the chronological timestamps: at
     // chronological position `p` the ts is BASE+(p+1) and the source record is
     // insertion index `i = N-1-p`, so its id-tagged columns must read back as `i`.
-    // Indexes six parallel columns by chronological position and derives the
-    // source insertion index `i = N-1-p` — a range loop is the clearest form.
     #[allow(clippy::needless_range_loop)]
     for p in 0..N {
         assert_eq!(
@@ -265,9 +285,9 @@ fn per_row_columns_roundtrip_in_chronological_order() {
     }
 }
 
-/// Four records whose `poly` attribute alternates `Int`/`Str` (a polymorphic
-/// path) while `n` is always `Int` — exercises the typed tree + D45–D47
-/// coalescing end to end.
+/// Four records whose `poly` attribute alternates Int/Str — one polymorphic
+/// leaf — while `n` is always Int: exercises typed-tree persistence and
+/// scalar-kind coalescing end to end.
 fn request_typed() -> ExportLogsServiceRequest {
     let log_records = (0..4)
         .map(|i| {
@@ -344,18 +364,21 @@ fn typed_tree_and_coalesced_kinds_roundtrip() {
     let data = std::fs::read(&out).unwrap();
     let reader = IndexReader::open(&data).unwrap();
 
-    // The typed schema tree is persisted (structure beyond the bare root).
+    // The typed schema tree survives sealing: the file carries leaf nodes, not
+    // just the bare root.
     let tree = reader.tree();
     assert!(tree.len() > 1, "tree should carry leaf nodes");
 
-    // Coalesced scalar kinds (D45–D47): the polymorphic Int+Str path → Str; the
-    // always-Int path → Int.
+    // Coalesced scalar kinds per the `SchemaTree::derive_scalar_kinds` lattice
+    // (Int ⊔ Double = Double; any other scalar mix → Str): the polymorphic
+    // Int+Str path reads Str, the always-Int path Int.
     let scalars: std::collections::HashMap<String, sfst::ValueKind> =
         tree.derive_scalar_kinds().into_iter().collect();
     assert_eq!(scalars.get("attributes.poly"), Some(&sfst::ValueKind::Str));
     assert_eq!(scalars.get("attributes.n"), Some(&sfst::ValueKind::Int));
 
-    // Derived field table: the polymorphic path collapses to a single entry.
+    // Derived field table: it is built from the tree's leaves, so the Int and
+    // Str leaves sharing the `attributes.poly` path must collapse to one entry.
     let names: Vec<&str> = reader.field_table().names().collect();
     assert!(names.contains(&"attributes.poly"));
     assert!(names.contains(&"attributes.n"));
@@ -368,7 +391,8 @@ fn typed_tree_and_coalesced_kinds_roundtrip() {
 
 #[test]
 fn missing_flattened_wal_is_an_error() {
-    // An empty directory has no `.wal` file to read.
+    // A directory with no `.wal` file must fail WAL discovery
+    // (`sole_wal_file` → `Error::NoWal`), never produce an empty index.
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("missing.sfst");
     assert!(build_sfst(dir.path(), &out, &Metrics::new()).is_err());
@@ -416,10 +440,11 @@ fn write_multiframe_flat_wal(num_frames: usize) -> (tempfile::TempDir, std::path
     (flat, wal_path)
 }
 
-/// The in-memory whole-file range build (`build_sfst_range`) is byte-identical to
-/// the on-disk file build (`build_sfst`) over the same frames — same typed tree +
-/// columns, deterministic, only the sink differs. This is the on-query/seal-time
-/// contract parity the migration's index-feed swap depends on.
+/// The in-memory whole-file range build (`build_sfst_range`) must be
+/// byte-identical to the on-disk file build (`build_sfst`) over the same
+/// frames — same typed tree + columns, deterministic, only the sink differs.
+/// This is the parity that lets the on-query chunk build over an active WAL
+/// and the seal-time file build share one format.
 #[test]
 fn build_sfst_range_whole_file_matches_file_build() {
     let (dir, wal_path) = write_multiframe_flat_wal(3);
@@ -444,9 +469,10 @@ fn build_sfst_range_whole_file_matches_file_build() {
     assert_eq!(reader.total_logs(), 12);
 }
 
-/// A frame-aligned split partitions the records exactly: the two chunk builds'
-/// record counts sum to the whole. Exercises `build_sfst_range` over interior
-/// frame ranges (the on-query active-WAL chunk case).
+/// A frame-aligned split — the cut is a scanned frame boundary — partitions the
+/// records exactly: the two chunk builds' record counts sum to the whole.
+/// Exercises `build_sfst_range` over interior frame ranges (the on-query
+/// active-WAL chunk case).
 #[test]
 fn build_sfst_range_split_partitions_records() {
     let (_dir, wal_path) = write_multiframe_flat_wal(4);
@@ -480,12 +506,13 @@ fn build_sfst_range_split_partitions_records() {
     assert_eq!(whole.record_count, 16, "4 frames x 4 records");
 }
 
-/// Regression: an OTLP attribute key containing '=' (legal) used to inject a
-/// false key=value boundary — the interner derived field `attributes.a` while
-/// the schema-tree leaf path was `attributes.a=b`, so the leaf silently
-/// dropped from the reader-derived field table (debug builds panicked on the
-/// fill_field_stats round-trip assert). Keys are now sanitized ('=' → '_') at
-/// flatten time, so the field survives sealing and is queryable.
+/// Regression: an OTLP attribute key containing '=' — legal input, but it
+/// collides with the `key=value` entry delimiter — used to inject a false
+/// key=value boundary: the interner derived field `attributes.a` while the
+/// schema-tree leaf path was `attributes.a=b`, so the leaf silently dropped
+/// from the reader-derived field table (debug builds panicked on the
+/// `fill_field_stats` round-trip assert). Keys are now sanitized ('=' → '_')
+/// at flatten time, so the field survives sealing and is queryable.
 #[test]
 fn attribute_key_containing_eq_is_sanitized_and_queryable() {
     let req = ExportLogsServiceRequest {

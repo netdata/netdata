@@ -193,3 +193,13 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration �
 | `snmp.device_prof_lldpStatsRxPortTLVsDiscardedTotal` | — | per lldp_loc_port_num |  |
 | `snmp.device_prof_lldpStatsRxPortTLVsUnrecognizedTotal` | — | per lldp_loc_port_num |  |
 | `snmp.device_prof_lldpStatsTxPortFramesTotal` | — | per lldp_loc_port_num |  |
+
+
+
+## Troubleshooting
+
+### Other Problems
+
+#### Collect Diagnostics for Netdata Support
+
+For SNMP metrics, BGP, licensing, or topology issues, follow [Collect SNMP troubleshooting data](https://github.com/netdata/netdata/blob/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to include built-in diagnostics in a support bundle. SNMP evidence is unsanitized; share the bundle through a restricted Netdata Support ticket.

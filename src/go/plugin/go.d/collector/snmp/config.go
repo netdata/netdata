@@ -18,7 +18,8 @@ type (
 
 		CreateVnode              bool               `yaml:"create_vnode,omitempty" json:"create_vnode"`
 		VnodeDeviceDownThreshold int                `yaml:"vnode_device_down_threshold,omitempty" json:"vnode_device_down_threshold"`
-		Vnode                    vnodes.VirtualNode `yaml:"vnode,omitempty" json:"vnode"`
+		Vnode                    string             `yaml:"vnode,omitempty" json:"vnode"`
+		LocalVnode               vnodes.VirtualNode `yaml:"local_vnode,omitempty" json:"local_vnode"`
 
 		ManualProfiles []string `yaml:"manual_profiles,omitempty" json:"manual_profiles"`
 

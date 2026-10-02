@@ -68,21 +68,23 @@ metrics:
       OID: 1.3.6.1.4.1.29671.1.1.5
       name: devInterfaceTable
       # devInterfaceTable INDEX is: devInterfaceDevMac, devInterfaceIndex
-    metric_type: gauge
     symbols:
       - OID: 1.3.6.1.4.1.29671.1.1.5.1.4
+        metric_type: gauge
         name: devInterfaceSentPkts
         chart_meta:
           description: The number of packets sent on this interface.
           family: 'Network/Interface/Packet/Total/Out'
           unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.29671.1.1.5.1.5
+        metric_type: gauge
         name: devInterfaceRecvPkts
         chart_meta:
           description: The number of packets received on this interface.
           family: 'Network/Interface/Packet/Total/In'
           unit: "{packet}/s"
       - OID: 1.3.6.1.4.1.29671.1.1.5.1.6
+        metric_type: gauge
         name: devInterfaceSentBytes
         scale_factor: 8
         chart_meta:
@@ -90,6 +92,7 @@ metrics:
           family: 'Network/Interface/Traffic/Total/Out'
           unit: "bit/s"
       - OID: 1.3.6.1.4.1.29671.1.1.5.1.7
+        metric_type: gauge
         name: devInterfaceRecvBytes
         scale_factor: 8
         chart_meta:

@@ -7,11 +7,34 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
+	"github.com/stretchr/testify/require"
 )
 
+func useTestLocalHelper(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		return
+	}
+	helper := filepath.Join(t.TempDir(), "nd-run")
+	// Exercise real subprocess plumbing without requiring an installed nd-run
+	// or changing the test user's identity. Privilege dropping belongs to nd-run.
+	require.NoError(t, os.WriteFile(helper, []byte(`#!/bin/sh
+if [ "$1" = "--preserve-env" ]; then
+    [ "$2" = "--" ] || exit 64
+    shift 2
+fi
+exec "$@"
+`), 0o700))
+	t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
+}
+
 func TestDefaultAtomicResolver(t *testing.T) {
+	useTestLocalHelper(t)
 	tests := map[string]struct {
 		input           func(t *testing.T) any
 		want            any
@@ -72,6 +95,12 @@ func TestDefaultAtomicResolver(t *testing.T) {
 		"relative file": {
 			input:           func(*testing.T) any { return "${file:relative/secret}" },
 			wantErrContains: "file path must be absolute",
+		},
+		"missing file": {
+			input: func(t *testing.T) any {
+				return "${file:" + filepath.Join(t.TempDir(), "missing") + "}"
+			},
+			wantErrContains: "resolving secret",
 		},
 		"unknown provider": {
 			input:           func(*testing.T) any { return "${unknown:value}" },

@@ -32,8 +32,8 @@ agents_load_env
 agents_query_cloud POST "/api/v3/spaces/$SPACE/rooms/$ROOM/nodes" '{}'
 ```
 
-The wrapper emits only the response body; `NETDATA_CLOUD_TOKEN`
-never reaches stdout.
+The wrapper keeps request authentication out of its command log and forwards the response unchanged.
+Use [Safe Execution](./SKILL.md#safe-execution) to capture or project sensitive response fields before display.
 
 ## Per-node response fields
 

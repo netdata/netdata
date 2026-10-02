@@ -19,7 +19,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/runtimechartemit"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
 var (
@@ -29,14 +32,16 @@ var (
 
 // Config is an Agent configuration.
 type Config struct {
-	Name            string
-	PluginConfigDir []string
+	SNMPVnodeAcquirer vnodes.SNMPAcquirer
+	Name              string
+	PluginConfigDir   []string
 
 	CollectorsConfigDir       []string
 	CollectorsConfigWatchPath []string
 	ServiceDiscoveryConfigDir []string
 	VarLibDir                 string
 
+	Services        []composition.ProcessService
 	ModuleRegistry  collectorapi.Registry
 	RunModule       string
 	RunJob          []string
@@ -50,10 +55,12 @@ type Config struct {
 	RunModePolicy policy.RunModePolicy
 
 	DiscoveryProviders []discovery.ProviderFactory
+	Secrets            *secrets.Config // nil disables secret loading, resolution and SecretStore DynCfg
 }
 
 // Agent represents orchestrator.
 type Agent struct {
+	SNMPVnodeAcquirer vnodes.SNMPAcquirer
 	*logger.Logger
 
 	Name string
@@ -77,10 +84,14 @@ type Agent struct {
 	runModePolicy policy.RunModePolicy
 
 	DiscoveryProviders []discovery.ProviderFactory
+	Secrets            *secrets.Config // nil disables secret loading, resolution and SecretStore DynCfg
 
+	Services       []composition.ProcessService
 	ModuleRegistry collectorapi.Registry
 	In             io.Reader
 	Out            io.Writer
+
+	loadSecretStores func([]string) ([]secretstore.Config, []error)
 
 	processMu    sync.Mutex
 	process      *composition.Process
@@ -91,6 +102,7 @@ type Agent struct {
 // New creates a new Agent.
 func New(cfg Config) *Agent {
 	a := &Agent{
+		SNMPVnodeAcquirer: cfg.SNMPVnodeAcquirer,
 		Logger: logger.New().With(
 			slog.String("component", "agent"),
 		),
@@ -107,11 +119,14 @@ func New(cfg Config) *Agent {
 		IsInsideK8s:               cfg.IsInsideK8s,
 		runModePolicy:             cfg.RunModePolicy,
 		ModuleRegistry:            cfg.ModuleRegistry,
+		Services:                  cfg.Services,
 		DiscoveryProviders:        cfg.DiscoveryProviders,
+		Secrets:                   cfg.Secrets,
 		In:                        os.Stdin,
 		Out:                       safewriter.Stdout,
 		DisableServiceDiscovery:   cfg.DisableServiceDiscovery,
 		processReady:              make(chan struct{}),
+		loadSecretStores:          secretstore.LoadFileConfigs,
 	}
 
 	return a
@@ -176,17 +191,31 @@ func (a *Agent) run(ctx context.Context) error {
 	if a.RunModule != "" && a.RunModule != "all" {
 		runJob = a.RunJob
 	}
+	if err := a.Secrets.Validate(); err != nil {
+		return err
+	}
+	var secretConfig *composition.SecretsConfig
+	if a.Secrets != nil {
+		secretConfig = &composition.SecretsConfig{
+			Providers: *a.Secrets,
+			Initial:   a.setupSecretStoreConfigs(),
+		}
+	}
 	process, err := composition.NewProcess(composition.Config{
-		Input: a.In, Output: a.Out,
-		PluginName: a.Name, Modules: enabledModules,
+		Input:                 a.In,
+		Output:                a.Out,
+		PluginName:            a.Name,
+		Modules:               enabledModules,
 		Defaults:              discCfg.Defaults,
 		DiscoveryBuildContext: discCfg.BuildContext,
 		DiscoveryProviders:    discCfg.Providers,
 		RunJob:                runJob,
 		AutoEnable:            a.runModePolicy.AutoEnableDiscovered,
-		InitialSecrets:        a.setupSecretStoreConfigs(),
+		Secrets:               secretConfig,
 		InitialVnodes:         a.setupVnodeRegistry(),
+		SNMPVnodeAcquirer:     a.SNMPVnodeAcquirer,
 		Runtime:               a.setupRuntimeService(),
+		Services:              a.Services,
 		KeepAlive:             !a.runModePolicy.IsTerminal,
 		ShutdownTimeout:       a.ShutdownTimeout,
 	})

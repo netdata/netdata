@@ -71,7 +71,7 @@ The stock conf at `/etc/netdata/go.d/sd/docker.conf` ships with `disabled: no` a
 
 #### Options
 
-The configuration file has two top-level blocks: `discoverer:` (the options below) and `services:` (rules that turn discovered containers into collector jobs — see [Service Rules](#service-rules)).
+The configuration file has two top-level blocks: `discoverer:` (the discoverer-specific options below) and `services:` (rules that turn discovered containers into collector jobs — see [Service Rules](#service-rules)).
 
 After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
 
@@ -79,8 +79,27 @@ After editing the file, restart the Netdata Agent to load the updated discovery 
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
+| [trust_discovered_targets](#option-trust-discovered-targets) | Allow secret references in generated collector jobs, including target-controlled values that can make Netdata read files, run commands, or fetch stored secrets. Off by default; enable only if you control and trust every discoverable target and accept the risk of exposing resolved values to it. | no | no |
 | [address](#option-address) | Docker daemon address. | unix:///var/run/docker.sock | no |
 | timeout | Maximum time to wait for a Docker API response (per request). | 2s | no |
+
+<a id="option-trust-discovered-targets"></a>
+##### trust_discovered_targets
+
+Set this option at the top level, alongside `discoverer:` and `services:`, not inside the discoverer block.
+It enables `${env:...}`, `${file:...}`, `${cmd:...}` and `${store:...}` in generated collector jobs.
+
+If a service rule copies a target-controlled value into a job field, the target can insert a reference that
+makes Netdata read a local file, run a command, or fetch a stored secret with the secret provider's
+permissions. The collector may send the result to that target as a credential or other request field.
+Enable only if you control and trust every target this pipeline can discover; enabling it accepts
+this risk for the whole pipeline. One untrusted target is enough to abuse it.
+
+Container owners can control command arguments, labels and other values used by service rules.
+
+The default keeps reference syntax literal. This option does not resolve the discoverer's own connection
+credentials. See [Service Discovery](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md#configuration-file-structure).
+
 
 <a id="option-address"></a>
 ##### address
@@ -104,7 +123,7 @@ If unset, Netdata also honors the `DOCKER_HOST` environment variable when presen
 
 Define the discovery pipeline in `/etc/netdata/go.d/sd/docker.conf`.
 
-The file has two top-level blocks: `discoverer:` (the options above) and `services:` (rules that turn discovered targets into collector jobs — see [Service Rules](#service-rules)).
+The file has two top-level blocks: `discoverer:` (discoverer-specific settings) and `services:` (rules that turn discovered targets into collector jobs — see [Service Rules](#service-rules)). Set pipeline options such as `trust_discovered_targets` alongside these blocks, not inside `discoverer:`.
 
 After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
 
@@ -291,7 +310,9 @@ If a job was created but no charts appear, the rendered `config_template` produc
 
 ## Troubleshooting
 
-### Permission denied on docker.sock
+### Other Problems
+
+#### Permission denied on docker.sock
 
 The Netdata user must be able to read the Docker socket. On a typical Linux host:
 
@@ -303,16 +324,16 @@ systemctl restart netdata
 In containers, mount the socket read-only and verify the file is readable from inside.
 
 
-### No targets discovered for containers in `host` networking
+#### No targets discovered for containers in `host` networking
 
 `host`-mode containers are intentionally skipped by the Docker discoverer. Enable the `net_listeners` discoverer instead — it picks up locally-listening processes, which includes `host`-mode containers.
 
 
-### Wrong module picked for an image
+#### Wrong module picked for an image
 
 Stock rules match on `.Image` patterns. Custom forks or in-house image names won't match. Add a rule above the stock catch-alls keyed on your own image name (`match "sp" .Image "myorg/nginx myorg/nginx:*"`) or use a `.Labels`-driven rule.
 
 
-### Generated jobs fail to start
+#### Generated jobs fail to start
 
 Common causes: the rendered URL is not reachable from the agent (different network, firewall); credentials baked into the template are wrong; the module's port is not the one Docker reported. Check the rendered job YAML in the agent's debug output.

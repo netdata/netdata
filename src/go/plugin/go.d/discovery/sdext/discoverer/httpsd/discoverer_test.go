@@ -193,8 +193,9 @@ func TestDiscoverer_NotFollowRedirects(t *testing.T) {
 }
 
 func TestDiscoverer_BearerTokenFileReread(t *testing.T) {
-	tokenFile := t.TempDir() + "/token"
-	require.NoError(t, os.WriteFile(tokenFile, []byte("token-1"), 0o600))
+	useCredentialHelper(t)
+	tokenFile := credentialTestDir(t) + "/token"
+	require.NoError(t, os.WriteFile(tokenFile, []byte("token-1"), 0o644))
 
 	var mu sync.Mutex
 	var auths []string
@@ -220,7 +221,7 @@ func TestDiscoverer_BearerTokenFileReread(t *testing.T) {
 
 	_, err = d.fetchTargetGroup(context.Background())
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(tokenFile, []byte("token-2"), 0o600))
+	require.NoError(t, os.WriteFile(tokenFile, []byte("token-2"), 0o644))
 	_, err = d.fetchTargetGroup(context.Background())
 	require.NoError(t, err)
 

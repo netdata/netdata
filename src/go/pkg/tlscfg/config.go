@@ -3,11 +3,13 @@
 package tlscfg
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 )
 
@@ -45,8 +47,15 @@ type TLSConfig struct {
 	InsecureSkipVerify bool `yaml:"tls_skip_verify,omitempty" json:"tls_skip_verify"`
 }
 
-// NewTLSConfig creates a tls.Config, may be nil without an error if TLS is not configured.
-func NewTLSConfig(cfg TLSConfig) (*tls.Config, error) {
+// NewTLSConfig loads configured TLS files through the credential-file boundary.
+// The result may be nil without an error if TLS is not configured.
+func NewTLSConfig(ctx context.Context, cfg TLSConfig) (*tls.Config, error) {
+	return newTLSConfig(ctx, cfg, credentialfile.Read)
+}
+
+type fileReader func(context.Context, string) ([]byte, error)
+
+func newTLSConfig(ctx context.Context, cfg TLSConfig, files fileReader) (*tls.Config, error) {
 	if cfg.TLSCA == "" && cfg.TLSKey == "" && cfg.TLSCert == "" && !cfg.InsecureSkipVerify {
 		return nil, nil
 	}
@@ -57,7 +66,7 @@ func NewTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 	}
 
 	if cfg.TLSCA != "" {
-		pool, err := loadCertPool([]string{cfg.TLSCA})
+		pool, err := loadCertPool(ctx, []string{cfg.TLSCA}, files)
 		if err != nil {
 			return nil, err
 		}
@@ -65,7 +74,7 @@ func NewTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 	}
 
 	if cfg.TLSCert != "" && cfg.TLSKey != "" {
-		cert, err := loadCertificate(cfg.TLSCert, cfg.TLSKey)
+		cert, err := loadCertificate(ctx, cfg.TLSCert, cfg.TLSKey, files)
 		if err != nil {
 			return nil, err
 		}
@@ -75,10 +84,10 @@ func NewTLSConfig(cfg TLSConfig) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-func loadCertPool(certFiles []string) (*x509.CertPool, error) {
+func loadCertPool(ctx context.Context, certFiles []string, files fileReader) (*x509.CertPool, error) {
 	pool := x509.NewCertPool()
 	for _, certFile := range certFiles {
-		pem, err := safefile.Read(certFile)
+		pem, err := readFile(ctx, certFile, files)
 		if err != nil {
 			return nil, newFileError(fmt.Errorf("could not read certificate %q: %w", certFile, err))
 		}
@@ -89,23 +98,33 @@ func loadCertPool(certFiles []string) (*x509.CertPool, error) {
 	return pool, nil
 }
 
-func loadCertificate(certFile, keyFile string) (tls.Certificate, error) {
-	certPEM, err := safefile.Read(certFile)
+func loadCertificate(ctx context.Context,
+	certFile, keyFile string,
+	files fileReader,
+) (tls.Certificate, error) {
+	certPEM, err := readFile(ctx, certFile, files)
 	if err != nil {
 		return tls.Certificate{}, newFileError(fmt.Errorf("could not read certificate %q: %w", certFile, err))
 	}
-	keyPEM, err := safefile.Read(keyFile)
+	keyPEM, err := readFile(ctx, keyFile, files)
 	if err != nil {
 		return tls.Certificate{}, newFileError(fmt.Errorf("could not read key %q: %w", keyFile, err))
 	}
 
 	cert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
-		return tls.Certificate{}, newFileError(fmt.Errorf("could not load keypair %s:%s: %w", certFile, keyFile, err))
+		// The TLS parser can include input PEM labels in its error.
+		return tls.Certificate{}, newFileError(fmt.Errorf("could not parse keypair %s:%s", certFile, keyFile))
 	}
 	return cert, nil
 }
 
 func newFileError(err error) error {
 	return &fileError{err: err}
+}
+func readFile(ctx context.Context, path string, files fileReader) ([]byte, error) {
+	if files == nil {
+		return nil, fmt.Errorf("TLS file reader unavailable: %w", safefile.ErrFile)
+	}
+	return files(ctx, path)
 }

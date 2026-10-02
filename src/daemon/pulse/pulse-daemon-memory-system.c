@@ -17,11 +17,11 @@
 
 #ifdef HAVE_C_MALLOC_INFO
 // Helper function to find the last occurrence of a substring in a string
-static char *find_last(const char *haystack, const char *needle, size_t *found) {
+static const char *find_last(const char *haystack, const char *needle, size_t *found) {
     *found = 0;
 
-    char *last = NULL;
-    char *current = strstr(haystack, needle);
+    const char *last = NULL;
+    const char *current = strstr(haystack, needle);
     while (current) {
         (*found)++;
         last = current;
@@ -67,42 +67,42 @@ static bool parse_malloc_info(size_t *arenas, size_t *allocated_arena, size_t *u
     buffer[size - 1] = '\0';
 
     // Find the last </heap>
-    char *last_heap_end = find_last(buffer, "</heap>", arenas);
+    const char *last_heap_end = find_last(buffer, "</heap>", arenas);
     if (!last_heap_end)
         goto cleanup;
 
     // Move past the last </heap>
-    char *summary_section = last_heap_end + strlen("</heap>");
+    const char *summary_section = last_heap_end + strlen("</heap>");
 
     // Parse the summary section using strstr
     const char *fast_key = "<total type=\"fast\"";
     const char *rest_key = "<total type=\"rest\"";
     const char *mmap_key = "<total type=\"mmap\"";
     const char *system_key = "<system type=\"current\"";
-    char *size_pos;
+    const char *size_pos;
 
-    char *fast_pos = strstr(summary_section, fast_key);
+    const char *fast_pos = strstr(summary_section, fast_key);
     if(!fast_pos || !(size_pos = strstr(fast_pos, "size=\"")))
         goto cleanup;
 
     *unused_fast = strtoull(size_pos + 6, NULL, 10);
     found++;
 
-    char *rest_pos = strstr(summary_section, rest_key);
+    const char *rest_pos = strstr(summary_section, rest_key);
     if (!rest_pos || !(size_pos = strstr(rest_pos, "size=\"")))
         goto cleanup;
 
     *unused_rest = strtoull(size_pos + 6, NULL, 10);
     found++;
 
-    char *mmap_pos = strstr(summary_section, mmap_key);
+    const char *mmap_pos = strstr(summary_section, mmap_key);
     if (!mmap_pos || !(size_pos = strstr(mmap_pos, "size=\"")))
         goto cleanup;
 
     *allocated_mmap = strtoull(size_pos + 6, NULL, 10);
     found++;
 
-    char *system_pos = strstr(summary_section, system_key);
+    const char *system_pos = strstr(summary_section, system_key);
     if (!system_pos || !(size_pos = strstr(system_pos, "size=\"")))
         goto cleanup;
 
@@ -119,9 +119,10 @@ cleanup:
 void pulse_daemon_memory_system_do(bool extended) {
     if(!extended) return;
 
-    // last observed glibc mmap count. static because mallinfo2() below may be skipped on
-    // this call while netdata.memory_maps (which consumes it) still updates every step;
-    // it is therefore a last-known value, at most PULSE_GLIBC_MALLINFO_UPDATE_EVERY stale.
+    // last observed glibc mmap count. static because mallinfo2() below may be skipped on this
+    // call while netdata.memory_maps (which consumes it) still updates every step; it is
+    // therefore a last-known value, lagging by roughly the configured interval, plus up to one
+    // pulse step of alignment, plus one mallinfo2() call.
     static size_t glibc_mmaps = 0;
 
     bool have_mallinfo = false;
@@ -164,15 +165,20 @@ void pulse_daemon_memory_system_do(bool extended) {
     static usec_t mallinfo_last_ut = 0;
     usec_t mallinfo_now_ut = now_monotonic_usec();
 
-    // half a second of slack: our heartbeat ticks on absolute second boundaries, so the
-    // elapsed time at the tick we want can land a few usec short of the interval. Without
-    // the slack we would skip to the next tick and the chart would miss a sample.
+    // half a second of slack: mallinfo2() completes between aligned pulse ticks, so without the
+    // slack a tick that falls just short of the interval would defer the sample to the next one.
     usec_t mallinfo_step_ut = (usec_t)mallinfo_every * USEC_PER_SEC - USEC_PER_SEC / 2;
 
     if(!mallinfo_last_ut || mallinfo_now_ut - mallinfo_last_ut >= mallinfo_step_ut) {
-        mallinfo_last_ut = mallinfo_now_ut;
-
         struct mallinfo2 mi = mallinfo2();
+
+        // Stamped after the call, not before it. mallinfo2() walks every arena and on a large
+        // heap it can outrun the configured interval; stamping before would make the next tick
+        // fire immediately and run the calls back to back, defeating the only purpose of the
+        // "glibc mallinfo update every" setting - bounding what this costs. The interval
+        // separates completed measurements.
+        mallinfo_last_ut = now_monotonic_usec();
+
         glibc_mmaps = mi.hblks;
         if(mi.hblkhd || mi.fordblks) {
             static RRDSET *st_mallinfo = NULL;

@@ -95,14 +95,11 @@ func TestCommandKernelRoutesOperationActionsThroughOwnershipGate(t *testing.T) {
 		}
 	}
 
-	// These are the ownership boundary itself and the four lifecycle-event
-	// adapters that are allowed to enter it.
+	// Operation, resource-shutdown and one-shot work each have one action owner.
 	require.Equal(t, map[string]int{
-		"jobmgr.completeRunFinalizer":    1,
-		"jobmgr.completeShutdownBarrier": 1,
-		"jobmgr.completeTask":            1,
-		"jobmgr.sendOperationAction":     1,
-		"jobmgr.sendShutdownAction":      1,
+		"jobmgr.completeOneShotTask": 1,
+		"jobmgr.sendOperationAction": 1,
+		"jobmgr.sendShutdownAction":  1,
 	}, directSenders)
 }
 

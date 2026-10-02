@@ -10,6 +10,19 @@
 #include "../ebpf_process.h"
 #include <ifaddrs.h>
 
+#ifdef LIBBPF_MAJOR_VERSION
+int ebpf_kernel_btf_find_by_name_kind(const char *name, __u32 kind)
+{
+    struct btf *btf = btf__load_vmlinux_btf();
+    if (!btf || libbpf_get_error(btf))
+        return -1;
+
+    int id = btf__find_by_name_kind(btf, name, kind);
+    btf__free(btf);
+    return id;
+}
+#endif
+
 /*****************************************************************
  *
  *  DIMENSION WRITING FUNCTIONS
@@ -545,11 +558,6 @@ void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_
     enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "mount", CONFIG_BOOLEAN_YES);
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_MOUNT_IDX, *disable_cgroups);
-    }
-
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "fd", CONFIG_BOOLEAN_YES);
-    if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_FD_IDX, *disable_cgroups);
     }
 
     enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "hardirq", CONFIG_BOOLEAN_YES);

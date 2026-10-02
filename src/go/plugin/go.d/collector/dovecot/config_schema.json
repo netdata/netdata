@@ -42,16 +42,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
-    "autodetection_retry": {
-      "title": "Detection retry",
-      "description": "Recheck interval in seconds. Zero means no recheck will be scheduled.",
-      "type": "integer",
-      "minimum": 0,
-      "default": 60
-    },
     "vnode": {
       "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },

@@ -10,9 +10,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
 
-#ifdef HAVE_CAPABILITY
-#include <sys/capability.h>
+#include "exec-signals.h"
+#include "nd-file-reader.h"
+
+#ifdef __linux__
+#include <linux/capability.h>
+#include <sys/syscall.h>
 #endif
 
 #ifdef __APPLE__
@@ -24,14 +30,6 @@ extern char **environ;
 
 #define FALLBACK_USER "nobody"
 
-// USER, LOGNAME, HOME, SHELL, LC_ALL, PATH, PWD, TZ, TZDIR, TMPDIR, NULL
-#define MAX_ENV_VARS 16
-
-// The environment we hand to the child. It must be static: environ has to stay
-// valid until execvp() replaces the process image.
-static char *new_environ[MAX_ENV_VARS];
-static size_t new_environ_entries = 0;
-
 void show_help() {
     fprintf(stdout, "\n");
     fprintf(stdout, "nd-run\n");
@@ -40,10 +38,18 @@ void show_help() {
     fprintf(stdout, "\n");
     fprintf(stdout, "A helper to run a command as an unprivileged user without any extra privileges\n");
     fprintf(stdout, "\n");
+    fprintf(stdout, "Usage: nd-run command [args...]\n");
+    fprintf(stdout, "       nd-run --preserve-env -- command [args...]\n");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "The default is a minimal environment. --preserve-env retains inherited application variables\n");
+    fprintf(stdout, "for trusted commands, but USER, LOGNAME, HOME, SHELL and LC_ALL remain helper-controlled.\n");
+    fprintf(stdout, "TMPDIR is inherited when set, otherwise it defaults to /tmp. Privilege dropping is unchanged.\n");
+    fprintf(stdout, "The -- delimiter is required after --preserve-env.\n");
+    fprintf(stdout, "\n");
     fprintf(stdout, "Defaults to running the command as '%s', but will fall back to '%s' if '%s' is not found on the system.\n", NETDATA_USER, FALLBACK_USER, NETDATA_USER);
     fprintf(stdout, "\n");
     fprintf(stdout, "If it's not possible to switch users, the command will run as the current user instead.\n");
-    #ifdef HAVE_CAPABILITY
+    #ifdef __linux__
         fprintf(stdout, "\n");
         fprintf(stdout, "Regardless of whether it switched users, all capabilities will be dropped.\n");
     #endif
@@ -59,31 +65,74 @@ static _Noreturn void fatal_msg(const char *msg) {
     exit(EXIT_FAILURE);
 }
 
-#ifdef HAVE_CAPABILITY
-static void clear_caps() {
-    // Clear out all capabilities
-    //
-    // This does not require any special privileges since it is reducing
-    // the process’s privileges.
-    cap_t caps = cap_init();
-
-    if (caps == NULL) fatal("cap_init");
-
-    if (cap_clear(caps) == -1) {
-        cap_free(caps);
-        fatal("cap_clear");
-    }
-
-    if (cap_set_proc(caps) == -1) {
-        cap_free(caps);
-        fatal("cap_set_proc");
-    }
-
-    cap_free(caps);
-}
+static void clear_caps(void) {
+#ifdef __linux__
+    // File mode does not exec. Clear capabilities here for every mode, even
+    // without libcap; clearing inheritable/permitted also clears ambient caps.
+    struct __user_cap_header_struct header = { .version = _LINUX_CAPABILITY_VERSION_3, .pid = 0 };
+    struct __user_cap_data_struct caps[2] = {{0}, {0}};
+    if (syscall(SYS_capset, &header, caps) != 0 || syscall(SYS_capget, &header, caps) != 0)
+        fatal("capability reduction");
+    if (caps[0].effective || caps[0].permitted || caps[0].inheritable ||
+        caps[1].effective || caps[1].permitted || caps[1].inheritable)
+        fatal_msg("capabilities remain after privilege reduction");
 #endif
+}
 
-static void add_env_var(const char *name, const char *value) {
+static int set_all_gids(gid_t gid) {
+#ifdef HAVE_SETRESGID
+    return setresgid(gid, gid, gid);
+#else
+    return setregid(gid, gid);
+#endif
+}
+
+static int set_all_uids(uid_t uid) {
+#ifdef HAVE_SETRESUID
+    return setresuid(uid, uid, uid);
+#else
+    return setreuid(uid, uid);
+#endif
+}
+
+static void drop_privileges(const struct passwd *pw) {
+    uid_t euid = geteuid();
+    bool switch_user = euid != pw->pw_uid;
+    uid_t uid = switch_user ? pw->pw_uid : euid;
+    gid_t gid = switch_user ? pw->pw_gid : getegid();
+
+    // Same-user execution retains OS-granted supplementary groups.
+    if (switch_user && initgroups(pw->pw_name, pw->pw_gid) != 0) {
+        if (euid == 0) {
+            if (setgroups(0, NULL) != 0)
+                fatal("setgroups");
+        } else if (errno != EPERM) {
+            fatal("initgroups");
+        }
+    }
+
+    // Normalize real/effective/saved IDs even for same-user execution and
+    // permitted nonroot fallback. Successful target changes need no second pass.
+    if (set_all_gids(gid) != 0) {
+        if (euid == 0 || errno != EPERM)
+            fatal("set group IDs");
+        gid = getegid();
+        if (set_all_gids(gid) != 0)
+            fatal("retain group IDs");
+    }
+    if (set_all_uids(uid) != 0) {
+        if (euid == 0 || errno != EPERM)
+            fatal("set user IDs");
+        uid = geteuid();
+        if (set_all_uids(uid) != 0)
+            fatal("retain user IDs");
+    }
+    if (getuid() != uid || geteuid() != uid || getgid() != gid || getegid() != gid)
+        fatal_msg("identity mismatch after privilege reduction");
+    clear_caps();
+}
+
+static void add_env_var(char **env, size_t *entries, const char *name, const char *value) {
     // Append "name=value" to the environment we are building for the child.
     // Variables that are not set are skipped.
 
@@ -91,11 +140,13 @@ static void add_env_var(const char *name, const char *value) {
         return;
     }
 
-    if (new_environ_entries + 1 >= MAX_ENV_VARS) {
-        fatal_msg("too many environment variables");
+    size_t name_len = strlen(name);
+    size_t value_len = strlen(value);
+    if (name_len > SIZE_MAX - 2 || value_len > SIZE_MAX - name_len - 2) {
+        fatal_msg("environment variable is too large");
     }
 
-    size_t size = strlen(name) + 1 + strlen(value) + 1;
+    size_t size = name_len + value_len + 2;
     char *entry = malloc(size);
     if (entry == NULL) {
         fatal("malloc");
@@ -103,32 +154,75 @@ static void add_env_var(const char *name, const char *value) {
 
     snprintf(entry, size, "%s=%s", name, value);
 
-    new_environ[new_environ_entries++] = entry;
-    new_environ[new_environ_entries] = NULL;
+    env[(*entries)++] = entry;
 }
 
-static void build_environment(struct passwd *pw) {
-    // Build a minimal environment for the child from scratch, only passing on
-    // a few things we know are needed to make things work correctly.
-    //
+static char **build_environment(struct passwd *pw, bool preserve_env) {
     // We never modify our own environment: getenv() keeps returning valid
     // pointers into the original environment block until main() replaces
     // environ, right before execvp(). Clearing the environment in place is not
     // portable - clearenv() does not exist everywhere, and setting environ to
     // NULL makes setenv() dereference a NULL environment array on macOS.
 
-    const char *tmpdir = getenv("TMPDIR");
+    const struct {
+        const char *name;
+        const char *value;
+    } controlled[] = {
+        { "USER", pw->pw_name },
+        { "LOGNAME", pw->pw_name },
+        { "HOME", pw->pw_dir },
+        { "SHELL", "/bin/sh" },
+        { "LC_ALL", "C" },
+    };
+    const size_t controlled_count = sizeof(controlled) / sizeof(controlled[0]);
 
-    add_env_var("USER", pw->pw_name);
-    add_env_var("LOGNAME", pw->pw_name);
-    add_env_var("HOME", pw->pw_dir);
-    add_env_var("SHELL", "/bin/sh"); // Ignore user default shell
-    add_env_var("LC_ALL", "C"); // Force C locale
-    add_env_var("PATH", getenv("PATH"));
-    add_env_var("PWD", getenv("PWD"));
-    add_env_var("TZ", getenv("TZ"));
-    add_env_var("TZDIR", getenv("TZDIR"));
-    add_env_var("TMPDIR", (tmpdir == NULL) ? "/tmp" : tmpdir); // Use a sane default for TMPDIR if it wasn't set.
+    // Space for the controlled fields, PATH/PWD/TZ/TZDIR, TMPDIR and NULL,
+    // plus every inherited entry in preservation mode. calloc leaves the terminator.
+    size_t capacity = controlled_count + 6;
+    if (preserve_env) {
+        for (char **entry = environ; *entry; entry++) {
+            if (capacity >= SIZE_MAX / sizeof(char *))
+                fatal_msg("environment is too large");
+            capacity++;
+        }
+    }
+    char **env = calloc(capacity, sizeof(*env));
+    if (!env)
+        fatal("calloc");
+
+    size_t entries = 0;
+    for (size_t i = 0; i < controlled_count; i++)
+        add_env_var(env, &entries, controlled[i].name, controlled[i].value);
+
+    if (preserve_env) {
+        for (char **entry = environ; *entry; entry++) {
+            bool reserved = false;
+            for (size_t i = 0; i < controlled_count; i++) {
+                size_t len = strlen(controlled[i].name);
+                if (strncmp(*entry, controlled[i].name, len) == 0 && (*entry)[len] == '=') {
+                    reserved = true;
+                    break;
+                }
+            }
+            if (!reserved) {
+                env[entries] = strdup(*entry);
+                if (!env[entries])
+                    fatal("strdup");
+                entries++;
+            }
+        }
+    } else {
+        add_env_var(env, &entries, "PATH", getenv("PATH"));
+        add_env_var(env, &entries, "PWD", getenv("PWD"));
+        add_env_var(env, &entries, "TZ", getenv("TZ"));
+        add_env_var(env, &entries, "TZDIR", getenv("TZDIR"));
+    }
+
+    const char *tmpdir = getenv("TMPDIR");
+    if (!preserve_env || tmpdir == NULL)
+        add_env_var(env, &entries, "TMPDIR", tmpdir == NULL ? "/tmp" : tmpdir);
+
+    return env;
 }
 
 int main(int argc, char *argv[]) {
@@ -137,7 +231,18 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    uid_t euid = geteuid();
+    bool file_reader = strcmp(argv[1], "--file-reader") == 0;
+    struct nd_file_request file_request;
+    if (file_reader && !nd_file_reader_parse(argc - 2, argv + 2, &file_request))
+        fatal_msg("usage: --file-reader read regular|stream <limit> <path>, or --file-reader stat <path>");
+
+    bool preserve_env = strcmp(argv[1], "--preserve-env") == 0;
+    int command = 1;
+    if (preserve_env) {
+        if (argc < 4 || strcmp(argv[2], "--") != 0)
+            fatal_msg("usage: nd-run --preserve-env -- command [args...]");
+        command = 3;
+    }
 
     struct passwd *pw = getpwnam(NETDATA_USER);
     if (!pw) {
@@ -148,54 +253,16 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (euid != pw->pw_uid) {
-        // Set supplementary groups for this user (must be done before dropping privs)
-        if (initgroups(pw->pw_name, pw->pw_gid) != 0) {
-            if (euid == 0) {
-                if (setgroups(0, NULL) != 0) {
-                    fatal("setgroups");
-                }
-            } else if (errno != EPERM) {
-                fatal("initgroups");
-            }
-        }
+    drop_privileges(pw);
+    if (file_reader && geteuid() == 0)
+        fatal_msg("file reader requires an unprivileged identity");
 
-        // Drop GID then UID. Prefer setres* when available to also drop saved IDs.
-        // Linux/BSD generally provide setresgid/setresuid; macOS does not.
-        #ifdef HAVE_SETRESGID
-            if (setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) != 0) {
-                if (euid == 0 || errno != EPERM) {
-                    fatal("setresgid");
-                }
-            }
-        #else
-            if (setgid(pw->pw_gid) != 0) {
-                if (euid == 0 || errno != EPERM) {
-                    fatal("setgid");
-                }
-            }
-        #endif
+    // SIG_IGN survives exec; the file reader also needs default SIGPIPE handling.
+    reset_signal_dispositions();
+    if (file_reader)
+        return nd_file_reader_run(&file_request);
 
-        #ifdef HAVE_SETRESUID
-            if (setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid) != 0) {
-                if (euid == 0 || errno != EPERM) {
-                    fatal("setresuid");
-                }
-            }
-        #else
-            if (setuid(pw->pw_uid) != 0) {
-                if (euid == 0 || errno != EPERM) {
-                    fatal("setuid");
-                }
-            }
-        #endif
-    }
-
-    #ifdef HAVE_CAPABILITY
-        clear_caps();
-    #endif
-
-    build_environment(pw);
+    char **new_environ = build_environment(pw, preserve_env);
 
     // Replace the environment wholesale. From here on we must not call
     // setenv()/putenv()/unsetenv(): libc may try to realloc() or free() an
@@ -204,7 +271,7 @@ int main(int argc, char *argv[]) {
     environ = new_environ;
 
     // Exec the requested command (replaces the current process on success)
-    execvp(argv[1], &argv[1]);
+    execvp(argv[command], &argv[command]);
 
     // Only reached on error. Use the exit codes every exec wrapper uses, so
     // that callers can tell an exec failure apart from the command exiting 1.

@@ -1,11 +1,31 @@
-//! OTel **traces** flattening: the span request/record types, the span flatten +
+//! OTel **traces** flattening: the span request/record types, the flatten +
 //! normalization entry points, and the trace frame codec. The span analog of
-//! [`crate::logs`], built on the same neutral substrate in [`crate::common`].
+//! [`crate::logs`], built on the same neutral substrate in [`crate::common`];
+//! distinct types (not generics) keep the logs path untouched, while
+//! resource/scope flattening is shared via [`Flattener::flatten_resource`] /
+//! [`Flattener::flatten_scope`].
 //!
-//! Distinct types (not generics) keep the logs path untouched; resource/scope
-//! flattening is shared via [`Flattener::flatten_resource`] /
-//! [`Flattener::flatten_scope`]. Same no-inner-version frame caveat as logs (see
-//! [`crate::logs`]).
+//! One span → one SFST row. What becomes what at seal time (the builder is
+//! `src/crates/ng-index/src/sfst_build.rs::populate_trace_row_index`):
+//! - interned facets: `name`, `kind`/`_kind`, `status_code`/`_status_code`,
+//!   `trace_state`, `status_message`, `attributes.*` (emitted by
+//!   [`Flattener::flatten_span`]), plus the event/link `events.*` / `links.*`
+//!   entries — searchable tokens in the shared [`SchemaTree`];
+//! - per-row columns from [`SpanRecord`]: `ts` (row key), `duration`,
+//!   `trace_id`/`span_id`/`parent_span_id`, `flags`, `dropped_attributes_count`,
+//!   with the `TIDX` index + `TBLM` bloom built from the chronological
+//!   `trace_id` column, the `EVNB`/`LNKB` event/link chunks fed by the
+//!   structured lists, and the trace rollup capturing the `name`/`_kind`/
+//!   `status_code` facets plus the resource's `service.name`.
+//!
+//! [`prepare_trace_frame`] is the single normalize → flatten → encode recipe;
+//! producers: `ng-ingest::write_trace_request` (no bounds — dev/bench) and the
+//! `otel-ingestor` trace service (with bounds). Readers decode via
+//! [`decode_trace_frame`]: `ng-index::sfst_build` (index build) and
+//! `sfsq::traces` (unindexed WAL-tail scan). Same frame rule as logs:
+//! positional bincode with no inner version — the WAL header's
+//! `payload_format` id ([`TRACE_FRAME_PAYLOAD_FORMAT`]) carries the version
+//! (see [`crate::logs`]).
 
 use serde::{Deserialize, Serialize};
 
@@ -39,19 +59,20 @@ pub struct SpanScopeGroup {
 
 /// One span: its per-row columns, its flattened entries, and its structured
 /// sub-objects (span analog of [`crate::logs::Record`]). Carries every OTLP
-/// `Span` field: scalar facets (`name`, `kind`, `status_code`, `trace_state`,
-/// `status_message`) and `attributes.*` live in [`entries`](Self::entries);
-/// events and links are structured lists ([`EventRecord`] / [`LinkRecord`])
-/// whose searchable parts double as entries at seal time.
+/// `Span` field: the scalar facets (`name`, `kind`, `status_code`,
+/// `trace_state`, `status_message`) and `attributes.*` live in
+/// [`entries`](Self::entries); events and links are the structured lists
+/// ([`EventRecord`] / [`LinkRecord`]) whose searchable parts double as entries
+/// at seal time.
 ///
-/// Per-row columns (NOT FST facets): `ts` = the resolved `start_time_unix_nano`
-/// (the row-ordering key; callers MUST normalize first, see
-/// [`normalize_trace_request`]); `duration` = `end - start` ns, clamped to 0 on
-/// an unset/earlier end (see [`flatten_trace_into`]); `trace_id`/`span_id`/
-/// `parent_span_id` raw OTLP bytes (empty if unset); `flags` /
-/// `dropped_attributes_count` carried verbatim. There is no `observed_ts` (spans
-/// have no observed time). `dropped_events_count` / `dropped_links_count` are
-/// span-level scalars sealed alongside the event/link structures (`EVNB`/`LNKB`).
+/// Per-row columns (NOT facets): `ts` = the resolved `start_time_unix_nano`
+/// (the row-ordering key at seal); `duration` = `end - start` ns clamped to 0
+/// (see `span_duration`); `trace_id`/`span_id`/`parent_span_id` typed raw
+/// bytes — absent or normalized-away ids become the all-zero UNSET sentinel, so
+/// an UNSET `parent_span_id` is the downstream root-span marker; `flags` /
+/// `dropped_attributes_count` verbatim. There is no `observed_ts` (spans have
+/// none). `dropped_events_count`/`dropped_links_count` seal as per-row counts
+/// alongside the event/link structures (`EVNB`/`LNKB`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpanRecord {
     pub ts: i64,
@@ -148,8 +169,8 @@ pub fn flatten_trace_into(
                 .map(|sp| {
                     let ts = i64::try_from(sp.start_time_unix_nano).unwrap_or(i64::MAX);
                     let duration = span_duration(&sp);
-                    // Ingest normalization (normalize_trace_request) already cleared
-                    // any wrong-length id to empty → from_bytes(empty) → UNSET.
+                    // Normalization cleared wrong-length ids to empty →
+                    // from_bytes(empty) → UNSET; unwrap_or_default is exact.
                     let trace_id = TraceId::from_bytes(&sp.trace_id).unwrap_or_default();
                     let span_id = SpanId::from_bytes(&sp.span_id).unwrap_or_default();
                     let parent_span_id =
@@ -228,13 +249,12 @@ pub struct TraceNormalization {
 ///    resolved value is written back; `SpanRecord.ts` reads it.
 /// 2. **Applies the interval time bounds**: a span is kept only if its whole
 ///    `[start, effective end]` interval lies inside `bounds` — `start >= min_ns`
-///    AND `effective end <= max_ns`, where the effective end collapses an unset
-///    or before-start `end_time_unix_nano` to the start (exactly the
-///    `span_duration` clamp, so the judged interval is the stored one). This
-///    also implicitly caps a claimed duration at the window width. A
-///    *synthesized* start is server-stamped, not client data, so it is exempt
-///    from the past bound AND from the future bound's start-clamp (else
-///    `future_skew = 0` would reject every start-less span) — but a RAW
+///    and `effective end <= max_ns`, the effective end collapsing an unset or
+///    before-start `end_time_unix_nano` onto the start (exactly the
+///    `span_duration` clamp, so the judged interval is the stored one; this
+///    also implicitly caps a claimed duration at the window width). A
+///    *synthesized* start is server-stamped, not client data: exempt from the
+///    past bound and from the future bound's start-clamp — but a RAW
 ///    client-provided end still faces the future bound, so a start-less span
 ///    with an absurd end is rejected.
 /// 3. **Clears malformed trace/span ids**: any non-empty
@@ -260,10 +280,9 @@ pub fn normalize_trace_request(
     let mut max = 0u64;
     for rs in &mut req.resource_spans {
         for ss in &mut rs.scope_spans {
-            // `retain_mut` resolves the start time and applies the bounds in
-            // the same walk, dropping out-of-window spans in place — so
-            // `records`/`ts_range` cover kept spans only, and rejected spans
-            // contribute nothing to `bad_ids`.
+            // `retain_mut` resolves start times and applies bounds in one walk,
+            // so `records`/`ts_range` cover kept spans only and a rejected span
+            // contributes nothing to `bad_ids`.
             ss.spans.retain_mut(|s| {
                 let synthesized = s.start_time_unix_nano == 0;
                 if synthesized {
@@ -272,14 +291,13 @@ pub fn normalize_trace_request(
                 }
                 if let Some(b) = bounds {
                     let start = s.start_time_unix_nano;
-                    // The bounds judge CLIENT-claimed time only. For a client
+                    // The bounds judge CLIENT-claimed time only. For a raw
                     // start, the effective end clamps to the start (the same
                     // clamp as `span_duration`), so a malformed end degenerates
                     // to the start check instead of dodging the future bound.
-                    // For a SYNTHESIZED start, the clamp would judge our own
-                    // server-stamped value — with `future_skew = 0` that would
-                    // reject every start-less span — so only a RAW client end
-                    // faces the future bound there.
+                    // For a synthesized start only its raw end faces the future
+                    // bound: clamping to our own server-stamped value would —
+                    // with `future_skew = 0` — reject every start-less span.
                     let future_violation = if synthesized {
                         s.end_time_unix_nano > b.max_ns
                     } else {
@@ -318,9 +336,9 @@ pub fn normalize_trace_request(
                 true
             });
         }
-        // Drop scopes emptied by the bounds filter (or sent empty): their scope
-        // attributes would otherwise be flattened/interned into the SFST with no
-        // rows referencing them, surfacing as zero-row values in the field picker.
+        // Drop scopes emptied by the bounds filter (or sent empty): their
+        // attributes would otherwise be interned as zero-row values in the
+        // SFST (surfacing in the field picker with no rows behind them).
         rs.scope_spans.retain(|ss| !ss.spans.is_empty());
     }
     // Drop resources whose every scope was emptied, for the same reason.
@@ -356,8 +374,7 @@ pub struct PreparedTraceFrame {
 
 /// The single owner of the traces frame-payload recipe: normalize (ONE span
 /// walk — [`normalize_trace_request`]: resolve start times, interval bounds,
-/// id clearing) → flatten ([`flatten_trace_request`]) → (entry hashes are
-/// filled at emit time by the flattener) → bincode-encode
+/// id clearing) → flatten ([`flatten_trace_request`]) → bincode-encode
 /// ([`encode_trace_frame`]). Shared by `ng-ingest` and the production
 /// OTel-traces ingestor so the recipe exists exactly once — the traces analog
 /// of [`crate::logs::prepare_log_frame`].
@@ -371,14 +388,12 @@ pub fn prepare_trace_frame(
     bounds: Option<TimeBounds>,
 ) -> Result<PreparedTraceFrame, bincode::error::EncodeError> {
     let norm = normalize_trace_request(&mut req, fallback_base_ns, bounds);
-    // Nothing to flatten or encode without kept spans; callers skip writing
-    // (`ts_range` is `None`). This also covers a frame whose every span was
-    // dropped as out-of-window — `rejected` still carries the count so the
-    // caller can report it. Spanless resource/scope attributes are skipped
-    // too — same as not writing the frame.
+    // Nothing to flatten or encode without kept spans: callers skip writing
+    // (`ts_range` is `None`), and spanless resource/scope attributes are
+    // skipped with it. A fully out-of-window request still reports `rejected`.
     if norm.records == 0 {
-        // `bad_ids` is necessarily zero here (normalization fixes kept spans
-        // only) — carried through so the invariant is visible.
+        // `bad_ids` is necessarily zero here: normalization only ever fixes
+        // kept spans, and none were kept.
         return Ok(PreparedTraceFrame {
             data: Vec::new(),
             records: 0,

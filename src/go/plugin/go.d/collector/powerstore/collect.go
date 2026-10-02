@@ -6,15 +6,17 @@ import (
 	"sync"
 	"time"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/powerstore/client"
 )
 
 const discoveryEvery = 5
 
-func (c *Collector) collect() error {
+func (c *Collector) collect(ctx context.Context) error {
 	c.runs++
 	if !c.lastDiscoveryOK || c.runs%discoveryEvery == 0 {
-		if err := c.discovery(); err != nil {
+		if err := c.discovery(ctx); err != nil {
 			if !c.lastDiscoveryOK {
 				return err
 			}
@@ -24,7 +26,7 @@ func (c *Collector) collect() error {
 
 	// Collect metrics from API concurrently, bounded by semaphore.
 	var wg sync.WaitGroup
-	for _, fn := range []func(){
+	for _, fn := range []func(context.Context){
 		c.collectClusterSpace,
 		c.collectAppliances,
 		c.collectVolumes,
@@ -37,9 +39,9 @@ func (c *Collector) collect() error {
 		c.collectReplication,
 	} {
 		wg.Add(1)
-		go func(f func()) {
+		go func(f func(context.Context)) {
 			defer wg.Done()
-			f()
+			f(ctx)
 		}(fn)
 	}
 	wg.Wait()
@@ -51,21 +53,21 @@ func (c *Collector) collect() error {
 	return nil
 }
 
-func (c *Collector) discovery() error {
+func (c *Collector) discovery(ctx context.Context) error {
 	start := time.Now()
 	c.Debugf("starting discovery")
 
 	// Build results in a temp struct; only swap on full success.
 	var d discovered
 
-	clusters, err := c.client.Clusters()
+	clusters, err := c.client.Clusters(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
 	}
 	d.clusters = clusters
 
-	appliances, err := c.client.Appliances()
+	appliances, err := c.client.Appliances(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
@@ -75,7 +77,7 @@ func (c *Collector) discovery() error {
 		d.appliances[a.ID] = a
 	}
 
-	volumes, err := c.client.Volumes()
+	volumes, err := c.client.Volumes(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
@@ -87,7 +89,7 @@ func (c *Collector) discovery() error {
 		}
 	}
 
-	allHW, err := c.client.AllHardware()
+	allHW, err := c.client.AllHardware(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
@@ -104,7 +106,7 @@ func (c *Collector) discovery() error {
 		}
 	}
 
-	fcPorts, err := c.client.FcPorts()
+	fcPorts, err := c.client.FcPorts(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
@@ -114,7 +116,7 @@ func (c *Collector) discovery() error {
 		d.fcPorts[p.ID] = p
 	}
 
-	ethPorts, err := c.client.EthPorts()
+	ethPorts, err := c.client.EthPorts(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
@@ -124,7 +126,7 @@ func (c *Collector) discovery() error {
 		d.ethPorts[p.ID] = p
 	}
 
-	fileSystems, err := c.client.FileSystems()
+	fileSystems, err := c.client.FileSystems(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err
@@ -134,7 +136,7 @@ func (c *Collector) discovery() error {
 		d.fileSystems[fs.ID] = fs
 	}
 
-	nas, err := c.client.NASServers()
+	nas, err := c.client.NASServers(ctx)
 	if err != nil {
 		c.lastDiscoveryOK = false
 		return err

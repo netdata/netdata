@@ -19,10 +19,13 @@
 //    metric alive. Such a pointer can be stale.
 //
 // 3. Acquiring from a possibly stale pointer is NOT safe: aral_freez() lets
-//    ARAL write its free-list header over the first 16 bytes of the element,
-//    which overlays uuid and refcount. A freed slot can therefore present a
-//    refcount that metric_acquire() happily accepts. Do not treat a successful
-//    acquire on an unowned pointer as proof the metric is alive.
+//    ARAL write its free-list header over the start of the element. ARAL_FREE is
+//    {size_t size; struct aral_free *next;}, so on 64-bit builds those 16 bytes
+//    cover section, uuid AND refcount; on 32-bit they cover 8 and stop before
+//    refcount. Either way the slot can also be handed to an unrelated allocation,
+//    so a freed slot can present a refcount that metric_acquire() happily accepts.
+//    Do not treat a successful acquire on an unowned pointer as proof the metric
+//    is alive.
 //
 // 4. uuid never changes and every live METRIC holds its uuidmap reference for
 //    its whole lifetime: metric_add_and_acquire() takes it, and metric_release()
@@ -138,7 +141,7 @@ static inline void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const cha
     uuid_unparse_lower(uuid, uuid_txt);
     nd_log(NDLS_DAEMON, NDLP_ERR,
            "METRIC: %s on %s at tier %d, refcount %d, partition %u, "
-           "retention [%ld - %ld (hot), %ld (clean)], update every %"PRIu32
+           "retention [%" PRId64 " - %" PRId64 " (hot), %" PRId64 " (clean)], update every %"PRIu32
 #ifdef NETDATA_INTERNAL_CHECKS
            ", writer pid %d "
 #endif
@@ -148,9 +151,9 @@ static inline void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const cha
            ctx->config.tier,
            metric->refcount,
            metric->partition,
-           metric->first_time_s,
-           metric->latest_time_s_hot,
-           metric->latest_time_s_clean,
+           (int64_t)metric->first_time_s,
+           (int64_t)metric->latest_time_s_hot,
+           (int64_t)metric->latest_time_s_clean,
            metric->latest_update_every_s
 #ifdef NETDATA_INTERNAL_CHECKS
            , (int)metric->writer

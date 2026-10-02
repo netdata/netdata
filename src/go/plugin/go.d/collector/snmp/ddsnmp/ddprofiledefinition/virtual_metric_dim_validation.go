@@ -3,6 +3,7 @@
 package ddprofiledefinition
 
 import (
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -48,12 +49,17 @@ func collectVirtualMetricSourceSpecs(metrics []MetricsConfig) map[string]map[str
 	return specs
 }
 
-func addVirtualMetricSourceSpec(specs map[string]map[string]virtualMetricSourceSpec, metricName, tableName string, spec virtualMetricSourceSpec) {
+func addVirtualMetricSourceSpec(
+	specs map[string]map[string]virtualMetricSourceSpec,
+	metricName, tableName string,
+	spec virtualMetricSourceSpec,
+) {
 	tables, ok := specs[metricName]
 	if !ok {
 		tables = make(map[string]virtualMetricSourceSpec)
 		specs[metricName] = tables
 	}
+	spec.dimSupport = mergeVirtualMetricDimSupport(tables[tableName].dimSupport, spec.dimSupport)
 	tables[tableName] = spec
 }
 
@@ -68,7 +74,9 @@ func buildVirtualMetricSourceSpec(sym SymbolConfig) virtualMetricSourceSpec {
 
 func buildMappingVirtualMetricDimSupport(mapping MappingConfig) virtualMetricDimSupport {
 	if !mapping.HasItems() {
-		return virtualMetricDimSupport{mode: virtualMetricDimUnsupported}
+		return virtualMetricDimSupport{
+			mode: virtualMetricDimUnsupported,
+		}
 	}
 
 	if mapping.EffectiveMode() == MappingModeBitmask {
@@ -79,9 +87,14 @@ func buildMappingVirtualMetricDimSupport(mapping MappingConfig) virtualMetricDim
 			}
 		}
 		if len(dims) == 0 {
-			return virtualMetricDimSupport{mode: virtualMetricDimUnsupported}
+			return virtualMetricDimSupport{
+				mode: virtualMetricDimUnsupported,
+			}
 		}
-		return virtualMetricDimSupport{mode: virtualMetricDimKnown, dims: dims}
+		return virtualMetricDimSupport{
+			mode: virtualMetricDimKnown,
+			dims: dims,
+		}
 	}
 
 	keysNumeric := true
@@ -97,13 +110,18 @@ func buildMappingVirtualMetricDimSupport(mapping MappingConfig) virtualMetricDim
 
 	switch {
 	case keysNumeric && valuesNumeric:
-		return virtualMetricDimSupport{mode: virtualMetricDimUnsupported}
+		return virtualMetricDimSupport{
+			mode: virtualMetricDimUnsupported,
+		}
 	case keysNumeric:
 		dims := make(map[string]bool)
 		for _, value := range mapping.Items {
 			dims[value] = true
 		}
-		return virtualMetricDimSupport{mode: virtualMetricDimKnown, dims: dims}
+		return virtualMetricDimSupport{
+			mode: virtualMetricDimKnown,
+			dims: dims,
+		}
 	default:
 		dims := make(map[string]bool)
 		for key, value := range mapping.Items {
@@ -112,53 +130,63 @@ func buildMappingVirtualMetricDimSupport(mapping MappingConfig) virtualMetricDim
 			}
 		}
 		if len(dims) == 0 {
-			return virtualMetricDimSupport{mode: virtualMetricDimUnsupported}
+			return virtualMetricDimSupport{
+				mode: virtualMetricDimUnsupported,
+			}
 		}
-		return virtualMetricDimSupport{mode: virtualMetricDimKnown, dims: dims}
+		return virtualMetricDimSupport{
+			mode: virtualMetricDimKnown,
+			dims: dims,
+		}
 	}
 }
 
 func buildTransformVirtualMetricDimSupport(transform string) virtualMetricDimSupport {
 	if transform == "" {
-		return virtualMetricDimSupport{mode: virtualMetricDimUnsupported}
+		return virtualMetricDimSupport{
+			mode: virtualMetricDimUnsupported,
+		}
 	}
 
 	if strings.Contains(transform, "transformEntitySensorValue") {
-		return virtualMetricDimSupport{mode: virtualMetricDimDynamic}
+		return virtualMetricDimSupport{
+			mode: virtualMetricDimDynamic,
+		}
 	}
 
 	if !strings.Contains(transform, "setMultivalue") {
-		return virtualMetricDimSupport{mode: virtualMetricDimUnsupported}
+		return virtualMetricDimSupport{
+			mode: virtualMetricDimUnsupported,
+		}
 	}
 
 	dims := extractTransformMultiValueDims(transform)
 	if len(dims) == 0 {
-		return virtualMetricDimSupport{mode: virtualMetricDimDynamic}
+		return virtualMetricDimSupport{
+			mode: virtualMetricDimDynamic,
+		}
 	}
 
-	return virtualMetricDimSupport{mode: virtualMetricDimKnown, dims: dims}
+	return virtualMetricDimSupport{
+		mode: virtualMetricDimKnown,
+		dims: dims,
+	}
 }
 
-func mergeVirtualMetricDimSupport(mappingSupport, transformSupport virtualMetricDimSupport) virtualMetricDimSupport {
-	if transformSupport.mode == virtualMetricDimDynamic {
-		return transformSupport
-	}
-
-	if transformSupport.mode == virtualMetricDimKnown {
-		if mappingSupport.mode == virtualMetricDimKnown {
-			dims := make(map[string]bool, len(mappingSupport.dims)+len(transformSupport.dims))
-			for dim := range mappingSupport.dims {
-				dims[dim] = true
-			}
-			for dim := range transformSupport.dims {
-				dims[dim] = true
-			}
-			return virtualMetricDimSupport{mode: virtualMetricDimKnown, dims: dims}
+// mergeVirtualMetricDimSupport unions capabilities into the accumulator's owned map.
+func mergeVirtualMetricDimSupport(left, right virtualMetricDimSupport) virtualMetricDimSupport {
+	if left.mode == virtualMetricDimDynamic || right.mode == virtualMetricDimDynamic {
+		return virtualMetricDimSupport{
+			mode: virtualMetricDimDynamic,
 		}
-		return transformSupport
 	}
-
-	return mappingSupport
+	if left.mode != virtualMetricDimKnown {
+		return right
+	}
+	if right.mode == virtualMetricDimKnown {
+		maps.Copy(left.dims, right.dims)
+	}
+	return left
 }
 
 func extractTransformMultiValueDims(transform string) map[string]bool {

@@ -1,12 +1,31 @@
-//! Build an SFST index file from ng-flatten output — the augment-SFST path.
+//! Build SFST index data from ng-flatten WAL frames — the producer side of the
+//! SFST build. [`sfst::RowIndex`] is Phase 1 (in-memory accumulation; see
+//! `sfst::row_index`), [`sfst::IndexWriter`] is Phase 2 (tiering, time-sort,
+//! FST build, chunk packing), so this file owns only the extract-and-fill step.
 //!
-//! Streams the flattened WAL, stringifies each typed entry into a `key=value`
-//! pair (collapsed-array paths like `tags[]`, typed values rendered to strings),
-//! and feeds an [`sfst::RowIndex`] (interning via its `lookup_hash`/`intern`
-//! fast path, one `row` per record) in a single pass, then writes a standard
-//! SFST file via [`sfst::IndexWriter`]. This reuses SFST's proven build/query
-//! machinery while the keys/values now come from the typed, array-collapsed
-//! flattening.
+//! One pass over the WAL per signal: decode each frame, render every typed
+//! entry to its `key=value` string (collapsed-array paths like `tags[]`, values
+//! rendered to strings), intern through the precomputed-hash fast path, feed
+//! one row per record, and attach the per-row columns + typed schema tree. The
+//! signals share the skeleton but differ in what a record is:
+//!
+//! - **logs** (`populate_row_index`): one row per log record; per-row columns
+//!   `observed_ts`/`trace_id`/`span_id`/`flags`/`dropped_attributes_count`
+//!   (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`); no trace-id index (log trace ids
+//!   are correlation ids, not a grouping key).
+//! - **traces** (`populate_trace_row_index`): one row per span; adds
+//!   `parent_span_id`/`duration` (`PSPN`/`DURN`), the event/link structures
+//!   (`EVNB`/`LNKB`), the per-file trace rollup (`TRSU`), and the `TIDX`
+//!   index + `TBLM` bloom over the chronological trace ids.
+//!
+//! Entry points: file builds — [`build_sfst`] (logs, from a WAL directory) and
+//! [`build_sfst_file`] / [`build_sfst_traces_file`] (from one WAL path; the
+//! `otel-ledger` seal) — and in-memory range builds [`build_sfst_range`] /
+//! [`build_sfst_traces_range`] (the on-query chunk over an active WAL's
+//! durable prefix). Both builds of a signal share one populate fn, so chunk
+//! bytes match a file build over the same frames. Also [`to_sfst_tree`], the
+//! canonical ng-flatten→sfst schema-tree conversion (the `sfsq` tail scan
+//! reuses it). Consumers: `otel-ledger`, `sfsq`, this crate's binaries.
 
 use std::path::Path;
 
@@ -41,11 +60,12 @@ fn to_value_kind(kind: ng_flatten::Kind) -> sfst::ValueKind {
 }
 
 /// Convert a flatten [`ng_flatten::SchemaTree`] into the format crate's
-/// [`sfst::SchemaTree`] node-by-node (ids are preserved, parents precede
+/// [`sfst::SchemaTree`] node-by-node (ids preserved, parents precede
 /// children). Leaf stats are left unset here — the SFST build fills them from
 /// the per-field cardinality/tier. Public as the CANONICAL boundary
-/// conversion: the sfsq traces tail scan derives its field→kind map through
-/// this exact converter, so tail and sealed kinds agree by construction.
+/// conversion: the `sfsq` traces tail scan derives its field→kind map through
+/// this exact converter (`sfsq::traces::wal_scan`), so tail and sealed kinds
+/// agree by construction.
 pub fn to_sfst_tree(tree: &ng_flatten::SchemaTree) -> sfst::SchemaTree {
     let nodes = (0..tree.len() as NodeId)
         .map(|id| sfst::SchemaNode {
@@ -79,11 +99,9 @@ pub struct SfstStats {
     pub misses: u64,
 }
 
-/// Intern a slice of entries into tokens. The `key=value` is always rendered so a
-/// `lookup_hash` hit can be verified against the interned string (guarding against a
-/// hash collision aliasing distinct strings); a verified hit skips the intern-map
-/// insert. Computed once per resource/scope group and reused across its records, so
-/// shared attrs aren't re-probed per record.
+/// Intern one entry, returning its slot. The `key=value` is always rendered so
+/// a `lookup_hash` hit can be verified against the interned string (see the
+/// body for why); a verified hit skips the intern-map insert.
 fn intern_one(
     row_index: &mut RowIndex<'_>,
     e: &Entry,
@@ -91,12 +109,12 @@ fn intern_one(
     kv: &mut String,
     stats: &mut SfstStats,
 ) -> KvSlot {
-    // Render key=value up front so a hash hit can be *verified* against the
-    // interned string. Without this re-check, two distinct strings sharing a
-    // hash (a genuine xxhash64 collision, or an unfilled hash==0) would alias:
-    // `lookup_hash` returns the first string's slot with no string check, and
-    // the interner's collision overflow — populated only inside `intern` — is
-    // never reached, because a fast-path hit skips `intern` entirely.
+    // `lookup_hash` answers from the hash alone. When a second, distinct
+    // string with the same hash arrives, the interner has not recorded the
+    // collision yet (its overflow map fills only inside `intern`), so the hit
+    // still names the first string's slot; the string re-check detects that,
+    // and the fallback `intern` stores the string AND records the collision,
+    // poisoning the hash so later lookups of it take the string-comparing path.
     build_kv(&paths[e.node as usize], &e.value, kv);
     let hit = row_index.lookup_hash(e.hash);
     match hit {
@@ -131,6 +149,9 @@ fn intern_entries_into(
     }
 }
 
+/// The allocating form of `intern_entries_into`: interns `entries` into a
+/// fresh `Vec`. Used for the resource/scope/record entry groups; the resource
+/// and scope results are reused across their records.
 fn intern_entries(
     row_index: &mut RowIndex<'_>,
     entries: &[Entry],
@@ -156,21 +177,19 @@ fn populate_row_index(
     check_payload_format(reader, ng_flatten::LOG_FRAME_PAYLOAD_FORMAT)?;
     let mut stats = SfstStats::default();
     let mut kv = String::new();
-    // Accumulates the global typed schema tree by interning every frame's
-    // per-frame tree. Persisted as the on-disk field descriptor (`Metadata.tree`).
-    // The interner feed still renders `key=value` via the per-frame paths (the
-    // rendered string is identical), so this is build-only — the returned
-    // local→global map is unused.
+    // Accumulates the global typed schema tree across frames; attached as the
+    // on-disk field descriptor (`Metadata.tree`) at the end. Interning still
+    // renders `key=value` from the per-frame paths (identical strings), so
+    // merge_tree's local→global map is unused here.
     let mut flattener = ng_flatten::Flattener::new();
 
-    // Per-row columns accumulated in insertion order, parallel to the rows fed to
-    // `row_index.row(...)`. Stored as the optional SFST column chunks
-    // (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`), not facets: identifiers/scalars retrieved
-    // per row, not FST-indexed. trace_id/span_id are no longer flattened as entries
-    // (see `ng_flatten::flatten_record`), so they never reach the interner — they live
-    // only here. The ingest boundary already validated id lengths (16/8 or empty);
-    // the push sites map each raw id to a typed `TraceId`/`SpanId` (empty/malformed
-    // → the all-zero `UNSET`) — the arenas store exactly-width typed values.
+    // Per-row columns accumulated in insertion order, parallel to the rows fed
+    // to `row_index.row(...)`. Stored as the optional SFST column chunks
+    // (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`), not FST facets. trace_id/span_id
+    // are never interned — columns only (see `ng_flatten::flatten_record`).
+    // The ingest boundary validated id lengths (16/8 or empty); the pushes
+    // below map each raw id to the typed `TraceId`/`SpanId` (empty/malformed
+    // → the all-zero `UNSET`).
     let mut observed_ts: Vec<i64> = Vec::new();
     let mut trace_ids = TraceIds::default();
     let mut span_ids = SpanIds::default();
@@ -257,11 +276,11 @@ fn populate_row_index(
     // builder fills each leaf's cardinality/tier from the per-field stats.
     row_index.tree = Some(to_sfst_tree(&flattener.into_tree()));
 
-    // Hand the accumulated per-row columns to the builder, which reorders each to
-    // chronological order and writes its column chunk. This pipeline supplies all
-    // five (each accumulated one value per row, so lengths equal the row count and
-    // align with the rows fed to `row.row(...)`); the columns are independently
-    // optional at the format level (see `RowIndex`), this caller just fills them all.
+    // Hand the accumulated per-row columns to the builder: Phase 2 reorders
+    // each present column to chronological order and writes its chunk. This
+    // pipeline supplies all five, one value per row (so lengths equal the row
+    // count and align with the rows fed to `row_index.row(...)`); the columns
+    // are independently optional at the format level — this caller fills them all.
     row_index.observed_timestamps = Some(ObservedTimestamps(observed_ts));
     row_index.trace_ids = Some(trace_ids);
     row_index.span_ids = Some(span_ids);
@@ -282,8 +301,9 @@ fn check_payload_format(reader: &wal::Reader, expected: u16) -> Result<(), Error
     Ok(())
 }
 
-/// Build an SFST index file at `out_path` from the flattened WAL in `flat_dir`.
-/// Single pass; phases timed: `read` / `deserialize` / `index` / `build`.
+/// Build an SFST index file at `out_path` from the flattened **logs** WAL in
+/// `flat_dir` (the `ng-index` binary's entry point). Single pass; phases
+/// timed: `read` / `deserialize` / `index` / `build`.
 pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result<SfstStats, Error> {
     let path = sole_wal_file(flat_dir)?;
     let mut reader = wal::Reader::open(&path)?;
@@ -363,7 +383,7 @@ pub fn build_sfst_traces_range(
     Ok((summary, cursor.into_inner()))
 }
 
-/// The traces analog of [`populate_row_index`]: decode `FlattenedTraceRequest` frames,
+/// The traces analog of `populate_row_index`: decode `FlattenedTraceRequest` frames,
 /// intern each span's entries (resource ++ scope ++ span), feed one row per span keyed
 /// on the span's start `ts`, and accumulate the span per-row columns — `trace_id`,
 /// `span_id`, `parent_span_id`, `duration`, `flags`, `dropped_attributes_count`. There
@@ -381,9 +401,9 @@ fn populate_trace_row_index(
     let mut kv = String::new();
     let mut flattener = ng_flatten::Flattener::new();
 
-    // The producer-side storage keys the rollup captures by (this crate
-    // family DEFINES the storage paths via the flattener; the sfsq
-    // vocabulary mirrors them — a downstream lockstep test keeps both
+    // The producer-side storage keys the rollup captures by: this crate family
+    // defines them via the flattener, and sfsq's query vocabulary mirrors them
+    // (the tail/seal parity test `sfsq/tests/traces_rollup_tail.rs` keeps both
     // honest).
     const ROLLUP_SERVICE_KEY: &str = "resource.attributes.service.name";
     const ROLLUP_NAME_KEY: &str = "name";
@@ -524,28 +544,27 @@ fn populate_trace_row_index(
                     // ts = start_time, normalized at ingest (always concrete).
                     row_index.row(span.ts, &tokens);
 
-                    // Per-row pushes AFTER row(): the row and every parallel
-                    // per-row structure advance atomically at the bottom of the
-                    // iteration (same discipline as the column Vecs below), so
-                    // no early exit can leave the accumulators misaligned.
+                    // Per-row advances share one iteration — row() above,
+                    // then events/links end_row here, the rollup fold and
+                    // column pushes below — so every parallel structure
+                    // advances exactly once per span and stays aligned.
                     events.end_row(span.dropped_events_count);
                     links.end_row(span.dropped_links_count);
 
                     // The trace rollup folds this span: name/raw-kind/status
                     // captured by storage key from the just-interned span
                     // entries (tokens[base + j] is span.entries[j]'s slot).
-                    // FIRST entry wins per facet — the same value every
-                    // evaluation path reads (span_field / the tail fold /
-                    // canonical materialization all take the first), so
-                    // a crafted multi-valued frame cannot make the
-                    // recorded facets diverge from the evaluated ones.
-                    // Precisely: `name` locks on the first entry, `kind`
-                    // on the first Int-valued entry, `status` on the
-                    // first entry of any type — the flattener emits
+                    // FIRST matching entry wins per facet — every evaluation
+                    // path (span_field / the tail fold / canonical
+                    // materialization) takes the first, so a crafted
+                    // multi-valued frame cannot make the recorded facets
+                    // diverge from the evaluated ones. `name` locks on the
+                    // first entry, `kind` on the first Int-valued one,
+                    // `status` on the first of any type; the finer nuances
+                    // are unreachable from ingest because the flattener emits
                     // `_kind` only as Int and `status_code` only as Str
-                    // (ng-flatten common.rs), so the per-facet nuances
-                    // are unreachable from the ingest path.
-                    // Honest OTLP spans carry each of these exactly once.
+                    // (ng-flatten common.rs). Honest OTLP spans carry each of
+                    // these exactly once.
                     {
                         let base = resource_tokens.len() + scope_tokens.len();
                         let mut name_slot = None;
@@ -697,7 +716,7 @@ mod tests {
     /// `to_sfst_tree` preserves node ids and structure, so the format crate's
     /// `path()` must render every node identically to `ng_flatten`'s. This pins
     /// the two duplicated renderers against a divergence that would silently
-    /// drop a field from the reader's derived field table (review finding D).
+    /// drop a field from the reader's derived field table.
     #[test]
     fn sfst_and_ng_flatten_path_renderers_agree() {
         let (flattened, _) = flatten_log_request(nested_request());

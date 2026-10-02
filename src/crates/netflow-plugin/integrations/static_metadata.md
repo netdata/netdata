@@ -298,7 +298,11 @@ enrichment:
 
 
 
-### A more-specific entry inherits the wrong field from its supernet
+## Troubleshooting
+
+### Other Problems
+
+#### A more-specific entry inherits the wrong field from its supernet
 
 `enrichment.networks` merges containing prefixes from least-specific to
 most-specific. Leaving a field blank on a `/24` does **not** clear the `/16`'s value
@@ -307,12 +311,12 @@ entry to overwrite. The same merge rule applies to entries from
 `network_sources`, which interleave at the same prefix lengths.
 
 
-### GeoIP returns spurious data for an internal range
+#### GeoIP returns spurious data for an internal range
 
 Declare an `enrichment.networks` entry for the range to override the GeoIP layer at the merge step -- see [Private and non-routable IPs](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md#private-and-non-routable-ips) for why GeoIP is unreliable for RFC1918 / RFC6598 / link-local ranges and how the override works.
 
 
-### ifIndex changed after a hardware swap
+#### ifIndex changed after a hardware swap
 
 `if_indexes` keys are the numeric ifIndex sent in the flow record. A
 line-card reseat or stack rebuild can renumber the interfaces; the old
@@ -320,14 +324,14 @@ ifIndex no longer matches and the per-interface block silently no longer
 applies. Audit after hardware changes.
 
 
-### speed shows up wrong by a factor of 1000
+#### speed shows up wrong by a factor of 1000
 
 `speed:` is in **bits per second**. `speed: 1000` means 1 kbps, not
 1 Mbps. A 1 Gbps interface is `1000000000`. `speed: 0` means "not set"
 and removes the field from the output.
 
 
-### An interface block silently no longer applies
+#### An interface block silently no longer applies
 
 When the configured ifIndex is not present in the flow record, the
 `default` block is used instead -- unless `skip_missing_interfaces: true`
@@ -335,14 +339,14 @@ is set, in which case no interface labels are written at all. If you expected yo
 router is sending a different ifIndex.
 
 
-### Coordinates dropped silently
+#### Coordinates dropped silently
 
 Out-of-range latitude / longitude (`latitude: 91.5`) and non-finite
 values become empty strings without an error. The map quietly stops drawing the marker. Validate input externally if
 the data matters.
 
 
-### Static labels block the classifiers
+#### Static labels block the classifiers
 
 When static metadata sets **any** of `group`, `role`, `site`, `region`,
 `tenant` for an exporter, the `exporter_classifiers` rule chain does not
@@ -353,7 +357,7 @@ you want classifiers to run on top of static metadata, drop the static
 fields they are supposed to set.
 
 
-### A typo fails config load
+#### A typo fails config load
 
 The schema is `deny_unknown_fields` at every level. A typo such as
 `if_index` (the canonical key is `if_indexes`; aliases `ifindexes`,
@@ -361,7 +365,7 @@ The schema is `deny_unknown_fields` at every level. A typo such as
 start with a YAML parse error rather than being silently ignored.
 
 
-### Sampling override looks ignored
+#### Sampling override looks ignored
 
 `override_sampling_rate` always wins when its prefix matches; if the
 field still looks unset, check that the **exporter IP** -- not the
@@ -370,7 +374,7 @@ flow's source / destination IP -- falls under the configured prefix.
 carry a rate.
 
 
-### Changes do not take effect
+#### Changes do not take effect
 
 Static metadata is loaded at plugin startup and there is no file-change
 watcher. Restart the plugin (or the agent) after editing

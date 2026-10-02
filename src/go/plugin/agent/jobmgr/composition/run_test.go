@@ -20,12 +20,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,6 +44,7 @@ func TestRunGenerationPublishesPerJobTemplatesInModuleOrder(t *testing.T) {
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets:         testRunSecrets(t),
 		Generation:      7,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -88,6 +89,7 @@ func TestRunGenerationQuarantinesUnpublishableDiscoveredConfigAndContinues(t *te
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets:         testRunSecrets(t),
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -160,6 +162,7 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(t *testing.T) 
 				},
 			}
 			jobs := testRunJobServices(t)
+			secretConfig := testRunSecrets(t)
 			jobs.Defaults = confgroup.Registry{
 				"module": {UpdateEvery: 1},
 			}
@@ -169,6 +172,7 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(t *testing.T) 
 			require.NoError(t, err)
 			uids := lifecycle.NewUIDLedger()
 			generation, err := newTestRunGeneration(t, runGenerationConfig{
+				Secrets:         secretConfig,
 				Generation:      1,
 				ShutdownTimeout: 10 * time.Second,
 				UIDs:            uids,
@@ -202,87 +206,90 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(t *testing.T) 
 }
 
 func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
-	var eventsMu sync.Mutex
-	var events []string
-	record := func(event string) {
-		eventsMu.Lock()
-		events = append(events, event)
-		eventsMu.Unlock()
-	}
-	var output bytes.Buffer
-	frames, err := lifecycle.NewFrameOwner(runRecordingWriter{
-		target: &output,
-		record: func(payload []byte) {
-			switch {
-			case bytes.HasPrefix(payload, []byte("FUNCTION GLOBAL")) &&
-				bytes.Contains(payload, []byte(`"module:method"`)):
-				record("publish")
-			case bytes.HasPrefix(payload, []byte("FUNCTION_DEL")) &&
-				bytes.Contains(payload, []byte(`"module:method"`)):
-				record("withdraw")
-			case bytes.HasPrefix(payload, []byte("FUNCTION_RESULT_BEGIN")):
-				record("result")
-			}
-		},
-	})
-	require.NoError(t, err)
-	modules := collectorapi.Registry{
-		"module": {
-			AgentFunctions: func() []funcapi.FunctionConfig {
-				return []funcapi.FunctionConfig{{ID: "method"}}
-			},
-			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-				return &runTestHandler{
-					cleanup: func() { record("cleanup") },
+	withSecretsModes(t, func(t *testing.T, secretConfig *SecretsConfig) {
+		var eventsMu sync.Mutex
+		var events []string
+		record := func(event string) {
+			eventsMu.Lock()
+			events = append(events, event)
+			eventsMu.Unlock()
+		}
+		var output bytes.Buffer
+		frames, err := lifecycle.NewFrameOwner(runRecordingWriter{
+			target: &output,
+			record: func(payload []byte) {
+				switch {
+				case bytes.HasPrefix(payload, []byte("FUNCTION GLOBAL")) &&
+					bytes.Contains(payload, []byte(`"module:method"`)):
+					record("publish")
+				case bytes.HasPrefix(payload, []byte("FUNCTION_DEL")) &&
+					bytes.Contains(payload, []byte(`"module:method"`)):
+					record("withdraw")
+				case bytes.HasPrefix(payload, []byte("FUNCTION_RESULT_BEGIN")):
+					record("result")
 				}
 			},
-		},
-	}
-	uids := lifecycle.NewUIDLedger()
-	generation, err := newTestRunGeneration(t, runGenerationConfig{
-		Generation:      1,
-		ShutdownTimeout: time.Second,
-		UIDs:            uids,
-		Frames:          frames,
-		Modules:         modules,
-		Jobs:            testRunJobServices(t),
-		Discovery:       testRunDiscoveryServices(t),
+		})
+		require.NoError(t, err)
+		modules := collectorapi.Registry{
+			"module": {
+				AgentFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{ID: "method"}}
+				},
+				MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+					return &runTestHandler{
+						cleanup: func() { record("cleanup") },
+					}
+				},
+			},
+		}
+		uids := lifecycle.NewUIDLedger()
+		generation, err := newTestRunGeneration(t, runGenerationConfig{
+			Secrets:         secretConfig,
+			Generation:      1,
+			ShutdownTimeout: time.Second,
+			UIDs:            uids,
+			Frames:          frames,
+			Modules:         modules,
+			Jobs:            testRunJobServices(t),
+			Discovery:       testRunDiscoveryServices(t),
+		})
+		require.NoError(t, err)
+
+		require.NoError(t, generation.start(context.Background()))
+
+		require.NoError(t, generation.kernel.Submit(context.Background(), jobmgr.Request{
+			UID:    "function-flow",
+			Source: lifecycle.SourceFunction,
+			Route:  "module:method",
+		}),
+		)
+		require.Eventually(t, func() bool {
+			eventsMu.Lock()
+			defer eventsMu.Unlock()
+			return slices.Contains(events, "result")
+		}, time.Second, time.Millisecond)
+
+		generation.Stop()
+
+		require.NoError(t, generation.Wait(context.Background()))
+
+		want := []string{"publish", "result", "withdraw", "cleanup"}
+		require.Eventually(t, func() bool {
+			eventsMu.Lock()
+			defer eventsMu.Unlock()
+			return len(events) == len(want)
+		}, time.Second, time.Millisecond)
+		eventsMu.Lock()
+		got := append([]string(nil), events...)
+		eventsMu.Unlock()
+		require.EqualValues(t, len(want), len(got))
+		for index := range want {
+			require.EqualValues(t, want[index], got[index])
+		}
+
+		closeRunTestUIDs(t, uids)
 	})
-	require.NoError(t, err)
-
-	require.NoError(t, generation.start(context.Background()))
-
-	require.NoError(t, generation.kernel.Submit(context.Background(), jobmgr.Request{
-		UID:    "function-flow",
-		Source: lifecycle.SourceFunction,
-		Route:  "module:method",
-	}),
-	)
-	require.Eventually(t, func() bool {
-		eventsMu.Lock()
-		defer eventsMu.Unlock()
-		return slices.Contains(events, "result")
-	}, time.Second, time.Millisecond)
-
-	generation.Stop()
-
-	require.NoError(t, generation.Wait(context.Background()))
-
-	want := []string{"publish", "result", "withdraw", "cleanup"}
-	require.Eventually(t, func() bool {
-		eventsMu.Lock()
-		defer eventsMu.Unlock()
-		return len(events) == len(want)
-	}, time.Second, time.Millisecond)
-	eventsMu.Lock()
-	got := append([]string(nil), events...)
-	eventsMu.Unlock()
-	require.EqualValues(t, len(want), len(got))
-	for index := range want {
-		require.EqualValues(t, want[index], got[index])
-	}
-
-	closeRunTestUIDs(t, uids)
 }
 
 func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *testing.T) {
@@ -320,6 +327,7 @@ func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("test")
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
@@ -329,6 +337,7 @@ func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets:         secretConfig,
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -411,7 +420,9 @@ func TestRunGenerationAcceptedEnableDoesNotBlockDisableBehindNonCooperativeCheck
 				return []funcapi.FunctionConfig{{ID: "method"}}
 			},
 			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-				return &runTestHandler{cleanup: func() {}}
+				return &runTestHandler{
+					cleanup: func() {},
+				}
 			},
 			JobConfigSchema: collectorapi.MockConfigSchema,
 		},
@@ -426,6 +437,7 @@ func TestRunGenerationAcceptedEnableDoesNotBlockDisableBehindNonCooperativeCheck
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("test")
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
@@ -435,6 +447,7 @@ func TestRunGenerationAcceptedEnableDoesNotBlockDisableBehindNonCooperativeCheck
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets:         secretConfig,
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -559,6 +572,7 @@ func TestRunGenerationAcceptedEnablePublishesLateProbeFailure(t *testing.T) {
 			config.SetSourceType(test.sourceType)
 			config.SetSource("test")
 			jobs := testRunJobServices(t)
+			secretConfig := testRunSecrets(t)
 			jobs.Defaults = confgroup.Registry{
 				"module": {UpdateEvery: 1},
 			}
@@ -568,6 +582,7 @@ func TestRunGenerationAcceptedEnablePublishesLateProbeFailure(t *testing.T) {
 			require.NoError(t, err)
 			uids := lifecycle.NewUIDLedger()
 			generation, err := newTestRunGeneration(t, runGenerationConfig{
+				Secrets:         secretConfig,
 				Generation:      1,
 				ShutdownTimeout: time.Second,
 				UIDs:            uids,
@@ -678,6 +693,7 @@ func TestRunGenerationShutdownRejectsInFlightJobProbeBeforePublication(t *testin
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("test")
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
@@ -687,6 +703,7 @@ func TestRunGenerationShutdownRejectsInFlightJobProbeBeforePublication(t *testin
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets:         secretConfig,
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -764,16 +781,16 @@ func newTestRunGeneration(
 	config runGenerationConfig,
 ) (*runGeneration, error) {
 	t.Helper()
-	store, err := secretstore.NewSecretStore(config.Jobs.Resolver)
-	if err != nil {
-		return nil, err
+	var err error
+	var epoch *processSecretEpoch
+	if config.Secrets != nil {
+		store, err := secretstore.NewSecretStore(config.Secrets.Providers.Resolver)
+		if err != nil {
+			return nil, err
+		}
+		epoch = &processSecretEpoch{generation: config.Generation, store: store, diagnostics: config.Diagnostics}
+		config.SecretEpoch = epoch
 	}
-	epoch := &processSecretEpoch{
-		generation:  config.Generation,
-		store:       store,
-		diagnostics: config.Diagnostics,
-	}
-	config.SecretEpoch = epoch
 	ownsAttempts := config.Attempts == nil
 	if ownsAttempts {
 		config.Attempts, err = containment.NewAuthority(config.Diagnostics)
@@ -794,6 +811,9 @@ func newTestRunGeneration(
 			defer cancel()
 			require.NoError(t, config.Attempts.Shutdown(shutdownCtx))
 		}
+		if epoch == nil {
+			return
+		}
 		require.NoError(t, epoch.seal())
 		select {
 		case <-epoch.done():
@@ -806,17 +826,16 @@ func newTestRunGeneration(
 
 func testRunJobServices(t testing.TB) runJobServices {
 	t.Helper()
+	return runJobServices{PluginName: "go.d", Defaults: confgroup.Registry{}}
+}
+
+func testRunSecrets(t testing.TB) *SecretsConfig {
+	t.Helper()
 	resolver, err := secretresolver.NewAtomicResolver(nil)
 	require.NoError(t, err)
 	creators, err := secretstore.NewCreatorCatalog(nil)
 	require.NoError(t, err)
-	return runJobServices{
-		PluginName:    "go.d",
-		Defaults:      confgroup.Registry{},
-		Resolver:      resolver,
-		StoreCreators: creators,
-		Vnodes:        vnoderegistry.New(),
-	}
+	return &SecretsConfig{Providers: secretconfig.Config{Resolver: resolver, Creators: creators}}
 }
 
 func testRunDiscoveryServices(t testing.TB, configs ...confgroup.Config) runDiscoveryServices {

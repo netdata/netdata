@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
+
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/stretchr/testify/require"
 )
@@ -109,7 +111,7 @@ func (job *schedulerTestJob) ModuleName() string { return job.module }
 func (job *schedulerTestJob) Name() string       { return job.id }
 func (*schedulerTestJob) IsRunning() bool        { return true }
 func (job *schedulerTestJob) Collector() any     { return job }
-func (*schedulerTestJob) StartManaged(chan<- struct{}) {
+func (*schedulerTestJob) StartManaged(*jobruntime.ManagedRun) {
 }
 func (*schedulerTestJob) Stop()    {}
 func (*schedulerTestJob) Cleanup() {}

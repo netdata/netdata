@@ -14,6 +14,8 @@ type CachestatRuntime struct{}
 
 type DCStatRuntime struct{}
 
+type FDRuntime struct{}
+
 type SocketRuntime struct{}
 
 func OpenObject(path string) (*Object, error) {
@@ -159,6 +161,60 @@ func (r *DCStatRuntime) DeletePids(pids []uint32) error {
 }
 
 func (r *DCStatRuntime) Close() {
+	// No-op in the disabled build because the runtime never acquired native resources.
+}
+
+// FDSupportsCore mirrors the libbpf build's probe; without libbpf there are no
+// fd CO-RE skeletons compiled in.
+func FDSupportsCore() bool {
+	return false
+}
+
+func NewFDRuntime(path string, useCore bool, customBTFPath string) (*FDRuntime, error) {
+	_ = customBTFPath
+	return newDisabledRuntime[FDRuntime](path, useCore)
+}
+
+func (r *FDRuntime) Prepare(pidTableSize uint32, mapsPerCore bool) error {
+	_, _ = pidTableSize, mapsPerCore
+	return ErrDisabled
+}
+
+func (r *FDRuntime) Load() error {
+	return ErrDisabled
+}
+
+func (r *FDRuntime) Attach(openTarget, closeTarget string) error {
+	_, _ = openTarget, closeTarget
+	return ErrDisabled
+}
+
+func (r *FDRuntime) UpdateController(appsEnabled bool, appsLevel int) error {
+	_, _ = appsEnabled, appsLevel
+	return ErrDisabled
+}
+
+func (r *FDRuntime) Snapshot(mapsPerCore bool) (FDSnapshot, error) {
+	_ = mapsPerCore
+	return FDSnapshot{}, ErrDisabled
+}
+
+func (r *FDRuntime) SnapshotApps(mapsPerCore bool) ([]FDAppSnapshot, error) {
+	_ = mapsPerCore
+	return nil, ErrDisabled
+}
+
+func (r *FDRuntime) DeletePid(pid uint32) error {
+	_ = pid
+	return ErrDisabled
+}
+
+func (r *FDRuntime) DeletePids(pids []uint32) error {
+	_ = pids
+	return ErrDisabled
+}
+
+func (r *FDRuntime) Close() {
 	// No-op in the disabled build because the runtime never acquired native resources.
 }
 

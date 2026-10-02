@@ -18,6 +18,9 @@
 #include "../nd_alloc_shim.h"
 #include "nd_ebpf_runtime_common.h"
 
+#if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
+#define NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED 1
+#endif
 
 #if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1) && defined(__has_include) && __has_include(<linux/btf.h>)
 /*
@@ -64,6 +67,7 @@ struct netdata_ebpf_cachestat_runtime {
     int flavor;
     struct bpf_object *obj;
     struct bpf_link **links;
+    const char *program_names[4];
     /* Persistent per-CPU work buffers — allocated once in prepare(), reused on
      * every snapshot call to eliminate per-cycle malloc/free overhead. */
     uint64_t *percpu_u64;               /* global snapshot: ncpus × uint64     */
@@ -74,12 +78,19 @@ struct netdata_ebpf_cachestat_runtime {
      * the runtime, freed in close().  Callers must not free out->items. */
     struct netdata_ebpf_cachestat_pid_snapshot *items_buf;
     size_t items_cap;
+    /* (map key -> TGID) pairs from the last apps snapshot.  Eviction needs
+     * them because the snapshot reports TGIDs while the map is keyed by
+     * something else entirely — see struct nd_ebpf_key_tgid. */
+    struct nd_ebpf_key_table pid_keys;
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     union {
         struct cachestat_bpf *base;
         struct cachestat_buffer_bpf *buffer;
         struct cachestat_arena_bpf *arena;
     } core;
+#endif
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
+    struct nd_ebpf_raw_arena *raw_arena;
     /* Event consumer and per-TGID accumulator (buffer and arena flavors).
      * These flavors emit ring buffer / arena events rather than writing
      * directly to cstat_pid, so per-app counters are accumulated here. */
@@ -118,102 +129,83 @@ ND_EBPF_ASSERT_PID_FIRST(struct netdata_ebpf_cachestat_pid_snapshot);
 int netdata_cachestat_runtime_supports_core(void);
 
 
-static const char *cachestat_account_program_name(const char *account_function, int flavor)
+static bool cachestat_prefer_buffer_programs(int flavor)
 {
-#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
-    if (flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA) {
-        if (!strcmp(account_function, "__folio_mark_dirty"))
-            return "netdata_folio_mark_dirty_buffer";
-        if (!strcmp(account_function, "__set_page_dirty"))
-            return "netdata_set_page_dirty_buffer";
-        return "netdata_account_page_dirtied_buffer";
-    }
-
-    if (!strcmp(account_function, "__folio_mark_dirty"))
-        return "netdata_folio_mark_dirty_kprobe";
-    if (!strcmp(account_function, "__set_page_dirty"))
-        return "netdata_set_page_dirty_kprobe";
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
+    return flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA;
 #else
-    (void)account_function;
     (void)flavor;
+    return false;
 #endif
-    return "netdata_account_page_dirtied_kprobe";
 }
 
-static const char *cachestat_data_program_name(const char *event_name, int flavor)
+static const char *cachestat_resolve_account_program(
+    struct bpf_object *obj, const char *account_function, bool prefer_buffer)
 {
-#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
-    if (flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA) {
-        if (!strcmp(event_name, "add_to_page_cache_lru"))
-            return "netdata_add_to_page_cache_lru_buffer";
-        if (!strcmp(event_name, "mark_page_accessed"))
-            return "netdata_mark_page_accessed_buffer";
-        if (!strcmp(event_name, "mark_buffer_dirty"))
-            return "netdata_mark_buffer_dirty_buffer";
-    } else {
-        if (!strcmp(event_name, "add_to_page_cache_lru"))
-            return "netdata_add_to_page_cache_lru_kprobe";
-        if (!strcmp(event_name, "mark_page_accessed"))
-            return "netdata_mark_page_accessed_kprobe";
-        if (!strcmp(event_name, "mark_buffer_dirty"))
-            return "netdata_mark_buffer_dirty_kprobe";
-    }
-#else
-    (void)event_name;
-    (void)flavor;
-#endif
+    static const char *const folio[] = {
+        "netdata_folio_mark_dirty_kprobe", "netdata_folio_mark_dirty_buffer",
+        "netdata_set_page_dirty_kprobe", "netdata_set_page_dirty_buffer",
+        "netdata_set_page_dirty", "netdata_account_page_dirtied_kprobe",
+        "netdata_account_page_dirtied_buffer", "netdata_account_page_dirtied",
+    };
+    static const char *const set_page[] = {
+        "netdata_set_page_dirty_kprobe", "netdata_set_page_dirty_buffer", "netdata_set_page_dirty",
+        "netdata_folio_mark_dirty_kprobe", "netdata_folio_mark_dirty_buffer",
+        "netdata_account_page_dirtied_kprobe", "netdata_account_page_dirtied_buffer",
+        "netdata_account_page_dirtied",
+    };
+    static const char *const account[] = {
+        "netdata_account_page_dirtied_kprobe", "netdata_account_page_dirtied_buffer",
+        "netdata_account_page_dirtied", "netdata_set_page_dirty_kprobe",
+        "netdata_set_page_dirty_buffer", "netdata_set_page_dirty",
+        "netdata_folio_mark_dirty_kprobe", "netdata_folio_mark_dirty_buffer",
+    };
+
+    if (!account_function || !strcmp(account_function, "account_page_dirtied"))
+        return nd_ebpf_find_program_name_preferring_buffer(
+            obj, account, sizeof(account) / sizeof(account[0]), prefer_buffer);
+    if (!strcmp(account_function, "__set_page_dirty"))
+        return nd_ebpf_find_program_name_preferring_buffer(
+            obj, set_page, sizeof(set_page) / sizeof(set_page[0]), prefer_buffer);
+    if (!strcmp(account_function, "__folio_mark_dirty"))
+        return nd_ebpf_find_program_name_preferring_buffer(
+            obj, folio, sizeof(folio) / sizeof(folio[0]), prefer_buffer);
 
     return NULL;
 }
 
-static void cachestat_disable_program_if_present(struct bpf_object *obj, const char *name)
+static int cachestat_resolve_program_names(
+    struct bpf_object *obj, const char *account_function, int flavor, const char **names)
 {
-    struct bpf_program *prog = bpf_object__find_program_by_name(obj, name);
-    if (prog)
-        bpf_program__set_autoload(prog, false);
-}
-
-static void cachestat_disable_fentry_programs(struct bpf_object *obj)
-{
-    struct bpf_program *prog;
-    bpf_object__for_each_program(prog, obj)
-    {
-        const char *name = bpf_program__name(prog);
-        if (strstr(name, "_fentry"))
-            bpf_program__set_autoload(prog, false);
-    }
-}
-
-static void cachestat_prepare_autoload(struct bpf_object *obj, const char *account_function, int flavor)
-{
-    cachestat_disable_fentry_programs(obj);
-    cachestat_disable_program_if_present(obj, "netdata_folio_mark_dirty_kprobe");
-    cachestat_disable_program_if_present(obj, "netdata_set_page_dirty_kprobe");
-    cachestat_disable_program_if_present(obj, "netdata_account_page_dirtied_kprobe");
-#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
-    cachestat_disable_program_if_present(obj, "netdata_folio_mark_dirty_buffer");
-    cachestat_disable_program_if_present(obj, "netdata_set_page_dirty_buffer");
-    cachestat_disable_program_if_present(obj, "netdata_account_page_dirtied_buffer");
-#endif
-
-    if (!account_function)
-        account_function = "account_page_dirtied";
-
-    const char *program_names[] = {
-        cachestat_data_program_name("add_to_page_cache_lru", flavor),
-        cachestat_data_program_name("mark_page_accessed", flavor),
-        cachestat_account_program_name(account_function, flavor),
-        cachestat_data_program_name("mark_buffer_dirty", flavor),
+    static const char *const add[] = {
+        "netdata_add_to_page_cache_lru_kprobe", "netdata_add_to_page_cache_lru_buffer",
+        "netdata_add_to_page_cache_lru",
+    };
+    static const char *const access[] = {
+        "netdata_mark_page_accessed_kprobe", "netdata_mark_page_accessed_buffer",
+        "netdata_mark_page_accessed",
+    };
+    static const char *const dirty[] = {
+        "netdata_mark_buffer_dirty_kprobe", "netdata_mark_buffer_dirty_buffer",
+        "netdata_mark_buffer_dirty",
     };
 
-    for (size_t i = 0; i < sizeof(program_names) / sizeof(program_names[0]); i++) {
-        if (!program_names[i])
-            continue;
+    bool prefer_buffer = cachestat_prefer_buffer_programs(flavor);
+    names[0] = nd_ebpf_find_program_name_preferring_buffer(obj, add, sizeof(add) / sizeof(add[0]), prefer_buffer);
+    names[1] =
+        nd_ebpf_find_program_name_preferring_buffer(obj, access, sizeof(access) / sizeof(access[0]), prefer_buffer);
+    names[2] = cachestat_resolve_account_program(obj, account_function, prefer_buffer);
+    names[3] =
+        nd_ebpf_find_program_name_preferring_buffer(obj, dirty, sizeof(dirty) / sizeof(dirty[0]), prefer_buffer);
 
-        struct bpf_program *prog = bpf_object__find_program_by_name(obj, program_names[i]);
-        if (prog)
-            bpf_program__set_autoload(prog, true);
+    for (size_t i = 0; i < 4; i++) {
+        if (!names[i]) {
+            fprintf(stderr, "cachestat: object does not contain required probe %zu\n", i);
+            return -1;
+        }
     }
+
+    return 0;
 }
 
 static int cachestat_update_map_types(struct bpf_object *obj, int maps_per_core)
@@ -251,7 +243,6 @@ struct netdata_ebpf_cachestat_pid_entry {
     uint32_t mark_buffer_dirty;
 };
 
-#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
 static int cachestat_runtime_flavor_from_path(const char *path)
 {
     if (!path)
@@ -265,7 +256,6 @@ static int cachestat_runtime_flavor_from_path(const char *path)
 
     return NETDATA_CACHESTAT_RUNTIME_FLAVOR_BASE;
 }
-#endif
 
 static struct bpf_object *cachestat_runtime_object(struct netdata_ebpf_cachestat_runtime *rt)
 {
@@ -339,16 +329,16 @@ struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const
         return NULL;
     }
 
-#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
     /* The buffer/arena flavors accumulate per-TGID counters in userspace; the
      * table has to know the entry layout before the first event arrives. */
     nd_ebpf_acc_init(&rt->acc, sizeof(struct netdata_ebpf_cachestat_pid_entry), offsetof(struct netdata_ebpf_cachestat_pid_entry, tgid));
 #endif
 
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
+    rt->flavor = cachestat_runtime_flavor_from_path(path);
     if (use_core) {
         rt->kind = NETDATA_CACHESTAT_RUNTIME_CORE;
-        rt->flavor = cachestat_runtime_flavor_from_path(path);
         switch (rt->flavor) {
         case NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER:
             rt->core.buffer = cachestat_buffer_bpf__open();
@@ -374,15 +364,26 @@ struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const
     (void)use_core;
 #endif
     {
+        rt->kind = NETDATA_CACHESTAT_RUNTIME_LEGACY;
+        rt->flavor = cachestat_runtime_flavor_from_path(path);
         struct bpf_object *obj = bpf_object__open_file(path, NULL);
         if (!obj || libbpf_get_error(obj)) {
-            if (obj && libbpf_get_error(obj))
-                bpf_object__close(obj);
             freez(rt);
             return NULL;
         }
 
         rt->obj = obj;
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
+        if (rt->flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA) {
+            rt->raw_arena = nd_ebpf_raw_arena_create(obj, "cachestat_events");
+            if (!rt->raw_arena) {
+                bpf_object__close(obj);
+                nd_ebpf_acc_free(&rt->acc);
+                freez(rt);
+                return NULL;
+            }
+        }
+#endif
     }
 
     return rt;
@@ -398,26 +399,27 @@ int netdata_cachestat_runtime_prepare(
     if (!rt || !obj)
         return -1;
 
-    cachestat_prepare_autoload(obj, account_function, rt->flavor);
+    if (cachestat_resolve_program_names(obj, account_function, rt->flavor, rt->program_names) != 0 ||
+        nd_ebpf_prepare_autoload(obj, rt->program_names, 4, "cachestat") != 0)
+        return -1;
     if (cachestat_update_map_types(obj, maps_per_core) != 0)
         return -1;
     cachestat_update_map_sizes(obj, pid_table_size);
-#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
-    /* The userspace accumulator only exists for the buffer and arena flavors,
-     * which require CO-RE.  Bounding it is meaningless — and the field is not
-     * even declared — in a legacy-only build. */
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
+    /* Buffer and arena objects emit per-TGID events instead of using cstat_pid. */
     nd_ebpf_acc_set_max_entries(&rt->acc, pid_table_size);
 #endif
 
-    nd_ebpf_alloc_percpu_buffers(
+    if (nd_ebpf_alloc_percpu_buffers(
         &rt->percpu_u64, &rt->percpu_u64_cap,
-        (void **)&rt->percpu_entries, &rt->percpu_entries_cap, sizeof(*rt->percpu_entries));
+        (void **)&rt->percpu_entries, &rt->percpu_entries_cap, sizeof(*rt->percpu_entries)) != 0)
+        return -1;
 
     /* items_buf starts NULL; grows lazily in snapshot_apps */
     return 0;
 }
 
-#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
 
 /* Action values emitted by the cachestat BPF programs.  The event layout itself
  * is shared with the other modules (see struct nd_ebpf_pid_event). */
@@ -473,21 +475,19 @@ static void cachestat_destroy_ring_buffer(struct netdata_ebpf_cachestat_runtime 
     nd_ebpf_acc_free(&rt->acc);
 }
 
-/* Arena flavor: the BPF programs publish events into an mmap-able BPF arena
- * instead of a ring buffer.  The state layout and the drain loop are shared (see
- * struct nd_ebpf_arena_state); only the companion BSS field name is per-module.
- *
- * bpf_map__initial_value() on a BPF_MAP_TYPE_ARENA map returns the arena region
- * start (mmap offset 0), but the data section is placed at a page-aligned offset
- * inside the region, so using the arena map pointer directly reads uninitialized
- * memory.  The arena skeleton wires a companion BSS map whose mmaped pointer
- * libbpf resolves to the correct offset after load — use that. */
-static void cachestat_setup_arena(struct netdata_ebpf_cachestat_runtime *rt)
+/* Both generated and runtime-built skeletons expose the correctly offset arena data section. */
+static int cachestat_setup_arena(struct netdata_ebpf_cachestat_runtime *rt)
 {
-    if (!rt->core.arena || !rt->core.arena->bss)
-        return;
+#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
+    if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE) {
+        if (!rt->core.arena || !rt->core.arena->arena)
+            return -1;
 
-    rt->arena_state = (void *)&rt->core.arena->bss->cachestat_arena_state;
+        rt->arena_state = (void *)&rt->core.arena->arena->cachestat_arena_state;
+        return 0;
+    }
+#endif
+    return nd_ebpf_raw_arena_get_state(rt->raw_arena, &rt->arena_state);
 }
 
 static void cachestat_rb_event(void *ctx, const struct nd_ebpf_pid_event *ev)
@@ -535,7 +535,7 @@ static void cachestat_drain_arena(struct netdata_ebpf_cachestat_runtime *rt)
     rt->arena_tail = nd_ebpf_arena_drain(rt->arena_state, rt->arena_tail, cachestat_rb_event, rt);
 }
 
-#endif /* NETDATA_LIBBPF_CORE_SUPPORTED */
+#endif /* NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED */
 
 int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt)
 {
@@ -544,18 +544,30 @@ int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt)
 
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE) {
-        int rc = cachestat_runtime_load_core(rt);
-        if (rc != 0)
-            return rc;
-        if (rt->flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER && cachestat_setup_ring_buffer(rt) != 0)
+        if (cachestat_runtime_load_core(rt) != 0)
             return -1;
-        else if (rt->flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA)
-            cachestat_setup_arena(rt);
-        return 0;
+    } else
+#endif
+    {
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
+        if (rt->raw_arena) {
+            if (nd_ebpf_raw_arena_load(rt->raw_arena) != 0)
+                return -1;
+        } else
+#endif
+        if (bpf_object__load(rt->obj) != 0)
+            return -1;
+    }
+
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
+    if (rt->flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_BUFFER && cachestat_setup_ring_buffer(rt) != 0)
+        return -1;
+    if (rt->flavor == NETDATA_CACHESTAT_RUNTIME_FLAVOR_ARENA && cachestat_setup_arena(rt) != 0) {
+        fprintf(stderr, "cachestat: unable to map arena event state\n");
+        return -1;
     }
 #endif
-
-    return bpf_object__load(rt->obj);
+    return 0;
 }
 
 int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, const char *account_function)
@@ -574,33 +586,15 @@ int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, 
     if (!rt->links)
         return -1;
 
-    const char *account_prog = cachestat_account_program_name(account_function, rt->flavor);
-#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
-    const char *add_prog = (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE && rt->flavor != NETDATA_CACHESTAT_RUNTIME_FLAVOR_BASE) ?
-                               "netdata_add_to_page_cache_lru_buffer" :
-                               "netdata_add_to_page_cache_lru_kprobe";
-    const char *access_prog = (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE && rt->flavor != NETDATA_CACHESTAT_RUNTIME_FLAVOR_BASE) ?
-                                  "netdata_mark_page_accessed_buffer" :
-                                  "netdata_mark_page_accessed_kprobe";
-    const char *dirty_prog = (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE && rt->flavor != NETDATA_CACHESTAT_RUNTIME_FLAVOR_BASE) ?
-                                 "netdata_mark_buffer_dirty_buffer" :
-                                 "netdata_mark_buffer_dirty_kprobe";
-#else
-    const char *add_prog = "netdata_add_to_page_cache_lru_kprobe";
-    const char *access_prog = "netdata_mark_page_accessed_kprobe";
-    const char *dirty_prog = "netdata_mark_buffer_dirty_kprobe";
-#endif
+    rt->links[0] = cachestat_attach_program_by_name(obj, rt->program_names[0], "add_to_page_cache_lru");
+    rt->links[1] = cachestat_attach_program_by_name(obj, rt->program_names[1], "mark_page_accessed");
+    rt->links[2] = cachestat_attach_program_by_name(obj, rt->program_names[2], account_function);
+    rt->links[3] = cachestat_attach_program_by_name(obj, rt->program_names[3], "mark_buffer_dirty");
 
-    rt->links[0] = cachestat_attach_program_by_name(obj, add_prog, "add_to_page_cache_lru");
-    rt->links[1] = cachestat_attach_program_by_name(obj, access_prog, "mark_page_accessed");
-    rt->links[2] = cachestat_attach_program_by_name(obj, account_prog, account_function);
-    rt->links[3] = cachestat_attach_program_by_name(obj, dirty_prog, "mark_buffer_dirty");
-
-    for (size_t i = 0; i < 4; i++) {
-        if (!rt->links[i] || libbpf_get_error(rt->links[i])) {
-            nd_ebpf_destroy_links(&rt->links, 4);
-            return -1;
-        }
+    const char *targets[] = {"add_to_page_cache_lru", "mark_page_accessed", account_function, "mark_buffer_dirty"};
+    if (nd_ebpf_validate_links(rt->links, rt->program_names, targets, 4, "cachestat") != 0) {
+        nd_ebpf_destroy_links(&rt->links, 4);
+        return -1;
     }
 
     return 0;
@@ -637,33 +631,22 @@ int netdata_cachestat_runtime_snapshot(
     if (fd < 0)
         return -1;
 
-    /* Re-query the actual post-load map type; bpf_map__set_type can silently
-     * fail before load, leaving a non-percpu map while percpu_u64_cap > 1. */
-    enum bpf_map_type mtype = bpf_map__type(map);
-    int count = (mtype == BPF_MAP_TYPE_PERCPU_ARRAY && rt->percpu_u64_cap > 0)
-                ? rt->percpu_u64_cap : 1;
-    (void)maps_per_core;
     uint64_t *values = rt->percpu_u64;
     if (!values)
         return -1;
 
-    struct {
-        uint64_t *dst;
-        uint32_t key;
-    } entries[] = {
+    (void)maps_per_core;
+
+    const struct nd_ebpf_snap_global_entry entries[] = {
         {&out->add_to_page_cache_lru, 0},
         {&out->mark_page_accessed, 1},
         {&out->account_page_dirtied, 2},
         {&out->mark_buffer_dirty, 3},
     };
 
-    for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) {
-        uint32_t key = entries[i].key;
-        *entries[i].dst = 0;
-
-        if (bpf_map_lookup_elem(fd, &key, values) == 0)
-            *entries[i].dst = nd_ebpf_sum_percpu_u64(values, count);
-    }
+    nd_ebpf_global_snap_aggregate(
+        map, fd, values, rt->percpu_u64_cap,
+        entries, sizeof(entries) / sizeof(entries[0]));
 
     return 0;
 }
@@ -685,6 +668,22 @@ static void cachestat_snapshot_merge_same_pid(void *dst_v, const void *src_v)
         nd_ebpf_copy_comm(dst->comm, sizeof(dst->comm), src->comm, sizeof(src->comm));
 }
 
+/* nd_ebpf_apps_snap_iterate() per-CPU fold callback. */
+static void cachestat_apps_snap_fold(void *dst_v, const void *values_v, int i)
+{
+    struct netdata_ebpf_cachestat_pid_snapshot *dst = dst_v;
+    const struct netdata_ebpf_cachestat_pid_entry *values = values_v;
+
+    if (values[i].ct > dst->ct)
+        dst->ct = values[i].ct;
+    dst->add_to_page_cache_lru += values[i].add_to_page_cache_lru;
+    dst->mark_page_accessed += values[i].mark_page_accessed;
+    dst->account_page_dirtied += values[i].account_page_dirtied;
+    dst->mark_buffer_dirty += values[i].mark_buffer_dirty;
+    if (!dst->comm[0] && values[i].name[0])
+        nd_ebpf_copy_comm(dst->comm, sizeof(dst->comm), values[i].name, sizeof(values[i].name));
+}
+
 int netdata_cachestat_runtime_snapshot_apps(
     struct netdata_ebpf_cachestat_runtime *rt,
     int maps_per_core,
@@ -699,7 +698,7 @@ int netdata_cachestat_runtime_snapshot_apps(
 
     struct bpf_map *map = bpf_object__find_map_by_name(obj, "cstat_pid");
 
-#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
     if (!map) {
         /* Buffer and arena flavors have no cstat_pid map; drain events into
          * the userspace accumulator and convert to snapshot format. */
@@ -721,80 +720,26 @@ int netdata_cachestat_runtime_snapshot_apps(
     if (fd < 0)
         return -1;
 
-    /* Re-query the actual post-load map type; bpf_map__set_type can silently
-     * fail before load, leaving a non-percpu map while percpu_entries_cap > 1. */
-    enum bpf_map_type mtype = bpf_map__type(map);
-    int count = (mtype == BPF_MAP_TYPE_PERCPU_HASH && rt->percpu_entries_cap > 0)
-                ? rt->percpu_entries_cap : 1;
     (void)maps_per_core;
 
     struct netdata_ebpf_cachestat_pid_entry *values = rt->percpu_entries;
     if (!values)
         return -1;
 
-    /* Single-pass with a growable persistent output buffer: no pre-count pass,
-     * no per-cycle alloc/free.  items_buf doubles when full; capacity persists
-     * across cycles so steady-state has zero allocations. */
-    size_t out_count = 0;
-    uint32_t key = 0, next_key = 0;
-    bool first_iter = true;
-
-    while (bpf_map_get_next_key(fd, first_iter ? NULL : &key, &next_key) == 0) {
-        first_iter = false;
-        if (bpf_map_lookup_elem(fd, &next_key, values)) {
-            key = next_key;
-            memset(values, 0, (size_t)count * sizeof(*values));
-            continue;
-        }
-
-        /* Grow items_buf on demand — amortised O(1) per entry. */
-        nd_ebpf_snapshot_reserve(
-            (void **)&rt->items_buf, &rt->items_cap, sizeof(*rt->items_buf), out_count);
-
-        /*
-         * With NETDATA_APPS_LEVEL_ALL the BPF key is the thread ID (TID).
-         * The process TGID is stored in values[i].tgid by the BPF program.
-         * We must index shared memory by TGID so that cgroup.procs lookups
-         * (which use TGIDs) succeed.  Fall back to next_key only when every
-         * per-CPU entry has tgid==0 (race at entry creation; counters are
-         * also zero in that case so the entry is harmless).
-         */
-        uint32_t tgid = nd_ebpf_snapshot_tgid(
-            values, count, sizeof(*values), offsetof(struct netdata_ebpf_cachestat_pid_entry, tgid), next_key);
-
-        struct netdata_ebpf_cachestat_pid_snapshot *dst = &rt->items_buf[out_count];
-        memset(dst, 0, sizeof(*dst));
-        dst->pid = tgid;
-
-        for (int i = 0; i < count; i++) {
-            if (values[i].ct > dst->ct)
-                dst->ct = values[i].ct;
-            dst->add_to_page_cache_lru += values[i].add_to_page_cache_lru;
-            dst->mark_page_accessed += values[i].mark_page_accessed;
-            dst->account_page_dirtied += values[i].account_page_dirtied;
-            dst->mark_buffer_dirty += values[i].mark_buffer_dirty;
-            if (!dst->comm[0] && values[i].name[0])
-                nd_ebpf_copy_comm(dst->comm, sizeof(dst->comm), values[i].name, sizeof(values[i].name));
-        }
-        out_count++;
-
-        key = next_key;
-        memset(values, 0, (size_t)count * sizeof(*values));
-    }
+    size_t out_count = nd_ebpf_apps_snap_iterate(
+        map, fd, rt->percpu_entries_cap, values,
+        sizeof(*values),
+        offsetof(struct netdata_ebpf_cachestat_pid_entry, tgid),
+        offsetof(struct netdata_ebpf_cachestat_pid_entry, ct),
+        (void **)&rt->items_buf, &rt->items_cap, sizeof(*rt->items_buf),
+        cachestat_apps_snap_fold, cachestat_snapshot_merge_same_pid,
+        &rt->pid_keys);
 
     if (out_count == 0) {
         out->items = NULL;
         out->count = 0;
         return 0;
     }
-
-    /*
-     * Multiple threads of the same process produce separate BPF entries with
-     * the same TGID.  Sort by pid (TGID) and merge consecutive same-pid
-     * entries so each shared-memory slot represents one process.
-     */
-    out_count = nd_ebpf_snapshot_merge_same_pid(
-        rt->items_buf, out_count, sizeof(*rt->items_buf), cachestat_snapshot_merge_same_pid);
 
     out->items = rt->items_buf;
     out->count = out_count;
@@ -814,14 +759,15 @@ int netdata_cachestat_runtime_delete_pid(struct netdata_ebpf_cachestat_runtime *
         return -1;
 
     bool map_missing = false;
-    int rc = nd_ebpf_map_delete_pid(cachestat_runtime_object(rt), "cstat_pid", pid, &map_missing);
+    int rc = nd_ebpf_map_delete_tgids(
+        cachestat_runtime_object(rt), "cstat_pid", &rt->pid_keys, &pid, 1, rt->percpu_entries, sizeof(*rt->percpu_entries), offsetof(struct netdata_ebpf_cachestat_pid_entry, tgid), offsetof(struct netdata_ebpf_cachestat_pid_entry, ct), rt->percpu_entries_cap, &map_missing);
     if (!map_missing)
         return rc;
 
     /* Buffer/arena flavor: no cstat_pid map.  Evict from the userspace acc
      * accumulator so dead TGIDs do not permanently inflate it and grow the
      * O(N) scan over time. */
-#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
     nd_ebpf_acc_evict_tgid(&rt->acc, pid);
 #endif
     return 0;
@@ -836,11 +782,12 @@ int netdata_cachestat_runtime_delete_pids(
         return 0;
 
     bool map_missing = false;
-    int rc = nd_ebpf_map_delete_pids(cachestat_runtime_object(rt), "cstat_pid", pids, count, &map_missing);
+    int rc = nd_ebpf_map_delete_tgids(
+        cachestat_runtime_object(rt), "cstat_pid", &rt->pid_keys, pids, count, rt->percpu_entries, sizeof(*rt->percpu_entries), offsetof(struct netdata_ebpf_cachestat_pid_entry, tgid), offsetof(struct netdata_ebpf_cachestat_pid_entry, ct), rt->percpu_entries_cap, &map_missing);
     if (!map_missing)
         return rc;
 
-#ifdef NETDATA_LIBBPF_CORE_SUPPORTED
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
     /* nd_ebpf_acc_evict_tgid() rebuilds the hash table after every removal, so a
      * batch of N evictions costs O(N*count).  Eviction batches are typically
      * small (<= 10), so that is accepted rather than adding a deferred-rebuild
@@ -877,15 +824,25 @@ void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)
     freez(rt->percpu_u64);
     freez(rt->percpu_entries);
     freez(rt->items_buf);
+    nd_ebpf_key_table_free(&rt->pid_keys);
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
+    if (rt->kind != NETDATA_CACHESTAT_RUNTIME_CORE)
+        cachestat_destroy_ring_buffer(rt);
+#endif
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE) {
         cachestat_destroy_ring_buffer(rt);
         cachestat_runtime_destroy_core(rt);
-    } else if (rt->obj)
-        bpf_object__close(rt->obj);
-#else
-    if (rt->obj)
-        bpf_object__close(rt->obj);
+    } else
 #endif
+    {
+#ifdef NETDATA_CACHESTAT_EVENT_FLAVORS_SUPPORTED
+        if (rt->raw_arena)
+            nd_ebpf_raw_arena_destroy(rt->raw_arena);
+        else
+#endif
+        if (rt->obj)
+            bpf_object__close(rt->obj);
+    }
     freez(rt);
 }

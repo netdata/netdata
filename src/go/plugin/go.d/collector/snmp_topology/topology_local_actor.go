@@ -21,10 +21,7 @@ func augmentLocalActor(actor *topologymodel.Actor, local topologymodel.Device) {
 }
 
 func topologyLocalActorFromCache(localDeviceID string, local topologymodel.Device) (topologymodel.Actor, bool) {
-	actorID := strings.TrimSpace(localDeviceID)
-	if actorID == "" {
-		actorID = ensureTopologyObservationDeviceID(local, "")
-	}
+	actorID := topologymodel.LocalActorID(localDeviceID, local)
 	if actorID == "" {
 		return topologymodel.Actor{}, false
 	}

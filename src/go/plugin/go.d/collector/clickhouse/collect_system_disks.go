@@ -3,6 +3,7 @@
 package clickhouse
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/netdata/netdata/go/plugins/pkg/web"
@@ -25,8 +26,8 @@ type diskStats struct {
 	freeBytes  int64
 }
 
-func (c *Collector) collectSystemDisks(mx map[string]int64) error {
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+func (c *Collector) collectSystemDisks(ctx context.Context, mx map[string]int64) error {
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return err
 	}

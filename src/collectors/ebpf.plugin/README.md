@@ -240,7 +240,8 @@ The eBPF collector enables and runs the following eBPF programs by default:
 - `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
     [`apps.plugin`](/src/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
     for each application.
-- `fd` :  This eBPF program creates charts that show information about calls to open files.
+- `fd`: The eBPFGo program creates charts that show information about calls to open and close files. Its object
+    flavor instruments the kernel's open and close entry points; the error charts require `ebpf load mode = return`.
 - `mount`: This eBPF program creates charts that show calls to syscalls mount(2) and umount(2).
 - `shm`: This eBPF program creates charts that show calls to syscalls shmget(2), shmat(2), shmdt(2) and shmctl(2).
 - `process`: This eBPF program creates charts that show information about process life. When in `return` mode, it also
@@ -283,7 +284,8 @@ To configure an eBPF thread:
       `[ebpf programs]` section of `ebpf.d.conf`.
     - `disk.conf`: Configuration for the `disk` thread.
     - `dns.conf`: Configuration for the `dns` thread.
-    - `fd.conf`: Configuration for the `file descriptor` thread.
+    - `fd.conf`: Legacy compatibility overlay for the eBPFGo `fd` program. Prefer enabling `fd` in the
+      `[ebpf programs]` section of `ebpf.d.conf`.
     - `filesystem.conf`: Configuration for the `filesystem` thread.
     - `hardirq.conf`: Configuration for the `hardirq` thread.
     - `mdflush.conf`: Configuration for the `mdflush` thread.
@@ -404,7 +406,10 @@ Internally, the Linux kernel treats both processes and threads as `tasks`. To cr
 system calls: `fork(2)`, `vfork(2)`, and `clone(2)`. To generate this chart, the eBPF
 collector uses the following `tracepoints` and `kprobe`:
 
-- `sched/sched_process_fork`: Tracepoint called after a call for `fork (2)`, `vfork (2)` and `clone (2)`.
+- `sched/sched_process_fork`: Tracepoint called after a call for `fork (2)`, `vfork (2)` and `clone (2)`. It is
+     attached as a BTF raw tracepoint (`tp_btf`) when CO-RE code runs in `trampoline` or `tracepoint` mode.
+- `kprobe/wake_up_new_task`: called when a new task is started. Legacy code, CO-RE code in `probe` mode, and CO-RE
+     code in `tracepoint` mode on kernels without BTF raw tracepoint support use it instead of `sched/sched_process_fork`.
 - `sched/sched_process_exec`: Tracepoint called after a exec-family syscall.
 - `kprobe/kernel_clone`: This is the main [`fork()`](https://elixir.bootlin.com/linux/v5.10/source/kernel/fork.c#L2415)
      routine since kernel `5.10.0` was released.
@@ -595,12 +600,20 @@ The eBPF plugin also shows a chart in the Disk section when the `disk` thread is
 
 #### Disk Latency
 
-This will create the chart `disk_latency_io` for each disk on the host. The following tracepoints are used:
+This will create the chart `disk_latency_io` for each disk on the host. The following functions are monitored:
 
-- [`block/block_rq_issue`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_issue):
-    IO request operation to a device drive.
-- [`block/block_rq_complete`](https://www.kernel.org/doc/html/latest/core-api/tracepoint.html#c.trace_block_rq_complete):
-    IO operation completed by device.
+- `kprobe/blk_mq_start_request`: IO request operation sent to a device driver.
+- `kprobe/blk_start_request`: IO request operation sent through the older single-queue path on kernels before 5.0.
+- `kprobe/blk_mq_end_request`: IO operation completed by the device.
+- `kprobe/__blk_mq_end_request`: IO operation completed by the SCSI layer (SCSI, SATA and SAS disks), which does not
+    call `blk_mq_end_request`. If this symbol cannot be probed, `kprobe/blk_mq_free_request` is used as a fallback.
+    A request seen by multiple completion probes is counted once.
+- `blk_complete_request`: IO completion on the older request path. It is attached only when the running kernel
+    provides this function (a `kprobe` with legacy code, `fentry` with CO-RE code).
+
+On generic kernels 6.8 and newer, disk latency is unavailable when the plugin must use legacy BPF objects. The
+plugin refuses the older 5.4 disk object because its compiled kernel structure offsets are not validated for these
+kernels. On builds with CO-RE support, kernel BTF allows the plugin to use the CO-RE object instead.
 
 Disk Latency is the single most important metric to focus on when it comes to storage performance, under most circumstances.
 For hard drives, an average latency somewhere between 10 to 20 ms can be considered acceptable. For SSD (Solid State Drives),
@@ -681,20 +694,33 @@ filesystem, the collector needs to attach `kprobes` and `kretprobes` for each of
 
 #### File descriptor
 
-To give metrics related to `open` and `close` events, instead of attaching kprobes for each syscall used to do these
-events, the collector attaches `kprobes` for the common function used for syscalls:
+To give metrics related to `open` and `close` events, the eBPFGo `fd` collector resolves its attach symbols from
+`/proc/kallsyms` at start-up, because they differ across kernel versions and architectures.
 
-- [`do_sys_open`](https://0xax.gitbooks.io/linux-insides/content/SysCall/linux-syscall-5.html): Internal function used to
-     open files.
+For open it instruments the inner function that every entry point funnels through, so one probe covers `open`, `openat`
+and `openat2`:
+
 - [`do_sys_openat2`](https://elixir.bootlin.com/linux/v5.6/source/fs/open.c#L1162):
     Function called from `do_sys_open` since version `5.6.0`.
-- [`close_fd`](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg2271761.html): Function used to close file
-    descriptor since kernel `5.11.0`.
-- `__close_fd`: Function used to close files before version `5.11.0`.
+- [`do_sys_open`](https://0xax.gitbooks.io/linux-insides/content/SysCall/linux-syscall-5.html): Internal function used to
+     open files on older kernels.
+
+Close is resolved differently, because no inner function stayed on the close(2) path across kernel versions. Newer
+kernels call `file_close_fd()` from the syscall and leave `close_fd()` for in-kernel callers only, so a probe on the
+inner helper attaches successfully and then never fires. The collector therefore instruments the syscall itself:
+
+- `__x64_sys_close`, `__arm64_sys_close`, and the equivalents on other architectures with syscall wrappers.
+- `sys_close` on architectures without them, such as 32-bit ARM and PowerPC.
+- [`close_fd`](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg2271761.html) and `__close_fd`, the inner
+    helpers, only as a fallback on kernels that predate the syscall wrappers.
+
+Both open and close are instrumented as return probes, because the return value is what distinguishes a successful call
+from a failed one. The selected eBPF object flavor supplies the appropriate attachment method for the running kernel.
 
 #### File error
 
-This chart shows the number of times some software tried and failed to open or close a file descriptor.
+This chart shows the number of times some software tried and failed to open or close a file descriptor. It is published
+only with `ebpf load mode = return`; the counters behind it are collected in every mode.
 
 #### VFS
 

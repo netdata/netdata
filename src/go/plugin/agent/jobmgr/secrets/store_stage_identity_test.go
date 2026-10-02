@@ -20,13 +20,17 @@ import (
 )
 
 func TestStoreAttemptIdentityIsBoundedAndStructurallyDistinct(t *testing.T) {
-	operations := &StoreOperations{epoch: 7}
+	operations := &StoreOperations{
+		epoch: 7,
+	}
 	same := operations.identity("vault:main", false, nil)
 	require.Equal(t, same, operations.identity("vault:main", false, nil))
 	require.Len(t, same.Key, sha256.Size)
 	require.Equal(t, "vault:main", same.Resource)
 
-	differentEpoch := (&StoreOperations{epoch: 8}).identity("vault:main", false, nil)
+	differentEpoch := (&StoreOperations{
+		epoch: 8,
+	}).identity("vault:main", false, nil)
 	require.NotEqual(t, same.Key, differentEpoch.Key)
 
 	testA := operations.identity("vault:main", true, []byte("a"))
@@ -40,7 +44,7 @@ func TestStoreAttemptIdentityIsBoundedAndStructurallyDistinct(t *testing.T) {
 	require.Equal(t, "secret Store", long.Resource)
 }
 
-func TestInitialStoreAttemptAcceptsLongValidName(t *testing.T) {
+func TestInitialStoreAdmissionAcceptsLongValidName(t *testing.T) {
 	config := longNameSecretTestConfig(confgroup.TypeUser, "initial")
 	require.NoError(t, config.Validate())
 	require.Greater(t, len(config.ExposedKey()), 256)
@@ -57,7 +61,7 @@ func TestInitialStoreAttemptAcceptsLongValidName(t *testing.T) {
 	})
 
 	require.NoError(t, controller.PublishInitial(t.Context(), commands))
-	require.Equal(t, []int{200}, commands.Statuses())
+	require.Equal(t, []int{202}, commands.Statuses())
 }
 
 func TestDynCfgStoreMutationAttemptsAcceptLongValidName(t *testing.T) {
@@ -104,8 +108,13 @@ func TestDynCfgStoreMutationAttemptsAcceptLongValidName(t *testing.T) {
 			result, err := stage.take()
 			require.NoError(t, err)
 			require.NoError(t, result.err)
-			require.NotNil(t, result.mutation)
-			require.NoError(t, result.mutation.Abort())
+			require.Equal(t, name, result.config.Name())
+			if command == dyncfg.CommandAdd {
+				require.Nil(t, result.mutation, "admission must not acquire a generation")
+			} else {
+				require.NotNil(t, result.mutation)
+				require.NoError(t, result.mutation.Abort())
+			}
 		})
 	}
 }

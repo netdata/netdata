@@ -115,45 +115,45 @@ metrics:
         unit: "{processor}"
     # Memory
   - MIB: CHECKPOINT-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.3.0
+      metric_type: gauge
       name: memTotalReal64
       chart_meta:
         description: "Total real memory"
         family: 'System/Memory/Real/Total'
         unit: "By"
   - MIB: CHECKPOINT-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.4.0
+      metric_type: gauge
       name: memActiveReal64
       chart_meta:
         description: "Active real memory"
         family: 'System/Memory/Real/Active'
         unit: "By"
   - MIB: CHECKPOINT-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.5.0
+      metric_type: gauge
       name: memFreeReal64
       chart_meta:
         description: "Free real memory"
         family: 'System/Memory/Real/Free'
         unit: "By"
   - MIB: CHECKPOINT-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.1.0
+      metric_type: gauge
       name: memTotalVirtual64
       chart_meta:
         description: "Total virtual memory"
         family: 'System/Memory/Virtual/Total'
         unit: "By"
   - MIB: CHECKPOINT-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.6.7.4.2.0
+      metric_type: gauge
       name: memActiveVirtual64
       chart_meta:
         description: "Active virtual memory"
@@ -161,42 +161,47 @@ metrics:
         unit: "By"
     # Disk
   - MIB: CHECKPOINT-MIB
-    metric_type: gauge
     table:
       OID: 1.3.6.1.4.1.2620.1.6.7.6
       name: multiDiskTable
     symbols:
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.3
+        metric_type: gauge
         name: multiDiskSize
         chart_meta:
           description: "Disk size"
           family: 'System/Disk/Size/Total'
           unit: "GBy"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.4
+        metric_type: gauge
         name: multiDiskUsed
         chart_meta:
           description: "Disk used"
           family: 'System/Disk/Size/Used'
           unit: "GBy"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.5
+        metric_type: gauge
         name: multiDiskFreeTotalBytes
         chart_meta:
           description: "Disk free total bytes"
           family: 'System/Disk/Size/Free'
           unit: "By"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.7
+        metric_type: gauge
         name: multiDiskFreeAvailableBytes
         chart_meta:
           description: "Disk free available bytes"
           family: 'System/Disk/Size/Available'
           unit: "By"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.6
+        metric_type: gauge
         name: multiDiskFreeTotalPercent
         chart_meta:
           description: "Disk free total percent"
           family: 'System/Disk/Free'
           unit: "%"
       - OID: 1.3.6.1.4.1.2620.1.6.7.6.1.8
+        metric_type: gauge
         name: multiDiskFreeAvailablePercent
         chart_meta:
           description: "Disk free available percent"
@@ -315,9 +320,9 @@ metrics:
         unit: "{connection}"
     # CPU global scalars (not per-core — complements multiProcTable)
   - MIB: CHECKPOINT-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.6.7.2.5.0
+      metric_type: gauge
       name: procQueue
       chart_meta:
         description: "Processor run queue length"
@@ -333,18 +338,18 @@ metrics:
         unit: "{interrupt}/s"
     # Remote Access VPN users
   - MIB: CHECKPOINT-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.9.5.0
+      metric_type: gauge
       name: dtpsConnectedUsers
       chart_meta:
         description: "Currently connected remote access VPN users"
         family: 'Security/RemoteAccess/Users/Connected'
         unit: "{user}"
   - MIB: CHECKPOINT-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.9.4.0
+      metric_type: gauge
       name: dtpsLicensedUsers
       chart_meta:
         description: "Licensed remote access VPN users"

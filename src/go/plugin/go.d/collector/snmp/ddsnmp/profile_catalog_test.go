@@ -13,27 +13,37 @@ import (
 )
 
 func TestCatalogResolve_ManualProfilePolicies(t *testing.T) {
-	catalog := &Catalog{profiles: []*Profile{
-		{
-			SourceFile: "auto.yaml",
-			Definition: &ddprofiledefinition.ProfileDefinition{
-				Selector: ddprofiledefinition.SelectorSpec{
-					{SysObjectID: ddprofiledefinition.SelectorIncludeExclude{Include: []string{"1.3.6.1.*"}}},
+	catalog := &Catalog{
+		profiles: []*Profile{
+			{
+				SourceFile: "auto.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Selector: ddprofiledefinition.SelectorSpec{
+						{SysObjectID: ddprofiledefinition.SelectorIncludeExclude{
+							Include: []string{"1.3.6.1.*"},
+						}},
+					},
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{Symbol: ddprofiledefinition.SymbolConfig{
+							OID:  "1.3.6.1.2.1.1.5.0",
+							Name: "sysName",
+						}},
+					},
 				},
-				Metrics: []ddprofiledefinition.MetricsConfig{
-					{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.1.5.0", Name: "sysName"}},
+			},
+			{
+				SourceFile: "manual.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					Metrics: []ddprofiledefinition.MetricsConfig{
+						{Symbol: ddprofiledefinition.SymbolConfig{
+							OID:  "1.3.6.1.2.1.1.1.0",
+							Name: "sysDescr",
+						}},
+					},
 				},
 			},
 		},
-		{
-			SourceFile: "manual.yaml",
-			Definition: &ddprofiledefinition.ProfileDefinition{
-				Metrics: []ddprofiledefinition.MetricsConfig{
-					{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.1.1.0", Name: "sysDescr"}},
-				},
-			},
-		},
-	}}
+	}
 
 	tests := map[string]struct {
 		policy   ManualProfilePolicy
@@ -107,7 +117,9 @@ func TestResolvedProfileSetProject_SeparatesMetricsAndTopology(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			resolved := &ResolvedProfileSet{profiles: []*Profile{projectionTestProfile()}}
+			resolved := &ResolvedProfileSet{
+				profiles: []*Profile{projectionTestProfile()},
+			}
 
 			profiles := resolved.Project(tc.consumer).Profiles()
 
@@ -132,7 +144,9 @@ func TestResolvedProfileSetProject_SeparatesMetricsAndTopology(t *testing.T) {
 }
 
 func TestResolvedProfileSetProject_MetricsAndLicensing(t *testing.T) {
-	resolved := &ResolvedProfileSet{profiles: []*Profile{projectionTestProfile()}}
+	resolved := &ResolvedProfileSet{
+		profiles: []*Profile{projectionTestProfile()},
+	}
 
 	profiles := resolved.Project(ConsumerMetrics, ConsumerLicensing).Profiles()
 
@@ -155,7 +169,9 @@ func TestResolvedProfileSetProject_MetricsAndLicensing(t *testing.T) {
 }
 
 func TestResolvedProfileSetProject_MetricsAndBGP(t *testing.T) {
-	resolved := &ResolvedProfileSet{profiles: []*Profile{projectionTestProfile()}}
+	resolved := &ResolvedProfileSet{
+		profiles: []*Profile{projectionTestProfile()},
+	}
 
 	profiles := resolved.Project(ConsumerMetrics, ConsumerBGP).Profiles()
 
@@ -179,25 +195,31 @@ func TestResolvedProfileSetProject_MetricsAndBGP(t *testing.T) {
 }
 
 func TestResolvedProfileSetProject_UnscopedMetricTagsPropagateToLicensing(t *testing.T) {
-	resolved := &ResolvedProfileSet{profiles: []*Profile{
-		{
-			SourceFile: "licensing.yaml",
-			Definition: &ddprofiledefinition.ProfileDefinition{
-				MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{
-					{MetricTagConfig: ddprofiledefinition.MetricTagConfig{Tag: "device_model"}},
-				},
-				Licensing: []ddprofiledefinition.LicensingConfig{
-					{
-						ID:              "license",
-						OriginProfileID: "licensing.yaml",
-						Identity: ddprofiledefinition.LicenseIdentityConfig{
-							ID: ddprofiledefinition.LicenseValueConfig{Value: "license"},
+	resolved := &ResolvedProfileSet{
+		profiles: []*Profile{
+			{
+				SourceFile: "licensing.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{
+						{MetricTagConfig: ddprofiledefinition.MetricTagConfig{
+							Tag: "device_model",
+						}},
+					},
+					Licensing: []ddprofiledefinition.LicensingConfig{
+						{
+							ID:              "license",
+							OriginProfileID: "licensing.yaml",
+							Identity: ddprofiledefinition.LicenseIdentityConfig{
+								ID: ddprofiledefinition.LicenseValueConfig{
+									Value: "license",
+								},
+							},
 						},
 					},
 				},
 			},
 		},
-	}}
+	}
 
 	profiles := resolved.Project(ConsumerLicensing).Profiles()
 
@@ -207,29 +229,39 @@ func TestResolvedProfileSetProject_UnscopedMetricTagsPropagateToLicensing(t *tes
 }
 
 func TestResolvedProfileSetProject_UnscopedMetricTagsPropagateToBGP(t *testing.T) {
-	resolved := &ResolvedProfileSet{profiles: []*Profile{
-		{
-			SourceFile: "bgp.yaml",
-			Definition: &ddprofiledefinition.ProfileDefinition{
-				MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{
-					{MetricTagConfig: ddprofiledefinition.MetricTagConfig{Tag: "device_model"}},
-				},
-				BGP: []ddprofiledefinition.BGPConfig{
-					{
-						ID:   "peer",
-						Kind: ddprofiledefinition.BGPRowKindPeer,
-						Identity: ddprofiledefinition.BGPIdentityConfig{
-							Neighbor: ddprofiledefinition.BGPValueConfig{Value: "192.0.2.1"},
-							RemoteAS: ddprofiledefinition.BGPValueConfig{Value: "65001"},
-						},
-						State: ddprofiledefinition.BGPStateConfig{
-							BGPValueConfig: ddprofiledefinition.BGPValueConfig{Value: "established"},
+	resolved := &ResolvedProfileSet{
+		profiles: []*Profile{
+			{
+				SourceFile: "bgp.yaml",
+				Definition: &ddprofiledefinition.ProfileDefinition{
+					MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{
+						{MetricTagConfig: ddprofiledefinition.MetricTagConfig{
+							Tag: "device_model",
+						}},
+					},
+					BGP: []ddprofiledefinition.BGPConfig{
+						{
+							ID:   "peer",
+							Kind: ddprofiledefinition.BGPRowKindPeer,
+							Identity: ddprofiledefinition.BGPIdentityConfig{
+								Neighbor: ddprofiledefinition.BGPValueConfig{
+									Value: "192.0.2.1",
+								},
+								RemoteAS: ddprofiledefinition.BGPValueConfig{
+									Value: "65001",
+								},
+							},
+							State: ddprofiledefinition.BGPStateConfig{
+								BGPValueConfig: ddprofiledefinition.BGPValueConfig{
+									Value: "established",
+								},
+							},
 						},
 					},
 				},
 			},
 		},
-	}}
+	}
 
 	profiles := resolved.Project(ConsumerBGP).Profiles()
 
@@ -239,7 +271,9 @@ func TestResolvedProfileSetProject_UnscopedMetricTagsPropagateToBGP(t *testing.T
 }
 
 func TestResolvedProfileSetProject_DoesNotShareMutableProjectionState(t *testing.T) {
-	resolved := &ResolvedProfileSet{profiles: []*Profile{projectionTestProfile()}}
+	resolved := &ResolvedProfileSet{
+		profiles: []*Profile{projectionTestProfile()},
+	}
 
 	view1 := resolved.Project(ConsumerTopology).Profiles()
 	view2 := resolved.Project(ConsumerTopology).Profiles()
@@ -248,7 +282,9 @@ func TestResolvedProfileSetProject_DoesNotShareMutableProjectionState(t *testing
 	require.Len(t, view2, 1)
 
 	view1[0].Definition.Topology[0].MetricTags[0].Tag = "mutated"
-	view1[0].Definition.Metadata["device"].Fields["lldp_loc_sys_name"] = ddprofiledefinition.MetadataField{Value: "mutated"}
+	view1[0].Definition.Metadata["device"].Fields["lldp_loc_sys_name"] = ddprofiledefinition.MetadataField{
+		Value: "mutated",
+	}
 
 	assert.Equal(t, "lldp_rem_index", view2[0].Definition.Topology[0].MetricTags[0].Tag)
 	assert.NotEqual(t, "mutated", view2[0].Definition.Metadata["device"].Fields["lldp_loc_sys_name"].Value)
@@ -259,7 +295,9 @@ func TestResolvedProfileSetProject_DoesNotShareMutableProjectionState(t *testing
 }
 
 func TestProjectedViewFilterBGPToTopologyPeersDoesNotShareMutableProjectionState(t *testing.T) {
-	resolved := &ResolvedProfileSet{profiles: []*Profile{projectionTestProfile()}}
+	resolved := &ResolvedProfileSet{
+		profiles: []*Profile{projectionTestProfile()},
+	}
 
 	pruned := resolved.Project(ConsumerTopology, ConsumerBGP).FilterBGPToTopologyPeers().Profiles()
 	full := resolved.Project(ConsumerBGP).Profiles()
@@ -281,7 +319,9 @@ func TestProjectedViewFilterBGPToTopologyPeersDoesNotShareMutableProjectionState
 }
 
 func TestProjectedViewFilterByKind(t *testing.T) {
-	resolved := &ResolvedProfileSet{profiles: []*Profile{projectionTestProfile()}}
+	resolved := &ResolvedProfileSet{
+		profiles: []*Profile{projectionTestProfile()},
+	}
 
 	view := resolved.Project(ConsumerTopology).FilterByKind(map[ddprofiledefinition.TopologyKind]bool{
 		ddprofiledefinition.KindStpPort: true,
@@ -298,7 +338,9 @@ func TestProjectedViewFilterByKind(t *testing.T) {
 }
 
 func TestProjectedViewFilterBGPByKind(t *testing.T) {
-	resolved := &ResolvedProfileSet{profiles: []*Profile{projectionTestProfile()}}
+	resolved := &ResolvedProfileSet{
+		profiles: []*Profile{projectionTestProfile()},
+	}
 
 	view := resolved.Project(ConsumerTopology, ConsumerBGP).FilterBGPByKind(map[ddprofiledefinition.BGPRowKind]bool{
 		ddprofiledefinition.BGPRowKindPeer: true,
@@ -316,7 +358,9 @@ func TestProjectedViewFilterBGPByKind(t *testing.T) {
 }
 
 func TestProjectedViewFilterBGPToTopologyPeers(t *testing.T) {
-	resolved := &ResolvedProfileSet{profiles: []*Profile{projectionTestProfile()}}
+	resolved := &ResolvedProfileSet{
+		profiles: []*Profile{projectionTestProfile()},
+	}
 
 	view := resolved.Project(ConsumerTopology, ConsumerBGP).
 		FilterBGPToTopologyPeers().
@@ -362,33 +406,56 @@ func TestProjectedViewFilterBGPToTopologyPeers(t *testing.T) {
 }
 
 func TestProjectedViewFilterBGPToTopologyPeersKeepsSingleAnchorWithoutTopologySignal(t *testing.T) {
-	resolved := &ResolvedProfileSet{profiles: []*Profile{{
-		SourceFile: "projection.yaml",
-		Definition: &ddprofiledefinition.ProfileDefinition{
-			BGP: []ddprofiledefinition.BGPConfig{
-				{
-					ID:   "peer",
-					Kind: ddprofiledefinition.BGPRowKindPeer,
-					Identity: ddprofiledefinition.BGPIdentityConfig{
-						Neighbor: ddprofiledefinition.BGPValueConfig{Value: "192.0.2.1"},
-						RemoteAS: ddprofiledefinition.BGPValueConfig{Value: "65001"},
-					},
-					Descriptors: ddprofiledefinition.BGPDescriptorsConfig{
-						Description: ddprofiledefinition.BGPValueConfig{Value: "peer without state"},
-					},
-					Transitions: ddprofiledefinition.BGPTransitionsConfig{
-						Established: ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.2011.5.25.177.1.1.7.1.4", Name: "hwBgpPeerFsmEstablishedTransitions"}},
-						Down:        ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.2011.5.25.177.1.1.7.1.5", Name: "hwBgpPeerDownCounts"}},
-					},
-					Traffic: ddprofiledefinition.BGPTrafficConfig{
-						Updates: ddprofiledefinition.BGPDirectionalConfig{
-							Received: ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.2011.5.25.177.1.1.7.1.6", Name: "hwBgpPeerInUpdateMsgs"}},
+	resolved := &ResolvedProfileSet{
+		profiles: []*Profile{{
+			SourceFile: "projection.yaml",
+			Definition: &ddprofiledefinition.ProfileDefinition{
+				BGP: []ddprofiledefinition.BGPConfig{
+					{
+						ID:   "peer",
+						Kind: ddprofiledefinition.BGPRowKindPeer,
+						Identity: ddprofiledefinition.BGPIdentityConfig{
+							Neighbor: ddprofiledefinition.BGPValueConfig{
+								Value: "192.0.2.1",
+							},
+							RemoteAS: ddprofiledefinition.BGPValueConfig{
+								Value: "65001",
+							},
+						},
+						Descriptors: ddprofiledefinition.BGPDescriptorsConfig{
+							Description: ddprofiledefinition.BGPValueConfig{
+								Value: "peer without state",
+							},
+						},
+						Transitions: ddprofiledefinition.BGPTransitionsConfig{
+							Established: ddprofiledefinition.BGPValueConfig{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.2011.5.25.177.1.1.7.1.4",
+									Name: "hwBgpPeerFsmEstablishedTransitions",
+								},
+							},
+							Down: ddprofiledefinition.BGPValueConfig{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.2011.5.25.177.1.1.7.1.5",
+									Name: "hwBgpPeerDownCounts",
+								},
+							},
+						},
+						Traffic: ddprofiledefinition.BGPTrafficConfig{
+							Updates: ddprofiledefinition.BGPDirectionalConfig{
+								Received: ddprofiledefinition.BGPValueConfig{
+									Symbol: ddprofiledefinition.SymbolConfig{
+										OID:  "1.3.6.1.4.1.2011.5.25.177.1.1.7.1.6",
+										Name: "hwBgpPeerInUpdateMsgs",
+									},
+								},
+							},
 						},
 					},
 				},
 			},
-		},
-	}}}
+		}},
+	}
 
 	view := resolved.Project(ConsumerBGP).FilterBGPToTopologyPeers().Profiles()
 
@@ -398,56 +465,83 @@ func TestProjectedViewFilterBGPToTopologyPeersKeepsSingleAnchorWithoutTopologySi
 	assert.Equal(t, "192.0.2.1", row.Identity.Neighbor.Value)
 	assert.Equal(t, "peer without state", row.Descriptors.Description.Value)
 	assert.Equal(t, ddprofiledefinition.BGPTransitionsConfig{
-		Established: ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.2011.5.25.177.1.1.7.1.4", Name: "hwBgpPeerFsmEstablishedTransitions"}},
-		Down:        ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.2011.5.25.177.1.1.7.1.5", Name: "hwBgpPeerDownCounts"}},
+		Established: ddprofiledefinition.BGPValueConfig{
+			Symbol: ddprofiledefinition.SymbolConfig{
+				OID:  "1.3.6.1.4.1.2011.5.25.177.1.1.7.1.4",
+				Name: "hwBgpPeerFsmEstablishedTransitions",
+			},
+		},
+		Down: ddprofiledefinition.BGPValueConfig{
+			Symbol: ddprofiledefinition.SymbolConfig{
+				OID:  "1.3.6.1.4.1.2011.5.25.177.1.1.7.1.5",
+				Name: "hwBgpPeerDownCounts",
+			},
+		},
 	}, row.Transitions)
 	assert.Equal(t, ddprofiledefinition.BGPTrafficConfig{}, row.Traffic)
 }
 
 func TestProjectedViewFilterBGPToTopologyPeersPrunesAuxiliaryTableReferences(t *testing.T) {
-	resolved := &ResolvedProfileSet{profiles: []*Profile{{
-		SourceFile: "projection.yaml",
-		Definition: &ddprofiledefinition.ProfileDefinition{
-			BGP: []ddprofiledefinition.BGPConfig{
-				{
-					ID:    "peer",
-					Kind:  ddprofiledefinition.BGPRowKindPeer,
-					Table: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.10", Name: "peerTable"},
-					Identity: ddprofiledefinition.BGPIdentityConfig{
-						Neighbor: ddprofiledefinition.BGPValueConfig{
-							Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.10.1.1", Name: "peerRemoteAddr"},
+	resolved := &ResolvedProfileSet{
+		profiles: []*Profile{{
+			SourceFile: "projection.yaml",
+			Definition: &ddprofiledefinition.ProfileDefinition{
+				BGP: []ddprofiledefinition.BGPConfig{
+					{
+						ID:   "peer",
+						Kind: ddprofiledefinition.BGPRowKindPeer,
+						Table: ddprofiledefinition.SymbolConfig{
+							OID:  "1.3.6.1.4.1.99999.10",
+							Name: "peerTable",
 						},
-						RemoteAS: ddprofiledefinition.BGPValueConfig{
-							Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.10.1.2", Name: "peerRemoteAS"},
-						},
-					},
-					State: ddprofiledefinition.BGPStateConfig{
-						BGPValueConfig: ddprofiledefinition.BGPValueConfig{
-							Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.10.1.3", Name: "peerState"},
-						},
-					},
-					Traffic: ddprofiledefinition.BGPTrafficConfig{
-						Messages: ddprofiledefinition.BGPDirectionalConfig{
-							Received: ddprofiledefinition.BGPValueConfig{
-								Table:  "peerAuxTable",
-								Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.20.1.1", Name: "peerMessagesReceived"},
+						Identity: ddprofiledefinition.BGPIdentityConfig{
+							Neighbor: ddprofiledefinition.BGPValueConfig{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.99999.10.1.1",
+									Name: "peerRemoteAddr",
+								},
+							},
+							RemoteAS: ddprofiledefinition.BGPValueConfig{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.99999.10.1.2",
+									Name: "peerRemoteAS",
+								},
 							},
 						},
-					},
-					MetricTags: []ddprofiledefinition.MetricTagConfig{
-						{
-							Tag:   "aux_tag",
-							Table: "peerAuxTable",
-							Symbol: ddprofiledefinition.SymbolConfigCompat{
-								OID:  "1.3.6.1.4.1.99999.20.1.2",
-								Name: "peerAuxTag",
+						State: ddprofiledefinition.BGPStateConfig{
+							BGPValueConfig: ddprofiledefinition.BGPValueConfig{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.4.1.99999.10.1.3",
+									Name: "peerState",
+								},
+							},
+						},
+						Traffic: ddprofiledefinition.BGPTrafficConfig{
+							Messages: ddprofiledefinition.BGPDirectionalConfig{
+								Received: ddprofiledefinition.BGPValueConfig{
+									Table: "peerAuxTable",
+									Symbol: ddprofiledefinition.SymbolConfig{
+										OID:  "1.3.6.1.4.1.99999.20.1.1",
+										Name: "peerMessagesReceived",
+									},
+								},
+							},
+						},
+						MetricTags: []ddprofiledefinition.MetricTagConfig{
+							{
+								Tag:   "aux_tag",
+								Table: "peerAuxTable",
+								Symbol: ddprofiledefinition.SymbolConfigCompat{
+									OID:  "1.3.6.1.4.1.99999.20.1.2",
+									Name: "peerAuxTag",
+								},
 							},
 						},
 					},
 				},
 			},
-		},
-	}}}
+		}},
+	}
 
 	full := resolved.Project(ConsumerBGP).Profiles()
 	require.Len(t, full, 1)
@@ -522,7 +616,9 @@ func projectionTestProfile() *Profile {
 							Consumers: ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerMetrics},
 						},
 						"lldp_loc_sys_name": {
-							Symbol:    ddprofiledefinition.SymbolConfig{Name: "lldpLocSysName"},
+							Symbol: ddprofiledefinition.SymbolConfig{
+								Name: "lldpLocSysName",
+							},
 							Consumers: ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerTopology},
 						},
 						"license_vendor": {
@@ -561,39 +657,56 @@ func projectionTestProfile() *Profile {
 			},
 			MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{
 				{
-					MetricTagConfig: ddprofiledefinition.MetricTagConfig{Tag: "model"},
-					Consumers:       ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerMetrics},
+					MetricTagConfig: ddprofiledefinition.MetricTagConfig{
+						Tag: "model",
+					},
+					Consumers: ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerMetrics},
 				},
 				{
-					MetricTagConfig: ddprofiledefinition.MetricTagConfig{Tag: "lldp_loc_chassis_id"},
-					Consumers:       ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerTopology},
+					MetricTagConfig: ddprofiledefinition.MetricTagConfig{
+						Tag: "lldp_loc_chassis_id",
+					},
+					Consumers: ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerTopology},
 				},
 				{
-					MetricTagConfig: ddprofiledefinition.MetricTagConfig{Tag: "license_model"},
-					Consumers:       ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerLicensing},
+					MetricTagConfig: ddprofiledefinition.MetricTagConfig{
+						Tag: "license_model",
+					},
+					Consumers: ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerLicensing},
 				},
 				{
-					MetricTagConfig: ddprofiledefinition.MetricTagConfig{Tag: "bgp_model"},
-					Consumers:       ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerBGP},
+					MetricTagConfig: ddprofiledefinition.MetricTagConfig{
+						Tag: "bgp_model",
+					},
+					Consumers: ddprofiledefinition.ConsumerSet{ddprofiledefinition.ConsumerBGP},
 				},
 			},
 			Metrics: []ddprofiledefinition.MetricsConfig{
 				{
-					Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.1.3.0", Name: "systemUptime"},
+					Symbol: ddprofiledefinition.SymbolConfig{
+						OID:  "1.3.6.1.2.1.1.3.0",
+						Name: "systemUptime",
+					},
 				},
 				{
-					Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.1.5.0", Name: "sysName"},
+					Symbol: ddprofiledefinition.SymbolConfig{
+						OID:  "1.3.6.1.2.1.1.5.0",
+						Name: "sysName",
+					},
 				},
 			},
 			Topology: []ddprofiledefinition.TopologyConfig{
 				{
 					Kind: ddprofiledefinition.KindLldpRem,
 					MetricsConfig: ddprofiledefinition.MetricsConfig{
-						Table: ddprofiledefinition.SymbolConfig{OID: "1.0.8802.1.1.2.1.4.1", Name: "lldpRemTable"},
+						Table: ddprofiledefinition.SymbolConfig{
+							OID:  "1.0.8802.1.1.2.1.4.1",
+							Name: "lldpRemTable",
+						},
 						Symbols: []ddprofiledefinition.SymbolConfig{
 							{OID: "1.0.8802.1.1.2.1.4.1.1.6", Name: "lldp_rem"},
 						},
-						MetricTags: ddprofiledefinition.MetricTagConfigList{
+						MetricTags: []ddprofiledefinition.MetricTagConfig{
 							{Tag: "lldp_rem_index", Index: 3},
 						},
 					},
@@ -601,11 +714,14 @@ func projectionTestProfile() *Profile {
 				{
 					Kind: ddprofiledefinition.KindStpPort,
 					MetricsConfig: ddprofiledefinition.MetricsConfig{
-						Table: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.17.2.15.1", Name: "dot1dStpPortTable"},
+						Table: ddprofiledefinition.SymbolConfig{
+							OID:  "1.3.6.1.2.1.17.2.15.1",
+							Name: "dot1dStpPortTable",
+						},
 						Symbols: []ddprofiledefinition.SymbolConfig{
 							{OID: "1.3.6.1.2.1.17.2.15.1.3", Name: "stp_port"},
 						},
-						MetricTags: ddprofiledefinition.MetricTagConfigList{
+						MetricTags: []ddprofiledefinition.MetricTagConfig{
 							{Tag: "stp_port", Index: 1},
 						},
 					},
@@ -616,7 +732,9 @@ func projectionTestProfile() *Profile {
 					ID:              "smart",
 					OriginProfileID: "_cisco-licensing-smart.yaml",
 					Identity: ddprofiledefinition.LicenseIdentityConfig{
-						ID: ddprofiledefinition.LicenseValueConfig{Value: "smart"},
+						ID: ddprofiledefinition.LicenseValueConfig{
+							Value: "smart",
+						},
 					},
 				},
 			},
@@ -625,88 +743,175 @@ func projectionTestProfile() *Profile {
 					ID:   "peer",
 					Kind: ddprofiledefinition.BGPRowKindPeer,
 					Identity: ddprofiledefinition.BGPIdentityConfig{
-						RoutingInstance: ddprofiledefinition.BGPValueConfig{Value: "default"},
-						Neighbor:        ddprofiledefinition.BGPValueConfig{Value: "192.0.2.1"},
-						RemoteAS:        ddprofiledefinition.BGPValueConfig{Value: "65001"},
+						RoutingInstance: ddprofiledefinition.BGPValueConfig{
+							Value: "default",
+						},
+						Neighbor: ddprofiledefinition.BGPValueConfig{
+							Value: "192.0.2.1",
+						},
+						RemoteAS: ddprofiledefinition.BGPValueConfig{
+							Value: "65001",
+						},
 					},
 					Descriptors: ddprofiledefinition.BGPDescriptorsConfig{
-						LocalAddress:    ddprofiledefinition.BGPValueConfig{Value: "192.0.2.2"},
-						LocalAS:         ddprofiledefinition.BGPValueConfig{Value: "65000"},
-						LocalIdentifier: ddprofiledefinition.BGPValueConfig{Value: "10.0.0.1"},
-						PeerIdentifier:  ddprofiledefinition.BGPValueConfig{Value: "10.0.0.2"},
-						PeerType:        ddprofiledefinition.BGPValueConfig{Value: "ipv4"},
-						BGPVersion:      ddprofiledefinition.BGPValueConfig{Value: "4"},
-						Description:     ddprofiledefinition.BGPValueConfig{Value: "peer"},
+						LocalAddress: ddprofiledefinition.BGPValueConfig{
+							Value: "192.0.2.2",
+						},
+						LocalAS: ddprofiledefinition.BGPValueConfig{
+							Value: "65000",
+						},
+						LocalIdentifier: ddprofiledefinition.BGPValueConfig{
+							Value: "10.0.0.1",
+						},
+						PeerIdentifier: ddprofiledefinition.BGPValueConfig{
+							Value: "10.0.0.2",
+						},
+						PeerType: ddprofiledefinition.BGPValueConfig{
+							Value: "ipv4",
+						},
+						BGPVersion: ddprofiledefinition.BGPValueConfig{
+							Value: "4",
+						},
+						Description: ddprofiledefinition.BGPValueConfig{
+							Value: "peer",
+						},
 					},
 					Admin: ddprofiledefinition.BGPAdminConfig{
-						Enabled: ddprofiledefinition.BGPValueConfig{Value: "start"},
+						Enabled: ddprofiledefinition.BGPValueConfig{
+							Value: "start",
+						},
 					},
 					State: ddprofiledefinition.BGPStateConfig{
-						BGPValueConfig: ddprofiledefinition.BGPValueConfig{Value: "established"},
+						BGPValueConfig: ddprofiledefinition.BGPValueConfig{
+							Value: "established",
+						},
 					},
 					Previous: ddprofiledefinition.BGPStateConfig{
-						BGPValueConfig: ddprofiledefinition.BGPValueConfig{Value: "idle"},
+						BGPValueConfig: ddprofiledefinition.BGPValueConfig{
+							Value: "idle",
+						},
 					},
 					Connection: ddprofiledefinition.BGPConnectionConfig{
 						EstablishedUptime: ddprofiledefinition.BGPValueConfig{
-							Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.15.3.1.16", Name: "bgpPeerFsmEstablishedTime"},
+							Symbol: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.2.1.15.3.1.16",
+								Name: "bgpPeerFsmEstablishedTime",
+							},
 						},
 						LastReceivedUpdateAge: ddprofiledefinition.BGPValueConfig{
-							Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.15.3.1.24", Name: "bgpPeerInUpdateElapsedTime"},
+							Symbol: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.2.1.15.3.1.24",
+								Name: "bgpPeerInUpdateElapsedTime",
+							},
 						},
 					},
 					Traffic: ddprofiledefinition.BGPTrafficConfig{
 						Messages: ddprofiledefinition.BGPDirectionalConfig{
-							Received: ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.15.3.1.12", Name: "bgpPeerInTotalMessages"}},
-							Sent:     ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.15.3.1.13", Name: "bgpPeerOutTotalMessages"}},
+							Received: ddprofiledefinition.BGPValueConfig{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.15.3.1.12",
+									Name: "bgpPeerInTotalMessages",
+								},
+							},
+							Sent: ddprofiledefinition.BGPValueConfig{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.15.3.1.13",
+									Name: "bgpPeerOutTotalMessages",
+								},
+							},
 						},
 					},
 					Transitions: ddprofiledefinition.BGPTransitionsConfig{
-						Established: ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.15.3.1.15", Name: "bgpPeerFsmEstablishedTransitions"}},
+						Established: ddprofiledefinition.BGPValueConfig{
+							Symbol: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.2.1.15.3.1.15",
+								Name: "bgpPeerFsmEstablishedTransitions",
+							},
+						},
 					},
 					Timers: ddprofiledefinition.BGPTimersConfig{
 						Negotiated: ddprofiledefinition.BGPTimerPairConfig{
-							HoldTime: ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.15.3.1.18", Name: "bgpPeerHoldTime"}},
+							HoldTime: ddprofiledefinition.BGPValueConfig{
+								Symbol: ddprofiledefinition.SymbolConfig{
+									OID:  "1.3.6.1.2.1.15.3.1.18",
+									Name: "bgpPeerHoldTime",
+								},
+							},
 						},
 					},
 					LastError: ddprofiledefinition.BGPLastErrorConfig{
-						Code: ddprofiledefinition.BGPValueConfig{Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.15.3.1.14", Name: "bgpPeerLastErrorCode"}},
+						Code: ddprofiledefinition.BGPValueConfig{
+							Symbol: ddprofiledefinition.SymbolConfig{
+								OID:  "1.3.6.1.2.1.15.3.1.14",
+								Name: "bgpPeerLastErrorCode",
+							},
+						},
 					},
 					LastNotify: ddprofiledefinition.BGPLastNotifyConfig{
 						Received: ddprofiledefinition.BGPLastNotificationConfig{
-							Reason: ddprofiledefinition.BGPValueConfig{Value: "hold timer expired"},
+							Reason: ddprofiledefinition.BGPValueConfig{
+								Value: "hold timer expired",
+							},
 						},
 					},
 					Reasons: ddprofiledefinition.BGPReasonsConfig{
-						LastDown: ddprofiledefinition.BGPValueConfig{Value: "manual"},
+						LastDown: ddprofiledefinition.BGPValueConfig{
+							Value: "manual",
+						},
 					},
 					Restart: ddprofiledefinition.BGPGracefulRestartConfig{
-						State: ddprofiledefinition.BGPValueConfig{Value: "enabled"},
+						State: ddprofiledefinition.BGPValueConfig{
+							Value: "enabled",
+						},
 					},
 					Routes: ddprofiledefinition.BGPRoutesConfig{
 						Total: ddprofiledefinition.BGPRouteCountersConfig{
-							Accepted: ddprofiledefinition.BGPValueConfig{Value: "10"},
+							Accepted: ddprofiledefinition.BGPValueConfig{
+								Value: "10",
+							},
 						},
 					},
 					RouteLimits: ddprofiledefinition.BGPRouteLimitsConfig{
-						Limit: ddprofiledefinition.BGPValueConfig{Value: "1000"},
+						Limit: ddprofiledefinition.BGPValueConfig{
+							Value: "1000",
+						},
 					},
 					Device: ddprofiledefinition.BGPDeviceCountsConfig{
-						Peers: ddprofiledefinition.BGPValueConfig{Value: "1"},
+						Peers: ddprofiledefinition.BGPValueConfig{
+							Value: "1",
+						},
 					},
 					StaticTags: []ddprofiledefinition.StaticMetricTagConfig{{Tag: "scope", Value: "bgp"}},
 					MetricTags: []ddprofiledefinition.MetricTagConfig{
-						{Tag: "bgp_extra", Symbol: ddprofiledefinition.SymbolConfigCompat{OID: "1.3.6.1.2.1.15.3.1.99", Name: "bgpPeerExtra"}},
+						{
+							Tag: "bgp_extra",
+							Symbol: ddprofiledefinition.SymbolConfigCompat{
+								OID:  "1.3.6.1.2.1.15.3.1.99",
+								Name: "bgpPeerExtra",
+							},
+						},
 					},
 				},
 				{
 					ID:   "peer-family",
 					Kind: ddprofiledefinition.BGPRowKindPeerFamily,
 					Identity: ddprofiledefinition.BGPIdentityConfig{
-						Neighbor:                ddprofiledefinition.BGPValueConfig{Value: "192.0.2.1"},
-						RemoteAS:                ddprofiledefinition.BGPValueConfig{Value: "65001"},
-						AddressFamily:           ddprofiledefinition.BGPAddressFamilyValueConfig{BGPValueConfig: ddprofiledefinition.BGPValueConfig{Value: "ipv4"}},
-						SubsequentAddressFamily: ddprofiledefinition.BGPSubsequentAddressFamilyValueConfig{BGPValueConfig: ddprofiledefinition.BGPValueConfig{Value: "unicast"}},
+						Neighbor: ddprofiledefinition.BGPValueConfig{
+							Value: "192.0.2.1",
+						},
+						RemoteAS: ddprofiledefinition.BGPValueConfig{
+							Value: "65001",
+						},
+						AddressFamily: ddprofiledefinition.BGPAddressFamilyValueConfig{
+							BGPValueConfig: ddprofiledefinition.BGPValueConfig{
+								Value: "ipv4",
+							},
+						},
+						SubsequentAddressFamily: ddprofiledefinition.BGPSubsequentAddressFamilyValueConfig{
+							BGPValueConfig: ddprofiledefinition.BGPValueConfig{
+								Value: "unicast",
+							},
+						},
 					},
 				},
 				{

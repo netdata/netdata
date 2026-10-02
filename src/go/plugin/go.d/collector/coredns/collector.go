@@ -48,12 +48,12 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode              string `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery        int    `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 	web.HTTPConfig     `yaml:",inline" json:""`
-	PerServerStats     matcher.SimpleExpr `yaml:"per_server_stats,omitempty" json:"per_server_stats"`
-	PerZoneStats       matcher.SimpleExpr `yaml:"per_zone_stats,omitempty" json:"per_zone_stats"`
+	PerServerStats     matcher.SimpleExpr `yaml:"per_server_stats,omitempty"    json:"per_server_stats"`
+	PerZoneStats       matcher.SimpleExpr `yaml:"per_zone_stats,omitempty"      json:"per_zone_stats"`
 }
 
 type Collector struct {
@@ -77,7 +77,7 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation: %v", err)
 	}
@@ -98,7 +98,7 @@ func (c *Collector) Init(context.Context) error {
 		c.perZoneMatcher = zm
 	}
 
-	prom, err := c.initPrometheusClient()
+	prom, err := c.initPrometheusClient(ctx)
 	if err != nil {
 		return fmt.Errorf("init prometheus client: %v", err)
 	}
@@ -107,8 +107,8 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
+func (c *Collector) Check(ctx context.Context) error {
+	mx, err := c.collect(ctx)
 	if err != nil {
 		return err
 	}
@@ -123,8 +123,8 @@ func (c *Collector) Charts() *Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
+func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+	mx, err := c.collect(ctx)
 
 	if err != nil {
 		c.Error(err)
@@ -134,7 +134,7 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return mx
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
 	if c.prom != nil && c.prom.HTTPClient() != nil {
 		c.prom.HTTPClient().CloseIdleConnections()
 	}

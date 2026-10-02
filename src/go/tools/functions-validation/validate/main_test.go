@@ -51,6 +51,36 @@ func TestTopologyV1EnvelopeVersionValidates(t *testing.T) {
 	}
 }
 
+func TestTopologyV1NotificationValidates(t *testing.T) {
+	schemaBytes := readTestFile(t, filepath.Join("..", "..", "..", "..", "plugins.d", "FUNCTION_TOPOLOGY_SCHEMA.json"))
+	fixture := readTestFile(t, filepath.Join("..", "fixtures", "topology-v1", "snmp-l2.json"))
+
+	var payload map[string]any
+	if err := json.Unmarshal(fixture, &payload); err != nil {
+		t.Fatalf("decode fixture: %v", err)
+	}
+	payload["data"].(map[string]any)["notifications"] = []any{
+		map[string]any{
+			"severity":         "error",
+			"code":             "source.unavailable",
+			"message":          "A requested source did not return topology data.",
+			"affected_node_id": "node-a",
+		},
+	}
+
+	inputBytes, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("encode fixture: %v", err)
+	}
+	validated, err := validateJSON(schemaBytes, inputBytes)
+	if err != nil {
+		t.Fatalf("validate fixture with notification: %v", err)
+	}
+	if validated.(map[string]any)["status"] != float64(200) {
+		t.Fatalf("expected non-terminal notification response status 200")
+	}
+}
+
 func TestFunctionUISchemaValidationSkipsTopologySemanticsForTableResponses(t *testing.T) {
 	schemaBytes := readTestFile(t, filepath.Join("..", "..", "..", "..", "plugins.d", "FUNCTION_UI_SCHEMA.json"))
 	input := []byte(`{

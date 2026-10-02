@@ -30,6 +30,92 @@ size_t exporting_name_copy(char *dst, const char *src, size_t max_len)
 }
 
 /**
+ * Decode one UTF-8 sequence
+ *
+ * Shared by the text-protocol connectors, which must decode before they can decide whether a
+ * codepoint threatens their record framing. Invalid or truncated sequences are reported as their
+ * single leading byte, so callers keep byte-for-byte length. A caller therefore passes such a byte
+ * through unchanged, except where the byte value is itself a codepoint the caller replaces: an orphan
+ * 0x80-0x9F is a C1 control and 0xA0 is NBSP.
+ *
+ * @param src the sequence to decode.
+ * @param len the number of bytes available at src.
+ * @param codepoint where the decoded codepoint is stored.
+ * @return Returns the number of bytes consumed, or 0 when len is 0.
+ */
+size_t exporting_utf8_decode(const char *src, size_t len, uint32_t *codepoint) {
+    if(!len) {
+        *codepoint = 0;
+        return 0;
+    }
+
+    const uint8_t *s = (const uint8_t *)src;
+    uint32_t cp = s[0];
+    uint32_t minimum = 0;
+    size_t bytes = 1;
+
+    if(cp < 0x80)
+        goto done;
+    else if((cp & 0xE0) == 0xC0) {
+        cp &= 0x1F;
+        minimum = 0x80;
+        bytes = 2;
+    }
+    else if((cp & 0xF0) == 0xE0) {
+        cp &= 0x0F;
+        minimum = 0x800;
+        bytes = 3;
+    }
+    else if((cp & 0xF8) == 0xF0) {
+        cp &= 0x07;
+        minimum = 0x10000;
+        bytes = 4;
+    }
+    else
+        goto done;
+
+    if(bytes > len)
+        goto invalid;
+
+    for(size_t i = 1; i < bytes; i++) {
+        if((s[i] & 0xC0) != 0x80)
+            goto invalid;
+
+        cp = (cp << 6) | (s[i] & 0x3F);
+    }
+
+    if(cp < minimum || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF))
+        goto invalid;
+
+done:
+    *codepoint = cp;
+    return bytes;
+
+invalid:
+    *codepoint = s[0];
+    return 1;
+}
+
+/**
+ * Check whether a codepoint is Unicode whitespace
+ *
+ * Receivers of our text protocols split fields on whitespace, and the Python-based ones (Carbon)
+ * split on the full Unicode set, not just ASCII. Any codepoint here can therefore split a field or
+ * terminate a record at the destination.
+ *
+ * @param codepoint the codepoint to check.
+ * @return Returns true when the codepoint is whitespace.
+ */
+bool exporting_unicode_is_whitespace(uint32_t codepoint) {
+    return (codepoint >= 0x0009 && codepoint <= 0x000D) ||
+           (codepoint >= 0x001C && codepoint <= 0x0020) ||
+           codepoint == 0x0085 || codepoint == 0x00A0 || codepoint == 0x1680 ||
+           (codepoint >= 0x2000 && codepoint <= 0x200A) ||
+           codepoint == 0x2028 || codepoint == 0x2029 || codepoint == 0x202F ||
+           codepoint == 0x205F || codepoint == 0x3000;
+}
+
+/**
  * Mark scheduled instances
  *
  * Any instance can have its own update interval. On every exporting engine update only those instances are picked,

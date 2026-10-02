@@ -19,9 +19,6 @@
     }
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "device": {
       "ui:placeholder": "For systems with multiple GPUs, create separate data collection jobs and specify the device for each job."
     }

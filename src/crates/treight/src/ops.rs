@@ -1,6 +1,31 @@
+//! Recursive subtree walkers behind `RawBitmap`'s query, mutation and
+//! set-op methods. `raw` is the only importer (`raw.rs`'s `use crate::ops`
+//! block); bitmap.rs and
+//! sfst reach these through `RawBitmap`/`Bitmap` methods. Everything here
+//! is `pub(crate)`.
+//!
+//! Shared conventions:
+//! - `level` is the height of the subtree at the reader's cursor and is
+//!   decremented per step; a node at height `h` spans `8^h` values and
+//!   child `c` of it starts at `base + c * 8^(h-1)` (`child_index`/
+//!   `child_offset`, node.rs).
+//! - `NodeReader` walks the serialized tree in pre-order (node byte, then
+//!   present children in index order), so each call consumes exactly one
+//!   subtree and later children are reached by skipping the preceding
+//!   ones.
+//! - Bytes appended to `out` are the result subtree's serialization,
+//!   appended at the end of `out`; [`RawBitmap`]'s set-op methods snapshot
+//!   `out.len()` around the call (see `raw.rs`) and treat the
+//!   growth as the result's tree bytes — the convention sfst's set ops
+//!   build on (`PosSet::or_assign`/`and_assign` in `sfst/src/index_reader.rs`).
 use crate::node::{child_index, NodeReader};
 
-/// Recursive contains check. Matches `is_hit_1` from `src/fid.c:260-278`.
+/// Walk the tree to `value`, reading one node byte per level: take the
+/// child selected by `value`'s 3-bit field, return `false` if that child
+/// is absent, else skip the preceding siblings' subtrees so the cursor
+/// lands on the child's subtree, and recurse. `level` is the remaining
+/// height and is decremented first — the call at `level == 1` reads the
+/// leaf byte. Matches `is_hit_1` in GNU idutils' fid.c.
 pub(crate) fn contains_inner(nodes: &mut NodeReader, level: u32, value: u32) -> bool {
     let level = level - 1;
     let child = child_index(level, value);
@@ -22,10 +47,17 @@ pub(crate) fn contains_inner(nodes: &mut NodeReader, level: u32, value: u32) -> 
     contains_inner(nodes, level, value)
 }
 
-/// Count set bits in the subtree at `level` that fall within `[start, end)`.
+/// Count the set bits in the subtree at `level` whose values fall in
+/// `[start, end)`. `base` is the value the subtree's root starts at (0 at
+/// the tree root). Children fully inside the range are counted in one
+/// shot by `skip_subtree` — its return value is the subtree's population
+/// — fully outside ones are skipped, and partially overlapping ones
+/// recurse; the leaf counts only its bits inside `[start, end)`, clamped
+/// to the leaf's 8 values.
 ///
-/// `base` is the value offset of this subtree's root (0 for the tree root).
-/// Uses u64 arithmetic to avoid overflow at the highest tree levels.
+/// Arithmetic is `u64` because the span of an 11-level (u32-max) tree is
+/// `8^11 = 2^33`, so `base` and the range offsets can exceed `u32::MAX`
+/// even though stored values cannot.
 pub(crate) fn range_count(
     reader: &mut NodeReader,
     level: u32,
@@ -70,13 +102,13 @@ pub(crate) fn range_count(
     count
 }
 
-/// Remove values in `[start, end)` from the subtree at `level`, writing the
-/// surviving nodes to `out`. Returns `true` if the subtree is non-empty after
-/// removal.
-///
-/// Same structure as the set-operation walkers: children fully outside the
-/// removal range are copied, children fully inside are skipped (dropped), and
-/// children with partial overlap are recursed into.
+/// Remove the values in `[start, end)` from the subtree at `level`,
+/// appending the surviving subtree to `out`. Returns `true` if anything
+/// survived. Children fully outside the range are copied verbatim, fully
+/// inside ones are dropped, and partially overlapping ones recurse; like
+/// the pruning set-op walkers, a node whose children all vanish pops its
+/// reserved byte (nothing is appended) and a leaf survives only if bits
+/// remain after masking out `[start, end)`.
 pub(crate) fn remove_range_subtree(
     reader: &mut NodeReader,
     level: u32,
@@ -139,34 +171,37 @@ pub(crate) fn remove_range_subtree(
     }
 }
 
-/// Copy a subtree rooted at `level` from the reader to `out` verbatim.
-///
-/// Advances the reader past the subtree by calling `skip_subtree`, then copies
-/// the raw bytes that were traversed.
+/// Copy the subtree at `level` from the reader to `out` verbatim:
+/// `skip_subtree` advances the reader past it and the traversed byte
+/// range is appended as-is.
 pub(crate) fn copy_subtree(reader: &mut NodeReader, level: u32, out: &mut Vec<u8>) {
     let start = reader.pos;
     reader.skip_subtree(level);
     out.extend_from_slice(&reader.nodes[start..reader.pos]);
 }
 
-// The four set-operation walkers below share identical structure and differ
-// in exactly three parameters:
+// The four set-op walkers below share one shape: both readers advance in
+// lockstep, one subtree per child position, and the operations differ in
+// the leaf byte op plus what a child present in only one operand does:
 //
-//   Operation  | Leaf op   | A-only child | B-only child
-//   -----------+-----------+--------------+-------------
-//   OR  (union)| a | b     | copy         | copy
-//   AND (inter)| a & b     | skip         | skip
-//   SUB (diff) | a & !b    | copy         | skip
-//   XOR (symd) | a ^ b     | copy         | copy
+//   Operation | Leaf op | A-only child | B-only child
+//   ----------+---------+--------------+-------------
+//   OR        | a | b   | copy         | copy
+//   AND       | a & b   | skip         | skip
+//   SUB       | a & !b  | copy         | skip
+//   XOR       | a ^ b   | copy         | copy
 //
-// They could be unified into a single generic walker parameterized by these
-// three values, but are kept separate for readability.
+// Both operands must be non-empty and equally tall — raw.rs guarantees
+// that (empty-blob short-circuits plus an unconditional `assert_eq!` on
+// universe sizes) before dispatch. OR never prunes: union always emits
+// its `a|b` node byte. AND/SUB/XOR prune subtrees that compute to
+// nothing, reporting survival with a `bool` and back-patching the
+// reserved node byte with the surviving child bits.
 
-/// Recursively compute the union of two subtrees at the given `level`.
-///
-/// Walks both trees in lockstep. Children present in both are recursed into
-/// (OR-ing leaf bytes). Children unique to one side are bulk-copied. The result
-/// is always non-empty when at least one input subtree is non-empty.
+/// Union of two subtrees (see the table above): leaf and node bytes are
+/// OR'd, children unique to one side are copied verbatim, and nothing is
+/// pruned — the result is a canonical non-empty subtree whenever the
+/// inputs are.
 pub(crate) fn union_subtree(a: &mut NodeReader, b: &mut NodeReader, level: u32, out: &mut Vec<u8>) {
     let node_a = a.next();
     let node_b = b.next();
@@ -198,11 +233,10 @@ pub(crate) fn union_subtree(a: &mut NodeReader, b: &mut NodeReader, level: u32, 
     }
 }
 
-/// Recursively intersect two subtrees at the given `level`.
-///
-/// Walks both trees in lockstep, only descending into children present in both.
-/// Subtrees unique to one side are skipped without expansion. Returns `true`
-/// if the intersection produced any output.
+/// Intersection of two subtrees (see the table above): leaves AND
+/// byte-wise, children unique to one side are skipped past, and subtrees
+/// that intersect to nothing are pruned. Returns `true` if the subtree
+/// survived.
 pub(crate) fn intersect_subtree(
     a: &mut NodeReader,
     b: &mut NodeReader,
@@ -258,11 +292,10 @@ pub(crate) fn intersect_subtree(
     }
 }
 
-/// Recursively compute the set difference (a - b) of two subtrees at `level`.
-///
-/// Children only in A are copied verbatim. Children only in B are skipped.
-/// Children in both are recursed into with leaf op `a & !b`. Returns `true`
-/// if the result is non-empty (needs pruning like intersect).
+/// Set difference `a - b` of two subtrees (see the table above): leaves
+/// keep `a & !b`, A-only children are copied verbatim (B has nothing to
+/// remove there), B-only ones are skipped past, and empty results are
+/// pruned. Returns `true` if the subtree survived.
 pub(crate) fn difference_subtree(
     a: &mut NodeReader,
     b: &mut NodeReader,
@@ -317,11 +350,11 @@ pub(crate) fn difference_subtree(
     }
 }
 
-/// Recursively compute the symmetric difference (a ^ b) of two subtrees at `level`.
-///
-/// Children unique to one side are copied verbatim. Children in both are
-/// recursed into with leaf op `a ^ b`. Returns `true` if the result is
-/// non-empty (needs pruning since identical leaves XOR to zero).
+/// Symmetric difference `a ^ b` of two subtrees (see the table above):
+/// leaves XOR byte-wise, children unique to either side are copied
+/// verbatim (the other operand has nothing there), and equal leaves XOR
+/// to zero, so empty subtrees are pruned. Returns `true` if the subtree
+/// survived.
 pub(crate) fn symmetric_difference_subtree(
     a: &mut NodeReader,
     b: &mut NodeReader,

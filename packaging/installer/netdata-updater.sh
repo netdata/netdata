@@ -20,9 +20,9 @@
 # Optional environment options:
 #
 #  - TMPDIR (set to a usable temporary directory)
-#  - NETDATA_NIGHTLIES_BASEURL (set the base url for downloading the dist tarball)
+#  - NETDATA_BASE_URL (set the base url for downloading the dist tarball)
 
-# Next unused error code: U0029
+# Next unused error code: U002A
 
 set -e
 
@@ -873,12 +873,21 @@ self_update() {
   fi
 }
 
+# Parse the version into a (large) integer for easy comparison.
+#
+# The resultant integer consists of three groups of three digits encoding the major, minor, and patch versions,
+# followed by a single digit encoding the version type (0 for nightly builds and git builds based on a stable or
+# nightly version, 1 for release candidate builds, 2 for git builds based on a release candidate version, 3 for
+# stable versions, and 9 for unknown), three digits for the release candidate number (all zeroes if the build
+# isn’t a release candidate build), and five digits for the commit number for git builds (all zeroes if the
+# build isn’t a git build).
 parse_version() {
   r="${1}"
+  vmax="999999999999999999"
   if [ "${r}" = "latest" ]; then
     # If we get ‘latest’ as a version, return the largest possible
     # version value.
-    printf "999999999999999"
+    printf "%s" "${vmax}"
     return 0
   elif echo "${r}" | grep -q '^v.*'; then
     # shellcheck disable=SC2001
@@ -888,10 +897,33 @@ parse_version() {
 
   tmpfile="$(mktemp)"
   echo "${r}" | tr '-' ' ' > "${tmpfile}"
-  read -r v b _ < "${tmpfile}"
+  read -r v b1 b2 _ < "${tmpfile}"
 
-  if echo "${b}" | grep -vEq "^[0-9]+$"; then
-    b="0"
+  if echo "${b1}" | grep -Eq "^rc[0-9]+$"; then
+    rc="$(echo "${b1}" | tr -d 'rc')"
+
+    if echo "${b2}" | grep -Eq "^[0-9]+$"; then
+      t=2
+      b="${b2}"
+    elif [ -z "${b2}" ]; then
+      t=1
+      b=0
+    else
+      t=9
+      b=99999
+    fi
+  elif echo "${b1}" | grep -Eq "^[0-9]+$"; then
+    t=0
+    rc=0
+    b="${b1}"
+  elif [ -z "${b1}" ]; then
+    t=3
+    rc=0
+    b=0
+  else
+    t=9
+    rc=999
+    b=99999
   fi
 
   echo "${v}" | tr '.' ' ' > "${tmpfile}"
@@ -899,16 +931,22 @@ parse_version() {
 
   rm -f "${tmpfile}"
 
-  printf "%04d%03d%03d%05d" "${maj}" "${min}" "${patch}" "${b}"
+  if [ "${#maj}" -gt 3 ] || [ "${#min}" -gt 3 ] || [ "${#patch}" -gt 3 ] || [ "${#rc}" -gt 3 ] || [ "${#b}" -gt 5 ]; then
+    warning "Failed to parse version ${r}"
+    printf "%s" "${vmax}"
+    return 0
+  fi
+
+  printf "%03d%03d%03d%01d%03d%05d" "${maj}" "${min}" "${patch}" "${t}" "${rc}" "${b}"
 }
 
 get_latest_tag() {
   if [ -z "${_latest_tag}" ]; then
-    if [ "${RELEASE_CHANNEL}" = "stable" ]; then
-        _latest_tag="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}")"
-    else
-        _latest_tag="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}")"
-    fi
+    case "${1}" in
+      stable) _latest_tag="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}")" ;;
+      nightly) _latest_tag="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}")" ;;
+      *) warning "Unknown release channel ${1}, updating may not work correctly" ; _latest_tag="" ;;
+    esac
   fi
 
   echo "${_latest_tag}"
@@ -938,7 +976,7 @@ get_current_version() {
 }
 
 get_latest_version() {
-  parse_version "$(get_latest_tag)"
+  parse_version "$(get_latest_tag "${RELEASE_CHANNEL}")"
 }
 
 update_available() {
@@ -963,8 +1001,8 @@ update_available() {
     info "Update available"
 
     if [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
-      current_major="$(echo "${current_version}" | head -c 4)"
-      latest_major="$(echo "${latest_version}" | head -c 4)"
+      current_major="$(echo "${current_version}" | head -c 3)"
+      latest_major="$(echo "${latest_version}" | head -c 3)"
 
       if [ "${current_major}" -ne "${latest_major}" ]; then
         update_safe=0
@@ -987,7 +1025,7 @@ update_available() {
 }
 
 set_tarball_urls() {
-  filename="netdata-latest.tar.gz"
+  filename="netdata-latest.tar"
 
   if [ "$2" = "yes" ]; then
     if [ -e /opt/netdata/etc/netdata/.install-type ]; then
@@ -1000,18 +1038,25 @@ set_tarball_urls() {
     fi
   fi
 
+  export archive_base_name="${filename}"
+
   if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
     path="$(cd "${NETDATA_OFFLINE_INSTALL_SOURCE}" || exit 1; pwd)"
     export NETDATA_TARBALL_URL="file://${path}/${filename}"
     export NETDATA_TARBALL_CHECKSUM_URL="file://${path}/sha256sums.txt"
-  elif [ "$1" = "stable" ]; then
-    latest="$(get_latest_tag)"
-    export NETDATA_TARBALL_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/${filename}"
-    export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/sha256sums.txt"
   else
-    tag="$(get_latest_tag)"
-    export NETDATA_TARBALL_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${tag}/${filename}"
-    export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${tag}/sha256sums.txt"
+    latest="$(get_latest_tag "${1}")"
+    [ -z "${latest}" ] && fatal "Unknown release channel ${1}, unable to update" U0029
+    case "${1}" in
+      stable)
+        export NETDATA_TARBALL_URL="${NETDATA_STABLE_BASE_URL}/download/${latest}/${filename}"
+        export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_STABLE_BASE_URL}/download/${latest}/sha256sums.txt"
+        ;;
+      nightly)
+        export NETDATA_TARBALL_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${latest}/${filename}"
+        export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${latest}/sha256sums.txt"
+        ;;
+    esac
   fi
 }
 
@@ -1022,22 +1067,42 @@ update_build() {
   create_exec_tmp_directory
   cd "$ndtmpdir" || fatal "Failed to change current working directory to ${ndtmpdir}" U0016
 
+  zstd="$(command -v zstd 2>/dev/null || true)"
+
   install_build_dependencies
 
   if update_available; then
     download "${NETDATA_TARBALL_CHECKSUM_URL}" "${ndtmpdir}/sha256sum.txt" >&3 2>&3
-    download "${NETDATA_TARBALL_URL}" "${ndtmpdir}/netdata-latest.tar.gz"
+
+    archive_name=""
+
+    if [ -n "${zstd}" ]; then
+      if _safe_download "${NETDATA_TARBALL_URL}.zst" "${ndtmpdir}/${archive_base_name}.zst"; then
+        archive_name="${archive_base_name}.zst"
+        decompress="${zstd} -dc"
+      else
+        warning "Failed to download zstd compressed source archive, trying gzip compressed source archive as a fallback."
+      fi
+    fi
+
+    if [ -z "${archive_name}" ]; then
+      if download "${NETDATA_TARBALL_URL}.gz" "${ndtmpdir}/${archive_base_name}.gz"; then
+        archive_name="${archive_base_name}.gz"
+        decompress="$(command -v gzip 2>/dev/null) -dc"
+      fi
+    fi
+
     if [ -n "${NETDATA_TARBALL_CHECKSUM}" ] &&
       grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3 &&
       [ "$NETDATA_FORCE_UPDATE" != "1" ]; then
       info "Newest version is already installed"
     else
-      if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
+      if ! grep "${archive_name}" sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
         fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${ndtmpdir}\nUsually this is a result of an older copy of the tarball or checksum file being cached somewhere upstream and can be resolved by retrying in an hour." U0008
       fi
-      NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2> /dev/null | cut -d' ' -f1)"
-      tar -xf netdata-latest.tar.gz >&3 2>&3
-      rm netdata-latest.tar.gz >&3 2>&3
+      NEW_CHECKSUM="$(safe_sha256sum "${archive_name}" 2> /dev/null | cut -d' ' -f1)"
+      ${decompress} "${archive_name}" | tar -xf - >&3 2>&3
+      rm "${archive_name}" >&3 2>&3
       if [ -z "$path_version" ]; then
         latest_tag="$(get_latest_tag)"
         path_version="$(echo "${latest_tag}" | cut -f 1 -d "-")"
@@ -1293,13 +1358,21 @@ update_binpkg() {
   elif ${pkg_installed_check} netdata-repo-edge > /dev/null 2>&1; then
     RELEASE_CHANNEL="nightly"
     repopkg="netdata-repo-edge"
-  elif echo "${initial_version}" | grep -Eq -- '^[0-9]*[1-9][0-9]*0{5}$'; then # All five final digits are zero and at least one preceeding digit is non-zero.
-    RELEASE_CHANNEL="stable"
-  elif echo "${initial_version}" | grep -Eq -- '^[0-9]*[1-9][0-9]{0,4}$'; then # At least one of the final five digits is non-zero.
-    RELEASE_CHANNEL="nightly"
   else
-    RELEASE_CHANNEL="none"
-    warning "Unable to determine which release channel is being used on this system, cannot check if packages are still being published."
+    case "$(echo "${initial_version}" | cut -c 10)" in
+      0)
+        RELEASE_CHANNEL="nightly"
+        repopkg="netdata-repo-edge"
+        ;;
+      3)
+        RELEASE_CHANNEL="stable"
+        repopkg="netdata-repo"
+        ;;
+      *)
+        RELEASE_CHANNEL="none"
+        warning "Unable to determine which release channel is being used on this system, cannot check if packages are still being published."
+        ;;
+    esac
   fi
 
   if [ -n "${repo_path}" ]; then
@@ -1348,7 +1421,7 @@ update_binpkg() {
     fi
   fi
 
-  current_major="$(get_current_version | head -c 4 | awk '{ print $1 + 0 }')"
+  current_major="$(get_current_version | head -c 3 | awk '{ print $1 + 0 }')"
   latest_major="$(get_new_binpkg_major)"
 
   # current_major == 0 means we could not determine the installed version
@@ -1406,7 +1479,7 @@ update_binpkg() {
 
 # Simple function to encapsulate original updater behavior.
 update_legacy() {
-  set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
+  set_tarball_urls "${RELEASE_CHANNEL:-nightly}" "${IS_NETDATA_STATIC_BINARY}"
   case "${IS_NETDATA_STATIC_BINARY}" in
     yes) update_static && exit 0 ;;
     *) update_build && exit 0 ;;
@@ -1549,12 +1622,12 @@ dev_null_fix
 case "${INSTALL_TYPE}" in
     *-build)
       validate_environment_file
-      set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
+      set_tarball_urls "${RELEASE_CHANNEL:-nightly}" "${IS_NETDATA_STATIC_BINARY}"
       update_build && exit 0
       ;;
     *-static*)
       validate_environment_file
-      set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
+      set_tarball_urls "${RELEASE_CHANNEL:-nightly}" "${IS_NETDATA_STATIC_BINARY}"
       update_static && exit 0
       ;;
     *binpkg*) update_binpkg && exit 0 ;;

@@ -2,6 +2,10 @@
 
 package web
 
+import (
+	"context"
+)
+
 func ExampleHTTPConfig_usage() {
 	// Just embed HTTPConfig into your module structure.
 	// It allows you to have both RequestConfig and ClientConfig fields in the module configuration file.
@@ -10,6 +14,10 @@ func ExampleHTTPConfig_usage() {
 	}
 
 	var m myModule
-	_, _ = NewHTTPRequest(m.RequestConfig)
-	_, _ = NewHTTPClient(m.ClientConfig)
+	client, err := NewHTTPClient(context.Background(), m.ClientConfig)
+	if err != nil {
+		return
+	}
+	defer client.CloseIdleConnections()
+	_, _ = NewHTTPRequest(context.Background(), m.RequestConfig)
 }

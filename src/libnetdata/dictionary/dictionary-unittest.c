@@ -1039,6 +1039,181 @@ static int dictionary_unittest_view_threads() {
     return 0;
 }
 
+// ----------------------------------------------------------------------------
+// GC traversal cursor regression test
+//
+// garbage_collect_pending_deletes() used to free each victim - and therefore run the user's delete
+// callback - in the middle of its list walk, while holding an unprotected pointer to the victim's
+// successor. A callback that garbage collects the same dictionary could free that successor, and the
+// walk then dereferenced freed memory (crash signature: SIGSEGV in garbage_collect_pending_deletes()
+// at "item_next = item->next").
+//
+// The victims are now detached during the walk and delivered after it, so a re-entrant callback walks
+// a list they are no longer part of.
+
+struct dict_gc_cursor_test {
+    DICTIONARY *dict;
+    size_t deletes;                 // how many delete callbacks fired
+    size_t reentered;               // how many times we recursed into the GC
+    size_t undetached;              // callbacks that ran while a victim was still on the items list
+    char order[8];                  // the order the callbacks fired in
+    size_t order_len;
+};
+
+static void dict_gc_cursor_delete_callback(const DICTIONARY_ITEM *item, void *value __maybe_unused, void *data) {
+    struct dict_gc_cursor_test *t = data;
+
+    // The contract this test pins: when a delete callback runs, no victim of this collection is still
+    // on the items list. Before the fix the walk freed each victim in turn, so A's callback ran with B
+    // still linked, and this counter is what makes that visible without a sanitizer. It matters because
+    // the freed-successor read is otherwise unreliable as a signal in a plain build: ARAL usually leaves
+    // the slot readable, so the stale refcount still reads REFCOUNT_DELETED and the walk can finish
+    // quietly with every other assertion below satisfied. Measured on the unfixed collector, 12
+    // plain-build runs: 12 failed - 8 reported this counter, 4 crashed first inside the corrupted
+    // traversal. The fixed collector passed 10 of 10 plain and 3 of 3 under ASAN.
+    //
+    // Look for an uncollected victim specifically - deleted, unreferenced, still linked - not merely a
+    // non-empty list: live items legitimately stay on the list throughout delivery, and C below is one.
+    // This predicate is right for THIS test, not a general one: the victims here are master items, and
+    // a view orphan can carry the deleted flag only on its shared part.
+    for(DICTIONARY_ITEM *i = t->dict->items.list; i ; i = i->next) {
+        if((i->flags & ITEM_FLAG_DELETED) && i->refcount == 0) {
+            t->undetached++;
+            break;
+        }
+    }
+
+    const char *name = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+    if(name && *name && t->order_len < sizeof(t->order) - 1)
+        t->order[t->order_len++] = name[0];
+
+    t->deletes++;
+
+    // Re-enter the garbage collector from inside a delete callback, exactly as a real callback can
+    // (the items lock is recursive). Before the fix this freed the walk's cached successor.
+    if(name && name[0] == 'A' && !t->reentered) {
+        t->reentered++;
+        dictionary_garbage_collect(t->dict);
+    }
+}
+
+static size_t dictionary_gc_cursor_unittest(void) {
+    size_t errors = 0;
+    struct dictionary_stats stats = {};
+    struct dict_gc_cursor_test t = { 0 };
+
+    fprintf(stderr, "\n\nChecking GC traversal cursor (delete callback re-entering the GC)...\n");
+
+    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_NONE, &stats, 0);
+    t.dict = dict;
+    dictionary_register_delete_callback(dict, dict_gc_cursor_delete_callback, &t);
+
+    // two adjacent items, in list order A then B, plus a live item C that is never deleted.
+    // C is what keeps the check above honest: it stays linked for the whole collection, so a check that
+    // merely asked "is the items list empty?" would report a false victim on the fixed collector.
+    DICTIONARY_ITEM *a = dictionary_set_and_acquire_item(dict, "A", "VA", 3);
+    DICTIONARY_ITEM *b = dictionary_set_and_acquire_item(dict, "B", "VB", 3);
+    dictionary_set(dict, "C", "VC", 3);
+
+    // delete both while referenced: they are only flagged, not freed
+    dictionary_del(dict, "A");
+    dictionary_del(dict, "B");
+
+    // releasing the references makes both pending-deletion victims
+    dictionary_acquired_item_release(dict, a);
+    dictionary_acquired_item_release(dict, b);
+
+    // the walk that used to crash here
+    dictionary_garbage_collect(dict);
+
+    if(t.deletes != 2) {
+        fprintf(stderr, "GC CURSOR: expected exactly 2 delete callbacks, got %zu\n", t.deletes);
+        errors++;
+    }
+
+    if(t.undetached) {
+        fprintf(stderr, "GC CURSOR: %zu delete callback(s) ran while a victim was still linked on the "
+                        "items list - the walk is delivering during the traversal, not after it\n",
+                t.undetached);
+        errors++;
+    }
+
+    if(!t.reentered) {
+        fprintf(stderr, "GC CURSOR: the delete callback never re-entered the garbage collector - "
+                        "the test did not exercise what it is meant to\n");
+        errors++;
+    }
+
+    t.order[t.order_len] = '\0';
+    if(strcmp(t.order, "AB") != 0) {
+        fprintf(stderr, "GC CURSOR: expected victims delivered in traversal order 'AB', got '%s'\n", t.order);
+        errors++;
+    }
+
+    // both victims must be gone and nothing left pending; the live item C must be untouched
+    errors += unittest_check_dictionary("gc cursor", dict, 1, 1, 0, 0, 0);
+
+    dictionary_destroy(dict);
+
+    if(!errors)
+        fprintf(stderr, "GC traversal cursor test OK\n");
+
+    return errors;
+}
+
+// Views discover victims the pending counter never saw: an item deleted on the MASTER orphans the
+// view item, and that discovery happens inside item_check_and_acquire_advanced() during the walk.
+// So the GC must not stop on a zero pending count when it is collecting a view. Two orphans, so a
+// premature exit after the first one is caught.
+
+static size_t dictionary_gc_view_orphans_unittest(void) {
+    size_t errors = 0;
+    struct dictionary_stats stats = {};
+
+    fprintf(stderr, "\n\nChecking GC on a view collects every master-deleted orphan...\n");
+
+    DICTIONARY *master = dictionary_create_advanced(DICT_OPTION_NONE, &stats, 0);
+    DICTIONARY *view = dictionary_create_view(master);
+
+    DICTIONARY_ITEM *m1 = dictionary_set_and_acquire_item(master, "M1", "V1", 3);
+    DICTIONARY_ITEM *m2 = dictionary_set_and_acquire_item(master, "M2", "V2", 3);
+
+    DICTIONARY_ITEM *v1 = dictionary_view_set_and_acquire_item(view, "VIEW1", m1);
+    DICTIONARY_ITEM *v2 = dictionary_view_set_and_acquire_item(view, "VIEW2", m2);
+
+    dictionary_acquired_item_release(view, v1);
+    dictionary_acquired_item_release(view, v2);
+    dictionary_acquired_item_release(master, m1);
+    dictionary_acquired_item_release(master, m2);
+
+    // delete on the master: both view items are now orphans, but the view's own
+    // pending-deletion counter is still zero - nothing marked them
+    dictionary_del(master, "M1");
+    dictionary_del(master, "M2");
+
+    // the setup is only meaningful if the view really has nothing counted: these orphans are
+    // invisible to the pending counter until the walk discovers them
+    long int pending_before = DICTIONARY_PENDING_DELETES_GET(view);
+    if(pending_before != 0) {
+        fprintf(stderr, "GC VIEW ORPHANS: expected 0 pending on the view before the GC, got %ld\n",
+                pending_before);
+        errors++;
+    }
+
+    dictionary_garbage_collect(view);
+
+    // both must be gone; if the walk stopped at a zero pending count, VIEW2 would survive
+    errors += unittest_check_dictionary("gc view orphans", view, 0, 0, 0, 0, 0);
+
+    dictionary_destroy(view);
+    dictionary_destroy(master);
+
+    if(!errors)
+        fprintf(stderr, "GC view orphan collection test OK\n");
+
+    return errors;
+}
+
 size_t dictionary_unittest_views(void) {
     size_t errors = 0;
     struct dictionary_stats stats = {};
@@ -2145,6 +2320,9 @@ int dictionary_unittest(size_t entries) {
     }
     else
         fprintf(stderr, "Destroy on traversal test OK\n");
+
+    errors += dictionary_gc_cursor_unittest();
+    errors += dictionary_gc_view_orphans_unittest();
 
     errors += dictionary_destroy_race_unittest();
 

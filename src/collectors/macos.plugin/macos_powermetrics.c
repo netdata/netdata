@@ -27,6 +27,15 @@
 // interval arguments; configured values are clamped so ndsudo never rejects them.
 #define MACOS_POWERMETRICS_INTERVAL_MS_MAX 60000
 #define MACOS_POWERMETRICS_DEFAULT_TIMEOUT_MS 5000
+// Ceiling for the configured command timeout. Generous for any real command, and low enough that
+// sample_interval_ms + command_timeout_ms cannot overflow an int.
+#define MACOS_POWERMETRICS_TIMEOUT_MS_MAX 600000
+// Margin added to one sample interval when waiting for a closed pipe to kill the loop child.
+#define MACOS_POWERMETRICS_KILL_GRACE_MARGIN_MS 1000
+// Grace used instead when we are stopping: just enough for a child that is about to die anyway to
+// do so, rather than a full sample interval, so a wedged one cannot hold up collector shutdown.
+// Deliberately not shared with the no-pipe path above, which waits for nothing at all.
+#define MACOS_POWERMETRICS_STOPPING_KILL_GRACE_MS 1000
 #define MACOS_POWERMETRICS_READ_STEP_MS 250
 #define MACOS_POWERMETRICS_MAX_OUTPUT (1024 * 1024)
 #define MACOS_POWERMETRICS_INITIAL_BACKOFF_MS 1000
@@ -611,6 +620,32 @@ static POPEN_INSTANCE *macos_powermetrics_start_loop(const struct macos_powermet
     return spawn_popen_run_argv(pm.use_ndsudo ? argv_ndsudo : argv_direct);
 }
 
+// Grace to allow a loop-mode child to exit on its own after we close its stdout.
+//
+// Closing the pipe does not signal the child - its next WRITE does, and in loop mode that is one
+// sample interval away. `command timeout` is clamped against `sample window` only, so at a legal
+// `sample every` above it (the range is 1s-60s) a plain command_timeout_ms grace can expire before
+// the child ever writes. It would then be signalled instead - and a child started through the
+// setuid-root ndsudo helper cannot be signalled by an unprivileged netdata at all, so it would be
+// abandoned while still running. Wait at least one full interval, matching the staleness budget.
+//
+// This rests on powermetrics actually dying on a broken pipe once SIGPIPE is deliverable. Measured
+// 2026-09-03 on macOS 15 / Apple Silicon, samplers thermal,gpu_power: with the default disposition
+// it died of SIGPIPE 2s after the pipe closed; with the disposition inherited as ignored it
+// survived indefinitely. Environment evidence, not a portable guarantee - re-verify with
+// tests/manual/spawn-termination-macos.sh. A build of powermetrics that handled SIGPIPE itself, or
+// one wedged without writing, would still need the privileged-child problem solved instead: netdata
+// runs unprivileged and cannot signal a setuid-root ndsudo child at all (netdata/netdata#23730).
+static int macos_powermetrics_loop_kill_grace_ms(void)
+{
+    // One full sample interval - which is when the child's next write, and therefore its SIGPIPE,
+    // is due - plus a small scheduling margin. Deliberately NOT interval + command_timeout_ms:
+    // that expression is the loop's staleness budget, and reusing it here padded the grace with up
+    // to 600s of timeout that the next-write reasoning does not justify, delaying SIGTERM for a
+    // child that is never going to write again.
+    return pm.sample_interval_ms + MACOS_POWERMETRICS_KILL_GRACE_MARGIN_MS;
+}
+
 static bool macos_powermetrics_process_stream_document(const char *data, size_t size)
 {
     struct macos_powermetrics_sample sample = {0};
@@ -668,7 +703,13 @@ static bool macos_powermetrics_run_loop(const struct macos_powermetrics_sampler_
 
     int fd = spawn_popen_read_fd(pi);
     if (fd < 0) {
-        spawn_popen_kill(pi, pm.command_timeout_ms);
+        // No grace at all: the graces below buy a voluntary exit via SIGPIPE on the child's next
+        // write, and here there is no stdout pipe for that to happen on - nor can the loop proceed
+        // without one. A zero grace makes the nofork spawn server (the backend built on macOS)
+        // skip its pre-SIGTERM wait and signal at once. NOTE the posix_spawn backend treats the
+        // value as a POST-SIGTERM grace and substitutes its own default for zero; that backend is
+        // not compiled on any platform today, and either way the child is signalled promptly.
+        spawn_popen_kill(pi, 0);
         return false;
     }
 
@@ -753,7 +794,16 @@ static bool macos_powermetrics_run_loop(const struct macos_powermetrics_sampler_
         (void)macos_powermetrics_process_stream_document(buf, used);
 
     freez(buf);
-    spawn_popen_kill(pi, pm.command_timeout_ms);
+
+    // The loop also exits when service_running() goes false, which can happen before this thread is
+    // cancelled - and spawn_popen_kill()'s pre-SIGTERM wait only aborts early on cancellation. So
+    // waiting a full interval here would let a wedged child hold up collector shutdown. When we are
+    // stopping, signal it promptly instead; the interval-sized grace is for recycling the loop,
+    // where letting the old child die on its own keeps the restart clean.
+    bool stopping = nd_thread_signaled_to_cancel() || !service_running(SERVICE_COLLECTORS);
+    spawn_popen_kill(pi, stopping ? MACOS_POWERMETRICS_STOPPING_KILL_GRACE_MS
+                                  : macos_powermetrics_loop_kill_grace_ms());
+
     return ok && !nd_thread_signaled_to_cancel() && service_running(SERVICE_COLLECTORS);
 }
 
@@ -869,6 +919,13 @@ static void macos_powermetrics_init(void)
         MACOS_POWERMETRICS_DEFAULT_TIMEOUT_MS);
     if (pm.command_timeout_ms < pm.sample_window_ms + 1000)
         pm.command_timeout_ms = pm.sample_window_ms + 1000;
+    // Upper bound too: this value is added to sample_interval_ms for the loop's staleness budget,
+    // and both are int, so a large configured timeout would overflow that addition and yield a
+    // negative budget. (It no longer feeds any kill grace - see
+    // macos_powermetrics_loop_kill_grace_ms() - but the staleness expression still needs the
+    // bound.)
+    if (pm.command_timeout_ms > MACOS_POWERMETRICS_TIMEOUT_MS_MAX)
+        pm.command_timeout_ms = MACOS_POWERMETRICS_TIMEOUT_MS_MAX;
 
     pm.use_ndsudo = inicfg_get_boolean(&netdata_config, "plugin:macos:powermetrics", "use ndsudo", 1);
 

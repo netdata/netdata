@@ -65,72 +65,72 @@ metadata:
 metrics:
   # Memory stats
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.1.44.0
+      metric_type: gauge
       name: sysStatMemoryTotal
       chart_meta:
         description: The total memory available in bytes for TMM (Traffic Management Module)
         family: 'System/Memory/TMM/Total'
         unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.1.45.0
+      metric_type: gauge
       name: sysStatMemoryUsed
       chart_meta:
         description: The memory in use in bytes for TMM (Traffic Management Module)
         family: 'System/Memory/TMM/Used'
         unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.21.28.0
+      metric_type: gauge
       name: sysGlobalTmmStatMemoryTotal
       chart_meta:
         description: The total memory available in bytes for TMM (Traffic Management Module)
         family: 'System/Memory/TMM/Total'
         unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.21.29.0
+      metric_type: gauge
       name: sysGlobalTmmStatMemoryUsed
       chart_meta:
         description: The memory in use in bytes for TMM (Traffic Management Module)
         family: 'System/Memory/TMM/Used'
         unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.44.0
+      metric_type: gauge
       name: sysGlobalHostOtherMemoryTotal
       chart_meta:
         description: The total other non-TMM memory in bytes for the system
         family: 'System/Memory/Host/Total'
         unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.45.0
+      metric_type: gauge
       name: sysGlobalHostOtherMemoryUsed
       chart_meta:
         description: The other non-TMM memory in bytes currently in use for the system
         family: 'System/Memory/Host/Used'
         unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.46.0
+      metric_type: gauge
       name: sysGlobalHostSwapTotal
       chart_meta:
         description: The total swap in bytes for the system
         family: 'System/Memory/Swap/Total'
         unit: "By"
   - MIB: F5-BIGIP-SYSTEM-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.3375.2.1.1.2.20.47.0
+      metric_type: gauge
       name: sysGlobalHostSwapUsed
       chart_meta:
         description: The swap in bytes currently in use for the system
@@ -142,9 +142,9 @@ metrics:
     table:
       OID: 1.3.6.1.4.1.3375.2.1.7.5.2
       name: sysMultiHostCpuTable
-    metric_type: gauge
     symbols:
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.11
+        metric_type: gauge
         name: cpu.usage # sysMultiHostCpuUsageRatio
         chart_meta:
           description: The current CPU utilization
@@ -160,9 +160,9 @@ metrics:
     table:
       OID: 1.3.6.1.4.1.3375.2.1.7.5.2
       name: sysMultiHostCpuTable
-    metric_type: percent
     symbols:
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.4
+        metric_type: percent
         name: sysMultiHostCpuUser
         scale_factor: 100
         chart_meta:
@@ -170,6 +170,7 @@ metrics:
           family: 'System/CPU/User'
           unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.5
+        metric_type: percent
         name: sysMultiHostCpuNice
         scale_factor: 100
         chart_meta:
@@ -177,6 +178,7 @@ metrics:
           family: 'System/CPU/Nice'
           unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.6
+        metric_type: percent
         name: sysMultiHostCpuSystem
         scale_factor: 100
         chart_meta:
@@ -184,6 +186,7 @@ metrics:
           family: 'System/CPU/System'
           unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.7
+        metric_type: percent
         name: sysMultiHostCpuIdle
         scale_factor: 100
         chart_meta:
@@ -191,6 +194,7 @@ metrics:
           family: 'System/CPU/Idle'
           unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.8
+        metric_type: percent
         name: sysMultiHostCpuIrq
         scale_factor: 100
         chart_meta:
@@ -198,6 +202,7 @@ metrics:
           family: 'System/CPU/IRQ'
           unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.9
+        metric_type: percent
         name: sysMultiHostCpuSoftirq
         scale_factor: 100
         chart_meta:
@@ -205,6 +210,7 @@ metrics:
           family: 'System/CPU/SoftIRQ'
           unit: "%"
       - OID: 1.3.6.1.4.1.3375.2.1.7.5.2.1.10
+        metric_type: percent
         name: sysMultiHostCpuIowait
         scale_factor: 100
         chart_meta:

@@ -180,7 +180,9 @@ Metrics:
 
 ## Troubleshooting
 
-### Recurring Cannot find file warnings for tc-qos-helper.conf
+### Other Problems
+
+#### Recurring Cannot find file warnings for tc-qos-helper.conf
 
 When `tc-qos-helper.sh` starts, it looks for its configuration in two places, in this order: the stock configuration directory (typically at `/usr/lib/netdata/conf.d`) and the user [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md) (typically at `/etc/netdata`). Netdata does not ship a stock `tc-qos-helper.conf`, so on a default installation neither file exists and the script emits a `Cannot find file` warning for each missing path.
 
@@ -189,7 +191,7 @@ These warnings are harmless. When no configuration file is found the script keep
 Creating `tc-qos-helper.conf` in your user config directory with the desired setting silences the warning for the user configuration path. The warning for the stock path is expected to remain, because no stock `tc-qos-helper.conf` ships with Netdata, and it is benign.
 
 
-### FireQOS is not installed warning
+#### FireQOS is not installed warning
 
 When `tc-qos-helper.sh` starts and cannot find FireQOS (neither the `/var/run/fireqos` directory nor the `fireqos` executable), it logs that FireQOS is not installed on this system. This is normal on systems that do not perform QoS traffic shaping with FireQOS.
 

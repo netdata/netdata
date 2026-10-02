@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -10,12 +11,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
+const lldpManagementAddressMaxLength = 31
+
 func init() {
 	registerTopologyMetricHandler(ddsnmp.KindLldpLocPort, (*topologyBuilder).updateLldpLocPort)
 	registerTopologyMetricHandler(ddsnmp.KindLldpLocManAddr, (*topologyBuilder).updateLldpLocManAddr)
 	registerTopologyMetricHandler(ddsnmp.KindLldpRem, (*topologyBuilder).updateLldpRemote)
 	registerTopologyMetricHandler(ddsnmp.KindLldpRemManAddr, (*topologyBuilder).updateLldpRemManAddr)
-	registerTopologyMetricHandler(ddsnmp.KindLldpRemManAddrCompat, (*topologyBuilder).updateLldpRemManAddr)
 }
 
 func (c *topologyBuilder) updateLldpLocPort(tags map[string]string) {
@@ -146,8 +148,8 @@ func (c *topologyBuilder) updateLldpRemManAddr(tags map[string]string) {
 	}
 
 	addrHex := tags[tagLldpRemMgmtAddr]
-	if strings.TrimSpace(addrHex) == "" {
-		addrHex = reconstructLldpRemMgmtAddrHex(tags)
+	if !validLLDPManagementAddressLength(addrHex, tags[tagLldpRemMgmtAddrLen]) {
+		return
 	}
 	addr, addrType := normalizeLLDPManagementAddress(addrHex, tags[tagLldpRemMgmtAddrSubtype])
 	if addr == "" {
@@ -163,4 +165,19 @@ func (c *topologyBuilder) updateLldpRemManAddr(tags map[string]string) {
 		Source:      "lldp_remote",
 	}
 	entry.managementAddrs = appendManagementAddress(entry.managementAddrs, mgmt)
+}
+
+func validLLDPManagementAddressLength(addrHex, declaredLength string) bool {
+	declaredLength = strings.TrimSpace(declaredLength)
+	if declaredLength == "" {
+		return true
+	}
+
+	length, err := strconv.Atoi(declaredLength)
+	if err != nil || length <= 0 || length > lldpManagementAddressMaxLength {
+		return false
+	}
+
+	addrHex = strings.TrimSpace(addrHex)
+	return len(addrHex)%2 == 0 && len(addrHex)/2 == length
 }

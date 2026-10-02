@@ -1,4 +1,4 @@
-//! WAL message handling.
+//! Writer-event handling: gap-check, apply to registries, index on close.
 
 use super::Ledger;
 use bridge::signals::Signal;
@@ -10,9 +10,9 @@ impl Ledger {
         fields(tenant = %msg.tenant_id, frame_seq = msg.frame_seq, event = ?msg.event),
     )]
     pub(super) async fn handle_ingestor_msg(&mut self, msg: wal::Message) {
-        // The WAL event carries the raw numeric axis stamped by the writer (another
-        // process). Decode it to a `Signal` here — this is the sole boundary where
-        // an unknown id can appear; after it, routing is total.
+        // `pipeline_id` is a raw u16 stamped by the writer process; decode it
+        // to a `Signal` here — the sole boundary where an unknown id can
+        // appear. Past it, routing is total.
         let pipeline_id = msg.event.pipeline_id();
         let signal = match Signal::try_from(pipeline_id) {
             Ok(signal) => signal,
@@ -22,9 +22,9 @@ impl Ledger {
             }
         };
 
-        // Per-signal frame-sequence gap-check. Each signal has its own monotonic
-        // `frame_seq` stream, so a gap here is a real lost FileEvent for THIS
-        // signal — inter-signal interleaving can no longer trigger (or mask) it.
+        // Per-signal frame-seq gap-check: signals interleave on one connection
+        // but each has its own monotonic `frame_seq`, so a gap is a genuinely
+        // lost event of THIS signal (fire-and-forget IPC). Log it, apply anyway.
         let expected = self.expected_frame_seq.get_mut(signal);
         if msg.frame_seq != *expected {
             tracing::error!(
@@ -46,7 +46,7 @@ impl Ledger {
                 return;
             }
 
-            // Build an indexing request when a WAL file is closed.
+            // Closed WAL: queue a seal (WAL → SFST) with the indexer.
             if let wal::FileEvent::Closed { file_id, .. } = msg.event {
                 let registry = registries
                     .get(&msg.tenant_id)

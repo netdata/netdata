@@ -58,34 +58,40 @@ const (
 // value could be resolved. Slice fields are detached from engine state and are
 // owned by the callback.
 type PlanRouteDiagnostic struct {
-	Decision                PlanRouteDecision
-	Reason                  PlanRouteReason
-	SeriesIdentity          metrix.SeriesIdentity
-	MetricName              string
-	MetricFamilyName        string
-	ChartTemplateID         string
-	DimensionIndex          int
-	ChartID                 string
-	DimensionName           string
-	DimensionKeyLabel       string
-	InstanceIdentity        PlanInstanceIdentity
-	InstanceLabels          []string
-	MissingInstanceLabels   []string
-	Context                 string
-	Family                  string
-	Units                   string
-	Algorithm               string
-	Aggregation             string
-	Presentation            string
-	SeriesKind              string
-	Multiplier              int
-	Divisor                 int
-	LabelPromotionMode      PlanLabelPromotionMode
-	PromotedLabels          []string
-	ExistingChartTemplateID string
-	AutogenRuleIndex        int
-	AutogenRuleScope        string
-	Autogen                 bool
+	Decision                     PlanRouteDecision
+	Reason                       PlanRouteReason
+	SeriesIdentity               metrix.SeriesIdentity
+	MetricName                   string
+	MetricFamilyName             string
+	ChartTemplateID              string
+	TemplateEntryID              string
+	LocalChartTemplateID         string
+	DimensionIndex               int
+	ChartID                      string
+	DimensionName                string
+	DimensionKeyLabel            string
+	InstanceIdentity             PlanInstanceIdentity
+	InstanceLabels               []string
+	MissingInstanceLabels        []string
+	Context                      string
+	Family                       string
+	Units                        string
+	Algorithm                    string
+	Aggregation                  string
+	Presentation                 string
+	SeriesKind                   string
+	Multiplier                   int
+	Divisor                      int
+	LabelPromotionMode           PlanLabelPromotionMode
+	PromotedLabels               []string
+	ExistingChartTemplateID      string
+	ExistingTemplateEntryID      string
+	ExistingLocalChartTemplateID string
+	AutogenRuleIndex             int
+	AutogenRuleScope             string
+	AutogenRuleEntryID           string
+	AutogenRuleLocalIndex        int
+	Autogen                      bool
 }
 
 func diagnosticLabelPromotion(policy *chartLabelPolicy) (PlanLabelPromotionMode, []string) {
@@ -165,4 +171,37 @@ func (ctx *planBuildContext) observeAutogenDisplacement(
 		ExistingChartTemplateID: displacedTemplateID,
 		Autogen:                 route.Autogen,
 	})
+}
+
+// Named-set provenance is attached at the diagnostic boundary, keeping ordinary
+// route bindings compact and legacy document facts unchanged.
+func (s *TemplateSet) diagnosticObserver(observe func(PlanRouteDiagnostic)) func(PlanRouteDiagnostic) {
+	if observe == nil || s == nil || s.legacy {
+		return observe
+	}
+	return func(fact PlanRouteDiagnostic) {
+		chart := s.index.chartsByID[fact.ChartTemplateID]
+		fact.TemplateEntryID, fact.LocalChartTemplateID = chart.EntryID, chart.LocalTemplateID
+		prior := s.index.chartsByID[fact.ExistingChartTemplateID]
+		fact.ExistingTemplateEntryID, fact.ExistingLocalChartTemplateID = prior.EntryID, prior.LocalTemplateID
+		if fact.Reason == PlanRouteReasonAutogenRuleRejected && fact.AutogenRuleIndex >= 0 {
+			index := fact.AutogenRuleIndex
+			if index < len(s.global.autogen.Rules) {
+				fact.AutogenRuleLocalIndex = index
+				fact.AutogenRuleScope = s.global.autogen.Rules[index].Scope
+			} else {
+				index -= len(s.global.autogen.Rules)
+				for _, entry := range s.entries {
+					if index < len(entry.AutogenRules) {
+						fact.AutogenRuleEntryID = entry.ID
+						fact.AutogenRuleLocalIndex = index
+						fact.AutogenRuleScope = entry.AutogenRules[index].Scope
+						break
+					}
+					index -= len(entry.AutogenRules)
+				}
+			}
+		}
+		observe(fact)
+	}
 }

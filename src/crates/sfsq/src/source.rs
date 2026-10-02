@@ -2,12 +2,17 @@
 //!
 //! [`Source`] says where an SFST candidate's bytes come from; [`Mapped`]
 //! is those bytes obtained (memory-mapped or shared in-memory), and
-//! [`map_source`] converts one to the other. The logs engine wraps
-//! [`map_source`] with its historical log-and-degrade behavior
-//! (`logs::mmap`); the traces engine consumes the structured error
-//! directly, because a source that fails to map must surface as an
-//! explicit partial-result reason rather than silently contributing
-//! nothing (the design-record status model).
+//! [`map_source`] converts one to the other. Failure policy is
+//! per-engine: the logs engine wraps [`map_source`] with its historical
+//! log-and-degrade behavior (`logs::mmap`); the traces engine consumes
+//! the structured error and reports the source as an explicit partial
+//! reason (`traces::PartialReason`), so a broken source never reads as
+//! an empty one.
+//!
+//! [`Source`] is the only `pub` item here (re-exported as `sfsq::Source`
+//! and `sfsq::logs::Source`); the rest is `pub(crate)`, reaching the
+//! logs modules via the `super::mmap` facade and the traces operations
+//! directly.
 
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -29,7 +34,8 @@ pub enum Source {
 }
 
 impl Source {
-    /// A short label for log/error context.
+    /// A short label for log/error context (used by the logs engine's
+    /// parse-failure warnings).
     pub(crate) fn describe(&self) -> std::borrow::Cow<'_, str> {
         match self {
             Source::File(p) => p.display().to_string().into(),
@@ -63,9 +69,13 @@ impl Mapped {
     }
 }
 
-/// A failure obtaining a source's bytes — distinguishing "the source is
-/// broken" from "the source is empty" (an engine that treated the two the
-/// same would silently under-report; see the design-record status model).
+/// A failure obtaining a source's bytes.
+///
+/// Each variant names the failed operation (`open` or `mmap`) and pairs
+/// the path with the OS error; the logs engine embeds that `Display` in
+/// its degrade warning, traces turns the error into a partial-result
+/// reason — a broken source surfaces as a failure, never silently as an
+/// empty one (the design-record status model).
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum MapError {
     #[error("open {path}: {source}")]
@@ -81,9 +91,9 @@ pub(crate) enum MapError {
 }
 
 /// Obtain a candidate's bytes from its [`Source`]. A `File` is
-/// memory-mapped; a `Memory` chunk's `Arc` is cloned (cheap — a refcount
-/// bump that keeps the bytes alive for the query even if the producing
-/// cache evicts the entry). Failures are structured — the caller decides
+/// memory-mapped; a `Memory` chunk's `Arc` is cloned — cheap, cannot
+/// fail, and keeps the bytes alive for the query even if the producing
+/// cache evicts the entry. Failures are structured — the caller decides
 /// whether to degrade (logs) or report (traces).
 pub(crate) fn map_source(source: &Source) -> Result<Mapped, MapError> {
     match source {

@@ -13,15 +13,18 @@
 #define TASK_COMM_LEN 16
 #endif
 
-/* v5: dcstat_update_every_s added to ebpf_publish_dcstat.  It is retained for
+/* v6: fd_update_every_s added to ebpf_publish_fd_stat.  fd consumers publish
+ *     interval totals, so their divisor cannot be inferred from the shared
+ *     segment owner.
+ * v5: dcstat_update_every_s added to ebpf_publish_dcstat.  It is retained for
  *     shared-memory ABI compatibility; dcstat consumers publish interval totals.
  * v4: socket_update_every_s added to ebpf_socket_publish_apps.
  * v3: live_count added at offset 16; header is now 24 bytes; entries start
  *     at offset 24 (still 8-byte aligned for the uint64_t fields in ebpf_pid_stat).
  * v2: update_every_s replaced _pad; header grew from 8 to 16 bytes.
  * Version suffix ensures old consumers never map the new layout at the wrong offset. */
-#define NETDATA_EBPFGO_INTEGRATION_NAME "/netdata_shm_integration_ebpfgo_v5"
-#define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo_v5"
+#define NETDATA_EBPFGO_INTEGRATION_NAME "/netdata_shm_integration_ebpfgo_v6"
+#define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo_v6"
 
 /* SHM header written at byte-offset 0; the ebpf_pid_stat[] array follows
  * immediately.  sizeof == 24 so entries start on an 8-byte boundary, which
@@ -41,6 +44,13 @@ struct ebpfgo_shm_header {
 #define EBPFGO_SHM_FLAG_CACHESTAT 0x01u /* cachestat per-PID fields are valid */
 #define EBPFGO_SHM_FLAG_SOCKET    0x02u /* socket per-PID fields are valid */
 #define EBPFGO_SHM_FLAG_DCSTAT    0x04u /* dcstat (directory cache) per-PID fields are valid */
+#define EBPFGO_SHM_FLAG_FD        0x08u /* fd (file descriptor) per-PID fields are valid */
+/* Set alongside EBPFGO_SHM_FLAG_FD when fd runs with `ebpf load mode = return`.
+ * fd counts open/close errors on every mode — its probes always read the syscall
+ * return value — but the collector only exposes the error charts in `return`
+ * mode.  Consumers are separate processes and cannot see fd's config, so this bit
+ * is what tells them whether the *_err fields may be charted. */
+#define EBPFGO_SHM_FLAG_FD_ERRORS 0x10u
 
 struct ebpf_cachestat {
     uint32_t add_to_page_cache_lru;
@@ -80,6 +90,7 @@ struct ebpf_publish_fd_stat {
     uint32_t close_call;
     uint32_t open_err;
     uint32_t close_err;
+    uint32_t fd_update_every_s; /* fd collection interval for these deltas */
 };
 
 struct ebpf_process_stat {

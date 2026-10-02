@@ -166,14 +166,16 @@ Metrics:
 
 ## Troubleshooting
 
-### update every
+### Other Problems
+
+#### update every
 
 Data collection frequency.
 
-### ebpf load mode
+#### ebpf load mode
 
 Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
 
-### lifetime
+#### lifetime
 
 Set default lifetime for thread when enabled by cloud.

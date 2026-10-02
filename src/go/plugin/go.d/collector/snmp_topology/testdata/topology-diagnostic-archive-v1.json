@@ -1,8 +1,9 @@
 {
-  "format": "netdata.snmp_topology.diagnostics",
+  "format": "netdata.snmp.diagnostics",
   "version": 1,
   "producer": {
-    "agent_version": "v1.2.3"
+    "agent_version": "v1.2.3",
+    "run_id": ""
   },
   "snapshot": {
     "job_lifecycle_cut": {
@@ -20,9 +21,44 @@
             "last_completed": {
               "phase": "collect",
               "outcome": "success",
-              "completed_at": "2026-08-29T12:00:02Z"
+              "completed_at": "2026-08-29T12:00:02Z",
+              "failure": {},
+              "preparation_failure": {},
+              "collection_failures": {
+                "profiles": {
+                  "count": 0,
+                  "last": {}
+                },
+                "get": {
+                  "count": 0,
+                  "last": {}
+                },
+                "walk": {
+                  "count": 0,
+                  "last": {}
+                },
+                "bgp": {
+                  "count": 0,
+                  "last": {}
+                },
+                "licensing": {
+                  "count": 0,
+                  "last": {}
+                },
+                "processing": {
+                  "preparation": 0,
+                  "scalar": 0,
+                  "table": 0,
+                  "bgp": 0,
+                  "licensing": 0
+                }
+              }
             },
-            "topology_ready": true
+            "topology_ready": true,
+            "profile_context": {
+              "capture_state": "not_attempted",
+              "manual_applied": false
+            }
           }
         ]
       }
@@ -73,5 +109,7 @@
       "registration_count": 1,
       "selected_count": 1
     }
-  }
+  },
+  "kind": "topology",
+  "published_at": "0001-01-01T00:00:00Z"
 }

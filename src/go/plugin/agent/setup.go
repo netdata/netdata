@@ -168,7 +168,7 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry) discoverySetup
 	return cfg
 }
 
-func (a *Agent) setupVnodeRegistry() map[string]*vnodes.VirtualNode {
+func (a *Agent) setupVnodeRegistry() map[string]*vnodes.Config {
 	a.Debugf("looking for 'vnodes/' in %v", a.ConfigDir)
 	if len(a.ConfigDir) == 0 {
 		return nil
@@ -179,7 +179,7 @@ func (a *Agent) setupVnodeRegistry() map[string]*vnodes.VirtualNode {
 		return nil
 	}
 
-	reg := vnodes.Load(dirPath)
+	reg := vnodes.Load(dirPath, a.SNMPVnodeAcquirer != nil)
 	a.Infof("found '%s' (%d vhosts)", dirPath, len(reg))
 
 	return reg
@@ -191,7 +191,7 @@ func (a *Agent) setupSecretStoreConfigs() []secretstore.Config {
 		return nil
 	}
 
-	cfgs, errs := secretstore.LoadFileConfigs(a.CollectorsConfDir)
+	cfgs, errs := a.loadSecretStores(a.CollectorsConfDir)
 	for _, err := range errs {
 		a.Warningf("%v", err)
 	}

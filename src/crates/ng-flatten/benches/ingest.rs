@@ -8,6 +8,14 @@
 //!                └──────────── prepare_log_frame ───────────┘
 //! ```
 //!
+//! The legs diagnose differently: a delta in `prost_decode` points at prost's
+//! OTLP wire decode, in `normalize` at the timestamp/id/JSON-body walk, in
+//! `flatten` at schema-tree interning plus the emit-time `xxhash64` hashing
+//! of `path=value` (what the SFST builder keys on), in `encode` at bincode
+//! frame serialization, in `lz4_compress` at the WAL writer's compression.
+//! `prepare_log_frame` is the aggregate `ng-ingest` pays per request — the
+//! headline number; the split legs attribute a regression to one stage.
+//!
 //! Needs a request dump captured by `ng-ingest --dump-requests` (the
 //! `u32-LE length + prost bytes` framing of `ng_ingest::append_dumped_request`;
 //! the trivial reader is duplicated here because the dependency direction is
@@ -27,6 +35,9 @@ use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 
+/// Load the `OTLP_BENCH_FILE` dump (`~/` expands against `$HOME`) and split it
+/// into per-request blobs. `None` (env unset) skips the benches; an unreadable
+/// path panics.
 fn corpus_blobs() -> Option<Vec<Vec<u8>>> {
     let path = std::env::var("OTLP_BENCH_FILE").ok()?;
     let path = match (path.strip_prefix("~/"), std::env::var("HOME")) {
@@ -34,8 +45,6 @@ fn corpus_blobs() -> Option<Vec<Vec<u8>>> {
         _ => std::path::PathBuf::from(&path),
     };
     let bytes = std::fs::read(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    // Split the dump into per-request blobs (framing per
-    // `ng_ingest::append_dumped_request`).
     let mut rest = &bytes[..];
     let mut blobs = Vec::new();
     while !rest.is_empty() {
@@ -46,6 +55,7 @@ fn corpus_blobs() -> Option<Vec<Vec<u8>>> {
     Some(blobs)
 }
 
+/// Decode every blob with prost — one `ExportLogsServiceRequest` per dump entry.
 fn decode_all(blobs: &[Vec<u8>]) -> Vec<ExportLogsServiceRequest> {
     blobs
         .iter()
@@ -53,8 +63,9 @@ fn decode_all(blobs: &[Vec<u8>]) -> Vec<ExportLogsServiceRequest> {
         .collect()
 }
 
-/// Every stage mutates or consumes fresh input; a fixed fallback base keeps
-/// normalization deterministic across iterations.
+/// Production stamps one clock tick (`now`) as the synthetic-timestamp base; a
+/// pinned constant keeps the synthesized values (`base + k`) identical across
+/// iterations and legs, so the split stages stay comparable with the aggregate.
 const FALLBACK_BASE_NS: u64 = 1_700_000_000_000_000_000;
 
 fn bench(c: &mut Criterion) {
@@ -92,6 +103,7 @@ fn bench(c: &mut Criterion) {
         })
     });
 
+    // Normalization mutates in place — a fresh copy per iteration.
     g.bench_function("normalize", |b| {
         b.iter_batched(
             || pristine.clone(),
@@ -114,8 +126,9 @@ fn bench(c: &mut Criterion) {
         reqs
     };
 
-    // Consuming flatten: each iteration gets a fresh owned batch (clone cost
-    // excluded via iter_batched) and the flattener moves payloads out of it.
+    // `flatten_log_request` consumes the request by value, so each iteration
+    // gets a fresh owned batch (`iter_batched`) — clone cost stays out of the
+    // measurement.
     g.bench_function("flatten", |b| {
         b.iter_batched(
             || normalized.clone(),
@@ -130,6 +143,8 @@ fn bench(c: &mut Criterion) {
         )
     });
 
+    // Frozen flattened input for the encode and lz4 legs (`.0` drops the
+    // sanitized-key count).
     let flattened: Vec<ng_flatten::FlattenedLogRequest> = normalized
         .iter()
         .map(|req| ng_flatten::flatten_log_request(req.clone()).0)
@@ -158,7 +173,9 @@ fn bench(c: &mut Criterion) {
         })
     });
 
-    // The aggregate production path over pristine requests.
+    // The aggregate production recipe over pristine requests — exactly what
+    // `ng_ingest::write_request` runs per request (bounds `None`); the WAL
+    // writer adds the lz4 leg above on top of this payload.
     g.bench_function("prepare_log_frame", |b| {
         b.iter_batched(
             || pristine.clone(),

@@ -3,6 +3,8 @@
 package pipeline
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
@@ -204,6 +206,89 @@ func TestServiceEngine_composeHTTPItems(t *testing.T) {
 	}
 }
 
+func TestStockTypesenseRulesPreserveAPIKeyAsString(t *testing.T) {
+	tests := map[string]struct {
+		file    string
+		jobName string
+		target  func(string) model.Target
+	}{
+		"docker": {
+			file:    "docker.conf",
+			jobName: "docker_typesense",
+			target: func(apiKey string) model.Target {
+				return &typesenseStockTarget{
+					Name:    "typesense",
+					Image:   "typesense/typesense:latest",
+					Command: "typesense-server --api-key=" + apiKey,
+					Address: "127.0.0.1:8108",
+				}
+			},
+		},
+		"network listener": {
+			file:    "net_listeners.conf",
+			jobName: "local",
+			target: func(apiKey string) model.Target {
+				return &typesenseStockTarget{
+					Port:    "8108",
+					Comm:    "typesense-server",
+					Cmdline: "typesense-server --api-key=" + apiKey,
+					Address: "127.0.0.1:8108",
+				}
+			},
+		},
+	}
+
+	apiKeys := map[string]string{
+		"ordinary":               "ordinary-key",
+		"empty":                  "",
+		"null":                   "null",
+		"boolean":                "true",
+		"number":                 "123",
+		"flow collection":        "[abc]",
+		"flow map":               "{key:value}",
+		"quotes and backslashes": `quote"and\\backslash`,
+		"secret reference":       "${file:/synthetic/typesense}",
+		"escaped reference":      "$${env:VALUE}",
+		"newline":                "line1\nline2",
+		"trailing newline":       "line1\n",
+		"structure injection":    "key\nextra:\n-	${env:VALUE}",
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join("../../../../go.d/config/go.d/sd", test.file)
+			bs, err := os.ReadFile(path)
+			require.NoError(t, err)
+
+			var cfg Config
+			require.NoError(t, yaml.Unmarshal(bs, &cfg))
+
+			var typesenseRule ServiceRuleConfig
+			for _, rule := range cfg.Services {
+				if rule.ID == "typesense" {
+					typesenseRule = rule
+					break
+				}
+			}
+			require.Equal(t, "typesense", typesenseRule.ID)
+
+			svr, err := newServiceEngine([]ServiceRuleConfig{typesenseRule})
+			require.NoError(t, err)
+
+			for keyName, apiKey := range apiKeys {
+				t.Run(keyName, func(t *testing.T) {
+					configs := svr.compose(test.target(apiKey))
+					require.Len(t, configs, 1)
+					assert.Equal(t, []confgroup.Config{{
+						"module": "typesense", "name": test.jobName,
+						"url": "http://127.0.0.1:8108", "api_key": apiKey,
+					}}, configs)
+				})
+			}
+		})
+	}
+}
+
 type itemTarget struct {
 	model.Base
 	Item any
@@ -218,3 +303,18 @@ func (t itemTarget) TUID() string {
 }
 
 func (t itemTarget) Hash() uint64 { return 1 }
+
+type typesenseStockTarget struct {
+	model.Base
+
+	Name    string
+	Image   string
+	Command string
+	Address string
+	Port    string
+	Comm    string
+	Cmdline string
+}
+
+func (t *typesenseStockTarget) TUID() string { return "typesense" }
+func (t *typesenseStockTarget) Hash() uint64 { return 1 }

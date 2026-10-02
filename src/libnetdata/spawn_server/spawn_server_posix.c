@@ -147,17 +147,26 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     sigemptyset(&empty_mask);
     if (posix_spawnattr_setsigmask(&attr, &empty_mask) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setsigmask() failed: %s", cmdline);
-        posix_spawn_file_actions_destroy(&file_actions);
-        posix_spawnattr_destroy(&attr);
-        return false;
+        goto cleanup_attr;
+    }
+
+    // POSIX_SPAWN_SETSIGDEF only forces to default the signals that are MEMBERS of the
+    // spawn-sigdefault set, and posix_spawnattr_init() leaves that set empty - so the flag alone
+    // resets nothing. SIG_IGN survives execve(), and netdata ignores SIGPIPE, so without this the
+    // child inherits that ignore and closing its stdio yields EPIPE instead of killing it.
+    // See the equivalent block in spawn_server_nofork.c for the full rationale.
+    sigset_t default_signals;
+    sigemptyset(&default_signals);
+    sigaddset(&default_signals, SIGPIPE);
+    if (posix_spawnattr_setsigdefault(&attr, &default_signals) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setsigdefault() failed: %s", cmdline);
+        goto cleanup_attr;
     }
 
     short flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
     if (posix_spawnattr_setflags(&attr, flags) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setflags() failed: %s", cmdline);
-        posix_spawn_file_actions_destroy(&file_actions);
-        posix_spawnattr_destroy(&attr);
-        return false;
+        goto cleanup_attr;
     }
 
     spinlock_lock(&spawn_globals.spinlock);
@@ -209,6 +218,19 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
            "SPAWN SERVER: process created with pid %d: %s",
            si->child_pid, cmdline);
     return si;
+
+cleanup_attr:
+    // Shared by the three attr-configuration failures. Each of them used to return without closing
+    // the pipes or freeing si, unlike every other failure path in this function. si is not linked
+    // into spawn_globals.instances until after those checks, so this is everything it owns.
+    posix_spawn_file_actions_destroy(&file_actions);
+    posix_spawnattr_destroy(&attr);
+    close(stdin_pipe[PIPE_READ]);
+    close(stdin_pipe[PIPE_WRITE]);
+    close(stdout_pipe[PIPE_READ]);
+    close(stdout_pipe[PIPE_WRITE]);
+    freez(si);
+    return NULL;
 }
 
 static int spawn_server_waitpid(SPAWN_INSTANCE *si);

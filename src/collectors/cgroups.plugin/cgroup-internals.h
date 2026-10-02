@@ -62,6 +62,14 @@ typedef struct cgroup_ebpfgo_publish_dcstat {
     long long not_found;
 } cgroup_ebpfgo_publish_dcstat_t;
 
+/* Per-second file-descriptor totals for one cgroup, in fixed-point units. */
+typedef struct cgroup_ebpfgo_publish_fd {
+    long long open_call;
+    long long close_call;
+    long long open_err;
+    long long close_err;
+} cgroup_ebpfgo_publish_fd_t;
+
 typedef struct cgroup_ebpfgo_socket {
     uint64_t bytes_sent;
     uint64_t bytes_received;
@@ -266,6 +274,14 @@ struct cgroup {
     RRDSET *st_dcstat_reference;
     RRDSET *st_dcstat_not_cache;
     RRDSET *st_dcstat_not_found;
+
+    // eBPF fd (file descriptor) snapshot from ebpfgo.plugin SHM.
+    cgroup_ebpfgo_publish_fd_t fd;
+
+    RRDSET *st_fd_open;
+    RRDSET *st_fd_open_error;
+    RRDSET *st_fd_close;
+    RRDSET *st_fd_close_error;
 
     // eBPF socket snapshot from ebpfgo.plugin SHM.
     cgroup_ebpfgo_socket_t net;
@@ -585,6 +601,13 @@ void cgroup_ebpfgo_dcstat_set_snapshot_ready(bool ready);
 void cgroup_ebpfgo_dcstat_update_locked(void);
 void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg);
 
+// Controls whether fd charts update this tick (set after reading SHM flags).
+// `errors` carries EBPFGO_SHM_FLAG_FD_ERRORS: fd always counts open/close errors,
+// but only `ebpf load mode = return` exposes the error charts.
+void cgroup_ebpfgo_fd_set_snapshot_ready(bool ready, bool errors);
+void cgroup_ebpfgo_fd_update_locked(void);
+void cgroup_ebpfgo_fd_update_charts(struct cgroup *cg);
+
 void cgroup_ebpfgo_socket_set_snapshot_ready(bool ready);
 void cgroup_ebpfgo_socket_update_locked(void);
 void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg);
@@ -600,6 +623,10 @@ static inline void cgroup_ebpfgo_cachestat_update_charts(struct cgroup *cg) { (v
 static inline void cgroup_ebpfgo_dcstat_set_snapshot_ready(bool ready) { (void)ready; }
 static inline void cgroup_ebpfgo_dcstat_update_locked(void) {}
 static inline void cgroup_ebpfgo_dcstat_update_charts(struct cgroup *cg) { (void)cg; }
+
+static inline void cgroup_ebpfgo_fd_set_snapshot_ready(bool ready, bool errors) { (void)ready; (void)errors; }
+static inline void cgroup_ebpfgo_fd_update_locked(void) {}
+static inline void cgroup_ebpfgo_fd_update_charts(struct cgroup *cg) { (void)cg; }
 
 static inline void cgroup_ebpfgo_socket_set_snapshot_ready(bool ready) { (void)ready; }
 static inline void cgroup_ebpfgo_socket_update_locked(void) {}

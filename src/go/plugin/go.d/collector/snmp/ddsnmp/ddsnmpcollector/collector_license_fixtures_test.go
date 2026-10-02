@@ -50,7 +50,10 @@ func TestCollector_Collect_LicensingProfileFixtures(t *testing.T) {
 			setup:       expectSophosFixtureGets,
 			keep: func(row ddprofiledefinition.LicensingConfig) bool {
 				return row.MIB == "SFOS-FIREWALL-MIB" &&
-					strings.HasPrefix(strings.TrimPrefix(ddprofiledefinition.LicenseValueSourceOID(row.State.LicenseValueConfig), "."), "1.3.6.1.4.1.2604.5.1.5.")
+					strings.HasPrefix(
+						strings.TrimPrefix(row.State.LicenseValueConfig.SourceOID(), "."),
+						"1.3.6.1.4.1.2604.5.1.5.",
+					)
 			},
 			assertRows: assertSophosFixtureRows,
 		},
@@ -240,7 +243,11 @@ func assertMikroTikFixtureRows(t *testing.T, rows []ddsnmp.LicenseRow) {
 	assert.Equal(t, "upgrade_entitlement", row.Type)
 	assert.Equal(t, "routeros", row.Component)
 	assert.True(t, row.Expiry.Has)
-	assert.EqualValues(t, time.Date(2002, time.September, 21, 13, 53, 32, 300_000_000, time.UTC).Unix(), row.Expiry.Timestamp)
+	assert.EqualValues(
+		t,
+		time.Date(2002, time.September, 21, 13, 53, 32, 300_000_000, time.UTC).Unix(),
+		row.Expiry.Timestamp,
+	)
 	assert.Equal(t, "1.3.6.1.4.1.14988.1.1.4.2.0", row.Expiry.SourceOID)
 }
 

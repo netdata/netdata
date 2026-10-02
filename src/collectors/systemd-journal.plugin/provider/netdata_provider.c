@@ -23,7 +23,8 @@ int nsd_journal_open_files(NsdJournal **ret, const char *const *paths, int flags
 #if defined(HAVE_RUST_PROVIDER)
     return rsd_journal_open_files(ret, paths, flags);
 #else
-    return sd_journal_open_files(ret, paths, flags);
+    // sd_journal_open_files() is declared with const char ** but does not modify the array
+    return sd_journal_open_files(ret, (const char **)paths, flags);
 #endif
 }
 

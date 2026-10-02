@@ -662,12 +662,11 @@ void pulse_dbengine_do(bool extended) {
 
     int64_t buffers_total_size = (int64_t)dbmem.xt_buf + (int64_t)dbmem.wal;
 
-    int64_t aral_structures_total_size = 0, aral_used_total_size = 0;
+    int64_t aral_structures_total_size = 0;
     int64_t aral_padding_total_size = 0;
     for(size_t i = 0; i < RRDENG_MEM_MAX ; i++) {
         buffers_total_size += (int64_t)aral_free_bytes_from_stats(dbmem.as[i]);
         aral_structures_total_size += (int64_t)aral_structures_bytes_from_stats(dbmem.as[i]);
-        aral_used_total_size += (int64_t)aral_used_bytes_from_stats(dbmem.as[i]);
         aral_padding_total_size += (int64_t)aral_padding_bytes_from_stats(dbmem.as[i]);
     }
 
@@ -1557,6 +1556,42 @@ void pulse_dbengine_do(bool extended) {
                 rrddim_set_by_pointer(st_compression, rd_savings, ratio);
 
                 rrdset_done(st_compression);
+            }
+
+            // ----------------------------------------------------------------
+
+            {
+                static RRDSET *st_decompression = NULL;
+                static RRDDIM *rd_compressed = NULL;
+                static RRDDIM *rd_uncompressed = NULL;
+
+                if (unlikely(!st_decompression)) {
+                    st_decompression = rrdset_create_localhost(
+                        "netdata",
+                        "dbengine_decompression_throughput",
+                        NULL,
+                        "dbengine io",
+                        NULL,
+                        "Netdata DB engine extent decompression throughput",
+                        "MiB/s",
+                        "netdata",
+                        "pulse",
+                        priority,
+                        localhost->rrd_update_every,
+                        RRDSET_TYPE_LINE);
+
+                    rd_compressed = rrddim_add(st_decompression, "compressed", NULL, 1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
+                    rd_uncompressed = rrddim_add(st_decompression, "uncompressed", NULL, 1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
+                }
+                priority++;
+
+                // an extent is decompressed as a whole, on every access, including extent cache hits.
+                // comparing "uncompressed" against the pages queries actually consume shows how much
+                // of each decompression is discarded.
+                rrddim_set_by_pointer(st_decompression, rd_compressed, (collected_number)stats_array[13]);
+                rrddim_set_by_pointer(st_decompression, rd_uncompressed, (collected_number)stats_array[14]);
+
+                rrdset_done(st_decompression);
             }
 
             // ----------------------------------------------------------------

@@ -27,6 +27,30 @@ func (ck *CommandKernel) abortFunctionMutation(mutation FunctionCatalogMutation)
 	return ck.functionCatalog.AbortMutation(mutation)
 }
 
+func (ck *CommandKernel) completeFunctionCleanup(cleanup functionCleanupTask, completion lifecycle.TaskCompletion) {
+	cleanup.err = ck.completeOneShotTask(&cleanup.task, completion, "Function cleanup")
+	ck.functionCleanupTasks[completion.Ref] = cleanup
+}
+
+func (ck *CommandKernel) acknowledgeFunctionCleanup(cleanup functionCleanupTask, ack lifecycle.TaskAcknowledgement) {
+	if err := cleanup.task.validateAcknowledgement(ack, "Function cleanup"); err != nil {
+		ck.run.Dirty(err)
+		return
+	}
+	if !ck.releaseOneShotTask(&cleanup.task, ack, "function-cleanup") {
+		ck.functionCleanupTasks[ack.Ref] = cleanup
+		return
+	}
+	delete(ck.functionCleanupTasks, ack.Ref)
+	// Ordinary cleanup errors become terminal only after the physical task and
+	// its exact catalog generation have both been acknowledged.
+	completeErr := errors.Join(cleanup.err, ack.Err)
+	catalogErr := ck.functionCatalog.CompleteCleanup(cleanup.ref)
+	if completeErr != nil || catalogErr != nil {
+		ck.run.Dirty(errors.Join(completeErr, catalogErr))
+	}
+}
+
 func (ck *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
 	if quantum <= 0 {
 		return ck.functionCleanupBacklog.count != 0
@@ -182,7 +206,7 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 }
 
 func (ck *CommandKernel) serviceFunctionCatalogClose(quantum int) bool {
-	if !ck.shutdownBarrierDone || ck.shutdownBarrierFailed {
+	if !ck.barrierWork.done || ck.barrierWork.failed {
 		return false
 	}
 	if !ck.functionCatalogClosing {

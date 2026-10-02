@@ -1,31 +1,29 @@
 //! The trace-id bloom filter (`TBLM` chunk): a per-file membership pre-check
-//! that lets a reader skip a whole file without touching `TIDX`/`TRCE`.
+//! that lets trace-by-id lookups skip a whole file without touching
+//! `TIDX`/`TRCE`.
 //!
-//! `TIDX` answers "where are this trace's spans" in O(log) *within* a file;
-//! what it cannot do is make "not in this file" cheap across MANY files — the
-//! cross-file trace-by-id (the query engine's fan-out) would otherwise open
-//! every candidate file's index. The bloom is the industry-standard answer
-//! (Tempo's only auxiliary index is exactly this): one small chunk read gives
-//! "definitely absent" for ~95% of non-member files at the configured 5%
-//! false-positive rate. False positives cost only a wasted `TIDX` lookup;
-//! false negatives cannot happen.
+//! `TIDX` locates a trace's spans *within* one file; it cannot make "not in
+//! this file" cheap across MANY files — the cross-file fan-out would
+//! otherwise open every candidate file's index. A bloom `false` is definitive
+//! and skips the file; the ~5% false positives each cost one wasted `TIDX`
+//! lookup; false negatives cannot happen.
 //!
-//! The filter itself is [`fastbloom::BloomFilter`] — an audited, widely-used
-//! crate (no `unsafe` in its source as of the pinned version; see the
-//! workspace `Cargo.toml` pin note) — serialized verbatim inside the chunk via
-//! serde, so the on-disk payload is self-describing (bit length, hash count,
-//! and seeded hasher state all travel with it). Build-time policy lives here:
-//! 5% target FP over the file's DISTINCT non-unset trace ids, one filter per
-//! file, and a constant seed so identical inputs seal to identical bytes.
+//! The filter is a [`fastbloom::BloomFilter`] serialized verbatim inside the
+//! chunk via serde, so the payload is self-describing: bit length, hash
+//! count, and seeded hasher state all travel with it. The crate is pinned
+//! and audited `unsafe`-free per version (see the workspace `Cargo.toml`).
 //!
-//! Same additive TOC-indexed contract as `TIDX`/`EVNB`/`LNKB`: optional,
-//! detected via the TOC, no format version bump; absent when the file has no
-//! set trace ids.
+//! Build-time policy lives here: 5% false-positive target over the file's
+//! DISTINCT non-unset trace ids, one filter per file, a constant seed so
+//! identical inputs seal to identical bytes, ~6.25 bits per distinct id
+//! (≈0.8 MB per million). Bounding that cardinality is the producer's
+//! responsibility (file-rotation limits), not this module's.
 //!
-//! Build-time sizing is ~6.25 bits per distinct id (≈0.8 MB per million
-//! distinct traces): bounded in practice by the producer's file-rotation
-//! limits, not here — bounding distinct-id cardinality is the seal's
-//! responsibility (see the production-cutover ingest caps).
+//! Chunk contract: additive and TOC-detected like `TIDX`/`EVNB`/`LNKB` (no
+//! format version bump); the chunk is absent when the file has no set trace
+//! ids. Consumers: `reader.rs` decodes and validates it at the trust
+//! boundary; `index_reader/session.rs` tests it per id and, when corrupt,
+//! warns once and degrades to exact `TIDX` lookups.
 
 use fastbloom::BloomFilter;
 use serde::{Deserialize, Serialize};
@@ -53,20 +51,20 @@ pub struct TraceIdBloom {
 }
 
 impl TraceIdBloom {
-    /// Build the per-file filter from the file's sorted trace-id index —
-    /// adjacent-dedup over the permutation yields each distinct id exactly
-    /// once, collected up front because the filter must be sized before
-    /// insertion. The transient `Vec` costs 16 B per distinct id, bounded by
-    /// the `TRCE` column the seal already holds in memory twice
-    /// (insertion-order + chronological) — never the peak. Returns `None`
-    /// when the file has no set (non-zero) trace ids: no chunk is written,
-    /// and a reader treats absence as "cannot skip".
+    /// Build the per-file filter from the file's sorted trace-id index.
+    /// Returns `None` when the file has no set (non-zero) trace ids: no chunk
+    /// is written (the seal declares `TBLM` only when a set id exists), and a
+    /// reader treats absence as "cannot skip".
     ///
     /// `trace_ids` MUST be the chronological `TRCE` column `index` was built
     /// from (the same coupling `TraceIdIndex::positions` documents).
     pub(crate) fn build(index: &TraceIdIndex, trace_ids: &TraceIds) -> Option<Self> {
-        // One pass: the filter needs its item count BEFORE insertion (sizing),
-        // so collect the distinct ids rather than walking the permutation twice.
+        // fastbloom sizes the filter from the item count BEFORE insertion, so
+        // collect the distinct ids — adjacent-dedup over the sorted
+        // permutation, each exactly once — into a transient `Vec` first. That
+        // buffer costs 16 B per distinct id, bounded by the `TRCE` column the
+        // seal already holds in memory twice (insertion-order +
+        // chronological) — never the peak.
         let distinct: Vec<TraceId> = index.distinct_ids(trace_ids).collect();
         if distinct.is_empty() {
             return None;
@@ -107,10 +105,12 @@ impl TraceIdBloom {
 
     /// Panic-safety validation at the trust boundary (the `TIDX` contract):
     /// a decoded chunk claiming an impossible shape surfaces as
-    /// [`Error::CorruptIndex`] so the query layer skips the file.
+    /// [`Error::CorruptIndex`]. The bloom is only a hint, so corruption never
+    /// skips the file — `index_reader/session.rs` warns once and falls back
+    /// to exact `TIDX` lookups.
     ///
     /// This deliberately reaches INTO the decoded filter, not just our
-    /// envelope: serde bypasses the crate's constructor asserts, so a
+    /// envelope: serde bypasses fastbloom's constructor asserts, so a
     /// CRC-valid crafted chunk could deserialize a filter whose bit vector is
     /// empty (`contains` would index it — panic) or whose hash count is
     /// absurd (`contains` would run up to ~4B probes per lookup — a stall).

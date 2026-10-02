@@ -1,11 +1,30 @@
-//! Journal file indexing functionality.
+//! The indexing engine of journal-index: turns one journal file into a
+//! searchable [`FileIndex`] - a time histogram, a time-ordered entry-offset
+//! list and one [`Bitmap`] per indexed field=value pair -
+//! which [`FileIndex::find_log_entries`] and [`Filter`](crate::Filter) then consume.
 //!
-//! This module provides the [`FileIndexer`] type which creates searchable
-//! indexes from journal files. The indexing process extracts:
+//! `FileIndexer::index` runs the pass: open the file through journal-core's
+//! window manager, bound it by the header's `tail_object_offset`, translate
+//! requested field names through the file's remapping map, exclude
+//! `ND_REMAPPING=1` bookkeeping entries, order the snapshot's entries by
+//! time (source timestamp field, falling back to each entry's realtime),
+//! bucket them into a [`Histogram`] via
+//! [`Histogram::from_timestamp_offset_pairs`], then build the bitmaps
+//! over positions in that time-ordered list.
 //!
-//! - Time-based histograms for efficient range queries
-//! - Bitmap indexes for fast field=value lookups
-//! - Metadata about available and indexed fields
+//! Drivers (grep-verified): journal-engine's `batch_compute_file_indexes`
+//! builds one indexer per file in a rayon pool and feeds each result to the
+//! index cache and the registry's time-range metadata
+//! (`journal-engine/src/indexing.rs`; reached from
+//! journal-function and `otel-legacy-logs/src/handler.rs`); the crate's
+//! integration tests index files directly (tests/pagination.rs,
+//! tests/filter_evaluation.rs, tests/remapping_indexing.rs).
+//!
+//! Errors (error.rs): journal read failures arrive as `IndexError::Journal`
+//! through `#[from]`; a header without `tail_object_offset` aborts with
+//! `MissingOffset`; a zero `bucket_duration` fails in the histogram step
+//! ([`IndexError::ZeroBucketDuration`]) and a snapshot without entries
+//! fails with [`IndexError::EmptyHistogramInput`].
 
 use crate::{
     Bitmap, FieldName, FieldValuePair, FileIndex, Histogram, IndexError, Microseconds, Result,
@@ -24,24 +43,20 @@ pub const DEFAULT_MAX_UNIQUE_VALUES_PER_FIELD: usize = 500;
 /// Default maximum payload size (in bytes) for field values to index.
 pub const DEFAULT_MAX_FIELD_PAYLOAD_SIZE: usize = 100;
 
-/// Configuration limits for the indexing process.
+/// Cardinality and size caps for the indexing pass.
 ///
-/// These limits protect against unbounded memory growth when indexing
-/// journal files with high-cardinality fields or large payloads.
+/// Enforced per field while building bitmaps (`build_entries_index`): once a
+/// field reaches `max_unique_values_per_field` indexed values, its remaining
+/// values are skipped; a value is also skipped when its stored payload is at
+/// or above `max_field_payload_size` or the data object is compressed.
 #[derive(Debug, Clone, Copy)]
 pub struct IndexingLimits {
-    /// Maximum number of unique values to index per field.
-    ///
-    /// Fields with more unique values than this limit will have their indexing
-    /// truncated. This protects against high-cardinality fields (e.g., MESSAGE
-    /// with millions of unique values) causing memory exhaustion.
+    /// Maximum number of unique values indexed per field; a field stops at
+    /// this many values and its remaining data objects are skipped.
     pub max_unique_values_per_field: usize,
 
-    /// Maximum payload size (in bytes) for field values to index.
-    ///
-    /// Field values with payloads larger than this limit (or compressed values)
-    /// will be skipped. This prevents large binary data or encoded content
-    /// from consuming excessive memory.
+    /// Maximum stored payload size (bytes) for an indexable value; values at
+    /// or above this size, and all compressed values, are skipped.
     pub max_field_payload_size: usize,
 }
 
@@ -54,35 +69,27 @@ impl Default for IndexingLimits {
     }
 }
 
-/// Reusable indexer for creating searchable indexes from journal files.
+/// Reusable indexer that turns one journal file into a [`FileIndex`].
 ///
-/// # Indexing Process
+/// Carries only the configured [`IndexingLimits`] between calls: `index`
+/// resets every scratch buffer up front, so one instance can index files
+/// back to back (journal-engine builds a fresh one per file anyway,
+/// `journal-engine/src/indexing.rs`). The work lives in `build_histogram` and
+/// `build_entries_index`; the snapshot bound and the bookkeeping exclusion
+/// are set up in `index` itself.
 ///
-/// The indexer performs three main tasks:
-///
-/// 1. **Histogram Construction**: Creates time-based buckets for efficient
-///    range queries. Entries are ordered by their source timestamp (if
-///    available) or realtime timestamp.
-///
-/// 2. **Bitmap Index Creation**: For each specified field, creates bitmap
-///    indexes mapping field=value pairs to entry indices, enabling fast
-///    filtered queries.
-///
-/// 3. **Metadata Collection**: Tracks which fields are available in the file
-///    and which were indexed.
-///
-/// # Concurrent Write Handling
-///
-/// The indexer captures the journal file's `tail_object_offset` at the start of indexing
-/// to create a consistent snapshot. Any entries written to the file after indexing begins
-/// are ignored, preventing race conditions with concurrent writers.
+/// Concurrency contract: the pass is bounded by the file header's
+/// `tail_object_offset`, captured once at the start, so entries appended by
+/// a concurrent writer during indexing stay invisible to the histogram, the
+/// time-ordered list and the bitmaps alike.
 #[derive(Debug)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct FileIndexer {
     /// Configuration limits for the indexing process.
     limits: IndexingLimits,
 
-    // Associates a source timestamp value with its inlined cursor
+    // (source timestamp value, inlined cursor) pairs, one per distinct value
+    // of the source timestamp field
     source_timestamp_cursor_pairs: Vec<(Microseconds, InlinedCursor)>,
 
     // Scratch buffer to collect entry offsets from the inlined cursor of a
@@ -99,16 +106,15 @@ pub struct FileIndexer {
     // object appears
     entry_indices: Vec<u32>,
 
-    // Maps entry offsets to an index of an implicitly defined time-ordered
-    // array of entries
+    // Maps an entry offset to its position in the time-ordered entry list -
+    // the index space the bitmaps' entry indices live in
     entry_offset_index: HashMap<NonZeroU64, u64>,
 
-    // Entry offsets that belong to ND_REMAPPING=1 bookkeeping records written
-    // by the otel-plugin. These describe the OTel-to-systemd field name
-    // mapping; they are not real log records and must be excluded from the
-    // file's time histogram, the time-ordered entry list, and the per-field
-    // bitmaps so that downstream consumers (queries, histograms) see only
-    // genuine log entries.
+    // Entry offsets of ND_REMAPPING=1 bookkeeping records: the OTel log
+    // writer's field-mapping metadata (`journal-log-writer/src/log/mod.rs`
+    // `write_remapping_entry`),
+    // not log entries. Excluded from the histogram, the time-ordered list and
+    // the bitmaps so consumers see only genuine log entries.
     remapping_entry_offsets: HashSet<NonZeroU64>,
 }
 
@@ -137,11 +143,19 @@ impl FileIndexer {
 impl FileIndexer {
     /// Create a searchable index from a journal file.
     ///
-    /// # Arguments
-    /// * `file` - The journal file to index
-    /// * `source_timestamp_field` - Optional field to use for timestamps
-    /// * `field_names` - Fields to create bitmap indexes for
-    /// * `bucket_duration` - Duration of histogram buckets
+    /// Resets all scratch state first, so the same indexer can be reused for
+    /// further files. Each field in `field_names` that the file carries
+    /// (resolved through the file's remapping map) gets one bitmap per
+    /// field=value pair; `source_timestamp_field`, when given, provides the
+    /// entries' timestamps, with the entry's realtime timestamp as fallback.
+    ///
+    /// # Errors
+    ///
+    /// `IndexError::Journal` for journal read failures; `MissingOffset` when
+    /// the header carries no `tail_object_offset`; `ZeroBucketDuration` for a
+    /// zero `bucket_duration` ([`IndexError::ZeroBucketDuration`]);
+    /// `EmptyHistogramInput` when
+    /// no entries fall inside the snapshot ([`IndexError::EmptyHistogramInput`]).
     pub fn index(
         &mut self,
         file: &File,
@@ -157,54 +171,55 @@ impl FileIndexer {
         self.entry_offset_index = HashMap::default();
         self.remapping_entry_offsets.clear();
 
+        // 32 MiB mmap window for journal-core's window manager - the same
+        // size the query path uses (`src/file_index.rs` `find_log_entries`).
         let window_size = 32 * 1024 * 1024;
         let journal_file = JournalFile::<Mmap>::open(file, window_size)?;
 
-        // NOTE: Capture the maximum valid entry offset at the start of
-        // indexing.
-        //
-        // This prevents race conditions when the journal file is being
-        // actively written to. The `tail_object_offset` from the header tells
-        // us the offset of the last object in the file at this moment. Any
-        // entry offset beyond this was added after we started indexing and
-        // should be ignored.
+        // Snapshot bound: the header's tail object offset is the last object
+        // in the file as of this read; every stage below ignores entry
+        // offsets beyond it, so entries appended while indexing runs stay
+        // out of the index.
         let Some(tail_object_offset) = journal_file.journal_header_ref().tail_object_offset else {
             return Err(IndexError::MissingOffset);
         };
 
-        // Capture indexing timestamp
+        // Stamped into the FileIndex; drives the engine cache's freshness
+        // window for online files (`src/file_index.rs` `is_fresh`).
         let indexed_at = Seconds::now();
 
-        // Capture whether the file was online when indexed.
+        // "Online" if either signal says so: the header state (1 =
+        // JournalState::Online, `journal-core/src/file/object.rs`) or the
+        // file's scan-time status, which is Active exactly when the name
+        // lacks the archived `@seqnum_id-head_seqnum-head_realtime` pattern
+        // (`journal-registry/src/repository/file.rs` `Status::parse`).
         //
-        // A file is considered online if:
-        // 1. The journal header state is 1 (STATE_ONLINE), OR
-        // 2. The file is an "Active" file by filename (e.g., system.journal
-        //    without the @seqnum_id-head_seqnum-head_realtime suffix)
-        //
-        // We check both conditions because systemd-journal may temporarily set
-        // `state != 1` on active journal files (e.g., during flush operations).
-        // If we only checked the header state, we might incorrectly mark an
-        // active file as offline/archived, causing its cache entry to be
-        // considered "always fresh" and never re-indexed. This would result
-        // in the file being excluded from queries for current time ranges
-        // because its bounded time range (from when it was indexed) doesn't
-        // overlap with the query range.
-        //
-        // The otel-plugin does not suffer from this issue because it always
-        // uses "archived", instead of "active", filenames.
+        // The OR is deliberate: a still-written file can transiently report
+        // a non-online header state (e.g. while journald flushes or
+        // rotates). Header-only classification would mark it offline, and an
+        // offline index never goes stale in the engine cache
+        // (`src/file_index.rs` `is_fresh`), so it would never be re-indexed and its bounded
+        // time range would stop covering the entries written since. The
+        // registry likewise stores TimeRange::Active vs TimeRange::Bounded on
+        // this flag (`journal-registry/src/registry/mod.rs`
+        // `update_time_range`).
         let was_online = journal_file.journal_header_ref().state == 1 || file.is_active();
 
+        // field_map: requested field name -> the systemd-side name stored in
+        // the journal. Identity for plain fields; the OTel log writer's
+        // remappings resolve to their ND_<md5> names
+        // (`journal-core/src/file/file.rs` `load_fields`).
         let field_map = journal_file.load_fields()?;
 
-        // Discover ND_REMAPPING bookkeeping entries so they can be excluded
-        // from the time histogram, the time-ordered entry list, and the
-        // per-field bitmaps. Typically there is at most one such entry per
-        // file (written by the otel-plugin); journals without remappings
-        // produce an empty set.
+        // Find the ND_REMAPPING=1 bookkeeping records so their entry offsets
+        // can be excluded everywhere below. The OTel log writer writes one
+        // record whenever new field mappings appear and all of them share a
+        // single ND_REMAPPING=1 data object
+        // (`journal-log-writer/src/log/mod.rs` `write_remapping_entry`); journals without
+        // remappings leave the exclusion set empty.
         self.collect_remapping_entry_offsets(&journal_file, tail_object_offset)?;
 
-        // Build the file histogram
+        // Build the time histogram (buckets the snapshot's entries).
         let histogram = self.build_histogram(
             &journal_file,
             source_timestamp_field,
@@ -212,15 +227,16 @@ impl FileIndexer {
             tail_object_offset,
         )?;
 
-        // Use the (timestamp, entry-offset) pairs to construct a vector that
-        // will contain entry offsets sorted by time
+        // The pairs are fully sorted by now; project them to the
+        // time-ordered entry-offset list that FileIndex stores and that
+        // bitmap entry indices point into (the `entry_offsets` field).
         let entry_offsets = self
             .source_timestamp_entry_offset_pairs
             .iter()
             .map(|(_, entry_offset)| entry_offset.get() as u32)
             .collect();
 
-        // Create the bitmaps for field=value pairs
+        // Build the field=value bitmaps.
         let entries = self.build_entries_index(
             &journal_file,
             &field_map,
@@ -229,7 +245,8 @@ impl FileIndexer {
             was_online,
         )?;
 
-        // Convert field_names to HashSet<FieldName> for indexed_fields
+        // indexed_fields = what was requested; file_fields (next) = what the
+        // file carries, via the field map's keys.
         let indexed_fields: HashSet<FieldName> = field_names.iter().cloned().collect();
 
         let mut file_fields = HashSet::default();
@@ -249,17 +266,19 @@ impl FileIndexer {
         ))
     }
 
-    /// Build bitmap indexes for field=value pairs.
+    /// Build the field=value bitmaps for the requested fields.
     ///
-    /// For each field in `field_names`, this iterates through all data objects
-    /// for that field and creates a bitmap mapping each unique field=value pair
-    /// to the entry indices where it appears.
+    /// For each requested field, walks its data objects (resolved through
+    /// `field_map`) and stores one bitmap per value, keyed by the
+    /// caller-facing field name. Bitmap values are entry indices - positions
+    /// in the time-ordered entry-offset list built above.
     ///
-    /// Only entries with offsets <= `tail_object_offset` are included in the
-    /// bitmaps, ensuring a consistent snapshot.
-    ///
-    /// Fields with more than `self.limits.max_unique_values_per_field` unique values
-    /// will have their indexing truncated to prevent unbounded memory growth.
+    /// Skipped without failing the pass: fields absent from the field map or
+    /// whose data chain fails to read; values that fail to load, sit at or
+    /// above the payload cap, are compressed, do not parse as field=value,
+    /// reference no entry, or whose entry-offset walk fails; and
+    /// bookkeeping-only data objects whose every entry is an ND_REMAPPING
+    /// record. A field stops early at the unique-value cap.
     fn build_entries_index(
         &mut self,
         journal_file: &JournalFile<Mmap>,
@@ -277,7 +296,8 @@ impl FileIndexer {
                 continue;
             };
 
-            // Get the data object iterator for this field
+            // A failure here is a journal read error for this field's data
+            // chain: warn and skip the field, indexing continues.
             let field_data_iterator =
                 match journal_file.field_data_objects(systemd_field.as_bytes()) {
                     Ok(field_data_iterator) => field_data_iterator,
@@ -292,25 +312,30 @@ impl FileIndexer {
                     }
                 };
 
-            // Track the number of unique values indexed for this field
+            // Per-field counters: values indexed, large payloads skipped,
+            // early stop flag.
             let mut unique_values_count: usize = 0;
             let mut ignored_large_payloads: usize = 0;
             let mut was_truncated = false;
 
             for data_object in field_data_iterator {
-                // Check cardinality limit before processing this value
                 if unique_values_count >= self.limits.max_unique_values_per_field {
                     was_truncated = true;
                     break;
                 }
 
-                // Get the payload and the inlined cursor for this data object
+                // Copy the payload out and detach the inlined cursor; the
+                // data-object guard drops at the block's end, so
+                // `collect_offsets` below can re-borrow the window manager
+                // (same two-phase pattern as
+                // `collect_remapping_entry_offsets`).
                 let (data_payload, inlined_cursor) = {
                     let Ok(data_object) = data_object else {
                         continue;
                     };
 
-                    // Do not create indexes with fields that contain large payloads.
+                    // Skip values at or above the payload cap and compressed
+                    // ones (their stored bytes are the compressed form).
                     if data_object.raw_payload().len() >= self.limits.max_field_payload_size
                         || data_object.is_compressed()
                     {
@@ -333,7 +358,8 @@ impl FileIndexer {
                     continue;
                 };
 
-                // Collect the offset of entries where this data object appears
+                // Walk the value's entry-offset chain; a failed walk is
+                // skipped silently - an unreadable chain cannot be indexed.
                 self.entry_offsets.clear();
                 if inlined_cursor
                     .collect_offsets(journal_file, &mut self.entry_offsets)
@@ -342,10 +368,10 @@ impl FileIndexer {
                     continue;
                 }
 
-                // Map entry offsets where this data object appears to entry indices.
-                // Filter out any offsets that are beyond our initial snapshot's maximum,
-                // and any offsets that belong to ND_REMAPPING bookkeeping records (those
-                // entries are not in entry_offset_index and must not appear in bitmaps).
+                // Map the value's entry offsets to time-ordered entry indices,
+                // keeping only offsets within the snapshot bound and dropping
+                // ND_REMAPPING bookkeeping offsets (they are not in
+                // entry_offset_index and must not appear in bitmaps).
                 self.entry_indices.clear();
                 for entry_offset in self
                     .entry_offsets
@@ -357,8 +383,9 @@ impl FileIndexer {
                         continue;
                     }
                     let Some(entry_index) = self.entry_offset_index.get(&entry_offset) else {
-                        // This should never happen given that we filter by the tail object
-                        // offset and exclude remapping entries.
+                        // Unreachable with both filters above: every
+                        // in-snapshot, non-bookkeeping offset is time-ordered
+                        // into entry_offset_index by the histogram stage.
                         panic!(
                             "missing entry offset {} from index (total offsets: {})",
                             entry_offset,
@@ -368,16 +395,19 @@ impl FileIndexer {
                     self.entry_indices.push(*entry_index as u32);
                 }
 
-                // If every entry that contains this data object is a remapping
-                // record, the data object only describes the OTel field mapping
-                // (e.g. NDABE_LOG_SEVERITY_NUMBER=log.severity_number) and must
-                // not surface as a value in the index.
+                // Every entry carrying this data object is a bookkeeping
+                // record, so the value only describes the field mapping (e.g.
+                // NDABE_LOG_SEVERITY_NUMBER=log.severity_number) and must not
+                // surface as an indexable value.
                 if self.entry_indices.is_empty() {
                     continue;
                 }
                 self.entry_indices.sort_unstable();
 
-                // Create the bitmap for the entry indices
+                // sort_unstable above satisfies from_sorted_iter's strictly
+                // increasing requirement (`src/bitmap.rs`
+                // `Bitmap::from_sorted_iter`); `optimize()` compacts
+                // the roaring containers.
                 let mut bitmap = Bitmap::from_sorted_iter(self.entry_indices.iter().copied())
                     .expect("sorted entry indices");
                 bitmap.optimize();
@@ -398,7 +428,11 @@ impl FileIndexer {
             }
         }
 
-        // Log summary of indexing issues.
+        // Summarize truncated and payload-skipped fields. Severity follows
+        // was_online: online files are re-indexed on essentially every query
+        // (fresh for one second, `src/file_index.rs` `is_fresh`), so their issues stay at
+        // trace level; archived files are indexed once, so warn/info is
+        // worth the noise.
         if !truncated_fields.is_empty() {
             let field_names: Vec<&str> = truncated_fields.iter().map(|f| f.as_str()).collect();
             let msg = format!(
@@ -435,56 +469,49 @@ impl FileIndexer {
         Ok(entries_index)
     }
 
-    /// Collect entry offsets that belong to ND_REMAPPING=1 bookkeeping
-    /// records.
+    /// Collect the entry offsets of `ND_REMAPPING=1` bookkeeping records.
     ///
-    /// The otel-plugin writes one such entry per journal file containing the
-    /// mapping from OTel field names to their systemd-compatible counterparts
-    /// (e.g. `NDABE_LOG_SEVERITY_NUMBER=log.severity_number`). These records
-    /// are not log messages and must be excluded from time histograms,
-    /// time-ordered entry lists, and per-field bitmaps. Journals that contain
-    /// no remappings (e.g. regular systemd journals) leave the set empty.
-    ///
-    /// Only entries whose offset is at or before `tail_object_offset` are
-    /// considered, matching the snapshot semantics used elsewhere in
-    /// indexing.
+    /// The OTel log writer emits these records to carry the OTel→systemd
+    /// field-name mapping (ND_<md5>=<otel-name>, e.g.
+    /// NDABE_LOG_SEVERITY_NUMBER=log.severity_number); they are metadata, not
+    /// log entries, so every offset found here is excluded from the
+    /// histogram, the time-ordered list and the bitmaps. Journals without
+    /// remappings leave the set empty, and only offsets within the snapshot
+    /// bound are collected.
     fn collect_remapping_entry_offsets(
         &mut self,
         journal_file: &JournalFile<Mmap>,
         tail_object_offset: NonZeroU64,
     ) -> Result<()> {
-        // The ND_REMAPPING field key is the bytes before '=' in the marker.
-        // Resolved from REMAPPING_MARKER to keep both call sites in sync.
+        // Hash-table lookup key: REMAPPING_MARKER's bytes before '='. Derived
+        // from the marker so it cannot drift from it, mirroring journal-core's
+        // load_remappings (`journal-core/src/file/reader.rs`).
         let Some(eq_pos) = REMAPPING_MARKER.iter().position(|b| *b == b'=') else {
             // REMAPPING_MARKER is a compile-time constant containing '='; this
-            // branch is unreachable but is preferred over an unwrap so changes
-            // to the marker can't crash indexing.
+            // arm is unreachable but avoids an unwrap, so a marker change
+            // cannot panic indexing.
             return Ok(());
         };
         let marker_field = &REMAPPING_MARKER[..eq_pos];
 
-        // `field_data_objects` returns an empty iterator when the field is
-        // absent (the regular-systemd-journal case), so any Err here is a
-        // genuine journal read failure. Swallowing it would leave the
-        // indexer unaware of bookkeeping records and re-introduce the leak
-        // this helper exists to prevent; propagate instead. The same
-        // reasoning applies to the per-data-object and per-cursor errors
-        // below — a missed ND_REMAPPING data object means its entries
-        // silently flow into the index.
+        // Every failure below propagates: an unreadable ND_REMAPPING chain
+        // must not silently leak bookkeeping entries into the index. An
+        // absent field is not an error - field_data_objects returns an empty
+        // iterator for it (`journal-core/src/file/file.rs`) - so any Err is
+        // a genuine journal read failure.
         let field_data_iterator = journal_file.field_data_objects(marker_field)?;
 
         // Phase 1: collect the inlined cursor of every ND_REMAPPING=1 data
-        // object.
-        //
-        // Each iterator item is a `ValueGuard<DataObject>` that holds the
-        // journal file's window-manager borrow for as long as it is alive.
-        // `InlinedCursor` is a small `Copy` value, so we copy it out and let
-        // the data-object guard drop at the end of each iteration. We must
-        // NOT call `collect_offsets()` here: when a data object is referenced
-        // by more than one entry it walks the entry-array chain, which
-        // re-borrows the window manager. Doing that while a data-object guard
-        // is still live fails with `ValueGuardInUse`. This mirrors the
-        // two-phase approach in `collect_source_field_info`.
+        // object. Iterator items are `ValueGuard<DataObject>`s holding the
+        // journal file's window-manager borrow while alive; `InlinedCursor`
+        // is `Copy` (`journal-core/src/file/offset_array.rs`), so the
+        // cursor is copied out and the guard drops at the end of each loop
+        // turn. `collect_offsets` must NOT be called here: for a data object
+        // shared by several entries it walks the entry-offset-array chain,
+        // which re-borrows the window manager and fails with
+        // `ValueGuardInUse` (`journal-core/src/file/guarded_cell.rs`) while
+        // a guard is live. Same two-phase shape as
+        // `collect_source_field_info`.
         let mut remapping_cursors = Vec::new();
         for data_object in field_data_iterator {
             let data_object = data_object?;
@@ -501,8 +528,8 @@ impl FileIndexer {
             remapping_cursors.push(inlined_cursor);
         }
 
-        // Phase 2: walk each cursor's entry-array chain. No data-object guard
-        // is held at this point, so re-borrowing the window manager is safe.
+        // Phase 2: walk each cursor's entry-array chain with no data-object
+        // guard held, so re-borrowing the window manager is safe.
         for inlined_cursor in remapping_cursors {
             self.entry_offsets.clear();
             inlined_cursor.collect_offsets(journal_file, &mut self.entry_offsets)?;
@@ -520,24 +547,26 @@ impl FileIndexer {
         Ok(())
     }
 
-    /// Collect timestamp information from a source timestamp field.
+    /// Collect (source timestamp, entry offset) pairs for the source
+    /// timestamp field.
     ///
-    /// This extracts (timestamp, entry_offset) pairs from the specified source
-    /// field (typically `_SOURCE_REALTIME_TIMESTAMP`). The pairs are sorted by
-    /// timestamp and used to build `entry_offset_index`, which maps each entry
-    /// offset to its position in the time-ordered sequence.
-    ///
-    /// If the source field is missing for some entries, those entries will be
-    /// handled later using the journal file's realtime timestamp.
+    /// Reads every data object of `source_field_name` (typically
+    /// `_SOURCE_REALTIME_TIMESTAMP`), parses each value as a microseconds
+    /// timestamp ([`crate::field_types::parse_timestamp`]) and pairs it with every entry offset
+    /// the value's cursor reaches, minus ND_REMAPPING offsets. The pairs are
+    /// sorted by (timestamp, offset) and feed `entry_offset_index`, which
+    /// maps each offset to its position in the time-ordered list. Entries the
+    /// source field does not cover fall back to their realtime timestamps in
+    /// `build_histogram`. Per-object failures are logged and skipped; a
+    /// failure to list the field's data objects propagates.
     fn collect_source_field_info(
         &mut self,
         journal_file: &JournalFile<Mmap>,
         source_field_name: &[u8],
     ) -> Result<()> {
-        // Create an iterator over all the different values the field can take
         let field_data_iterator = journal_file.field_data_objects(source_field_name)?;
 
-        // Collect all the inlined cursors of the source timestamp field
+        // Pass 1: one (timestamp, inlined cursor) pair per distinct value.
         self.source_timestamp_cursor_pairs.clear();
         for data_object_result in field_data_iterator {
             let Ok(data_object) = data_object_result else {
@@ -552,6 +581,8 @@ impl FileIndexer {
                 continue;
             };
 
+            // A data object referenced by no entry has no inlined cursor
+            // (`journal-core/src/file/object.rs`); log it and skip.
             let Some(ic) = data_object.inlined_cursor() else {
                 use journal_core::file::JournalState;
 
@@ -572,7 +603,8 @@ impl FileIndexer {
                 .push((Microseconds(source_timestamp), ic));
         }
 
-        // Collect all the [source_timestamp, entry-offset] pairs
+        // Pass 2: expand each cursor to its entry offsets, dropping
+        // ND_REMAPPING bookkeeping offsets.
         self.source_timestamp_entry_offset_pairs.clear();
         for (ts, ic) in self.source_timestamp_cursor_pairs.iter() {
             self.entry_offsets.clear();
@@ -593,10 +625,10 @@ impl FileIndexer {
                     .push((*ts, *entry_offset));
             }
         }
-        // Sort the [source_timestamp, entry-offset] pairs
         self.source_timestamp_entry_offset_pairs.sort_unstable();
 
-        // Map each entry offset to its position in the pair vector
+        // entry_offset_index: offset -> position in the sorted pair list, i.e.
+        // the bitmap entry index for that offset.
         for (idx, (_, entry_offset)) in self.source_timestamp_entry_offset_pairs.iter().enumerate()
         {
             self.entry_offset_index.insert(*entry_offset, idx as _);
@@ -605,19 +637,16 @@ impl FileIndexer {
         Ok(())
     }
 
-    /// Build a time-based histogram for the journal file.
+    /// Build the file's time histogram.
     ///
-    /// This creates a histogram that maps time ranges to entry counts, enabling
-    /// efficient time-range queries. The histogram uses the source timestamp field
-    /// if available, falling back to the journal file's realtime timestamp for
-    /// entries where the source field is missing.
-    ///
-    /// The method:
-    /// 1. Collects timestamps from the source field (if specified)
-    /// 2. Loads the global entry offset array
-    /// 3. Fills in missing timestamps using realtime values
-    /// 4. Sorts all (timestamp, entry_offset) pairs by time
-    /// 5. Constructs the histogram with the specified bucket duration
+    /// Orders every in-snapshot entry by time and buckets the ordered pairs
+    /// with `bucket_duration`. Timestamps come from the source timestamp
+    /// field when given; any entry it does not cover falls back to its own
+    /// realtime timestamp. Steps: collect the source-field pairs
+    /// (`collect_source_field_info`), read the file's global entry offset
+    /// array (`journal-core/src/file/file.rs` `entry_offsets`), fill the gaps from
+    /// realtime, re-sort if fallbacks were added, then bucket with
+    /// [`Histogram::from_timestamp_offset_pairs`].
     fn build_histogram(
         &mut self,
         journal_file: &JournalFile<Mmap>,
@@ -625,26 +654,22 @@ impl FileIndexer {
         bucket_duration: Seconds,
         tail_object_offset: NonZeroU64,
     ) -> Result<Histogram> {
-        // Collect information from the source timestamp field
         if let Some(source_field_name) = source_timestamp_field_name {
             self.collect_source_field_info(journal_file, source_field_name.as_bytes())?;
         }
 
-        // At this point:
+        // State so far:
         //
-        // - `self.source_timestamp_entry_offset_pairs`: contains a vector of
-        //   (timestamp, entry-offset) pairs sorted by time,
-        // - `self.entry_offset_index`: maps an entry offset to a number
-        //   with the following invariant:
-        //      if (e1.offset < e2.offset) then e1.number < e2.number.
+        // - source_timestamp_entry_offset_pairs: (timestamp, entry offset)
+        //   pairs sorted by (timestamp, offset);
+        // - entry_offset_index: offset -> position in that list.
 
-        // Load the global entry offset array from the file
+        // Load the file's global entry offset array.
         self.entry_offsets.clear();
         journal_file.entry_offsets(&mut self.entry_offsets)?;
 
-        // Iterate through entry offsets and find entries for which we could
-        // not collect a timestamp. In this case, fall-back to using the journal
-        // file's realtime timestamp. Filter out offsets beyond our maximum.
+        // Entries the source field did not cover get their own realtime
+        // timestamp; snapshot-bound and bookkeeping offsets are filtered out.
         self.realtime_entry_offset_pairs.clear();
         for entry_offset in self
             .entry_offsets
@@ -654,43 +679,34 @@ impl FileIndexer {
             .filter(|offset| !self.remapping_entry_offsets.contains(offset))
         {
             if self.entry_offset_index.contains_key(&entry_offset) {
-                // We have the timestamp of this entry offset
                 continue;
             }
 
-            // We don't know the timestamp of this entry offset, use
-            // the journal's file realtime timestamp.
+            // Not covered by the source field: fall back to the entry's own
+            // realtime timestamp.
 
             let timestamp = {
                 let entry = journal_file.entry_ref(entry_offset)?;
                 entry.header.realtime
             };
 
-            // Add the new (timestamp, entry-offset) pair
             self.realtime_entry_offset_pairs
                 .push((Microseconds(timestamp), entry_offset));
         }
 
-        // At this point:
-        //
-        // - `self.realtime_entry_offset_pairs`: contains (timestamp, entry-offset)
-        // pairs of all the entries for which we had to use the journal file's
-        // realtime timestamp.
+        // realtime_entry_offset_pairs now holds every entry the source field
+        // did not cover, stamped with its realtime timestamp.
 
-        // Reconstruct our indexes if we have entries whose time does not
-        // come from the source timestamp
+        // Entries whose time came from the realtime fallback need a rebuild:
+        // merge them into the pair list and re-sort.
         if !self.realtime_entry_offset_pairs.is_empty() {
-            // Extend the vector holding pairs collected from the source timestamp
-            // with the pairs collected from the realtime timestamp and
-            // sort it by time again.
             self.source_timestamp_entry_offset_pairs
                 .append(&mut self.realtime_entry_offset_pairs);
             self.source_timestamp_entry_offset_pairs.sort_unstable();
 
-            // We need to rebuild the `self.entry_offset_index` because
-            // we found entry offsets from the global entry offset array
-            // whose timestamp is assume to be equal to the realtime timestamp
-            // of the journal file
+            // The merge re-ranks every entry, so entry_offset_index must be
+            // rebuilt; fallback entries carry their entry's realtime as
+            // their assumed time.
             self.entry_offset_index.clear();
             for (idx, (_, entry_offset)) in
                 self.source_timestamp_entry_offset_pairs.iter().enumerate()
@@ -699,18 +715,12 @@ impl FileIndexer {
             }
         }
 
-        // At this point, we have information about the order and the time
-        // of all entries in the journal file:
-        //
-        // - `self.source_timestamp_entry_offset_pairs`: contains a vector of
-        //   (timestamp, entry-offset) pairs sorted by time,
-        // - `self.entry_offset_index`: maps an entry offset to a number
-        //   with the following invariant:
-        //      if (e1.offset < e2.offset) then e1.number < e2.number.
-        //
-        // We can proceed with building the histogram
+        // Every snapshot entry is now ordered: the pair list is sorted and
+        // entry_offset_index matches it.
 
-        // Now we can build the file histogram
+        // Fails with ZeroBucketDuration for a zero bucket duration and
+        // EmptyHistogramInput when the snapshot holds no entries
+        // (both raised by `Histogram::from_timestamp_offset_pairs`).
         Histogram::from_timestamp_offset_pairs(
             bucket_duration,
             self.source_timestamp_entry_offset_pairs.as_slice(),

@@ -4,7 +4,6 @@
 #include "cgroup_ebpfgo_shared_memory.h"
 
 #if defined(OS_LINUX)
-
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>

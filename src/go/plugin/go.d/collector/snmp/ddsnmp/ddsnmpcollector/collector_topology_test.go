@@ -144,3 +144,99 @@ func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresenceWithoutStruc
 	require.Zero(t, secondWalkStats.TableCache.Hits)
 	require.Zero(t, secondWalkStats.TableCache.Misses)
 }
+
+func TestCollector_CollectTopologyMetrics_DependencyOnlyRouteWaitsForAnchorRows(t *testing.T) {
+	const (
+		anchorTableOID      = "1.3.6.1.4.1.99999.1"
+		anchorColumnOID     = anchorTableOID + ".1"
+		dependencyColumnOID = "1.3.6.1.4.1.99999.2.1"
+	)
+
+	profile := &ddsnmp.Profile{
+		SourceFile: "topology-lazy-dependency.yaml",
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Topology: []ddprofiledefinition.TopologyConfig{{
+				Kind: ddsnmp.KindIpIfIndex,
+				MetricsConfig: ddprofiledefinition.MetricsConfig{
+					Table:   ddprofiledefinition.SymbolConfig{OID: anchorTableOID, Name: "anchorTable"},
+					Symbols: []ddprofiledefinition.SymbolConfig{{OID: anchorColumnOID, Name: "ip_if_index"}},
+					MetricTags: []ddprofiledefinition.MetricTagConfig{{
+						Tag:    "dependency_value",
+						Table:  "dependencyTable",
+						Symbol: ddprofiledefinition.SymbolConfigCompat{OID: dependencyColumnOID, Name: "dependencyValue"},
+					}},
+				},
+			}},
+		},
+	}
+	ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
+
+	device := newStatefulSNMPDevice()
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+	device.install(mockHandler)
+	collector := New(Config{
+		SnmpClient: mockHandler,
+		Profiles:   []*ddsnmp.Profile{profile},
+		Log:        logger.New(),
+	})
+
+	results, err := collector.Collect()
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Empty(t, results[0].TopologyMetrics)
+	assert.Equal(t, 1, device.walkCount[anchorTableOID])
+	assert.Zero(t, device.walkCount[dependencyColumnOID])
+}
+
+func TestCollector_CollectTopologyMetrics_DependencyWithSymbolOwnerRemainsEager(t *testing.T) {
+	const (
+		anchorTableOID      = "1.3.6.1.4.1.99999.1"
+		anchorColumnOID     = anchorTableOID + ".1"
+		dependencyColumnOID = "1.3.6.1.4.1.99999.2.1"
+	)
+
+	profile := &ddsnmp.Profile{
+		SourceFile: "topology-owned-dependency.yaml",
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Topology: []ddprofiledefinition.TopologyConfig{
+				{
+					Kind: ddsnmp.KindIpIfIndex,
+					MetricsConfig: ddprofiledefinition.MetricsConfig{
+						Table:   ddprofiledefinition.SymbolConfig{OID: anchorTableOID, Name: "anchorTable"},
+						Symbols: []ddprofiledefinition.SymbolConfig{{OID: anchorColumnOID, Name: "anchor"}},
+						MetricTags: []ddprofiledefinition.MetricTagConfig{{
+							Tag:    "dependency_value",
+							Table:  "dependencyTable",
+							Symbol: ddprofiledefinition.SymbolConfigCompat{OID: dependencyColumnOID, Name: "dependencyValue"},
+						}},
+					},
+				},
+				{
+					Kind: ddsnmp.KindIpIfIndex,
+					MetricsConfig: ddprofiledefinition.MetricsConfig{
+						Table:   ddprofiledefinition.SymbolConfig{OID: dependencyColumnOID, Name: "dependencyTable"},
+						Symbols: []ddprofiledefinition.SymbolConfig{{OID: dependencyColumnOID, Name: "dependencyValue"}},
+					},
+				},
+			},
+		},
+	}
+
+	device := newStatefulSNMPDevice()
+	ctrl, mockHandler := setupMockHandler(t)
+	defer ctrl.Finish()
+	device.install(mockHandler)
+	collector := New(Config{
+		SnmpClient: mockHandler,
+		Profiles:   []*ddsnmp.Profile{profile},
+		Log:        logger.New(),
+	})
+
+	results, err := collector.Collect()
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Empty(t, results[0].TopologyMetrics)
+	assert.Equal(t, 1, device.walkCount[anchorTableOID])
+	assert.Equal(t, 1, device.walkCount[dependencyColumnOID])
+}

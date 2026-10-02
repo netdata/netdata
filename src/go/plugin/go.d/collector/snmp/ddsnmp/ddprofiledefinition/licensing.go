@@ -83,18 +83,18 @@ func IsValidLicenseStatePolicy(policy LicenseStatePolicy) bool {
 }
 
 type LicensingConfig struct {
-	OriginProfileID string       `yaml:"-" json:"-"`
-	ID              string       `yaml:"id,omitempty" json:"id,omitempty"`
-	MIB             string       `yaml:"MIB,omitempty" json:"MIB,omitempty"`
+	OriginProfileID string       `yaml:"-"               json:"-"`
+	ID              string       `yaml:"id,omitempty"    json:"id,omitempty"`
+	MIB             string       `yaml:"MIB,omitempty"   json:"MIB,omitempty"`
 	Table           SymbolConfig `yaml:"table,omitempty" json:"table"`
 
-	Identity    LicenseIdentityConfig    `yaml:"identity,omitempty" json:"identity"`
+	Identity    LicenseIdentityConfig    `yaml:"identity,omitempty"    json:"identity"`
 	Descriptors LicenseDescriptorsConfig `yaml:"descriptors,omitempty" json:"descriptors"`
-	State       LicenseStateConfig       `yaml:"state,omitempty" json:"state"`
-	Signals     LicenseSignalsConfig     `yaml:"signals,omitempty" json:"signals"`
+	State       LicenseStateConfig       `yaml:"state,omitempty"       json:"state"`
+	Signals     LicenseSignalsConfig     `yaml:"signals,omitempty"     json:"signals"`
 
 	StaticTags []StaticMetricTagConfig `yaml:"static_tags,omitempty" json:"-"`
-	MetricTags MetricTagConfigList     `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
+	MetricTags []MetricTagConfig       `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
 }
 
 func (c LicensingConfig) Clone() LicensingConfig {
@@ -113,9 +113,9 @@ func (c LicensingConfig) Clone() LicensingConfig {
 }
 
 type LicenseIdentityConfig struct {
-	ID        LicenseValueConfig `yaml:"id,omitempty" json:"id"`
-	Name      LicenseValueConfig `yaml:"name,omitempty" json:"name"`
-	Feature   LicenseValueConfig `yaml:"feature,omitempty" json:"feature"`
+	ID        LicenseValueConfig `yaml:"id,omitempty"        json:"id"`
+	Name      LicenseValueConfig `yaml:"name,omitempty"      json:"name"`
+	Feature   LicenseValueConfig `yaml:"feature,omitempty"   json:"feature"`
 	Component LicenseValueConfig `yaml:"component,omitempty" json:"component"`
 }
 
@@ -129,8 +129,8 @@ func (c LicenseIdentityConfig) Clone() LicenseIdentityConfig {
 }
 
 type LicenseDescriptorsConfig struct {
-	Type      LicenseValueConfig `yaml:"type,omitempty" json:"type"`
-	Impact    LicenseValueConfig `yaml:"impact,omitempty" json:"impact"`
+	Type      LicenseValueConfig `yaml:"type,omitempty"      json:"type"`
+	Impact    LicenseValueConfig `yaml:"impact,omitempty"    json:"impact"`
 	Perpetual LicenseValueConfig `yaml:"perpetual,omitempty" json:"perpetual"`
 	Unlimited LicenseValueConfig `yaml:"unlimited,omitempty" json:"unlimited"`
 }
@@ -145,7 +145,7 @@ func (c LicenseDescriptorsConfig) Clone() LicenseDescriptorsConfig {
 }
 
 type LicenseStateConfig struct {
-	LicenseValueConfig `yaml:",inline" json:",inline"`
+	LicenseValueConfig `                   yaml:",inline"          json:",inline"`
 	Policy             LicenseStatePolicy `yaml:"policy,omitempty" json:"policy,omitempty"`
 }
 
@@ -157,11 +157,11 @@ func (c LicenseStateConfig) Clone() LicenseStateConfig {
 }
 
 type LicenseSignalsConfig struct {
-	Expiry        LicenseTimerSignalsConfig `yaml:"expiry,omitempty" json:"expiry"`
+	Expiry        LicenseTimerSignalsConfig `yaml:"expiry,omitempty"        json:"expiry"`
 	Authorization LicenseTimerSignalsConfig `yaml:"authorization,omitempty" json:"authorization"`
-	Certificate   LicenseTimerSignalsConfig `yaml:"certificate,omitempty" json:"certificate"`
-	Grace         LicenseTimerSignalsConfig `yaml:"grace,omitempty" json:"grace"`
-	Usage         LicenseUsageSignalsConfig `yaml:"usage,omitempty" json:"usage"`
+	Certificate   LicenseTimerSignalsConfig `yaml:"certificate,omitempty"   json:"certificate"`
+	Grace         LicenseTimerSignalsConfig `yaml:"grace,omitempty"         json:"grace"`
+	Usage         LicenseUsageSignalsConfig `yaml:"usage,omitempty"         json:"usage"`
 }
 
 func (c LicenseSignalsConfig) Clone() LicenseSignalsConfig {
@@ -175,7 +175,7 @@ func (c LicenseSignalsConfig) Clone() LicenseSignalsConfig {
 }
 
 type LicenseTimerSignalsConfig struct {
-	LicenseValueConfig `yaml:",inline" json:",inline"`
+	LicenseValueConfig `                   yaml:",inline"             json:",inline"`
 	Timestamp          LicenseValueConfig `yaml:"timestamp,omitempty" json:"timestamp"`
 	Remaining          LicenseValueConfig `yaml:"remaining,omitempty" json:"remaining"`
 }
@@ -189,10 +189,10 @@ func (c LicenseTimerSignalsConfig) Clone() LicenseTimerSignalsConfig {
 }
 
 type LicenseUsageSignalsConfig struct {
-	Used      LicenseValueConfig `yaml:"used,omitempty" json:"used"`
-	Capacity  LicenseValueConfig `yaml:"capacity,omitempty" json:"capacity"`
+	Used      LicenseValueConfig `yaml:"used,omitempty"      json:"used"`
+	Capacity  LicenseValueConfig `yaml:"capacity,omitempty"  json:"capacity"`
 	Available LicenseValueConfig `yaml:"available,omitempty" json:"available"`
-	Percent   LicenseValueConfig `yaml:"percent,omitempty" json:"percent"`
+	Percent   LicenseValueConfig `yaml:"percent,omitempty"   json:"percent"`
 }
 
 func (c LicenseUsageSignalsConfig) Clone() LicenseUsageSignalsConfig {
@@ -206,19 +206,19 @@ func (c LicenseUsageSignalsConfig) Clone() LicenseUsageSignalsConfig {
 
 type LicenseValueConfig struct {
 	Value string `yaml:"value,omitempty" json:"value,omitempty"`
-	From  string `yaml:"from,omitempty" json:"from,omitempty"`
+	From  string `yaml:"from,omitempty"  json:"from,omitempty"`
 
-	Index          uint                   `yaml:"index,omitempty" json:"index,omitempty"`
+	Index          uint                   `yaml:"index,omitempty"           json:"index,omitempty"`
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
 
 	Symbol SymbolConfig `yaml:"symbol,omitempty" json:"symbol"`
-	OID    string       `yaml:"OID,omitempty" json:"OID,omitempty" jsonschema:"-"`
-	Name   string       `yaml:"name,omitempty" json:"name,omitempty" jsonschema:"-"`
+	OID    string       `yaml:"OID,omitempty"    json:"OID,omitempty"`
+	Name   string       `yaml:"name,omitempty"   json:"name,omitempty"`
 
-	Format   string                  `yaml:"format,omitempty" json:"format,omitempty"`
-	Mapping  MappingConfig           `yaml:"mapping,omitempty" json:"mapping"`
+	Format   string                  `yaml:"format,omitempty"   json:"format,omitempty"`
+	Mapping  MappingConfig           `yaml:"mapping,omitempty"  json:"mapping"`
 	Sentinel []LicenseSentinelPolicy `yaml:"sentinel,omitempty" json:"sentinel,omitempty"`
-	Kind     LicenseSignalKind       `yaml:"kind,omitempty" json:"kind,omitempty"`
+	Kind     LicenseSignalKind       `yaml:"kind,omitempty"     json:"kind,omitempty"`
 }
 
 func (c LicenseValueConfig) IsSet() bool {
@@ -253,32 +253,13 @@ func (c LicenseValueConfig) Clone() LicenseValueConfig {
 	}
 }
 
-type LicenseSignalValueRef struct {
-	Kind  LicenseSignalKind
-	Value LicenseValueConfig
-}
-
-func LicenseSignalValueRefs(row LicensingConfig) []LicenseSignalValueRef {
-	var values []LicenseSignalValueRef
-	add := func(kind LicenseSignalKind, value LicenseValueConfig) {
-		values = append(values, LicenseSignalValueRef{Kind: kind, Value: value})
-	}
-	add(LicenseSignalStateSeverity, row.State.LicenseValueConfig)
-	addLicenseTimerSignalValueRefs(row.Signals.Expiry, LicenseSignalExpiryTimestamp, LicenseSignalExpiryRemaining, add)
-	addLicenseTimerSignalValueRefs(row.Signals.Authorization, LicenseSignalAuthorizationTimestamp, LicenseSignalAuthorizationRemaining, add)
-	addLicenseTimerSignalValueRefs(row.Signals.Certificate, LicenseSignalCertificateTimestamp, LicenseSignalCertificateRemaining, add)
-	addLicenseTimerSignalValueRefs(row.Signals.Grace, LicenseSignalGraceTimestamp, LicenseSignalGraceRemaining, add)
-	add(LicenseSignalUsageUsed, row.Signals.Usage.Used)
-	add(LicenseSignalUsageCapacity, row.Signals.Usage.Capacity)
-	add(LicenseSignalUsageAvailable, row.Signals.Usage.Available)
-	add(LicenseSignalUsagePercent, row.Signals.Usage.Percent)
-	return values
-}
-
-func addLicenseTimerSignalValueRefs(cfg LicenseTimerSignalsConfig, timestampKind, remainingKind LicenseSignalKind, add func(LicenseSignalKind, LicenseValueConfig)) {
-	add(timestampKind, cfg.LicenseValueConfig)
-	add(timestampKind, cfg.Timestamp)
-	add(remainingKind, cfg.Remaining)
+// ForEachLicenseSignalValue visits configured signals in schema order.
+func ForEachLicenseSignalValue(row LicensingConfig, add func(LicenseValueConfig)) {
+	visitLicenseSignalValues(&row, func(_ string, value LicenseValueConfig) {
+		if value.IsSet() {
+			add(value)
+		}
+	}, nil)
 }
 
 func LicenseStructuralIdentity(row LicensingConfig) string {
@@ -296,27 +277,88 @@ func LicenseMergeIdentity(row LicensingConfig) string {
 	if row.ID != "" {
 		return strings.Join([]string{"scalar-group", row.ID}, "|")
 	}
-	for _, sig := range LicenseSignalValueRefs(row) {
-		if oid := LicenseValueSourceOID(sig.Value); oid != "" {
-			return strings.Join([]string{"scalar", TrimLicenseOID(oid)}, "|")
+	var sourceOID string
+	ForEachLicenseSignalValue(row, func(value LicenseValueConfig) {
+		if sourceOID == "" {
+			sourceOID = value.SourceOID()
 		}
+	})
+	if sourceOID != "" {
+		return strings.Join([]string{"scalar", TrimLicenseOID(sourceOID)}, "|")
 	}
 	return strings.Join([]string{"scalar", "<missing-source>"}, "|")
 }
 
-func LicenseValueSourceOID(value LicenseValueConfig) string {
-	switch {
-	case value.From != "":
-		return value.From
-	case value.Symbol.OID != "":
-		return value.Symbol.OID
-	case value.OID != "":
-		return value.OID
-	default:
-		return ""
+// SourceOID selects the OID used by collection, validation and inheritance identity.
+func (value LicenseValueConfig) SourceOID() string {
+	oid, _ := valueSourceOID(value.Symbol.OID, value.From, value.OID)
+	return oid
+}
+
+// EffectiveSymbol applies symbol-first source and formatting defaults.
+func (value LicenseValueConfig) EffectiveSymbol() SymbolConfig {
+	sym := value.Symbol
+	sym.OID = value.SourceOID()
+	if sym.Name == "" {
+		sym.Name = value.Name
 	}
+	if sym.Name == "" && sym.OID != "" {
+		sym.Name = "license:" + strings.TrimPrefix(strings.TrimSpace(sym.OID), ".")
+	}
+	if sym.Format == "" {
+		sym.Format = value.Format
+	}
+	if !sym.Mapping.HasItems() && value.Mapping.HasItems() {
+		sym.Mapping = value.Mapping
+	}
+	return sym
 }
 
 func TrimLicenseOID(oid string) string {
 	return strings.TrimPrefix(strings.TrimSpace(oid), ".")
+}
+
+// visitLicenseSignalValues includes unset values so every consumer sees the same signal schema.
+func visitLicenseSignalValues(
+	row *LicensingConfig,
+	read func(string, LicenseValueConfig),
+	transform func(string, LicenseValueConfig) LicenseValueConfig,
+) {
+	add := func(path string, value *LicenseValueConfig) {
+		if transform != nil {
+			*value = transform(path, *value)
+		} else {
+			read(path, *value)
+		}
+	}
+	add("state", &row.State.LicenseValueConfig)
+	add("signals.expiry", &row.Signals.Expiry.LicenseValueConfig)
+	add("signals.expiry.timestamp", &row.Signals.Expiry.Timestamp)
+	add("signals.expiry.remaining", &row.Signals.Expiry.Remaining)
+	add("signals.authorization", &row.Signals.Authorization.LicenseValueConfig)
+	add("signals.authorization.timestamp", &row.Signals.Authorization.Timestamp)
+	add("signals.authorization.remaining", &row.Signals.Authorization.Remaining)
+	add("signals.certificate", &row.Signals.Certificate.LicenseValueConfig)
+	add("signals.certificate.timestamp", &row.Signals.Certificate.Timestamp)
+	add("signals.certificate.remaining", &row.Signals.Certificate.Remaining)
+	add("signals.grace", &row.Signals.Grace.LicenseValueConfig)
+	add("signals.grace.timestamp", &row.Signals.Grace.Timestamp)
+	add("signals.grace.remaining", &row.Signals.Grace.Remaining)
+	add("signals.usage.used", &row.Signals.Usage.Used)
+	add("signals.usage.capacity", &row.Signals.Usage.Capacity)
+	add("signals.usage.available", &row.Signals.Usage.Available)
+	add("signals.usage.percent", &row.Signals.Usage.Percent)
+}
+
+func transformLicenseValues(row *LicensingConfig, visit func(string, LicenseValueConfig) LicenseValueConfig) {
+	add := func(path string, value *LicenseValueConfig) { *value = visit(path, *value) }
+	add("identity.id", &row.Identity.ID)
+	add("identity.name", &row.Identity.Name)
+	add("identity.feature", &row.Identity.Feature)
+	add("identity.component", &row.Identity.Component)
+	add("descriptors.type", &row.Descriptors.Type)
+	add("descriptors.impact", &row.Descriptors.Impact)
+	add("descriptors.perpetual", &row.Descriptors.Perpetual)
+	add("descriptors.unlimited", &row.Descriptors.Unlimited)
+	visitLicenseSignalValues(row, nil, visit)
 }

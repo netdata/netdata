@@ -3,6 +3,7 @@
 package tomcat
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"strings"
@@ -16,8 +17,8 @@ var (
 	urlQueryServerStatus = url.Values{"XML": {"true"}}.Encode()
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	mx, err := c.collectServerStatus()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	mx, err := c.collectServerStatus(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -25,8 +26,8 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) collectServerStatus() (map[string]int64, error) {
-	resp, err := c.queryServerStatus()
+func (c *Collector) collectServerStatus(ctx context.Context) (map[string]int64, error) {
+	resp, err := c.queryServerStatus(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -83,8 +84,8 @@ func cleanName(name string) string {
 	return strings.ToLower(r.Replace(name))
 }
 
-func (c *Collector) queryServerStatus() (*serverStatusResponse, error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathServerStatus)
+func (c *Collector) queryServerStatus(ctx context.Context) (*serverStatusResponse, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathServerStatus)
 	if err != nil {
 		return nil, err
 	}

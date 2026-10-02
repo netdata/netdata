@@ -55,9 +55,8 @@ func useEmptyConfigRoots(t *testing.T) {
 
 // TestResolveUpdateEvery pins the precedence every module's startup path depends
 // on: config wins over the legacy numeric CLI argument, which wins over the
-// module default. All four collectors route through this one function
-// (main.go:113,137,169,206), so a silent inversion would change every module's
-// interval at once.
+// module default. Every collector routes through this one function in main(), so
+// a silent inversion would change every module's interval at once.
 func TestResolveUpdateEvery(t *testing.T) {
 	const fallback = 10
 

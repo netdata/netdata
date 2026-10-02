@@ -30,16 +30,17 @@ field schema (mostly for UI rendering).
 ## Use the wrapper
 
 ```bash
-source "$(git rev-parse --show-toplevel)/.agents/skills/query-netdata-agents/scripts/_lib.sh"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
 agents_load_env
 
 # Last 10 events in a space.
-read -r -d '' BODY <<EOF
+BODY="$(cat <<EOF
 {
   "space_id":  "$SPACE",
   "page_size": 10
 }
 EOF
+)"
 
 agents_query_cloud POST /api/v1/feed/search "$BODY"
 ```
@@ -128,7 +129,7 @@ that holds the per-event payload.
 
 ```bash
 # Last hour of node-state changes.
-read -r -d '' BODY <<EOF
+BODY="$(cat <<EOF
 {
   "space_id":  "$SPACE",
   "actions":   ["node-state-live","node-state-stale","node-state-offline"],
@@ -137,11 +138,12 @@ read -r -d '' BODY <<EOF
   "page_size": 50
 }
 EOF
+)"
 agents_query_cloud POST /api/v1/feed/search "$BODY" \
   | jq -r '.results.hits.hits[]._source | "\(.["@timestamp"])\t\(.Netdata.event.action // "?")\t\(.host.name // "?")"'
 
 # Distribution of alert classes triggered in the last 24h.
-read -r -d '' BODY <<EOF
+BODY="$(cat <<EOF
 {
   "space_id":  "$SPACE",
   "actions":   ["alert-node_instance-transition"],
@@ -150,12 +152,13 @@ read -r -d '' BODY <<EOF
   "page_size": 0
 }
 EOF
+)"
 agents_query_cloud POST /api/v1/feed/search "$BODY" \
   | jq -r '.results.aggregations.alert_classes.buckets[] | "\(.key)\t\(.doc_count)"'
 
 # All space-user-added events for a given account in the last 7 days.
 ACCT="<account-uuid>"
-read -r -d '' BODY <<EOF
+BODY="$(cat <<EOF
 {
   "space_id":  "$SPACE",
   "actions":   ["space-user-added"],
@@ -164,6 +167,7 @@ read -r -d '' BODY <<EOF
   "page_size": 50
 }
 EOF
+)"
 agents_query_cloud POST /api/v1/feed/search "$BODY" \
   | jq --arg id "$ACCT" '.results.hits.hits[] | select(._source.user.id // "" == $id)'
 ```

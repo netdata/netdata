@@ -59,7 +59,7 @@ func TestTableCache(t *testing.T) {
 			}
 
 			// Cache data
-			cache.cacheRows(cfg, oidMap, tagValues, nil)
+			cache.cacheRows(cfg, oidMap, tagValues, nil, nil)
 
 			// Retrieve cached data - should work
 			cachedOIDs, cachedTags, found := cache.getCachedData(cfg)
@@ -107,10 +107,10 @@ func TestTableCacheEntryKinds(t *testing.T) {
 		Table: ddprofiledefinition.SymbolConfig{OID: "1.2.4", Name: "auxiliaryTable"},
 	}
 
-	cache.cacheRows(rowConfig, nil, nil, nil)
+	cache.cacheRows(rowConfig, nil, nil, nil, nil)
 	assert.False(t, cache.isConfigCached(rowConfig), "empty row snapshots must not become cache entries")
 
-	cache.cacheMarker(markerConfig)
+	cache.cacheMarker(markerConfig, nil)
 	assert.True(t, cache.isConfigCached(markerConfig), "markers must satisfy route planning")
 	_, _, found := cache.getCachedData(markerConfig)
 	assert.False(t, found, "markers must never be readable as row snapshots")
@@ -146,9 +146,9 @@ func BenchmarkTableCacheDiscardDependentsScaling(b *testing.B) {
 			for range b.N {
 				b.StopTimer()
 				cache := newTableCache(time.Hour, 0)
-				cache.cacheRows(configs[0], data, nil, nil)
+				cache.cacheRows(configs[0], data, nil, nil, nil)
 				for i := 1; i < len(configs); i++ {
-					cache.cacheRows(configs[i], data, nil, []string{configs[i-1].Table.OID})
+					cache.cacheRows(configs[i], data, nil, []string{configs[i-1].Table.OID}, nil)
 				}
 				b.StartTimer()
 
@@ -219,8 +219,8 @@ func TestTableCacheMultipleConfigs(t *testing.T) {
 	}
 
 	// Cache both configs
-	cache.cacheRows(cfg1, oidMap1, tagValues1, nil)
-	cache.cacheRows(cfg2, oidMap2, tagValues2, nil)
+	cache.cacheRows(cfg1, oidMap1, tagValues1, nil, nil)
+	cache.cacheRows(cfg2, oidMap2, tagValues2, nil, nil)
 
 	// Both should be retrievable
 	cachedOIDs1, cachedTags1, found1 := cache.getCachedData(cfg1)
@@ -271,8 +271,8 @@ func TestTableCacheInvalidateConfig(t *testing.T) {
 		cache := newTableCache(time.Hour, 0)
 		cfg1 := newConfig("1.3.6.1.2.1.2.2", "ifTable", "ifInOctets")
 		cfg2 := newConfig("1.3.6.1.2.1.2.2", "ifTable", "ifOutOctets")
-		cache.cacheRows(cfg1, data, nil, nil)
-		cache.cacheRows(cfg2, data, nil, nil)
+		cache.cacheRows(cfg1, data, nil, nil, nil)
+		cache.cacheRows(cfg2, data, nil, nil, nil)
 
 		cache.invalidateConfig(cfg1)
 
@@ -287,8 +287,8 @@ func TestTableCacheInvalidateConfig(t *testing.T) {
 		cache := newTableCache(time.Hour, 0)
 		cfg1 := newConfig("1.3.6.1.2.1.2.2", "ifTable", "ifInOctets")
 		cfg2 := newConfig("1.3.6.1.2.1.31.1.1", "ifXTable", "ifHCInOctets")
-		cache.cacheRows(cfg1, data, nil, []string{cfg2.Table.OID})
-		cache.cacheRows(cfg2, data, nil, nil)
+		cache.cacheRows(cfg1, data, nil, []string{cfg2.Table.OID}, nil)
+		cache.cacheRows(cfg2, data, nil, nil, nil)
 
 		cache.invalidateConfig(cfg1)
 
@@ -304,9 +304,9 @@ func TestTableCacheInvalidateConfig(t *testing.T) {
 		cfg1 := newConfig("1.3.6.1.2.1.2.2", "ifTable", "ifInOctets")
 		cfg2 := newConfig("1.3.6.1.2.1.2.2", "ifTable", "ifOutOctets")
 		cfg3 := newConfig("1.3.6.1.2.1.31.1.1", "ifXTable", "ifHCInOctets")
-		cache.cacheRows(cfg1, data, nil, []string{cfg3.Table.OID})
-		cache.cacheRows(cfg2, data, nil, nil)
-		cache.cacheRows(cfg3, data, nil, nil)
+		cache.cacheRows(cfg1, data, nil, []string{cfg3.Table.OID}, nil)
+		cache.cacheRows(cfg2, data, nil, nil, nil)
+		cache.cacheRows(cfg3, data, nil, nil, nil)
 
 		cache.invalidateTable(cfg1.Table.OID)
 
@@ -335,10 +335,10 @@ func TestTableCacheDiscardTables(t *testing.T) {
 		unrelated := newConfig("1.3.6.1.2.1.4", "unrelated")
 		data := map[string]map[string]string{"1": {"column": "column.1"}}
 
-		cache.cacheRows(dependency, data, nil, nil)
-		cache.cacheRows(source, data, nil, []string{dependency.Table.OID})
-		cache.cacheRows(dependent, data, nil, []string{source.Table.OID})
-		cache.cacheRows(unrelated, data, nil, nil)
+		cache.cacheRows(dependency, data, nil, nil, nil)
+		cache.cacheRows(source, data, nil, []string{dependency.Table.OID}, nil)
+		cache.cacheRows(dependent, data, nil, []string{source.Table.OID}, nil)
+		cache.cacheRows(unrelated, data, nil, nil, nil)
 		return cache, dependency, source, dependent, unrelated
 	}
 
@@ -421,11 +421,11 @@ func TestTableCacheDependencies(t *testing.T) {
 
 	// Cache tables with dependencies
 	// table1 and table2 depend on each other
-	cache.cacheRows(cfg1, oidMap, tagValues, []string{cfg2.Table.OID})
-	cache.cacheRows(cfg2, oidMap, tagValues, []string{cfg1.Table.OID})
+	cache.cacheRows(cfg1, oidMap, tagValues, []string{cfg2.Table.OID}, nil)
+	cache.cacheRows(cfg2, oidMap, tagValues, []string{cfg1.Table.OID}, nil)
 
 	// table3 depends on table2
-	cache.cacheRows(cfg3, oidMap, nil, []string{cfg2.Table.OID})
+	cache.cacheRows(cfg3, oidMap, nil, []string{cfg2.Table.OID}, nil)
 
 	// All tables should be cached
 	assert.True(t, cache.areTablesCached([]string{cfg1.Table.OID, cfg2.Table.OID, cfg3.Table.OID}))
@@ -516,10 +516,10 @@ func TestTableCacheDependenciesCascade(t *testing.T) {
 	data := map[string]map[string]string{"1": {"col": "val"}}
 
 	// Cache with chain dependencies
-	cache.cacheRows(cfgA, data, nil, []string{cfgB.Table.OID})
-	cache.cacheRows(cfgB, data, nil, []string{cfgA.Table.OID, cfgC.Table.OID})
-	cache.cacheRows(cfgC, data, nil, []string{cfgB.Table.OID, cfgD.Table.OID})
-	cache.cacheRows(cfgD, data, nil, []string{cfgC.Table.OID})
+	cache.cacheRows(cfgA, data, nil, []string{cfgB.Table.OID}, nil)
+	cache.cacheRows(cfgB, data, nil, []string{cfgA.Table.OID, cfgC.Table.OID}, nil)
+	cache.cacheRows(cfgC, data, nil, []string{cfgB.Table.OID, cfgD.Table.OID}, nil)
+	cache.cacheRows(cfgD, data, nil, []string{cfgC.Table.OID}, nil)
 
 	// All should be cached
 	assert.True(t, cache.areTablesCached([]string{cfgA.Table.OID, cfgB.Table.OID, cfgC.Table.OID, cfgD.Table.OID}))
@@ -576,9 +576,9 @@ func TestTableCacheMixedDependencies(t *testing.T) {
 	data := map[string]map[string]string{"1": {"col": "val"}}
 
 	// Cache tables
-	cache.cacheRows(cfg1, data, nil, []string{cfg2.Table.OID})
-	cache.cacheRows(cfg2, data, nil, []string{cfg1.Table.OID})
-	cache.cacheRows(cfg3, data, nil, nil) // No dependencies
+	cache.cacheRows(cfg1, data, nil, []string{cfg2.Table.OID}, nil)
+	cache.cacheRows(cfg2, data, nil, []string{cfg1.Table.OID}, nil)
+	cache.cacheRows(cfg3, data, nil, nil, nil) // No dependencies
 
 	// All should be cached
 	_, _, found1 := cache.getCachedData(cfg1)
@@ -643,14 +643,14 @@ func TestTableCacheDisabled(t *testing.T) {
 	}
 
 	// Try to cache data
-	cache.cacheRows(cfg, oidMap, tagValues, nil)
+	cache.cacheRows(cfg, oidMap, tagValues, nil, nil)
 
 	// Should not find anything
 	_, _, found := cache.getCachedData(cfg)
 	assert.False(t, found)
 
 	// Try to cache with dependencies
-	cache.cacheRows(cfg, oidMap, tagValues, []string{"other.table"})
+	cache.cacheRows(cfg, oidMap, tagValues, []string{"other.table"}, nil)
 
 	// Should not find anything
 	_, _, found = cache.getCachedData(cfg)
@@ -683,7 +683,7 @@ func TestTableCacheDeepCopy(t *testing.T) {
 	}
 
 	// Cache the data
-	cache.cacheRows(cfg, oidMap, tagValues, nil)
+	cache.cacheRows(cfg, oidMap, tagValues, nil, nil)
 
 	// Modify original maps
 	oidMap["1"]["col2"] = "should not appear"
@@ -725,8 +725,8 @@ func TestTableCacheDependencyCleanup(t *testing.T) {
 	data := map[string]map[string]string{"1": {"col": "val"}}
 
 	// Cache with circular deps
-	cache.cacheRows(cfg1, data, nil, []string{cfg2.Table.OID})
-	cache.cacheRows(cfg2, data, nil, []string{cfg1.Table.OID})
+	cache.cacheRows(cfg1, data, nil, []string{cfg2.Table.OID}, nil)
+	cache.cacheRows(cfg2, data, nil, []string{cfg1.Table.OID}, nil)
 
 	// Check initial state
 	tables, configs, withDeps, totalDeps := cache.stats()
@@ -780,7 +780,7 @@ func TestTableCacheNonExistentDependency(t *testing.T) {
 	cache.cacheRows(cfgA,
 		map[string]map[string]string{"1": {"col": "val"}},
 		nil,
-		[]string{cfgB.Table.OID})
+		[]string{cfgB.Table.OID}, nil)
 
 	// tableA should be cached
 	_, _, found := cache.getCachedData(cfgA)
@@ -798,7 +798,7 @@ func TestTableCacheNonExistentDependency(t *testing.T) {
 	cache.cacheRows(cfgB,
 		map[string]map[string]string{"1": {"col": "val"}},
 		nil,
-		[]string{cfgA.Table.OID})
+		[]string{cfgA.Table.OID}, nil)
 
 	// Both should be cached
 	assert.True(t, cache.areTablesCached([]string{cfgA.Table.OID, cfgB.Table.OID}))
@@ -850,9 +850,9 @@ func TestTableCacheMultipleConfigsSameTableExpiration(t *testing.T) {
 	}
 
 	// Cache multiple configs for the same table
-	cache.cacheRows(cfg1, map[string]map[string]string{"1": {"col1": "val1"}}, nil, nil)
-	cache.cacheRows(cfg2, map[string]map[string]string{"1": {"col2": "val2"}}, nil, nil)
-	cache.cacheRows(cfg3, map[string]map[string]string{"1": {"col3": "val3"}}, nil, nil)
+	cache.cacheRows(cfg1, map[string]map[string]string{"1": {"col1": "val1"}}, nil, nil, nil)
+	cache.cacheRows(cfg2, map[string]map[string]string{"1": {"col2": "val2"}}, nil, nil, nil)
+	cache.cacheRows(cfg3, map[string]map[string]string{"1": {"col3": "val3"}}, nil, nil, nil)
 
 	// All configs should be cached
 	assert.True(t, cache.isConfigCached(cfg1))
@@ -919,8 +919,8 @@ func TestTableCacheConfigIsolation(t *testing.T) {
 	}
 
 	// Cache configs with different tags
-	cache.cacheRows(cfg1, config1OIDs, config1Tags, nil)
-	cache.cacheRows(cfg2, config2OIDs, config2Tags, nil)
+	cache.cacheRows(cfg1, config1OIDs, config1Tags, nil, nil)
+	cache.cacheRows(cfg2, config2OIDs, config2Tags, nil, nil)
 
 	// Retrieve and verify isolation
 	_, tags1, found1 := cache.getCachedData(cfg1)

@@ -17,20 +17,24 @@ selector:
 # [legacy] Global tags
 metric_tags:
   - tag: legacy_pdu_name
-    OID: 1.3.6.1.4.1.30932.1.1.2.40.0
-    symbol: pduName
+    symbol:
+      OID: 1.3.6.1.4.1.30932.1.1.2.40.0
+      name: pduName
 
   - tag: legacy_pdu_version
-    OID: 1.3.6.1.4.1.30932.1.1.1.1.0
-    symbol: version
+    symbol:
+      OID: 1.3.6.1.4.1.30932.1.1.1.1.0
+      name: version
 
   - tag: legacy_pdu_model
-    OID: 1.3.6.1.4.1.30932.1.1.1.2.0
-    symbol: modelCode
+    symbol:
+      OID: 1.3.6.1.4.1.30932.1.1.1.2.0
+      name: modelCode
 
   - tag: legacy_pdu_macaddress
-    OID: 1.3.6.1.4.1.30932.1.1.1.3.0
-    symbol: hwAddress
+    symbol:
+      OID: 1.3.6.1.4.1.30932.1.1.1.3.0
+      name: hwAddress
 
 metrics:
   ### [Legacy] PDU

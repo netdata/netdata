@@ -67,10 +67,15 @@ func (d *statefulSNMPDevice) install(mockHandler *snmpmock.MockHandler) {
 			if pdu, ok := d.values[trimOID(oid)]; ok {
 				vars = append(vars, pdu)
 			} else {
-				vars = append(vars, gosnmp.SnmpPDU{Name: oid, Type: gosnmp.NoSuchInstance})
+				vars = append(vars, gosnmp.SnmpPDU{
+					Name: oid,
+					Type: gosnmp.NoSuchInstance,
+				})
 			}
 		}
-		return &gosnmp.SnmpPacket{Variables: vars}, nil
+		return &gosnmp.SnmpPacket{
+			Variables: vars,
+		}, nil
 	}).AnyTimes()
 }
 
@@ -96,17 +101,24 @@ func TestCollector_Collect_AlternatingOmissionDiscardsStaleDependent(t *testing.
 	)
 
 	ownerConfig := ddprofiledefinition.MetricsConfig{
-		Table:   ddprofiledefinition.SymbolConfig{OID: sharedTableOID, Name: "sharedTable"},
+		Table: ddprofiledefinition.SymbolConfig{
+			OID:  sharedTableOID,
+			Name: "sharedTable",
+		},
 		Symbols: []ddprofiledefinition.SymbolConfig{{OID: ownerColumnOID, Name: "ownerValue"}},
 	}
 	sourceConfig := ddprofiledefinition.MetricsConfig{
-		Table:   ddprofiledefinition.SymbolConfig{OID: sourceTableOID, Name: "sourceTable"},
+		Table: ddprofiledefinition.SymbolConfig{
+			OID:  sourceTableOID,
+			Name: "sourceTable",
+		},
 		Symbols: []ddprofiledefinition.SymbolConfig{{OID: sourceColumnOID, Name: "sourceValue"}},
 		MetricTags: []ddprofiledefinition.MetricTagConfig{{
 			Tag:   "dep_name",
 			Table: "sharedTable",
 			Symbol: ddprofiledefinition.SymbolConfigCompat{
-				OID: depColumnOID, Name: "depName",
+				OID:  depColumnOID,
+				Name: "depName",
 			},
 		}},
 	}
@@ -192,7 +204,9 @@ func TestCollector_Collect_BGPIneligibleWalkIsNotCached(t *testing.T) {
 		SnmpClient: mockHandler,
 		Profiles: []*ddsnmp.Profile{{
 			SourceFile: "vendor-device.yaml",
-			Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{cfg}},
+			Definition: &ddprofiledefinition.ProfileDefinition{
+				BGP: []ddprofiledefinition.BGPConfig{cfg},
+			},
 		}},
 		Log: logger.New(),
 	})
@@ -221,15 +235,24 @@ func TestCollector_Collect_LicensingIneligibleWalkIsNotCached(t *testing.T) {
 
 	cfg := ddprofiledefinition.LicensingConfig{
 		OriginProfileID: "_vendor-licensing.yaml",
-		Table:           ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.3", Name: "vendorLicenseTable"},
+		Table: ddprofiledefinition.SymbolConfig{
+			OID:  "1.3.6.1.4.1.99999.3",
+			Name: "vendorLicenseTable",
+		},
 		Identity: ddprofiledefinition.LicenseIdentityConfig{
 			ID: ddprofiledefinition.LicenseValueConfig{
-				Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.3.1", Name: "licenseID"},
+				Symbol: ddprofiledefinition.SymbolConfig{
+					OID:  "1.3.6.1.4.1.99999.3.1",
+					Name: "licenseID",
+				},
 			},
 		},
 		State: ddprofiledefinition.LicenseStateConfig{
 			LicenseValueConfig: ddprofiledefinition.LicenseValueConfig{
-				Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.3.3", Name: "licenseState"},
+				Symbol: ddprofiledefinition.SymbolConfig{
+					OID:  "1.3.6.1.4.1.99999.3.3",
+					Name: "licenseState",
+				},
 			},
 			Policy: ddprofiledefinition.LicenseStatePolicyDefault,
 		},
@@ -240,7 +263,9 @@ func TestCollector_Collect_LicensingIneligibleWalkIsNotCached(t *testing.T) {
 		SnmpClient: mockHandler,
 		Profiles: []*ddsnmp.Profile{{
 			SourceFile: "vendor-device.yaml",
-			Definition: &ddprofiledefinition.ProfileDefinition{Licensing: []ddprofiledefinition.LicensingConfig{cfg}},
+			Definition: &ddprofiledefinition.ProfileDefinition{
+				Licensing: []ddprofiledefinition.LicensingConfig{cfg},
+			},
 		}},
 		Log: logger.New(),
 	})
@@ -296,11 +321,17 @@ func TestCollector_Collect_SharesEmptyDirectTableWalkPerPass(t *testing.T) {
 		defer ctrl.Finish()
 
 		first := ddprofiledefinition.LicensingConfig{
-			ID:    "first-license-view",
-			Table: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.3", Name: "vendorLicenseTable"},
+			ID: "first-license-view",
+			Table: ddprofiledefinition.SymbolConfig{
+				OID:  "1.3.6.1.4.1.99999.3",
+				Name: "vendorLicenseTable",
+			},
 			Identity: ddprofiledefinition.LicenseIdentityConfig{
 				ID: ddprofiledefinition.LicenseValueConfig{
-					Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.3.1", Name: "licenseID"},
+					Symbol: ddprofiledefinition.SymbolConfig{
+						OID:  "1.3.6.1.4.1.99999.3.1",
+						Name: "licenseID",
+					},
 				},
 			},
 		}
@@ -404,11 +435,17 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 		defer ctrl.Finish()
 
 		first := ddprofiledefinition.LicensingConfig{
-			ID:    "first-license-view",
-			Table: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.3", Name: "vendorLicenseTable"},
+			ID: "first-license-view",
+			Table: ddprofiledefinition.SymbolConfig{
+				OID:  "1.3.6.1.4.1.99999.3",
+				Name: "vendorLicenseTable",
+			},
 			Identity: ddprofiledefinition.LicenseIdentityConfig{
 				ID: ddprofiledefinition.LicenseValueConfig{
-					Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.3.1", Name: "licenseID"},
+					Symbol: ddprofiledefinition.SymbolConfig{
+						OID:  "1.3.6.1.4.1.99999.3.1",
+						Name: "licenseID",
+					},
 				},
 			},
 		}
@@ -447,22 +484,31 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 			dependencyOID = "1.3.6.1.2.1.31.1.1.1.1"
 		)
 		first := ddprofiledefinition.LicensingConfig{
-			ID:    "first-license-view",
-			Table: ddprofiledefinition.SymbolConfig{OID: primaryOID, Name: "licenseIfTable"},
+			ID: "first-license-view",
+			Table: ddprofiledefinition.SymbolConfig{
+				OID:  primaryOID,
+				Name: "licenseIfTable",
+			},
 			Identity: ddprofiledefinition.LicenseIdentityConfig{
-				ID: ddprofiledefinition.LicenseValueConfig{Index: 1},
+				ID: ddprofiledefinition.LicenseValueConfig{
+					Index: 1,
+				},
 			},
 			State: ddprofiledefinition.LicenseStateConfig{
 				LicenseValueConfig: ddprofiledefinition.LicenseValueConfig{
-					Symbol: ddprofiledefinition.SymbolConfig{OID: primaryOID + ".1", Name: "licenseState"},
+					Symbol: ddprofiledefinition.SymbolConfig{
+						OID:  primaryOID + ".1",
+						Name: "licenseState",
+					},
 				},
 				Policy: ddprofiledefinition.LicenseStatePolicyDefault,
 			},
-			MetricTags: ddprofiledefinition.MetricTagConfigList{{
+			MetricTags: []ddprofiledefinition.MetricTagConfig{{
 				Tag:   "if_name",
 				Table: "ifXTable",
 				Symbol: ddprofiledefinition.SymbolConfigCompat{
-					OID: dependencyOID, Name: "ifName",
+					OID:  dependencyOID,
+					Name: "ifName",
 				},
 			}},
 		}
@@ -503,15 +549,24 @@ func TestCollector_Collect_BGPCrossTableTagIsCurrentOnEveryCollection(t *testing
 		OriginProfileID: "_vendor-bgp.yaml",
 		ID:              "xtag-peer",
 		Kind:            ddprofiledefinition.BGPRowKindPeer,
-		Table:           ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.4.1.99999.80.1", Name: "xtagPeerTable"},
+		Table: ddprofiledefinition.SymbolConfig{
+			OID:  "1.3.6.1.4.1.99999.80.1",
+			Name: "xtagPeerTable",
+		},
 		Identity: ddprofiledefinition.BGPIdentityConfig{
-			Neighbor: ddprofiledefinition.BGPValueConfig{Index: 1},
-			RemoteAS: ddprofiledefinition.BGPValueConfig{Value: "65001"},
+			Neighbor: ddprofiledefinition.BGPValueConfig{
+				Index: 1,
+			},
+			RemoteAS: ddprofiledefinition.BGPValueConfig{
+				Value: "65001",
+			},
 		},
 		State: ddprofiledefinition.BGPStateConfig{
 			BGPValueConfig: ddprofiledefinition.BGPValueConfig{
 				Symbol: ddprofiledefinition.SymbolConfig{
-					OID: "1.3.6.1.4.1.99999.80.1.2", Name: "xtagPeerState", Mapping: bgpPeerStateMapping(),
+					OID:     "1.3.6.1.4.1.99999.80.1.2",
+					Name:    "xtagPeerState",
+					Mapping: bgpPeerStateMapping(),
 				},
 			},
 		},
@@ -519,7 +574,8 @@ func TestCollector_Collect_BGPCrossTableTagIsCurrentOnEveryCollection(t *testing
 			Tag:   "peer_group",
 			Table: "vendorPeerGroupTable",
 			Symbol: ddprofiledefinition.SymbolConfigCompat{
-				OID: "1.3.6.1.4.1.99999.81.1.1", Name: "vendorPeerGroupName",
+				OID:  "1.3.6.1.4.1.99999.81.1.1",
+				Name: "vendorPeerGroupName",
 			},
 		}},
 	}
@@ -529,7 +585,9 @@ func TestCollector_Collect_BGPCrossTableTagIsCurrentOnEveryCollection(t *testing
 		SnmpClient: mockHandler,
 		Profiles: []*ddsnmp.Profile{{
 			SourceFile: "vendor-device.yaml",
-			Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{cfg}},
+			Definition: &ddprofiledefinition.ProfileDefinition{
+				BGP: []ddprofiledefinition.BGPConfig{cfg},
+			},
 		}},
 		Log: logger.New(),
 	})
@@ -558,7 +616,10 @@ func TestTableCollector_OrganizePDUsByRow_AllocatesCacheMapsOnlyWhenEligible(t *
 	)
 	collector := newTableCollector(nil, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
 	config := ddprofiledefinition.MetricsConfig{
-		Table:   ddprofiledefinition.SymbolConfig{OID: tableOID, Name: "allocationTable"},
+		Table: ddprofiledefinition.SymbolConfig{
+			OID:  tableOID,
+			Name: "allocationTable",
+		},
 		Symbols: []ddprofiledefinition.SymbolConfig{{OID: columnOID, Name: "value"}},
 	}
 

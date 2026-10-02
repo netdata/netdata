@@ -34,7 +34,13 @@ func compileValidated(spec *charttpl.Spec, revision uint64) (*program.Program, e
 	c := compiler{
 		metricsSet: make(map[string]struct{}),
 	}
+	if err := c.compileSpec(spec); err != nil {
+		return nil, err
+	}
+	return program.New(spec.Version, revision, c.metricNames(), c.charts)
+}
 
+func (c *compiler) compileSpec(spec *charttpl.Spec) error {
 	rootCtx := normalizeOptional(spec.ContextNamespace)
 	for i := range spec.Groups {
 		groupPath := []int{i}
@@ -43,11 +49,11 @@ func compileValidated(spec *charttpl.Spec, revision uint64) (*program.Program, e
 			familyParts:  nil,
 			contextParts: rootCtx,
 		}, groupPath); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
-	return program.New(spec.Version, revision, c.metricNames(), c.charts)
+	return nil
 }
 
 type compiler struct {

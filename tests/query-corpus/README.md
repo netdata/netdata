@@ -98,4 +98,4 @@ layers; each layer declares which entries it consumes:
 
 The full developer contract — how to run the suite, author fixtures and
 oracles, add a case for a new bug, and change pins safely — is
-`.agents/skills/project-query-corpus/SKILL.md`.
+`.agents/skills/tests-query-corpus/SKILL.md`.

@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/relabel"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 type Config struct {
@@ -27,6 +27,7 @@ type Config struct {
 	MaxTS              int                       `yaml:"max_time_series" json:"max_time_series"`
 	MaxTSPerMetric     int                       `yaml:"max_time_series_per_metric" json:"max_time_series_per_metric"`
 	FallbackType       promprofiles.FallbackType `yaml:"fallback_type,omitempty" json:"fallback_type"`
+	CounterRawCharts   []string                  `yaml:"counter_raw_charts,omitempty" json:"counter_raw_charts"`
 }
 
 const (

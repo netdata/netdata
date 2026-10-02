@@ -236,6 +236,9 @@ struct rrdhost {
             // reserved for the receiver/sender thread - do not use for other purposes
             struct sender_buffer commit;
 
+            // serializes the host labels snapshot and its commit (stream_send_host_labels())
+            SPINLOCK labels_spinlock;
+
             STRING *destination;                    // where to send metrics to
             STRING *api_key;                        // the api key at the receiving netdata
             SIMPLE_PATTERN *charts_matching;        // pattern to match the charts to be sent
@@ -292,9 +295,13 @@ struct rrdhost {
                 // pulse_host_status() (relaxed atomic).
                 bool running_latched;
 
-                // last host-label version applied to this host's per-child charts; the pulse
-                // traversal (single thread) re-applies labels + hops only when it changes, i.e. on
-                // reconnect / mid-stream label push.
+                // last host-label version applied to this host's per-child streaming.in.* charts.
+                // Written and read only by the pulse thread (pulse_child_charts_update()), which
+                // re-applies the labels when the version differs. labels_applied distinguishes
+                // "version 0 and never applied" from "version 0 and applied": a host with no labels
+                // at all keeps version 0 forever, so the version compare alone would never label its
+                // charts. See pulse-parents.c for what this version does and does not detect.
+                bool labels_applied;
                 uint32_t labels_applied_version;
             } status;
         } rcv;
@@ -489,6 +496,13 @@ RRDHOST *rrdhost_find_by_node_id(const char *node_id);
 // the lock, which threads an rrd_wrlock() holder can be blocked on MUST use - see the definition for
 // the lifetime argument, that constraint, and why this is not keyed on node_id
 bool rrdhost_apply_by_machine_guid(const char *machine_guid, void (*cb)(RRDHOST *host, void *data), void *data, bool may_block);
+
+// Copies a machine-guid into a GUID_LEN + 1 byte destination, truncating anything longer.
+// Exposed for rrdhost_machine_guid_unittest().
+void rrdhost_machine_guid_copy(char *dst, const char *guid);
+
+// True when a streamed machine-guid is a UUID that fits in RRDHOST.machine_guid unchanged.
+bool rrdhost_machine_guid_is_valid(const char *guid);
 
 #ifdef RRDHOST_INTERNALS
 RRDHOST *rrdhost_create(

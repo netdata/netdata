@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_IsPlainOid(t *testing.T) {
@@ -60,36 +61,48 @@ func Test_SelectorSpec_HasExactOidMatch(t *testing.T) {
 	}{
 		"single exact match": {
 			spec: SelectorSpec{
-				{SysObjectID: SelectorIncludeExclude{Include: []string{"1.3.6.1"}}},
+				{SysObjectID: SelectorIncludeExclude{
+					Include: []string{"1.3.6.1"},
+				}},
 			},
 			oid:  "1.3.6.1",
 			want: true,
 		},
 		"exact not present": {
 			spec: SelectorSpec{
-				{SysObjectID: SelectorIncludeExclude{Include: []string{"1.3.6.2"}}},
+				{SysObjectID: SelectorIncludeExclude{
+					Include: []string{"1.3.6.2"},
+				}},
 			},
 			oid:  "1.3.6.1",
 			want: false,
 		},
 		"regex present but no exact": {
 			spec: SelectorSpec{
-				{SysObjectID: SelectorIncludeExclude{Include: []string{"1.3.6.*"}}},
+				{SysObjectID: SelectorIncludeExclude{
+					Include: []string{"1.3.6.*"},
+				}},
 			},
 			oid:  "1.3.6.1",
 			want: false, // only counts literal equality
 		},
 		"mixed regex + exact": {
 			spec: SelectorSpec{
-				{SysObjectID: SelectorIncludeExclude{Include: []string{"1.3.6.*", "1.3.6.1"}}},
+				{SysObjectID: SelectorIncludeExclude{
+					Include: []string{"1.3.6.*", "1.3.6.1"},
+				}},
 			},
 			oid:  "1.3.6.1",
 			want: true,
 		},
 		"multiple rules one exact": {
 			spec: SelectorSpec{
-				{SysObjectID: SelectorIncludeExclude{Include: []string{"1.3.6.*"}}},
-				{SysObjectID: SelectorIncludeExclude{Include: []string{"1.3.6.1"}}},
+				{SysObjectID: SelectorIncludeExclude{
+					Include: []string{"1.3.6.*"},
+				}},
+				{SysObjectID: SelectorIncludeExclude{
+					Include: []string{"1.3.6.1"},
+				}},
 			},
 			oid:  "1.3.6.1",
 			want: true,
@@ -103,43 +116,61 @@ func Test_SelectorSpec_HasExactOidMatch(t *testing.T) {
 	}
 }
 
+type selectorMatchResult struct {
+	matched bool
+	prefix  string
+}
+
 func Test_SelectorSpec_Matches(t *testing.T) {
 	tests := map[string]struct {
 		spec        SelectorSpec
 		deviceOID   string
 		deviceDescr string
-		wantOK      bool
-		wantPrefix  string
+		want        selectorMatchResult
 	}{
 		"no rules -> no match": {
-			spec:       SelectorSpec{},
-			deviceOID:  "1.3.6.1",
-			wantOK:     false,
-			wantPrefix: "",
+			spec:      SelectorSpec{},
+			deviceOID: "1.3.6.1",
+			want: selectorMatchResult{
+				matched: false,
+				prefix:  "",
+			},
 		},
 		"OID include regex only -> matches": {
 			spec: SelectorSpec{
-				{SysObjectID: SelectorIncludeExclude{Include: []string{"1.3.6.*"}}},
+				{SysObjectID: SelectorIncludeExclude{
+					Include: []string{"1.3.6.*"},
+				}},
 			},
-			deviceOID:  "1.3.6.9",
-			wantOK:     true,
-			wantPrefix: "1.3.6.*", // longest (only) selector that matched
+			deviceOID: "1.3.6.9",
+			want: selectorMatchResult{
+				matched: true,
+				prefix:  "1.3.6.*",
+			}, // longest (only) selector that matched
 		},
 		"OID include exact found first -> early break returns exact": {
 			spec: SelectorSpec{
-				{SysObjectID: SelectorIncludeExclude{Include: []string{"1.3.6.9", "1.3.6.*"}}},
+				{SysObjectID: SelectorIncludeExclude{
+					Include: []string{"1.3.6.9", "1.3.6.*"},
+				}},
 			},
-			deviceOID:  "1.3.6.9",
-			wantOK:     true,
-			wantPrefix: "1.3.6.9", // exact wins (break when IsPlainOid)
+			deviceOID: "1.3.6.9",
+			want: selectorMatchResult{
+				matched: true,
+				prefix:  "1.3.6.9",
+			}, // exact wins (break when IsPlainOid)
 		},
 		"OID include none -> no match": {
 			spec: SelectorSpec{
-				{SysObjectID: SelectorIncludeExclude{Include: []string{"1.3.7.*"}}},
+				{SysObjectID: SelectorIncludeExclude{
+					Include: []string{"1.3.7.*"},
+				}},
 			},
-			deviceOID:  "1.3.6.9",
-			wantOK:     false,
-			wantPrefix: "",
+			deviceOID: "1.3.6.9",
+			want: selectorMatchResult{
+				matched: false,
+				prefix:  "",
+			},
 		},
 		"OID exclude blocks": {
 			spec: SelectorSpec{
@@ -148,18 +179,24 @@ func Test_SelectorSpec_Matches(t *testing.T) {
 					Exclude: []string{"1.3.6.9"},
 				}},
 			},
-			deviceOID:  "1.3.6.9",
-			wantOK:     false,
-			wantPrefix: "",
+			deviceOID: "1.3.6.9",
+			want: selectorMatchResult{
+				matched: false,
+				prefix:  "",
+			},
 		},
 		"sysDescr include passes (no OID include)": {
 			spec: SelectorSpec{
-				{SysDescr: SelectorIncludeExclude{Include: []string{"RouterOS"}}},
+				{SysDescr: SelectorIncludeExclude{
+					Include: []string{"RouterOS"},
+				}},
 			},
 			deviceOID:   "0.0", // irrelevant
 			deviceDescr: "MikroTik RouterOS v7.10",
-			wantOK:      true,
-			wantPrefix:  "", // no OID include -> empty prefix
+			want: selectorMatchResult{
+				matched: true,
+				prefix:  "",
+			}, // no OID include -> empty prefix
 		},
 		"sysDescr exclude blocks": {
 			spec: SelectorSpec{
@@ -170,45 +207,69 @@ func Test_SelectorSpec_Matches(t *testing.T) {
 			},
 			deviceOID:   "0.0",
 			deviceDescr: "MikroTik RouterOS v7.10 (Not some pulse string)",
-			wantOK:      false,
-			wantPrefix:  "",
+			want: selectorMatchResult{
+				matched: false,
+				prefix:  "",
+			},
 		},
 		"both OID and sysDescr required when both present": {
 			spec: SelectorSpec{
-				{SysObjectID: SelectorIncludeExclude{Include: []string{"1.3.6.*"}},
-					SysDescr: SelectorIncludeExclude{Include: []string{"IOS"}}},
+				{SysObjectID: SelectorIncludeExclude{
+					Include: []string{"1.3.6.*"},
+				},
+					SysDescr: SelectorIncludeExclude{
+						Include: []string{"IOS"},
+					}},
 			},
 			deviceOID:   "1.3.6.9",
 			deviceDescr: "Cisco IOS XE",
-			wantOK:      true,
-			wantPrefix:  "1.3.6.*",
+			want: selectorMatchResult{
+				matched: true,
+				prefix:  "1.3.6.*",
+			},
 		},
 		"sysDescr include fails -> overall no match": {
 			spec: SelectorSpec{
-				{SysObjectID: SelectorIncludeExclude{Include: []string{"1.3.6.*"}},
-					SysDescr: SelectorIncludeExclude{Include: []string{"JunOS"}}},
+				{SysObjectID: SelectorIncludeExclude{
+					Include: []string{"1.3.6.*"},
+				},
+					SysDescr: SelectorIncludeExclude{
+						Include: []string{"JunOS"},
+					}},
 			},
 			deviceOID:   "1.3.6.9",
 			deviceDescr: "Cisco IOS XE",
-			wantOK:      false,
-			wantPrefix:  "",
+			want: selectorMatchResult{
+				matched: false,
+				prefix:  "",
+			},
 		},
 		"longest include wins when multiple regex includes match": {
 			spec: SelectorSpec{
-				{SysObjectID: SelectorIncludeExclude{Include: []string{"1.3.*", "1.3.6.*"}}},
+				{SysObjectID: SelectorIncludeExclude{
+					Include: []string{"1.3.*", "1.3.6.*"},
+				}},
 			},
-			deviceOID:  "1.3.6.9",
-			wantOK:     true,
-			wantPrefix: "1.3.6.*", // longer string wins per code
+			deviceOID: "1.3.6.9",
+			want: selectorMatchResult{
+				matched: true,
+				prefix:  "1.3.6.*",
+			}, // longer string wins per code
 		},
 		"multiple rules: first matching rule returns": {
 			spec: SelectorSpec{
-				{SysObjectID: SelectorIncludeExclude{Include: []string{"2.2.*"}}},
-				{SysObjectID: SelectorIncludeExclude{Include: []string{"1.3.6.*"}}},
+				{SysObjectID: SelectorIncludeExclude{
+					Include: []string{"2.2.*"},
+				}},
+				{SysObjectID: SelectorIncludeExclude{
+					Include: []string{"1.3.6.*"},
+				}},
 			},
-			deviceOID:  "1.3.6.9",
-			wantOK:     true,
-			wantPrefix: "1.3.6.*",
+			deviceOID: "1.3.6.9",
+			want: selectorMatchResult{
+				matched: true,
+				prefix:  "1.3.6.*",
+			},
 		},
 		"regex invalid in exclude -> treated as not matched, rule continues": {
 			spec: SelectorSpec{
@@ -217,48 +278,79 @@ func Test_SelectorSpec_Matches(t *testing.T) {
 					Exclude: []string{"1.3.6.("}, // invalid regex: MatchString error -> false
 				}},
 			},
-			deviceOID:  "1.3.6.9",
-			wantOK:     true,
-			wantPrefix: "1.3.6.*",
+			deviceOID: "1.3.6.9",
+			want: selectorMatchResult{
+				matched: true,
+				prefix:  "1.3.6.*",
+			},
 		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			ok, prefix := tt.spec.Matches(tt.deviceOID, tt.deviceDescr)
-			assert.Equal(t, tt.wantOK, ok)
-			assert.Equal(t, tt.wantPrefix, prefix)
+			assert.Equal(t, tt.want, selectorMatchResult{
+				matched: ok,
+				prefix:  prefix,
+			})
 		})
 	}
 }
 
 func Test_SelectorSpec_Clone(t *testing.T) {
-	orig := SelectorSpec{
-		{
-			SysObjectID: SelectorIncludeExclude{
-				Include: []string{"1.3.6.*", "1.3.6.9"},
-				Exclude: []string{"2.2.*"},
+	tests := map[string]struct {
+		newSelector  func() SelectorSpec
+		mutate       func(SelectorSpec)
+		wantMatch    selectorMatchResult
+		wantNilClone bool
+	}{
+		"nil":   {newSelector: func() SelectorSpec { return nil }, wantNilClone: true},
+		"empty": {newSelector: func() SelectorSpec { return SelectorSpec{} }, wantNilClone: true},
+		"populated": {
+			newSelector: func() SelectorSpec {
+				return SelectorSpec{
+					{
+						SysObjectID: SelectorIncludeExclude{
+							Include: []string{"1.3.6.*", "1.3.6.9"},
+							Exclude: []string{"2.2.*"},
+						},
+						SysDescr: SelectorIncludeExclude{
+							Include: []string{"RouterOS", "IOS"},
+							Exclude: []string{"Not some pulse"},
+						},
+					},
+				}
 			},
-			SysDescr: SelectorIncludeExclude{
-				Include: []string{"RouterOS", "IOS"},
-				Exclude: []string{"Not some pulse"},
+			mutate: func(cloned SelectorSpec) {
+				cloned[0].SysObjectID.Include[0] = "CHANGED"
+				cloned[0].SysObjectID.Exclude = append(cloned[0].SysObjectID.Exclude, "extra")
+				cloned[0].SysDescr.Include[1] = "CHANGED2"
+			},
+			wantMatch: selectorMatchResult{
+				matched: true,
+				prefix:  "1.3.6.*",
 			},
 		},
 	}
-	cp := orig.Clone()
-
-	// Equal initially
-	assert.Equal(t, orig, cp)
-
-	// Mutate copy; original should remain unchanged (deep copy)
-	cp[0].SysObjectID.Include[0] = "CHANGED"
-	cp[0].SysObjectID.Exclude = append(cp[0].SysObjectID.Exclude, "extra")
-	cp[0].SysDescr.Include[1] = "CHANGED2"
-
-	// Ensure original didn't change
-	assert.NotEqual(t, orig, cp)
-	// Also ensure original still matches unchanged expectations
-	ok, prefix := orig.Matches("1.3.6.9", "MikroTik RouterOS v7")
-	assert.True(t, ok)
-	assert.Equal(t, "1.3.6.*", prefix)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			original, want := tc.newSelector(), tc.newSelector()
+			cloned := original.Clone()
+			wantClone := tc.newSelector()
+			if tc.wantNilClone {
+				wantClone = nil
+			}
+			require.Equal(t, wantClone, cloned)
+			if tc.mutate != nil {
+				tc.mutate(cloned)
+				assert.NotEqual(t, want, cloned)
+			}
+			assert.Equal(t, want, original)
+			matched, prefix := original.Matches("1.3.6.9", "MikroTik RouterOS v7")
+			assert.Equal(t, tc.wantMatch, selectorMatchResult{
+				matched: matched,
+				prefix:  prefix,
+			})
+		})
+	}
 }

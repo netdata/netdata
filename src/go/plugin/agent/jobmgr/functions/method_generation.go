@@ -34,9 +34,7 @@ type methodGeneration struct {
 	methods map[string]funcapi.FunctionConfig // method configs by method ID
 	bundles map[string]*functionBundle        // stable handler bundles by job name; agent uses ""
 
-	cleanupOnce sync.Once     // guards cleanup (once)
-	cleanupErr  error         // captured cleanup error
-	done        chan struct{} // closed when cleanup completes
+	cleanupOnce sync.Once // releases this generation's bundle references once
 }
 
 func newMethodGeneration(
@@ -57,7 +55,6 @@ func newMethodGeneration(
 		creator: creator,
 		methods: make(map[string]funcapi.FunctionConfig, len(methods)),
 		bundles: make(map[string]*functionBundle, max(1, len(bundles))),
-		done:    make(chan struct{}),
 	}
 	transferred := false
 	defer func() {
@@ -117,26 +114,13 @@ func (mg *methodGeneration) declaration() *HandlerGenerationDeclaration {
 	}
 }
 
-func (mg *methodGeneration) wait(ctx context.Context) error {
-	if mg == nil {
-		return nil
-	}
-	select {
-	case <-mg.done:
-		return mg.cleanupErr
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
 func (mg *methodGeneration) cleanup(ctx context.Context) error {
 	mg.cleanupOnce.Do(func() {
 		for _, bundle := range mg.bundles {
 			bundle.release()
 		}
-		close(mg.done)
 	})
-	return mg.cleanupErr
+	return nil
 }
 
 func callMethodCleanup(ctx context.Context, handler funcapi.MethodHandler) (err error) {
@@ -154,8 +138,14 @@ func (mg *methodGeneration) handle(ctx context.Context, input HandlerInput) (lif
 	if !ok {
 		return functionErrorResult(404, "unknown method %q", input.Method)
 	}
-	if slices.Contains(input.Args, "info") && !method.RawRequest {
-		return mg.infoResult(method)
+	if slices.Contains(input.Args, "info") {
+		selectableJob := mg.sharedJobSelectable()
+		boundInfo := !method.RawRequest && !selectableJob
+		bootstrapInfo := selectableJob && (!method.RawRequest || method.ManagedInfo) &&
+			len(functionJobValues(input)) == 0
+		if boundInfo || bootstrapInfo {
+			return mg.infoResult(method)
+		}
 	}
 	jobName, job, bundle, err := mg.resolveTarget(method, input)
 	if err != nil {
@@ -197,7 +187,15 @@ func (mg *methodGeneration) invokeResolved(
 			Permissions: input.Permissions,
 			Source:      input.CallerSource,
 		})
-		return mg.responseResult(method, nil, response)
+		if method.ManagedInfo && job != nil && !job.IsRunning() {
+			return functionErrorResult(503, "job %q stopped during request", jobName)
+		}
+		return mg.responseResult(
+			method,
+			method.RequiredParams,
+			response,
+			method.ManagedInfo && slices.Contains(input.Args, "info"),
+		)
 	}
 
 	params, err := handler.MethodParams(ctx, method.ID)
@@ -205,6 +203,12 @@ func (mg *methodGeneration) invokeResolved(
 		return functionErrorResult(503, "method %q cannot provide parameters: %v", method.ID, err)
 	}
 	params = funcapi.MergeParamConfigs(method.RequiredParams, params)
+	if slices.Contains(input.Args, "info") {
+		if job != nil && !job.IsRunning() {
+			return functionErrorResult(503, "job %q stopped during request", jobName)
+		}
+		return mg.responseResult(method, params, &funcapi.FunctionResponse{}, true)
+	}
 	payload := parseMethodPayload(input.Payload)
 	arguments := parseMethodArguments(input.Args)
 	if err := validateMethodParamValues(params, arguments, payload, jobName); err != nil {
@@ -224,7 +228,7 @@ func (mg *methodGeneration) invokeResolved(
 	if job != nil && !job.IsRunning() {
 		return functionErrorResult(503, "job %q stopped during request", jobName)
 	}
-	return mg.responseResult(method, params, response)
+	return mg.responseResult(method, params, response, false)
 }
 
 func (mg *methodGeneration) resolveTarget(
@@ -256,11 +260,7 @@ func (mg *methodGeneration) resolveTarget(
 		}
 		name := names[0]
 		if mg.creator.InstancePolicy != collectorapi.InstancePolicySingle {
-			values := methodParamValues(
-				parseMethodArguments(input.Args),
-				parseMethodPayload(input.Payload),
-				functionJobParameter,
-			)
+			values := functionJobValues(input)
 			if len(values) > 1 {
 				return "", nil, nil, functionStatusError{
 					status:  400,
@@ -295,7 +295,7 @@ func (mg *methodGeneration) availableJobNames(methodID string) []string {
 }
 
 // sharedJobSelectable reports whether this shared-module generation exposes the
-// __job instance selector (a shared module with more than one selectable job).
+// __job instance selector, including when only one job is currently running.
 func (mg *methodGeneration) sharedJobSelectable() bool {
 	return mg.kind == methodGenerationShared && mg.creator.InstancePolicy != collectorapi.InstancePolicySingle
 }
@@ -306,7 +306,14 @@ func (mg *methodGeneration) withJobParam(methodID string, params []funcapi.Param
 	if !mg.sharedJobSelectable() {
 		return params
 	}
-	return append([]funcapi.ParamConfig{buildFunctionJobParam(mg.availableJobNames(methodID))}, params...)
+	result := make([]funcapi.ParamConfig, 0, len(params)+1)
+	result = append(result, buildFunctionJobParam(mg.availableJobNames(methodID)))
+	for _, param := range params {
+		if param.ID != functionJobParameter {
+			result = append(result, param)
+		}
+	}
+	return result
 }
 
 type functionStatusError struct {
@@ -325,27 +332,14 @@ func functionResponseError(err error) (lifecycle.SealedResult, error) {
 }
 
 func (mg *methodGeneration) infoResult(method funcapi.FunctionConfig) (lifecycle.SealedResult, error) {
-	params := mg.withJobParam(method.ID, slices.Clone(method.RequiredParams))
-	help := method.Help
-	if help == "" {
-		help = fmt.Sprintf("%s %s data function", mg.module, method.ID)
-	}
-	response := map[string]any{
-		"v": 3, "update_every": max(method.UpdateEvery, 1), "status": 200,
-		"type": functionResponseType("", method.ResponseType), "has_history": false,
-		"help": help, "accepted_params": acceptedMethodParams(params),
-		"required_params": requiredMethodParams(params),
-	}
-	if presentation := method.Presentation(); presentation != nil {
-		response["presentation"] = presentation
-	}
-	return functionJSONResult(200, response)
+	return mg.responseResult(method, method.RequiredParams, &funcapi.FunctionResponse{}, true)
 }
 
 func (mg *methodGeneration) responseResult(
 	method funcapi.FunctionConfig,
 	params []funcapi.ParamConfig,
 	response *funcapi.FunctionResponse,
+	info bool,
 ) (lifecycle.SealedResult, error) {
 	if response == nil {
 		return functionErrorResult(500, "module returned nil response")
@@ -367,12 +361,25 @@ func (mg *methodGeneration) responseResult(
 		params = funcapi.MergeParamConfigs(params, response.RequiredParams)
 	}
 	params = mg.withJobParam(method.ID, params)
+	help := response.Help
+	if info && help == "" {
+		help = method.Help
+		if help == "" {
+			help = fmt.Sprintf("%s %s data function", mg.module, method.ID)
+		}
+	}
 	payload := map[string]any{
 		"v": 3, "update_every": max(method.UpdateEvery, 1), "status": status,
 		"type":        functionResponseType(response.ResponseType, method.ResponseType),
-		"has_history": false, "help": response.Help,
-		"accepted_params": acceptedMethodParams(params),
+		"has_history": method.HasHistory, "help": help,
+		"accepted_params": acceptedMethodParams(params, method.AcceptedParams),
 		"required_params": requiredMethodParams(params),
+	}
+	if info {
+		if presentation := method.Presentation(); presentation != nil {
+			payload["presentation"] = presentation
+		}
+		return functionJSONResult(status, payload)
 	}
 	if response.Columns != nil {
 		payload["columns"] = response.Columns
@@ -432,6 +439,10 @@ func functionResponseType(responseType, methodType string) string {
 	return "table"
 }
 
+func functionJobValues(input HandlerInput) []string {
+	return methodParamValues(parseMethodArguments(input.Args), parseMethodPayload(input.Payload), functionJobParameter)
+}
+
 func parseMethodPayload(raw []byte) map[string]any {
 	if len(raw) == 0 {
 		return nil
@@ -456,7 +467,7 @@ func parseMethodArguments(arguments []string) map[string][]string {
 		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 			continue
 		}
-		params[parts[0]] = splitMethodCSV(parts[1])
+		params[parts[0]] = append(params[parts[0]], splitMethodCSV(parts[1])...)
 	}
 	if len(params) == 0 {
 		return nil
@@ -561,11 +572,16 @@ func buildFunctionJobParam(jobs []string) funcapi.ParamConfig {
 	}
 }
 
-func acceptedMethodParams(params []funcapi.ParamConfig) []string {
-	accepted := make([]string, 0, len(params))
+func acceptedMethodParams(params []funcapi.ParamConfig, extra []string) []string {
+	accepted := make([]string, 0, len(params)+len(extra))
 	for _, param := range params {
 		if !slices.Contains(accepted, param.ID) {
 			accepted = append(accepted, param.ID)
+		}
+	}
+	for _, name := range extra {
+		if !slices.Contains(accepted, name) {
+			accepted = append(accepted, name)
 		}
 	}
 	return accepted

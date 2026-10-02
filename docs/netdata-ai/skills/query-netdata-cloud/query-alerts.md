@@ -7,53 +7,48 @@ Alerts are exposed as **REST endpoints** -- not as Functions. Both
 Netdata Cloud and the Netdata Agent expose dedicated alert paths.
 Use the Cloud-proxied paths by default (no per-agent bearer needed).
 Use the agent-direct paths when you need single-host detail or when
-Cloud is unavailable (see the sibling
-[`query-netdata-agents`](../query-netdata-agents/SKILL.md) skill for
-direct-agent auth).
+Cloud is unavailable and direct authentication is available. The shared helper needs an accepted cached bearer or
+Cloud access to mint one; see the sibling
+[authentication reference](../query-netdata-agents/authentication.md#mint-and-cache-lifecycle).
 
 ---
 
 ## Mandatory Requirements (READ FIRST)
 
-1. **Provide actionable instructions.** Every recommendation ends in
-   a runnable curl command.
-2. **Never request credentials.** Use `YOUR_API_TOKEN`,
-   `YOUR_SPACE_ID`, `YOUR_ROOM_ID` placeholders.
-3. **Always include a heredoc body.** Avoids quote-escaping pain.
-4. **Cloud and agent endpoints have different shapes.** Cloud
-   endpoints aggregate across nodes in a room/space. Agent
-   endpoints serve a single host. Pick the one that matches the
-   question.
+Follow [Choose The Task](./SKILL.md#choose-the-task) for explain, review and execution requests, and
+[Safe Execution](./SKILL.md#safe-execution) for local setup, credentials and response handling.
+
+Cloud endpoints aggregate across nodes in a room/space; Agent endpoints serve a single host. Choose the endpoint
+that matches the question. Silencing mutations require authorization for the specific change.
 
 ---
 
 ## Cloud-side endpoints
 
-Base URL: `https://app.netdata.cloud`. All require
-`Authorization: Bearer YOUR_API_TOKEN` and the
-`PermissionAlertReadAll` role on the target space (notification
-silencing endpoints require write permission).
+The helper targets the locally configured Cloud hostname. Historical permission guidance names
+`PermissionAlertReadAll` for alert reads and write permission for notification silencing. Exact scope mappings and
+Cloud-server gates are not revalidated here; check the requested endpoint and target-space access.
 
 ### Current alerts in a room
 
 `POST /api/v2/spaces/{spaceID}/rooms/{roomID}/alerts`
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "options": ["instances", "values", "summary", "config"]
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/spaces/$SPACE/rooms/$ROOM/alerts" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/spaces/$SPACE/rooms/$ROOM/alerts" \
+  "$PAYLOAD"
 ```
 
 Body accepts optional filters: `status[]` (`CRITICAL`, `WARNING`,
@@ -89,12 +84,12 @@ requested), `nodes[]`, `timings`. Per-instance compact fields
 `GET /api/v2/spaces/{spaceID}/alarms`
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 
-curl -sS \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/spaces/$SPACE/alarms"
+agents_query_cloud GET \
+  "/api/v2/spaces/$SPACE/alarms"
 ```
 
 Returns total counts (`critical`, `warning`, `clear`, `silenced`)
@@ -105,12 +100,12 @@ across all rooms in the space. Use to drive a dashboard summary.
 `GET /api/v2/spaces/{spaceID}/alarms/metas`
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 
-curl -sS \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/spaces/$SPACE/alarms/metas"
+agents_query_cloud GET \
+  "/api/v2/spaces/$SPACE/alarms/metas"
 ```
 
 Lists every alert template/prototype configured across the space:
@@ -122,13 +117,13 @@ discover what alerts exist before drilling into a specific one.
 `GET /api/v2/spaces/{spaceID}/rooms/{roomID}/alerts_stats`
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-curl -sS \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/spaces/$SPACE/rooms/$ROOM/alerts_stats"
+agents_query_cloud GET \
+  "/api/v2/spaces/$SPACE/rooms/$ROOM/alerts_stats"
 ```
 
 Same shape as `/alarms` but scoped to one room. Optional
@@ -139,11 +134,12 @@ node-filter query params.
 `POST /api/v2/spaces/{spaceID}/rooms/{roomID}/alerts:misconfigured`
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "categories": ["firing_often", "stuck_raised", "silenced_long", "dispatch_none"],
   "thresholds": {
@@ -152,12 +148,11 @@ read -r -d '' PAYLOAD <<'EOF'
   }
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/spaces/$SPACE/rooms/$ROOM/alerts:misconfigured" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/spaces/$SPACE/rooms/$ROOM/alerts:misconfigured" \
+  "$PAYLOAD"
 ```
 
 Categories: `firing_often`, `stuck_raised`, `silenced_long`,
@@ -169,25 +164,25 @@ you can clean up noisy or broken alert configurations.
 `POST /api/v2/spaces/{spaceID}/rooms/{roomID}/alert_transitions`
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 # absolute Unix seconds; the endpoint rejects negative or 0 values.
 AFTER=$(( $(date +%s) - 86400 ))
 
-read -r -d '' PAYLOAD <<EOF
+PAYLOAD="$(cat <<EOF
 {
   "after":  ${AFTER},
   "before": $(date +%s),
   "status": ["CRITICAL", "WARNING"]
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/spaces/$SPACE/rooms/$ROOM/alert_transitions" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/spaces/$SPACE/rooms/$ROOM/alert_transitions" \
+  "$PAYLOAD"
 ```
 
 `after` must be **absolute Unix seconds > 0** (verified live; the
@@ -212,22 +207,22 @@ Response top-level: `api`, `transitions[]`. Each transition record:
 `POST /api/v2/spaces/{spaceID}/rooms/{roomID}/alert_config`
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "config":  "ALERT_CONFIG_HASH_UUID",
   "node_id": "YOUR_NODE_UUID"
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/spaces/$SPACE/rooms/$ROOM/alert_config" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/spaces/$SPACE/rooms/$ROOM/alert_config" \
+  "$PAYLOAD"
 ```
 
 `config` is the hash UUID from the `cfg` field of an alert
@@ -242,11 +237,12 @@ Returns the full alert definition: top-level keys `name`, `info`,
 `POST /api/v2/spaces/{spaceID}/rooms/{roomID}/alert_config/evaluate`
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 ROOM="YOUR_ROOM_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "node_id": "YOUR_NODE_UUID",
   "config":  "alarm: example_high_cpu\n on: system.cpu\n lookup: average -1m of user\n warn: $this > 70\n crit: $this > 90\n",
@@ -254,12 +250,11 @@ read -r -d '' PAYLOAD <<'EOF'
   "before":  0
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/spaces/$SPACE/rooms/$ROOM/alert_config/evaluate" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/spaces/$SPACE/rooms/$ROOM/alert_config/evaluate" \
+  "$PAYLOAD"
 ```
 
 Replays the alert definition against real metric data over the
@@ -279,22 +274,22 @@ generate, suggest, or explain an alert configuration. All three are
 | `/alert-config/explain` | Explain in prose what an existing config does |
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "context":  "system.cpu",
   "instance": "system",
   "metric":   "user"
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/spaces/$SPACE/alert-config/generate" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/spaces/$SPACE/alert-config/generate" \
+  "$PAYLOAD"
 ```
 
 ### Notification silencing rules
@@ -312,22 +307,23 @@ API). Five endpoints, all under
 | `rrule/evaluate` | POST | Evaluate an iCal-style RRULE recurrence expression |
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 
 # List all silencing rules.
-curl -sS \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/spaces/$SPACE/notifications/silencing/rules"
+agents_query_cloud GET \
+  "/api/v2/spaces/$SPACE/notifications/silencing/rules"
 ```
 
 Create-rule body:
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 SPACE="YOUR_SPACE_ID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "name":            "Maintenance window for db cluster",
   "room_ids":        ["YOUR_ROOM_ID"],
@@ -341,12 +337,11 @@ read -r -d '' PAYLOAD <<'EOF'
   "rrule":           ""
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/spaces/$SPACE/notifications/silencing/rule" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/spaces/$SPACE/notifications/silencing/rule" \
+  "$PAYLOAD"
 ```
 
 `rrule` is an iCalendar RFC 5545 recurrence string (e.g.
@@ -357,8 +352,9 @@ the schedule before creating.
 
 ## Direct-agent fallback (single-host alerts)
 
-When you need detail for a specific host or Cloud is unavailable,
-talk to the agent directly. All paths below are reachable at
+For single-host detail, use direct access when the Agent and its authentication are available. During a Cloud
+outage the shared helper needs a cached bearer accepted by its cache policy; otherwise minting still needs Cloud.
+All paths below are addressed at
 `http://<agent>:19999/host/<node-uuid>` and require a per-agent
 bearer if the agent is bearer-protected (see
 [query-netdata-agents](../query-netdata-agents/SKILL.md) for the
@@ -369,21 +365,22 @@ mint flow).
 `POST /api/v3/alerts`
 
 ```bash
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 HOST="agent.example:19999"
 NODE="YOUR_NODE_UUID"
-BEARER="MINTED_AGENT_BEARER"
+MG="YOUR_MACHINE_GUID"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "options": ["summary", "values", "instances"]
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H "X-Netdata-Auth: Bearer $BEARER" \
-  -H 'Content-Type: application/json' \
-  "http://$HOST/host/$NODE/api/v3/alerts" \
-  -d "$PAYLOAD"
+agents_query_agent --node "$NODE" --host "$HOST" --machine-guid "$MG" \
+  POST "/api/v3/alerts" \
+  "$PAYLOAD"
 ```
 
 Same body fields as the Cloud-proxied `/alerts` endpoint
@@ -405,14 +402,15 @@ v3 by default.
 `GET /api/v3/alert_config?config=CONFIG_HASH_UUID`
 
 ```bash
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 HOST="agent.example:19999"
 NODE="YOUR_NODE_UUID"
-BEARER="MINTED_AGENT_BEARER"
+MG="YOUR_MACHINE_GUID"
 CFG="ALERT_CONFIG_HASH_UUID"   # the cfg field of an alert instance
 
-curl -sS \
-  -H "X-Netdata-Auth: Bearer $BEARER" \
-  "http://$HOST/host/$NODE/api/v3/alert_config?config=$CFG"
+agents_query_agent --node "$NODE" --host "$HOST" --machine-guid "$MG" \
+  GET "/api/v3/alert_config?config=$CFG"
 ```
 
 `config` is the hash UUID (the `cfg` field of an alert instance).
@@ -437,19 +435,19 @@ alert endpoints. On any modern agent, use the v3 endpoints above.
 | `/api/v1/variable` | GET | Single variable lookup; `?chart=<name>&variable=<name>` |
 
 ```bash
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 HOST="agent.example:19999"
 NODE="YOUR_NODE_UUID"
-BEARER="MINTED_AGENT_BEARER"
+MG="YOUR_MACHINE_GUID"
 
 # Active alarms only
-curl -sS \
-  -H "X-Netdata-Auth: Bearer $BEARER" \
-  "http://$HOST/host/$NODE/api/v1/alarms"
+agents_query_agent --node "$NODE" --host "$HOST" --machine-guid "$MG" \
+  GET "/api/v1/alarms"
 
 # Alarm transition history since a given timestamp
-curl -sS \
-  -H "X-Netdata-Auth: Bearer $BEARER" \
-  "http://$HOST/host/$NODE/api/v1/alarm_log?after=1700000000"
+agents_query_agent --node "$NODE" --host "$HOST" --machine-guid "$MG" \
+  GET "/api/v1/alarm_log?after=1700000000"
 ```
 
 Migration: `/api/v1/alarms` -> `/api/v2/alerts`,
@@ -477,9 +475,9 @@ Migration: `/api/v1/alarms` -> `/api/v2/alerts`,
 
 ## Limits and gotchas
 
-- **`PermissionAlertReadAll` is required** for all alert reads --
-  `scope:all` tokens have it; `scope:grafana-plugin` tokens do
-  NOT. If you get HTTP 403, mint a wider-scoped token.
+- **Permission errors:** historical guidance associates alert reads with `PermissionAlertReadAll` and distinguishes
+  `scope:all` from `scope:grafana-plugin`; exact mappings remain unverified. For HTTP 403, inspect the target-space
+  role, scope and endpoint restrictions before deciding whether access needs to change.
 - **Silencing rules are Cloud-only.** The agent's internal
   `SILENCER` structures are not REST-addressable. There is no
   `/api/v[123]/silencers` on the agent.

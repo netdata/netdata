@@ -29,11 +29,11 @@ Steps 6–7 below discriminate this from streaming/replication problems.
 
 ## Step 0 — prerequisites
 
-Source the token-safe wrappers and resolve space/room/node IDs (see
+Source the shared request helpers and resolve space/room/node IDs (see
 [SKILL.md](../SKILL.md) discovery endpoints):
 
 ```bash
-source docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
 agents_load_env
 SPACE="YOUR_SPACE_ID"; ROOM="YOUR_ROOM_ID"; NODE="YOUR_NODE_UUID"
 ```
@@ -55,7 +55,7 @@ Query the suspect window at high resolution (5s/point or finer) with
 served the query; `.db.per_tier[]` shows how many points each tier provided.
 
 ```bash
-read -r -d '' PAYLOAD <<EOF
+PAYLOAD="$(cat <<EOF
 {
   "scope": { "nodes": ["$NODE"], "contexts": ["system.cpu"] },
   "selectors": { "nodes": ["*"], "contexts": ["*"], "instances": ["*"], "dimensions": ["*"], "labels": ["*"] },
@@ -64,6 +64,7 @@ read -r -d '' PAYLOAD <<EOF
   "format": "json2", "options": ["jsonwrap", "minify"], "timeout": 30000
 }
 EOF
+)"
 agents_query_cloud POST "/api/v3/spaces/$SPACE/rooms/$ROOM/data" "$PAYLOAD" \
   | jq '{served_by: .agents[0].nm, per_tier: [.db.per_tier[] | {tier, points}],
          null_rows: ([.result.data[] | select(([.[1:][] | .[0]] | map(select(. != null)) | length) == 0)] | length),
@@ -154,13 +155,14 @@ circular buffer, ~1 MiB, so hours-old triggers may already be overwritten —
 check early):
 
 ```bash
-read -r -d '' PAYLOAD <<EOF
+PAYLOAD="$(cat <<EOF
 {
   "after": WINDOW_START_EPOCH, "before": WINDOW_END_EPOCH, "last": 300,
   "query": "dbengine",
   "selections": { "__logs_sources": ["Netdata/Daemon"] }
 }
 EOF
+)"
 agents_call_function --via cloud --node "PARENT_NODE_UUID" \
   --function windows-events --body "$PAYLOAD"
 ```

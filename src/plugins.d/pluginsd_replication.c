@@ -43,10 +43,10 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *
     const char *wall_clock_time_txt = get_word(words, num_words, 3);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END, PLUGINSD_KEYWORD_CHART);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     time_t first_entry_child = (first_entry_txt && *first_entry_txt) ? (time_t)str2ul(first_entry_txt) : 0;
     time_t last_entry_child = (last_entry_txt && *last_entry_txt) ? (time_t)str2ul(last_entry_txt) : 0;
@@ -120,7 +120,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
     char *child_now_str = get_word(words, num_words, idx++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st;
     if (likely(!id || !*id))
@@ -128,10 +128,10 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
     else
         st = pluginsd_rrdset_cache_get_from_slot(parser, host, id, slot, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_REPLAY_BEGIN))
-        return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+        return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     if(start_time_str && end_time_str) {
         time_t start_time = (time_t) str2ull_encoded(start_time_str);
@@ -154,15 +154,15 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
         internal_error(
                 (!st->replay.start_streaming && (end_time < st->replay.after || start_time > st->replay.before)),
-                "REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %ld to %ld, which does not match our request (%ld to %ld).",
-                rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time, st->replay.after, st->replay.before);
+                "REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %" PRId64 " to %" PRId64 ", which does not match our request (%" PRId64 " to %" PRId64 ").",
+                rrdhost_hostname(st->rrdhost), rrdset_id(st), (int64_t)start_time, (int64_t)end_time, (int64_t)st->replay.after, (int64_t)st->replay.before);
 
         internal_error(
                 true,
-                "REPLAY: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %ld to %ld, child wall clock is %ld (%s), had requested %ld to %ld",
+                "REPLAY: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %" PRId64 " to %" PRId64 ", child wall clock is %" PRId64 " (%s), had requested %" PRId64 " to %" PRId64,
                 rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                start_time, end_time, wall_clock_time, wall_clock_comes_from_child ? "from child" : "parent time",
-                st->replay.after, st->replay.before);
+                (int64_t)start_time, (int64_t)end_time, (int64_t)wall_clock_time, wall_clock_comes_from_child ? "from child" : "parent time",
+                (int64_t)st->replay.after, (int64_t)st->replay.before);
 #endif
 
         if(start_time && end_time && start_time < wall_clock_time + tolerance && end_time < wall_clock_time + tolerance && start_time < end_time) {
@@ -195,11 +195,11 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, PA
 
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN
-               " from %ld to %ld, but timestamps are invalid "
-               "(now is %ld [%s], tolerance %ld). Ignoring " PLUGINSD_KEYWORD_REPLAY_SET,
-               rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time,
-               wall_clock_time, wall_clock_comes_from_child ? "child wall clock" : "parent wall clock",
-               tolerance);
+               " from %" PRId64 " to %" PRId64 ", but timestamps are invalid "
+               "(now is %" PRId64 " [%s], tolerance %" PRId64 "). Ignoring " PLUGINSD_KEYWORD_REPLAY_SET,
+               rrdhost_hostname(st->rrdhost), rrdset_id(st), (int64_t)start_time, (int64_t)end_time,
+               (int64_t)wall_clock_time, wall_clock_comes_from_child ? "child wall clock" : "parent wall clock",
+               (int64_t)tolerance);
     }
 
     // the child sends an RBEGIN without any parameters initially
@@ -224,10 +224,10 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARS
     char *flags_str = get_word(words, num_words, idx++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_SET);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_SET, PLUGINSD_KEYWORD_REPLAY_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     if(!parser->user.replay.rset_enabled) {
         nd_log_limit_static_thread_var(erl, 1, 0);
@@ -240,7 +240,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARS
     }
 
     RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, slot, PLUGINSD_KEYWORD_REPLAY_SET);
-    if(!rd) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!rd) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     st->pluginsd.set = true;
 
@@ -248,11 +248,11 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_set(char **words, size_t num_words, PARS
         
         nd_log(NDLS_DAEMON, NDLP_ERR, 
             "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s/dim:%s' got a %s with "
-            "invalid timestamps %ld to %ld from a %s. Disabling it.",
+            "invalid timestamps %" PRId64 " to %" PRId64 " from a %s. Disabling it.",
             rrdhost_hostname(host), rrdset_id(st), dimension, PLUGINSD_KEYWORD_REPLAY_SET,
-            parser->user.replay.start_time, parser->user.replay.end_time, PLUGINSD_KEYWORD_REPLAY_BEGIN);
+            (int64_t)parser->user.replay.start_time, (int64_t)parser->user.replay.end_time, PLUGINSD_KEYWORD_REPLAY_BEGIN);
         
-        return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+        return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
     }
 
     if (unlikely(!value_str || !*value_str))
@@ -294,10 +294,10 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, si
     char *last_stored_value_str = get_word(words, num_words, idx++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, PLUGINSD_KEYWORD_REPLAY_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     if(st->pluginsd.set) {
         // reset pos to reuse the same RDAs
@@ -306,7 +306,7 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, si
     }
 
     RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, slot, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
-    if(!rd) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!rd) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     usec_t dim_last_collected_ut = (usec_t)rd->collector.last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->collector.last_collected_time.tv_usec;
     usec_t last_collected_ut = last_collected_ut_str ? str2ull_encoded(last_collected_ut_str) : 0;
@@ -338,11 +338,11 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, si
     char *last_updated_ut_str = get_word(words, num_words, 2);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE,
                                               PLUGINSD_KEYWORD_REPLAY_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     usec_t chart_last_collected_ut = (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec;
     usec_t last_collected_ut = last_collected_ut_str ? str2ull_encoded(last_collected_ut_str) : 0;
@@ -394,11 +394,11 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
             child_world_time_txt) : now_realtime_sec();
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_REPLAY_END);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
     __atomic_add_fetch(&host->stream.rcv.status.replication.counter_in, 1, __ATOMIC_RELAXED);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END, PLUGINSD_KEYWORD_REPLAY_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     internal_error(true,

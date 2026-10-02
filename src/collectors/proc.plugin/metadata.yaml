@@ -1654,13 +1654,13 @@ modules:
       problems:
         list: []
     alerts:
-      - name: ecc_memory_mc_noinfo_correctable
+      - name: ecc_memory_mc_correctable
         metric: mem.edac_mc_errors
-        info: memory controller ${label:controller} ECC correctable errors (unknown DIMM slot)
+        info: Memory controller ${label:controller} ECC correctable errors
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf
-      - name: ecc_memory_mc_noinfo_uncorrectable
+      - name: ecc_memory_mc_uncorrectable
         metric: mem.edac_mc_errors
-        info: memory controller ${label:controller} ECC uncorrectable errors (unknown DIMM slot)
+        info: Memory controller ${label:controller} ECC uncorrectable errors
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/memory.conf
       - name: ecc_memory_dimm_correctable
         metric: mem.edac_mc_dimm_errors

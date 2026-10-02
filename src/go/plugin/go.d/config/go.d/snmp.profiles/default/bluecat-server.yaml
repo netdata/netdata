@@ -11,14 +11,17 @@ selector:
 
 metric_tags:
   - tag: bcn_sys_id_product
-    OID: 1.3.6.1.4.1.13315.3.2.2.1.1.0
-    symbol: bcnSysIdProduct
+    symbol:
+      OID: 1.3.6.1.4.1.13315.3.2.2.1.1.0
+      name: bcnSysIdProduct
   - tag: bcn_sys_id_os_release
-    OID: 1.3.6.1.4.1.13315.3.2.2.1.2.0
-    symbol: bcnSysIdOSRelease
+    symbol:
+      OID: 1.3.6.1.4.1.13315.3.2.2.1.2.0
+      name: bcnSysIdOSRelease
   - tag: bcn_sys_id_platform
-    OID: 1.3.6.1.4.1.13315.3.2.2.1.5.0
-    symbol: bcnSysIdPlatform
+    symbol:
+      OID: 1.3.6.1.4.1.13315.3.2.2.1.5.0
+      name: bcnSysIdPlatform
 
 metadata:
   device:

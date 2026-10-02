@@ -1,26 +1,48 @@
+//! Binary entry point of the `otel-plugin` crate: the plugins.d process the
+//! Netdata agent spawns, the worker subprocesses it re-execs, and an offline
+//! log query front end.
+//!
+//! One executable, three clap-dispatched modes:
+//!
+//! - No subcommand (the agent also passes `<update_every>`): run the supervisor
+//!   (`supervisor::run`), which speaks the pluginsd protocol on stdin/stdout,
+//!   loads `config`, and drives the three worker subprocesses.
+//! - `worker <kind>`: the supervisor's internal re-exec of this binary as the
+//!   ingestor, ledger, or legacy-logs worker (see `supervisor::spawn_worker`).
+//! - `logs`: the embedded `sfsq-cli` query over stored WAL/SFST files, for
+//!   operators inspecting logs without a running agent.
+//!
+//! The worker implementations live in their own crates (`otel_ingestor`,
+//! `otel_ledger`, `otel_legacy_logs`); this crate owns only the entry point,
+//! the supervisor, and configuration loading.
 mod config;
 mod supervisor;
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 
+/// The worker subprocess modes, selected by the supervisor's internal re-exec
+/// of this binary (see `supervisor::spawn_worker`).
 #[derive(Subcommand)]
 enum WorkerKind {
-    /// Run the ingestor worker.
+    /// Run the ingestor worker: the OTLP gRPC receiver that streams records to
+    /// the ledger over the writer socket and chart data to the supervisor.
     Ingestor {
-        /// IPC socket path for communication with the supervisor.
+        /// Ferryboat IPC socket the supervisor bound for this worker.
         #[arg(long)]
         socket: String,
     },
-    /// Run the ledger worker.
+    /// Run the ledger worker: owner of the WAL/SFST log and trace storage
+    /// pipeline and the `otel-logs` query handler.
     Ledger {
-        /// IPC socket path for communication with the supervisor.
+        /// Ferryboat IPC socket the supervisor bound for this worker.
         #[arg(long)]
         socket: String,
     },
-    /// Run the read-only legacy OTel logs viewer worker.
+    /// Run the read-only legacy OTel logs viewer worker: serves the
+    /// `legacy-otel-logs` function over the former otel plugin's journal files.
     LegacyLogs {
-        /// IPC socket path for communication with the supervisor.
+        /// Ferryboat IPC socket the supervisor bound for this worker.
         #[arg(long)]
         socket: String,
     },
@@ -28,7 +50,8 @@ enum WorkerKind {
 
 #[derive(Subcommand)]
 enum CliCommand {
-    /// Run as a worker subprocess (used internally by the supervisor).
+    /// Run as a worker subprocess of this same executable; spawned by the
+    /// supervisor's own re-exec, not an operator command.
     Worker {
         #[command(subcommand)]
         kind: WorkerKind,
@@ -37,15 +60,18 @@ enum CliCommand {
     /// running agent required). Reads the same on-disk files the `otel-logs`
     /// Function serves and prints NDJSON.
     ///
-    /// Boxed so this query-args variant does not bloat the enum past the small
-    /// worker variants; clap flattens `Box<Args>` since `Box<T: Args>: Args`.
+    /// Boxed so the large query-args struct does not set the enum's size for
+    /// the small worker variants; clap flattens `Box<Args>` since
+    /// `Box<T: Args>: Args`.
     Logs(Box<sfsq_cli::Args>),
 }
 
 #[derive(Parser)]
 #[command(name = "otel-plugin")]
 struct Cli {
-    /// Collection frequency passed by the Netdata agent (ignored).
+    /// Collection frequency in seconds the agent passes as the first argument
+    /// of every plugin exec (`exec <plugin> <update_every> …`). Unused by this
+    /// plugin, but it must parse so the agent's spawn line is accepted.
     #[arg(hide = true)]
     _update_every: Option<u64>,
 
@@ -53,10 +79,15 @@ struct Cli {
     command: Option<CliCommand>,
 }
 
+/// Run the selected worker subprocess to completion: connect to the IPC socket
+/// `supervisor::spawn_worker` bound for it and run until the supervisor sends
+/// Shutdown over the connection.
 async fn run_worker(kind: WorkerKind) -> anyhow::Result<()> {
-    // Workers are shut down via IPC (Shutdown message) from the supervisor.
-    // Register signal handlers that do nothing, preventing the default
-    // process termination when the process group receives SIGINT/SIGTERM.
+    // Shutdown is negotiated over IPC (supervisor sends Shutdown, then waits),
+    // so SIGINT/SIGTERM must not preempt it. Registering these handlers stops
+    // them from killing the worker — it stays in the plugin's process group, so
+    // a cgroup-wide or terminal-group signal reaches it — and a worker that
+    // never exits is SIGKILLed by the supervisor's `ChildGuard`.
     let _sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt());
     let _sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate());
 

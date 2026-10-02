@@ -1,85 +1,53 @@
-//! Severity levels for log entries.
-//!
-//! This module provides severity classification based on syslog PRIORITY values,
-//! matching the C implementation in systemd-journal-annotations.c.
+//! Severity levels for the systemd-journal logs UI: the `Severity` each
+//! rendered row carries in its rowOptions `{"severity": ...}` object,
+//! derived per row from the journal `PRIORITY` field. Mirrors the C
+//! implementation `syslog_priority_to_facet_severity()` in
+//! `src/collectors/systemd-journal.plugin/systemd-journal-annotations.c`.
+//! Sole consumer (grep-verified):
+//! [`crate::netdata::response::table_to_netdata_response`].
 
 use serde::{Deserialize, Serialize};
 
-/// Log entry severity level.
-///
-/// Maps syslog PRIORITY values to severity levels for UI display.
-/// Implementation matches systemd-journal-annotations.c:256-281.
+/// Log entry severity level, serialized lowercase
+/// ("critical", "warning", "notice", "debug", "normal").
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
-    /// Critical errors (PRIORITY <= 3, LOG_ERR)
+    /// Critical: PRIORITY <= 3 (EMERG, ALERT, CRIT, ERR)
     Critical,
 
-    /// Warnings (PRIORITY == 4, LOG_WARNING)
+    /// Warning: PRIORITY == 4 (LOG_WARNING)
     Warning,
 
-    /// Notices (PRIORITY == 5, LOG_NOTICE)
+    /// Notice: PRIORITY == 5 (LOG_NOTICE)
     Notice,
 
-    /// Debug messages (PRIORITY >= 7, LOG_DEBUG)
+    /// Debug: PRIORITY >= 7 (LOG_DEBUG)
     Debug,
 
-    /// Normal/Info messages (PRIORITY == 6, LOG_INFO, or missing)
+    /// Normal/Info: PRIORITY == 6 (LOG_INFO)
     #[default]
     Normal,
 }
 
 impl Severity {
-    /// Convert syslog PRIORITY value to severity level.
+    /// Maps a journal `PRIORITY` string to a severity.
     ///
-    /// Implements the same logic as `syslog_priority_to_facet_severity()`
-    /// in systemd-journal-annotations.c:256-281.
-    ///
-    /// Priority mapping (from syslog.h):
-    /// - 0 = LOG_EMERG
-    /// - 1 = LOG_ALERT
-    /// - 2 = LOG_CRIT
-    /// - 3 = LOG_ERR
-    /// - 4 = LOG_WARNING
-    /// - 5 = LOG_NOTICE
-    /// - 6 = LOG_INFO (default)
-    /// - 7 = LOG_DEBUG
-    ///
-    /// # Arguments
-    ///
-    /// * `priority` - The PRIORITY field value (as string), or None if missing
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use journal_function::netdata::Severity;
-    ///
-    /// assert_eq!(Severity::from_priority(Some("0")), Severity::Critical);
-    /// assert_eq!(Severity::from_priority(Some("3")), Severity::Critical);
-    /// assert_eq!(Severity::from_priority(Some("4")), Severity::Warning);
-    /// assert_eq!(Severity::from_priority(Some("5")), Severity::Notice);
-    /// assert_eq!(Severity::from_priority(Some("6")), Severity::Normal);
-    /// assert_eq!(Severity::from_priority(Some("7")), Severity::Debug);
-    /// assert_eq!(Severity::from_priority(None), Severity::Normal);
-    /// ```
+    /// Missing or unparseable values count as LOG_INFO (6). The C mirror
+    /// (`str2i()`, same file) parses garbage as 0
+    /// and reports Critical instead.
     pub fn from_priority(priority: Option<&str>) -> Self {
         let priority_num = priority.and_then(|s| s.parse::<i32>().ok()).unwrap_or(6); // Default to LOG_INFO if missing or invalid
 
-        // Matches C code logic exactly
         if priority_num <= 3 {
-            // LOG_ERR and below (EMERG, ALERT, CRIT, ERR)
             Severity::Critical
         } else if priority_num <= 4 {
-            // LOG_WARNING
             Severity::Warning
         } else if priority_num <= 5 {
-            // LOG_NOTICE
             Severity::Notice
         } else if priority_num >= 7 {
-            // LOG_DEBUG
             Severity::Debug
         } else {
-            // LOG_INFO (6) or anything else
             Severity::Normal
         }
     }
@@ -117,7 +85,7 @@ mod tests {
 
     #[test]
     fn test_severity_serialization() {
-        // Test that severity serializes to lowercase strings
+        // serde(rename_all = "lowercase") drives these strings
         assert_eq!(
             serde_json::to_string(&Severity::Critical).unwrap(),
             "\"critical\""

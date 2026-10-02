@@ -6,39 +6,57 @@ import (
 	"context"
 	"errors"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 var errResolvedLifecycleRedacted = errors.New(
 	"job output: collector lifecycle failed; resolved configuration details redacted",
 )
 
-type redactedResolvedCodedError struct {
-	cause     error
-	code      int
-	retryable bool
-}
-
-func (err *redactedResolvedCodedError) Error() string         { return err.cause.Error() }
-func (err *redactedResolvedCodedError) Unwrap() error         { return err.cause }
-func (err *redactedResolvedCodedError) DyncfgCode() int       { return err.code }
-func (err *redactedResolvedCodedError) DyncfgRetryable() bool { return err.retryable }
-
-type redactedResolvedRetryableError struct {
+type redactedResolvedProcessControlError struct {
 	cause error
 }
 
-func (err *redactedResolvedRetryableError) Error() string         { return err.cause.Error() }
-func (err *redactedResolvedRetryableError) Unwrap() error         { return err.cause }
-func (err *redactedResolvedRetryableError) DyncfgRetryable() bool { return true }
+func (err *redactedResolvedProcessControlError) Error() string {
+	return errResolvedLifecycleRedacted.Error()
+}
+
+func (err *redactedResolvedProcessControlError) Unwrap() error {
+	return err.cause
+}
 
 func redactResolvedLifecycleError(err error) error {
 	if err == nil {
 		return nil
 	}
 	safe := error(errResolvedLifecycleRedacted)
+	if jobmgr.ContainsOnlyErrorLeaves(
+		err,
+		jobmgr.ErrProcessAttemptRetired,
+		jobmgr.ErrProcessAttemptStopped,
+	) {
+		retired := errors.Is(err, jobmgr.ErrProcessAttemptRetired)
+		stopped := errors.Is(err, jobmgr.ErrProcessAttemptStopped)
+		var cause error
+		switch {
+		case retired && stopped:
+			cause = errors.Join(
+				jobmgr.ErrProcessAttemptRetired,
+				jobmgr.ErrProcessAttemptStopped,
+			)
+		case retired:
+			cause = jobmgr.ErrProcessAttemptRetired
+		case stopped:
+			cause = jobmgr.ErrProcessAttemptStopped
+		}
+		if cause != nil {
+			safe = &redactedResolvedProcessControlError{cause: cause}
+		}
+	}
 	if errors.Is(err, context.Canceled) {
 		safe = errors.Join(safe, context.Canceled)
 	}
@@ -50,16 +68,16 @@ func redactResolvedLifecycleError(err error) error {
 	}
 	var resolveErr *secretresolver.AtomicResolveError
 	if errors.As(err, &resolveErr) {
+		if resolveErr.Kind == secretresolver.AtomicErrorScope && errors.Is(err, secretstore.ErrStoreNotFound) {
+			safe = errors.Join(safe, secretstore.ErrStoreNotFound)
+		}
 		safe = &secretresolver.AtomicResolveError{Kind: resolveErr.Kind, Cause: safe}
 	}
-	if coded, ok := errors.AsType[dyncfg.CodedError](err); ok {
-		safe = &redactedResolvedCodedError{
-			cause:     safe,
-			code:      coded.DyncfgCode(),
-			retryable: dyncfg.IsRetryableError(err),
-		}
-	} else if dyncfg.IsRetryableError(err) {
-		safe = &redactedResolvedRetryableError{cause: safe}
+	switch collectorapi.ClassifyLifecycleError(err) {
+	case collectorapi.LifecycleErrorPermanent:
+		safe = collectorapi.PermanentError(safe)
+	case collectorapi.LifecycleErrorTemporary:
+		safe = collectorapi.TemporaryError(safe)
 	}
 	var invalid *invalidJobConfigurationError
 	if errors.As(err, &invalid) {
@@ -71,6 +89,15 @@ func redactResolvedLifecycleError(err error) error {
 	}
 	if lifecycle.OwnershipRetained(err) {
 		safe = lifecycle.RetainOwnership(safe)
+	}
+	var preparation *jobConfigPreparationError
+	if errors.As(err, &preparation) {
+		safe = &jobConfigPreparationError{cause: safe, failure: preparation.failure}
+	}
+	if startup, ok := onlyRuntimeStartupFailure(err); ok {
+		copy := *startup.failure
+		copy.cause = safe
+		safe = &runtimeStartupFailure{failure: &copy}
 	}
 	return safe
 }
