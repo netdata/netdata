@@ -26,7 +26,7 @@ type packageDescription struct {
 var descriptionShape = strictjson.Optional(strictjson.Fields{
 	"functions":     nativefunc.DefinitionShape(),
 	"config_schema": strictjson.Any(),
-}, "version", "mode", "collect", "charts")
+}, "version", "mode", "snapshot_format", "collect", "charts")
 
 // loadDescribedPackage runs a self-contained package's describe operation once
 // and validates its output.

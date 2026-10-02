@@ -75,6 +75,10 @@ modules:
               description: Auto uses the manifest's mode or runs a direct command once per collection. Choose oneshot or persistent only for a direct command.
               default_value: auto
               required: false
+            - name: snapshot_format
+              description: Auto uses the manifest's snapshot format or JSON for a direct command. Choose json or lines only for a direct command.
+              default_value: auto
+              required: false
             - name: config
               description: Values for the package configuration schema. Leave empty to use package defaults.
               default_value: ""

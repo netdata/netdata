@@ -5,6 +5,7 @@ package native
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -16,12 +17,22 @@ import (
 // product. Allocations should follow the current frame, plus retained contracts.
 // Timing is a development-machine trend, not a CI threshold.
 func BenchmarkSnapshotPipeline(b *testing.B) {
+	benchmarkSnapshotPipeline(b, formatJSON)
+}
+
+func BenchmarkLinesSnapshotPipeline(b *testing.B) {
+	benchmarkSnapshotPipeline(b, formatLines)
+}
+
+func benchmarkSnapshotPipeline(b *testing.B, format string) {
 	for _, size := range []struct{ families, samples int }{{1, 1}, {10, 100}, {1000, 1}} {
 		b.Run(fmt.Sprintf("families=%d/samples=%d", size.families, size.samples), func(b *testing.B) {
 			var families []any
+			var lines strings.Builder
 			for f := range size.families {
 				var samples []any
 				for s := range size.samples {
+					fmt.Fprintf(&lines, "metric_%d:%g|gauge|#instance:%d|unit:jobs\n", f, float64(s)+0.5, s)
 					samples = append(
 						samples,
 						map[string]any{
@@ -37,6 +48,10 @@ func BenchmarkSnapshotPipeline(b *testing.B) {
 			}
 			data, err := json.Marshal(map[string]any{"version": "v1", "metrics": families})
 			require.NoError(b, err)
+			decode := decodeSnapshot
+			if format == formatLines {
+				data, decode = []byte(lines.String()), decodeLines
+			}
 			c := New()
 			managed, ok := metrix.AsCycleManagedStore(c.store)
 			require.True(b, ok)
@@ -46,7 +61,7 @@ func BenchmarkSnapshotPipeline(b *testing.B) {
 			for b.Loop() {
 				cycle.BeginCycle()
 				c.reconcileContracts()
-				snap, err := decodeSnapshot(data)
+				snap, err := decode(data)
 				if err != nil {
 					b.Fatal(err)
 				}
