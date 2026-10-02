@@ -66,7 +66,7 @@ These cadence-matched values apply to Linux Parents. Parents on platforms withou
 
 For the five- and ten-minute savings above, apply that interval to all streamed charts, including collector overrides and Agent monitoring charts. A one-minute chart keeps automatic keepalive idle at 30 seconds. Reconnect the Child after changing the interval policy so the Parent starts with the new cadence.
 
-The default automatic keepalives maintain idle connections through gateways while avoiding unnecessary packets. To override the default, set `tcp keepalive idle` to a fixed duration from 30 seconds to one hour. To opt out, set it to `off`, `0` or `never`, which disables TCP keepalives on the Parent's receiving socket. A per-device `[MACHINE_GUID]` setting takes precedence over the API-key setting.
+The default automatic keepalives maintain idle connections through gateways while avoiding unnecessary packets. To override the default, set `tcp keepalive idle` to a fixed duration. Positive values below 30 seconds become 30 seconds; values above one hour become one hour. To opt out, set it to `off`, `0` or `never`, which disables TCP keepalives on the Parent's receiving socket. A per-device `[MACHINE_GUID]` setting takes precedence over the API-key setting.
 
 The Parent also adjusts its application-idle timeout for sparse updates: it waits at least ten minutes, or twice the fastest chart interval when that is longer. Together, these settings support sparse telemetry while detecting lost connections.
 

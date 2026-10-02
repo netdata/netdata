@@ -44,9 +44,10 @@ Give the Child multiple destinations in `stream.conf`:
 ```ini
 [stream]
     destination = parent1.example:19999:SSL parent2.example:19999:SSL
+    ssl skip certificate verification = no
 ```
 
-The Child connects to an available Parent and tries alternative destinations when it loses the connection. Provision the streaming key, permitted source addresses and TLS trust on each Parent.
+The Child connects to an available Parent and tries alternative destinations when it loses the connection. Provision the streaming key, permitted source addresses and TLS certificates on each Parent. Configure the Child to trust both Parents using the [TLS setup guide](./deployment-and-identity.md#secure-the-connection-and-operator-access).
 
 For shared historical coverage across Parents, configure their storage and replication topology using the [centralization architecture guide](../deployment-guides/deployment-with-centralization-points.md). Connection failover and Parent history work together to keep your monitoring service available.
 

@@ -33,7 +33,8 @@ class PrepareFleetTests(unittest.TestCase):
         self.put('system/install-or-update.sh', (ROOT / 'packaging/makeself/install-or-update.sh').read_text())
         self.put('etc/netdata/custom.conf', 'secret stays in file')
         self.put('var/lib/netdata/state', 'state')
-        for plugin in ('apps.plugin', 'network-viewer.plugin', 'go.d.plugin', 'local-listeners', 'snmp-trap-profile-gen', 'ndsudo', 'loopsleepms.sh.inc'):
+        for plugin in ('apps.plugin', 'network-viewer.plugin', 'go.d.plugin', 'local-listeners',
+                       'snmp-trap-profile-gen', 'ndsudo', 'loopsleepms.sh.inc'):
             self.put('usr/libexec/netdata/plugins.d/' + plugin, plugin)
         self.put('usr/lib/netdata/conf.d/go.d/custom.conf', 'stock')
         self.put('usr/lib/netdata/conf.d/go.d.conf', 'stock framework config')
@@ -150,6 +151,13 @@ class PrepareFleetTests(unittest.TestCase):
         directory = self.put('usr/share/netdata/private-source/config', 'must survive').parent
         directory.chmod(0)
         try:
+            try:
+                with os.scandir(directory) as entries:
+                    list(entries)
+            except PermissionError:
+                pass
+            else:
+                self.skipTest('process can read mode-000 directories')
             target, result = self.prepare(success=False)
             self.assertFalse(target.exists())
             self.assertIn('Permission denied', result.stderr)
@@ -279,7 +287,12 @@ class PrepareFleetTests(unittest.TestCase):
     def test_allocated_section_mutation_refused(self):
         self.elf_fixture('bin/srv/netdata')
         tool = self.root / 'bad-objcopy'
-        tool.write_text('#!/usr/bin/env python3\nimport pathlib,sys\np=pathlib.Path(sys.argv[2]); d=bytearray(p.read_bytes()); d[24]^=1; pathlib.Path(sys.argv[3]).write_bytes(d)\n')
+        tool.write_text('#!/usr/bin/env python3\n'
+                        'import pathlib, sys\n'
+                        'p = pathlib.Path(sys.argv[2])\n'
+                        'd = bytearray(p.read_bytes())\n'
+                        'd[24] ^= 1\n'
+                        'pathlib.Path(sys.argv[3]).write_bytes(d)\n')
         tool.chmod(0o755)
         target, result = self.prepare(strip='all', objcopy=tool, success=False)
         self.assertFalse(target.exists())
@@ -302,6 +315,40 @@ class PrepareFleetTests(unittest.TestCase):
         self.assertEqual(target.read_text(), 'other publisher')
         self.assertFalse(Path(str(target) + '.sha256').exists())
 
+    def checksum_publication_race(self, replace_installer=False):
+        path, sha = self.installer()
+        target = self.root / 'checksum-race.gz.run'
+        injection = self.root / 'injection'
+        injection.mkdir()
+        (injection / 'sitecustomize.py').write_text(
+            'import os, pathlib\n'
+            'original = os.link\n'
+            'def race(source, target, *args, **kwargs):\n'
+            '    if pathlib.Path(source).name == "installer.sha256":\n'
+            '        pathlib.Path(target).write_text("competing checksum")\n'
+            '        if os.environ.get("FLEET_REPLACE_INSTALLER") == "yes":\n'
+            '            installer = pathlib.Path(str(target).removesuffix(".sha256"))\n'
+            '            installer.unlink()\n'
+            '            installer.write_text("competing installer")\n'
+            '    return original(source, target, *args, **kwargs)\n'
+            'os.link = race\n')
+        env = dict(os.environ, PYTHONPATH=str(injection),
+                   FLEET_REPLACE_INSTALLER='yes' if replace_installer else 'no')
+        result = self.run_script('--input', path, '--sha256', sha, '--keep', 'none',
+                                 '--strip-mode', 'none', '--apply', '--output', target,
+                                 success=False, env=env)
+        self.assertIn('File exists', result.stderr)
+        self.assertEqual(Path(str(target) + '.sha256').read_text(), 'competing checksum')
+        return target
+
+    def test_checksum_publication_failure_rolls_back_own_installer(self):
+        target = self.checksum_publication_race()
+        self.assertFalse(target.exists())
+
+    def test_checksum_publication_failure_preserves_replaced_installer(self):
+        target = self.checksum_publication_race(replace_installer=True)
+        self.assertEqual(target.read_text(), 'competing installer')
+
     def installer(self, extra=None, omit_directories=False):
         data = io.BytesIO()
         with tarfile.open(fileobj=data, mode='w') as tf:
@@ -316,7 +363,8 @@ class PrepareFleetTests(unittest.TestCase):
         payload = gzip.compress(data.getvalue(), mtime=0)
         header = ('#!/bin/sh\nskip="15"\nfilesizes="SIZE"\ntotalsize="SIZE"\nCRCsum="0"\nMD5="0"\nSHA="0"\n'
                   'SIGNATURE=""\ndecrypt_cmd=""\ntargetdir="/opt/netdata"\nscript="./system/post-installer.sh"\n'
-                  'eval "gzip -cd"\necho Uncompressed size: 999 KB\nMS_Printf "About to extract 999 KB in $tmpdir (999 KB)"\n'
+                  'eval "gzip -cd"\necho Uncompressed size: 999 KB\n'
+                  'MS_Printf "About to extract 999 KB in $tmpdir (999 KB)"\n'
                   'if test "$leftspace" -lt 999; then\n').replace('SIZE', str(len(payload)))
         path = self.root / 'input.gz.run'
         path.write_bytes(header.encode() + payload)
@@ -325,7 +373,8 @@ class PrepareFleetTests(unittest.TestCase):
     def test_archive_rebuilt_metadata_checksums_and_space(self):
         path, sha = self.installer()
         target = self.root / 'reduced.gz.run'
-        self.run_script('--input', path, '--sha256', sha, '--keep', 'apps', '--strip-mode', 'none', '--apply', '--output', target)
+        self.run_script('--input', path, '--sha256', sha, '--keep', 'apps',
+                        '--strip-mode', 'none', '--apply', '--output', target)
         content = target.read_bytes()
         header = b'\n'.join(content.split(b'\n', 15)[:15]) + b'\n'
         payload = content[len(header):]
@@ -334,13 +383,15 @@ class PrepareFleetTests(unittest.TestCase):
         self.assertIn(b'CRCsum="' + checksum + b'"', header)
         self.assertIn(b'MD5="' + hashlib.md5(payload).hexdigest().encode() + b'"', header)
         self.assertIn(b'SHA="' + hashlib.sha256(payload).hexdigest().encode() + b'"', header)
-        self.assertNotIn(b'999', header)
+        self.assertNotIn(b'999 KB', header)
+        self.assertNotIn(b'-lt 999;', header)
         self.assertIn(str((len(raw) + 1023) // 1024).encode() + b' KB', header)
         self.assertTrue(Path(str(target) + '.sha256').exists())
         with tarfile.open(fileobj=io.BytesIO(raw)) as tf:
             self.assertIn('./bin/srv/netdata', tf.getnames())
             self.assertNotIn('./usr/libexec/netdata/plugins.d/go.d.plugin', tf.getnames())
-            self.assertEqual(tf.getmember('./bin/srv/netdata').mode, (self.source / 'bin/srv/netdata').stat().st_mode & 0o7777)
+            self.assertEqual(tf.getmember('./bin/srv/netdata').mode,
+                             (self.source / 'bin/srv/netdata').stat().st_mode & 0o7777)
 
     def test_archive_with_implicit_directories_keeps_directory_capabilities(self):
         path, sha = self.installer(omit_directories=True)
@@ -361,7 +412,8 @@ class PrepareFleetTests(unittest.TestCase):
     def test_archive_checksum_and_traversal_refusal(self):
         path, sha = self.installer()
         self.run_script('--input', path, '--sha256', '0' * 64, '--keep', 'none', success=False)
-        bad = tarfile.TarInfo('../outside'); bad.size = 1
+        bad = tarfile.TarInfo('../outside')
+        bad.size = 1
         path, sha = self.installer(bad)
         self.run_script('--input', path, '--sha256', sha, '--keep', 'none', success=False)
         self.assertFalse((self.root / 'outside').exists())

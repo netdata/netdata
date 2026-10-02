@@ -469,7 +469,17 @@ def main():
         checksum = work / 'installer.sha256'
         checksum.write_text(f'{digest(prepared)}  {output.name}\n')
         publish_file(prepared, output)
-        publish_file(checksum, checksum_path)
+        try:
+            publish_file(checksum, checksum_path)
+        except OSError:
+            # Preserve an installer replaced by another publisher during the failure.
+            try:
+                if output.samefile(prepared):
+                    output.unlink()
+                    print(f'Rolled back installer after checksum publication failed: {output}', file=sys.stderr)
+            except FileNotFoundError:
+                pass
+            raise
     final_bytes = report['output_regular_bytes_without_manifest']
     show(f'Prepared payload: {size_text(final_bytes)}')
     if original_bytes:
