@@ -7,11 +7,16 @@
 
 static struct backtrace_state *backtrace_state = NULL;
 
+// Written instead of the function and file of a frame too long to fit in full, so its number and address survive
+#define COMPACT_FRAME_LABEL "<frame too long>"
+
 typedef struct {
     BUFFER *wb;             // Buffer to write to
     size_t frame_count;     // Number of frames processed
     bool first_frame;       // Is this the first frame?
     bool found_signal_handler;  // Have we found the signal handler frame?
+    size_t max_length;      // Stop adding frames beyond this text length (0 = unlimited)
+    bool truncated;         // Were frames dropped because of max_length?
 } backtrace_data_t;
 
 // For collecting raw frames
@@ -55,6 +60,7 @@ static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char 
         buffer_flush(wb);
         bt_data->frame_count = 0;
         bt_data->first_frame = true;
+        bt_data->truncated = false;
         bt_data->found_signal_handler = true;
         root_cause_function[0] = '\0';
         return; // Skip adding the signal handler itself
@@ -67,6 +73,7 @@ static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char 
         buffer_flush(wb);
         bt_data->frame_count = 0;
         bt_data->first_frame = true;
+        bt_data->truncated = false;
         root_cause_function[0] = '\0';
         // continue to add the function to the stack trace
     }
@@ -75,6 +82,42 @@ static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char 
     // (but only if we haven't already stored one)
     if (!root_cause_function[0] && stacktrace_is_netdata_function(function, filename))
         stacktrace_keep_first_root_cause_function(function);
+
+    const char *f = NULL;
+    if (filename && *filename) {
+        f = strstr(filename, "/src/");
+        if (f) {
+            const char *f2 = strstr(f + 1, "/src/");
+            if(f2) f = f2;
+        }
+        if(!f) f = filename;
+    }
+
+    bool compact = false;
+    if (bt_data->max_length) {
+        if (bt_data->truncated)
+            return;
+
+        // Never grow the buffer past max_length: in a signal handler after a glibc heap abort the arena lock
+        // may be held, and a realloc would deadlock. Worst case of this frame: "\n#N function [0xPC] (file:NNN)".
+        // strnlen(): any string reaching max_length cannot fit anyway, so the scan stays bounded
+        size_t frame_max_length = 1 + 1 + 20 + 1
+            + ((function && *function) ? strnlen(function, bt_data->max_length) : sizeof("<unknown>") - 1)
+            + 2 + 18 + 1
+            + (f ? 2 + strnlen(f, bt_data->max_length) + 1 + 20 + 1 : 0);
+        size_t compact_max_length = 1 + 1 + 20 + 1 + sizeof(COMPACT_FRAME_LABEL) - 1 + 2 + 18 + 1;
+        size_t used = buffer_strlen(wb) + sizeof(STACKTRACE_TRUNCATED_MARKER) - 1;
+
+        // A frame that does not fit in full (a huge mangled C++ name) keeps its number and address, so one
+        // long name cannot cost the frames after it. Only when even that does not fit are the rest dropped.
+        if (used + frame_max_length >= bt_data->max_length) {
+            if (used + compact_max_length >= bt_data->max_length) {
+                bt_data->truncated = true;
+                return;
+            }
+            compact = true;
+        }
+    }
 
     // Add a newline between frames
     if (!bt_data->first_frame)
@@ -87,7 +130,9 @@ static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char 
     buffer_print_uint64(wb, bt_data->frame_count);
     buffer_putc(wb, ' ');
 
-    if (function && *function)
+    if (compact)
+        buffer_strcat(wb, COMPACT_FRAME_LABEL);
+    else if (function && *function)
         buffer_strcat(wb, function);
     else
         buffer_strcat(wb, "<unknown>");
@@ -98,16 +143,8 @@ static void add_stack_frame(backtrace_data_t *bt_data, uintptr_t pc, const char 
         buffer_putc(wb, ']');
     }
 
-    if (filename && *filename) {
+    if (f && !compact) {
         buffer_strcat(wb, " (");
-
-        const char *f = strstr(filename, "/src/");
-        if (f) {
-            const char *f2 = strstr(f + 1, "/src/");
-            if(f2) f = f2;
-        }
-        if(!f) f = filename;
-
         buffer_strcat(wb, f);
 
         if (lineno > 0) {
@@ -139,12 +176,13 @@ static void bt_error_handler(void *data, const char *msg, int errnum) {
     if (msg)
         len = strcatz(error_buf, len, msg, sizeof(error_buf));
 
-    // Add the error number description if available
+    // Add the error number - as a number: this runs inside signal handlers, where strerror() is not safe
     if (errnum > 0) {
-        if (msg) {
-            len = strcatz(error_buf, len, ": ", sizeof(error_buf));
-        }
-        len = strcatz(error_buf, len, strerror(errnum), sizeof(error_buf));
+        char errnum_buf[UINT64_MAX_LENGTH];
+        print_uint64(errnum_buf, (uint64_t)errnum);
+
+        len = strcatz(error_buf, len, msg ? ": errno " : "errno ", sizeof(error_buf));
+        strcatz(error_buf, len, errnum_buf, sizeof(error_buf));
     }
 
     add_stack_frame(bt_data, 0, function, error_buf, 0);
@@ -210,6 +248,14 @@ bool stacktrace_available(void) {
     return backtrace_state != NULL;
 }
 
+static void stacktrace_capture_finish(backtrace_data_t *bt_data) {
+    // truncated first: dropped frames must never read as "no frames"
+    if (bt_data->truncated)
+        buffer_strcat(bt_data->wb, STACKTRACE_TRUNCATED_MARKER);
+    else if (bt_data->frame_count == 0)
+        buffer_strcat(bt_data->wb, NO_STACK_TRACE_PREFIX "libbacktrace reports no frames");
+}
+
 NEVER_INLINE
 void stacktrace_capture(BUFFER *wb) {
     root_cause_function[0] = '\0';
@@ -223,17 +269,34 @@ void stacktrace_capture(BUFFER *wb) {
         .wb = wb,
         .frame_count = 0,
         .first_frame = true,
-        .found_signal_handler = false
+        .found_signal_handler = false,
+        .max_length = STACKTRACE_MAX_TEXT_LENGTH,
     };
 
     // Skip one frame to hide stacktrace_capture() itself
     backtrace_full(backtrace_state, 1, bt_full_handler,
                  bt_error_handler, &bt_data);
 
-    // If no frames were reported
-    if (bt_data.frame_count == 0) {
-        buffer_strcat(wb, NO_STACK_TRACE_PREFIX "libbacktrace reports no frames");
-    }
+    stacktrace_capture_finish(&bt_data);
+}
+
+// Formats synthetic frames the way stacktrace_capture() formats unwound ones, past the signal handler, so the
+// unittest can produce frame sizes the unwinder cannot.
+void stacktrace_capture_frames_unittest(BUFFER *wb, const uintptr_t *pcs, const char *const *functions, size_t count) {
+    root_cause_function[0] = '\0';
+
+    backtrace_data_t bt_data = {
+        .wb = wb,
+        .frame_count = 0,
+        .first_frame = true,
+        .found_signal_handler = true,
+        .max_length = STACKTRACE_MAX_TEXT_LENGTH,
+    };
+
+    for (size_t i = 0; i < count; i++)
+        add_stack_frame(&bt_data, pcs[i], functions[i], NULL, 0);
+
+    stacktrace_capture_finish(&bt_data);
 }
 
 // Implementation-specific function to collect stack trace frames
