@@ -1106,14 +1106,18 @@ static void command_pipe_accept_thread(void *arg) {
     }
     first_instance = false;
     command_pipe_startup_complete(ERROR_SUCCESS);
+    bool create_error_reported = false;
 
     while (WaitForSingleObject(command_pipe_stop_event, 0) != WAIT_OBJECT_0) {
         if (pipe == INVALID_HANDLE_VALUE) {
-            pipe = command_pipe_create_instance(name, first_instance, &create_error, true);
+            pipe = command_pipe_create_instance(name, first_instance, &create_error,
+                                                !create_error_reported);
             if (pipe == INVALID_HANDLE_VALUE) {
+                create_error_reported = true;
                 Sleep(100);
                 continue;
             }
+            create_error_reported = false;
         }
 
         bool connected = command_pipe_wait_for_connection(pipe);
@@ -1146,11 +1150,14 @@ static void command_pipe_accept_thread(void *arg) {
         if (WaitForSingleObject(command_pipe_stop_event, 0) == WAIT_OBJECT_0)
             break;
 
-        pipe = command_pipe_create_instance(name, first_instance, &create_error, true);
+        pipe = command_pipe_create_instance(name, first_instance, &create_error,
+                                            !create_error_reported);
         if (pipe == INVALID_HANDLE_VALUE) {
+            create_error_reported = true;
             Sleep(100);
             continue;
         }
+        create_error_reported = false;
     }
 
     if (pipe != INVALID_HANDLE_VALUE)

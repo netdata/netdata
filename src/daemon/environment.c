@@ -53,14 +53,18 @@ static char *nd_env_native_path_list(const char *src) {
 
 // output is always C:/... with forward slashes.  Non-Windows: straight copy.
 void nd_env_normalize_dir_path(const char *src, char *dst, size_t dst_size) {
-    if (!src || !dst || !dst_size) return;
+    if (!dst || !dst_size) return;
+    dst[0] = '\0';
+    if (!src || !*src) return;
 
 #if defined(OS_WINDOWS)
     // Translate package-relative POSIX paths (for example /etc/netdata)
     // before passing them to UCRT/Win32 filesystem calls.
-    char translated_src[FILENAME_MAX + 1];
+    char translated_src[FILENAME_MAX + 1] = {0};
     os_translate_path(translated_src, src, sizeof(translated_src));
     src = translated_src;
+    if (!*src)
+        return;
 
     if (isalpha((unsigned char)src[0]) && src[1] == ':') {
         // Windows-native: upper-case drive, \ → /

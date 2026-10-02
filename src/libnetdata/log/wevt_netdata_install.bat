@@ -60,7 +60,8 @@ echo.
 echo Verifying Netdata Publisher for Event Tracing for Windows (ETW)...
 wevtutil gp "Netdata"
 if %errorlevel% neq 0 (
-    echo Warning: ETW publisher 'Netdata' not found - this is expected on WEL-only builds.
+    echo Error: ETW publisher 'Netdata' is not registered.
+    exit /b 1
 )
 
 echo.

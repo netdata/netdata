@@ -575,7 +575,18 @@ typedef unsigned long nfds_t;
 // winsock2.h defines struct pollfd == WSAPOLLFD (same layout), so the cast is safe.
 // Socket fds on UCRT64 are raw SOCKET/Win32 HANDLE values stored in int variables.
 static inline int poll(struct pollfd *fds, nfds_t nfds, int timeout) {
-    return WSAPoll((WSAPOLLFD *)fds, (ULONG)nfds, timeout);
+    int rc = WSAPoll((WSAPOLLFD *)fds, (ULONG)nfds, timeout);
+    if (rc == SOCKET_ERROR) {
+        switch (WSAGetLastError()) {
+            case WSAEINTR: errno = EINTR; break;
+            case WSAENOTSOCK: errno = EBADF; break;
+            case WSAEINVAL: errno = EINVAL; break;
+            case WSAENOBUFS: errno = ENOMEM; break;
+            default: errno = EIO; break;
+        }
+        return -1;
+    }
+    return rc;
 }
 
 // ── getsockopt / setsockopt ── Winsock declares char* for optval; POSIX void* ──

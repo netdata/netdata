@@ -569,6 +569,11 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
         va_end(args);
     }
 
+#if defined(OS_WINDOWS) && defined(HAVE_ETW)
+    // Deliver the fatal entry before callbacks; atexit drains callback logs.
+    nd_log_flush_windows_async();
+#endif
+
 #if defined(FSANITIZE_ADDRESS)
     fprintf(stderr, "FATAL: %04lu@%s:%s, errno = %d\n", line, file, function, saved_errno);
 #endif

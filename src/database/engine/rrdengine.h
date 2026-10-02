@@ -476,6 +476,7 @@ struct rrdengine_instance {
         struct rrdeng_file_deletion *tail;
         bool running;
         size_t pending;
+        bool free_context_when_drained;
     } deletion;
 };
 
@@ -486,6 +487,7 @@ struct rrdengine_instance {
 
 int rrdeng_file_deletion_schedule(struct rrdengine_instance *ctx, const char *path, size_t bytes, bool datafile);
 bool rrdeng_file_deletion_drain(struct rrdengine_instance *ctx);
+bool rrdeng_file_deletion_defer_context_cleanup(struct rrdengine_instance *ctx);
 
 static inline void ctx_io_read_op_bytes(struct rrdengine_instance *ctx, size_t bytes) {
     __atomic_add_fetch(&ctx->stats.io_read_bytes, bytes, __ATOMIC_RELAXED);

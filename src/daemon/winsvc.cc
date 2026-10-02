@@ -29,8 +29,17 @@ static HANDLE svc_heartbeat_done_event = nullptr;
 static HANDLE heartbeat_thread = nullptr;
 
 static CRITICAL_SECTION svc_status_lock;
-static bool svc_status_lock_init_done = false;
-static void svc_status_lock_ensure_init(void);
+static INIT_ONCE svc_status_lock_once = INIT_ONCE_STATIC_INIT;
+
+static BOOL CALLBACK svc_status_lock_initialize(PINIT_ONCE, PVOID, PVOID *)
+{
+    return InitializeCriticalSectionEx(&svc_status_lock, 0, 0);
+}
+
+static bool svc_status_lock_ensure_init(void)
+{
+    return InitOnceExecuteOnce(&svc_status_lock_once, svc_status_lock_initialize, nullptr, nullptr) != 0;
+}
 
 static bool ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint, DWORD dwControlsAccepted)
 {
@@ -40,7 +49,8 @@ static bool ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD d
     // between our writes to svc_status and the SetServiceStatus call below.
     // The timeout path joins the heartbeat before taking this lock, so the
     // heartbeat cannot be blocked while it exits.
-    svc_status_lock_ensure_init();
+    if (!svc_status_lock_ensure_init())
+        return false;
     EnterCriticalSection(&svc_status_lock);
 
     // A late heartbeat must never move the service back to STOP_PENDING after
@@ -88,18 +98,6 @@ static HANDLE CreateEventHandle(void)
 // stop-pending heartbeat thread both write svc_status; without this lock the
 // heartbeat can publish SERVICE_STOP_PENDING *after* the callback has set
 // SERVICE_STOPPED, and the SCM records a "stopped after stop pending" race.
-static void svc_status_lock_ensure_init(void)
-{
-    if (svc_status_lock_init_done)
-        return;
-
-    // InitializeCriticalSection is not async-signal-safe, but the heartbeat
-    // thread and the abort callback both run from normal thread context, not
-    // from a signal handler. Calling it once at startup is safe.
-    InitializeCriticalSection(&svc_status_lock);
-    svc_status_lock_init_done = true;
-}
-
 // Stops the stop-pending heartbeat (if any) so the abort callback can publish
 // SERVICE_STOPPED without racing it. Returns after the heartbeat thread has
 // either signalled completion or been observed alive; the caller does not
@@ -107,7 +105,8 @@ static void svc_status_lock_ensure_init(void)
 // including the shutdown-timeout callback.
 extern "C" void netdata_svc_shutdown_aborted(void)
 {
-    svc_status_lock_ensure_init();
+    if (!svc_status_lock_ensure_init())
+        return;
     if (svc_heartbeat_done_event) {
         // Signal the heartbeat to exit and wait briefly. We are already past
         // the SCM's dwWaitHint, so a few extra seconds here only delay an
@@ -296,7 +295,8 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
         // main() below for the CLI entry path; both are intentional because
         // the SCM path must report SERVICE_STOPPED before returning.
         svc_status.dwServiceSpecificExitCode = rc;
-        ReportSvcStatus(SERVICE_STOPPED, ERROR_SERVICE_SPECIFIC_ERROR, 0, 0);
+        ReportSvcStatus(SERVICE_STOPPED,
+                        rc == 0 ? NO_ERROR : ERROR_SERVICE_SPECIFIC_ERROR, 0, 0);
         return;
     }
 

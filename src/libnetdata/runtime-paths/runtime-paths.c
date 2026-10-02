@@ -53,6 +53,22 @@ static bool nd_windows_directory_exists(const char *path) {
     return exists;
 }
 
+static bool nd_windows_create_directory_utf8(const char *path) {
+    int wpath_length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, NULL, 0);
+    if (wpath_length <= 0)
+        return false;
+
+    wchar_t *wpath = mallocz((size_t)wpath_length * sizeof(*wpath));
+    bool created = false;
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, wpath, wpath_length) > 0) {
+        created = CreateDirectoryW(wpath, NULL) != 0;
+        if (!created && GetLastError() == ERROR_ALREADY_EXISTS)
+            created = nd_windows_directory_exists(path);
+    }
+    freez(wpath);
+    return created;
+}
+
 static char *nd_windows_temp_path_utf8(size_t *utf8_length_out) {
     DWORD capacity = MAX_PATH;
     for (;;) {
@@ -196,8 +212,8 @@ void nd_windows_detect_prefix_and_override_paths(void) {
             CLEAN_CHAR_P *fallback = mallocz(fallback_size);
             snprintfz(fallback_parent, fallback_size, "%snetdata", temp_path);
             snprintfz(fallback, fallback_size, "%snetdata/run", temp_path);
-            (void)mkdir(fallback_parent, 0755);
-            (void)mkdir(fallback, 0755);
+            (void)nd_windows_create_directory_utf8(fallback_parent);
+            (void)nd_windows_create_directory_utf8(fallback);
             if (nd_windows_directory_exists(fallback))
                 nd_setenv("NETDATA_RUN_DIR", fallback, 1);
             else

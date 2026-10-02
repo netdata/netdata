@@ -19,6 +19,7 @@ project(netdata
 include(CMakeDependentOption)
 include(CMakePushCheckState)
 include(NetdataUtil)
+include(NetdataMSYS2)
 netdata_fixup_system_processor()
 
 option(STATIC_BUILD "Use static linking instead of dynamic linking for the build." FALSE)
@@ -2677,12 +2678,11 @@ if(OS_WINDOWS)
                 set(WEVT_GEN_BIN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_mc_generate")
 
                 set(WEVT_BUILD_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_compile.sh")
-                unset(WEVT_BASH_EXECUTABLE CACHE)
-                find_program(WEVT_BASH_EXECUTABLE NAMES bash.exe bash
-                             HINTS "$ENV{MSYS2_ROOT}/usr/bin"
-                                   "C:/msys64/usr/bin"
-                                   "$ENV{ChocolateyToolsLocation}/msys64/usr/bin"
-                             NO_DEFAULT_PATH)
+                netdata_find_msys2_program(WEVT_BASH_EXECUTABLE
+                    NAMES bash.exe bash
+                    HINTS "$ENV{MSYS2_ROOT}/usr/bin"
+                          "C:/msys64/usr/bin"
+                          "$ENV{ChocolateyToolsLocation}/msys64/usr/bin")
                 if(NOT WEVT_BASH_EXECUTABLE)
                         message(FATAL_ERROR "MSYS2 bash is required to generate Windows ETW resources")
                 endif()
@@ -3738,9 +3738,9 @@ if(OS_WINDOWS)
                 DESTINATION "${BINDIR}")
 
         # Remove Windows system DLLs that should never live in the build
-        # directory alongside netdata.exe. These get staged there by the old
-        # stage-runtime-dlls.sh logic (which had an inverted allow-list) and
-        # then shadow the real System32 versions, causing access violations
+        # directory alongside netdata.exe. Stale copies can be left there by
+        # an older or manually modified build tree and then shadow real
+        # System32 versions, causing access violations
         # in KernelBase.dll during DLL initialization before main() runs.
         # Running this as a POST_BUILD command ensures incremental cmake --build
         # runs also clean up leftover stale DLLs without needing a full rebuild.
@@ -4920,28 +4920,40 @@ if(OS_WINDOWS)
         # stores; `/usr/ssl` is an MSYS runtime path, not a valid CMake source
         # path in the native UCRT64 install tree.
 
-        # Install UCRT64 runtime DLLs to both usr/bin and plugins.d.
-        # compile-on-windows.sh stages all transitive lib*.dll and zlib1.dll
-        # for netdata.exe into the build root via stage-runtime-dlls.sh.
-        # Copying the same set to plugins.d covers plugin executables: they share
-        # the same UCRT64 toolchain and need their DLLs co-located because Windows
-        # loads DLLs from the executable's own directory first, and the SYSTEM
-        # service account has no MSYS2/UCRT64 bin in its search path.
-        # ${CMAKE_BINARY_DIR} is expanded at configure time to the build root path;
-        # file(GLOB ...) and file(COPY ...) run at cmake --install time.
+        # Resolve each installed executable's UCRT64 DLL dependencies and copy
+        # their union to the executable directories. The SYSTEM service account
+        # has no MSYS2/UCRT64 bin in its search path.
         install(CODE "
-            file(GLOB _runtime_dlls
-                \"${CMAKE_BINARY_DIR}/lib*.dll\"
-                \"${CMAKE_BINARY_DIR}/zlib1.dll\"
-            )
-            if(_runtime_dlls)
-                file(COPY \${_runtime_dlls}
-                     DESTINATION \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/bin\")
-                file(COPY \${_runtime_dlls}
-                     DESTINATION \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d\")
-            else()
-                message(WARNING \"No UCRT64 runtime DLLs found in build root; run compile-on-windows.sh first.\")
+            set(_runtime_manifest \"${CMAKE_BINARY_DIR}/.netdata-runtime-dlls.manifest\")
+            file(REMOVE \"\${_runtime_manifest}\")
+            file(GLOB_RECURSE _runtime_executables LIST_DIRECTORIES FALSE
+                 \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/bin/*.exe\"
+                 \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/*.exe\")
+            if(NOT _runtime_executables)
+                message(FATAL_ERROR \"No Windows executables found to stage runtime DLLs for.\")
             endif()
+            foreach(_runtime_executable IN LISTS _runtime_executables)
+                execute_process(
+                    COMMAND \"${WEVT_BASH_EXECUTABLE}\" --login
+                            \"${CMAKE_SOURCE_DIR}/packaging/windows/stage-runtime-dlls.sh\"
+                            \"\${_runtime_executable}\"
+                            \"${CMAKE_BINARY_DIR}/netdata-runtime-dlls\"
+                            \"\${_runtime_manifest}\"
+                    RESULT_VARIABLE _stage_runtime_result)
+                if(NOT _stage_runtime_result EQUAL 0)
+                    message(FATAL_ERROR \"Failed to stage runtime DLLs for \${_runtime_executable}.\")
+                endif()
+            endforeach()
+            file(STRINGS \"\${_runtime_manifest}\" _runtime_dll_names)
+            if(NOT _runtime_dll_names)
+                message(FATAL_ERROR \"No UCRT64 runtime DLLs were staged for the Windows install.\")
+            endif()
+            foreach(_runtime_dll IN LISTS _runtime_dll_names)
+                file(COPY \"${CMAKE_BINARY_DIR}/netdata-runtime-dlls/\${_runtime_dll}\"
+                     DESTINATION \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/bin\")
+                file(COPY \"${CMAKE_BINARY_DIR}/netdata-runtime-dlls/\${_runtime_dll}\"
+                     DESTINATION \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d\")
+            endforeach()
         " COMPONENT netdata)
 endif()
 

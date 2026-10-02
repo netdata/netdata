@@ -20,18 +20,17 @@ function(netdata_bundle_libbacktrace)
         # bash, but make.exe is an MSYS2 binary that handles POSIX paths and shell
         # commands in Makefiles natively and can be invoked directly by cmake.
         if(OS_WINDOWS)
-                unset(BASH_EXECUTABLE CACHE)
-                find_program(BASH_EXECUTABLE NAMES bash.exe bash
-                             HINTS "$ENV{MSYS2_ROOT}/usr/bin"
-                                   "C:/msys64/usr/bin"
-                                   "$ENV{ChocolateyToolsLocation}/msys64/usr/bin"
-                             NO_DEFAULT_PATH)
+                netdata_find_msys2_program(BASH_EXECUTABLE
+                    NAMES bash.exe bash
+                    HINTS "$ENV{MSYS2_ROOT}/usr/bin"
+                          "C:/msys64/usr/bin"
+                          "$ENV{ChocolateyToolsLocation}/msys64/usr/bin")
                 if(NOT BASH_EXECUTABLE)
                         message(FATAL_ERROR "MSYS2 bash not found; install it under MSYS2/usr/bin")
                 endif()
                 get_filename_component(_BT_MSYS_BIN "${BASH_EXECUTABLE}" DIRECTORY)
-                find_program(_BT_MAKE_EXECUTABLE NAMES make.exe make
-                             HINTS "${_BT_MSYS_BIN}" NO_DEFAULT_PATH)
+                netdata_find_msys2_program(_BT_MAKE_EXECUTABLE
+                    NAMES make.exe make HINTS "${_BT_MSYS_BIN}")
                 if(NOT _BT_MAKE_EXECUTABLE)
                         message(FATAL_ERROR "MSYS2 make not found next to the selected bash")
                 endif()

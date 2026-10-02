@@ -47,24 +47,21 @@ function(netdata_bundle_sqlite3)
                 # which cannot execute POSIX shell scripts. Locate MSYS2 bash explicitly
                 # so configure and make run in the correct POSIX environment.
                 # Requires: bash, make, and tclsh (pacman -S bash make tcl).
-                unset(_ND_SQLITE_BASH CACHE)
-                find_program(_ND_SQLITE_BASH NAMES bash.exe bash
-                             HINTS "$ENV{MSYS2_ROOT}/usr/bin"
-                                   "C:/msys64/usr/bin"
-                                   "$ENV{ChocolateyToolsLocation}/msys64/usr/bin"
-                             NO_DEFAULT_PATH)
+                netdata_find_msys2_program(_ND_SQLITE_BASH
+                    NAMES bash.exe bash
+                    HINTS "$ENV{MSYS2_ROOT}/usr/bin"
+                          "C:/msys64/usr/bin"
+                          "$ENV{ChocolateyToolsLocation}/msys64/usr/bin")
                 if(NOT _ND_SQLITE_BASH)
                         message(FATAL_ERROR
                                 "bash not found — required to build the SQLite amalgamation on Windows. "
                                 "Install MSYS2 and run: pacman -S bash make tcl")
                 endif()
                 get_filename_component(_ND_SQLITE_MSYS_BIN "${_ND_SQLITE_BASH}" DIRECTORY)
-                unset(_ND_SQLITE_MAKE CACHE)
-                unset(_ND_SQLITE_TCLSH CACHE)
-                find_program(_ND_SQLITE_MAKE NAMES make.exe make
-                             HINTS "${_ND_SQLITE_MSYS_BIN}" NO_DEFAULT_PATH)
-                find_program(_ND_SQLITE_TCLSH NAMES tclsh.exe tclsh
-                             HINTS "${_ND_SQLITE_MSYS_BIN}" NO_DEFAULT_PATH)
+                netdata_find_msys2_program(_ND_SQLITE_MAKE
+                    NAMES make.exe make HINTS "${_ND_SQLITE_MSYS_BIN}")
+                netdata_find_msys2_program(_ND_SQLITE_TCLSH
+                    NAMES tclsh.exe tclsh HINTS "${_ND_SQLITE_MSYS_BIN}")
                 if(NOT _ND_SQLITE_MAKE OR NOT _ND_SQLITE_TCLSH)
                         message(FATAL_ERROR "MSYS2 make and tclsh are required to build SQLite")
                 endif()

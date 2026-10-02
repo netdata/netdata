@@ -10,6 +10,55 @@
 
 #include "../libnetdata.h"
 
+bool sock_create_loopback_pair(int fds[2]) {
+    if (!fds)
+        return false;
+
+#if defined(OS_WINDOWS)
+    SOCKET listener = INVALID_SOCKET;
+    SOCKET reader = INVALID_SOCKET;
+    SOCKET writer = INVALID_SOCKET;
+    struct sockaddr_in address = { 0 };
+    int address_len = sizeof(address);
+
+    listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (listener == INVALID_SOCKET)
+        goto fail;
+
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (bind(listener, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR ||
+        listen(listener, 1) == SOCKET_ERROR ||
+        getsockname(listener, (struct sockaddr *)&address, &address_len) == SOCKET_ERROR)
+        goto fail;
+
+    writer = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (writer == INVALID_SOCKET || connect(writer, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR)
+        goto fail;
+
+    reader = accept(listener, NULL, NULL);
+    if (reader == INVALID_SOCKET)
+        goto fail;
+
+    closesocket(listener);
+    // The rest of this Windows socket layer stores SOCKET handles in int fields.
+    fds[0] = (int)(intptr_t)reader;
+    fds[1] = (int)(intptr_t)writer;
+    return true;
+
+fail:
+    if (listener != INVALID_SOCKET)
+        closesocket(listener);
+    if (reader != INVALID_SOCKET)
+        closesocket(reader);
+    if (writer != INVALID_SOCKET)
+        closesocket(writer);
+    return false;
+#else
+    return socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0;
+#endif
+}
+
 bool ip_to_hostname(const char *ip, char *dst, size_t dst_len) {
     if(!dst || !dst_len)
         return false;
@@ -559,14 +608,14 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
 #endif
 
     if (flags) {
-        close(fd);
+        sock_close(fd);
         errno = EINVAL;
         return -1;
     }
 
     if (fcntl(fd, F_SETFL, newflags) < 0) {
         int saved_errno = errno;
-        close(fd);
+        sock_close(fd);
         errno = saved_errno;
         return -1;
     }
@@ -668,7 +717,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
     int nfd = accept4(fd, (struct sockaddr *)&sadr, &addrlen, flags | DEFAULT_SOCKET_FLAGS);
     if (likely(nfd >= 0)) {
         if(unlikely(!client_ip || ipsize < 2 || !client_port || portsize < 2)) {
-            close(nfd);
+            sock_close(nfd);
             errno = EINVAL;
             return -1;
         }
@@ -730,7 +779,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                    "Permission denied for client '%s', port '%s'",
                    client_ip, client_port);
 
-            close(nfd);
+            sock_close(nfd);
             nfd = -1;
             errno = EPERM;
         }

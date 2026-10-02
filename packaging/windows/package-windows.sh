@@ -28,35 +28,9 @@ if [ -f /opt/netdata/usr/bin/bashbug ]; then
     rm -rf /opt/netdata/usr/bin/bashbug
 fi
 
-runtime_dll_destination="/opt/netdata/usr/bin"
-mkdir -p "${runtime_dll_destination}"
-
 ${GITHUB_ACTIONS+echo "::group::Staging Windows runtime DLLs"}
-# Resolve build to an absolute POSIX path so the glob expands correctly
-# regardless of CWD when the script is invoked.
-case "${build}" in
-    /*) build_abs="${build}" ;;
-    *)  build_abs="$(cd "${build}" && pwd -P)" ;;
-esac
-
-# compile-on-windows.sh stages all transitive UCRT64 runtime DLLs for
-# netdata.exe into the build root via stage-runtime-dlls.sh.  Copy them to
-# both destinations BEFORE cmake --install so they are present when cmake
-# installs the executables alongside them.
-#
-# netdata.exe and other sbin executables need DLLs in usr/bin.
-# C plugin executables (apps.plugin.exe, windows-events.plugin.exe, etc.)
-# need DLLs co-located in plugins.d: Windows loads DLLs from the executable's
-# own directory first, and the SYSTEM service account has no MSYS2/UCRT64
-# bin directory in its DLL search path.
-plugins_dll_destination="/opt/netdata/usr/libexec/netdata/plugins.d"
-mkdir -p "${plugins_dll_destination}"
-
-for dll in "${build_abs}"/lib*.dll "${build_abs}"/zlib1.dll; do
-    [ -f "${dll}" ] || continue
-    cp "${dll}" "${runtime_dll_destination}/"
-    cp "${dll}" "${plugins_dll_destination}/"
-done
+# Runtime DLL dependencies for all installed executables are resolved and
+# staged by CMake's Windows install code.
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Installing"}

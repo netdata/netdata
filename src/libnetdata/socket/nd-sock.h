@@ -68,7 +68,14 @@ static void nd_sock_close(ND_SOCK *s) {
     netdata_ssl_close(&s->ssl);
 
     if(s->fd != -1) {
+#if defined(OS_WINDOWS)
+        if (fd_is_socket(s->fd))
+            sock_close(s->fd);
+        else
+            close(s->fd);
+#else
         close(s->fd);
+#endif
         s->fd = -1;
     }
 

@@ -2,14 +2,22 @@
 
 set -eu -o pipefail
 
-if [ $# -ne 2 ]; then
-    echo "Usage: $0 <executable> <destination-directory>" >&2
+if [ $# -lt 2 ] || [ $# -gt 3 ]; then
+    echo "Usage: $0 <executable> <destination-directory> [dependency-manifest]" >&2
     exit 1
 fi
 
 executable="$1"
 destination="$2"
 runtime_dll_dir="${NETDATA_WINDOWS_RUNTIME_DLL_DIR:-/ucrt64/bin}"
+dependency_manifest="${3:-}"
+resolved_dlls=()
+
+if [ -n "${dependency_manifest}" ] && [ -f "${dependency_manifest}" ]; then
+    while IFS= read -r dll; do
+        [ -n "${dll}" ] && resolved_dlls+=("${dll}")
+    done < "${dependency_manifest}"
+fi
 
 if [ ! -f "${executable}" ] || [ ! -r "${executable}" ]; then
     echo "ERROR: executable not found: ${executable}" >&2
@@ -38,14 +46,15 @@ is_ignored_dll() {
     local dll="${1,,}"
 
     case "${dll}" in
-        lib*.dll|zlib1.dll)
-            return 1
-            ;;
-        api-ms-*|ext-ms-*)
+        api-ms-*|ext-ms-*|advapi32.dll|bcrypt.dll|cfgmgr32.dll|combase.dll|crypt32.dll|cryptbase.dll|\
+        dbgcore.dll|dbghelp.dll|gdi32.dll|imm32.dll|iphlpapi.dll|kernel32.dll|kernelbase.dll|\
+        msvcrt.dll|ntdll.dll|ole32.dll|oleaut32.dll|powrprof.dll|psapi.dll|rpcrt4.dll|\
+        secur32.dll|setupapi.dll|shell32.dll|shlwapi.dll|user32.dll|userenv.dll|version.dll|\
+        wer.dll|werfault.dll|winhttp.dll|winmm.dll|winspool.drv|ws2_32.dll|wldap32.dll)
             return 0
             ;;
         *)
-            return 0
+            return 1
             ;;
     esac
 }
@@ -66,6 +75,8 @@ copy_missing_dlls_once() {
     local unresolved=()
     local dll
     local source
+    local resolved_path
+    local normalized_resolved_path
 
     local dependency_output
     if ! dependency_output="$(PATH="${destination}:${runtime_dll_dir}:${PATH}" ldd.exe "${executable}" 2>/dev/null)"; then
@@ -84,10 +95,21 @@ copy_missing_dlls_once() {
                 dll="${dll#"${dll%%[![:space:]]*}"}"
                 dll="${dll%"${dll##*[![:space:]]}"}"
                 dll="${dll##*/}"
+                resolved_path="${line#*=>}"
+                resolved_path="${resolved_path#"${resolved_path%%[![:space:]]*}"}"
+                resolved_path="${resolved_path%"${resolved_path##*[![:space:]]}"}"
+                normalized_resolved_path="${resolved_path,,}"
+                normalized_resolved_path="${normalized_resolved_path//\\//}"
                 if is_msys_dll "${dll}"; then
                     unresolved+=("${dll} (MSYS runtime dependency)")
                     continue
                 fi
+
+                case "${normalized_resolved_path}" in
+                    /c/windows/system32/*|[a-z]:/windows/system32/*)
+                        continue
+                        ;;
+                esac
 
                 if is_ignored_dll "${dll}"; then
                     continue
@@ -98,6 +120,18 @@ copy_missing_dlls_once() {
                 if [ ! -f "${source}" ]; then
                     unresolved+=("${dll}")
                     continue
+                fi
+
+                local seen=false
+                local resolved
+                for resolved in "${resolved_dlls[@]}"; do
+                    if [ "${resolved,,}" = "${dll,,}" ]; then
+                        seen=true
+                        break
+                    fi
+                done
+                if [ "${seen}" = false ]; then
+                    resolved_dlls+=("${dll}")
                 fi
 
                 # Refresh managed copies after runtime updates, but avoid copying a
@@ -128,6 +162,9 @@ copy_missing_dlls_once() {
 
 for _ in $(seq 1 20); do
     if copy_missing_dlls_once; then
+        if [ -n "${dependency_manifest}" ]; then
+            printf '%s\n' "${resolved_dlls[@]}" > "${dependency_manifest}"
+        fi
         exit 0
     else
         rc=$?

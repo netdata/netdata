@@ -259,7 +259,20 @@ int main(int argc, char **argv)
             int saved_errno = errno;
             fprintf(stderr, "Cannot convert command-pipe handle to a libuv descriptor.\n");
             CloseHandle(pipe_handle);
-            connect_cb(&req, uv_translate_sys_error(saved_errno));
+            int uv_error;
+            switch (saved_errno) {
+                case EMFILE: uv_error = UV_EMFILE; break;
+                case ENOMEM: uv_error = UV_ENOMEM; break;
+                case EINVAL: uv_error = UV_EINVAL; break;
+                case EBADF: uv_error = UV_EBADF; break;
+                case EACCES: uv_error = UV_EACCES; break;
+                case EINTR: uv_error = UV_EINTR; break;
+                case EAGAIN: uv_error = UV_EAGAIN; break;
+                case EEXIST: uv_error = UV_EEXIST; break;
+                case ENOSPC: uv_error = UV_ENOSPC; break;
+                default: uv_error = UV_EIO; break;
+            }
+            connect_cb(&req, uv_error);
         }
         else {
             ret = uv_pipe_open(&client_pipe, pipe_fd);

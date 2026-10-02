@@ -121,7 +121,7 @@ bool nd_sock_connect_to_this(ND_SOCK *s, const char *definition, int default_por
     if(ssl && s->ctx) {
         if (!nd_sock_open_ssl(s)) {
             netdata_ssl_close(&s->ssl);
-            close(s->fd);
+            sock_close(s->fd);
             s->fd = -1;
             freez(s->sni_hostname);
             s->sni_hostname = NULL;

@@ -97,15 +97,23 @@ static bool websocket_thread_init_poll(WEBSOCKET_THREAD *wth) {
         }
     }
 
-    // Create command pipe
+    // Create the command wake channel.
     if(wth->cmd.pipe[PIPE_READ] == -1 || wth->cmd.pipe[PIPE_WRITE] == -1) {
+#if defined(OS_WINDOWS)
+        if (!sock_create_loopback_pair(wth->cmd.pipe)) {
+#else
         if (pipe(wth->cmd.pipe) == -1) {
+#endif
             netdata_log_error("WEBSOCKET[%zu]: Failed to create command pipe: %s", wth->id, strerror(errno));
             goto cleanup;
         }
 
         // Set pipe to non-blocking
+#if defined(OS_WINDOWS)
+        if (sock_setnonblock(wth->cmd.pipe[PIPE_READ], true) == -1) {
+#else
         if(fcntl(wth->cmd.pipe[PIPE_READ], F_SETFL, O_NONBLOCK) == -1) {
+#endif
             netdata_log_error("WEBSOCKET[%zu]: Failed to set command pipe to non-blocking: %s", wth->id, strerror(errno));
             goto cleanup;
         }
@@ -122,11 +130,19 @@ static bool websocket_thread_init_poll(WEBSOCKET_THREAD *wth) {
 
 cleanup:
     if(wth->cmd.pipe[PIPE_READ] != -1) {
+#if defined(OS_WINDOWS)
+        sock_close(wth->cmd.pipe[PIPE_READ]);
+#else
         close(wth->cmd.pipe[PIPE_READ]);
+#endif
         wth->cmd.pipe[PIPE_READ] = -1;
     }
     if(wth->cmd.pipe[PIPE_WRITE] != -1) {
+#if defined(OS_WINDOWS)
+        sock_close(wth->cmd.pipe[PIPE_WRITE]);
+#else
         close(wth->cmd.pipe[PIPE_WRITE]);
+#endif
         wth->cmd.pipe[PIPE_WRITE] = -1;
     }
     if(wth->ndpl) {

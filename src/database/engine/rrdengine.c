@@ -289,16 +289,18 @@ static void rrdeng_file_deletion_start(struct rrdeng_file_deletion *deletion) {
 static struct rrdeng_file_deletion *rrdeng_file_deletion_finish(struct rrdeng_file_deletion *deletion) {
     struct rrdengine_instance *ctx = deletion->ctx;
 
-    if (deletion->result == 0 || deletion->result == UV_ENOENT) {
+    if (deletion->result == 0) {
         if (deletion->datafile)
             __atomic_add_fetch(&ctx->stats.datafile_deletions, 1, __ATOMIC_RELAXED);
         else
             __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+    }
 
+    if (deletion->result == 0 || deletion->result == UV_ENOENT) {
         if (deletion->bytes)
             ctx_current_disk_space_decrease(ctx, deletion->bytes);
     }
-    else if (deletion->result != UV_ENOENT) {
+    else {
         netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", deletion->path,
                           uv_strerror(deletion->result));
         ctx_fs_error(ctx);
@@ -325,11 +327,28 @@ static struct rrdeng_file_deletion *rrdeng_file_deletion_finish(struct rrdeng_fi
     }
     else
         ctx->deletion.running = false;
+    size_t pending = __atomic_sub_fetch(&ctx->deletion.pending, 1, __ATOMIC_RELEASE);
+    bool release_context = pending == 0 && ctx->deletion.free_context_when_drained;
     spinlock_unlock(&ctx->deletion.spinlock);
 
     freez(deletion);
-    __atomic_sub_fetch(&ctx->deletion.pending, 1, __ATOMIC_RELEASE);
+    if (release_context) {
+        rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors,
+                            -RRDENG_FD_BUDGET_PER_INSTANCE);
+        freez(ctx);
+    }
     return next;
+}
+
+bool rrdeng_file_deletion_defer_context_cleanup(struct rrdengine_instance *ctx) {
+    spinlock_lock(&ctx->deletion.spinlock);
+    if (__atomic_load_n(&ctx->deletion.pending, __ATOMIC_ACQUIRE) == 0) {
+        spinlock_unlock(&ctx->deletion.spinlock);
+        return false;
+    }
+    ctx->deletion.free_context_when_drained = true;
+    spinlock_unlock(&ctx->deletion.spinlock);
+    return true;
 }
 
 static void rrdeng_file_deletion_after(uv_work_t *work, int status __maybe_unused) {

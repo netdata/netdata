@@ -235,6 +235,7 @@ static struct {
     struct etw_queue_entry  slots[ETW_QUEUE_DEPTH];
     size_t                  head, tail, count;
     bool                    stopped;
+    bool                    stop_complete;
     uint64_t                dropped;
     netdata_mutex_t         mutex;
     netdata_cond_t          not_empty;
@@ -282,15 +283,29 @@ static bool etw_entry_process(struct etw_queue_entry *e) {
     };
     ULONG status = EventWrite(regHandle, &ed, _NDF_MAX - 1, desc);
     if(status != ERROR_SUCCESS) {
-        // The producer has already released its queue slot by this point.  Keep
-        // the failure observable instead of silently losing the event.
+        // Report each rejected payload; the producer has already returned success
+        // because it only knows that the entry was queued.
         uint64_t now = now_monotonic_usec();
         uint64_t previous = __atomic_load_n(&etw_last_write_error_usec, __ATOMIC_RELAXED);
         if(now - previous >= 60ULL * USEC_PER_SEC &&
            __atomic_compare_exchange_n(&etw_last_write_error_usec, &previous, now, false,
                                        __ATOMIC_RELAXED, __ATOMIC_RELAXED))
-            fprintf(stderr, "Netdata ETW EventWrite failed: %lu (further errors suppressed for 60s)\n",
+            fprintf(stderr, "Netdata ETW EventWrite failed: %lu (further status details suppressed for 60s)\n",
                     (unsigned long)status);
+
+        const wchar_t *message = etw_entry_field(e, NDF_MESSAGE);
+        size_t message_len = etw_wcslen_bounded(message, BIG_WIDE_BUFFERS_SIZE);
+        if (message_len > 0 && message_len <= INT_MAX) {
+            int utf8_size = WideCharToMultiByte(CP_UTF8, 0, message, (int)message_len,
+                                                NULL, 0, NULL, NULL);
+            if (utf8_size > 0) {
+                char *utf8 = malloc((size_t)utf8_size + 1);
+                if (utf8 && WideCharToMultiByte(CP_UTF8, 0, message, (int)message_len,
+                                        utf8, utf8_size, NULL, NULL) > 0)
+                    fprintf(stderr, "Netdata ETW message fallback: %s\n", utf8);
+                free(utf8);
+            }
+        }
         return false;
     }
 
@@ -351,7 +366,24 @@ static bool etw_queue_init(void) {
     }
 
     etw_queue.initialized = true;
+    atexit(nd_log_stop_windows_async);
     return true;
+}
+
+void nd_log_flush_windows_async(void) {
+    if(!etw_queue.initialized)
+        return;
+
+    ULONGLONG deadline = GetTickCount64() + 2000;
+    for(;;) {
+        netdata_mutex_lock(&etw_queue.mutex);
+        bool drained = etw_queue.count == 0;
+        netdata_mutex_unlock(&etw_queue.mutex);
+
+        if(drained || GetTickCount64() >= deadline)
+            return;
+        Sleep(1);
+    }
 }
 
 void nd_log_stop_windows_async(void) {
@@ -359,14 +391,21 @@ void nd_log_stop_windows_async(void) {
         return;
 
     netdata_mutex_lock(&etw_queue.mutex);
+    if(etw_queue.stop_complete) {
+        netdata_mutex_unlock(&etw_queue.mutex);
+        return;
+    }
     etw_queue.stopped = true;
     netdata_cond_signal(&etw_queue.not_empty);
     netdata_mutex_unlock(&etw_queue.mutex);
 
     // Wait up to 2 s for the async writer to drain remaining entries.
     // If ETW is still blocked we time out and let the process terminate normally.
-    if(etw_queue.drain_ack)
-        WaitForSingleObject(etw_queue.drain_ack, 2000);
+    if(etw_queue.drain_ack && WaitForSingleObject(etw_queue.drain_ack, 2000) == WAIT_OBJECT_0) {
+        netdata_mutex_lock(&etw_queue.mutex);
+        etw_queue.stop_complete = true;
+        netdata_mutex_unlock(&etw_queue.mutex);
+    }
 
 }
 

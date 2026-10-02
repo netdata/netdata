@@ -200,7 +200,7 @@ CFLAGS="${BUILD_CFLAGS}" /ucrt64/bin/cmake \
 #   behaviour explicit and uniform across compile rules too.
 #
 #   No-op on non-Ninja generators and on non-Windows (this script only runs
-#   on Windows). Diagnostic: SOW P22/P26 (cmd.exe 8 KB command-line limit).
+#   on Windows). Keep command lines below cmd.exe's 8 KB limit.
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Building"}

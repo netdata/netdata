@@ -1241,19 +1241,23 @@ int rrdeng_init(
 
     if (ctx->dynamically_allocated) {
         bool drained = rrdeng_file_deletion_drain(ctx);
-        if (drained) {
+        bool deferred = !drained && ctxp && rrdeng_file_deletion_defer_context_cleanup(ctx);
+        if (deferred) {
+            // The deletion queue owns `ctx` until its final callback releases it.
+            *ctxp = NULL;
+        }
+        else {
             freez(ctx);
             if (ctxp)
                 *ctxp = NULL;
         }
-        else if (ctxp) {
-            // Keep the context alive until queued callbacks finish; they retain
-            // its pointer while unlink work is in flight.
-            *ctxp = ctx;
-        }
+        if (!deferred)
+            rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors,
+                                -RRDENG_FD_BUDGET_PER_INSTANCE);
     }
-
-    rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
+    else
+        rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors,
+                            -RRDENG_FD_BUDGET_PER_INSTANCE);
     return UV_EIO;
 }
 

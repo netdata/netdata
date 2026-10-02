@@ -107,21 +107,65 @@ struct pipe_header {
 
 static void websocket_thread_close_command_pipe(WEBSOCKET_THREAD *wth) {
     if(wth->cmd.pipe[PIPE_READ] != -1) {
+#if defined(OS_WINDOWS)
+        sock_close(wth->cmd.pipe[PIPE_READ]);
+#else
         close(wth->cmd.pipe[PIPE_READ]);
+#endif
         wth->cmd.pipe[PIPE_READ] = -1;
     }
 
     if(wth->cmd.pipe[PIPE_WRITE] != -1) {
+#if defined(OS_WINDOWS)
+        sock_close(wth->cmd.pipe[PIPE_WRITE]);
+#else
         close(wth->cmd.pipe[PIPE_WRITE]);
+#endif
         wth->cmd.pipe[PIPE_WRITE] = -1;
     }
 }
 
 static void websocket_thread_close_command_pipe_write(WEBSOCKET_THREAD *wth) {
     if(wth->cmd.pipe[PIPE_WRITE] != -1) {
+#if defined(OS_WINDOWS)
+        sock_close(wth->cmd.pipe[PIPE_WRITE]);
+#else
         close(wth->cmd.pipe[PIPE_WRITE]);
+#endif
         wth->cmd.pipe[PIPE_WRITE] = -1;
     }
+}
+
+static ssize_t websocket_wakeup_send(int fd, const void *buffer, size_t size) {
+#if defined(OS_WINDOWS)
+    if (size > INT_MAX)
+        return -1;
+    int rc = send((SOCKET)(uintptr_t)(unsigned)fd, buffer, (int)size, 0);
+    if (rc == SOCKET_ERROR) {
+        int error = WSAGetLastError();
+        errno = error == WSAEWOULDBLOCK ? EAGAIN : error == WSAEINTR ? EINTR : EIO;
+        return -1;
+    }
+    return rc;
+#else
+    return write(fd, buffer, size);
+#endif
+}
+
+static ssize_t websocket_wakeup_recv(int fd, void *buffer, size_t size) {
+#if defined(OS_WINDOWS)
+    if (size > INT_MAX)
+        size = INT_MAX;
+    int rc = recv((SOCKET)(uintptr_t)(unsigned)fd, buffer, (int)size, 0);
+    if (rc == SOCKET_ERROR) {
+        int error = WSAGetLastError();
+        errno = error == WSAEWOULDBLOCK ? EAGAIN : error == WSAEINTR ? EINTR : EIO;
+        return -1;
+    }
+    return rc;
+#else
+    return read(fd, buffer, size);
+#endif
 }
 
 static ssize_t write_pipe_block(int fd, const void *buffer, size_t size) {
@@ -129,7 +173,7 @@ static ssize_t write_pipe_block(int fd, const void *buffer, size_t size) {
     ssize_t total_written = 0;
 
     while (total_written < (ssize_t) size) {
-        ssize_t bytes = write(fd, buf + total_written, size - total_written);
+        ssize_t bytes = websocket_wakeup_send(fd, buf + total_written, size - total_written);
 
         if (bytes < 0) {
             if (errno == EINTR)
@@ -238,7 +282,7 @@ static ssize_t read_pipe_block(int fd, void *buffer, size_t size) {
     ssize_t total_read = 0;
 
     while (total_read < (ssize_t) size) {
-        ssize_t bytes = read(fd, buf + total_read, size - total_read);
+        ssize_t bytes = websocket_wakeup_recv(fd, buf + total_read, size - total_read);
 
         if (bytes < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -261,7 +305,7 @@ static ssize_t read_pipe_block(int fd, void *buffer, size_t size) {
 
 static ssize_t read_pipe_available(int fd, void *buffer, size_t size) {
     for(;;) {
-        ssize_t bytes = read(fd, buffer, size);
+        ssize_t bytes = websocket_wakeup_recv(fd, buffer, size);
         if(bytes < 0 && errno == EINTR)
             continue;
 

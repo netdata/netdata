@@ -72,7 +72,10 @@ if(DEFINED ENV{GOROOT} AND NOT "$ENV{GOROOT}" STREQUAL "")
   set(_go_candidates "$ENV{GOROOT}/bin/${_go_executable_name}")
 elseif(OS_WINDOWS)
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    set(_go_candidates C:/go/bin/${_go_executable_name} "C:/Program Files/go/bin/${_go_executable_name}")
+    set(_go_candidates C:/go/bin/${_go_executable_name}
+                       "C:/Program Files/go/bin/${_go_executable_name}"
+                       "$ENV{MSYS2_ROOT}/ucrt64/lib/go/bin/${_go_executable_name}"
+                       C:/msys64/ucrt64/lib/go/bin/${_go_executable_name})
   else()
     set(_go_candidates /c/go/bin/${_go_executable_name} "/c/Program Files/go/bin/${_go_executable_name}" /ucrt64/lib/go/bin/${_go_executable_name} /clang64/lib/go/bin/${_go_executable_name})
   endif()
