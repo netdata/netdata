@@ -2145,12 +2145,18 @@ static int inicfg_section_check(struct config *cfg, const char *section, const c
     return 0;
 }
 
-static void inicfg_section_write_file(const char *filename, const char *contents) {
+static int inicfg_section_write_file(const char *filename, const char *contents) {
     FILE *fp = fopen(filename, "w");
-    if(!fp)
-        fatal("test_inicfg_section_reload: cannot write '%s'", filename);
-    fputs(contents, fp);
-    fclose(fp);
+    if(!fp) {
+        fprintf(stderr, "test_inicfg_section_reload: cannot write '%s'\n", filename);
+        return 1;
+    }
+    bool written = fputs(contents, fp) >= 0;
+    if(fclose(fp) != 0 || !written) {
+        fprintf(stderr, "test_inicfg_section_reload: cannot write '%s'\n", filename);
+        return 1;
+    }
+    return 0;
 }
 
 static int test_inicfg_section_reload(void) {
@@ -2158,33 +2164,46 @@ static int test_inicfg_section_reload(void) {
 
     // reloading one section (as reload-labels does) must leave it exactly as the file has it now,
     // and must not touch the other sections
+    const char *tmpdir = getenv("TMPDIR");
+    if(!tmpdir || !*tmpdir)
+        tmpdir = P_tmpdir;
+
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, sizeof(filename), "/tmp/netdata-unittest-inicfg-%d.conf", (int)getpid());
+    snprintfz(filename, sizeof(filename), "%s/netdata-unittest-inicfg-XXXXXX", tmpdir);
+    int fd = mkstemp(filename);
+    if(fd == -1) {
+        fprintf(stderr, "%s: cannot create the fixture in '%s'\n", __FUNCTION__, tmpdir);
+        return 1;
+    }
+    close(fd);
+
+    // never created, so loading it fails
+    char missing[FILENAME_MAX + 1];
+    snprintfz(missing, sizeof(missing), "%s.missing", filename);
 
     struct config cfg = APPCONFIG_INITIALIZER;
     int rc = 0;
 
-    inicfg_section_write_file(filename, "[target]\na = 1\nb = 2\n[other]\nx = 1\n");
+    rc += inicfg_section_write_file(filename, "[target]\na = 1\nb = 2\n[other]\nx = 1\n");
     inicfg_load(&cfg, filename, 0, NULL);
     rc += inicfg_section_check(&cfg, "target", "a=1,b=2", "full load");
 
-    inicfg_section_write_file(filename, "[target]\na = 1\n[other]\nx = 2\n");
+    rc += inicfg_section_write_file(filename, "[target]\na = 1\n[other]\nx = 2\n");
     inicfg_load(&cfg, filename, 1, "target");
     rc += inicfg_section_check(&cfg, "target", "a=1", "option removed");
     rc += inicfg_section_check(&cfg, "other", "x=1", "option removed");
 
-    inicfg_section_write_file(filename, "[target]\na = 1\n[other]\nx = 2\n[target]\nc = 3\n");
+    rc += inicfg_section_write_file(filename, "[target]\na = 1\n[other]\nx = 2\n[target]\nc = 3\n");
     inicfg_load(&cfg, filename, 1, "target");
     rc += inicfg_section_check(&cfg, "target", "a=1,c=3", "section repeated");
 
-    unlink(filename);
-    if(inicfg_load(&cfg, filename, 1, "target")) {
+    if(inicfg_load(&cfg, missing, 1, "target")) {
         fprintf(stderr, "%s: loading a missing file succeeded\n", __FUNCTION__);
         rc++;
     }
     rc += inicfg_section_check(&cfg, "target", "a=1,c=3", "file missing");
 
-    inicfg_section_write_file(filename, "[other]\nx = 2\n");
+    rc += inicfg_section_write_file(filename, "[other]\nx = 2\n");
     inicfg_load(&cfg, filename, 1, "target");
     rc += inicfg_section_check(&cfg, "target", "", "section removed");
     rc += inicfg_section_check(&cfg, "other", "x=1", "section removed");
