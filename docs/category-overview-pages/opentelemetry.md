@@ -1,9 +1,9 @@
 # OpenTelemetry Overview
 
-The Netdata Agent receives OpenTelemetry telemetry over OTLP/gRPC, on port 4317: metrics become Netdata charts, and logs
-and traces are stored, indexed, on the receiving Agent. Anything that speaks OTLP/gRPC can send to it — an OpenTelemetry
-Collector, an instrumented application, an SDK — with TLS or mutual TLS on the endpoint. Start with
-[OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md) for the endpoint, the exporter block, and two smoke tests.
+The Netdata Agent receives OpenTelemetry telemetry over OTLP — gRPC on port 4317 or HTTP on port 4318: metrics become
+Netdata charts, and logs and traces are stored, indexed, on the receiving Agent. Anything that speaks OTLP can send to it
+— an OpenTelemetry Collector, an instrumented application, an SDK — with TLS or mutual TLS on either listener. Start with
+[OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md) for the endpoints, the exporter blocks, and two smoke tests.
 
 ## Metrics
 
@@ -42,7 +42,7 @@ explore them in the Traces tab. Sending traces from an SDK or a Collector is in
 
 ## In this section
 
-- [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md) — the endpoint, the exporter, smoke tests, troubleshooting.
+- [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md) — the endpoints, the exporters, smoke tests, troubleshooting.
 - [Securing the OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md) — TLS, mutual TLS, network
   controls, certificate rotation.
 - [Metrics Collection](/docs/opentelemetry/metrics-collection.md) — receiver recipes for hosts and applications.

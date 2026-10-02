@@ -23,6 +23,24 @@ def test_endpoint_error_rejects_port_out_of_range():
     assert err is not None and "range" in err.message
 
 
+def test_http_endpoint_error_accepts_valid_host_port():
+    assert _endpoint_error("a", "127.0.0.1:4318", name="otlp_http_endpoint") is None
+    assert _endpoint_error("a", "localhost:1", name="otlp_http_endpoint") is None
+
+
+def test_http_endpoint_error_names_the_parameter():
+    # The message must say which knob is malformed once two endpoints exist.
+    err = _endpoint_error("a", "not-a-host-port", name="otlp_http_endpoint")
+    assert err is not None and err.state == "error" and "otlp_http_endpoint" in err.message
+    err = _endpoint_error("a", "127.0.0.1:70000", name="otlp_http_endpoint")
+    assert err is not None and "otlp_http_endpoint" in err.message and "range" in err.message
+
+
+def test_http_endpoint_error_rejects_garbage():
+    assert _endpoint_error("a", "127.0.0.1", name="otlp_http_endpoint") is not None
+    assert _endpoint_error("a", "http://127.0.0.1:4318", name="otlp_http_endpoint") is not None
+
+
 def test_extra_yaml_error_accepts_mapping_and_empty():
     from netdata_mcp.tools.otel_config import _extra_yaml_error
 

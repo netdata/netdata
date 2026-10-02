@@ -123,18 +123,24 @@ class OtelConfig:
 
     Every field is optional: ``None`` means "leave the plugin default" and the
     key is omitted from the generated otel.yaml (which the plugin partial-merges
-    over its own stock defaults). The local storage layout is derived from a
+    over its own stock defaults), except the two endpoint fields, which are
+    always emitted: ``otlp_endpoint`` resolves to a free loopback port and
+    ``otlp_http_endpoint`` to another one (or to a disable when set to ``""``),
+    so parallel agents never collide on the stock 4317/4318 — the plugin fails
+    fast on an occupied port. The local storage layout is derived from a
     single ``base_dir`` that is always pinned under the run dir for per-agent
     isolation (re-pinned after the ``extra_yaml`` merge, alongside
-    ``endpoint.path``). Caller-supplied paths do exist beyond the pin:
-    ``remote_storage_uri``, ``journal_dir``, and whatever ``extra_yaml`` reaches — the
-    server is a localhost-only developer tool, so the caller is trusted. The
-    rotation/retention knobs are the edge-case drivers (tiny thresholds force
-    multi-file splits and evictions over small, deterministic corpora).
-    ``journal_dir`` is a read-only path (the legacy viewer's fixture).
+    ``endpoint.path`` and ``endpoint.http_path``). Caller-supplied paths do
+    exist beyond the pin: ``remote_storage_uri``, ``journal_dir``, and whatever
+    ``extra_yaml`` reaches — the server is a localhost-only developer tool, so
+    the caller is trusted. The rotation/retention knobs are the edge-case
+    drivers (tiny thresholds force multi-file splits and evictions over small,
+    deterministic corpora). ``journal_dir`` is a read-only path (the legacy
+    viewer's fixture).
     """
 
     otlp_endpoint: str | None = None          # endpoint.path; None → auto free loopback port
+    otlp_http_endpoint: str | None = None     # endpoint.http_path; None → auto free loopback port, "" → null (disable)
     # Per-signal tuning (dirs are derived from base_dir, not set here). Each
     # signal has an independent set; an omitted knob keeps the plugin's stock
     # default for that signal. logs.* and traces.* are symmetric.
@@ -162,10 +168,10 @@ class OtelConfig:
     # value replaces). Reaches knobs without first-class fields (auth, ingest
     # windows, retention max_age/horizon, catalog rotation_period, per-tenant
     # override blocks, startup_op_timeout) and deliberately-invalid keys for
-    # strict-config refusal tests. base_dir and endpoint.path stay pinned (the
-    # harness' per-agent isolation invariants) — see _otel_doc. Validated as
-    # parseable YAML at the tool boundary; a semantically bad config surfaces
-    # as the plugin's own refuse-to-start (that IS the test).
+    # strict-config refusal tests. base_dir, endpoint.path, and endpoint.http_path
+    # stay pinned (the harness' per-agent isolation invariants) — see _otel_doc.
+    # Validated as parseable YAML at the tool boundary; a semantically bad config
+    # surfaces as the plugin's own refuse-to-start (that IS the test).
     extra_yaml: str | None = None
 
 
@@ -230,14 +236,16 @@ def _signal_tuning(
     return out
 
 
-def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
-    """The otel.yaml override document: pinned per-agent base_dir + endpoint, plus any set knobs.
+def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint: str | None) -> dict:
+    """The otel.yaml override document: pinned per-agent base_dir + both endpoints, plus any set knobs.
 
     Only fields the caller set are emitted; the plugin keeps its stock defaults
     for the rest. ``base_dir`` is always pinned under the run dir, so every
     derived dir (``{base_dir}/{logs,traces}/{wal,index,catalog}``, the shared
     download cache ``{base_dir}/remote-read``, ``{base_dir}/shared/seq_highwater``)
-    lands in isolation — one pin isolates both signals.
+    lands in isolation — one pin isolates both signals. ``otlp_http_endpoint``
+    arrives already resolved (a host:port string, or ``None``/``""`` which both
+    serialize to ``http_path: null`` — the plugin's disable).
     """
     base_dir = str(rd / "lib" / "otel")
 
@@ -285,7 +293,10 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
     if cfg.journal_dir:
         logs["journal_dir"] = cfg.journal_dir
 
-    doc: dict = {"endpoint": {"path": otlp_endpoint}, "base_dir": base_dir}
+    doc: dict = {
+        "endpoint": {"path": otlp_endpoint, "http_path": otlp_http_endpoint or None},
+        "base_dir": base_dir,
+    }
     if remote_storage:
         doc["remote_storage"] = remote_storage
     if logs:
@@ -295,9 +306,10 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
 
     # Raw-YAML escape hatch (see OtelConfig.extra_yaml): deep-merge the caller's
     # mapping over the generated doc — passthrough wins — then RE-PIN base_dir
-    # and endpoint.path. Those two are harness invariants (per-agent isolation;
-    # the reported OTLP endpoint), not plugin knobs to reach; everything else,
-    # including keys the plugin will refuse, passes through untouched.
+    # and both endpoint addresses. Those are harness invariants (per-agent
+    # isolation; the reported OTLP endpoint; no undeclared 4318 bind), not
+    # plugin knobs to reach; everything else, including keys the plugin will
+    # refuse, passes through untouched.
     if cfg.extra_yaml:
         try:
             extra = yaml.safe_load(cfg.extra_yaml)
@@ -313,8 +325,12 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
             doc.setdefault("endpoint", {})
             if isinstance(doc["endpoint"], dict):
                 doc["endpoint"]["path"] = otlp_endpoint
+                doc["endpoint"]["http_path"] = otlp_http_endpoint or None
             else:
-                doc["endpoint"] = {"path": otlp_endpoint}
+                doc["endpoint"] = {
+                    "path": otlp_endpoint,
+                    "http_path": otlp_http_endpoint or None,
+                }
     return doc
 
 
@@ -352,8 +368,11 @@ def generate_runtime(
     plugin loads the otel.yaml we generate there (netdata derives
     ``NETDATA_USER_CONFIG_DIR`` from that key and re-exports it to plugins; the
     ``-c`` flag only loads the file, not the dir). ``otlp_endpoint`` defaults to a
-    free loopback port so parallel agents don't collide on 4317; it is returned
-    so the caller can record where to push OTLP data.
+    free loopback port so parallel agents don't collide on 4317; the OTLP/HTTP
+    listener gets its own free port for the same reason (the plugin fails fast on
+    an occupied port), unless the config disables it (``otlp_http_endpoint=""``)
+    or pins it. The gRPC endpoint is returned so the caller can record where to
+    push OTLP data.
     """
     rd = run_dir(agent_id)
     for sub in ("etc", "cache", "lib", "log"):
@@ -369,7 +388,13 @@ def generate_runtime(
 
     cfg = otel or OtelConfig()
     otlp_endpoint = cfg.otlp_endpoint or f"127.0.0.1:{free_port()}"
-    otel_yaml = yaml.safe_dump(_otel_doc(cfg, rd, otlp_endpoint), sort_keys=False)
+    # "" (disable) must survive intact: only None auto-assigns.
+    otlp_http_endpoint = (
+        cfg.otlp_http_endpoint if cfg.otlp_http_endpoint is not None else f"127.0.0.1:{free_port()}"
+    )
+    otel_yaml = yaml.safe_dump(
+        _otel_doc(cfg, rd, otlp_endpoint, otlp_http_endpoint), sort_keys=False
+    )
     (rd / "etc" / "otel.yaml").write_text(otel_yaml, encoding="utf-8")
 
     return rd, conf_path, otlp_endpoint

@@ -20,6 +20,7 @@ modules:
         - otel
         - otlp
         - grpc
+        - http
         - metrics
         - logs
         - traces
@@ -31,17 +32,18 @@ modules:
         description: ""
     # Metric kinds, sum flavors, the `otel.` context prefix, and the mapping
     # option keys are implemented in otel-ingestor (chart.rs, chart_config.rs,
-    # aggregation.rs); the endpoint is gRPC-only (otel-ingestor/src/lib.rs).
+    # aggregation.rs); both endpoints (gRPC and OTLP/HTTP) are served from
+    # otel-ingestor/src/lib.rs.
     overview:
       data_collection:
         metrics_description: |
-          Receive OpenTelemetry metrics, logs, and traces over OTLP/gRPC from Collectors, SDKs, and instrumented applications. The plugin converts supported metrics into Netdata charts, indexes logs for exploration in the Logs tab, and indexes traces for exploration in the Traces tab.
+          Receive OpenTelemetry metrics, logs, and traces over OTLP/gRPC and OTLP/HTTP from Collectors, SDKs, and instrumented applications. The plugin converts supported metrics into Netdata charts, indexes logs for exploration in the Logs tab, and indexes traces for exploration in the Traces tab.
 
           The plugin accepts gauges, sums, explicit-bucket histograms, and summaries. It does not currently ingest exponential histograms. Monotonic cumulative and delta sums are rate-normalized; non-monotonic cumulative sums behave as gauges.
 
           For a maintained Collector configuration and end-to-end verification steps, see [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md). The separate [OpenTelemetry Logs integration](/integrations/logs/integrations/opentelemetry_logs.md) explains how received logs appear in Netdata, and [Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md) explains how received traces are stored and kept.
         method_description: |
-          The plugin starts automatically and listens on a configurable OTLP/gRPC endpoint. OTLP/HTTP is not supported, so senders must use the gRPC exporter and port `4317`, not the HTTP exporter and port `4318`.
+          The plugin starts automatically and listens on two configurable OTLP endpoints: OTLP/gRPC on `endpoint.path` (port `4317` by default) and OTLP/HTTP on `endpoint.http_path` (port `4318` by default; set it to `null` to serve gRPC only). The HTTP listener serves `POST /v1/logs`, `POST /v1/traces`, and `POST /v1/metrics` with `application/x-protobuf` or `application/json` bodies, accepts gzip request compression, and honors the same `X-Scope-OrgID` tenant header as gRPC. Startup is strict for both listeners: if either address is already in use, the plugin refuses to start.
 
           Each metric name becomes a Netdata chart context prefixed with `otel.`. YAML mapping rules can match a metric name and instrumentation scope, select a data point attribute for dimension names, and override chart timing. User mapping files take priority over the stock hostmetrics mappings compiled into the plugin. Metrics without a matching mapping still create charts using default settings.
 
@@ -65,7 +67,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The plugin starts automatically and listens on `127.0.0.1:4317` for OTLP/gRPC connections.
+            The plugin starts automatically and listens on `127.0.0.1:4317` for OTLP/gRPC connections and on `127.0.0.1:4318` for OTLP/HTTP connections.
         # The ingest windows are bridge::config defaults (netdata-plugin/bridge/
         # src/config.rs IngestConfig: 24h max_age, 10m future_skew); the chart cap
         # is the stock-file value the ingestor enforces; retention evicts on
@@ -82,9 +84,9 @@ modules:
           - title: A Netdata installation that includes the OpenTelemetry plugin
             description: |
               Official Linux packages, static builds, containers, and supported macOS packages include the plugin. Linux source installs using `netdata-installer.sh` require a compatible Rust toolchain and `--enable-plugin-otel`; on macOS, the installer enables the plugin automatically when it finds a compatible Rust toolchain.
-          - title: An OTLP/gRPC data source
+          - title: An OTLP data source
             description: |
-              Configure an OpenTelemetry Collector, SDK, or instrumented application to export metrics, logs, or traces to the Agent endpoint. Use the gRPC exporter. The default loopback endpoint accepts only senders on the same host.
+              Configure an OpenTelemetry Collector, SDK, or instrumented application to export metrics, logs, or traces to the Agent endpoint. Use the gRPC exporter against port `4317` or the HTTP exporter against `4318`. The default loopback endpoints accept only senders on the same host.
       configuration:
         file:
           name: otel.yaml
@@ -99,7 +101,7 @@ modules:
 
             The absolute paths shown below are the defaults for standard Linux packages. The installed stock configuration resolves its configuration and log directories for the installation layout, so macOS and custom-prefix installations use different paths. Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) with `otel.yaml` to inspect the installed values.
 
-            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Names are the uppercase option path with dots replaced by underscores. For example, `endpoint.tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
+            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Names are the uppercase option path with dots replaced by underscores. For example, `endpoint.tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`, and `endpoint.http_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_HTTP_PATH` — set the latter to an empty value to disable the OTLP/HTTP listener. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
 
             Configuration is strict. Unknown YAML fields, unknown `NETDATA_OTEL_CFG_*` variables, malformed values, and the former experimental schema prevent the plugin from starting. The effective configuration is logged at startup; `remote_storage.uri` is redacted in that log.
           folding:
@@ -124,6 +126,26 @@ modules:
               description: Path to a CA certificate used to verify client certificates.
               detailed_description: |
                 Setting a CA certificate enables mutual TLS and therefore also requires the server certificate and key. Clients must present a certificate signed by this CA.
+              default_value: ""
+              required: false
+            - name: endpoint.http_path
+              description: OTLP/HTTP endpoint on which the Agent listens; `null` disables the HTTP listener.
+              detailed_description: |
+                The OTLP/HTTP listener serves `POST /v1/logs`, `POST /v1/traces`, and `POST /v1/metrics` with `application/x-protobuf` or `application/json` bodies. Set it to `null` to disable the listener and serve gRPC only. The default IPv4 loopback address accepts only local senders; to accept remote senders, bind a non-loopback address and protect the listener with TLS or mutual TLS and network access controls. Startup is strict: the plugin refuses to start when the address is already in use, exactly as for the gRPC listener.
+              default_value: "127.0.0.1:4318"
+              required: false
+            - name: endpoint.http_tls_cert_path
+              description: Path to the server TLS certificate for the OTLP/HTTP listener. Set it together with `endpoint.http_tls_key_path`.
+              default_value: ""
+              required: false
+            - name: endpoint.http_tls_key_path
+              description: Path to the server TLS private key for the OTLP/HTTP listener. Set it together with `endpoint.http_tls_cert_path`.
+              default_value: ""
+              required: false
+            - name: endpoint.http_tls_ca_cert_path
+              description: Path to a CA certificate used to verify client certificates on the OTLP/HTTP listener.
+              detailed_description: |
+                The `http_tls_*` options configure TLS for the OTLP/HTTP listener independently of the gRPC `tls_*` options, so one transport can be protected while the other is not. Setting a CA certificate enables mutual TLS and therefore also requires the HTTP server certificate and key. Clients must present a certificate signed by this CA.
               default_value: ""
               required: false
             - name: metrics.chart_configs_dir
@@ -178,7 +200,7 @@ modules:
               default_value: "1GB"
               required: false
             - name: auth.enabled
-              description: Require the `X-Scope-OrgID` gRPC header to select a log or trace tenant.
+              description: Require the `X-Scope-OrgID` header (gRPC metadata or HTTP header) to select a log or trace tenant.
               detailed_description: |
                 This is tenant selection, not credential authentication. When disabled, all logs and traces belong to the `default` tenant. When enabled, trust the header only behind TLS or mutual TLS and suitable network controls. Metrics are not tenant-scoped.
               default_value: false
@@ -238,13 +260,17 @@ modules:
               folding:
                 enabled: false
               description: |
-                Bind beyond loopback only when the endpoint is protected. This example requires each sender to present a certificate signed by the configured CA.
+                Bind beyond loopback only when the endpoint is protected. This example requires each sender to present a certificate signed by the configured CA. Each listener has its own address and its own TLS settings: the `http_tls_*` trio protects the OTLP/HTTP listener independently of the gRPC `tls_*` trio, so one transport can be protected while the other is not, and setting `http_path` to `null` disables the HTTP listener entirely.
               config: |
                 endpoint:
                   path: "0.0.0.0:4317"
                   tls_cert_path: /etc/netdata/ssl/server-cert.pem
                   tls_key_path: /etc/netdata/ssl/server-key.pem
                   tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
+                  http_path: "0.0.0.0:4318"
+                  http_tls_cert_path: /etc/netdata/ssl/server-cert.pem
+                  http_tls_key_path: /etc/netdata/ssl/server-key.pem
+                  http_tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
             - name: Configure log and trace retention
               folding:
                 enabled: true
@@ -279,24 +305,27 @@ modules:
                       dimension_attribute_key: direction
                   "redis.cpu.time":
                     - dimension_attribute_key: state
-    # Quoted journal lines must match the shipped log text: the bind error is
-    # formatted in otel-ingestor/src/lib.rs, the disable line is emitted by
-    # src/plugins.d/plugins_d.c, and the "otel-plugin/ingestor" worker journal
-    # name is set in otel-plugin/src/main.rs.
+    # Quoted journal lines must match the shipped log text: the gRPC bind
+    # error is formatted in otel-ingestor/src/lib.rs, the disable line is
+    # emitted by src/plugins.d/plugins_d.c, and the "otel-plugin/ingestor"
+    # worker journal name is set in otel-plugin/src/main.rs.
     troubleshooting:
       errors:
         list:
           - error: "`failed to bind gRPC endpoint 127.0.0.1:4317: Address already in use (os error 98)`"
             when: |
-              Logged in the Agent journal at startup by the `otel-plugin/ingestor` worker, followed by `exited with error code 1 and haven't collected any data. Disabling it.` from the Agent.
+              Logged in the Agent journal at startup by the `otel-plugin/ingestor` worker, followed by `exited with error code 1 and haven't collected any data. Disabling it.` from the Agent. A conflict on the OTLP/HTTP listener fails the same strict way: `failed to bind OTLP/HTTP endpoint 127.0.0.1:4318: Address already in use (os error 98)`.
             cause: |
-              Another process already listens on the configured endpoint. Typical sources are a standalone OpenTelemetry Collector on the same host, or several Netdata Agents running in containers that share the host network namespace (`--network host`), where only one of them can own `127.0.0.1:4317`. The plugin binds the endpoint before it advertises anything, so on a conflict it exits once and the Agent disables it until the next Agent restart.
+              Another process already listens on the configured address. Typical sources are a standalone OpenTelemetry Collector on the same host — its own OTLP receivers default to the same conventional ports, `4317` for gRPC and `4318` for HTTP — or several Netdata Agents running in containers that share the host network namespace (`--network host`), where only one of them can own a given port. The plugin binds both listeners before it advertises anything, so on a conflict it exits once and the Agent disables it until the next Agent restart.
             fix: |
-              Find the owner with `ss -ltnp 'sport = :4317'`. Then either stop that listener, or give this Agent its own endpoint in `otel.yaml` and point every OTLP sender at the new port (avoid `4318`, the conventional OTLP/HTTP port, which this plugin does not serve):
+              Find the owner with `ss -ltnp 'sport = :4317'` (or `sport = :4318` for the OTLP/HTTP listener). Then stop that listener, or give this Agent its own addresses in `otel.yaml` and point every OTLP sender at the new ports. The OTLP/HTTP listener can also be disabled outright with `http_path: null`:
 
               ```yaml
               endpoint:
                 path: 127.0.0.1:14317
+                http_path: 127.0.0.1:14318
+                # or serve gRPC only:
+                # http_path: null
               ```
 
               When several Agents share one network namespace and only one needs to receive OTLP, disable the plugin on the others in `netdata.conf`:
@@ -312,7 +341,7 @@ modules:
               Check the Agent journal for `otel-plugin` configuration errors. User YAML and `NETDATA_OTEL_CFG_*` variables are validated strictly, so a typo or an option from the former experimental schema stops startup. For a source install, confirm that a compatible Rust toolchain is available; Linux installs using `netdata-installer.sh` also require `--enable-plugin-otel`.
           - name: The endpoint is reachable but no data appears
             description: |
-              A successful TCP connection proves only that something is listening. Confirm that the sender uses OTLP/gRPC on port `4317`; OTLP/HTTP on port `4318` is unsupported. With the default endpoint, use `127.0.0.1` explicitly if `localhost` resolves to IPv6. Then send a real OTLP record and verify the resulting chart, log entry, or trace.
+              A successful TCP connection proves only that something is listening. Confirm which transport the sender uses: OTLP/gRPC targets port `4317`, while OTLP/HTTP targets port `4318` at `/v1/logs`, `/v1/traces`, or `/v1/metrics` with an `application/x-protobuf` or `application/json` Content-Type. With the default endpoints, use `127.0.0.1` explicitly if `localhost` resolves to IPv6. Then send a real OTLP record and verify the resulting chart, log entry, or trace.
           - name: A metric does not create the expected chart
             description: |
               Exponential histograms are not currently ingested. For other supported metrics, inspect the Agent journal for rejected user mapping files and verify the metric name, instrumentation scope, and `dimension_attribute_key`. The resulting chart context is `otel.<metric-name>`.

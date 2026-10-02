@@ -102,10 +102,32 @@ def test_generate_runtime_writes_otel_yaml_with_isolated_base_dir_and_endpoint(t
     # endpoint auto-assigned on loopback and reported back
     assert doc["endpoint"]["path"] == otlp
     assert otlp.startswith("127.0.0.1:")
+    # the OTLP/HTTP listener gets its OWN auto-assigned loopback port — never
+    # the stock 4318 (a collide-and-fail-fast across parallel agents), never
+    # the gRPC one
+    assert doc["endpoint"]["http_path"].startswith("127.0.0.1:")
+    assert doc["endpoint"]["http_path"] != otlp
     # no per-signal dirs are emitted (derived), and no tuning knobs were set
     assert "logs" not in doc
     # global storage omitted (disabled) unless configured
     assert "remote_storage" not in doc
+
+
+def test_generate_runtime_otel_http_endpoint_states(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    # explicit host:port pins the listener
+    rd, _conf, _otlp = runtime.generate_runtime(
+        "agent-h1", otel=runtime.OtelConfig(otlp_http_endpoint="127.0.0.1:4318")
+    )
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    assert doc["endpoint"]["http_path"] == "127.0.0.1:4318"
+    # "" (the tool-layer disable sentinel) serializes as http_path: null —
+    # the plugin's disable — not as an empty string or an omission
+    rd, _conf, _otlp = runtime.generate_runtime(
+        "agent-h2", otel=runtime.OtelConfig(otlp_http_endpoint="")
+    )
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    assert doc["endpoint"]["http_path"] is None
 
 
 def test_generate_runtime_otel_emits_journal_dir_when_set(tmp_path, monkeypatch):
@@ -253,30 +275,43 @@ def test_generate_runtime_otel_extra_yaml_deep_merges_and_wins(tmp_path, monkeyp
 
 def test_generate_runtime_otel_extra_yaml_cannot_override_pins(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    # base_dir and endpoint.path are harness isolation invariants: the
-    # passthrough must not escape the per-agent run dir or lie about the
-    # reported OTLP endpoint.
+    # base_dir and both endpoint addresses are harness isolation invariants:
+    # the passthrough must not escape the per-agent run dir, lie about the
+    # reported OTLP endpoint, or smuggle in an undeclared HTTP bind.
     cfg = runtime.OtelConfig(
-        extra_yaml='base_dir: /tmp/escape\nendpoint:\n  path: "1.2.3.4:1"\n  tls_cert_path: /x.pem\n'
+        extra_yaml=(
+            "base_dir: /tmp/escape\n"
+            "endpoint:\n"
+            '  path: "1.2.3.4:1"\n'
+            '  http_path: "1.2.3.4:2"\n'
+            "  tls_cert_path: /x.pem\n"
+            "  http_tls_cert_path: /y.pem\n"
+        )
     )
     rd, _conf, otlp = runtime.generate_runtime("agent-pin", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert doc["base_dir"] == str(rd / "lib" / "otel")
     assert doc["endpoint"]["path"] == otlp
-    # Non-pinned endpoint siblings still pass through.
+    # http_path re-pinned to the auto-assigned address, not the override
+    assert doc["endpoint"]["http_path"].startswith("127.0.0.1:")
+    assert doc["endpoint"]["http_path"] != otlp
+    # Non-pinned endpoint siblings (either listener's TLS) still pass through.
     assert doc["endpoint"]["tls_cert_path"] == "/x.pem"
+    assert doc["endpoint"]["http_tls_cert_path"] == "/y.pem"
 
 
 def test_generate_runtime_otel_extra_yaml_pins_survive_non_mapping_endpoint(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     # The re-pin must hold even when the passthrough replaces `endpoint` with
-    # something that is not a mapping (the isinstance fallback branch).
+    # something that is not a mapping (the isinstance fallback branch). The
+    # HTTP listener is disabled here so the expected endpoint is exactly the
+    # two pins (a disable must also survive the passthrough).
     for evil in ("endpoint: null\n", "endpoint: 42\n", "endpoint: [1, 2]\n", "base_dir: null\nendpoint: null\n"):
-        cfg = runtime.OtelConfig(extra_yaml=evil)
+        cfg = runtime.OtelConfig(otlp_http_endpoint="", extra_yaml=evil)
         rd, _conf, otlp = runtime.generate_runtime("agent-nd", otel=cfg)
         doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
         assert doc["base_dir"] == str(rd / "lib" / "otel"), evil
-        assert doc["endpoint"] == {"path": otlp}, evil
+        assert doc["endpoint"] == {"path": otlp, "http_path": None}, evil
 
 
 def test_generate_runtime_otel_extra_yaml_rejects_invalid_yaml(tmp_path, monkeypatch):
