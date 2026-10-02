@@ -92,6 +92,15 @@ class PrepareFleetTests(unittest.TestCase):
         for name in ('unrecognized', 'journal'):
             self.run_script('--source', self.source, '--keep', name, success=False)
 
+    def test_dashboard_removal_retains_required_empty_web_directory(self):
+        target, _ = self.prepare('none')
+        web = target / 'usr/share/netdata/web'
+        self.assertTrue(web.is_dir(), 'Agent startup requires NETDATA_WEB_DIR')
+        self.assertEqual(list(web.iterdir()), [])
+        manifest = json.loads((target / 'usr/share/netdata/fleet-manifest.json').read_text())
+        self.assertNotIn('usr/share/netdata/web', manifest['removed_paths'])
+        self.assertIn('usr/share/netdata/web/index.html', manifest['removed_paths'])
+
     def test_all_keeps_available_plugins(self):
         target, _ = self.prepare('all')
         self.assertTrue((target / 'usr/libexec/netdata/plugins.d/go.d.plugin').exists())
@@ -187,10 +196,15 @@ class PrepareFleetTests(unittest.TestCase):
         self.assertFalse(target.exists())
         self.assertIn('changed allocated sections or ELF identity', result.stderr)
 
-    def installer(self, extra=None):
+    def installer(self, extra=None, omit_directories=False):
         data = io.BytesIO()
         with tarfile.open(fileobj=data, mode='w') as tf:
-            tf.add(self.source, arcname='.', recursive=True)
+            if omit_directories:
+                for file in sorted(self.source.rglob('*')):
+                    if not file.is_dir() or file.is_symlink():
+                        tf.add(file, arcname='./' + file.relative_to(self.source).as_posix(), recursive=False)
+            else:
+                tf.add(self.source, arcname='.', recursive=True)
             if extra:
                 tf.addfile(extra, io.BytesIO(b'x'))
         payload = gzip.compress(data.getvalue(), mtime=0)
@@ -221,6 +235,22 @@ class PrepareFleetTests(unittest.TestCase):
             self.assertIn('./bin/srv/netdata', tf.getnames())
             self.assertNotIn('./usr/libexec/netdata/plugins.d/go.d.plugin', tf.getnames())
             self.assertEqual(tf.getmember('./bin/srv/netdata').mode, (self.source / 'bin/srv/netdata').stat().st_mode & 0o7777)
+
+    def test_archive_with_implicit_directories_keeps_directory_capabilities(self):
+        path, sha = self.installer(omit_directories=True)
+        result = self.run_script('--input', path, '--sha256', sha, '--keep', 'dashboard,go')
+        self.assertEqual(json.loads(result.stdout)['resolved'], ['dashboard', 'go'])
+
+    def test_archive_with_implicit_directories_retains_empty_web_directory(self):
+        path, sha = self.installer(omit_directories=True)
+        target = self.root / 'implicit-dirs.gz.run'
+        self.run_script('--input', path, '--sha256', sha, '--keep', 'apps',
+                        '--strip-mode', 'none', '--apply', '--output', target)
+        content = target.read_bytes()
+        payload = content.split(b'\n', 15)[15]
+        with tarfile.open(fileobj=io.BytesIO(gzip.decompress(payload))) as tf:
+            self.assertTrue(tf.getmember('./usr/share/netdata/web').isdir())
+            self.assertNotIn('./usr/share/netdata/web/index.html', tf.getnames())
 
     def test_archive_checksum_and_traversal_refusal(self):
         path, sha = self.installer()

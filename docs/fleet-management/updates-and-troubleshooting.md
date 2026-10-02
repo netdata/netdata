@@ -1,49 +1,46 @@
 # Update and Troubleshoot Reduced Fleet Images
 
-Treat the reduced Netdata package as a reproducible image-build artifact. The standard static updater downloads a full upstream package; it does not retain the preparation script's capability policy. Keep security updates flowing through the fleet image pipeline instead.
+Keep edge devices current through your fleet image pipeline. Prepare a reduced Netdata package for each release, apply the device class's runtime configuration, and deliver both together as part of the image update.
 
-## Rebuild for every selected release
+## Prepare each release
 
-1. Download the intended upstream release for each architecture and verify its published checksum.
-2. Run the pinned preparation script with the recorded capability and stripping policy into a fresh output.
-3. Inspect the manifest, omitted paths, measured sizes and derived checksum.
-4. Install the derived package into a clean image and apply the fleet runtime configuration.
-5. Validate on representative devices, including privileges, selected collectors, streaming, Functions, outages and recovery.
-6. Roll out through a canary ring, then progressively expand while monitoring coverage and resource budgets.
+1. Download the upstream installer for each device architecture and verify its published checksum.
+2. Run the [preparation script](./minimize-disk-footprint.md) with your saved capability and stripping policy into a fresh output.
+3. Keep the generated manifest and checksum with the image release.
+4. Install the reduced package into a clean image and apply streaming, collection and local-storage settings.
+5. Bring a pilot group online, check its metrics and live Functions, then expand the rollout.
 
-A fresh upstream release can add new components or change archive structure. Unknown files survive preparation, which protects compatibility but can increase size. Review the manifest and sizing on every update. Unsupported formats and unfamiliar installer permission policies fail rather than being silently rewritten.
+Keep each device's identity and required configuration through normal updates so its history remains associated with the same node.
 
-## Keep one update authority
+## Manage updates through one pipeline
 
-In an image-managed fleet, do not independently enable the standard Agent auto-updater. Audit provisioning and kickstart options as well as existing schedules: disabling an option in a new build does not remove an updater schedule on an already commissioned device. Use the documented [updater controls](../../packaging/installer/UPDATE.md) as part of your fleet's authorized configuration process.
+Use the image pipeline as the update authority for reduced installations. The standard Netdata auto-updater installs the full upstream package, so configure [updater controls](../../packaging/installer/UPDATE.md) as part of device provisioning. Include existing updater schedules when migrating a previously commissioned device to image-managed updates.
 
-This preparation script neither modifies updater schedules nor restarts services. It cannot guarantee a reduced footprint if another updater installs the full upstream archive later. Define the fleet release cadence and security-response ownership so avoiding the stock updater does not mean avoiding updates.
+Deliver security updates through the same pipeline and maintain a release schedule for each device class.
 
-## Use clean images, not overlay pruning
+## Install into a clean image
 
-An installer extracts over an existing installation. Files absent from the reduced archive can remain from a previous full installation. Therefore applying a reduced installer over an existing full installation is not a reliable cleanup operation.
+Prepare a clean image filesystem for each reduced package. The installer extracts its files into the destination; it does not remove files left by an older, larger installation. Building a clean image ensures that the installed components match the capability policy.
 
-Use a clean image filesystem, or a separately designed migration process with explicit backups, service coordination and approved removal rules. The preparation script intentionally does not perform that live migration. Preserve device identity, configuration and required state through the image platform's normal update mechanism.
+For existing devices, use your fleet platform's migration and state-preservation process when moving to the reduced image.
 
-## Retain a recovery set
+## Keep recovery straightforward
 
-Keep the original installer and checksum, matching unstripped binaries, preparation script revision, policy, manifest and validated image. Retain the preceding known-good image for rollback. Database and identity migration rules still apply when rolling back Agent versions; test the fleet platform's recovery path.
+Retain the preceding working image and its runtime configuration for rollback. Keep the original upstream installer, preparation script revision, capability policy and generated manifest in the release inventory.
 
-Do not deploy a failed preparation output. Private workspaces remain available for diagnosis, and a failed tree copy may leave an incomplete destination. Retry with a fresh output path after resolving the failure.
+When stripping all removable symbols, keep the matching original binaries on the build host for crash diagnosis. If package preparation fails, resolve the reported error and retry with a fresh output rather than deploying the incomplete result.
 
-## Troubleshoot by symptom
+## Troubleshoot common issues
 
-| Symptom | Check |
+| Issue | Action |
 |:--|:--|
-| `objcopy` fails | Tool supports the target ELF architecture; use the correct cross-tool or LLVM tool |
-| Requested capability absent | Input architecture and build options; ARMv6 and ARMv7 can include different plugins |
-| Required metrics or Functions missing | Retained collector, runtime enablement, permissions, job configuration and connected Child |
-| Package is still large | Retained Go bundle, local dashboard, IP-intelligence assets and unknown new files |
-| Installed files unexpectedly reappear | Stock updater, another deployment agent, or an overlay over an old image |
-| RAM or writes exceed budget | Cardinality, local database mode, metadata/logs, buffers and plugin processes |
-| Cellular traffic exceeds budget | Faster charts, reconnects, NAT expiry, replication, TLS, downloads and Function calls |
-| Sparse charts are marked disconnected | Parent version includes cadence-aware liveness; actual fastest chart and keepalive configuration |
+| The stripping tool fails | Select an `objcopy` implementation that supports the device architecture |
+| A requested capability is unavailable | Use a package that includes that plugin or adjust the device class's selection |
+| Metrics or live Functions are missing | Check the retained collector, job settings, permissions and Child connection |
+| The package is larger than expected | Review retained bundles such as `go`, dashboard files and IP-intelligence data |
+| Removed files return after an update | Check the stock updater and other deployment agents; build the next image from a clean filesystem |
+| Device CPU or memory increases | Check newly discovered metrics, collector intervals and local retention |
+| Cellular traffic increases | Check reconnects, chart intervals, replication and image downloads |
+| A device does not reconnect | Check network access, Parent destinations, TLS trust and streaming authorization |
 
-For unexpectedly high idle CPU on 32-bit Linux, check whether the release contains the [time64 futex fix](https://github.com/netdata/netdata/pull/24049), merged September 27, 2026. That fix addresses a specific wait-loop issue; it does not establish a general CPU budget.
-
-Collect diagnostics before replacing the image. Use the [support bundle tool](../developer-and-contributor-corner/netdata-support-bundle.md) where available, and handle bundles as potentially sensitive operational data. Keep original symbols off-device for crash investigation when deploying stripped binaries.
+Use the [support bundle tool](../developer-and-contributor-corner/netdata-support-bundle.md) to collect diagnostics for unresolved issues. Handle bundles through your organization's normal process for operational data.

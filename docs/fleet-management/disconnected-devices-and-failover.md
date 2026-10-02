@@ -1,31 +1,31 @@
 # Handle Disconnected Devices and Parent Failover
 
-Devices may enter tunnels, lose cellular coverage, sleep or power down. Decide which gaps are acceptable and which must be recovered before selecting a local storage mode or reducing liveness traffic.
+Keep monitoring history available when devices lose coverage, enter tunnels or switch networks. Netdata Children collect locally during a connection outage and can send retained history to a Parent when they reconnect.
 
-## Understand three different buffers
+## Keep history for coverage gaps
 
-| Mechanism | What it provides | Limitation |
-|:--|:--|:--|
-| Streaming send buffer | Absorbs transient send delay | Not a durable outage queue; reconnects flush it |
-| Local metric history | Samples that can be replicated after reconnection | Limited by retention; RAM history is lost on restart |
-| Parent history | Central history already received | Cannot reconstruct uncollected or expired Child samples |
+Choose local storage according to the device's recovery needs:
 
-Increasing a send buffer consumes RAM and does not replace historical replication. Use local retention and enabled replication when backfill is required. See the [Parent-Child reference](../../src/streaming/README.md) for replication periods and steps.
+- **RAM history** keeps samples through a network outage while the Agent continues running.
+- **DBengine history** keeps samples across Agent restarts and device power loss.
+- **No local history** resumes current monitoring after reconnection, without backfilling the disconnected period.
 
-## Set an outage contract
+Configure retention for the coverage gaps you want to recover and enable historical replication. The Parent requests available history after reconnection. See [CPU and memory settings](./minimize-cpu-and-memory.md) for database choices and the [Parent-Child reference](../../src/streaming/README.md) for replication periods and steps.
 
-For each device class, specify maximum recoverable outage, power-loss behavior, expected reconnect traffic and how missing telemetry appears to operators. A Child with no local history can resume live streaming, but it cannot fill the disconnected period. A coarse collection policy still has coarse data after backfill.
+The streaming send buffer handles short delays while sending. Use local history for outage recovery, rather than increasing the send buffer to cover a long disconnection.
 
-Test outages shorter and longer than retention, and test a device reboot while disconnected. Inspect actual oldest and newest timestamps at the Parent after reconnection. Size local disk or RAM from that evidence rather than the streaming buffer setting.
+## Provide alternative Parents
 
-## Provide Parent alternatives
+Configure a list of Parent destinations on the Child. It connects to the first available destination and can use another Parent when the current one is unavailable.
 
-The Child destination supports a list of Parents and connects to the first available destination. Provision matching authorization and TLS trust on each intended Parent. Verify failover with the actual network routes and firewall policy.
+Provision matching streaming authorization and TLS trust on each Parent, and allow the device's network sources. Use the [centralization architecture guide](../deployment-guides/deployment-with-centralization-points.md) to arrange Parent replication and retention when your team needs shared historical coverage across Parents.
 
-Multiple destinations do not by themselves create identical historical databases on every Parent. Design Parent replication and routing according to [centralization architecture](../deployment-guides/deployment-with-centralization-points.md), and test what users see when a Parent becomes unavailable.
+A destination list provides connection failover; history on each Parent follows your centralization and replication configuration.
 
-## Distinguish disconnected from unhealthy
+## Keep the fleet understandable during outages
 
-An absent Child cannot execute forwarded Functions. Previously retained history remains queryable on the Parent, subject to retention. Plan local diagnostics for field service and a recovery path for devices that cannot reconnect.
+The Parent continues to serve the history it has received while a device is offline. Live Functions become available again when the Child reconnects.
 
-Define separate expectations for devices that intentionally sleep and devices expected to remain online. Tune liveness with the [cellular guide](./minimize-cellular-traffic.md), but do not interpret a longer detection delay as improved reliability. Alert routing should reflect the device's expected operating schedule.
+Organize alerts around how your devices operate. A sleeping device and a device that should be online need different connectivity expectations. Use labels and alert routing to distinguish planned offline periods from unexpected loss of monitoring.
+
+For cellular devices, combine the recovery policy with [keepalive and traffic settings](./minimize-cellular-traffic.md). After reconnecting a device, check that its current metrics and retained history appear at the Parent.

@@ -323,18 +323,26 @@ def main():
             fail('--source must be an offline directory')
         records = validate_members(tree_members(input_path))
         work = None
+    # Static archives can list only files, leaving directories implicit.
+    def present(path):
+        return path in records or any(p.startswith(path + '/') for p in records)
+
     if args.keep != 'all':
         for name in selected:
             primary = CAPS[name][0][0]
-            if primary not in records:
+            if not present(primary):
                 fail(f'requested capability {name} is absent ({primary})')
-    available = {name for name in selected if CAPS[name][0][0] in records}
+    available = {name for name in selected if present(CAPS[name][0][0])}
     for name in available:
         for companion in REQUIRED_COMPANIONS.get(name, []):
-            if companion not in records:
+            if not present(companion):
                 fail(f'incomplete capability {name}: missing {companion}')
     omitted = [p for name, (paths, _) in CAPS.items() if name not in selected for p in paths]
-    removed = sorted(p for p in records if any(p == prefix or p.startswith(prefix + '/') for prefix in omitted))
+    # Agent startup validates the web directory even when no dashboard is installed.
+    required_empty_dirs = {'usr/share/netdata/web'}
+    removed = sorted(p for p in records
+                     if not (p in required_empty_dirs and records[p].isdir())
+                     and any(p == prefix or p.startswith(prefix + '/') for prefix in omitted))
     removed_set = set(removed)
     original_bytes = sum(m.size for m in records.values() if m.isfile())
     removed_bytes = sum(records[p].size for p in removed if records[p].isfile())
@@ -354,6 +362,11 @@ def main():
     stage = work / 'tree'
     stage.mkdir()
     kept = {p: copy.copy(m) for p, m in records.items() if p not in removed_set and p != MANIFEST}
+    for name in required_empty_dirs:
+        if name not in kept:
+            directory = tarfile.TarInfo(name)
+            directory.type, directory.mode = tarfile.DIRTYPE, 0o755
+            kept[name] = directory
     # Create regular files before links, and never traverse an input symlink.
     for name, m in sorted(kept.items()):
         target = stage / name

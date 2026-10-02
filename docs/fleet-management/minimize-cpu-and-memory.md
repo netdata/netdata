@@ -1,55 +1,136 @@
 # Minimize CPU and Memory on Fleet Devices
 
-Move long-term storage, alert evaluation and anomaly detection to Parents, then measure what remains on the Child. The package preparation script saves installed bytes; collector activity, metric cardinality and database configuration determine most runtime costs.
+Keep edge devices focused on their workload by moving historical storage, alert evaluation and anomaly detection to Netdata Parents. Configure the Child to collect the metrics you need, at the interval you need, with enough local history for your connectivity pattern.
 
-## Choose the Child's responsibilities
+## Configure a lightweight Child
 
-Use the [lightweight Child configuration guidance](../deployment-guides/deployment-strategies.md) as the baseline:
+For the reduced package prepared with `--keep apps,debugfs`, put this baseline in the Child's `netdata.conf`. It collects system, process and supported hardware metrics every five seconds, keeps a small RAM history, and leaves alerts and anomaly detection to the Parent:
 
-- Disable ML on the Child when the Parent supplies anomaly detection.
-- Disable health evaluation on the Child when the Parent supplies alerts. Decide separately whether any local alerts are needed during disconnection.
-- Keep only required collectors and integrations running. Built-in collectors remain compiled in after package pruning.
-- Restrict the local web listener according to your access policy. If the dashboard files are omitted, use the Parent dashboard.
-- Keep the information required to diagnose the device, including process or hardware collectors where those are operational requirements.
+```ini
+[global]
+    profile = iot
 
-Apply these settings in the Child's `netdata.conf` when the corresponding Parent responsibility is confirmed:
+[db]
+    db = ram
+    update every = 5
+    retention = 120
 
-| Section and setting | Effect |
+[health]
+    enabled = no
+
+[ml]
+    enabled = no
+
+[web]
+    bind to = localhost
+
+[plugins]
+    proc = yes
+    diskspace = yes
+    apps = yes
+    debugfs = yes
+    cgroups = no
+    tc = no
+    idlejitter = no
+    statsd = no
+```
+
+Add the [streaming configuration](./deployment-and-identity.md#connect-to-a-parent) before starting the Agent. A reduced package supplies the executable files; this configuration selects the collection work. Enable cgroups for container devices and retain the `containers` capability when container names and network attribution are needed.
+
+Use `update every = 300` for five-minute collection or `600` for ten-minute collection. With 120 samples per dimension, the nominal RAM history is ten minutes at five-second collection, ten hours at five-minute collection, or twenty hours at ten-minute collection. Allocation is rounded and charts can use different intervals, so check the actual available history before setting your recovery policy.
+
+Use a release with cadence-aware plugin read timeouts before applying five- or ten-minute collection to every retained plugin. For the pinned **v2.12.0-2-nightly** package, keep `apps` and `debugfs` below the Agent's two-minute plugin-read timeout. To combine five- or ten-minute system collection with process and sensor collection, add these overrides:
+
+```ini
+[plugin:apps]
+    update every = 60
+
+[plugin:debugfs]
+    update every = 60
+```
+
+This mixed configuration was run on Pi 3 B+ with the prepared ARMv7 package: system CPU charts updated every 300 seconds, process charts every 60 seconds, and the processes and sensors Functions remained registered. Over six minutes, the Agent and persistent plugins used 0.69% of one CPU core and 28.1 MiB mean PSS.
+
+These plugins continue to collect once a minute, and their streamed charts also update once a minute. The Parent's automatic keepalive therefore uses its 30-second minimum. Setting `apps` or `debugfs` to 300 or 600 seconds in this package disconnects it before its next collection; do not use that configuration for complete process and sensor coverage.
+
+The IoT profile does not select a five- or ten-minute interval automatically. Set it explicitly. At long intervals, allow at least two collection cycles after startup before checking rates and complete chart availability.
+
+## Move analysis to the Parent
+
+Configure these settings in the Child's `netdata.conf` when the Parent provides alerting and anomaly detection:
+
+| Section and setting | What it does |
 |:--|:--|
-| `[ml] enabled = no` | Stops local anomaly-detection work |
-| `[health] enabled = no` | Stops local alert evaluation |
-| `[web] bind to = localhost` | Restricts the local listener to loopback |
-| `[db] db = ram` | Retains metric samples in RAM; requires a retention budget |
-| `[db] db = none` | Removes local metric history and its backfill capability |
+| `[global] profile = iot` | Selects defaults suited to constrained devices |
+| `[ml] enabled = no` | Moves anomaly detection work off the Child |
+| `[health] enabled = no` | Moves alert evaluation off the Child |
+| `[web] bind to = localhost` | Keeps the device's web listener on loopback |
 
-Use either `ram` or `none`, according to the outage contract. These are Child settings; do not copy disabled ML and health settings onto a Parent expected to provide those capabilities.
+Enable the corresponding features on the Parent, where your team uses dashboards and alerts. If you need local alerts while a device is disconnected, keep Child health evaluation enabled for that device class.
 
-The automatic IoT profile is selected for constrained hardware, including one-CPU or low-memory systems. It is a default profile, not a complete fleet policy. Inspect the effective configuration rather than assuming it disables all storage or changes collection to five minutes. You can explicitly select `[global] profile = iot`; still configure collection, storage and health according to the fleet requirements. See [Agent configuration](../netdata-agent/configuration/README.md).
+The IoT profile supplies a starting point. Set collection intervals and local storage explicitly to match the device's role. See [Agent configuration](../netdata-agent/configuration/README.md) for the settings and [lightweight Child configuration](../deployment-guides/deployment-strategies.md) for a complete baseline.
 
-## Select local history deliberately
+## Choose a collection interval
 
-`ram` database mode retains recent metric samples in memory instead of DBengine metric files. `none` provides no local metric history. Neither setting means that Netdata performs no disk writes: metadata databases, logs and other state may still be persisted.
+Set `[db] update every` to control the default collection interval:
 
-For non-DBengine memory-backed history, the configured `retention` value is used as a sample-entry count, despite being parsed with duration syntax. The retained time is approximately the entry count multiplied by that chart's collection interval, with allocation rounding. Therefore a value of 120 does not mean two minutes of history for charts collected every 300 seconds. For example, on a system with 4 KiB pages, RAM sample arrays round to multiples of 1,024 four-byte entries per dimension. A requested 120 entries can therefore allocate 1,024, representing roughly 85 hours at a 300-second cadence. Size the buffer against actual chart intervals and verify the resulting oldest timestamps and memory use on the device.
+| Value | Collection interval | Suitable use |
+|:--|:--|:--|
+| `5` | Five seconds | General device monitoring with quicker fault visibility |
+| `1` | One second | Fast-changing workloads and troubleshooting |
+| `300` | Five minutes | Periodic health, status and capacity monitoring |
+| `600` | Ten minutes | Slowly changing devices on tight power or cellular budgets |
 
-DBengine provides persistent metric history, with separately configured disk limits and storage tiers. Use it when outage recovery requires persistence through restarts, and budget for database space, I/O and memory. Consult [database configuration](../netdata-agent/configuration/README.md) and [Agent sizing](../netdata-agent/sizing-netdata-agents/README.md); package size is separate from database capacity.
+Longer intervals reduce collection work and streamed updates. Use shorter intervals for conditions that need quick detection, such as brief thermal excursions or short service failures. At longer intervals, gauges show periodic readings and counter rates average activity over a longer period.
 
-Choose the maximum outage you intend to backfill. RAM history survives a network outage while the Agent remains running; it does not survive an Agent restart or device power loss. With `none`, there is no history to replicate after reconnection.
+Collector-specific settings can override the default. Set those intervals consistently and check the chart update intervals at the Parent.
 
-## Reduce collection work
+## Choose local history
 
-Increase `[db] update every` only as far as the monitored behavior allows. A cadence of 300 or 600 seconds can reduce work and steady streaming traffic for slow status metrics. Set `[db] update every = 300` for five minutes or `600` for ten minutes only where that loss of resolution is acceptable. Collector-specific configuration can override the default; inspect actual chart cadence at the Parent, including Netdata's own monitoring charts.
+The Child's local database determines how much history it can send after a connection outage:
 
-Counter rates and gauge samples have different meanings at coarse cadence. A gauge can miss an entire event between samples. A long counter interval can average a burst into a low rate. Collectors may have independent event processing or maintenance work that continues between published samples; CPU reduction is not necessarily proportional to the interval.
+| `[db] db` setting | Local history | Use it when |
+|:--|:--|:--|
+| `none` | No local metric history | You need current monitoring with the smallest local history footprint |
+| `ram` | Metric history in memory | You want to recover coverage gaps while the Agent keeps running |
+| `dbengine` | Persistent metric history | You need history to survive device or Agent restarts |
 
-Control metric cardinality before cutting intervals indiscriminately: unnecessary per-process groups, interfaces, container dimensions and application jobs can cost both RAM and CPU. Remove the unused collection job or configure its supported filters; streaming filters alone do not stop local collection.
+With RAM mode, `retention` controls sample entries per dimension. The time covered depends on each chart's interval, and allocation is rounded to memory pages. Longer intervals provide a longer history window for the same entry count. Check the available history at the Parent when setting your outage recovery window.
 
-## Measure a realistic budget
+RAM and `none` modes reduce metric-database disk activity. Metadata, logs and other Agent state can still write to disk. Configure [logging destinations and rotation](../../src/libnetdata/log/README.md) alongside the database policy.
 
-For each device class, record Agent and plugin RSS, CPU time, metric count, writes and startup time. Include first boot, steady operation, Parent disconnection, backfill, interactive Functions and update commissioning. Track plugin processes as well as the daemon. Verify Parent ML training and eligibility at the chosen cadence; moving ML does not make sparse samples equivalent to one-second data.
+For DBengine disk limits and storage tiers, see [Agent sizing](../netdata-agent/sizing-netdata-agents/README.md). The [disconnection guide](./disconnected-devices-and-failover.md) explains how local history supports recovery.
 
-For logs, configure supported destinations, severity and rotation in the image. Confirm metadata and log writes on the filesystem; do not assume `ram` makes the device read-only. See the [logging reference](../../src/libnetdata/log/README.md).
+Stripping symbols reduces package and installation space. Control steady-state CPU and memory through collection intervals, collector selection and local retention; symbol removal alone does not reduce the number of metrics collected.
 
-Use an otherwise identical image to compare policies, with the same workload, kernel and observation period. On 32-bit systems, include address-space limits in your assessment; a package that fits on disk can still fail a runtime memory budget.
+## Keep collection focused
 
-The general performance and sizing documents describe typical workloads, not a promised ARM footprint. No runtime CPU or memory benchmark accompanies the offline package measurements in this guide. Use [performance optimization](../netdata-agent/configuration/optimize-the-netdata-agents-performance.md) as a reference, and set acceptance thresholds from your measured hardware.
+Enable the collectors and jobs that monitor your device workload. Configure supported filters to avoid collecting unnecessary process groups, interfaces, containers or application instances. Fewer metrics reduce collection, memory and streaming work together.
+
+Package preparation removes unused optional plugins. Built-in collectors and retained plugin bundles are controlled through runtime configuration. A streaming chart filter controls what reaches the Parent; use collector settings to control work on the Child.
+
+## Plan device capacity
+
+Use these measured footprints to size the monitoring budget for a device class. The packages contain the Agent, built-in system collectors, `apps` and `debugfs`; the [disk guide](./minimize-disk-footprint.md) gives their complete contents and preparation commands.
+
+The following runs used **v2.12.0-2-nightly**, compressed streaming to a Parent, the configuration above and 120 RAM samples per dimension. CPU includes the Agent and its persistent plugin processes; 100% means one fully occupied CPU core. Memory is their mean proportional set size (PSS), which apportions shared pages instead of counting them repeatedly.
+
+| Device | Package / device OS | One-second collection: CPU / memory | Five-second collection: CPU / memory |
+|:--|:--|--:|--:|
+| Raspberry Pi 1 B+ | ARMv6 / 32-bit Raspbian 12 | 29.1% / 34.4 MiB | 7.6% / 34.3 MiB |
+| Raspberry Pi 2 B | ARMv7 / 32-bit Raspbian 12 | 18.2% / 29.8 MiB | 4.5% / 30.2 MiB |
+| Raspberry Pi 3 B+ | ARMv7 / 32-bit Raspbian 12 | 12.0% / 30.3 MiB | 3.1% / 29.6 MiB |
+| Raspberry Pi 4 B | ARMv7 / 64-bit Linux | 11.0% / 36.8 MiB | 3.0% / 36.8 MiB |
+| Raspberry Pi 5 B | ARMv7 / 64-bit Debian 12 | 5.2% / 57.6 MiB | 0.8% / 55.2 MiB |
+
+Measurements cover 90 seconds at one-second collection and 120 seconds at five-second collection, after a short startup warmup. The process tree was sampled every ten seconds; short-lived helpers can fall between samples. PSS excludes kernel memory and the filesystem cache. They describe these boards and workloads; running applications, kernel features and collector jobs change resource use. Pi 5 also hosted the isolated Parent. ARMv7 execution on the two 64-bit operating systems was verified on these installations; choose a package supported by your own device OS.
+
+On Pi 1, using `db = none` at one-second collection used 29.1 MiB of process-tree PSS, compared with 34.4 MiB for `db = ram`. `none` still streamed metrics to the Parent; the Child's local charts API had no stored charts. Choose RAM history when recovery after a connection outage matters.
+
+RAM mode does not make the Agent completely write-free: these runs still wrote metadata and logs. Four boards used NFS roots and Pi 4 used local storage, so these observations do not quantify flash wear. Route and rotate logs, then measure writes on the storage used by your device image.
+
+## Watch resource use from the Parent
+
+Monitor the Agent and its plugin processes for CPU, memory and local storage growth. Check resource use during normal operation, reconnection and live troubleshooting. Use these observations to adjust the device class's collection and retention settings.
+
+For additional settings, see [performance optimization](../netdata-agent/configuration/optimize-the-netdata-agents-performance.md). Once configured, use the [fleet monitoring guide](./monitor-the-fleet.md) to keep track of monitoring overhead across the fleet.

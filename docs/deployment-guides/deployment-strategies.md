@@ -2,7 +2,7 @@
 
 These practical examples will help you optimize Netdata for various real-world deployment scenarios.
 
-For constrained robots, signage players and other edge devices, see [Fleet Management of Robots and Edge Devices](../fleet-management/README.md).
+For constrained robots, signage players and other edge devices, see [Edge Device Monitoring](../fleet-management/README.md).
 
 ## Single Agent Configuration
 

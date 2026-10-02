@@ -1,37 +1,31 @@
-# Fleet Management of Robots and Edge Devices
+# Edge Device Monitoring
 
-Netdata can monitor fleets of Linux robots, digital signage players, gateways and autonomous vehicles while keeping most storage and analysis on Netdata Parents. This guide focuses on constrained devices, especially 32-bit ARM systems, and on deployments managed through an image or firmware pipeline.
+Monitor robots, digital signage, gateways and autonomous vehicles from one place, with a small Netdata Agent on each device. Stream their metrics to Netdata Parents to bring fleet-wide dashboards, historical data, alerts, anomaly detection and live troubleshooting together while reducing work on the devices.
 
-A small Child collects telemetry on each device and streams it to one or more Parents. Parents provide historical queries, dashboards, alerts and anomaly detection. Device Functions can be invoked through the Parent while the device is connected. Collection and the implementation of those Functions still run on the device: removing a collector removes its telemetry and Functions.
+Netdata separates collection from analysis. The Agent on an edge device is a **Child**: it collects system and application metrics and sends them to a **Parent**. The Parent stores history and provides the monitoring experience for your fleet. You can also run live troubleshooting Functions through the Parent to inspect a connected device's processes, network connections and logs.
 
-## Design the fleet before shrinking it
+## Fit monitoring to your devices
 
-Define what operators need to detect, how quickly they must detect it, how long devices can be disconnected, and how much CPU, RAM, disk and cellular traffic each device can spend. Treat these as separate budgets.
+Use the same architecture across a fleet while adapting each device's Agent to its hardware and workload. For constrained Linux systems, including 32-bit ARM devices, you can:
 
-| Budget | Main controls | Consequence to assess |
-|:--|:--|:--|
-| Installed files | Strip debugging information; omit optional plugins, dashboard and data files | Omitted capabilities cannot run on the Child |
-| Local disk writes | Local database mode and retention; logging policy | Less local history to recover after an outage |
-| Memory | Metric count, retention, enabled plugins, ML, buffers | Smaller buffers tolerate less interruption |
-| CPU | Collection interval, enabled collectors, metric count, compression | Slower detection or less telemetry |
-| Cellular traffic | Collection interval, chart selection, liveness policy, reconnects | Coarser data and potentially slower disconnect detection |
+- **Reduce installed size** by removing debugging symbols and packaging only the plugins your devices use.
+- **Reduce CPU and memory use** by moving storage, alerting and anomaly detection to Parents and collecting at an appropriate interval.
+- **Reduce cellular traffic** with less frequent metric updates, compression and keepalive settings suited to intermittent connections.
+- **Recover data after an outage** by keeping local history and replicating it when the device reconnects.
+- **Troubleshoot centrally** with dashboards and live Functions, without installing a dashboard on every device.
 
-Stripping debugging information primarily saves disk space. It does not remove collection work. Conversely, disabling a plugin does not remove its installed binary. Use both package preparation and runtime configuration.
+Keep the collectors that supply your operational metrics and live Functions. For example, retain the apps plugin for process monitoring, the network viewer for network inspection, and the journal plugin for journal access. Your Parent brings these capabilities into one interface.
 
-## Follow the deployment sequence
+## Set up edge monitoring
 
-1. [Define capabilities and provision devices](./deployment-and-identity.md), including unique identities and secure Parent connections.
-2. [Prepare a smaller static package](./minimize-disk-footprint.md) in your build pipeline.
-3. [Set CPU and memory budgets](./minimize-cpu-and-memory.md), and verify them on representative hardware.
-4. [Tune cellular traffic](./minimize-cellular-traffic.md) using a cadence appropriate to the workload.
-5. [Plan disconnection and failover](./disconnected-devices-and-failover.md).
-6. [Monitor the fleet and its observability cost](./monitor-the-fleet.md).
-7. [Roll out updates and recover safely](./updates-and-troubleshooting.md).
+Follow these guides to prepare and operate your fleet:
 
-## What a Parent preserves
+1. [Deploy and identify devices](./deployment-and-identity.md): provision unique identities, labels and secure Parent connections.
+2. [Minimize disk footprint](./minimize-disk-footprint.md): prepare a smaller static package for your device image.
+3. [Minimize CPU and memory](./minimize-cpu-and-memory.md): choose the Child's collection interval and local storage.
+4. [Minimize cellular traffic](./minimize-cellular-traffic.md): configure sparse updates, compression and connection keepalives.
+5. [Handle disconnections and failover](./disconnected-devices-and-failover.md): retain data through coverage gaps and provide alternative Parents.
+6. [Monitor fleet health](./monitor-the-fleet.md): track device health, connectivity and monitoring resource use.
+7. [Update and troubleshoot devices](./updates-and-troubleshooting.md): deliver reduced packages through your image pipeline and recover quickly.
 
-Centralization preserves the ability to analyze retained telemetry, alert on it and view it centrally. It does not preserve every capability after arbitrary pruning. Keep `apps` for process telemetry and process Functions, `network` for network inspection, `journal` for journal Functions, and the appropriate application or custom collectors for device services. Remote Functions require a connected Child and can consume additional CPU and bandwidth when called.
-
-Five- or ten-minute collection can suit status and capacity monitoring. It can miss short CPU spikes, brief temperature excursions and intermittent faults. For safety-critical control, keep the required sensing and decision loop on the device independently of this monitoring design.
-
-For general deployment tooling and configuration distribution, see [Fleet Deployment and Configuration Management](../fleet-configuration-management.md). For Parent architecture and capacity, see [deployment with centralization points](../deployment-guides/deployment-with-centralization-points.md) and [Parent best practices](../observability-centralization-points/best-practices.md).
+For deployment automation, see [Fleet Deployment and Configuration Management](../fleet-configuration-management.md). For the central monitoring layer, see [deployment with centralization points](../deployment-guides/deployment-with-centralization-points.md) and [Parent best practices](../observability-centralization-points/best-practices.md).
