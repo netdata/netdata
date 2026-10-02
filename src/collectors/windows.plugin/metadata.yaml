@@ -19,12 +19,13 @@ modules:
         - dns server
         - dns
         - perflib
+        - microsoft
     overview:
       data_collection:
         metrics_description: |
           Monitor DNS Server query traffic, recursion, zone transfers, dynamic updates, memory, response handling, and WINS lookups on Windows.
         method_description: |
-          It reads the DNS performance object from Windows Perflib. If the DNS Server role is not installed when the Agent starts, the collector disables itself; restart the Agent after installing the role to begin collection.
+          It reads the DNS performance object from Windows Perflib. If the DNS Server role is installed later, collection begins automatically after Windows refreshes the performance counter registry.
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -34,7 +35,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            This collector is enabled by default. It creates charts only for counters available from the DNS performance object; hosts without the DNS Server role produce no DNS charts.
+            This collector is enabled by default. It creates charts only for counters available from the DNS performance object; hosts without the DNS Server role produce no DNS charts. It retries automatically after the performance counter registry changes.
         limits:
           description: ""
         performance_impact:
@@ -43,7 +44,7 @@ modules:
       prerequisites:
         list:
           - title: DNS Server role
-            description: The Windows DNS Server role must be installed. If it is installed after the Agent starts, restart the Agent.
+            description: Install the Windows DNS Server role to collect these metrics. If installed after the Agent starts, collection begins after Windows refreshes its performance counter registry.
       configuration:
         file:
           name: "netdata.conf"
@@ -72,7 +73,7 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: "DNS Server event counters are running totals, displayed as per-second rates. Missing counters leave gaps. Query-drop totals and individual reasons are separate, non-stacked dimensions."
+      description: "DNS Server event counters are running totals, displayed as per-second rates. Missing counters leave gaps. Query-drop totals and individual reasons are separate, non-stacked dimensions. Suppressed responses and recursive send timeouts have separate charts and units."
       availability: []
       scopes:
         - name: DNS Server
@@ -94,8 +95,8 @@ modules:
                 - name: tcp
                 - name: udp
             - name: windows.dns.query_handling
-              description: DNS query handling events
-              unit: "events/s"
+              description: DNS queries dropped
+              unit: "queries/s"
               chart_type: line
               dimensions:
                 - name: dropped_total
@@ -103,7 +104,12 @@ modules:
                 - name: dropped_rate_limiting
                 - name: dropped_send
                 - name: dropped_bad_socket
-                - name: responses_suppressed
+            - name: windows.dns.suppressed_responses
+              description: DNS responses suppressed
+              unit: "responses/s"
+              chart_type: line
+              dimensions:
+                - name: suppressed
             - name: windows.dns.remote_queries
               description: DNS remote queries in flight
               unit: "queries"
@@ -112,12 +118,17 @@ modules:
                 - name: in_flight
             - name: windows.dns.recursive_queries
               description: DNS recursive queries
-              unit: "events/s"
+              unit: "queries/s"
               chart_type: line
               dimensions:
                 - name: queries
                 - name: failures
-                - name: send_timeouts
+            - name: windows.dns.recursive_send_timeouts
+              description: DNS recursive send timeouts
+              unit: "timeouts/s"
+              chart_type: line
+              dimensions:
+                - name: timeouts
             - name: windows.dns.zone_transfer_requests_received
               description: DNS zone transfer requests received
               unit: "requests/s"
