@@ -11,7 +11,8 @@ static struct {
 
 static bool netdata_conf_path_is_absolute(const char *path) {
 #if defined(OS_WINDOWS)
-    if(*path == '\\' || (isalpha((uint8_t)path[0]) && path[1] == ':'))
+    // "C:\x" is absolute, "C:x" is relative to the current directory of drive C
+    if(*path == '\\' || (isalpha((uint8_t)path[0]) && path[1] == ':' && (path[2] == '\\' || path[2] == '/')))
         return true;
 #endif
     return *path == '/';
