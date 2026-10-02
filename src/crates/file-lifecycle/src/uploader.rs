@@ -1,16 +1,30 @@
-//! Uploader component that copies index and catalog files to remote object
-//! storage.
+//! The uploader: copies index (SFST) and catalog files to remote object
+//! storage. One worker per ledger process, shared by every signal pipeline
+//! (like the cleaner): steady-state requests come from the indexer-response
+//! path and catalog rotations, and recovery queues every un-uploaded file at
+//! startup.
 //!
 //! Uploads run in spawned async tasks, but the number in flight at once is
 //! bounded by a [`Semaphore`]: the receive loop acquires a permit before
-//! spawning, so a recovery backlog (which enqueues every un-uploaded file at
-//! once) can't fan out into thousands of simultaneous file reads + PUTs. Each
-//! task buffers its whole file in memory, so the permit count also caps peak
-//! upload memory. In-flight tasks are tracked in a [`JoinSet`] so a shutdown
-//! drains them briefly instead of abandoning detached uploads mid-PUT.
+//! spawning, so a recovery backlog can't fan out into thousands of
+//! simultaneous file reads + PUTs. Each task buffers its whole file in
+//! memory, so the permit count also caps peak upload memory. In-flight tasks
+//! are tracked in a [`JoinSet`] so a shutdown drains them briefly instead of
+//! abandoning detached uploads mid-PUT.
+//!
+//! Failure handling: a failed read/write is logged and returned as a
+//! `*Failed` response carrying the error string — there is no retry here.
+//! The caller records failures in the backoff queue (`crate::upload_retry`),
+//! which re-issues them with capped exponential backoff.
 //!
 //! The backend is abstracted behind [`Storage`]; the component is generic over
 //! it so production uses opendal and tests inject a mock.
+//!
+//! Consumers (grep-verified): spawned once by otel-ledger's `Ledger::new`
+//! (`ComponentHandle::spawn::<Uploader<OpendalStorage>>`, remote storage
+//! enabled only). Senders: `ledger/indexer.rs`, `ledger/catalog_builder.rs`,
+//! and `recovery/remote.rs`. Responses are handled by `ledger/uploader.rs`
+//! (`handle_uploader_resp`).
 
 use std::marker::PhantomData;
 use std::path::Path;
@@ -33,8 +47,9 @@ use crate::storage::{Storage, WriteMeta};
 const SHUTDOWN_DRAIN: Duration = Duration::from_secs(5);
 
 /// Construction args for the uploader. The `Storage` bound lives on the
-/// `Component` impl, not here, so this `pub` type doesn't leak the crate-private
-/// trait into its signature.
+/// `Component` impl — the only place the backend is used — so this struct
+/// stays bound-free; callers name the concrete backend in the `Component`
+/// type anyway (`spawn::<Uploader<OpendalStorage>>`).
 pub struct UploaderArgs<S> {
     pub storage: S,
     /// Maximum uploads in flight at once. Bounds concurrent PUTs/sockets and,

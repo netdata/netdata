@@ -1,7 +1,32 @@
+//! Tests for the high-level `Bitmap` layer (bitmap.rs): the `RawBitmap`
+//! descriptor plus `inverted` flag that lets dense sets store their
+//! complement. Pinned here:
+//!
+//! - Query results are representation-independent: `contains`, `len` and
+//!   `is_empty` answer the same whether the set is stored directly or as
+//!   its complement, and `is_inverted` reports which form is in use.
+//! - `contains` rejects out-of-range values before the flag flips the
+//!   answer — even `full`, which contains every in-range value, excludes
+//!   everything at or past the universe.
+//! - `and`/`or` dispatch on the two inverted flags (the De Morgan tables
+//!   in bitmap.rs), pinned per combination and exhaustively against a
+//!   plain set oracle over the same logical operands.
+//! - `and_not` = `and` with the complemented rhs, across flag
+//!   combinations and the full/empty identities.
+//! - `empty`/`full` carry their state in the flag alone over an empty raw
+//!   tree; boolean short-circuits against them return identity results,
+//!   `and` with a full operand copying the other side's tree bytes into
+//!   `out`.
+//! - A double `complement()` round-trips to the original set.
+//!
+//! The raw tree layer itself is pinned in tests_raw.rs; the roaring
+//! bridge in tests_roaring.rs (feature `roaring`).
 use crate::*;
 
-// ---- Bitmap (high-level, De Morgan) tests ----
+// ── single-bitmap queries ─────────────────────────────────────────
 
+/// A directly stored bitmap contains exactly its stored values: present
+/// values hit, absent and out-of-range values miss.
 #[test]
 fn test_bitmap_contains_normal() {
     let mut data = Vec::new();
@@ -14,6 +39,8 @@ fn test_bitmap_contains_normal() {
     assert!(!bm.is_inverted());
 }
 
+/// The complement-stored form of the same set answers the opposite way:
+/// stored (clear) values miss, every other value in the universe hits.
 #[test]
 fn test_bitmap_contains_inverted() {
     let mut data = Vec::new();
@@ -27,6 +54,10 @@ fn test_bitmap_contains_inverted() {
     assert!(bm.is_inverted());
 }
 
+/// Out-of-range values are never contained, whatever the representation:
+/// the universe bound is checked before the inverted flag flips the
+/// answer — so `full`, which contains every in-range value, still rejects
+/// everything at or past the universe.
 #[test]
 fn test_bitmap_contains_out_of_bounds() {
     let mut data = Vec::new();
@@ -50,6 +81,9 @@ fn test_bitmap_contains_out_of_bounds() {
     assert!(!full.contains(&empty_data, u32::MAX));
 }
 
+/// `len` counts logical set bits: the stored count when directly stored,
+/// universe minus stored count when complement-stored (3 clear of 64
+/// means 61 set).
 #[test]
 fn test_bitmap_len() {
     let mut data = Vec::new();
@@ -61,6 +95,9 @@ fn test_bitmap_len() {
     assert_eq!(bm.len(&data2), 61);
 }
 
+/// `empty` and `full` are pure flag states over an empty raw tree: with a
+/// zero-byte data buffer, empty reports no bits and full behaves as if
+/// every value in the universe were set.
 #[test]
 fn test_bitmap_empty_full() {
     let bm = Bitmap::empty(64);
@@ -77,6 +114,9 @@ fn test_bitmap_empty_full() {
     }
 }
 
+// ── boolean ops: the De Morgan and/or tables ──────────────────────
+/// De Morgan row N&N: a raw intersection, result normal.
+/// {0,1,2,3} ∩ {2,3,4,5} = {2,3}.
 #[test]
 fn test_bitmap_and_nn() {
     let mut da = Vec::new();
@@ -93,6 +133,8 @@ fn test_bitmap_and_nn() {
     assert!(!c.contains(&out, 4));
 }
 
+/// De Morgan row N&I: lowered to a raw difference, result normal.
+/// {0,1,2,3} ∩ ¬{2,3} = {0,1}.
 #[test]
 fn test_bitmap_and_ni() {
     let mut da = Vec::new();
@@ -109,6 +151,8 @@ fn test_bitmap_and_ni() {
     assert!(!c.contains(&out, 3));
 }
 
+/// De Morgan row I&N: the inverted lhs's stored tree is subtracted from
+/// the rhs's, result normal. ¬{2,3} ∩ {0,1,2,3} = {0,1}.
 #[test]
 fn test_bitmap_and_in() {
     let mut da = Vec::new();
@@ -124,6 +168,8 @@ fn test_bitmap_and_in() {
     assert!(!c.contains(&out, 2));
 }
 
+/// De Morgan row I&I: lowered to a raw union, result inverted.
+/// ¬{0,1} ∩ ¬{2,3} = ¬{0,1,2,3} = {4..63}.
 #[test]
 fn test_bitmap_and_ii() {
     let mut da = Vec::new();
@@ -141,6 +187,8 @@ fn test_bitmap_and_ii() {
     assert!(c.contains(&out, 63));
 }
 
+/// De Morgan row N|N: a raw union, result normal.
+/// {0,1} ∪ {2,3} = {0,1,2,3}.
 #[test]
 fn test_bitmap_or_nn() {
     let mut da = Vec::new();
@@ -156,6 +204,8 @@ fn test_bitmap_or_nn() {
     assert!(!c.contains(&out, 4));
 }
 
+/// De Morgan row N|I: lowered to an inverted difference.
+/// {10,20} ∪ ¬{5,10,15} = ¬{5,15}, result inverted.
 #[test]
 fn test_bitmap_or_ni() {
     let mut da = Vec::new();
@@ -173,6 +223,8 @@ fn test_bitmap_or_ni() {
     assert!(c.contains(&out, 63));
 }
 
+/// De Morgan row I|N, mirror of N|I: ¬{5,10,15} ∪ {10,20} = ¬{5,15},
+/// result inverted.
 #[test]
 fn test_bitmap_or_in() {
     let mut da = Vec::new();
@@ -188,6 +240,8 @@ fn test_bitmap_or_in() {
     assert!(c.contains(&out, 20));
 }
 
+/// De Morgan row I|I: lowered to a raw intersection, result inverted.
+/// ¬{0,1,2} ∪ ¬{2,3,4} = ¬{2} — 63 of 64 values set.
 #[test]
 fn test_bitmap_or_ii() {
     let mut da = Vec::new();
@@ -205,6 +259,9 @@ fn test_bitmap_or_ii() {
     assert!(c.contains(&out, 4));
 }
 
+/// `and` short-circuits on degenerate operands: an empty operand yields an
+/// empty result without writing `out`; a full operand returns the other
+/// side unchanged, its tree bytes copied into `out` (a ∩ full = a).
 #[test]
 fn test_bitmap_and_with_empty() {
     let mut da = Vec::new();
@@ -224,6 +281,9 @@ fn test_bitmap_and_with_empty() {
     assert!(c.contains(&out2, 20));
 }
 
+/// `or` against a full operand short-circuits to `full` itself: `out`
+/// stays empty, yet `len` reports the full 64 because an inverted
+/// bitmap's len needs no stored bytes.
 #[test]
 fn test_bitmap_or_with_full() {
     let mut da = Vec::new();
@@ -235,12 +295,15 @@ fn test_bitmap_or_with_full() {
     assert_eq!(c.len(&out), 64);
 }
 
+/// One stored operand serves both operations: the same `b` tree bytes are
+/// read as rhs of `and` and of `or` — operands are immutable inputs, each
+/// call appends its result's tree bytes to a fresh caller-owned `out`.
 #[test]
 fn test_bitmap_assign_variants() {
     let mut db = Vec::new();
     let b = Bitmap::from_sorted_iter([2, 3, 4].into_iter(), 64, &mut db);
 
-    // AND
+    // a ∩ b = {2}
     let mut da = Vec::new();
     let a = Bitmap::from_sorted_iter([0, 1, 2].into_iter(), 64, &mut da);
     let mut out = Vec::new();
@@ -248,7 +311,7 @@ fn test_bitmap_assign_variants() {
     assert!(c.contains(&out, 2));
     assert!(!c.contains(&out, 0));
 
-    // OR
+    // a ∪ b = {0,1,2,3,4}
     let mut da = Vec::new();
     let a = Bitmap::from_sorted_iter([0, 1, 2].into_iter(), 64, &mut da);
     let mut out = Vec::new();
@@ -258,6 +321,10 @@ fn test_bitmap_assign_variants() {
     }
 }
 
+/// All four `and` inverted-flag combinations on the same logical sets:
+/// each row re-encodes `a_vals`/`b_vals` (directly, or as
+/// complement-of-complement through the complement value list), and every
+/// value in the universe must land in `a_vals ∩ b_vals`.
 #[test]
 fn test_bitmap_and_exhaustive() {
     let universe = 64u32;
@@ -307,6 +374,9 @@ fn test_bitmap_and_exhaustive() {
     }
 }
 
+/// The same four-representation matrix for `or`: every value in the
+/// universe must land in `a_vals ∪ b_vals`, whichever way each operand is
+/// stored.
 #[test]
 fn test_bitmap_or_exhaustive() {
     let universe = 64u32;
@@ -356,6 +426,10 @@ fn test_bitmap_or_exhaustive() {
     }
 }
 
+/// `and_not` (self ∩ ¬other) through the `and` dispatch: directly stored
+/// rhs, complement-stored rhs (subtracting it keeps its cleared bits),
+/// full \ N = ¬N, the identities a \ empty = a and a \ full = empty, and
+/// a double `complement()` round-tripping to the original set.
 #[test]
 fn test_bitmap_and_not_all_flag_combinations() {
     let mut da = Vec::new();

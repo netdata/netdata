@@ -1,13 +1,37 @@
-//! System utilities for loading machine and boot identifiers.
+//! Host-identity lookups for the journal stack: machine ID, hostname, and
+//! boot ID. Each lookup is a set of `#[cfg]`-selected per-platform variants —
+//! Linux, macOS, and a stub returning `ErrorKind::Unsupported` everywhere
+//! else — behind one `io::Result`-returning API, so the platform split stays
+//! inside this module. All lookups do blocking I/O, including subprocess
+//! spawns (`system_profiler`, `sysctl`), and nothing is cached: call once at
+//! startup and pass the value around rather than re-querying per entry.
 //!
-//! This module provides platform-specific functions to load system identifiers
-//! that are used for journal file creation and identification.
+//! Consumers (grep-verified): journal-log-writer imports the functions flat
+//! via the crate-root re-export ([`crate::load_machine_id`],
+//! [`crate::load_boot_id`], [`crate::load_hostname`]) — machine ID becomes
+//! the journal directory name `<path>/<machine-id>`
+//! (`journal-log-writer/src/log/mod.rs` `create_chain`) and boot ID resumes
+//! the per-boot monotonic tail (`journal-log-writer/src/log/mod.rs`
+//! `Log::new`); ng-ingest calls `journal_common::load_machine_id`/
+//! `load_boot_id` directly for its file-registry identity
+//! (`ng-ingest/src/main.rs` `main` and `ng-ingest/src/bin/traces.rs` `main`).
+//! `load_hostname` is re-exported at the root but no crate calls it.
+//!
+//! `src/crates/jf/journal_file/src/file.rs` (`read_host_file`,
+//! `load_machine_id`, `load_boot_id`) carries a near-identical copy of the
+//! same lookups (same `/host` fallback and macOS parsing, but `[u8; 16]` +
+//! `JournalError` instead of `Uuid` + `io::Error`); the two must be edited in
+//! step by hand.
 
 use std::io;
 
-/// Reads a file from the host filesystem, trying both the normal path and /host/ prefix.
+/// Reads a file from the host filesystem, falling back to `/host/<filename>`.
 ///
-/// This is useful when running in containers where the host filesystem may be mounted at /host.
+/// Tries `filename` as-is and retries under the `/host` prefix only when the
+/// first read is `NotFound` — `/host` is the host-root prefix the Netdata
+/// container runs with (`-s /host` in packaging/docker/run.sh). Any other
+/// first-read error propagates unchanged and the `/host` path is never
+/// tried; if the fallback read also fails, its error propagates as-is.
 #[cfg(target_os = "linux")]
 fn read_host_file(filename: &str) -> io::Result<String> {
     match std::fs::read_to_string(filename) {
@@ -20,11 +44,20 @@ fn read_host_file(filename: &str) -> io::Result<String> {
     }
 }
 
-/// Loads the machine ID from the system.
+/// The host machine ID as a UUID.
 ///
-/// On Linux, this reads from `/etc/machine-id`.
-/// On macOS, this uses `system_profiler` to get the hardware UUID.
-/// On other platforms, this returns an error.
+/// Linux: reads `/etc/machine-id` through `read_host_file`, trims
+/// whitespace, and parses it with `Uuid::try_parse`, which accepts systemd's
+/// undashed 32-hex form as well as hyphenated UUIDs; unparseable content
+/// becomes `ErrorKind::InvalidData`. The machine ID is stable across
+/// reboots, unlike the boot ID.
+///
+/// macOS: spawns `system_profiler SPHardwareDataType` and hex-decodes the
+/// stripped "Hardware UUID:" line into the UUID bytes. A wrong-length value,
+/// a missing line, or a non-zero exit surfaces as `ErrorKind::NotFound`; a
+/// 32-character value that is not hex is `ErrorKind::InvalidData`.
+///
+/// Other platforms: `ErrorKind::Unsupported`.
 #[cfg(target_os = "linux")]
 pub fn load_machine_id() -> io::Result<uuid::Uuid> {
     let content = read_host_file("/etc/machine-id")?;
@@ -75,10 +108,16 @@ pub fn load_machine_id() -> io::Result<uuid::Uuid> {
     ))
 }
 
-/// Loads the hostname from the system.
+/// The system hostname.
 ///
-/// On Linux and macOS, this uses `nix::unistd::gethostname()`.
-/// On other platforms, this returns an error.
+/// Linux and macOS: `nix::unistd::gethostname()`; a failed lookup wraps the
+/// `nix` errno as `ErrorKind::Other`, and a hostname that is not valid
+/// UTF-8 is rejected as `ErrorKind::InvalidData` (the raw bytes are dropped).
+/// This is the only user of the crate's `nix` `hostname` feature (enabled on
+/// the `nix` dependency in `Cargo.toml`); currently no crate outside this
+/// module calls it.
+///
+/// Other platforms: `ErrorKind::Unsupported`.
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 pub fn load_hostname() -> io::Result<String> {
     let hostname =
@@ -96,11 +135,19 @@ pub fn load_hostname() -> io::Result<String> {
     ))
 }
 
-/// Loads the boot ID from the system.
+/// A boot identifier: a UUID that stays the same until the next reboot.
 ///
-/// On Linux, this reads from `/proc/sys/kernel/random/boot_id`.
-/// On macOS, this derives a deterministic ID from the boot time.
-/// On other platforms, this returns an error.
+/// Linux: reads `/proc/sys/kernel/random/boot_id` — the per-boot UUID
+/// assigned by the kernel — directly, without `read_host_file`'s `/host`
+/// fallback; whitespace is trimmed and the content parsed with
+/// `Uuid::try_parse` (`ErrorKind::InvalidData` if it does not parse).
+///
+/// macOS: derives the UUID deterministically from the boot time reported by
+/// `sysctl -n kern.boottime` (see the byte layout in the function body); any
+/// failure to read or parse it — including a non-zero exit — becomes
+/// `ErrorKind::NotFound`.
+///
+/// Other platforms: `ErrorKind::Unsupported`.
 #[cfg(target_os = "linux")]
 pub fn load_boot_id() -> io::Result<uuid::Uuid> {
     let content = std::fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
@@ -118,8 +165,8 @@ pub fn load_boot_id() -> io::Result<uuid::Uuid> {
 
     if output.status.success() {
         let output_str = String::from_utf8_lossy(&output.stdout);
-        // Parse "{ sec = 1753988677, usec = 131097 } Thu Jul 31 22:04:37 2025"
-        // Extract sec and usec values
+        // Sample output: "{ sec = 1753988677, usec = 131097 } Thu Jul 31 22:04:37 2025"
+        // The +6/+7 slice offsets below are the lengths of the "sec = " / "usec = " prefixes.
         if let (Some(sec_start), Some(usec_start)) =
             (output_str.find("sec = "), output_str.find("usec = "))
         {
@@ -132,12 +179,12 @@ pub fn load_boot_id() -> io::Result<uuid::Uuid> {
             let usec_str = &usec_str[..usec_end].trim();
 
             if let (Ok(sec), Ok(usec)) = (sec_str.parse::<u64>(), usec_str.parse::<u64>()) {
-                // Create a deterministic UUID from boot time
-                // Use sec in first 8 bytes, usec in next 4 bytes, pad remaining with zeros
+                // Deterministic UUID from the boot time: big-endian seconds in bytes
+                // 0..8, big-endian microseconds in bytes 8..12, zero-padded bytes 12..16.
                 let mut bytes = [0u8; 16];
                 bytes[0..8].copy_from_slice(&sec.to_be_bytes());
                 bytes[8..12].copy_from_slice(&(usec as u32).to_be_bytes());
-                // bytes[12..16] remain zero-filled for consistency
+                // usec is sub-second, so the u32 cast above is lossless for real boottime values.
                 return Ok(uuid::Uuid::from_bytes(bytes));
             }
         }

@@ -1,3 +1,36 @@
+//! Integration tests for startup recovery. Each test pins one contract of the
+//! passes documented in `recovery/{mod,local,remote,startup}.rs`, at the seams
+//! where those passes meet the components and remote storage:
+//!
+//! - `startup` (P7 fail-closed diff-sync): `startup_sync_*` pins the recursive
+//!   LIST → parse/sanitize + own-machine (D6) filter → high-water seed →
+//!   bounded, short-circuiting diff-download-and-install pipeline: restore
+//!   after a wipe (incl. the auth-off `default` tenant), zero downloads when
+//!   everything is local, filename-only high-water seeding, hostile-key and
+//!   invalid-body skipping, and `Err` on every LIST/transport/timeout failure
+//!   (never a partial high-water write). The `validate_catalog_*` tests pin
+//!   the install oracle's per-entry arm priority and a real builder-rotation
+//!   round-trip.
+//! - `local` (per-tenant replay): `recover_unindexed_*` pins skip-and-orphan
+//!   on a failed seal plus the `holds_seq` routing predicate;
+//!   `recover_retention_*` pins SFST eviction gated on `is_remote_cataloged`
+//!   (ungated with storage disabled); `seed_*` pins replay of local catalogs
+//!   into uploaded/rotated state and the D-P8.1 corrupt-catalog matrix
+//!   (heal/quarantine, storage-disabled leave-in-place, future-version
+//!   leave-in-place, reboot with zero downloads).
+//! - `remote` (per-tenant reconcile, storage enabled): `reconcile_remote_*`
+//!   pins LIST-driven upload marking — D6 filter, prior-instance objects
+//!   marked under their own identity, the identity splice guard, and
+//!   `AddEntry` counts asserted through `catalog_builder.pending()`
+//!   (component.rs's pending counter); `reconcile_local_catalog_*` pins the
+//!   per-catalog stat confirm/re-upload pass, its per-identity seq floor, and
+//!   the `remote_cataloged` seeds that gate `recover_retention` eviction.
+//!
+//! Not pinned here: `recover_orphaned_wals`, `drain_wal_deletes` and
+//! `recover_unuploaded` have no direct test, and the caller wiring
+//! (otel-ledger `build_pipeline`: pass order, STARTUP_REMOTE_BUDGET, the
+//! remote_ok skip policy) is exercised only through the Err/skip contracts the
+//! passes themselves expose.
 use super::*;
 
 fn machine() -> file_registry::MachineId { file_registry::MachineId::new(uuid::Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)).unwrap() }
@@ -38,6 +71,9 @@ fn make_registry(catalog_dir: &Path) -> Registry {
     Registry::new(wal, sfst, catalog_files)
 }
 
+/// Write a local catalog file at its canonical path, its filename stamped from
+/// the entries' fold (max seq, min/max ts) exactly as the builder would name
+/// it. Returns the path.
 fn write_catalog_file(
     catalog_dir: &Path,
     date: NaiveDate,
@@ -62,6 +98,9 @@ fn write_catalog_file(
     path
 }
 
+/// Pass 4 (`seed_from_catalog_files`): valid local catalogs seed every entry
+/// into BOTH `is_uploaded` and `is_rotated`; with storage disabled this is a
+/// pure local scan — no heal path runs.
 #[tokio::test]
 async fn seed_from_catalog_files_populates_both_sets() {
     let catalog_dir = tempfile::tempdir().unwrap();
@@ -255,8 +294,7 @@ async fn seed_after_heal_reboots_with_zero_downloads() {
 /// fires before the full envelope parse, so the other fields need only be
 /// well-typed JSON.
 fn future_version_catalog_bytes(version: u32) -> Vec<u8> {
-    // Raw JSON (no serde_json dep): the version peek fires before the full parse,
-    // so the remaining fields only need to be well-typed.
+    // Hand-built JSON: the crate has no serde_json dependency.
     let json = format!(
         r#"{{"version":{version},"tenant_id":"tenant1","date":"2026-04-17","machine_id":"{m}","instance_id":"{i}","entries":[]}}"#,
         m = machine().as_uuid(),
@@ -427,6 +465,8 @@ fn validate_catalog_rejection_arm_priority() {
     }
 }
 
+/// Drive `recover_retention` through a real cleaner component on a fresh
+/// cancellation token, then cancel the token to stop the cleaner.
 async fn run_recover_retention(
     registry: &mut Registry,
     retention: &bridge::config::RetentionConfig,
@@ -444,6 +484,8 @@ async fn run_recover_retention(
     cancel.cancel();
 }
 
+/// Retention whose `max_files: 0` makes every tracked file evictable; the
+/// size/age knobs are set so they do not fire.
 fn evict_all_retention() -> bridge::config::RetentionConfig {
     bridge::config::RetentionConfig {
         max_files: 0,
@@ -510,11 +552,11 @@ async fn recover_retention_evicts_all_when_storage_disabled() {
 
 // ── reconcile_local_catalog_uploads tests ────────────────────
 
-/// Returns an OpenDAL operator backed by a fresh tempdir, plus the
-/// `TempDir` guard the caller must keep alive for the test's
-/// duration. The `fs` service is the only backend already enabled
-/// for the crate; using it here lets tests run without adding a
-/// dev-only feature flag for `services-memory`.
+/// An OpenDAL operator backed by a fresh tempdir, plus the `TempDir` guard
+/// the caller must keep alive for the test's duration. `services-fs` is the
+/// enabled backend that runs in-process against a local directory, so these
+/// tests exercise the real opendal stack without a server or extra
+/// dev-only feature flag.
 fn fs_operator() -> (opendal::Operator, tempfile::TempDir) {
     let tmp = tempfile::tempdir().unwrap();
     let mut builder = opendal::services::Fs::default();
@@ -523,10 +565,10 @@ fn fs_operator() -> (opendal::Operator, tempfile::TempDir) {
     (op, tmp)
 }
 
-/// Place a real catalog file on disk under the registry's canonical
-/// path and `track` it. The file's body is an empty catalog; we
-/// only care about path identity and the byte content the uploader
-/// will read.
+/// Place a real single-entry catalog file on disk under the registry's
+/// canonical path and `track` it in `catalog_files`. The entry's seq is
+/// `max_seq`, so reconcile reads the seqs the catalog covers from the body;
+/// the uploader re-uploads the same bytes.
 fn place_local_catalog(
     reg: &mut Registry,
     date: NaiveDate,
@@ -555,6 +597,9 @@ fn place_local_catalog(
     path
 }
 
+/// The only test that drives a real `UploadCatalog` through the `Uploader`:
+/// a catalog missing from the remote is re-uploaded, its response is
+/// `CatalogUploaded`, and the remote bytes match the local file.
 #[tokio::test]
 async fn reconcile_local_catalog_uploads_re_uploads_missing_files() {
     let catalog_dir = tempfile::tempdir().unwrap();
@@ -1017,9 +1062,10 @@ fn today_window_retention() -> bridge::config::RetentionConfig {
     }
 }
 
-/// Spawn a catalog builder whose `rotation_count` is high enough that a single
-/// `AddEntry` never rotates — so `handle.pending()` equals the number of
-/// `AddEntry` requests `reconcile_remote_uploads` sent (the test never recvs).
+/// Spawn an idle catalog builder: `rotation_count` is high enough that no
+/// `AddEntry` triggers a rotation or disk write. The tests never `recv`, and
+/// each `AddEntry` draws exactly one response, so `handle.pending()` equals
+/// the number of `AddEntry` requests `reconcile_remote_uploads` sent.
 fn spawn_idle_catalog_builder(
     cancel: &tokio_util::sync::CancellationToken,
 ) -> crate::component::ComponentHandle<
@@ -1170,8 +1216,9 @@ async fn reconcile_remote_uploads_skips_when_local_sfst_missing() {
 
 #[tokio::test]
 async fn reconcile_remote_uploads_propagates_list_error() {
-    // A failed LIST must abort the pass with Err so the caller (Ledger::new)
-    // sets remote_ok = false and skips further remote-dependent recovery.
+    // A failed LIST must abort the pass with Err so the caller (otel-ledger's
+    // `build_pipeline`) sets remote_ok = false, skips the stat-based catalog
+    // reconcile, and still queues the local upload backlog.
     let catalog_dir = tempfile::tempdir().unwrap();
     let mut reg = make_registry(catalog_dir.path());
 
@@ -1298,7 +1345,12 @@ impl crate::component::Component for IdleCleaner {
 
 #[tokio::test]
 async fn recover_unindexed_orphans_unsealable_wals() {
-    // A real archived WAL file, tracked by directory recovery.
+    // Pins `recover_unindexed`'s orphan policy on a failed seal: the pass
+    // returns Ok (not fatal), the WAL entry is untracked (the planner never
+    // sees it), the seq is not routable (`holds_seq`), the bytes stay on
+    // disk, and the next restart re-discovers and re-orphans the file.
+    //
+    // Setup: a real archived WAL file, tracked by directory recovery.
     let wal_dir = tempfile::tempdir().unwrap();
     let seq_alloc = std::sync::Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(
@@ -1346,8 +1398,8 @@ async fn recover_unindexed_orphans_unsealable_wals() {
         crate::component::ComponentHandle::spawn::<FailingIndexer>((), cancel.clone());
     let mut cleaner = crate::component::ComponentHandle::spawn::<IdleCleaner>((), cancel.clone());
 
-    // A seal failure must not fail recovery (the pre-change code bailed with
-    // "refusing to start").
+    // A seal failure must not fail recovery: the pass skips the file and
+    // startup proceeds.
     recover_unindexed(&mut registry, &mut indexer, &mut cleaner)
         .await
         .expect("seal failures are skipped, not fatal");
@@ -1480,6 +1532,9 @@ fn place_local_catalog_for(
     path
 }
 
+/// A real `Uploader` over `storage`: the required handle argument of
+/// `reconcile_local_catalog_uploads` (nothing is enqueued while the mock
+/// stats every catalog present).
 fn spawn_mock_uploader(
     storage: &crate::storage::MockStorage,
     cancel: &tokio_util::sync::CancellationToken,
@@ -1741,7 +1796,7 @@ async fn reconcile_local_catalog_marks_under_catalog_own_identity() {
 
 // ── P7: startup catalog diff-sync ────────────────────────────
 
-/// A [`Storage`] whose every op never resolves — solely for the timeout
+/// A `Storage` whose every op never resolves — solely for the timeout
 /// fail-closed test (`std::future::pending()`).
 #[derive(Clone)]
 struct HangingStorage;
@@ -1765,6 +1820,8 @@ impl crate::storage::Storage for HangingStorage {
     }
 }
 
+/// An op_timeout no test operation can hit; the hang test passes its own
+/// short timeout instead.
 fn long_timeout() -> std::time::Duration {
     std::time::Duration::from_secs(300)
 }
@@ -1799,6 +1856,7 @@ fn catalog_object(
     (key, catalog.to_container_bytes().unwrap())
 }
 
+/// Calendar date in the tests' fixed month (April 2026).
 fn d(day: u32) -> NaiveDate {
     NaiveDate::from_ymd_opt(2026, 4, day).unwrap()
 }
@@ -1846,8 +1904,9 @@ async fn startup_sync_restores_after_wipe() {
     .await
     .unwrap();
 
-    // Both own tenants discovered; foreign machine's tenant-shape not added by an
-    // own-tenant it happens to share (t1 is present from own keys regardless).
+    // Both own tenants discovered. The foreign machine's t1 catalog is
+    // D6-filtered before tenant discovery, so t1 comes from own-machine keys
+    // only.
     assert!(tenants.contains(&t1) && tenants.contains(&t2));
 
     // All four own catalogs installed byte-identical; the foreign one is absent.
@@ -2113,7 +2172,7 @@ async fn startup_sync_sanitizer_skips_hostile_keys() {
     );
 }
 
-/// A [`Storage`] for the short-circuit test only: one key's `read` errors
+/// A `Storage` for the short-circuit test only: one key's `read` errors
 /// instantly, every other `read` hangs (`pending()`). With `buffer_unordered`
 /// plus `try_collect`, the instant error must abort the phase before the hung
 /// downloads (or any later ones) complete.
@@ -2284,9 +2343,10 @@ async fn rotated_catalog_passes_validate_catalog() {
         .expect("rotated catalog must pass validate_catalog");
 }
 
-/// Auth-off restore blackout guard (finding #1): with auth disabled all data is
-/// stored under the "default" tenant. A wiped node MUST still restore it — the
-/// bug was that the key parsers rejected "default". fs-backed end to end.
+/// Auth-off restore: with auth disabled all data is stored under the "default"
+/// tenant, and a wiped node must still restore it — the key parsers
+/// (`parse_catalog_key` → `validate_path_segment`) must accept "default".
+/// fs-backed end to end.
 #[tokio::test]
 async fn startup_sync_restores_default_tenant() {
     let (op, _op_tmp) = fs_operator();

@@ -1,5 +1,35 @@
+//! Tests for the netdata-function wire types in `wire.rs` (this file is its
+//! child `mod tests`): the serde behavior wire consumers depend on that
+//! plain derives don't make obvious — which JSON type selects which
+//! untagged `AnchorParam` variant, and the hand-written `Serialize` /
+//! `Deserialize` impls on `DataPoint`.
+//!
+//! Fixtures are inline JSON literals driven straight through serde_json —
+//! no files, engine, or handler involved. These pin transport shapes only;
+//! the mapping onto the `sfsq::logs` engine is `adapter/tests.rs`.
+//!
+//! Pins:
+//!
+//! - `anchor` accepts both forms the UI sends, JSON type alone picking the
+//!   untagged variant: string → opaque row cursor, number → microsecond
+//!   timestamp;
+//! - `DataPoint` serializes to the exact flat
+//!   `[timestamp_ms, [v, arp, pa], …]` array the cloud-frontend chart
+//!   renderer expects;
+//! - `DataPoint`'s hand-written deserializer inverts its hand-written
+//!   serializer.
+//!
+//! Not pinned here: `AnchorParam` serialization, rejection of an `anchor`
+//! that is neither string nor number, the timestamp-only bucket (an array
+//! with no `[v, arp, pa]` triples — currently accepted), and the rest of
+//! the module's derived wire surface (request defaults, the `v` / `type`
+//! field renames, the untagged response envelopes).
 use super::*;
 
+/// `anchor` in an `OtelLogsRequest` accepts both forms the UI sends, the
+/// untagged enum choosing the variant by JSON type alone: a string is the
+/// opaque row cursor echoed from a boundary row's hidden `cursor` column,
+/// a bare number the microsecond timestamp of a histogram-bar click.
 #[test]
 fn anchor_param_deserializes_string_and_number() {
     let s: OtelLogsRequest = serde_json::from_slice(br#"{"anchor":"100:2:3"}"#).unwrap();
@@ -11,6 +41,11 @@ fn anchor_param_deserializes_string_and_number() {
     ));
 }
 
+/// `DataPoint` serializes as the flat `[timestamp_ms, [v, arp, pa], …]`
+/// array the cloud-frontend chart renderer expects, not a
+/// `{"timestamp_ms":…, "items":…}` object. The comparison against an exact
+/// `serde_json::Value` pins the shape — nesting and element order — not
+/// just parseability.
 #[test]
 fn data_point_serializes_as_flat_array() {
     let dp = DataPoint {
@@ -24,6 +59,10 @@ fn data_point_serializes_as_flat_array() {
     );
 }
 
+/// The hand-written `Deserialize` impl reads back exactly what the
+/// hand-written `Serialize` impl emits: serialize → parse reproduces the
+/// original `timestamp_ms` and `items`. Both directions are manual, so
+/// their mutual symmetry is a real contract rather than a derive guarantee.
 #[test]
 fn data_point_round_trip() {
     let dp = DataPoint {

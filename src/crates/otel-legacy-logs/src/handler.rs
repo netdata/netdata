@@ -1,9 +1,17 @@
 //! Read-only `legacy-otel-logs` function handler.
 //!
-//! Ported from the former `otel-signal-viewer-plugin` catalog handler. It
-//! serves the systemd-journal facets protocol over the journal files written
-//! by the former otel plugin, driving the restored `journal-function` query
-//! stack. It never writes to the journal directory.
+//! The request→response pipeline for the crate's single Function (see
+//! `declaration`): a systemd-journal `JournalRequest` in, a logs-UI
+//! `JournalResponse` out — facets, histogram, table and pagination footer,
+//! the protocol the logs UI renders. Data comes from the journal files the
+//! former otel plugin wrote; all query work rides the restored
+//! `journal-function` stack, and the journal files are only ever read
+//! (derived indexes cache under `config.cache_dir`, never in the journal
+//! directory).
+//!
+//! Served by the `legacy-logs` worker (lib.rs) under the otel-plugin
+//! supervisor; ported from the former `otel-signal-viewer-plugin` catalog
+//! handler.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -25,16 +33,28 @@ use journal_function::{
 use journal_index::Filter;
 use journal_index::{FieldName, FieldValuePair, Microseconds, Seconds};
 
-/// Request parameters for the function (systemd-journal request structure).
+/// The function's request wire type: the systemd-journal request struct.
 type LegacyLogsRequestParams = netdata::JournalRequest;
 
-/// Response from the function (systemd-journal response structure).
+/// The function's response wire type: the systemd-journal response struct.
 type LegacyLogsResponseBody = netdata::JournalResponse;
 
-/// Translate the legacy GET-style args (`info`, `after:N`, `before:M`) into a
-/// JSON request payload, matching the new ledger's shim. The Netdata logs UI
-/// issues these functions as GET with space-separated args; the bridge handler
-/// engine deserializes the request from the payload only.
+/// Synthesize a JSON request payload from legacy GET-style URL args
+/// (`info`, `after:N`, `before:M`), mirroring the ledger's shim
+/// (`otel-ledger/src/ledger/rpc/mod.rs` `patch_args_into_payload`). The
+/// rt-level GET shim only rewrites `otel-logs` calls
+/// (`netdata-plugin/rt/src/lib.rs` `handle_function_call`), but the
+/// logs UI issues this function the same GET way, and the bridge builds the
+/// typed request from the payload alone
+/// (`netdata-plugin/bridge/src/function.rs` `HandlerAdapter::handle_raw`) —
+/// so without this translation GET args would never reach `JournalRequest`.
+/// Returns `None` when there are no args or a payload already exists (the
+/// caller then keeps the original).
+///
+/// Divergence from the ledger: tokens parse as u64 (the rt shim's width),
+/// not the ledger's u32, so a token past `JournalRequest`'s u32 window
+/// fields synthesizes a value the deserializer rejects — failing the whole
+/// call with 400 — where the ledger skips the token.
 pub(crate) fn patch_args_into_payload(args: &[String], payload: Option<&[u8]>) -> Option<Vec<u8>> {
     if args.is_empty() || payload.is_some() {
         return None;
@@ -59,7 +79,12 @@ pub(crate) fn patch_args_into_payload(args: &[String], payload: Option<&[u8]>) -
     serde_json::to_vec(&serde_json::Value::Object(map)).ok()
 }
 
-/// Builds a Filter from the selections HashMap.
+/// Build a `Filter` from the request's `selections` (facet picks).
+///
+/// Values picked for one field are ORed (each parsed as `field=value`);
+/// fields are ANDed together. Unparseable values are dropped (with a
+/// warning only when every value of a field failed). No selections, or
+/// nothing parseable, yields `Filter::none()` — no restriction.
 #[instrument(skip(selections))]
 fn build_filter_from_selections(selections: &HashMap<String, Vec<String>>) -> Filter {
     if selections.is_empty() {
@@ -99,11 +124,14 @@ fn build_filter_from_selections(selections: &HashMap<String, Vec<String>>) -> Fi
 fn accepted_params() -> Vec<netdata::RequestParam> {
     use netdata::RequestParam;
 
-    // Advertise only what this viewer deserializes and honors (mirrors
-    // otel-ledger's ACCEPTED_PARAMS). `DataOnly` is deliberately omitted: the
-    // cloud UI computes `dataOnly = data_only && accepted_params.includes("data_only")`,
-    // so advertising it would make the UI preserve stale columns/facets/pagination
-    // instead of refreshing from each full response — and this viewer recomputes
+    // Advertise only what this handler deserializes and honors — the
+    // ledger's list (`otel-ledger/src/ledger/rpc/logs/wire.rs`
+    // `ACCEPTED_PARAMS`) minus `tenant` (single journal directory, no
+    // storage tenants). `DataOnly`
+    // is deliberately omitted: the UI computes
+    // `dataOnly = data_only && accepted_params.includes(..)`, so advertising
+    // it would make the UI preserve stale columns/facets/pagination instead
+    // of refreshing from each full response — and this viewer recomputes
     // everything per call. `IfModifiedSince`/`Delta`/`Tail`/`Sampling` drive
     // incremental/live-tail/sampling modes that are not implemented here.
     vec![
@@ -124,6 +152,7 @@ fn required_params() -> Vec<netdata::RequiredParam> {
     Vec::new()
 }
 
+/// Shared handler state; `LegacyLogsHandler` clones are cheap Arc handles.
 struct LegacyLogsHandlerInner {
     registry: Registry,
     cache: FileIndexCache,
@@ -131,15 +160,16 @@ struct LegacyLogsHandlerInner {
     indexing_limits: IndexingLimits,
 }
 
-/// Read-only handler that serves the former otel plugin's journal logs.
+/// Read-only handler serving the former otel plugin's journal logs as the
+/// `legacy-otel-logs` Function.
 #[derive(Clone)]
 pub struct LegacyLogsHandler {
     inner: Arc<LegacyLogsHandlerInner>,
 }
 
 impl LegacyLogsHandler {
-    /// Create the handler, discover existing journal files in `journal_dir`,
-    /// and watch the directory for changes. The viewer is read-only.
+    /// Create the handler: build the index cache and discover + watch the
+    /// journal directory. Read-only with respect to the journal directory.
     pub async fn new(config: &LegacyLogsConfig) -> anyhow::Result<Self> {
         let (monitor, mut notify_rx) = Monitor::new()?;
         let registry = Registry::new(monitor);
@@ -166,21 +196,22 @@ impl LegacyLogsHandler {
 
         let handler = Self { inner };
 
-        // Initial scan discovers existing files (recursively, including the
-        // per-machine-id subdirectory); also watches for later changes. A watch
-        // failure (e.g. permissions) is non-fatal: log and continue serving
-        // whatever was discovered rather than taking down the otel-plugin.
+        // Initial scan + recursive watch of the journal directory (the scan
+        // descends into the per-machine-id subdirectory the former plugin
+        // wrote). A watch failure (e.g. permissions) is non-fatal: log and
+        // keep serving whatever was discovered rather than taking down the
+        // otel-plugin.
         let journal_dir = config.journal_dir.to_string_lossy().into_owned();
         if let Err(e) = handler.inner.registry.watch_directory(&journal_dir) {
             tracing::warn!("failed to watch journal directory {journal_dir}: {e:#}");
         }
 
-        // Forward filesystem events so a still-live directory stays current.
-        // For a stopped former agent the directory is static and this idles.
-        // Hold a Weak ref: the watcher's event sender lives inside `inner`, so a
-        // strong clone here would keep it alive, the channel would never close,
-        // and this task would never exit (a self-sustaining cycle). With Weak,
-        // once the handler is dropped the sender closes and `recv` returns None.
+        // Forward filesystem events so a still-live directory stays current;
+        // for a stopped former agent the directory is static and this idles.
+        // The Weak ref is load-bearing: the event sender lives inside
+        // `inner`, so a strong clone here would keep the channel open
+        // forever and this task would never exit. With Weak, dropping the
+        // handler closes the sender and `recv` returns None.
         let forwarder = Arc::downgrade(&handler.inner);
         tokio::spawn(async move {
             while let Some(event) = notify_rx.recv().await {
@@ -196,9 +227,15 @@ impl LegacyLogsHandler {
         Ok(handler)
     }
 
-    /// Query log entries from pre-indexed files.
+    /// Query one page of log entries from pre-indexed files. Synchronous —
+    /// the caller runs it on a blocking thread.
     ///
-    /// Returns: (entries, has_before, has_after).
+    /// Returns `(entries, has_before, has_after)`, the has-more flags in
+    /// chronological order (older / newer beyond the page). The page is
+    /// fetched with `limit + 1` so a single extra hit reveals
+    /// more-in-this-direction; a one-entry probe in the opposite direction
+    /// (only when an anchor is set) reveals the other side. Entries are
+    /// returned newest-first, the order the logs UI renders.
     #[allow(clippy::too_many_arguments)]
     fn query_logs_from_indexes(
         indexed_files: &[journal_index::FileIndex],
@@ -356,9 +393,10 @@ impl FunctionHandler for LegacyLogsHandler {
         trace!("[{}] started transaction", transaction);
 
         // Capability/`info` probes may arrive without a usable time range
-        // (e.g. tooling that discovers parameters before querying). The query
-        // engine requires after < before, so substitute a minimal recent
-        // window in that case; real queries always send a valid range.
+        // (the request fields default to 0), but the query engine needs
+        // after < before (QueryTimeRange::new rejects the rest); substitute
+        // a minimal recent window in that case. Real queries always send a
+        // valid range.
         let (after, before) = if request.after < request.before {
             (request.after, request.before)
         } else {
@@ -391,13 +429,17 @@ impl FunctionHandler for LegacyLogsHandler {
         let filter_expr = build_filter_from_selections(&request.selections);
         let facets = Facets::new(&request.facets);
 
+        // Entry-timestamp field for indexes and queries — the default of
+        // `LogQuery::new` (`journal-engine/src/logs/query.rs`) is the same
+        // field. It is part of FileIndexKey, so cached indexes are keyed per
+        // timestamp field as well as per file and facet set.
         let source_timestamp_field = FieldName::new_unchecked("_SOURCE_REALTIME_TIMESTAMP");
         let keys: Vec<FileIndexKey> = files
             .iter()
             .map(|f| FileIndexKey::new(&f.file, &facets, Some(source_timestamp_field.clone())))
             .collect();
 
-        // Progress: indexing phase first, then query phase.
+        // Progress phase 1 of 2: indexing, one done-unit per file.
         let num_files = keys.len();
         ctx.progress.set_total(num_files);
 
@@ -415,6 +457,8 @@ impl FunctionHandler for LegacyLogsHandler {
             message: format!("[{}] failed to index files: {}", transaction, e),
         })?;
 
+        // Progress phase 2 of 2: querying. The done counter keeps counting
+        // across phases, so the total doubles — one unit per file per phase.
         ctx.progress.set_total(2 * num_files);
 
         let histogram = self
@@ -425,6 +469,7 @@ impl FunctionHandler for LegacyLogsHandler {
                 message: format!("[{}] failed to compute histogram: {}", transaction, e),
             })?;
 
+        // Page size when the request carries no `last`.
         let limit = request.last.unwrap_or(200);
         let file_indexes: Vec<_> = indexed_files.iter().map(|(_, idx)| idx.clone()).collect();
         let query_progress = ctx.progress.done_counter();
@@ -436,6 +481,9 @@ impl FunctionHandler for LegacyLogsHandler {
         let query_time_range = time_range;
         let query_cancellation = ctx.cancellation.clone();
 
+        // The query is synchronous CPU + file work, so run it off the async
+        // runtime. Cancellation is cooperative: the token is handed to the
+        // query itself; the select below only stops waiting for the result.
         let query_task = tokio::task::spawn_blocking(move || {
             LegacyLogsHandler::query_logs_from_indexes(
                 &file_indexes,
@@ -469,6 +517,8 @@ impl FunctionHandler for LegacyLogsHandler {
         let (columns, data) = netdata::build_ui_response(&histogram, &log_entries);
         let transformations = netdata::systemd_transformations();
 
+        // Histogram field falls back to PRIORITY (syslog severity) when the
+        // request names none.
         let histogram_field_name = if request.histogram.is_empty() {
             "PRIORITY"
         } else {
@@ -478,17 +528,17 @@ impl FunctionHandler for LegacyLogsHandler {
         let ui_histogram = netdata::histogram(&histogram, &histogram_field, &transformations);
 
         let items = netdata::Items {
-            // `u32::MAX` is the logs UI's "not computed" sentinel: this read-only
-            // viewer does not track sampling statistics, so evaluated/unsampled/
-            // estimated are reported as unknown rather than a misleading count.
+            // u32::MAX marks these "not computed": the viewer tracks no
+            // sampling statistics, so evaluated/unsampled/estimated are
+            // reported as unknown rather than a misleading count.
             evaluated: u32::MAX as usize,
             unsampled: u32::MAX as usize,
             estimated: u32::MAX as usize,
             matched: ui_histogram.count(),
-            // The logs UI treats `before`/`after` as booleans (0 = none, >0 = more
-            // exist) in *display* order, which is inverted from the query's
-            // chronological `has_before`/`has_after`. The crossover is intentional
-            // and matches the former otel-signal-viewer catalog handler + the ledger.
+            // The UI reads before/after as 0/1 flags in display order, not
+            // chronology: "before" = newer rows exist (scroll up), "after"
+            // = older rows exist (scroll down). Same crossover as the
+            // ledger (`otel-ledger/src/ledger/rpc/logs/adapter.rs` `to_result`).
             before: if has_after { 1 } else { 0 },
             after: if has_before { 1 } else { 0 },
             returned: log_entries.len(),
@@ -514,6 +564,9 @@ impl FunctionHandler for LegacyLogsHandler {
             help: String::from(
                 "View, search and analyze OpenTelemetry logs stored by the former otel plugin.",
             ),
+            // Anchor-based paging: the UI echoes a timestamp back as the
+            // `anchor` param — this struct only advertises that contract;
+            // the has-more flags travel via `items` above.
             pagination: netdata::Pagination::default(),
         };
 

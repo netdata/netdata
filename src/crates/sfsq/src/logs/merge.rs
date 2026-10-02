@@ -1,31 +1,40 @@
-//! Cross-file merge helpers.
+//! Pure cross-shard merge helpers for the statistics step.
 //!
-//! The multi-file engine queries each candidate SFST independently and
-//! then folds the per-file results together. These are the pure folds —
-//! no I/O, no wire shaping — operating entirely on `sfst` types.
+//! The engine evaluates each source (indexed SFST or WAL-tail row scan)
+//! into a [`LogsShard`], then folds the shards with [`LogsShard::merge`],
+//! which calls the functions here; [`run`](super::run) drives both steps.
+//! The folds are pure — no I/O, no wire shaping, entirely on `sfst`
+//! types — associative, and each returns its empty result for empty
+//! input.
+//!
+//! [`LogsShard`]: super::LogsShard
+//! [`LogsShard::merge`]: super::LogsShard::merge
 
 /// Hard ceiling on the number of values a merged facet may carry.
 ///
-/// Per-file facets are bounded by the mid-card tier threshold (<1000
-/// distinct values), but the cross-file union is not: the value count
-/// grows with `window × files × per-file cardinality`, and a
-/// near-unique-per-log field (e.g. journald's `__SEQNUM` in small,
-/// fast-rotated files) can union into many thousands of options — a
-/// response-size liability and useless as a facet. When the union
-/// exceeds the cap, the top values by count survive.
+/// Per-shard facets are bounded by facet eligibility: a field must sit
+/// below the high-card cutoff (10× the producer's cardinality
+/// threshold; <1000 distinct values with the default) to be faceted at
+/// all. The cross-shard union is not: the value count grows with
+/// `window × files × per-file cardinality`, and a near-unique-per-log
+/// field (e.g. journald's `__SEQNUM` in small, fast-rotated files) can
+/// union into many thousands of options — a response-size liability and
+/// useless as a facet. When the union exceeds the cap, the top values
+/// by count survive.
 pub const MAX_FACET_VALUES: usize = 1000;
 
-/// Merge per-file [`sfst::FacetResult`] sets into a single combined set.
-/// Union by field name; per field, sum counts across files for each
-/// value. Output values are emitted in lexicographic order by value
-/// string, matching the FST iteration-order contract documented on
-/// [`sfst::FacetResult`]. Unions exceeding [`MAX_FACET_VALUES`] keep the
-/// top values by count (ties broken lexicographically-first), then
-/// restore lexicographic order.
+/// Merge per-shard [`sfst::FacetResult`] sets into a single combined
+/// set: union by field name (output fields sorted by name), summing
+/// each value's counts across shards. Values are emitted in
+/// lexicographic order, matching the iteration-order contract
+/// documented on [`sfst::FacetResult`]. Unions exceeding
+/// [`MAX_FACET_VALUES`] keep the top values by count (ties broken
+/// lexicographically-first), then restore lexicographic order. An
+/// empty input yields an empty output.
 pub fn merge_facet_results(per_file: Vec<Vec<sfst::FacetResult>>) -> Vec<sfst::FacetResult> {
     use std::collections::BTreeMap;
 
-    // Accumulate in `u64` so summing across many files can't wrap
+    // Accumulate in `u64` so summing across many shards can't wrap
     // `u32::MAX` mid-merge. Output is saturating-cast back to `u32` to
     // match `sfst::FacetResult::values`'s on-the-wire type.
     let mut by_field: BTreeMap<String, BTreeMap<String, u64>> = BTreeMap::new();
@@ -60,15 +69,15 @@ pub fn merge_facet_results(per_file: Vec<Vec<sfst::FacetResult>>) -> Vec<sfst::F
         .collect()
 }
 
-/// Merge per-file [`sfst::Timeline`]s into a single combined timeline.
+/// Merge per-shard [`sfst::Timeline`]s into a single combined timeline.
 ///
-/// Precondition: every input must share the same [`sfst::Grid`] — the
-/// multi-file caller builds them off a single request-aligned grid, so
-/// `grid.bucket_start_ns`, `grid.bucket_width_ns`, and `grid.num_buckets`
-/// all match across inputs. Dimensions are unioned via [`BTreeSet`]
-/// (sorted lexicographically) and each input's per-bucket counts are
-/// reindexed onto the union order before bucket-wise summation. `unset`
-/// sums bucket-wise.
+/// Precondition: every input shares the same [`sfst::Grid`] — the caller
+/// builds every timeline off the one query grid — and each input's
+/// `buckets.len()` equals `grid.num_buckets`. Both are asserted: a
+/// mismatch would silently merge misaligned buckets. Dimensions are
+/// unioned via [`BTreeSet`] (sorted lexicographically); each input's
+/// per-bucket counts are reindexed onto the union order before
+/// bucket-wise summation, and `unset` sums bucket-wise.
 ///
 /// Returns `None` if `per_file` is empty.
 ///
@@ -85,7 +94,7 @@ pub fn merge_timelines(per_file: Vec<sfst::Timeline>) -> Option<sfst::Timeline> 
     let mut timelines: Vec<sfst::Timeline> = vec![first];
     timelines.extend(iter);
 
-    // Union of dimension labels across all files.
+    // Union of dimension labels across all shards.
     let mut dim_set: BTreeSet<String> = BTreeSet::new();
     for timeline in &timelines {
         for d in &timeline.dimensions {
@@ -107,15 +116,14 @@ pub fn merge_timelines(per_file: Vec<sfst::Timeline>) -> Option<sfst::Timeline> 
         .collect();
 
     for timeline in &timelines {
-        // Hard-assert the precondition: every input must share the
-        // grid established by `first`. A violation silently produces
-        // wrong merged data — better to panic than serve misaligned
-        // buckets. The cost is one comparison per file, not per bucket,
-        // so the check is free at runtime.
+        // Hard-assert both preconditions (same grid, full bucket
+        // count): a violation would silently misalign every merged
+        // bucket — panic rather than serve wrong data. The cost is one
+        // comparison per shard, not per bucket.
         assert_eq!(timeline.grid, grid);
         assert_eq!(timeline.buckets.len(), grid.num_buckets);
 
-        // Map this file's local dim index → union dim index.
+        // Map this shard's local dim index → union dim index.
         let local_to_union: Vec<usize> = timeline
             .dimensions
             .iter()
@@ -137,26 +145,26 @@ pub fn merge_timelines(per_file: Vec<sfst::Timeline>) -> Option<sfst::Timeline> 
     })
 }
 
-/// Merge per-file field tables into one, keyed by name and sorted by
-/// name. Keeps **every** field across **all** tiers; a field's tier is
-/// bumped to [`sfst::FieldTier::High`] if it's high-card in *any* input,
-/// and its `cardinality` is the max across inputs (the concept is
-/// per-file, not global, so the max is a conservative estimate).
+/// Merge per-shard field tables into one, keyed and sorted by field
+/// name (a file's table is tier-ordered; the merged one is not). Keeps
+/// **every** field across **all** tiers: a field's tier is bumped to
+/// [`sfst::FieldTier::High`] if it is high-card in *any* input, and its
+/// `cardinality` is the max across inputs (cardinality is a per-file
+/// concept, so the max is a conservative estimate).
 ///
-/// The merge is associative and drops nothing, so it is safe to apply at
-/// every level of a fan-out: a child merges its own files' tables, the
-/// parent merges the children's, and the result is identical to merging
-/// all files at once. Crucially, high-card fields are *kept* (marked
-/// `High`) rather than removed — a downstream merge must still see that a
-/// field is high-card somewhere to apply the rule. The actual drop of
-/// high-card fields from the offerable set happens once, at the root,
-/// when the caller builds `available_fields` (see
-/// [`run`](super::run)).
+/// The merge is associative and drops nothing, so it is safe to apply
+/// at every level of a fan-out: a child merges its own shards' tables,
+/// the parent merges the children's, and the result is identical to
+/// merging all shards at once. High-card fields are *kept* (marked
+/// `High`), not removed — a downstream merge must still see that a
+/// field is high-card somewhere to apply the rule. The actual drop
+/// from the offerable set happens once, at the root, when the caller
+/// builds `available_fields` (see [`run`](super::run)).
 pub fn merge_field_tables(per_file: &[sfst::FieldTable]) -> sfst::FieldTable {
     use std::collections::BTreeMap;
 
-    // name → (max cardinality across files, tier). The tier is bumped to
-    // `High` if the field is high-card in *any* file so the marker
+    // name → (max cardinality across shards, tier). The tier is bumped
+    // to `High` if the field is high-card in *any* shard so the marker
     // survives nested merges and the root-level high-card drop.
     let mut by_name: BTreeMap<String, (u32, sfst::FieldTier)> = BTreeMap::new();
 

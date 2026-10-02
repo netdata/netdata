@@ -127,9 +127,15 @@ func (c *Collector) serveRequest(
 		// Queue waiting must not consume the admitted exchange budget.
 		exchangeCtx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
 		defer cancel()
-		data, err := s.exchange(exchangeCtx, encodeCollectRequest(id))
-		if err == nil {
-			result.snapshot, err = c.definition.decodeReply(data, id)
+		var err error
+		if c.definition.SnapshotFormat == formatLines {
+			result.snapshot, err = s.exchangeLines(exchangeCtx, id)
+		} else {
+			var data []byte
+			data, err = s.exchange(exchangeCtx, encodeCollectRequest(id))
+			if err == nil {
+				result.snapshot, err = decodeReply(data, id)
+			}
 		}
 		result.err = err
 		return result, err != nil && !errors.Is(err, errCollectionFailed)

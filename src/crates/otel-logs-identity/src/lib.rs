@@ -10,12 +10,23 @@
 //! opaque `part_key: u64` (in the file's `FileId`/filename, the single source
 //! of truth) and an opaque `content_meta: Vec<u8>` (in the per-file summary)
 //! and never interprets either. This crate is the one place that gives them
-//! meaning, for logs — the
-//! producer (`otel-ingestor`) encodes the identity here before writing, and the
-//! query layer (`otel-ledger`) decodes it here for display. A second signal
-//! (traces) will get its own sibling identity crate; the opinion-free hash
-//! primitive is only extracted into a shared leaf crate if and when a second
-//! signal actually needs to share it.
+//! meaning for logs: the producer (`otel-ingestor`) encodes the identity here
+//! before writing, and the query layer (`otel-ledger`) decodes it here for
+//! display. Traces reuse only the *unattributed* convention defined here — the
+//! `("", "")` stream `otel-ingestor`'s `trace_service` writes (`part_key` 0 +
+//! the version-tagged empty-fields blob) — the single seam a future
+//! per-service traces scheme would replace; a sibling traces identity crate,
+//! and a shared home for the hash primitive, would arrive with that switch.
+//! The boundary runs the other way too: `file-lifecycle/tests/dep_guard.rs`
+//! bars the content-agnostic substrate from depending on this log-content
+//! crate. Consumers (grep-verified): `otel-ingestor` `logs_service` (extracts
+//! the stream from OTLP resource attributes, groups frames per stream, writes
+//! `part_key` + `content_meta`) and `trace_service`; `otel-ledger`'s
+//! `rpc/logs` handler + adapter (`decode_content_meta_or_empty` for the stream
+//! names shown to the UI, the "Services" selector included); `sfsq-cli`
+//! `discover`/`lib` (derives the query partition key from the CLI
+//! namespace/name via `ns_hash` to filter offline WAL/SFST candidates);
+//! `otel-ledger`'s test helpers and fixture tests (`sfsq-cli`, `ng-index`).
 
 use std::hash::Hasher;
 
@@ -51,6 +62,8 @@ pub struct ServiceStream {
 }
 
 impl ServiceStream {
+    /// Stores both fields verbatim — no validation or normalization here; an
+    /// over-long field is rejected only at [`encode_content_meta`] time.
     pub fn new<N: Into<String>, M: Into<String>>(namespace: N, name: M) -> Self {
         Self {
             namespace: namespace.into(),
@@ -74,8 +87,9 @@ impl ServiceStream {
     /// sender; the namespace-side collapse is the one the spec mandates.
     ///
     /// This is the only correct way to derive an `ns_hash` from a
-    /// `ServiceStream`; [`compute_ns_hash`] is the underlying primitive and
-    /// must not be called with the absent/empty distinction at this layer.
+    /// `ServiceStream`; [`compute_ns_hash`] is the raw primitive below it, and
+    /// callers must not bypass this method with it (they would drop the
+    /// absent/empty collapse).
     ///
     /// Note this is unrelated to the type's derived [`Hash`]: that hashes the
     /// stored strings byte-for-byte for `HashMap` bucketing, whereas `ns_hash`
@@ -95,9 +109,9 @@ impl ServiceStream {
 ///   sentinel stays unambiguous.
 ///
 /// Identity-layer callers MUST go through [`ServiceStream::ns_hash`], which
-/// applies the absent-equals-empty rule. Calling this directly with `Some("")`
-/// vs `None` is what produced the absent-vs-empty divergence the type guards
-/// against.
+/// applies the absent-equals-empty rule; calling this with `Some("")` produces
+/// a digest that disagrees with the canonical one — the exact divergence
+/// [`ServiceStream`] exists to prevent.
 pub fn compute_ns_hash(namespace: Option<&str>, name: Option<&str>) -> u64 {
     if namespace.is_none() && name.is_none() {
         return 0;
@@ -180,11 +194,12 @@ pub fn encode_content_meta(stream: &ServiceStream) -> Option<Vec<u8>> {
 ///
 /// Returns `None` on an unknown version, truncated/over-long input, trailing
 /// bytes, or non-UTF-8 fields. This gives *structural* integrity only — it does
-/// not detect content corruption that preserves structure (e.g. a bit-flip into
-/// different valid UTF-8). A content checksum, if ever needed, belongs to the
-/// Stage 2 framing layer, not this codec. (A typed error enum distinguishing the
-/// rejection reasons for recovery diagnostics is likewise deferred to the first
-/// real caller — the Stage 2 format flip.)
+/// not detect content corruption that preserves structure (a bit-flip into
+/// different valid UTF-8 decodes fine); byte-level integrity is the framing
+/// layers' job (the WAL frames already CRC32 their payloads), not this codec's.
+/// Rejection reasons are not distinguished — every invalid blob is the same
+/// `None`; a typed error enum is worth adding only when a caller needs to tell
+/// them apart.
 pub fn decode_content_meta(bytes: &[u8]) -> Option<ServiceStream> {
     let (&version, rest) = bytes.split_first()?;
     if version != CONTENT_META_VERSION {
@@ -220,6 +235,8 @@ fn put_field(out: &mut Vec<u8>, len: u16, field: &[u8]) {
     out.extend_from_slice(field);
 }
 
+/// Read one length-prefixed field: a little-endian `u16` length, then that
+/// many bytes. `None` when the prefix or the field bytes are truncated.
 fn take_field(bytes: &[u8]) -> Option<(&[u8], &[u8])> {
     let (len_bytes, rest) = bytes.split_at_checked(2)?;
     let len = u16::from_le_bytes([len_bytes[0], len_bytes[1]]) as usize;
@@ -411,9 +428,9 @@ mod tests {
     #[test]
     fn ns_hash_differs_from_literal_empty_namespace_primitive() {
         // The collapse means an empty-namespace stream does NOT hash like the
-        // raw `Some("")` primitive — a literal-empty-namespace file written
-        // before the collapse existed re-partitions under the new key (a
-        // one-time rollover the substrate handled for short-lived WAL files).
+        // raw `Some("")` primitive — the digest is a stability contract:
+        // changing the collapse re-partitions already-written files, whose
+        // `part_key` is baked into the `FileId` filename.
         assert_ne!(
             ServiceStream::new("", "api").ns_hash(),
             compute_ns_hash(Some(""), Some("api"))

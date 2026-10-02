@@ -1,3 +1,29 @@
+//! The seq-keyed in-memory file index the WAL and SFST registries build on.
+//!
+//! [`FileRegistry`] is a `BTreeMap<u64, M>` keyed by each entry's own seq
+//! ([`Sequenced`]) plus the [`FileDir`] it derives file paths from. It is
+//! content-agnostic and purely in-memory: no I/O, no locking; consumers
+//! embed their own per-file metadata in `M` and rebuild the map at startup
+//! from the files in that directory. Durable state is the consumers'
+//! business (`durable` writes, `dir` scans); this type only mirrors it for
+//! one process's lifetime.
+//!
+//! The bare `u64` seq keys an entry because a `FileId.seq` is unique within
+//! one process instance across pipelines and partitions. The registry reads
+//! only [`Sequenced::seq`]; the other `FileId` axes (machine/instance,
+//! `pipeline_id` — the `bridge::signals` signal axis — and `part_key`) ride
+//! the entries' `FileId`s, which only [`FileRegistry::file_path`] touches.
+//!
+//! Concurrency is the caller's: mutators take `&mut self`, readers `&self`,
+//! nothing synchronizes internally — `file-lifecycle` holds the composed
+//! per-tenant registries behind `Arc<tokio::sync::RwLock<TenantRegistries>>`.
+//! Every method is synchronous, pure computation, and infallible; the
+//! fallible work (directory scans, header reads) lives in the consumers'
+//! recovery paths.
+//!
+//! Consumers, grep-verified: `wal::registry` and `sfst::registry`, each
+//! holding a `FileRegistry<File>`, composed per tenant into
+//! `file_lifecycle::registry::Registry`.
 use std::collections::BTreeMap;
 
 use crate::FileId;
@@ -15,16 +41,22 @@ pub trait Sequenced {
     fn seq(&self) -> u64;
 }
 
-/// An ordered collection of files with per-file metadata.
+/// A seq-keyed in-memory collection of tracked files with per-file metadata.
 ///
-/// Files are keyed by sequence number (`u64`), providing chronological ordering.
-/// Path derivation is delegated to the owned [`FileDir`].
+/// Entries live in a `BTreeMap<u64, M>`, keyed by each entry's own
+/// [`Sequenced::seq`], so every iteration is ascending-seq (oldest first).
+/// One registry covers one flat directory: the owned [`FileDir`] derives
+/// each file's on-disk path ([`FileRegistry::file_path`]) and backs the
+/// startup scan the consumer runs to rebuild the map after a restart.
 pub struct FileRegistry<M> {
     dir: FileDir,
     files: BTreeMap<u64, M>,
 }
 
 impl<M> FileRegistry<M> {
+    /// An empty registry over `dir`. Pure construction — no disk access;
+    /// population is the caller's (a recovery scan, or live inserts as
+    /// files are created).
     pub fn new(dir: FileDir) -> Self {
         Self {
             dir,
@@ -32,18 +64,21 @@ impl<M> FileRegistry<M> {
         }
     }
 
+    /// The directory this registry covers (path derivation, recovery scans).
     pub fn dir(&self) -> &FileDir {
         &self.dir
     }
 
-    /// Derive the on-disk path for a file.
+    /// Derive the on-disk path for a file: `<dir>/<stem>.<ext>` in the
+    /// [`FileDir`]'s extension.
     pub fn file_path(&self, id: FileId) -> std::path::PathBuf {
         self.dir.file_path(id)
     }
 
-    /// Insert an entry, keyed by its own [`seq`](Sequenced::seq). Returns the
-    /// previous entry for that seq, if any. The key is derived from the entry, so
-    /// it cannot drift from the seq the entry carries.
+    /// Insert an entry, keyed by its own [`seq`](Sequenced::seq). Replaces
+    /// and returns any previous entry with the same seq, so detecting a
+    /// duplicate seq is the caller's job — the WAL's `Created` handler
+    /// rejects one via [`contains`](Self::contains) first.
     pub fn insert(&mut self, entry: M) -> Option<M>
     where
         M: Sequenced,
@@ -51,6 +86,8 @@ impl<M> FileRegistry<M> {
         self.files.insert(entry.seq(), entry)
     }
 
+    /// Remove the entry for `seq`, returning it if tracked. Untracking says
+    /// nothing about the file on disk; deletion stays with the caller.
     pub fn remove(&mut self, seq: u64) -> Option<M> {
         self.files.remove(&seq)
     }
@@ -59,6 +96,11 @@ impl<M> FileRegistry<M> {
         self.files.get(&seq)
     }
 
+    /// Mutable access to the entry for `seq`, if tracked. Intended for
+    /// in-place metadata updates (consumer event application, lifecycle
+    /// marks). The value [`Sequenced::seq`] returns is part of the entry's
+    /// key: changing it here desynchronizes the entry from its `BTreeMap`
+    /// position and later seq lookups miss it.
     pub fn get_mut(&mut self, seq: u64) -> Option<&mut M> {
         self.files.get_mut(&seq)
     }

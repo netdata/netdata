@@ -736,6 +736,103 @@ void set_late_analytics_variables(struct rrdhost_system_info *system_info)
     analytics_get_install_type(system_info);
 }
 
+// ----------------------------------------------------------------------------
+// Windows timezone mapping
+//
+// c:\Windows\Globalization\Time Zone\TimezoneMapping.xml maps Windows zone IDs to IANA names, one row per line:
+//   <MapTZ TZID="America/Los_Angeles" WinID="Pacific Standard Time" Region="US" Default="true" ... />
+// The parser below is platform-independent, so it is unit-tested everywhere.
+
+// Copy the value of attribute `name` from `line` into `dst`.
+// Fails when the attribute is missing, its value is unterminated, or it does not fit - it never truncates.
+static bool tz_mapping_attr(const char *line, const char *name, char *dst, size_t dst_size) {
+    char key[32];
+    snprintfz(key, sizeof(key), " %s=\"", name);
+
+    const char *s = strstr(line, key);
+    if (!s)
+        return false;
+
+    s += strlen(key);
+    const char *e = strchr(s, '"');
+    if (!e)
+        return false;
+
+    size_t len = (size_t)(e - s);
+    if (len >= dst_size)
+        return false;
+
+    memcpy(dst, s, len);
+    dst[len] = '\0';
+    return true;
+}
+
+// Find the IANA name for `win_id`. Among the rows whose WinID equals it, the first row of the highest rank wins:
+//   3 - Region is the user's region and Default="true"
+//   2 - Region is the user's region
+//   1 - Region is "001", the world default
+// Returns 0 and writes `out` only when a TZID was found; otherwise returns -1 and leaves `out` untouched.
+static int tz_windows_mapping_select(FILE *fp, const char *win_id, const char *geo, char *out, size_t out_size) {
+    if (!fp || !win_id || !*win_id || !out || !out_size)
+        return -1;
+
+    if (!geo)
+        geo = "";
+
+    char line[CONFIG_FILE_LINE_MAX + 1];
+    char best[FILENAME_MAX + 1] = "";
+    int best_rank = 0;
+
+    while (best_rank < 3 && fgets(line, sizeof(line), fp)) {
+        size_t len = strlen(line);
+        if (len && line[len - 1] != '\n') {
+            // the buffer filled up or the file ended; the row is complete only if the next char ends the line
+            int c = fgetc(fp);
+            if (c != EOF && c != '\n') {
+                // longer than our buffer: discard the rest of this line, never parse a partial row
+                while ((c = fgetc(fp)) != EOF && c != '\n')
+                    ;
+                continue;
+            }
+        }
+
+        char value[FILENAME_MAX + 1];
+        if (!tz_mapping_attr(line, "WinID", value, sizeof(value)) || strcmp(value, win_id) != 0)
+            continue;
+
+        char region[16];
+        if (!tz_mapping_attr(line, "Region", region, sizeof(region)))
+            continue;
+
+        int rank;
+        if (*geo && strcmp(region, geo) == 0) {
+            char is_default[8];
+            rank = (tz_mapping_attr(line, "Default", is_default, sizeof(is_default)) &&
+                    strcmp(is_default, "true") == 0) ? 3 : 2;
+        }
+        else if (strcmp(region, "001") == 0)
+            rank = 1;
+        else
+            continue;
+
+        if (rank <= best_rank)
+            continue;
+
+        if (!tz_mapping_attr(line, "TZID", value, MIN(sizeof(value), out_size)) || !*value)
+            continue;
+
+        strncpyz(best, value, sizeof(best) - 1);
+        best_rank = rank;
+    }
+
+    // a read error may have hidden a better-ranked row; do not report a lower-ranked one as the answer
+    if (ferror(fp) || !best_rank)
+        return -1;
+
+    strncpyz(out, best, out_size - 1);
+    return 0;
+}
+
 #ifdef OS_WINDOWS
 static void get_timezone_win_id(char *win_id, DWORD win_size)
 {
@@ -749,10 +846,18 @@ static void get_timezone_win_id(char *win_id, DWORD win_size)
     if (ret != ERROR_SUCCESS)
         return;
 
-    DWORD valueType;
-    RegQueryValueExA(hKey, "TimeZoneKeyName", NULL, &valueType, (LPBYTE)win_id, &win_size);
-
+    // the stored value is not guaranteed to be NUL-terminated, so keep a byte for it
+    DWORD valueType = 0;
+    DWORD size = win_size - 1;
+    ret = RegQueryValueExA(hKey, "TimeZoneKeyName", NULL, &valueType, (LPBYTE)win_id, &size);
     RegCloseKey(hKey);
+
+    if (ret != ERROR_SUCCESS || valueType != REG_SZ || size > win_size - 1) {
+        win_id[0] = '\0';
+        return;
+    }
+
+    win_id[size] = '\0';
 }
 
 static void get_win_geoiso(char *geo_name, int length) {
@@ -762,57 +867,25 @@ static void get_win_geoiso(char *geo_name, int length) {
         geo_name[0] = '\0';
 }
 
-static int map_windows_tz_to_iana(char *out, char *win_id, char *geo_name) {
-    if (*win_id == '\0')
-        return -1;
-
+static int map_windows_tz_to_iana(char *out, size_t out_size, const char *win_id, const char *geo_name) {
     FILE *fp = fopen("c:\\Windows\\Globalization\\Time Zone\\TimezoneMapping.xml", "r");
     if (!fp)
         return -1;
 
-    char buffer[CONFIG_FILE_LINE_MAX + 1];
-    char win_id_match[512];
-    bool copied = 0;
-
-    snprintfz(win_id_match, sizeof(win_id_match), "\"%s\"", win_id);
-
-    while (fgets(buffer, CONFIG_FILE_LINE_MAX, fp) != NULL) {
-        buffer[CONFIG_FILE_LINE_MAX] = '\0';
-
-        char *s = strstr(buffer, win_id_match);
-        if (!s) {
-            if (!copied)
-                continue;
-            else // Country codes do not match, but we found the zone
-                break;
-        }
-
-        //Escape:'  <MapTZ TZID="'
-        s = &buffer[15];
-        char *end = strchr(s, '"');
-        if (!end)
-            continue;
-
-        *end = '\0';
-
-        strncpyz(out, s, strlen(s));
-
-        //Escape:" Region="
-        char *cmpregion = end+ 10;
-        if (!strncmp(cmpregion, geo_name, 2))
-            break;
-
-        copied = 1;
-    }
-
+    int ret = tz_windows_mapping_select(fp, win_id, geo_name, out, out_size);
     fclose(fp);
-    return 0;
+    return ret;
 }
 #endif
 
 // Detect the current IANA timezone name from the system.
 // Returns a pointer into the provided buffer, or NULL if detection fails.
 const char *detect_system_timezone_name(char *buffer, size_t buffer_size) {
+    if (!buffer || !buffer_size)
+        return NULL;
+
+    // callers may pass an uninitialised buffer; no path below may read it before writing it
+    buffer[0] = '\0';
     const char *timezone = NULL;
 
 #ifdef OS_WINDOWS
@@ -820,7 +893,7 @@ const char *detect_system_timezone_name(char *buffer, size_t buffer_size) {
     char win_zone[256];
     get_timezone_win_id(win_zone, 256);
     get_win_geoiso(geo_name, 128);
-    if (!map_windows_tz_to_iana(buffer, win_zone, geo_name))
+    if (!map_windows_tz_to_iana(buffer, buffer_size, win_zone, geo_name))
         timezone = buffer;
 #else
     // read the /etc/localtime symlink first — this is the authoritative source
@@ -849,8 +922,9 @@ const char *detect_system_timezone_name(char *buffer, size_t buffer_size) {
         // sanitize in-place: keep only alnum, '_', '/', '-', '+'
         char *d = buffer;
         const char *src = timezone;
+        const char *src_end = buffer + buffer_size;
         const char *end = buffer + buffer_size - 1;
-        while (*src && d < end) {
+        while (src < src_end && *src && d < end) {
             if (isalnum((uint8_t)*src) || *src == '_' || *src == '/' || *src == '-' || *src == '+')
                 *d++ = *src;
             src++;
@@ -860,6 +934,122 @@ const char *detect_system_timezone_name(char *buffer, size_t buffer_size) {
     }
 
     return (timezone && *timezone) ? timezone : NULL;
+}
+
+static int timezone_windows_mapping_write_and_select(const char *rows, const char *win_id, const char *geo, char *out, size_t out_size) {
+    FILE *fp = tmpfile();
+    if (!fp)
+        return -2;
+
+    // a failed fixture write must fail the case, not let a no-match case pass without parsing anything
+    if (fputs(rows, fp) == EOF || fflush(fp) != 0) {
+        fclose(fp);
+        return -2;
+    }
+
+    rewind(fp);
+    int ret = tz_windows_mapping_select(fp, win_id, geo, out, out_size);
+    fclose(fp);
+    return ret;
+}
+
+int timezone_windows_mapping_unittest(void) {
+#define PST "WinID=\"Pacific Standard Time\""
+    static const char *pacific =
+        "\xEF\xBB\xBF<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n"
+        "<TimeZoneMapping>\r\n"
+        "  <MapTZ TZID=\"Etc/GMT+8\" " PST " Region=\"001\" Default=\"true\" StdPath=\"PST/standard\" />\r\n"
+        "  <MapTZ TZID=\"America/Vancouver\" " PST " Region=\"CA\" StdPath=\"PST/standard\" />\r\n"
+        "  <MapTZ TZID=\"PST8PDT\" " PST " Region=\"US\" StdPath=\"PST/standard\" />\r\n"
+        "  <MapTZ TZID=\"America/Los_Angeles\" " PST " Region=\"US\" Default=\"true\" StdPath=\"PST/standard\" />\r\n"
+        "  <MapTZ TZID=\"Etc/UTC\" WinID=\"UTC\" Region=\"001\" Default=\"true\" StdPath=\"UTC/standard\" />\r\n"
+        "</TimeZoneMapping>\r\n";
+#undef PST
+
+    static const struct {
+        const char *name;
+        const char *rows;
+        const char *win_id;
+        const char *geo;
+        size_t out_size;
+        int ret;
+        const char *expected;
+    } cases[] = {
+        { "region with Default beats an earlier region row and 001", NULL, "Pacific Standard Time", "US", 64, 0, "America/Los_Angeles" },
+        { "region without Default beats 001",                         NULL, "Pacific Standard Time", "CA", 64, 0, "America/Vancouver" },
+        { "unknown region falls back to 001",                         NULL, "Pacific Standard Time", "GR", 64, 0, "Etc/GMT+8" },
+        { "no region falls back to 001",                              NULL, "Pacific Standard Time", "",   64, 0, "Etc/GMT+8" },
+        { "exact WinID match",                                        NULL, "UTC",                   "US", 64, 0, "Etc/UTC" },
+        { "no match leaves out untouched",                            NULL, "Nowhere Standard Time", "US", 64, -1, "untouched" },
+        { "empty win id",                                             NULL, "",                      "US", 64, -1, "untouched" },
+        { "WinID must not match another attribute's value",
+          "  <MapTZ TZID=\"UTC\" WinID=\"Coordinated\" Region=\"001\" StdPath=\"UTC\" />\n", "UTC", "", 64, -1, "untouched" },
+        { "TZID that does not fit is rejected, not truncated",
+          "  <MapTZ TZID=\"America/Argentina/ComodRivadavia\" WinID=\"X\" Region=\"001\" />\n", "X", "", 16, -1, "untouched" },
+        { "unterminated TZID is rejected",
+          "  <MapTZ WinID=\"X\" Region=\"001\" TZID=\"Europe/Athens\n", "X", "", 64, -1, "untouched" },
+        { "row without Region is ignored",
+          "  <MapTZ TZID=\"Europe/Athens\" WinID=\"X\" />\n", "X", "", 64, -1, "untouched" },
+    };
+
+    int failures = 0;
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        char out[64] = "untouched";
+        int ret = timezone_windows_mapping_write_and_select(
+            cases[i].rows ? cases[i].rows : pacific, cases[i].win_id, cases[i].geo, out, cases[i].out_size);
+
+        if (ret != cases[i].ret || strcmp(out, cases[i].expected) != 0) {
+            fprintf(stderr, "timezone_windows_mapping_unittest: '%s': expected %d '%s', got %d '%s'\n",
+                    cases[i].name, cases[i].ret, cases[i].expected, ret, out);
+            failures++;
+        }
+    }
+
+    // a line longer than the read buffer is discarded whole; the row after it is still read
+    {
+        size_t junk = CONFIG_FILE_LINE_MAX + 100;
+        const char *bad = " <MapTZ TZID=\"Bad/Zone\" WinID=\"X\" Region=\"001\" />\n";
+        const char *good = "  <MapTZ TZID=\"Good/Zone\" WinID=\"X\" Region=\"001\" />\n";
+        char *rows = mallocz(junk + strlen(bad) + strlen(good) + 1);
+        memset(rows, 'x', junk);
+        strcpy(rows + junk, bad);
+        strcat(rows, good);
+
+        char out[64] = "untouched";
+        int ret = timezone_windows_mapping_write_and_select(rows, "X", "", out, sizeof(out));
+        if (ret != 0 || strcmp(out, "Good/Zone") != 0) {
+            fprintf(stderr, "timezone_windows_mapping_unittest: 'overlong line is discarded': expected 0 'Good/Zone', got %d '%s'\n",
+                    ret, out);
+            failures++;
+        }
+        freez(rows);
+    }
+
+    // a row of exactly sizeof(line) - 1 chars fills the read buffer but is complete, at EOF or before a newline
+    for (int with_newline = 0; with_newline <= 1; with_newline++) {
+        const char *head = "  <MapTZ TZID=\"Exact/Zone\" WinID=\"X\" Region=\"001\" StdPath=\"";
+        const char *tail = "\" />";
+        size_t row_len = CONFIG_FILE_LINE_MAX;
+        char *rows = mallocz(row_len + 2);
+        size_t pad = row_len - strlen(head) - strlen(tail);
+        strcpy(rows, head);
+        memset(rows + strlen(head), 'x', pad);
+        strcpy(rows + strlen(head) + pad, tail);
+        if (with_newline)
+            strcat(rows, "\n");
+
+        char out[64] = "untouched";
+        int ret = timezone_windows_mapping_write_and_select(rows, "X", "", out, sizeof(out));
+        if (ret != 0 || strcmp(out, "Exact/Zone") != 0) {
+            fprintf(stderr, "timezone_windows_mapping_unittest: 'row filling the buffer exactly%s': expected 0 'Exact/Zone', got %d '%s'\n",
+                    with_newline ? ", then a newline" : ", at EOF", ret, out);
+            failures++;
+        }
+        freez(rows);
+    }
+
+    fprintf(stderr, "timezone_windows_mapping_unittest: %s (%d failures)\n", failures ? "FAILED" : "OK", failures);
+    return failures;
 }
 
 // Set at startup: true when the user explicitly set "timezone" in netdata.conf.

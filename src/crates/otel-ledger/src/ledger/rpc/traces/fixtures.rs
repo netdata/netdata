@@ -1,8 +1,9 @@
-//! Shared test fixtures for the traces rpc suites (sources, handler):
-//! registries construction, sealed-SFST registration, REAL trace-WAL
-//! fixtures (OTLP → ng-flatten trace frames) so chunk builds run the
-//! actual traces seal, and REAL sealed traces files built by that seal.
-//! Test-only (`#[cfg(test)]` at the module decl).
+//! Shared fixtures for the traces rpc test suites (sources/tests.rs,
+//! handler/tests.rs, handler/remote_tests.rs): OTLP request builders,
+//! registry installers, REAL trace-WAL bytes (OTLP → ng-flatten trace
+//! frames) so engine chunk builds run the actual traces seal, REAL
+//! sealed-SFST bytes built by that same seal, and the remote-storage
+//! [`TestRemote`]. Test-only (`#[cfg(test)]` at the module decl).
 
 use std::sync::Arc;
 
@@ -15,7 +16,8 @@ use tokio::sync::RwLock;
 
 use file_lifecycle::registry::TenantRegistries;
 
-/// Fresh empty registries over throwaway dirs.
+/// Fresh empty registries: the WAL, index, and catalog base dirs are
+/// throwaway `tempfile` dirs.
 pub(crate) fn make_registries() -> Arc<RwLock<TenantRegistries>> {
     Arc::new(RwLock::new(TenantRegistries::new(
         tempfile::tempdir().unwrap().keep(),
@@ -24,6 +26,9 @@ pub(crate) fn make_registries() -> Arc<RwLock<TenantRegistries>> {
     )))
 }
 
+/// A hand-set [`sfst::Summary`] with empty `content_meta` — only
+/// [`install_sfst`] needs one. The count 6 is not arbitrary: the
+/// sources suite asserts it passes through capture unchanged.
 pub(crate) fn summary(record_count: u32, min_s: u32, max_s: u32) -> sfst::Summary {
     sfst::Summary {
         min_timestamp_s: min_s,
@@ -33,15 +38,19 @@ pub(crate) fn summary(record_count: u32, min_s: u32, max_s: u32) -> sfst::Summar
     }
 }
 
-/// The identity every fixture file of sequence `seq` is installed under
-/// (one test identity, pipeline 1, part_key 7).
+/// The id every registry-installed fixture file of sequence `seq`
+/// carries: one shared test identity, pipeline 1, part_key 7.
 pub(crate) fn test_file_id(seq: u64) -> FileId {
     FileId::new(test_identity(), 1, seq, 7)
 }
 
 /// Track a sealed SFST under `tenant` and return its registry path.
-/// The file itself is never written: `capture` maps registry state
-/// (summaries come from `track`); the engine opens files later.
+/// Registry state only — no file is ever written: the tracked size is
+/// a flat 1 KiB and the summary comes from [`summary`]. Tests lean on
+/// that shortcut two ways: sources capture maps registry state without
+/// opening sealed files (the missing bytes are invisible to it), and
+/// handler tests expect a probe of the missing file to fail as
+/// `source_failure`.
 pub(crate) async fn install_sfst(
     registries: &Arc<RwLock<TenantRegistries>>,
     tenant: &str,
@@ -57,9 +66,10 @@ pub(crate) async fn install_sfst(
     path
 }
 
-/// One OTLP request holding `span_count` spans of one synthetic trace,
-/// starting at `base_ns`. Just enough shape for the seal to index. Span
-/// 1 is the root (unset parent); spans 2.. parent to span 1.
+/// One OTLP request holding `span_count` spans of one synthetic trace:
+/// trace id `trace_byte` repeated, span i starting `i` µs after
+/// `base_ns` and lasting 500ns. Span 1 is the root (unset parent);
+/// spans 2.. parent to span 1. Just enough shape for the seal to index.
 pub(crate) fn otlp_req(trace_byte: u8, span_count: u8, base_ns: u64) -> ExportTraceServiceRequest {
     otlp_req_svc(trace_byte, span_count, base_ns, "svc")
 }
@@ -104,7 +114,7 @@ pub(crate) fn otlp_req_svc(
 }
 
 /// Like [`otlp_req_svc`], with span 1 carrying an OTLP ERROR status —
-/// for the overview's error-totals coverage.
+/// feeds the overview/grid error totals and the status-selection tests.
 pub(crate) fn otlp_req_err(
     trace_byte: u8,
     span_count: u8,
@@ -128,8 +138,8 @@ pub(crate) fn otlp_req_at(
     service: &str,
 ) -> ExportTraceServiceRequest {
     // The fixture id space is u8 (span ids are vec![i; 8] with i: u8):
-    // 256+ starts would wrap the count to 0 and the zip below would
-    // silently build no spans.
+    // 256+ starts would wrap the `as u8` count to 0 and the zip below
+    // would build no spans; the assert turns that into a panic.
     assert!(
         span_starts_ns.len() <= u8::MAX as usize,
         "{} spans would wrap the fixture's u8 count",
@@ -144,9 +154,11 @@ pub(crate) fn otlp_req_at(
     req
 }
 
-/// Write `reqs` into a fresh traces WAL (one frame per request) in a
-/// throwaway dir and return the produced file's path. Mirrors the sfsq
-/// integration suites' fixture recipe.
+/// Write `reqs` into a fresh traces WAL under `dir` — one ng-flatten
+/// trace frame per request, no rotation limits, crc + compression on,
+/// `b"test-meta"` content meta — and return the produced file's path.
+/// Mirrors the sfsq integration suites' `write_wal` fixture recipe
+/// (`sfsq/tests/common/mod.rs`).
 fn write_traces_wal(
     dir: &std::path::Path,
     reqs: Vec<ExportTraceServiceRequest>,
@@ -206,8 +218,10 @@ fn write_traces_wal(
         .expect("a wal file was written")
 }
 
-/// Seal `reqs` into real traces SFST bytes — the traces seal over a fresh
-/// WAL holding one frame per request — with the summary the seal records.
+/// Seal `reqs` into real traces SFST bytes:
+/// `ng_index::build_sfst_traces_range` — the same call the engine's
+/// on-query chunk build makes — over a fresh WAL holding one frame per
+/// request. Returns the seal's own summary alongside the bytes.
 pub(crate) fn sealed_traces(reqs: Vec<ExportTraceServiceRequest>) -> (sfst::Summary, Vec<u8>) {
     let staging = tempfile::tempdir().unwrap();
     let wal = write_traces_wal(staging.path(), reqs);
@@ -236,10 +250,12 @@ pub(crate) async fn install_sealed(
     path
 }
 
-/// Build a real traces WAL from `reqs`, install its bytes at the
-/// registry's path for a fresh WAL id, and register it as an active
-/// synced WAL (`valid_up_to` = the real file length). Returns the
-/// registry path `capture` will resolve.
+/// Build a real traces WAL from `reqs`, write its bytes at the
+/// registry's path for [`test_file_id`], and register it as an active
+/// synced WAL: `Created` then `Synced` with `valid_up_to` = the real
+/// file length and frame/entry counts read off `reqs`. The event
+/// timestamps are dummies (1 … u64::MAX), never asserted on. Returns
+/// the registry path `capture` will resolve.
 pub(crate) async fn install_wal(
     registries: &Arc<RwLock<TenantRegistries>>,
     tenant: &str,
@@ -288,7 +304,10 @@ pub(crate) async fn install_wal(
 pub(crate) struct TestRemote {
     /// The object store's root: an object's key is its path below it.
     pub(crate) objects: std::path::PathBuf,
+    /// The download cache's directory — tests corrupt or inspect it
+    /// directly.
     pub(crate) cache_dir: std::path::PathBuf,
+    /// The download cache [`Self::read`] hands to the query path.
     pub(crate) cache: file_cache::FileCache,
 }
 
@@ -386,8 +405,9 @@ impl TestRemote {
     }
 }
 
-/// A file [`TestRemote::evicted`] stored remotely: its catalog entry and the
-/// local catalog file that lists it.
+/// A remotely cataloged fixture ([`TestRemote::evicted`] or
+/// [`TestRemote::refused`]): its catalog entry and the local catalog
+/// file that lists it.
 pub(crate) struct Evicted {
     pub(crate) entry: otel_catalog::CatalogEntry,
     pub(crate) catalog: std::path::PathBuf,

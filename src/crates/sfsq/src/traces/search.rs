@@ -1,24 +1,31 @@
 //! Cross-source trace search.
 //!
 //! [`search`] evaluates a span-local predicate (the positive stage-A
-//! subset of the [`Predicate`] grammar) across a validated pair of
-//! source sets and returns EXACT, most-recent-first trace summaries —
-//! exact up to the ruled root-divergence carve-out below — via
-//! the pinned two-phase design:
+//! subset of the [`Predicate`] grammar) over a validated pair of source
+//! sets and returns exact, most-recent-first trace summaries — exact up
+//! to the ruled root-divergence carve-out below — in a pinned two-phase
+//! design:
 //!
-//! - **Phase 1 (over-approximation, window set):** each candidate file's
-//!   plan compiles once ([`sfst::TracePlan`], one shared stream-batch
-//!   pass for high-card terms) and yields RANK-BOUNDED newest-K matched
-//!   positions; the tail evaluates decoded spans through the same
-//!   span-side evaluator. Raw matches over-approximate (a losing resend
-//!   may match while its canonical copy does not) but NEVER
-//!   under-approximate: a matching canonical span raw-matches in its own
-//!   file (pinned per-trace span-group consequence).
+//! - **Phase 1 (over-approximation, window set):** each window file's
+//!   plan compiles once ([`sfst::TracePlan`]; the sfst trace_plan
+//!   module owns the execution, its one shared stream-batch pass for
+//!   high-card terms, and the work accounting) and yields RANK-BOUNDED
+//!   newest-K matched positions; tail spans evaluate decoded through
+//!   the same span-side evaluator phase 2 uses. Raw matches can
+//!   OVER-approximate (a losing resend may match while its canonical
+//!   copy does not) but NEVER under-approximate: a matching canonical
+//!   span raw-matches in its own file (pinned per-trace span-group
+//!   consequence).
 //! - **Phase 2 (exact assembly, completion set):** candidates assemble
 //!   through the shared combiner over ALL completion sources (sessions
 //!   opened once, reused for every candidate — the by-id pattern), the
 //!   span-local predicate re-evaluates against the retained CANONICAL
 //!   spans, and non-matching candidates drop.
+//!
+//! Consumers (grep-verified): the ledger's otel-traces Search mode —
+//! the Functions view pages it beside an optional aggregate section
+//! (`otel-ledger/src/ledger/rpc/traces/handler.rs` `search_result`) —
+//! and the sfsq-cli traces tool (`sfsq-cli/src/traces.rs` `run_search`).
 //!
 //! # Ranking and refill (pins C-1, R2-1)
 //!
@@ -34,10 +41,11 @@
 //!
 //! The work ceilings are deterministic — functions of the query and the
 //! snapshot (sources are iterated in `SourceId` order, so the caller's
-//! ordering never changes a result) — and a breach TERMINATES the loop,
-//! returning the gathered, ranked, trimmed result with
-//! [`WorkCeiling`](PartialReason::WorkCeiling). Cancellation is
-//! ALL-OR-EMPTY: a mid-flight prefix cannot be deterministic under
+//! ordering never changes a result). A breach stops further work; while
+//! a threat still stands, the loop ends there and returns the gathered,
+//! ranked, trimmed result with [`WorkCeiling`](PartialReason::WorkCeiling)
+//! (a breach whose threats provably resolve stays Complete). Cancellation
+//! is ALL-OR-EMPTY: a mid-flight prefix cannot be deterministic under
 //! canonical re-ranking and grow-K, so any cancellation before the final
 //! ranked result is complete returns an EMPTY result with
 //! [`Cancelled`](PartialReason::Cancelled) (plus any reasons already
@@ -62,47 +70,30 @@
 //! The trace-level gate ([`gate`](super::gate)) prunes root-selection
 //! candidates on the sealed rollup's RECORDED per-file root claims,
 //! while the post-assembly truth evaluates the assembled TRUE root
-//! (above). The recorded claims can diverge from the assembled pick in
-//! the mechanisms below, accepted by explicit project ruling as
-//! ignore-and-document (recall-miss only; seal-side hardening beyond
-//! the tie abstention was rejected as unjustified recorder/combiner
-//! lockstep). Under a residual mechanism, a FILTERED search may omit a
-//! matching trace while reporting `Complete`; the trace stays findable
+//! (above). The recorded claims can diverge from the assembled pick;
+//! explicit project ruling accepts the divergence as ignore-and-document,
+//! recall-miss only (seal-side hardening beyond the tie abstention was
+//! rejected as unjustified recorder/combiner lockstep; the mechanism
+//! detail lives in the gate and sfst trace_rollup module docs):
+//!
+//! - Full `(start_ns, span_id)` ties — CLOSED by the recorder's
+//!   abstention: on any recorded-facet difference it claims nothing, so
+//!   the gate has nothing to prune on (facet-identical ties keep a
+//!   claim, but the gate only ever tests those equal facets).
+//! - Multi-valued `name` — CLOSED by the seal's first-entry capture:
+//!   every evaluation path reads the same recorded value.
+//! - Stored-vs-retained copies — RESIDUAL: the recorder folds STORED
+//!   rows, the combiner retains canonical copies, so a recorded root
+//!   can mask a real, later true root ("phantom root"; requires
+//!   producers that contradict themselves across resends).
+//!
+//! Under a residual mechanism a FILTERED search may omit a matching
+//! trace while reporting `Complete`; the trace stays findable
 //! unfiltered, by id (`trace:id` pins bypass the gate), and in the
-//! panels:
-//!
-//! 1. **Tie-breaking — CLOSED by the recorder's abstention.** On a
-//!    full `(start_ns, span_id)` tie the canonical pick continues
-//!    through the combiner total order `(kind, content)`, which the
-//!    recorder does not model; instead of guessing, the recorder drops
-//!    the claim when tie candidates differ in any recorded facet
-//!    (kind, service, name) — no claim, no prune, no divergence. A
-//!    facet-identical tie may still record either copy, but the gate
-//!    only ever tests those equal facets, so no observable divergence
-//!    remains from ties. (Equal-start ties with DISTINCT span ids were
-//!    always deterministic: ascending span id.) Aggregate panels lose
-//!    the root for ambiguous-tie traces — honest-or-absent.
-//! 2. **Stored-vs-retained.** The recorder folds STORED rows; the
-//!    combiner works on RETAINED canonical copies — a recorded root can
-//!    be a stored row whose canonical `(span_id, kind)` copy lives
-//!    elsewhere with a different parent/name (the "phantom root"). A
-//!    phantom claim can mask a real, later true root (all-claims-fail
-//!    prunes on the phantom's values while the assembled true root
-//!    matches), and under 1D a claim can also exist where the RETAINED
-//!    copies carry no unset parent at all (the gate then declines the
-//!    no-root prune it could have made — conservative, not wrong).
-//!    Requires producers that contradict themselves across resends.
-//! 3. **Multi-valued `name` — CLOSED by first-entry capture.** The
-//!    seal now records the FIRST `name`/`kind`/`status` entry of the
-//!    root span, the same value every evaluation path reads (only a
-//!    crafted frame carries more than one), so the recorded facets
-//!    cannot diverge from the evaluated ones — and the tie abstention's
-//!    facet comparison agrees between the seal and the tail fold.
-//!
-//! The differential gate-on/gate-off superset test runs on tie-free,
-//! single-valued, corruption-free corpora — inside the mechanisms the
-//! divergence is accepted; everywhere else gate-on and gate-off must be
-//! byte-identical.
+//! panels. The differential gate-on/gate-off superset test therefore
+//! runs on tie-free, single-valued, corruption-free corpora — inside
+//! the accepted mechanisms the divergence is fine; everywhere else
+//! gate-on and gate-off must be byte-identical.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
@@ -139,28 +130,33 @@ pub const SERVICE_BREAKDOWN_TOP_K: usize = 5;
 /// Phase-1 over-collection: the initial per-file K is `limit ×` this;
 /// the demand-driven refill doubles it per round.
 const OVER_COLLECTION_FACTOR: usize = 3;
-/// Assembled-traces ceiling: `max(limit × FACTOR, FLOOR)` combiner runs
-/// per query.
+/// Assembled-traces ceiling, multiplier side: at most `limit ×` this
+/// combiner runs per query.
 const ASSEMBLED_CEILING_FACTOR: usize = 16;
+/// Assembled-traces ceiling, floor side: the cap never drops below
+/// this, so small limits still bound loop churn.
 const ASSEMBLED_CEILING_FLOOR: usize = 64;
-/// Visited-rows ceiling (the C-5/R2-10 units: high-card stream-batch
-/// rows, emitted phase-1 positions, and tail spans evaluated).
+/// Visited-rows ceiling, in the C-5/R2-10 units: high-card stream-batch
+/// rows, emitted phase-1 positions, and tail spans evaluated (sfst
+/// trace_plan.rs counts the same units).
 const VISITED_ROWS_CEILING: u64 = 4_000_000;
 
-/// The two validated source sets of one search:
-/// `window` drives phase-1 candidate discovery, `completion` (its
-/// superset — ENFORCED by [`SourceId`] membership) drives
-/// phase-2 assembly, so a matched trace's spans outside the window still
-/// complete it. The completion EXTENT is the caller's choice and is a
-/// BOUNDED range it declares on its wire (window plus a clamped slack —
-/// not all of retention); spans in files beyond that range are unknown
-/// to the assembly, which is honest only because the caller declares
-/// the bound. Passing identical vectors for both roles is valid: the
-/// engine narrows the window role itself (SFSTs by summary overlap,
-/// tail spans per-span). Reusing a window source inside `completion` is
-/// the intended shape, not a duplicate; hygiene validates per role.
-/// Both sets share ONE snapshot: every source opens once, a tail
-/// decodes once, and both phases read those objects.
+/// The two validated source sets of one search. `window` drives phase-1
+/// candidate discovery; `completion` — its superset, ENFORCED by
+/// [`SourceId`] membership — drives phase-2 assembly, so a matched
+/// trace's spans outside the window still complete it.
+///
+/// The completion EXTENT is the caller's declared, BOUNDED range (the
+/// ledger: the match window plus a clamped slack — never all of
+/// retention). Spans in files beyond that range are unknown to the
+/// assembly, which is honest only because the caller declares the
+/// bound. Passing identical vectors for both roles is the intended
+/// shape, not a duplicate: the engine narrows the window role itself
+/// (SFSTs by summary overlap, tail spans per-span), hygiene validates
+/// each role, and the ledger's capture collapses the duplicated range
+/// into one registry scan with `Arc`-shared chunk bytes. Both sets
+/// share ONE snapshot: every source opens once, a tail decodes once,
+/// and both phases read those objects.
 pub struct SearchSources {
     pub window: Vec<TraceSource>,
     pub completion: Vec<TraceSource>,
@@ -215,8 +211,8 @@ impl SearchQuery {
         self
     }
 
-    /// Test-only override of the visited-rows work ceiling — the
-    /// acceptance suite proves ceiling termination without building a
+    /// Test-only override of the visited-rows work ceiling, so the
+    /// acceptance suite proves ceiling termination without a
     /// four-million-row corpus. NOT a tuning surface; production uses
     /// [`VISITED_ROWS_CEILING`] unconditionally.
     #[doc(hidden)]
@@ -225,16 +221,16 @@ impl SearchQuery {
         self
     }
 
-    /// Test-only override of the assembly span cap (must be non-zero) —
-    /// the capped-candidate honesty paths are provable without a
-    /// 65k-span corpus. NOT a tuning surface (search's
-    /// cap is not caller-tunable); production uses [`DEFAULT_SPAN_CAP`]
+    /// Test-only override of the assembly span cap (must be non-zero),
+    /// so the capped-candidate honesty paths are provable without a
+    /// 65k-span corpus. NOT a tuning surface — search's cap is not
+    /// caller-tunable; production uses [`DEFAULT_SPAN_CAP`]
     /// unconditionally.
     #[doc(hidden)]
     pub fn span_cap_for_tests(mut self, cap: usize) -> Self {
-        // The combiner's guard is debug-only; enforce the documented
-        // precondition here so a release-mode test cannot silently turn
-        // every candidate into an empty SizeCap result.
+        // The combiner's own cap guard is debug-only; assert here so a
+        // release-mode test cannot silently turn every candidate into
+        // an empty SizeCap result.
         assert_ne!(cap, 0, "span_cap must be non-zero");
         self.span_cap = cap;
         self
@@ -266,11 +262,12 @@ pub enum SearchRequestError {
     WindowNotInCompletion(SourceId),
     #[error(transparent)]
     Predicate(#[from] PredicateError),
-    /// `search` itself never constructs a [`TimeWindow`] (the query
-    /// carries one ready-built), so this variant is reached only through
-    /// the `From` conversion — kept so a caller assembling a request can
-    /// `?` window construction into the one request-error type (the
-    /// R2-8 wrapper contract, mirroring `AttributeRequestError`).
+    /// `search` itself never builds a [`TimeWindow`] (the query
+    /// carries one ready-built), so this variant is reached only
+    /// through the `From` conversion — kept so a caller assembling a
+    /// request can `?` window construction into the one request-error
+    /// type (the R2-8 wrapper contract, mirroring
+    /// `AttributeRequestError`).
     #[error(transparent)]
     Window(#[from] WindowError),
     #[error(transparent)]
@@ -290,9 +287,10 @@ pub struct TraceSummary {
     /// Envelope start: the earliest retained canonical span start.
     pub start_ns: i64,
     /// The trace's RANK key: the newest canonical matched-span start —
-    /// the value the most-recent-first ordering sorts by. Distinct from
-    /// the envelope `start_ns`, which can be much older; a consumer
-    /// paging by rank MUST anchor on this field, never the envelope.
+    /// what the most-recent-first ordering sorts by, and what a
+    /// consumer paging by rank MUST anchor on (the ledger's search
+    /// cursor carries exactly this pair). Never the envelope
+    /// `start_ns`, which can be much older.
     pub newest_matched_start_ns: i64,
     /// Envelope duration: `max(start ⊕ duration) − min(start)`,
     /// SATURATING (ingest saturates pathological durations).
@@ -390,14 +388,15 @@ impl FileDiscovery {
         match emitted.first() {
             None => self.band_bottom = self.lo,
             Some(&lowest) => {
-                // The extraction band [lowest, band_bottom) held exactly
-                // `emitted.len()` matches; fewer than requested means the
-                // whole remaining range was drained. An EXACTLY-full band
-                // may have drained it too — probe (a bitmap-tree count,
-                // not a row visit) so a file with nothing left below is
-                // never mistaken for an undiscovered threat: that would
-                // turn a provably complete result Partial{WorkCeiling}
-                // when the ceiling was crossed by the last match.
+                // The band [lowest, band_bottom) held exactly
+                // `emitted.len()` matches; fewer than requested means
+                // everything below is drained. An exactly-full band may
+                // have drained it too, so probe — `count_in_range`, a
+                // bitmap-tree walk, not a row visit — and never mistake
+                // an empty remainder for an undiscovered threat: that
+                // would turn a provably complete result
+                // Partial{WorkCeiling} when the last match crossed the
+                // ceiling.
                 self.band_bottom = if emitted.len() < count { self.lo } else { lowest };
                 if self.band_bottom > self.lo
                     && self.compiled.count_in_range(self.lo, self.band_bottom) == 0
@@ -634,10 +633,11 @@ pub fn search(
     let mut files: Vec<FileDiscovery> = Vec::new();
     let mut pool = CandidatePool::new(trace_ids.excluded);
     // `trace:id =` PINS the candidate set: discovery is skipped whole —
-    // the pins go straight to assembly (examine-all ranks; UNSET ids
-    // are not traces and drop per the pinned candidate rule), and
-    // phase-2 re-evaluation still applies the span-local remainder +
-    // window, so exactness holds.
+    // the pins go straight to assembly at rank `i64::MAX` (examine
+    // every pin, ordered by id on the tie; UNSET ids are not traces and
+    // drop per the pinned candidate rule) — and phase-2 re-evaluation
+    // still applies the span-local remainder + window, so exactness
+    // holds.
     let pinned = trace_ids.pins.is_some();
     if let Some(pins) = trace_ids.pins {
         for trace_id in pins {
@@ -659,9 +659,10 @@ pub fn search(
         let TraceSource::Sfst(c) = source else {
             unreachable!("readers hold SFST sources only")
         };
-        // File-granular window pruning on the summary range — sharing
-        // the key-enumeration overlap comparison; exact for span-start windows
-        // because file ranges are span-start-based.
+        // File-granular window pruning on the summary range — the same
+        // overlap comparison key enumeration shares
+        // (`TimeWindow::overlaps_summary`); exact for span-start
+        // windows because file ranges are span-start-based.
         if query
             .window
             .is_some_and(|w| !w.overlaps_summary(c.summary.min_timestamp_s, c.summary.max_timestamp_s))
@@ -721,8 +722,8 @@ pub fn search(
         }
         // The tail is small (bounded by rotation): evaluate every
         // decoded span through the SAME span-side evaluator phase 2
-        // uses; each visited span feeds the ceiling, which
-        // is enforced PER SPAN — a between-sources check alone could
+        // uses, each visited span feeding the ceiling. The ceiling is
+        // enforced PER SPAN — a between-sources check alone could
         // overshoot by a whole tail.
         for (trace_id, span) in scan.spans_with_ids() {
             work.rows_visited += 1;
@@ -793,6 +794,10 @@ pub fn search(
         .map(|(reader, _)| sfst::TraceFileSession::open(reader))
         .collect();
     let session_count = sessions.len();
+    // Merge-index → source id, parallel to `merged`: names the source
+    // in the failure warnings below. The FieldKinds pass splits the
+    // same index space at `session_count` (below = SFST readers, from
+    // it = tails).
     let mut origin: Vec<String> = readers
         .iter()
         .map(|(_, source)| source.source_id().to_string())
@@ -872,15 +877,15 @@ pub fn search(
             }
             let (_, trace_id) = pool.pop().expect("peeked above");
             // The gate: skip the assembly when the rollup evidence
-            // proves a non-match. A pruned pop charges NOTHING — that
-            // is the incident fix. Corruption the gate discovers is
-            // surfaced per the skip-and-surface principle: the source
-            // is failed (SourceFailure + degraded assembly), so every
-            // LATER summary is inexact and trace-level evaluation
-            // excludes it — the corrupt file's spans can no longer
-            // reach the results even though `merged` still holds the
-            // session (point-of-discovery semantics, the same contract
-            // as a mid-merge read failure).
+            // proves a non-match; a pruned pop charges NOTHING toward
+            // the assembled ceiling — that is the incident fix.
+            // Corruption the gate discovers is skip-and-surface: the
+            // source is failed (SourceFailure + degraded assembly), so
+            // every LATER summary is inexact and trace-level evaluation
+            // excludes it — the corrupt file's spans cannot reach the
+            // results even though `merged` still holds the session
+            // (point-of-discovery semantics, the same contract as a
+            // mid-merge read failure).
             if let Some(g) = gate.as_mut() {
                 let decision = g.check(trace_id);
                 for idx in g.take_new_failures() {
@@ -943,16 +948,16 @@ pub fn search(
                     !outcome.truncated && !merge_failed && !degraded_assembly,
                 );
                 // Trace-level conditions evaluate post-assembly as
-                // TRI-STATE: an inexact trace's root and
-                // envelope values are unreliable — the candidate is
-                // EXCLUDED as indeterminate (the underlying cause
-                // already marked the query Partial: SizeCap at the
-                // examined-truncated rule, SourceFailure at the
-                // failure sites), never guessed either way. Root
-                // conditions test the TRUE root only (decision 1D —
-                // see the module docs): a trace whose root span was
-                // never exported has NO root as far as filters are
-                // concerned; the summary's promoted root is display.
+                // TRI-STATE: an inexact trace's root and envelope
+                // values are unreliable, so the candidate is EXCLUDED
+                // as indeterminate — never guessed either way (the
+                // underlying cause already marked the query Partial:
+                // SizeCap at the examined-truncated rule, SourceFailure
+                // at the failure sites). Root conditions test the TRUE
+                // root only (decision 1D, see the module docs): a trace
+                // whose root span was never exported has NO root as far
+                // as filters are concerned; the summary's promoted root
+                // is display.
                 if let Some(tl) = &trace_level_eval {
                     if !summary.exact {
                         continue; // indeterminate → excluded

@@ -1,13 +1,18 @@
-//! Uploader response handling.
+//! Uploader response handling and the upload-retry drain.
 //!
-//! On SFST `Uploaded`, marks the seq uploaded on the tenant's registry
-//! and forwards a catalog `AddEntry` to the catalog builder. The summary
-//! fields needed to construct the catalog entry are pulled directly from
-//! the registry's `sfst::File` — no separate pending-metadata cache.
-//!
-//! On `CatalogUploaded`, marks the catalog's SFSTs remote-cataloged (which
-//! gates their eviction). Both `*Failed` responses are recorded in the upload
-//! retry queue so they're re-issued with backoff rather than dropped.
+//! The ledger side of the shared uploader's IPC — the transport itself is
+//! file-lifecycle's uploader.rs (semaphore-bounded PUTs). Responses arrive on
+//! the run loop's `UploaderResp` arm and echo the request's `pipeline_id`.
+//! `Uploaded` marks the seq uploaded on the tenant's registry and forwards a
+//! catalog `AddEntry` — the entry's summary fields come straight from the
+//! registry's `sfst::File`, no pending-metadata cache. `CatalogUploaded`
+//! marks the covered seqs remote-cataloged, the stage retention's
+//! SFST-eviction gate waits for (`ledger/retention.rs`
+//! `evaluate_retention`). `*Failed` responses are
+//! re-queued in the shared `upload_retry`
+//! (src/crates/file-lifecycle/src/upload_retry.rs) while their local file
+//! still exists; `handle_retry_tick` re-issues due entries with capped
+//! exponential backoff.
 
 use bridge::signals::Signal;
 use file_registry::{SeqKey, TimestampNs};
@@ -37,8 +42,9 @@ impl Ledger {
             }
         };
         let pipeline = self.pipelines.get(signal);
-        // Snapshot the pipeline's registries handle + catalog-builder sender so
-        // the shared `upload_retry` (a `&mut self` field) stays freely borrowable.
+        // Clone the handles so nothing holds a borrow of `self` past this
+        // point — the arms below mutate `upload_retry` (a `&mut self` field)
+        // and await on the registries lock.
         let registries = pipeline.registries().clone();
         let catalog_builder_tx = pipeline.catalog_builder_tx().clone();
 
@@ -56,13 +62,18 @@ impl Ledger {
                     match registries.for_seq_mut(seq.seq) {
                         Some((tid, registry)) => {
                             let Some(sfst_file) = registry.sfst.get(seq.seq).cloned() else {
-                                // Registry doesn't know about this seq —
-                                // defensive against races on restart. Mark
-                                // uploaded anyway so we don't keep
-                                // re-attempting.
+                                // Routed seq with no local SFST entry — no
+                                // summary to build a catalog entry from.
+                                // Mark uploaded (nothing re-attempts an
+                                // entryless seq; recovery re-queues only
+                                // tracked files) and return.
                                 registry.mark_uploaded(seq);
                                 return;
                             };
+                            // Catalog partition date; empty/unrepresentable
+                            // summaries fall back to today at the call site
+                            // (`src/crates/file-lifecycle/src/helpers.rs`
+                            // `date_from_summary`).
                             let date = date_from_summary(&sfst_file.summary)
                                 .unwrap_or_else(|| chrono::Utc::now().date_naive());
                             let uploaded_at_ns = TimestampNs(now_ns());
@@ -80,6 +91,11 @@ impl Ledger {
                     date,
                     entry,
                 };
+                // A failed send is only logged: the seq is in no catalog file,
+                // so it never reaches the rotated stage and the next restart's
+                // remote reconcile re-sends the AddEntry from the local summary
+                // (`src/crates/file-lifecycle/src/recovery/remote.rs`
+                // `reconcile_remote_uploads`).
                 if let Err(e) = catalog_builder_tx.send(req) {
                     tracing::error!("failed to send catalog add entry seq={seq}: {e}");
                 }
@@ -92,9 +108,10 @@ impl Ledger {
                 ..
             } => {
                 tracing::error!(seq = %seq, remote_key = %remote_key, "upload failed: {error}");
-                // Retry only while the local source still exists; if it was
-                // retention-evicted the upload can never succeed, so abandon it
-                // rather than loop on a missing file.
+                // Retry only while the local source still exists. Commonly the
+                // failure IS the vanished file (the uploader's read failed), or
+                // retention evicted it meanwhile; either way a retry can never
+                // succeed, so abandon it and drop the queue entry.
                 if local_path.exists() {
                     self.upload_retry.record_failure(
                         UploaderRequest::Upload {
@@ -123,29 +140,24 @@ impl Ledger {
                     "catalog upload complete",
                 );
                 self.upload_retry.clear_catalog(&remote_key);
-                // The catalog is now durably on the remote, so the SFSTs it
-                // covers may be evicted locally. Mark each seq remote-cataloged
-                // via its own route: don't resolve the tenant from just the
-                // first seq — if that one was already evicted (its route gone)
-                // the still-registered siblings would otherwise never be marked
-                // and would be deferred from eviction forever. Key each mark by
-                // the catalog's own identity (echoed from the request).
+                // The catalog is durably remote, so the SFSTs it covers become
+                // evictable — this mark is what retention's gate waits for
+                // (`ledger/retention.rs` `evaluate_retention`). Route each seq
+                // separately: an already
+                // evicted sibling (its route is forgotten on eviction) must not
+                // block marking the rest. Key each mark by the catalog's OWN
+                // echoed identity, not this process's.
                 if !seqs.is_empty() {
                     let mut registries = registries.write().await;
                     for seq in &seqs {
                         let key = SeqKey::new(identity, *seq);
                         if let Some((_tenant, registry)) = registries.for_seq_mut(*seq) {
-                            // The mark records a true remote fact under the
-                            // catalog's OWN identity, so it is always correct to
-                            // record. When a still-local SFST of that identity
-                            // exists (a recovered prior instance's file), the mark
-                            // is exactly what makes it evictable — the case that
-                            // matters. When no local SFST matches the full
-                            // identity, the mark is inert (bounded, in-memory,
-                            // reset on restart) — a debug breadcrumb, not a bug.
-                            // We do NOT gate the mark on a local-SFST lookup: that
-                            // would reintroduce the very lookup-in-the-mark-path
-                            // dependency this identity-keying removes.
+                            // Marking under the catalog's own identity is always
+                            // correct: a prior-instance file still on disk at
+                            // that seq is exactly what the mark makes evictable;
+                            // with no matching local SFST the mark is inert,
+                            // bounded in-memory state (logged below). Deliberately
+                            // not gated on a local-SFST lookup.
                             if registry.sfst.get(*seq).map(|e| SeqKey::from(&e.id)) != Some(key) {
                                 tracing::debug!(
                                     mark = %key,
@@ -193,9 +205,13 @@ impl Ledger {
         }
     }
 
-    /// Re-issue failed uploads whose backoff has elapsed, and emit an
-    /// operator-facing log proportional to how stuck the backlog is. Fired by
-    /// the ledger's retry timer.
+    /// Re-issue failed uploads whose backoff has elapsed, then log the pending
+    /// backlog — `warn` normally, escalating to `error` once an item has been
+    /// retried `PERSISTENT_FAILURE_ATTEMPTS` times (the threshold constant in
+    /// `src/crates/file-lifecycle/src/upload_retry.rs`): the remote is then
+    /// treated as persistently unreachable and local files accumulate until it
+    /// recovers. Fired every 30s by the ledger's retry timer (created in
+    /// [`Ledger::new`](super::Ledger::new), missed ticks skipped).
     pub(super) async fn handle_retry_tick(&mut self) {
         if self.upload_retry.is_empty() {
             return;
@@ -210,10 +226,11 @@ impl Ledger {
                 break;
             };
             if let Err(e) = uploader.send(req) {
-                // The uploader channel is closed (component gone) — re-arm so the
-                // item isn't stranded `in_flight`. In practice the run loop exits
-                // right after this on the same closed channel and recovery
-                // re-drives on the next restart.
+                // The uploader is gone (closed channel); re-arm so the item
+                // isn't stranded `in_flight`. The run loop exits on the same
+                // closed channel (`ledger/mod.rs` `Ledger::run`) and the next
+                // restart's recovery re-drives un-uploaded files idempotently
+                // (deterministic remote keys; uploads overwrite).
                 tracing::error!("failed to re-issue upload: {e}");
                 self.upload_retry.record_failure(e.0, Instant::now());
             }

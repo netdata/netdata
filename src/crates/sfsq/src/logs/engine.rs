@@ -1,21 +1,25 @@
 //! Composition: the all-in-one local query.
 //!
 //! [`run`] ties the two steps together for the local case: it evaluates
-//! every candidate into a [`LogsShard`](super::LogsShard) (step 1, see
+//! every source into a [`LogsShard`](super::LogsShard) (step 1, see
 //! [`aggregate`](super::aggregate)), merges the shards, then paginates and
 //! materializes a page (step 2, see [`page`](super::page)), and assembles
 //! a single [`LogsData`].
 //!
-//! It opens each file once for step 1 and again for step 2; the re-open is
-//! deliberate — step 1's shards are fully owned and drop their readers, and
-//! the heavy work is the bounded page materialization, not the re-read.
+//! Each SFST's bytes are mapped once, up front, and the same mapping feeds
+//! both passes — so statistics and page see one identical source set, and
+//! an SFST unlinked by retention mid-query stays readable. A source that
+//! fails to map is logged and degrades to empty in both ([`mmap`]).
+//!
+//! Consumers: the ledger's logs Function handler (the agent's query
+//! surface) and sfsq-cli discovery (offline scans). The traces engine has
+//! its own parallel modules — this is the logs one.
 //!
 //! The caller supplies a fully-specified [`LogsQuery`] — including the
 //! histogram [`grid`](LogsQuery::grid), whose span is the query window —
-//! and selects the candidates whose range overlaps that window. The work
-//! is pure and synchronous — no I/O scheduling, no locks, no
-//! window/geometry policy — but since it reads and decompresses files the
-//! caller is expected to invoke it off any async runtime thread.
+//! and preselects the sources whose time range overlaps it. The work is
+//! synchronous and I/O-bound; [`run`]'s doc holds the thread-placement,
+//! cancellation, and progress contract.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -44,9 +48,10 @@ pub use crate::source::Source;
 /// `file_seq` and `part` together place this candidate's rows in the
 /// pagination cursor's total order (see [`Cursor`](super::cursor::Cursor)).
 pub struct SfstCandidate {
-    /// Cheap time/stream/size facts ([`sfst::Summary`]); its `[min, max]`
-    /// second-range is what overlapped the request window to make this a
-    /// candidate.
+    /// The file's cheap summary ([`sfst::Summary`]) — time span, record
+    /// count, opaque content metadata. Its `[min, max]` second range is
+    /// what overlapped the request window to make this a candidate, and
+    /// what step 2 uses to skip files past the page boundary.
     pub summary: sfst::Summary,
     /// Globally-unique sequence of the underlying file — the sealed
     /// SFST's own seq, or the active WAL's seq for an in-memory chunk
@@ -56,8 +61,9 @@ pub struct SfstCandidate {
     /// Which indexed sub-source of `file_seq` this is — always a
     /// [`Part::Indexed`]: `Indexed(0)` for a sealed SFST, or
     /// `Indexed(chunk index)` for an in-memory chunk. The cursor's third
-    /// key, breaking ties at equal `(timestamp, seq)`. (An SFST candidate
-    /// is never [`Part::Tail`]; that is the row-scanned [`WalTail`].)
+    /// key, breaking ties at equal `(timestamp_ns, file_seq)`. (An SFST
+    /// candidate is never [`Part::Tail`]; that is the row-scanned
+    /// [`WalTail`].)
     pub part: Part,
     /// Where the candidate's bytes come from — [`Source::File`] for a
     /// sealed index, [`Source::Memory`] for an in-memory WAL chunk.
@@ -154,7 +160,9 @@ impl LogSource {
 /// Per-source errors (corrupt file, missing field, unreadable WAL tail,
 /// etc.) are logged and that source is skipped — others still
 /// contribute. An empty source set (or one where everything fails)
-/// yields an empty `LogsData` aligned to the grid (the monoid identity).
+/// yields an empty `LogsData` aligned to the grid (the monoid identity) —
+/// and an empty set does no I/O at all: nothing is mapped, scanned, or
+/// opened.
 ///
 /// Statistics (matched, facets, histogram, field table) and the row
 /// table both reflect **every** source — sealed SFSTs, in-memory chunks
@@ -166,13 +174,15 @@ impl LogSource {
 /// since it reads and decompresses files the caller is expected to invoke
 /// it off any async runtime thread.
 ///
-/// **Cancellation** is cooperative, polled once per source (a single
-/// in-flight source still runs to completion): once `cancel` fires, the
-/// loops stop opening further sources and `run` returns whatever was
-/// assembled so far. The caller racing the call against the token (the
-/// bridge's cancel `select!`) discards that partial result — its only
-/// purpose is to stop burning CPU/IO promptly. Callers that don't
-/// cancel pass `CancellationToken::new()`.
+/// **Cancellation** is cooperative, polled before each source in the
+/// step-1 fold and before each SFST reader is opened in step 2 (a single
+/// in-flight source still runs to completion; the up-front mapping and
+/// the WAL-tail scans don't poll). Once `cancel` fires, the polls stop
+/// letting further sources in and `run` returns whatever was assembled so
+/// far. The caller racing the call against the token (the bridge's cancel
+/// `select!`) discards that partial result — its only purpose is to stop
+/// burning CPU/IO promptly. Callers that don't cancel pass
+/// `CancellationToken::new()`.
 ///
 /// **Progress**: `progress` is incremented by one as each source's
 /// step-1 shard completes; the caller advertises the total
@@ -316,7 +326,8 @@ mod tests {
         let cancel = CancellationToken::new();
         cancel.cancel();
         // Returns a well-formed (empty, grid-aligned) LogsData without
-        // touching any source — the caller discards it.
+        // evaluating any source (only the up-front mapping ran) — the
+        // caller discards it.
         let data = run(garbage_sources(5), query(), cancel, Arc::clone(&progress));
         assert_eq!(progress.load(Ordering::Relaxed), 0);
         assert_eq!(data.matched, 0);

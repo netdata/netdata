@@ -93,7 +93,7 @@ Edit `otel.yaml` with [`edit-config`](https://github.com/netdata/netdata/blob/ma
 
 The absolute paths shown below are the defaults for standard Linux packages. The installed stock configuration resolves its configuration and log directories for the installation layout, so macOS and custom-prefix installations use different paths. Use [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-configuration-files) with `otel.yaml` to inspect the installed values.
 
-Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Most names are the uppercase option path with dots replaced by underscores. For example, `endpoint.tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
+Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Names are the uppercase option path with dots replaced by underscores. For example, `endpoint.tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
 
 Configuration is strict. Unknown YAML fields, unknown `NETDATA_OTEL_CFG_*` variables, malformed values, and the former experimental schema prevent the plugin from starting. The effective configuration is logged at startup; `remote_storage.uri` is redacted in that log.
 
@@ -117,6 +117,7 @@ Configuration is strict. Unknown YAML fields, unknown `NETDATA_OTEL_CFG_*` varia
 | [remote_storage.enabled](#option-remote-storage-enabled) | Upload retained OpenTelemetry logs and traces to configured remote object storage. | no | no |
 | [remote_storage.uri](#option-remote-storage-uri) | Remote storage URI. Supported schemes are `fs` and `s3`. | fs:///var/log/netdata/otel/v2/remote | no |
 | remote_storage.read_cache_max_size | Maximum size of the local download cache, shared by logs and traces, for data fetched back from remote storage during queries. | 1GB | no |
+| [auth.enabled](#option-auth-enabled) | Require the `X-Scope-OrgID` gRPC header to select a log or trace tenant. | no | no |
 | logs.rotation.default.max_file_size | Write-ahead log file size that triggers rotation. | 25MB | no |
 | logs.rotation.default.max_entries | Write-ahead log entry count that triggers rotation. | 50000 | no |
 | logs.retention.default.max_files | Maximum retained indexed-file count. | 100000 | no |
@@ -161,7 +162,7 @@ This limits a single request's cardinality burst. It does not cap the total numb
 <a id="option-base-dir"></a>
 ##### base_dir
 
-Retention limits govern retained indexed files. Write-ahead logs, catalogs, and the download cache for offloaded data (`<base_dir>/remote-read`) can make total usage below this directory exceed the `retention.*.max_total_size` limits.
+Retention limits govern retained indexed files. Write-ahead logs, catalogs, and the download cache for offloaded data (in the `remote-read` subdirectory under your configured base directory) can make total usage below this directory exceed the `retention.*.max_total_size` limits.
 
 
 <a id="option-remote-storage-enabled"></a>
@@ -174,6 +175,12 @@ Sealed indexed files are uploaded in addition to being kept under local retentio
 ##### remote_storage.uri
 
 Put non-secret backend options in the query string. Never put credentials in this file or URI. For S3, use the standard AWS environment, credentials file, or instance-role mechanisms available to the Netdata service account.
+
+
+<a id="option-auth-enabled"></a>
+##### auth.enabled
+
+This is tenant selection, not credential authentication. When disabled, all logs and traces belong to the `default` tenant. When enabled, trust the header only behind TLS or mutual TLS and suitable network controls. Metrics are not tenant-scoped.
 
 
 <a id="option-logs-retention-default-max-total-size"></a>
@@ -223,7 +230,7 @@ endpoint:
 ```
 ###### Configure log and trace retention
 
-A user file needs only the fields that change; omitted fields keep their stock values. Logs and traces have separate settings.
+A user file needs only the fields that change; omitted fields keep their stock values. Logs and traces have separate settings, each tenant entry inherits omitted fields from `default`, and a per-tenant key must match the sender's `X-Scope-OrgID` value when `auth.enabled` is true.
 
 
 <details open><summary>Config</summary>

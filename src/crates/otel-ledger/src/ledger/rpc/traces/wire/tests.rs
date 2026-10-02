@@ -1,3 +1,45 @@
+//! Tests for the `otel-traces` wire types in `wire.rs` (this file is its
+//! child `mod tests`): the request deserialization contract — which JSON
+//! shape selects which `TracesMode`, and every strictness rule that
+//! turns a bad request into a transport 400 before the handler runs —
+//! plus the `InfoResponse` descriptor and `StatusWire` serialization.
+//!
+//! Fixtures are inline `json!` literals driven straight through
+//! serde_json, so the message fragments asserted here are the strings
+//! clients see; raw byte slices exist only where a `json!` literal
+//! cannot go (duplicate top-level keys). One test reads the published
+//! `FUNCTION_UI_SCHEMA.json` — the only file fixture.
+//!
+//! Pins:
+//!
+//! - mode selection: no selector means the implicit Functions view,
+//!   each of the seven selectors its own mode, `tenant` riding beside
+//!   a selector;
+//! - strictness: unknown keys, a selector mixed with Functions
+//!   parameters, conflicting selectors (reported even when one is also
+//!   malformed), selector values that are not objects, present-but-null
+//!   selectors, duplicate top-level keys, and a non-object top level —
+//!   all client errors, with the message fragments clients match on;
+//! - the implicit view's parameter mapping through
+//!   `FunctionsParams::search_params`: defaults, relative-window
+//!   resolution, and the duration-filter forwarding;
+//! - per-mode param objects: self-contained windows, the overview
+//!   grid's selections-but-no-duration-bounds rule, the slowest limit,
+//!   and the `overview_facets` knob's `Option<bool>` semantics;
+//! - `InfoResponse`'s exact descriptor JSON and the untagged response
+//!   envelope;
+//! - `StatusWire` serialization: the two status shapes, deterministic
+//!   partial-reason order, the round trip, the unrepresentable
+//!   `{"complete": false}`, and every reason present in the published
+//!   UI schema.
+//!
+//! Not pinned here: the anchor's format (an opaque string on the wire —
+//! cursor parsing and the "malformed anchor" rejections are the
+//! adapter's pin, `rpc/traces/adapter.rs`), the selections grammar
+//! (also the adapter's), semantic validation beyond deserialization
+//! (trace-id shape, limit caps, window bounds — the handler's and
+//! engine's job), and data-mode response semantics (the handler tests,
+//! end to end).
 use super::*;
 use serde_json::json;
 use sfsq::traces::StatusBuilder;
@@ -14,6 +56,11 @@ fn req_err(v: serde_json::Value) -> String {
         .to_string()
 }
 
+/// The implicit Functions view: no selector becomes Functions params
+/// with their serde defaults — `last` falls to the engine default,
+/// windows stay at the `0` sentinel — and `tenant` rides beside. A
+/// relative window resolves against `now`; a relative `after`
+/// resolves against the already-resolved `before`, not `now` again.
 #[test]
 fn a_request_without_a_mode_selector_selects_the_functions_search_view() {
     let TracesMode::Functions(p) = req(json!({})).mode else {
@@ -57,7 +104,8 @@ fn the_functions_view_forwards_the_minimum_trace_duration() {
         Some(250_000_000)
     );
 
-    // Omitted stays unset — existing callers keep their behaviour.
+    // Omitted stays unset — the bound is opt-in; a client that never
+    // sends it keeps the same engine query as before.
     let TracesMode::Functions(p) = req(json!({})).mode else {
         panic!("Functions mode expected");
     };
@@ -74,7 +122,8 @@ fn the_functions_view_forwards_the_maximum_trace_duration() {
         Some(250_000_000)
     );
 
-    // Omitted stays unset — existing callers keep their behaviour.
+    // Omitted stays unset — the bound is opt-in; a client that never
+    // sends it keeps the same engine query as before.
     let TracesMode::Functions(p) = req(json!({})).mode else {
         panic!("Functions mode expected");
     };
@@ -83,10 +132,10 @@ fn the_functions_view_forwards_the_maximum_trace_duration() {
 
 #[test]
 fn overview_facets_rides_with_the_functions_parameters() {
-    // The aggregate's facet opt-in is a Functions parameter: it selects
-    // the Functions view like the others, and it cannot ride with a
-    // mode selector (the response key is not a request field — the
-    // `overview` selector still means the legacy mode).
+    // The aggregate's facet opt-in is a Functions parameter — it
+    // selects the Functions view, and cannot ride with a mode selector
+    // (the response's `overview` key is no request field: that
+    // selector still means the legacy mode).
     assert!(matches!(
         req(json!({"after": -900, "overview_facets": true})).mode,
         TracesMode::Functions(_)
@@ -101,9 +150,9 @@ fn overview_facets_rides_with_the_functions_parameters() {
 #[test]
 fn info_is_the_strict_empty_object() {
     assert!(matches!(req(json!({"info": {}})).mode, TracesMode::Info));
-    // Both of the old wire's boolean forms, junk scalars, null, and
-    // non-empty objects are malformed selectors — a malformed selector
-    // must not silently select.
+    // Bools (the old wire's two forms), junk scalars, null, arrays,
+    // and non-empty objects are all malformed selectors — a malformed
+    // selector must not silently select.
     for body in [
         json!({"info": true}),
         json!({"info": false}),
@@ -164,8 +213,9 @@ fn a_present_but_null_selector_selects_then_rejects() {
 
 #[test]
 fn selectors_are_object_only_arrays_reject() {
-    // serde-derived structs also accept positional JSON arrays via the
-    // seq visitor; the object gate closes that hole at both levels.
+    // serde-derived struct visitors also accept positional JSON arrays
+    // via the seq visitor; the is_object gate before the typed parse
+    // closes that hole for every selector value.
     for (body, needle) in [
         (json!({"overview": []}), "invalid overview selector"),
         (json!({"trace": ["00ff", 7]}), "invalid trace selector"),
@@ -187,6 +237,10 @@ fn the_top_level_must_be_a_json_object() {
     }
 }
 
+/// Both rejection classes are deserialization-time client errors:
+/// genuinely unknown keys always, and each legal Functions parameter —
+/// even `timeout`, accepted but ignored — beside any selector, as the
+/// mixing error rather than an unknown-field error.
 #[test]
 fn unknown_and_retired_top_level_keys_are_client_errors() {
     for body in [json!({"search": {}, "bogus": 1}), json!({"bogus": 1})] {
@@ -210,6 +264,10 @@ fn unknown_and_retired_top_level_keys_are_client_errors() {
     }
 }
 
+/// The `trace` selector's strictness and parse-through: junk shapes and
+/// unknown fields are client errors; a well-formed body carries `id`,
+/// `span_cap`, and the optional window through untouched — semantic
+/// validation is not the wire's job.
 #[test]
 fn trace_params_reject_malformed_and_parse_bounds() {
     let cases = [
@@ -260,9 +318,8 @@ fn conflicting_selectors_are_a_client_error() {
 
 #[test]
 fn a_conflict_is_reported_before_a_malformed_selector() {
-    // ALL present selectors are counted before any is decoded — a
-    // conflicting body reports the conflict even when one selector is
-    // also malformed.
+    // All present selectors are counted before any is decoded, so the
+    // conflict wins over a malformed selector in the same body.
     let err = req_err(json!({"trace": null, "overview": {}}));
     assert!(
         err.contains("conflicting mode selectors: trace, overview"),
@@ -381,6 +438,10 @@ fn tenant_rides_beside_any_mode() {
 
 // ── Info response ───────────────────────────────────────────────────
 
+/// The capability-discovery descriptor, field for field: the envelope
+/// fields, the help string, and `accepted_params` equal to the
+/// module's `ACCEPTED_PARAMS` list — the list the UI builds requests
+/// from, so a missing entry makes a request field unreachable.
 #[test]
 fn info_response_shape_is_pinned() {
     let v = serde_json::to_value(InfoResponse::default()).unwrap();
@@ -553,6 +614,9 @@ fn overview_facets_knob_parses_and_junk_is_rejected() {
     }
 }
 
+/// The untagged enum reads back exactly what it writes: the distinct
+/// field names (`complete` vs `partial`) make the round trip a real
+/// contract even though both directions are derived.
 #[test]
 fn status_wire_round_trips() {
     for status in [

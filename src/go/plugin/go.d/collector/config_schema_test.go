@@ -381,6 +381,66 @@ func TestConfigSchemasDoNotDeclareBranchKeysAsProperties(t *testing.T) {
 	}
 }
 
+// TestConfigSchemasOfferAlternativesOnlyThroughDependencies forbids oneOf/anyOf anywhere the form
+// renders except a dependencies entry. The form library merges allOf and renders a remaining oneOf or
+// anyOf, on a property or on an object, as a branch selector; on a tabbed object it also repeats the
+// tab strip. Subschemas under not and if only validate and are never rendered. A cross-field rule
+// belongs in if/then.
+func TestConfigSchemasOfferAlternativesOnlyThroughDependencies(t *testing.T) {
+	for _, doc := range loadConfigSchemas(t) {
+		var walk func(node any, path string)
+		walk = func(node any, path string) {
+			switch value := node.(type) {
+			case []any:
+				for i, child := range value {
+					walk(child, fmt.Sprintf("%s[%d]", path, i))
+				}
+			case map[string]any:
+				for _, keyword := range []string{"oneOf", "anyOf"} {
+					_, found := value[keyword]
+					assert.Falsef(t, found,
+						"%s: %s uses %s outside dependencies; the form renders it as a branch selector, use if/then",
+						doc.file, path, keyword)
+				}
+				for key, child := range value {
+					switch key {
+					case "not", "if", "const", "enum", "default", "examples":
+					case "dependencies":
+						for name, dependency := range mapField(child) {
+							for _, branch := range schemaBranches(dependency) {
+								walk(branch, path+".dependencies."+name)
+							}
+						}
+					default:
+						walk(child, path+"."+key)
+					}
+				}
+			}
+		}
+		walk(doc.schema, "jsonSchema")
+	}
+}
+
+// TestConfigSchemasKeepDependentObjectsOpen forbids additionalProperties: false on an object with
+// dependencies. Draft-07 checks additionalProperties against the object's own properties only, so a
+// standard validator rejects every key a branch reveals, and with it every configuration that selects
+// that branch; the form validates the branch-merged schema and hides the conflict.
+func TestConfigSchemasKeepDependentObjectsOpen(t *testing.T) {
+	for _, doc := range loadConfigSchemas(t) {
+		forEachObject(doc, doc.schema, doc.ui, "", func(path string, schema, _ map[string]any) {
+			if mapField(schema["dependencies"]) == nil {
+				return
+			}
+			where := doc.file
+			if path != "" {
+				where += ": " + path
+			}
+			assert.NotEqualf(t, false, schema["additionalProperties"],
+				"%s: additionalProperties: false next to dependencies rejects every key a branch reveals", where)
+		})
+	}
+}
+
 // configSchema is one loaded schema document.
 type configSchema struct {
 	file     string

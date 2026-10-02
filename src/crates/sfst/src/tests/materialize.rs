@@ -1,10 +1,39 @@
-//! Materialized-row label correctness.
+//! Materialization and value-enumeration correctness over whole files
+//! this module builds with the crate's own writer ([`RowIndex`] +
+//! [`IndexWriter::write_into`] — not the byte-level `fixture.rs`
+//! helpers).
+//!
+//! The recurring hazard: one field name dot-extends another (`a` vs
+//! `a.b`). The primary FST's global key sort then disagrees with the
+//! file's KvId assignment (`a.b=y` sorts before `a=x` because '.' < '=',
+//! while KvIds go tier by tier, fields name-sorted, values sorted within
+//! each field) — every consumer that maps KvIds to strings must follow
+//! the assignment, not the FST walk.
+//!
+//! Pins:
+//!
+//! - [`IndexReader::materialize_rows`] labels survive that divergence,
+//!   in one tier and across all tiers;
+//! - every string↔position consumer agrees with the same assignment:
+//!   exact and regex selects (the high-card legs resolve through KvId
+//!   ranges + the stream-batch scan), facets, projected columns via
+//!   [`IndexReader::materialize_fields`], and field-less full text;
+//! - [`IndexReader::field_values`]: per-tier enumeration, sorted, prefix
+//!   stripped by LENGTH, `UnknownField` for an absent field;
+//! - `field_values` reads dictionary chunks only — with every stream
+//!   batch corrupted, enumeration still succeeds while row access fails.
+//!
+//! Not pinned here: projecting a field this file lacks (absent-field
+//! columns), `materialize_rows`' corruption error paths, chunk-level
+//! format round-trips (`round_trip.rs`), general query semantics
+//! (`query.rs`), trace-plan evaluation (`trace_plan.rs`).
 
 use bumpalo::Bump;
 
 use crate::{IndexReader, IndexWriter, RowIndex};
 
-/// One row per kv list, timestamps in row order.
+/// Real-writer fixture: one row per kv list, timestamps in row order,
+/// packed by [`IndexWriter::write_into`].
 fn file_of_rows(rows: &[&[&str]]) -> Vec<u8> {
     let arena = Bump::new();
     let mut ri = RowIndex::new(&arena, 100);
@@ -17,12 +46,12 @@ fn file_of_rows(rows: &[&[&str]]) -> Vec<u8> {
     buf.into_inner()
 }
 
-/// Two low-card fields where one name is a dot-extended prefix of the other,
-/// each in its OWN row. In the primary FST `a.b=y` sorts BEFORE `a=x`
-/// ('.' < '='), while KvId assignment orders fields by name (`a` before
-/// `a.b`) — the two orders disagree, and label resolution must follow the
-/// KvId assignment, not the FST walk. Per-row separation makes a swap
-/// visible (a shared row would swap labels into the same set).
+/// Two low-card fields where one name is a dot-extended prefix of the
+/// other, each in its OWN row. In the primary FST `a.b=y` sorts BEFORE
+/// `a=x` ('.' < '='), while KvId assignment orders fields by name (`a`
+/// before `a.b`) — label resolution must follow the KvId assignment, not
+/// the FST walk. Per-row separation makes a swap visible: one shared row
+/// would swap the two labels within a single field set and still pass.
 #[test]
 fn labels_survive_prefix_field_families() {
     let bytes = file_of_rows(&[&["a=x"], &["a.b=y"]]);
@@ -59,18 +88,19 @@ fn prefix_family_fixture() -> (Vec<u8>, Vec<(String, String)>) {
             exp.push((field.to_string(), v));
         }
     };
-    fill(&mut ri, "a", 3, &mut expected); // low pair
+    fill(&mut ri, "a", 3, &mut expected); // low-tier pair
     fill(&mut ri, "a.b", 3, &mut expected);
-    fill(&mut ri, "m", 20, &mut expected); // mid pair
+    fill(&mut ri, "m", 20, &mut expected); // mid-tier pair
     fill(&mut ri, "m.n", 20, &mut expected);
-    fill(&mut ri, "h", 120, &mut expected); // high pair
+    fill(&mut ri, "h", 120, &mut expected); // high-tier pair
     fill(&mut ri, "h.i", 120, &mut expected);
     let (buf, _s, _m) =
         IndexWriter::write_into(&ri, std::io::Cursor::new(Vec::new()), Vec::new()).unwrap();
     (buf.into_inner(), expected)
 }
 
-/// The same dot-extended-family divergence, exercised in every tier at once.
+/// The same dot-extended-family divergence through
+/// [`IndexReader::materialize_rows`], exercised in every tier at once.
 #[test]
 fn labels_survive_prefix_field_families_all_tiers() {
     let (bytes, expected) = prefix_family_fixture();
@@ -82,11 +112,12 @@ fn labels_survive_prefix_field_families_all_tiers() {
     }
 }
 
-/// KvId-assignment agreement audit for the query paths that do KvId
-/// arithmetic (rather than string-keyed lookups): the high-card filter path
-/// (exact + regex → SB scan), projected columns for every tier, facets, and
-/// field-less full text. Each `field=value` exists on exactly one known row,
-/// so any writer/reader order disagreement returns the wrong positions.
+/// Cross-path agreement on the KvId assignment, exercised per tier:
+/// exact and regex selects (the high-card legs resolve through KvId
+/// ranges + the stream-batch scan), facets, projected columns
+/// ([`IndexReader::materialize_fields`]), and field-less full text.
+/// Each `field=value` exists on exactly one known row, so any
+/// writer/reader order disagreement returns the wrong positions.
 #[test]
 fn kv_id_paths_agree_for_prefix_field_families() {
     let (bytes, expected) = prefix_family_fixture();
@@ -105,7 +136,8 @@ fn kv_id_paths_agree_for_prefix_field_families() {
         );
     }
 
-    // Regex select on one value per field (exercises the pattern scans).
+    // Regex select on one value per field (exercises the pattern scans;
+    // a pattern anchors to the whole value, so "v0*1" hits v001 only).
     for field in ["a", "a.b", "m", "m.n", "h", "h.i"] {
         let f = crate::Filter::new().select_pattern(field, "v0*1"); // matches v001 only
         let bf = idx.compile_filter(&f, None).unwrap();
@@ -167,12 +199,11 @@ fn kv_id_paths_agree_for_prefix_field_families() {
     );
 }
 
-/// Per-tier distinct-value enumeration ([`IndexReader::field_values`]):
-/// every tier returns exactly its stored values, sorted, prefix-stripped
-/// by LENGTH (values containing `=` survive whole), and an absent field
-/// is `UnknownField` — all without touching stream batches (the method
-/// reads only the field's dictionary chunk; the access-pattern proof
-/// lives in the corruption test below).
+/// [`IndexReader::field_values`] per tier: every tier returns exactly its
+/// stored values, sorted, with the `field=` prefix stripped by LENGTH
+/// (values containing `=` survive whole); an absent field is
+/// `UnknownField`. Reads only the field's dictionary chunk — the
+/// access-pattern proof is the corruption test below.
 #[test]
 fn field_values_per_tier_prefix_stripped_by_length() {
     let (bytes, expected) = prefix_family_fixture();
@@ -195,8 +226,9 @@ fn field_values_per_tier_prefix_stripped_by_length() {
         Err(crate::Error::UnknownField(f)) if f == "absent"
     ));
 
-    // A value containing '=' round-trips whole (prefix-LENGTH strip; a
-    // split-once would truncate it to "x").
+    // A value containing '=' round-trips whole: the prefix is stripped by
+    // LENGTH, so later '='s stay in the value (a split-on-'=' would cut
+    // it to "x").
     let bytes = file_of_rows(&[&["eq=x=y=z"], &["eq=plain"]]);
     let idx = IndexReader::open(&bytes).unwrap();
     assert_eq!(

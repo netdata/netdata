@@ -1,10 +1,20 @@
-//! `ng-index-traces`: seal a flattened **traces** WAL into an SFST index, and look
-//! traces up by id from a sealed file — the standalone traces analog of `ng-index`
-//! (it does NOT wire into the live `otel-ledger` pipeline).
+//! `ng-index-traces`: standalone CLI for the traces index. `seal` turns one
+//! flattened **traces** WAL file into an SFST index; `trace` reads a sealed
+//! index back — reconstructing one trace by id, or sampling the ids it holds.
+//! The traces analog of the `ng-index` binary, which does the same for
+//! flattened *log* frames (a WAL directory instead of a single file).
+//!
+//! The binary is a developer/ops tool: nothing wires it into the live
+//! `otel-ledger` pipeline. Its seal, though, is the pipeline's seal — the same
+//! `ng_index::build_sfst_traces_file` the `otel-ledger` traces indexer runs
+//! (`src/crates/otel-ledger/src/ledger/traces_pipeline.rs`) — so an index
+//! built here is exactly what the live query path serves. The input WAL is
+//! produced by `ng-ingest-traces`.
 //!
 //! ```text
 //! ng-index-traces seal  --in ~/repos/tmp/ng/<wal> --out /tmp/traces.sfst
 //! ng-index-traces trace --sfst /tmp/traces.sfst --trace-id <32-hex-chars>
+//! ng-index-traces trace --sfst /tmp/traces.sfst --sample 10
 //! ```
 
 use std::collections::HashSet;
@@ -125,6 +135,8 @@ fn sample_ids(sfst_path: &Path, limit: usize) -> ExitCode {
 }
 
 fn seal(wal: &Path, out: &Path) -> ExitCode {
+    // The library does all the work; its Metrics are gathered but never
+    // reported here (unlike `ng-index`, which prints a report at the end).
     let metrics = Metrics::new();
     match build_sfst_traces_file(wal, out, &metrics) {
         Ok((summary, size)) => {
@@ -185,6 +197,8 @@ fn reconstruct(sfst_path: &Path, trace_id_hex: &str) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    // `trace_by_id` resolves an absent id to an empty trace (not an error),
+    // so a miss is reported as a normal "not found" — still a SUCCESS exit.
     if trace.spans.is_empty() {
         println!("trace {trace_id} not found");
         return ExitCode::SUCCESS;

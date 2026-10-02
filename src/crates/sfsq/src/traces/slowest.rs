@@ -1,13 +1,14 @@
 //! Duration-ranked top-K traces — the UI's explicit "Slowest" sort
 //! mode.
 //!
-//! The SAME cross-source merge as the overview (envelopes widen,
-//! stored-row counts saturate) but KEEPING roots: the list rows
-//! display root service/name, so the sealed side pays for the
-//! root-resolving [`sealed_trace_aggregates`] view (root-field
-//! dictionary decodes) the grid path deliberately skips. Merged traces clip by
-//! envelope-start (the alignment rule shared with the overview),
-//! then rank by envelope duration DESC (`trace_id` ASC tie-break) and
+//! The SAME cross-source merge as the overview (the shared fold,
+//! fold.rs: envelopes widen, stored-row counts saturate) but KEEPING
+//! roots: the list rows display root service/name, so the sealed side
+//! pays for the root-resolving [`sealed_trace_aggregates`] view
+//! (root-field dictionary decodes the visited budget deliberately does
+//! not charge) that the grid path skips. Merged traces clip by
+//! envelope-start (the alignment rule shared with the overview), then
+//! rank by envelope duration DESC (`trace_id` ASC tie-break) and
 //! truncate to the requested top-K.
 //!
 //! Pinned semantics:
@@ -15,32 +16,31 @@
 //! - **Stored-row statistics**: per-row span/error counts sum the
 //!   stored rows — a resend counts every time it is stored. Exact
 //!   canonical figures live in trace-by-id (the row click).
-//! - **No mixed units**: a sealed source without the rollup
-//!   chunk is EXCLUDED and marked
+//! - **No mixed units**: a sealed source without the rollup chunk is
+//!   EXCLUDED and marked
 //!   [`RollupAbsent`](PartialReason::RollupAbsent) — identical to the
 //!   overview.
-//! - **Cross-source root pick**: `TRSU` carries no
-//!   root start, so "earliest true root" is not computable across
-//!   sources; among the sources' `Some(root)` candidates the SMALLEST
-//!   root `span_id` wins. Exact in every non-pathological case — a
-//!   single-root straddle has exactly one contributing source (the
-//!   others' spans all have set parents → honest-absent) and a resent
-//!   root is the same span id in both files; only genuine multi-root
-//!   traces reach the tie.
+//! - **Cross-source root pick** (fold.rs owns the rule): among the
+//!   sources' `Some(root)` candidates the SMALLEST root `span_id` wins
+//!   — `TRSU` carries no root start, so "earliest" is not computable
+//!   across sources. Exact except for genuinely multi-root straddles,
+//!   where a list row and the opened trace may display different
+//!   roots.
 //! - **No pagination**: top-K is a single bounded page — a rank cursor
 //!   over an unstable dataset re-ranks between pages, so it is
-//!   deliberately absent.
+//!   deliberately absent (the otel-ledger wire's `SlowestParams` has
+//!   no cursor).
+//! - **Honest partials**: a failed source is
+//!   [`SourceFailure`](PartialReason::SourceFailure), an unavailable
+//!   one a [`RemoteUnavailable`](PartialReason::RemoteUnavailable) (the
+//!   rest still rank); the OWN visited budget (rollup rows sealed,
+//!   decoded spans tails — each shape's actual fold cost) stops BETWEEN
+//!   sources with [`SlowestCeiling`](PartialReason::SlowestCeiling), so
+//!   the ranking covers only the processed SourceId prefix — the true
+//!   slowest trace may live in an unvisited source.
 //!
-//! Engine contracts mirrored from the siblings: sources process in
-//! `SourceId` order; a failed source is a
-//! [`SourceFailure`](PartialReason::SourceFailure) and an unavailable
-//! one a [`RemoteUnavailable`](PartialReason::RemoteUnavailable) (the
-//! rest still rank); cancellation is polled up front and between sources
-//! (all-or-empty); an OWN visited budget (rollup rows sealed, decoded
-//! spans tails — each shape's actual fold cost) terminates with the
-//! deterministic prefix and
-//! [`SlowestCeiling`](PartialReason::SlowestCeiling), checked BETWEEN
-//! sources (one source may overshoot by its whole cost).
+//! Cancellation is polled up front and between sources, all-or-empty:
+//! a cancelled run is an EMPTY list, not an error (see [`slowest`]).
 
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
@@ -53,13 +53,14 @@ use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
 use super::window::TimeWindow;
 
-/// Default result limit; zero is rejected and there is no unbounded
-/// option — slowest is top-K by construction (the search precedent).
+/// Default result limit (top-K traces). Zero is rejected — slowest has
+/// no unbounded option.
 pub const DEFAULT_SLOWEST_LIMIT: usize = 20;
 /// Library maximum for [`SlowestQuery::limit`]; beyond it is a request
 /// error (an unbounded list would defeat the bounded-list design).
 pub const SLOWEST_LIMIT_MAX: usize = 1000;
-/// The default visited budget (rollup rows + tail spans examined).
+/// The default visited budget (rollup rows + tail spans examined) —
+/// the shared fold's work ceiling; it bounds WORK, not memory.
 const VISITED_ROWS_CEILING: u64 = 4_000_000;
 
 /// A slowest request: the window, the K, and the work budget.
@@ -129,12 +130,17 @@ pub struct SlowTrace {
 pub struct SlowestData {
     /// Duration DESC, `trace_id` ASC; at most `limit`.
     pub traces: Vec<SlowTrace>,
+    /// Why the result may be incomplete — e.g.
+    /// [`SlowestCeiling`](PartialReason::SlowestCeiling) bounds the
+    /// ranking to the processed sources' prefix.
     pub status: QueryStatus,
 }
 
 /// Run a cross-source duration-ranked top-K. `progress` ticks once per
 /// source; callers that don't report pass a fresh counter. Pure sync —
-/// invoke off any async runtime thread (the engine contract).
+/// invoke off any async runtime thread (the engine contract). A
+/// cancelled run is not an error: `Ok` with an empty list and
+/// [`Cancelled`](PartialReason::Cancelled) on the status.
 pub fn slowest(
     sources: Vec<TraceSource>,
     query: SlowestQuery,

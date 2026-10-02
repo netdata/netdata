@@ -1,3 +1,34 @@
+// Build script for the protocol crate: writes `OUT_DIR/tokens.rs`, whose
+// `COMMAND_MAP` static is the pluginsd keyword table that `src/line_parser.rs`
+// includes at compile time (`include!(concat!(env!("OUT_DIR"), "/tokens.rs"))`).
+//
+// `COMMAND_MAP` maps every pluginsd wire keyword — the first word of a line,
+// looked up byte-exact — to the `Token` variant `parse_normal_line` dispatches
+// on, so keyword resolution is a single phf lookup.
+//
+// The table spans both wire directions. It mirrors the pluginsd keyword
+// vocabulary the agent side maintains: the wire words in
+// `src/libnetdata/functions_evloop/functions_evloop.h` (`PLUGINSD_KEYWORD_*` /
+// `PLUGINSD_CALL_*`) and the agent's parse table
+// `src/plugins.d/gperf-hashtable.h`. It is not an exact mirror of the parse
+// table: the `PLUGIN_KEEPALIVE` and `FUNCTION_DEL` lines the agent's parser
+// accepts are not listed here.
+//
+// Sync contract with the `Token` enum in line_parser.rs: exactly one entry per
+// variant, in enum-declaration order, both sides maintained by hand. Entry
+// keys and values are rendered verbatim into the generated file, so a variant
+// renamed without updating its entry here fails to compile in line_parser.rs.
+//
+// Mapping a keyword does not make the decoder understand it:
+// `parse_normal_line` converts only the tokens it matches — the chart and
+// function-protocol subsets — to `Command`s; any other mapped token hits its
+// `panic!` arm when that keyword arrives, and a keyword missing from this
+// table parses as `Command::Unknown` and is dropped by the message layer. A
+// `Token` variant added without an entry therefore leaves its keyword
+// silently unrecognized.
+//
+// No `cargo:rerun-if-*` directives are emitted, so cargo falls back to
+// rerunning this script whenever any file in the package changes.
 use std::env;
 use std::fs::File;
 use std::io::{BufWriter, Write};

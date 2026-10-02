@@ -1,5 +1,31 @@
-//! OTel ingestor worker — receives metrics, logs, and traces via gRPC and emits
-//! Netdata chart data over ferryboat IPC to the otel-plugin supervisor.
+//! OTel ingestor worker: the production OTLP receiver of the otel-plugin
+//! pipeline. It serves the three OpenTelemetry Collector gRPC services —
+//! metrics, logs, traces — on one TLS-optional endpoint and splits them by
+//! signal:
+//!
+//! - **Logs + traces** — each export request is normalized, flattened, and
+//!   encoded into a WAL frame by `ng_flatten` (`prepare_log_frame` /
+//!   `prepare_trace_frame`), then appended to a per-tenant WAL; file events
+//!   stream to the ledger over a dedicated writer socket (`ledger_sender`)
+//!   for sealing into SFSTs by `ng-index`.
+//! - **Metrics** — aggregated into Netdata charts and emitted once per second
+//!   as chart data over ferryboat IPC to the supervisor (`aggregation` →
+//!   `chart` → `output`).
+//!
+//! The supervisor spawns this crate as a worker process; [`run_worker`] is
+//! the entry point (Configure → bind → build services → `Ready` → serve).
+//!
+//! # Modules
+//!
+//! - gRPC services: `logs_service` and `trace_service` (WAL writers),
+//!   `metrics_service` (chart emission); `tenant` (tenant extraction from
+//!   the `X-Scope-OrgID` header).
+//! - Metrics support: `aggregation` (per-slot accumulation + cross-slot
+//!   contexts), `chart` (per-chart dimension state), `chart_config` (stock +
+//!   user chart config), `iter` (OTLP metric traversal), `otel` (proto
+//!   normalize/compare/hash extensions), `output` (plugin-protocol
+//!   formatting).
+//! - Ledger wiring: `ledger_sender` (writer→ledger IPC events).
 
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -33,10 +59,10 @@ use logs_service::NetdataLogsService;
 use metrics_service::{ChartManager, NetdataMetricsService};
 use trace_service::NetdataTracesService;
 
-/// How often the idle-rotation sweep runs (P4/I2). Fixed, no config knob: it
-/// bounds only the *idle*-stream rotation latency — active streams still rotate
-/// precisely on the next write. 30s mirrors Loki's flush-sweep cadence; a no-op
-/// tick is cheap (one lock + arithmetic per tenant, no I/O).
+/// How often the idle-rotation sweep runs. Fixed, no config knob: it bounds
+/// only the *idle*-stream rotation latency — active streams still rotate
+/// precisely on the next write. A no-op tick is cheap (one lock + arithmetic
+/// per tenant, no I/O).
 const WAL_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// Ingestor worker entry point.
@@ -83,10 +109,10 @@ async fn run_ingestor(
 ) -> Result<()> {
     // Bind the gRPC endpoint FIRST, before this worker's disk setup: a port
     // conflict is the most likely startup failure (another listener, or another
-    // agent in a shared network namespace), and detecting it here fails fast
-    // before the ingestor touches its WAL directories or the seq high-water
-    // file (the ledger has already done its own disk startup by now). tonic's
-    // `serve(addr)` would bind lazily, only when the server future is polled.
+    // agent in a shared network namespace), and binding here fails fast, before
+    // the ingestor touches its WAL directories or the seq high-water file.
+    // tonic's `serve(addr)` would bind lazily, only when the server future is
+    // polled.
     let addr: std::net::SocketAddr =
         config.endpoint.path.parse().with_context(|| {
             format!("failed to parse endpoint address: {}", config.endpoint.path)
@@ -133,7 +159,8 @@ async fn run_ingestor(
     // Channel for tick loop → main loop chart data forwarding
     let (chart_tx, mut chart_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(64);
 
-    // Tick loop: periodically emit chart data
+    // Tick loop: wakes on each second boundary and emits the chart data for
+    // that slot.
     let tick_chart_manager = Arc::clone(&chart_manager);
     let tick_handle = tokio::spawn(async move {
         let mut buf = String::new();
@@ -221,15 +248,11 @@ async fn run_ingestor(
         traces_service.ingest_max_age(),
     );
 
-    // Idle-rotation sweeps (P4/I2): a periodic task per signal closes WAL
-    // streams that have passed their duration threshold with no new frames, so
-    // quiet streams still get indexed (and, with remote storage, uploaded).
-    // The sweep interval is a floor on idle-stream latency only; if an
-    // operator sets a default rotation shorter than it, idle files rotate at
-    // sweep granularity (active files are unaffected — they rotate on write;
-    // `warn_signal_config` flags that case). Each signal gets its OWN task:
-    // the sweeps do serial fsyncs, so sharing one task would let a slow
-    // traces sweep delay the next logs sweep tick (and vice versa) — the
+    // Idle-rotation sweeps: a periodic task per signal closes WAL streams that
+    // have passed their duration threshold with no new frames, so quiet streams
+    // still get indexed (and, with remote storage, uploaded). Each signal gets
+    // its OWN task: the sweeps do serial fsyncs, so sharing one task would let
+    // a slow traces sweep delay the next logs sweep tick (and vice versa) — the
     // signals' writer registries are independent, so nothing is shared.
     let logs_sweep_handle = spawn_sweep("logs", Arc::clone(&logs_service), |s| {
         s.sweep_expired_rotations()
@@ -312,7 +335,7 @@ async fn run_ingestor(
                     req = conn.recv() => {
                         match req {
                             Ok(IngestorRequest::Call { transaction, .. }) => {
-                                // No function handlers yet — return 404
+                                // No Functions are registered here — reply 404
                                 let resp = IngestorResponse::Result(netdata_plugin_types::FunctionResult {
                                     transaction,
                                     status: 404,
@@ -403,6 +426,8 @@ fn create_shared_writer_state(
     Ok((sender, seq))
 }
 
+/// The logs ingestion service, built from the derived logs lifecycle the same
+/// way as [`create_traces_service`].
 fn create_logs_service(
     lifecycle: &LifecycleConfig,
     auth: &AuthConfig,

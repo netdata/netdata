@@ -1,21 +1,54 @@
 //! Reading evicted files back from remote storage.
 //!
-//! Signal-neutral: [`RemoteRead::fetch`] takes remote catalog entries,
-//! downloads their objects into the process's download cache
-//! ([`file_cache::FileCache`]) and returns them as local sealed files, the
-//! entries it could not obtain, and the pins that keep the downloaded files
-//! from being evicted while a query reads them.
+//! The read-back side of the retention handoff: local retention may evict an
+//! SFST once its catalog entry is confirmed on the remote, and a query that
+//! needs the data fetches it back through here. [`RemoteRead::fetch`] is
+//! signal-neutral: it takes the remote-only catalog entries a
+//! [`crate::query::RemotePlan`] has selected, downloads their objects into
+//! the process's shared download cache ([`file_cache::FileCache`]) and
+//! returns them as [`file_registry::SelectedFile`]s (path = the cache pin's
+//! path; summary = the catalog's stored one — `file-registry`'s
+//! `selection.rs` documents the type), the entries it could not obtain, and
+//! the pins that keep the downloaded files from being evicted while a query
+//! reads them.
 //!
-//! Downloads are sequential (the cache fetches one object at a time) and each
-//! runs under its own deadline ([`download_deadline`]): the storage client's
-//! retry layer alone can spend minutes on one object, and a query should not
-//! wait that out. Every object gets its own attempt: a failure of any kind
-//! costs only that object, so the query still answers from the others.
-//! An object another query is already downloading is awaited until that query
-//! finishes with it (bounded by its own deadline and the cache's retry limit).
+//! One download cache serves every signal; otel-ledger opens it at
+//! `{base_dir}/remote-read` and hands a clone to each signal's query
+//! handler. Its contracts — whole-object fetches, all-or-nothing admission,
+//! single flight, pin lifetime, degrade-on-failure — belong to the
+//! file-cache crate (`file-cache/src/lib.rs`) and are not restated here.
 //!
-//! One download cache serves every signal. [`migrate_read_cache`] moves the
-//! logs-only cache earlier versions kept to the shared location at startup.
+//! Lock discipline: callers snapshot under the registry read lock
+//! (`Registry::remote_plan_input`), drop it, then plan and call
+//! [`RemoteRead::fetch`] off it — the drop-the-lock-before-file-I/O model
+//! the registry module docs carry. `fetch` itself holds no lock and touches
+//! no registry state.
+//!
+//! Async context: [`RemoteRead::fetch`] runs on the async runtime; each
+//! download is awaited network I/O, not a blocking call, and the cache's
+//! durable write runs under `spawn_blocking` inside file-cache.
+//! [`migrate_read_cache`] is blocking std-fs work, run once at startup.
+//!
+//! Downloads are sequential (the cache fetches one reserved object at a
+//! time) and each runs under its own deadline (`download_deadline`): the
+//! storage client's retry layer alone can spend minutes on one object, and
+//! a query should not wait that out. Every object gets its own attempt: a
+//! failure of any kind — missing object, storage error, timeout, size
+//! mismatch, failed cache write — costs only that object, so the query
+//! still answers from the others. An object another query is already
+//! downloading is awaited until that query finishes with it; if it
+//! vanishes, the awaiter retries it as a fresh download, bounded by the
+//! cache's retry limit, each attempt under its own deadline.
+//!
+//! Consumers (grep-verified, all `otel-ledger/src/ledger/`): `pipeline.rs`
+//! and `traces_pipeline.rs` build each signal's handler a `RemoteRead` when
+//! remote storage is enabled; `rpc/logs/handler.rs` and
+//! `rpc/traces/sources.rs` call [`RemoteRead::fetch`] — the traces capture
+//! also reads [`RemoteRead::cache`]'s capacity to bound planning via
+//! `RemotePlanInput::plan_within` — and hold the returned pins across their
+//! blocking query runs; `mod.rs` runs [`migrate_read_cache`] before opening
+//! the cache; `rpc/traces/fixtures.rs` builds one over an `fs://` backend
+//! in tests.
 
 use std::collections::{HashMap, HashSet};
 use std::io;
@@ -48,19 +81,26 @@ pub(crate) fn download_deadline(size: u64) -> Duration {
 
 /// The outcome of one [`RemoteRead::fetch`].
 pub struct RemoteFetch {
-    /// The files now in the cache, as sealed files at their cache paths with
-    /// their catalog summaries, in the order they were requested.
+    /// The entries obtained, in request order, as
+    /// [`file_registry::SelectedFile`]s: identity and summary from the
+    /// catalog entry, path = the cache pin's path (that type's remote-origin
+    /// contract, documented in `file-registry`'s `selection.rs`).
     pub files: Vec<SelectedFile>,
-    /// The requested entries that could not be obtained: the download failed,
-    /// timed out, or could not be stored in the cache. In request order.
+    /// The requested entries that could not be obtained: the download
+    /// failed or timed out, the object's size mismatched its catalog entry,
+    /// the cache could not store it, or the cache gave up on it after its
+    /// bounded retries. In request order.
     pub failed: Vec<CatalogEntry>,
-    /// Pins keeping `files` in the cache. Hold them until every file has been
-    /// read; dropping them lets the cache evict the files.
+    /// Pins keeping `files` in the cache, one per file in `files`. Hold
+    /// them until every file has been read; dropping them lets the cache
+    /// evict the files.
     pub pins: Vec<CachedFile>,
 }
 
 /// The query path's handle to remote storage: the storage client and the
-/// download cache that materializes evicted files back to local disk.
+/// download cache that materializes evicted files back to local disk. Cheap
+/// to clone (both halves are `Arc`-backed); generic over [`Storage`] so
+/// tests can drive a mock.
 #[derive(Clone)]
 pub struct RemoteRead<S: Storage = OpendalStorage> {
     storage: S,
@@ -73,20 +113,33 @@ impl<S: Storage> RemoteRead<S> {
     }
 
     /// The download cache (its capacity is the largest remote footprint one
-    /// query can have).
+    /// query can have — all-or-nothing admission — which the traces caller
+    /// reads to bound planning via `RemotePlanInput::plan_within`).
     pub fn cache(&self) -> &FileCache {
         &self.cache
     }
 
-    /// Materialize `entries` in the download cache. Entries naming the same
-    /// file are fetched once. `progress` ticks once per planned download,
-    /// completed or failed; a cache hit downloads nothing and does not tick, so
-    /// a caller sizing its total by `entries.len()` gets an upper bound.
+    /// Materialize `entries` in the download cache and return the obtained
+    /// files with their pins. The cache key is the entry's `FileId`
+    /// data-file name with the `SFST_EXT` extension, so entries naming the
+    /// same file are fetched once.
+    ///
+    /// `progress` ticks once per planned download, completed or failed; a
+    /// cache hit downloads nothing and does not tick — the filename
+    /// identifies immutable content, so a hit is served as-is (see the
+    /// file-cache crate docs) — so a caller sizing its total by
+    /// `entries.len()` gets an upper bound.
     ///
     /// Per-entry failures are reported in [`RemoteFetch::failed`]. The only
-    /// errors are query-wide: [`CacheError::TooLarge`] (the entries' total size
-    /// exceeds the cache), [`CacheError::EvictionFailed`] (the cache directory
-    /// cannot free room) and [`CacheError::Cancelled`].
+    /// errors are query-wide: [`CacheError::TooLarge`] (the planned files'
+    /// total size exceeds the cache), [`CacheError::EvictionFailed`] (the
+    /// cache directory cannot free room) and [`CacheError::Cancelled`].
+    ///
+    /// Called off the registry read lock: the entries come from a remote
+    /// plan built after the snapshot dropped the lock
+    /// (`Registry::remote_plan_input` → `RemotePlan`, per the registry
+    /// module docs' lock model). `fetch` itself holds no lock and touches
+    /// no registry state.
     pub async fn fetch(
         &self,
         entries: Vec<CatalogEntry>,
@@ -124,8 +177,13 @@ impl<S: Storage> RemoteRead<S> {
                 &wants,
                 |filename| {
                     let object = objects.get(filename).copied();
+                    // Captured by reference: `Storage` has no `Clone`
+                    // bound, and the future lives only for this call.
                     let (storage, progress) = (&self.storage, &progress);
                     async move {
+                        // Unreachable arm: the cache only invokes this closure
+                        // for names this call planned, and all of them are in
+                        // `objects`.
                         let result = match object {
                             Some((key, size)) => download(storage, key, size).await,
                             None => Err(anyhow::anyhow!("no remote key for cache entry")),
@@ -138,6 +196,9 @@ impl<S: Storage> RemoteRead<S> {
             )
             .await?;
 
+        // The pins come back unordered; correlate by filename and rebuild
+        // `files` in request order, leaving each failed entry without a
+        // pin.
         let cached: HashMap<&str, &CachedFile> =
             pins.iter().map(|pin| (pin.filename(), pin)).collect();
         let mut files = Vec::with_capacity(pins.len());
@@ -160,7 +221,9 @@ impl<S: Storage> RemoteRead<S> {
     }
 }
 
-/// Download one object under its deadline.
+/// Download one object under its deadline. `size` is the catalog's declared
+/// size and only sets the deadline — the cache separately checks the
+/// returned byte count against [`Want::size`].
 async fn download<S: Storage>(storage: &S, key: &str, size: u64) -> anyhow::Result<Vec<u8>> {
     let deadline = download_deadline(size);
     match tokio::time::timeout(deadline, storage.read(key)).await {
@@ -198,7 +261,8 @@ fn read_error_to_anyhow(key: &str, e: StorageError) -> anyhow::Error {
 /// - `old` a symlink to a directory and `new` absent: `new` becomes a symlink to
 ///   the directory `old` resolves to (the disk the operator chose; moving a
 ///   relative link would change its target) and the old link is removed. Any
-///   other symlink: only the link is removed.
+///   other symlink (dangling, non-directory target, `new` present,
+///   non-Unix): only the link is removed.
 /// - `old` not a directory: logged and left.
 /// - `new` absent: `old` is renamed to `new`.
 /// - `new` present, or the rename failed (another filesystem, permissions, a

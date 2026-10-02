@@ -1099,10 +1099,22 @@ static bool status_file_load_and_parse(const char *filename, void *data) {
 // --------------------------------------------------------------------------------------------------------------------
 // save the current status
 
+// Signal handlers capture stack traces and save the status file into this buffer, so it must never be reallocated
+// (after a glibc heap abort the allocator lock may be held). JSON escaping turns a byte into at most 6 (\u00XX), and
+// the keys and structure of the status file take about 5 KiB.
+#define STATIC_SAVE_BUFFER_SIZE (64 * 1024)
+
+_Static_assert(STATIC_SAVE_BUFFER_SIZE >= 6 * sizeof(DAEMON_STATUS_FILE) + 8192,
+               "static_save_buffer must fit the worst-case status file JSON without growing");
+_Static_assert(STATIC_SAVE_BUFFER_SIZE >= STACKTRACE_CAPTURE_MIN_BUFFER_SIZE,
+               "static_save_buffer must fit a full stack trace without growing");
+_Static_assert(sizeof(((DAEMON_STATUS_FILE *)0)->fatal.stack_trace) >= STACKTRACE_MAX_TEXT_LENGTH,
+               "the status file must store a full stack trace");
+
 static BUFFER *static_save_buffer = NULL;
 static void static_save_buffer_init(void) {
     if (!static_save_buffer)
-        static_save_buffer = buffer_create(16384, NULL);
+        static_save_buffer = buffer_create(STATIC_SAVE_BUFFER_SIZE, NULL);
 
     buffer_flush(static_save_buffer);
 }
@@ -1814,7 +1826,9 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     // This can cause a deadlock when a signal is received while the lock is held.
     // The code is commented out to prevent the deadlock, at the cost of not saving the status file on a crash.
 #else
-    bool safe_to_get_stack_trace = reason != EXIT_REASON_SIGABRT && stacktrace_capture_is_async_signal_safe();
+    // SIGABRT is not excluded: fatal() stores its stack before it aborts, so stack_trace_is_empty() skips it,
+    // while an abort() from a library (glibc heap checks, assert, std::terminate, libuv) has no stack yet.
+    bool safe_to_get_stack_trace = stacktrace_capture_is_async_signal_safe();
     bool get_stack_trace = stacktrace_available() && safe_to_get_stack_trace && stack_trace_is_empty(ds);
 
     // save it
@@ -1823,8 +1837,6 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     else {
         if (!stacktrace_available())
             set_stack_trace_message_if_empty(ds, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
-        else if(reason == EXIT_REASON_SIGABRT)
-            set_stack_trace_message_if_empty(ds, STACK_TRACE_INFO_PREFIX "fatal handler already captured the stack trace");
         else
             set_stack_trace_message_if_empty(ds, STACK_TRACE_INFO_PREFIX "not safe to get a stack trace for this signal using this backend");
 

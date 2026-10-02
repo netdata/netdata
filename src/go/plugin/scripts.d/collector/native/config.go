@@ -15,14 +15,28 @@ import (
 const (
 	defaultUpdateEvery = 10
 	defaultTimeout     = 5 * time.Second
+	modeAuto           = "auto"
 )
 
+type jobModeSpec struct{}
+
+func (jobModeSpec) Values() []string { return []string{modeAuto, modeOneshot, modePersistent} }
+func (jobModeSpec) Default() string  { return modeAuto }
+
+type jobSnapshotFormatSpec struct{}
+
+func (jobSnapshotFormatSpec) Values() []string { return []string{modeAuto, formatJSON, formatLines} }
+func (jobSnapshotFormatSpec) Default() string  { return modeAuto }
+
 type Config struct {
-	ScriptConfig    Settings         `yaml:"config,omitempty"              json:"config,omitempty"`
-	UpdateEvery     int              `yaml:"update_every,omitempty"        json:"update_every,omitempty"`
-	AutoDetectEvery int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
-	Manifest        string           `yaml:"manifest,omitempty"            json:"manifest,omitempty"`
-	Timeout         confopt.Duration `yaml:"timeout,omitempty"             json:"timeout,omitempty"`
+	SnapshotFormat  confopt.Enum[jobSnapshotFormatSpec] `yaml:"snapshot_format,omitempty"     json:"snapshot_format,omitempty"`
+	ScriptConfig    Settings                            `yaml:"config,omitempty"              json:"config,omitempty"`
+	UpdateEvery     int                                 `yaml:"update_every,omitempty"        json:"update_every,omitempty"`
+	AutoDetectEvery int                                 `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
+	Command         []string                            `yaml:"command,omitempty"             json:"command,omitempty"`
+	Mode            confopt.Enum[jobModeSpec]           `yaml:"mode,omitempty"                json:"mode,omitempty"`
+	Manifest        string                              `yaml:"manifest,omitempty"            json:"manifest,omitempty"`
+	Timeout         confopt.Duration                    `yaml:"timeout,omitempty"             json:"timeout,omitempty"`
 }
 
 // Settings holds a job's package configuration as JSON-compatible values,
