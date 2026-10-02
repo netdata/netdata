@@ -116,7 +116,7 @@ impl FieldTransformation for PriorityTransformation {
 
 /// log.severity_number: OpenTelemetry severity number → short name, per the
 /// spec's ranges (0 = UNSPECIFIED, 1-4 TRACE … 21-24 FATAL):
-/// https://opentelemetry.io/docs/specs/otel/logs/data-model/#displaying-severity
+/// <https://opentelemetry.io/docs/specs/otel/logs/data-model/#displaying-severity>
 pub struct OtelSeverityNumberTransformation;
 
 impl FieldTransformation for OtelSeverityNumberTransformation {

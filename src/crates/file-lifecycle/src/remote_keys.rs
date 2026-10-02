@@ -242,7 +242,7 @@ pub fn parse_sfst_key(key: &str, expected_signal: &str) -> Option<(FileId, Tenan
 /// No production caller: the recovery LIST knows each date from the prefix
 /// it issued (one LIST per day) and parses the trailing filename with
 /// `FileId::parse` for the file identity only. This remains the
-/// format-pinned inverse of [`sfst`] (same module, kept in sync by
+/// format-pinned inverse of `sfst` (same module, kept in sync by
 /// construction), and its tests pin the layout, including rejection of the
 /// old segment-less v1 shape.
 pub fn parse_sfst_date(key: &str) -> Option<NaiveDate> {

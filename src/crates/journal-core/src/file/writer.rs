@@ -203,7 +203,7 @@ impl JournalWriter {
     /// The written arena's end - where the next object appends, and what
     /// `header_size + arena_size` add up to. Not the on-disk length: mmap
     /// windows map in whole chunks and the writable
-    /// [`MemoryMapMut`](crate::file::mmap::MemoryMapMut)'s `create`
+    /// `MemoryMapMut`'s `create`
     /// extends the file past this. Rotation sizing reads it as the size
     /// signal (journal-log-writer/src/log/mod.rs).
     pub fn current_file_size(&self) -> u64 {

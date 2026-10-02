@@ -49,7 +49,7 @@ const FORMER_LOGS_KEYS: [(&str, &str); 7] = [
 /// Wrap a user-file parse failure, adding a migration guide when the file is
 /// recognizably the former schema. Called from `ConfigResolver::resolve`
 /// (mod.rs) for the user file only — the stock file's parse errors keep the
-/// plain form. Always carries the "parsing <path>" context the plain error
+/// plain form. Always carries the parsing `path` context the plain error
 /// path carries.
 pub(super) fn enrich_parse_error(
     path: &Path,
