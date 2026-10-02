@@ -80,13 +80,13 @@ Use the hexagon Nodes Map to organize the same fleet by labels and operating met
 
 ## Centralize alerts and anomaly detection
 
-Run alert evaluation and machine learning on the Parent to keep that work off the devices. Operators get centralized notifications and anomaly visibility alongside the same fleet charts and maps.
+Run alert evaluation and machine learning on the Parent to keep that work off the devices. Operators get centralized notifications and anomaly visibility alongside the same fleet charts and maps. Anomaly detection learns patterns in your custom StatsD metrics too, helping identify unusual motor RPM, vehicle speed or other operating values.
 
 Alert on the conditions that affect the workload: temperature, storage capacity, service availability and sustained CPU or memory pressure. Match alert lookup windows to collection cadence—for example, allow a 15-minute window for five-minute samples and a 30-minute window for ten-minute samples. Use faster collection when failures need faster detection.
 
 Enable machine learning on the Parent and keep history for its training window. Anomaly detection becomes available as models train on incoming samples. With sparse collection, allow time for samples to accumulate and for scheduled training; the defaults use a six-hour history window and retrain every three hours.
 
-Use labels to apply different connectivity expectations to always-on devices and those that sleep or operate intermittently. The [disconnection guide](./disconnected-devices-and-failover.md) shows how to recover history after an outage.
+Use Cloud [node states](../netdata-cloud/node-states-and-transitions.md#states-on-netdata-cloud) to follow connectivity and data availability: **Live** nodes provide current metrics, **Stale** nodes have history available through a connected Parent, **Offline** nodes have no available data source, and **Unseen** nodes have been claimed but have never connected. Use labels to apply different connectivity expectations to always-on devices and those that sleep or operate intermittently. The [disconnection guide](./disconnected-devices-and-failover.md) shows how to recover history after an outage.
 
 ## Troubleshoot devices through the Parent
 

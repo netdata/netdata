@@ -6,7 +6,7 @@ Give every device a place in your fleet's monitoring view. Install a small Netda
 
 Netdata provides static Linux packages for 32-bit ARM devices, including `armv6l` and `armv7l`. Choose the package for your device's CPU and operating system, then use the [disk-footprint guide](./minimize-disk-footprint.md) to retain the capabilities your team needs.
 
-For example, a signage player may need system and process metrics; a robot may also need hardware sensors, container monitoring and application telemetry. Use the same package and runtime configuration across devices with the same role.
+For example, monitor a signage player's system and processes; include hardware sensors, container monitoring and application telemetry for a robot running containerized control software. Use the same package and runtime configuration across devices with the same role.
 
 ## Preserve each device's identity
 
@@ -91,7 +91,7 @@ Provision the trusted CA certificate on each device and add these settings to th
 
 Place the trusted CA certificate at the configured path. Allow outbound access to the Parent's streaming port, directly or through your fleet VPN. See [TLS certificate configuration](../../src/web/server/README.md) for Parent certificates and the [Parent-Child reference](../../src/streaming/README.md) for destination syntax and authorization.
 
-Claim the Parent to your Netdata Cloud Space to give your team a central operating view. Manage customer access through Cloud permissions and Rooms, and use authorized signed-in sessions for sensitive live Functions such as process inspection. Streaming keys authorize device connections; Cloud permissions authorize your operators.
+Claim the Parent to your Netdata Cloud Space to give your team a central operating view. Manage customer access through Cloud permissions and Rooms, and give authorized signed-in operators live Functions such as process inspection. Streaming keys authorize device connections; Cloud permissions authorize your operators.
 
 ## Roll out the device image
 

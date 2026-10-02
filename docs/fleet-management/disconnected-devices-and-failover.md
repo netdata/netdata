@@ -52,6 +52,6 @@ For shared historical coverage across Parents, configure their storage and repli
 
 ## Distinguish sleeping devices from failures
 
-Use device labels to separate always-on devices from those that sleep or operate intermittently. Apply connectivity alerts and routing to those groups so your team responds to unexpected outages while allowing planned offline periods.
+Cloud [node states](../netdata-cloud/node-states-and-transitions.md#states-on-netdata-cloud) show when a device is **Live** or **Stale** with history still available through its Parent. Use device labels to separate always-on devices from those that sleep or operate intermittently. Apply connectivity alerts and routing to those groups so your team responds to unexpected outages while allowing planned offline periods.
 
 When a Child reconnects, current monitoring resumes and live troubleshooting Functions become available again. Combine the recovery policy with [cellular traffic settings](./minimize-cellular-traffic.md) to budget for the history sent after an outage.

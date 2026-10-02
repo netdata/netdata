@@ -88,9 +88,9 @@ On Pi 1, choosing `none` instead of `ram` saved about 5 MiB of memory at one-sec
 
 ## Protect SD cards from continuous writes
 
-Keep monitoring history on the Parent and metric samples in RAM to protect the device's SD card from continuous monitoring writes. With health and machine learning running on the Parent, the Child focuses on collection and streaming.
+Keep monitoring history on the Parent and metric samples in RAM. The Child collects and streams without writing metric history to the SD card. With health and machine learning running on the Parent, the Child focuses on collection and streaming.
 
-The metadata database initializes at startup, then stays quiet while the device's charts, dimensions and labels remain stable. Continuous metric collection in this lightweight configuration does not continually rewrite that metadata.
+The metadata database initializes at startup, then stays quiet while the device's charts, dimensions and labels remain stable. It records monitoring structure and identity changes as they occur.
 
 Disable the Child's Agent logs in `netdata.conf`:
 

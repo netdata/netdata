@@ -2,7 +2,7 @@
 
 Keep devices connected to their Parent and available for live troubleshooting with a small cellular data budget. Netdata combines sparse metric collection, compressed streaming and collection-aware TCP keepalives to reduce routine traffic between updates.
 
-For a compact metric workload, five- or ten-minute collection can bring connected streaming down to **about 4–7 MiB per device per month**. Your team retains the connection for device status and on-demand troubleshooting, while routine telemetry follows the interval you choose.
+With five- or ten-minute collection and automatic keepalives, Netdata streams a compact metric workload for **about 4–7 MiB per device per month**. Your team retains the connection for device status and on-demand troubleshooting, while routine telemetry follows the interval you choose.
 
 ## Keep the connection, reduce the background traffic
 
@@ -16,7 +16,7 @@ Three settings determine routine traffic:
 
 ## Set a monthly streaming budget
 
-This example streams 46 metric dimensions over compressed TLS. It includes traffic in both directions and illustrates the effect of changing keepalive frequency:
+This example streams 46 metric dimensions over compressed TLS. It includes traffic in both directions and shows the monthly traffic for each keepalive setting:
 
 | Collection interval | Parent keepalive idle | Monthly streaming budget |
 |:--|:--|--:|

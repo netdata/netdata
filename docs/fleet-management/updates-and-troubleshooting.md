@@ -14,7 +14,7 @@ Build each image from a clean filesystem so the installed plugins match your sel
 
 ## Keep one update authority
 
-Use your image pipeline to deliver both Netdata and its configuration. The standard Netdata updater installs the full upstream package, so disable its schedule when provisioning a reduced installation. For the static package:
+Use your image pipeline as the update authority for both Netdata and its configuration. Turn off the on-device updater schedule when provisioning a reduced installation so each release follows your fleet's package policy. For the static package:
 
 ```bash
 sudo /opt/netdata/usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
