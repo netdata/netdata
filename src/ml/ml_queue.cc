@@ -80,7 +80,8 @@ void ml_queue_sort_pass(std::deque<ml_create_model_entry_t> &pass, time_t now_s,
 
 // Start a pass: called with the mutex held and create_current empty, create_next not empty. Returns with the
 // mutex held. Resolution and sorting run without the mutex, so pushes and the stop signal are never blocked
-// behind them; a stop request abandons the sort and hands the entries back to create_next.
+// behind them; a stop request ends the key resolution and skips the sort (a sort already running completes),
+// and hands the entries back to create_next.
 static void ml_queue_start_pass(ml_queue_t *q)
 {
     std::deque<ml_create_model_entry_t> pass;
