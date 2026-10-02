@@ -388,7 +388,7 @@ static int compare_query_plan_entries(const void *a, const void *b) {
 static bool query_plan_fill_coverage(QUERY_ENGINE_OPS *ops, size_t selected_tier,
                                      time_t after_wanted, time_t before_wanted) {
     QUERY_METRIC *qm = ops->qm;
-    time_t boundaries[2 * RRD_STORAGE_TIERS] = { 0 };
+    time_t boundaries[2 * RRD_STORAGE_TIERS];
     size_t boundaries_used = 0;
     size_t head_order[RRD_STORAGE_TIERS], tail_order[RRD_STORAGE_TIERS];
     size_t head_used = 0, tail_used = 0;

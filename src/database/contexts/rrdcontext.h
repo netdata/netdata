@@ -788,3 +788,4 @@ int32_t rrdcontext_queue_entries(RRDCONTEXT_QUEUE_JudyLSet *queue);
 #include "rrdcontext-context-registry.h"
 
 #endif // NETDATA_RRDCONTEXT_H
+
