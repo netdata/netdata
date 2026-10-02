@@ -140,6 +140,65 @@ volumes:
 
 :::
 
+### With Podman Quadlets
+
+Podman is a daemonless OCI container runtime, and the `netdata/netdata` image runs on it the same way it runs on Docker. Quadlets let you manage a Podman container as a native systemd service: you write a `.container` unit file and control Netdata with `systemctl` instead of a `docker run` or `docker-compose` command. The dashboard is available at `http://NODE:19999`, the same as with Docker.
+
+Create `/etc/containers/systemd/netdata.container` (for a rootless setup, use `~/.config/containers/systemd/netdata.container` instead) with the following content. It translates the `docker run` example in [Recommended way](#recommended-way) one-to-one.
+
+```ini
+[Unit]
+Description=Netdata Agent container
+
+[Container]
+Image=netdata/netdata
+ContainerName=netdata
+Network=host
+PodmanArgs=--pid=host
+AddCapability=SYS_PTRACE SYS_ADMIN
+AppArmor=unconfined
+Volume=netdataconfig:/etc/netdata
+Volume=netdatalib:/var/lib/netdata
+Volume=netdatacache:/var/cache/netdata
+Volume=/:/host/root:ro,rslave
+Volume=/etc/passwd:/host/etc/passwd:ro
+Volume=/etc/group:/host/etc/group:ro
+Volume=/etc/localtime:/etc/localtime:ro
+Volume=/proc:/host/proc:ro
+Volume=/sys:/host/sys:ro
+Volume=/etc/os-release:/host/etc/os-release:ro
+Volume=/var/log:/host/var/log:ro
+Volume=/var/run/docker.sock:/var/run/docker.sock:ro
+Volume=/run/dbus:/run/dbus:ro
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+:::info If you remove `--pid=host`
+As with Docker, if you choose **not** to use the host PID namespace, you **must** enable an init process so Netdata reaps child processes and stays stable. In a `.container` file, replace `PodmanArgs=--pid=host` with `RunInit=true`.
+:::
+
+Then reload systemd and start the service:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl start netdata
+```
+
+With `Restart=always` set above, systemd restarts Netdata automatically if it exits. To start it at boot as well, enable the service with `sudo systemctl enable netdata`.
+
+:::tip
+
+- On a host without Docker, the `/var/run/docker.sock` mount is unnecessary. Remove that `Volume=` line, or repoint it at the Podman socket if you want Netdata to monitor Podman containers.
+- When using `netdata/netdata` without a tag, Podman pulls the latest image by default. To run the stable version, replace it with `netdata/netdata:stable`.
+- For a rootless setup, run `systemctl --user daemon-reload`, `systemctl --user start netdata`, and `systemctl --user enable netdata`, and set `WantedBy=default.target` in the `[Install]` section.
+
+:::
+
 ### With NVIDIA GPUs monitoring
 
 Monitoring NVIDIA GPUs requires:
