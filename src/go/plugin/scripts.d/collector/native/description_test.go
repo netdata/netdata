@@ -72,8 +72,9 @@ const unicodeDescription = `{
 func TestParseDescription(t *testing.T) {
 	disabled := false
 	unicodeSpec := packageSpec{
-		Version: "v1",
-		Mode:    modePersistent,
+		Version:        "v1",
+		Mode:           modePersistent,
+		SnapshotFormat: formatJSON,
 		Functions: []nativefunc.Definition{{
 			ID:             "items",
 			Name:           "Items 😀",
@@ -96,8 +97,9 @@ func TestParseDescription(t *testing.T) {
 	require.Contains(t, escapedDescription, `\`+"ud83d", "the fixture must spell surrogate-pair escapes")
 	require.NotContains(t, escapedDescription, "😀")
 	collecting := packageSpec{
-		Version: "v1",
-		Mode:    modeOneshot,
+		Version:        "v1",
+		Mode:           modeOneshot,
+		SnapshotFormat: formatJSON,
 	}
 	tests := map[string]struct {
 		data         string
@@ -109,9 +111,10 @@ func TestParseDescription(t *testing.T) {
 		"YAML with inline assets": {
 			data: testDescription,
 			wantSpec: packageSpec{
-				Version:   "v1",
-				Mode:      modePersistent,
-				Functions: []nativefunc.Definition{{ID: "items", Name: "Items", Help: "Show queue items."}},
+				Version:        "v1",
+				Mode:           modePersistent,
+				SnapshotFormat: formatJSON,
+				Functions:      []nativefunc.Definition{{ID: "items", Name: "Items", Help: "Show queue items."}},
 			},
 			wantCharts: true,
 			wantSettings: Settings{
@@ -122,10 +125,11 @@ func TestParseDescription(t *testing.T) {
 		"JSON function-only": {
 			data: `{"version":"v1","collect":false,"functions":[{"id":"items","name":"Items","help":"Show items."}]}`,
 			wantSpec: packageSpec{
-				Version:   "v1",
-				Mode:      modeOneshot,
-				Collect:   &disabled,
-				Functions: []nativefunc.Definition{{ID: "items", Name: "Items", Help: "Show items."}},
+				Version:        "v1",
+				Mode:           modeOneshot,
+				SnapshotFormat: formatJSON,
+				Collect:        &disabled,
+				Functions:      []nativefunc.Definition{{ID: "items", Name: "Items", Help: "Show items."}},
 			},
 		},
 		// Python json.dumps() uses surrogate-pair escapes by default for non-BMP Unicode.
@@ -156,7 +160,7 @@ func TestParseDescription(t *testing.T) {
 			wantCharts: true,
 		},
 		"JSON nulls select defaults": {
-			data:       `{"version":"v1","mode":null,"collect":null,"functions":null,"charts":null,"config_schema":null}`,
+			data:       `{"version":"v1","mode":null,"snapshot_format":null,"collect":null,"functions":null,"charts":null,"config_schema":null}`,
 			wantSpec:   collecting,
 			wantCharts: true,
 		},

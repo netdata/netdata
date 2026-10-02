@@ -13,10 +13,14 @@ func (c *Collector) initDefinition() error {
 	if err := c.Mode.Validate(); err != nil {
 		return fmt.Errorf("mode %w", err)
 	}
+	if err := c.SnapshotFormat.Validate(); err != nil {
+		return fmt.Errorf("snapshot_format %w", err)
+	}
+	format := c.SnapshotFormat.Normalized()
 	mode := c.Mode.Normalized()
 	if c.registered {
-		if c.Manifest != "" || c.Command != nil || mode != modeAuto {
-			return errors.New("registered packages cannot override manifest, command or mode")
+		if c.Manifest != "" || c.Command != nil || mode != modeAuto || format != modeAuto {
+			return errors.New("registered packages cannot override manifest, command, mode or snapshot_format")
 		}
 		return nil
 	}
@@ -31,9 +35,13 @@ func (c *Collector) initDefinition() error {
 		if mode == modeAuto {
 			mode = modeOneshot
 		}
+		if format == modeAuto {
+			format = formatJSON
+		}
 		definition, err := newPackageDefinition(packageSpec{
-			Version: "v1",
-			Mode:    string(mode),
+			SnapshotFormat: string(format),
+			Version:        "v1",
+			Mode:           string(mode),
 		}, command)
 		if err != nil {
 			return err
@@ -46,6 +54,9 @@ func (c *Collector) initDefinition() error {
 	}
 	if mode != modeAuto {
 		return errors.New("mode must be auto when using a manifest")
+	}
+	if format != modeAuto {
+		return errors.New("snapshot_format must be auto when using a manifest")
 	}
 	definition, err := loadManifest(c.Manifest, c.validateExecutable)
 	if err != nil {

@@ -85,32 +85,37 @@ func decodeSnapshot(data []byte) (snapshot, error) {
 	if err := strictjson.Decode(data, snapshotShape, &result); err != nil {
 		return result, err
 	}
+	return result, result.validate()
+}
+
+// validate is shared by every snapshot encoding, before any store writes.
+func (result *snapshot) validate() error {
 	if result.Version != "v1" {
-		return result, errors.New("unsupported response version")
+		return errors.New("unsupported response version")
 	}
 	seen := make(map[string]bool, len(result.Metrics))
 	for i := range result.Metrics {
 		f := &result.Metrics[i]
 		if seen[f.Name] {
-			return result, errors.New("duplicate metric family")
+			return errors.New("duplicate metric family")
 		}
 		seen[f.Name] = true
 		if err := f.validate(); err != nil {
-			return result, fmt.Errorf("metric family %d: %w", i, err)
+			return fmt.Errorf("metric family %d: %w", i, err)
 		}
 	}
 	clear(seen)
 	for i := range result.Checks {
 		f := &result.Checks[i]
 		if seen[f.ID] {
-			return result, errors.New("duplicate check family")
+			return errors.New("duplicate check family")
 		}
 		seen[f.ID] = true
 		if err := f.validate(); err != nil {
-			return result, fmt.Errorf("check family %d: %w", i, err)
+			return fmt.Errorf("check family %d: %w", i, err)
 		}
 	}
-	return result, nil
+	return nil
 }
 
 func (f *metricFamily) validate() error {

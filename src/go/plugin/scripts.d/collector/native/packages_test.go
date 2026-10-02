@@ -177,7 +177,7 @@ func TestPackageCreator_JobForm(t *testing.T) {
 				"registered form must not retain source-selection conditions",
 			)
 			ui := document["uiSchema"].(map[string]any)
-			for _, removed := range []string{"manifest", "command", "mode"} {
+			for _, removed := range []string{"manifest", "command", "mode", "snapshot_format"} {
 				assert.NotContains(t, ui, removed)
 			}
 

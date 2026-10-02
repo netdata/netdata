@@ -27,7 +27,8 @@ func init() {
 		CreateV2: func() collectorapi.CollectorV2 { return New() },
 		Config: func() any {
 			return &Config{
-				Mode: modeAuto,
+				Mode:           modeAuto,
+				SnapshotFormat: modeAuto,
 			}
 		},
 	})
@@ -65,9 +66,10 @@ type Collector struct {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			Mode:        modeAuto,
-			UpdateEvery: defaultUpdateEvery,
-			Timeout:     confopt.Duration(defaultTimeout),
+			Mode:           modeAuto,
+			SnapshotFormat: modeAuto,
+			UpdateEvery:    defaultUpdateEvery,
+			Timeout:        confopt.Duration(defaultTimeout),
 		},
 		store:              metrix.NewCollectorStore(),
 		validateExecutable: pathvalidate.ValidateBinaryPath,
@@ -80,9 +82,11 @@ func (c *Collector) Configuration() any {
 		cfg.Manifest = ""
 		cfg.Command = nil
 		cfg.Mode = ""
+		cfg.SnapshotFormat = ""
 		cfg.ScriptConfig = c.definition.effectiveSettings(cfg.ScriptConfig)
 	} else {
 		cfg.Mode = cfg.Mode.Normalized()
+		cfg.SnapshotFormat = cfg.SnapshotFormat.Normalized()
 	}
 	return cfg
 }

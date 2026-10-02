@@ -13,6 +13,9 @@ import (
 )
 
 const (
+	formatJSON  = "json"
+	formatLines = "lines"
+
 	modeOneshot    = "oneshot"
 	modePersistent = "persistent"
 
@@ -36,10 +39,11 @@ func checkMetricName(id string) string { return checkMetricPrefix + id }
 
 // packageSpec holds static capabilities shared by manifest files and descriptions.
 type packageSpec struct {
-	Version   string                  `yaml:"version"   json:"version"`
-	Mode      string                  `yaml:"mode"      json:"mode"`
-	Collect   *bool                   `yaml:"collect"   json:"collect"`
-	Functions []nativefunc.Definition `yaml:"functions" json:"functions"`
+	SnapshotFormat string                  `yaml:"snapshot_format" json:"snapshot_format"`
+	Version        string                  `yaml:"version"         json:"version"`
+	Mode           string                  `yaml:"mode"            json:"mode"`
+	Collect        *bool                   `yaml:"collect"         json:"collect"`
+	Functions      []nativefunc.Definition `yaml:"functions"       json:"functions"`
 }
 
 // packageDefinition is a validated package, independent of its source. It is
@@ -67,6 +71,15 @@ func newPackageDefinition(spec packageSpec, command []string) (packageDefinition
 	}
 	if d.Mode != modeOneshot && d.Mode != modePersistent {
 		return d, errors.New("mode must be oneshot or persistent")
+	}
+	if d.SnapshotFormat == "" {
+		d.SnapshotFormat = formatJSON
+	}
+	if d.SnapshotFormat != formatJSON && d.SnapshotFormat != formatLines {
+		return d, errors.New("snapshot_format must be json or lines")
+	}
+	if d.functionOnly() && d.SnapshotFormat == formatLines {
+		return d, errors.New("snapshot_format lines requires collection")
 	}
 	if d.functionOnly() && len(d.Functions) == 0 {
 		return d, errors.New("collect: false requires functions")

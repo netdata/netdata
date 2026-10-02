@@ -176,11 +176,13 @@ func packageForm(name string, definition packageDefinition) (string, error) {
 	delete(properties, "manifest")
 	delete(properties, "command")
 	delete(properties, "mode")
+	delete(properties, "snapshot_format")
 	delete(properties, "config")
 	ui := form["uiSchema"].(map[string]any)
 	delete(ui, "manifest")
 	delete(ui, "command")
 	delete(ui, "mode")
+	delete(ui, "snapshot_format")
 	delete(ui, "config")
 	if definition.functionOnly() {
 		delete(properties, "update_every")

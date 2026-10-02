@@ -32,6 +32,17 @@
         ],
         "default": "auto"
       },
+      "snapshot_format": {
+        "title": "Snapshot format",
+        "description": "Auto uses the manifest's snapshot format or JSON for a direct command. Choose json or lines only for a direct command.",
+        "type": "string",
+        "enum": [
+          "auto",
+          "json",
+          "lines"
+        ],
+        "default": "auto"
+      },
       "update_every": {
         "title": "Update every",
         "description": "Data collection interval in seconds.",
@@ -63,18 +74,31 @@
       }
     },
     "if": {
-      "required": ["manifest"]
+      "required": [
+        "manifest"
+      ]
     },
     "then": {
       "properties": {
-        "command": {"type": "null"},
-        "mode": {"const": "auto"}
+        "command": {
+          "type": "null"
+        },
+        "mode": {
+          "const": "auto"
+        },
+        "snapshot_format": {
+          "const": "auto"
+        }
       }
     },
     "else": {
-      "required": ["command"],
+      "required": [
+        "command"
+      ],
       "properties": {
-        "command": {"type": "array"}
+        "command": {
+          "type": "array"
+        }
       }
     }
   },
@@ -83,6 +107,12 @@
       "ui:placeholder": "/usr/local/lib/netdata/custom/example/manifest.yaml"
     },
     "mode": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      }
+    },
+    "snapshot_format": {
       "ui:widget": "radio",
       "ui:options": {
         "inline": true

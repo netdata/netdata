@@ -1,13 +1,13 @@
 # Native script development
 
 The `native` collector runs executables through scripts.d. A script can report
-labeled metrics and service checks using ordinary JSON, without a manifest, an SDK,
-a `describe` operation, or a chart file. Packages can add static chart templates,
-configuration forms, and interactive Functions.
+labeled gauges and counters using scalar lines, or metrics and service checks using
+ordinary JSON, without a manifest, an SDK, a `describe` operation, or a chart file.
+Packages can add static chart templates, configuration forms, and interactive Functions.
 
 This contract is WIP. It supports one-shot and persistent collection, floating-point
-gauges, cumulative counters, enum and bitset StateSets, package-specific DynCfg forms,
-and script-provided Functions. The development health template turns warning and
+gauges, cumulative counters, scalar line snapshots, enum and bitset StateSets,
+package-specific DynCfg forms, and script-provided Functions. The development health template turns warning and
 critical checks into notifications. Additional metric kinds and production delivery
 remain later steps. The package and wire formats may change during the preview.
 
@@ -70,6 +70,18 @@ This creates a floating-point gauge with units `value` and an automatic chart. U
 meaningful `unit`, such as `jobs`, when the measurement has one. No special library is
 required; use your language's JSON encoder.
 
+Job `snapshot_format` accepts `auto` (the default), `json`, or `lines`. For a direct
+command, `auto` selects JSON. To emit scalar lines, set `snapshot_format: lines`:
+
+```text
+queue_depth:17.5|gauge|unit:jobs
+```
+
+Format selection is explicit: the collector does not sniff output or fall back to
+another decoder. Execution mode and snapshot format are independent; both formats
+support one-shot and persistent collection. See [Scalar line snapshots](#scalar-line-snapshots)
+for labels, metadata, quoting, and runnable examples.
+
 For a file-backed package, replace `command` with its manifest path:
 
 ```yaml
@@ -81,8 +93,9 @@ jobs:
 ```
 
 Every generic job MUST select exactly one `manifest` or `command`. A manifest owns
-its execution mode, so a job using it MUST leave `mode` omitted or set to `auto`;
-concrete mode overrides are rejected. Auto does not probe the script. A direct command has no
+its execution mode and snapshot format, so a job using it MUST leave `mode` and
+`snapshot_format` omitted or set to `auto`; concrete overrides are rejected, even
+when they match the manifest. Auto does not probe the script. A direct command has no
 configuration schema and rejects a nonempty `config` object; use a package to supply
 validated configuration on stdin. Use the development binary for these configurations.
 There is no package auto-discovery. Explicit registration below provides individual
@@ -108,6 +121,9 @@ charts: charts.yaml
   directory. It enables configuration input on stdin in both modes; see below.
 - `mode` is `oneshot` (the default when omitted) or `persistent`. Persistent jobs
   retain one process across collection attempts; their state resets on restart.
+- `snapshot_format` is `json` (the default when omitted) or `lines`. The package
+  declaration does not accept `auto`. Function-only packages MUST use JSON or omit
+  the field; `lines` requires periodic collection.
 - `charts` is an optional path to the existing [V2 chart-template language](../framework/charttpl/README.md),
   resolved relative to the manifest. Without it, metrics get automatic charts.
   With it, its autogen setting determines whether unmatched metrics get charts.
@@ -183,8 +199,9 @@ packages:
 The manifest source reads metadata files without executing the package. The command
 source executes `describe` once during plugin process startup. Both sources compile
 the same package definition before registration. The registered module binds its
-metadata and command: job configuration MUST NOT set `manifest`, `command`, or
-`mode` to replace them. Registration never
+metadata and command: job configuration MUST NOT set `manifest` or `command`, or
+concrete `mode` or `snapshot_format` values to replace them. Registered forms and
+configuration GET omit these source-owned fields. Registration never
 creates a default job. Add a job through DynCfg or `scripts.d/native-queue.conf`:
 
 ```yaml
@@ -221,7 +238,7 @@ or select another executable.
 `describe` MUST print exactly one UTF-8 YAML or JSON document and exit zero. JSON
 strings support standard Unicode escapes, including surrogate pairs. Declaration
 field names are case-sensitive, and unknown fields and duplicate keys are rejected.
-It uses the manifest's `version`, `mode`, `collect` and `functions` fields,
+It uses the manifest's `version`, `mode`, `snapshot_format`, `collect` and `functions` fields,
 with these inline assets:
 
 | Field | File manifest | Executable description |
@@ -361,10 +378,12 @@ A nonempty job `config` without a declared schema is rejected.
 
 ## Collection response
 
-In one-shot mode, each invocation MUST exit zero and print exactly one UTF-8 JSON
-object, at most 64 MiB including whitespace. Stdin is EOF for schema-free packages;
-configured packages receive one configuration envelope followed by EOF. In persistent mode, the
-same snapshot is carried in a correlated reply as described below. Stdout
+In one-shot mode, each invocation MUST exit zero and print one complete UTF-8
+snapshot in its selected format: one JSON object or the scalar line records below.
+The complete output MUST fit in 64 MiB, including whitespace and line endings.
+Stdin is EOF for schema-free packages; configured packages receive one configuration
+envelope followed by EOF. In persistent mode, the same snapshot is carried in a
+correlated reply as described below. Stdout
 is exclusively the protocol; redirect command chatter to stderr. The collector
 discards stderr to avoid copying arbitrary script output into Agent logs. One-shot
 Function failures log only safe command categories (including numeric exit status)
@@ -407,7 +426,7 @@ or an invalid-reply diagnostic; script output and request data are never logged.
 }
 ```
 
-### Metric families
+### JSON metric families
 
 Each `metrics` entry defines one named family and all of its samples. `name` and
 `samples` are required. `type` defaults to `gauge`; supported types are `gauge`,
@@ -460,6 +479,78 @@ The [snapshot JSON Schema](collector/native/snapshot_schema.json) supports edito
 validation. The host additionally checks family/series uniqueness, active-state
 membership, identity label values, floating-point range, duplicate JSON keys, and
 retained metric contracts.
+
+### Scalar line snapshots
+
+With `snapshot_format: lines`, each non-comment record supplies one observation:
+
+```text
+queue_depth:17.5|gauge|#queue:mail,region:east|unit:jobs|title:"Queue depth"|family:Queues|priority:1000
+processed_total:100|counter|#queue:mail|unit:jobs
+queue_depth:4|gauge|#queue:batch,region:east
+```
+
+The required prefix is `name:value|type`. Type MUST be exactly `gauge` or `counter`;
+values MUST be finite JSON numbers. Gauges are absolute observations; counters are
+nonnegative cumulative totals. This is not StatsD: increments, sample rates, timers,
+sets, and abbreviated types such as `g` or `c` are unsupported. Use JSON for StateSets
+and service checks.
+
+After the type, these optional fields may appear in any order, at most once each
+per record:
+
+| Field | Meaning |
+|---|---|
+| `#key:value,key:value` | Sample labels; keys MUST be unique within the record |
+| `unit:value` | Metric unit; defaults to `value` |
+| `title:value` | Chart title |
+| `family:value` | Chart family |
+| `priority:value` | Positive decimal integer chart priority |
+
+Name and label-key rules, reserved identities, number precision, and metric-contract
+stability are the same as JSON. `nd_*` label names have no special meaning; they
+are ordinary labels. Metadata fields are distinct from labels.
+
+Records for the same metric name form one family, even when interleaved with other
+names. Supply metadata on any record in that family; repeated declarations MUST
+agree after string decoding. Defaults apply only after all records have been grouped,
+so a later record can supply the unit or chart metadata omitted earlier. Each new
+snapshot MUST supply its own metadata: nothing is inherited from earlier snapshots.
+A metric MUST keep its meaning after expiry or restart, as described above.
+
+Label and metadata values may be unquoted literals or JSON quoted strings. Use
+unquoted literals for fixed values without surrounding whitespace or separators:
+`|` ends a field, and `,` also ends a label value. Unquoted values are literal;
+backslashes do not introduce escapes. For dynamic or external strings, always use
+a JSON encoder, such as Python's `json.dumps()`, and emit its complete quoted result.
+Quoted strings support all JSON escapes, including Unicode surrogate pairs and
+escaped control characters. Raw control characters inside records are invalid. For example:
+
+```text
+queue_depth:2|gauge|#queue:"mail|urgent,west",region:"",note:"line one\nline two"|unit:"jobs"|title:"Queue \u03bb"
+```
+
+An empty quoted label value (`""`) is valid. Metadata values MUST be nonempty;
+units MUST also contain a non-whitespace character. Unquoted values MUST be nonempty. Metric names, numbers, types, label keys, and
+field names are not quoted. `priority` MUST decode to a positive decimal integer
+without signs or leading zeros. Duplicate fields or sample identities, conflicting
+metadata, malformed quoting, unknown fields, or unsupported types reject the whole
+snapshot before any sample is published.
+
+Blank lines and lines beginning with `#` after surrounding space/tab trimming are
+ignored. LF and CRLF line endings are accepted. A comment-only snapshot, such as
+`# no observations`, intentionally publishes an empty successful snapshot. Empty or
+whitespace-only output fails collection. One-shot EOF completes the snapshot; a final
+line need not end with LF. Persistent snapshots use the terminator described below.
+
+Runnable examples support both `collect` and `serve`:
+
+- [Bash scalar lines](development/lines-bash/collect.sh).
+- [Python scalar lines](development/lines-python/collect.py).
+
+Set `snapshot_format: lines` in the direct job or package declaration, and select
+`mode: persistent` when using `serve`. The existing `native.sh` snapshot helpers
+continue to emit JSON; they do not switch formats with the job setting.
 
 ### Check families and complete snapshots
 
@@ -519,11 +610,26 @@ read it without a general JSON parser:
 ```
 
 IDs are positive decimal strings, increasing per process. Treat them as opaque
-correlation values. Reply exactly once, echoing the ID and using the snapshot above:
+correlation values. Reply exactly once, echoing the ID. For JSON snapshots, use:
 
 ```json
 {"id":"1","result":{"version":"v1","metrics":[],"checks":[]}}
 ```
+
+For scalar line snapshots, a successful collect reply is a block of records followed
+by the exact line `# EOF <id>`, with the request ID substituted and a final LF:
+
+```text
+queue_depth:17.5|gauge|unit:jobs
+# EOF 1
+```
+
+Flush the complete block immediately. CRLF is also accepted. The `# EOF` prefix is
+reserved in persistent blocks; malformed terminators and wrong IDs terminate the
+session. A comment-only block plus its terminator is a valid empty snapshot; a
+terminator alone or preceded only by whitespace fails. The entire block, including
+all raw bytes of comments, whitespace, CRLF endings, and the terminator, MUST fit in
+64 MiB. EOF before the terminator is a protocol failure.
 
 If the attempt failed and cannot produce a trustworthy full snapshot, reply:
 
@@ -531,16 +637,20 @@ If the attempt failed and cannot produce a trustworthy full snapshot, reply:
 {"id":"1","error":"collection_failed"}
 ```
 
+This error reply remains JSON in both formats. In line mode it MUST be the first
+reply line, with no preceding records or comments and no block terminator.
 This fixed error code aborts the collection without publishing any samples; the
 same process can answer the next request. It is not a health state. Use an explicit
 `unknown` check when that is a valid observation of an existing service.
 
-Every handshake, request and reply MUST be one UTF-8 JSON object on one physical
-line, terminated by LF and flushed immediately. A frame is limited to 64 MiB,
+Handshakes, requests, configuration envelopes, Function replies, collection errors,
+and successful JSON collection replies MUST each be one UTF-8 JSON object on one
+physical line, terminated by LF and flushed immediately. Only successful line-format
+collection replies use the block framing above. A frame is limited to 64 MiB,
 including LF and other whitespace. Embedded newlines in strings MUST be escaped.
 Exact field spelling, duplicate-key and null rules apply to envelopes as well as
-snapshots. A reply MUST contain exactly one of `result` or `error`; the only error
-code is `collection_failed`. There is one outstanding request and no push channel.
+snapshots. A JSON collection reply MUST contain exactly one of `result` or `error`;
+the only error code is `collection_failed`. There is one outstanding request and no push channel.
 Scripts MAY perform background work, but MUST NOT emit unsolicited frames.
 
 `timeout` bounds startup and the caller's collection wait, including time behind

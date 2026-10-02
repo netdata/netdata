@@ -137,6 +137,12 @@ func TestGenericJobFormSources(t *testing.T) {
 		"direct persistent":           {config: map[string]any{"command": []any{"/collect"}, "mode": "persistent"}},
 		"no source":                   {config: map[string]any{}, wantErr: true},
 		"two sources":                 {config: map[string]any{"manifest": "/manifest.yaml", "command": []any{"/collect"}}, wantErr: true},
+		"manifest format auto":        {config: map[string]any{"manifest": "/manifest.yaml", "snapshot_format": "auto"}},
+		"manifest format override":    {config: map[string]any{"manifest": "/manifest.yaml", "snapshot_format": "json"}, wantErr: true},
+		"direct lines":                {config: map[string]any{"command": []any{"/collect"}, "snapshot_format": "lines"}},
+		"direct json":                 {config: map[string]any{"command": []any{"/collect"}, "snapshot_format": "json"}},
+		"invalid format":              {config: map[string]any{"command": []any{"/collect"}, "snapshot_format": "invalid"}, wantErr: true},
+		"null format":                 {config: map[string]any{"command": []any{"/collect"}, "snapshot_format": nil}, wantErr: true},
 		"manifest mode override":      {config: map[string]any{"manifest": "/manifest.yaml", "mode": "oneshot"}, wantErr: true},
 		"invalid mode":                {config: map[string]any{"command": []any{"/collect"}, "mode": "push"}, wantErr: true},
 		"empty mode":                  {config: map[string]any{"command": []any{"/collect"}, "mode": ""}, wantErr: true},
@@ -206,6 +212,68 @@ func TestJobModeDefaultRoundTrip(t *testing.T) {
 					require.NoError(t, codec.unmarshal(data, &reloaded.Config))
 					require.NoError(t, reloaded.Init(context.Background()))
 					assert.Equal(t, wantMode, reloaded.definition.Mode)
+				})
+			}
+		}
+	}
+}
+
+func TestJobSnapshotFormatDefaultRoundTrip(t *testing.T) {
+	assert.Equal(t, modeAuto, string(New().SnapshotFormat))
+	assert.Equal(t, modeAuto, string(collectorapi.DefaultRegistry["native"].Config().(*Config).SnapshotFormat))
+	for encoding, codec := range map[string]struct {
+		marshal   func(any) ([]byte, error)
+		unmarshal func([]byte, any) error
+	}{
+		"json": {marshal: json.Marshal, unmarshal: json.Unmarshal},
+		"yaml": {marshal: yaml.Marshal, unmarshal: yaml.Unmarshal},
+	} {
+		for _, source := range []string{"command", "manifest", "registered"} {
+			for _, format := range []string{"omitted", "null", "", modeAuto} {
+				t.Run(encoding+"/"+source+"/"+format, func(t *testing.T) {
+					c, dir := fixtureCollector(t, "exit 0\n")
+					appendFile(t, c.Manifest, "snapshot_format: lines\n")
+					newCollector := New
+					wantFormat := formatLines
+					if source == "command" {
+						c.Manifest = ""
+						c.Command = []string{filepath.Join(dir, "collect.sh")}
+						wantFormat = formatJSON
+					} else if source == "registered" {
+						_, registeredDir := configuredFixture(t, "exit 0\n", modeOneshot)
+						appendFile(t, filepath.Join(registeredDir, "manifest.yaml"), "snapshot_format: lines\n")
+						registry, err := loadPackages(context.Background(), filepath.Join(registeredDir, "packages.yaml"), nil, statExecutable)
+						require.NoError(t, err)
+						newCollector = func() *Collector { return registry["native-fixture"].CreateV2().(*Collector) }
+						c = newCollector()
+						c.ScriptConfig["text"] = "synthetic"
+					}
+					c.SnapshotFormat = "" // Also cover decoding into a zero-valued option.
+					input := map[string]any{}
+					switch format {
+					case "omitted":
+					case "null":
+						input["snapshot_format"] = nil
+					default:
+						input["snapshot_format"] = format
+					}
+					data, err := codec.marshal(input)
+					require.NoError(t, err)
+					require.NoError(t, codec.unmarshal(data, &c.Config))
+					data, err = codec.marshal(c.Configuration())
+					require.NoError(t, err)
+					var returned map[string]any
+					require.NoError(t, codec.unmarshal(data, &returned))
+					if source == "registered" {
+						assert.NotContains(t, returned, "snapshot_format")
+					} else {
+						assert.Equal(t, modeAuto, returned["snapshot_format"])
+					}
+					reloaded := newCollector()
+					reloaded.validateExecutable = statExecutable
+					require.NoError(t, codec.unmarshal(data, &reloaded.Config))
+					require.NoError(t, reloaded.Init(context.Background()))
+					assert.Equal(t, wantFormat, reloaded.definition.SnapshotFormat)
 				})
 			}
 		}

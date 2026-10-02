@@ -218,3 +218,58 @@ func buildGoExample(t *testing.T, source string) []byte {
 	require.NoError(t, err, "%s", out)
 	return readFile(t, binary)
 }
+
+func TestExamples_Lines(t *testing.T) {
+	setupRunner(t)
+	for _, language := range []string{"bash", "python"} {
+		tool, file := "bash", "collect.sh"
+		if language == "python" {
+			tool, file = "python3", "collect.py"
+		}
+		executable := requireTool(t, tool)
+		path, err := filepath.Abs(filepath.Join("../../development", "lines-"+language, file))
+		require.NoError(t, err)
+		for _, mode := range []string{modeOneshot, modePersistent} {
+			t.Run(language+"/"+mode, func(t *testing.T) {
+				c := New()
+				c.validateExecutable = statExecutable
+				c.Command = []string{executable, path}
+				c.Mode = confopt.Enum[jobModeSpec](mode)
+				c.SnapshotFormat = formatLines
+				c.Timeout = confopt.Duration(5 * time.Second)
+				require.NoError(t, c.Init(context.Background()))
+				if mode == modePersistent {
+					startRuntime(t, c).waitReady(t)
+				}
+				values, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+				require.NoError(t, err)
+				assert.Equal(t, float64(21.5), values["temperature"])
+				queue := `queue.depth{queue="mail"}`
+				if language == "python" {
+					queue = `queue.depth{queue="batch, \"night\" | café 😀"}`
+				}
+				assert.Equal(t, float64(17), values[queue])
+				assert.Equal(t, float64(12345), values[`requests_total{service="api"}`])
+			})
+		}
+	}
+}
+
+func TestJob_LinesAutogen(t *testing.T) {
+	setupRunner(t)
+	executable := requireTool(t, "bash")
+	path, err := filepath.Abs("../../development/lines-bash/collect.sh")
+	require.NoError(t, err)
+	c := New()
+	c.validateExecutable = statExecutable
+	c.Command = []string{executable, path}
+	c.SnapshotFormat = formatLines
+	out := &wireOutput{}
+	job, _ := startTestJob(t, c, out)
+	tickUntil(t, job, func() bool { return strings.Contains(out.String(), "SET 'requests_total' = 12345") })
+	wire := out.String()
+	assert.Contains(t, wire, "'Celsius'")
+	assert.Contains(t, wire, "'API requests' 'requests/s'")
+	assert.Contains(t, wire, "DIMENSION 'requests_total' 'requests_total' 'incremental'")
+	assert.Contains(t, wire, "CLABEL 'queue' 'mail'")
+}

@@ -20,10 +20,10 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 		t,
 		New(),
 		[]byte(
-			`{"manifest":"/opt/custom/manifest.yaml","mode":"auto","update_every":15,"timeout":3.5,"autodetection_retry":60,"config":{"enabled":false,"count":0,"nested":{"optional":null}}}`,
+			`{"manifest":"/opt/custom/manifest.yaml","mode":"auto","snapshot_format":"auto","update_every":15,"timeout":3.5,"autodetection_retry":60,"config":{"enabled":false,"count":0,"nested":{"optional":null}}}`,
 		),
 		[]byte(
-			"manifest: /opt/custom/manifest.yaml\nmode: auto\nupdate_every: 15\ntimeout: 3.5\nautodetection_retry: 60\nconfig:\n  enabled: false\n  count: 0\n  nested:\n    optional: null\n",
+			"manifest: /opt/custom/manifest.yaml\nmode: auto\nsnapshot_format: auto\nupdate_every: 15\ntimeout: 3.5\nautodetection_retry: 60\nconfig:\n  enabled: false\n  count: 0\n  nested:\n    optional: null\n",
 		),
 	)
 }
@@ -142,9 +142,11 @@ func TestCollector_DirectConfigurationSerialize(t *testing.T) {
 		t,
 		New(),
 		[]byte(
-			`{"command":["/opt/custom/collect","fixed argument"],"mode":"persistent","update_every":15,"timeout":3.5}`,
+			`{"command":["/opt/custom/collect","fixed argument"],"mode":"persistent","snapshot_format":"lines","update_every":15,"timeout":3.5}`,
 		),
-		[]byte("command: [/opt/custom/collect, fixed argument]\nmode: persistent\nupdate_every: 15\ntimeout: 3.5\n"),
+		[]byte(
+			"command: [/opt/custom/collect, fixed argument]\nmode: persistent\nsnapshot_format: lines\nupdate_every: 15\ntimeout: 3.5\n",
+		),
 	)
 }
 
@@ -251,10 +253,11 @@ else:
 func TestCollector_RegisteredSourceOverrides(t *testing.T) {
 	registry, _ := configuredFixture(t, "exit 0\n", modeOneshot)
 	for name, set := range map[string]func(*Collector){
-		"manifest":      func(c *Collector) { c.Manifest = "/different/package" },
-		"command":       func(c *Collector) { c.Command = []string{"/different/command"} },
-		"empty command": func(c *Collector) { c.Command = []string{} },
-		"mode":          func(c *Collector) { c.Mode = modePersistent },
+		"manifest":        func(c *Collector) { c.Manifest = "/different/package" },
+		"command":         func(c *Collector) { c.Command = []string{"/different/command"} },
+		"empty command":   func(c *Collector) { c.Command = []string{} },
+		"mode":            func(c *Collector) { c.Mode = modePersistent },
+		"snapshot format": func(c *Collector) { c.SnapshotFormat = formatJSON },
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := registry["native-fixture"].CreateV2().(*Collector)
@@ -264,6 +267,7 @@ func TestCollector_RegisteredSourceOverrides(t *testing.T) {
 			assert.Empty(t, cfg.Manifest)
 			assert.Nil(t, cfg.Command)
 			assert.Empty(t, cfg.Mode)
+			assert.Empty(t, cfg.SnapshotFormat)
 		})
 	}
 }
