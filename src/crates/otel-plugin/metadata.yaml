@@ -99,7 +99,7 @@ modules:
 
             The absolute paths shown below are the defaults for standard Linux packages. The installed stock configuration resolves its configuration and log directories for the installation layout, so macOS and custom-prefix installations use different paths. Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) with `otel.yaml` to inspect the installed values.
 
-            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Most names are the uppercase option path with dots replaced by underscores. For example, `endpoint.tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
+            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Names are the uppercase option path with dots replaced by underscores. For example, `endpoint.tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
 
             Configuration is strict. Unknown YAML fields, unknown `NETDATA_OTEL_CFG_*` variables, malformed values, and the former experimental schema prevent the plugin from starting. The effective configuration is logged at startup; `remote_storage.uri` is redacted in that log.
           folding:
@@ -177,6 +177,12 @@ modules:
               description: Maximum size of the local download cache, shared by logs and traces, for data fetched back from remote storage during queries.
               default_value: "1GB"
               required: false
+            - name: auth.enabled
+              description: Require the `X-Scope-OrgID` gRPC header to select a log or trace tenant.
+              detailed_description: |
+                This is tenant selection, not credential authentication. When disabled, all logs and traces belong to the `default` tenant. When enabled, trust the header only behind TLS or mutual TLS and suitable network controls. Metrics are not tenant-scoped.
+              default_value: false
+              required: false
             - name: logs.rotation.default.max_file_size
               description: Write-ahead log file size that triggers rotation.
               default_value: "25MB"
@@ -243,7 +249,7 @@ modules:
               folding:
                 enabled: true
               description: |
-                A user file needs only the fields that change; omitted fields keep their stock values. Logs and traces have separate settings.
+                A user file needs only the fields that change; omitted fields keep their stock values. Logs and traces have separate settings, each tenant entry inherits omitted fields from `default`, and a per-tenant key must match the sender's `X-Scope-OrgID` value when `auth.enabled` is true.
               config: |
                 logs:
                   retention:
