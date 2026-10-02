@@ -109,13 +109,6 @@ layers; each layer declares which entries it consumes:
   first-principles correctness.
 - A new engine defect is first stated as the correct contract in a failing
   corpus case, then fixed in a separate focused branch/PR.
-- Dedicated fixtures sharing a host use one streaming connection for that
-  host's charts. A second connection with the same machine GUID can be
-  rejected while the first remains active; that handshake failure is a
-  fixture prerequisite failure, not evidence of a query defect.
-- An uninstalled native binary still needs its stock configuration and
-  asset directories at its configured filesystem prefix. If startup fails,
-  inspect the dedicated daemon logs before interpreting any corpus result.
 - **A broken contract fails. Always.** On master, on a feature branch, whether
   or not the break is already known. There is no recorded "expected failure"
   anywhere in this suite: a corpus that reports success on a broken engine is
