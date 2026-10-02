@@ -1,9 +1,10 @@
-//! `sfsq-cli trace` / `attributes` / `attribute-values` — the traces
-//! query engine from the terminal, without a running agent: the
-//! dev/real-use front door of `sfsq::traces` (phases 4a/4b). Point any
-//! subcommand at a mix of sealed SFSTs and traces WALs; `trace` merges
-//! one trace through the shared combiner, `attributes` /
-//! `attribute-values` enumerate the key vocabulary off the dictionaries.
+//! `sfsq-cli trace` / `attributes` / `attribute-values` / `search` — the
+//! `sfsq::traces` engine from the terminal, without a running agent. Each
+//! subcommand takes an explicit file list (`--sfst` sealed files, `--wal`
+//! traces WALs) instead of the logs front door's directory discovery;
+//! `trace` reconstructs one trace through the shared combiner,
+//! `attributes` / `attribute-values` enumerate the key vocabulary off the
+//! dictionaries, `search` filters whole traces.
 //!
 //! WAL inputs are served as tail scans over the file's full frame range —
 //! right for shut-down or recovered WALs (the dev case); an actively
@@ -68,11 +69,11 @@ fn build_sources(sfsts: &[PathBuf], wals: &[PathBuf]) -> Result<Vec<TraceSource>
         bail!("provide at least one --sfst or --wal source");
     }
     // Source identity is the path STRING (SourceId, wal_id), so the same
-    // file through two aliases (symlink, relative vs absolute) would pass
-    // the engine's DuplicateSource check and be scanned twice, inflating
-    // UNSET-span counts. Canonicalize so aliases collide and the duplicate
-    // is rejected — BEST-EFFORT: a path canonicalize cannot resolve keeps
-    // its user-supplied identity, so deleted-but-open files through
+    // file under two aliases (symlink, relative vs absolute) would pass
+    // the engine's DuplicateSource check and be scanned twice, doubling
+    // UNSET-span-id spans. Canonicalize so aliases collide into one
+    // identity — best-effort: a path canonicalize cannot resolve keeps
+    // its user-supplied spelling, so deleted-but-open files through
     // `/proc/<pid>/fd/N` (a forensic staple) still open, and nonexistent
     // paths surface the per-kind errors below instead of a generic one.
     let canonical = |path: &PathBuf| path.canonicalize().unwrap_or_else(|_| path.clone());
@@ -100,13 +101,11 @@ fn build_sources(sfsts: &[PathBuf], wals: &[PathBuf]) -> Result<Vec<TraceSource>
             );
         }
         // The bounded reader treats a frame crossing its end bound as an
-        // expected torn tail — designed for `end = valid_up_to`, not a
-        // physical file length. Scan the frame headers first so a
-        // truncated tail is SURFACED and only complete frames are read
-        // (the `discover` module's convention; corrupt data never drops
-        // silently under a `complete` status).
-        // Content corruption is a PER-SOURCE failure (warn + skip, the
-        // discover convention) — one corrupt WAL must not abort a
+        // expected torn tail (designed for `end = valid_up_to`, not a
+        // physical file length), so scan the frame headers first: a
+        // truncated tail is SURFACED and only complete frames are read.
+        // Content corruption is a PER-SOURCE failure — warn + skip, the
+        // `discover` convention — so one corrupt WAL cannot abort a
         // multi-source query. Path-level problems (nonexistent, shorter
         // than a header) stay hard errors above: those are argument
         // typos, not data problems.
@@ -156,6 +155,10 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
     if let Some(cap) = args.span_cap {
         query = query.span_cap(cap);
     }
+    // Fresh uncancelled token + throwaway progress counter — the engine
+    // signature's other two arguments. This CLI never cancels and never
+    // surfaces progress (the logs front door's `run_query` does the
+    // same); every subcommand below repeats the pattern.
     let data = trace_by_id(
         sources,
         query,
@@ -216,7 +219,7 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
     Ok(())
 }
 
-// ── Key enumeration (phase 4b) ─────────────────────────────────────────
+// ── Key enumeration (attributes / attribute-values) ───────────────────
 
 /// An [`AttributeOwner`] as a CLI word (this tool's rendering, not a
 /// wire contract). `Any` is deliberately absent: it exists for
@@ -245,7 +248,9 @@ impl From<OwnerArg> for AttributeOwner {
 }
 
 /// The CLI spelling of each builtin field (kebab-case), used by
-/// `--key` under `--owner builtin` and by the output rendering.
+/// `--key` under `--owner builtin` and by the output rendering. Must
+/// stay 1:1 with the engine's `BuiltinField::ALL` — pinned by the
+/// `every_builtin_has_a_cli_word` test below.
 const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
     ("name", BuiltinField::Name),
     ("kind", BuiltinField::Kind),
@@ -312,7 +317,8 @@ fn parse_key(owner: AttributeOwner, key: &str) -> Result<AttributeKey> {
         })
 }
 
-/// Both-or-neither `--start-ns`/`--end-ns` into an engine window.
+/// Both-or-neither `--start-ns`/`--end-ns` into an engine window (the
+/// engine also rejects `start >= end`).
 fn parse_window(start_ns: Option<i64>, end_ns: Option<i64>) -> Result<Option<TimeWindow>> {
     match (start_ns, end_ns) {
         (None, None) => Ok(None),
@@ -458,7 +464,7 @@ pub fn run_attribute_values(args: &AttributeValuesArgs, out: &mut dyn std::io::W
     Ok(())
 }
 
-// ── Search (phase 4c) ──────────────────────────────────────────────────
+// ── Search ─────────────────────────────────────────────────────────────
 
 /// Search for traces across sealed SFSTs and traces WALs.
 #[derive(Debug, clap::Args)]
@@ -508,10 +514,10 @@ pub struct SearchArgs {
     pub end_ns: Option<i64>,
 }
 
-/// Parse one `--where` condition: `TARGET <op> VALUE` (multi-char ops
-/// checked first so `=~` never parses as `=` with a `~value`, `>=`
-/// never as `>` with `=value`). Ordering ops take numeric values;
-/// `=`/`!=`/`=~`/`!~` take text.
+/// Parse one `--where` condition: `TARGET <op> VALUE`. The op match is
+/// leftmost, longest-symbol first, so `>=` never parses as `>` with a
+/// `=value` and `=~` never as `=` with a `~value`. Ordering ops take
+/// numeric values; `=`/`!=`/`=~`/`!~` take text.
 fn parse_condition(spec: &str) -> Result<Condition> {
     const OPS: [(&str, CompareOp); 8] = [
         ("=~", CompareOp::Regex),
@@ -634,9 +640,9 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
         query = query.spans_per_trace(spans_per_trace);
     }
 
-    // The dev shape: one flat set of paths serves both roles (window =
-    // completion — trivially a subset). Built ONCE — TraceSource clones
-    // cheaply, and build_sources now scans every WAL's frame boundaries.
+    // The dev shape: the same source list fills both roles — the engine
+    // requires window ⊆ completion, and identical lists satisfy that
+    // trivially. Built once; `TraceSource` clones cheaply.
     let window = build_sources(&args.sfsts, &args.wals)?;
     let sources = SearchSources {
         completion: window.clone(),
@@ -649,6 +655,8 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
         Arc::new(AtomicUsize::new(0)),
     )?;
 
+    // `[inexact]` marks a trace whose assembly was capped or degraded —
+    // its summary numbers may undercount (the engine's `exact` flag).
     for t in &data.traces {
         writeln!(
             out,

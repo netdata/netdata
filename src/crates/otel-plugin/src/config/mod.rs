@@ -4,6 +4,16 @@
 //! 1. Environment variables (`NETDATA_OTEL_CFG_*`)
 //! 2. User config file (`$NETDATA_USER_CONFIG_DIR/otel.yaml`)
 //! 3. Stock config file (`$NETDATA_STOCK_CONFIG_DIR/otel.yaml`)
+//!
+//! [`load_config`] wires the layers together; the supervisor calls it once at
+//! startup (`supervisor.rs` `run`) and sends the effective config to the workers
+//! over IPC. Only the stock file is parsed directly into the full
+//! [`PluginConfig`]: the other two layers produce a [`ConfigOverride`] applied
+//! on top. The submodules hold the override parsers this file merges:
+//!
+//! - `env`: collects and maps the `NETDATA_OTEL_CFG_*` variables
+//! - `endpoint`, `metrics`, `signal`: per-section override types
+//! - `legacy`: turns a former-schema user file into a migration guide
 
 mod endpoint;
 mod env;
@@ -54,9 +64,8 @@ pub fn resolve_legacy_journal_dir() -> PathBuf {
         return dir;
     }
 
-    // Default to the former plugin's templated `@logdir_POST@/otel/v1`, i.e. the
-    // agent's log directory plus `otel/v1`. Standard service installs report
-    // `NETDATA_LOG_DIR=/var/log/netdata`, matching the historical default.
+    // The former plugin's templated `@logdir_POST@/otel/v1` layout; standard
+    // service installs report `NETDATA_LOG_DIR=/var/log/netdata`.
     if let Ok(log_dir) = std::env::var("NETDATA_LOG_DIR") {
         return Path::new(&log_dir).join("otel").join("v1");
     }
@@ -248,10 +257,12 @@ pub fn load_config() -> Result<PluginConfig> {
 
 fn log_config(source: &str, config: &PluginConfig) {
     // The whole config is logged at startup for supportability, but `remote_storage.uri`
-    // is redacted to its scheme first: operators are told (otel.yaml.in + the
-    // remote-storage spec) the URI is not logged, so a misplaced secret in its
-    // host/path/query cannot leak to the journal. Redaction is logging-only — the
-    // real config sent to the workers over IPC keeps the verbatim URI.
+    // is redacted to its scheme first: the crate README (src/crates/otel-plugin/README.md)
+    // promises "`remote_storage.uri` is redacted in that log", and otel.yaml.in plus
+    // the storage docs tell operators never to put credentials in the URI. A misplaced
+    // secret in the host/path/query therefore cannot leak to the journal. Redaction
+    // is logging-only — the real config sent to the workers over IPC keeps the
+    // verbatim URI.
     let mut redacted = config.clone();
     redacted.remote_storage.uri = redact_uri(&config.remote_storage.uri);
     match serde_json::to_string(&redacted) {
@@ -273,6 +284,17 @@ fn redact_uri(uri: &str) -> String {
     }
 }
 
+/// Validate the fully-merged effective config — all layers applied — at the
+/// end of [`ConfigResolver::resolve`]; a violation aborts startup. Unlike
+/// [`ConfigOverride::validate`], which judges a single layer in isolation,
+/// these checks depend on the combined result: `base_dir` must be set and
+/// absolute (the per-signal dirs join onto it); `remote_storage.uri` must be
+/// non-empty when storage is enabled; `endpoint.path` must contain a `:port` —
+/// a shape check only, the ingestor does the full `SocketAddr` parse when it
+/// binds (`otel-ingestor/src/lib.rs` `run_ingestor`); TLS cert and key must
+/// come as a pair, with the CA requiring both; and each signal's retention
+/// must satisfy the catalog-horizon invariant
+/// (`netdata-plugin/bridge/src/config.rs` `RetentionPolicy::validate`).
 fn validate(config: &PluginConfig) -> Result<()> {
     if config.base_dir.as_os_str().is_empty() {
         anyhow::bail!("base_dir must be set (the mandatory root for all signal storage)");
@@ -349,6 +371,13 @@ fn validate(config: &PluginConfig) -> Result<()> {
 // Override types for partial config merging (user YAML + env vars)
 // ============================================================================
 
+/// The partial override shape shared by the user-file and env layers: every
+/// section optional, so a layer sets only what it carries. The user file
+/// deserializes directly into this type (`deny_unknown_fields` makes any
+/// unknown YAML key a startup error); `env.rs` builds it from the
+/// `NETDATA_OTEL_CFG_*` snapshot via [`ConfigOverride::from_map`].
+/// [`ConfigResolver::resolve`] applies it onto the parsed stock config, user
+/// layer first, then env.
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ConfigOverride {
@@ -386,6 +415,9 @@ impl ConfigOverride {
         Ok(())
     }
 
+    /// True when any section is set. [`ConfigResolver::resolve`] gates the env
+    /// layer on it, so a snapshot with no recognized variables neither applies
+    /// nor triggers layer validation.
     fn has_any(&self) -> bool {
         self.endpoint.is_some()
             || self.metrics.is_some()
@@ -397,6 +429,9 @@ impl ConfigOverride {
     }
 }
 
+/// Apply every section the override layer sets onto the effective config.
+/// Called once per layer in [`ConfigResolver::resolve`] (user, then env), so
+/// later layers win per field.
 fn apply_overrides(config: &mut PluginConfig, o: &ConfigOverride) {
     if let Some(ep) = &o.endpoint {
         endpoint::apply(&mut config.endpoint, ep);
@@ -1238,9 +1273,8 @@ logs:
 
     // -- Builder mechanics + full precedence via `ConfigResolver` --
     //
-    // Precedence was previously punted to E2E because it needed process-global
-    // env mutation; now covered here with a per-test tempdir for the config files
-    // and a built EnvMap for the env layer (helpers above).
+    // Covered here with a per-test tempdir for the config files and a built
+    // EnvMap for the env layer (helpers above).
 
     #[test]
     fn resolve_stock_only() {
@@ -1346,8 +1380,8 @@ logs:
 
     // -- Legacy journal_dir resolution (former-schema otel.yaml parsing) --
     //
-    // `journal_dir_from_yaml` covers per-file extraction; `pick_journal_dir`
-    // (below) covers candidate precedence (user before stock, malformed skipped).
+    // `journal_dir_from_yaml` tests cover per-file extraction; `pick_journal_dir`
+    // tests cover candidate precedence (user before stock, malformed skipped).
     // The remaining env/filesystem wiring (which dirs, NETDATA_LOG_DIR, the hard
     // default) lives in the thin `resolve_legacy_journal_dir` shell and is E2E-covered.
 
@@ -1370,7 +1404,8 @@ logs:
 
     #[test]
     fn journal_dir_from_yaml_none_when_absent() {
-        // logs present but no journal_dir, and no logs section at all → no override.
+        // A logs section without journal_dir, no logs section at all, or an
+        // empty file → no override.
         assert_eq!(
             journal_dir_from_yaml("logs:\n  wal:\n    dir: /x\n").unwrap(),
             None
@@ -1457,8 +1492,7 @@ logs:
         );
         assert!(!config.auth.enabled);
 
-        // The shipped file documents the traces section (visible since the
-        // phase-3 production cutover, plan decision D8) with the same tuning
+        // The shipped file documents the traces section with the same tuning
         // as logs; the shared loop below pins both signals to those shipped
         // values (and the hidden knobs to their code defaults).
         assert!(substituted.contains("\ntraces:"));

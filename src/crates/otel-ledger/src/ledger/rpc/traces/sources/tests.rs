@@ -1,22 +1,36 @@
+//! Tests for the traces source assembly ([`super`]): what
+//! `TracesSourceSupplier::capture` hands the engine for a tenant's
+//! registry state — sealed files, WAL chunks + tail, downloaded remote
+//! files. Identities, WAL coverage, window pruning, ordering, progress
+//! totals, and failure/cancellation behavior are pinned at the
+//! registry boundary: registry state in, engine sources out.
+//!
+//! Fixture strategy ([`crate::ledger::rpc::traces::fixtures`]): sealed
+//! files are tracked in the registry WITHOUT bytes on disk — capture
+//! never opens sealed files, so registry summaries pass through and
+//! the engine opens files later — while WAL tests write REAL trace
+//! WALs (OTLP → ng-flatten trace frames) so chunk builds run the
+//! actual traces seal.
+//!
+//! Not pinned here: the wire layer above (`handler/tests.rs`,
+//! `remote_tests.rs`), the `EvictionFailed`/`Planning` capture errors,
+//! unreadable catalogs' unavailable sources, and chunk bytes
+//! `Arc`-shared across copies (the multi-copy tests use sealed files
+//! only).
 use super::*;
 use crate::ledger::rpc::traces::fixtures::{
     TestRemote, install_sfst, install_wal, make_registries, otlp_req, test_file_id,
 };
 use bridge::function::ProgressState;
 
-// These tests cover `capture` end to end at the registry boundary —
-// registry state in, engine sources out. The sealed-file tests need no
-// real SFST bytes (`capture` never opens sealed files; summaries come
-// from the registry and the engine opens files later). The WAL tests
-// write REAL trace WALs (OTLP → ng-flatten trace frames) so the chunk
-// builds run the actual traces seal.
+// ── supplier and id helpers ─────────────────────────────────────────
 
 fn make_supplier() -> TracesSourceSupplier {
     make_supplier_with_min_entries(16_384)
 }
 
-/// `min_entries` controls chunk grouping — WAL tests pick small values
-/// so a handful of frames splits into chunks + tail.
+/// The supplier's `min_entries` chunk-grouping threshold. WAL tests
+/// pick small values so a handful of frames splits into chunks + tail.
 fn make_supplier_with_min_entries(min_entries: u64) -> TracesSourceSupplier {
     TracesSourceSupplier::new(
         make_registries(),
@@ -31,13 +45,14 @@ fn sfst_id(seq: u64) -> String {
     test_file_id(seq).to_filename("sfst")
 }
 
-/// A fixture WAL's expected id (its chunks and tail extend it).
+/// A fixture WAL's expected id; its chunks and tail extend it with
+/// `#chunk<n>` / `#tail<start>` suffixes.
 fn wal_id(seq: u64) -> String {
     test_file_id(seq).to_filename("wal")
 }
 
-/// Sources' ids in capture order (chunks and tails carry their identity
-/// in the id string).
+/// Each source's id string, in the order capture emitted them — the
+/// string the tests compare to pin set shape and ordering.
 fn source_ids(sources: &[TraceSource]) -> Vec<String> {
     sources
         .iter()
@@ -45,6 +60,8 @@ fn source_ids(sources: &[TraceSource]) -> Vec<String> {
         .collect()
 }
 
+// An empty tenant is not an error: capture succeeds and honors
+// `copies` with an empty set per copy.
 #[tokio::test]
 async fn empty_registries_yield_empty_copies() {
     let supplier = make_supplier();
@@ -84,9 +101,9 @@ async fn sealed_file_maps_to_an_identity_named_file_source() {
     let TraceSource::Sfst(c) = &sources[0] else {
         panic!("sealed file must map to an Sfst source");
     };
-    // Identity is the file's FileId, not its path; sealed files carry no
-    // WAL coverage; the summary passes through; the bytes are read from
-    // the registry path.
+    // The sealed-file contract: identity from the FileId (never the
+    // path), no WAL coverage, the registry's summary verbatim, and the
+    // source pointing at the registry path for the engine to open.
     assert_eq!(c.source_id, SourceId::new(sfst_id(1)));
     assert!(c.coverage.is_none());
     assert_eq!(c.summary.record_count, 6);
@@ -99,9 +116,9 @@ async fn sealed_file_maps_to_an_identity_named_file_source() {
 
 #[tokio::test]
 async fn copies_are_structurally_identical() {
-    // Search consumes two source vectors from ONE capture (window ⊆
-    // completion validation matches by source id) — the copies must be
-    // the same sources in the same order.
+    // Search hands both of its roles source vectors from ONE capture —
+    // its window ⊆ completion check matches sources by id — so the
+    // copies must be the same sources in the same order.
     let supplier = make_supplier();
     install_sfst(&supplier.registries, "default", 1, 1000, 1005).await;
     install_sfst(&supplier.registries, "default", 2, 2000, 2005).await;
@@ -200,10 +217,13 @@ async fn wal_resolves_to_chunks_and_a_tail() {
     );
     // Chunk and tail partition the durable prefix: adjacent, no overlap.
     assert_eq!(coverage.range.end(), tail.coverage.range.start());
-    // And the engine's own validation accepts the set.
+    // The engine's own set hygiene accepts the set: no duplicate ids,
+    // no overlapping WAL coverage.
     sfsq::traces::validate_sources(&sources).expect("capture output must validate");
 }
 
+// Below min_entries nothing groups: the whole durable prefix stays one
+// tail, beginning right after the WAL header.
 #[tokio::test]
 async fn wal_below_min_entries_is_all_tail() {
     let supplier = make_supplier_with_min_entries(1_000_000);
@@ -239,9 +259,9 @@ async fn wal_below_min_entries_is_all_tail() {
 
 #[tokio::test]
 async fn corrupt_wal_is_refused_whole_but_sealed_files_still_serve() {
-    // Corrupt everything past the WAL header: the scan/build fails and
-    // the WHOLE WAL is refused for this capture, while the sealed file
-    // keeps serving (the logs failure policy).
+    // Corrupt everything past the WAL header: the boundary scan fails
+    // and the WHOLE WAL is refused for this capture, while the sealed
+    // file keeps serving (the logs failure policy).
     let supplier = make_supplier_with_min_entries(4);
     install_sfst(&supplier.registries, "default", 3, 1000, 1005).await;
     let path = install_wal(
@@ -278,8 +298,10 @@ async fn corrupt_wal_is_refused_whole_but_sealed_files_still_serve() {
 
 #[tokio::test]
 async fn cancelled_capture_with_a_wal_returns_empty_and_caches_nothing() {
-    // The WAL loop polls before resolving each WAL: a pre-cancelled
-    // call returns empty without touching the chunk cache.
+    // capture polls the token before the WAL-resolution loop starts, so
+    // a pre-cancelled call returns empty sets and never resolves the
+    // WAL (the cache is not probed here — the too-large test below
+    // probes it).
     let supplier = make_supplier_with_min_entries(4);
     install_wal(
         &supplier.registries,
@@ -350,10 +372,10 @@ async fn capture_is_tenant_scoped() {
 
 #[tokio::test]
 async fn source_ids_do_not_depend_on_the_directory() {
-    // The same files installed under two different base directories name
-    // the same sources: a file keeps its name wherever its bytes are
-    // served from (a local path today, a download-cache path once remote
-    // files are read back).
+    // The same files installed under two different base directories
+    // name the same sources and carry the same coverage: a file keeps
+    // its identity wherever its bytes are served from (a local path
+    // today, a download-cache path once remote files are read back).
     let mut captured = Vec::new();
     let mut sealed_paths = Vec::new();
     for _ in 0..2 {
@@ -459,6 +481,7 @@ async fn capture_sets_the_progress_total_to_the_distinct_ranges_sources() {
     assert_eq!(progress.load(), (0, 3));
 }
 
+// ── remote read-back ────────────────────────────────────────────────
 /// A supplier reading back through `remote`, over `registries`.
 fn remote_supplier(
     registries: Arc<RwLock<TenantRegistries>>,
@@ -487,7 +510,8 @@ async fn too_large_fails_before_any_download_or_chunk_build() {
             )
             .await;
     }
-    // A local WAL whose chunks a capture would build.
+    // A local WAL the capture would have chunked, so the probe below
+    // can prove no chunk was built.
     install_wal(
         &registries,
         "default",
@@ -523,6 +547,9 @@ async fn too_large_fails_before_any_download_or_chunk_build() {
         (0, 0),
         "no total set: the capture stopped at planning"
     );
+    // An erring init makes the probe succeed only if a chunk image was
+    // already cached under (seq, index): the error proves nothing was
+    // built.
     let probe = supplier
         .chunk_cache
         .get_or_build(test_file_id(9).seq, 0, async {
@@ -532,6 +559,8 @@ async fn too_large_fails_before_any_download_or_chunk_build() {
     assert!(probe.is_err(), "no chunk was built");
 }
 
+// A pre-cancelled call stops before the download phase: the evicted
+// file's object is never fetched and nothing is pinned.
 #[tokio::test]
 async fn a_cancelled_capture_downloads_nothing() {
     let registries = make_registries();
@@ -566,9 +595,9 @@ async fn a_cancelled_capture_downloads_nothing() {
 
 #[tokio::test]
 async fn remote_sources_are_named_like_local_sealed_files() {
-    // One name wherever a file's bytes come from: a downloaded file and a
-    // failed one both carry `<stem>.sfst`, so the engine's duplicate check
-    // and id order treat them as the local file would be.
+    // One name wherever a file's bytes come from: the downloaded file
+    // and the failed one both carry `<stem>.sfst`, so the engine's
+    // duplicate check and id order see what a local file would present.
     let registries = make_registries();
     let remote = TestRemote::new(64 * 1024 * 1024);
     for seq in 1..=2 {

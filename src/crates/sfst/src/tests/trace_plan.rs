@@ -1,6 +1,19 @@
-//! Per-file trace-search plan evaluation: tier matrix, conjunction,
-//! duration bounds, work counting, and the rank-bounded-extraction
-//! proof (positions emitted = min(K, matched), never the full set).
+//! Tests for the per-file search-plan executor
+//! (`index_reader/trace_plan.rs`): one compilation resolving every
+//! term against a file, then rank-bounded extractions of the newest-K
+//! matched positions. Pins: per-tier term resolution (exact, regex,
+//! dictionary numerics), cross-term conjunction, negation (the pinned
+//! `presence ∩ complement` rule), duration bounds, work accounting
+//! (free dictionary terms, ONE shared stream-batch pass, in-scan
+//! budget stops), and the rank-bounded proof — emission is
+//! `min(K, matched)`, never the full set.
+//!
+//! One shared 256-row fixture (one field per tier at threshold 10,
+//! plus a sparse field and a DURN column) is checked against a
+//! brute-force full-scan oracle; dedicated fixtures cover what it
+//! structurally cannot — multi-batch masking, the short-circuit arms
+//! (no event/link index; empty matching set with the chunk present),
+//! and a file without DURN.
 
 use std::io::Cursor;
 
@@ -22,7 +35,7 @@ struct FixtureRow {
     s: Option<String>,
     /// Mid-card numeric-valued field (`i % 50`).
     num: i64,
-    /// High-card numeric-valued field (`(i % 130).5`).
+    /// High-card numeric-valued field (`(i % 130) + 0.5`).
     fnum: f64,
     dur: i64,
 }
@@ -87,6 +100,8 @@ fn plan(terms: Vec<PlanTerm>) -> TracePlan {
     TracePlan { terms }
 }
 
+/// [`tokens`] with `negated: true` — the pinned
+/// `presence ∩ complement` rule.
 fn not_tokens(field: &str, exact: &[&str], patterns: &[&str]) -> PlanTerm {
     let PlanTerm::Fields {
         fields, matcher, ..
@@ -101,6 +116,8 @@ fn not_tokens(field: &str, exact: &[&str], patterns: &[&str]) -> PlanTerm {
     }
 }
 
+/// A numeric-comparison `Fields` term; `negated` applies the same
+/// `presence ∩ complement` rule.
 fn number(field: &str, cmp: crate::NumberCmp, values: &[f64], negated: bool) -> PlanTerm {
     PlanTerm::Fields {
         fields: vec![field.to_string()],
@@ -135,8 +152,11 @@ fn oracle(
     matched.split_off(cut)
 }
 
-/// Every tier (exact and regex), cross-tier conjunctions, and duration
-/// bounds return exactly the oracle's newest-K, at several K and windows.
+/// The term matrix returns exactly the oracle's newest-K at several
+/// windows and K: every tier (exact and regex), cross-tier
+/// conjunctions, negation, multi-field OR, dictionary numerics, and
+/// duration bounds. Count agrees with the oracle, and extraction work
+/// equals emitted positions for both extraction shapes.
 #[test]
 fn tier_matrix_matches_the_oracle() {
     let (bytes, rows) = fixture();
@@ -208,7 +228,7 @@ fn tier_matrix_matches_the_oracle() {
             ]),
             Box::new(|r: &FixtureRow| r.l == "b" && r.dur >= 1_000),
         ),
-        // ── Stage B: negation (presence ∩ complement) per tier ──────
+        // ── Negation: presence ∩ complement, per tier ──────
         // Sparse low field: absent rows never satisfy a negation.
         (
             plan(vec![not_tokens("s", &["yes"], &[])]),
@@ -230,7 +250,7 @@ fn tier_matrix_matches_the_oracle() {
         ),
         // A negated term on an ABSENT field matches nothing.
         (plan(vec![not_tokens("absent", &["x"], &[])]), Box::new(|_| false)),
-        // ── Stage B: multi-field OR (the unscoped disjunction) ──────
+        // ── Multi-field OR (the unscoped disjunction) ──────
         (
             plan(vec![PlanTerm::Fields {
                 fields: vec!["s".to_string(), "l".to_string()],
@@ -260,7 +280,7 @@ fn tier_matrix_matches_the_oracle() {
                 !matches // l is always present, so presence always holds
             }),
         ),
-        // ── Stage B: dictionary numerics ────────────────────────────
+        // ── Dictionary numerics ────────────────────────────
         (
             plan(vec![number("num", crate::NumberCmp::Gte, &[45.0], false)]),
             Box::new(|r: &FixtureRow| r.num >= 45),
@@ -288,7 +308,7 @@ fn tier_matrix_matches_the_oracle() {
             plan(vec![number("m", crate::NumberCmp::Gte, &[0.0], false)]),
             Box::new(|_| false),
         ),
-        // ── Stage B: duration interval sets, straight and negated ───
+        // ── Duration interval sets, straight and negated ───
         (
             plan(vec![PlanTerm::Duration {
                 intervals: vec![(Some(0), Some(50)), (Some(1_000), Some(1_100))],
@@ -305,7 +325,7 @@ fn tier_matrix_matches_the_oracle() {
             }]),
             Box::new(|r: &FixtureRow| r.dur != 100 && r.dur != 200),
         ),
-        // ── Stage B composed: negation ∧ numeric ∧ token ────────────
+        // ── Composed: negation ∧ numeric ∧ token ────────────
         (
             plan(vec![
                 tokens("l", &["a"], &[]),
@@ -691,11 +711,11 @@ fn empty_event_kvid_set_short_circuits_with_the_chunk_present() {
     let mut events = crate::EventRows::new();
     for i in 0..ROWS {
         let h = ri.intern(None, &format!("h=w{i:03}"));
-        // events.name must be HIGH-TIER too: a low/mid-tier field's
-        // prefilter parts are all Ready, and their AND-to-empty arm of
-        // group_ready_empty short-circuits on its own — only a
-        // probe-based (non-Ready) prefilter leaves the empty-KvId
-        // disjunct as the load-bearing check.
+        // The queried value is absent from the events.name dictionary,
+        // so the condition is empty-KvId IMPOSSIBLE and its prefilter
+        // part is a ready empty set — both short-circuit arms agree.
+        // The test pins the outcome with the chunk present (zero
+        // budget compiles, no rows visited), not which arm fired.
         let name = ri.intern(None, &format!("events.name=e{i:03}"));
         ri.row(1_000 + i as i64, &[h, name]);
         events.push_event(1_000 + i as u64, 0, name, &[]);

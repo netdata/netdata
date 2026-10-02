@@ -3,10 +3,6 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Redfish collector configuration.",
     "type": "object",
-    "additionalProperties": false,
-    "patternProperties": {
-      "^name$": {}
-    },
     "properties": {
       "update_every": {
         "title": "Update every",
@@ -44,16 +40,6 @@
           "none"
         ],
         "default": "auto"
-      },
-      "username": {
-        "title": "Username",
-        "description": "Username of the BMC account. Required unless the authentication method is `none`.",
-        "type": "string"
-      },
-      "password": {
-        "title": "Password",
-        "description": "Password of the BMC account. Required unless the authentication method is `none`.",
-        "type": "string"
       },
       "timeout": {
         "title": "Timeout",
@@ -105,43 +91,47 @@
     "required": [
       "url"
     ],
-    "allOf": [
-      {
-        "if": {
-          "properties": {
-            "auth_method": {
-              "const": "none"
-            }
-          },
-          "required": [
-            "auth_method"
-          ]
-        },
-        "then": {
-          "properties": {
-            "username": {
-              "pattern": "^[\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$"
+    "dependencies": {
+      "auth_method": {
+        "oneOf": [
+          {
+            "properties": {
+              "auth_method": {
+                "enum": [
+                  "auto",
+                  "session",
+                  "basic"
+                ]
+              },
+              "username": {
+                "title": "Username",
+                "description": "Username of the BMC account. Required unless the authentication method is `none`.",
+                "type": "string",
+                "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+              },
+              "password": {
+                "title": "Password",
+                "description": "Password of the BMC account. Required unless the authentication method is `none`.",
+                "type": "string",
+                "minLength": 1
+              }
             },
-            "password": {
-              "maxLength": 0
+            "required": [
+              "username",
+              "password"
+            ]
+          },
+          {
+            "properties": {
+              "auth_method": {
+                "const": "none"
+              }
             }
           }
-        },
-        "else": {
-          "properties": {
-            "username": {
-              "pattern": "[^\t\n\u000b\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
-            },
-            "password": {
-              "minLength": 1
-            }
-          },
-          "required": [
-            "username",
-            "password"
-          ]
-        }
-      },
+        ]
+      }
+    },
+    "allOf": [
       {
         "if": {
           "properties": {
@@ -241,6 +231,13 @@
     },
     "url": {
       "ui:placeholder": "https://192.0.2.10/redfish/v1/"
+    },
+    "auth_method": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      },
+      "ui:help": "- `auto`: tries a Redfish session first and switches to HTTP Basic when the BMC does not offer sessions.\n- `session`: always uses a session. The BMC must publish an origin-relative `Links.Sessions` endpoint.\n- `basic`: sends HTTP Basic credentials with every request.\n- `none`: sends no credentials, so username and password are not shown."
     },
     "vnode": {
       "ui:placeholder": "<example-vnode-name>",

@@ -12,8 +12,10 @@ collect_snapshot() {
     local state=ok
     if (( depth >= warning )); then state=warning; fi
     nd_begin
-    nd_metric depth "$depth" queue "$queue"
-    nd_check backlog "$state" queue "$queue"
+    nd_metric depth gauge jobs
+    nd_sample "$ND_FAMILY" "$depth" queue "$queue"
+    nd_check backlog 'Queue Backlog' queue
+    nd_check_sample "$ND_FAMILY" "$state" queue "$queue"
     nd_end
 }
 case ${1:-} in

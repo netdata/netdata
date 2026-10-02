@@ -1,3 +1,48 @@
+//! Core value types of the file-registry substrate — the identity vocabulary
+//! every durable artifact is named and keyed by, plus the summary and scalar
+//! wrappers that travel with it. This crate is a leaf (no internal
+//! dependencies), so these types must stand alone.
+//!
+//! - [`MachineId`] / [`InstanceId`] / [`Identity`]: the node-and-process
+//!   identity stamped into every [`FileId`]; non-nil by construction.
+//! - [`FileId`]: a file's full identity plus its bidirectional filename-stem
+//!   codec. `crate::stem` owns the `{machine}-{instance}` prefix; this type
+//!   owns the rest.
+//! - [`SeqKey`]: the `(machine, instance, seq)` key for lifecycle state that
+//!   crosses identity boundaries.
+//! - [`TenantId`]: the tenant scoping selector, with separate ingest,
+//!   path-segment, and query validation policies.
+//! - [`FileSummary`]: the content-agnostic per-file summary.
+//! - [`TimestampNs`] / [`ByteSize`]: transparent `u64` wrappers.
+//!
+//! Two file-registry-wide wire contracts:
+//!
+//! - Serde is transparent for wrappers: newtype structs serialize their inner
+//!   value (`MachineId`/`InstanceId` as a bare `Uuid`, `TimestampNs`/`ByteSize`
+//!   as a bare `u64`, `TenantId` as a string), so they are wire-neutral
+//!   drop-ins for their inner values.
+//! - The stem is a lossless `FileId` encoding,
+//!   `<machine_id>-<instance_id>-<pipeline_id:05>-<seq:010>-<part_key:016x>`:
+//!   32-hex simple-form UUIDs, zero-padded decimal pipeline/seq, zero-padded
+//!   hex `part_key`. Rendering always emits the padded canonical form;
+//!   parsing is lenient about padding and rejects nil identities.
+//!
+//! [`FileId::pipeline_id`] is an opaque `u16`. The signal↔id mapping and its
+//! closed value set live in the integration layer (`bridge::signals`); there
+//! the numeric axis is the wire/disk form — stamped into `FileId`s, filenames,
+//! and WAL frames, never carrying a serialized `Signal` — and out-of-set ids
+//! are that layer's runtime error. file-registry carries the raw `u16` and
+//! ascribes it no meaning.
+//!
+//! Consumers: `file-lifecycle` and `otel-ledger` (identity-keyed lifecycle
+//! state, tenant routing); `wal`, `sfst`, `otel-catalog` (per-artifact
+//! registries; the catalog wire stores the summary fields next to the
+//! `FileId`); `otel-ingestor` and `ng-ingest` (ingest binaries: `Identity`
+//! construction, clock, scalars; `otel-ingestor` also validates tenants and
+//! stamps `FileId`s); `sfsq` and `sfsq-cli` (query engine and CLI over
+//! `SelectedFile`/`Query`); `bridge` and `otel-plugin` (the plugin config
+//! carries [`Identity`] to worker processes); `file-cache` (durable
+//! tmp+rename helpers); `ng-index` (tests only).
 use std::borrow::Borrow;
 use std::fmt;
 use std::path::Path;
@@ -57,15 +102,15 @@ impl TenantId {
         Ok(Self::from(id))
     }
 
-    /// Path-safety validation for a tenant segment recovered from a remote key
-    /// or a local directory name (NOT from a client). Enforces the same length
-    /// and `[a-zA-Z0-9._-]` charset as [`validate_ingest`](Self::validate_ingest)
-    /// (so `/` and control bytes are impossible — no path traversal), and still
-    /// rejects `.`/`..` (`date_tenant_dir(base, date, "..")` would escape), but
-    /// ALLOWS the literal [`DEFAULT`](TenantId::DEFAULT): a catalog this node
-    /// itself wrote under the auth-disabled tenant is a legitimate object to
-    /// parse. The `default`-rejection in `validate_ingest` is an ingest-side
-    /// policy (clients may not claim it), not a path-safety rule.
+    /// Path-safety validation for a tenant segment recovered from a remote
+    /// key or a local directory name (never from a client). Same length and
+    /// `[a-zA-Z0-9._-]` charset as [`validate_ingest`](Self::validate_ingest)
+    /// (`/` and control bytes impossible — no path traversal), still rejects
+    /// `.`/`..` (a `date_tenant_dir(base, date, "..")` segment would escape),
+    /// but ALLOWS the literal [`DEFAULT`](TenantId::DEFAULT): a catalog this
+    /// node itself wrote under the auth-disabled tenant is a legitimate
+    /// object to parse. The `default` rejection is an ingest-side client
+    /// policy, not a path-safety rule.
     pub fn validate_path_segment(id: &str) -> Result<Self, &'static str> {
         if id.is_empty() || id.len() > Self::MAX_LEN {
             return Err("tenant segment must be 1-64 bytes");
@@ -151,7 +196,9 @@ impl<'de> Deserialize<'de> for TenantId {
 // TimestampNs
 // ---------------------------------------------------------------------------
 
-/// Nanoseconds since the Unix epoch.
+/// Nanoseconds since the Unix epoch. A plain value carries no ordering
+/// guarantee; only [`MonotonicClock`](crate::clock::MonotonicClock) mints
+/// strictly increasing ones. Serializes transparently as the inner `u64`.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize,
 )]
@@ -179,7 +226,8 @@ impl fmt::Display for TimestampNs {
 // ByteSize
 // ---------------------------------------------------------------------------
 
-/// A byte count (file size, offset, etc.).
+/// A byte count (file size, offset, etc.). Serializes transparently as the
+/// inner `u64`.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize,
 )]
@@ -307,10 +355,12 @@ impl fmt::Display for InstanceId {
     }
 }
 
-/// The `(machine, instance)` identity pair stamped into every [`FileId`]. Passed
-/// as one value through the producer/threading layers (the WAL writer, the
-/// ingestor services, the plugin config) so the two ids cannot be transposed at
-/// a call site. Serializable so it can ride the plugin-config IPC to workers.
+/// The `(machine, instance)` identity pair stamped into every [`FileId`].
+/// Passed as one value through the producer/threading layers (the WAL writer,
+/// the ingestor services, the plugin config) so the two ids cannot be
+/// transposed at a call site. Serializable so the plugin config can carry it
+/// to the worker processes (the supervisor stamps it into `PluginConfig`
+/// before configuring any worker — see `bridge::config`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Identity {
     pub machine_id: MachineId,
@@ -326,9 +376,10 @@ impl Identity {
     }
 }
 
-/// A fixed non-nil [`Identity`] shared by tests across the workspace. The exact
-/// UUIDs are arbitrary — any non-nil pair works — but a single shared fixture
-/// keeps test identities consistent and avoids re-spelling the constructor.
+/// A fixed non-nil [`Identity`] shared by tests and fixtures across the
+/// workspace. The exact UUIDs are arbitrary — any non-nil pair works — but a
+/// single shared fixture keeps test identities consistent and avoids
+/// re-spelling the constructor.
 pub fn test_identity() -> Identity {
     Identity::new(
         MachineId::new(Uuid::from_u128(0x1111_2222_3333_4444_5555_6666_7777_8888)).unwrap(),
@@ -345,9 +396,10 @@ pub fn test_identity() -> Identity {
 /// instance's local files, which is why cross-identity state needs the full key.
 ///
 /// Deliberately NOT `Serialize`/`Deserialize` (unlike [`Identity`]/[`FileId`]):
-/// it is a purely in-process map/IPC key over tokio channels, never persisted
-/// and never crossing the ferryboat plugin-config boundary. Durable/cross-process
-/// identity travels as a [`FileId`] (catalog wire) or [`Identity`] instead.
+/// it is a purely in-process key — in-memory maps and in-process tokio
+/// channels — never persisted and never serialized across a process boundary.
+/// Durable/cross-process identity travels as a [`FileId`] (catalog wire) or
+/// [`Identity`] (plugin config) instead.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SeqKey {
     pub machine_id: MachineId,
@@ -399,35 +451,38 @@ impl std::fmt::Display for SeqKey {
 /// Uniquely identifies a file across machines, process instances, pipelines,
 /// and sequences.
 ///
-/// The filename format is:
-/// `<machine_id>-<instance_id>-<pipeline_id:05>-<seq:010>-<part_key:016x>.<ext>`
-/// where machine_id and instance_id are 32-character lowercase hex (no
-/// hyphens), pipeline_id is a 5-digit zero-padded decimal, seq is a 10-digit
-/// zero-padded decimal, and part_key is a 16-character zero-padded hex u64.
+/// The filename stem is the canonical lossless encoding —
+/// `<machine_id>-<instance_id>-<pipeline_id:05>-<seq:010>-<part_key:016x>` —
+/// built by [`to_stem`](Self::to_stem) and parsed by
+/// [`parse_stem`](Self::parse_stem); the exact field formats and the wire
+/// contracts are in the module docs.
 ///
 /// `part_key` is an opaque partition key and `pipeline_id` an opaque
 /// signal/pipeline discriminator: this crate never interprets either. The
-/// content plane derives them and assigns their meaning (for OTel logs today,
-/// `part_key` is the content plane's service-stream hash).
-/// `seq` is a single counter, unique within ONE process instance across
-/// pipelines — so it alone identifies a LOCAL file, but not across process
-/// instances or machines (a post-wipe reseed or a shared bucket can repeat a
-/// seq). State that crosses an identity boundary is keyed by [`SeqKey`], not
-/// bare `seq`. `pipeline_id` routes a file to its owning pipeline.
+/// content plane derives `part_key` and assigns its meaning (for OTel logs
+/// today, the content plane's service-stream hash); the integration layer
+/// assigns `pipeline_id` and owns the signal↔id mapping (`bridge::signals`).
+/// `pipeline_id` routes a file to its owning pipeline.
 ///
-/// Identity contract: `machine_id` is the Netdata machine GUID (permanent node
-/// identity); `instance_id` is a fresh UUID the plugin generates once per
-/// process at startup, so each plugin process — including a crash-respawn under
-/// one agent — has a distinct identity. Both are UUIDs; the 32-hex filename
-/// shape is unchanged from when this field held the OS boot id.
+/// `seq` is a single per-process counter shared across pipelines, so it alone
+/// identifies a LOCAL file and nothing beyond that: a post-wipe reseed (new
+/// process instance) or a shared bucket can repeat a seq under a different
+/// identity. State that crosses an identity boundary is keyed by [`SeqKey`],
+/// not bare `seq`.
+///
+/// Identity contract: `machine_id` is the Netdata machine GUID (permanent
+/// node identity); `instance_id` is a fresh UUID generated once per process at
+/// startup, so each plugin process — including a crash-respawn under one
+/// agent — has a distinct identity. Both are UUIDs, rendered into the stem as
+/// 32-hex without hyphens by `crate::stem`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct FileId {
     pub machine_id: MachineId,
     pub instance_id: InstanceId,
     /// Opaque pipeline/signal discriminator assigned by the integration layer
-    /// (the signal↔id mapping is the integration layer's, e.g. `bridge::signals`;
-    /// `file-registry` ascribes no meaning to the value). Always chosen
-    /// explicitly at construction — there is no default pipeline.
+    /// (the signal↔id mapping is its concern — see `bridge::signals` and the
+    /// module docs). Always chosen explicitly at construction; there is no
+    /// default pipeline.
     pub pipeline_id: u16,
     pub seq: u64,
     /// Opaque partition key; the content plane derives it.
@@ -435,9 +490,9 @@ pub struct FileId {
 }
 
 impl FileId {
-    /// Construct a `FileId`. The `pipeline_id` is always chosen explicitly by the
-    /// integration layer (the signal↔id mapping is its concern, e.g.
-    /// `bridge::signals`); there is no default pipeline.
+    /// Construct a `FileId` from an [`Identity`] plus the opaque
+    /// `pipeline_id` / `seq` / `part_key` fields (conventions in the struct
+    /// docs).
     pub fn new(identity: Identity, pipeline_id: u16, seq: u64, part_key: u64) -> Self {
         Self {
             machine_id: identity.machine_id,
@@ -465,15 +520,21 @@ impl FileId {
         format!("{}.{}", self.to_stem(), ext)
     }
 
-    /// Parse a filename (not a full path) into a FileId.
-    ///
-    /// Expects: `<machine_id>-<instance_id>-<pipeline_id>-<seq>-<part_key>.<ext>`
+    /// Parse a path's file stem into a `FileId`: the file name minus its last
+    /// extension, so any directory prefix and any extension are ignored.
+    /// `None` when the name is not valid UTF-8 or the stem does not decode.
     pub fn parse(path: &Path) -> Option<Self> {
         let name = path.file_stem()?.to_str()?;
         Self::parse_stem(name)
     }
 
-    /// Parse just the stem: `<machine_id>-<instance_id>-<pipeline_id>-<seq>-<part_key>`
+    /// Parse just the stem:
+    /// `<machine_id>-<instance_id>-<pipeline_id>-<seq>-<part_key>`.
+    ///
+    /// Lenient about zero-padding (any decimal/hex width parses) and strict
+    /// about shape: `None` for a malformed UUID prefix (`crate::stem`), a
+    /// `pipeline_id` that does not fit `u16`, an unparsable `seq` or
+    /// `part_key`, or a nil machine/instance id.
     pub fn parse_stem(stem: &str) -> Option<Self> {
         let (machine_uuid, instance_uuid, rest) = crate::stem::parse_uuid_pair(stem)?;
 
@@ -510,9 +571,9 @@ impl fmt::Display for FileId {
 }
 
 // `Ord`/`PartialOrd` are derived: field order (machine_id, instance_id,
-// pipeline_id, seq, part_key) yields the same ordering the previous hand-written
-// impl produced, and the `MachineId`/`InstanceId` newtypes compare by their
-// inner UUID's byte order (identical to the old `as_bytes().cmp()`).
+// pipeline_id, seq, part_key) — within one identity and pipeline, files sort
+// by seq then part_key; pipeline_id dominates seq across pipelines. The
+// `MachineId`/`InstanceId` newtypes compare by their inner UUID's byte order.
 
 // ---------------------------------------------------------------------------
 // FileSummary
@@ -523,14 +584,15 @@ impl fmt::Display for FileId {
 /// blob that the content plane (de)serializes and the substrate never
 /// interprets.
 ///
-/// This is the substrate's replacement for the content-typed per-file summary
-/// the storage tiers carried before the restructure (where the summary embedded
-/// an OTLP service stream). The time range and `record_count` drive candidate
-/// selection and retention; `content_meta` carries the content plane's
-/// per-file identity (for logs, the encoded `(namespace, name)` — see the
-/// `otel-logs-identity` crate). The partition key is NOT a summary field — it
-/// lives only in the file's [`FileId`] (filename), the single source of truth;
-/// candidate filtering reads `id.part_key`.
+/// The `[min, max]` second timestamps drive candidate selection
+/// ([`Query::overlaps`](crate::query::Query::overlaps)) and age-based
+/// retention; `record_count == 0` marks an empty file (recovery drops an
+/// indexed-empty WAL's SFST, and an empty SFST ages out immediately).
+/// `content_meta` carries the content plane's per-file identity (for OTel
+/// logs, the encoded `(namespace, name)` — see the `otel-logs-identity`
+/// crate). The partition key is NOT a summary field — it lives only in the
+/// file's [`FileId`] (filename), the single source of truth; candidate
+/// filtering reads `id.part_key`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileSummary {
     /// Earliest record timestamp in the file, seconds since the Unix epoch.
@@ -539,9 +601,8 @@ pub struct FileSummary {
     pub max_timestamp_s: u32,
     /// Number of records (rows) the file holds.
     pub record_count: u32,
-    /// Opaque content-plane metadata, stored verbatim and never parsed by the
-    /// substrate. The partition key is NOT stored here — it lives only in the
-    /// file's `FileId` (filename), the single source of truth.
+    /// Opaque content-plane metadata, stored verbatim and never parsed by
+    /// the substrate.
     pub content_meta: Vec<u8>,
 }
 

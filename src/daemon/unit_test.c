@@ -2676,7 +2676,7 @@ int test_sqlite(void) {
 
     fprintf(stderr,"SQLite is OK\n");
     (void) sqlite3_close_v2(db_mt);
-    return 0;
+    return sqlite_lease_unittest();
 }
 
 #ifdef OS_WINDOWS

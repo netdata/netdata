@@ -1,3 +1,7 @@
+# otel.plugin collector metadata. The YAML values are the integration page copy:
+# the integrations pipeline renders them into README.md and the Learn page, so edit
+# claims here, never in the generated outputs. Other comments anchor where each
+# group of claims is implemented, for re-verification when the plugin changes.
 plugin_name: otel.plugin
 modules:
   - meta:
@@ -25,6 +29,9 @@ modules:
           list: []
       info_provided_to_referring_integrations:
         description: ""
+    # Metric kinds, sum flavors, the `otel.` context prefix, and the mapping
+    # option keys are implemented in otel-ingestor (chart.rs, chart_config.rs,
+    # aggregation.rs); the endpoint is gRPC-only (otel-ingestor/src/lib.rs).
     overview:
       data_collection:
         metrics_description: |
@@ -59,6 +66,10 @@ modules:
         auto_detection:
           description: |
             The plugin starts automatically and listens on `127.0.0.1:4317` for OTLP/gRPC connections.
+        # The ingest windows are bridge::config defaults (netdata-plugin/bridge/
+        # src/config.rs IngestConfig: 24h max_age, 10m future_skew); the chart cap
+        # is the stock-file value the ingestor enforces; retention evicts on
+        # whichever bound is hit first.
         limits:
           description: |
             Each export request can create at most 100 new charts by default. This is a per-request throttle, not a total cardinality limit. By default, log timestamps are accepted from up to 24 hours in the past through 10 minutes in the future; records without a timestamp use their arrival time. A span is accepted when it started no more than 24 hours ago and ends no more than 10 minutes in the future. Log and trace retention are each bounded by whichever limit is reached first: retained file count, retained indexed-data size, or age.
@@ -77,13 +88,18 @@ modules:
       configuration:
         file:
           name: otel.yaml
+        # The option rows' default_value entries mirror the stock
+        # configs/otel.yaml.in (its @*_POST@ placeholders resolve to the standard
+        # Linux package paths shown below); update both together. The env-var
+        # naming rules and strict-config behavior live in otel-plugin/src/config/
+        # (env.rs, mod.rs, legacy.rs).
         options:
           description: |
             Edit `otel.yaml` with [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files). A user file can contain only the fields that differ from the stock configuration. Configuration resolves in this order: stock file, user file, then environment variables. Restart the Netdata Agent after changing `otel.yaml` or any `NETDATA_OTEL_CFG_*` environment variable.
 
             The absolute paths shown below are the defaults for standard Linux packages. The installed stock configuration resolves its configuration and log directories for the installation layout, so macOS and custom-prefix installations use different paths. Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) with `otel.yaml` to inspect the installed values.
 
-            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Most names are the uppercase option path with dots replaced by underscores. For example, `endpoint.tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
+            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Names are the uppercase option path with dots replaced by underscores. For example, `endpoint.tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
 
             Configuration is strict. Unknown YAML fields, unknown `NETDATA_OTEL_CFG_*` variables, malformed values, and the former experimental schema prevent the plugin from starting. The effective configuration is logged at startup; `remote_storage.uri` is redacted in that log.
           folding:
@@ -139,9 +155,12 @@ modules:
             - name: base_dir
               description: Absolute root directory for locally stored OpenTelemetry logs and traces.
               detailed_description: |
-                Retention limits govern retained indexed files. Write-ahead logs, catalogs, and the download cache for offloaded data (`<base_dir>/remote-read`) can make total usage below this directory exceed the `retention.*.max_total_size` limits.
+                Retention limits govern retained indexed files. Write-ahead logs, catalogs, and the download cache for offloaded data (in the `remote-read` subdirectory under your configured base directory) can make total usage below this directory exceed the `retention.*.max_total_size` limits.
               default_value: "/var/log/netdata/otel/v2"
               required: false
+            # Cache and download claims are file-lifecycle behavior: the shared
+            # `{base_dir}/remote-read` cache and the 30s + 1 MiB/s (5 min cap)
+            # deadline are remote_read.rs; fs/s3 select opendal backends.
             - name: remote_storage.enabled
               description: Upload retained OpenTelemetry logs and traces to configured remote object storage.
               detailed_description: |
@@ -157,6 +176,12 @@ modules:
             - name: remote_storage.read_cache_max_size
               description: Maximum size of the local download cache, shared by logs and traces, for data fetched back from remote storage during queries.
               default_value: "1GB"
+              required: false
+            - name: auth.enabled
+              description: Require the `X-Scope-OrgID` gRPC header to select a log or trace tenant.
+              detailed_description: |
+                This is tenant selection, not credential authentication. When disabled, all logs and traces belong to the `default` tenant. When enabled, trust the header only behind TLS or mutual TLS and suitable network controls. Metrics are not tenant-scoped.
+              default_value: false
               required: false
             - name: logs.rotation.default.max_file_size
               description: Write-ahead log file size that triggers rotation.
@@ -198,6 +223,8 @@ modules:
                 This is not a cap on all plugin disk use. Write-ahead logs, catalogs, and cache are additional.
               default_value: "1GB"
               required: false
+            # File age here is judged on the newest span's start time (ng-index
+            # row timestamps; sfst registry eviction).
             - name: traces.retention.default.max_age
               description: Maximum retained indexed trace-file age, measured on the start time of its newest span.
               default_value: "7 days"
@@ -222,7 +249,7 @@ modules:
               folding:
                 enabled: true
               description: |
-                A user file needs only the fields that change; omitted fields keep their stock values. Logs and traces have separate settings.
+                A user file needs only the fields that change; omitted fields keep their stock values. Logs and traces have separate settings, each tenant entry inherits omitted fields from `default`, and a per-tenant key must match the sender's `X-Scope-OrgID` value when `auth.enabled` is true.
               config: |
                 logs:
                   retention:
@@ -252,6 +279,10 @@ modules:
                       dimension_attribute_key: direction
                   "redis.cpu.time":
                     - dimension_attribute_key: state
+    # Quoted journal lines must match the shipped log text: the bind error is
+    # formatted in otel-ingestor/src/lib.rs, the disable line is emitted by
+    # src/plugins.d/plugins_d.c, and the "otel-plugin/ingestor" worker journal
+    # name is set in otel-plugin/src/main.rs.
     troubleshooting:
       errors:
         list:

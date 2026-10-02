@@ -1,17 +1,19 @@
-//! `OtelTracesHandler` — typed `FunctionHandler` implementation for the
+//! `OtelTracesHandler` — the typed `FunctionHandler` for the
 //! `otel-traces` Function.
 //!
-//! The full mode catalog is implemented: `info` (capability
-//! discovery), `trace` (exact single-trace fetch), `search` (bounded
-//! most-recent-first trace search), the enumeration pair `attributes`
-//! / `attribute_values` (the facet rail's vocabulary), `overview` (the
-//! trace-density grid — the UI's default paint), and `slowest` (the
-//! window's duration-ranked top-K traces). Mode selection and every
-//! request-SHAPE validation happen during deserialization (the wire's
-//! typed request — shape errors are transport 400s); this handler owns
-//! only the semantic validation (trace-id shape, zero limit, bounds).
+//! The full mode catalog lives here: `info` (capability discovery),
+//! `trace` (exact single-trace fetch), `search` (bounded
+//! most-recent-first search), the enumeration pair `attributes`
+//! / `attribute_values` (the facet lists' vocabulary), `overview` (the
+//! trace-density grid), and `slowest` (the window's duration-ranked
+//! top-K). Mode selection and every request-SHAPE check happen at
+//! deserialization (the wire's typed request — shape errors are
+//! transport 400s); this handler owns only the semantic validation
+//! (trace-id shape, zero limits, bounds).
+//!
 //! The wire contract lives in [`super::wire`], the engine mapping in
-//! [`super::adapter`], and source resolution in [`super::sources`].
+//! [`super::adapter`], source resolution in [`super::sources`], and
+//! the shared time-grid derivation in [`super::super::grid`].
 //!
 //! Netdata-plugin glue only, like the logs handler: the engine
 //! ([`sfsq::traces`]) stays wire-neutral; the bridge's `HandlerAdapter`
@@ -84,16 +86,15 @@ fn capture_error(e: CaptureError) -> netdata_plugin_error::NetdataPluginError {
 
 /// The Functions view's aggregate half: what the second engine pass
 /// needs beyond the page's own window. The window itself is the page's
-/// (aligned to the grid); the predicate is the page's `selections` and
+/// (grid-aligned); the predicate is the page's `selections` and
 /// nothing else — never the duration bounds — and the wire's scope flag
-/// reports whether one ran.
+/// reports which one ran.
 ///
-/// Requested as an `Option`: `None` means no second pass and no
-/// `overview` section on the response. The Functions view passes `None`
-/// on an ANCHOR page (see the anchor gate in `functions`); the legacy
-/// `search` mode always does.
+/// `None` means no second pass and no `overview` section: the Functions
+/// view passes `None` on an ANCHOR page (the anchor gate in
+/// `functions`); the legacy `search` mode always does.
 struct AggregateRequest {
-    /// Root-facet lists: opted in by the request AND allowed by the
+    /// Root-facet lists: requested by the caller AND allowed by the
     /// scope gate (see `functions`).
     facets: bool,
     /// The heatmap's filter: the page's selections when they are all
@@ -124,17 +125,15 @@ impl OtelTracesHandler {
     /// The `trace` mode: exact single-trace fetch via the engine's
     /// cross-source `trace_by_id`.
     ///
-    /// Ignores the ENVELOPE window; assembly bounds live in the `trace`
+    /// Ignores the envelope window; assembly bounds live in the `trace`
     /// sub-object. Absent bounds capture the FULL range, remote history
-    /// included (so the lookup fails as too large once that history
-    /// exceeds the download cache) — a trace is an exact object whose spans
-    /// straddle files (WAL rotation is content-agnostic), and only the
-    /// caller knows how much slack its anchor deserves. Present bounds
-    /// prune the capture file-granularly
-    /// (a file overlapping the bounds is probed whole). Either way the
-    /// response DECLARES the range used (`coverage`) — spans beyond it
-    /// are unknown, never silently dropped: the declaration is the
-    /// honesty. An absent id is a Complete empty trace, not an error.
+    /// included (too-large history fails via the download cache rather
+    /// than truncate) — a trace is one object whose spans straddle
+    /// files. Present bounds prune file-granularly (a file overlapping
+    /// the bounds is probed whole). Either way the response DECLARES
+    /// the range used (`coverage`) — spans beyond it are unknown, never
+    /// silently dropped. An id absent from the sources is a Complete
+    /// empty trace, not an error.
     async fn trace(
         &self,
         ctx: &FunctionCallContext,
@@ -227,9 +226,11 @@ impl OtelTracesHandler {
         ))))
     }
 
-    /// The `search` mode: the engine's bounded most-recent-first trace
-    /// search over the request's (canonicalized) window, with wire-level
-    /// tie-safe pagination — see the adapter's cursor docs.
+    /// The engine's bounded most-recent-first search over the request's
+    /// (canonicalized) window, with wire-level tie-safe pagination —
+    /// see the adapter's cursor docs. The shared page core of both the
+    /// `search` mode and the Functions view (which layers the aggregate
+    /// on through `aggregate`).
     ///
     /// `aggregate` adds the Functions view's full-window section: a
     /// SECOND engine pass in this same call, off the same capture. It
@@ -308,13 +309,12 @@ impl OtelTracesHandler {
         }
 
         // ONE capture over the COMPLETION range (the match window
-        // widened by the clamped slack), two roles: the engine narrows
-        // the window role internally (SFSTs by summary overlap, tail
-        // spans per-span), so identical copies keep window ⊆ completion
-        // by construction while slack-only files still complete
-        // straddling hits. The cursor keeps freezing the ORIGINAL
-        // window (window.capture) — the completion range re-derives
-        // from it deterministically on every page.
+        // widened by the clamped slack), feeding two roles: the engine
+        // narrows the window role internally, so identical copies keep
+        // window ⊆ completion by construction while slack-only files
+        // still complete straddling hits. The cursor keeps freezing the
+        // ORIGINAL window (window.capture) — the completion range
+        // re-derives from it deterministically on every page.
         let completion_range = completion_capture_range(&window.capture);
         let completion_coverage = CoverageWire {
             after: completion_range.start,
@@ -346,6 +346,7 @@ impl OtelTracesHandler {
             .capture_ranges(&tenant, &ranges, &ctx.cancellation, &ctx.progress)
             .await
             .map_err(capture_error)?;
+        // The pops unwind `ranges` (aggregate was pushed last).
         let aggregate_sources = match aggregate_grid {
             Some(_) => sets.pop().unwrap_or_default(),
             None => Vec::new(),
@@ -477,26 +478,21 @@ impl OtelTracesHandler {
         let heatmap_predicate = heatmap_predicate(&params.selections)
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?
             .filter(|p| p.trace_level_target().is_none());
-        // The anchor gate. An anchor page reruns the same query — same
-        // selections — over the cursor's FROZEN window, so the section it
-        // would compose is the one the first page already delivered,
-        // byte for byte. Only the rows advance. Composing it again would
-        // spend a second full-window engine pass per page of a walk, so
-        // it is skipped and the section is simply ABSENT: consumers
-        // detect it by presence (a `null` was never on the wire), and the
-        // window can only change on a request that carries no anchor (an
-        // anchor page IGNORES the request's own bounds), which composes
-        // it afresh.
+        // The anchor gate. An anchor page reruns the same query over the
+        // cursor's FROZEN window, so the section it would compose is the
+        // first page's, byte for byte — only the rows advance. It is
+        // skipped and the section simply ABSENT (never a `null` on the
+        // wire); consumers re-read it on the next anchor-less request,
+        // the only kind that can move the window. Details on the wire
+        // (`SearchResult::overview`).
         //
-        // The scope gate. The root-facet lists stay suppressed while ANY
-        // page filter is active. For the duration bounds this is
-        // correctness: the grid never applies them, so lists over the
-        // unfiltered durations would contradict the page. For the
-        // selections it is a product choice (the lists would be exact,
-        // since the grid now applies them) kept for one uniform rule:
-        // facets describe the whole window or not at all. Gated before
-        // the engine call, so the suppressed lists also cost nothing (the
-        // facets' price is the sealed sources' dictionary decodes).
+        // The scope gate. Root-facet lists stay suppressed while ANY page
+        // filter is active — correctness where the grid cannot apply the
+        // filter (the trace-duration bounds, a trace-level word) and one
+        // uniform rule for the rest: facets describe the whole window or
+        // not at all. Gated before the engine call, so suppressed lists
+        // cost nothing (their price is the sealed sources' dictionary
+        // decodes).
         let aggregate = params.anchor.is_none().then(|| AggregateRequest {
             facets: params.overview_facets.unwrap_or(false)
                 && params.selections.is_empty()
@@ -542,7 +538,7 @@ impl OtelTracesHandler {
     }
 
     /// The `attributes` mode: exact dictionary-backed key enumeration —
-    /// the facet rail's vocabulary, in the selection grammar.
+    /// the facet lists' vocabulary, in the selection grammar.
     async fn attributes(
         &self,
         ctx: &FunctionCallContext,
@@ -804,6 +800,10 @@ impl FunctionHandler for OtelTracesHandler {
         }
     }
 
+    /// Advertise the function to the agent/Cloud: `global` (not scoped
+    /// to one node), tagged `traces`, accessible to signed-in users of
+    /// the same space, with the SENSITIVE_DATA flag since trace payloads
+    /// may carry sensitive content.
     fn declaration(&self) -> FunctionDeclaration {
         let mut d = FunctionDeclaration::new("otel-traces", "Query OpenTelemetry traces");
         d.global = true;

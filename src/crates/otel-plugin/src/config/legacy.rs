@@ -3,18 +3,21 @@
 //! "unknown field" error.
 //!
 //! The former plugin configured logs with journal-file knobs
-//! (`size_of_journal_file`, `number_of_journal_files`, ...). Values do not
-//! carry over: the storage engine changed, file sizes and counts mean
-//! different things, and the defaults changed too — so nothing is migrated
-//! automatically. The operator re-decides each value; this module hands them
-//! the key mapping. `logs.journal_dir` is the one former key that is still
-//! valid (read-only pointer to the old journals; see
-//! `resolve_legacy_journal_dir`).
+//! (`size_of_journal_file`, `number_of_journal_files`, ...); that is the only
+//! section whose keys changed — the former endpoint/metrics keys are still
+//! valid. Values do not carry over: the storage engine changed, file sizes
+//! and counts mean different things, and the defaults changed too — so
+//! nothing is migrated automatically. The operator re-decides each value;
+//! this module hands them the key mapping. `logs.journal_dir` is the one
+//! former key that is still valid (read-only pointer to the old journals;
+//! see `resolve_legacy_journal_dir`).
 
 use std::path::Path;
 
-/// The former `logs:` keys that no longer exist, with their guidance.
-/// `journal_dir` is absent: it is still a valid key.
+/// The former `logs:` keys that no longer exist, each mapped to its
+/// replacement key (or a `removed` note). One table drives both detection
+/// and the mapping printed in the guide. `journal_dir` is absent: it is
+/// still a valid key.
 const FORMER_LOGS_KEYS: [(&str, &str); 7] = [
     (
         "size_of_journal_file",
@@ -44,8 +47,10 @@ const FORMER_LOGS_KEYS: [(&str, &str); 7] = [
 ];
 
 /// Wrap a user-file parse failure, adding a migration guide when the file is
-/// recognizably the former schema. Always carries the "parsing <path>" context
-/// the plain error path carries.
+/// recognizably the former schema. Called from `ConfigResolver::resolve`
+/// (mod.rs) for the user file only — the stock file's parse errors keep the
+/// plain form. Always carries the parsing `path` context the plain error
+/// path carries.
 pub(super) fn enrich_parse_error(
     path: &Path,
     contents: &str,
@@ -61,9 +66,11 @@ pub(super) fn enrich_parse_error(
 }
 
 /// When `contents` is well-formed YAML whose `logs:` section carries former
-/// schema keys, return the operator-facing migration guide. Returns `None` for
-/// files that are not recognizably the former schema (including files that do
-/// not parse as YAML at all — those keep the plain syntax error).
+/// schema keys, return the operator-facing migration guide. The guide's
+/// header names only the keys actually present; the mapping table beneath
+/// lists all of them. Returns `None` for files that are not recognizably the
+/// former schema (including files that do not parse as YAML at all — those
+/// keep the plain syntax error).
 fn former_schema_guidance(contents: &str) -> Option<String> {
     let value: serde_yaml::Value = serde_yaml::from_str(contents).ok()?;
     let logs = value.get("logs")?.as_mapping()?;
@@ -99,7 +106,8 @@ fn former_schema_guidance(contents: &str) -> Option<String> {
 mod tests {
     use super::*;
 
-    /// The former plugin's stock `logs:` section, verbatim shape.
+    /// The former plugin's stock otel.yaml minus its metrics section: the
+    /// endpoint block plus a full `logs:` set, values verbatim.
     const FORMER_FILE: &str = r#"
 endpoint:
   path: "127.0.0.1:4317"
@@ -118,10 +126,10 @@ logs:
     fn former_stock_file_is_detected_with_full_guide() {
         let guide = former_schema_guidance(FORMER_FILE).expect("former schema detected");
         assert!(guide.contains("former (experimental) otel.yaml schema"));
-        // Names every former key found in the file.
+        // The header names the former keys found in the file.
         assert!(guide.contains("found logs.size_of_journal_file"));
         assert!(guide.contains("logs.store_otlp_json"));
-        // Maps every former key.
+        // Spot-checks the mapping table: rotation, retention, and the removed key.
         assert!(guide.contains("size_of_journal_file      -> logs.rotation.default.max_file_size"));
         assert!(guide.contains("number_of_journal_files   -> logs.retention.default.max_files"));
         assert!(guide.contains("store_otlp_json           -> removed (no replacement)"));

@@ -1,12 +1,20 @@
 //! The query-plane reader for the split-FST index format.
 //!
-//! Opens an `.sfst` file (typically via mmap) and provides query methods
+//! Opens an `.sfst` file (typically an mmap of a chunk-cached index file —
+//! see `src/crates/file-lifecycle/src/chunk.rs`) and provides query methods
 //! that follow the access pattern described in `sfst/FORMAT.md`:
 //!
-//! 1. Decode SUMR + META + PRIM eagerly on open (always needed).
-//! 2. Look up low-card `key=value` pairs in the primary FST → bitmap.
-//! 3. Load secondary chunks on demand (mid-card FST or high-card blob).
-//! 4. Load per-stream log entries for attribute resolution.
+//! 1. Decode `SUMR` + `META` + `PRIM` eagerly on open (always needed).
+//! 2. Look up low-card `key=value` pairs in the primary FST → position bitmap.
+//! 3. Load secondary chunks on demand (mid-card `MF{hi}{lo}` FST or
+//!    high-card `HF{hi}{lo}` columnar chunk).
+//! 4. Load stream batches (`SB0{N}`) for attribute resolution.
+//!
+//! Consumers (grep-verified): the ledger's log/trace query paths open one
+//! reader per file (src/crates/otel-ledger/src/ledger/rpc/logs/handler.rs,
+//! src/crates/otel-ledger/src/ledger/rpc/traces/sources.rs), and the sfsq
+//! traces search wraps them in trace sessions
+//! (src/crates/sfsq/src/traces/search.rs).
 
 use std::collections::HashMap;
 
@@ -41,15 +49,16 @@ pub struct IndexReader<'a> {
     primary: PrefixMap<BitmapValue>,
 }
 
-/// One materialized span of a trace reconstructed by [`IndexReader::trace_by_id`]:
-/// its ids, timing, per-row scalars, attribute facets (`name`, `kind`,
-/// `status_code`, `trace_state`, `status_message`, `attributes.*`) as flat
-/// `(key, value)` pairs, and its structured events/links (from the `EVNB`/`LNKB`
-/// chunks; empty when the file predates them or the span has none).
+/// One materialized span of a reconstructed trace: its ids, timing, per-row
+/// scalars, attribute facets (`name`, `kind`, `status_code`, `trace_state`,
+/// `status_message`, `attributes.*`) as flat `(key, value)` pairs, and its
+/// structured events/links (from the `EVNB`/`LNKB` chunks; empty when the
+/// file predates them or the span has none). Built by
+/// [`IndexReader::trace_by_id`] and the cross-source combiner alike.
 /// `Serialize` exists for the combiner's canonical encoding
-/// ([`crate::trace_combine::canonical_bytes`]) — the field ORDER of this
-/// struct is part of that encoding and thus of the canonical-copy
-/// contract (pre-release changeable, frozen at release).
+/// ([`crate::trace_combine::canonical_bytes`]): the field ORDER of this
+/// struct is part of that encoding and of the canonical-copy contract
+/// (changeable pre-release, frozen at release).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct TraceSpan {
     pub span_id: SpanId,
@@ -57,10 +66,9 @@ pub struct TraceSpan {
     pub start_ns: i64,
     pub duration_ns: i64,
     /// Raw OTLP span kind int (0 = UNSPECIFIED, which older files leave
-    /// absent), parsed once from
-    /// the `_kind` facet at materialization — part of the combiner's
-    /// dedup key (shared client/server span ids are real). The readable
-    /// `kind` label stays in [`fields`](Self::fields).
+    /// absent), parsed from the low-card `_kind` facet at materialization —
+    /// part of the combiner's dedup key (shared client/server span ids are
+    /// real). The readable `kind` label stays in [`fields`](Self::fields).
     pub kind: i32,
     /// W3C trace flags (the low byte carries the sampled bit).
     pub flags: u32,
@@ -188,8 +196,10 @@ fn kv_attr(strings: &HashMap<u32, String>, id: crate::KvId, prefix: &str) -> (St
 impl<'a> IndexReader<'a> {
     /// Open a split-FST index from a byte slice (typically an mmap).
     ///
-    /// Immediately deserializes the summary, metadata, and primary FST.
-    /// Metadata stays cached on the underlying chunk reader.
+    /// Immediately deserializes the summary, metadata, and primary FST —
+    /// a summary-only file (no queryable chunks) is rejected here.
+    /// Everything else (timestamps, per-row columns, trace structures,
+    /// stream batches) decodes lazily, on the accessor that needs it.
     pub fn open(data: &'a [u8]) -> Result<Self, crate::Error> {
         let sfst = ChunkReader::open(data)?;
         let summary = sfst.summary()?;
@@ -514,7 +524,7 @@ impl<'a> IndexReader<'a> {
     /// scan, MF FST, or HF arena) — never stream batches, per-row
     /// columns, or the trace index/bloom — which is what makes tag-value
     /// enumeration affordable across whole retention. A field absent
-    /// from this file's field table is [`Error::UnknownField`] (callers
+    /// from this file's field table is [`crate::Error::UnknownField`] (callers
     /// consult [`field_table`](Self::field_table) first; filtering-style
     /// absent-matches-nothing is the caller's call to make, not this
     /// accessor's).
@@ -811,7 +821,8 @@ impl<'a> IndexReader<'a> {
             .map(|_| vec![Vec::new(); positions.len()])
             .collect();
 
-        // Matched positions are a set, so each maps to exactly one output slot.
+        // Position → output slot; duplicate positions collapse to the last
+        // occurrence (that slot receives the value, earlier ones stay empty).
         let slot: std::collections::HashMap<u32, usize> =
             positions.iter().enumerate().map(|(i, &p)| (p, i)).collect();
 
@@ -1228,9 +1239,8 @@ impl<'a> IndexReader<'a> {
     /// full-value-anchored and test the field's distinct values. Returns
     /// the empty set if the field is absent from this file.
     ///
-    /// All-exact selections (every query without a regex) take the same
-    /// lookups they always have; patterns add an enumeration pass over the
-    /// field's values only when present.
+    /// Exact selections resolve by direct lookups only; patterns add one
+    /// enumeration pass over the field's distinct values.
     ///
     /// A malformed pattern is a hard failure ([`crate::Error::InvalidPattern`]),
     /// not "matches nothing" — validate patterns at the request boundary.
@@ -1740,10 +1750,15 @@ impl PosSet {
     /// `Copy`; only the tree bytes are cloned.
     ///
     /// Invariant: the writer builds every value bitmap at the same
-    /// `universe_size` (`== record_count`), which is what lets the resulting set
-    /// combine with `range`/`full`/other values via `and`/`or` — those require
-    /// matching universes (a mismatch is only a debug assert, so it would be
-    /// silently wrong in release).
+    /// `universe_size` (`== record_count`; build.rs remaps insertion-order
+    /// rows to chronological positions), which is what lets the resulting
+    /// set combine with `range`/`full`/other values via `and`/`or`. Treight
+    /// enforces the match: a `debug_assert` on the `Bitmap` wrapper
+    /// (treight/src/bitmap.rs) plus an UNCONDITIONAL `assert_eq!` in the raw
+    /// tree ops once dispatched (treight/src/raw.rs) — so a violating file
+    /// panics in release too, it cannot silently mis-answer; the only
+    /// unchecked paths are the empty/full short-circuits, and those return
+    /// value-correct results regardless of universe.
     fn from_value(bv: &BitmapValue) -> Self {
         Self {
             bitmap: bv.desc,
@@ -1842,6 +1857,8 @@ impl KvIdSet {
         self.bits[i / 64] |= 1u64 << (i % 64);
     }
 
+    /// Whether `kvid` was inserted; ids outside `[base, base + width)`
+    /// read as absent.
     fn contains(&self, kvid: KvId) -> bool {
         let k = kvid.0;
         if k < self.base || k - self.base >= self.width {

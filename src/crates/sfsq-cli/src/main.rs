@@ -1,9 +1,11 @@
-//! `sfsq-cli` — inspect OTel logs stored in Netdata's WAL/SFST files from the
-//! terminal, without a running agent.
+//! `sfsq-cli` — inspect OTel logs and traces stored in Netdata's WAL/SFST
+//! files from the terminal, without a running agent.
 //!
 //! A thin shell: the query surface (`Args`, `run`, tracing, broken-pipe) lives
 //! in the `sfsq_cli` lib so the `otel-plugin logs` subcommand shares it. This
-//! binary only owns argument parsing, tracing setup, and exit-code mapping.
+//! binary only owns argument parsing, tracing setup, and exit-code mapping,
+//! over two dispatch paths: the top-level flags run the logs query (`run`),
+//! and the trace subcommands go to the `sfsq_cli::traces` runners.
 
 use std::io;
 use std::process::ExitCode;
@@ -46,6 +48,10 @@ enum Cmd {
     Search(SearchArgs),
 }
 
+/// Run one query and map its result to a process exit code. Bad argv exits
+/// inside `Cli::parse` (usage to stderr, status 2). Both dispatch paths share
+/// the same mapping — success and a broken downstream pipe (e.g. `| head`)
+/// exit 0 quietly; any other error prints `error: …` to stderr and exits 1.
 fn main() -> ExitCode {
     init_tracing();
     let cli = Cli::parse();
@@ -83,9 +89,9 @@ fn main() -> ExitCode {
 mod tests {
     use super::*;
 
-    /// clap must accept the leading-dash relative form (`--since -1h`) rather
-    /// than treating `-1h` as an unknown flag — this is what `allow_hyphen_values`
-    /// on the `since`/`until` args buys, and it is the form the README documents.
+    /// clap must accept leading-dash relative times (`--since -1h`) instead of
+    /// rejecting `-1h` as an unknown flag — the `allow_hyphen_values` behavior
+    /// on `since`/`until` that the README documents.
     #[test]
     fn accepts_leading_dash_relative_times() {
         let cli = Cli::try_parse_from([

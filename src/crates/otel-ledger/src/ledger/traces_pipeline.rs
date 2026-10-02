@@ -1,22 +1,22 @@
-//! The traces binding: spawns the shared [`crate::indexer::Indexer`] seal
-//! worker with the **traces** seal ([`ng_index::build_sfst_traces_file`] —
-//! full span columns, `TIDX` trace-id index, `TBLM` bloom, `EVNB`/`LNKB`
-//! structures) and delegates to the shared [`super::pipeline::build_pipeline`]
-//! with a closure that wires the [`OtelTracesHandler`]. A second signal
-//! plugs into the content-agnostic substrate through the same builder as
-//! logs, differing only in its seal function + handler.
+//! The traces binding — the twin of the logs binding in
+//! [`super::pipeline`]. It pre-spawns the shared
+//! [`crate::indexer::Indexer`] seal worker with the **traces** seal
+//! ([`ng_index::build_sfst_traces_file`]: full span columns, `TIDX`
+//! trace-id index, `TBLM` trace-id bloom, `EVNB`/`LNKB` event/link
+//! chunks) and delegates the rest to [`super::pipeline::build_pipeline`].
+//! Only the seal function, the handler, and the GET shim differ from logs.
 //!
-//! The query handler is [`OtelTracesHandler`] (`rpc/traces/`), the
-//! `otel-traces` Function: `info` capability discovery plus the
-//! `trace`/`search`/`attributes`/`attribute_values`/`overview`/`slowest`
-//! data modes. It shares the logs pipeline's
-//! chunk cache (seqs are process-global, so `(seq, index)` keys never
-//! collide across signals) but installs its OWN GET shim: the traces
-//! wire is strict (one mode object, no top-level window), so only the
+//! The handler is [`OtelTracesHandler`] (`rpc/traces/`), the `otel-traces`
+//! Function. It shares the logs pipeline's chunk cache (seqs are
+//! process-global, so `(seq, index)` keys never collide across signals) and
+//! the shared download cache, but installs its own GET shim
+//! ([`super::rpc::patch_traces_args_into_payload`]): the traces wire is
+//! strict (one mode object, no top-level window), so only the literal
 //! `info` token synthesizes a payload and data calls are POST-only.
 //!
-//! The whole registry/catalog/recovery machinery is reused verbatim through
-//! `build_pipeline`.
+//! Consumers: `Ledger::new` (`mod.rs`) builds this pipeline right after the
+//! logs one; the registry/catalog/recovery machinery is
+//! [`super::pipeline::build_pipeline`]'s, reused unchanged.
 
 use bridge::config::LifecycleConfig;
 use bridge::function::{HandlerAdapter, RawFunctionHandler};
@@ -40,8 +40,8 @@ use super::rpc::OtelTracesHandler;
 
 /// Build the traces pipeline: spawn the shared [`Indexer`] with the traces
 /// seal, then delegate to [`super::pipeline::build_pipeline`] with a closure
-/// that wires the [`OtelTracesHandler`] (the `otel-traces` Function, with the
-/// shared download cache when storage is enabled).
+/// that wires the [`OtelTracesHandler`] (the `otel-traces` Function) and the
+/// traces GET shim, with the remote-read cache when storage is enabled.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn build_traces_pipeline(
     signal: Signal,
@@ -57,16 +57,16 @@ pub(crate) async fn build_traces_pipeline(
     chunk_cache: Arc<ChunkCache>,
     pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
 ) -> anyhow::Result<Pipeline> {
-    // The traces seal: decode ng-flatten trace frames (format 3) into a full
-    // trace SFST (columns + TIDX + TBLM + EVNB/LNKB).
+    // The traces seal: decode ng-flatten trace frames (payload format 3)
+    // into a trace SFST (full span columns + TIDX + TBLM + EVNB/LNKB).
     let indexer = ComponentHandle::spawn::<Indexer>(
         ng_index::build_sfst_traces_file as crate::indexer::SealFn,
         cancel.child_token(),
     );
 
-    // Owned clones for the handler closure (the builder borrows `storage` for
-    // recovery): reading evicted files back needs the storage client and the
-    // download cache the logs pipeline shares.
+    // Owned clones for the handler closure (the builder only borrows
+    // `storage` for recovery): reading evicted files back needs the
+    // storage client + the download cache every signal shares.
     let remote = match (storage, read_cache) {
         (Some(storage), Some(cache)) => Some(RemoteRead::new(storage.clone(), cache.clone())),
         _ => None,
@@ -89,8 +89,8 @@ pub(crate) async fn build_traces_pipeline(
                 OtelTracesHandler::new(registries, chunk_cache, CHUNK_MIN_ENTRIES, remote);
             let handler: Arc<dyn RawFunctionHandler> =
                 Arc::new(HandlerAdapter::new(traces_handler));
-            // The traces-own GET shim: `info` token → `{"info": {}}`,
-            // anything else → no payload (data calls are POST-only).
+            // The traces-own GET shim: the literal `info` token →
+            // `{"info": {}}`, anything else → no payload (POST-only data).
             (handler, super::rpc::patch_traces_args_into_payload as ArgShim)
         },
     )

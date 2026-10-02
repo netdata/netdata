@@ -1,49 +1,52 @@
-//! Aggregation logic for mapping OpenTelemetry's event-based metrics to Netdata's
-//! fixed-interval collection model.
+//! Aggregation state machines that map OpenTelemetry's event-based metrics to
+//! Netdata's fixed-interval collection model. The only consumer is chart.rs:
+//! it quantizes each data point's timestamp into an `update_every`-second
+//! slot and owns slot readiness, gap-fill cadence, and the per-second rate
+//! division applied to the sum flavors' output.
 //!
-//! The design separates per-slot accumulation from cross-slot context:
-//!
-//! - [`SlotAccumulator`]: collects data points within a single time slot.
-//!   One instance per (dimension, slot) pair, created on demand.
-//! - [`CrossSlotContext`]: persistent per-dimension state that spans slot
-//!   boundaries (e.g. the previous cumulative value for delta computation).
-//!   Owns finalization logic that consumes a slot accumulator and produces
-//!   the value to emit.
+//! Per (dimension, slot) pair a [`SlotAccumulator`] collects the slot's data
+//! points (Gauge: latest value; DeltaSum: summed deltas; CumulativeSum:
+//! latest cumulative value); the per-dimension [`CrossSlotContext`] carries
+//! state across slots and finalizes each accumulator into a value to emit.
 
-/// Per-slot accumulation state.
+/// Per-slot accumulation state for one (dimension, slot) pair.
 ///
-/// One instance per (dimension, slot) pair. Created on demand when the first
-/// data point for a slot arrives, consumed by [`CrossSlotContext::finalize`]
-/// at emission time.
+/// Created on demand via `Default` when the slot's first data point arrives,
+/// consumed by [`CrossSlotContext::finalize`] at emission time. `record` may
+/// see out-of-order timestamps: implementations either keep the latest by
+/// timestamp or sum every point.
 pub trait SlotAccumulator: Default + std::fmt::Debug {
     /// Record a data point into this slot's accumulator.
     fn record(&mut self, value: f64, timestamp_ns: u64, start_time_ns: u64);
 
-    /// Whether any data was recorded into this accumulator.
+    /// Whether any data was recorded; no in-repo caller (chart.rs checks the slot map instead).
     #[allow(dead_code)]
     fn has_data(&self) -> bool;
 }
 
-/// Cross-slot context that persists across slot boundaries.
+/// Cross-slot context for one dimension (not per slot).
 ///
-/// One instance per dimension (not per slot). Holds state needed to convert
-/// raw slot data into emittable values (e.g. the previous cumulative value
-/// for computing deltas).
+/// Holds state spanning slot boundaries (e.g. the previous cumulative value)
+/// and turns a finished slot accumulator into a value to emit via
+/// [`Self::finalize`], or synthesizes one via [`Self::gap_fill`] when the
+/// dimension has no data for an emitted slot.
 pub trait CrossSlotContext: Default + std::fmt::Debug {
     /// The slot accumulator type paired with this context.
     type Slot: SlotAccumulator;
 
-    /// Finalize a slot accumulator into an emittable value, updating
+    /// Finalize a slot accumulator into a value to emit, updating
     /// cross-slot state as needed.
     ///
-    /// Returns `None` if no value can be produced (e.g. first cumulative
-    /// observation establishing a baseline).
+    /// Returns `None` when there is nothing to emit: the slot was empty, or
+    /// a cumulative sum saw its first observation and can only establish
+    /// its delta baseline.
     fn finalize(&mut self, slot: Self::Slot) -> Option<f64>;
 
-    /// Value to emit when no data arrived for a slot (gap filling).
+    /// Value to emit when a slot has no data for this dimension; stateless (`&self`).
     fn gap_fill(&self) -> f64;
 
-    /// Reset all cross-slot state. Called when the dimension is re-initialized.
+    /// Reset all cross-slot state. No production caller today; tests use it
+    /// to verify state clearing.
     #[allow(dead_code)]
     fn reset(&mut self);
 }
@@ -52,9 +55,9 @@ pub trait CrossSlotContext: Default + std::fmt::Debug {
 // Gauge
 // ---------------------------------------------------------------------------
 
-/// Per-slot state for Gauge metrics.
-///
-/// Keeps the last value by timestamp within the slot.
+/// Per-slot state for Gauge metrics: keeps the latest value by timestamp;
+/// points at or before the current one are ignored, so ties keep the first
+/// recorded value.
 #[derive(Debug, Default)]
 pub struct GaugeSlot {
     pending: Option<PendingValue>,
@@ -118,7 +121,8 @@ impl CrossSlotContext for GaugeContext {
 
 /// Per-slot state for Delta Sum metrics.
 ///
-/// Accumulates deltas within a slot by summing them.
+/// Sums every recorded point; timestamps are ignored, so record order does
+/// not matter.
 #[derive(Debug, Default)]
 pub struct DeltaSumSlot {
     accumulated: f64,
@@ -167,7 +171,8 @@ impl CrossSlotContext for DeltaSumContext {
 
 /// Per-slot state for Cumulative Sum metrics.
 ///
-/// Keeps the latest cumulative value by timestamp within the slot.
+/// Keeps the latest cumulative value (with its `start_time`) by timestamp;
+/// points at or before the current one are ignored, ties keeping the first.
 #[derive(Debug, Default)]
 pub struct CumulativeSumSlot {
     pending: Option<CumulativePending>,
@@ -175,11 +180,13 @@ pub struct CumulativeSumSlot {
 
 /// Cross-slot context for Cumulative Sum metrics.
 ///
-/// Tracks the previous cumulative value across slot boundaries to compute
-/// deltas. Detects counter restarts via `start_time_unix_nano` changes.
+/// Diffs each slot's cumulative value against the previous slot's and emits
+/// the delta. Emits `0.0` on a counter restart (changed
+/// `start_time_unix_nano`) or a negative delta (wrap, or a restart that
+/// didn't update the start time), rebaselining to the new value each time.
 #[derive(Debug, Default)]
 pub struct CumulativeSumContext {
-    /// State from the previous finalized slot.
+    /// Last finalized (value, start_time); the baseline for the next delta.
     previous: Option<CumulativeState>,
 }
 
@@ -197,6 +204,8 @@ struct CumulativePending {
 }
 
 impl CumulativeSumContext {
+    /// True when `pending` starts a new counter run: its `start_time` differs
+    /// from the previous baseline. No baseline yet means no restart.
     fn is_restart(&self, pending: &CumulativePending) -> bool {
         match &self.previous {
             Some(prev) => prev.start_time_ns != pending.start_time_ns,
@@ -428,7 +437,7 @@ mod tests {
             slot2.record(150.0, 2000, START_TIME);
             ctx.finalize(slot2);
 
-            // Restart: start_time changes, value resets
+            // Restart: start_time changes, so the emitted value resets to 0
             let new_start_time = START_TIME + 1_000_000;
             let mut slot3 = CumulativeSumSlot::default();
             slot3.record(20.0, 3000, new_start_time);

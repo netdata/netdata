@@ -4,7 +4,7 @@ use std::net::IpAddr;
 const MAX_CANONICAL_JOURNAL_FIELDS: usize = crate::flow::CANONICAL_FLOW_DEFAULTS.len();
 
 /// Reusable buffer for encoding flow fields into journal entries.
-/// Avoids ~60 Vec<u8> allocations per flow by writing all fields into
+/// Avoids ~60 `Vec<u8>` allocations per flow by writing all fields into
 /// a single contiguous buffer and tracking offsets.
 pub(crate) struct JournalEncodeBuffer {
     data: Vec<u8>,

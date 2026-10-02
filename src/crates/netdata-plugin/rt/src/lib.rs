@@ -1,8 +1,23 @@
-//! A runtime framework for building Netdata plugins with asynchronous function handlers.
+//! Runtime framework for Netdata plugins that expose Functions: the pluginsd
+//! event loop over stdin/stdout, asynchronous function handlers, and
+//! declarative chart emission.
 //!
-//! This crate provides a complete runtime system for creating Netdata plugins that can expose
-//! custom functions to the Netdata monitoring system. It handles all the communication protocol,
-//! serialization, concurrent execution, and lifecycle management.
+//! A plugin builds a [`PluginRuntime`], registers [`FunctionHandler`]s (and
+//! optionally charts), and calls [`PluginRuntime::run`], which drives the whole
+//! lifecycle: it publishes the function declarations, reads calls from stdin,
+//! executes handlers concurrently with cancellation and progress support, and
+//! writes results back over stdout. `run()` also carries the stdout publication
+//! contract the agent enforces (what counts as collected data, keepalives,
+//! restart-on-error) — see its # Publishing notes before changing startup
+//! ordering.
+//!
+//! Consumers: `netflow-plugin` and `journal-function` (through
+//! [`StdPluginRuntime`]) drive this runtime directly. The otel-plugin workers
+//! instead run the protocol-agnostic engine copy in `bridge::function`, fed by
+//! the supervisor over IPC. The two crates carry parallel
+//! `FunctionHandler`/`FunctionCallContext`/`ProgressState` implementations with
+//! different progress semantics: raw work units here, percent over a fixed
+//! denominator of 100 there.
 //!
 //! # Overview
 //!
@@ -80,8 +95,20 @@
 //! ## Concurrency Model
 //!
 //! The runtime uses Tokio for asynchronous execution, allowing multiple function calls to be
-//! processed concurrently. Each function call is tracked as a transaction with its own
-//! cancellation token and control channel.
+//! processed concurrently. Each call is tracked as a transaction with its own cancellation
+//! token; results and progress reports flow through one shared outbound channel into a
+//! dedicated writer task, so stdout writes are serialized and never block the read loop.
+//!
+//! ## Crate Layout
+//!
+//! - `charts` — declarative chart types: derive `NetdataChart` (from
+//!   `netdata_plugin_charts_derive`, re-exported here alongside the trait of
+//!   the same name) on a schemars-annotated struct and register it on the
+//!   runtime; a registry task samples the charts and emits the chart protocol.
+//! - `netdata_env` — the `NETDATA_*` environment variables the agent exports
+//!   to plugins (directories, log settings, machine GUID).
+//! - `tracing_setup` — `init_tracing_with_identifier`, which initializes
+//!   logging to the systemd journal or stderr based on the agent environment.
 
 #![allow(unused_imports)]
 
@@ -106,30 +133,33 @@ use tokio::sync::{Mutex, mpsc};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, instrument, trace, warn};
 
-// Charts module and re-exports
 pub mod charts;
 pub use charts::{
     ChartDimensions, ChartHandle, ChartMetadata, ChartRegistry, ChartType, DimensionAlgorithm,
     DimensionMetadata, InstancedChart, TrackedChart,
 };
 
-// Re-export the trait and derive macro
-// Note: In Rust, derive macros and traits can have the same name because they're in different namespaces
+// The trait and its derive macro share the name `NetdataChart`; they live in
+// different Rust namespaces, so both re-exports can carry the same name.
 pub use charts::NetdataChart;
 pub use netdata_plugin_charts_derive::NetdataChart;
 
-// Netdata environment utilities
 pub mod netdata_env;
 pub use netdata_env::{LogFormat, LogLevel, LogMethod, NetdataEnv, SyslogFacility};
 
-// Tracing initialization
 mod tracing_setup;
 pub use tracing_setup::init_tracing_with_identifier;
 
-/// Atomic progress state shared between handlers and the runtime ticker.
+/// Atomic progress counters shared between a handler and the runtime's ticker.
 ///
-/// Handlers write counters from any context (async, `spawn_blocking`, rayon),
-/// and the runtime sends progress to the agent once per second.
+/// Handlers write the counters from any context (async, `spawn_blocking`,
+/// rayon); the runtime samples them once per second and forwards them to the
+/// agent as `FUNCTION_PROGRESS` while the call runs. Nothing is sent until
+/// `total` is non-zero, so a handler that never sets a total stays silent.
+/// The two counters are independent atomics, so a read may pair a newer `done`
+/// with an older `total`. Values are raw work units, sent as-is — the
+/// `bridge::function` engine used by the otel-plugin workers instead emits a
+/// percent over a fixed denominator of 100.
 ///
 /// # Example
 ///
@@ -331,64 +361,56 @@ impl Default for ProgressState {
     }
 }
 
-/// Context provided to function handlers during execution.
+/// Per-call context handed to a [`FunctionHandler::on_call`].
 ///
-/// Contains the transaction identifier, atomic progress state, and a
-/// cancellation token that signals when the function should stop.
+/// The runtime cancels `cancellation` when the agent cancels the call or the
+/// plugin shuts down; `progress` reaches the agent through the runtime ticker
+/// (see [`ProgressState`]).
 pub struct FunctionCallContext {
-    /// Unique identifier for this function call.
     transaction: String,
-    /// Atomic progress state. The runtime reads these counters once per
-    /// second and sends progress to the agent automatically.
+    /// Progress counters sampled by the runtime's ticker; see [`ProgressState`].
     pub progress: ProgressState,
-    /// Token that signals when the function should stop.
-    /// Check `is_cancelled()` in sync code, or `await cancelled()` in async code.
+    /// Cancelled on agent cancel or runtime shutdown. Check `is_cancelled()`
+    /// from sync code, or `.await` the `cancelled()` future from async code.
     pub cancellation: CancellationToken,
 }
 
 impl FunctionCallContext {
-    /// Returns the transaction identifier for this function call.
+    /// Echoed on the progress responses and the result for this call; the
+    /// agent uses it to route them back to the caller.
     pub fn transaction(&self) -> &str {
         &self.transaction
     }
 }
 
-/// Represents an active function call transaction.
-///
-/// Each transaction tracks a single function invocation, including its
-/// unique identifier and cancellation token.
+/// An in-flight function call, held in the runtime's registry from call
+/// receipt to result delivery; its token is what [`FunctionCancel`] targets.
 struct Transaction {
-    /// Unique identifier for this transaction.
     id: String,
-    /// Token for cancelling this specific function execution.
     cancellation_token: CancellationToken,
 }
 
-/// Execution context provided to the handler adapter layer.
-///
-/// Contains all the information needed for a function to execute.
+/// Everything needed to execute one function call, shared with the spawned
+/// handler task via `Arc`.
 struct FunctionContext {
-    /// The original function call request from Netdata.
     function_call: Box<FunctionCall>,
-    /// Token for detecting cancellation requests.
     cancellation_token: CancellationToken,
-    /// Sender for outbound messages (e.g., progress reports back to the agent).
+    /// Feeds the writer task; the per-call progress ticker pushes through it
+    /// while the call is still running.
     outbound_tx: mpsc::UnboundedSender<Message>,
 }
 
-/// Type alias for a future that produces a function result.
+/// One running function call; resolves to `(transaction_id, result)` so the
+/// main loop can remove the transaction from its registry on completion.
 type FunctionFuture = BoxFuture<'static, (String, FunctionResult)>;
 
 /// Trait for implementing Netdata function handlers.
 ///
-/// This is the main trait that developers implement to create custom functions
-/// that can be called by Netdata. The trait provides automatic serialization,
-/// cancellation handling, and progress reporting.
-///
-/// # Type Parameters
-///
-/// * `Request` - The type of the incoming request payload (must be deserializable from JSON)
-/// * `Response` - The type of the response payload (must be serializable to JSON)
+/// Implement this to expose a custom function: the runtime deserializes the
+/// call's JSON payload into `Request`, runs [`FunctionHandler::on_call`], and
+/// serializes the `Response` back to the agent. Cancellation handling and
+/// progress reporting come from the [`FunctionCallContext`] the handler
+/// receives.
 ///
 /// # Example
 ///
@@ -434,49 +456,37 @@ type FunctionFuture = BoxFuture<'static, (String, FunctionResult)>;
 /// ```
 #[async_trait]
 pub trait FunctionHandler: Send + Sync + 'static {
-    /// The request payload type that will be deserialized from JSON.
-    ///
-    /// This type must implement `DeserializeOwned` to be deserializable from
-    /// the JSON payload sent by Netdata.
+    /// The request payload, deserialized from the call's JSON payload.
     type Request: DeserializeOwned + Send;
 
-    /// The response type that will be serialized to JSON.
-    ///
-    /// This type must implement `Serialize` to be serializable to JSON
-    /// for sending back to Netdata.
+    /// The response payload, serialized to JSON for the agent.
     type Response: Serialize + Send;
 
-    /// Main function logic executed when the function is called.
-    ///
-    /// This method contains the primary computation or operation that the
-    /// function performs. It receives the deserialized request, a context
-    /// for progress reporting and cancellation, and should return either
-    /// a successful response or an error.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - Context with transaction ID, progress sender, and cancellation token
-    /// * `request` - The deserialized request payload
-    ///
-    /// # Returns
-    ///
-    /// A `Result` containing either the response payload or an error
+    /// Run the function: called once per invocation with the deserialized
+    /// request and the per-call context.
     ///
     /// # Cancellation
     ///
-    /// When cancelled, the runtime cancels the token in `ctx.cancellation`
-    /// and drops this future. Check `ctx.cancellation.is_cancelled()` in
-    /// synchronous code paths.
+    /// When the call is cancelled (by the agent, or by runtime shutdown), the
+    /// runtime cancels `ctx.cancellation`, stops polling and drops this
+    /// future, and answers the agent with status 499. Check
+    /// `ctx.cancellation.is_cancelled()` in synchronous code paths; in async
+    /// code prefer `.await`ing `ctx.cancellation.cancelled()` so the future
+    /// completes promptly at an await point.
     async fn on_call(
         &self,
         ctx: FunctionCallContext,
         request: Self::Request,
     ) -> Result<Self::Response>;
 
-    /// Parse the incoming request for this handler.
+    /// Parse the raw [`FunctionCall`] into this handler's request.
     ///
-    /// Handlers can override this to support compatibility request shapes
+    /// The default parses the call's `payload` as JSON, or `{}` when there is
+    /// no payload. Handlers can override it to support legacy request shapes
     /// while keeping the runtime itself protocol-agnostic.
+    ///
+    /// Returning `Err(result)` short-circuits the call: `result` is sent back
+    /// to the agent unmodified and `on_call` never runs.
     fn parse_request(
         &self,
         function_call: &FunctionCall,
@@ -517,42 +527,26 @@ pub trait FunctionHandler: Send + Sync + 'static {
         }
     }
 
-    /// Provide the function's declaration metadata.
-    ///
-    /// Returns a [`FunctionDeclaration`] that describes this function to Netdata,
-    /// including its name and description.
-    ///
-    /// # Returns
-    ///
-    /// A function declaration with the function's name and description.
+    /// The function's declaration, published to the agent when the runtime
+    /// starts. Its name is also the dispatch key for incoming calls.
     fn declaration(&self) -> FunctionDeclaration;
 }
 
-/// Internal trait for handling raw function calls with serialization.
+/// Type-erased handler interface the runtime dispatches on.
 ///
-/// This trait is used internally to bridge between the typed [`FunctionHandler`]
-/// trait and the raw message protocol used by Netdata.
+/// Bridges the raw `FunctionCall`/`FunctionResult` protocol to the typed
+/// [`FunctionHandler`]; [`HandlerAdapter`] is the only implementation.
 #[async_trait]
 trait RawFunctionHandler: Send + Sync {
-    /// Handle a raw function call with the given context.
-    ///
-    /// # Arguments
-    ///
-    /// * `ctx` - The execution context containing the function call details
-    ///
-    /// # Returns
-    ///
-    /// A [`FunctionResult`] to be sent back to Netdata
+    /// Run one call and return the result to send back to the agent.
     async fn handle_raw(&self, ctx: Arc<FunctionContext>) -> FunctionResult;
 
-    /// Get the function declaration for this handler.
     fn declaration(&self) -> FunctionDeclaration;
 }
 
-/// Adapter that bridges typed handlers with the raw protocol.
-///
-/// This struct wraps a [`FunctionHandler`] implementation and provides
-/// automatic JSON serialization/deserialization for the request and response.
+/// Wraps a typed [`FunctionHandler`] so the runtime can dispatch on
+/// [`RawFunctionHandler`]: parses the request, runs `on_call`, serializes the
+/// response, and reports progress from a per-call ticker.
 struct HandlerAdapter<H: FunctionHandler> {
     handler: Arc<H>,
 }
@@ -567,15 +561,15 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
             Err(result) => return result,
         };
 
-        // Build the function call context
         let call_ctx = FunctionCallContext {
             transaction: transaction.clone(),
             progress: ProgressState::new(),
             cancellation: ctx.cancellation_token.clone(),
         };
 
-        // Spawn a background ticker that reads the atomic progress counters
-        // once per second and sends FunctionProgressResponse to the agent.
+        // Progress ticker: samples the counters once a second (missed ticks
+        // are skipped, not bursted) and pushes FUNCTION_PROGRESS while the
+        // call runs; aborted below as soon as it completes.
         let progress = call_ctx.progress.clone();
         let ticker_tx = ctx.outbound_tx.clone();
         let ticker_transaction = transaction.clone();
@@ -630,10 +624,11 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
 
         let expires: u64 = current_timestamp + 2;
 
-        // Process the result
+        // Unix-seconds cache deadline carried on successful results; the agent
+        // stores it on the HTTP response it serves for the call. Error results
+        // below are sent with `expires: 0`.
         match result {
             Ok(response) => {
-                // Serialize the response
                 match serde_json::to_vec_pretty(&response) {
                     Ok(payload) => FunctionResult {
                         transaction,
@@ -655,6 +650,8 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                 }
             }
             Err(e) => {
+                // 499 marks a cancelled call (client closed the request);
+                // anything else is an internal error.
                 let status = if ctx.cancellation_token.is_cancelled() {
                     499
                 } else {
@@ -689,6 +686,10 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
     }
 }
 
+/// Standard plugin runtime over stdin/stdout — the configuration the agent
+/// spawns plugins with, and the typical choice for production Netdata plugins.
+pub type StdPluginRuntime = PluginRuntime<tokio::io::Stdin, tokio::io::Stdout>;
+
 /// Main runtime for managing Netdata plugin execution.
 ///
 /// The `PluginRuntime` orchestrates all aspects of a Netdata plugin's lifecycle:
@@ -700,8 +701,8 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
 ///
 /// # Type Parameters
 ///
-/// * `R` - The reader type (must implement `AsyncRead + Unpin`)
-/// * `W` - The writer type (must implement `AsyncWrite + Unpin`)
+/// * `R` - The reader type: `AsyncRead + Unpin + Send + 'static`
+/// * `W` - The writer type: `AsyncWrite + Unpin + Send + 'static`
 ///
 /// # Example
 ///
@@ -716,60 +717,44 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
 ///     Ok(())
 /// }
 /// ```
-///
-/// Type alias for the standard plugin runtime using stdin/stdout.
-/// This is the typical configuration for production Netdata plugins.
-pub type StdPluginRuntime = PluginRuntime<tokio::io::Stdin, tokio::io::Stdout>;
-
 pub struct PluginRuntime<R, W>
 where
     R: AsyncRead + Unpin + Send + 'static,
     W: AsyncWrite + Unpin + Send + 'static,
 {
-    /// Name of this plugin (used for identification).
+    /// Plugin name, used in log lines.
     plugin_name: String,
-    /// Reader for incoming messages from Netdata.
     reader: MessageReader<R>,
-    /// Writer for outgoing messages to Netdata.
+    /// All protocol output (framed messages, chart text, keepalives) funnels
+    /// through this shared writer; the mutex serializes concurrent writers.
     writer: Arc<Mutex<MessageWriter<W>>>,
 
-    /// Registry of all available function handlers.
+    /// Function names mapped to their type-erased handlers; the key is each
+    /// handler's `declaration().name`.
     function_handlers: HashMap<String, Arc<dyn RawFunctionHandler>>,
 
-    /// Active transactions (ongoing function calls).
+    /// In-flight calls, keyed by transaction id.
     transaction_registry: HashMap<String, Arc<Transaction>>,
-    /// Futures representing running function executions.
     futures: FuturesUnordered<FunctionFuture>,
 
-    /// Token for initiating graceful shutdown.
+    /// Cancelled by the signal task or when stdin ends.
     shutdown_token: CancellationToken,
 
-    /// Sender for outbound messages (progress reports, function results).
     outbound_tx: mpsc::UnboundedSender<Message>,
-    /// Receiver for outbound messages — consumed by the writer task.
+    /// Taken by the writer task spawned in `run`.
     outbound_rx: Option<mpsc::UnboundedReceiver<Message>>,
 
-    /// Optional chart registry for managing metrics emission.
+    /// Created on the first `register_chart`/`register_instanced_chart` call.
     chart_registry: Option<ChartRegistry<W>>,
-    /// Handle to chart registry background task.
+    /// Join handle of the registry task started in `run`; awaited in shutdown.
     chart_registry_handle: Option<
         tokio::task::JoinHandle<std::result::Result<(), Box<dyn std::error::Error + Send + Sync>>>,
     >,
 }
 
 impl PluginRuntime<tokio::io::Stdin, tokio::io::Stdout> {
-    /// Create a new plugin runtime with the given name using stdin/stdout.
-    ///
-    /// This is the default constructor that creates a runtime communicating
-    /// via standard input and output streams.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The name of the plugin (used for identification in logs)
-    ///
-    /// # Returns
-    ///
-    /// A new `PluginRuntime` instance ready to accept handler registrations.
+    /// Create a plugin runtime over stdin/stdout, ready for handler and chart
+    /// registration. `name` appears in log lines.
     pub fn new(name: &str) -> Self {
         Self::with_streams(name, tokio::io::stdin(), tokio::io::stdout())
     }
@@ -780,21 +765,9 @@ where
     R: AsyncRead + Unpin + Send + 'static,
     W: AsyncWrite + Unpin + Send + 'static,
 {
-    /// Create a new plugin runtime with custom reader and writer streams.
-    ///
-    /// This allows the runtime to work with any streams that implement
-    /// `AsyncRead` and `AsyncWrite`, such as TCP connections, Unix sockets,
-    /// or in-memory buffers.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The name of the plugin (used for identification in logs)
-    /// * `reader` - The input stream to read messages from
-    /// * `writer` - The output stream to write messages to
-    ///
-    /// # Returns
-    ///
-    /// A new `PluginRuntime` instance ready to accept handler registrations.
+    /// Create a plugin runtime over custom streams — anything implementing
+    /// `AsyncRead`/`AsyncWrite`, such as TCP, Unix sockets, or in-memory
+    /// buffers. `name` appears in log lines.
     ///
     /// # Example
     ///
@@ -835,39 +808,33 @@ where
 
     /// Get a clone of the shared message writer.
     ///
-    /// This allows external code to write protocol messages while coordinating
-    /// with the runtime's own writes (e.g., for function results, chart data).
-    ///
-    /// # Returns
-    ///
-    /// An Arc-wrapped, mutex-protected MessageWriter that coordinates with
-    /// the runtime's stdin/stdout handling.
+    /// External code writes through the same mutex-protected writer the
+    /// runtime uses for function results, so all protocol output stays
+    /// serialized on the one stream.
     ///
     /// # Example
     ///
     /// ```ignore
     /// let writer = runtime.writer();
     ///
-    /// // Write raw protocol messages
+    /// // Write raw protocol lines — e.g. PLUGIN_KEEPALIVE while fallible
+    /// // startup steps that must precede `run()` are still in progress
+    /// // (see the publishing notes on `run`).
     /// let mut w = writer.lock().await;
-    /// w.write_raw(b"CHART ...\n").await?;
+    /// w.write_raw(b"PLUGIN_KEEPALIVE\n").await?;
     /// ```
     pub fn writer(&self) -> Arc<Mutex<MessageWriter<W>>> {
         Arc::clone(&self.writer)
     }
 
-    /// Register a function handler with the runtime.
+    /// Register a function handler.
     ///
-    /// The handler will be available for Netdata to call once the runtime starts.
-    /// Multiple handlers can be registered, each with a unique function name.
-    ///
-    /// # Arguments
-    ///
-    /// * `handler` - The function handler implementation
-    ///
-    /// # Panics
-    ///
-    /// May panic if two handlers with the same function name are registered.
+    /// The handler's [`FunctionHandler::declaration`] is published to the
+    /// agent when `run()` starts, and its `declaration().name` becomes the
+    /// dispatch key for incoming calls. Names must be unique: registering a
+    /// second handler with the name of an existing one silently replaces the
+    /// first. A call for a name that was never registered is logged and
+    /// dropped without a result.
     pub fn register_handler<H: FunctionHandler + 'static>(&mut self, handler: H) {
         let adapter = HandlerAdapter {
             handler: Arc::new(handler),
@@ -878,18 +845,11 @@ where
 
     /// Register a chart for metrics emission.
     ///
-    /// Charts are automatically sampled at the given interval and emitted through
-    /// the shared message writer. Returns a handle that can be used to update
-    /// chart values from anywhere in your code.
-    ///
-    /// # Arguments
-    ///
-    /// * `initial` - The initial chart value
-    /// * `interval` - How often to sample and emit the chart
-    ///
-    /// # Returns
-    ///
-    /// A `ChartHandle` for updating the chart values
+    /// The chart is sampled every `interval` once `run()` starts: the CHART
+    /// definition is emitted once, then BEGIN/SET/END updates on every tick
+    /// through the shared writer — even when values did not change, so each
+    /// sample interval carries a datapoint; change detection does not gate
+    /// emission. Update the value from anywhere through the returned handle.
     ///
     /// # Example
     ///
@@ -914,19 +874,14 @@ where
         registry.register_chart(initial, interval)
     }
 
-    /// Register an instanced chart for per-instance metrics.
+    /// Register one instance of an instanced chart.
     ///
-    /// Similar to `register_chart`, but for charts that have multiple instances
-    /// (e.g., per-CPU core metrics, per-disk I/O stats).
-    ///
-    /// # Arguments
-    ///
-    /// * `initial` - The initial chart value with instance ID set
-    /// * `interval` - How often to sample and emit the chart
-    ///
-    /// # Returns
-    ///
-    /// A `ChartHandle` for updating the chart values
+    /// Like [`Self::register_chart`], but `{instance}` placeholders in the
+    /// chart id, name, title, family, and context are replaced with the
+    /// initial value's `instance_id()` before the chart is declared. Call
+    /// once per instance to build per-core/per-disk chart sets; the type must
+    /// implement [`InstancedChart`] by hand — the derive macro does not
+    /// implement it.
     pub fn register_instanced_chart<T>(&mut self, initial: T, interval: Duration) -> ChartHandle<T>
     where
         T: InstancedChart + Default + PartialEq + Send + Sync + 'static,
@@ -937,21 +892,19 @@ where
         registry.register_instanced_chart(initial, interval)
     }
 
-    /// Start the plugin runtime and begin processing messages.
+    /// Start the plugin runtime and process messages until shutdown.
     ///
-    /// This method:
-    /// 1. Sets up signal handlers for graceful shutdown
-    /// 2. Declares all registered functions to Netdata
-    /// 3. Enters the main message processing loop
-    /// 4. Handles shutdown when requested
+    /// 1. Installs signal handlers (SIGINT/SIGTERM) that trigger graceful shutdown
+    /// 2. Starts the chart registry task, if charts were registered
+    /// 3. Declares all registered functions to the agent
+    /// 4. Spawns the writer task and enters the main loop, dispatching calls,
+    ///    cancels and results until the shutdown token is cancelled or stdin ends
+    /// 5. Cancels in-flight functions (10s grace period) and waits for the
+    ///    writer task to drain
     ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` on successful shutdown, or an error if a critical failure occurs.
-    ///
-    /// # Note
-    ///
-    /// This method runs indefinitely until shutdown is requested (via signals or stdin closing).
+    /// Consumes the runtime; it cannot be reused after `run()`. Protocol write
+    /// failures during declaration or the main loop abort `run()` with that
+    /// error.
     ///
     /// # Publishing
     ///
@@ -1038,7 +991,8 @@ where
         Ok(())
     }
 
-    /// Setup signal handlers for graceful shutdown
+    /// Spawn the runtime-lifetime task that cancels `shutdown_token` when a
+    /// shutdown signal arrives (see `wait_for_shutdown_signal`); never joined.
     fn handle_shutdown_signals(&self) {
         let shutdown_token = self.shutdown_token.clone();
 
@@ -1076,10 +1030,11 @@ async fn wait_for_shutdown_signal() -> std::io::Result<()> {
 }
 
 impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R, W> {
-    /// Declare all registered functions to Netdata.
+    /// Publish one [`FunctionDeclaration`] per registered handler to the agent.
     ///
-    /// Sends a [`FunctionDeclaration`] message for each registered handler,
-    /// informing Netdata about available functions and their metadata.
+    /// Runs before the main loop starts; a write failure aborts `run()`. The
+    /// agent counts these declarations as collected data — see the publishing
+    /// notes on [`Self::run`].
     async fn declare_functions(&self) -> Result<()> {
         let mut writer = self.writer.lock().await;
 
@@ -1098,10 +1053,9 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
         Ok(())
     }
 
-    /// Main message processing loop.
-    ///
-    /// Continuously processes incoming messages from Netdata and completed function futures.
-    /// Handles function calls, cancellations, progress requests, and completions.
+    /// Main loop: dispatches completed function results, incoming agent
+    /// messages, and shutdown, whichever is ready first. Exits on shutdown or
+    /// when `handle_message` reports the stream ended.
     async fn process_messages(&mut self) -> Result<()> {
         info!("starting message processing loop");
 
@@ -1125,11 +1079,12 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
         Ok(())
     }
 
-    /// Handle a single incoming message from Netdata.
+    /// Handle one message from the agent.
     ///
-    /// # Returns
-    ///
-    /// Returns `true` if the message loop should terminate, `false` otherwise.
+    /// Parse errors are logged and skipped — the loop keeps reading. Inbound
+    /// progress requests are ignored: progress is pushed by the per-call
+    /// ticker, not polled. Returns `true` to end the loop, which happens only
+    /// when stdin closes; the runtime then cancels its own shutdown token.
     async fn handle_message(&mut self, message: Option<Result<Message>>) -> Result<bool> {
         match message {
             Some(Ok(Message::FunctionCall(function_call))) => {
@@ -1159,8 +1114,11 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
 
     /// Handle an incoming function call request.
     ///
-    /// Creates a new transaction, sets up the execution context, and spawns
-    /// the function handler to process the request asynchronously.
+    /// Registers the transaction (id → cancellation token), builds the
+    /// execution context, and queues the handler future. A duplicate
+    /// transaction id is ignored with a warning. A call for an unknown
+    /// function name is logged and dropped without a result, leaving the
+    /// agent's in-flight request to time out on its side.
     fn handle_function_call(&mut self, function_call: Box<FunctionCall>) {
         if self
             .transaction_registry
@@ -1207,13 +1165,11 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
             }
         }
 
-        // Get handler
         let Some(handler) = self.function_handlers.get(&function_call.name).cloned() else {
             error!("could not find function {:#?}", function_call.name);
             return;
         };
 
-        // Create a new function context
         let cancellation_token = CancellationToken::new();
 
         let function_context = Arc::new(FunctionContext {
@@ -1222,7 +1178,6 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
             outbound_tx: self.outbound_tx.clone(),
         });
 
-        // Create new transaction
         let id = function_context.function_call.transaction.clone();
         let transaction = Arc::new(Transaction {
             id,
@@ -1231,7 +1186,6 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
         self.transaction_registry
             .insert(transaction.id.clone(), transaction.clone());
 
-        // Create future
         let future = Box::pin(async move {
             let result = handler.handle_raw(function_context).await;
             (transaction.id.clone(), result)
@@ -1239,9 +1193,8 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
         self.futures.push(future);
     }
 
-    /// Handle a function cancellation request.
-    ///
-    /// Signals the corresponding transaction to cancel its execution.
+    /// Cancel the transaction the agent names; unknown ids are warned about
+    /// and ignored.
     fn handle_function_cancel(&mut self, function_cancel: &FunctionCancel) {
         let Some(transaction) = self.transaction_registry.get(&function_cancel.transaction) else {
             warn!(
@@ -1255,10 +1208,8 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
         transaction.cancellation_token.cancel();
     }
 
-    /// Handle a completed function execution.
-    ///
-    /// Removes the transaction from the registry and sends the result
-    /// through the outbound channel (written to stdout by the writer task).
+    /// Remove the completed call from the registry and hand its result to the
+    /// writer task, which serializes it to stdout.
     async fn handle_completed(
         &mut self,
         transaction: String,
@@ -1275,15 +1226,11 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
         Ok(())
     }
 
-    /// Perform graceful shutdown of the runtime.
+    /// Graceful shutdown: cancel every in-flight call, drain their results
+    /// for up to 10 seconds, then wait for the chart registry task to finish.
     ///
-    /// Cancels all active transactions and waits for them to complete
-    /// (up to a timeout of 10 seconds). Any functions that don't complete
-    /// within the timeout are forcefully aborted.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` after shutdown completes (either cleanly or after timeout).
+    /// Calls that miss the deadline are dropped with `self`: their futures are
+    /// never polled again and their results never reach the agent.
     async fn shutdown(&mut self) -> Result<()> {
         let in_flight = self.transaction_registry.len();
 
@@ -1292,12 +1239,10 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
         } else {
             info!("shutting down with {} in-flight functions...", in_flight);
 
-            // Send cancel to all active transactions
             for transaction in self.transaction_registry.values() {
                 transaction.cancellation_token.cancel();
             }
 
-            // Wait for functions to complete with a timeout
             let timeout = Duration::from_secs(10);
             let mut completed = 0;
 
@@ -1324,7 +1269,6 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
             }
         }
 
-        // Wait for chart registry to finish
         if let Some(handle) = self.chart_registry_handle.take() {
             info!("waiting for chart registry to finish...");
             match handle.await {

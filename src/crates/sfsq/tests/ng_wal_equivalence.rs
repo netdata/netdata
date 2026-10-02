@@ -1,29 +1,45 @@
-//! Equivalence harness for the **ng-flatten** logs path: `WalScan::scan_flattened`
-//! (active-WAL tail) vs an SFST built from the same frames by
-//! `ng_index::build_sfst` (sealed).
+//! Whole-engine equivalence harness for the ng-flatten logs path: WAL bytes of
+//! ng-flatten frames, evaluated by BOTH engines — the row-scan evaluator
+//! (`WalScan`, the implementation that serves a WAL's un-indexed tail) and the
+//! indexed engine (a sealed `ng_index::build_sfst` file; chunk SFSTs folded by
+//! `run`) — must agree over the same frames. The rows are shared by
+//! construction (both sides render through `ng_flatten::build_kv` and order by
+//! the same frozen `Record.ts`); what is under test is the scan side's
+//! re-implementation of the query semantics (see wal_scan.rs).
 //!
-//! This harness proves that, for any WAL of ng-flatten frames and any query, the
-//! tail row-scan's shard is indistinguishable from indexing those frames into an
-//! SFST and querying the engine — so tail and sealed results agree by construction.
+//! Pins:
 //!
-//! Both sides consume the **same** ng-flatten frame through the **same**
-//! `ng_flatten::build_kv` renderer and the **same** `Record.ts`, so parity here is
-//! structural, not coincidental. Corpora are seeded/deterministic (failures
-//! reproduce by seed) and sweep: multi-frame files, multi-valued scalar arrays
-//! (`attributes.tags[]`), array-of-structs (`attributes.endpoints[].host` —
-//! collapsed, not positional), nested kvlists, a polymorphic Int/Str path, exotic
-//! pairs (`=` in value, empty value), non-ASCII bytes, body text, and the projected
-//! scalar fields (`severity_number`/`severity_text`). Queries sweep filters (exact,
-//! OR/AND, anchored patterns), full-text, facet/histogram field choices, and grid
-//! geometries.
+//! - the payload-format gate: `scan_flattened` refuses a WAL stamped with a
+//!   different frame codec (the traces format here) before decoding any frame;
+//! - shard parity: a whole-file `scan_flattened` vs the `build_sfst` index of
+//!   the same file — equal row counts, then per query equal `matched`, field
+//!   table, facets, and timeline;
+//! - run-level parity, the chunk/tail split the otel-ledger handler drives:
+//!   chunk SFSTs (`build_sfst_range`, `Source::Memory`) + a row-scanned tail,
+//!   folded by `run`, match the whole-file index on matched/facets/histogram
+//!   and on served rows (strictly-monotonic fixture);
+//! - one tail per WAL: a duplicate-`file_seq` tail is dropped at `run`'s
+//!   entry, never double-counted or misrouted.
 //!
-//! Note on timestamps: this harness feeds `flatten_log_request` directly (no
-//! ingest normalization), so the fixture builder applies the same
-//! event→observed→clock rule
-//! before flattening, mirroring production. The clock fallback is a deterministic
-//! counter here (vs `ng-ingest`'s monotonic wall clock) — value differs, ordering
-//! does not, and it does not affect tail-vs-sealed parity (both read one frozen
-//! `Record.ts`).
+//! The corpora are seeded and deterministic (failures reproduce by seed) and
+//! sweep: multi-frame files, multi-valued arrays (`attributes.tags[]`),
+//! array-of-structs collapsed to `attributes.endpoints[].host` (not
+//! positional), nested kvlists, a polymorphic Int/Str path, `=`-in-value and
+//! empty values, non-ASCII values, body text, and the top-level `severity_*` /
+//! `body` / `scope.*` / `resource.attributes.*` field families. The query
+//! matrix sweeps exact / OR-AND / anchored-pattern filters, full-text,
+//! facet/histogram field choices, and grid geometries.
+//!
+//! Not pinned here: per-query semantics (wal_scan/tests.rs and the sfst
+//! crate's tests), anchor paging / has-more (page/tests.rs), decode errors
+//! beyond the payload-format gate (torn/corrupt frames), chunk-boundary math
+//! (`wal::prefix`), and ingest normalization (`ng-ingest`).
+//!
+//! Timestamps: the harness feeds `flatten_log_request` directly — no ingest
+//! normalization — so the fixture applies the production rule itself
+//! (time → observed → clock; `ng_flatten::normalize_log_request`), with a
+//! deterministic counter in place of the monotonic-clock base. Parity is
+//! unaffected: both sides read the one frozen `Record.ts`.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -125,8 +141,9 @@ struct Corpus {
 
 /// Generate a corpus for `seed`. The timestamp regime cycles with the seed so
 /// the sweep covers monotonic, shuffled, equal-run, and the observed/clock
-/// fallback tiers — the fallback is applied *here* (ng-flatten reads only
-/// `time_unix_nano`), mirroring `ng_flatten::normalize_log_request`.
+/// fallback tiers. The fallback is resolved *here*, because flatten reads
+/// only `time_unix_nano` — the field `ng_flatten::normalize_log_request`
+/// would have written — mirroring its rule.
 fn gen_corpus(seed: u64) -> Corpus {
     let mut rng = Rng::new(seed);
     let num_logs = 60 + rng.below(120);
@@ -171,8 +188,9 @@ fn gen_corpus(seed: u64) -> Corpus {
                 }
             }
         };
-        // ng-ingest's rule: time else observed else clock — applied at ingest,
-        // not in flatten. Resolve here so `Record.ts` is concrete and sane.
+        // Production resolves at ingest (normalize_log_request); flatten
+        // reads only `time_unix_nano`. Same rule here — time else observed
+        // else clock — so `Record.ts` is concrete for both engines.
         let resolved_time = if time_ns != 0 {
             time_ns
         } else if observed_ns != 0 {
@@ -206,8 +224,8 @@ fn gen_corpus(seed: u64) -> Corpus {
             attributes.push(kv("tags", string_array(&picked)));
         }
         if rng.chance(25) {
-            // Array-of-structs → collapsed `attributes.endpoints[].host` /
-            // `[].port` (collapsed, not positional `.0.host`).
+            // Array-of-structs → collapsed, non-positional
+            // `attributes.endpoints[].host` / `[].port`.
             let h0 = &hosts[rng.below(hosts.len() as u64) as usize];
             let h1 = &hosts[rng.below(hosts.len() as u64) as usize];
             attributes.push(kv(
@@ -265,8 +283,9 @@ fn gen_corpus(seed: u64) -> Corpus {
         });
     }
 
-    // Split into 1–4 batches → multiple WAL frames (cross-frame pair dedup +
-    // shared resource/scope attrs). Same stream identity (service.name) per file.
+    // Split into 1–4 batches → multiple WAL frames: exercises cross-frame
+    // pair dedup and shared resource/scope attributes within one file.
+    // `service.name` stays constant — one stream identity per file.
     let num_batches = 1 + rng.below(4) as usize;
     let per = records.len().div_ceil(num_batches);
     let mut batches = Vec::new();
@@ -351,8 +370,11 @@ fn tail_scan_refuses_wrong_payload_format() {
     }
 }
 
-/// Write the corpus as a flattened-frame WAL (one frame per batch) using the
-/// `ng-flatten` encode + the production `wal::Writer`.
+/// Write the corpus as a flattened-frame WAL — one frame per batch — with the
+/// production `wal::Writer` and `ng-flatten` encoding. Unlike ingest
+/// (`prepare_log_frame`) there is no normalization pass: the fixture resolves
+/// timestamps itself. The single-file assert holds because
+/// `ng_index::build_sfst` expects a directory containing exactly one WAL.
 fn write_flattened_wal(dir: &Path, corpus: &Corpus) -> std::path::PathBuf {
     let seq = std::sync::Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(
@@ -404,7 +426,9 @@ fn write_flattened_wal(dir: &Path, corpus: &Corpus) -> std::path::PathBuf {
 }
 
 /// Build the sealed SFST from the flattened WAL via `ng_index::build_sfst` and
-/// wrap it as an engine candidate (summary read back from the written file).
+/// wrap it as an engine candidate — the sealed-file identity: the whole file
+/// as one index under `file_seq` 1 / `Indexed(0)`, summary read back from the
+/// written bytes.
 fn ng_index_candidate(wal_dir: &Path) -> SfstCandidate {
     let sfst_path = wal_dir.join("harness-ng.sfst");
     ng_index::build_sfst(wal_dir, &sfst_path, &ng_index::Metrics::new()).expect("build_sfst");
@@ -437,9 +461,11 @@ fn assert_equiv(ctx: &str, via_sfst: &LogsShard, via_scan: &LogsShard) {
     );
 }
 
-/// Run every query against both ng paths and assert equivalence. Returns the
-/// number of queries that matched at least one row (guards against a vacuous
-/// matrix that agrees only at zero matches).
+/// Run every query against both engines — the sealed-SFST candidate and the
+/// whole-file row scan — and assert shard equivalence: row counts first, then
+/// `matched` / field table / facets / timeline per query. Returns the number
+/// of queries that matched at least one row (guards against a vacuous matrix
+/// that agrees only at zero matches).
 fn check_corpus(
     label: &str,
     corpus: &Corpus,
@@ -646,7 +672,7 @@ fn query_matrix(summary: &sfst::Summary) -> Vec<(String, LogsQuery)> {
 }
 
 // ---------------------------------------------------------------------------
-// The test
+// Shard-level sweep: seeded corpora × the query matrix
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -708,13 +734,16 @@ fn ng_flattened_tail_matches_sealed_index() {
 }
 
 // ---------------------------------------------------------------------------
-// Run-level equivalence (the live production path): chunk SFSTs built by
-// `ng_index::build_sfst_range` (fed as Source::Memory) + a row-scanned tail
-// (`scan_flattened`), folded by `run`, must match indexing the whole WAL — the
-// path the ledger actually drives (build_sfst_range chunks + scan_flattened
-// tails → run).
+// Run-level equivalence over the live production split: chunk SFSTs built by
+// `ng_index::build_sfst_range` (fed as `Source::Memory`) plus the row-scanned
+// tail (`run` scans it with `scan_flattened_range`), folded by `run`, must
+// match indexing the whole WAL — the partition the otel-ledger handler
+// drives (`resolve_wal`: scan_frame_boundaries → chunk_boundaries →
+// build_sfst_range + one tail).
 // ---------------------------------------------------------------------------
 
+/// `run` with a fresh cancellation token and progress counter — these tests
+/// never cancel or observe progress.
 fn run_plain(sources: Vec<LogSource>, query: LogsQuery) -> LogsData {
     run(
         sources,
@@ -724,6 +753,8 @@ fn run_plain(sources: Vec<LogSource>, query: LogsQuery) -> LogsData {
     )
 }
 
+/// One mixed source list — candidates as `LogSource::Sfst`, tails as
+/// `LogSource::Tail` — as the handler passes to `run`.
 fn sources(candidates: Vec<SfstCandidate>, tails: Vec<WalTail>) -> Vec<LogSource> {
     candidates
         .into_iter()
@@ -732,6 +763,8 @@ fn sources(candidates: Vec<SfstCandidate>, tails: Vec<WalTail>) -> Vec<LogSource
         .collect()
 }
 
+/// The tests reuse one resolved source set across queries; `run` consumes
+/// its sources, so these rebuild owned copies per call.
 fn clone_candidate(c: &SfstCandidate) -> SfstCandidate {
     SfstCandidate {
         summary: c.summary.clone(),
@@ -755,11 +788,15 @@ fn tails_clone(ts: &[WalTail]) -> Vec<WalTail> {
 
 #[test]
 fn ng_run_stats_equal_whole_file_index() {
-    // Statistics equivalence over the live path: chunk SFSTs (built by
-    // build_sfst_range, fed as Source::Memory) + a row-scanned tail, folded by
-    // `run`, must yield the same matched/facets/histogram as indexing the whole
-    // WAL. Only stats (pagination is on-disk-SFST only; chunk/whole field-table
-    // cardinality can legitimately differ under the conservative merge).
+    // Statistics equivalence over the live split: chunk SFSTs
+    // (build_sfst_range, `Source::Memory`) + a row-scanned tail, folded by
+    // `run`, must yield the same matched/facets/histogram as indexing the
+    // whole WAL. Stats only: the merge is an order-independent monoid, while
+    // served-row ORDER at equal timestamps turns on the cursor's per-source
+    // tie-break — pinned separately by ng_run_rows_match_whole_file_index
+    // with a strictly-monotonic fixture. Field tables are not compared
+    // either: chunk-vs-whole cardinality can legitimately differ under the
+    // conservative merge (per-field max across chunks, `merge_field_tables`).
     let header = wal::HEADER_SIZE as u64;
     let mut any_matched = false;
 
@@ -797,8 +834,10 @@ fn ng_run_stats_equal_whole_file_index() {
             ]
         };
 
-        // All-tail (no chunks → pure scan_flattened) and a small threshold
-        // (chunks + tail → the merge path), partitioned by the production rule.
+        // Two partitions of the same WAL by the production rule
+        // (chunk_boundaries): u64::MAX → no complete chunk, so the whole file
+        // is one row-scanned tail; 25 → every corpus yields ≥1 chunk (the
+        // leftover tail may be empty).
         for min_entries in [u64::MAX, 25] {
             let chunks = wal::prefix::chunk_boundaries(
                 &wal::scan_frame_boundaries(&wal_path, wal::FrameRange::new(header, file_len))
@@ -832,6 +871,8 @@ fn ng_run_stats_equal_whole_file_index() {
                 });
             }
             let tail_begin = wal::prefix::tail_start(&chunks, header);
+            // The tail's `file_seq` is arbitrary here — the stats merge is
+            // order-independent (the row test below reuses the chunks' seq).
             let tails = vec![WalTail {
                 file_seq: 9999,
                 path: wal_path.clone(),
@@ -859,11 +900,14 @@ fn ng_run_stats_equal_whole_file_index() {
 
 #[test]
 fn ng_run_rows_match_whole_file_index() {
-    // Row equivalence over the live path: rows served from chunk SFSTs
-    // interleaved with the scan_flattened tail (under the cursor order) must
-    // match the rows from indexing the whole WAL. Strictly-monotonic timestamps
-    // so the chunked and whole-file total orders coincide (equal-ts tie-break is
-    // the documented WAL->SFST cursor seam, out of scope).
+    // Row equivalence over the live split: rows served from chunk SFSTs
+    // interleaved with the row-scanned tail (`run` reads it via
+    // `scan_flattened_range`) must match the rows from indexing the whole
+    // WAL — page order included. Strictly-monotonic timestamps make the
+    // merged cursor order equal the whole-file order whatever the chunk/tail
+    // boundaries; equal-timestamp tie-breaking across sources (the cursor's
+    // file_seq/part/position keys; the sealed-vs-chunk wire seam, cursor.rs)
+    // is out of scope.
     let header = wal::HEADER_SIZE as u64;
     let levels = ["info", "error", "warn"];
     let records: Vec<LogRecord> = (0..200)

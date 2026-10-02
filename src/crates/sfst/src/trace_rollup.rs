@@ -1,33 +1,41 @@
-//! The optional per-file trace rollup (`TRSU` chunk): one row per
-//! distinct set (non-UNSET) trace id in the file — the trace-level
-//! aggregate the traces overview/slowest/facet queries fold WITHOUT
+//! The optional per-file trace rollup (`TRSU` chunk): one summary row
+//! per distinct set (non-UNSET) trace id in the file, so trace-level
+//! queries (overview, slowest, root facets) fold aggregates without
 //! assembling traces.
 //!
-//! Semantics (pinned):
+//! Pinned semantics:
 //!
-//! - **Stored-row statistics**: counts count what is on disk. A
-//!   resent span counts every time it is stored — the canonical
-//!   `(span_id, kind)` dedup belongs to assembly (`trace_combine`),
-//!   deliberately NOT replicated here. Consumers label the numbers so.
-//! - **Root honest-or-absent**: root fields are set only from a
-//!   span with a genuinely UNSET parent seen in THIS file (the earliest
-//!   such span wins, mirroring `Trace::summary_root`'s convention);
-//!   otherwise `root_is_true_root` is false and the root fields are
-//!   sentinels. A consumer NEVER synthesizes a root from them. A full
-//!   `(start_ns, span_id)` tie between candidates with DIFFERENT
-//!   recorded facets ABSTAINS rather than guessing a pick the
-//!   combiner's deeper tie-break keys could contradict — flagged
-//!   [`ROOT_CLAIM_WITHHELD`], distinct from [`ROOT_CLAIM_NONE`]'s
-//!   proof of local root absence (the flag a pruning consumer may
-//!   act on under true-root filter semantics).
-//! - **UNSET trace ids are excluded** (the TIDX rule): the all-zero id
+//! - **Counts are stored rows.** A resent span counts every time it is
+//!   stored; the canonical `(span_id, kind)` dedup belongs to assembly
+//!   (`trace_combine`) and is deliberately not replicated here.
+//! - **Root honest-or-absent.** Root fields come only from a span with
+//!   a genuinely UNSET parent stored in THIS file — the earliest such
+//!   span wins, mirroring `Trace::summary_root`'s convention
+//!   (`index_reader.rs`). Otherwise the root fields are sentinels, and
+//!   a consumer never synthesizes a root from them. A full
+//!   `(start_ns, span_id)` tie between candidates with different
+//!   recorded facets ABSTAINS ([`ROOT_CLAIM_WITHHELD`]) rather than
+//!   guessing a pick the combiner's deeper tie-break keys could
+//!   contradict; [`ROOT_CLAIM_NONE`] is proven local root absence —
+//!   the only flag a pruning consumer may act on under true-root
+//!   filter semantics.
+//! - **UNSET trace ids form no rows** (the TIDX rule): the all-zero id
 //!   is the OTLP "unset" sentinel, not a trace.
 //!
-//! Accumulated inside the seal's existing single-pass span walk
-//! ([`TraceRollupRows`], the `EventRows` pattern: holds interner
-//! [`KvSlot`]s, the build translates them to file [`KvId`]s), emitted
-//! sorted by trace id. Additive and TOC-indexed like `TIDX`/`EVNB` — no
-//! format version bump; old readers skip it.
+//! # Lifecycle
+//!
+//! ng-index's span walk (`src/crates/ng-index/src/sfst_build.rs`) folds
+//! every stored span into [`TraceRollupRows`] — the `EventRows`
+//! pattern: build-side interner [`KvSlot`]s, translated to file
+//! [`KvId`]s at seal (`build.rs`), rows emitted sorted by trace id
+//! after the span structures. `writer.rs` packs the additive,
+//! TOC-indexed chunk (like `TIDX`/`EVNB`; no format version bump — a
+//! reader that predates `TRSU` never looks the id up). `reader.rs`
+//! decodes the chunk and rejects a file whose `TRCE` column is missing,
+//! so a missing rollup row can never prove "trace absent". Consumers:
+//! sfsq's traces fold and root gate (`src/crates/sfsq/src/traces/`)
+//! and the per-file root-ref resolver
+//! (`index_reader/rollup_resolver.rs`).
 
 use std::collections::HashMap;
 
@@ -36,9 +44,9 @@ use serde::{Deserialize, Serialize};
 use crate::kv_interner::KvSlot;
 use crate::{KvId, SpanId, SpanIds, TraceId, TraceIds};
 
-/// The sentinel `root_*_ref` value for "no true root / no such
-/// attribute on the root": file KvIds are dense small integers, so
-/// `u32::MAX` can never collide.
+/// The sentinel `root_service_refs`/`root_name_refs` value meaning "no
+/// true root / no such attribute on the root". File KvIds are dense
+/// small integers, so `u32::MAX` can never collide.
 pub const ROLLUP_NO_REF: u32 = u32::MAX;
 
 /// [`TraceRollup::root_is_true_root`] tri-state: NO unset-parent span
@@ -54,7 +62,7 @@ pub const ROOT_CLAIM_WITHHELD: u8 = 2;
 
 /// The sealed rollup: struct-of-arrays, index-parallel across every
 /// field, sorted ascending by trace id. Root fields are meaningful only
-/// where [`root_is_true_root`](Self::root_is_true_root) is `1`.
+/// where `root_is_true_root` is [`ROOT_CLAIM_TRUE`].
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct TraceRollup {
     /// Distinct set trace ids, ascending (16-byte arena).
@@ -71,11 +79,9 @@ pub struct TraceRollup {
     pub error_counts: Vec<u32>,
     /// The true root's raw OTLP span kind; 0 when no true root.
     pub root_kinds: Vec<i32>,
-    /// Root-claim tri-state per row: [`ROOT_CLAIM_NONE`] (no
-    /// unset-parent span stored here — proof of local root absence),
-    /// [`ROOT_CLAIM_TRUE`] (the root columns carry the claim), or
-    /// [`ROOT_CLAIM_WITHHELD`] (unset-parent spans exist, claim
-    /// withheld on an ambiguous tie — root unknown).
+    /// Root-claim tri-state per row: [`ROOT_CLAIM_NONE`],
+    /// [`ROOT_CLAIM_TRUE`], or [`ROOT_CLAIM_WITHHELD`] — each
+    /// constant's doc carries its meaning.
     pub root_is_true_root: Vec<u8>,
     /// File-interner [`KvId`] of the root's resource `service.name`
     /// entry, or [`ROLLUP_NO_REF`].
@@ -88,14 +94,15 @@ pub struct TraceRollup {
 impl TraceRollup {
     /// Validate the decoded chunk's structural invariants (the reader
     /// calls this; unit-testable without a file, the `LinkIndex`
-    /// precedent): index-parallel arrays, in-range root refs (`kv_total`
-    /// exclusive, [`ROLLUP_NO_REF`] allowed), tri-state claim flags, and strictly
-    /// increasing trace ids (the seal sorts; a crafted duplicate would
-    /// silently double-count in every cross-source merge).
+    /// precedent): whole id arenas, index-parallel fields, in-range
+    /// root refs (`kv_total` exclusive, [`ROLLUP_NO_REF`] allowed),
+    /// tri-state claim flags, strictly increasing trace ids (a crafted
+    /// duplicate would silently double-count in every cross-source
+    /// merge), and the internal consistency rules below.
     pub(crate) fn validate(&self, kv_total: u32) -> Result<(), crate::Error> {
-        // `len()` floors (`bytes / WIDTH`), so a trailing-bytes arena would
-        // pass the parallelism check alone — reject non-whole arenas
-        // explicitly, like `LinkIndex::validate` and the per-row readers do.
+        // `len()` floors (`bytes / WIDTH`), so a trailing-bytes arena
+        // would pass the parallelism check alone — reject non-whole
+        // arenas, like `LinkIndex::validate` and the per-row readers do.
         if !self.trace_ids.well_formed() || !self.root_span_ids.well_formed() {
             return Err(crate::Error::CorruptIndex(
                 "trace rollup id arena is not a whole number of ids".into(),
@@ -134,14 +141,12 @@ impl TraceRollup {
         }
         // Internal consistency — the invariants pruning consumers treat
         // as proof, enforced as far as a self-contained check can: a
-        // non-claiming row must carry only sentinels (a flipped flag
-        // beside real root fields is a detectable contradiction), and
-        // the envelope must be well-formed (end = start ⊕ duration ≥
-        // start for every honest producer). A CONSISTENT lie — flag and
-        // fields forged together — remains outside the trust model, the
-        // same boundary as row-completeness (rows cannot be proven
-        // complete without re-reading TRCE, which would defeat the
-        // rollup's purpose).
+        // non-claiming row must carry only sentinels, and the envelope
+        // must be well-formed (end = start ⊕ duration ≥ start for every
+        // honest producer). A CONSISTENT lie (flag and fields forged
+        // together) and incomplete rows stay outside the trust model —
+        // proving either needs a TRCE re-read that would defeat the
+        // rollup's purpose.
         for i in 0..n {
             if self.root_is_true_root[i] != ROOT_CLAIM_TRUE
                 && (!self.root_span_ids.get(i).is_unset()
@@ -158,9 +163,9 @@ impl TraceRollup {
                     "trace rollup envelope is inverted".into(),
                 ));
             }
-            // Counter contradictions the writer cannot emit: every row
-            // exists because record_span ran at least once, and the
-            // error counter increments alongside the span counter.
+            // Contradictions the writer cannot emit: a row exists only
+            // because record_span ran at least once, and errors count
+            // within spans.
             if self.span_counts[i] == 0 {
                 return Err(crate::Error::CorruptIndex(
                     "trace rollup row carries zero spans".into(),
@@ -185,8 +190,8 @@ impl TraceRollup {
     }
 
     /// Row index of `trace_id`, or `None` when this file holds no spans
-    /// of that trace. Binary search over the id column — validation
-    /// guarantees strictly increasing ids, so `partition_point` is exact.
+    /// of that trace. Binary search over the id column; `validate`
+    /// guarantees strictly increasing ids, so the search is exact.
     pub fn find(&self, trace_id: TraceId) -> Option<usize> {
         let n = self.trace_ids.len();
         let mut lo = 0usize;
@@ -212,11 +217,14 @@ struct Acc {
     error_count: u32,
     /// The earliest unset-parent span seen so far, when any.
     root: Option<Root>,
-    /// The incumbent tied another root candidate with different
-    /// recorded facets: the seal abstains from claiming a root.
+    /// The incumbent took a full tie against a root candidate with
+    /// different recorded facets: the seal abstains from claiming a
+    /// root. Cleared when a strictly earlier candidate installs.
     root_ambiguous: bool,
 }
 
+/// A root candidate: what the rollup keeps about the span that would be
+/// the trace's root (`service`/`name` are build-side interner slots).
 #[derive(Debug, Clone)]
 struct Root {
     start_ns: i64,
@@ -226,10 +234,11 @@ struct Root {
     name: Option<KvSlot>,
 }
 
-/// Insertion-order accumulator for [`TraceRollup`]: the traces seal
-/// calls [`record_span`](Self::record_span) once per stored span inside
-/// its existing walk. Holds interner [`KvSlot`]s; the build translates
-/// them to file [`KvId`]s and emits rows sorted by trace id.
+/// Insertion-order accumulator for [`TraceRollup`]. The indexer's span
+/// walk (`ng-index/src/sfst_build.rs`) calls
+/// [`record_span`](Self::record_span) once per stored span; the seal
+/// calls `sealed`, translating interner [`KvSlot`]s to
+/// file [`KvId`]s and emitting rows sorted by trace id.
 #[derive(Debug, Clone, Default)]
 pub struct TraceRollupRows {
     map: HashMap<TraceId, Acc>,
@@ -240,10 +249,11 @@ impl TraceRollupRows {
         Self::default()
     }
 
-    /// Fold one stored span. `duration_ns` is the stored (clamped ≥ 0)
-    /// span duration; `service`/`name` are the span's captured interner
-    /// slots (resource `service.name`, span `name`) — consulted only
-    /// when this span becomes the trace's root candidate.
+    /// Fold one stored span. `duration_ns` is the stored span duration;
+    /// negatives clamp to 0 for the envelope. `service`/`name` are the
+    /// span's captured interner slots (resource `service.name`, span
+    /// `name`), used only for root selection — kept as the candidate's
+    /// values, or compared against the incumbent on a full tie.
     ///
     /// `parent_unset` is the typed all-zero check on the STORED parent
     /// id — ingest normalizes an empty/malformed parent to UNSET, so the
@@ -279,18 +289,17 @@ impl TraceRollupRows {
         if is_error {
             acc.error_count = acc.error_count.saturating_add(1);
         }
-        // The earliest genuinely-unset-parent span wins the root
-        // (the summary_root convention). Equal starts tie-break by
+        // Root selection: the earliest genuinely-unset-parent span wins
+        // (the summary_root convention); equal starts tie-break by
         // ascending span id — the combiner total order's next key. On a
-        // FULL (start_ns, span_id) tie the canonical pick continues
-        // through keys (kind, content) the recorder does not model, so
-        // the recorder ABSTAINS instead of guessing: a tie challenger
-        // whose recorded facets (kind, service, name) differ from the
-        // incumbent's marks the claim AMBIGUOUS, and the seal emits no
-        // root for the trace — honest-or-absent, storage-order
-        // independent, and never a wrong claim a pruning consumer could
-        // act on. Identical-facet ties (plain resends) keep the claim; a
-        // strictly earlier span installs a fresh unambiguous incumbent.
+        // FULL (start_ns, span_id) tie the combiner keeps tie-breaking
+        // through keys (kind, content) this recorder does not model, so
+        // a challenger with different recorded facets (kind, service,
+        // name) marks the claim AMBIGUOUS and the seal emits no root —
+        // honest-or-absent, storage-order independent, never a wrong
+        // claim a pruning consumer could act on. Identical-facet ties
+        // (plain resends) keep the claim; a strictly earlier span
+        // installs a fresh unambiguous incumbent.
         if parent_unset {
             match &acc.root {
                 Some(r) if (start_ns, span_id) == (r.start_ns, r.span_id) => {
@@ -324,8 +333,10 @@ impl TraceRollupRows {
         !self.map.is_empty()
     }
 
-    /// Slot→file-id translation + trace-id sort (build phase 2 — the
-    /// same `kv_to_file` table every stream batch and structure rides).
+    /// Seal the accumulator into the stored form: translate root-ref
+    /// slots to file KvIds through the build's shared `kv_to_file` table
+    /// (so refs point at exactly the ids the rows carry) and emit rows
+    /// sorted by trace id.
     pub(crate) fn sealed(&self, kv_to_file: &[KvId]) -> TraceRollup {
         let translate = |slot: &Option<KvSlot>| -> u32 {
             slot.as_ref()

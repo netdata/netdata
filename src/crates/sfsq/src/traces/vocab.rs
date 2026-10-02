@@ -8,10 +8,16 @@
 //! The vocabulary is OpenTelemetry's own: ATTRIBUTES belong to an owner
 //! (the OTLP message carrying them — Resource, InstrumentationScope,
 //! Span, Event, Link); BUILTIN FIELDS are the fixed members of those
-//! messages themselves (name, kind, status, ...).
+//! messages themselves (name, kind, status, ...). Which builtins are
+//! TRACE-LEVEL — stored span groups cannot answer them (`root_name`,
+//! `root_service_name`, `trace_duration`, the `trace_id` constraint) —
+//! is not encoded here: `predicate.rs` owns that list
+//! (`Predicate::trace_level_target`) so a wire cannot drift from the
+//! engine.
 //!
 //! The storage↔vocabulary mapping lives here in BOTH directions —
-//! [`storage_to_attribute`] for key enumeration; [`AttributeOwner::attribute_prefix`]
+//! [`storage_to_attribute`] for key enumeration (attributes.rs);
+//! [`AttributeOwner::attribute_prefix`]
 //! and [`BuiltinField::dictionary_field`] for value lookups and 4c
 //! lowering — so there is exactly one table to keep right.
 
@@ -57,13 +63,14 @@ impl AttributeOwner {
 /// unconditionally: filtering on `Status` is valid on a
 /// corpus with no statuses (it matches nothing).
 ///
-/// Dictionary-backed builtins ([`dictionary_field`]
-/// (Self::dictionary_field) = `Some`) support value enumeration; the
-/// rest are VIRTUAL — backed by per-row columns (`Duration`, `SpanId`,
-/// `ParentSpanId`, `TraceId`), by the EVNB/LNKB structures (`LinkSpanId`,
-/// `LinkTraceId`, `EventTimeSinceStart`), or by post-assembly derivation
-/// (`RootName`, `RootServiceName`, `TraceDuration`) — and value
-/// enumeration on them is a request error.
+/// Dictionary-backed builtins
+/// ([`dictionary_field`](BuiltinField::dictionary_field) = `Some`)
+/// support value enumeration; the rest are VIRTUAL — backed by per-row
+/// columns (`Duration`, `SpanId`, `ParentSpanId`, `TraceId`), by the
+/// EVNB/LNKB event/link structures (`LinkSpanId`, `LinkTraceId`,
+/// `EventTimeSinceStart`), or by post-assembly derivation (`RootName`,
+/// `RootServiceName`, `TraceDuration`) — and value enumeration on them
+/// is a request error.
 ///
 /// `trace_state` is deliberately NOT a builtin: the key
 /// vocabulary exists for filter autocomplete, and no query path filters
@@ -151,7 +158,9 @@ const INTERNAL_FIELDS: [&str; 2] = ["_kind", "_status_code"];
 /// Map one storage field name to its key, or `None` when the field is
 /// not part of the key vocabulary: the internal facets above,
 /// `trace_state` (17A), and anything unrecognized (a foreign field in a
-/// file this engine was pointed at is not vocabulary).
+/// file this engine was pointed at is not vocabulary). That `None` is
+/// the vocabulary's one deliberate silent filter — a dropped name never
+/// surfaces as a filterable key (see attributes.rs).
 pub fn storage_to_attribute(storage: &str) -> Option<(AttributeOwner, AttributeKey)> {
     if INTERNAL_FIELDS.contains(&storage) || storage == "trace_state" {
         return None;

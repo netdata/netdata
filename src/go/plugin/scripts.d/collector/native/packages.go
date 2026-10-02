@@ -107,15 +107,24 @@ func (e inventoryEntry) load(
 	if e.Command == nil {
 		return loadManifest(e.Manifest, validateExecutable)
 	}
-	if len(e.Command) == 0 || !filepath.IsAbs(e.Command[0]) {
-		return packageDefinition{}, errors.New("command requires an absolute executable")
-	}
-	command := slices.Clone(e.Command)
-	var err error
-	if command[0], err = validateExecutable(command[0]); err != nil {
+	command, err := validatedCommand(e.Command, validateExecutable)
+	if err != nil {
 		return packageDefinition{}, err
 	}
 	return loadDescribedPackage(ctx, command)
+}
+
+// validatedCommand shares the executable policy of direct and registered jobs.
+func validatedCommand(command []string, validateExecutable func(string) (string, error)) ([]string, error) {
+	if len(command) == 0 || !filepath.IsAbs(command[0]) {
+		return nil, errors.New("command requires an absolute executable")
+	}
+	command = slices.Clone(command)
+	var err error
+	if command[0], err = validateExecutable(command[0]); err != nil {
+		return nil, err
+	}
+	return command, nil
 }
 
 // packageCreator registers a package as its own module. Every job receives the
@@ -152,7 +161,7 @@ func packageCreator(name string, definition packageDefinition) (collectorapi.Cre
 }
 
 // packageForm derives a package's job form from the generic native form: no
-// manifest option, and the package configuration form embedded as config.
+// source or mode options, and the package configuration form embedded as config.
 func packageForm(name string, definition packageDefinition) (string, error) {
 	var form map[string]any
 	if json.Unmarshal([]byte(configSchema), &form) != nil {
@@ -160,12 +169,21 @@ func packageForm(name string, definition packageDefinition) (string, error) {
 	}
 	schema := form["jsonSchema"].(map[string]any)
 	schema["title"] = name + " collector configuration."
-	delete(schema, "required")
+	delete(schema, "if")
+	delete(schema, "then")
+	delete(schema, "else")
 	properties := schema["properties"].(map[string]any)
 	delete(properties, "manifest")
+	delete(properties, "command")
+	delete(properties, "mode")
+	delete(properties, "snapshot_format")
 	delete(properties, "config")
 	ui := form["uiSchema"].(map[string]any)
 	delete(ui, "manifest")
+	delete(ui, "command")
+	delete(ui, "mode")
+	delete(ui, "snapshot_format")
+	delete(ui, "config")
 	if definition.functionOnly() {
 		delete(properties, "update_every")
 		if definition.Mode == modePersistent {

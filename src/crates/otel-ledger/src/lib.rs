@@ -1,10 +1,22 @@
 //! OTel ledger: the logs + traces content bindings over the content-agnostic
 //! [`file_lifecycle`] substrate. It owns the `Ledger` coordinator (run-loop,
-//! supervisor/writer IPC, shared workers), the logs query handler + engine
-//! adapter (`ledger::rpc`), and the shared seal component (`indexer`, spawned
-//! per signal with that signal's `ng-index` builder). The reusable machinery
+//! supervisor/writer IPC, shared workers), the Function-call dispatch and the
+//! `otel-logs`/`otel-traces` query handlers over the wire-neutral `sfsq`
+//! engines (`ledger::rpc`), and the shared seal component (`indexer`, spawned
+//! per signal with that signal's `ng-index` builder — `build_sfst_file` for
+//! logs, `build_sfst_traces_file` for traces). The reusable machinery
 //! (registry, catalog, upload/download, cache, recovery, the per-signal
 //! `Pipeline` shell) lives in `file-lifecycle`.
+//!
+//! One ledger worker process per plugin run: the supervisor re-execs the
+//! plugin binary as a `worker ledger` subprocess and its main dispatches to
+//! [`run_worker`] (`otel-plugin/src/main.rs` `run_worker` — the crate's only
+//! importer),
+//! alongside the `otel-ingestor` producer that writes the per-tenant WALs and
+//! forwards their events over the writer socket this crate accepts.
+//! `event`/`indexer` are reached only via `crate::` from `ledger/`, and
+//! `Ledger` has no external importer either (grep-verified): [`run_worker`]
+//! is the crate's whole external surface.
 
 pub mod event;
 pub mod indexer;
@@ -22,8 +34,11 @@ use ferryboat::{Connection, Endpoint};
 
 /// Ledger worker entry point.
 ///
-/// Connects to the supervisor's IPC socket, performs the Configure → Ready
-/// handshake, then runs the ledger event loop.
+/// Spawned by the supervisor re-exec (`worker ledger --socket …`,
+/// `otel-plugin/src/supervisor.rs` `spawn_worker`). Connects to the
+/// supervisor's IPC socket, performs the Configure → Ready handshake —
+/// `Configure` received
+/// here, `Ready` sent from `Ledger::new` — then runs the ledger event loop.
 pub async fn run_worker(socket_path: &str) -> Result<()> {
     tracing::info!("connecting to supervisor socket={socket_path}");
 
@@ -74,9 +89,14 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     .context("failed to initialize ledger")?;
 
     // Log the error while `ledger` is still in scope: returning drops its
-    // supervisor connection, and the supervisor SIGKILLs workers as soon as
-    // it sees the connection close — an error logged after the drop (e.g.
-    // in main) loses that race and is never recorded.
+    // supervisor connection. The supervisor treats a worker disconnect as
+    // fatal (`otel-plugin/src/supervisor.rs` `Supervisor::run`) and tears
+    // the whole plugin down — graceful `Shutdown` + ≤2s exit wait
+    // (`otel-plugin/src/supervisor.rs` `shutdown_workers`), ChildGuard
+    // SIGKILL only as last resort
+    // (`otel-plugin/src/supervisor.rs` `ChildGuard`) — so an error logged
+    // after the drop (e.g. in main) races that teardown and may never be
+    // recorded.
     let result = ledger.run().await;
     if let Err(e) = &result {
         tracing::error!("ledger event loop error: {e:#}");

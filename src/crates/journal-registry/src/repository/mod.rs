@@ -1,21 +1,8 @@
-//! Journal file repository
+//! Journal file repository: the passive data model the journal stack queries.
 //!
-//! This module provides types and data structures for representing and organizing
-//! systemd journal files into a queryable repository.
+//! Journal paths are parsed into `File`s per systemd's naming convention
+//! ([`File::from_str`]) and organized as:
 //!
-//! ## Key Components
-//!
-//! - **File**: Represents a journal file with parsed metadata (origin, status)
-//! - **Origin**: Identifies where a journal file comes from (system, user, remote)
-//! - **Status**: Indicates whether a file is active, archived, or disposed
-//! - **Chain**: An ordered collection of journal files from the same origin
-//! - **Repository**: The top-level container organizing chains by directory and origin
-//! - **FileInfo**: Associates a file with its time range metadata
-//! - **TimeRange**: Tracks the temporal bounds of indexed journal files
-//!
-//! ## Architecture
-//!
-//! The repository organizes files in a three-level hierarchy:
 //! ```text
 //! Repository
 //!   └─ Directory (/var/log/journal)
@@ -23,31 +10,77 @@
 //!           └─ Chain (ordered list of files)
 //! ```
 //!
-//! Files within a chain are kept sorted:
-//! - Disposed files (corrupted) come first
-//! - Archived files follow in chronological order
-//! - Active file (if any) comes last
+//! The directory key is [`File::dir`] - the machine-id directory's parent when
+//! the file parsed a machine id, else the file's parent
+//! - so one directory entry holds the chains of
+//! every machine-id subdirectory under a base journal directory, and
+//! [`Origin`] (machine id + optional namespace + source)
+//! keeps them apart. Chains stay sorted disposed → archived (chronological) →
+//! active ([`Status`]'s `Ord`); range queries answer with
+//! rotation-boundary coverage - each archived file covers [its head, the next
+//! head), the last archived file and the active file run to infinity, disposed
+//! files are never returned ([`Chain::find_files_in_range`]).
+//!
+//! The `Registry` runtime (registry/mod.rs) serializes one `Repository` (the
+//! container above, wrapped with a per-file metadata overlay) behind
+//! `Arc<parking_lot::RwLock>` ([`crate::Registry`]). Its
+//! `find_files_in_range` runs the chain query first, then drops only `Bounded`
+//! files whose indexed `TimeRange` misses the window, so `Unknown`/`Active`
+//! files stay visible until indexed (bounds set via
+//! [`crate::Registry::update_time_range`]). `TimeRange` itself lives at the
+//! crate root ([`crate::TimeRange`]), not here.
+//!
+//! Submodules:
+//! - `collection` - `Chain` (one origin's files in rotation order) and
+//!   `Repository` (the container above) with the range queries.
+//! - `file` - `File`/`Origin`/`Source`/`Status` parsing, the chain sort order,
+//!   and [`crate::repository::file::scan_journal_files`] (a directory-tree
+//!   walk).
+//! - `metadata` - `FileInfo`: a `File` paired with its indexed `TimeRange`.
+//! - `error` - `RepositoryError` and the module's `Result` alias.
+//!
+//! Export surface: the file model and `FileInfo` are the public API (the
+//! `pub use` lines below), also flat at the crate root ([`crate::File`],
+//! [`crate::FileInfo`]).
+//! `Chain`/`Repository`/`RepositoryError` are re-exported `#[doc(hidden)]`
+//! below - see the comment there for why.
+//!
+//! Nothing here opens journal-file contents (reading entries is journal-core's
+//! job) or locks: mutation goes through `&mut self` only.
 
-// Public modules - accessible to workspace crates via full paths
+// Submodules; the module doc above says what each owns.
 pub mod collection;
 pub mod error;
 pub mod file;
 pub mod metadata;
 
-// Re-export only the public API types
+// Public API: the file model + FileInfo. Also re-exported flat at the crate
+// root (lib.rs); FileInfo ships onward through journal-function
+// (journal-function/src/lib.rs).
 pub use crate::repository::file::{File, Origin, Source, Status};
 pub use crate::repository::metadata::FileInfo;
 
-// Re-export workspace-internal types (hidden from public docs)
-// These are not in lib.rs exports but accessible via full paths for workspace crates
+// Chain/Repository/RepositoryError reach workspace consumers through these
+// short paths (journal-engine/src/error.rs,
+// journal-log-writer/src/log/chain.rs) and journal-core's glob shim
+// carries them on (journal-core/src/lib.rs). #[doc(hidden)] keeps them
+// out of rustdoc because lib.rs's flat exports (lib.rs) deliberately
+// omit them; the types remain documented under their defining modules
+// (collection::, error::).
 #[doc(hidden)]
 pub use crate::repository::collection::{Chain, Repository};
 #[doc(hidden)]
 pub use crate::repository::error::RepositoryError;
 
-// Crate-internal only
+// Crate-internal path for the directory scanner; `registry` imports it from
+// here (registry/mod.rs). The function itself is public under `file::`
+// (repository/file.rs).
 pub(crate) use crate::repository::file::scan_journal_files;
 
+// Tests for `Chain::find_files_in_range`: empty chains, invalid ranges
+// (start >= end), boundary edges, the per-status coverage rules (archived
+// [head, next head), last archived/active to infinity, disposed skipped) and
+// result ordering.
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,21 +1,24 @@
 //! Cross-source TRACE-density overview — the traces UI's default paint
-//! (trace-level numbers, `unit:"traces"`).
+//! (trace-level numbers, `unit:"traces"`). Consumers: the otel-traces
+//! Function's `overview` mode and the `overview` section embedded in
+//! its `search` view — the ledger's adapter shapes both from one
+//! [`OverviewData`].
 //!
 //! Folds per-trace aggregates from BOTH source shapes — sealed files'
 //! `TRSU` rollup rows and WAL tails' decoded-span folds (parity
-//! test-pinned) — into one map keyed by trace id (traces
-//! STRADDLE sealed files: WAL rotation is content-agnostic), then
-//! bins each merged trace into the (time bucket × log-scale duration
-//! bin) grid by its ENVELOPE (min start; saturating max end − min
-//! start).
+//! test-pinned) — into one map keyed by trace id (sealed-file rotation
+//! is content-agnostic: a trace's spans straddle files and tails),
+//! then bins each merged trace into the (time bucket × log-scale
+//! duration bin) grid by its ENVELOPE (min start; saturating max end
+//! − min start).
 //!
 //! Pinned semantics:
 //!
-//! - **Stored-row statistics**: span/error totals sum the stored
-//!   rows; a resent span counts every time it is stored. Canonical
-//!   dedup remains assembly's property (`search`/`trace_by_id`). The
-//!   error cells are that same ERROR-SPAN statistic sliced per cell —
-//!   NOT "cells holding a failed trace".
+//! - **Stored-row statistics**: span/error totals sum the stored rows;
+//!   a resent span counts every time it is stored. Canonical dedup
+//!   remains assembly's property (`search`/`trace_by_id`). The error
+//!   cells are that same ERROR-SPAN statistic sliced per cell — NOT
+//!   "cells holding a failed trace".
 //! - **No mixed units**: a sealed source WITHOUT the rollup chunk
 //!   (legacy) is EXCLUDED and marked
 //!   [`RollupAbsent`](PartialReason::RollupAbsent) — its spans never
@@ -28,32 +31,31 @@
 //!   to an order-of-magnitude error.
 //! - **Bin-by-envelope-start**: a trace whose MERGED envelope starts
 //!   outside the grid is clipped — excluded from the cells AND the
-//!   totals (the same start-clipping rule spans followed in v1). A
-//!   long trace straddling the window's left edge is therefore
-//!   invisible here even though search returns its in-window spans.
+//!   totals. The same start-in-window rule the search list applies to
+//!   spans, here applied to the merged envelope, so a long trace
+//!   straddling the window's left edge is invisible here even though
+//!   search returns its in-window spans.
 //! - **Filtered population is a stored-row match**: with an
 //!   [`OverviewQuery::predicate`], a trace is binned when ANY of its
-//!   stored rows in the window's sources matches the span-local
-//!   predicate and starts inside the grid — the search engine's phase-1
-//!   rule, evaluated by the same per-file plan (sealed) and span-side
-//!   evaluator (tails), never by canonical assembly. The binned trace
-//!   still contributes its WHOLE merged envelope and ALL its stored
-//!   spans, matching or not — the filter selects traces, it does not
-//!   trim them. Trace-level conditions (`root_name`,
-//!   `root_service_name`, `trace_duration`) and `trace_id` pins need
-//!   assembly or the candidate machinery and are REJECTED at the
-//!   request boundary — never silently ignored.
+//!   stored rows that starts inside the grid matches the span-local
+//!   predicate — evaluated by the search engine's per-file plan
+//!   (sealed) and span-side evaluator (tails), never by canonical
+//!   assembly. The filter SELECTS traces, it does not trim them: a
+//!   binned trace still contributes its WHOLE merged envelope and ALL
+//!   its stored spans, matching or not. Trace-level conditions
+//!   (`root_name`, `root_service_name`, `trace_duration`) and
+//!   `trace_id` pins need assembly or the candidate machinery and are
+//!   REJECTED at the request boundary — never silently ignored.
 //! - **Roots are resolved only for the facet lists**: the grid needs
 //!   only envelopes and counts, so the shared fold (one merge, in
-//!   [`super::fold`]) runs roots-free by default — no file string
-//!   table built. Requesting [`OverviewQuery::root_facets`] flips the
-//!   flag and accumulates the top-root lists over the binned
-//!   population; the facet count maps are bounded by that population
-//!   (distinct values ≤ binned traces), the same order the visited
-//!   budget already governs through the merge map.
+//!   [`super::fold`]) runs roots-free by default — no root-field
+//!   dictionary decodes. Requesting [`OverviewQuery::root_facets`]
+//!   flips the flag and accumulates the top-root lists over the binned
+//!   population, whose size the visited budget already bounds through
+//!   the merge map.
 //!
-//! Engine contracts mirrored from the siblings: sources process in
-//! `SourceId` order; a failed source is a
+//! Engine contracts mirrored from the siblings (all owned by the shared
+//! fold): sources process in `SourceId` order; a failed source is a
 //! [`SourceFailure`](PartialReason::SourceFailure) and an unavailable
 //! one a [`RemoteUnavailable`](PartialReason::RemoteUnavailable) (the
 //! rest still count); cancellation is polled up front and between sources
@@ -62,8 +64,8 @@
 //! [`OverviewCeiling`](PartialReason::OverviewCeiling). The budget
 //! charges each source shape its actual fold cost — rollup rows
 //! (sealed) or decoded spans (tails) — and is checked BETWEEN sources,
-//! so one source may overshoot it by that source's whole cost: work
-//! stays per-source-whole (and the result deterministic) at the price
+//! so one source may overshoot it by that source's whole cost:
+//! per-source work stays whole (the result deterministic) at the price
 //! of a bounded overshoot. It bounds WORK, not memory — the merge map
 //! peaks at the processed prefix's distinct traces.
 
@@ -283,7 +285,8 @@ impl OverviewData {
     }
 }
 
-/// Run a cross-source trace-level overview. `progress` ticks once per
+/// Run a cross-source trace-level overview. See the module docs for the
+/// pinned semantics and the engine contracts. `progress` ticks once per
 /// source; callers that don't report pass a fresh counter. Pure sync —
 /// invoke off any async runtime thread (the engine contract).
 pub fn overview(
@@ -334,8 +337,8 @@ pub fn overview(
         op: "overview",
         visited_ceiling: query.visited_ceiling,
         ceiling_reason: PartialReason::OverviewCeiling,
-        // The grid itself discards roots — the sealed path decodes the
-        // root-field dictionaries ONLY when the facet lists need them.
+        // Roots only for the facets: resolve_roots=false skips the
+        // sealed root-field dictionary decodes and drops tail roots.
         resolve_roots: query.root_facets,
         filter,
     };
@@ -348,9 +351,10 @@ pub fn overview(
         ));
     };
 
-    // Bin the merged traces by envelope; totals fold alongside. Traces
-    // whose envelope START lies outside the grid are clipped (the same
-    // rule spans followed in v1).
+    // Bin the merged traces by envelope; totals fold alongside. A
+    // trace whose envelope START lies outside the grid is clipped —
+    // the search engine's start-in-window rule, applied to the
+    // envelope.
     let mut cells = vec![[0u64; DURATION_BIN_COUNT]; grid.num_buckets];
     let mut error_cells = vec![[0u64; DURATION_BIN_COUNT]; grid.num_buckets];
     let mut total_traces = 0u64;

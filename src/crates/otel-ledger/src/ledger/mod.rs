@@ -1,22 +1,22 @@
 //! Ledger actor.
 //!
-//! The `Ledger` is a content-agnostic shell: it owns the supervisor and writer
-//! IPC connections, the process cancellation token, the shared workers
-//! (cleaner, uploader, chunk cache) and the upload-retry queue, the function-
-//! response funnel, and the `select!` run-loop that dispatches every event. The
-//! per-signal state — tenant registries, lifecycle config, the seal/index and
-//! catalog-builder workers, and the query handler — lives in a [`Pipeline`] per
-//! signal, decoded from the wire `pipeline_id` to a `Signal` at the boundary and
-//! held in a `PerSignal` structure (today logs + traces). A further signal
-//! plugs in by adding a `Pipeline`, not by editing the shell.
+//! The `Ledger` is a content-agnostic shell: it owns the supervisor and
+//! writer IPC connections, the process cancellation token, the shared
+//! workers (cleaner, uploader), the shared chunk cache and upload-retry
+//! queue, the function-response funnel, and the `select!` run-loop that
+//! dispatches every event. Per-signal state — tenant registries, lifecycle
+//! config, the seal/index and catalog-builder workers, and the query
+//! handler — lives in a [`Pipeline`] per signal (today logs + traces); the
+//! wire `pipeline_id` is decoded to a `Signal` at each boundary, after
+//! which routing is total. Adding a signal means adding a `Pipeline` (and
+//! widening `PerSignal`), not reworking the shell.
 //!
 //! Routing:
-//! - writer events → `pipelines[event.file_id.pipeline_id]` (after the global
-//!   frame-seq gap-check);
-//! - shared-worker responses → the pipeline whose `pipeline_id` the response
-//!   carries;
+//! - writer events → `Signal::try_from(msg.event.pipeline_id())` →
+//!   `pipelines[signal]`, after the per-signal frame-seq gap-check;
+//! - shared-worker responses → the pipeline whose inline `pipeline_id` they carry;
 //! - per-pipeline worker responses → funneled into one merged channel, tagged
-//!   with `pipeline_id` by a forwarder, then dispatched to the owning pipeline;
+//!   with the owning `Signal` by a forwarder;
 //! - function calls → the pipeline whose declared function name matches.
 
 mod catalog_builder;
@@ -51,8 +51,8 @@ use file_lifecycle::ipc::{CleanerRequest, CleanerResponse, UploaderRequest, Uplo
 use file_lifecycle::storage::OpendalStorage;
 use file_lifecycle::uploader::{Uploader, UploaderArgs};
 
-/// Byte budget for the query-time chunk cache (LRU eviction above it). Shared
-/// across pipelines (one global memory budget) and keyed by the global `seq`.
+/// Byte budget for the query-time chunk cache (byte-weighted LRU above it).
+/// Shared by every pipeline; keys are `(global wal seq, chunk index)`.
 const CHUNK_CACHE_BYTES: u64 = 256 * 1024 * 1024;
 /// Maximum uploads in flight at once, across all pipelines. Bounds the recovery
 /// fan-out — which enqueues the whole un-uploaded backlog at once — so it can't
@@ -110,11 +110,11 @@ pub struct Ledger {
     /// across pipelines (the uploader is shared); keyed by seq/remote-key, both
     /// globally unique, so no per-pipeline partitioning is needed.
     upload_retry: file_lifecycle::upload_retry::UploadRetry,
-    /// Fires periodically to re-drive `upload_retry`.
+    /// Fires every 30s to re-drive `upload_retry` (due entries only).
     retry_timer: tokio::time::Interval,
     /// Query-time chunk SFSTs of active WALs; shared across pipelines (one
-    /// global byte budget), keyed by the global `seq`. A pipeline drops a WAL's
-    /// chunks here when its authoritative SFST is registered.
+    /// global byte budget), keyed by `(seq, chunk index)`. A WAL's chunks are
+    /// dropped when its authoritative SFST registers (or the WAL proves empty).
     chunk_cache: Arc<ChunkCache>,
     /// Per-signal frame-sequence gap-check. The single writer process feeds every
     /// signal over one connection, but assigns a separate monotonic `frame_seq`
@@ -141,7 +141,7 @@ pub struct Ledger {
     pipeline_rx: mpsc::UnboundedReceiver<(Signal, PipelineResp)>,
     /// Retained sender clone of the merged channel. Kept so the channel never
     /// closes while the shell lives (worker death is signaled explicitly via
-    /// `PipelineResp::WorkerGone`), and handed to each new pipeline's forwarders.
+    /// `PipelineResp::WorkerGone`), so a close here only happens at teardown.
     _pipeline_tx: mpsc::UnboundedSender<(Signal, PipelineResp)>,
 }
 
@@ -200,10 +200,10 @@ impl Ledger {
         let mut cleaner = ComponentHandle::spawn::<Cleaner>((), cancel.child_token());
         tracing::info!("cleaner spawned");
 
-        // Build the shared remote-storage client and uploader ONLY when storage
-        // is enabled. `OpendalStorage::new` parses `remote_storage.uri` (and applies the
-        // retry layer); deferring it behind the flag means a malformed URI cannot
-        // abort startup for a local-only (remote_storage.enabled = false) deployment.
+        // Build the shared remote-storage client, uploader and read cache —
+        // only when storage is enabled. `OpendalStorage::new` parses the URI
+        // (and applies the retry layer); see the `uploader` field doc for why
+        // a malformed URI must not abort a local-only deployment's startup.
         let (storage, mut uploader, read_cache) = if remote_storage_config.enabled {
             let storage = OpendalStorage::new(remote_storage_config.uri.as_str())?;
 
@@ -265,19 +265,19 @@ impl Ledger {
 
         // Query-time chunk cache, shared between every pipeline's handler (which
         // populates it) and its indexer-response path (which drops a WAL's
-        // chunks on rotation). The budget and chunk size are fixed defaults for
-        // now; tuning is deferred with the rest of cache governance — note the
-        // one budget now serves BOTH signals' queries (logs and traces can
-        // evict each other's chunks under pressure), so re-evaluate it when
-        // the traces data modes go live.
+        // chunks once the WAL's authoritative SFST registers). The budget and
+        // chunk size are fixed defaults for now; tuning is deferred with the
+        // rest of cache governance. The one budget serves BOTH signals'
+        // queries — logs and traces can evict each other's chunks under
+        // pressure — so re-evaluate it if either signal's query load grows.
         let chunk_cache = Arc::new(ChunkCache::new(CHUNK_CACHE_BYTES));
 
         let (pipeline_tx, pipeline_rx) = mpsc::unbounded_channel();
         let (outbound_tx, outbound_rx) = mpsc::unbounded_channel();
 
         // Build the logs pipeline: per-signal disk/registries/workers + recovery
-        // (using the shared cleaner/uploader/storage). Adding a second signal is
-        // another `build_*_pipeline` call here.
+        // (using the shared cleaner/uploader/storage). Adding a further signal
+        // is another `build_*_pipeline` call here.
         let logs = pipeline::build_logs_pipeline(
             Signal::Logs,
             lifecycle,
@@ -376,9 +376,9 @@ impl Ledger {
     pub async fn run(&mut self) -> Result<(), ferryboat::Error> {
         // Every exit below logs its reason *here*, while `self` (and thus
         // the supervisor connection) is still alive. Returning drops the
-        // connection, and the supervisor SIGKILLs workers the moment it
-        // sees the connection close — anything logged after the return
-        // loses that race and is never recorded.
+        // connection; the supervisor treats that as a fatal disconnect and
+        // tears the plugin down, so anything logged after the return races
+        // that teardown and may never be recorded.
         loop {
             let event = tokio::select! {
                 msg = self.ingestor.recv() => LedgerEvent::WalMsg(msg.inspect_err(

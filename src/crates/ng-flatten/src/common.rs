@@ -72,6 +72,7 @@ pub enum Value {
 }
 
 impl Value {
+    /// The matching [`Kind`] tag (a leaf kind for every variant).
     pub fn kind(&self) -> Kind {
         match self {
             Value::Null => Kind::Null,
@@ -95,6 +96,8 @@ pub enum Step {
     ArrayElem,
 }
 
+/// One upward edge: the parent node and the [`Step`] that reaches the child
+/// from it — the chain of these is what [`SchemaTree::path`] renders.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Edge {
     parent: NodeId,
@@ -116,8 +119,9 @@ pub struct Entry {
     pub value: Value,
     /// Pre-computed `xxhash64` of this entry's `key=value` rendering, filled at
     /// emit time by the [`Flattener`] (an invariant, not a later fill pass).
-    /// Lets an SFST-style interner skip re-hashing on every occurrence — the
-    /// `_nd_kv_hash` fast path.
+    /// Lets the SFST build's interner resolve a repeat pair from the hash alone
+    /// — no re-hash, no string compare (`lookup_hash`; feed at
+    /// `src/crates/ng-index/src/sfst_build.rs`).
     pub hash: u64,
 }
 
@@ -156,10 +160,10 @@ impl SchemaTree {
     }
 
     /// The node's upward edge as `(parent, step)`, or `None` at the root.
-    /// Exposes the parent id + immediate step so a consumer can copy the tree
-    /// node-by-node into another representation (e.g. `sfst::SchemaTree` at index
-    /// time). Nodes are interned parent-before-child, so an ascending copy sees
-    /// every parent already placed.
+    /// Exposes parent + step so a consumer can copy the tree node-by-node into
+    /// another representation (e.g. `sfst::SchemaTree`). Nodes are interned
+    /// parent-before-child, so an ascending copy sees every parent already
+    /// placed.
     pub fn edge(&self, id: NodeId) -> Option<(NodeId, &Step)> {
         self.nodes[id as usize]
             .edge
@@ -242,7 +246,7 @@ impl<'a> StepRef<'a> {
 }
 
 /// Owned intern-map key. `name == None` is `Step::ArrayElem`. The manual
-/// `Hash` MUST stay field-for-field identical to [`InternProbe`]'s so a
+/// `Hash` MUST stay field-for-field identical to `InternProbe`'s so a
 /// borrowed probe finds the owned key.
 #[derive(PartialEq, Eq)]
 struct InternKey {
@@ -259,7 +263,7 @@ impl std::hash::Hash for InternKey {
     }
 }
 
-/// Borrowed, allocation-free probe for [`InternKey`].
+/// Borrowed, allocation-free probe for `InternKey`.
 struct InternProbe<'a> {
     parent: NodeId,
     kind: Kind,
@@ -286,10 +290,9 @@ pub struct Flattener {
     nodes: Vec<Node>,
     lookup: hashbrown::HashMap<InternKey, NodeId>,
     /// Collapsed path per node, built incrementally at interning time (the
-    /// parent's path is always already cached) — must render exactly like
-    /// [`SchemaTree::path`]. Lets [`emit`](Self::emit) hash `key=value`
-    /// while the value bytes are still cache-hot, instead of a second full
-    /// pass over the entries.
+    /// parent's path is always cached first) — must render exactly like
+    /// [`SchemaTree::path`]. Lets `emit_one` hash
+    /// `key=value` with no second pass over the entries.
     paths: Vec<String>,
     /// Reused `key=value` render buffer for the emit-time hash.
     kv_buf: String,
@@ -326,13 +329,15 @@ impl Flattener {
     /// Merge a foreign per-frame [`SchemaTree`] into this builder's (global) tree,
     /// returning a `local → global` node-id map indexed by the foreign [`NodeId`].
     ///
-    /// This is the index-time counterpart to flattening: it rebuilds one global
-    /// column space from many stored per-frame trees. A non-root node always has a
-    /// smaller id than its children (children are interned after their parent), so
-    /// a single ascending pass sees every parent already mapped. Interning each
-    /// `(global_parent, step, kind)` reuses the same logic as flattening, so a
-    /// column shared across frames collapses to one global node. Callers renumber
-    /// entries through the returned map — an integer lookup per entry.
+    /// The read-side counterpart to flattening: rebuilds one global column space
+    /// from many stored per-frame trees (the sfsq traces WAL-tail scan
+    /// accumulates every frame's tree this way —
+    /// `src/crates/sfsq/src/traces/wal_scan.rs`). A non-root node always has a
+    /// smaller id than its children (children are interned after their parent),
+    /// so a single ascending pass sees every parent already mapped. Interning
+    /// each `(global_parent, step, kind)` reuses flattening's logic, so a column
+    /// shared across frames collapses to one global node; callers renumber
+    /// entries through the returned map.
     pub fn merge_tree(&mut self, foreign: &SchemaTree) -> Vec<NodeId> {
         let mut map = vec![ROOT; foreign.len()];
         for local in 1..foreign.len() as NodeId {
@@ -452,18 +457,17 @@ impl Flattener {
     }
 
     fn flatten_kv(&mut self, parent: NodeId, kv: KeyValue, out: &mut Vec<Entry>) {
-        // '=' is the key=value delimiter everywhere downstream (the interner's
-        // field split, the WAL-tail scan, `build_kv`); a key containing it
-        // would inject a false field/value boundary. Every user-controlled key
-        // passes through here, so rewrite '=' to '_' at this single choke
-        // point — counted, so ingest can surface the rename.
+        // '=' is the key=value delimiter everywhere downstream (`build_kv`,
+        // the interner's per-field grouping, the WAL-tail `split_kv`), so a
+        // key carrying it would forge a field/value boundary. Every
+        // user-controlled key passes through this single choke point, which
+        // rewrites '=' to '_' and counts the rename for ingest to surface.
         let sanitized;
         let name: &str = if kv.key.is_empty() {
-            // Proto3 accepts an empty key (OTLP only SHOULDs non-empty).
-            // Stored bare it becomes a prefix-only field ("attributes.")
-            // that enumerates as an empty attribute name and cannot
-            // round-trip through selections — degrade it the same way
-            // as the '=' rewrite, at the same choke point.
+            // Proto3 accepts an empty key (OTLP only SHOULDs non-empty), but
+            // stored bare it becomes a prefix-only field that cannot
+            // round-trip through selections — degrade to "_", same as the
+            // '=' rewrite, at the same choke point.
             self.sanitized_keys += 1;
             "_"
         } else if kv.key.contains('=') {
@@ -528,13 +532,13 @@ impl Flattener {
     pub fn flatten_record(&mut self, record: LogRecord) -> Vec<Entry> {
         let mut out = Vec::new();
 
-        // Queryable scalar fields. OTLP uses 0/"" for unset → treated as absent.
-        // Per-row identifier/scalar fields are intentionally NOT emitted as entries —
-        // they are carried as columns on [`Record`] (normalized/copied at ingest),
-        // used for row ordering or per-row retrieval, not as indexed facets:
-        // `time_unix_nano`/`observed_time_unix_nano` (→ `ts`/`observed_ts`)
-        // and `trace_id`/`span_id` (near-unique identifiers). `flags` and
-        // `dropped_attributes_count` are likewise carried on the record.
+        // Queryable scalar fields; OTLP encodes unset as 0/"" → treated as
+        // absent. Identifier/timing fields are NOT emitted as entries — they
+        // ride as columns on `Record` (normalized at ingest), used for row
+        // ordering or per-row retrieval, not indexed facets:
+        // `time_unix_nano`/`observed_time_unix_nano` (→ `ts`/`observed_ts`),
+        // `trace_id`/`span_id` (near-unique identifiers), `flags`,
+        // `dropped_attributes_count`.
         if record.severity_number != 0 {
             self.scalar(
                 "severity_number",
@@ -574,22 +578,19 @@ impl Flattener {
     /// [`crate::traces::SpanRecord`], not as entries — same split as
     /// [`Flattener::flatten_record`] for logs.
     ///
-    /// Enum facets (`kind`, `status_code`) store **both** the raw OTLP int and a
-    /// readable label, under a deliberate convention:
+    /// Enum facets (`kind`, `status_code`) store **both** representations:
     /// - the clean name (`kind`, `status_code`) carries the user-facing **label**
     ///   (`SERVER`, `ERROR`, …) — what an operator queries;
-    /// - the same name with a leading `_` (`_kind`, `_status_code`) carries the raw
-    ///   **int** — lossless and forward-compatible, so an unknown future enum
-    ///   variant still survives and stays queryable.
+    /// - the `_`-prefixed name (`_kind`, `_status_code`) carries the raw **int** —
+    ///   lossless and forward-compatible when unknown future variants appear.
     ///
-    /// Every span stores both facets, default variants included (`UNSPECIFIED`
-    /// kind, `UNSET` status), so the defaults stay filterable and enumerable; an
-    /// absent status object is the OTel default, `UNSET`. The dual label+raw-int
-    /// *representation* is span-specific (`SpanKind`/`StatusCode` are closed enums
-    /// whose readable label is worth indexing, unlike the open numeric
-    /// `severity_number`). The raw int is always emitted; the label only when the
-    /// variant is known. `trace_state` is carried **verbatim** (it embeds the W3C
-    /// sampling threshold `ot=th:`); `status_message` is emitted whenever
+    /// The raw int is always emitted; the label only for a known variant.
+    /// Defaults are stored too (`UNSPECIFIED` kind; `UNSET` status — also what
+    /// an absent status object means), so they stay filterable and enumerable.
+    /// This dual form is span-specific: `SpanKind`/`StatusCode` are closed enums
+    /// whose labels are worth indexing, unlike the open numeric
+    /// `severity_number`. `trace_state` is carried **verbatim** (it embeds the
+    /// W3C sampling threshold `ot=th:`); `status_message` is emitted whenever
     /// non-empty, independent of the status code.
     pub fn flatten_span(&mut self, span: Span) -> FlattenedSpan {
         let mut out = Vec::new();
@@ -598,7 +599,7 @@ impl Flattener {
             self.scalar("name", Value::Str(span.name), &mut out);
         }
 
-        // UNSPECIFIED is stored as itself, never synthesized into INTERNAL.
+        // UNSPECIFIED (0) is stored as itself, never rewritten to INTERNAL.
         if let Some(label) = span_kind_label(span.kind) {
             self.scalar("kind", Value::Str(label.to_string()), &mut out);
         }
@@ -608,8 +609,7 @@ impl Flattener {
             self.scalar("trace_state", Value::Str(span.trace_state), &mut out);
         }
 
-        // An absent status object is the OTel default: UNSET. The message
-        // round-trips whenever non-empty, even alongside an UNSET code.
+        // An absent status object is the OTel default: UNSET.
         let status = span.status.unwrap_or_default();
         if let Some(label) = status_code_label(status.code) {
             self.scalar("status_code", Value::Str(label.to_string()), &mut out);
@@ -670,7 +670,8 @@ impl Flattener {
 
     /// Flatten one span link: attributes under `links.attributes.*`; the linked
     /// ids, `trace_state`, and flags stay structured scalars (ids are near-unique
-    /// and deliberately not faceted — the log-correlation-id rule).
+    /// and deliberately not faceted — the same rule that keeps log correlation
+    /// ids out; see `crate::logs`).
     fn flatten_link(&mut self, link: SpanLink) -> crate::traces::LinkRecord {
         let mut attributes = Vec::new();
         if !link.attributes.is_empty() {
@@ -871,7 +872,7 @@ fn frame_config() -> impl bincode::config::Config {
 
 /// Bincode-encode any flattened-frame payload `T`. The single codec the
 /// per-signal `encode_*_frame` wrappers delegate to, so logs and traces ride the
-/// identical [`frame_config`] — the two cannot drift apart.
+/// identical `frame_config` — the two cannot drift apart.
 pub(crate) fn encode<T: Serialize>(req: &T) -> Result<Vec<u8>, bincode::error::EncodeError> {
     bincode::serde::encode_to_vec(req, frame_config())
 }

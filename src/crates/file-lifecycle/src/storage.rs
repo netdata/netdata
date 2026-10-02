@@ -1,14 +1,48 @@
 //! Remote object-storage seam.
 //!
-//! [`Storage`] is the single abstraction the uploader and recovery code depend
-//! on, so opendal is confined to this module's [`OpendalStorage`] impl and the
-//! rest of the crate stays backend-agnostic and unit-testable with a mock.
+//! [`Storage`] is the single abstraction every remote access goes through —
+//! the uploader's PUTs, the startup catalog diff-sync's LIST and downloads,
+//! recovery's pre-mark LISTs/stats, and the query path's read-backs — so
+//! opendal is confined to this module's [`OpendalStorage`] impl and the rest
+//! of the crate stays backend-agnostic and unit-testable with a mock.
 //!
-//! Native async-in-trait + generic dispatch (matching the crate's [`Component`]
-//! trait) keeps calls monomorphized and zero-cost. The `+ Send` bound on each
-//! returned future is needed because storage futures run in spawned upload
-//! tasks (`write`) and under `join_all` during recovery (`list`); it is applied
-//! uniformly across all methods so any backend stays usable there.
+//! Surface: `write` / `list` / `read` / `stat` and nothing else — there is no
+//! delete. Objects age out through bucket-side lifecycle rules keyed on the
+//! date-bucketed keys `remote_keys` builds (its module docs own the bucket
+//! layout and that rationale). `list` is recursive over the whole `prefix`
+//! sub-tree; `read` loads the whole object into memory; every error surfaces
+//! as [`StorageError`].
+//!
+//! Native async-in-trait + generic dispatch (matching the crate's
+//! [`Component`] trait) keeps calls monomorphized and zero-cost. The `+ Send`
+//! bound on each returned future is needed because storage futures run in
+//! spawned upload tasks (`write`) and under `join_all` during recovery
+//! (`list`); it is applied uniformly across all methods so any backend stays
+//! usable there. The trait bound `Send + Sync + 'static` makes a storage
+//! handle shareable across tasks.
+//!
+//! [`OpendalStorage::new`] wraps the backend in opendal's retry layer — the
+//! parameters and the ~3-minute per-operation backoff ceiling live on its
+//! docs (the bound `bridge::config`'s `startup_op_timeout` should stay
+//! above). The layer is transparent to callers; where a call must be bounded
+//! tighter, the caller wraps it (`recovery::startup`'s per-op timeout,
+//! `remote_read`'s per-download deadline).
+//!
+//! Journal safety: `StorageError`'s `Display` and the retry layer's notify
+//! pass error text through `crate::redact`, so rendering an error into a
+//! log line is credential-safe by construction; the `redact` module docs own
+//! that contract.
+//!
+//! Consumers (grep-verified): `uploader` writes; `recovery::startup` LISTs
+//! the catalog prefix and downloads bodies; `recovery::remote` LISTs per-day
+//! SFST prefixes and stats catalogs, with `recovery::local`'s
+//! `seed_from_catalog_files` re-fetching a corrupt body; `remote_read`'s
+//! `RemoteRead<S: Storage>` (defaulting to [`OpendalStorage`]) reads objects
+//! back through the shared download cache (`file-cache`). `otel-ledger`'s
+//! `Ledger::new` constructs [`OpendalStorage`] behind
+//! `remote_storage.enabled` and spawns [`probe_reachable`]; its pipeline
+//! builders thread the cloned handle to recovery and each signal's
+//! `RemoteRead`, and its tests drive `fs://` backends.
 //!
 //! [`Component`]: crate::component::Component
 
@@ -20,10 +54,12 @@ use crate::redact::redact;
 /// Metadata returned by a successful [`Storage::write`].
 pub struct WriteMeta {
     /// Size the backend reports for the written object. Some backends report
-    /// `0` (unknown); callers must treat only a non-zero mismatch as a failure.
+    /// `0` (unknown); the uploader's size guard treats only a non-zero
+    /// mismatch as a failed upload.
     pub content_length: u64,
-    /// Backend-reported ETag (e.g. S3), recorded on the catalog entry; `None`
-    /// when the backend does not supply one.
+    /// Backend-reported ETag (e.g. S3), recorded on the SFST's catalog entry
+    /// via the uploader's `Uploaded` response; `None` when the backend does
+    /// not supply one.
     pub etag: Option<String>,
 }
 
@@ -34,10 +70,13 @@ pub struct WriteMeta {
 /// it into `Other` would turn "transient -> skip" into "missing -> re-upload".
 ///
 /// `Display` renders the FULL error source chain with URL query strings
-/// stripped (see [`crate::redact`]) — safe to log, and complete enough to
-/// diagnose (a top-level-only message once hid a missing-TLS root cause behind
-/// "error sending request"). `Debug` is derived and UNREDACTED — it exists for
-/// test assertions and must not be used to log real backend errors.
+/// stripped (see `crate::redact`) — safe to log, and complete enough to
+/// diagnose (reqwest renders only a generic top-level message such as "error
+/// sending request"; the cause is visible only deeper in the chain). `Debug`
+/// is derived and UNREDACTED — it exists for test assertions and must not be
+/// used to log real backend errors. Converting the error into another type
+/// MUST flatten through this `Display` (`remote_read::read_error_to_anyhow`
+/// is the pattern); the `crate::redact` module docs own the rationale.
 #[derive(Debug)]
 pub enum StorageError {
     NotFound,
@@ -54,9 +93,17 @@ impl std::fmt::Display for StorageError {
 }
 
 /// Abstraction over the remote object store. Implemented for opendal by
-/// [`OpendalStorage`]; mocked in tests.
+/// [`OpendalStorage`]; mocked in tests (`MockStorage`, `cfg(test)`).
+///
+/// Keys are full object paths in the scheme `remote_keys` builds; the trait
+/// treats them as opaque strings. There is no delete: objects age out through
+/// bucket-side lifecycle rules keyed on the date-bucketed layout
+/// (`remote_keys`' module docs own the rationale).
 pub trait Storage: Send + Sync + 'static {
-    /// Write `data` to `key` and return the backend's reported metadata.
+    /// Overwrite `key` with `data` and return the backend's reported
+    /// metadata. Writes are idempotent overwrites at deterministic keys,
+    /// which is what lets the uploader re-drive an abandoned upload on the
+    /// next restart.
     fn write(
         &self,
         key: &str,
@@ -67,14 +114,19 @@ pub trait Storage: Send + Sync + 'static {
     /// at any depth below `prefix`, not just the immediate level. Directory
     /// placeholder entries (keys ending in `/`) may be returned by some backends
     /// and MUST be filtered by callers that want objects only. Leaf-prefix
-    /// callers (a single date directory) are unaffected by the recursive
-    /// contract; the startup catalog sync depends on it (one LIST of the whole
-    /// `catalog/` prefix spanning many date/tenant subdirectories).
+    /// callers (`recovery::remote`'s per-day SFST prefixes) are unaffected by
+    /// the recursive contract; the startup catalog sync depends on it (one
+    /// LIST of the whole `catalog/` prefix spanning many date/tenant
+    /// subdirectories).
     fn list(&self, prefix: &str) -> impl Future<Output = Result<Vec<String>, StorageError>> + Send;
 
-    /// Read the whole object at `key` into memory. `NotFound` is preserved for
-    /// parity with the other methods, so a caller can distinguish an absent object
-    /// from a transient failure if it needs to.
+    /// Read the whole object at `key` into memory — peak memory is the
+    /// object's size (the shared download cache is sized on that basis).
+    /// `NotFound` is preserved for parity with the other methods, so a caller
+    /// can distinguish an absent object from a transient failure if it needs
+    /// to. The retry layer alone can spend minutes on one call, so callers
+    /// that need a bound wrap it (`remote_read`'s per-download deadline,
+    /// `recovery::startup`'s per-op timeout).
     fn read(&self, key: &str) -> impl Future<Output = Result<Vec<u8>, StorageError>> + Send;
 
     /// Probe a single object. `Ok(())` if present; `Err(StorageError::NotFound)`
@@ -89,7 +141,7 @@ const STORAGE_PROBE_KEY: &str = ".netdata-otel-storage-probe";
 /// Startup connectivity probe: confirm the configured backend is reachable and
 /// the credentials are accepted, without requiring any object to exist.
 ///
-/// A `stat` on [`STORAGE_PROBE_KEY`] returning `Ok` or `NotFound` both mean the
+/// A `stat` on `STORAGE_PROBE_KEY` returning `Ok` or `NotFound` both mean the
 /// request reached the backend and was authorized — `NotFound` is the expected
 /// case, since the sentinel is never written. Only `Other` signals a real
 /// problem (bad credentials, wrong bucket, unreachable endpoint).
@@ -97,8 +149,10 @@ const STORAGE_PROBE_KEY: &str = ".netdata-otel-storage-probe";
 /// The call runs through the operator's retry layer, so a *temporary* failure
 /// (e.g. an unreachable endpoint) is retried before it surfaces, while permanent
 /// failures (auth, missing bucket) are not retried by opendal and surface
-/// immediately. Because that retry window can be minutes, callers MUST run this
-/// off the startup path (see `Ledger::new`, which spawns it).
+/// immediately. Because that retry window can run to the ~3-minute backoff
+/// ceiling (module docs), callers MUST run this off the startup path (see
+/// `Ledger::new`, which spawns it). The sole caller treats the result as a
+/// diagnostic — logged, never fatal.
 pub async fn probe_reachable<S: Storage>(storage: &S) -> Result<(), StorageError> {
     match storage.stat(STORAGE_PROBE_KEY).await {
         Ok(()) | Err(StorageError::NotFound) => Ok(()),
@@ -106,18 +160,33 @@ pub async fn probe_reachable<S: Storage>(storage: &S) -> Result<(), StorageError
     }
 }
 
-/// opendal-backed [`Storage`]. Owns the `Operator` construction and retry layer.
+/// opendal-backed [`Storage`] — the production backend, constructed once per
+/// process when remote storage is enabled (`Ledger::new`). Owns the
+/// `Operator` construction and retry layer.
+///
+/// Cheap to clone (the `Operator` is `Arc`-backed): the ledger shares one
+/// handle across the uploader's args, the reachability probe task, and each
+/// signal's `RemoteRead`.
 #[derive(Clone)]
 pub struct OpendalStorage {
     op: opendal::Operator,
 }
 
 impl OpendalStorage {
-    /// Build from a storage URI, applying the standard retry layer. Parsing the
-    /// URI here (not at `Ledger::new`) keeps opendal out of the ledger; the
-    /// caller still gates construction on `remote_storage.enabled` so a malformed URI
-    /// can't abort a local-only deployment.
+    /// Build from a storage URI (e.g. `fs:///path`, `s3://bucket/?region=…`),
+    /// wrapped in opendal's retry layer: exponential backoff 1 s → 30 s with
+    /// jitter, at most 10 attempts — a worst-case ~3-minute backoff ceiling
+    /// per operation, which `bridge::config`'s `startup_op_timeout` should
+    /// stay above. Each retry is logged at `warn` with the redacted error
+    /// text. Err only on URI parse failure, as a raw `std::io::Error`
+    /// carrying opendal's error display — not a [`StorageError`], so it does
+    /// not pass through the `Display` redaction.
+    ///
+    /// Parsing the URI here (not at `Ledger::new`) keeps opendal out of the
+    /// ledger; the caller still gates construction on `remote_storage.enabled`
+    /// so a malformed URI can't abort a local-only deployment.
     pub fn new(uri: &str) -> std::io::Result<Self> {
+        // Worst-case backoff sum: 1+2+4+8+16+30·5 s ≈ 181 s ≈ 3 min per op.
         let retry_layer = opendal::layers::RetryLayer::new()
             .with_min_delay(Duration::from_secs(1))
             .with_max_delay(Duration::from_secs(30))
@@ -170,10 +239,9 @@ impl Storage for OpendalStorage {
     }
 
     async fn list(&self, prefix: &str) -> Result<Vec<String>, StorageError> {
-        // `recursive(true)` walks the whole sub-tree under `prefix` (opendal's
-        // plain `list` is one level only). Required by the startup catalog sync,
-        // which LISTs the whole `catalog/` prefix; leaf-prefix callers are
-        // unaffected (a single date dir has no sub-levels).
+        // `recursive(true)` walks the whole sub-tree under `prefix`; opendal's
+        // plain `list` returns one level only. This is the mechanism behind the
+        // trait's recursive contract.
         let entries = self.op.list_with(prefix).recursive(true).await?;
         Ok(entries.into_iter().map(|e| e.path().to_owned()).collect())
     }
@@ -192,8 +260,8 @@ impl Storage for OpendalStorage {
     }
 }
 
-/// In-memory [`Storage`] for unit tests: configurable write size/failure and
-/// stat outcome. Shared by the uploader and recovery test modules.
+/// In-memory [`Storage`] for unit tests: configurable write/list/read/stat
+/// outcomes. Shared by the uploader, recovery, and `remote_read` test modules.
 #[cfg(test)]
 #[derive(Clone)]
 pub(crate) struct MockStorage {
@@ -204,8 +272,10 @@ pub(crate) struct MockStorage {
     pub write_error: Option<String>,
     /// What `stat` returns.
     pub stat: MockStat,
-    /// Object keys every `list` call returns (prefix is ignored). Lets tests
-    /// drive `reconcile_remote_uploads` without a real backend.
+    /// Object keys every `list` call returns, filtered by `starts_with(prefix)`
+    /// like a real backend, so multi-day reconcile tests see each key only
+    /// under its own date prefix. Lets tests drive `reconcile_remote_uploads`
+    /// without a real backend.
     pub list_response: Vec<String>,
     /// If `Some`, `list` fails with this message — drives the LIST-error path.
     pub list_error: Option<String>,
@@ -223,7 +293,8 @@ pub(crate) struct MockStorage {
     /// tests set exactly one error mode at a time.
     pub read_not_found: bool,
     /// Counts `read` calls (shared, so a `.clone()` of the mock still counts) —
-    /// lets the normal-boot no-op test assert zero downloads.
+    /// lets recovery tests assert download counts (the no-op startup sync
+    /// asserts zero).
     pub read_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     /// Per-key read failures, checked before every other read mode.
     pub read_key_errors: std::collections::HashMap<String, MockReadError>,
@@ -240,6 +311,9 @@ pub(crate) enum MockReadError {
     Other,
 }
 
+/// What [`MockStorage`]'s `stat` returns: `Found` → `Ok(())`, `NotFound` →
+/// `StorageError::NotFound`, `Transient` → `Other` (drives the probe's
+/// transient-error path and recovery's log-and-skip).
 #[cfg(test)]
 #[derive(Clone, Copy)]
 pub(crate) enum MockStat {
@@ -289,8 +363,6 @@ impl Storage for MockStorage {
         // (a non-recursive `OpendalStorage::list` would still pass mock tests).
         // The real recursive contract is covered by `startup_sync_restores_after
         // _wipe`, which runs an fs-backed `OpendalStorage` over nested dirs.
-        // Honor the prefix like a real backend, so multi-day reconcile tests
-        // see each key only under its own date prefix.
         Ok(self
             .list_response
             .iter()

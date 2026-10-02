@@ -7,12 +7,11 @@
 //!
 //! The agent's `otel.yaml` no longer configures per-signal dirs: it sets one
 //! `base_dir` and the plugin derives `{base_dir}/{signal}/{wal,index,catalog}`
-//! (see `PluginConfig::lifecycle_for`). This is a logs query tool, so we derive
-//! the logs dirs `{base_dir}/logs/wal` and `{base_dir}/logs/index`. We parse with
-//! a minimal struct that extracts only `base_dir` and ignores every other field —
-//! reusing the full plugin config type would fail on unrelated missing mandatory
-//! fields. Per-dir overrides are still available via the `--wal-dir`/`--sfst-dir`
-//! flags.
+//! (see `PluginConfig::lifecycle_for`). This module serves only the logs query
+//! path, so it derives the logs dirs `{base_dir}/logs/wal` and
+//! `{base_dir}/logs/index`, parsing with a minimal struct that extracts just
+//! `base_dir` — reusing the full plugin config type would fail on unrelated
+//! missing mandatory fields.
 
 use std::path::{Path, PathBuf};
 
@@ -20,19 +19,18 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 
 /// Minimal view of `otel.yaml`: only the base dir we need. Unknown fields are
-/// ignored; a missing `base_dir` deserializes to `None` (serde treats `Option`
-/// fields as optional).
+/// ignored; a missing `base_dir` deserializes to `None`.
 #[derive(Debug, Default, Deserialize)]
 struct OtelYaml {
     base_dir: Option<PathBuf>,
 }
 
 impl OtelYaml {
-    /// Logs WAL dir derived from `base_dir`, matching `lifecycle_for(Signal::Logs)`.
+    /// Logs WAL dir: `{base_dir}/logs/wal`, matching `lifecycle_for(Signal::Logs)`.
     fn wal_dir(&self) -> Option<PathBuf> {
         self.base_dir.as_ref().map(|b| b.join("logs").join("wal"))
     }
-    /// Logs SFST/index dir derived from `base_dir`.
+    /// Logs SFST/index dir: `{base_dir}/logs/index`, same derivation.
     fn sfst_dir(&self) -> Option<PathBuf> {
         self.base_dir.as_ref().map(|b| b.join("logs").join("index"))
     }
@@ -61,7 +59,7 @@ pub struct DirInputs<'a> {
     pub sfst_dir: Option<&'a Path>,
 }
 
-/// Resolve both dirs. Explicit flag wins, then user `--config`, then
+/// Resolve the WAL and SFST dirs. Explicit flag wins, then user `--config`, then
 /// `--stock-config`. An unresolved dir is an error naming the ways to set it.
 pub fn resolve_dirs(inputs: &DirInputs) -> Result<Dirs> {
     let user = inputs.config.map(load).transpose()?;

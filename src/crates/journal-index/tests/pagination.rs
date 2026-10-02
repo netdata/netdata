@@ -1,7 +1,58 @@
-//! Integration tests for query pagination.
+//! Integration tests for query pagination over an indexed journal
+//! (file_index.rs): each test writes a fresh journal file, indexes it
+//! with `FileIndexer::index`, and pages through it with
+//! `find_log_entries`.
 //!
-//! These tests verify that pagination works correctly when querying log entries,
-//! especially in the edge case where many entries share the same timestamp.
+//! Fixture: one journal per test at `<tmp>/<machine-id>/system.journal`
+//! — the registry path grammar `File::from_path` parses
+//! (`journal-registry/src/repository/file.rs`). Every entry is
+//! stamped with `_SOURCE_REALTIME_TIMESTAMP=<microseconds>` and
+//! `add_entry` receives the same value as realtime and monotonic
+//! (`journal-core/src/file/writer.rs` `add_entry`). The same-timestamp and
+//! mixed-timestamp tests index with `Some(&source_timestamp_field)`,
+//! the rest with `None` (realtime fallback); both must paginate
+//! identically because the two values coincide. Entries sharing a
+//! timestamp keep their (timestamp, offset) sort order
+//! (`src/file_indexer.rs` `collect_source_field_info` sort), so a run's
+//! internal order is deterministic.
+//!
+//! Pinned contracts:
+//!
+//! - `LogEntryId.position` indexes the time-ordered entry list the
+//!   query walks — the full list unless a filter narrows it — and is
+//!   the pagination cursor: a forward page starts at
+//!   `resume_position + 1`, a backward page at `resume_position - 1`
+//!   (`src/file_index.rs` `find_log_entries` resume handling).
+//!   Positions are absolute, not
+//!   window-relative, so time-boundary queries report the entries'
+//!   real indices.
+//! - `Anchor::Timestamp` is inclusive in both directions: the entry at
+//!   exactly the anchor starts the walk (`src/file_index.rs`
+//!   `find_log_entries` anchor search).
+//!   `Anchor::Head`/`Tail` resolve to the histogram's
+//!   first-bucket start and exclusive end (`src/file_index.rs`
+//!   `find_log_entries` Head/Tail arms, `src/histogram.rs`
+//!   `Histogram::start_time`/`end_time`).
+//! - `after` is inclusive, `before` exclusive (`src/file_index.rs`
+//!   `find_log_entries` boundary checks); `limit` is an upper bound,
+//!   never padded; limit 0
+//!   returns empty without error (`src/file_index.rs` `find_log_entries`
+//!   limit-0 check).
+//! - Out-of-bounds resume positions return empty, never panic:
+//!   forward clamps at the end-of-list check (`src/file_index.rs`
+//!   `find_log_entries` Forward arm),
+//!   backward rejects 0 and >= len up front (`src/file_index.rs`
+//!   `find_log_entries` Backward arm).
+//! - Same-timestamp runs are the hard case: the anchor search can only
+//!   locate the run's edge, so stepping within a run works only
+//!   through resume_position.
+//!
+//! Not pinned here: pagination with an active filter (positions then
+//! index the filtered list and resume requires the filter to stay
+//! unchanged between pages — the `resume_position` contract in
+//! `src/file_index.rs`), regex filtering,
+//! unlimited queries (every test sets a limit), and multi-file
+//! pagination (one file per index throughout).
 
 use journal_common::Seconds;
 use journal_core::file::{JournalFile, JournalFileOptions, JournalWriter};
@@ -15,10 +66,11 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 use uuid::Uuid;
 
-// Helper constants
+// JAN_1_2024_MIDNIGHT is 2024-01-01 00:00:00 UTC in microseconds; tests
+// derive offsets from it rather than writing raw epoch values.
 const JAN_1_2024_MIDNIGHT: Microseconds = Microseconds(1704067200_000_000);
 
-/// Test journal entry specification
+/// One journal entry: a timestamp plus (field, value) pairs.
 struct TestEntry {
     timestamp: Microseconds,
     fields: Vec<(String, String)>,
@@ -38,7 +90,10 @@ impl TestEntry {
     }
 }
 
-/// Create a test journal file path that conforms to the expected format
+/// Journal path in the registry layout `<dir>/<machine-id>/system.journal`:
+/// `File::from_path` reads status from the suffix, source from the parent
+/// dir and machine id from the dir above
+/// (`journal-registry/src/repository/file.rs` `File::from_path`).
 fn create_test_journal_path(temp_dir: &TempDir) -> PathBuf {
     let machine_id = Uuid::from_u128(0x12345678_1234_1234_1234_123456789abc);
     let machine_dir = temp_dir.path().join(machine_id.to_string());
@@ -46,7 +101,15 @@ fn create_test_journal_path(temp_dir: &TempDir) -> PathBuf {
     machine_dir.join("system.journal")
 }
 
-/// Helper to create a test journal file with specified entries
+/// Write `entries` into a fresh journal file; returns the `File` plus
+/// the `TempDir` backing it — indexing re-opens the journal by path, so
+/// the dir must outlive it.
+///
+/// Each entry carries `_SOURCE_REALTIME_TIMESTAMP=<microseconds>` and
+/// `add_entry` receives the same value as realtime and monotonic
+/// (`journal-core/src/file/writer.rs` `add_entry`): the field feeds the
+/// source-timestamp ordering path, the header timestamps the realtime
+/// fallback.
 fn create_test_journal(
     entries: Vec<TestEntry>,
 ) -> Result<(TempDir, File), Box<dyn std::error::Error>> {
@@ -68,10 +131,8 @@ fn create_test_journal(
     for entry in entries {
         let mut entry_data = Vec::new();
 
-        // Add _SOURCE_REALTIME_TIMESTAMP first
         entry_data.push(format!("_SOURCE_REALTIME_TIMESTAMP={}", entry.timestamp.0).into_bytes());
 
-        // Add all other fields
         for (field, value) in entry.fields {
             entry_data.push(format!("{}={}", field, value).into_bytes());
         }
@@ -91,7 +152,10 @@ fn create_test_journal(
 
 #[test]
 fn test_pagination_forward_with_same_timestamps() {
-    // Create 300 entries all with the same timestamp
+    // All 300 entries share one timestamp: the anchor search can only
+    // locate where the run starts (`src/file_index.rs` `find_log_entries`
+    // anchor search), so stepping
+    // within the run works only through resume_position.
     const TOTAL_ENTRIES: usize = 300;
     const PAGE_SIZE: usize = 200;
     let same_timestamp = JAN_1_2024_MIDNIGHT;
@@ -122,7 +186,6 @@ fn test_pagination_forward_with_same_timestamps() {
     let mut all_positions = HashSet::new();
     let mut resume_position = None;
 
-    // First page
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(PAGE_SIZE)
         .build()
@@ -136,7 +199,6 @@ fn test_pagination_forward_with_same_timestamps() {
         "First page should return PAGE_SIZE entries"
     );
 
-    // Verify all have the same timestamp
     for entry in &results {
         assert_eq!(entry.timestamp, same_timestamp);
         all_offsets.push(entry.offset);
@@ -151,7 +213,6 @@ fn test_pagination_forward_with_same_timestamps() {
         resume_position = Some(last_entry.position);
     }
 
-    // Second page - should get remaining 100 entries
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(PAGE_SIZE)
         .with_resume_position(resume_position.unwrap())
@@ -166,7 +227,6 @@ fn test_pagination_forward_with_same_timestamps() {
         "Second page should return remaining entries"
     );
 
-    // Verify all have the same timestamp
     for entry in &results {
         assert_eq!(entry.timestamp, same_timestamp);
         all_offsets.push(entry.offset);
@@ -181,7 +241,6 @@ fn test_pagination_forward_with_same_timestamps() {
         resume_position = Some(last_entry.position);
     }
 
-    // Third page - should be empty
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(PAGE_SIZE)
         .with_resume_position(resume_position.unwrap())
@@ -192,14 +251,12 @@ fn test_pagination_forward_with_same_timestamps() {
     println!("Third page: {} entries", results.len());
     assert_eq!(results.len(), 0, "Third page should be empty");
 
-    // Verify we got all entries
     assert_eq!(
         all_offsets.len(),
         TOTAL_ENTRIES,
         "Should have retrieved all entries"
     );
 
-    // Verify all offsets are unique (no duplicates)
     let unique_offsets: HashSet<_> = all_offsets.iter().collect();
     assert_eq!(
         unique_offsets.len(),
@@ -207,7 +264,7 @@ fn test_pagination_forward_with_same_timestamps() {
         "All offsets should be unique"
     );
 
-    // Verify all positions are unique and contiguous
+    // Together the pages covered positions 0..299: no gaps, no repeats.
     assert_eq!(
         all_positions.len(),
         TOTAL_ENTRIES,
@@ -220,7 +277,11 @@ fn test_pagination_forward_with_same_timestamps() {
 
 #[test]
 fn test_pagination_backward_with_same_timestamps() {
-    // Create 300 entries all with the same timestamp
+    // Anchor::Tail resolves to the histogram's exclusive end
+    // (`src/file_index.rs` `find_log_entries` Tail arm, `src/histogram.rs`
+    // `Histogram::end_time`), so the search lands
+    // on the last entry of the same-timestamp run and pagination walks
+    // it newest to oldest.
     const TOTAL_ENTRIES: usize = 300;
     const PAGE_SIZE: usize = 200;
     let same_timestamp = JAN_1_2024_MIDNIGHT;
@@ -251,7 +312,6 @@ fn test_pagination_backward_with_same_timestamps() {
     let mut all_positions = HashSet::new();
     let mut resume_position = None;
 
-    // First page (from tail, going backward)
     let params = LogQueryParamsBuilder::new(Anchor::Tail, Direction::Backward)
         .with_limit(PAGE_SIZE)
         .build()
@@ -265,7 +325,6 @@ fn test_pagination_backward_with_same_timestamps() {
         "First page should return PAGE_SIZE entries"
     );
 
-    // Verify all have the same timestamp
     for entry in &results {
         assert_eq!(entry.timestamp, same_timestamp);
         all_offsets.push(entry.offset);
@@ -280,7 +339,6 @@ fn test_pagination_backward_with_same_timestamps() {
         resume_position = Some(last_entry.position);
     }
 
-    // Second page - should get remaining 100 entries
     let params = LogQueryParamsBuilder::new(Anchor::Tail, Direction::Backward)
         .with_limit(PAGE_SIZE)
         .with_resume_position(resume_position.unwrap())
@@ -295,7 +353,6 @@ fn test_pagination_backward_with_same_timestamps() {
         "Second page should return remaining entries"
     );
 
-    // Verify all have the same timestamp
     for entry in &results {
         assert_eq!(entry.timestamp, same_timestamp);
         all_offsets.push(entry.offset);
@@ -310,7 +367,6 @@ fn test_pagination_backward_with_same_timestamps() {
         resume_position = Some(last_entry.position);
     }
 
-    // Third page - should be empty
     let params = LogQueryParamsBuilder::new(Anchor::Tail, Direction::Backward)
         .with_limit(PAGE_SIZE)
         .with_resume_position(resume_position.unwrap())
@@ -321,14 +377,12 @@ fn test_pagination_backward_with_same_timestamps() {
     println!("Third page: {} entries", results.len());
     assert_eq!(results.len(), 0, "Third page should be empty");
 
-    // Verify we got all entries
     assert_eq!(
         all_offsets.len(),
         TOTAL_ENTRIES,
         "Should have retrieved all entries"
     );
 
-    // Verify all offsets are unique (no duplicates)
     let unique_offsets: HashSet<_> = all_offsets.iter().collect();
     assert_eq!(
         unique_offsets.len(),
@@ -336,7 +390,7 @@ fn test_pagination_backward_with_same_timestamps() {
         "All offsets should be unique"
     );
 
-    // Verify all positions are unique and contiguous
+    // Together the pages covered positions 0..299: no gaps, no repeats.
     assert_eq!(
         all_positions.len(),
         TOTAL_ENTRIES,
@@ -349,13 +403,14 @@ fn test_pagination_backward_with_same_timestamps() {
 
 #[test]
 fn test_pagination_forward_with_mixed_timestamps() {
-    // Create entries with varying timestamps to ensure pagination works across different timestamps too
+    // 150 entries at T plus 150 at T+1s: PAGE_SIZE 200 makes the first
+    // page straddle the timestamp boundary, and the resume must continue
+    // midway through the T+1s run, returning only its entries.
     const ENTRIES_PER_TIMESTAMP: usize = 150;
     const PAGE_SIZE: usize = 200;
 
     let mut entries = Vec::new();
 
-    // First 150 entries at timestamp T
     let timestamp1 = JAN_1_2024_MIDNIGHT;
     for i in 0..ENTRIES_PER_TIMESTAMP {
         entries.push(
@@ -365,7 +420,6 @@ fn test_pagination_forward_with_mixed_timestamps() {
         );
     }
 
-    // Next 150 entries at timestamp T+1
     let timestamp2 = Microseconds(timestamp1.0 + 1_000_000);
     for i in 0..ENTRIES_PER_TIMESTAMP {
         entries.push(
@@ -392,7 +446,6 @@ fn test_pagination_forward_with_mixed_timestamps() {
     let mut all_offsets = Vec::new();
     let mut all_positions = HashSet::new();
 
-    // First page - should get 200 entries (all 150 from timestamp1 + 50 from timestamp2)
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(PAGE_SIZE)
         .build()
@@ -409,7 +462,6 @@ fn test_pagination_forward_with_mixed_timestamps() {
 
     let resume_position = results.last().unwrap().position;
 
-    // Second page - should get remaining 100 entries (all from timestamp2)
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(PAGE_SIZE)
         .with_resume_position(resume_position)
@@ -420,14 +472,12 @@ fn test_pagination_forward_with_mixed_timestamps() {
     println!("Second page: {} entries", results.len());
     assert_eq!(results.len(), 100);
 
-    // All entries in second page should have timestamp2
     for entry in &results {
         assert_eq!(entry.timestamp, timestamp2);
         all_offsets.push(entry.offset);
         assert!(all_positions.insert(entry.position));
     }
 
-    // Verify we got all entries without duplicates
     assert_eq!(all_offsets.len(), 300);
     let unique_offsets: HashSet<_> = all_offsets.iter().collect();
     assert_eq!(unique_offsets.len(), 300);
@@ -435,20 +485,24 @@ fn test_pagination_forward_with_mixed_timestamps() {
 
 #[test]
 fn test_pagination_empty_journal() {
-    // Create an empty journal file
     let entries = Vec::new();
 
     let (_temp_dir, file) = create_test_journal(entries).unwrap();
 
     let mut indexer = FileIndexer::default();
 
-    // Indexing an empty journal should fail with EmptyHistogramInput
+    // No entries means no (timestamp, offset) pairs, and the histogram
+    // build rejects empty input (`src/histogram.rs`
+    // `Histogram::from_timestamp_offset_pairs` empty-input check) — an empty journal
+    // is an indexing error, not an empty index.
     let result = indexer.index(&file, None, &[], Seconds(3600));
     assert!(result.is_err(), "Empty journal should fail to index");
 }
 
 #[test]
 fn test_pagination_single_entry() {
+    // One entry: returned at position 0 in both directions, and
+    // resuming from it is empty both ways.
     let timestamp = JAN_1_2024_MIDNIGHT;
     let entries = vec![TestEntry::new(timestamp).with_field("MESSAGE", "Single entry")];
 
@@ -457,7 +511,6 @@ fn test_pagination_single_entry() {
     let mut indexer = FileIndexer::default();
     let file_index = indexer.index(&file, None, &[], Seconds(3600)).unwrap();
 
-    // Query forward with large limit
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(100)
         .build()
@@ -468,7 +521,6 @@ fn test_pagination_single_entry() {
     assert_eq!(results[0].timestamp, timestamp);
     assert_eq!(results[0].position, 0);
 
-    // Try to paginate from that position (should return empty)
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(100)
         .with_resume_position(results[0].position)
@@ -478,7 +530,6 @@ fn test_pagination_single_entry() {
     let results = file_index.find_log_entries(&file, &params).unwrap();
     assert_eq!(results.len(), 0, "No more entries after single entry");
 
-    // Query backward
     let params = LogQueryParamsBuilder::new(Anchor::Tail, Direction::Backward)
         .with_limit(100)
         .build()
@@ -489,7 +540,6 @@ fn test_pagination_single_entry() {
     assert_eq!(results[0].timestamp, timestamp);
     assert_eq!(results[0].position, 0);
 
-    // Try to paginate backward from position 0 (should return empty)
     let params = LogQueryParamsBuilder::new(Anchor::Tail, Direction::Backward)
         .with_limit(100)
         .with_resume_position(0)
@@ -506,6 +556,8 @@ fn test_pagination_single_entry() {
 
 #[test]
 fn test_pagination_two_entries() {
+    // A large limit returns both entries with contiguous positions;
+    // limit 1 pages them one at a time in both directions.
     let timestamp = JAN_1_2024_MIDNIGHT;
     let entries = vec![
         TestEntry::new(timestamp).with_field("MESSAGE", "Entry 1"),
@@ -517,7 +569,6 @@ fn test_pagination_two_entries() {
     let mut indexer = FileIndexer::default();
     let file_index = indexer.index(&file, None, &[], Seconds(3600)).unwrap();
 
-    // Forward: Get both entries at once with limit 10
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(10)
         .build()
@@ -528,7 +579,6 @@ fn test_pagination_two_entries() {
     assert_eq!(results[0].position, 0);
     assert_eq!(results[1].position, 1);
 
-    // Forward: Get first entry with limit 1, then paginate
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(1)
         .build()
@@ -540,7 +590,6 @@ fn test_pagination_two_entries() {
 
     let first_position = results[0].position;
 
-    // Get second entry
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(1)
         .with_resume_position(first_position)
@@ -551,7 +600,6 @@ fn test_pagination_two_entries() {
     assert_eq!(results.len(), 1, "Should return second entry");
     assert_eq!(results[0].position, 1);
 
-    // Try to get third entry (should be empty)
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(1)
         .with_resume_position(1)
@@ -561,7 +609,6 @@ fn test_pagination_two_entries() {
     let results = file_index.find_log_entries(&file, &params).unwrap();
     assert_eq!(results.len(), 0, "No third entry");
 
-    // Backward: Get both entries at once
     let params = LogQueryParamsBuilder::new(Anchor::Tail, Direction::Backward)
         .with_limit(10)
         .build()
@@ -570,7 +617,6 @@ fn test_pagination_two_entries() {
     let results = file_index.find_log_entries(&file, &params).unwrap();
     assert_eq!(results.len(), 2, "Should return both entries backward");
 
-    // Backward: Get last entry with limit 1, then paginate
     let params = LogQueryParamsBuilder::new(Anchor::Tail, Direction::Backward)
         .with_limit(1)
         .build()
@@ -580,7 +626,6 @@ fn test_pagination_two_entries() {
     assert_eq!(results.len(), 1, "Should return last entry");
     assert_eq!(results[0].position, 1);
 
-    // Get first entry going backward
     let params = LogQueryParamsBuilder::new(Anchor::Tail, Direction::Backward)
         .with_limit(1)
         .with_resume_position(1)
@@ -606,7 +651,9 @@ fn test_pagination_limit_zero() {
     let mut indexer = FileIndexer::default();
     let file_index = indexer.index(&file, None, &[], Seconds(3600)).unwrap();
 
-    // Query with limit 0 should return empty results
+    // Limit 0 is a valid query returning empty, rejected before the
+    // scan (`src/file_index.rs` `find_log_entries` limit-0 check) — no
+    // error, no entries.
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(0)
         .build()
@@ -627,7 +674,6 @@ fn test_pagination_limit_zero() {
 
 #[test]
 fn test_pagination_limit_exact_match() {
-    // Create exactly 50 entries
     const TOTAL_ENTRIES: usize = 50;
     let timestamp = JAN_1_2024_MIDNIGHT;
 
@@ -640,7 +686,8 @@ fn test_pagination_limit_exact_match() {
     let mut indexer = FileIndexer::default();
     let file_index = indexer.index(&file, None, &[], Seconds(3600)).unwrap();
 
-    // Query with limit exactly equal to total entries
+    // Limit == total: the full set returns, and resuming from the last
+    // position is empty — no wraparound, no duplicate.
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(TOTAL_ENTRIES)
         .build()
@@ -649,7 +696,6 @@ fn test_pagination_limit_exact_match() {
     let results = file_index.find_log_entries(&file, &params).unwrap();
     assert_eq!(results.len(), TOTAL_ENTRIES, "Should return all entries");
 
-    // Try to paginate from last position (should return empty)
     let last_position = results.last().unwrap().position;
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(TOTAL_ENTRIES)
@@ -663,7 +709,6 @@ fn test_pagination_limit_exact_match() {
 
 #[test]
 fn test_pagination_limit_exceeds_total() {
-    // Create 10 entries but query with limit 1000
     const TOTAL_ENTRIES: usize = 10;
     const LARGE_LIMIT: usize = 1000;
     let timestamp = JAN_1_2024_MIDNIGHT;
@@ -677,7 +722,7 @@ fn test_pagination_limit_exceeds_total() {
     let mut indexer = FileIndexer::default();
     let file_index = indexer.index(&file, None, &[], Seconds(3600)).unwrap();
 
-    // Query with limit much larger than total entries
+    // Limit beyond the total: returns exactly what exists, never padded.
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(LARGE_LIMIT)
         .build()
@@ -690,7 +735,7 @@ fn test_pagination_limit_exceeds_total() {
         "Should return all entries (not more than available)"
     );
 
-    // Verify all positions are present
+    // Forward returns positions 0..9 in order.
     for (i, entry) in results.iter().enumerate() {
         assert_eq!(entry.position, i);
     }
@@ -711,7 +756,11 @@ fn test_pagination_limit_exceeds_total() {
 
 #[test]
 fn test_pagination_resume_out_of_bounds() {
-    // Create 10 entries
+    // Out-of-bounds resume positions must yield empty results, never a
+    // panic or error: forward clamps at the end-of-list check
+    // (`src/file_index.rs` `find_log_entries` Forward arm), backward
+    // rejects 0 and >= len up front
+    // (`src/file_index.rs` `find_log_entries` Backward arm).
     const TOTAL_ENTRIES: usize = 10;
     let timestamp = JAN_1_2024_MIDNIGHT;
 
@@ -724,7 +773,8 @@ fn test_pagination_resume_out_of_bounds() {
     let mut indexer = FileIndexer::default();
     let file_index = indexer.index(&file, None, &[], Seconds(3600)).unwrap();
 
-    // Forward: Resume from position equal to total entries (at boundary)
+    // Forward: Resume from the last valid position — a page starts one
+    // past the resume point, so nothing remains.
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_limit(10)
         .with_resume_position(TOTAL_ENTRIES - 1)
@@ -766,7 +816,7 @@ fn test_pagination_resume_out_of_bounds() {
         "Resume from way beyond should return empty (not panic)"
     );
 
-    // Backward: Resume from position 0 returns empty (already tested but for completeness)
+    // Backward: Resume from 0 has nothing before it.
     let params = LogQueryParamsBuilder::new(Anchor::Tail, Direction::Backward)
         .with_limit(10)
         .with_resume_position(0)
@@ -825,7 +875,9 @@ fn test_pagination_resume_out_of_bounds() {
 
 #[test]
 fn test_pagination_anchor_before_all_entries() {
-    // Create entries at timestamps 10:00, 11:00, 12:00
+    // Anchor at 09:00 sits before every entry: forward still returns
+    // all three; backward has nothing at-or-before the anchor and
+    // returns none.
     let base_timestamp = JAN_1_2024_MIDNIGHT;
     let entries = vec![
         TestEntry::new(Microseconds(base_timestamp.0 + 10 * 3600_000_000))
@@ -873,7 +925,8 @@ fn test_pagination_anchor_before_all_entries() {
 
 #[test]
 fn test_pagination_anchor_after_all_entries() {
-    // Create entries at timestamps 10:00, 11:00, 12:00
+    // Mirror: anchor at 13:00 sits after every entry — forward has
+    // nothing after it; backward returns all three.
     let base_timestamp = JAN_1_2024_MIDNIGHT;
     let entries = vec![
         TestEntry::new(Microseconds(base_timestamp.0 + 10 * 3600_000_000))
@@ -921,7 +974,9 @@ fn test_pagination_anchor_after_all_entries() {
 
 #[test]
 fn test_pagination_anchor_in_middle_with_pagination() {
-    // Create entries at timestamps 10:00, 11:00, 12:00, 13:00, 14:00
+    // Anchor exactly on the middle entry: Anchor::Timestamp is
+    // inclusive in both directions — the entry at the anchor starts
+    // each walk — and pagination resumes through the rest.
     let base_timestamp = JAN_1_2024_MIDNIGHT;
     let entries = vec![
         TestEntry::new(Microseconds(base_timestamp.0 + 10 * 3600_000_000))
@@ -941,7 +996,6 @@ fn test_pagination_anchor_in_middle_with_pagination() {
     let mut indexer = FileIndexer::default();
     let file_index = indexer.index(&file, None, &[], Seconds(3600)).unwrap();
 
-    // Anchor at 12:00 (middle), going forward with limit 2
     let anchor_timestamp = Microseconds(base_timestamp.0 + 12 * 3600_000_000);
     let params =
         LogQueryParamsBuilder::new(Anchor::Timestamp(anchor_timestamp), Direction::Forward)
@@ -955,11 +1009,9 @@ fn test_pagination_anchor_in_middle_with_pagination() {
         2,
         "Should return 2 entries starting from anchor"
     );
-    // Should get entries at 12:00 and 13:00 (positions 2 and 3)
     assert_eq!(results[0].position, 2);
     assert_eq!(results[1].position, 3);
 
-    // Paginate forward to get the rest
     let params =
         LogQueryParamsBuilder::new(Anchor::Timestamp(anchor_timestamp), Direction::Forward)
             .with_limit(2)
@@ -971,7 +1023,6 @@ fn test_pagination_anchor_in_middle_with_pagination() {
     assert_eq!(results.len(), 1, "Should return remaining 1 entry");
     assert_eq!(results[0].position, 4);
 
-    // Anchor at 12:00, going backward with limit 2
     let params =
         LogQueryParamsBuilder::new(Anchor::Timestamp(anchor_timestamp), Direction::Backward)
             .with_limit(2)
@@ -984,11 +1035,9 @@ fn test_pagination_anchor_in_middle_with_pagination() {
         2,
         "Should return 2 entries backward from anchor"
     );
-    // Should get entries at 12:00 and 11:00 (positions 2 and 1)
     assert_eq!(results[0].position, 2);
     assert_eq!(results[1].position, 1);
 
-    // Paginate backward to get the rest
     let params =
         LogQueryParamsBuilder::new(Anchor::Timestamp(anchor_timestamp), Direction::Backward)
             .with_limit(2)
@@ -1003,11 +1052,9 @@ fn test_pagination_anchor_in_middle_with_pagination() {
 
 #[test]
 fn test_pagination_with_time_boundaries() {
-    // Create entries at different timestamps
     let base_timestamp = JAN_1_2024_MIDNIGHT;
     let entries: Vec<TestEntry> = (0..20)
         .map(|i| {
-            // Entry at hour i
             TestEntry::new(Microseconds(base_timestamp.0 + i * 3600_000_000))
                 .with_field("ENTRY_ID", i.to_string())
         })
@@ -1018,12 +1065,12 @@ fn test_pagination_with_time_boundaries() {
     let mut indexer = FileIndexer::default();
     let file_index = indexer.index(&file, None, &[], Seconds(3600)).unwrap();
 
-    // Query with after and before boundaries: entries from hour 5 to hour 15 (exclusive)
-    // That's entries 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 (10 entries total)
+    // Window [after = hour 5, before = hour 15): entries 5..14. Positions
+    // stay absolute in the index's entry list, so page 1 reports 5..8 —
+    // not 0..3 — and resume continues at 9.
     let after = Microseconds(base_timestamp.0 + 5 * 3600_000_000);
     let before = Microseconds(base_timestamp.0 + 15 * 3600_000_000);
 
-    // First page with limit 4
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_after(after)
         .with_before(before)
@@ -1033,13 +1080,11 @@ fn test_pagination_with_time_boundaries() {
 
     let results = file_index.find_log_entries(&file, &params).unwrap();
     assert_eq!(results.len(), 4, "First page should return 4 entries");
-    // Should get entries 5, 6, 7, 8
     assert_eq!(results[0].position, 5);
     assert_eq!(results[3].position, 8);
 
     let mut all_results = results.clone();
 
-    // Second page
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_after(after)
         .with_before(before)
@@ -1050,13 +1095,11 @@ fn test_pagination_with_time_boundaries() {
 
     let results = file_index.find_log_entries(&file, &params).unwrap();
     assert_eq!(results.len(), 4, "Second page should return 4 entries");
-    // Should get entries 9, 10, 11, 12
     assert_eq!(results[0].position, 9);
     assert_eq!(results[3].position, 12);
 
     all_results.extend(results.clone());
 
-    // Third page
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_after(after)
         .with_before(before)
@@ -1071,13 +1114,11 @@ fn test_pagination_with_time_boundaries() {
         2,
         "Third page should return remaining 2 entries"
     );
-    // Should get entries 13, 14
     assert_eq!(results[0].position, 13);
     assert_eq!(results[1].position, 14);
 
     all_results.extend(results.clone());
 
-    // Fourth page (should be empty)
     let params = LogQueryParamsBuilder::new(Anchor::Head, Direction::Forward)
         .with_after(after)
         .with_before(before)
@@ -1089,10 +1130,11 @@ fn test_pagination_with_time_boundaries() {
     let results = file_index.find_log_entries(&file, &params).unwrap();
     assert_eq!(results.len(), 0, "Fourth page should be empty");
 
-    // Verify we got exactly 10 entries total
     assert_eq!(all_results.len(), 10);
 
-    // Verify all timestamps are within boundaries
+    // Window edges pinned: after inclusive, before exclusive, in both
+    // walk directions (`src/file_index.rs` `find_log_entries` boundary
+    // checks).
     for entry in &all_results {
         assert!(
             entry.timestamp.0 >= after.0,
@@ -1107,7 +1149,6 @@ fn test_pagination_with_time_boundaries() {
 
 #[test]
 fn test_pagination_backward_with_time_boundaries() {
-    // Create entries at different timestamps
     let base_timestamp = JAN_1_2024_MIDNIGHT;
     let entries: Vec<TestEntry> = (0..20)
         .map(|i| {
@@ -1121,12 +1162,12 @@ fn test_pagination_backward_with_time_boundaries() {
     let mut indexer = FileIndexer::default();
     let file_index = indexer.index(&file, None, &[], Seconds(3600)).unwrap();
 
-    // Query backward with boundaries: entries from hour 5 to hour 15 (exclusive)
-    // That's entries 5-14 (10 entries total), going backward from 14 to 5
+    // Same window walked backward: entries 14 down to 5, with the same
+    // after-inclusive/before-exclusive edges (`src/file_index.rs`
+    // `find_log_entries` Backward boundary checks).
     let after = Microseconds(base_timestamp.0 + 5 * 3600_000_000);
     let before = Microseconds(base_timestamp.0 + 15 * 3600_000_000);
 
-    // First page with limit 4
     let params = LogQueryParamsBuilder::new(Anchor::Tail, Direction::Backward)
         .with_after(after)
         .with_before(before)
@@ -1136,13 +1177,11 @@ fn test_pagination_backward_with_time_boundaries() {
 
     let results = file_index.find_log_entries(&file, &params).unwrap();
     assert_eq!(results.len(), 4, "First page should return 4 entries");
-    // Going backward, should get 14, 13, 12, 11
     assert_eq!(results[0].position, 14);
     assert_eq!(results[3].position, 11);
 
     let mut all_results = results.clone();
 
-    // Second page
     let params = LogQueryParamsBuilder::new(Anchor::Tail, Direction::Backward)
         .with_after(after)
         .with_before(before)
@@ -1153,13 +1192,11 @@ fn test_pagination_backward_with_time_boundaries() {
 
     let results = file_index.find_log_entries(&file, &params).unwrap();
     assert_eq!(results.len(), 4, "Second page should return 4 entries");
-    // Should get 10, 9, 8, 7
     assert_eq!(results[0].position, 10);
     assert_eq!(results[3].position, 7);
 
     all_results.extend(results.clone());
 
-    // Third page
     let params = LogQueryParamsBuilder::new(Anchor::Tail, Direction::Backward)
         .with_after(after)
         .with_before(before)
@@ -1174,13 +1211,11 @@ fn test_pagination_backward_with_time_boundaries() {
         2,
         "Third page should return remaining 2 entries"
     );
-    // Should get 6, 5
     assert_eq!(results[0].position, 6);
     assert_eq!(results[1].position, 5);
 
     all_results.extend(results.clone());
 
-    // Fourth page (should be empty)
     let params = LogQueryParamsBuilder::new(Anchor::Tail, Direction::Backward)
         .with_after(after)
         .with_before(before)
@@ -1192,10 +1227,11 @@ fn test_pagination_backward_with_time_boundaries() {
     let results = file_index.find_log_entries(&file, &params).unwrap();
     assert_eq!(results.len(), 0, "Fourth page should be empty");
 
-    // Verify we got exactly 10 entries total
     assert_eq!(all_results.len(), 10);
 
-    // Verify all timestamps are within boundaries
+    // Window edges pinned: after inclusive, before exclusive, in both
+    // walk directions (`src/file_index.rs` `find_log_entries` boundary
+    // checks).
     for entry in &all_results {
         assert!(
             entry.timestamp.0 >= after.0,

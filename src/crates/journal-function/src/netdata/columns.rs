@@ -1,28 +1,49 @@
-//! Column schema generation for the logs table UI.
+//! Column schemas for the logs table of the systemd-journal Functions
+//! protocol: the per-column metadata the UI reads from the response's
+//! `columns` object - identity, visibility, type, sort, filter and cell
+//! formatting (`valueOptions`).
 //!
-//! This module provides types and functions for generating the column schema
-//! that defines how log entries should be displayed in the Netdata dashboard.
+//! `generate_column_schema` builds the schema map - the special
+//! `timestamp`/`rowOptions` columns at indexes 0-1, then one column per
+//! discovered journal field - from the histogram's discovered fields
+//! (`discovered_fields` of `journal-engine/src/histogram.rs`'s
+//! `Histogram`); `columns_to_sorted_json`
+//! serializes it with keys in index order into the `columns` field of
+//! [`crate::netdata::types::JournalResponse`]. `netdata/response.rs`
+//! renders the row arrays against the same schema
+//! ([`crate::netdata::response::table_to_netdata_response`]). Sole
+//! in-tree caller (grep-verified):
+//! [`crate::netdata::builder::build_ui_response`], whose output
+//! `otel-legacy-logs/src/handler.rs` (`LegacyLogsHandler::on_call`) puts
+//! into the response.
+//!
+//! Outside this crate, otel-ledger's logs adapter hand-builds the same
+//! column shape for its tables (`build_columns` in
+//! `otel-ledger/src/ledger/rpc/logs/adapter.rs`).
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::HashMap as StdHashMap;
 
-/// Filter type for a column in the logs table.
+/// How the UI can filter a column, serialized as `"facet"`, `"range"` or
+/// `"none"` (snake_case).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum FilterType {
-    /// Faceted filtering (for fields with enumerable values)
+    /// Facet filtering: the UI offers the column's distinct values as filter choices
     Facet,
-    /// Range filtering (for numeric/timestamp values)
+    /// Range filtering - part of the protocol, but no column sets it today
     Range,
     /// No filtering available
     None,
 }
 
-/// Value transformation options for a column.
+/// Cell-formatting instructions the UI applies to a column's values
+/// (see `build_columns` in `otel-ledger/src/ledger/rpc/logs/adapter.rs`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValueOptions {
-    /// Transformation to apply (e.g., "datetime_usec", "none")
+    /// UI-side transform for the cell value: "datetime_usec" renders µs
+    /// epoch values as datetimes, "none" passes them through
     pub transform: String,
     /// Number of decimal points for numeric values
     pub decimal_points: u32,
@@ -30,6 +51,8 @@ pub struct ValueOptions {
     pub default_value: Option<String>,
 }
 
+// Defaults for regular field columns (for_field): no transform, no
+// decimals, "-" shown for missing values.
 impl Default for ValueOptions {
     fn default() -> Self {
         Self {
@@ -40,16 +63,22 @@ impl Default for ValueOptions {
     }
 }
 
-/// Complete schema for a single column in the logs table.
+/// Schema of one column of the logs table, serialized into the response's
+/// `columns` object keyed by `key`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColumnSchema {
-    /// Column index (position in the table)
+    /// Position in the table; also drives the JSON key order
+    /// (columns_to_sorted_json)
     pub index: usize,
 
-    /// Column identifier/key
+    /// The column's identifier: the map key here, the JSON object key in
+    /// [`columns_to_sorted_json`], and the value
+    /// [`crate::netdata::response::table_to_netdata_response`] matches on.
+    /// Skipped in serialization - `id` mirrors it.
     #[serde(skip)]
     pub key: String,
 
+    /// Column identifier as it appears in the serialized schema
     pub id: String,
 
     /// Whether this column is a unique key
@@ -61,11 +90,13 @@ pub struct ColumnSchema {
     /// Whether the column is visible by default
     pub visible: bool,
 
-    /// Data type of the column
+    /// Data type of the column ("timestamp", "none" or "string" for the
+    /// columns built here), serialized as `type`
     #[serde(rename = "type")]
     pub column_type: String,
 
-    /// How to visualize the column
+    /// How the UI renders the column: "value" for data columns,
+    /// "rowOptions" for the pseudo-column
     pub visualization: String,
 
     /// Value transformation options
@@ -95,13 +126,16 @@ pub struct ColumnSchema {
     /// Whether the filter should be expanded by default
     pub default_expanded_filter: bool,
 
-    /// Whether this is a dummy column (for rowOptions)
+    /// Whether this is a dummy column (true only for rowOptions); omitted
+    /// from the JSON when `None`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dummy: Option<bool>,
 }
 
 impl ColumnSchema {
-    /// Create the special "timestamp" column (index 0).
+    /// The special "timestamp" column (index 0): the only `unique_key`
+    /// column, a µs epoch value the UI renders through the `datetime_usec`
+    /// transform, no filter.
     pub fn timestamp() -> Self {
         Self {
             index: 0,
@@ -129,7 +163,10 @@ impl ColumnSchema {
         }
     }
 
-    /// Create the special "rowOptions" column (index 1).
+    /// The special "rowOptions" column (index 1): an invisible dummy
+    /// column that reserves row position 1, where the rendered rows carry
+    /// the per-row options object `{"severity": ...}` that
+    /// [`crate::netdata::response::table_to_netdata_response`] emits.
     pub fn row_options() -> Self {
         Self {
             index: 1,
@@ -157,19 +194,17 @@ impl ColumnSchema {
         }
     }
 
-    /// Create a schema for a regular field column.
-    ///
-    /// # Arguments
-    ///
-    /// * `index` - Column index (must be >= 2, as 0 and 1 are special columns)
-    /// * `field_name` - The journal field name
+    /// Schema for a regular field column: one column per discovered
+    /// journal field. Indexes 0-1 belong to the special columns, so
+    /// `index` must be >= 2 (debug-asserted).
     pub fn for_field(index: usize, field_name: &str) -> Self {
         debug_assert!(index >= 2);
 
         let name = field_name.to_string();
 
-        // Determine filter type - matches C implementation (facets.c:2733)
-        // Default is FACET for all fields, EXCEPT those marked NEVER_FACET
+        // Filter type mirrors the C implementation: FACET for every field,
+        // NONE for the ones registered FACET_KEY_OPTION_NEVER_FACET there
+        // (src/libnetdata/facets/facets.c).
         let filter = match name.as_str() {
             // Fields with FACET_KEY_OPTION_NEVER_FACET in C code
             "MESSAGE" | "ND_JOURNAL_PROCESS" | "ND_JOURNAL_FILE" => FilterType::None,
@@ -177,18 +212,20 @@ impl ColumnSchema {
             _ => FilterType::Facet,
         };
 
-        // Determine visibility - most fields hidden by default
-        // Only MESSAGE is visible by default (timestamp is always visible)
+        // Only MESSAGE is visible by default (timestamp and rowOptions set
+        // their own).
         let visible = name == "MESSAGE";
 
-        // Determine if filter should be expanded by default
+        // Filters shown expanded on first view, mirroring the C plugin's
+        // EXPANDED_FILTER registrations (FACET_KEY_OPTION_EXPANDED_FILTER in
+        // src/collectors/systemd-journal.plugin/systemd-journal.c).
         let default_expanded_filter =
             matches!(name.as_str(), "PRIORITY" | "SYSLOG_FACILITY" | "MESSAGE_ID");
 
-        // MESSAGE gets full width
+        // MESSAGE and the OTEL body field (log.body) take the full width.
         let full_width = (name == "MESSAGE") || (name == "log.body");
 
-        // log.body should not wrap
+        // Same field set as full_width: MESSAGE and log.body wrap.
         let wrap = (name == "MESSAGE") || (name == "log.body");
 
         Self {
@@ -214,42 +251,38 @@ impl ColumnSchema {
     }
 }
 
-/// Generate the complete column schema map for the logs table UI.
-///
-/// This function creates the full schema including:
-/// 1. Special "timestamp" column (index 0) - with no filter
-/// 2. Special "rowOptions" column (index 1) - UI-only, no filter
-/// 3. All discovered fields from the histogram (index 2+) - with facet or no filter
-///
-/// Filter type logic matches C implementation (facets.c:2733):
-/// - Default: `filter: "facet"` for all fields
-/// - Exception: MESSAGE, ND_JOURNAL_PROCESS, ND_JOURNAL_FILE → `filter: "none"`
-///
-/// **IMPORTANT**: When serializing to JSON, the keys must be sorted by their `index`
-/// field to match the order expected by the UI. Use `columns_to_sorted_json()` helper.
+/// Builds the full column schema map for the logs table: the special
+/// columns at indexes 0-1 (`timestamp`, `rowOptions`) plus one column per
+/// discovered field from index 2 on. Filter types come from
+/// `ColumnSchema::for_field`. The UI expects the serialized `columns`
+/// object's keys in index order, so convert the map through
+/// `columns_to_sorted_json`.
 ///
 /// # Arguments
 ///
-/// * `discovered_fields` - Ordered list of field names from HistogramResponse::discovered_fields()
+/// * `discovered_fields` - Sorted field names from
+///   `journal_engine::Histogram::discovered_fields()`
+///   (in `journal-engine/src/histogram.rs`), as passed by
+///   [`crate::netdata::builder::build_ui_response`]. Names matching the special columns are skipped.
 ///
 /// # Returns
 ///
-/// A HashMap mapping column keys to their schemas.
+/// A map from column key to schema.
 pub fn generate_column_schema(discovered_fields: &[String]) -> StdHashMap<String, ColumnSchema> {
     let mut columns = StdHashMap::new();
 
-    // Add special columns first (in index order)
+    // Special columns at indexes 0 and 1.
     let timestamp = ColumnSchema::timestamp();
     columns.insert(timestamp.key.clone(), timestamp);
 
     let row_options = ColumnSchema::row_options();
     columns.insert(row_options.key.clone(), row_options);
 
-    // Add discovered fields starting at index 2 (in index order)
-    // Skip special columns (timestamp, rowOptions) if they appear in discovered_fields
+    // Discovered fields from index 2 on.
     let mut index = 2;
     for field_name in discovered_fields.iter() {
-        // Skip special column names to avoid overwriting them
+        // Colliding names would overwrite the special columns (and shift
+        // the field indexes), so skip them.
         if field_name == "timestamp" || field_name == "rowOptions" {
             continue;
         }
@@ -262,31 +295,19 @@ pub fn generate_column_schema(discovered_fields: &[String]) -> StdHashMap<String
     columns
 }
 
-/// Convert column schema HashMap to JSON with keys sorted by index.
-///
-/// The UI expects column keys in the JSON object to appear in index order (0, 1, 2, ...).
-/// This function sorts the HashMap entries by their `index` field before creating the JSON.
-///
-/// **IMPORTANT**: This requires serde_json's "preserve_order" feature to be enabled,
-/// so that `serde_json::Map` uses IndexMap internally and preserves insertion order.
-///
-/// # Arguments
-///
-/// * `columns` - HashMap of column schemas
-///
-/// # Returns
-///
-/// A JSON Value with columns as an object where keys are ordered by index.
+/// Serializes the schema map into the response's `columns` object with the
+/// keys in index order, as the UI expects. Insertion order survives
+/// because journal-function enables serde_json's `preserve_order` feature
+/// (`journal-function/Cargo.toml`); without it `serde_json::Map`
+/// alphabetizes keys.
 pub fn columns_to_sorted_json(columns: &StdHashMap<String, ColumnSchema>) -> Value {
-    // Collect entries and sort by index
     let mut entries: Vec<_> = columns.iter().collect();
     entries.sort_by_key(|(_, schema)| schema.index);
 
-    // Build JSON object with keys in index order
-    // With preserve_order feature, serde_json::Map preserves insertion order
     let mut map = Map::new();
     for (key, schema) in entries {
         if let Ok(value) = serde_json::to_value(schema) {
+            // Insertion order = index order (preserve_order feature).
             map.insert(key.clone(), value);
         }
     }
@@ -298,6 +319,9 @@ pub fn columns_to_sorted_json(columns: &StdHashMap<String, ColumnSchema>) -> Val
 mod tests {
     use super::*;
 
+    // Regression guard: the timestamp column's filter used to serialize as
+    // "range" and was switched to "none" when its filters were aligned
+    // with the systemd-journal SDK; no column may offer "range" again.
     #[test]
     fn serialized_columns_do_not_offer_timestamp_range_filter() {
         let schema = generate_column_schema(&["PRIORITY".to_string()]);

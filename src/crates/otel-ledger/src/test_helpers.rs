@@ -1,11 +1,22 @@
-//! Shared test fixtures.
-//!
-//! Only compiled under `#[cfg(test)]`; use across the crate's test modules
-//! to avoid duplicating common construction patterns.
+//! Shared test fixtures for the crate's test modules: the logs handler tests
+//! (ledger/rpc/logs/handler/tests.rs), the traces fixtures
+//! (ledger/rpc/traces/fixtures.rs), and the traces handler remote tests
+//! (ledger/rpc/traces/handler/remote_tests.rs). Three groups: logs-stream
+//! identity ([`identity_for`], [`summary_for`]), the one-entry catalog
+//! installer ([`track_catalog_entry`]), and unix-only FIFO control for the
+//! two `catalogs_are_read_off_the_registry_lock` tests. Test-only
+//! (`#[cfg(test)]` at the module decl, lib.rs); unlike the content-agnostic
+//! twin (src/crates/file-lifecycle/src/test_helpers.rs), identity here comes
+//! from the real `otel-logs-identity` codecs.
 
-/// Derive the substrate identity fields — the partition key and the opaque
-/// `content_meta` blob — for a stream, exactly as production indexing does.
-/// Returns `(part_key, content_meta)`.
+/// The identity pair production stamps per logs stream — its `part_key` (the
+/// `ns_hash`) and the opaque `content_meta` blob — from the real
+/// `otel-logs-identity` codecs, exactly as the ingestor does when writing a
+/// WAL header (`src/crates/otel-ingestor/src/logs_service.rs`
+/// `NetdataLogsService::export`). Returns `(part_key, content_meta)`. The
+/// `.expect` covers the encoder's
+/// only failure (a field over its `u16` cap — production drops such records)
+/// and cannot fire for the short identities tests use.
 pub(crate) fn identity_for(stream: &otel_logs_identity::ServiceStream) -> (u64, Vec<u8>) {
     (
         otel_logs_identity::part_key(stream),
@@ -15,9 +26,12 @@ pub(crate) fn identity_for(stream: &otel_logs_identity::ServiceStream) -> (u64, 
 }
 
 /// A `Summary` for `stream` with the given range and record count, deriving
-/// `content_meta` the way production does. The partition key is NOT in the
-/// summary — it lives in the file's `FileId`; tests that filter by partition
-/// pass the key via [`identity_for`] into the `FileId`.
+/// `content_meta` with the real encoder — the blob the seal stores in the
+/// summary verbatim from the WAL header (`src/crates/ng-index/src/sfst_build.rs`
+/// `build_sfst_file`). The partition key is NOT in the summary — it lives only
+/// in the file's
+/// `FileId`; tests keep the pair consistent by using the same stream's
+/// `ns_hash` as the `FileId`'s `part_key`.
 pub(crate) fn summary_for(
     stream: &otel_logs_identity::ServiceStream,
     record_count: u32,
@@ -33,10 +47,14 @@ pub(crate) fn summary_for(
     }
 }
 
-/// Write a catalog file holding `entry` into `tenant`'s catalog directory and
-/// track it, as the catalog builder does once the entry's file is uploaded:
-/// a remote plan then selects the entry unless a local copy masks it.
-/// Returns the catalog file's path.
+/// Write a one-entry catalog file for `entry` under `tenant` and track it —
+/// the registry state production reaches once the entry's SFST has uploaded
+/// and the catalog builder rotates (ledger/catalog_builder.rs). A remote plan
+/// then selects the entry unless a local copy masks it: the remote-read tests
+/// build their evicted files on this. Shortcuts: the date is pinned to
+/// 2026-04-17; identity and the filename's `(max_seq, min_s, max_s)` fold
+/// come from the single `entry`; the write is plain, not production's atomic
+/// tmp→rename. Returns the catalog file's path.
 pub(crate) fn track_catalog_entry(
     tr: &mut file_lifecycle::registry::TenantRegistries,
     tenant: &str,
@@ -62,7 +80,8 @@ pub(crate) fn track_catalog_entry(
     path
 }
 
-/// Make `path` a FIFO: reading it blocks until a writer opens it.
+/// Make `path` a FIFO (mode 0o600): opening it for reading blocks until a
+/// writer opens — the lock tests plant one to stall the query path.
 #[cfg(unix)]
 pub(crate) fn mkfifo(path: &std::path::Path) {
     use std::os::unix::ffi::OsStrExt;
@@ -72,8 +91,9 @@ pub(crate) fn mkfifo(path: &std::path::Path) {
     assert_eq!(rc, 0, "mkfifo {}", path.display());
 }
 
-/// Open the FIFO at `path` for writing once a reader holds it open (a
-/// non-blocking open fails until then), within `deadline`.
+/// Open the FIFO at `path` for writing once a reader holds it open — a
+/// non-blocking write-end open fails with `ENXIO` until then — polling every
+/// 10ms within `deadline`. Past the deadline (or any other error) it panics.
 #[cfg(unix)]
 pub(crate) async fn open_fifo_writer(
     path: &std::path::Path,
@@ -96,8 +116,10 @@ pub(crate) async fn open_fifo_writer(
     }
 }
 
-/// On drop, open the FIFO at the path for writing and close it: a reader
-/// still blocked opening or reading it gets EOF instead of waiting forever.
+/// Drop guard for a lock test's FIFO reader: on drop, opens the FIFO at the
+/// path for writing (failure ignored — the reader may already be gone) and
+/// closes it right away, releasing a reader still blocked in `open` and
+/// handing an open reader EOF instead of hanging runtime shutdown.
 #[cfg(unix)]
 pub(crate) struct FifoUnblocker(pub(crate) std::path::PathBuf);
 

@@ -1,15 +1,38 @@
-//! Catalog builder component: accumulates `CatalogEntry` rows in memory
-//! per `(tenant, date, machine, instance)` scope and rotates to an immutable
-//! catalog file on disk on the first of three triggers: `rotation_count`
-//! entries, `rotation_period` elapsed since the accumulator was created, or an
-//! explicit `Flush` (clean shutdown).
+//! The catalog builder component: accumulates `otel_catalog::CatalogEntry`
+//! rows in memory per `(tenant, date, machine, instance)` scope — each catalog
+//! file is single-identity by construction because the scope key carries the
+//! machine and instance — and rotates a scope to an immutable catalog file on
+//! the first of three triggers: `rotation_count` entries accumulated,
+//! `rotation_period` elapsed since the accumulator was created, or an explicit
+//! `Flush` (clean shutdown).
 //!
-//! Catalog files are atomic (tmp + rename). Upload to remote is handled
-//! by the ledger via the existing `Uploader` component.
+//! A rotation serializes the scope's accumulator to the `NCAT` container
+//! (`Catalog::to_container_bytes`), writes it through
+//! `file_registry::durable::write_atomic` (the shared tmp → fsync file →
+//! rename → fsync parent-dir sequence, run under `spawn_blocking`), and
+//! removes the accumulator only on success — a failure leaves it intact for
+//! the next trigger. The builder owns nothing beyond accumulation and local
+//! rotation: the ledger's response handler registers the file in the tenant
+//! registry, marks the covered SFST seqs rotated, and forwards an
+//! `UploadCatalog` to the shared uploader when remote storage is enabled.
+//! Uploads that never land are repaired next boot: local catalog files missing
+//! from the remote are re-uploaded by
+//! `recovery::remote::reconcile_local_catalog_uploads`, and uploaded-but-
+//! uncataloged SFSTs are re-sent to this builder as `AddEntry`s by the remote
+//! reconcile (the flush-failure repair; see `flush_all`).
 //!
-//! Processing is sequential: a single receiver drives a single task body, and
-//! the time trigger fires on the same `select!`, so mutations and rotations for
-//! the same scope cannot interleave.
+//! One component instance runs per signal pipeline (spawned by the ledger;
+//! signal-neutral). `AddEntry`, `Flush` and the periodic age check share a
+//! single `select!` body on that one task, so accumulation and rotation of a
+//! scope can never interleave and the accumulator map needs no lock.
+//!
+//! Consumers (grep-verified): `otel-ledger/src/ledger/pipeline.rs` spawns the
+//! component per signal and constructs the args from `config.catalog`;
+//! `ledger/uploader.rs` forwards `AddEntry` after each `Uploaded`;
+//! `ledger/catalog_builder.rs` handles the responses; `recovery::remote`
+//! enqueues `AddEntry` at startup; `recovery::startup` mirrors the path and
+//! fold contracts (`local_catalog_path`, `validate_catalog`). Behavior is
+//! pinned end-to-end in this module's `tests` and in `recovery/tests.rs`.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -38,8 +61,13 @@ const ROTATION_CHECK_INTERVAL: Duration = Duration::from_secs(30);
 const MIN_ROTATION_PERIOD: Duration = Duration::from_secs(1);
 
 pub struct CatalogBuilderArgs {
-    /// Tenant-prefix root for catalog storage (the signal's `config.catalog.dir`).
-    /// Per-tenant subdirectories `{tenant}/catalog/{date}/` are created lazily.
+    /// Root of the date-partitioned catalog layout (the signal's derived
+    /// `config.catalog.dir`, `{base_dir}/{signal}/catalog`): files land at
+    /// `{base}/{YYYY-MM-DD}/{tenant}/<catalog filename>` (see `scope_path`).
+    /// The date/tenant directories are created by the rotation write itself,
+    /// not on scope creation. The ledger passes this same directory to the
+    /// tenant registry and to `recovery::startup::startup_catalog_sync`, so
+    /// builder, registry and recovery all read/write one tree.
     pub catalog_base_dir: PathBuf,
     /// Number of entries that triggers a rotation for a scope.
     pub rotation_count: usize,
@@ -48,8 +76,14 @@ pub struct CatalogBuilderArgs {
     pub rotation_period: Duration,
 }
 
+/// The catalog builder component: a unit struct whose [`Component`] impl owns
+/// the accumulation/rotation event loop (all state lives inside `run`). The
+/// ledger spawns one instance per signal pipeline (logs, traces).
 pub struct CatalogBuilder;
 
+/// Scope of one catalog accumulator — tenant × date × machine × instance.
+/// A catalog file covers exactly one scope, and the serialized `Catalog`
+/// carries the same four fields, so a file is self-describing.
 type ScopeKey = (TenantId, NaiveDate, MachineId, InstanceId);
 
 /// An in-memory accumulator plus the instant it was created (its first entry
@@ -169,7 +203,11 @@ async fn flush_all(
     // `FlushComplete` (sent by the caller) follows regardless of failures, so
     // surface any lost scopes here: a failed flush-rotation keeps its
     // accumulator, but the process is exiting, so those in-memory entries are
-    // lost — rebuilt on next boot by the catalog-upload reconcile.
+    // lost — next boot's remote reconcile rebuilds them from the SFST
+    // summaries the registry already holds (`recovery::remote`:
+    // `reconcile_remote_uploads` re-sends uploaded-but-uncataloged SFSTs to
+    // this builder; `recover_unuploaded` re-queues their uploads, whose
+    // `Uploaded` responses forward `AddEntry` too).
     if failed > 0 {
         tracing::warn!(
             failed,
@@ -199,9 +237,10 @@ async fn rotate_scope(
         .expect("rotate_scope called with a key not in accumulators")
         .catalog;
 
-    // Fold to the filename fields via the shared `Catalog::fold` (the same
+    // Fold to the filename fields via the shared `Catalog::fold`: the same
     // fold `recovery::startup::validate_catalog` recomputes to check a
-    // downloaded catalog against its filename — one source, no drift).
+    // downloaded catalog against its remote key's filename fields — one
+    // source, no drift.
     let (max_seq, min_timestamp_s, max_timestamp_s) = catalog.fold();
     let seqs: Vec<u64> = catalog.entries.values().map(|e| e.id.seq).collect();
 
@@ -272,15 +311,22 @@ async fn rotate_scope(
     }
 }
 
-/// Full on-disk path for a catalog file.
+/// Full on-disk path for a rotated catalog file:
+/// `{base}/{YYYY-MM-DD}/{tenant_id}/{machine}-{instance}-{max_seq}-{min_ts}-{max_ts}.catalog`
+/// — directory from `file_registry::layout::date_tenant_dir`, filename from
+/// `otel_catalog::filename` (UUID-pair stem, zero-padded numerics, `.catalog`).
+/// `base` is the signal's derived catalog dir (`{base_dir}/{signal}/catalog`),
+/// dedicated to catalog files, so there's no extra `catalog/` level — same
+/// convention as the WAL and SFST dirs.
 ///
-/// Layout: `{base}/{YYYY-MM-DD}/{tenant_id}/{machine}-{instance}-{max_seq}-{min_ts}-{max_ts}.catalog`.
-/// The base directory (the signal's derived catalog dir,
-/// `{base_dir}/{signal}/catalog`) is dedicated to catalog files, so there's no
-/// `catalog/` subdir — same convention as WAL and SFST.
+/// `recovery::startup::local_catalog_path` builds this same path for catalogs
+/// installed from remote at startup, so a remote-healed catalog lands exactly
+/// where this builder would have written it.
 ///
-/// `tenant_id` is expected to be pre-validated by
-/// [`TenantId::validate_ingest`].
+/// `tenant_id` is used verbatim as a path segment by `date_tenant_dir`; ids
+/// reaching this builder have already passed one of the two `TenantId`
+/// policies — `validate_ingest` (ingestor) or `validate_path_segment`
+/// (`remote_keys` parsing) — both of which enforce the path-safe charset.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn scope_path(
     base: &Path,
@@ -296,12 +342,16 @@ pub(crate) fn scope_path(
     )
 }
 
-/// Durable atomic catalog write — the shared tmp → fsync → rename →
-/// parent-dir-fsync sequence, off the runtime thread. The dir-fsync
-/// matters here: a catalog gates the eviction of the SFSTs it
-/// describes, so losing the directory entry on power loss would
-/// orphan their uploaded/rotated state. A failed write reaps its own
-/// temp file (the guard inside `write_atomic`).
+/// Durable atomic catalog write — the shared `file_registry::durable` sequence
+/// (create temp → write → fsync file → rename → fsync parent dir), run off the
+/// runtime thread under `spawn_blocking` (`write_atomic` is blocking std-fs
+/// I/O; `recovery::startup`'s catalog install is the other catalog site). The
+/// dir fsync matters here: SFST eviction is gated on this catalog (retention
+/// requires it confirmed on the remote), so the catalog's directory entry must
+/// be durable before the ledger marks the covered SFSTs rotated and uploads the
+/// file — otherwise a power loss could drop a catalog the rest of the pipeline
+/// already recorded, leaving its SFSTs to be re-cataloged from scratch. A
+/// failed write reaps its own temp file (the guard inside `write_atomic`).
 async fn write_local_atomic(final_path: &Path, bytes: Vec<u8>) -> std::io::Result<()> {
     let path = final_path.to_path_buf();
     match tokio::task::spawn_blocking(move || file_registry::durable::write_atomic(&path, &bytes))
