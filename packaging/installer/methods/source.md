@@ -59,6 +59,33 @@ To avoid the bundled download:
 
 :::
 
+:::note
+
+Beyond the optional protobuf download above, a standard source build downloads
+additional source code from the internet while CMake is configuring and building:
+
+- **libbacktrace** is cloned from
+  <https://github.com/ianlancetaylor/libbacktrace.git> whenever
+  `ENABLE_LIBBACKTRACE` is enabled. This option is enabled by default on Linux
+  and Windows, and is what produces build output such as
+  `Performing download step (git clone) for 'libbacktrace'`. To avoid the
+  download, pass `-DENABLE_LIBBACKTRACE=False` to `cmake` when configuring.
+- **SQLite** is always fetched and built as part of the build — there is no CMake
+  option to skip it. By default a source tarball is downloaded from
+  `www.sqlite.org`; pass `-DSQLITE_USE_GIT=ON` to fetch it via a git clone instead.
+- **libyaml** and **JSON-C** are fetched from GitHub using CMake's `FetchContent`
+  only when a usable copy is not already installed on the system (or when bundling
+  is forced, for example with `-DENABLE_BUNDLED_JSONC=True`).
+
+Because of these automatic downloads, a working internet connection is required
+for a standard source build. On systems that cannot reach GitHub or `sqlite.org`
+(for example behind a firewall or proxy), either pre-populate the build directory
+with the required sources in advance, or use the
+[offline installation method](/packaging/installer/methods/offline.md), which
+relies on pre-built static builds instead of compiling from source.
+
+:::
+
 ## Preparing the source tree
 
 Netdata uses Git submodules for some of it’s components, which must be fetched prior to building Netdata. If you
