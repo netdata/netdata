@@ -2,7 +2,7 @@
 
 Keep monitoring small on the device while retaining fleet-wide dashboards, history, alerts, anomaly detection and live troubleshooting. Let the Child collect and stream metrics; let the Parent provide the storage and analysis capacity.
 
-You control the device's monitoring budget through three settings: which collectors run, how often they collect, and how much history stays locally. On a Raspberry Pi 3 B+, the sparse configuration below used under 1% of one CPU core and about 30 MiB of memory, with process and sensor troubleshooting available through the Parent.
+You control the device's monitoring budget through three settings: which collectors run, how often they collect, and how much history stays locally. On a Raspberry Pi 3 B+, sparse system, process and sensor monitoring used under 1% of one CPU core and about 30 MiB of memory, with troubleshooting available through the Parent.
 
 ## Configure a lightweight Child
 
@@ -34,12 +34,14 @@ For a package prepared with `--keep apps,debugfs`, add this baseline to the Chil
     cgroups = no
     tc = no
     idlejitter = no
-    statsd = no
+    statsd = yes
 ```
 
 This configuration collects system, process and supported hardware metrics every five seconds, stores a short history in RAM, and moves alert evaluation and machine learning to the Parent. Add the [streaming configuration](./deployment-and-identity.md#connect-devices-to-a-parent) to connect it.
 
-For container devices, enable the built-in cgroups collector and retain `containers` for container names and network attribution. For your own application metrics, enable StatsD as shown in the [fleet monitoring guide](./monitor-the-fleet.md#add-your-applications-operating-metrics).
+StatsD is enabled on `localhost:8125`, ready for your applications to report operating states and measurements. It follows the Agent's collection interval. See the [fleet monitoring guide](./monitor-the-fleet.md#add-your-applications-operating-metrics) for examples. If a device needs only system monitoring and the smallest footprint, set `statsd = no`.
+
+For container devices, enable the built-in cgroups collector and retain `containers` for container names and network attribution.
 
 ## Choose how quickly you need new values
 
@@ -117,7 +119,7 @@ Select plugin bundles when [preparing the package](./minimize-disk-footprint.md)
 
 ## Plan the device's monitoring budget
 
-The examples below use Netdata **v2.12.0-2-nightly**, `apps` and `debugfs`, compressed streaming and 120 RAM entries per dimension. CPU covers the Agent and persistent plugins as a percentage of one core; memory covers their combined process footprint (PSS).
+The examples below use Netdata **v2.12.0-2-nightly**, `apps` and `debugfs`, compressed streaming and 120 RAM entries per dimension, with StatsD disabled. CPU covers the Agent and persistent plugins as a percentage of one core; memory covers their combined process footprint (PSS).
 
 | Device | Package / device OS | One-second collection: CPU / memory | Five-second collection: CPU / memory |
 |:--|:--|--:|--:|

@@ -47,7 +47,7 @@ The [Home tab](../dashboards-and-charts/home-tab.md) provides a Room overview an
 
 Bring your application's state and measurements into the same charts, alerts and maps as system metrics. Send simple StatsD messages to the local Netdata Agent, which collects and streams the values to the Parent.
 
-Enable the built-in collector in the Child's `netdata.conf`:
+The [lightweight Child baseline](./minimize-cpu-and-memory.md#configure-a-lightweight-child) already enables StatsD. For other Child configurations, enable the built-in collector in `netdata.conf`:
 
 ```ini
 [plugins]
@@ -76,7 +76,7 @@ For example, filter to `customer=tenant-a`, group by `building`, color the fill 
 
 Attach decimal-degree `latitude` and `longitude` host labels to place devices on the geographic map. It shows node status and active alerts at their locations, helping operators identify affected sites and open the relevant device.
 
-Use the hexagon Nodes Map to organize the same fleet by labels and operating metrics. Both views work with ordinary device monitoring. Add `network-viewer.plugin` when you also want live connection inspection and network-connection topology.
+Use the hexagon Nodes Map to organize the same fleet by labels and operating metrics. Both views work with ordinary device monitoring. Retain the [`network` capability](./minimize-disk-footprint.md#choose-what-to-keep) when preparing the package if you also want live connection inspection and network-connection topology.
 
 ## Centralize alerts and anomaly detection
 
