@@ -80,13 +80,21 @@ Use the hexagon Nodes Map to organize the same fleet by labels and operating met
 
 ## Centralize alerts and anomaly detection
 
-Run alert evaluation and machine learning on the Parent to keep that work off the devices. Operators get centralized notifications and anomaly visibility alongside the same fleet charts and maps. Anomaly detection learns patterns in your custom StatsD metrics too, helping identify unusual motor RPM, vehicle speed or other operating values.
+Run alert evaluation and machine learning on the Parent to keep that work off the devices. Keep local health enabled as well when you want [autonomous device actions](#automate-actions-on-the-device). Operators get centralized notifications and anomaly visibility alongside the same fleet charts and maps. Anomaly detection learns patterns in your custom StatsD metrics too, helping identify unusual motor RPM, vehicle speed or other operating values.
 
 Alert on the conditions that affect the workload: temperature, storage capacity, service availability and sustained CPU or memory pressure. Match alert lookup windows to collection cadence—for example, allow a 15-minute window for five-minute samples and a 30-minute window for ten-minute samples. Use faster collection when failures need faster detection.
 
 Enable machine learning on the Parent and keep history for its training window. Anomaly detection becomes available as models train on incoming samples. With sparse collection, allow time for samples to accumulate and for scheduled training; the defaults use a six-hour history window and retrain every three hours.
 
 Use Cloud [node states](../netdata-cloud/node-states-and-transitions.md#states-on-netdata-cloud) to follow connectivity and data availability: **Live** nodes provide current metrics, **Stale** nodes have history available through a connected Parent, **Offline** nodes have no available data source, and **Unseen** nodes have been claimed but have never connected. Use labels to apply different connectivity expectations to always-on devices and those that sleep or operate intermittently. The [disconnection guide](./disconnected-devices-and-failover.md) shows how to recover history after an outage.
+
+## Automate actions on the device
+
+Let a device respond to operating conditions itself, even while disconnected from its Parent. Enable `[health] enabled = yes` in the Child's `netdata.conf`, configure the local alerts your application needs, and use each alert's [`exec` setting](../../src/health/REFERENCE.md#alert-line-exec) to run a custom script on alert status transitions.
+
+For example, an action can restart an application, capture diagnostics when a fault appears, or restore normal operation when the alert clears. The script receives the alert's current and previous status so it can choose the action for warning, critical and recovery transitions. Apply the alert's delay and repeat settings to match the response your device needs, and choose collection intervals and alert lookup windows that support its required response time.
+
+Local actions and Parent-side alerting work together: the device responds autonomously while your operators receive centralized visibility and notifications. Budget for local alert evaluation, alert-history storage and the scripts' work when enabling this option; the lightweight baseline keeps health on the Parent for devices that need only central monitoring.
 
 ## Troubleshoot devices through the Parent
 

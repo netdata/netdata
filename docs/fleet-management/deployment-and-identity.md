@@ -73,6 +73,8 @@ Enable centralized alerting and anomaly detection in the Parent's `netdata.conf`
 
 Apply the [lightweight Child configuration](./minimize-cpu-and-memory.md#configure-a-lightweight-child) on the devices. The Children collect; the Parent stores history, evaluates alerts and runs machine learning.
 
+Keep health enabled on Children that need autonomous responses. Their local alerts can [trigger custom device actions](./monitor-the-fleet.md#automate-actions-on-the-device) while the Parent continues central alerting and notifications.
+
 ## Secure the connection and operator access
 
 For cellular or other untrusted networks, provision the Parent's server certificate and private key, and make them readable by its Agent. Set their paths in the Parent's `netdata.conf`:

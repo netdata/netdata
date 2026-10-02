@@ -39,6 +39,8 @@ For a package prepared with `--keep apps,debugfs`, add this baseline to the Chil
 
 This configuration collects system, process and supported hardware metrics every five seconds, stores a short history in RAM, and moves alert evaluation and machine learning to the Parent. Add the [streaming configuration](./deployment-and-identity.md#connect-devices-to-a-parent) to connect it.
 
+For autonomous device actions, set `[health] enabled = yes` on the Child. Local alerts can run custom scripts on alert status transitions, including while the device is disconnected from its Parent. See [device-side automation](./monitor-the-fleet.md#automate-actions-on-the-device) for how to combine local actions with centralized alerting.
+
 StatsD is enabled on `localhost:8125`, ready for your applications to report operating states and measurements. It follows the Agent's collection interval. See the [fleet monitoring guide](./monitor-the-fleet.md#add-your-applications-operating-metrics) for examples. If a device needs only system monitoring and the smallest footprint, set `statsd = no`.
 
 For container devices, enable the built-in cgroups collector and retain `containers` for container names and network attribution.
