@@ -10,6 +10,7 @@ Use the same architecture across a fleet while adapting each device's Agent to i
 
 - **Reduce installed size** by removing debugging symbols and packaging only the plugins your devices use.
 - **Reduce CPU and memory use** by moving storage, alerting and anomaly detection to Parents and collecting at an appropriate interval.
+- **Protect SD cards from continuous monitoring writes** by keeping metric history in RAM, disabling local logs and storing long-term history on the Parent. See [SD-card protection settings](./minimize-cpu-and-memory.md#protect-sd-cards-from-continuous-writes).
 - **Reduce cellular traffic** with less frequent metric updates, compression and keepalive settings suited to intermittent connections.
 - **Recover data after an outage** by keeping local history and replicating it when the device reconnects.
 - **See the fleet your way** by filtering and grouping devices with customer, location, model and software labels, and using system or custom application metrics to annotate and color the Nodes Map.

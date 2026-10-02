@@ -97,11 +97,38 @@ The Child's local database determines how much history it can send after a conne
 
 With RAM mode, `retention` controls sample entries per dimension. The time covered depends on each chart's interval, and allocation is rounded to memory pages. Longer intervals provide a longer history window for the same entry count. Check the available history at the Parent when setting your outage recovery window.
 
-RAM and `none` modes reduce metric-database disk activity. Metadata, logs and other Agent state can still write to disk. Configure [logging destinations and rotation](../../src/libnetdata/log/README.md) alongside the database policy.
+RAM and `none` modes keep metric samples off the SD card. Use the settings below to prevent local logs from adding continuous writes.
 
 For DBengine disk limits and storage tiers, see [Agent sizing](../netdata-agent/sizing-netdata-agents/README.md). The [disconnection guide](./disconnected-devices-and-failover.md) explains how local history supports recovery.
 
 Stripping symbols reduces package and installation space. Control steady-state CPU and memory through collection intervals, collector selection and local retention; symbol removal alone does not reduce the number of metrics collected.
+
+## Protect SD cards from continuous writes
+
+Netdata can monitor SD-card devices without continuously writing collected metrics to the card. Keep the Child's metric history in RAM, disable local logging, and let the Parent store long-term history, evaluate alerts and run anomaly detection. Collection and streaming continue normally, including live troubleshooting through the Parent.
+
+Use the lightweight Child configuration above with `db = ram` or `db = none`, health disabled and ML disabled. To turn off the Agent's local logs, add:
+
+```ini
+[logs]
+    daemon = off
+    collector = off
+    access = off
+    health = off
+    debug = off
+    debug flags = 0
+
+[cloud]
+    conversation log = no
+```
+
+Disabling these logs removes local Agent log history. Keep any device logs you need for troubleshooting in RAM or forward them to your central logging service. Configure the service manager's output destination too if it persists startup messages or plugin output outside Netdata's logging system. See [logging configuration](../../src/libnetdata/log/README.md).
+
+The metadata database records the device, its charts, dimensions and labels. Expect an initialization burst when Netdata starts. Once the metrics and labels are stable, with health and ML disabled, ongoing collection does not repeatedly write that metadata: it stays quiet until metadata changes. You do not need to disable the metadata database to achieve this behavior.
+
+The Agent also saves a small diagnostic status file every 15 minutes and at lifecycle events. This is separate from the metadata database and metric history. Keeping this runtime state on a RAM-backed filesystem removes those writes from the SD card too; preserve the device's identity across restarts when preparing your image.
+
+This setup protects the SD card from continuous monitoring writes while the Parent retains your fleet's monitoring history. Choose `dbengine` instead when you need local metric history to survive device restarts.
 
 ## Keep collection focused
 
@@ -127,7 +154,7 @@ Measurements cover 90 seconds at one-second collection and 120 seconds at five-s
 
 On Pi 1, using `db = none` at one-second collection used 29.1 MiB of process-tree PSS, compared with 34.4 MiB for `db = ram`. `none` still streamed metrics to the Parent; the Child's local charts API had no stored charts. Choose RAM history when recovery after a connection outage matters.
 
-RAM mode does not make the Agent completely write-free: these runs still wrote metadata and logs. Four boards used NFS roots and Pi 4 used local storage, so these observations do not quantify flash wear. Route and rotate logs, then measure writes on the storage used by your device image.
+The CPU and memory measurements used the baseline configuration, before applying the logging settings in [Protect SD cards from continuous writes](#protect-sd-cards-from-continuous-writes). Four boards used NFS roots and Pi 4 used local storage; these runs measured CPU and memory, rather than SD-card endurance.
 
 ## Watch resource use from the Parent
 
