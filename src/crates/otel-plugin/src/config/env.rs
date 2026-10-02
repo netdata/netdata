@@ -56,9 +56,7 @@ pub(super) fn otel_env_from_process() -> EnvMap {
 /// `NETDATA_OTEL_SERVICE_HOST` and `NETDATA_OTEL_PORT_4317_TCP` into every pod
 /// that can see a Service named `netdata-otel`, and those must never reach the
 /// strict unknown-name check below.
-pub(super) fn otel_env_from_iter(
-    vars: impl IntoIterator<Item = (OsString, OsString)>,
-) -> EnvMap {
+pub(super) fn otel_env_from_iter(vars: impl IntoIterator<Item = (OsString, OsString)>) -> EnvMap {
     let mut env = EnvMap::new();
     for (key, value) in vars {
         let Some(key) = key.to_str() else { continue };
@@ -220,9 +218,30 @@ impl EndpointOverride {
     fn from_map(env: &EnvReader<'_>) -> Result<Self> {
         Ok(Self {
             path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_PATH")?.map(str::to_string),
-            tls_cert_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH")?.map(str::to_string),
-            tls_key_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_TLS_KEY_PATH")?.map(str::to_string),
+            tls_cert_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH")?
+                .map(str::to_string),
+            tls_key_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_TLS_KEY_PATH")?
+                .map(str::to_string),
             tls_ca_cert_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_TLS_CA_CERT_PATH")?
+                .map(str::to_string),
+            // An EMPTY value maps to `Some(None)` — the explicit clear that
+            // `http_path: null` expresses in YAML. The env layer cannot
+            // convey "unset" any other way for a knob the stock file already
+            // sets: a set-but-empty variable is the deliberate "turn the
+            // OTLP/HTTP listener off", never a no-op, so it must not fall
+            // through to the stock value.
+            http_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_HTTP_PATH")?.map(|v| {
+                if v.is_empty() {
+                    None
+                } else {
+                    Some(v.to_string())
+                }
+            }),
+            http_tls_cert_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_HTTP_TLS_CERT_PATH")?
+                .map(str::to_string),
+            http_tls_key_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_HTTP_TLS_KEY_PATH")?
+                .map(str::to_string),
+            http_tls_ca_cert_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_HTTP_TLS_CA_CERT_PATH")?
                 .map(str::to_string),
         })
     }
@@ -235,7 +254,10 @@ impl MetricsOverride {
                 .map(str::to_string),
             interval_secs: parse_env_var(env, "NETDATA_OTEL_CFG_METRICS_INTERVAL_SECS")?,
             grace_period_secs: parse_env_var(env, "NETDATA_OTEL_CFG_METRICS_GRACE_PERIOD_SECS")?,
-            expiry_duration_secs: parse_env_var(env, "NETDATA_OTEL_CFG_METRICS_EXPIRY_DURATION_SECS")?,
+            expiry_duration_secs: parse_env_var(
+                env,
+                "NETDATA_OTEL_CFG_METRICS_EXPIRY_DURATION_SECS",
+            )?,
             max_new_charts_per_request: parse_env_var(
                 env,
                 "NETDATA_OTEL_CFG_METRICS_MAX_NEW_CHARTS_PER_REQUEST",
@@ -324,11 +346,7 @@ impl SignalOverride {
             } else {
                 None
             },
-            ingest: if ingest.has_any() {
-                Some(ingest)
-            } else {
-                None
-            },
+            ingest: if ingest.has_any() { Some(ingest) } else { None },
             // The former plugin's journal dir stays YAML-only (`logs.journal_dir`,
             // consumed by `resolve_legacy_journal_dir`); no env var exists for it.
             journal_dir: None,

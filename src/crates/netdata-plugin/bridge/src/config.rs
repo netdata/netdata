@@ -189,11 +189,14 @@ impl LegacyLogsConfig {
     }
 }
 
-/// gRPC server endpoint configuration.
+/// Ingestion listener endpoints: the mandatory OTLP/gRPC listener (`path`
+/// plus its TLS trio) and the optional OTLP/HTTP listener (`http_path` plus
+/// its own TLS trio), which serves the same signals over HTTP
+/// `POST /v1/{logs,traces,metrics}` for senders that speak OTLP/HTTP.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EndpointConfig {
-    /// Bind address (e.g., "127.0.0.1:4317").
+    /// Bind address for the OTLP/gRPC listener (e.g., "127.0.0.1:4317").
     pub path: String,
     /// TLS certificate file path.
     #[serde(default)]
@@ -204,6 +207,27 @@ pub struct EndpointConfig {
     /// CA certificate for client authentication.
     #[serde(default)]
     pub tls_ca_cert_path: Option<String>,
+    /// Bind address for the OTLP/HTTP listener (e.g., "127.0.0.1:4318");
+    /// `None` disables the listener (gRPC alone is served). Like `path`,
+    /// this is a network address, not a filesystem path. Optional so the
+    /// pre-HTTP schema (and stock files written before this field existed)
+    /// keeps parsing unchanged.
+    #[serde(default)]
+    pub http_path: Option<String>,
+    /// TLS certificate file path for the OTLP/HTTP listener. Kept separate
+    /// from the gRPC `tls_cert_path` so one transport can be protected while
+    /// the other is not.
+    #[serde(default)]
+    pub http_tls_cert_path: Option<String>,
+    /// TLS private key file path for the OTLP/HTTP listener; paired with
+    /// `http_tls_cert_path` exactly like the gRPC trio above.
+    #[serde(default)]
+    pub http_tls_key_path: Option<String>,
+    /// CA certificate for client authentication (mutual TLS) on the
+    /// OTLP/HTTP listener; requires both `http_tls_cert_path` and
+    /// `http_tls_key_path`.
+    #[serde(default)]
+    pub http_tls_ca_cert_path: Option<String>,
 }
 
 /// Metrics ingestion configuration.
@@ -998,6 +1022,43 @@ traces:
     }
 
     #[test]
+    fn endpoint_http_fields_default_absent_and_survive_bincode_ipc() {
+        // FULL_YAML predates the OTLP/HTTP keys: every http field absent →
+        // None (listener disabled), so a pre-change config keeps parsing
+        // unchanged at the schema level.
+        let c = full_config();
+        assert_eq!(c.endpoint.http_path, None);
+        assert_eq!(c.endpoint.http_tls_cert_path, None);
+        assert_eq!(c.endpoint.http_tls_key_path, None);
+        assert_eq!(c.endpoint.http_tls_ca_cert_path, None);
+
+        // The whole PluginConfig travels supervisor→worker over bincode
+        // (ferryboat); the new endpoint fields must round-trip the compact
+        // wire form, not just human-readable YAML.
+        let mut with_http = full_config();
+        with_http.endpoint.http_path = Some("127.0.0.1:4318".to_string());
+        with_http.endpoint.http_tls_cert_path = Some("/http/cert.pem".to_string());
+        with_http.endpoint.http_tls_key_path = Some("/http/key.pem".to_string());
+        with_http.endpoint.http_tls_ca_cert_path = Some("/http/ca.pem".to_string());
+        let bytes = bincode::serde::encode_to_vec(&with_http, bincode::config::standard()).unwrap();
+        let (back, _): (PluginConfig, usize) =
+            bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+        assert_eq!(back.endpoint.http_path.as_deref(), Some("127.0.0.1:4318"));
+        assert_eq!(
+            back.endpoint.http_tls_cert_path.as_deref(),
+            Some("/http/cert.pem")
+        );
+        assert_eq!(
+            back.endpoint.http_tls_key_path.as_deref(),
+            Some("/http/key.pem")
+        );
+        assert_eq!(
+            back.endpoint.http_tls_ca_cert_path.as_deref(),
+            Some("/http/ca.pem")
+        );
+    }
+
+    #[test]
     fn lifecycle_for_derives_dirs_and_tuning() {
         let c = full_config();
 
@@ -1115,7 +1176,10 @@ traces:
             "default:\n  max_files: 10\n  max_total_size: \"1GB\"\n  max_age: \"7 days\"\n",
         )
         .unwrap();
-        assert_eq!(policy.resolve("default").horizon, default_retention_horizon());
+        assert_eq!(
+            policy.resolve("default").horizon,
+            default_retention_horizon()
+        );
         policy.validate().unwrap();
 
         // Explicit default + per-tenant override both resolve.
