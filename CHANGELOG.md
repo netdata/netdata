@@ -3,6 +3,15 @@
 ### Merged Pull Requests:
 
 - Sync repos (netdata, ebpf-co-re, kernel-collector) ([#24008](https://github.com/netdata/netdata/issues/24008))
+- Net Framework (windows.plugin) ([#22219](https://github.com/netdata/netdata/issues/22219))
+- Feat(go.d/prometheus): add counter_raw_charts to chart a counter's raw value alongside its rate ([#24103](https://github.com/netdata/netdata/issues/24103))
+- Regenerate integrations docs ([#24085](https://github.com/netdata/netdata/issues/24085))
+- Test(go.d/sd/net_listeners): apply simulated listener steps atomically ([#24105](https://github.com/netdata/netdata/issues/24105))
+- Fix(scripts.d): scan persistent native frames in linear time ([#24104](https://github.com/netdata/netdata/issues/24104))
+- Refactor streaming system info columns into a shared table ([#24100](https://github.com/netdata/netdata/issues/24100))
+- Fix(go.d/ceph): remove the stray selector from the configuration form ([#24108](https://github.com/netdata/netdata/issues/24108))
+- Docs(cloud-authentication): correct SCIM/OIDC user keying, add Entra ID mapping ([#24110](https://github.com/netdata/netdata/issues/24110))
+- Fix Windows timezone detection buffer overread ([#24101](https://github.com/netdata/netdata/issues/24101))
 
 ## [2.12.0] - 2026-09-30
 
