@@ -1,32 +1,40 @@
-//! Durable WAL sequence allocator.
+//! Durable WAL sequence allocator: the `seq` axis of the file-registry
+//! `FileId` (`machine_id`/`instance_id`/`pipeline_id`/`seq`/`part_key`).
+//! One seq is allocated per WAL file creation (`writer.rs` `ensure_file`)
+//! and stamped into every local filename, every remote object key, and
+//! every catalog stem; the SFST built from a WAL file and the catalog
+//! entry describing it inherit the same seq. The 17-byte `NSEQ`
+//! high-water envelope below is this crate's on-disk contract.
 //!
-//! `seq` is one component of the durable global identity
-//! `FileId { machine_id, instance_id, pipeline_id, seq, part_key }`, embedded in every
-//! local filename, every remote object key, and every catalog entry.
-//! The instance id is freshly generated per process, so a seq reused
-//! after a restart can never reproduce an existing FileId, and callers
-//! key all cross-identity state by the full identity — seq reuse
-//! cannot corrupt.
+//! Uniqueness scoping: one `Arc<SeqAllocator>` spans every writer, signal,
+//! and partition within the process (the ingestor builds exactly one, for
+//! logs + traces together), so issued seqs are unique across pipelines and
+//! partitions. Across restarts the fresh per-process `instance_id`
+//! (supervisor) keeps a reused seq from ever reproducing an existing
+//! `FileId`, and cross-identity state keys on the full identity
+//! (`SeqKey` = machine + instance + seq), so reuse cannot corrupt.
 //!
-//! What reuse would cost is monotonicity: callers key and age-order
-//! *local* files by bare seq, and the never-GC'd archive reads best
-//! when seq tracks creation order per machine. Boot scans of the
-//! surviving local files already guarantee the correctness part
-//! (no new seq collides with a live local file), but not monotonicity
-//! against seqs whose files are gone — age-based eviction is keyed on
-//! each file's data timestamp, not its seq, so a high-seq file holding
-//! old data can be evicted while lower-seq files survive.
-//! [`SeqAllocator`] therefore persists a monotonic **high-water
-//! mark** — the highest seq ever *reserved* (a ceiling) — and never
-//! issues a seq above it without first durably raising it: ordering
-//! hygiene plus a safety margin for the bare-seq convention, not a
-//! correctness requirement.
+//! What persistence protects is the bare-seq keying and its monotonicity:
+//! the per-tenant WAL/SFST registries key entries by bare seq — regardless
+//! of which process instance wrote the file — so the startup seed must
+//! dominate the highest seq still on disk (boot scans; file-registry's
+//! `dir.rs` scan contract), or a restart would put two files under one
+//! registry key. Beyond what is still on disk, the mark keeps `seq` usable
+//! as a creation-order proxy for seqs whose files are gone (age-evicted,
+//! or wiped once uploaded to the never-GC'd remote archive): the
+//! registries iterate ascending-seq as oldest-first while retention evicts
+//! by each file's data timestamps and global count/size, so a reissued seq
+//! could not corrupt anything but would mis-age-order. [`SeqAllocator`]
+//! therefore persists a monotonic **high-water mark** — the highest seq
+//! ever *reserved* (a ceiling) — and never issues a seq above it without
+//! first durably raising it: ordering hygiene plus a safety margin for the
+//! bare-seq convention, not a correctness requirement.
 //!
 //! Reservations are batched: raising the ceiling by
-//! [`DEFAULT_RESERVE_BATCH`] costs one durable write per batch, and
-//! seqs are then handed out from memory. A crash forfeits at most one
-//! batch of unissued seqs — gaps are harmless (`FileId`s are a sparse
-//! set everywhere they are keyed).
+//! [`DEFAULT_RESERVE_BATCH`] costs one durable write per batch, and seqs
+//! are then handed out from memory. A crash forfeits at most one batch of
+//! unissued seqs — gaps are harmless (`FileId`s are a sparse set everywhere
+//! they are keyed).
 //!
 //! On-disk envelope (17 bytes):
 //!
@@ -37,13 +45,36 @@
 //! [ crc32: u32 LE  (over the preceding 13 bytes) ]
 //! ```
 //!
-//! The file is written via `tmp → fsync(file) → rename → fsync(dir)`,
-//! so a reader observes the complete previous-or-new value, never a
-//! torn one. Reading a missing or invalid file yields `None` — the
-//! caller falls back to the filesystem scans — and MUST NOT fail boot:
-//! a too-low seed only degrades to the scan-only behavior, while
-//! `max(scan, high-water)` keeps the file from ever making things
-//! worse.
+//! Writes go through `file_registry::durable`'s atomic sequence
+//! (`tmp → fsync(file) → rename → fsync(dir)`), so a reader observes the
+//! complete previous-or-new value, never a torn one. That sequence is not
+//! safe against concurrent writers to the same path; the writers here
+//! never overlap — the allocator's are mutex-serialized, and
+//! file-lifecycle's startup catalog sync (which raises the mark to the
+//! remote catalog max) completes strictly before the ingestor is
+//! configured.
+//!
+//! Reading a missing, unreadable, or invalid file yields `None` — never an
+//! error — and boot MUST NOT fail on it: the caller seeds
+//! `max(WAL scan, SFST scan, catalog scan, read_seq_highwater())` (the
+//! contract [`SeqAllocator::durable`]'s `seed` requires), so a too-low or
+//! `None` seed only degrades to scan-only behavior while
+//! `max(scan, high-water)` keeps the file from ever making things worse.
+//! The next durable write — the allocator's constructor — rewrites a valid
+//! envelope.
+//!
+//! # Consumers (grep-verified)
+//!
+//! - `otel-ingestor`: the only `SeqAllocator::durable` call site; one
+//!   allocator shared by the logs and traces services and every per-tenant
+//!   writer, seeded at startup (its `create_shared_writer_state`) from the
+//!   dir scans plus the high-water file.
+//! - `wal::Writer`: one [`SeqAllocator::next`] per file creation.
+//! - `file-lifecycle` startup catalog sync: raises the mark to the remote
+//!   catalog max (direct `read_seq_highwater`/`write_seq_highwater`
+//!   read-modify-write).
+//! - Tests across the stack and the dev/bench `ng-ingest` binaries:
+//!   `SeqAllocator::ephemeral` (throwaway files).
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -61,11 +92,13 @@ pub const DEFAULT_RESERVE_BATCH: u64 = 256;
 
 /// Read the persisted high-water mark from `path`.
 ///
-/// Returns `None` — never an error — when the file is missing or fails
-/// any validation (short read, bad magic, bad version, CRC mismatch).
-/// Validation failures are logged loudly; the caller treats `None` as
-/// `0` and seeds from its filesystem scans instead. The next
-/// reservation rewrites a valid file.
+/// Returns `None` — never an error — when the file is missing
+/// (`NotFound`), unreadable, or fails any validation (short read, bad
+/// magic, bad version, CRC mismatch). Only `NotFound` returns silently;
+/// every other case logs a warning naming the reason. The caller treats
+/// `None` as `0` and seeds from its filesystem scans instead; the next
+/// durable write (an allocator construction or batch raise) rewrites a
+/// valid envelope.
 pub fn read_seq_highwater(path: &Path) -> Option<u64> {
     let bytes = match std::fs::read(path) {
         Ok(b) => b,
@@ -91,6 +124,9 @@ pub fn read_seq_highwater(path: &Path) -> Option<u64> {
     }
 }
 
+/// Validate and decode an envelope: length, magic, version, then CRC over
+/// the first 13 bytes, then the `u64` payload. The `Err` string names the
+/// first failing check (interpolated into the reader's warning).
 fn parse_envelope(bytes: &[u8]) -> std::result::Result<u64, String> {
     if bytes.len() != ENVELOPE_LEN {
         return Err(format!("length {} (expected {ENVELOPE_LEN})", bytes.len()));
@@ -111,6 +147,8 @@ fn parse_envelope(bytes: &[u8]) -> std::result::Result<u64, String> {
     Ok(u64::from_le_bytes(bytes[5..13].try_into().unwrap()))
 }
 
+/// Encode `reserved` into the envelope layout documented at the module
+/// top; the CRC covers the first 13 bytes.
 fn encode_envelope(reserved: u64) -> [u8; ENVELOPE_LEN] {
     let mut buf = [0u8; ENVELOPE_LEN];
     buf[0..4].copy_from_slice(MAGIC);
@@ -121,19 +159,23 @@ fn encode_envelope(reserved: u64) -> [u8; ENVELOPE_LEN] {
     buf
 }
 
-/// Durably persist `reserved` to `path` via the shared atomic-write
-/// sequence (tmp → fsync(file) → rename → fsync(parent dir)). The
-/// parent-dir fsync is non-negotiable here — a high-water file lost on
-/// power loss would silently drop the monotonicity guarantee it exists
-/// to provide.
+/// Durably persist `reserved` to `path` via `file_registry::durable`'s
+/// atomic-write sequence (tmp → fsync(file) → rename → fsync(parent dir));
+/// the parent-dir fsync is non-negotiable here — a high-water file lost on
+/// power loss would silently drop the monotonicity guarantee it exists to
+/// provide.
 ///
-/// Public counterpart of [`read_seq_highwater`] for tooling and tests;
-/// normal allocation goes through [`SeqAllocator`].
+/// Writers: [`SeqAllocator`] (constructor and batch raises) and
+/// file-lifecycle's startup catalog sync, which raises the mark to the
+/// remote catalog max before the ingestor seeds. They never overlap (the
+/// module doc's single-writer rule), and `write_atomic` is not
+/// concurrency-safe on one path by itself.
 pub fn write_seq_highwater(path: &Path, reserved: u64) -> Result<()> {
     file_registry::durable::write_atomic(path, &encode_envelope(reserved))?;
     Ok(())
 }
 
+/// In-memory allocator state, guarded by `SeqAllocator`'s mutex.
 struct State {
     /// Last seq handed out.
     last_issued: u64,
@@ -142,18 +184,24 @@ struct State {
     ceiling: u64,
 }
 
-/// Process-wide monotonic seq allocator backed by the high-water file.
+/// Process-wide monotonic seq allocator backed by the durable high-water
+/// file.
 ///
-/// Shared across all per-tenant WAL writers (`Arc<SeqAllocator>`) so
-/// file sequence numbers stay globally unique. Allocation is mutex-
-/// guarded — it happens once per WAL file creation, so contention and
-/// the occasional in-line durable ceiling raise are negligible.
+/// One `Arc<SeqAllocator>` spans every per-tenant writer and every signal
+/// (the ingestor builds exactly one), so issued seqs are unique across
+/// pipelines and partitions for the process lifetime. Allocation is
+/// mutex-guarded — the only lock inside the crate — and happens once per
+/// WAL file creation, so contention and the occasional in-line durable
+/// ceiling raise are negligible.
 pub struct SeqAllocator {
     state: Mutex<State>,
-    /// `None` for ephemeral (test/in-memory) allocators.
+    /// Persistence target; `None` for ephemeral allocators (no file,
+    /// ceiling pinned at `u64::MAX`).
     persist: Option<Persist>,
 }
 
+/// Where and how a durable allocator raises the ceiling: the high-water
+/// file path and the seqs per durable write.
 struct Persist {
     path: PathBuf,
     batch: u64,
@@ -165,7 +213,12 @@ impl SeqAllocator {
     /// on-disk ceiling is always ≥ every issued seq.
     ///
     /// `seed` must already fold in every known lower bound:
-    /// `max(WAL scan, SFST scan, catalog scan, read_seq_highwater())`.
+    /// `max(WAL scan, SFST scan, catalog scan, read_seq_highwater())` —
+    /// the ingestor's startup seed, which file-lifecycle's startup catalog
+    /// sync may have raised further to cover the remote archive. `batch`
+    /// is clamped to at least 1. The only failure is the initial
+    /// high-water write; on failure the previous on-disk value is
+    /// untouched (atomic-write semantics) and nothing is consumed.
     pub fn durable(path: PathBuf, seed: u64, batch: u64) -> Result<Self> {
         let batch = batch.max(1);
         let ceiling = seed.saturating_add(batch);
@@ -179,8 +232,10 @@ impl SeqAllocator {
         })
     }
 
-    /// In-memory allocator with no persistence — for tests and callers
-    /// that manage durability elsewhere. Seqs start at `seed + 1`.
+    /// In-memory allocator with no persistence: the ceiling is pinned at
+    /// `u64::MAX`, so `next()` never touches the filesystem. For tests
+    /// and the dev/bench `ng-ingest` binaries, whose WAL files are
+    /// throwaway. Seqs start at `seed + 1`.
     pub fn ephemeral(seed: u64) -> Self {
         Self {
             state: Mutex::new(State {
@@ -191,9 +246,12 @@ impl SeqAllocator {
         }
     }
 
-    /// Allocate the next seq. Raises (and durably persists) the
-    /// reservation ceiling first whenever the batch is exhausted —
-    /// never returns a seq greater than the persisted ceiling.
+    /// Allocate the next seq. When the batch is exhausted, raises (and
+    /// durably persists) the reservation ceiling first: the file is
+    /// rewritten before any in-memory state changes, so an issued seq is
+    /// never above the persisted ceiling. On a failed raise the call
+    /// returns `Err` without consuming the seq — the file and the state
+    /// are unchanged, and the next allocation retries the raise.
     pub fn next(&self) -> Result<u64> {
         let mut state = self.state.lock().expect("seq allocator mutex poisoned");
         let seq = state.last_issued + 1;

@@ -1,4 +1,84 @@
-//! Integration tests for multi-file pagination with PaginationState.
+//! Integration tests for multi-file pagination through the engine's
+//! `LogQuery::execute_page` (src/logs/query.rs:215-231): each test
+//! writes 2-3 fresh journal files, indexes them with
+//! `FileIndexer::index`, and pages across the merged result, threading
+//! `PaginationState` from page to page. The state type is never named
+//! here - it is not re-exported from `logs` (src/logs/mod.rs:9) and
+//! only arrives through `execute_page`'s return value.
+//!
+//! Fixture: `file1.journal`..`fileN.journal` in one machine-id dir.
+//! Any `<name>.journal` parses as an active journal whose source is
+//! derived from the basename
+//! (journal-registry/src/repository/file.rs:104-108,147-170,236-283),
+//! and distinct names give distinct `File` identities (file.rs:185-197)
+//! - what keeps the per-file positions in
+//! `PaginationState.file_positions` (src/logs/query.rs:33) separate.
+//! Most tests chain disjoint entry runs across the files (typically
+//! 100 entries per file); overlaps, shared timestamps, an empty file,
+//! a filter, time windows and boundary anchors are called out per
+//! test. Every entry is stamped with
+//! `_SOURCE_REALTIME_TIMESTAMP=<microseconds>` - the tests index that
+//! field explicitly, so each file's entry list is time-ordered by it
+//! (journal-index/src/file_indexer.rs:592-601) - and carries a unique
+//! `ENTRY_ID=fileN_<i>`: the prefix identifies the source file in the
+//! distribution assertions, the value is the dedup key wherever
+//! timestamps repeat. Several tests also stamp and index a per-file
+//! `FILE` field that no assertion reads back.
+//!
+//! How a page is built (src/logs/query.rs:330-421): files are
+//! processed in stable temporal sort order - start_time ascending
+//! forward, end_time descending backward (src/logs/query.rs:309-319).
+//! Each file walks only its own entry list from the per-file-resolved
+//! anchor (Head/Tail map to that file's own histogram bounds,
+//! journal-index/src/file_index.rs:555-556; Timestamp is the anchor
+//! value, inclusive in both directions, file_index.rs:618-633,708-737),
+//! and each per-file merge re-interleaves the results into one
+//! globally timestamp-ordered page capped at the limit
+//! (src/logs/query.rs:447-505; ties go to the already-collected side,
+//! query.rs:489-492). Page order is global regardless of processing
+//! order; processing order only decides which entries survive the cap
+//! - a file whose fetch is wholly displaced by the cap keeps no resume
+//! position and is re-walked from its anchor on the next page
+//! (src/logs/query.rs:405-419,327-328), which the per-entry dedup
+//! assertions prove loses nothing. The fixtures use microsecond-scale
+//! timestamps inside one 3600 s histogram bucket, so every file's
+//! Head/Tail bounds coincide and the walks effectively start at each
+//! file's first/last entry.
+//!
+//! Pinned contracts:
+//!
+//! - `PaginationState` holds one position per file - the max
+//!   (forward) / min (backward) `LogEntryId.position` among entries
+//!   that actually landed in the page
+//!   (journal-index/src/file_index.rs:521-523; src/logs/query.rs:405-419),
+//!   merged over the previous state (src/logs/query.rs:328) so
+//!   positions persist across pages where a file contributed nothing.
+//! - Resume is per file, not global: forward starts at
+//!   `resume_position + 1`, backward at `resume_position - 1`
+//!   (src/logs/query.rs:361-389;
+//!   journal-index/src/file_index.rs:613-617,695-707).
+//! - `Anchor::Head`/`Tail` take the minimum start / maximum end across
+//!   all files (src/logs/query.rs:264-279).
+//! - Time boundaries apply during each file's walk: `after` inclusive,
+//!   `before` exclusive (src/logs/query.rs:119-131;
+//!   journal-index/src/file_index.rs:655-664).
+//! - A filtered query paginates each file's FILTERED entry list
+//!   (journal-index/src/file_index.rs:521-523) and every page
+//!   re-applies the current query's filter (src/logs/query.rs:373-375),
+//!   so the filter must not change between pages.
+//!
+//! Not pinned here: unlimited queries (every test sets a limit),
+//! limit 0 (src/logs/query.rs:256-259), regex search, cancellation and
+//! progress counters (src/logs/query.rs:145-161), output-field
+//! projection (src/logs/query.rs:163-174), per-file read errors (logged
+//! and skipped, src/logs/query.rs:393-396), the per-direction relevance
+//! pre-filter (src/logs/query.rs:283-298 - every file qualifies in
+//! these fixtures), the prune/skip path (its break condition is never
+//! met here, src/logs/query.rs:346-356,424-445), which file leads a
+//! page when timestamps tie (assertions count per-file totals, not
+//! page layout), and changing any query parameter between pages - the
+//! state is bound to the configuration that produced it
+//! (src/logs/query.rs:27-29).
 
 use journal_common::Seconds;
 use journal_core::file::{JournalFile, JournalFileOptions, JournalWriter};
@@ -13,7 +93,7 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 use uuid::Uuid;
 
-/// Test journal entry specification
+/// One journal entry: a timestamp plus (field, value) pairs.
 struct TestEntry {
     timestamp: Microseconds,
     fields: Vec<(String, String)>,
@@ -33,7 +113,11 @@ impl TestEntry {
     }
 }
 
-/// Create a test journal file path with a specific name
+/// Path of a test journal: `<tmp>/<machine-id>/<filename>` - the
+/// registry grammar `File::from_path` parses
+/// (journal-registry/src/repository/file.rs:236-283). All of a test's
+/// files share the machine-id dir; distinct names keep their `File`
+/// identities - and `PaginationState`'s per-file positions - separate.
 fn create_test_journal_path(temp_dir: &TempDir, filename: &str) -> PathBuf {
     let machine_id = Uuid::from_u128(0x12345678_1234_1234_1234_123456789abc);
     let machine_dir = temp_dir.path().join(machine_id.to_string());
@@ -41,7 +125,15 @@ fn create_test_journal_path(temp_dir: &TempDir, filename: &str) -> PathBuf {
     machine_dir.join(filename)
 }
 
-/// Helper to create a test journal file with specified entries
+/// Write `entries` into a fresh journal under `temp_dir` and return
+/// the registry `File` for it.
+///
+/// Every entry is stamped with
+/// `_SOURCE_REALTIME_TIMESTAMP=<microseconds>` and `add_entry`
+/// receives the same value as realtime and monotonic
+/// (journal-core/src/file/writer.rs:182-188). Zero entries still
+/// writes a valid journal - one that cannot be indexed (the
+/// empty-file test relies on that).
 fn create_test_journal(
     temp_dir: &TempDir,
     filename: &str,
@@ -64,10 +156,8 @@ fn create_test_journal(
     for entry in entries {
         let mut entry_data = Vec::new();
 
-        // Add _SOURCE_REALTIME_TIMESTAMP first
         entry_data.push(format!("_SOURCE_REALTIME_TIMESTAMP={}", entry.timestamp.0).into_bytes());
 
-        // Add all other fields
         for (field, value) in entry.fields {
             entry_data.push(format!("{}={}", field, value).into_bytes());
         }
@@ -87,10 +177,8 @@ fn create_test_journal(
 
 #[test]
 fn test_multi_file_pagination_forward_non_overlapping() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: entries at t=100..200 microseconds (100 entries)
     let entries_file1: Vec<TestEntry> = (100..200)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -101,7 +189,6 @@ fn test_multi_file_pagination_forward_non_overlapping() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: entries at t=200..300 microseconds (100 entries)
     let entries_file2: Vec<TestEntry> = (200..300)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -112,7 +199,6 @@ fn test_multi_file_pagination_forward_non_overlapping() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let file_field = FieldName::new("FILE").unwrap();
@@ -149,7 +235,7 @@ fn test_multi_file_pagination_forward_non_overlapping() {
         "First page should contain exactly 150 entries"
     );
 
-    // Verify timestamps are in ascending order
+    // The merged page is globally timestamp-ordered across both files.
     for i in 1..first_page.len() {
         assert!(
             first_page[i - 1].timestamp <= first_page[i].timestamp,
@@ -157,27 +243,26 @@ fn test_multi_file_pagination_forward_non_overlapping() {
         );
     }
 
-    // First entry should be at timestamp 100
     assert_eq!(
         first_page.first().unwrap().timestamp,
         100,
         "First entry should be at timestamp 100"
     );
 
-    // Last entry should be at timestamp 249 (100-199 from file1, then 200-249 from file2)
     assert_eq!(
         first_page.last().unwrap().timestamp,
         249,
         "Last entry of first page should be at timestamp 249"
     );
 
-    // State should track positions for files we read from
+    // Both files contributed, so the state starts tracking both.
     assert!(
         !state1.file_positions.is_empty(),
         "State should track positions"
     );
 
-    // Second page: use state to get remaining 50 entries
+    // Second page draws only from file2: file1's resume is past its
+    // end and yields nothing.
     let (second_page, state2) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_limit(150)
         .execute_page(Some(&state1))
@@ -189,7 +274,6 @@ fn test_multi_file_pagination_forward_non_overlapping() {
         "Second page should contain remaining 50 entries"
     );
 
-    // Verify timestamps continue from where first page left off
     assert_eq!(
         second_page.first().unwrap().timestamp,
         250,
@@ -202,7 +286,8 @@ fn test_multi_file_pagination_forward_non_overlapping() {
         "Second page should end at timestamp 299"
     );
 
-    // Verify no duplicates across both pages
+    // Together the pages must cover each of the 200 entries exactly
+    // once - no cross-file duplicates, none missed.
     let mut all_timestamps = HashSet::new();
     for entry in &first_page {
         assert!(
@@ -219,14 +304,12 @@ fn test_multi_file_pagination_forward_non_overlapping() {
         );
     }
 
-    // Verify we got all 200 unique entries
     assert_eq!(
         all_timestamps.len(),
         200,
         "Should have retrieved all 200 unique entries"
     );
 
-    // Third page should be empty
     let (third_page, _state3) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_limit(150)
         .execute_page(Some(&state2))
@@ -241,10 +324,13 @@ fn test_multi_file_pagination_forward_non_overlapping() {
 
 #[test]
 fn test_multi_file_pagination_same_timestamps() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: 150 entries all at timestamp 1000
+    // 150 entries per file, all at timestamp 1000 - one 300-entry run
+    // split across two files. The anchor can only locate the run's
+    // edge, so in-file stepping runs on resume positions
+    // (journal-index/src/file_index.rs:613-617) and the merge
+    // tie-break (src/logs/query.rs:489-492), not on time.
     let entries_file1: Vec<TestEntry> = (0..150)
         .map(|i| {
             TestEntry::new(Microseconds(1000))
@@ -256,7 +342,6 @@ fn test_multi_file_pagination_same_timestamps() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: 150 entries all at timestamp 1000
     let entries_file2: Vec<TestEntry> = (0..150)
         .map(|i| {
             TestEntry::new(Microseconds(1000))
@@ -268,7 +353,6 @@ fn test_multi_file_pagination_same_timestamps() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let file_field = FieldName::new("FILE").unwrap();
@@ -294,7 +378,9 @@ fn test_multi_file_pagination_same_timestamps() {
 
     let file_indexes = vec![index1, index2];
 
-    // First page: limit=200, should get all 150 from file1 + 50 from file2
+    // First page (limit 200): one file's whole 150-entry run plus the
+    // first 50 of the other - with tied timestamps, which file leads
+    // is a merge-tie artifact, so only totals are asserted.
     let (first_page, state1) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_limit(200)
         .execute_page(None)
@@ -306,7 +392,6 @@ fn test_multi_file_pagination_same_timestamps() {
         "First page should contain exactly 200 entries"
     );
 
-    // All timestamps should be 1000
     for entry in &first_page {
         assert_eq!(
             entry.timestamp, 1000,
@@ -314,14 +399,15 @@ fn test_multi_file_pagination_same_timestamps() {
         );
     }
 
-    // State should track positions for both files
+    // Both files contributed, so both carry positions.
     assert_eq!(
         state1.file_positions.len(),
         2,
         "State should track positions for both files"
     );
 
-    // Second page: use state to get remaining 100 entries
+    // Second page: the leading file's resume is past its end; the
+    // other contributes its remaining 100.
     let (second_page, state2) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_limit(200)
         .execute_page(Some(&state1))
@@ -333,7 +419,6 @@ fn test_multi_file_pagination_same_timestamps() {
         "Second page should contain remaining 100 entries"
     );
 
-    // All timestamps should still be 1000
     for entry in &second_page {
         assert_eq!(
             entry.timestamp, 1000,
@@ -341,7 +426,8 @@ fn test_multi_file_pagination_same_timestamps() {
         );
     }
 
-    // Collect all ENTRY_ID values to verify uniqueness
+    // ENTRY_IDs must be unique across pages: all 300 entries, each
+    // exactly once.
     let mut all_entry_ids = HashSet::new();
 
     for entry in &first_page {
@@ -368,14 +454,13 @@ fn test_multi_file_pagination_same_timestamps() {
         }
     }
 
-    // Verify we got all 300 unique entries
     assert_eq!(
         all_entry_ids.len(),
         300,
         "Should have retrieved all 300 unique entries"
     );
 
-    // Verify we have entries from both files
+    // 150 from each file.
     let file1_entries: usize = all_entry_ids
         .iter()
         .filter(|id| id.starts_with("file1_"))
@@ -388,7 +473,6 @@ fn test_multi_file_pagination_same_timestamps() {
     assert_eq!(file1_entries, 150, "Should have 150 entries from file1");
     assert_eq!(file2_entries, 150, "Should have 150 entries from file2");
 
-    // Third page should be empty
     let (third_page, _state3) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_limit(200)
         .execute_page(Some(&state2))
@@ -403,10 +487,10 @@ fn test_multi_file_pagination_same_timestamps() {
 
 #[test]
 fn test_multi_file_pagination_overlapping_timestamps() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: entries at t=100..200 (100 entries)
+    // Overlapping files: file1 holds 100-199, file2 150-249 -
+    // timestamps 150-199 exist in both.
     let entries_file1: Vec<TestEntry> = (100..200)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -418,7 +502,6 @@ fn test_multi_file_pagination_overlapping_timestamps() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: entries at t=150..250 (100 entries) - overlaps with file1 from 150-199
     let entries_file2: Vec<TestEntry> = (150..250)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -430,7 +513,6 @@ fn test_multi_file_pagination_overlapping_timestamps() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let file_field = FieldName::new("FILE").unwrap();
@@ -456,8 +538,10 @@ fn test_multi_file_pagination_overlapping_timestamps() {
 
     let file_indexes = vec![index1, index2];
 
-    // First page: limit=120
-    // Expected: 50 from file1 (100-149) + 50 interleaved from both (150-199) + 20 from file2 (200-219)
+    // First page (limit 120): file1's 50 exclusive entries (100-149),
+    // then the overlap interleaved by timestamp - the cap falls
+    // mid-overlap at 184, so page 1 never reaches file2's exclusive
+    // range.
     let (first_page, state1) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_limit(120)
         .execute_page(None)
@@ -469,7 +553,7 @@ fn test_multi_file_pagination_overlapping_timestamps() {
         "First page should contain exactly 120 entries"
     );
 
-    // Verify timestamps are in ascending order
+    // The merged page is globally timestamp-ordered across both files.
     for i in 1..first_page.len() {
         assert!(
             first_page[i - 1].timestamp <= first_page[i].timestamp,
@@ -477,20 +561,20 @@ fn test_multi_file_pagination_overlapping_timestamps() {
         );
     }
 
-    // First entry should be at timestamp 100
     assert_eq!(
         first_page.first().unwrap().timestamp,
         100,
         "First entry should be at timestamp 100"
     );
 
-    // State should track positions for both files
+    // Both files contributed, so the state starts tracking both.
     assert!(
         !state1.file_positions.is_empty(),
         "State should track positions"
     );
 
-    // Second page: get remaining entries
+    // Second page: both files resume mid-run at 185 and finish their
+    // own tails - file1 through 199, file2 through 249.
     let (second_page, state2) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_limit(120)
         .execute_page(Some(&state1))
@@ -502,7 +586,6 @@ fn test_multi_file_pagination_overlapping_timestamps() {
         "Second page should contain remaining 80 entries"
     );
 
-    // Verify timestamps continue in order
     for i in 1..second_page.len() {
         assert!(
             second_page[i - 1].timestamp <= second_page[i].timestamp,
@@ -510,7 +593,7 @@ fn test_multi_file_pagination_overlapping_timestamps() {
         );
     }
 
-    // Verify no timestamp gap between pages
+    // No gap: page 2 starts exactly where page 1 stopped.
     if !first_page.is_empty() && !second_page.is_empty() {
         assert!(
             first_page.last().unwrap().timestamp <= second_page.first().unwrap().timestamp,
@@ -518,14 +601,14 @@ fn test_multi_file_pagination_overlapping_timestamps() {
         );
     }
 
-    // Last entry should be at timestamp 249
     assert_eq!(
         second_page.last().unwrap().timestamp,
         249,
         "Last entry should be at timestamp 249"
     );
 
-    // Collect all ENTRY_ID values to verify uniqueness and completeness
+    // ENTRY_IDs must be unique across pages: all 200 entries, each
+    // exactly once.
     let mut all_entry_ids = HashSet::new();
 
     for entry in &first_page {
@@ -552,14 +635,14 @@ fn test_multi_file_pagination_overlapping_timestamps() {
         }
     }
 
-    // Verify we got all 200 unique entries (100 from each file)
     assert_eq!(
         all_entry_ids.len(),
         200,
         "Should have retrieved all 200 unique entries"
     );
 
-    // Verify we have entries from both files
+    // 100 from each file - the overlap neither duplicated nor dropped
+    // either file's entries.
     let file1_entries: usize = all_entry_ids
         .iter()
         .filter(|id| id.starts_with("file1_"))
@@ -572,18 +655,17 @@ fn test_multi_file_pagination_overlapping_timestamps() {
     assert_eq!(file1_entries, 100, "Should have 100 entries from file1");
     assert_eq!(file2_entries, 100, "Should have 100 entries from file2");
 
-    // Verify all timestamps from 100-249 are represented
     let mut all_timestamps = HashSet::new();
     for entry in first_page.iter().chain(second_page.iter()) {
         all_timestamps.insert(entry.timestamp);
     }
 
-    // We should have entries at all timestamps from 100-249 (150 unique timestamps)
+    // Every timestamp 100-249 is represented - shared timestamps
+    // yield both files' entries (200 entries over 150 timestamps).
     for ts in 100..250 {
         assert!(all_timestamps.contains(&ts), "Missing timestamp: {}", ts);
     }
 
-    // Third page should be empty
     let (third_page, _state3) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_limit(120)
         .execute_page(Some(&state2))
@@ -598,10 +680,8 @@ fn test_multi_file_pagination_overlapping_timestamps() {
 
 #[test]
 fn test_multi_file_pagination_three_files() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: entries at t=100..200 (100 entries)
     let entries_file1: Vec<TestEntry> = (100..200)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -613,7 +693,6 @@ fn test_multi_file_pagination_three_files() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: entries at t=200..300 (100 entries)
     let entries_file2: Vec<TestEntry> = (200..300)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -625,7 +704,6 @@ fn test_multi_file_pagination_three_files() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // File 3: entries at t=300..400 (100 entries)
     let entries_file3: Vec<TestEntry> = (300..400)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -637,7 +715,6 @@ fn test_multi_file_pagination_three_files() {
 
     let file3 = create_test_journal(&temp_dir, "file3.journal", entries_file3).unwrap();
 
-    // Index all three files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let file_field = FieldName::new("FILE").unwrap();
@@ -687,7 +764,8 @@ fn test_multi_file_pagination_three_files() {
     assert_eq!(first_page.first().unwrap().timestamp, 100);
     assert_eq!(first_page.last().unwrap().timestamp, 224);
 
-    // State should track positions for file1 and file2
+    // State: file1 done, file2 mid-run; file3 untouched, so only 2
+    // positions.
     assert_eq!(
         state1.file_positions.len(),
         2,
@@ -709,7 +787,8 @@ fn test_multi_file_pagination_three_files() {
     assert_eq!(second_page.first().unwrap().timestamp, 225);
     assert_eq!(second_page.last().unwrap().timestamp, 349);
 
-    // State should now track all 3 files
+    // State now covers all 3 files - file1's position persisted even
+    // though page 2 drew nothing from it.
     assert_eq!(
         state2.file_positions.len(),
         3,
@@ -731,7 +810,8 @@ fn test_multi_file_pagination_three_files() {
     assert_eq!(third_page.first().unwrap().timestamp, 350);
     assert_eq!(third_page.last().unwrap().timestamp, 399);
 
-    // Collect all ENTRY_ID values to verify uniqueness
+    // ENTRY_IDs must be unique across pages: all 300 entries, each
+    // exactly once.
     let mut all_entry_ids = HashSet::new();
 
     for entry in first_page
@@ -750,14 +830,13 @@ fn test_multi_file_pagination_three_files() {
         }
     }
 
-    // Verify we got all 300 unique entries
     assert_eq!(
         all_entry_ids.len(),
         300,
         "Should have retrieved all 300 unique entries"
     );
 
-    // Verify distribution: 100 from each file
+    // 100 from each file.
     let file1_count = all_entry_ids
         .iter()
         .filter(|id| id.starts_with("file1_"))
@@ -775,7 +854,6 @@ fn test_multi_file_pagination_three_files() {
     assert_eq!(file2_count, 100, "Should have 100 entries from file2");
     assert_eq!(file3_count, 100, "Should have 100 entries from file3");
 
-    // Fourth page should be empty
     let (fourth_page, _state4) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_limit(125)
         .execute_page(Some(&state3))
@@ -790,10 +868,8 @@ fn test_multi_file_pagination_three_files() {
 
 #[test]
 fn test_multi_file_pagination_small_limit() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: 100 entries at t=100..200
     let entries_file1: Vec<TestEntry> = (100..200)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -804,7 +880,6 @@ fn test_multi_file_pagination_small_limit() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: 100 entries at t=200..300
     let entries_file2: Vec<TestEntry> = (200..300)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -815,7 +890,6 @@ fn test_multi_file_pagination_small_limit() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
@@ -840,12 +914,13 @@ fn test_multi_file_pagination_small_limit() {
 
     let file_indexes = vec![index1, index2];
 
-    // Use very small limit=30, need multiple pages for file1 alone
+    // limit 30: file2's fetches are displaced by the cap until page 4,
+    // so the first pages drain file1 alone.
     let mut all_entry_ids = HashSet::new();
     let mut state = None;
     let mut page_count = 0;
 
-    // Paginate through all entries with small page size
+    // Page until empty, threading the state through each round trip.
     loop {
         let (page, new_state) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
             .with_limit(30)
@@ -858,7 +933,7 @@ fn test_multi_file_pagination_small_limit() {
 
         page_count += 1;
 
-        // Verify order within page
+        // Each page stays timestamp-ordered.
         for i in 1..page.len() {
             assert!(
                 page[i - 1].timestamp <= page[i].timestamp,
@@ -867,7 +942,7 @@ fn test_multi_file_pagination_small_limit() {
             );
         }
 
-        // Collect ENTRY_IDs
+        // ENTRY_IDs must never repeat.
         for entry in &page {
             for field in &entry.fields {
                 if field.field() == "ENTRY_ID" {
@@ -886,14 +961,13 @@ fn test_multi_file_pagination_small_limit() {
     // Should need 7 pages: 30+30+30+30+30+30+20 = 200 entries
     assert_eq!(page_count, 7, "Should need exactly 7 pages");
 
-    // Verify we got all 200 unique entries
     assert_eq!(
         all_entry_ids.len(),
         200,
         "Should have retrieved all 200 unique entries"
     );
 
-    // Verify distribution
+    // 100 from each file - the cap's displaced fetches lost nothing.
     let file1_count = all_entry_ids
         .iter()
         .filter(|id| id.starts_with("file1_"))
@@ -909,10 +983,8 @@ fn test_multi_file_pagination_small_limit() {
 
 #[test]
 fn test_multi_file_pagination_limit_one() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: 10 entries at t=100..110
     let entries_file1: Vec<TestEntry> = (100..110)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -923,7 +995,6 @@ fn test_multi_file_pagination_limit_one() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: 10 entries at t=110..120
     let entries_file2: Vec<TestEntry> = (110..120)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -934,7 +1005,6 @@ fn test_multi_file_pagination_limit_one() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
@@ -959,7 +1029,8 @@ fn test_multi_file_pagination_limit_one() {
 
     let file_indexes = vec![index1, index2];
 
-    // Paginate with limit=1 (extreme case)
+    // limit 1: every page boundary is a resume - 20 pages of one
+    // entry each.
     let mut all_entry_ids = HashSet::new();
     let mut all_timestamps = Vec::new();
     let mut state = None;
@@ -977,10 +1048,10 @@ fn test_multi_file_pagination_limit_one() {
 
         page_count += 1;
 
-        // Each page should have exactly 1 entry
         assert_eq!(page.len(), 1, "Each page should have exactly 1 entry");
 
-        // Collect ENTRY_ID and timestamp
+        // ENTRY_IDs must never repeat; timestamps are collected for
+        // the ordering check.
         for entry in &page {
             all_timestamps.push(entry.timestamp);
             for field in &entry.fields {
@@ -1000,14 +1071,14 @@ fn test_multi_file_pagination_limit_one() {
     // Should need 20 pages for 20 entries
     assert_eq!(page_count, 20, "Should need exactly 20 pages");
 
-    // Verify we got all 20 unique entries
     assert_eq!(
         all_entry_ids.len(),
         20,
         "Should have retrieved all 20 unique entries"
     );
 
-    // Verify timestamps are in ascending order
+    // The single-entry pages chain into one globally ascending stream
+    // across the file boundary.
     for i in 1..all_timestamps.len() {
         assert!(
             all_timestamps[i - 1] <= all_timestamps[i],
@@ -1015,7 +1086,7 @@ fn test_multi_file_pagination_limit_one() {
         );
     }
 
-    // Verify we got all timestamps from 100-119
+    // Every timestamp 100-119 appears exactly once.
     let unique_timestamps: HashSet<_> = all_timestamps.into_iter().collect();
     assert_eq!(
         unique_timestamps.len(),
@@ -1029,10 +1100,8 @@ fn test_multi_file_pagination_limit_one() {
 
 #[test]
 fn test_multi_file_pagination_with_empty_file() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: 50 entries at t=100..150
     let entries_file1: Vec<TestEntry> = (100..150)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -1043,11 +1112,11 @@ fn test_multi_file_pagination_with_empty_file() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: Empty (0 entries) - created but not indexed since empty files cannot be indexed
+    // file2 is written with zero entries and then dropped: an empty
+    // journal cannot be indexed.
     let entries_file2: Vec<TestEntry> = vec![];
     let _file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // File 3: 50 entries at t=150..200
     let entries_file3: Vec<TestEntry> = (150..200)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -1058,8 +1127,11 @@ fn test_multi_file_pagination_with_empty_file() {
 
     let file3 = create_test_journal(&temp_dir, "file3.journal", entries_file3).unwrap();
 
-    // Index files - note that empty file cannot be indexed (returns EmptyHistogramInput error)
-    // In practice, the system would skip files with no entries
+    // Indexing an empty journal fails with EmptyHistogramInput
+    // (journal-index/src/histogram.rs:73-75), so file2 is simply left
+    // out of the query list.
+    // Production behaves the same: per-file indexing failures are
+    // logged and the file omitted (src/indexing.rs:353-374).
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
@@ -1073,8 +1145,7 @@ fn test_multi_file_pagination_with_empty_file() {
         )
         .unwrap();
 
-    // Skip empty file - it cannot be indexed
-    // let index2 = indexer.index(&file2, ...) would fail with EmptyHistogramInput
+    // No index for file2 - the query sees only file1 and file3.
 
     let index3 = indexer
         .index(
@@ -1113,7 +1184,7 @@ fn test_multi_file_pagination_with_empty_file() {
     assert_eq!(second_page.first().unwrap().timestamp, 160);
     assert_eq!(second_page.last().unwrap().timestamp, 199);
 
-    // Collect all ENTRY_IDs
+    // ENTRY_IDs must never repeat.
     let mut all_entry_ids = HashSet::new();
     for entry in first_page.iter().chain(second_page.iter()) {
         for field in &entry.fields {
@@ -1146,7 +1217,6 @@ fn test_multi_file_pagination_with_empty_file() {
     assert_eq!(file1_count, 50, "Should have 50 entries from file1");
     assert_eq!(file3_count, 50, "Should have 50 entries from file3");
 
-    // Third page should be empty
     let (third_page, _state3) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_limit(60)
         .execute_page(Some(&state2))
@@ -1161,10 +1231,8 @@ fn test_multi_file_pagination_with_empty_file() {
 
 #[test]
 fn test_multi_file_pagination_reverse_file_order() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: entries at t=100..200 (oldest)
     let entries_file1: Vec<TestEntry> = (100..200)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -1175,7 +1243,6 @@ fn test_multi_file_pagination_reverse_file_order() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: entries at t=200..300 (middle)
     let entries_file2: Vec<TestEntry> = (200..300)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -1186,7 +1253,6 @@ fn test_multi_file_pagination_reverse_file_order() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // File 3: entries at t=300..400 (newest)
     let entries_file3: Vec<TestEntry> = (300..400)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -1197,7 +1263,6 @@ fn test_multi_file_pagination_reverse_file_order() {
 
     let file3 = create_test_journal(&temp_dir, "file3.journal", entries_file3).unwrap();
 
-    // Index all three files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
@@ -1229,11 +1294,13 @@ fn test_multi_file_pagination_reverse_file_order() {
         )
         .unwrap();
 
-    // Pass files in REVERSE chronological order (newest first)
-    // The query should still process them in correct temporal order
+    // The files are handed to the query newest-first; the temporal
+    // re-sort (src/logs/query.rs:309-319) must undo that.
     let file_indexes = vec![index3, index2, index1];
 
-    // Query should still return entries in ascending timestamp order
+    // Each page is still globally ascending: every per-file merge
+    // re-interleaves by timestamp (src/logs/query.rs:447-505), so
+    // processing order never leaks into page order.
     let (first_page, state1) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_limit(150)
         .execute_page(None)
@@ -1241,14 +1308,12 @@ fn test_multi_file_pagination_reverse_file_order() {
 
     assert_eq!(first_page.len(), 150);
 
-    // First entry should be from file1 (oldest timestamp)
     assert_eq!(
         first_page.first().unwrap().timestamp,
         100,
         "First entry should be at timestamp 100 from file1"
     );
 
-    // Verify ascending order
     for i in 1..first_page.len() {
         assert!(
             first_page[i - 1].timestamp <= first_page[i].timestamp,
@@ -1256,7 +1321,6 @@ fn test_multi_file_pagination_reverse_file_order() {
         );
     }
 
-    // Continue pagination
     let (second_page, state2) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_limit(150)
         .execute_page(Some(&state1))
@@ -1271,13 +1335,13 @@ fn test_multi_file_pagination_reverse_file_order() {
         );
     }
 
-    // Verify continuity between pages
+    // No gap across the page boundary.
     assert!(
         first_page.last().unwrap().timestamp <= second_page.first().unwrap().timestamp,
         "Second page should continue from first page"
     );
 
-    // Collect all ENTRY_IDs
+    // ENTRY_IDs must never repeat.
     let mut all_entry_ids = HashSet::new();
     for entry in first_page.iter().chain(second_page.iter()) {
         for field in &entry.fields {
@@ -1291,14 +1355,14 @@ fn test_multi_file_pagination_reverse_file_order() {
         }
     }
 
-    // Should have 300 unique entries
+    // All 300 entries covered exactly once - newest-first input
+    // changed nothing.
     assert_eq!(
         all_entry_ids.len(),
         300,
         "Should have retrieved all 300 unique entries"
     );
 
-    // Third page should be empty
     let (third_page, _state3) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_limit(150)
         .execute_page(Some(&state2))
@@ -1309,10 +1373,8 @@ fn test_multi_file_pagination_reverse_file_order() {
 
 #[test]
 fn test_multi_file_pagination_backward_non_overlapping() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: entries at t=100..200 (100 entries)
     let entries_file1: Vec<TestEntry> = (100..200)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -1324,7 +1386,6 @@ fn test_multi_file_pagination_backward_non_overlapping() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: entries at t=200..300 (100 entries)
     let entries_file2: Vec<TestEntry> = (200..300)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -1336,7 +1397,6 @@ fn test_multi_file_pagination_backward_non_overlapping() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let file_field = FieldName::new("FILE").unwrap();
@@ -1373,7 +1433,7 @@ fn test_multi_file_pagination_backward_non_overlapping() {
         "First page should contain exactly 150 entries"
     );
 
-    // Verify timestamps are in descending order
+    // The merged page is globally descending across both files.
     for i in 1..first_page.len() {
         assert!(
             first_page[i - 1].timestamp >= first_page[i].timestamp,
@@ -1381,27 +1441,27 @@ fn test_multi_file_pagination_backward_non_overlapping() {
         );
     }
 
-    // First entry should be at timestamp 299 (highest)
     assert_eq!(
         first_page.first().unwrap().timestamp,
         299,
         "First entry should be at timestamp 299"
     );
 
-    // Last entry should be at timestamp 150 (100 from file2: 299-200, then 50 from file1: 199-150)
     assert_eq!(
         first_page.last().unwrap().timestamp,
         150,
         "Last entry of first page should be at timestamp 150"
     );
 
-    // State should track positions for files we read from
+    // Both files contributed, so the state starts tracking both.
     assert!(
         !state1.file_positions.is_empty(),
         "State should track positions"
     );
 
-    // Second page: use state to get remaining 50 entries
+    // Second page draws only from file1: file2's resume reached
+    // position 0, where the backward walk ends
+    // (journal-index/src/file_index.rs:698-700).
     let (second_page, state2) = LogQuery::new(&file_indexes, Anchor::Tail, Direction::Backward)
         .with_limit(150)
         .execute_page(Some(&state1))
@@ -1413,7 +1473,6 @@ fn test_multi_file_pagination_backward_non_overlapping() {
         "Second page should contain remaining 50 entries"
     );
 
-    // Verify timestamps continue in descending order
     assert_eq!(
         second_page.first().unwrap().timestamp,
         149,
@@ -1426,7 +1485,8 @@ fn test_multi_file_pagination_backward_non_overlapping() {
         "Second page should end at timestamp 100"
     );
 
-    // Verify no duplicates across both pages
+    // Together the pages must cover each of the 200 entries exactly
+    // once.
     let mut all_timestamps = HashSet::new();
     for entry in &first_page {
         assert!(
@@ -1443,14 +1503,12 @@ fn test_multi_file_pagination_backward_non_overlapping() {
         );
     }
 
-    // Verify we got all 200 unique entries
     assert_eq!(
         all_timestamps.len(),
         200,
         "Should have retrieved all 200 unique entries"
     );
 
-    // Third page should be empty
     let (third_page, _state3) = LogQuery::new(&file_indexes, Anchor::Tail, Direction::Backward)
         .with_limit(150)
         .execute_page(Some(&state2))
@@ -1465,10 +1523,10 @@ fn test_multi_file_pagination_backward_non_overlapping() {
 
 #[test]
 fn test_multi_file_pagination_backward_same_timestamps() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: 150 entries all at timestamp 1000
+    // 150 entries per file, all at timestamp 1000 - one 300-entry run
+    // split across two files, walked newest-first.
     let entries_file1: Vec<TestEntry> = (0..150)
         .map(|i| {
             TestEntry::new(Microseconds(1000))
@@ -1480,7 +1538,6 @@ fn test_multi_file_pagination_backward_same_timestamps() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: 150 entries all at timestamp 1000
     let entries_file2: Vec<TestEntry> = (0..150)
         .map(|i| {
             TestEntry::new(Microseconds(1000))
@@ -1492,7 +1549,6 @@ fn test_multi_file_pagination_backward_same_timestamps() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let file_field = FieldName::new("FILE").unwrap();
@@ -1518,7 +1574,9 @@ fn test_multi_file_pagination_backward_same_timestamps() {
 
     let file_indexes = vec![index1, index2];
 
-    // First page: limit=200, backward from tail
+    // First page (limit 200): one file's whole run plus the last 50
+    // of the other - with tied timestamps, which file leads is a
+    // merge-tie artifact, so only totals are asserted.
     let (first_page, state1) = LogQuery::new(&file_indexes, Anchor::Tail, Direction::Backward)
         .with_limit(200)
         .execute_page(None)
@@ -1530,7 +1588,6 @@ fn test_multi_file_pagination_backward_same_timestamps() {
         "First page should contain exactly 200 entries"
     );
 
-    // All timestamps should be 1000
     for entry in &first_page {
         assert_eq!(
             entry.timestamp, 1000,
@@ -1538,14 +1595,15 @@ fn test_multi_file_pagination_backward_same_timestamps() {
         );
     }
 
-    // State should track positions for both files
+    // Both files contributed, so both carry positions.
     assert_eq!(
         state1.file_positions.len(),
         2,
         "State should track positions for both files"
     );
 
-    // Second page: use state to get remaining 100 entries
+    // Second page: the leading file's resume hit 0 (the backward
+    // walk's end); the other contributes its remaining 100.
     let (second_page, state2) = LogQuery::new(&file_indexes, Anchor::Tail, Direction::Backward)
         .with_limit(200)
         .execute_page(Some(&state1))
@@ -1557,7 +1615,6 @@ fn test_multi_file_pagination_backward_same_timestamps() {
         "Second page should contain remaining 100 entries"
     );
 
-    // All timestamps should still be 1000
     for entry in &second_page {
         assert_eq!(
             entry.timestamp, 1000,
@@ -1565,7 +1622,8 @@ fn test_multi_file_pagination_backward_same_timestamps() {
         );
     }
 
-    // Collect all ENTRY_ID values to verify uniqueness
+    // ENTRY_IDs must be unique across pages: all 300 entries, each
+    // exactly once.
     let mut all_entry_ids = HashSet::new();
 
     for entry in &first_page {
@@ -1592,14 +1650,13 @@ fn test_multi_file_pagination_backward_same_timestamps() {
         }
     }
 
-    // Verify we got all 300 unique entries
     assert_eq!(
         all_entry_ids.len(),
         300,
         "Should have retrieved all 300 unique entries"
     );
 
-    // Verify we have entries from both files
+    // 150 from each file.
     let file1_entries: usize = all_entry_ids
         .iter()
         .filter(|id| id.starts_with("file1_"))
@@ -1612,7 +1669,6 @@ fn test_multi_file_pagination_backward_same_timestamps() {
     assert_eq!(file1_entries, 150, "Should have 150 entries from file1");
     assert_eq!(file2_entries, 150, "Should have 150 entries from file2");
 
-    // Third page should be empty
     let (third_page, _state3) = LogQuery::new(&file_indexes, Anchor::Tail, Direction::Backward)
         .with_limit(200)
         .execute_page(Some(&state2))
@@ -1627,10 +1683,8 @@ fn test_multi_file_pagination_backward_same_timestamps() {
 
 #[test]
 fn test_multi_file_pagination_backward_limit_one() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: 10 entries at t=100..110
     let entries_file1: Vec<TestEntry> = (100..110)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -1641,7 +1695,6 @@ fn test_multi_file_pagination_backward_limit_one() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: 10 entries at t=110..120
     let entries_file2: Vec<TestEntry> = (110..120)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -1652,7 +1705,6 @@ fn test_multi_file_pagination_backward_limit_one() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
@@ -1677,7 +1729,7 @@ fn test_multi_file_pagination_backward_limit_one() {
 
     let file_indexes = vec![index1, index2];
 
-    // Paginate backward with limit=1 (extreme case)
+    // limit 1 backward: 20 pages of one entry each, newest first.
     let mut all_entry_ids = HashSet::new();
     let mut all_timestamps = Vec::new();
     let mut state = None;
@@ -1695,10 +1747,10 @@ fn test_multi_file_pagination_backward_limit_one() {
 
         page_count += 1;
 
-        // Each page should have exactly 1 entry
         assert_eq!(page.len(), 1, "Each page should have exactly 1 entry");
 
-        // Collect ENTRY_ID and timestamp
+        // ENTRY_IDs must never repeat; timestamps are collected for
+        // the ordering check.
         for entry in &page {
             all_timestamps.push(entry.timestamp);
             for field in &entry.fields {
@@ -1718,14 +1770,14 @@ fn test_multi_file_pagination_backward_limit_one() {
     // Should need 20 pages for 20 entries
     assert_eq!(page_count, 20, "Should need exactly 20 pages");
 
-    // Verify we got all 20 unique entries
     assert_eq!(
         all_entry_ids.len(),
         20,
         "Should have retrieved all 20 unique entries"
     );
 
-    // Verify timestamps are in descending order
+    // The single-entry pages chain into one globally descending
+    // stream across the file boundary.
     for i in 1..all_timestamps.len() {
         assert!(
             all_timestamps[i - 1] >= all_timestamps[i],
@@ -1733,7 +1785,7 @@ fn test_multi_file_pagination_backward_limit_one() {
         );
     }
 
-    // Verify we got all timestamps from 119 down to 100
+    // Every timestamp 100-119 appears exactly once.
     let unique_timestamps: HashSet<_> = all_timestamps.into_iter().collect();
     assert_eq!(
         unique_timestamps.len(),
@@ -1747,10 +1799,8 @@ fn test_multi_file_pagination_backward_limit_one() {
 
 #[test]
 fn test_multi_file_pagination_anchor_timestamp_forward() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: entries at t=100..200 (100 entries)
     let entries_file1: Vec<TestEntry> = (100..200)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -1761,7 +1811,6 @@ fn test_multi_file_pagination_anchor_timestamp_forward() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: entries at t=200..300 (100 entries)
     let entries_file2: Vec<TestEntry> = (200..300)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -1772,7 +1821,6 @@ fn test_multi_file_pagination_anchor_timestamp_forward() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
@@ -1797,7 +1845,8 @@ fn test_multi_file_pagination_anchor_timestamp_forward() {
 
     let file_indexes = vec![index1, index2];
 
-    // Start from middle timestamp 150 (in file1), forward direction
+    // Anchor 150 sits mid-file1: each file starts its walk at the
+    // anchor, inclusive (journal-index/src/file_index.rs:618-633).
     let anchor = Anchor::Timestamp(Microseconds(150));
 
     // First page: limit=80, should get 50 from file1 (150-199) + 30 from file2 (200-229)
@@ -1812,21 +1861,18 @@ fn test_multi_file_pagination_anchor_timestamp_forward() {
         "First page should contain exactly 80 entries"
     );
 
-    // First entry should be at timestamp 150
     assert_eq!(
         first_page.first().unwrap().timestamp,
         150,
         "First entry should be at timestamp 150 (anchor)"
     );
 
-    // Last entry should be at timestamp 229
     assert_eq!(
         first_page.last().unwrap().timestamp,
         229,
         "Last entry should be at timestamp 229"
     );
 
-    // Verify ascending order
     for i in 1..first_page.len() {
         assert!(
             first_page[i - 1].timestamp <= first_page[i].timestamp,
@@ -1834,7 +1880,8 @@ fn test_multi_file_pagination_anchor_timestamp_forward() {
         );
     }
 
-    // Second page: get remaining entries
+    // Second page: file2's remaining 70 (230-299); file1's resume is
+    // past its end.
     let (second_page, state2) = LogQuery::new(&file_indexes, anchor, Direction::Forward)
         .with_limit(80)
         .execute_page(Some(&state1))
@@ -1858,7 +1905,7 @@ fn test_multi_file_pagination_anchor_timestamp_forward() {
         "Second page should end at timestamp 299"
     );
 
-    // Verify no duplicates
+    // ENTRY_IDs must never repeat.
     let mut all_entry_ids = HashSet::new();
     for entry in first_page.iter().chain(second_page.iter()) {
         for field in &entry.fields {
@@ -1872,14 +1919,14 @@ fn test_multi_file_pagination_anchor_timestamp_forward() {
         }
     }
 
-    // Should have 150 entries total (from 150-299)
+    // 150 entries - everything from the anchor onward, nothing before
+    // it.
     assert_eq!(
         all_entry_ids.len(),
         150,
         "Should have retrieved 150 unique entries from timestamp 150 onwards"
     );
 
-    // Third page should be empty
     let (third_page, _state3) = LogQuery::new(&file_indexes, anchor, Direction::Forward)
         .with_limit(80)
         .execute_page(Some(&state2))
@@ -1894,10 +1941,8 @@ fn test_multi_file_pagination_anchor_timestamp_forward() {
 
 #[test]
 fn test_multi_file_pagination_anchor_timestamp_backward() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: entries at t=100..200 (100 entries)
     let entries_file1: Vec<TestEntry> = (100..200)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -1908,7 +1953,6 @@ fn test_multi_file_pagination_anchor_timestamp_backward() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: entries at t=200..300 (100 entries)
     let entries_file2: Vec<TestEntry> = (200..300)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -1919,7 +1963,6 @@ fn test_multi_file_pagination_anchor_timestamp_backward() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
@@ -1944,7 +1987,9 @@ fn test_multi_file_pagination_anchor_timestamp_backward() {
 
     let file_indexes = vec![index1, index2];
 
-    // Start from middle timestamp 250 (in file2), backward direction
+    // Anchor 250 sits mid-file2: each file walks backward from the
+    // anchor, inclusive (journal-index/src/file_index.rs:708-737) -
+    // file2 from its 250 entry, file1 from its 199.
     let anchor = Anchor::Timestamp(Microseconds(250));
 
     // First page: limit=80, should get 51 from file2 (250-200) + 29 from file1 (199-171)
@@ -1959,21 +2004,18 @@ fn test_multi_file_pagination_anchor_timestamp_backward() {
         "First page should contain exactly 80 entries"
     );
 
-    // First entry should be at timestamp 250
     assert_eq!(
         first_page.first().unwrap().timestamp,
         250,
         "First entry should be at timestamp 250 (anchor)"
     );
 
-    // Last entry should be at timestamp 171
     assert_eq!(
         first_page.last().unwrap().timestamp,
         171,
         "Last entry should be at timestamp 171"
     );
 
-    // Verify descending order
     for i in 1..first_page.len() {
         assert!(
             first_page[i - 1].timestamp >= first_page[i].timestamp,
@@ -1981,7 +2023,8 @@ fn test_multi_file_pagination_anchor_timestamp_backward() {
         );
     }
 
-    // Second page: get remaining entries
+    // Second page: file2's resume hit 0; file1 contributes its
+    // remaining 71 (170-100).
     let (second_page, state2) = LogQuery::new(&file_indexes, anchor, Direction::Backward)
         .with_limit(80)
         .execute_page(Some(&state1))
@@ -2005,7 +2048,7 @@ fn test_multi_file_pagination_anchor_timestamp_backward() {
         "Second page should end at timestamp 100"
     );
 
-    // Verify no duplicates
+    // ENTRY_IDs must never repeat.
     let mut all_entry_ids = HashSet::new();
     for entry in first_page.iter().chain(second_page.iter()) {
         for field in &entry.fields {
@@ -2019,14 +2062,14 @@ fn test_multi_file_pagination_anchor_timestamp_backward() {
         }
     }
 
-    // Should have 151 entries total (from 250 down to 100)
+    // 151 entries - everything from the anchor backward, nothing
+    // after it.
     assert_eq!(
         all_entry_ids.len(),
         151,
         "Should have retrieved 151 unique entries from timestamp 250 backwards to 100"
     );
 
-    // Third page should be empty
     let (third_page, _state3) = LogQuery::new(&file_indexes, anchor, Direction::Backward)
         .with_limit(80)
         .execute_page(Some(&state2))
@@ -2041,10 +2084,10 @@ fn test_multi_file_pagination_anchor_timestamp_backward() {
 
 #[test]
 fn test_multi_file_pagination_anchor_timestamp_same_timestamps() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: 100 entries all at timestamp 150
+    // 100 entries per file, all at timestamp 150 - one 200-entry run
+    // split across two files, anchored inside it.
     let entries_file1: Vec<TestEntry> = (0..100)
         .map(|i| {
             TestEntry::new(Microseconds(150))
@@ -2055,7 +2098,6 @@ fn test_multi_file_pagination_anchor_timestamp_same_timestamps() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: 100 entries all at timestamp 150
     let entries_file2: Vec<TestEntry> = (0..100)
         .map(|i| {
             TestEntry::new(Microseconds(150))
@@ -2066,7 +2108,6 @@ fn test_multi_file_pagination_anchor_timestamp_same_timestamps() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
@@ -2091,10 +2132,13 @@ fn test_multi_file_pagination_anchor_timestamp_same_timestamps() {
 
     let file_indexes = vec![index1, index2];
 
-    // Anchor at timestamp 150 (all entries have this timestamp), forward direction
+    // Anchor 150 equals every entry's timestamp: each file's walk
+    // starts at its run edge (journal-index/src/file_index.rs:618-633),
+    // so progress rests entirely on resume positions and the merge.
     let anchor = Anchor::Timestamp(Microseconds(150));
 
-    // First page: limit=80
+    // First page (limit 80): one file's first 80 entries; the other's
+    // 80-entry fetch is displaced whole by the cap.
     let (first_page, state1) = LogQuery::new(&file_indexes, anchor, Direction::Forward)
         .with_limit(80)
         .execute_page(None)
@@ -2106,7 +2150,6 @@ fn test_multi_file_pagination_anchor_timestamp_same_timestamps() {
         "First page should contain exactly 80 entries"
     );
 
-    // All timestamps should be 150
     for entry in &first_page {
         assert_eq!(
             entry.timestamp, 150,
@@ -2114,7 +2157,9 @@ fn test_multi_file_pagination_anchor_timestamp_same_timestamps() {
         );
     }
 
-    // Second page: get remaining entries
+    // Second page: the displaced file is re-walked from its start -
+    // no position was recorded for it - and shares the page with the
+    // first file's last 20.
     let (second_page, state2) = LogQuery::new(&file_indexes, anchor, Direction::Forward)
         .with_limit(80)
         .execute_page(Some(&state1))
@@ -2133,7 +2178,7 @@ fn test_multi_file_pagination_anchor_timestamp_same_timestamps() {
         );
     }
 
-    // Third page: remaining entries
+    // Third page: the displaced file's remaining 40.
     let (third_page, state3) = LogQuery::new(&file_indexes, anchor, Direction::Forward)
         .with_limit(80)
         .execute_page(Some(&state2))
@@ -2152,7 +2197,8 @@ fn test_multi_file_pagination_anchor_timestamp_same_timestamps() {
         );
     }
 
-    // Verify no duplicates
+    // ENTRY_IDs must be unique across pages: the re-walk must not
+    // duplicate anything.
     let mut all_entry_ids = HashSet::new();
     for entry in first_page
         .iter()
@@ -2170,14 +2216,13 @@ fn test_multi_file_pagination_anchor_timestamp_same_timestamps() {
         }
     }
 
-    // Should have all 200 entries
+    // All 200 entries, each exactly once.
     assert_eq!(
         all_entry_ids.len(),
         200,
         "Should have retrieved all 200 unique entries"
     );
 
-    // Fourth page should be empty
     let (fourth_page, _state4) = LogQuery::new(&file_indexes, anchor, Direction::Forward)
         .with_limit(80)
         .execute_page(Some(&state3))
@@ -2192,10 +2237,8 @@ fn test_multi_file_pagination_anchor_timestamp_same_timestamps() {
 
 #[test]
 fn test_multi_file_pagination_forward_with_time_boundaries() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: entries at t=100..200 (100 entries)
     let entries_file1: Vec<TestEntry> = (100..200)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -2206,7 +2249,6 @@ fn test_multi_file_pagination_forward_with_time_boundaries() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: entries at t=200..300 (100 entries)
     let entries_file2: Vec<TestEntry> = (200..300)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -2217,7 +2259,6 @@ fn test_multi_file_pagination_forward_with_time_boundaries() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // File 3: entries at t=300..400 (100 entries)
     let entries_file3: Vec<TestEntry> = (300..400)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -2228,7 +2269,6 @@ fn test_multi_file_pagination_forward_with_time_boundaries() {
 
     let file3 = create_test_journal(&temp_dir, "file3.journal", entries_file3).unwrap();
 
-    // Index all three files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
@@ -2262,13 +2302,12 @@ fn test_multi_file_pagination_forward_with_time_boundaries() {
 
     let file_indexes = vec![index1, index2, index3];
 
-    // Query with time boundaries: after=150, before=350
-    // This should return entries from 150-349 (200 entries total)
-    // File1: 150-199 (50 entries)
-    // File2: 200-299 (100 entries)
-    // File3: 300-349 (50 entries)
+    // Window [150, 350) across three files: file1 contributes 150-199
+    // (50), file2 200-299 (100), file3 300-349 (50) - 200 entries.
+    // after is inclusive, before exclusive (src/logs/query.rs:119-131;
+    // journal-index/src/file_index.rs:655-664).
 
-    // First page: limit=80
+    // First page (limit 80): 150-229.
     let (first_page, state1) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_after_usec(150)
         .with_before_usec(350)
@@ -2278,21 +2317,19 @@ fn test_multi_file_pagination_forward_with_time_boundaries() {
 
     assert_eq!(first_page.len(), 80, "First page should contain 80 entries");
 
-    // Should start at timestamp 150
     assert_eq!(
         first_page.first().unwrap().timestamp,
         150,
         "First entry should be at timestamp 150"
     );
 
-    // Should end at timestamp 229 (50 from file1 + 30 from file2)
     assert_eq!(
         first_page.last().unwrap().timestamp,
         229,
         "Last entry should be at timestamp 229"
     );
 
-    // Verify all timestamps are within boundaries
+    // Every entry inside [150, 350).
     for entry in &first_page {
         assert!(
             entry.timestamp >= 150 && entry.timestamp < 350,
@@ -2301,7 +2338,7 @@ fn test_multi_file_pagination_forward_with_time_boundaries() {
         );
     }
 
-    // Second page: limit=80
+    // Second page (limit 80): 230-309.
     let (second_page, state2) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_after_usec(150)
         .with_before_usec(350)
@@ -2327,7 +2364,7 @@ fn test_multi_file_pagination_forward_with_time_boundaries() {
         "Second page should end at timestamp 309"
     );
 
-    // Verify all timestamps are within boundaries
+    // Every entry inside [150, 350).
     for entry in &second_page {
         assert!(
             entry.timestamp >= 150 && entry.timestamp < 350,
@@ -2336,7 +2373,7 @@ fn test_multi_file_pagination_forward_with_time_boundaries() {
         );
     }
 
-    // Third page: remaining 40 entries
+    // Third page: the remaining 40 (310-349).
     let (third_page, state3) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_after_usec(150)
         .with_before_usec(350)
@@ -2362,7 +2399,7 @@ fn test_multi_file_pagination_forward_with_time_boundaries() {
         "Third page should end at timestamp 349 (before boundary)"
     );
 
-    // Verify all timestamps are within boundaries
+    // Every entry inside [150, 350).
     for entry in &third_page {
         assert!(
             entry.timestamp >= 150 && entry.timestamp < 350,
@@ -2371,7 +2408,7 @@ fn test_multi_file_pagination_forward_with_time_boundaries() {
         );
     }
 
-    // Verify no duplicates and correct total count
+    // ENTRY_IDs must never repeat.
     let mut all_entry_ids = HashSet::new();
     for entry in first_page
         .iter()
@@ -2389,14 +2426,13 @@ fn test_multi_file_pagination_forward_with_time_boundaries() {
         }
     }
 
-    // Should have exactly 200 entries (150-349)
+    // Exactly the 200 window entries.
     assert_eq!(
         all_entry_ids.len(),
         200,
         "Should have retrieved exactly 200 entries within time boundaries"
     );
 
-    // Fourth page should be empty
     let (fourth_page, _state4) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_after_usec(150)
         .with_before_usec(350)
@@ -2413,10 +2449,10 @@ fn test_multi_file_pagination_forward_with_time_boundaries() {
 
 #[test]
 fn test_multi_file_pagination_backward_overlapping_timestamps() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: entries at t=100..200 (100 entries)
+    // Overlapping files: file1 holds 100-199, file2 150-249 -
+    // timestamps 150-199 exist in both.
     let entries_file1: Vec<TestEntry> = (100..200)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -2428,7 +2464,6 @@ fn test_multi_file_pagination_backward_overlapping_timestamps() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: entries at t=150..250 (100 entries) - overlaps with file1 from 150-199
     let entries_file2: Vec<TestEntry> = (150..250)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -2440,7 +2475,6 @@ fn test_multi_file_pagination_backward_overlapping_timestamps() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // Index both files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let file_field = FieldName::new("FILE").unwrap();
@@ -2466,8 +2500,9 @@ fn test_multi_file_pagination_backward_overlapping_timestamps() {
 
     let file_indexes = vec![index1, index2];
 
-    // First page: limit=120, backward from tail
-    // Expected: from timestamp 249 going backward
+    // First page (limit 120) backward from the tail: file2's 50
+    // exclusive entries (249-200), then the overlap walked backward,
+    // interleaved - the cap falls mid-overlap at 165.
     let (first_page, state1) = LogQuery::new(&file_indexes, Anchor::Tail, Direction::Backward)
         .with_limit(120)
         .execute_page(None)
@@ -2479,7 +2514,7 @@ fn test_multi_file_pagination_backward_overlapping_timestamps() {
         "First page should contain exactly 120 entries"
     );
 
-    // Verify timestamps are in descending order
+    // The merged page is globally descending across both files.
     for i in 1..first_page.len() {
         assert!(
             first_page[i - 1].timestamp >= first_page[i].timestamp,
@@ -2487,20 +2522,20 @@ fn test_multi_file_pagination_backward_overlapping_timestamps() {
         );
     }
 
-    // First entry should be at timestamp 249 (highest)
     assert_eq!(
         first_page.first().unwrap().timestamp,
         249,
         "First entry should be at timestamp 249"
     );
 
-    // State should track positions for both files
+    // Both files contributed, so the state starts tracking both.
     assert!(
         !state1.file_positions.is_empty(),
         "State should track positions"
     );
 
-    // Second page: get remaining entries
+    // Second page: both files resume mid-run and finish - file1
+    // through 100, file2 through 150.
     let (second_page, state2) = LogQuery::new(&file_indexes, Anchor::Tail, Direction::Backward)
         .with_limit(120)
         .execute_page(Some(&state1))
@@ -2512,7 +2547,6 @@ fn test_multi_file_pagination_backward_overlapping_timestamps() {
         "Second page should contain remaining 80 entries"
     );
 
-    // Verify timestamps continue in descending order
     for i in 1..second_page.len() {
         assert!(
             second_page[i - 1].timestamp >= second_page[i].timestamp,
@@ -2520,7 +2554,7 @@ fn test_multi_file_pagination_backward_overlapping_timestamps() {
         );
     }
 
-    // Verify no timestamp gap between pages
+    // No gap: page 2 starts exactly where page 1 stopped.
     if !first_page.is_empty() && !second_page.is_empty() {
         assert!(
             first_page.last().unwrap().timestamp >= second_page.first().unwrap().timestamp,
@@ -2528,14 +2562,14 @@ fn test_multi_file_pagination_backward_overlapping_timestamps() {
         );
     }
 
-    // Last entry should be at timestamp 100
     assert_eq!(
         second_page.last().unwrap().timestamp,
         100,
         "Last entry should be at timestamp 100"
     );
 
-    // Collect all ENTRY_ID values to verify uniqueness and completeness
+    // ENTRY_IDs must be unique across pages: all 200 entries, each
+    // exactly once.
     let mut all_entry_ids = HashSet::new();
 
     for entry in &first_page {
@@ -2562,14 +2596,14 @@ fn test_multi_file_pagination_backward_overlapping_timestamps() {
         }
     }
 
-    // Verify we got all 200 unique entries (100 from each file)
     assert_eq!(
         all_entry_ids.len(),
         200,
         "Should have retrieved all 200 unique entries"
     );
 
-    // Verify we have entries from both files
+    // 100 from each file - the overlap neither duplicated nor dropped
+    // either file's entries.
     let file1_entries: usize = all_entry_ids
         .iter()
         .filter(|id| id.starts_with("file1_"))
@@ -2582,18 +2616,17 @@ fn test_multi_file_pagination_backward_overlapping_timestamps() {
     assert_eq!(file1_entries, 100, "Should have 100 entries from file1");
     assert_eq!(file2_entries, 100, "Should have 100 entries from file2");
 
-    // Verify all timestamps from 100-249 are represented
     let mut all_timestamps = HashSet::new();
     for entry in first_page.iter().chain(second_page.iter()) {
         all_timestamps.insert(entry.timestamp);
     }
 
-    // We should have entries at all timestamps from 100-249 (150 unique timestamps)
+    // Every timestamp 100-249 is represented - shared timestamps
+    // yield both files' entries (200 entries over 150 timestamps).
     for ts in 100..250 {
         assert!(all_timestamps.contains(&ts), "Missing timestamp: {}", ts);
     }
 
-    // Third page should be empty
     let (third_page, _state3) = LogQuery::new(&file_indexes, Anchor::Tail, Direction::Backward)
         .with_limit(120)
         .execute_page(Some(&state2))
@@ -2608,10 +2641,8 @@ fn test_multi_file_pagination_backward_overlapping_timestamps() {
 
 #[test]
 fn test_multi_file_pagination_backward_three_files() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: entries at t=100..200 (100 entries)
     let entries_file1: Vec<TestEntry> = (100..200)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -2623,7 +2654,6 @@ fn test_multi_file_pagination_backward_three_files() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: entries at t=200..300 (100 entries)
     let entries_file2: Vec<TestEntry> = (200..300)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -2635,7 +2665,6 @@ fn test_multi_file_pagination_backward_three_files() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // File 3: entries at t=300..400 (100 entries)
     let entries_file3: Vec<TestEntry> = (300..400)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -2647,7 +2676,6 @@ fn test_multi_file_pagination_backward_three_files() {
 
     let file3 = create_test_journal(&temp_dir, "file3.journal", entries_file3).unwrap();
 
-    // Index all three files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let file_field = FieldName::new("FILE").unwrap();
@@ -2694,7 +2722,7 @@ fn test_multi_file_pagination_backward_three_files() {
         "First page should contain exactly 125 entries"
     );
 
-    // Verify descending order
+    // The merged page is globally descending across all three files.
     for i in 1..first_page.len() {
         assert!(
             first_page[i - 1].timestamp >= first_page[i].timestamp,
@@ -2705,7 +2733,8 @@ fn test_multi_file_pagination_backward_three_files() {
     assert_eq!(first_page.first().unwrap().timestamp, 399);
     assert_eq!(first_page.last().unwrap().timestamp, 275);
 
-    // State should track positions for file3 and file2
+    // State: file3 done, file2 mid-run; file1 untouched, so only 2
+    // positions.
     assert_eq!(
         state1.file_positions.len(),
         2,
@@ -2724,7 +2753,6 @@ fn test_multi_file_pagination_backward_three_files() {
         "Second page should contain exactly 125 entries"
     );
 
-    // Verify descending order
     for i in 1..second_page.len() {
         assert!(
             second_page[i - 1].timestamp >= second_page[i].timestamp,
@@ -2735,7 +2763,8 @@ fn test_multi_file_pagination_backward_three_files() {
     assert_eq!(second_page.first().unwrap().timestamp, 274);
     assert_eq!(second_page.last().unwrap().timestamp, 150);
 
-    // State should now track all 3 files
+    // State now covers all 3 files - file3's position persisted even
+    // though page 2 drew nothing from it.
     assert_eq!(
         state2.file_positions.len(),
         3,
@@ -2754,7 +2783,6 @@ fn test_multi_file_pagination_backward_three_files() {
         "Third page should contain remaining 50 entries"
     );
 
-    // Verify descending order
     for i in 1..third_page.len() {
         assert!(
             third_page[i - 1].timestamp >= third_page[i].timestamp,
@@ -2765,7 +2793,8 @@ fn test_multi_file_pagination_backward_three_files() {
     assert_eq!(third_page.first().unwrap().timestamp, 149);
     assert_eq!(third_page.last().unwrap().timestamp, 100);
 
-    // Collect all ENTRY_ID values to verify uniqueness
+    // ENTRY_IDs must be unique across pages: all 300 entries, each
+    // exactly once.
     let mut all_entry_ids = HashSet::new();
 
     for entry in first_page
@@ -2784,14 +2813,13 @@ fn test_multi_file_pagination_backward_three_files() {
         }
     }
 
-    // Verify we got all 300 unique entries
     assert_eq!(
         all_entry_ids.len(),
         300,
         "Should have retrieved all 300 unique entries"
     );
 
-    // Verify distribution: 100 from each file
+    // 100 from each file.
     let file1_count = all_entry_ids
         .iter()
         .filter(|id| id.starts_with("file1_"))
@@ -2809,7 +2837,6 @@ fn test_multi_file_pagination_backward_three_files() {
     assert_eq!(file2_count, 100, "Should have 100 entries from file2");
     assert_eq!(file3_count, 100, "Should have 100 entries from file3");
 
-    // Fourth page should be empty
     let (fourth_page, _state4) = LogQuery::new(&file_indexes, Anchor::Tail, Direction::Backward)
         .with_limit(125)
         .execute_page(Some(&state3))
@@ -2824,11 +2851,10 @@ fn test_multi_file_pagination_backward_three_files() {
 
 #[test]
 fn test_multi_file_pagination_with_filter() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: 50 entries at t=100..150 with LEVEL=ERROR
-    //         50 entries at t=150..200 with LEVEL=INFO
+    // Each file holds 100 entries: 50 LEVEL=ERROR followed by 50
+    // LEVEL=INFO.
     let mut entries_file1: Vec<TestEntry> = (100..150)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -2847,8 +2873,6 @@ fn test_multi_file_pagination_with_filter() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: 50 entries at t=200..250 with LEVEL=ERROR
-    //         50 entries at t=250..300 with LEVEL=INFO
     let mut entries_file2: Vec<TestEntry> = (200..250)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -2867,8 +2891,6 @@ fn test_multi_file_pagination_with_filter() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // File 3: 50 entries at t=300..350 with LEVEL=ERROR
-    //         50 entries at t=350..400 with LEVEL=INFO
     let mut entries_file3: Vec<TestEntry> = (300..350)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -2887,7 +2909,6 @@ fn test_multi_file_pagination_with_filter() {
 
     let file3 = create_test_journal(&temp_dir, "file3.journal", entries_file3).unwrap();
 
-    // Index all three files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
@@ -2922,8 +2943,10 @@ fn test_multi_file_pagination_with_filter() {
 
     let file_indexes = vec![index1, index2, index3];
 
-    // Create filter to match only LEVEL=ERROR entries
-    // This should match 50 entries per file (150 total)
+    // LEVEL=ERROR matches 50 entries per file - 150 total. Pagination
+    // runs over each file's FILTERED entry list
+    // (journal-index/src/file_index.rs:521-523), so resume positions
+    // index the filtered order.
     let filter = Filter::match_field_value_pair(FieldValuePair::parse("LEVEL=ERROR").unwrap());
 
     // First page: limit=80, should get 50 from file1 + 30 from file2
@@ -2939,7 +2962,7 @@ fn test_multi_file_pagination_with_filter() {
         "First page should contain 80 ERROR entries"
     );
 
-    // All entries should have LEVEL=ERROR
+    // Every entry LEVEL=ERROR - the filter holds page-wide.
     for entry in &first_page {
         let level_values: Vec<_> = entry
             .fields
@@ -2954,21 +2977,20 @@ fn test_multi_file_pagination_with_filter() {
         );
     }
 
-    // First entry should be at timestamp 100
     assert_eq!(
         first_page.first().unwrap().timestamp,
         100,
         "First entry should be at timestamp 100"
     );
 
-    // Last entry should be at timestamp 229
     assert_eq!(
         first_page.last().unwrap().timestamp,
         229,
         "Last entry should be at timestamp 229"
     );
 
-    // Second page: get remaining ERROR entries
+    // Second page: file2's remaining 20 ERROR entries (230-249) plus
+    // all 50 of file3's (300-349).
     let (second_page, state2) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_filter(filter.clone())
         .with_limit(80)
@@ -2981,7 +3003,7 @@ fn test_multi_file_pagination_with_filter() {
         "Second page should contain remaining 70 ERROR entries"
     );
 
-    // All entries should have LEVEL=ERROR
+    // Every entry LEVEL=ERROR.
     for entry in &second_page {
         let level_values: Vec<_> = entry
             .fields
@@ -2996,7 +3018,6 @@ fn test_multi_file_pagination_with_filter() {
         );
     }
 
-    // Should continue from timestamp 230 and go to 349
     assert_eq!(
         second_page.first().unwrap().timestamp,
         230,
@@ -3009,7 +3030,7 @@ fn test_multi_file_pagination_with_filter() {
         "Second page should end at timestamp 349"
     );
 
-    // Verify no duplicates
+    // ENTRY_IDs must never repeat.
     let mut all_entry_ids = HashSet::new();
     for entry in first_page.iter().chain(second_page.iter()) {
         for field in &entry.fields {
@@ -3023,21 +3044,21 @@ fn test_multi_file_pagination_with_filter() {
         }
     }
 
-    // Should have exactly 150 ERROR entries (50 from each file)
+    // Exactly the 150 ERROR entries.
     assert_eq!(
         all_entry_ids.len(),
         150,
         "Should have retrieved exactly 150 ERROR entries"
     );
 
-    // Verify all are error entries
+    // Every ENTRY_ID is an error entry.
     let error_count = all_entry_ids
         .iter()
         .filter(|id| id.contains("_error_"))
         .count();
     assert_eq!(error_count, 150, "All entries should be error entries");
 
-    // Verify distribution across files
+    // 50 ERROR entries from each file.
     let file1_count = all_entry_ids
         .iter()
         .filter(|id| id.starts_with("file1_"))
@@ -3055,7 +3076,6 @@ fn test_multi_file_pagination_with_filter() {
     assert_eq!(file2_count, 50, "Should have 50 ERROR entries from file2");
     assert_eq!(file3_count, 50, "Should have 50 ERROR entries from file3");
 
-    // Third page should be empty
     let (third_page, _state3) = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
         .with_filter(filter)
         .with_limit(80)
@@ -3071,10 +3091,8 @@ fn test_multi_file_pagination_with_filter() {
 
 #[test]
 fn test_multi_file_pagination_anchor_at_file_boundary() {
-    // Create temporary directory
     let temp_dir = TempDir::new().unwrap();
 
-    // File 1: entries at t=100..200 (100 entries)
     let entries_file1: Vec<TestEntry> = (100..200)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -3085,7 +3103,8 @@ fn test_multi_file_pagination_anchor_at_file_boundary() {
 
     let file1 = create_test_journal(&temp_dir, "file1.journal", entries_file1).unwrap();
 
-    // File 2: entries at t=200..300 (100 entries) - starts exactly where file1 ends
+    // The files chain exactly: file2 starts where file1 ends (200),
+    // file3 where file2 ends (300).
     let entries_file2: Vec<TestEntry> = (200..300)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -3096,7 +3115,6 @@ fn test_multi_file_pagination_anchor_at_file_boundary() {
 
     let file2 = create_test_journal(&temp_dir, "file2.journal", entries_file2).unwrap();
 
-    // File 3: entries at t=300..400 (100 entries) - starts exactly where file2 ends
     let entries_file3: Vec<TestEntry> = (300..400)
         .map(|i| {
             TestEntry::new(Microseconds(i))
@@ -3107,7 +3125,6 @@ fn test_multi_file_pagination_anchor_at_file_boundary() {
 
     let file3 = create_test_journal(&temp_dir, "file3.journal", entries_file3).unwrap();
 
-    // Index all three files
     let mut indexer = FileIndexer::default();
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
     let entry_id_field = FieldName::new("ENTRY_ID").unwrap();
@@ -3141,7 +3158,8 @@ fn test_multi_file_pagination_anchor_at_file_boundary() {
 
     let file_indexes = vec![index1, index2, index3];
 
-    // Test forward from exact boundary timestamp 200 (where file1 ends and file2 starts)
+    // Anchor exactly on the 200 boundary: forward, only file2 has
+    // entries at-or-after it.
     let anchor = Anchor::Timestamp(Microseconds(200));
 
     let (first_page_fwd, state1_fwd) = LogQuery::new(&file_indexes, anchor, Direction::Forward)
@@ -3155,21 +3173,18 @@ fn test_multi_file_pagination_anchor_at_file_boundary() {
         "Forward from boundary should return 80 entries"
     );
 
-    // Should start at timestamp 200 (first entry of file2)
     assert_eq!(
         first_page_fwd.first().unwrap().timestamp,
         200,
         "Forward should start at timestamp 200"
     );
 
-    // Should end at timestamp 279
     assert_eq!(
         first_page_fwd.last().unwrap().timestamp,
         279,
         "Forward should end at timestamp 279"
     );
 
-    // Continue forward pagination
     let (second_page_fwd, _state2_fwd) = LogQuery::new(&file_indexes, anchor, Direction::Forward)
         .with_limit(80)
         .execute_page(Some(&state1_fwd))
@@ -3193,7 +3208,9 @@ fn test_multi_file_pagination_anchor_at_file_boundary() {
         "Second page should end at 359"
     );
 
-    // Test backward from exact boundary timestamp 200
+    // Same anchor backward: file2's 200 entry is included (backward is
+    // inclusive, journal-index/src/file_index.rs:708-737) and file1
+    // continues below it.
     let (first_page_bwd, state1_bwd) = LogQuery::new(&file_indexes, anchor, Direction::Backward)
         .with_limit(80)
         .execute_page(None)
@@ -3205,21 +3222,18 @@ fn test_multi_file_pagination_anchor_at_file_boundary() {
         "Backward from boundary should return 80 entries"
     );
 
-    // Should start at timestamp 200 (inclusive for backward)
     assert_eq!(
         first_page_bwd.first().unwrap().timestamp,
         200,
         "Backward should start at timestamp 200 (inclusive)"
     );
 
-    // Should end at timestamp 121
     assert_eq!(
         first_page_bwd.last().unwrap().timestamp,
         121,
         "Backward should end at timestamp 121"
     );
 
-    // Continue backward pagination
     let (second_page_bwd, _state2_bwd) = LogQuery::new(&file_indexes, anchor, Direction::Backward)
         .with_limit(80)
         .execute_page(Some(&state1_bwd))
@@ -3243,7 +3257,8 @@ fn test_multi_file_pagination_anchor_at_file_boundary() {
         "Second backward page should end at 100"
     );
 
-    // Test anchor at boundary 300 (between file2 and file3)
+    // Anchor on the 300 boundary: forward walks file3 from its start;
+    // backward takes file3's 300 entry, then file2's tail.
     let anchor_300 = Anchor::Timestamp(Microseconds(300));
 
     let (page_fwd_300, _) = LogQuery::new(&file_indexes, anchor_300, Direction::Forward)
@@ -3292,7 +3307,7 @@ fn test_multi_file_pagination_anchor_at_file_boundary() {
         "Should end at 251"
     );
 
-    // Verify no duplicates within each query direction from anchor 200
+    // Each direction from 200 must be internally duplicate-free.
     let mut fwd_200_ids = HashSet::new();
     for entry in first_page_fwd.iter().chain(second_page_fwd.iter()) {
         for field in &entry.fields {
@@ -3333,7 +3348,8 @@ fn test_multi_file_pagination_anchor_at_file_boundary() {
         "Backward from boundary 200 should return 101 unique entries"
     );
 
-    // The boundary entry (200) should appear in both forward and backward results
+    // The boundary entry (200) legitimately appears in BOTH
+    // directions - dedup applies within a direction, not across them.
     assert!(
         fwd_200_ids.contains("file2_200"),
         "Forward should include boundary entry 200"

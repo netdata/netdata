@@ -1,21 +1,22 @@
-//! Inspect an SFST index file three ways: summary, log dump, and section sizes.
+//! Inspect an SFST index file three ways: `summary` (field cardinalities +
+//! histogram line), `dump` (reconstructed log entries), `sections` (per-chunk
+//! byte sizes). A developer tool for eyeballing what an index file holds; the
+//! on-disk format is specified in `src/crates/sfst/FORMAT.md`.
 //!
-//! Run with:
+//! Run from anywhere under src/crates. The only input is the file path (no
+//! environment variables), plus `dump`'s `-n/--limit`:
 //!
 //! ```text
-//! cargo run --features test-util --example inspect -- summary  path/to/file.sfst
-//! cargo run --features test-util --example inspect -- dump     path/to/file.sfst [--limit N]
-//! cargo run --features test-util --example inspect -- sections path/to/file.sfst
+//! cargo run -p sfst --features test-util --example inspect -- summary  path/to/file.sfst
+//! cargo run -p sfst --features test-util --example inspect -- dump     path/to/file.sfst [-n N]
+//! cargo run -p sfst --features test-util --example inspect -- sections path/to/file.sfst
 //! ```
 //!
-//! (`test-util` is required: the `sections` dump reads raw chunk bytes via the
-//! feature-gated [`sfst::ChunkReader`].)
-//!
-//! Together the three subcommands exercise most of sfst's public reader API:
-//! [`IndexReader::open`], [`IndexReader::field_table`], [`IndexReader::histogram`],
-//! [`IndexReader::build_string_table`], [`IndexReader::load_all_stream_entries`],
-//! [`IndexReader::load_timestamps`], plus the lower-level raw-chunk accessors
-//! on [`sfst::ChunkReader`].
+//! `test-util` is required because `sections` reads raw chunk bytes through the
+//! feature-gated [`sfst::ChunkReader`]. Together the subcommands exercise a
+//! representative slice of the reader API (`IndexReader::open`, `field_table`,
+//! `histogram`, `build_string_table`, `load_all_stream_entries`,
+//! `load_timestamps`).
 
 use std::mem;
 use std::path::PathBuf;
@@ -35,7 +36,8 @@ struct Cli {
 enum Command {
     /// Print field cardinalities and a histogram summary.
     Summary { file: PathBuf },
-    /// Reconstruct log entries from the on-disk chunks.
+    /// Reconstruct log entries from the on-disk chunks (entries on stdout,
+    /// stats on stderr).
     Dump {
         file: PathBuf,
         /// Max log entries to print (default: all).
@@ -71,6 +73,7 @@ fn summary(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     print_histogram(&reader);
 
     let mut fields = reader.field_table().to_vec();
+    // Largest-cardinality fields first.
     fields.sort_by_key(|f| std::cmp::Reverse(f.cardinality));
 
     let max_name_len = fields.iter().map(|f| f.name.len()).max().unwrap_or(0);
@@ -95,17 +98,21 @@ fn print_histogram(reader: &IndexReader) {
     }
 
     let buckets = h.timestamps.len();
+    // counts are cumulative, so the last one is the total log count.
     let total = *h.counts.last().unwrap();
     let start_sec = h.timestamps[0];
     let last_sec = *h.timestamps.last().unwrap();
     let span = last_sec.saturating_sub(start_sec) + 1;
 
+    // Bucket edges are epoch seconds; print as UTC wall-clock.
     let fmt = |sec: u32| {
         chrono::DateTime::from_timestamp(sec as i64, 0)
             .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
             .unwrap_or_else(|| sec.to_string())
     };
 
+    // The histogram's footprint both ways: the two u32 arrays as held in
+    // memory vs the bincode encoding stored in the META chunk on disk.
     let mem_bytes = buckets * mem::size_of::<u32>() * 2;
     let disk_bytes = bincode::serde::encode_to_vec(h, bincode::config::standard())
         .map(|v| v.len())
@@ -135,8 +142,8 @@ fn dump(path: &PathBuf, limit: Option<u32>) -> Result<(), Box<dyn std::error::Er
     let string_table = reader.build_string_table(fields)?;
     eprintln!("string table: {} entries", string_table.len());
 
-    // part_key is the single source of truth in the filename, not the file
-    // bytes — parse it from the path (0 if the name isn't a conformant FileId).
+    // part_key comes from the filename, not the file bytes — FileId::parse
+    // reads the stem; 0 when the name isn't a conformant FileId.
     let part_key = file_registry::FileId::parse(path)
         .map(|id| id.part_key)
         .unwrap_or(0);
@@ -166,9 +173,12 @@ fn dump(path: &PathBuf, limit: Option<u32>) -> Result<(), Box<dyn std::error::Er
         }
 
         let ts = timestamps.at(pos as u32).unwrap_or(0);
+        // `pos` is the log's chronological position in the file; `ts` is raw
+        // nanoseconds (0 when the position has no timestamp).
         println!("--- log {total_printed} (pos {pos}, t={ts}ns)");
         for id in kv_ids {
             let idx = id.0 as usize;
+            // The table spans every id the file defines (0..high_end).
             if idx < string_table.len() {
                 println!("  {}", string_table[idx]);
             } else {
@@ -193,6 +203,8 @@ fn sections(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
 
     let mut total_sections = 0usize;
 
+    // Every `*_raw` accessor returns a chunk's compressed bytes as stored, so
+    // sizes and percentages are on-disk shares; a missing chunk is skipped.
     if let Ok(raw) = sfst.metadata_raw() {
         print_section("META", raw.len(), file_size);
         total_sections += raw.len();
@@ -220,6 +232,9 @@ fn sections(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let mut high_total = 0usize;
     let mut mid_idx = 0u16;
     let mut high_idx = 0u16;
+    // Mid/high chunk ids are tier-relative: mid fields number MF0.. in
+    // field-table order, high fields HF0.. likewise. A counter advances per
+    // field even when its chunk is missing, so numbering stays sequential.
     for field in fields.iter() {
         match field.tier {
             FieldTier::Low => continue,
@@ -248,8 +263,7 @@ fn sections(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // part_key is the single source of truth in the filename, not the file
-    // bytes — parse it from the path (0 if the name isn't a conformant FileId).
+    // part_key from the filename, as in dump(); it labels each SB chunk.
     let part_key = file_registry::FileId::parse(path)
         .map(|id| id.part_key)
         .unwrap_or(0);
@@ -276,6 +290,7 @@ fn sections(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     print_section("stream chunks total", stream_total, file_size);
     print_section("sections total", total_sections, file_size);
     println!("{:<40} {:>10}", "file size", format_size(file_size));
+    // What the listed chunks don't account for: header + TOC.
     let overhead = file_size.saturating_sub(total_sections);
     print_section("overhead (header + TOC)", overhead, file_size);
 

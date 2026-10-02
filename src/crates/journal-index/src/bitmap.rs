@@ -1,11 +1,34 @@
-//! Compressed bitmap for efficient set operations on entry indices.
+//! The roaring-bitmap entry sets behind the journal index: `Bitmap` wraps
+//! the `roaring` crate's `u32` `RoaringBitmap`, and `FileIndex` stores one
+//! per indexed field=value pair (`file_index.rs:41`).
+//!
+//! Flow: `file_indexer` builds each bitmap from the file's entry indices
+//! (`file_indexer.rs:381-387`), `filter` AND/OR-combines them into the
+//! entry set matching a query (`filter.rs:268-297`), and `file_index` and
+//! `histogram` turn the surviving indices into entry offsets
+//! (`file_index.rs:575`) and time-bucket counts (`histogram.rs:226`).
+//! journal-engine uses `insert_range` the same way to get each histogram
+//! bucket's unfiltered entry count (journal-engine/src/histogram.rs:291).
+//!
+//! This file touches only `roaring` and `serde`; the crate's journal-core,
+//! journal-common and journal-registry dependencies sit in the other
+//! modules. The workspace pins `roaring` to Netdata's fork
+//! (src/crates/Cargo.toml:118), which carries the allocative support the
+//! crate's `allocative` feature forwards (`roaring/allocative`), and the
+//! `serde` feature supplies the inner serialization that
+//! `#[serde(transparent)]` below relies on.
 
 use roaring::RoaringBitmap;
 use serde::{Deserialize, Serialize};
 
-/// A compressed bitmap representing a set of journal entry indices.
+/// A compressed set of `u32` journal entry indices, backed by the Roaring
+/// bitmap compression scheme.
 ///
-/// Wraps [`RoaringBitmap`] and supports bitwise AND/OR operations for combining filters.
+/// Newtype over [`RoaringBitmap`] with a public tuple field. The
+/// `BitAnd`/`BitOr` impls below intersect and union sets; `Deref` exposes
+/// the rest of the `RoaringBitmap` API. Serialization is `transparent`, so
+/// within a serialized `FileIndex` each bitmap is the inner bitmap's bytes
+/// in Roaring's standard on-disk format.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 #[serde(transparent)]
@@ -18,6 +41,11 @@ impl Bitmap {
     }
 
     /// Create a bitmap from a sorted iterator of entry indices.
+    ///
+    /// The values must be strictly increasing; otherwise this fails with
+    /// [`roaring::NonSortedIntegers`], whose `valid_until` reports how many
+    /// values were consumed before the first out-of-order one. In-crate
+    /// callers pre-sort (`file_indexer.rs:378`).
     pub fn from_sorted_iter<I: IntoIterator<Item = u32>>(
         iterator: I,
     ) -> Result<Bitmap, roaring::NonSortedIntegers> {
@@ -25,6 +53,13 @@ impl Bitmap {
     }
 
     /// Create a bitmap containing all integers in the given range.
+    ///
+    /// This associated constructor is distinct from the same-named
+    /// `RoaringBitmap::insert_range` method reachable on an instance through
+    /// `DerefMut`: that one inserts into an existing bitmap and returns the
+    /// number of newly inserted values, a count this discards because the
+    /// bitmap starts empty. `file_index.rs:563` uses this as the
+    /// full-coverage bitmap for filterless queries.
     pub fn insert_range<R>(range: R) -> Self
     where
         R: std::ops::RangeBounds<u32>,
@@ -35,6 +70,8 @@ impl Bitmap {
     }
 }
 
+// Expose the whole `RoaringBitmap` API (len, contains, iter, is_empty,
+// range_cardinality, optimize, ...) directly on `Bitmap`.
 impl std::ops::Deref for Bitmap {
     type Target = RoaringBitmap;
 
@@ -61,6 +98,11 @@ impl From<Bitmap> for RoaringBitmap {
     }
 }
 
+// Intersection (`&`) and union (`|`) in every by-value/by-reference
+// combination, each delegating to the matching `RoaringBitmap` operation.
+// The by-reference forms avoid consuming either operand; `filter` folds a
+// resolved filter expression into a single entry set with `&=`/`|=`
+// (filter.rs:281, filter.rs:291).
 impl std::ops::BitAndAssign<&Bitmap> for Bitmap {
     fn bitand_assign(&mut self, rhs: &Bitmap) {
         self.0 &= &rhs.0;

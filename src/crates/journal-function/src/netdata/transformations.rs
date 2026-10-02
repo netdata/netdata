@@ -1,13 +1,32 @@
+//! Display-only field transformations for the journal/OTel logs Functions.
+//!
+//! The query engine returns raw field=value pairs, untransformed
+//! (journal-engine/src/logs/query.rs:537); display formatting lives here. A
+//! [`FieldTransformation`] maps one raw field value to its display form.
+//! [`TransformationRegistry`] keys mappers by field name and offers two
+//! lookups: `transform_field` for table cells (keeps raw + display side by
+//! side in a `CellValue`) and `transform_value` for facet/chart labels
+//! (display string only). Both echo the input back unchanged when a field is
+//! not registered — the normal case, because [`systemd_transformations`]
+//! pre-registers only the journal field set listed there. All mappers live
+//! in this file; the only construction sites are netdata/builder.rs:97 and
+//! otel-legacy-logs/src/handler.rs:470. The duplicate at
+//! journal-engine/src/logs/transformations.rs is not compiled.
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Trait for field transformations
+/// Maps one raw field value to its display form. Implementations are
+/// stateless unit types and echo unknown or unparseable values back
+/// unchanged; `Send + Sync` keeps the `Arc`-wrapped mappers usable across
+/// threads.
 pub trait FieldTransformation: Send + Sync {
-    /// Transform a raw field value to a display representation
+    /// Returns the display string for `raw_value`.
     fn transform(&self, raw_value: &str) -> String;
 }
 
-/// Registry of field transformations
+/// Field-name keyed set of [`FieldTransformation`] mappers. Cloning shares
+/// the mappers (`Arc`); `register` replaces any mapper already registered
+/// for the field.
 #[derive(Clone)]
 pub struct TransformationRegistry {
     transformations: HashMap<String, Arc<dyn FieldTransformation>>,
@@ -21,7 +40,7 @@ impl TransformationRegistry {
         }
     }
 
-    /// Register a transformation for a specific field
+    /// Registers the mapper for `field_name`, replacing any previous one.
     pub fn register(
         &mut self,
         field_name: impl Into<String>,
@@ -30,7 +49,12 @@ impl TransformationRegistry {
         self.transformations.insert(field_name.into(), transform);
     }
 
-    /// Transform a field value using the registered transformation
+    /// Builds a table cell for `field_name`: an empty cell for `None`, and
+    /// for `Some(raw)` a cell carrying the raw value and its display form
+    /// side by side (`CellValue::with_display`,
+    /// journal-engine/src/logs/table.rs:23). Display is the registered
+    /// mapper's output, or `raw` itself when the field has no registration.
+    /// Sole caller: the logs-table builder (netdata/builder.rs:37,43).
     pub fn transform_field(
         &self,
         field_name: &str,
@@ -50,9 +74,9 @@ impl TransformationRegistry {
         }
     }
 
-    /// Transform a string value for a field, returning the transformed string.
-    ///
-    /// If no transformation is registered for the field, returns the original value.
+    /// Display string for `field_name`; the input comes back unchanged when
+    /// the field is not registered. Sole callers: facet options
+    /// (netdata/facets.rs:55) and chart labels (netdata/histogram.rs:104).
     pub fn transform_value(&self, field_name: &str, value: &str) -> String {
         self.transformations
             .get(field_name)
@@ -67,7 +91,7 @@ impl Default for TransformationRegistry {
     }
 }
 
-/// PRIORITY: 0-7 → human-readable names
+/// PRIORITY: syslog severity code → name ("0" → "panic" … "7" → "debug").
 pub struct PriorityTransformation;
 
 impl FieldTransformation for PriorityTransformation {
@@ -86,8 +110,8 @@ impl FieldTransformation for PriorityTransformation {
     }
 }
 
-/// log.severity_number: OpenTelemetry severity number → short names
-/// Maps according to OpenTelemetry specification ranges:
+/// log.severity_number: OpenTelemetry severity number → short name, per the
+/// spec's ranges (0 = UNSPECIFIED, 1-4 TRACE … 21-24 FATAL):
 /// https://opentelemetry.io/docs/specs/otel/logs/data-model/#displaying-severity
 pub struct OtelSeverityNumberTransformation;
 
@@ -109,7 +133,7 @@ impl FieldTransformation for OtelSeverityNumberTransformation {
     }
 }
 
-/// SYSLOG_FACILITY: 0-23 → facility names
+/// SYSLOG_FACILITY: syslog facility code → conventional name ("0" → "kern" … "23" → "local7").
 pub struct SyslogFacilityTransformation;
 
 impl FieldTransformation for SyslogFacilityTransformation {
@@ -144,8 +168,9 @@ impl FieldTransformation for SyslogFacilityTransformation {
     }
 }
 
-/// ERRNO: numeric errno → its symbolic name (e.g. `"1"` → `"EPERM"`).
-/// Unrecognized values are passed through unchanged.
+/// ERRNO: Linux errno number → symbolic name ("1" → "EPERM"), using the
+/// Linux numbering (41 and 58 are unused there and have no mapping).
+/// Unrecognized values pass through unchanged.
 pub struct ErrnoTransformation;
 
 impl FieldTransformation for ErrnoTransformation {
@@ -289,33 +314,32 @@ impl FieldTransformation for ErrnoTransformation {
     }
 }
 
-/// _BOOT_ID: UUID → "UUID (timestamp)"
-/// Note: Full implementation would require boot_id cache lookup
+/// _BOOT_ID: placeholder — passes the boot UUID through unchanged. The
+/// intended "UUID (first boot time)" display needs a boot-id → timestamp
+/// lookup that is not wired up yet.
 pub struct BootIdTransformation;
 
 impl FieldTransformation for BootIdTransformation {
     fn transform(&self, raw_value: &str) -> String {
-        // For now, just return the UUID
-        // Full implementation would look up first boot timestamp from cache
+        // No boot-id cache lookup yet; just echo the UUID.
         raw_value.to_string()
     }
 }
 
-/// _UID: numeric → username
+/// _UID: numeric user ID → username via the host user database (nix); falls
+/// back to the raw value when the ID does not resolve.
 pub struct UidTransformation;
 
 impl FieldTransformation for UidTransformation {
     fn transform(&self, raw_value: &str) -> String {
         use nix::unistd::{Uid, User};
 
-        // Parse the UID
         let Ok(uid_num) = raw_value.parse::<u32>() else {
             return raw_value.to_string();
         };
 
         let uid = Uid::from_raw(uid_num);
 
-        // Look up the user
         match User::from_uid(uid) {
             Ok(Some(user)) => user.name,
             Ok(None) => raw_value.to_string(), // User not found
@@ -324,21 +348,20 @@ impl FieldTransformation for UidTransformation {
     }
 }
 
-/// _GID: numeric → groupname
+/// _GID: numeric group ID → group name via the host group database (nix);
+/// falls back to the raw value when the ID does not resolve.
 pub struct GidTransformation;
 
 impl FieldTransformation for GidTransformation {
     fn transform(&self, raw_value: &str) -> String {
         use nix::unistd::{Gid, Group};
 
-        // Parse the GID
         let Ok(gid_num) = raw_value.parse::<u32>() else {
             return raw_value.to_string();
         };
 
         let gid = Gid::from_raw(gid_num);
 
-        // Look up the group
         match Group::from_gid(gid) {
             Ok(Some(group)) => group.name,
             Ok(None) => raw_value.to_string(), // Group not found
@@ -347,12 +370,13 @@ impl FieldTransformation for GidTransformation {
     }
 }
 
-/// _CAP_EFFECTIVE: hex → "hex (capability names)"
+/// _CAP_EFFECTIVE: capability mask ("0x…"-prefixed hex or plain decimal) →
+/// the set bits' names, comma-separated; "none" when no bit is set;
+/// unparseable input passes through unchanged.
 pub struct CapEffectiveTransformation;
 
 impl FieldTransformation for CapEffectiveTransformation {
     fn transform(&self, raw_value: &str) -> String {
-        // Parse hex value
         let caps_value = if let Some(hex) = raw_value.strip_prefix("0x") {
             u64::from_str_radix(hex, 16).ok()
         } else {
@@ -363,7 +387,7 @@ impl FieldTransformation for CapEffectiveTransformation {
             return raw_value.to_string();
         };
 
-        // Linux capabilities (41 capabilities as of Linux 5.x)
+        // Capability names in bit order; 41 defined as of Linux 5.9 (bit 40 = CAP_CHECKPOINT_RESTORE).
         const CAPABILITIES: &[&str] = &[
             "CAP_CHOWN",
             "CAP_DAC_OVERRIDE",
@@ -423,41 +447,44 @@ impl FieldTransformation for CapEffectiveTransformation {
     }
 }
 
-/// _SOURCE_REALTIME_TIMESTAMP: microseconds → "microseconds (ISO8601)"
+/// Microseconds since the Unix epoch → RFC3339 with microsecond precision,
+/// rendered in the host's local timezone ("…Z" when that is UTC). Registered
+/// twice: as the synthetic first-column key "timestamp" the table builder
+/// feeds (netdata/builder.rs:37) and as the raw journal field
+/// _SOURCE_REALTIME_TIMESTAMP. Unparseable or unrepresentable input passes through.
 pub struct SourceRealtimeTimestampTransformation;
 
 impl FieldTransformation for SourceRealtimeTimestampTransformation {
     fn transform(&self, raw_value: &str) -> String {
-        // Parse microseconds since epoch
         let Ok(usec) = raw_value.parse::<i64>() else {
             return raw_value.to_string();
         };
 
-        // Convert to seconds and nanoseconds
+        // µs → seconds + nanoseconds; a negative remainder wraps the nanos and is rejected below
         let secs = usec / 1_000_000;
         let nsecs = ((usec % 1_000_000) * 1000) as u32;
 
-        // Create DateTime in UTC, then convert to local timezone
+        // Build the instant in UTC, then shift to the host's local timezone
         use chrono::{Local, TimeZone, Utc};
         let dt_utc = match Utc.timestamp_opt(secs, nsecs) {
             chrono::LocalResult::Single(dt) => dt,
             _ => return raw_value.to_string(),
         };
 
-        // Convert to local time
         let dt_local = dt_utc.with_timezone(&Local);
 
-        // Format as RFC3339 with microsecond precision in local timezone
+        // RFC3339, 6 fractional digits; "Z" replaces a zero UTC offset
         dt_local.to_rfc3339_opts(chrono::SecondsFormat::Micros, true)
     }
 }
 
-/// MESSAGE_ID: UUID → "UUID (description)"
+/// MESSAGE_ID: well-known journal message ID → short description
+/// ("f77379a8…777b" → "Journal started"); unknown IDs pass through unchanged.
 pub struct MessageIdTransformation;
 
 impl FieldTransformation for MessageIdTransformation {
     fn transform(&self, raw_value: &str) -> String {
-        // Known journal message IDs from systemd and other sources
+        // Well-known IDs from systemd, other daemons (dbus, GNOME) and Netdata itself.
         let description = match raw_value {
             "f77379a8490b408bbe5f6940505a777b" => "Journal started",
             "d93fb3c9c24d451a97cea615ce59c00b" => "Journal stopped",
@@ -605,11 +632,19 @@ impl FieldTransformation for MessageIdTransformation {
     }
 }
 
-/// Create a transformation registry with all systemd journal transformations
+/// Builds the registry the journal/OTel logs Functions render with.
+///
+/// Pre-registered keys: the synthetic first-column key "timestamp" plus
+/// _SOURCE_REALTIME_TIMESTAMP (both µs → RFC3339); the two severity mappers,
+/// "PRIORITY" and the OTel "log.severity_number"; "SYSLOG_FACILITY";
+/// "ERRNO"; the passthrough stub "_BOOT_ID"; "_UID"/"_GID" plus their
+/// OBJECT_*/audit aliases; "_CAP_EFFECTIVE"; "MESSAGE_ID". Fields outside
+/// this list keep display = raw (`transform_field` / `transform_value`).
+/// Sole callers: netdata/builder.rs:97 and otel-legacy-logs/src/handler.rs:470.
 pub fn systemd_transformations() -> TransformationRegistry {
     let mut registry = TransformationRegistry::new();
 
-    // Timestamp transformation (used for the first column)
+    // "timestamp" is not a real journal field; the table builder feeds the entry's µs time here.
     registry.register("timestamp", Arc::new(SourceRealtimeTimestampTransformation));
 
     registry.register("PRIORITY", Arc::new(PriorityTransformation));
@@ -625,13 +660,13 @@ pub fn systemd_transformations() -> TransformationRegistry {
     );
     registry.register("MESSAGE_ID", Arc::new(MessageIdTransformation));
 
-    // OpenTelemetry log fields
+    // One OTel log field, served next to the journal-native keys above.
     registry.register(
         "log.severity_number",
         Arc::new(OtelSeverityNumberTransformation),
     );
 
-    // Also register variations that exist in the wild
+    // UID/GID aliases seen in the wild (owner, audit login UID); GID only gets OBJECT_GID.
     registry.register("OBJECT_UID", Arc::new(UidTransformation));
     registry.register("OBJECT_GID", Arc::new(GidTransformation));
     registry.register("_SYSTEMD_OWNER_UID", Arc::new(UidTransformation));

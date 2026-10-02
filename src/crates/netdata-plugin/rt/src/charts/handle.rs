@@ -1,26 +1,45 @@
-//! Chart handle for updating metric values.
+//! Shared update state for a registered chart.
+//!
+//! [`ChartHandle`] is the cell holding a chart's current value between sample
+//! ticks: plugin code writes it from any task or thread, and the chart sampler
+//! in `registry` reads and clones it on every tick for emission.
 
 use parking_lot::RwLock;
 use std::sync::Arc;
 
-/// A handle to a chart that allows updating its values.
+/// Shared, clonable cell holding the current value of one registered chart.
 ///
-/// Multiple handles can exist for the same chart (they share the underlying data via Arc).
-/// This allows different parts of your code to update the same chart independently.
+/// All clones wrap the same `Arc<RwLock<T>>` (parking_lot), so the value can be
+/// updated from any task or thread. `T: Send + Sync + 'static` is required by
+/// chart registration, which is also the only way to obtain a handle
+/// (`PluginRuntime::register_chart` / `register_instanced_chart`, delegating to
+/// `ChartRegistry`).
+///
+/// The registry keeps its own clone, so dropping the last plugin handle does
+/// not stop emission: the chart keeps publishing the last written value until
+/// shutdown. Locking a handle while holding one of its guards deadlocks:
+/// write locks are not reentrant, and a queued writer makes even a recursive
+/// read block (parking_lot's task-fair policy).
 #[derive(Clone)]
 pub struct ChartHandle<T> {
     pub(crate) data: Arc<RwLock<T>>,
 }
 
 impl<T> ChartHandle<T> {
-    /// Create a new chart handle with the given initial value
+    /// Create a handle with the given initial value.
+    ///
+    /// Called only by `ChartRegistry::register_chart` /
+    /// `register_instanced_chart`; plugins receive handles from registration.
     pub(crate) fn new(initial: T) -> Self {
         Self {
             data: Arc::new(RwLock::new(initial)),
         }
     }
 
-    /// Update the chart data using a closure
+    /// Update the chart value by running `f` with exclusive access.
+    ///
+    /// Runs the closure while holding the write lock. The new value is emitted
+    /// on the chart's next sample tick.
     ///
     /// # Example
     ///
@@ -38,30 +57,25 @@ impl<T> ChartHandle<T> {
         f(&mut *guard);
     }
 
-    /// Get a write lock to the chart data
+    /// Get a write lock to the chart data for direct mutable access.
     ///
-    /// This allows direct mutable access to the data. Remember to drop
-    /// the guard when you're done to release the lock.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// {
-    ///     let mut guard = handle.write();
-    ///     guard.user = 42;
-    ///     guard.system = 13;
-    /// } // Lock released here
-    /// ```
+    /// Unlike `update`, the guard outlives the call. The sampler blocks on its
+    /// per-tick read until the guard is dropped, so holding it across an await
+    /// point or past a tick stalls emission for every chart in the same
+    /// registry batch (`ChartRegistry::run` groups samplers into batches of up
+    /// to 1000 and samples them serially).
     pub fn write(&self) -> parking_lot::RwLockWriteGuard<'_, T> {
         self.data.write()
     }
 
-    /// Get a read lock to the chart data
+    /// Get a read lock to the chart data for inspection.
     pub fn read(&self) -> parking_lot::RwLockReadGuard<'_, T> {
         self.data.read()
     }
 }
 
+/// Formats the chart value under a read lock; calling this while a write guard
+/// on the same handle is held deadlocks.
 impl<T: std::fmt::Debug> std::fmt::Debug for ChartHandle<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ChartHandle")

@@ -5,7 +5,12 @@
 //! the same corpus sealed as one file — under source-order permutations,
 //! resends (equal and unequal payloads), shared client/server span ids,
 //! UNSET ids, and mixed part_keys. Plus the status-honesty contract:
-//! failures, caps, and cancellation are reported, never silent.
+//! failures, caps, and cancellation are reported, never silent. Also
+//! pinned: request validation, the coalesced field-kind map, the
+//! absent-id Complete-empty, and the per-source progress ticks.
+//!
+//! The op's engine contract lives in `src/traces/by_id.rs`; the sibling
+//! suites in this directory pin the other traces query ops.
 
 mod common;
 
@@ -25,6 +30,8 @@ use sfsq::traces::{
     trace_by_id,
 };
 
+/// The suite's default runner: `trace_by_id` with the default query
+/// (default span cap), a fresh token, and a throwaway progress counter.
 fn run(sources: Vec<TraceSource>) -> sfsq::traces::TraceData {
     trace_by_id(
         sources,
@@ -46,8 +53,10 @@ type Fingerprint = (
 
 fn fingerprint(data: &sfsq::traces::TraceData) -> Fingerprint {
     // WHOLE spans: TraceSpan is Eq, so any sealed-vs-tail divergence in
-    // any field (ids, timing, flags, dropped counts, fields, events,
-    // links) fails the equivalence — not just names and ids.
+    // any field (ids, timing, kind, flags, dropped counts, fields,
+    // events, links) fails the equivalence — not just names and ids.
+    // The kind maps join into one vec with event:/link: prefixes, so an
+    // event attr and a link attr of the same name compare separately.
     let spans = data.trace.spans.clone();
     let mut kinds = data.field_kinds.fields.clone();
     kinds.extend(
@@ -94,7 +103,7 @@ fn corpus() -> Vec<SpanSpec> {
         sp(2, 1, 110, "child"),          // equal-payload resend of `child`
         sp(2, 1, 500, "child-conflict"), // UNEQUAL resend: later start loses
         sp(0, 9, 140, "ghost-a"),        // UNSET id, orphan parent
-        sp(0, 9, 141, "ghost-b"),        // UNSET id, distinct span
+        sp(0, 9, 141, "ghost-b"),        // UNSET id again — a distinct span
     ]
 }
 
@@ -114,7 +123,9 @@ fn assert_corpus_shape(data: &sfsq::traces::TraceData) {
         child.fields.iter().any(|(k, v)| k == "name" && v == "child"),
         "the chronological-first copy is canonical"
     );
-    // The shared pair's child hangs off the SERVER-kind node.
+    // The shared pair's child hangs off the SERVER-kind node — the
+    // forest builder resolves a shared parent id to the server-kind
+    // candidate, else the earliest.
     let server_idx = t.spans.iter().position(|s| s.kind == 2).expect("server");
     let under_idx = t
         .spans
@@ -137,7 +148,8 @@ fn assert_corpus_shape(data: &sfsq::traces::TraceData) {
     );
     assert_eq!(root_span.links.len(), 1);
     assert_eq!(root_span.links[0].trace_id, sfst::TraceId::from([0x33u8; 16]));
-    // Sectioned kind maps use result-exposed names only.
+    // Sectioned kind maps use result-exposed names only —
+    // "exception.line", not its storage-prefixed key.
     assert!(
         data.field_kinds
             .event_attributes
@@ -152,9 +164,12 @@ fn assert_corpus_shape(data: &sfsq::traces::TraceData) {
             .iter()
             .any(|(k, kind)| k == "peer" && *kind == sfst::ValueKind::Str)
     );
+    // Complete is part of the shape: no layout of this corpus may trip
+    // a partial reason.
     assert!(data.status.is_complete(), "status: {:?}", data.status);
 }
 
+/// Rendered span names — assertion-message material.
 fn span_names(data: &sfsq::traces::TraceData) -> Vec<String> {
     data.trace
         .spans
@@ -213,7 +228,8 @@ fn split_many_ways_equals_single_file_under_source_permutations() {
 
 #[test]
 fn unequal_resends_pick_the_same_canonical_copy_however_split() {
-    // The conflicting copies land in DIFFERENT sources, both orders.
+    // The conflicting copies land in DIFFERENT sources; both source
+    // orders must pick the same canonical (earlier) copy.
     let dir = tempfile::tempdir().unwrap();
     let early = sp(7, 0, 10, "early-copy");
     let mut late = sp(7, 0, 900, "late-copy");
@@ -260,7 +276,8 @@ fn cap_keeps_globally_earliest_and_reports_size_cap() {
     assert_eq!(span_names(&data), ["early-1", "early-2"]);
     assert!(data.status.has(PartialReason::SizeCap));
 
-    // Exactly-cap is Complete: 2 unique spans, cap 2.
+    // Exactly-cap is Complete — truncation is only detected at the
+    // first unique span BEYOND the cap.
     let sources = vec![sealed_source(dir.path(), &wal_early, "early-2nd")];
     let data = trace_by_id(
         sources,
@@ -370,6 +387,7 @@ fn failed_sources_are_reported_and_the_rest_served() {
     ]);
     assert_eq!(span_names(&data), ["good"]);
     assert!(data.status.has(PartialReason::SourceFailure));
+    // A source failure must not masquerade as a size-cap partial.
     assert!(!data.status.has(PartialReason::SizeCap));
 }
 
@@ -379,6 +397,8 @@ fn pre_cancelled_returns_empty_with_cancelled() {
     let wal = write_wal(dir.path(), vec![req(&[sp(1, 0, 1, "x")])], "c");
     let cancel = CancellationToken::new();
     cancel.cancel();
+    // A ready source exists, but cancellation is polled before any
+    // source head resolves: empty + Cancelled, never Complete.
     let data = trace_by_id(
         vec![sealed_source(dir.path(), &wal, "s")],
         TraceQuery::new(sfst::TraceId::from(TRACE)),
@@ -467,6 +487,8 @@ fn absent_id_is_a_complete_empty_result() {
 
 #[test]
 fn pre_cancelled_with_zero_sources_is_cancelled_not_complete() {
+    // An empty source set would otherwise report a vacuous Complete;
+    // the pre-cancelled poll wins.
     let cancel = CancellationToken::new();
     cancel.cancel();
     let data = trace_by_id(
@@ -483,6 +505,8 @@ fn pre_cancelled_with_zero_sources_is_cancelled_not_complete() {
 
 #[test]
 fn memory_chunk_without_coverage_is_a_request_error() {
+    // An in-memory chunk must declare the WAL range it came from:
+    // without coverage the source set is rejected outright.
     let chunk = TraceSource::Sfst(TraceSfstCandidate {
         source_id: SourceId::new("uncovered-chunk"),
         summary: sfst::Summary {
@@ -509,9 +533,9 @@ fn memory_chunk_without_coverage_is_a_request_error() {
 
 #[test]
 fn large_same_key_resend_run_collapses_to_one_canonical_span() {
-    // 40 copies of one span key — 20 in each of two sources, some with a
-    // conflicting later payload — collapse to the single chronological-
-    // first canonical copy (the streaming selection path).
+    // 40 copies of one span key (21 in one source, 19 in the other), two
+    // with a conflicting later payload — collapse to the single
+    // chronological-first canonical copy (the streaming selection path).
     let dir = tempfile::tempdir().unwrap();
     let canonical = sp(9, 0, 5, "canonical");
     let mut copies_a: Vec<SpanSpec> = vec![canonical.clone(); 20];

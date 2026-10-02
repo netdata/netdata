@@ -1,10 +1,40 @@
+//! Tests for the query module, driven directly against a real temp-dir
+//! `Registry` — real catalog files on disk, WAL and SFST state driven through
+//! the registry APIs. No tokio runtime and no content-plane identity codec:
+//! streams are opaque `(namespace, name)` fixtures from `test_helpers`.
+//!
+//! - Remote-only selection (`remote_plan_input` + `plan`): a range's
+//!   remote-only entries are its window's catalog entries with no servable
+//!   local copy, keyed by full `SeqKey` identity — a local SFST under the
+//!   same identity masks the entry, a foreign identity's file at the same
+//!   seq does not, and neither does a WAL with no durable prefix (the same
+//!   servable set `query_snapshot` serves).
+//! - The window-scoped, remote-inclusive stream selector
+//!   (`Registry::local_streams` + `LocalStreams::with_catalog` over the
+//!   plan's remote-only entries): window-scoped listing, local and
+//!   remote-only streams listed together, and same-seq local/remote and
+//!   WAL/remote dedup keyed on the folded seqs rather than the servable
+//!   mask.
+//! - The two-step plan: each range takes only its window of the shared hull,
+//!   the union holds each identity+seq once across overlapping ranges and
+//!   doubly-cataloged seqs (output sorted by seq), `plan_within` stops with
+//!   `TooLarge` the moment the union exceeds the capacity (`at_least` a
+//!   lower bound, an exact fit passes), an unreadable catalog is reported
+//!   while the rest still plans, a catalog removed after step 1 is skipped,
+//!   and step 1 reads no file.
+//! - An unknown tenant's `TenantRegistries::remote_plan_input` plans
+//!   nothing.
+//!
+//! Not pinned here: partition filtering (every query runs with empty
+//! `partition_keys`), entry fields beyond id and size, and the known-tenant
+//! path through `TenantRegistries::remote_plan_input`.
 use super::*;
 use file_registry::{ByteSize, FileId, TenantId, TimestampNs};
 use uuid::Uuid;
 use wal::FileEvent;
 
 /// A logical stream identity as an owned `(namespace, name)` tuple, for
-/// assertions against [`decode_opaque`]-decoded `content_meta`.
+/// assertions against `content_meta` decoded by `crate::test_helpers::decode_opaque`.
 fn ss(namespace: &str, name: &str) -> (String, String) {
     (namespace.to_owned(), name.to_owned())
 }
@@ -13,6 +43,7 @@ fn machine() -> file_registry::MachineId { file_registry::MachineId::new(Uuid::f
 fn instance() -> file_registry::InstanceId { file_registry::InstanceId::new(Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)).unwrap() }
 
 fn ident() -> file_registry::Identity { file_registry::Identity::new(machine(), instance()) }
+/// A `FileId` under `ident()` with pipeline id `0`.
 fn fid(seq: u64, part_key: u64) -> FileId {
     FileId::new(ident(), 0, seq, part_key)
 }
@@ -24,12 +55,17 @@ fn make_registry() -> Registry {
     let wal = wal::Registry::new(wal_dir.path());
     let sfst = sfst::Registry::new(sfst_dir.path());
     let catalog_files = otel_catalog::Registry::new(catalog_dir.path(), TenantId::from("tenant1"));
+    // Leak the TempDir guards so the three dirs outlive this helper — the
+    // registry's paths point into them (the OS reclaims the space at process
+    // exit).
     std::mem::forget((wal_dir, sfst_dir, catalog_dir));
     Registry::new(wal, sfst, catalog_files)
 }
 
-/// Track a WAL file via the event flow with the given range and
-/// `Archived` status (post-Closed).
+/// Track a WAL file via the event flow (`Created` + `Closed` → `Archived`)
+/// with the given range. No `Synced` is ever applied, so `valid_up_to` stays
+/// `0` (no servable durable prefix); the stream is the fixed `("ns", "svc")`
+/// identity.
 fn track_wal(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
     const NS: u64 = 1_000_000_000;
     let (part_key, content_meta) = crate::test_helpers::identity_for("ns", "svc");
@@ -54,7 +90,7 @@ fn track_wal(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
         .unwrap();
 }
 
-/// Track an SFST file with the given range and stream.
+/// Track an SFST file for the fixed `("ns", "a")` stream with the given range.
 fn track_sfst(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
     let id = fid(seq, crate::test_helpers::opaque_part_key("ns", "a"));
     reg.sfst.track(
@@ -71,9 +107,10 @@ fn track_remote(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
     track_remote_as(reg, seq, "ns", "a", min_s, max_s);
 }
 
-/// Like [`track_remote`] but with a caller-chosen stream. The catalog entry's
+/// Like [`track_remote`] but with a caller-chosen stream. The entry's
 /// `id.part_key` matches the stream's key, as production `build_catalog_entry`
-/// guarantees (it copies both `id` and identity from the same SFST).
+/// guarantees (it copies the `id` and the summary's `content_meta` from the
+/// same SFST).
 fn track_remote_as(reg: &mut Registry, seq: u64, ns: &str, name: &str, min_s: u32, max_s: u32) {
     use chrono::NaiveDate;
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
@@ -183,10 +220,10 @@ fn remote_only_not_masked_by_different_identity_local_file() {
 
 #[test]
 fn remote_only_kept_when_wal_has_no_durable_prefix() {
-    // A WAL with no durable prefix (`valid_up_to == 0`, as `track_wal` produces)
-    // is not a servable local copy — `query_snapshot` skips it too — so it must
-    // NOT mask the remote entry for the same seq. (Regression guard for the dedup
-    // divergence between the remote plan and `query_snapshot`.)
+    // A WAL with no durable prefix (`valid_up_to == 0`, as `track_wal`
+    // produces) is not a servable local copy — `query_snapshot` skips it too —
+    // so it must NOT mask the remote entry for the same seq: the remote plan's
+    // mask agrees with `query_snapshot`'s servable set.
     let mut reg = make_registry();
     track_wal(&mut reg, 2, 300, 400);
     track_remote(&mut reg, 2, 300, 400);
@@ -293,12 +330,13 @@ fn stream_selector_dedups_local_and_remote_same_seq() {
 #[test]
 fn stream_selector_dedups_wal_and_remote_same_seq() {
     let mut reg = make_registry();
-    // `track_wal` produces a `valid_up_to == 0` WAL (Created+Closed, no Synced),
-    // which is NOT in the servable mask. A catalog entry for the SAME seq+stream
-    // must still be skipped because the WAL was folded — the dedup keys on the
-    // folded seqs, not the servable mask. (Robustness guard; the catalog-write
-    // lifecycle makes this WAL/catalog pairing unreachable in production. On the
-    // old servable-mask dedup this would double-count to file_count == 2.)
+    // `track_wal` produces a `valid_up_to == 0` WAL (Created+Closed, no
+    // Synced), which is NOT in the servable mask. A catalog entry for the SAME
+    // seq+stream must still be skipped because the WAL was folded — the dedup
+    // keys on the folded seqs, not the servable mask (a servable-mask dedup
+    // would double-count to file_count == 2). Robustness guard: the
+    // catalog-write lifecycle makes this WAL/catalog pairing unreachable in
+    // production.
     track_wal(&mut reg, 2, 100, 200);
     track_remote_as(&mut reg, 2, "ns", "svc", 100, 200);
     let streams = enumerate(&reg, &window(50, 250));
@@ -332,7 +370,9 @@ fn remote_entry(
 }
 
 /// Write and track a catalog file named after `max_seq` holding `entries`;
-/// its filename bounds are the entries' union. Returns its path.
+/// its filename bounds are the entries' union. The file itself is registered
+/// under `ident()` even when an entry carries a foreign identity. Returns its
+/// path.
 fn track_catalog(
     reg: &mut Registry,
     max_seq: u64,
@@ -368,6 +408,8 @@ fn foreign() -> file_registry::Identity {
     )
 }
 
+/// Both plan steps over `ranges`: `Some(capacity)` plans within it, `None`
+/// plans unbounded.
 fn plan(reg: &Registry, ranges: &[Query], capacity: Option<u64>) -> Result<RemotePlan, TooLarge> {
     let input = reg.remote_plan_input(ranges);
     match capacity {
@@ -522,6 +564,10 @@ fn step_one_reads_no_catalog_file() {
     track_catalog(&mut reg, 2, vec![remote_entry(ident(), 2, 5_000, 6_000, 1)]);
     std::fs::remove_dir_all(reg.catalog_files.base_dir()).unwrap();
 
+    // The base dir is wiped before step 1 runs: the catalog selection still
+    // lists the one in-hull file from tracked state alone, and step 2 then
+    // finds nothing on disk (a missing file is skipped, not reported
+    // unreadable).
     let input = reg.remote_plan_input(&[window(0, 250), window(0, 300)]);
 
     assert_eq!(

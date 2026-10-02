@@ -14,6 +14,20 @@
 //! - **Deterministic termination:** ceilings return the gathered, ranked,
 //!   trimmed result + WorkCeiling; cancellation is all-or-empty; results
 //!   are identical under source-order permutation.
+//!
+//! Also pinned: the summary numbers against ground truth (roots,
+//! envelope, counts, spans_per_trace trimming), the service breakdown's
+//! partition of the retained canonical spans, the request-validation
+//! matrix, post-validation source vanish, unavailable-source honesty
+//! (including the completion slack), the span-cap honesty pair,
+//! budget-truncated sources that cannot falsify completeness, the
+//! trace:id pin shortcut past discovery, tri-state exclusion of
+//! indeterminate trace-level candidates, UNSET trace ids, the empty
+//! window set, and the field-kind projection.
+//!
+//! The op's engine contract lives in `src/traces/search.rs`; the
+//! sibling suites in this directory pin the other traces query ops, and
+//! `tests/common/mod.rs` owns the shared corpus/source fixtures.
 
 mod common;
 
@@ -36,6 +50,8 @@ use sfsq::traces::{
     TraceSource, search,
 };
 
+/// One second in nanoseconds — the corpus' timestamp unit (`500 * NS`
+/// below reads as 500s).
 const NS: u64 = 1_000_000_000;
 
 fn tid(n: u8) -> [u8; 16] {
@@ -68,6 +84,8 @@ fn pred(conditions: Vec<Condition>) -> Predicate {
     Predicate { conditions }
 }
 
+/// The suite's default runner: `search` with a fresh token and a
+/// throwaway progress counter, expecting a valid request.
 fn run(sources: SearchSources, query: SearchQuery) -> SearchData {
     search(
         sources,
@@ -93,6 +111,8 @@ type SummaryPrint = (
     (Vec<(String, u64)>, u64, usize, u64), // service breakdown
 );
 
+/// The whole result — rows plus status — in comparable form: the
+/// equivalence oracle's unit of comparison across layouts.
 fn norm(data: &SearchData) -> (Vec<SummaryPrint>, QueryStatus) {
     let traces = data
         .traces
@@ -132,6 +152,7 @@ fn norm(data: &SearchData) -> (Vec<SummaryPrint>, QueryStatus) {
     (traces, data.status.clone())
 }
 
+/// Positional expected-value constructor for `ServiceBreakdown` asserts.
 fn breakdown(
     top: &[(&str, u64)],
     other: u64,
@@ -168,6 +189,8 @@ fn assert_breakdowns_partition(data: &SearchData) {
 
 // ── The shared world (six traces, two services, two time halves) ──────
 
+/// A `sp()` span placed in shared-world trace `trace` (trace ids are
+/// the byte `trace` in the tid's last position).
 fn span_in(trace: u8, id: u8, parent: u8, start: u64, name: &'static str) -> SpanSpec {
     SpanSpec {
         trace: tid(trace),
@@ -258,8 +281,9 @@ fn late_requests() -> Vec<ExportTraceServiceRequest> {
     ]
 }
 
-/// Window role = completion role over the same paths (the whole-set dev
-/// shape; membership is by SourceId).
+/// Both roles over the same paths, each built fresh per call (sources
+/// are consumed by `search`; identical SourceId sets trivially satisfy
+/// the window ⊆ completion membership check).
 fn both_roles(build: impl Fn() -> Vec<TraceSource>) -> SearchSources {
     SearchSources {
         window: build(),
@@ -322,14 +346,16 @@ fn ids(data: &SearchData) -> Vec<String> {
     data.traces.iter().map(|t| t.trace_id.to_string()).collect()
 }
 
+/// Shared-world trace `n` hex-rendered, for expectation lists.
 fn hex(n: u8) -> String {
     sfst::TraceId::from(tid(n)).to_string()
 }
 
-/// Every layout answers every query identically, and the single-sealed
-/// answers match the hand-computed expectations (final ordering by
-/// canonical matched-span start; T6 ranks by its CANONICAL 1300s copy,
-/// not the 1950s resend).
+/// Every layout answers every query identically — id order checked
+/// against the hand-computed expectations everywhere, full summaries
+/// against the single-sealed reference — with every row exact and the
+/// status Complete (final ordering by canonical matched-span start; T6
+/// ranks by its CANONICAL 1300s copy, not the 1950s resend).
 #[test]
 fn oracle_equivalence_under_relayouts() {
     let dir = tempfile::tempdir().unwrap();
@@ -1008,10 +1034,10 @@ fn inflated_raw_ranks_do_not_hide_the_true_top_trace() {
             ..span_in(i, 0x10 + i, 0, (1_000 + u64::from(i)) * NS, "resend")
         }]));
     }
-    // T6: single span at 500s — the TRUE canonical #1 is NOT this one…
-    // every resend trace's canonical is at 10x s, so T6 (500s) outranks
-    // them all canonically while its raw rank (500s) sits below every
-    // inflated raw rank (1000+s).
+    // T6: a single span at 500s — the TRUE canonical #1 (every other
+    // trace's canonical sits at (100+i)s), yet its raw rank (500s)
+    // sits below every inflated raw rank (1001+s), outside the initial
+    // K: only a refill can find it.
     reqs.push(req_with(svc.clone(), None, &[SpanSpec {
         attrs: vec![kv_str("m", "yes")],
         ..span_in(6, 0x66, 0, 500 * NS, "hidden-winner")
@@ -1102,8 +1128,9 @@ fn request_validation_matrix() {
     ));
     // Stage-B constructs: named not-yet-evaluable request errors.
     for stage_b in [
-        // Negated subgroup forms (the recorded open question) and the
-        // trace-level builtins stay not-yet-evaluable after step 8.
+        // Negated event/link subgroup forms stay not-yet-evaluable —
+        // their semantics are the recorded open question (flat negation
+        // vs single-item subgroup) until the stage boundary relaxes.
         cond(
             PredicateTarget::Attribute(AttributeOwner::Event, "msg".into()),
             CompareOp::NotEq,

@@ -1,17 +1,36 @@
-//! The trace-level pre-assembly gate acceptance suite (phase 9).
+//! Integration tests for the trace-level pre-assembly gate — the
+//! TBLM-bloom + TRSU-rollup candidate prune filter `search` consults
+//! at each pool pop (sfsq/src/traces/gate.rs; gate engagement and the
+//! pruned-pops-don't-charge-the-ceiling rule live in
+//! sfsq/src/traces/search.rs).
 //!
-//! Pins the gate's three contracts:
+//! Fixtures come from tests/common/mod.rs: requests written to a WAL,
+//! sealed with `sealed_source` (or `sealed_source_at` after byte
+//! surgery on the sealed file), plus `tail_source` for tail presence.
+//! Each query runs twice — gate on vs `trace_gate_for_tests(false)` —
+//! and superset tests compare the answers through `norm`; the
+//! corrupt-file tests assert the designed divergence instead. Pinned
+//! contracts:
 //!
-//! - **Superset:** with the gate on, every query answers byte-identically
-//!   to the gate-off truth path on healthy, tie-free corpora — the gate
-//!   only removes work, never results. The known divergence is corrupt
-//!   corpora, where skip-and-surface is the DESIGNED difference.
+//! - **Superset:** gate-on answers are byte-identical to the gate-off
+//!   truth path on tie-free, corruption-free, single-valued corpora —
+//!   the gate only removes work, never results. The DESIGNED
+//!   differences live elsewhere: corrupt files (skip-and-surface) and
+//!   the status deltas a prune makes unobservable (a would-have-been
+//!   `SizeCap`; corruption only assembly would have found).
 //! - **The incident fix:** a rare trace-level predicate no longer burns
 //!   the assembled ceiling on discards — the gate-off `WorkCeiling`
 //!   partial becomes a gate-on `Complete`.
 //! - **Skip-and-surface:** a file that proves itself corrupt through any
 //!   gate read (TBLM, TRSU) is skipped as a failed source AND surfaced
 //!   (`SourceFailure`), never silently downgraded.
+//!
+//! Not pinned here: the no-root prune itself — its verdicts are
+//! observable, the prune is not (`GateStats` is crate-internal; see
+//! `rootless_traces_never_match_root_filters_either_polarity`) — and
+//! search's setup-failure engagement precondition (a completion source
+//! that failed to open disengages the gate; no fixture here fails at
+//! setup).
 
 mod common;
 
@@ -55,6 +74,8 @@ fn pred(conditions: Vec<Condition>) -> Predicate {
     Predicate { conditions }
 }
 
+/// One `search` call with a fresh cancellation token and progress
+/// counter; invalid requests panic rather than error.
 fn run(sources: SearchSources, query: SearchQuery) -> SearchData {
     search(
         sources,
@@ -65,6 +86,9 @@ fn run(sources: SearchSources, query: SearchQuery) -> SearchData {
     .expect("valid request")
 }
 
+/// Identical source vectors in both roles: `build()` runs once per
+/// role because `SearchSources` owns its vectors, and window ⊆
+/// completion holds trivially when both sides seal the same WALs.
 fn both_roles(build: impl Fn() -> Vec<TraceSource>) -> SearchSources {
     SearchSources {
         window: build(),
@@ -76,6 +100,8 @@ fn ids(data: &SearchData) -> Vec<String> {
     data.traces.iter().map(|t| t.trace_id.to_string()).collect()
 }
 
+/// `tid(n)`'s canonical hex rendering — the text form `trace:id =`
+/// conditions pin.
 fn hex(n: u8) -> String {
     sfst::TraceId::from(tid(n)).to_string()
 }
@@ -182,8 +208,9 @@ fn sealed_path(dir: &Path, id: &str) -> std::path::PathBuf {
 
 /// Many candidates, none matching a rare root selection: gate-off burns
 /// the assembled ceiling on discards (`Partial{WorkCeiling}`); gate-on
-/// prunes every candidate without assembling and PROVES the empty
-/// answer (`Complete`) — the phase-9 fix, pinned.
+/// prunes every candidate without assembling — a pruned pop charges
+/// nothing — and PROVES the empty answer (`Complete`). The incident
+/// fix, pinned.
 #[test]
 fn rare_root_selection_completes_instead_of_burning_the_ceiling() {
     let dir = tempfile::tempdir().unwrap();
@@ -351,13 +378,11 @@ fn absent_chunks_block_pruning_without_a_partial() {
 /// True-root filter semantics (decision 1D): a trace whose root span
 /// was never exported matches NO root condition — either polarity —
 /// with gate on and off agreeing, and the trace stays findable by
-/// span-level conditions. (That the gate reaches this verdict WITHOUT
-/// assembling — the `ROOT_CLAIM_NONE` prune — has no public observable
-/// yet: `GateStats` is crate-internal. Mutation-checked 2026-08-15:
-/// removing the no-root prune leaves this test green because assembly
-/// evaluates the same predicate to the same emptiness. The prune-proof
-/// assertion lands when gate stats surface for the tail-aggregates /
-/// work-ceiling follow-ups.)
+/// span-level conditions. What this does NOT pin: the gate's no-root
+/// prune. Removing it leaves the test green — the post-assembly
+/// evaluator reaches the same emptiness — and the prune itself has no
+/// public observable (`GateStats` is crate-internal), so only the
+/// verdict above is under contract here.
 #[test]
 fn rootless_traces_never_match_root_filters_either_polarity() {
     let dir = tempfile::tempdir().unwrap();
@@ -639,8 +664,9 @@ fn corrupt_rollup_chunk_is_skipped_and_surfaced() {
         on.status
     );
 
-    // Gate-off never reads TRSU: the corruption goes UNDISCOVERED and
-    // the trace returns — the designed v1 scope of the principle.
+    // Gate-off never reads TRSU (only the gate does): the corruption
+    // goes UNDISCOVERED and the trace returns — discovery laziness
+    // cuts both ways.
     let off = run(build(), q().trace_gate_for_tests(false));
     assert_eq!(ids(&off), vec![hex(1)]);
     assert_eq!(off.status, QueryStatus::Complete);
@@ -728,7 +754,9 @@ fn mid_tier_resolution_and_the_resolver_closed_rule() {
     let wal = write_wal(dir.path(), reqs, "midtier");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
 
-    // Trace ids wrap u8 (150 traces), so pick target 42 by name only.
+    // One distinct name per trace (ids 1..=150 stay inside u8): the
+    // query targets its trace by name, and the assertion pins ONE
+    // match — not which trace id returned.
     let q = || {
         SearchQuery::new(pred(vec![builtin(
             BuiltinField::RootName,
