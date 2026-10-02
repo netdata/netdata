@@ -41,7 +41,9 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: DNS Server role
+            description: The Windows DNS Server role must be installed. If it is installed after the Agent starts, restart the Agent.
       configuration:
         file:
           name: "netdata.conf"
