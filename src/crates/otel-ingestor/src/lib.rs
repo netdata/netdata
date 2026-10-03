@@ -55,6 +55,7 @@ mod ledger_sender;
 mod logs_service;
 mod metrics_service;
 mod otel;
+mod otlp_json;
 mod output;
 mod tenant;
 mod trace_service;

@@ -27,12 +27,12 @@
 //! - success replies `200` with the response encoded in the SAME encoding and
 //!   a mirrored `Content-Type`.
 //!
-//! One accepted-input deviation from the collector's protojson decoder: JSON
-//! bodies must be in canonical proto3 JSON form — 64-bit integers as strings,
-//! enums as numbers, `NaN`/`Infinity` unsupported — because the codec is the
-//! `opentelemetry-proto` `with-serde` derives. Every OTLP SDK exporter emits
-//! this form (as does the collector itself); non-canonical hand-written JSON
-//! is rejected with a `400` naming the offending field.
+//! JSON bodies are OTLP/JSON (hex ids, integer enums, 64-bit integers as
+//! decimal strings or numbers, omitted fields), decoded by
+//! [`crate::otlp_json`], which repairs the `opentelemetry-proto` derives'
+//! narrower JSON forms first. Deviations from the collector's decoder: enum
+//! names and the `NaN`/`Infinity` doubles are rejected with a `400` naming the
+//! offending field, never dropped silently.
 //!
 //! The listener binds during startup with the same strict fail-fast rule as
 //! the gRPC endpoint (user decision D4): a bind or TLS failure aborts the
@@ -57,11 +57,11 @@ use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequ
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message as _;
 use serde::Serialize;
-use serde::de::DeserializeOwned;
 use tonic::{Code, Status};
 
 use crate::logs_service::NetdataLogsService;
 use crate::metrics_service::NetdataMetricsService;
+use crate::otlp_json::OtlpJson;
 use crate::tenant::extract_tenant_id_from_headers;
 use crate::trace_service::NetdataTracesService;
 
@@ -427,7 +427,7 @@ async fn export_metrics(
 /// the two transports cannot drift apart.
 async fn serve_export<Req, Resp, F, Fut>(headers: HeaderMap, body: Body, run: F) -> Response<Body>
 where
-    Req: prost::Message + DeserializeOwned + Default,
+    Req: prost::Message + OtlpJson + Default,
     Resp: prost::Message + Serialize,
     F: FnOnce(Req) -> Fut + Send,
     Fut: Future<Output = Result<Resp, Status>> + Send,
@@ -503,7 +503,7 @@ where
                 );
             }
         },
-        Codec::Json => match serde_json::from_slice(&body_bytes) {
+        Codec::Json => match Req::decode_json(&body_bytes) {
             Ok(req) => req,
             Err(e) => {
                 return rpc_error(
@@ -1182,6 +1182,32 @@ mod tests {
         let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(v["code"], serde_json::json!(3));
         assert!(v["message"].as_str().unwrap().contains("JSON"));
+    }
+
+    #[tokio::test]
+    async fn json_metric_the_codec_cannot_hold_is_400_not_a_silent_200() {
+        // A `"NaN"` double is valid OTLP/JSON the codec cannot represent;
+        // without the loss check the gauge would vanish behind a 200.
+        let (state, _tmp) = test_state(AuthConfig::default());
+        let body = br#"{"resourceMetrics":[{"scopeMetrics":[{"metrics":[
+            {"name":"m","gauge":{"dataPoints":[{"timeUnixNano":"1","asDouble":"NaN"}]}}]}]}]}"#;
+        let resp = post(
+            state,
+            "/v1/metrics",
+            Some("application/json"),
+            None,
+            None,
+            body.to_vec(),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let v: serde_json::Value = serde_json::from_slice(&body_bytes(resp).await).unwrap();
+        assert_eq!(v["code"], serde_json::json!(3));
+        let message = v["message"].as_str().unwrap();
+        assert!(
+            message.contains("metrics[0].gauge.dataPoints[0]: value cannot be decoded"),
+            "{message}"
+        );
     }
 
     #[tokio::test]
