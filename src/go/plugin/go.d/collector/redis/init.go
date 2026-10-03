@@ -3,14 +3,12 @@
 package redis
 
 import (
+	"context"
 	"errors"
 
 	"github.com/redis/go-redis/v9"
 
-	"context"
-
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 func (c *Collector) validateConfig() error {
@@ -30,29 +28,26 @@ func (c *Collector) initRedisClient(ctx context.Context) (*redis.Client, error) 
 	if err != nil {
 		return nil, err
 	}
-
-	if opts.TLSConfig != nil && tlsConfig != nil {
-		tlsConfig.ServerName = opts.TLSConfig.ServerName
+	if tlsConfig != nil {
+		// A rediss:// address sets the server name used for hostname verification.
+		if opts.TLSConfig != nil {
+			tlsConfig.ServerName = opts.TLSConfig.ServerName
+		}
+		opts.TLSConfig = tlsConfig
 	}
 
-	if opts.Username == "" && c.Username != "" {
+	// Credentials in the address take precedence over the username and password options.
+	if opts.Username == "" {
 		opts.Username = c.Username
 	}
-	if opts.Password == "" && c.Password != "" {
+	if opts.Password == "" {
 		opts.Password = c.Password
 	}
 
 	opts.PoolSize = 1
-	if tlsConfig != nil {
-		opts.TLSConfig = tlsConfig
-	}
 	opts.DialTimeout = c.Timeout.Duration()
 	opts.ReadTimeout = c.Timeout.Duration()
 	opts.WriteTimeout = c.Timeout.Duration()
 
 	return redis.NewClient(opts), nil
-}
-
-func (c *Collector) initCharts() (*collectorapi.Charts, error) {
-	return redisCharts.Copy(), nil
 }

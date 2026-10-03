@@ -35,17 +35,12 @@ func TestCollector_CommandTimingAvailability(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			c := New()
-			c.PingSamples = 0
-			require.NoError(t, c.Init(context.Background()))
 			info := fmt.Sprintf(
 				"# Server\n%s_version:2.2.0\n\n# Commandstats\ncmdstat_get:%s\n",
 				test.server,
 				test.stats,
 			)
-			c.rdb = &mockRedisClient{
-				results: map[string][]byte{"all": []byte(info), "keyspace": {}, "commandstats": {}},
-			}
+			c := newInfoOnlyCollector(t, map[string][]byte{"all": []byte(info), "keyspace": {}, "commandstats": {}})
 			test.want["ping_latency_count"] = 0
 			test.want["ping_latency_sum"] = 0
 			assert.Equal(t, test.want, c.Collect(context.Background()))
@@ -78,20 +73,15 @@ func TestCollector_GarnetSamplingAvailability(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			c := New()
-			c.PingSamples = 0
-			require.NoError(t, c.Init(context.Background()))
 			info := "# Server\ngarnet_version:2.2.0\nmonitor_task:" + test.monitor + "\nuptime_in_seconds:60\n\n" +
 				"# Stats\ntotal_commands_processed:12\ntotal_connections_received:3\nrejected_connections:0\n" +
 				"total_net_input_bytes:128\ntotal_net_output_bytes:256\ntotal_found:3\ntotal_notfound:1\n\n" +
 				"# Clients\nconnected_clients:2\n# Memory\nproc_physical_memory_size:4096\n\n" +
 				"# Persistence_DB_0\nrdb_last_bgsave_status:ok\n"
-			c.rdb = &mockRedisClient{
-				results: map[string][]byte{
-					"all": []byte(info), "keyspace": []byte("# Keyspace\ndb0:keys=6,expires=1\n"),
-					"commandstats": []byte("# Commandstats\ncmdstat_get:calls=3,usec=0,usec_per_call=0.00\n"),
-				},
-			}
+			c := newInfoOnlyCollector(t, map[string][]byte{
+				"all": []byte(info), "keyspace": []byte("# Keyspace\ndb0:keys=6,expires=1\n"),
+				"commandstats": []byte("# Commandstats\ncmdstat_get:calls=3,usec=0,usec_per_call=0.00\n"),
+			})
 			for k, v := range map[string]int64{
 				"uptime_in_seconds": 60, "used_memory_rss": 4096, "rdb_last_bgsave_status": 0,
 				"db0_keys": 6, "db0_expires_keys": 1, "cmd_get_calls": 3,
@@ -121,13 +111,10 @@ func TestCollector_ReplicationDowntimeAvailability(t *testing.T) {
 		}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			c := New()
-			c.PingSamples = 0
-			require.NoError(t, c.Init(context.Background()))
-			c.rdb = &mockRedisClient{
-				result: []byte("# Server\nkvrocks_version:2.17.0\n\n# Replication\n" +
+			c := newInfoOnlyCollector(t, map[string][]byte{
+				"all": []byte("# Server\nkvrocks_version:2.17.0\n\n# Replication\n" +
 					"master_link_status:" + test.status + "\nmaster_last_io_seconds_ago:20\n" + test.duration),
-			}
+			})
 			test.want["master_last_io_seconds_ago"] = 20
 			test.want["ping_latency_count"] = 0
 			test.want["ping_latency_sum"] = 0
@@ -146,17 +133,32 @@ func TestCollector_RejectedConnectionsAvailability(t *testing.T) {
 		"measured rejections":  {value: "3", want: map[string]int64{"rejected_connections": 3}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			c := New()
-			c.PingSamples = 0
-			require.NoError(t, c.Init(context.Background()))
-			c.rdb = &mockRedisClient{
-				result: []byte("# Server\nredis_version:7.4.0\n\n# Stats\nrejected_connections:" + test.value + "\n"),
-			}
+			c := newInfoOnlyCollector(t, map[string][]byte{
+				"all": []byte("# Server\nredis_version:7.4.0\n\n# Stats\nrejected_connections:" + test.value + "\n"),
+			})
 			test.want["ping_latency_count"] = 0
 			test.want["ping_latency_sum"] = 0
 			assert.Equal(t, test.want, c.Collect(context.Background()))
 		})
 	}
+}
+
+func TestCollector_InvalidLastSaveTime(t *testing.T) {
+	c := newInfoOnlyCollector(t, map[string][]byte{
+		"all": []byte("# Server\nredis_version:7.4.0\n\n# Persistence\nrdb_last_save_time:never\n"),
+	})
+
+	assert.Equal(t, map[string]int64{"ping_latency_count": 0, "ping_latency_sum": 0}, c.Collect(context.Background()))
+}
+
+// newInfoOnlyCollector returns an initialized collector that serves the given INFO sections and sends no PINGs.
+func newInfoOnlyCollector(t *testing.T, info map[string][]byte) *Collector {
+	t.Helper()
+	c := newTestCollector(t, &mockRedisClient{
+		info: info,
+	})
+	c.PingSamples = 0
+	return c
 }
 
 // The parser is O(INFO bytes + metrics). Repeated cycles reuse discovered dimensions.

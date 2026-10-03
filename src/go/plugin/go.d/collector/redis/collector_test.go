@@ -5,13 +5,12 @@ package redis
 import (
 	"context"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
@@ -59,42 +58,6 @@ func Test_testDataIsValid(t *testing.T) {
 	}
 }
 
-// garnetCommandstatsMetrics is the cmd_* subset of the captured Garnet
-// commandstats fixture; its hardcoded timing placeholders are not measurements.
-var garnetCommandstatsMetrics = map[string]int64{
-	"cmd_client|setinfo_calls": 2,
-	"cmd_dbsize_calls":         1,
-	"cmd_get_calls":            1,
-	"cmd_hello_calls":          1,
-	"cmd_hset_calls":           1,
-	"cmd_info_calls":           4,
-	"cmd_lpush_calls":          1,
-	"cmd_ping_calls":           1,
-	"cmd_set_calls":            3,
-}
-
-// garnetWantCollected returns a fresh complete expected map for the garnet
-// fixture; a per-call copy is required because copyTimeRelatedMetrics mutates it.
-func garnetWantCollected(t *testing.T, withCommandstats bool) map[string]int64 {
-	t.Helper()
-	want := readInfoMetrics(t, "garnet")
-	if withCommandstats {
-		maps.Copy(want, garnetCommandstatsMetrics)
-	}
-	return want
-}
-
-// readInfoMetrics loads independently specified expectations kept beside each INFO fixture.
-func readInfoMetrics(t *testing.T, server string) map[string]int64 {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join("testdata", server, "metrics.json"))
-	require.NoError(t, err)
-	var want map[string]int64
-	require.NoError(t, json.Unmarshal(data, &want))
-	require.NotEmpty(t, want)
-	return want
-}
-
 func TestCollector_ConfigurationSerialize(t *testing.T) {
 	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
@@ -109,17 +72,23 @@ func TestCollector_Init(t *testing.T) {
 		},
 		"fails on unset 'address'": {
 			wantFail: true,
-			config:   Config{Address: ""},
+			config: Config{
+				Address: "",
+			},
 		},
 		"fails on invalid 'address' format": {
 			wantFail: true,
-			config:   Config{Address: "127.0.0.1:6379"},
+			config: Config{
+				Address: "127.0.0.1:6379",
+			},
 		},
 		"fails on invalid TLSCA": {
 			wantFail: true,
 			config: Config{
-				Address:   "redis://127.0.0.1:6379",
-				TLSConfig: tlscfg.TLSConfig{TLSCA: "testdata/tls"},
+				Address: "redis://127.0.0.1:6379",
+				TLSConfig: tlscfg.TLSConfig{
+					TLSCA: "testdata/tls",
+				},
 			},
 		},
 	}
@@ -144,33 +113,33 @@ func TestCollector_Check(t *testing.T) {
 		wantFail bool
 	}{
 		"success on valid response v6.0.9": {
-			prepare: prepareRedisV609,
+			prepare: prepareInfo(dataVer609InfoAll),
 		},
 		"success on valid response garnet": {
-			prepare: prepareGarnetWithCommandstats,
+			prepare: prepareGarnet(dataGarnetInfoCommandstats),
 		},
 		"success on garnet with commandstats disabled": {
-			prepare: prepareGarnetCommandstatsDisabled,
+			prepare: prepareGarnet(dataGarnetInfoCommandstatsOff),
 		},
 		"success on valid response valkey 9.1.2": {
-			prepare: prepareValkey,
+			prepare: prepareInfo(dataValkeyInfoAll),
 		},
 		"success on valid response dragonfly df-v2.0.0": {
-			prepare: prepareDragonfly,
+			prepare: prepareInfo(dataDragonflyInfoAll),
 		},
 		"success on valid response keydb 6.3.4": {
-			prepare: prepareKeydb,
+			prepare: prepareInfo(dataKeydbInfoAll),
 		},
 		"success on valid response kvrocks 2.17.0": {
-			prepare: prepareKvrocks,
+			prepare: prepareInfo(dataKvrocksInfoAll),
 		},
 		"fails on error on Info": {
 			wantFail: true,
-			prepare:  prepareRedisErrorOnInfo,
+			prepare:  prepareInfoError,
 		},
 		"fails on response from not Redis instance": {
 			wantFail: true,
-			prepare:  prepareRedisWithPikaMetrics,
+			prepare:  prepareInfo(dataPikaInfoAll),
 		},
 	}
 
@@ -241,10 +210,6 @@ var garnetMissingDims = map[string]bool{
 	"used_cpu_user_children":      true,
 }
 
-func skipGarnetMissingDims(_ *collectorapi.Chart, dim *collectorapi.Dim) bool {
-	return garnetMissingDims[dim.ID]
-}
-
 // dragonflyMissingDims holds chart dimension IDs whose backing INFO fields
 // Dragonfly does not measure; their chart dimensions stay empty for Dragonfly.
 var dragonflyMissingDims = map[string]bool{
@@ -257,10 +222,6 @@ var dragonflyMissingDims = map[string]bool{
 	"tracking_clients":            true,
 	"used_memory_dataset":         true,
 	"used_memory_scripts":         true,
-}
-
-func skipDragonflyMissingDims(_ *collectorapi.Chart, dim *collectorapi.Dim) bool {
-	return dragonflyMissingDims[dim.ID]
 }
 
 // kvrocksMissingDims holds chart dimension IDs whose backing INFO fields
@@ -283,8 +244,8 @@ var kvrocksMissingDims = map[string]bool{
 	"used_memory_scripts":         true,
 }
 
-func skipKvrocksMissingDims(_ *collectorapi.Chart, dim *collectorapi.Dim) bool {
-	return kvrocksMissingDims[dim.ID]
+func skipDims(ids map[string]bool) func(*collectorapi.Chart, *collectorapi.Dim) bool {
+	return func(_ *collectorapi.Chart, dim *collectorapi.Dim) bool { return ids[dim.ID] }
 }
 
 func TestCollector_Collect(t *testing.T) {
@@ -294,42 +255,42 @@ func TestCollector_Collect(t *testing.T) {
 		dimsSkip      func(chart *collectorapi.Chart, dim *collectorapi.Dim) bool
 	}{
 		"success on valid response v6.0.9": {
-			prepare:       prepareRedisV609,
+			prepare:       prepareInfo(dataVer609InfoAll),
 			wantCollected: readInfoMetrics(t, "v6.0.9"),
 		},
 		"success on valid response garnet (commandstats enabled)": {
-			prepare:       prepareGarnetWithCommandstats,
+			prepare:       prepareGarnet(dataGarnetInfoCommandstats),
 			wantCollected: garnetWantCollected(t, true),
-			dimsSkip:      skipGarnetMissingDims,
+			dimsSkip:      skipDims(garnetMissingDims),
 		},
 		"success on valid response garnet (commandstats disabled)": {
-			prepare:       prepareGarnetCommandstatsDisabled,
+			prepare:       prepareGarnet(dataGarnetInfoCommandstatsOff),
 			wantCollected: garnetWantCollected(t, false),
-			dimsSkip:      skipGarnetMissingDims,
+			dimsSkip:      skipDims(garnetMissingDims),
 		},
 		"success on valid response valkey 9.1.2": {
-			prepare:       prepareValkey,
+			prepare:       prepareInfo(dataValkeyInfoAll),
 			wantCollected: readInfoMetrics(t, "valkey"),
 		},
 		"success on valid response dragonfly df-v2.0.0": {
-			prepare:       prepareDragonfly,
-			dimsSkip:      skipDragonflyMissingDims,
+			prepare:       prepareInfo(dataDragonflyInfoAll),
+			dimsSkip:      skipDims(dragonflyMissingDims),
 			wantCollected: readInfoMetrics(t, "dragonfly"),
 		},
 		"success on valid response keydb 6.3.4": {
-			prepare:       prepareKeydb,
+			prepare:       prepareInfo(dataKeydbInfoAll),
 			wantCollected: readInfoMetrics(t, "keydb"),
 		},
 		"success on valid response kvrocks 2.17.0": {
-			prepare:       prepareKvrocks,
-			dimsSkip:      skipKvrocksMissingDims,
+			prepare:       prepareInfo(dataKvrocksInfoAll),
+			dimsSkip:      skipDims(kvrocksMissingDims),
 			wantCollected: readInfoMetrics(t, "kvrocks"),
 		},
 		"fails on error on Info": {
-			prepare: prepareRedisErrorOnInfo,
+			prepare: prepareInfoError,
 		},
 		"fails on response from not Redis instance": {
-			prepare: prepareRedisWithPikaMetrics,
+			prepare: prepareInfo(dataPikaInfoAll),
 		},
 	}
 
@@ -345,221 +306,48 @@ func TestCollector_Collect(t *testing.T) {
 			if len(test.wantCollected) > 0 {
 				collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, test.dimsSkip)
 				ensureCollectedCommandsAddedToCharts(t, collr)
-				ensureCollectedDbsAddedToCharts(t, collr)
+				ensureCollectedDBsAddedToCharts(t, collr)
 			}
 		})
 	}
 }
 
-func prepareRedisV609(t *testing.T) *Collector {
-	collr := New()
-	require.NoError(t, collr.Init(context.Background()))
-	collr.rdb = &mockRedisClient{
-		result: dataVer609InfoAll,
+// readInfoMetrics loads independently specified expectations kept beside each INFO fixture.
+func readInfoMetrics(t *testing.T, server string) map[string]int64 {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", server, "metrics.json"))
+	require.NoError(t, err)
+	var want map[string]int64
+	require.NoError(t, json.Unmarshal(data, &want))
+	require.NotEmpty(t, want)
+	return want
+}
+
+// garnetCommandstatsMetrics is the cmd_* subset of the captured Garnet
+// commandstats fixture; its hardcoded timing placeholders are not measurements.
+var garnetCommandstatsMetrics = map[string]int64{
+	"cmd_client|setinfo_calls": 2,
+	"cmd_dbsize_calls":         1,
+	"cmd_get_calls":            1,
+	"cmd_hello_calls":          1,
+	"cmd_hset_calls":           1,
+	"cmd_info_calls":           4,
+	"cmd_lpush_calls":          1,
+	"cmd_ping_calls":           1,
+	"cmd_set_calls":            3,
+}
+
+// garnetWantCollected returns a fresh complete expected map for the garnet
+// fixture; a per-call copy is required because copyTimeRelatedMetrics mutates it.
+func garnetWantCollected(t *testing.T, withCommandstats bool) map[string]int64 {
+	t.Helper()
+	want := readInfoMetrics(t, "garnet")
+	if withCommandstats {
+		maps.Copy(want, garnetCommandstatsMetrics)
 	}
-	return collr
+	return want
 }
 
-func prepareGarnetWithCommandstats(t *testing.T) *Collector {
-	return prepareGarnet(t, dataGarnetInfoCommandstats)
-}
-
-func prepareGarnetCommandstatsDisabled(t *testing.T) *Collector {
-	return prepareGarnet(t, dataGarnetInfoCommandstatsOff)
-}
-
-func prepareValkey(t *testing.T) *Collector {
-	collr := New()
-	require.NoError(t, collr.Init(context.Background()))
-	collr.rdb = &mockRedisClient{result: dataValkeyInfoAll}
-	return collr
-}
-
-func prepareDragonfly(t *testing.T) *Collector {
-	collr := New()
-	require.NoError(t, collr.Init(context.Background()))
-	collr.rdb = &mockRedisClient{result: dataDragonflyInfoAll}
-	return collr
-}
-
-func prepareKeydb(t *testing.T) *Collector {
-	collr := New()
-	require.NoError(t, collr.Init(context.Background()))
-	collr.rdb = &mockRedisClient{result: dataKeydbInfoAll}
-	return collr
-}
-
-func prepareKvrocks(t *testing.T) *Collector {
-	collr := New()
-	require.NoError(t, collr.Init(context.Background()))
-	collr.rdb = &mockRedisClient{result: dataKvrocksInfoAll}
-	return collr
-}
-
-func prepareGarnet(t *testing.T, commandstats []byte) *Collector {
-	collr := New()
-	require.NoError(t, collr.Init(context.Background()))
-	collr.rdb = &mockRedisClient{
-		results: map[string][]byte{
-			"all":          dataGarnetInfoAll,
-			"keyspace":     dataGarnetInfoKeyspace,
-			"commandstats": commandstats,
-		},
-	}
-	return collr
-}
-
-func prepareRedisErrorOnInfo(t *testing.T) *Collector {
-	collr := New()
-	require.NoError(t, collr.Init(context.Background()))
-	collr.rdb = &mockRedisClient{
-		errOnInfo: true,
-	}
-	return collr
-}
-
-func prepareRedisWithPikaMetrics(t *testing.T) *Collector {
-	collr := New()
-	require.NoError(t, collr.Init(context.Background()))
-	collr.rdb = &mockRedisClient{
-		result: dataPikaInfoAll,
-	}
-	return collr
-}
-
-func TestCollector_GarnetExtraInfoRequests(t *testing.T) {
-	collr := New()
-	require.NoError(t, collr.Init(context.Background()))
-	// Make the refresh interval longer than any test run so the "at most one
-	// request per interval" assertion does not depend on wall-clock time.
-	collr.garnetKeyspaceRefreshInterval = time.Hour
-	mock := &mockRedisClient{
-		results: map[string][]byte{
-			"all":          dataGarnetInfoAll,
-			"keyspace":     dataGarnetInfoKeyspace,
-			"commandstats": dataGarnetInfoCommandstats,
-		},
-		infoCalls: make(map[string]int),
-	}
-	collr.rdb = mock
-
-	ctx := context.Background()
-	for i := 0; i < 3; i++ {
-		assert.NotEmpty(t, collr.Collect(ctx))
-	}
-
-	// keyspace is expensive on Garnet (full store scan): at most one request
-	// within the refresh interval; commandstats is requested every cycle.
-	assert.Equal(t, 3, mock.infoCalls["all"])
-	assert.Equal(t, 1, mock.infoCalls["keyspace"])
-	assert.Equal(t, 3, mock.infoCalls["commandstats"])
-}
-
-// withRedisVersionFirst moves the redis_version line before the garnet_version
-// line, as if a Garnet server reported its redis compatibility version first.
-func withRedisVersionFirst(info []byte) []byte {
-	lines := strings.Split(string(info), "\n")
-	redisLine := ""
-	kept := make([]string, 0, len(lines))
-	for _, line := range lines {
-		if strings.HasPrefix(line, "redis_version:") {
-			redisLine = line
-			continue
-		}
-		kept = append(kept, line)
-	}
-	if redisLine == "" {
-		return info
-	}
-	for i, line := range kept {
-		if strings.HasPrefix(line, "garnet_version:") {
-			kept = append(kept[:i], append([]string{redisLine}, kept[i:]...)...)
-			break
-		}
-	}
-	return []byte(strings.Join(kept, "\n"))
-}
-
-func Test_extractServerVersion(t *testing.T) {
-	tests := map[string]struct {
-		info    []byte
-		wantSrv string
-		wantVer string
-	}{
-		"redis 6.0.9":                     {info: dataVer609InfoAll, wantSrv: "redis", wantVer: "6.0.9"},
-		"valkey 9.1.2":                    {info: dataValkeyInfoAll, wantSrv: "redis", wantVer: "7.2.4"},
-		"dragonfly df-v2.0.0":             {info: dataDragonflyInfoAll, wantSrv: "redis", wantVer: "7.4.0"},
-		"keydb 6.3.4":                     {info: dataKeydbInfoAll, wantSrv: "redis", wantVer: "6.3.4"},
-		"kvrocks 2.17.0":                  {info: dataKvrocksInfoAll, wantSrv: "kvrocks", wantVer: "2.17.0"},
-		"garnet 2.2.0":                    {info: dataGarnetInfoAll, wantSrv: "garnet", wantVer: "2.2.0"},
-		"garnet with redis_version first": {info: withRedisVersionFirst(dataGarnetInfoAll), wantSrv: "garnet", wantVer: "2.2.0"},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			server, ver, err := extractServerVersion(string(test.info))
-			require.NoError(t, err)
-			assert.Equal(t, test.wantSrv, server)
-			assert.Equal(t, test.wantVer, ver.String())
-		})
-	}
-}
-
-func Test_garnet_collectGarnetExtraInfo_joins_sections(t *testing.T) {
-	collr := New()
-	require.NoError(t, collr.Init(context.Background()))
-	collr.garnetKeyspaceRefreshInterval = time.Hour
-	collr.rdb = &mockRedisClient{
-		results: map[string][]byte{
-			"all":          []byte(strings.TrimRight(string(dataGarnetInfoAll), "\n")),
-			"keyspace":     []byte(strings.TrimRight(string(dataGarnetInfoKeyspace), "\n")),
-			"commandstats": []byte(strings.TrimRight(string(dataGarnetInfoCommandstats), "\n")),
-		},
-		infoCalls: map[string]int{},
-	}
-
-	// base INFO and extra sections without trailing newlines: the join must
-	// still put every section on its own lines (exactly one newline boundary,
-	// whatever line endings the sections use)
-	info := collr.collectGarnetExtraInfo(strings.TrimRight(string(dataGarnetInfoAll), "\n"))
-	assert.Contains(t, info, "\n# Keyspace")
-	assert.NotContains(t, info, "\n\n# Keyspace")
-	assert.Contains(t, info, "\n# Commandstats")
-	assert.NotContains(t, info, "\n\n# Commandstats")
-
-	mx := make(map[string]int64)
-	collr.collectInfo(mx, info)
-	assert.Equal(t, int64(64), mx["arch_bits"])    // base section parsed
-	assert.Equal(t, int64(6), mx["db0_keys"])      // keyspace section parsed
-	assert.Equal(t, int64(1), mx["cmd_get_calls"]) // commandstats section parsed
-}
-
-func TestCollector_GarnetKeyspaceErrorClearsCache(t *testing.T) {
-	collr := New()
-	require.NoError(t, collr.Init(context.Background()))
-	// interval 0: refresh on every cycle, so the test does not depend on timing
-	collr.garnetKeyspaceRefreshInterval = 0
-	mock := &mockRedisClient{
-		results: map[string][]byte{
-			"all":          dataGarnetInfoAll,
-			"keyspace":     dataGarnetInfoKeyspace,
-			"commandstats": dataGarnetInfoCommandstats,
-		},
-		infoCalls: map[string]int{},
-	}
-	collr.rdb = mock
-
-	ctx := context.Background()
-	mx := collr.Collect(ctx)
-	assert.Equal(t, int64(6), mx["db0_keys"])
-
-	mock.errOnKeyspace = true
-	mx = collr.Collect(ctx)
-	assert.NotContains(t, mx, "db0_keys")
-
-	mx = collr.Collect(ctx)
-	assert.NotContains(t, mx, "db0_keys")
-}
 func ensureCollectedCommandsAddedToCharts(t *testing.T, collr *Collector) {
 	for _, id := range []string{
 		chartCommandsCalls.ID,
@@ -577,14 +365,14 @@ func ensureCollectedCommandsAddedToCharts(t *testing.T, collr *Collector) {
 	}
 }
 
-func ensureCollectedDbsAddedToCharts(t *testing.T, collr *Collector) {
+func ensureCollectedDBsAddedToCharts(t *testing.T, collr *Collector) {
 	for _, id := range []string{
 		chartKeys.ID,
 		chartExpiresKeys.ID,
 	} {
 		chart := collr.Charts().Get(id)
 		require.NotNilf(t, chart, "'%s' chart is not in charts", id)
-		assert.Lenf(t, chart.Dims, len(collr.collectedDbs),
+		assert.Lenf(t, chart.Dims, len(collr.collectedDBs),
 			"'%s' chart unexpected number of dimensions", id)
 	}
 }
@@ -602,40 +390,66 @@ func copyTimeRelatedMetrics(dst, src map[string]int64) {
 	}
 }
 
-type mockRedisClient struct {
-	errOnInfo     bool
-	errOnKeyspace bool
-	result        []byte
-	results       map[string][]byte
-	infoCalls     map[string]int
-	calledClose   bool
+func prepareInfo(infoAll []byte) func(t *testing.T) *Collector {
+	return func(t *testing.T) *Collector {
+		return newTestCollector(t, &mockRedisClient{
+			info: map[string][]byte{"all": infoAll},
+		})
+	}
 }
 
-func (m *mockRedisClient) Info(_ context.Context, sections ...string) (cmd *redis.StringCmd) {
+func prepareGarnet(commandstats []byte) func(t *testing.T) *Collector {
+	return func(t *testing.T) *Collector {
+		return newTestCollector(t, newGarnetMock(commandstats))
+	}
+}
+
+func prepareInfoError(t *testing.T) *Collector {
+	return newTestCollector(t, &mockRedisClient{})
+}
+
+func newGarnetMock(commandstats []byte) *mockRedisClient {
+	return &mockRedisClient{
+		info: map[string][]byte{
+			"all":          dataGarnetInfoAll,
+			"keyspace":     dataGarnetInfoKeyspace,
+			"commandstats": commandstats,
+		},
+	}
+}
+
+func newTestCollector(t *testing.T, rdb *mockRedisClient) *Collector {
+	t.Helper()
+	collr := New()
+	require.NoError(t, collr.Init(context.Background()))
+	collr.rdb = rdb
+	return collr
+}
+
+type mockRedisClient struct {
+	info        map[string][]byte // INFO reply per section; requesting a missing section fails
+	infoCalls   map[string]int
+	calledClose bool
+}
+
+func (m *mockRedisClient) Info(_ context.Context, sections ...string) *redis.StringCmd {
 	section := "all"
 	if len(sections) > 0 {
 		section = sections[0]
 	}
-	if m.infoCalls != nil {
-		m.infoCalls[section]++
+	if m.infoCalls == nil {
+		m.infoCalls = make(map[string]int)
 	}
-	if m.errOnKeyspace && section == "keyspace" {
-		return redis.NewStringResult("", errors.New("error on Info keyspace"))
+	m.infoCalls[section]++
+
+	reply, ok := m.info[section]
+	if !ok {
+		return redis.NewStringResult("", fmt.Errorf("error on INFO %s", section))
 	}
-	if m.results != nil {
-		result, ok := m.results[section]
-		if !ok {
-			return redis.NewStringResult("", errors.New("error on Info"))
-		}
-		return redis.NewStringResult(string(result), nil)
-	}
-	if m.errOnInfo {
-		return redis.NewStringResult("", errors.New("error on Info"))
-	}
-	return redis.NewStringResult(string(m.result), nil)
+	return redis.NewStringResult(string(reply), nil)
 }
 
-func (m *mockRedisClient) Ping(_ context.Context) (cmd *redis.StatusCmd) {
+func (m *mockRedisClient) Ping(context.Context) *redis.StatusCmd {
 	return redis.NewStatusResult("PONG", nil)
 }
 
