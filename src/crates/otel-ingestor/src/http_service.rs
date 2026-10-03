@@ -1290,26 +1290,184 @@ mod tests {
                 .unwrap();
         });
 
-        let body = serde_json::to_vec(&logs_req(1)).unwrap();
-        let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
-        let request = format!(
-            "POST /v1/logs HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\n\
-             Content-Length: {}\r\nConnection: close\r\n\r\n",
-            body.len(),
-        );
-        {
-            use tokio::io::AsyncWriteExt as _;
-            stream.write_all(request.as_bytes()).await.unwrap();
-            stream.write_all(&body).await.unwrap();
-        }
-
-        let mut response = String::new();
-        use tokio::io::AsyncReadExt as _;
-        stream.read_to_string(&mut response).await.unwrap();
+        let stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+        let response = post_json_logs_http11(stream, addr).await.unwrap();
         assert!(response.starts_with("HTTP/1.1 200"), "{response}");
         assert!(response.contains("content-type: application/json"));
 
         assert!(any_file_under(&tmp.path().join("logs/wal")));
         server.abort();
+    }
+
+    /// POST one JSON logs export as a hand-rolled HTTP/1.1 request (no client
+    /// dependency) over any byte stream, plain or TLS, and return the raw
+    /// response. Errors surface as `Err` so TLS tests can assert rejections.
+    async fn post_json_logs_http11<S>(mut stream: S, addr: SocketAddr) -> std::io::Result<String>
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+    {
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+
+        let body = serde_json::to_vec(&logs_req(1)).unwrap();
+        let request = format!(
+            "POST /v1/logs HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\n\
+             Content-Length: {}\r\nConnection: close\r\n\r\n",
+            body.len(),
+        );
+        stream.write_all(request.as_bytes()).await?;
+        stream.write_all(&body).await?;
+        stream.flush().await?;
+
+        let mut response = String::new();
+        stream.read_to_string(&mut response).await?;
+        Ok(response)
+    }
+
+    // -- TLS listener --------------------------------------------------------
+    //
+    // Fixtures under `testdata/tls/` are throwaway EC P-256 certificates valid
+    // until 2126: `ca.pem` (the CA's key was discarded after signing),
+    // `server.{pem,key}` for `localhost`/`127.0.0.1`, and `client.{pem,key}`
+    // for mTLS. They exist only for these tests.
+
+    fn tls_fixture(name: &str) -> String {
+        format!("{}/testdata/tls/{name}", env!("CARGO_MANIFEST_DIR"))
+    }
+
+    /// The process-level rustls provider the otel-plugin binary installs at
+    /// startup; tests share one process, so a repeat install is expected.
+    fn install_crypto_provider() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    }
+
+    fn tls_endpoint(mtls: bool) -> EndpointConfig {
+        EndpointConfig {
+            path: "127.0.0.1:0".to_string(),
+            tls_cert_path: None,
+            tls_key_path: None,
+            tls_ca_cert_path: None,
+            http_path: Some("127.0.0.1:0".to_string()),
+            http_tls_cert_path: Some(tls_fixture("server.pem")),
+            http_tls_key_path: Some(tls_fixture("server.key")),
+            http_tls_ca_cert_path: mtls.then(|| tls_fixture("ca.pem")),
+        }
+    }
+
+    /// Bind the TLS listener from `endpoint` and serve a test state on it.
+    async fn spawn_tls_server(
+        endpoint: &EndpointConfig,
+    ) -> (SocketAddr, tokio::task::JoinHandle<()>, tempfile::TempDir) {
+        let Some(HttpListener::Tls(listener)) = bind_http(endpoint).await.unwrap() else {
+            panic!("a configured cert/key pair must yield a TLS listener");
+        };
+        let addr = listener.listener.local_addr().unwrap();
+        let (state, tmp) = test_state(AuthConfig::default());
+        let server = tokio::spawn(async move {
+            serve(HttpListener::Tls(listener), router(state))
+                .await
+                .unwrap();
+        });
+        (addr, server, tmp)
+    }
+
+    /// A client trusting the fixture CA, offering exactly `alpn`, optionally
+    /// presenting the fixture client certificate.
+    fn tls_client(alpn: &[&[u8]], client_cert: bool) -> tokio_rustls::TlsConnector {
+        use rustls::pki_types::pem::PemObject;
+        use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+
+        let mut roots = rustls::RootCertStore::empty();
+        for cert in CertificateDer::pem_file_iter(tls_fixture("ca.pem")).unwrap() {
+            roots.add(cert.unwrap()).unwrap();
+        }
+        let builder = rustls::ClientConfig::builder().with_root_certificates(roots);
+        let mut config = if client_cert {
+            let certs = CertificateDer::pem_file_iter(tls_fixture("client.pem"))
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+            let key = PrivateKeyDer::from_pem_file(tls_fixture("client.key")).unwrap();
+            builder.with_client_auth_cert(certs, key).unwrap()
+        } else {
+            builder.with_no_client_auth()
+        };
+        config.alpn_protocols = alpn.iter().map(|p| p.to_vec()).collect();
+        tokio_rustls::TlsConnector::from(Arc::new(config))
+    }
+
+    async fn tls_connect(
+        connector: &tokio_rustls::TlsConnector,
+        addr: SocketAddr,
+    ) -> std::io::Result<tokio_rustls::client::TlsStream<tokio::net::TcpStream>> {
+        let tcp = tokio::net::TcpStream::connect(addr).await?;
+        let name = rustls::pki_types::ServerName::try_from("localhost").unwrap();
+        connector.connect(name, tcp).await
+    }
+
+    #[tokio::test]
+    async fn tls_listener_negotiates_http1_and_h2_and_lands_exports() {
+        install_crypto_provider();
+        let (addr, server, tmp) = spawn_tls_server(&tls_endpoint(false)).await;
+
+        // A client offering ONLY http/1.1 (Python requests/urllib3 does this)
+        // must negotiate it, not fail the handshake.
+        let stream = tls_connect(&tls_client(&[b"http/1.1"], false), addr)
+            .await
+            .unwrap();
+        assert_eq!(stream.get_ref().1.alpn_protocol(), Some(&b"http/1.1"[..]));
+        let response = post_json_logs_http11(stream, addr).await.unwrap();
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert!(any_file_under(&tmp.path().join("logs/wal")));
+
+        // A client preferring h2 gets h2.
+        let stream = tls_connect(&tls_client(&[b"h2", b"http/1.1"], false), addr)
+            .await
+            .unwrap();
+        assert_eq!(stream.get_ref().1.alpn_protocol(), Some(&b"h2"[..]));
+
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn mtls_listener_rejects_anonymous_clients_and_keeps_serving() {
+        install_crypto_provider();
+        let (addr, server, _tmp) = spawn_tls_server(&tls_endpoint(true)).await;
+
+        // Without a client certificate the request never gets a response.
+        // TLS 1.3 completes the client side of the handshake before the server
+        // checks the certificate, so the rejection may surface on connect or
+        // on the first read; either way no HTTP response arrives.
+        let anonymous = match tls_connect(&tls_client(&[b"http/1.1"], false), addr).await {
+            Ok(stream) => post_json_logs_http11(stream, addr).await,
+            Err(e) => Err(e),
+        };
+        assert!(
+            !anonymous.as_deref().is_ok_and(|r| r.starts_with("HTTP/")),
+            "an anonymous client must not be served: {anonymous:?}"
+        );
+
+        // The failed handshake cost one connection, not the listener.
+        let stream = tls_connect(&tls_client(&[b"http/1.1"], true), addr)
+            .await
+            .unwrap();
+        let response = post_json_logs_http11(stream, addr).await.unwrap();
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn unreadable_tls_material_fails_the_bind() {
+        install_crypto_provider();
+        let mut endpoint = tls_endpoint(false);
+        endpoint.http_tls_key_path = Some(tls_fixture("missing.key"));
+        let err = bind_http(&endpoint)
+            .await
+            .err()
+            .expect("missing key must fail");
+        assert!(
+            format!("{err:#}").contains("failed to configure OTLP/HTTP TLS"),
+            "{err:#}"
+        );
     }
 }
