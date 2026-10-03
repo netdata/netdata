@@ -57,7 +57,7 @@ modules:
               [`dcgm-exporter-netdata.csv`](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/dcgm/dcgm-exporter-netdata.csv)
               (raw download: `https://raw.githubusercontent.com/netdata/netdata/master/src/go/plugin/go.d/collector/dcgm/dcgm-exporter-netdata.csv`).
 
-              The Netdata profile enables 123 fields by default and lists optional fields from its source dataset as commented entries.
+              The Netdata profile enables 121 fields by default and lists optional fields from its source dataset as commented entries.
               To customize beyond the baseline, uncomment the field you need and comment one currently enabled field.
 
               Runtime validation artifact:
