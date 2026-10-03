@@ -554,6 +554,12 @@ fn rpc_error(codec: Codec, status: Status) -> Response<Body> {
     response_bytes(http, codec.content_type(), body)
 }
 
+/// The collector's gRPC→HTTP table (otlpreceiver `GetHTTPStatusCodeFromStatus`).
+/// Today only three codes reach it: `InvalidArgument` (undecodable body,
+/// invalid tenant), `Unauthenticated` (missing tenant header) and `Internal`
+/// (frame encoding and WAL failures). The other arms are kept so a future
+/// core error maps correctly without touching the transport — e.g.
+/// throttling's `ResourceExhausted` becomes the retryable 429.
 fn http_status_for(code: Code) -> StatusCode {
     match code {
         Code::InvalidArgument | Code::OutOfRange | Code::FailedPrecondition => {
