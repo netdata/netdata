@@ -13,7 +13,7 @@ import os
 import re
 import socket
 import urllib.request
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -48,6 +48,35 @@ def run_dir(agent_id: str) -> Path:
     return Path.home() / "opt" / "netdata-mcp" / "run" / sanitize_agent_id(agent_id)
 
 
+# The longest socket path netdata creates under NETDATA_RUN_DIR is the otel
+# plugin's legacy-logs worker socket, named after the supervisor's pid (Linux
+# pid_max is at most 4194304, 7 digits). A Unix socket path holds 107 bytes.
+_LONGEST_RUNTIME_SOCKET = "otel-plugin/legacy-logs-4194304.sock"
+_UNIX_SOCKET_PATH_MAX = 107
+
+
+def runtime_dir(agent_id: str) -> Path:
+    """The agent's own netdata runtime dir, exported to it as ``NETDATA_RUN_DIR``.
+
+    Without it netdata falls back to the host-wide ``/tmp/netdata``, where
+    parallel agents share the spawn-server and plugin socket paths: a second
+    agent's failed spawn-server start deletes the first agent's socket file, and
+    the first agent can no longer launch or relaunch any plugin.
+    """
+    return run_dir(agent_id) / "run"
+
+
+def check_runtime_socket_paths(agent_id: str) -> None:
+    """Raise ValueError if ``agent_id`` makes netdata's socket paths overflow."""
+    excess = len(os.fsencode(runtime_dir(agent_id) / _LONGEST_RUNTIME_SOCKET)) - _UNIX_SOCKET_PATH_MAX
+    if excess > 0:
+        raise ValueError(
+            f"Agent id {agent_id!r} is {excess} chars too long on this host: netdata's sockets "
+            f"under {runtime_dir(agent_id)} would exceed the {_UNIX_SOCKET_PATH_MAX}-byte "
+            f"Unix socket path limit. Use at most {len(agent_id) - excess} chars."
+        )
+
+
 def free_port() -> int:
     """An OS-assigned free loopback TCP port.
 
@@ -61,6 +90,26 @@ def free_port() -> int:
     try:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
+    finally:
+        sock.close()
+
+
+def port_available(port: int) -> bool:
+    """True if ``port`` can be bound on loopback right now.
+
+    Used for a pinned (declared) port, which the kernel did not pick: a
+    listener already holding it — another agent, or a survivor of a previous
+    server — must fail the run up front with a clear reason instead of
+    netdata's bind error. SO_REUSEADDR mirrors netdata's own bind, so a socket
+    of a just-stopped agent lingering in TIME_WAIT does not count as taken.
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(("127.0.0.1", port))
+        return True
+    except OSError:
+        return False
     finally:
         sock.close()
 
@@ -123,18 +172,24 @@ class OtelConfig:
 
     Every field is optional: ``None`` means "leave the plugin default" and the
     key is omitted from the generated otel.yaml (which the plugin partial-merges
-    over its own stock defaults). The local storage layout is derived from a
+    over its own stock defaults), except the two endpoint fields, which are
+    always emitted: ``otlp_endpoint`` resolves to a free loopback port and
+    ``otlp_http_endpoint`` to another one (or to a disable when set to ``""``),
+    so parallel agents never collide on the stock 4317/4318 — the plugin fails
+    fast on an occupied port. The local storage layout is derived from a
     single ``base_dir`` that is always pinned under the run dir for per-agent
     isolation (re-pinned after the ``extra_yaml`` merge, alongside
-    ``endpoint.path``). Caller-supplied paths do exist beyond the pin:
-    ``remote_storage_uri``, ``journal_dir``, and whatever ``extra_yaml`` reaches — the
-    server is a localhost-only developer tool, so the caller is trusted. The
-    rotation/retention knobs are the edge-case drivers (tiny thresholds force
-    multi-file splits and evictions over small, deterministic corpora).
-    ``journal_dir`` is a read-only path (the legacy viewer's fixture).
+    ``endpoint.path`` and ``endpoint.http_path``). Caller-supplied paths do
+    exist beyond the pin: ``remote_storage_uri``, ``journal_dir``, and whatever
+    ``extra_yaml`` reaches — the server is a localhost-only developer tool, so
+    the caller is trusted. The rotation/retention knobs are the edge-case
+    drivers (tiny thresholds force multi-file splits and evictions over small,
+    deterministic corpora). ``journal_dir`` is a read-only path (the legacy
+    viewer's fixture).
     """
 
     otlp_endpoint: str | None = None          # endpoint.path; None → auto free loopback port
+    otlp_http_endpoint: str | None = None     # endpoint.http_path; None → auto free loopback port, "" → null (disable)
     # Per-signal tuning (dirs are derived from base_dir, not set here). Each
     # signal has an independent set; an omitted knob keeps the plugin's stock
     # default for that signal. logs.* and traces.* are symmetric.
@@ -162,10 +217,10 @@ class OtelConfig:
     # value replaces). Reaches knobs without first-class fields (auth, ingest
     # windows, retention max_age/horizon, catalog rotation_period, per-tenant
     # override blocks, startup_op_timeout) and deliberately-invalid keys for
-    # strict-config refusal tests. base_dir and endpoint.path stay pinned (the
-    # harness' per-agent isolation invariants) — see _otel_doc. Validated as
-    # parseable YAML at the tool boundary; a semantically bad config surfaces
-    # as the plugin's own refuse-to-start (that IS the test).
+    # strict-config refusal tests. base_dir, endpoint.path, and endpoint.http_path
+    # stay pinned (the harness' per-agent isolation invariants) — see _otel_doc.
+    # Validated as parseable YAML at the tool boundary; a semantically bad config
+    # surfaces as the plugin's own refuse-to-start (that IS the test).
     extra_yaml: str | None = None
 
 
@@ -230,14 +285,16 @@ def _signal_tuning(
     return out
 
 
-def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
-    """The otel.yaml override document: pinned per-agent base_dir + endpoint, plus any set knobs.
+def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint: str | None) -> dict:
+    """The otel.yaml override document: pinned per-agent base_dir + both endpoints, plus any set knobs.
 
     Only fields the caller set are emitted; the plugin keeps its stock defaults
     for the rest. ``base_dir`` is always pinned under the run dir, so every
     derived dir (``{base_dir}/{logs,traces}/{wal,index,catalog}``, the shared
     download cache ``{base_dir}/remote-read``, ``{base_dir}/shared/seq_highwater``)
-    lands in isolation — one pin isolates both signals.
+    lands in isolation — one pin isolates both signals. ``otlp_http_endpoint``
+    arrives already resolved (a host:port string, or ``None``/``""`` which both
+    serialize to ``http_path: null`` — the plugin's disable).
     """
     base_dir = str(rd / "lib" / "otel")
 
@@ -285,7 +342,10 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
     if cfg.journal_dir:
         logs["journal_dir"] = cfg.journal_dir
 
-    doc: dict = {"endpoint": {"path": otlp_endpoint}, "base_dir": base_dir}
+    doc: dict = {
+        "endpoint": {"path": otlp_endpoint, "http_path": otlp_http_endpoint or None},
+        "base_dir": base_dir,
+    }
     if remote_storage:
         doc["remote_storage"] = remote_storage
     if logs:
@@ -295,9 +355,10 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
 
     # Raw-YAML escape hatch (see OtelConfig.extra_yaml): deep-merge the caller's
     # mapping over the generated doc — passthrough wins — then RE-PIN base_dir
-    # and endpoint.path. Those two are harness invariants (per-agent isolation;
-    # the reported OTLP endpoint), not plugin knobs to reach; everything else,
-    # including keys the plugin will refuse, passes through untouched.
+    # and both endpoint addresses. Those are harness invariants (per-agent
+    # isolation; the reported OTLP endpoint; no undeclared 4318 bind), not
+    # plugin knobs to reach; everything else, including keys the plugin will
+    # refuse, passes through untouched.
     if cfg.extra_yaml:
         try:
             extra = yaml.safe_load(cfg.extra_yaml)
@@ -313,8 +374,12 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
             doc.setdefault("endpoint", {})
             if isinstance(doc["endpoint"], dict):
                 doc["endpoint"]["path"] = otlp_endpoint
+                doc["endpoint"]["http_path"] = otlp_http_endpoint or None
             else:
-                doc["endpoint"] = {"path": otlp_endpoint}
+                doc["endpoint"] = {
+                    "path": otlp_endpoint,
+                    "http_path": otlp_http_endpoint or None,
+                }
     return doc
 
 
@@ -339,9 +404,11 @@ def generate_runtime(
     agent_id: str,
     overrides: dict[str, dict[str, str]] | None = None,
     otel: OtelConfig | None = None,
-) -> tuple[Path, Path, str]:
+    reserved_ports: Iterable[int] = (),
+) -> tuple[Path, Path, str, str | None]:
     """Create the isolated run dir, write netdata.conf + otel.yaml; return
-    ``(run_dir, conf_path, otlp_endpoint)``.
+    ``(run_dir, conf_path, otlp_endpoint, otlp_http_endpoint)`` — the HTTP
+    endpoint is None when the config disables the OTLP/HTTP listener.
 
     ``overrides`` is the per-agent extension point ({section: {key: value}}),
     deep-merged over the defaults — the hook for runtime overrides (db mode,
@@ -352,11 +419,14 @@ def generate_runtime(
     plugin loads the otel.yaml we generate there (netdata derives
     ``NETDATA_USER_CONFIG_DIR`` from that key and re-exports it to plugins; the
     ``-c`` flag only loads the file, not the dir). ``otlp_endpoint`` defaults to a
-    free loopback port so parallel agents don't collide on 4317; it is returned
-    so the caller can record where to push OTLP data.
+    free loopback port so parallel agents don't collide on 4317; the OTLP/HTTP
+    listener gets its own free port for the same reason (the plugin fails fast on
+    an occupied port), unless the config disables it (``otlp_http_endpoint=""``)
+    or pins it; ``reserved_ports`` (the web port) are never auto-assigned. Both
+    endpoints are returned so the caller can report where to push OTLP data.
     """
     rd = run_dir(agent_id)
-    for sub in ("etc", "cache", "lib", "log"):
+    for sub in ("etc", "cache", "lib", "log", "run"):
         (rd / sub).mkdir(parents=True, exist_ok=True)
 
     conf = _default_conf(agent_id, rd)
@@ -368,11 +438,53 @@ def generate_runtime(
     conf_path.write_text(_render_ini(conf), encoding="utf-8")
 
     cfg = otel or OtelConfig()
-    otlp_endpoint = cfg.otlp_endpoint or f"127.0.0.1:{free_port()}"
-    otel_yaml = yaml.safe_dump(_otel_doc(cfg, rd, otlp_endpoint), sort_keys=False)
+    # Every auto-assigned port must differ from the caller's (the web port),
+    # from any pinned endpoint and from each other: free_port() releases its
+    # socket, so two calls can return the same port, and the plugin refuses
+    # to start when its two listeners collide.
+    taken = set(reserved_ports)
+    for pinned in (cfg.otlp_endpoint, cfg.otlp_http_endpoint):
+        if pinned and (port := _endpoint_port(pinned)) is not None:
+            taken.add(port)
+    if cfg.otlp_endpoint:
+        otlp_endpoint = cfg.otlp_endpoint
+    else:
+        port = _free_port_except(taken)
+        taken.add(port)
+        otlp_endpoint = f"127.0.0.1:{port}"
+    # "" (disable) must survive intact: only None auto-assigns.
+    otlp_http_endpoint = (
+        cfg.otlp_http_endpoint
+        if cfg.otlp_http_endpoint is not None
+        else f"127.0.0.1:{_free_port_except(taken)}"
+    )
+    otel_yaml = yaml.safe_dump(
+        _otel_doc(cfg, rd, otlp_endpoint, otlp_http_endpoint), sort_keys=False
+    )
     (rd / "etc" / "otel.yaml").write_text(otel_yaml, encoding="utf-8")
 
-    return rd, conf_path, otlp_endpoint
+    return rd, conf_path, otlp_endpoint, otlp_http_endpoint or None
+
+
+def _free_port_except(taken: set[int], attempts: int = 64) -> int:
+    """A free loopback port not in ``taken``.
+
+    Bounded: the kernel normally hands out a different port on the next try,
+    so failing ``attempts`` times means something is wrong with the host's
+    ephemeral range — fail loudly instead of spinning.
+    """
+    for _ in range(attempts):
+        if (port := free_port()) not in taken:
+            return port
+    raise RuntimeError(
+        f"no free loopback port outside {sorted(taken)} after {attempts} attempts"
+    )
+
+
+def _endpoint_port(endpoint: str) -> int | None:
+    """The port of a ``host:port`` endpoint (None if it has none)."""
+    _, _, port = endpoint.rpartition(":")
+    return int(port) if port.isdigit() else None
 
 
 def launch_command(netdata_bin: Path, port: int, conf_path: Path) -> list[str]:

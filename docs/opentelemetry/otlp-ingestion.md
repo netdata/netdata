@@ -1,13 +1,13 @@
 # Ingest OpenTelemetry Metrics, Logs, and Traces
 
-Use Netdata's OTLP/gRPC endpoint when an application already emits OpenTelemetry data or an OpenTelemetry Collector is already part of your observability pipeline. For host and application metrics that Netdata can collect directly, the native collector is usually simpler and exposes purpose-built charts and alerts.
+Use Netdata's OTLP endpoints — OTLP/gRPC and OTLP/HTTP — when an application already emits OpenTelemetry data or an OpenTelemetry Collector is already part of your observability pipeline. For host and application metrics that Netdata can collect directly, the native collector is usually simpler and exposes purpose-built charts and alerts.
 
 ## Choose the collection path
 
 | Situation                                                                           | Recommended path                                                                             |
 |:------------------------------------------------------------------------------------|:---------------------------------------------------------------------------------------------|
 | Netdata is the only consumer of host or application metrics                         | Use Netdata's [native collectors](/src/collectors/COLLECTORS.md)                             |
-| An application already emits OTLP, or a Collector fans data out to several backends | Export OTLP/gRPC to Netdata as described below                                               |
+| An application already emits OTLP, or a Collector fans data out to several backends | Export OTLP to Netdata over gRPC or HTTP, as described below                                 |
 | Network devices send syslog                                                         | Use the dedicated [OpenTelemetry Collector syslog setup](/docs/npm/syslog/otel-collector.md) |
 
 The Netdata Agent receives OTLP metrics, logs, and traces. Traces are stored on the receiving Agent under their own retention settings, the `traces` section of `otel.yaml`, and explored in the Traces tab; see [Send traces](/docs/opentelemetry/otlp-ingestion.md#send-traces) below and [Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md).
@@ -16,8 +16,8 @@ The Netdata Agent receives OTLP metrics, logs, and traces. Traces are stored on 
 
 ```mermaid
 flowchart LR
-    collector["OpenTelemetry Collector<br/>receivers · processors · exporters"] -->|"OTLP/gRPC · port 4317"| plugin["Netdata Agent<br/>OpenTelemetry plugin"]
-    sdk["OTLP SDK or<br/>instrumented application"] -->|"OTLP/gRPC · port 4317"| plugin
+    collector["OpenTelemetry Collector<br/>receivers · processors · exporters"] -->|"OTLP/gRPC · 4317<br/>OTLP/HTTP · 4318"| plugin["Netdata Agent<br/>OpenTelemetry plugin"]
+    sdk["OTLP SDK or<br/>instrumented application"] -->|"OTLP/gRPC · 4317<br/>OTLP/HTTP · 4318"| plugin
     plugin --> metrics["Metrics<br/>charts and alerts"]
     plugin --> logs["Logs<br/>indexed Logs tab"]
     plugin --> traces["Traces<br/>indexed Traces tab"]
@@ -26,7 +26,7 @@ flowchart LR
 ## What you need
 
 - A Netdata Agent with the OpenTelemetry plugin. Linux native DEB and RPM packages install it as a dependency of `netdata`, static builds bundle it (except the 32-bit ARMv6 build), and all Docker images include it. macOS kickstart installs provision a Rust toolchain and build it; if no adequate toolchain ends up available, the install continues with a warning and without the plugin. Linux source builds need `--enable-plugin-otel`. It is not available on Windows or FreeBSD. Wherever it is present, Netdata starts it automatically.
-- An OTLP/gRPC source. The examples use [OpenTelemetry Collector Contrib](https://github.com/open-telemetry/opentelemetry-collector-releases) because the `host_metrics` and `file_log` receivers are Contrib components.
+- An OTLP source — gRPC or HTTP. The examples use [OpenTelemetry Collector Contrib](https://github.com/open-telemetry/opentelemetry-collector-releases) because the `host_metrics` and `file_log` receivers are Contrib components.
 - Network access from the sender to the Agent's endpoint.
 - For log and trace verification, a Netdata Cloud account and sign-in. The `otel-logs` and `otel-traces` views are access-gated.
 
@@ -34,11 +34,11 @@ The maintained examples are validated with OpenTelemetry Collector Contrib `0.15
 
 For production pipelines beyond these smoke tests, continue with [Metrics Collection](/docs/opentelemetry/metrics-collection.md), [Logs Collection](/docs/opentelemetry/logs-collection.md), and [Transformations](/docs/opentelemetry/transformations.md). Each page links its examples to the complete upstream Collector documentation.
 
-The plugin starts automatically and listens on the IPv4 loopback endpoint `127.0.0.1:4317`. The examples below put the Collector and Agent on the same host and intentionally disable TLS only for that loopback connection.
+The plugin starts automatically and listens on two IPv4 loopback endpoints: `127.0.0.1:4317` for OTLP/gRPC and `127.0.0.1:4318` for OTLP/HTTP. The examples below put the Collector and Agent on the same host and intentionally disable TLS only for that loopback connection.
 
 ## Export to the local Agent
 
-Add this exporter to the Collector configuration:
+Add one of these exporters to the Collector configuration:
 
 ```yaml
 exporters:
@@ -48,7 +48,17 @@ exporters:
       insecure: true
 ```
 
-Use the `otlp_grpc` exporter and port `4317`. Netdata does not accept the `otlp_http` exporter or OTLP/HTTP port `4318`. Use `127.0.0.1` rather than `localhost` if the latter resolves to IPv6.
+```yaml
+exporters:
+  otlp_http/netdata:
+    endpoint: "http://127.0.0.1:4318"
+    tls:
+      insecure: true
+```
+
+Both transports work: `otlp_grpc` sends to port `4317`; `otlp_http` sends OTLP/HTTP to port `4318`, where the `endpoint` is a full URL. The HTTP receiver serves `POST /v1/logs`, `POST /v1/traces`, and `POST /v1/metrics` and accepts `application/x-protobuf` or `application/json` bodies. Use `127.0.0.1` rather than `localhost` if the latter resolves to IPv6.
+
+An SDK exporting directly can keep its OTLP/HTTP default: set `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318` with `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf` (or `http/json`). For gRPC, use `http://127.0.0.1:4317` with `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`. Because the HTTP receiver is plain HTTP POST, it is also easy to probe with `curl` — post an OTLP JSON body to `/v1/logs` with `Content-Type: application/json`. JSON bodies use the OTLP/JSON encoding: hex trace and span IDs, enum fields as integers, and 64-bit integers as decimal strings or plain numbers (`"timeUnixNano": "1700000000000000000"` and `"timeUnixNano": 1700000000000000000` are both accepted). Enum names (such as `"SEVERITY_NUMBER_INFO"`) and the non-finite values `"NaN"`, `"Infinity"`, and `"-Infinity"` are rejected with `400 Bad Request` rather than silently dropped. So are three rarer forms that proto3 JSON permits but the receiver's decoder cannot read: an empty attribute value (`{}`) as an element of an array value, decimal and 32-bit integer fields written as strings (such as `"asDouble": "1.5"`), and 64-bit integers written with a fraction or an exponent (such as `3.0` or `1e3`). The OpenTelemetry SDKs and the Collector do not emit these forms.
 
 ## Smoke-test Host Metrics
 
@@ -123,8 +133,8 @@ In Netdata, open the node's Logs tab, select the `otel-logs` source, and choose 
 
 Traces come from instrumented applications. Export them to the Agent directly from the OpenTelemetry SDK, or through a Collector that forwards them.
 
-- **SDK:** set `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317` and `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` in the application's environment. Many SDKs default to OTLP/HTTP, which Netdata does not accept.
-- **Collector:** add the exporter above to a `traces` pipeline. A Collector on the Agent's host cannot listen on the address the Agent already uses (`127.0.0.1:4317` by default), so give its `otlp` receiver another port and point the applications at it:
+- **SDK:** set `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4317` and `OTEL_EXPORTER_OTLP_PROTOCOL=grpc` in the application's environment, or point it at the HTTP receiver with `OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318` and `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf` (or `http/json`). Many SDKs default to OTLP/HTTP; the Agent accepts both transports.
+- **Collector:** add the exporter above to a `traces` pipeline. A Collector on the Agent's host cannot listen on the addresses the Agent already uses (`127.0.0.1:4317` and `127.0.0.1:4318` by default), so give its `otlp` receiver another port and point the applications at it:
 
   ```yaml
   exporters:
@@ -150,8 +160,8 @@ Set the `service.name` resource attribute in every application; it names the ser
 
 ## Accept remote senders securely
 
-The default loopback endpoint is the safe choice for a same-host Collector. To receive remote OTLP traffic, bind
-beyond loopback with TLS or mutual TLS and restrict port `4317` with network controls — the procedure and certificate
+The default loopback endpoints are the safe choice for a same-host Collector. To receive remote OTLP traffic, bind
+beyond loopback with TLS or mutual TLS and restrict ports `4317` and `4318` with network controls — the procedure and certificate
 rotation are in [Securing the OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md). See
 the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) for every option.
 
@@ -159,7 +169,7 @@ the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) for ever
 
 - **The plugin is absent:** on Linux native packages, confirm the `netdata-plugin-otel` package is installed; on ARMv6 static builds, Windows, and FreeBSD the plugin is not available.
 - **The plugin does not start:** check the Agent journal for strict `otel.yaml` or `NETDATA_OTEL_CFG_*` validation errors.
-- **The Collector or SDK connects but data is absent:** confirm that it uses OTLP/gRPC on `4317`; SDKs commonly select it with `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`. Then check both sender and Agent logs for rejected exports. On a systemd-based Agent host, query recent plugin messages with `journalctl SYSLOG_IDENTIFIER=otel-plugin SYSLOG_IDENTIFIER=otel-plugin/ingestor --since "-10 min"`.
+- **The Collector or SDK connects but data is absent:** confirm which transport it uses — OTLP/gRPC on `4317`, or OTLP/HTTP on `4318` targeting `/v1/logs`, `/v1/traces`, or `/v1/metrics` with an `application/x-protobuf` or `application/json` Content-Type. Then check both sender and Agent logs for rejected exports. On a systemd-based Agent host, query recent plugin messages with `journalctl SYSLOG_IDENTIFIER=otel-plugin SYSLOG_IDENTIFIER=otel-plugin/ingestor --since "-10 min"`.
 - **A metric is absent:** exponential histograms are not currently ingested. For other metrics, inspect mapping errors and search for the `otel.<metric-name>` context.
 - **Some logs are absent:** by default, Netdata accepts log timestamps from up to 24 hours in the past through 10 minutes in the future. Records outside this window are rejected. Netdata reports rejected records through OTLP `partial_success`; whether that message is visible depends on the sender.
 - **Some spans are absent:** by default, Netdata accepts a span only if it started no more than 24 hours ago and ends no more than 10 minutes in the future; a span without an end time is judged by its start. Netdata reports rejected spans through OTLP `partial_success`, whose visibility depends on the sender, and logs a warning in the Agent journal.

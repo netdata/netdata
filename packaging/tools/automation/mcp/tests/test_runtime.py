@@ -28,6 +28,19 @@ def test_run_dir_rejects_unsafe_id():
         runtime.run_dir("../escape")
 
 
+def test_runtime_dir_is_inside_the_run_dir():
+    assert runtime.runtime_dir("child-debug") == runtime.run_dir("child-debug") / "run"
+
+
+def test_runtime_socket_paths_limit_the_id_length(monkeypatch):
+    # "/h/opt/netdata-mcp/run/" + id + "/run/otel-plugin/legacy-logs-4194304.sock"
+    # is 64 + len(id) bytes, so ids up to 43 chars fit the 107-byte limit.
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: Path("/h")))
+    runtime.check_runtime_socket_paths("x" * 43)
+    with pytest.raises(ValueError, match="1 chars too long"):
+        runtime.check_runtime_socket_paths("x" * 44)
+
+
 def test_install_bin_path():
     b = runtime.install_bin("/home/u/repos/nd")
     assert b.parts[-3:] == ("usr", "sbin", "netdata")
@@ -42,7 +55,7 @@ def test_launch_command_shape():
 def test_generate_runtime_writes_isolated_conf(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     monkeypatch.setattr(journal, "journald_socket_present", lambda: True)
-    rd, conf, _otlp = runtime.generate_runtime("agent-x")
+    rd, conf, _otlp, _http = runtime.generate_runtime("agent-x")
     assert rd == tmp_path / "opt" / "netdata-mcp" / "run" / "agent-x"
     for sub in ("etc", "cache", "lib", "log"):
         assert (rd / sub).is_dir()
@@ -62,13 +75,19 @@ def test_generate_runtime_writes_isolated_conf(tmp_path, monkeypatch):
     assert "daemon = journal" in text
 
 
+def test_generate_runtime_creates_the_runtime_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    runtime.generate_runtime("agent-x")
+    assert runtime.runtime_dir("agent-x").is_dir()
+
+
 def test_generate_runtime_uses_stderr_logs_without_journald(tmp_path, monkeypatch):
     # No journald socket -> route logs to stderr (never journal, whose plugin
     # layer panics if it can't connect). stderr surfaces through netdata_run_logs
     # rather than vanishing into on-disk collector.log/daemon.log.
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     monkeypatch.setattr(journal, "journald_socket_present", lambda: False)
-    _, conf, _otlp = runtime.generate_runtime("agent-nj")
+    _, conf, _otlp, _http = runtime.generate_runtime("agent-nj")
     text = conf.read_text()
     assert "[logs]" in text
     assert "collector = stderr" in text
@@ -84,7 +103,7 @@ def test_generate_runtime_uses_stderr_logs_without_journald(tmp_path, monkeypatc
 
 def test_generate_runtime_applies_overrides(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    _, conf, _otlp = runtime.generate_runtime(
+    _, conf, _otlp, _http = runtime.generate_runtime(
         "agent-y", overrides={"db": {"mode": "dbengine"}, "plugins": {"go.d": "no"}}
     )
     text = conf.read_text()
@@ -94,7 +113,7 @@ def test_generate_runtime_applies_overrides(tmp_path, monkeypatch):
 
 def test_generate_runtime_writes_otel_yaml_with_isolated_base_dir_and_endpoint(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    rd, _conf, otlp = runtime.generate_runtime("agent-o")
+    rd, _conf, otlp, _http = runtime.generate_runtime("agent-o")
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     # One base_dir pinned under the run dir; the plugin derives every per-signal
     # dir from it (per-agent isolation for both logs and traces).
@@ -102,10 +121,87 @@ def test_generate_runtime_writes_otel_yaml_with_isolated_base_dir_and_endpoint(t
     # endpoint auto-assigned on loopback and reported back
     assert doc["endpoint"]["path"] == otlp
     assert otlp.startswith("127.0.0.1:")
+    # the OTLP/HTTP listener gets its OWN auto-assigned loopback port — never
+    # the stock 4318 (a collide-and-fail-fast across parallel agents), never
+    # the gRPC one
+    assert doc["endpoint"]["http_path"].startswith("127.0.0.1:")
+    assert doc["endpoint"]["http_path"] != otlp
     # no per-signal dirs are emitted (derived), and no tuning knobs were set
     assert "logs" not in doc
     # global storage omitted (disabled) unless configured
     assert "remote_storage" not in doc
+
+
+def test_generate_runtime_otel_http_endpoint_states(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    # explicit host:port pins the listener and is reported back
+    rd, _conf, _otlp, http = runtime.generate_runtime(
+        "agent-h1", otel=runtime.OtelConfig(otlp_http_endpoint="127.0.0.1:4318")
+    )
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    assert doc["endpoint"]["http_path"] == "127.0.0.1:4318"
+    assert http == "127.0.0.1:4318"
+    # "" (the tool-layer disable sentinel) serializes as http_path: null —
+    # the plugin's disable — not as an empty string or an omission — and is
+    # reported as None
+    rd, _conf, _otlp, http = runtime.generate_runtime(
+        "agent-h2", otel=runtime.OtelConfig(otlp_http_endpoint="")
+    )
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    assert doc["endpoint"]["http_path"] is None
+    assert http is None
+    # auto-assigned: the reported endpoint is the one written
+    rd, _conf, _otlp, http = runtime.generate_runtime("agent-h3")
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    assert http is not None and doc["endpoint"]["http_path"] == http
+
+
+def test_generate_runtime_auto_ports_never_collide(tmp_path, monkeypatch):
+    # free_port() releases its socket, so successive calls may repeat a port.
+    # Force every repeat: the reserved web port (5000) first, then the gRPC
+    # pick again for the HTTP listener.
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    picks = iter([5000, 6000, 6000, 7000])
+    monkeypatch.setattr(runtime, "free_port", lambda: next(picks))
+    rd, _conf, otlp, http = runtime.generate_runtime("agent-ports", reserved_ports=(5000,))
+    assert (otlp, http) == ("127.0.0.1:6000", "127.0.0.1:7000")
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    assert (doc["endpoint"]["path"], doc["endpoint"]["http_path"]) == (otlp, http)
+    # a pinned gRPC endpoint is avoided too
+    picks = iter([4317, 8000])
+    rd, _conf, otlp, http = runtime.generate_runtime(
+        "agent-ports2", otel=runtime.OtelConfig(otlp_endpoint="127.0.0.1:4317")
+    )
+    assert (otlp, http) == ("127.0.0.1:4317", "127.0.0.1:8000")
+
+
+def test_generate_runtime_auto_grpc_port_avoids_a_pinned_http_port(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    picks = iter([4318, 9000])
+    monkeypatch.setattr(runtime, "free_port", lambda: next(picks))
+    _rd, _conf, otlp, http = runtime.generate_runtime(
+        "agent-ports3", otel=runtime.OtelConfig(otlp_http_endpoint="127.0.0.1:4318")
+    )
+    assert (otlp, http) == ("127.0.0.1:9000", "127.0.0.1:4318")
+
+
+def test_generate_runtime_portless_pinned_endpoint_still_fails_cleanly(tmp_path, monkeypatch):
+    # A pinned endpoint without a numeric port reserves nothing; running out of
+    # ports must still raise the intended RuntimeError, not a sort TypeError.
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(runtime, "free_port", lambda: 5000)
+    with pytest.raises(RuntimeError, match="no free loopback port"):
+        runtime.generate_runtime(
+            "agent-ports4",
+            reserved_ports=(5000,),
+            otel=runtime.OtelConfig(otlp_endpoint="localhost:grpc"),
+        )
+
+
+def test_free_port_except_gives_up_instead_of_spinning(monkeypatch):
+    monkeypatch.setattr(runtime, "free_port", lambda: 5000)
+    with pytest.raises(RuntimeError, match="no free loopback port outside \\[5000\\]"):
+        runtime._free_port_except({5000}, attempts=3)
 
 
 def test_generate_runtime_otel_emits_journal_dir_when_set(tmp_path, monkeypatch):
@@ -114,7 +210,7 @@ def test_generate_runtime_otel_emits_journal_dir_when_set(tmp_path, monkeypatch)
     # can't be accidentally satisfied by a default.
     sentinel = "/srv/legacy-otel-fixture/v1"
     cfg = runtime.OtelConfig(journal_dir=sentinel)
-    rd, _conf, _otlp = runtime.generate_runtime("agent-j", otel=cfg)
+    rd, _conf, _otlp, _http = runtime.generate_runtime("agent-j", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     # journal_dir lands at logs.journal_dir for the read-only legacy viewer...
     assert doc["logs"]["journal_dir"] == sentinel
@@ -125,7 +221,7 @@ def test_generate_runtime_otel_emits_journal_dir_when_set(tmp_path, monkeypatch)
 def test_generate_runtime_otel_omits_empty_journal_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     # An empty string is "not set": omitted, not emitted as logs.journal_dir: "".
-    rd, _conf, _otlp = runtime.generate_runtime("agent-e", otel=runtime.OtelConfig(journal_dir=""))
+    rd, _conf, _otlp, _http = runtime.generate_runtime("agent-e", otel=runtime.OtelConfig(journal_dir=""))
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert "logs" not in doc
 
@@ -138,7 +234,7 @@ def test_generate_runtime_otel_emits_only_set_knobs(tmp_path, monkeypatch):
         logs_retention_max_files=2,
         logs_crc_enabled=False,
     )
-    rd, _conf, otlp = runtime.generate_runtime("agent-k", otel=cfg)
+    rd, _conf, otlp, _http = runtime.generate_runtime("agent-k", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert otlp == "127.0.0.1:4317"  # caller endpoint wins over auto-assign
     assert doc["endpoint"]["path"] == "127.0.0.1:4317"
@@ -161,7 +257,7 @@ def test_generate_runtime_otel_tunes_traces_only(tmp_path, monkeypatch):
     # Mirror of the logs-only test: tuning only traces emits a traces section and
     # NO logs section (no logs knobs, no journal_dir) — proves the symmetry.
     cfg = runtime.OtelConfig(traces_rotation_max_entries=5, traces_retention_max_files=1)
-    rd, _conf, _otlp = runtime.generate_runtime("agent-traces-only", otel=cfg)
+    rd, _conf, _otlp, _http = runtime.generate_runtime("agent-traces-only", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert doc["traces"]["rotation"]["default"] == {"max_entries": 5}
     assert doc["traces"]["retention"]["default"] == {"max_files": 1}
@@ -177,7 +273,7 @@ def test_generate_runtime_otel_tunes_signals_independently(tmp_path, monkeypatch
         traces_rotation_max_entries=10,
         traces_catalog_rotation_count=3,
     )
-    rd, _conf, _otlp = runtime.generate_runtime("agent-sig", otel=cfg)
+    rd, _conf, _otlp, _http = runtime.generate_runtime("agent-sig", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert doc["logs"]["rotation"]["default"] == {"max_entries": 20}
     assert "catalog" not in doc["logs"]
@@ -189,7 +285,7 @@ def test_generate_runtime_otel_tunes_signals_independently(tmp_path, monkeypatch
 
 def test_generate_runtime_otel_omits_dirs_and_storage_by_default(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    rd, _conf, _otlp = runtime.generate_runtime("agent-cat")
+    rd, _conf, _otlp, _http = runtime.generate_runtime("agent-cat")
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     # only base_dir is pinned; per-signal catalog/wal/index dirs are derived
     assert doc["base_dir"] == str(rd / "lib" / "otel")
@@ -200,7 +296,7 @@ def test_generate_runtime_otel_omits_dirs_and_storage_by_default(tmp_path, monke
 
 def test_generate_runtime_otel_emits_catalog_tuning_without_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    rd, _conf, _otlp = runtime.generate_runtime("agent-cat2", otel=runtime.OtelConfig(logs_catalog_rotation_count=2))
+    rd, _conf, _otlp, _http = runtime.generate_runtime("agent-cat2", otel=runtime.OtelConfig(logs_catalog_rotation_count=2))
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert doc["logs"]["catalog"] == {"rotation_count": 2}
 
@@ -208,7 +304,7 @@ def test_generate_runtime_otel_emits_catalog_tuning_without_dir(tmp_path, monkey
 def test_generate_runtime_otel_enables_global_remote_storage_with_default_fs_uri(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     cfg = runtime.OtelConfig(remote_storage_enabled=True, logs_catalog_rotation_count=2)
-    rd, _conf, _otlp = runtime.generate_runtime("agent-store", otel=cfg)
+    rd, _conf, _otlp, _http = runtime.generate_runtime("agent-store", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     # remote_storage is GLOBAL (top-level), not nested under logs
     assert doc["remote_storage"]["enabled"] is True
@@ -221,7 +317,7 @@ def test_generate_runtime_otel_enables_global_remote_storage_with_default_fs_uri
 def test_generate_runtime_otel_honors_explicit_global_remote_storage_uri(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     cfg = runtime.OtelConfig(remote_storage_enabled=True, remote_storage_uri="s3://bucket/prefix")
-    rd, _conf, _otlp = runtime.generate_runtime("agent-s3", otel=cfg)
+    rd, _conf, _otlp, _http = runtime.generate_runtime("agent-s3", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert doc["remote_storage"] == {"enabled": True, "uri": "s3://bucket/prefix"}
     assert "logs" not in doc
@@ -241,7 +337,7 @@ def test_generate_runtime_otel_extra_yaml_deep_merges_and_wins(tmp_path, monkeyp
             "  rotation:\n    default:\n      max_entries: 7\n"
         ),
     )
-    rd, _conf, _otlp = runtime.generate_runtime("agent-x", otel=cfg)
+    rd, _conf, _otlp, _http = runtime.generate_runtime("agent-x", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     # New sections merge in whole...
     assert doc["auth"] == {"enabled": True}
@@ -253,30 +349,43 @@ def test_generate_runtime_otel_extra_yaml_deep_merges_and_wins(tmp_path, monkeyp
 
 def test_generate_runtime_otel_extra_yaml_cannot_override_pins(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    # base_dir and endpoint.path are harness isolation invariants: the
-    # passthrough must not escape the per-agent run dir or lie about the
-    # reported OTLP endpoint.
+    # base_dir and both endpoint addresses are harness isolation invariants:
+    # the passthrough must not escape the per-agent run dir, lie about the
+    # reported OTLP endpoint, or smuggle in an undeclared HTTP bind.
     cfg = runtime.OtelConfig(
-        extra_yaml='base_dir: /tmp/escape\nendpoint:\n  path: "1.2.3.4:1"\n  tls_cert_path: /x.pem\n'
+        extra_yaml=(
+            "base_dir: /tmp/escape\n"
+            "endpoint:\n"
+            '  path: "1.2.3.4:1"\n'
+            '  http_path: "1.2.3.4:2"\n'
+            "  tls_cert_path: /x.pem\n"
+            "  http_tls_cert_path: /y.pem\n"
+        )
     )
-    rd, _conf, otlp = runtime.generate_runtime("agent-pin", otel=cfg)
+    rd, _conf, otlp, _http = runtime.generate_runtime("agent-pin", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert doc["base_dir"] == str(rd / "lib" / "otel")
     assert doc["endpoint"]["path"] == otlp
-    # Non-pinned endpoint siblings still pass through.
+    # http_path re-pinned to the auto-assigned address, not the override
+    assert doc["endpoint"]["http_path"].startswith("127.0.0.1:")
+    assert doc["endpoint"]["http_path"] != otlp
+    # Non-pinned endpoint siblings (either listener's TLS) still pass through.
     assert doc["endpoint"]["tls_cert_path"] == "/x.pem"
+    assert doc["endpoint"]["http_tls_cert_path"] == "/y.pem"
 
 
 def test_generate_runtime_otel_extra_yaml_pins_survive_non_mapping_endpoint(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     # The re-pin must hold even when the passthrough replaces `endpoint` with
-    # something that is not a mapping (the isinstance fallback branch).
+    # something that is not a mapping (the isinstance fallback branch). The
+    # HTTP listener is disabled here so the expected endpoint is exactly the
+    # two pins (a disable must also survive the passthrough).
     for evil in ("endpoint: null\n", "endpoint: 42\n", "endpoint: [1, 2]\n", "base_dir: null\nendpoint: null\n"):
-        cfg = runtime.OtelConfig(extra_yaml=evil)
-        rd, _conf, otlp = runtime.generate_runtime("agent-nd", otel=cfg)
+        cfg = runtime.OtelConfig(otlp_http_endpoint="", extra_yaml=evil)
+        rd, _conf, otlp, _http = runtime.generate_runtime("agent-nd", otel=cfg)
         doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
         assert doc["base_dir"] == str(rd / "lib" / "otel"), evil
-        assert doc["endpoint"] == {"path": otlp}, evil
+        assert doc["endpoint"] == {"path": otlp, "http_path": None}, evil
 
 
 def test_generate_runtime_otel_extra_yaml_rejects_invalid_yaml(tmp_path, monkeypatch):
@@ -293,7 +402,7 @@ def test_generate_runtime_otel_extra_yaml_passes_unknown_keys(tmp_path, monkeypa
     # Unknown keys pass through untouched — feeding the plugin's strict-config
     # refuse-to-start path is a supported test.
     cfg = runtime.OtelConfig(extra_yaml="some_future_option: true\n")
-    rd, _conf, _otlp = runtime.generate_runtime("agent-unk", otel=cfg)
+    rd, _conf, _otlp, _http = runtime.generate_runtime("agent-unk", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert doc["some_future_option"] is True
 
@@ -366,3 +475,15 @@ def test_free_port_is_bindable_and_in_range():
         s.bind(("127.0.0.1", p))
     finally:
         s.close()
+
+
+def test_port_available_detects_a_listener():
+    holder = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    holder.bind(("127.0.0.1", 0))
+    holder.listen()
+    try:
+        taken = holder.getsockname()[1]
+        assert runtime.port_available(taken) is False
+    finally:
+        holder.close()
+    assert runtime.port_available(taken) is True

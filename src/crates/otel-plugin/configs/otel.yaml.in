@@ -1,6 +1,6 @@
 # OpenTelemetry Plugin Configuration
 # Configures how Netdata ingests OpenTelemetry metrics, logs, and traces over
-# OTLP/gRPC.
+# OTLP/gRPC and OTLP/HTTP.
 #
 # To customize, run: edit-config otel.yaml
 # Include only the fields you want to change — everything left out keeps its
@@ -33,6 +33,29 @@ endpoint:
   # certificate signed by this CA. Requires both tls_cert_path and
   # tls_key_path to be set.
   tls_ca_cert_path: null
+
+  # Bind address (host:port) for the OTLP/HTTP listener — the same OTLP
+  # receiver as the gRPC listener above, served over HTTP POST
+  # /v1/logs, /v1/traces, and /v1/metrics, accepting protobuf or JSON
+  # bodies. Set to null to disable it and serve gRPC only. Startup is
+  # strict: a bind failure stops the plugin, exactly like the gRPC
+  # listener.
+  http_path: "127.0.0.1:4318"
+
+  # Server TLS certificate (PEM) for the OTLP/HTTP listener — separate from
+  # the gRPC keys above, so one transport can be protected while the other
+  # is not. TLS is enabled only when both this and http_tls_key_path are
+  # set; providing either one alone fails at startup.
+  http_tls_cert_path: null
+
+  # Server TLS private key (PEM) for the OTLP/HTTP listener. Required when
+  # http_tls_cert_path is set.
+  http_tls_key_path: null
+
+  # CA certificate (PEM) for mutual TLS on the OTLP/HTTP listener: senders
+  # must present a client certificate signed by this CA. Requires both
+  # http_tls_cert_path and http_tls_key_path to be set.
+  http_tls_ca_cert_path: null
 
 metrics:
   # Directory holding optional per-metric mapping files that shape how OTEL
@@ -96,8 +119,9 @@ remote_storage:
   read_cache_max_size: "1GB"
 
 auth:
-  # Require senders to identify a tenant via the X-Scope-OrgID gRPC header.
-  # This is tenant selection, not user authentication — trust the header only
+  # Require senders to identify a tenant via the X-Scope-OrgID header on
+  # either transport (gRPC metadata or HTTP header). This is tenant
+  # selection, not user authentication — trust the header only
   # on a protected endpoint (TLS and network controls). When disabled, all
   # data belongs to a single "default" tenant. Applies to logs and traces;
   # metrics have no tenants.

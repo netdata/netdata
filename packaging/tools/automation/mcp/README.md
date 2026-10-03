@@ -43,17 +43,21 @@ so multiple agents of one worktree coexist without clobbering.
 
 | Tool | Purpose |
 |------|---------|
-| `netdata_agent_declare(agent_id, worktree, profile)` | Bind an `agent-id` to a `(worktree, profile)`. Idempotent. |
-| `netdata_run_start(agent_id, restart=False)` | Build+install if needed, then launch netdata on an auto-assigned loopback port. Returns immediately; poll status until `ready`. First start for a profile can take minutes. Idempotent while live: a plain start does **not** rebuild a running agent. Pass `restart=true` after editing source — it stops, rebuilds (incremental), and relaunches. |
+| `netdata_agent_declare(agent_id, worktree, profile, port=None)` | Bind an `agent-id` to a `(worktree, profile)`. Idempotent. Optional `port` pins the agent's web port for every start/restart (stable URLs, e.g. for a local dashboard); re-declaring without it returns to auto-assigned ports. |
+| `netdata_run_start(agent_id, restart=False)` | Build+install if needed, then launch netdata on the declared port, else an auto-assigned loopback port (a declared port already in use fails the run before launch). Returns immediately; poll status until `ready`. First start for a profile can take minutes. Idempotent while live: a plain start does **not** rebuild a running agent. Pass `restart=true` after editing source — it stops, rebuilds (incremental), and relaunches. |
 | `netdata_run_status(agent_id)` | `building`/`starting`/`ready`/`stopped`/`failed` + the port and `url` (when ready), plus `claimed`/`cloud_connected` once ready. Long-polls ~8s while coming up. |
 | `netdata_run_logs(agent_id, offset)` | Combined build + netdata output, incremental. |
 | `netdata_agent_logs(agent_id, component, lines, grep, priority)` | Structured logs from the systemd journal for one part of the agent — `daemon` (netdata), `supervisor` (otel-plugin), or a worker (`ledger`/`ingestor`/`legacy-logs`) — scoped to that process by `_PID`. Read-only `journalctl` wrapper. Only registered where the journal is usable (`journalctl` on PATH and a running journald); elsewhere use `netdata_run_logs`. |
 | `netdata_run_stop(agent_id)` | Stop the agent (terminates its process group). |
 
 Each agent gets an isolated runtime dir **`~/opt/netdata-mcp/run/<agent-id>/`**
-(`etc`, `cache`, `lib`, `log`) and a generated `netdata.conf` (ram db, isolated
+(`etc`, `cache`, `lib`, `log`, `run`) and a generated `netdata.conf` (ram db, isolated
 `[directories]`, bind `127.0.0.1`); netdata launches as
-`<install>/usr/sbin/netdata -D -p <port> -c <conf>`. Readiness is probed via
+`<install>/usr/sbin/netdata -D -p <port> -c <conf>` with `NETDATA_RUN_DIR=<run dir>/run`,
+so its spawn-server and plugin sockets never collide with another agent's (without it
+every agent falls back to the shared `/tmp/netdata`). Unix socket paths are limited to
+107 bytes, so `netdata_agent_declare` refuses an agent id that would push the longest
+of them past it (about 35 chars under a short `/home/<user>`). Readiness is probed via
 `/api/v1/info`. The run dir is **kept after stop** for inspection; agent logs are
 not in the run dir — they're in the journal (`netdata_agent_logs`) on journald
 hosts, or in `netdata_run_logs` otherwise. Agents are in-memory and do not

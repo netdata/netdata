@@ -7,11 +7,12 @@ Agent — including certificate replacements.
 
 ## Keep the default when you can
 
-The plugin listens on `127.0.0.1:4317` by default: only processes on the same host can reach it, and TLS is unnecessary
-for the network path. Loopback limits reach, not identity: any local process can send records. Keep the default on hosts
-where every local process is trusted, such as a node that runs one Collector forwarding to its local Agent. On a shared
-host, enable TLS with client certificates on the loopback listener as described below, or restrict which local users may
-connect to the port with the host firewall (netfilter's `owner` match).
+The plugin listens on `127.0.0.1:4317` (OTLP/gRPC) and `127.0.0.1:4318` (OTLP/HTTP) by default: only processes on the
+same host can reach them, and TLS is unnecessary for the network path. Loopback limits reach, not identity: any local
+process can send records. Keep the defaults on hosts where every local process is trusted, such as a node that runs one
+Collector forwarding to its local Agent. On a shared host, enable TLS with client certificates on the loopback
+listeners as described below, or restrict which local users may connect to the ports with the host firewall
+(netfilter's `owner` match).
 
 ## Accepting remote senders
 
@@ -25,11 +26,17 @@ endpoint:
   # Require client certificates (mutual TLS): senders must present a
   # certificate signed by this CA.
   tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
+  # The OTLP/HTTP listener has its own address and its own TLS settings,
+  # separate from the gRPC trio above. Set http_path to null instead to
+  # serve gRPC only.
+  http_path: "0.0.0.0:4318"
+  http_tls_cert_path: /etc/netdata/ssl/server-cert.pem
+  http_tls_key_path: /etc/netdata/ssl/server-key.pem
+  http_tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
 ```
 
 - Never expose a plaintext listener beyond loopback.
-- Restrict port 4317 with network access controls (firewall, security groups) to the senders' addresses; the endpoint
-  speaks OTLP/gRPC only.
+- Restrict ports `4317` (OTLP/gRPC) and `4318` (OTLP/HTTP) with network access controls (firewall, security groups) to the senders' addresses; disable the transport you do not use (`http_path: null`) instead of leaving it exposed.
 - Issue the server certificate from whatever your infrastructure already trusts — an internal CA or your certificate
   automation; the senders configure the matching `ca_file` (and, for mutual TLS, their client certificate and key) as
   shown in [Collect Logs with OpenTelemetry Collector](/docs/opentelemetry/logs-collection.md#shared-exporter).
@@ -45,5 +52,5 @@ and is not stored in Netdata Cloud.
 
 - [ ] Endpoint bound only where senders need it; plaintext only on loopback.
 - [ ] TLS server certificate and key in place; mutual TLS where the network is not trusted.
-- [ ] Port 4317 restricted to known sender addresses.
+- [ ] Ports 4317 (OTLP/gRPC) and 4318 (OTLP/HTTP) restricted to known sender addresses, or the unused transport disabled.
 - [ ] A restart procedure for certificate rotation.

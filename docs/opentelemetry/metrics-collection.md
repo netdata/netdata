@@ -6,7 +6,7 @@ Before you begin, complete [Ingest OpenTelemetry Metrics, Logs, and Traces](/doc
 
 ## Shared exporter
 
-Add this exporter once, then combine it with a receiver and pipeline block from a recipe below:
+Add one of these exporters once, then combine it with a receiver and pipeline block from a recipe below:
 
 ```yaml
 exporters:
@@ -16,7 +16,17 @@ exporters:
       insecure: true
 ```
 
-After starting or reloading the Collector, verify an actual chart in Netdata. A successful connection to port `4317` does not prove that the receiver is producing metrics or that Netdata accepted them.
+```yaml
+exporters:
+  otlp_http/netdata:
+    endpoint: "http://127.0.0.1:4318"
+    tls:
+      insecure: true
+```
+
+Either transport works: `otlp_grpc` sends to port `4317`, while `otlp_http` sends OTLP/HTTP to port `4318` with a full-URL `endpoint`. Reference the exporter you chose in the `exporters` arrays of the recipes below.
+
+After starting or reloading the Collector, verify an actual chart in Netdata. A successful connection to the port does not prove that the receiver is producing metrics or that Netdata accepted them.
 
 The `service.pipelines.metrics` blocks are alternatives. To run several receivers in one Collector, define one metrics pipeline and list every enabled receiver in its `receivers` array.
 

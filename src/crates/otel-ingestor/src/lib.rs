@@ -1,7 +1,7 @@
 //! OTel ingestor worker: the production OTLP receiver of the otel-plugin
-//! pipeline. It serves the three OpenTelemetry Collector gRPC services —
-//! metrics, logs, traces — on one TLS-optional endpoint and splits them by
-//! signal:
+//! pipeline. It serves the three OpenTelemetry Collector services —
+//! metrics, logs, traces — on TWO transports with one shared set of
+//! ingestion cores, and splits them by signal:
 //!
 //! - **Logs + traces** — each export request is normalized, flattened, and
 //!   encoded into a WAL frame by `ng_flatten` (`prepare_log_frame` /
@@ -17,9 +17,14 @@
 //!
 //! # Modules
 //!
-//! - gRPC services: `logs_service` and `trace_service` (WAL writers),
+//! - Services: `logs_service` and `trace_service` (WAL writers),
 //!   `metrics_service` (chart emission); `tenant` (tenant extraction from
-//!   the `X-Scope-OrgID` header).
+//!   the `X-Scope-OrgID` header). Each service exposes a transport-agnostic
+//!   core that the gRPC wrappers and the OTLP/HTTP front end both call.
+//! - Transports: `http_service` (OTLP/HTTP, `POST /v1/{logs,traces,metrics}`
+//!   with protobuf + JSON codecs on `endpoint.http_path`) and `otlp_json`
+//!   (its OTLP/JSON decoding over the `opentelemetry-proto` derives); gRPC
+//!   serving is wired inline in `run_ingestor` on `endpoint.path`.
 //! - Metrics support: `aggregation` (per-slot accumulation + cross-slot
 //!   contexts), `chart` (per-chart dimension state), `chart_config` (stock +
 //!   user chart config), `iter` (OTLP metric traversal), `otel` (proto
@@ -45,11 +50,13 @@ use tonic::transport::{Identity, Server, ServerTlsConfig};
 mod aggregation;
 mod chart;
 mod chart_config;
+mod http_service;
 mod iter;
 mod ledger_sender;
 mod logs_service;
 mod metrics_service;
 mod otel;
+mod otlp_json;
 mod output;
 mod tenant;
 mod trace_service;
@@ -124,6 +131,12 @@ async fn run_ingestor(
         .with_nodelay(Some(true));
     tracing::info!(endpoint = %config.endpoint.path, "gRPC endpoint bound");
 
+    // Bind the OTLP/HTTP listener under the same strict fail-fast rule (user
+    // decision D4): a bind or TLS failure here aborts the worker exactly like
+    // the gRPC bind above — before disk setup, before `Ready` — instead of
+    // advertising an endpoint that cannot receive.
+    let http_listener = http_service::bind_http(&config.endpoint).await?;
+
     // Set up metrics pipeline
     let mut ccm = ChartConfigManager::with_default_configs();
     ccm.set_defaults(
@@ -150,11 +163,13 @@ async fn run_ingestor(
 
     let ccm = Arc::new(RwLock::new(ccm));
     let chart_manager = Arc::new(RwLock::new(ChartManager::new()));
-    let metrics_service = NetdataMetricsService::new(
+    // Arc-shared: the gRPC server and the OTLP/HTTP router both hold the
+    // metrics service (chart emission is transport-agnostic).
+    let metrics_service = Arc::new(NetdataMetricsService::new(
         Arc::clone(&ccm),
         Arc::clone(&chart_manager),
         config.metrics.max_new_charts_per_request,
-    );
+    ));
 
     // Channel for tick loop → main loop chart data forwarding
     let (chart_tx, mut chart_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(64);
@@ -294,11 +309,11 @@ async fn run_ingestor(
     }
 
     // Build gRPC router with metrics + logs + traces
-    let metrics_svc = MetricsServiceServer::new(metrics_service)
+    let metrics_svc = MetricsServiceServer::from_arc(Arc::clone(&metrics_service))
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
-    let logs_svc = LogsServiceServer::from_arc(logs_service)
+    let logs_svc = LogsServiceServer::from_arc(Arc::clone(&logs_service))
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
-    let traces_svc = TraceServiceServer::from_arc(traces_service)
+    let traces_svc = TraceServiceServer::from_arc(Arc::clone(&traces_service))
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
 
     tracing::info!(endpoint = %config.endpoint.path, "gRPC server starting (metrics + logs + traces)");
@@ -307,6 +322,19 @@ async fn run_ingestor(
         .add_service(logs_svc)
         .add_service(traces_svc)
         .serve_with_incoming(incoming);
+
+    // The OTLP/HTTP front end over the SAME service cores. `None` means the
+    // receiver is disabled (`http_path: null`); the pending future keeps the
+    // select! arm shape uniform either way.
+    let http_server = http_listener.map(|listener| {
+        let router = http_service::router(http_service::HttpState {
+            logs: Arc::clone(&logs_service),
+            traces: Arc::clone(&traces_service),
+            metrics: Arc::clone(&metrics_service),
+            auth: config.auth.clone(),
+        });
+        http_service::serve(listener, router)
+    });
 
     // Every fallible startup step is behind us and the listener is bound, so
     // this is the point at which the supervisor may advertise the plugin. The
@@ -317,10 +345,24 @@ async fn run_ingestor(
     .await?;
     tracing::info!("signaled ready to supervisor");
 
-    // Main loop: forward chart data to supervisor, handle incoming requests, run gRPC
+    // Main loop: forward chart data to supervisor, handle incoming requests,
+    // run both transport servers
     tokio::select! {
         result = grpc_server => {
             result.with_context(|| format!("gRPC server error on {}", config.endpoint.path))?;
+        }
+        result = async {
+            match http_server {
+                Some(server) => server.await,
+                // Disabled receiver: this arm then never resolves. Neither
+                // does an enabled one in practice (axum's serve loop never
+                // returns), so the gRPC arm or the supervisor loop below
+                // drives the exit.
+                None => std::future::pending::<Result<()>>().await,
+            }
+        } => {
+            // `serve` already names the transport (plain or TLS).
+            result?;
         }
         _ = async {
             loop {
@@ -588,7 +630,10 @@ mod seed_tests {
     /// real `FileId` codec so it can never drift from the on-disk format.
     fn data_filename(seq: u64, ext: &str) -> String {
         file_registry::FileId::new(
-            file_registry::Identity::new(file_registry::MachineId::new(uuid::Uuid::from_u128(1)).unwrap(), file_registry::InstanceId::new(uuid::Uuid::from_u128(2)).unwrap()),
+            file_registry::Identity::new(
+                file_registry::MachineId::new(uuid::Uuid::from_u128(1)).unwrap(),
+                file_registry::InstanceId::new(uuid::Uuid::from_u128(2)).unwrap(),
+            ),
             0,
             seq,
             0xabcd,
@@ -624,7 +669,10 @@ mod seed_tests {
         std::fs::create_dir_all(&cat_dir).unwrap();
         std::fs::write(
             cat_dir.join(otel_catalog::filename(
-                file_registry::Identity::new(file_registry::MachineId::new(uuid::Uuid::from_u128(1)).unwrap(), file_registry::InstanceId::new(uuid::Uuid::from_u128(2)).unwrap()),
+                file_registry::Identity::new(
+                    file_registry::MachineId::new(uuid::Uuid::from_u128(1)).unwrap(),
+                    file_registry::InstanceId::new(uuid::Uuid::from_u128(2)).unwrap(),
+                ),
                 25,
                 100,
                 200,
@@ -663,7 +711,10 @@ mod seed_tests {
         std::fs::create_dir_all(&cat_dir).unwrap();
         std::fs::write(
             cat_dir.join(otel_catalog::filename(
-                file_registry::Identity::new(file_registry::MachineId::new(uuid::Uuid::from_u128(1)).unwrap(), file_registry::InstanceId::new(uuid::Uuid::from_u128(2)).unwrap()),
+                file_registry::Identity::new(
+                    file_registry::MachineId::new(uuid::Uuid::from_u128(1)).unwrap(),
+                    file_registry::InstanceId::new(uuid::Uuid::from_u128(2)).unwrap(),
+                ),
                 7,
                 100,
                 200,

@@ -76,7 +76,6 @@ runs the same service inside your own infrastructure.
   which one to query.
 - **Alerts are evaluated on metrics, not on log content.** To alert on a log pattern, derive a metric from it, for
   example with [logs-to-metrics](/docs/opentelemetry/logs-to-metrics.md), and alert on that metric.
-- **The OTLP endpoint accepts OTLP/gRPC only** (port 4317). OTLP/HTTP is not supported.
 - **macOS has no OS-native log forwarding.** Centralize macOS logs through the OpenTelemetry Collector.
 
 ## In this section

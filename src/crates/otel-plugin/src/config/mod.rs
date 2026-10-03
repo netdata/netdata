@@ -21,6 +21,7 @@ mod legacy;
 mod metrics;
 mod signal;
 
+use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -263,12 +264,21 @@ fn log_config(source: &str, config: &PluginConfig) {
     // secret in the host/path/query therefore cannot leak to the journal. Redaction
     // is logging-only — the real config sent to the workers over IPC keeps the
     // verbatim URI.
-    let mut redacted = config.clone();
-    redacted.remote_storage.uri = redact_uri(&config.remote_storage.uri);
-    match serde_json::to_string(&redacted) {
+    match serde_json::to_string(&redact_for_log(config)) {
         Ok(json) => tracing::info!("{source} config: {json}"),
         Err(e) => tracing::warn!("failed to serialize {source} config: {e}"),
     }
+}
+
+/// The config as [`log_config`] emits it: a clone with `remote_storage.uri`
+/// reduced to its scheme (see `log_config` for why). Split out from the
+/// logging call so tests can assert exactly what the startup log will
+/// contain — new `EndpointConfig` fields included — without capturing
+/// tracing output.
+fn redact_for_log(config: &PluginConfig) -> PluginConfig {
+    let mut redacted = config.clone();
+    redacted.remote_storage.uri = redact_uri(&config.remote_storage.uri);
+    redacted
 }
 
 /// Reduce a storage URI to its scheme for logging, dropping the host/path/query
@@ -284,6 +294,60 @@ fn redact_uri(uri: &str) -> String {
     }
 }
 
+/// Whether two listener addresses would claim the same socket: one port and
+/// an equal IP, or a wildcard covering the other (`0.0.0.0` covers IPv4;
+/// `[::]` covers IPv4 too, as Linux binds it dual-stack by default). Port 0
+/// never clashes (the kernel picks a free port); unparseable addresses fail
+/// at bind, so only identical text is a clash here.
+fn listeners_overlap(a: &str, b: &str) -> bool {
+    let (Ok(a), Ok(b)) = (a.parse::<SocketAddr>(), b.parse::<SocketAddr>()) else {
+        return a == b;
+    };
+    let covers = |wild: IpAddr, other: IpAddr| match wild {
+        IpAddr::V6(w) => w.is_unspecified(),
+        IpAddr::V4(w) => w.is_unspecified() && other.is_ipv4(),
+    };
+    a.port() != 0
+        && a.port() == b.port()
+        && (a.ip() == b.ip() || covers(a.ip(), b.ip()) || covers(b.ip(), a.ip()))
+}
+
+/// The TLS pairing rules both listeners share: certificate and key come as a
+/// pair (neither alone), both non-empty when set, and the CA certificate
+/// (mutual TLS) requires the pair. `cert_field`/`key_field`/`ca_field` name
+/// the YAML keys of the listener being checked so the error points at the
+/// offending transport's fields, not an ambiguous "TLS".
+fn validate_tls_pairing(
+    cert_field: &str,
+    key_field: &str,
+    ca_field: &str,
+    cert: &Option<String>,
+    key: &Option<String>,
+    ca: &Option<String>,
+) -> Result<()> {
+    match (cert, key) {
+        (Some(cert), Some(key)) => {
+            if cert.is_empty() {
+                anyhow::bail!("{cert_field} cannot be empty");
+            }
+            if key.is_empty() {
+                anyhow::bail!("{key_field} cannot be empty");
+            }
+        }
+        (Some(_), None) => {
+            anyhow::bail!("{key_field} must be provided when {cert_field} is provided");
+        }
+        (None, Some(_)) => {
+            anyhow::bail!("{cert_field} must be provided when {key_field} is provided");
+        }
+        (None, None) => {}
+    }
+    if ca.is_some() && (cert.is_none() || key.is_none()) {
+        anyhow::bail!("{ca_field} requires both {cert_field} and {key_field}");
+    }
+    Ok(())
+}
+
 /// Validate the fully-merged effective config — all layers applied — at the
 /// end of [`ConfigResolver::resolve`]; a violation aborts startup. Unlike
 /// [`ConfigOverride::validate`], which judges a single layer in isolation,
@@ -291,9 +355,12 @@ fn redact_uri(uri: &str) -> String {
 /// absolute (the per-signal dirs join onto it); `remote_storage.uri` must be
 /// non-empty when storage is enabled; `endpoint.path` must contain a `:port` —
 /// a shape check only, the ingestor does the full `SocketAddr` parse when it
-/// binds (`otel-ingestor/src/lib.rs` `run_ingestor`); TLS cert and key must
-/// come as a pair, with the CA requiring both; and each signal's retention
-/// must satisfy the catalog-horizon invariant
+/// binds (`otel-ingestor/src/lib.rs` `run_ingestor`); each listener's TLS
+/// cert and key must come as a pair, with the CA requiring both
+/// ([`validate_tls_pairing`]); the optional `endpoint.http_path` (OTLP/HTTP
+/// listener), when enabled, carries the same host:port shape and must differ
+/// from `endpoint.path` (two listeners cannot bind one address); and each
+/// signal's retention must satisfy the catalog-horizon invariant
 /// (`netdata-plugin/bridge/src/config.rs` `RetentionPolicy::validate`).
 fn validate(config: &PluginConfig) -> Result<()> {
     if config.base_dir.as_os_str().is_empty() {
@@ -321,32 +388,43 @@ fn validate(config: &PluginConfig) -> Result<()> {
         );
     }
 
-    match (
+    // Both listeners share one TLS pairing shape; only the field names differ.
+    validate_tls_pairing(
+        "endpoint.tls_cert_path",
+        "endpoint.tls_key_path",
+        "endpoint.tls_ca_cert_path",
         &config.endpoint.tls_cert_path,
         &config.endpoint.tls_key_path,
-    ) {
-        (Some(cert), Some(key)) => {
-            if cert.is_empty() {
-                anyhow::bail!("TLS certificate path cannot be empty");
-            }
-            if key.is_empty() {
-                anyhow::bail!("TLS private key path cannot be empty");
-            }
+        &config.endpoint.tls_ca_cert_path,
+    )?;
+
+    // The OTLP/HTTP listener is optional (None disables it). When enabled it
+    // carries the same host:port shape as the gRPC listener, and the two
+    // must not claim one socket (see `listeners_overlap`): whichever bound
+    // second would fail with a raw OS error, so the collision is rejected
+    // here with both field names instead. The transports still do their own
+    // `SocketAddr` parse when they bind.
+    if let Some(http_path) = &config.endpoint.http_path {
+        if http_path.is_empty() || !http_path.contains(':') {
+            anyhow::bail!("endpoint.http_path must be in format host:port, got: {http_path}");
         }
-        (Some(_), None) => {
-            anyhow::bail!("TLS private key path must be provided when certificate is provided");
+        if listeners_overlap(http_path, &config.endpoint.path) {
+            anyhow::bail!(
+                "endpoint.http_path ({http_path}) must differ from endpoint.path ({}): \
+                 the OTLP/HTTP and OTLP/gRPC listeners cannot share an address and port",
+                config.endpoint.path
+            );
         }
-        (None, Some(_)) => {
-            anyhow::bail!("TLS certificate path must be provided when private key is provided");
-        }
-        (None, None) => {}
     }
 
-    if config.endpoint.tls_ca_cert_path.is_some()
-        && (config.endpoint.tls_cert_path.is_none() || config.endpoint.tls_key_path.is_none())
-    {
-        anyhow::bail!("TLS CA certificate requires both TLS certificate and key");
-    }
+    validate_tls_pairing(
+        "endpoint.http_tls_cert_path",
+        "endpoint.http_tls_key_path",
+        "endpoint.http_tls_ca_cert_path",
+        &config.endpoint.http_tls_cert_path,
+        &config.endpoint.http_tls_key_path,
+        &config.endpoint.http_tls_ca_cert_path,
+    )?;
 
     // Catalog retention (horizon) must outlive SFST retention (max_age) in day
     // units, or a catalog could be evicted while the SFSTs it gates are still
@@ -474,6 +552,10 @@ endpoint:
   tls_cert_path: null
   tls_key_path: null
   tls_ca_cert_path: null
+  http_path: "127.0.0.1:4318"
+  http_tls_cert_path: null
+  http_tls_key_path: null
+  http_tls_ca_cert_path: null
 metrics:
   chart_configs_dir: /etc/netdata/otel.d/v1/metrics
   interval_secs: 10
@@ -558,6 +640,8 @@ traces:
         let config = resolved_stock();
         assert_eq!(config.endpoint.path, "127.0.0.1:4317");
         assert!(config.endpoint.tls_cert_path.is_none());
+        assert_eq!(config.endpoint.http_path.as_deref(), Some("127.0.0.1:4318"));
+        assert!(config.endpoint.http_tls_cert_path.is_none());
         assert_eq!(config.metrics.interval_secs, Some(10));
         assert_eq!(config.metrics.grace_period_secs, Some(60));
         assert_eq!(config.metrics.expiry_duration_secs, Some(900));
@@ -577,7 +661,10 @@ traces:
         );
         // Storage + auth are global.
         assert!(!config.remote_storage.enabled);
-        assert_eq!(config.remote_storage.uri, "fs:///var/log/netdata/otel/v2/remote");
+        assert_eq!(
+            config.remote_storage.uri,
+            "fs:///var/log/netdata/otel/v2/remote"
+        );
         // The fixture omits read_cache_max_size → the code default (1 GB).
         assert_eq!(config.remote_storage.read_cache_max_size, ByteSize::gb(1));
         assert!(!config.auth.enabled);
@@ -648,6 +735,129 @@ traces:
             Some("/etc/ssl/key.pem")
         );
         assert_eq!(config.endpoint.path, "127.0.0.1:4317");
+    }
+
+    // -- OTLP/HTTP listener (http_path + its TLS trio) --
+
+    /// A user file written before the OTLP/HTTP listener existed: every
+    /// pre-change key, none of the new ones. The backward-compat contract —
+    /// such a file must keep working unchanged over the new stock.
+    const PRE_CHANGE_USER_YAML: &str = r#"
+endpoint:
+  path: "0.0.0.0:4317"
+  tls_cert_path: null
+  tls_key_path: null
+  tls_ca_cert_path: null
+metrics:
+  interval_secs: 30
+  max_new_charts_per_request: 200
+base_dir: /data/otel
+remote_storage:
+  enabled: true
+  uri: "fs:///data/remote"
+auth:
+  enabled: true
+logs:
+  retention:
+    default:
+      max_files: 20
+traces:
+  rotation:
+    default:
+      max_entries: 777
+"#;
+
+    #[test]
+    fn pre_change_user_yaml_over_new_stock_keeps_http_default() {
+        // A user file naming only pre-change keys neither disables nor
+        // reconfigures the new HTTP listener: the stock default stands and
+        // every old value the file sets lands intact.
+        let config = resolve_with_user(PRE_CHANGE_USER_YAML).unwrap();
+        // The HTTP listener keeps the stock default (absent = no override).
+        assert_eq!(config.endpoint.http_path.as_deref(), Some("127.0.0.1:4318"));
+        assert!(config.endpoint.http_tls_cert_path.is_none());
+        assert!(config.endpoint.http_tls_key_path.is_none());
+        assert!(config.endpoint.http_tls_ca_cert_path.is_none());
+        // Every pre-change key resolved to the user file's value.
+        assert_eq!(config.endpoint.path, "0.0.0.0:4317");
+        assert!(config.endpoint.tls_cert_path.is_none());
+        assert_eq!(config.metrics.interval_secs, Some(30));
+        assert_eq!(config.metrics.max_new_charts_per_request, 200);
+        assert_eq!(config.base_dir, Path::new("/data/otel"));
+        assert!(config.remote_storage.enabled);
+        assert_eq!(config.remote_storage.uri, "fs:///data/remote");
+        assert!(config.auth.enabled);
+        assert_eq!(config.logs.retention.resolve("default").max_files, 20);
+        assert_eq!(config.traces.rotation.resolve("default").max_entries, 777);
+    }
+
+    #[test]
+    fn stale_stock_file_without_http_keys_still_parses() {
+        // The other upgrade direction: the NEW code reading an OLD stock
+        // file (already installed on the host). The http fields default to
+        // absent → the HTTP listener is simply disabled, everything else
+        // resolves as before.
+        let config = resolve_stock_yaml(&stale_stock_yaml()).unwrap();
+        assert_eq!(config.endpoint.http_path, None);
+        assert!(config.endpoint.http_tls_cert_path.is_none());
+        assert_eq!(config.endpoint.path, "127.0.0.1:4317");
+        assert_eq!(config.metrics.interval_secs, Some(10));
+    }
+
+    /// The pre-OTLP/HTTP stock file: [`STOCK_YAML`] minus the four http
+    /// keys — what an upgrading host has on disk until the new stock file
+    /// is installed. Derived by stripping (not duplicated as a second
+    /// fixture) so it stays a strict subset of the current stock shape.
+    fn stale_stock_yaml() -> String {
+        STOCK_YAML
+            .replace("  http_path: \"127.0.0.1:4318\"\n", "")
+            .replace("  http_tls_cert_path: null\n", "")
+            .replace("  http_tls_key_path: null\n", "")
+            .replace("  http_tls_ca_cert_path: null\n", "")
+    }
+
+    #[test]
+    fn http_path_null_user_override_disables_listener() {
+        // YAML null is the explicit clear: stock ships the listener on, the
+        // user file turns it off. The gRPC listener is untouched.
+        let config = resolve_with_user("endpoint:\n  http_path: null\n").unwrap();
+        assert_eq!(config.endpoint.http_path, None);
+        assert_eq!(config.endpoint.path, "127.0.0.1:4317");
+    }
+
+    #[test]
+    fn http_path_string_override_wins_over_stock() {
+        let config = resolve_with_user("endpoint:\n  http_path: '0.0.0.0:4320'\n").unwrap();
+        assert_eq!(config.endpoint.http_path.as_deref(), Some("0.0.0.0:4320"));
+    }
+
+    #[test]
+    fn http_tls_override_sets_listener_tls() {
+        let config = resolve_with_user(
+            "endpoint:\n  http_tls_cert_path: /http/cert.pem\n  http_tls_key_path: /http/key.pem\n",
+        )
+        .unwrap();
+        assert_eq!(
+            config.endpoint.http_tls_cert_path.as_deref(),
+            Some("/http/cert.pem")
+        );
+        assert_eq!(
+            config.endpoint.http_tls_key_path.as_deref(),
+            Some("/http/key.pem")
+        );
+        // The gRPC trio is independent of the HTTP trio.
+        assert!(config.endpoint.tls_cert_path.is_none());
+    }
+
+    #[test]
+    fn http_endpoint_nested_form_rejected() {
+        // The surface is flat: `http: { ... }` (or any other unknown key)
+        // must refuse startup, not silently ignore the block.
+        let err = resolve_with_user("endpoint:\n  http:\n    path: '0.0.0.0:4318'\n").unwrap_err();
+        assert!(
+            format!("{err:#}").contains("unknown field `http`"),
+            "{err:#}"
+        );
     }
 
     #[test]
@@ -925,9 +1135,15 @@ logs:
         // The Tempo shim was removed; strict parsing refuses its former key
         // so a stale config fails loudly instead of silently not listening.
         let err = resolve_with_user("traces:\n  tempo:\n    enabled: true\n").unwrap_err();
-        assert!(format!("{err:#}").contains("unknown field `tempo`"), "{err:#}");
+        assert!(
+            format!("{err:#}").contains("unknown field `tempo`"),
+            "{err:#}"
+        );
         let err = resolve_with_user("logs:\n  tempo:\n    enabled: true\n").unwrap_err();
-        assert!(format!("{err:#}").contains("unknown field `tempo`"), "{err:#}");
+        assert!(
+            format!("{err:#}").contains("unknown field `tempo`"),
+            "{err:#}"
+        );
     }
 
     // -- Validation --
@@ -946,6 +1162,39 @@ logs:
         // Schemeless / empty inputs.
         assert_eq!(redact_uri("weird-no-scheme"), "[redacted]");
         assert_eq!(redact_uri(""), "");
+    }
+
+    #[test]
+    fn startup_config_log_serializes_http_fields_and_keeps_redaction() {
+        // `log_config` serializes the whole effective config; the OTLP/HTTP
+        // fields must appear there (supportability: the log is how an
+        // operator confirms which listeners the plugin actually runs) while
+        // the existing uri redaction stays in effect.
+        let config = resolve_with_user(
+            "endpoint:\n  http_path: '0.0.0.0:4320'\n  http_tls_cert_path: /http/cert.pem\n  http_tls_key_path: /http/key.pem\n",
+        )
+        .unwrap();
+        let json = serde_json::to_string(&redact_for_log(&config)).unwrap();
+        assert!(json.contains("\"http_path\":\"0.0.0.0:4320\""), "{json}");
+        assert!(
+            json.contains("\"http_tls_cert_path\":\"/http/cert.pem\""),
+            "{json}"
+        );
+        assert!(
+            json.contains("\"http_tls_key_path\":\"/http/key.pem\""),
+            "{json}"
+        );
+        assert!(json.contains("\"http_tls_ca_cert_path\":null"), "{json}");
+        // The disabled listener also logs its state (null), not omission.
+        let disabled = resolve_with_user("endpoint:\n  http_path: null\n").unwrap();
+        let json = serde_json::to_string(&redact_for_log(&disabled)).unwrap();
+        assert!(json.contains("\"http_path\":null"), "{json}");
+        // Redaction untouched: scheme only, verbatim URI nowhere in the log.
+        assert!(json.contains("fs://[redacted]"), "{json}");
+        assert!(
+            !json.contains("fs:///var/log/netdata/otel/v2/remote"),
+            "{json}"
+        );
     }
 
     #[test]
@@ -979,6 +1228,94 @@ logs:
     #[test]
     fn validation_rejects_ca_without_tls() {
         assert!(resolve_with_user("endpoint:\n  tls_ca_cert_path: /ca.pem\n").is_err());
+    }
+
+    #[test]
+    fn validation_rejects_invalid_http_path() {
+        // Same host:port shape rule as the gRPC endpoint: a missing port
+        // (or an empty value) is rejected at config load, not at bind.
+        for http_path in ["no-port", ""] {
+            let err =
+                resolve_with_user(&format!("endpoint:\n  http_path: '{http_path}'\n")).unwrap_err();
+            assert!(
+                format!("{err:#}").contains("endpoint.http_path must be in format host:port"),
+                "expected a host:port rejection for {http_path:?}, got: {err:#}"
+            );
+        }
+    }
+
+    #[test]
+    fn validation_rejects_http_path_equal_to_grpc_path() {
+        // Two listeners cannot bind one address; rejecting the collision at
+        // config load names both fields instead of surfacing a raw bind error.
+        let err = resolve_with_user("endpoint:\n  http_path: '127.0.0.1:4317'\n").unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("must differ from endpoint.path"), "{msg}");
+        assert!(msg.contains("127.0.0.1:4317"), "{msg}");
+    }
+
+    #[test]
+    fn validation_rejects_a_wildcard_grpc_path_over_the_http_port() {
+        // A gRPC listener moved to 0.0.0.0:4318 claims the stock HTTP
+        // listener's 127.0.0.1:4318 too, though the strings differ.
+        let err = resolve_with_user("endpoint:\n  path: '0.0.0.0:4318'\n").unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("must differ from endpoint.path"), "{msg}");
+        assert!(msg.contains("0.0.0.0:4318"), "{msg}");
+    }
+
+    #[test]
+    fn listeners_overlap_on_one_port_when_an_address_covers_the_other() {
+        let cases = [
+            ("127.0.0.1:4318", "127.0.0.1:4318", true),
+            ("0.0.0.0:4318", "127.0.0.1:4318", true),
+            ("127.0.0.1:4318", "0.0.0.0:4318", true),
+            // `[::]` is dual-stack on Linux by default: it claims IPv4 too.
+            ("[::]:4318", "127.0.0.1:4318", true),
+            ("0.0.0.0:4318", "[::]:4318", true),
+            ("[::]:4318", "[::1]:4318", true),
+            ("0.0.0.0:4318", "[::1]:4318", false),
+            ("127.0.0.1:4317", "127.0.0.1:4318", false),
+            ("127.0.0.1:4318", "127.0.0.2:4318", false),
+            // Port 0 asks the kernel for a free port, so two never clash.
+            ("127.0.0.1:0", "127.0.0.1:0", false),
+            // Unparseable addresses fail at bind; compare the text.
+            ("host:4318", "host:4318", true),
+            ("host:4318", "other:4318", false),
+        ];
+        for (a, b, expected) in cases {
+            assert_eq!(listeners_overlap(a, b), expected, "{a} vs {b}");
+        }
+    }
+
+    #[test]
+    fn validation_rejects_mismatched_http_tls() {
+        // HTTP cert without key (stock leaves the key null) is rejected —
+        // same pairing shape as the gRPC trio, field-named for the listener.
+        let err = resolve_with_user("endpoint:\n  http_tls_cert_path: /cert.pem\n").unwrap_err();
+        assert!(
+            format!("{err:#}").contains("endpoint.http_tls_key_path must be provided"),
+            "{err:#}"
+        );
+        // And key without cert, symmetrically.
+        assert!(resolve_with_user("endpoint:\n  http_tls_key_path: /key.pem\n").is_err());
+    }
+
+    #[test]
+    fn validation_rejects_http_ca_without_tls() {
+        let err = resolve_with_user("endpoint:\n  http_tls_ca_cert_path: /ca.pem\n").unwrap_err();
+        assert!(
+            format!("{err:#}").contains(
+                "endpoint.http_tls_ca_cert_path requires both endpoint.http_tls_cert_path \
+                 and endpoint.http_tls_key_path"
+            ),
+            "{err:#}"
+        );
+        // The full trio resolves.
+        assert!(resolve_with_user(
+            "endpoint:\n  http_tls_cert_path: /cert.pem\n  http_tls_key_path: /key.pem\n  http_tls_ca_cert_path: /ca.pem\n"
+        )
+        .is_ok());
     }
 
     // -- Invalid override formats rejected (malformed user config → error) --
@@ -1038,9 +1375,11 @@ logs:
             "{msg}"
         );
         // Old (pre-rework) storage/auth names are typos now too.
-        let err =
-            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_LOGS_STORAGE_ENABLED", "true")]))
-                .unwrap_err();
+        let err = ConfigOverride::from_map(&env_map(&[(
+            "NETDATA_OTEL_CFG_LOGS_STORAGE_ENABLED",
+            "true",
+        )]))
+        .unwrap_err();
         assert!(
             format!("{err:#}").contains("NETDATA_OTEL_CFG_LOGS_STORAGE_ENABLED"),
             "{err:#}"
@@ -1065,12 +1404,10 @@ logs:
             ("NETDATA_OTEL_SERVICE_PORT_OTEL", "4317"),
             ("NETDATA_OTEL_CFG_ENDPOINT_PATH", "0.0.0.0:9999"),
         ];
-        let map = env::otel_env_from_iter(vars.iter().map(|(k, v)| {
-            (
-                std::ffi::OsString::from(*k),
-                std::ffi::OsString::from(*v),
-            )
-        }));
+        let map = env::otel_env_from_iter(
+            vars.iter()
+                .map(|(k, v)| (std::ffi::OsString::from(*k), std::ffi::OsString::from(*v))),
+        );
         let o = ConfigOverride::from_map(&map).unwrap();
         assert_eq!(
             o.endpoint.as_ref().unwrap().path.as_deref(),
@@ -1092,9 +1429,11 @@ logs:
 
     #[test]
     fn env_override_endpoint_path() {
-        let o =
-            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_ENDPOINT_PATH", "0.0.0.0:9999")]))
-                .unwrap();
+        let o = ConfigOverride::from_map(&env_map(&[(
+            "NETDATA_OTEL_CFG_ENDPOINT_PATH",
+            "0.0.0.0:9999",
+        )]))
+        .unwrap();
         assert_eq!(
             o.endpoint.as_ref().unwrap().path.as_deref(),
             Some("0.0.0.0:9999")
@@ -1102,9 +1441,66 @@ logs:
     }
 
     #[test]
-    fn env_override_metrics_interval() {
-        let o = ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_METRICS_INTERVAL_SECS", "30")]))
+    fn env_override_endpoint_http_path_and_tls() {
+        // Non-empty values set/replace, like every other endpoint knob.
+        let o = ConfigOverride::from_map(&env_map(&[
+            ("NETDATA_OTEL_CFG_ENDPOINT_HTTP_PATH", "0.0.0.0:4320"),
+            (
+                "NETDATA_OTEL_CFG_ENDPOINT_HTTP_TLS_CERT_PATH",
+                "/http/cert.pem",
+            ),
+            (
+                "NETDATA_OTEL_CFG_ENDPOINT_HTTP_TLS_KEY_PATH",
+                "/http/key.pem",
+            ),
+            (
+                "NETDATA_OTEL_CFG_ENDPOINT_HTTP_TLS_CA_CERT_PATH",
+                "/http/ca.pem",
+            ),
+        ]))
+        .unwrap();
+        let ep = o.endpoint.as_ref().unwrap();
+        assert_eq!(ep.http_path, Some(Some("0.0.0.0:4320".to_string())));
+        assert_eq!(ep.http_tls_cert_path.as_deref(), Some("/http/cert.pem"));
+        assert_eq!(ep.http_tls_key_path.as_deref(), Some("/http/key.pem"));
+        assert_eq!(ep.http_tls_ca_cert_path.as_deref(), Some("/http/ca.pem"));
+        // Guard against a future refactor dropping a field from
+        // `EndpointOverride::has_any()` — a clear counts as an override, so
+        // a set-but-unapplied http knob would be silently discarded.
+        assert!(o.has_any());
+    }
+
+    #[test]
+    fn env_empty_http_path_is_the_explicit_clear() {
+        // A set-but-empty variable maps to Some(None) — the env layer's
+        // spelling of `http_path: null`. It must count as an override
+        // (endpoint section present), never a silent no-op.
+        let o = ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_ENDPOINT_HTTP_PATH", "")]))
             .unwrap();
+        let ep = o.endpoint.as_ref().unwrap();
+        assert_eq!(ep.http_path, Some(None));
+        assert!(o.has_any());
+    }
+
+    #[test]
+    fn env_unset_http_path_is_no_override() {
+        // Unset (the variable simply not present) is the third state: no
+        // override, so the stock/user value stands.
+        let o = ConfigOverride::from_map(&env_map(&[(
+            "NETDATA_OTEL_CFG_ENDPOINT_PATH",
+            "0.0.0.0:9999",
+        )]))
+        .unwrap();
+        assert_eq!(o.endpoint.as_ref().unwrap().http_path, None);
+    }
+
+    #[test]
+    fn env_override_metrics_interval() {
+        let o = ConfigOverride::from_map(&env_map(&[(
+            "NETDATA_OTEL_CFG_METRICS_INTERVAL_SECS",
+            "30",
+        )]))
+        .unwrap();
         assert_eq!(o.metrics.as_ref().unwrap().interval_secs, Some(30));
     }
 
@@ -1156,7 +1552,10 @@ logs:
         let o = ConfigOverride::from_map(&env_map(&[
             ("NETDATA_OTEL_CFG_REMOTE_STORAGE_ENABLED", "yes"),
             ("NETDATA_OTEL_CFG_REMOTE_STORAGE_URI", "fs:///data/remote"),
-            ("NETDATA_OTEL_CFG_REMOTE_STORAGE_READ_CACHE_MAX_SIZE", "2GiB"),
+            (
+                "NETDATA_OTEL_CFG_REMOTE_STORAGE_READ_CACHE_MAX_SIZE",
+                "2GiB",
+            ),
         ]))
         .unwrap();
         // Guard against a future refactor dropping a field from
@@ -1309,15 +1708,64 @@ logs:
             "user.yaml",
             "endpoint:\n  path: '192.168.1.1:4317'\n",
         );
-        let env =
-            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_ENDPOINT_PATH", "0.0.0.0:9999")]))
-                .unwrap();
+        let env = ConfigOverride::from_map(&env_map(&[(
+            "NETDATA_OTEL_CFG_ENDPOINT_PATH",
+            "0.0.0.0:9999",
+        )]))
+        .unwrap();
         let config = ConfigResolver::from_stock(stock)
             .with_user(user)
             .with_env(env)
             .resolve()
             .unwrap();
         assert_eq!(config.endpoint.path, "0.0.0.0:9999");
+    }
+
+    #[test]
+    fn resolve_env_http_path_overrides_user_and_stock() {
+        // Full precedence for the HTTP listener: env > user > stock.
+        let dir = tempfile::tempdir().unwrap();
+        let stock = write_file(dir.path(), "stock.yaml", STOCK_YAML);
+        let user = write_file(
+            dir.path(),
+            "user.yaml",
+            "endpoint:\n  http_path: '192.168.1.1:4320'\n",
+        );
+        let env = ConfigOverride::from_map(&env_map(&[(
+            "NETDATA_OTEL_CFG_ENDPOINT_HTTP_PATH",
+            "0.0.0.0:4321",
+        )]))
+        .unwrap();
+        let config = ConfigResolver::from_stock(stock)
+            .with_user(user)
+            .with_env(env)
+            .resolve()
+            .unwrap();
+        assert_eq!(config.endpoint.http_path.as_deref(), Some("0.0.0.0:4321"));
+        // The user value the env layer replaced (not the stock default).
+        assert_ne!(
+            config.endpoint.http_path.as_deref(),
+            Some("192.168.1.1:4320")
+        );
+        assert_ne!(config.endpoint.http_path.as_deref(), Some("127.0.0.1:4318"));
+    }
+
+    #[test]
+    fn resolve_env_empty_http_path_disables_stock_listener() {
+        // Stock enables the listener; a set-but-empty env variable is the
+        // explicit clear and wins over every lower layer.
+        let dir = tempfile::tempdir().unwrap();
+        let stock = write_file(dir.path(), "stock.yaml", STOCK_YAML);
+        let env =
+            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_ENDPOINT_HTTP_PATH", "")]))
+                .unwrap();
+        let config = ConfigResolver::from_stock(stock)
+            .with_env(env)
+            .resolve()
+            .unwrap();
+        assert_eq!(config.endpoint.http_path, None);
+        // The gRPC listener is untouched by the HTTP clear.
+        assert_eq!(config.endpoint.path, "127.0.0.1:4317");
     }
 
     #[test]
@@ -1335,10 +1783,7 @@ logs:
             .with_env(env)
             .resolve()
             .unwrap();
-        assert_eq!(
-            config.logs.rotation.resolve("default").max_entries,
-            12345
-        );
+        assert_eq!(config.logs.rotation.resolve("default").max_entries, 12345);
         // Untouched stock field survives the env override.
         assert_eq!(
             config.logs.rotation.resolve("default").max_file_size,
@@ -1470,6 +1915,12 @@ logs:
         assert!(config.endpoint.tls_cert_path.is_none());
         assert!(config.endpoint.tls_key_path.is_none());
         assert!(config.endpoint.tls_ca_cert_path.is_none());
+        // The OTLP/HTTP listener ships enabled on its standard port, with
+        // its TLS trio (separate from the gRPC trio) off.
+        assert_eq!(config.endpoint.http_path.as_deref(), Some("127.0.0.1:4318"));
+        assert!(config.endpoint.http_tls_cert_path.is_none());
+        assert!(config.endpoint.http_tls_key_path.is_none());
+        assert!(config.endpoint.http_tls_ca_cert_path.is_none());
 
         assert_eq!(
             config.metrics.chart_configs_dir.as_deref(),
@@ -1483,7 +1934,10 @@ logs:
         assert_eq!(config.base_dir, Path::new("/var/log/netdata/otel/v2"));
 
         assert!(!config.remote_storage.enabled);
-        assert_eq!(config.remote_storage.uri, "fs:///var/log/netdata/otel/v2/remote");
+        assert_eq!(
+            config.remote_storage.uri,
+            "fs:///var/log/netdata/otel/v2/remote"
+        );
         assert_eq!(config.remote_storage.read_cache_max_size, ByteSize::gb(1));
         // Hidden knob: resolved from the code default.
         assert_eq!(
