@@ -61,7 +61,7 @@ TEST(PGD, EmptyOrNull) {
     pgdc_reset(&cursor, pg, 0);
     EXPECT_FALSE(pgdc_get_next_point(&cursor, 0, &sp));
 
-    pgd_free(pg);
+    pgd_free(pg, PGD_FREE_SITE_UNITTEST);
 
     pg = PGD_EMPTY;
 
@@ -74,7 +74,7 @@ TEST(PGD, EmptyOrNull) {
     pgdc_reset(&cursor, pg, 0);
     EXPECT_FALSE(pgdc_get_next_point(&cursor, 0, &sp));
 
-    pgd_free(pg);
+    pgd_free(pg, PGD_FREE_SITE_UNITTEST);
 }
 
 TEST(PGD, Create) {
@@ -96,7 +96,7 @@ TEST(PGD, Create) {
         ".*"
     );
 
-    pgd_free(pg);
+    pgd_free(pg, PGD_FREE_SITE_UNITTEST);
 }
 
 TEST(PGD, CursorFullPage) {
@@ -151,7 +151,7 @@ TEST(PGD, CursorFullPage) {
         EXPECT_FALSE(pgdc_get_next_point(&cursor, 2 * slots, &sp));
     }
 
-    pgd_free(pg);
+    pgd_free(pg, PGD_FREE_SITE_UNITTEST);
 }
 
 TEST(PGD, CursorHalfPage) {
@@ -191,7 +191,7 @@ TEST(PGD, CursorHalfPage) {
 
     EXPECT_FALSE(pgdc_get_next_point(&cursor, slots, &sp));
 
-    pgd_free(pg);
+    pgd_free(pg, PGD_FREE_SITE_UNITTEST);
 }
 
 TEST(PGD, MemoryFootprint) {
@@ -267,7 +267,7 @@ TEST(PGD, DiskFootprint) {
     }
     EXPECT_EQ(pgd_disk_footprint(pg), footprint);
 
-    pgd_free(pg);
+    pgd_free(pg, PGD_FREE_SITE_UNITTEST);
 
     pg = pgd_create(page_type, slots);
 
@@ -290,7 +290,7 @@ TEST(PGD, DiskFootprint) {
     }
     EXPECT_EQ(pgd_disk_footprint(pg), footprint);
 
-    pgd_free(pg);
+    pgd_free(pg, PGD_FREE_SITE_UNITTEST);
 }
 
 TEST(PGD, CopyToExtent) {
@@ -323,7 +323,7 @@ TEST(PGD, CopyToExtent) {
     for (size_t i = 5; i != size_in_words; i++)
         EXPECT_EQ(disk_buffer[i], 0);
 
-    pgd_free(pg_collector);
+    pgd_free(pg_collector, PGD_FREE_SITE_UNITTEST);
 }
 
 TEST(PGD, Roundtrip) {
@@ -373,8 +373,8 @@ TEST(PGD, Roundtrip) {
         EXPECT_FALSE(pgdc_get_next_point(&cursor_disk, slots, &sp_disk));
     }
 
-    pgd_free(pg_disk);
-    pgd_free(pg_collector);
+    pgd_free(pg_disk, PGD_FREE_SITE_UNITTEST);
+    pgd_free(pg_collector, PGD_FREE_SITE_UNITTEST);
 }
 
 TEST(PGD, RejectCorruptGorillaDiskChain) {
@@ -396,7 +396,7 @@ TEST(PGD, RejectCorruptGorillaDiskChain) {
     PGD *pg_disk = pgd_create_from_disk_data(page_type, &disk_buffer[0], size_in_bytes);
     EXPECT_EQ(pg_disk, PGD_EMPTY);
 
-    pgd_free(pg_collector);
+    pgd_free(pg_collector, PGD_FREE_SITE_UNITTEST);
 }
 
 TEST(PGD, StopCorruptGorillaDiskEntriesAtEncodedBits) {
@@ -425,8 +425,8 @@ TEST(PGD, StopCorruptGorillaDiskEntriesAtEncodedBits) {
     EXPECT_EQ(value, static_cast<uint32_t>(sp.min));
     EXPECT_FALSE(pgdc_get_next_point(&cursor, 1, &sp));
 
-    pgd_free(pg_disk);
-    pgd_free(pg_collector);
+    pgd_free(pg_disk, PGD_FREE_SITE_UNITTEST);
+    pgd_free(pg_collector, PGD_FREE_SITE_UNITTEST);
 }
 
 TEST(PGD, RejectCorruptGorillaDiskNbits) {
@@ -446,7 +446,7 @@ TEST(PGD, RejectCorruptGorillaDiskNbits) {
     PGD *pg_disk = pgd_create_from_disk_data(page_type, &disk_buffer[0], size_in_bytes);
     EXPECT_EQ(pg_disk, PGD_EMPTY);
 
-    pgd_free(pg_collector);
+    pgd_free(pg_collector, PGD_FREE_SITE_UNITTEST);
 }
 
 int pgd_test(int argc, char *argv[])
