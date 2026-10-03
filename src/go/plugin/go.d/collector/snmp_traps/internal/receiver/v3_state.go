@@ -24,6 +24,9 @@ type engineStatePaths struct {
 	dir           string
 	engineBoots   string
 	localEngineID string
+	// readOnly loads existing state but never creates or writes files: a debug
+	// run from a terminal shares the root with the Agent's job that owns it.
+	readOnly bool
 }
 
 func newEngineStatePaths(root, jobName string) engineStatePaths {
@@ -58,6 +61,9 @@ func engineStatePathExistsChecked(path string) (bool, error) {
 }
 
 func cleanupCreatedEngineState(paths engineStatePaths, removeEngineBoots, removeLocalEngineID, removeDir bool) {
+	if paths.readOnly {
+		return
+	}
 	if removeEngineBoots {
 		_ = os.Remove(paths.engineBoots)
 		_ = os.Remove(paths.engineBoots + ".tmp")
@@ -74,17 +80,20 @@ func cleanupCreatedEngineState(paths engineStatePaths, removeEngineBoots, remove
 type engineBoots struct {
 	mu        sync.Mutex
 	path      string
+	readOnly  bool
 	value     int64
 	startedAt time.Time
 	valid     bool
 }
 
 func newEngineBoots(paths engineStatePaths) (*engineBoots, error) {
-	if err := os.MkdirAll(paths.dir, 0750); err != nil {
-		return nil, fmt.Errorf("engine-boots: create directory %s: %w", paths.dir, err)
+	if !paths.readOnly {
+		if err := os.MkdirAll(paths.dir, 0750); err != nil {
+			return nil, fmt.Errorf("engine-boots: create directory %s: %w", paths.dir, err)
+		}
 	}
 
-	eb := &engineBoots{path: paths.engineBoots, startedAt: time.Now()}
+	eb := &engineBoots{path: paths.engineBoots, readOnly: paths.readOnly, startedAt: time.Now()}
 	if err := eb.init(); err != nil {
 		return nil, err
 	}
@@ -120,6 +129,9 @@ func (eb *engineBoots) init() error {
 }
 
 func (eb *engineBoots) persist() error {
+	if eb.readOnly {
+		return nil
+	}
 	return persistEngineStateFile("engine-boots", eb.path, fmt.Appendf(nil, "%d\n", eb.value))
 }
 
@@ -156,18 +168,21 @@ func (eb *engineBoots) engineTimeLocked() uint32 {
 }
 
 type localEngineID struct {
-	mu    sync.Mutex
-	path  string
-	value []byte
-	valid bool
+	mu       sync.Mutex
+	path     string
+	readOnly bool
+	value    []byte
+	valid    bool
 }
 
 func newLocalEngineID(paths engineStatePaths, configuredHex string) (*localEngineID, error) {
-	if err := os.MkdirAll(paths.dir, 0750); err != nil {
-		return nil, fmt.Errorf("local-engine-id: create directory %s: %w", paths.dir, err)
+	if !paths.readOnly {
+		if err := os.MkdirAll(paths.dir, 0750); err != nil {
+			return nil, fmt.Errorf("local-engine-id: create directory %s: %w", paths.dir, err)
+		}
 	}
 
-	lid := &localEngineID{path: paths.localEngineID}
+	lid := &localEngineID{path: paths.localEngineID, readOnly: paths.readOnly}
 	if err := lid.init(configuredHex); err != nil {
 		return nil, err
 	}
@@ -228,6 +243,9 @@ func isAllByte(b []byte, value byte) bool {
 }
 
 func (lid *localEngineID) persist() error {
+	if lid.readOnly {
+		return nil
+	}
 	hexStr := hex.EncodeToString(lid.value)
 	return persistEngineStateFile("local-engine-id", lid.path, []byte(hexStr+"\n"))
 }

@@ -477,7 +477,7 @@ func TestJobHandleDatagramDynamicDecodeFailureReusesRateLimitAdmission(t *testin
 			Mode:         "drop",
 		},
 	})
-	if err := c.receiver.PrepareV3(t.TempDir(), jobName); err != nil {
+	if err := c.receiver.PrepareV3(t.TempDir(), jobName, false); err != nil {
 		t.Fatalf("prepare test v3 receiver: %v", err)
 	}
 	t.Cleanup(c.receiver.RollbackPreparedState)

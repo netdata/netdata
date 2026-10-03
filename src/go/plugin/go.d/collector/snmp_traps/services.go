@@ -19,18 +19,27 @@ type pluginServices struct {
 	telemetryRegistry *telemetry.Registry
 	journalActivity   *journalActivity
 	engineStateRoot   func() string
+	// engineStateReadOnly reports a terminal debug run, which must not touch the Agent's engine state.
+	engineStateReadOnly func() bool
 
 	catalogMu sync.Mutex
 	catalog   *catalog.Manager
 }
 
-func newPluginServices(enricher *enrichment.Enricher, hostIdentity jobruntime.HostIdentity, telemetryRegistry *telemetry.Registry, engineStateRoot func() string) *pluginServices {
+func newPluginServices(
+	enricher *enrichment.Enricher,
+	hostIdentity jobruntime.HostIdentity,
+	telemetryRegistry *telemetry.Registry,
+	engineStateRoot func() string,
+	engineStateReadOnly func() bool,
+) *pluginServices {
 	return &pluginServices{
-		enricher:          enricher,
-		hostIdentity:      hostIdentity,
-		telemetryRegistry: telemetryRegistry,
-		journalActivity:   &journalActivity{},
-		engineStateRoot:   engineStateRoot,
+		enricher:            enricher,
+		hostIdentity:        hostIdentity,
+		telemetryRegistry:   telemetryRegistry,
+		journalActivity:     &journalActivity{},
+		engineStateRoot:     engineStateRoot,
+		engineStateReadOnly: engineStateReadOnly,
 	}
 }
 
@@ -65,12 +74,13 @@ func (s *pluginServices) catalogCandidate() (*catalog.Manager, func()) {
 
 func (s *pluginServices) dependencies(c *Collector, manager *catalog.Manager) jobruntime.Dependencies {
 	return jobruntime.Dependencies{
-		Catalog:         manager,
-		HostIdentity:    s.hostIdentity,
-		Enricher:        s.enricher,
-		Telemetry:       s.telemetryRegistry,
-		JournalActivity: s.journalActivity,
-		EngineStateRoot: s.engineStateRoot,
+		Catalog:             manager,
+		HostIdentity:        s.hostIdentity,
+		Enricher:            s.enricher,
+		Telemetry:           s.telemetryRegistry,
+		JournalActivity:     s.journalActivity,
+		EngineStateRoot:     s.engineStateRoot,
+		EngineStateReadOnly: s.engineStateReadOnly,
 		Log: jobruntime.Logger{
 			Warningf: func(format string, args ...any) {
 				if c.Logger != nil {
