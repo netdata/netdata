@@ -3,6 +3,7 @@
 package otlp
 
 import (
+	"bytes"
 	"context"
 	"net"
 	"reflect"
@@ -13,7 +14,9 @@ import (
 	"google.golang.org/grpc"
 
 	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
@@ -108,7 +111,7 @@ func newRedactor(t *testing.T, secretValue string) *secrets.Redactor {
 
 func newExporter(t *testing.T, endpoint string, counters Counters, redact *secrets.Redactor) *Exporter {
 	t.Helper()
-	e, err := New(config.OTelCfg{
+	e, err := New(context.Background(), config.OTelCfg{
 		Enabled:  "yes",
 		Endpoint: endpoint,
 	}, counters, redact)
@@ -409,7 +412,7 @@ func TestIngestDropsOnFullQueue(t *testing.T) {
 
 func TestDisabledCountsDrops(t *testing.T) {
 	counters := newRecCounters()
-	e, err := New(config.OTelCfg{
+	e, err := New(context.Background(), config.OTelCfg{
 		Enabled: "no",
 	}, counters, nil)
 	if err != nil {
@@ -428,12 +431,12 @@ func TestDisabledCountsDrops(t *testing.T) {
 }
 
 func TestDialCredsBothOrNeither(t *testing.T) {
-	if _, err := dialCreds(config.OTelCfg{
+	if _, err := dialCreds(context.Background(), config.OTelCfg{
 		TLSCert: "/x.pem",
 	}); err == nil {
 		t.Fatal("tls_cert without tls_key must error")
 	}
-	if _, err := dialCreds(config.OTelCfg{}); err != nil {
+	if _, err := dialCreds(context.Background(), config.OTelCfg{}); err != nil {
 		t.Fatalf("plaintext default must not error: %v", err)
 	}
 }
@@ -549,4 +552,47 @@ func TestShutdownDrainsAcceptedQueues(t *testing.T) {
 	require.EqualValues(t, 300, got["s1/"+agg.CounterSpansSent])
 	require.Empty(t, e.ch)
 	require.Empty(t, e.spanCh)
+}
+
+func TestPartialRejectionDiagnosticsRedactSecrets(t *testing.T) {
+	const secret = "endpoint-secret-value"
+	var output bytes.Buffer
+	previous := exportLog
+	exportLog = logger.NewWithWriter(&output)
+	t.Cleanup(func() { exportLog = previous })
+
+	logs := &fakeLogsService{
+		resp: &collogspb.ExportLogsServiceResponse{
+			PartialSuccess: &collogspb.ExportLogsPartialSuccess{
+				RejectedLogRecords: 1,
+				ErrorMessage:       "rejected " + secret,
+			},
+		},
+	}
+	counters := newRecCounters()
+	e := newExporter(t, startServer(t, logs), counters, newRedactor(t, secret))
+	e.export(context.Background(), e.build(mkBeacon()), exportTimeout)
+	require.Equal(t, uint64(1), counters.snapshot()["s1/otlp_errors"])
+	require.Contains(t, output.String(), "partial rejection")
+	require.NotContains(t, output.String(), secret)
+	require.Contains(t, output.String(), "[REDACTED]")
+	output.Reset()
+
+	traces := &fakeTraceService{
+		resp: &coltracepb.ExportTraceServiceResponse{
+			PartialSuccess: &coltracepb.ExportTracePartialSuccess{
+				RejectedSpans: 1,
+				ErrorMessage:  "rejected " + secret,
+			},
+		},
+	}
+	b := tracedBeacon()
+	b.TraceExportTo = startTraceServer(t, traces)
+	e.exportSpans(context.Background(), []spanItem{{
+		site: b.Site, dest: b.TraceExportTo, rs: e.resourceSpans(b), n: 1,
+	}}, exportTimeout)
+	require.Equal(t, uint64(1), counters.snapshot()["s1/spans_errors"])
+	require.Contains(t, output.String(), "partially rejected")
+	require.NotContains(t, output.String(), secret)
+	require.Contains(t, output.String(), "[REDACTED]")
 }

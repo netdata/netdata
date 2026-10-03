@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/geoip"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/ingest"
@@ -77,7 +78,7 @@ func New(hub *runtimehub.Hub) *Collector {
 func (c *Collector) Configuration() any                 { return c.Config }
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 func (c *Collector) ChartTemplateYAML() string          { return charts }
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if c.hub == nil {
 		return errors.New("missing runtime routes")
 	}
@@ -106,14 +107,15 @@ func (c *Collector) Init(context.Context) error {
 		return errors.New("tls_cert and tls_key must be set together")
 	}
 	if c.TLSCert != "" {
-		cert, err := tls.LoadX509KeyPair(c.TLSCert, c.TLSKey)
+		tlsConfig, err := tlscfg.NewTLSConfig(ctx, tlscfg.TLSConfig{
+			TLSCert: c.TLSCert,
+			TLSKey:  c.TLSKey,
+		})
 		if err != nil {
 			return fmt.Errorf("listener TLS: %w", err)
 		}
-		c.tlsConfig = &tls.Config{
-			MinVersion:   tls.VersionTLS12,
-			Certificates: []tls.Certificate{cert},
-		}
+		tlsConfig.MinVersion = tls.VersionTLS12
+		c.tlsConfig = tlsConfig
 	}
 	resolver, err := geoip.Open(c.GeoIPDB)
 	if err != nil && !errors.Is(err, geoip.ErrNotFound) {

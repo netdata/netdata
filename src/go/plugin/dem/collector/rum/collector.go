@@ -96,7 +96,7 @@ func (c *Collector) ChartTemplateYAML() string          { return charts }
 
 var siteKey = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*$`)
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if c.deps.Hub == nil || c.deps.History == nil {
 		return errors.New("missing runtime/history dependencies")
 	}
@@ -161,7 +161,7 @@ func (c *Collector) Init(context.Context) error {
 	if c.OTLP.Enabled != "auto" && c.OTLP.Enabled != "yes" && c.OTLP.Enabled != "no" {
 		return errors.New("otlp.enabled must be auto, yes or no")
 	}
-	if err := otlp.ValidateConfig(c.OTLP); err != nil {
+	if err := otlp.ValidateConfig(ctx, c.OTLP); err != nil {
 		return err
 	}
 	c.redactor = secrets.NewRedactor(c.OTLP.AuthToken)
@@ -206,7 +206,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	if c.aggregator == nil {
 		return errors.New("site is not initialized")
 	}
-	exporter, err := otlp.New(c.OTLP, c.aggregator, c.redactor)
+	exporter, err := otlp.New(ctx, c.OTLP, c.aggregator, c.redactor)
 	if err != nil {
 		return err
 	}
@@ -242,14 +242,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	}
 	go func() {
 		defer close(probesDone)
-		route.RunReachability(probeCtx, 5*time.Minute, func() string {
-			state := c.deps.Hub.Availability()
-			fallback := state.PublicURL
-			if fallback == "" && state.Listen != "" {
-				fallback = c.RumSite.PublicBase(state.Listen, state.TLS)
-			}
-			return route.PublicBase(c.RumSite, fallback)
-		}, client)
+		route.RunReachability(probeCtx, 5*time.Minute, c.probeBase, client)
 	}()
 	ready()
 	<-ctx.Done()
@@ -262,3 +255,12 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	return nil
 }
 func (c *Collector) Cleanup(context.Context) {}
+
+// probeBase supplies only an explicitly configured address. With none, the
+// route probes the trusted-proxy address it learned before promoting it.
+func (c *Collector) probeBase() string {
+	if c.PublicURL != "" {
+		return c.PublicURL
+	}
+	return c.deps.Hub.Availability().PublicURL
+}

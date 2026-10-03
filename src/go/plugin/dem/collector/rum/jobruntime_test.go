@@ -159,3 +159,20 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 	_, _, _, ok = hub.AcquireSite("shop")
 	assert.False(t, ok)
 }
+
+func TestCancelledOTLPPreparationHonorsCaller(t *testing.T) {
+	db, err := store.Open(context.Background(), "")
+	require.NoError(t, err)
+	defer db.Close()
+	site := rum.New(rum.Dependencies{
+		Hub:     runtimehub.New(),
+		History: db,
+		Debug:   true,
+	})
+	site.Key = "shop"
+	site.AllowedOrigins = []string{"https://example.org"}
+	site.OTLP.TLSCA = "synthetic-ca.pem"
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.ErrorIs(t, site.Init(ctx), context.Canceled)
+}

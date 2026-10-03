@@ -10,9 +10,7 @@ package otlp
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -28,13 +26,14 @@ import (
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/secrets"
 )
 
-var log = logger.New()
+var exportLog = logger.New()
 
 // service.name resource attribute used by RUM exports.
 const serviceName = "netdata-rum"
@@ -81,7 +80,7 @@ type Exporter struct {
 // is nonblocking; Connect starts the first attempt in the background,
 // with reconnect backoff from 1s to 60s. Configuration errors, such as bad
 // TLS material, prevent the site runtime from starting.
-func New(cfg config.OTelCfg, counters Counters, redactor *secrets.Redactor) (*Exporter, error) {
+func New(ctx context.Context, cfg config.OTelCfg, counters Counters, redactor *secrets.Redactor) (*Exporter, error) {
 	e := &Exporter{
 		counters: counters,
 		redactor: redactor,
@@ -94,7 +93,7 @@ func New(cfg config.OTelCfg, counters Counters, redactor *secrets.Redactor) (*Ex
 		e.disabled = true
 		return e, nil
 	}
-	creds, err := dialCreds(cfg)
+	creds, err := dialCreds(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -124,46 +123,37 @@ func New(cfg config.OTelCfg, counters Counters, redactor *secrets.Redactor) (*Ex
 
 // dialCreds builds transport credentials: plaintext unless TLS options
 // are set. A client certificate and key must be supplied together.
-func dialCreds(cfg config.OTelCfg) (credentials.TransportCredentials, error) {
+func dialCreds(ctx context.Context, cfg config.OTelCfg) (credentials.TransportCredentials, error) {
 	if cfg.TLSCert == "" && cfg.TLSKey == "" && cfg.TLSCA == "" {
 		return insecure.NewCredentials(), nil
 	}
 	if (cfg.TLSCert == "") != (cfg.TLSKey == "") {
 		return nil, fmt.Errorf("otlp: tls_cert and tls_key must be set together")
 	}
-	tlsCfg := &tls.Config{
-		MinVersion: tls.VersionTLS12,
+	tlsCfg, err := tlscfg.NewTLSConfig(
+		ctx,
+		tlscfg.TLSConfig{
+			TLSCA:   cfg.TLSCA,
+			TLSCert: cfg.TLSCert,
+			TLSKey:  cfg.TLSKey,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("otlp: TLS configuration: %w", err)
 	}
-	if cfg.TLSCA != "" {
-		pem, err := os.ReadFile(cfg.TLSCA)
-		if err != nil {
-			return nil, fmt.Errorf("otlp: reading tls_ca: %w", err)
-		}
-		pool := x509.NewCertPool()
-		if !pool.AppendCertsFromPEM(pem) {
-			return nil, fmt.Errorf("otlp: tls_ca has no valid certificates")
-		}
-		tlsCfg.RootCAs = pool
-	}
-	if cfg.TLSCert != "" {
-		cert, err := tls.LoadX509KeyPair(cfg.TLSCert, cfg.TLSKey)
-		if err != nil {
-			return nil, fmt.Errorf("otlp: loading tls_cert/tls_key: %w", err)
-		}
-		tlsCfg.Certificates = []tls.Certificate{cert}
-	}
+	tlsCfg.MinVersion = tls.VersionTLS12
 	return credentials.NewTLS(tlsCfg), nil
 }
 
 // ValidateConfig checks transport material without starting a gRPC client.
-func ValidateConfig(cfg config.OTelCfg) error {
+func ValidateConfig(ctx context.Context, cfg config.OTelCfg) error {
 	if cfg.Enabled == "no" {
 		return nil
 	}
 	if cfg.Endpoint == "" {
 		return fmt.Errorf("otlp endpoint is required")
 	}
-	_, err := dialCreds(cfg)
+	_, err := dialCreds(ctx, cfg)
 	return err
 }
 
@@ -326,7 +316,11 @@ func (e *Exporter) export(parent context.Context, batch []queued, timeout time.D
 	if ps := resp.GetPartialSuccess(); ps != nil && ps.RejectedLogRecords > 0 {
 		// OTLP does not say which records were rejected; count the whole
 		// batch as errors rather than overclaiming success.
-		log.Warningf("rum/otlp: export partial rejection: %d records — %s", ps.RejectedLogRecords, ps.ErrorMessage)
+		exportLog.Warningf(
+			"rum/otlp: export partial rejection: %d records — %s",
+			ps.RejectedLogRecords,
+			e.redact(ps.ErrorMessage),
+		)
 		for site, n := range countBySite {
 			e.counters.Add(site, agg.CounterOTLPErrors, n)
 		}

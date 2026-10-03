@@ -145,6 +145,11 @@ func (s *Store) WriteRumHistoryBatch(
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		// SQLite may report SQLITE_INTERRUPT for a cancelled BEGIN. No write
+		// has started; expose caller cancellation consistently to the writer.
+		if ctx.Err() != nil {
+			err = ctx.Err()
+		}
 		return nil, nil, err
 	}
 	defer tx.Rollback() //nolint:errcheck // no-op once committed

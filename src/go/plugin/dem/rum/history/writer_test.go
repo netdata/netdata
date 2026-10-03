@@ -4,11 +4,14 @@ package history
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
@@ -426,4 +429,205 @@ func TestWriterRedactsPersistedMetadata(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, groups, 1)
 	require.NotContains(t, fmt.Sprint(groups), "SECRET")
+}
+
+// batchWriterFunc lets a test pause a real Run flush at the store boundary.
+type batchWriterFunc func(context.Context, store.RumHistoryBatch) (map[string]int, map[string]int, error)
+
+func (f batchWriterFunc) WriteRumHistoryBatch(
+	ctx context.Context,
+	batch store.RumHistoryBatch,
+) (map[string]int, map[string]int, error) {
+	return f(ctx, batch)
+}
+
+func TestWriterRetirementPreservesInterruptedBatch(t *testing.T) {
+	for _, abort := range []error{context.Canceled, sql.ErrTxDone} {
+		t.Run(abort.Error(), func(t *testing.T) {
+			st := newTestStore(t)
+			counters := newFakeCounters()
+			w := New(st, counters, nil)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			entered := make(chan struct{})
+			calls := 0
+			w.st = batchWriterFunc(
+				func(writeCtx context.Context, batch store.RumHistoryBatch) (map[string]int, map[string]int, error) {
+					calls++
+					if calls == 1 {
+						close(entered)
+						<-writeCtx.Done()
+						return nil, nil, abort
+					}
+					return st.WriteRumHistoryBatch(writeCtx, batch)
+				},
+			)
+			for range maxBatch {
+				w.Session(agg.HistorySession{
+					Site:      "site",
+					SessionID: "session",
+					StartedAt: 1,
+					LastAt:    2,
+					Pageviews: 1,
+				})
+			}
+			done := make(chan struct{})
+			go func() { w.Run(ctx); close(done) }()
+			select {
+			case <-entered:
+			case <-time.After(time.Second):
+				t.Fatal("size-triggered flush did not reach store")
+			}
+			// These accepted records remain queued behind the in-flight batch.
+			for range 7 {
+				w.Session(agg.HistorySession{
+					Site:      "site",
+					SessionID: "session",
+					StartedAt: 1,
+					LastAt:    2,
+					Pageviews: 1,
+				})
+			}
+			cancel()
+			select {
+			case <-done:
+			case <-time.After(6 * time.Second):
+				t.Fatal("retirement did not finish")
+			}
+			rows, err := st.QueryRumSessions(context.Background(), "site", 0, 10, 10)
+			require.NoError(t, err)
+			require.Len(t, rows, 1)
+			require.EqualValues(t, maxBatch+7, rows[0].Pageviews)
+			require.EqualValues(t, maxBatch+7, counters.get("site", agg.CounterHistoryWritten))
+			require.Zero(t, counters.get("site", agg.CounterHistoryDropped))
+			require.Equal(t, 2, calls, "retry and queued records share one final transaction")
+		})
+	}
+}
+
+func TestWriterThresholdCancellationBeforeSQL(t *testing.T) {
+	st := newTestStore(t)
+	counters := newFakeCounters()
+	w := New(st, counters, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	calls := 0
+	w.st = batchWriterFunc(
+		func(writeCtx context.Context, batch store.RumHistoryBatch) (map[string]int, map[string]int, error) {
+			calls++
+			if calls == 1 {
+				// The threshold branch has selected a record; retirement races
+				// before SQL begins, so this real transaction sees cancellation.
+				cancel()
+			}
+			return st.WriteRumHistoryBatch(writeCtx, batch)
+		},
+	)
+	for range maxBatch {
+		w.Session(agg.HistorySession{
+			Site:      "site",
+			SessionID: "session",
+			StartedAt: 1,
+			LastAt:    2,
+			Pageviews: 1,
+		})
+	}
+	w.Run(ctx)
+	rows, err := st.QueryRumSessions(context.Background(), "site", 0, 10, 10)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.EqualValues(t, maxBatch, rows[0].Pageviews)
+	require.Zero(t, counters.get("site", agg.CounterHistoryDropped))
+}
+
+func TestWriterDoesNotRetryCommittedOrFailedBatch(t *testing.T) {
+	for _, failure := range []bool{false, true} {
+		t.Run(fmt.Sprint("persistent failure=", failure), func(t *testing.T) {
+			st := newTestStore(t)
+			counters := newFakeCounters()
+			w := New(st, counters, nil)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			calls := 0
+			w.st = batchWriterFunc(
+				func(writeCtx context.Context, batch store.RumHistoryBatch) (map[string]int, map[string]int, error) {
+					calls++
+					if failure {
+						cancel()
+						return nil, nil, errors.New("disk full")
+					}
+					written, dropped, err := st.WriteRumHistoryBatch(writeCtx, batch)
+					// Commit wins the race; cancellation must not replay additive rows.
+					cancel()
+					return written, dropped, err
+				},
+			)
+			for range maxBatch {
+				w.Session(agg.HistorySession{
+					Site:      "site",
+					SessionID: "session",
+					StartedAt: 1,
+					LastAt:    2,
+					Pageviews: 1,
+				})
+			}
+			w.Run(ctx)
+			require.Equal(t, 1, calls)
+			rows, err := st.QueryRumSessions(context.Background(), "site", 0, 10, 10)
+			require.NoError(t, err)
+			if failure {
+				require.Empty(t, rows)
+				require.EqualValues(t, maxBatch, counters.get("site", agg.CounterHistoryDropped))
+			} else {
+				require.Len(t, rows, 1)
+				require.EqualValues(t, maxBatch, rows[0].Pageviews)
+				require.Zero(t, counters.get("site", agg.CounterHistoryDropped))
+			}
+		})
+	}
+}
+
+func TestWriterRetirementHasOneFinalDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		counters := newFakeCounters()
+		w := New(nil, counters, nil)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		entered := make(chan struct{})
+		calls := 0
+		w.st = batchWriterFunc(
+			func(writeCtx context.Context, batch store.RumHistoryBatch) (map[string]int, map[string]int, error) {
+				calls++
+				if calls == 1 {
+					close(entered)
+				}
+				<-writeCtx.Done()
+				return nil, nil, writeCtx.Err()
+			},
+		)
+		for range maxBatch {
+			w.Session(agg.HistorySession{
+				Site:      "site",
+				SessionID: "session",
+				Pageviews: 1,
+			})
+		}
+		done := make(chan struct{})
+		go func() { w.Run(ctx); close(done) }()
+		<-entered
+		for range maxBatch + 7 {
+			w.Session(agg.HistorySession{
+				Site:      "site",
+				SessionID: "session",
+				Pageviews: 1,
+			})
+		}
+		start := time.Now()
+		cancel()
+		<-done
+		require.Equal(t, 5*time.Second, time.Since(start))
+		require.Equal(t, 2, calls, "all accepted records use one bounded final transaction")
+		require.Zero(t, counters.get("site", agg.CounterHistoryWritten))
+		require.EqualValues(t, 2*maxBatch+7, counters.get("site", agg.CounterHistoryDropped))
+	})
 }

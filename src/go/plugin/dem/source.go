@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rumfunc"
@@ -62,6 +63,12 @@ func (s *source) Sites(ctx context.Context) ([]rumfunc.Observation, error) {
 		if fallback == "" && state.Listen != "" {
 			fallback = cfg.PublicBase(state.Listen, state.TLS)
 		}
+		// Explicit receiver configuration takes effect immediately, even while
+		// the site's last successful probe still describes an older proxy URL.
+		publicBase := strings.TrimRight(state.PublicURL, "/")
+		if cfg.PublicURL != "" || publicBase == "" {
+			publicBase = site.Route.PublicBase(cfg, fallback)
+		}
 		reach, _ := site.Route.Reachability(key)
 		snippet, _ := site.Route.Snippet(key)
 		rejected, _ := site.Route.LastRejectedOrigin(key)
@@ -82,7 +89,7 @@ func (s *source) Sites(ctx context.Context) ([]rumfunc.Observation, error) {
 				Reach:      reach,
 				Snippet:    snippet,
 				Rejected:   rejected,
-				PublicBase: redact.Apply(site.Route.PublicBase(cfg, fallback)),
+				PublicBase: redact.Apply(publicBase),
 			},
 		)
 	})

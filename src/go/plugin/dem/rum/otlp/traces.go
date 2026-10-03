@@ -20,7 +20,6 @@ import (
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 
-	"github.com/cloudflare/cfssl/log"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
@@ -219,11 +218,11 @@ func (e *Exporter) exportSpans(parent context.Context, batch []spanItem, timeout
 			continue
 		}
 		if ps := resp.GetPartialSuccess(); ps != nil && ps.RejectedSpans > 0 {
-			log.Warningf(
+			exportLog.Warningf(
 				"rum/otlp: span export to %q partially rejected: %d spans — %s",
-				dest,
+				e.redact(dest),
 				ps.RejectedSpans,
-				ps.ErrorMessage,
+				e.redact(ps.ErrorMessage),
 			)
 			count(agg.CounterSpansErrors)
 			continue
@@ -262,7 +261,7 @@ func (e *Exporter) traceClient(dest string) coltracepb.TraceServiceClient {
 	}
 	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(creds))
 	if err != nil {
-		log.Errorf("rum/otlp: span destination %s: %v", dest, err)
+		exportLog.Errorf("rum/otlp: span destination %s: %v", e.redact(dest), e.redact(err.Error()))
 		return nil
 	}
 	conn.Connect()

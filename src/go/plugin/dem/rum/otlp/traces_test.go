@@ -21,6 +21,7 @@ type fakeTraceService struct {
 	coltracepb.UnimplementedTraceServiceServer
 	mu   sync.Mutex
 	reqs []*coltracepb.ExportTraceServiceRequest
+	resp *coltracepb.ExportTraceServiceResponse
 }
 
 func (f *fakeTraceService) Export(
@@ -30,6 +31,9 @@ func (f *fakeTraceService) Export(
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.reqs = append(f.reqs, req)
+	if f.resp != nil {
+		return f.resp, nil
+	}
 	return &coltracepb.ExportTraceServiceResponse{}, nil
 }
 

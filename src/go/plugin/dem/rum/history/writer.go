@@ -7,6 +7,8 @@ package history
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"sync"
 	"time"
 
@@ -67,9 +69,13 @@ func (q queued) site() string {
 	}
 }
 
+type batchWriter interface {
+	WriteRumHistoryBatch(context.Context, store.RumHistoryBatch) (map[string]int, map[string]int, error)
+}
+
 // Writer implements agg.HistorySink and drives the batch flush loop.
 type Writer struct {
-	st       *store.Store
+	st       batchWriter
 	counters Counters
 	redact   Redactor
 	ch       chan queued
@@ -158,46 +164,59 @@ func (w *Writer) Run(ctx context.Context) {
 	ticker := time.NewTicker(batchPeriod)
 	defer ticker.Stop()
 	batch := make([]queued, 0, maxBatch)
-	flush := func() {
-		w.flush(ctx, batch)
+	flush := func() bool {
+		if w.flush(ctx, batch) {
+			return false
+		}
 		batch = batch[:0]
+		return true
 	}
+steady:
 	for {
 		select {
 		case <-ctx.Done():
-			finalCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			// Drain whatever is already queued before the final flush —
-			// unlike the steady-state ticks, shutdown gets exactly one
-			// last transaction, so nothing enqueued before this point is
-			// silently lost ("flushed on shutdown").
-			for drained := false; !drained; {
-				select {
-				case q := <-w.ch:
-					batch = append(batch, q)
-				default:
-					drained = true
-				}
-			}
-			w.flush(finalCtx, batch)
-			return
+			break steady
 		case q := <-w.ch:
 			batch = append(batch, q)
-			if len(batch) >= maxBatch {
-				flush()
+			if len(batch) >= maxBatch && !flush() {
+				break steady
 			}
 		case <-ticker.C:
-			flush()
+			if !flush() {
+				break steady
+			}
 		}
+	}
+	finalCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	// Preserve a retirement-aborted batch and drain accepted queued records
+	// into one final transaction sharing the single shutdown deadline.
+	for drained := false; !drained; {
+		select {
+		case q := <-w.ch:
+			batch = append(batch, q)
+		default:
+			drained = true
+		}
+	}
+	if w.flush(finalCtx, batch) {
+		w.dropBatch(batch)
 	}
 }
 
 // flush partitions one batch by record kind, writes it in one transaction,
-// and reports written/dropped counts per site on rum.history.
-func (w *Writer) flush(ctx context.Context, batch []queued) {
+// and reports written/dropped counts per site on rum.history. It returns true
+// only for a transaction aborted by cancellation, leaving the batch uncounted
+// for one final retry (or drop if the final shutdown deadline has expired).
+func (w *Writer) flush(ctx context.Context, batch []queued) bool {
 	chanDrops := w.takeChanDrops()
-	if len(batch) == 0 && len(chanDrops) == 0 {
-		return
+	for site, n := range chanDrops {
+		if n > 0 {
+			w.counters.Add(site, agg.CounterHistoryDropped, uint64(n))
+		}
+	}
+	if len(batch) == 0 {
+		return false
 	}
 	var b store.RumHistoryBatch
 	for _, q := range batch {
@@ -262,12 +281,15 @@ func (w *Writer) flush(ctx context.Context, batch []queued) {
 
 	written, dropped, err := w.st.WriteRumHistoryBatch(ctx, b)
 	if err != nil {
-		// A failed flush counts the batch as dropped. Retrying could stall the
-		// next flush behind a persistently failing write.
-		dropped = map[string]int{}
-		for _, q := range batch {
-			dropped[q.site()]++
+		// database/sql can report ErrTxDone when its cancellation rollback
+		// wins the race. The retry waits for the transaction connection; a
+		// successful driver commit returns nil even if cancellation races it.
+		if ctx.Err() != nil && (errors.Is(err, ctx.Err()) || errors.Is(err, sql.ErrTxDone)) {
+			return true
 		}
+		// Persistent SQL failures must not stall subsequent batches.
+		w.dropBatch(batch)
+		return false
 	}
 	for site, n := range written {
 		if n > 0 {
@@ -279,9 +301,15 @@ func (w *Writer) flush(ctx context.Context, batch []queued) {
 			w.counters.Add(site, agg.CounterHistoryDropped, uint64(n))
 		}
 	}
-	for site, n := range chanDrops {
-		if n > 0 {
-			w.counters.Add(site, agg.CounterHistoryDropped, uint64(n))
-		}
+	return false
+}
+
+func (w *Writer) dropBatch(batch []queued) {
+	dropped := make(map[string]int)
+	for _, q := range batch {
+		dropped[q.site()]++
+	}
+	for site, n := range dropped {
+		w.counters.Add(site, agg.CounterHistoryDropped, uint64(n))
 	}
 }

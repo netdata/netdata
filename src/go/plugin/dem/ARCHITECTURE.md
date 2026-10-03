@@ -21,10 +21,18 @@ Function reads lease domain state only while copying snapshots, and historical q
 
 A retiring site joins its HTTP and Function readers before cancelling the history/export worker context. Export queues
 drain using one shared fixed shutdown budget, and accepted history contributions flush under a detached five-second SQL
-budget. Session contributions are deltas, allowing persistence to accumulate across site generations and session cache
+budget. A cancelled steady-state SQL batch stays pending and joins the final transaction; successful commits and
+unrelated database failures are never replayed. Session contributions are deltas, allowing persistence to accumulate across site generations and session cache
 replacement. Publication uses typed metrix snapshots and static chart templates, with no V1 map bridge.
 
 Each site owns its exact generated health file. At command startup, before admission, recovery removes abandoned regular
 files only in the reserved RUM output namespace; subsequent process-service work retries health reload and never sweeps
 files while jobs are active. Health reload uses the existing nd-run command containment with the application environment
 preserved, including a customized Agent pipe name. Template selectors bind native chart labels rather than host labels.
+
+Reachability probes use an explicitly configured site or receiver public URL first. With neither configured, they probe
+the address learned from trusted proxy requests directly; setup Functions advertise it after successful confirmation.
+An explicit receiver public URL takes effect immediately, including when an older learned address was confirmed.
+
+Receiver and OTLP TLS preparation use the shared context-aware TLS helper, so native preflight cancellation reaches
+credential-file reads. Site redaction covers stored/exported payloads and remote OTLP diagnostic messages.

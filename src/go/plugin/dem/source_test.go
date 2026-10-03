@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -442,4 +443,42 @@ func TestHistoryFunctionsExplainSampling(t *testing.T) {
 			"Shop: measuring 25% of sessions, keeping 10% of measured in full",
 		)
 	}
+}
+
+func TestConfiguredReceiverURLOverridesPreviouslyConfirmedObservedBase(t *testing.T) {
+	hub := runtimehub.New()
+	addSite(t, hub, "shop", "generation")
+	data, _, release, ok := hub.AcquireSite("shop")
+	require.True(t, ok)
+	defer release()
+	server := httptest.NewServer(
+		ingest.New(&config.RumCfg{
+			TrustedProxies: []string{"127.0.0.1/32"},
+			MaxBodyBytes:   262144,
+			RateLimit: config.RumRateLimit{
+				PerIPPerMin:   120,
+				PerSitePerSec: 500,
+			},
+		}, hub, nil).
+			Handler(),
+	)
+	defer server.Close()
+	response, err := server.Client().Get(server.URL + "/rum/shop.js")
+	require.NoError(t, err)
+	require.NoError(t, response.Body.Close())
+	require.Equal(t, server.URL, data.Route.ObservedBase("shop"))
+	require.Equal(t, ingest.ReachOK, data.Route.Probe(context.Background(), server.Client(), "shop", server.URL).State)
+	revoke := hub.PublishReceiver(
+		runtimehub.Availability{
+			Serving:   true,
+			PublicURL: "https://rum.example.org/new-prefix",
+		},
+	)
+	defer revoke()
+	rows, err := (&source{
+		hub: hub,
+	}).Sites(context.Background())
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, "https://rum.example.org/new-prefix", rows[0].PublicBase)
 }
