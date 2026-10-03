@@ -4,6 +4,7 @@ package redis
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -20,35 +21,51 @@ var garnetFieldMap = map[string]string{
 	"total_notfound":            "keyspace_misses",
 }
 
-// garnetKeyspaceRefreshInterval limits INFO keyspace requests: Garnet
-// populates the section with a full per-database store scan (it has no O(1)
-// key counter) and excludes it from INFO all for that reason. Key counts
-// change slowly, so a value that is up to one interval old is acceptable.
+// garnetKeyspaceRefreshInterval is the default value of the collector's
+// garnetKeyspaceRefreshInterval field: Garnet populates the keyspace section
+// with a full per-database store scan (it has no O(1) key counter) and
+// excludes it from INFO all for that reason. Key counts change slowly, so a
+// value that is up to one interval old is acceptable.
 const garnetKeyspaceRefreshInterval = 30 * time.Second
+
+// appendInfoSection appends an INFO section to an INFO document, joining the
+// two with exactly one newline. INFO replies do not guarantee a trailing
+// newline, and the parser needs every field on its own line.
+func appendInfoSection(info, section string) string {
+	if section == "" {
+		return info
+	}
+	if info != "" && !strings.HasSuffix(info, "\n") {
+		info += "\n"
+	}
+	return info + strings.TrimRight(section, "\n") + "\n"
+}
 
 // collectGarnetExtraInfo appends the INFO sections Garnet excludes from `all`
 // and returns the extended INFO text:
 //   - keyspace: db/key counts, requested at most once per refresh interval
-//     (also on error, so a failed scan waits out the interval);
-//   - commandstats: redis-format per-command stats, populated only when the
-//     Garnet server runs with --commandstats-monitor; the disabled response
-//     contains no parseable fields.
+//     (also on error, so a failed scan waits out the interval); a failed
+//     refresh clears the cached section so stale key counts are not reported;
+//   - commandstats: redis-format per-command stats, requested every cycle,
+//     populated only when the Garnet server runs with --commandstats-monitor;
+//     the disabled response contains no parseable fields.
 func (c *Collector) collectGarnetExtraInfo(info string) string {
-	if time.Since(c.garnetKeyspaceRefreshedAt) >= garnetKeyspaceRefreshInterval {
+	if time.Since(c.garnetKeyspaceRefreshedAt) >= c.garnetKeyspaceRefreshInterval {
 		c.garnetKeyspaceRefreshedAt = time.Now()
 		keyspace, err := c.rdb.Info(context.Background(), "keyspace").Result()
 		if err != nil {
-			c.Debugf("garnet: error on INFO keyspace: %v", err)
+			c.Warningf("garnet: error on INFO keyspace: %v", err)
+			c.garnetKeyspaceInfo = ""
 		} else {
 			c.garnetKeyspaceInfo = keyspace
 		}
 	}
-	info += c.garnetKeyspaceInfo
+	info = appendInfoSection(info, c.garnetKeyspaceInfo)
 
 	commandstats, err := c.rdb.Info(context.Background(), "commandstats").Result()
 	if err != nil {
-		c.Debugf("garnet: error on INFO commandstats: %v", err)
+		c.Warningf("garnet: error on INFO commandstats: %v", err)
 		return info
 	}
-	return info + commandstats
+	return appendInfoSection(info, commandstats)
 }

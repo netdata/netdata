@@ -117,8 +117,11 @@ type (
 		collectedCommands map[string]bool
 		collectedDbs      map[string]bool
 
-		garnetKeyspaceRefreshedAt time.Time
-		garnetKeyspaceInfo        string
+		// garnetKeyspaceRefreshInterval defaults to garnetKeyspaceRefreshInterval
+		// in Init; it is a test seam, not a config option.
+		garnetKeyspaceRefreshInterval time.Duration
+		garnetKeyspaceRefreshedAt     time.Time
+		garnetKeyspaceInfo            string
 	}
 	redisClient interface {
 		Info(ctx context.Context, section ...string) *redis.StringCmd
@@ -136,6 +139,10 @@ func (c *Collector) Init(ctx context.Context) error {
 	err := c.validateConfig()
 	if err != nil {
 		return fmt.Errorf("config validation: %v", err)
+	}
+
+	if c.garnetKeyspaceRefreshInterval == 0 {
+		c.garnetKeyspaceRefreshInterval = garnetKeyspaceRefreshInterval
 	}
 
 	rdb, err := c.initRedisClient(ctx)

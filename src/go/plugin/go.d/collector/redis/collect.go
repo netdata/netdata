@@ -32,10 +32,11 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 	switch c.server {
 	// redis and redis protocol-compatible servers (kvrocks, garnet); identified
-	// by the first *_version line of the INFO response.
+	// by the first *_version line of the INFO response, or by the server's own
+	// *_version property wherever it appears (garnet, kvrocks).
 	case "redis", "kvrocks", "garnet":
 	default:
-		return nil, fmt.Errorf("unsupported server app, want=redis, got=%s", c.server)
+		return nil, fmt.Errorf("unsupported server app, want one of: redis, kvrocks, garnet, got=%s", c.server)
 	}
 
 	if c.server == "garnet" {
@@ -52,12 +53,17 @@ func (c *Collector) collect() (map[string]int64, error) {
 // redis_version:6.0.9
 var reVersion = regexp.MustCompile(`([a-z]+)_version:(\d+\.\d+\.\d+)`)
 
+// extractServerVersion identifies the server app and its version from the
+// INFO response. By default the first *_version property decides (Valkey,
+// Dragonfly and KeyDB emit redis_version first and are served by the redis
+// collector). Garnet and Kvrocks also emit a redis_version compatibility
+// value, but always emit their own <server>_version property as well, which
+// identifies both the server and its own version wherever it appears.
 func extractServerVersion(info string) (string, *semver.Version, error) {
-	var versionLine string
-	for sc := bufio.NewScanner(strings.NewReader(info)); sc.Scan(); {
-		line := sc.Text()
-		if strings.Contains(line, "_version") {
-			versionLine = strings.TrimSpace(line)
+	versionLine := firstVersionLine(info, "")
+	for _, server := range []string{"garnet", "kvrocks"} {
+		if own := firstVersionLine(info, server+"_version"); own != "" {
+			versionLine = own
 			break
 		}
 	}
@@ -77,4 +83,19 @@ func extractServerVersion(info string) (string, *semver.Version, error) {
 	}
 
 	return server, ver, nil
+}
+
+// firstVersionLine returns the first INFO line naming a version property. With
+// a non-empty field it returns the first line naming exactly that property.
+func firstVersionLine(info, field string) string {
+	want := "_version"
+	if field != "" {
+		want = field + ":"
+	}
+	for sc := bufio.NewScanner(strings.NewReader(info)); sc.Scan(); {
+		if line := sc.Text(); strings.Contains(line, want) {
+			return strings.TrimSpace(line)
+		}
+	}
+	return ""
 }

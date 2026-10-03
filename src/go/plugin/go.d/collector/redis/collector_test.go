@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
@@ -1356,6 +1357,9 @@ func prepareRedisWithPikaMetrics(t *testing.T) *Collector {
 func TestCollector_GarnetExtraInfoRequests(t *testing.T) {
 	collr := New()
 	require.NoError(t, collr.Init(context.Background()))
+	// Make the refresh interval longer than any test run so the "at most one
+	// request per interval" assertion does not depend on wall-clock time.
+	collr.garnetKeyspaceRefreshInterval = time.Hour
 	mock := &mockRedisClient{
 		results: map[string][]byte{
 			"all":          dataGarnetInfoAll,
@@ -1376,6 +1380,112 @@ func TestCollector_GarnetExtraInfoRequests(t *testing.T) {
 	assert.Equal(t, 3, mock.infoCalls["all"])
 	assert.Equal(t, 1, mock.infoCalls["keyspace"])
 	assert.Equal(t, 3, mock.infoCalls["commandstats"])
+}
+
+// withRedisVersionFirst moves the redis_version line before the garnet_version
+// line, as if a Garnet server reported its redis compatibility version first.
+func withRedisVersionFirst(info []byte) []byte {
+	lines := strings.Split(string(info), "\n")
+	redisLine := ""
+	kept := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if strings.HasPrefix(line, "redis_version:") {
+			redisLine = line
+			continue
+		}
+		kept = append(kept, line)
+	}
+	if redisLine == "" {
+		return info
+	}
+	for i, line := range kept {
+		if strings.HasPrefix(line, "garnet_version:") {
+			kept = append(kept[:i], append([]string{redisLine}, kept[i:]...)...)
+			break
+		}
+	}
+	return []byte(strings.Join(kept, "\n"))
+}
+
+func Test_extractServerVersion(t *testing.T) {
+	tests := map[string]struct {
+		info    []byte
+		wantSrv string
+		wantVer string
+	}{
+		"redis 6.0.9":                     {info: dataVer609InfoAll, wantSrv: "redis", wantVer: "6.0.9"},
+		"valkey 9.1.2":                    {info: dataValkeyInfoAll, wantSrv: "redis", wantVer: "7.2.4"},
+		"dragonfly df-v2.0.0":             {info: dataDragonflyInfoAll, wantSrv: "redis", wantVer: "7.4.0"},
+		"keydb 6.3.4":                     {info: dataKeydbInfoAll, wantSrv: "redis", wantVer: "6.3.4"},
+		"kvrocks 2.17.0":                  {info: dataKvrocksInfoAll, wantSrv: "kvrocks", wantVer: "2.17.0"},
+		"garnet 2.2.0":                    {info: dataGarnetInfoAll, wantSrv: "garnet", wantVer: "2.2.0"},
+		"garnet with redis_version first": {info: withRedisVersionFirst(dataGarnetInfoAll), wantSrv: "garnet", wantVer: "2.2.0"},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			server, ver, err := extractServerVersion(string(test.info))
+			require.NoError(t, err)
+			assert.Equal(t, test.wantSrv, server)
+			assert.Equal(t, test.wantVer, ver.String())
+		})
+	}
+}
+
+func Test_garnet_collectGarnetExtraInfo_joins_sections(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init(context.Background()))
+	collr.garnetKeyspaceRefreshInterval = time.Hour
+	collr.rdb = &mockRedisClient{
+		results: map[string][]byte{
+			"all":          []byte(strings.TrimRight(string(dataGarnetInfoAll), "\n")),
+			"keyspace":     []byte(strings.TrimRight(string(dataGarnetInfoKeyspace), "\n")),
+			"commandstats": []byte(strings.TrimRight(string(dataGarnetInfoCommandstats), "\n")),
+		},
+		infoCalls: map[string]int{},
+	}
+
+	// base INFO and extra sections without trailing newlines: the join must
+	// still put every section on its own lines (exactly one newline boundary,
+	// whatever line endings the sections use)
+	info := collr.collectGarnetExtraInfo(strings.TrimRight(string(dataGarnetInfoAll), "\n"))
+	assert.Contains(t, info, "\n# Keyspace")
+	assert.NotContains(t, info, "\n\n# Keyspace")
+	assert.Contains(t, info, "\n# Commandstats")
+	assert.NotContains(t, info, "\n\n# Commandstats")
+
+	mx := make(map[string]int64)
+	collr.collectInfo(mx, info)
+	assert.Equal(t, int64(64), mx["arch_bits"])    // base section parsed
+	assert.Equal(t, int64(6), mx["db0_keys"])      // keyspace section parsed
+	assert.Equal(t, int64(1), mx["cmd_get_calls"]) // commandstats section parsed
+}
+
+func TestCollector_GarnetKeyspaceErrorClearsCache(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init(context.Background()))
+	// interval 0: refresh on every cycle, so the test does not depend on timing
+	collr.garnetKeyspaceRefreshInterval = 0
+	mock := &mockRedisClient{
+		results: map[string][]byte{
+			"all":          dataGarnetInfoAll,
+			"keyspace":     dataGarnetInfoKeyspace,
+			"commandstats": dataGarnetInfoCommandstats,
+		},
+		infoCalls: map[string]int{},
+	}
+	collr.rdb = mock
+
+	ctx := context.Background()
+	mx := collr.Collect(ctx)
+	assert.Equal(t, int64(6), mx["db0_keys"])
+
+	mock.errOnKeyspace = true
+	mx = collr.Collect(ctx)
+	assert.NotContains(t, mx, "db0_keys")
+
+	mx = collr.Collect(ctx)
+	assert.NotContains(t, mx, "db0_keys")
 }
 func ensureCollectedCommandsAddedToCharts(t *testing.T, collr *Collector) {
 	for _, id := range []string{
@@ -1416,11 +1526,12 @@ func copyTimeRelatedMetrics(dst, src map[string]int64) {
 }
 
 type mockRedisClient struct {
-	errOnInfo   bool
-	result      []byte
-	results     map[string][]byte
-	infoCalls   map[string]int
-	calledClose bool
+	errOnInfo     bool
+	errOnKeyspace bool
+	result        []byte
+	results       map[string][]byte
+	infoCalls     map[string]int
+	calledClose   bool
 }
 
 func (m *mockRedisClient) Info(_ context.Context, sections ...string) (cmd *redis.StringCmd) {
@@ -1430,6 +1541,9 @@ func (m *mockRedisClient) Info(_ context.Context, sections ...string) (cmd *redi
 	}
 	if m.infoCalls != nil {
 		m.infoCalls[section]++
+	}
+	if m.errOnKeyspace && section == "keyspace" {
+		return redis.NewStringResult("", errors.New("error on Info keyspace"))
 	}
 	if m.results != nil {
 		result, ok := m.results[section]
