@@ -223,6 +223,10 @@ axum = { version = "0.8", default-features = false, features = ["http1", "http2"
 http = "1"
 http-body-util = "0.1"
 tokio-rustls = "0.26"
+# Test-only: in-memory CA/server/client certificates for the OTLP/HTTP TLS
+# listener tests, so no key material is committed. Default features select
+# `ring`, the workspace's rustls backend.
+rcgen = "0.14"
 
 flatten-serde-json = { git = "https://github.com/meilisearch/meilisearch", tag = "v1.22.1" }
 

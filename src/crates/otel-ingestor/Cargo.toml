@@ -51,8 +51,9 @@ uuid = { workspace = true }
 
 [dev-dependencies]
 bytesize = { workspace = true }
-# TLS listener tests: the test client config and the process crypto provider
-# the otel-plugin binary installs at startup.
+# TLS listener tests: certificates generated per run, the test client config,
+# and the process crypto provider the otel-plugin binary installs at startup.
+rcgen = { workspace = true }
 rustls = { workspace = true }
 tempfile = { workspace = true }
 # oneshot() request/response assertions against the OTLP/HTTP axum router.

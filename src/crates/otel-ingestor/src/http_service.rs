@@ -1327,15 +1327,6 @@ mod tests {
     }
 
     // -- TLS listener --------------------------------------------------------
-    //
-    // Fixtures under `testdata/tls/` are throwaway EC P-256 certificates valid
-    // until 2126: `ca.pem` (the CA's key was discarded after signing),
-    // `server.{pem,key}` for `localhost`/`127.0.0.1`, and `client.{pem,key}`
-    // for mTLS. They exist only for these tests.
-
-    fn tls_fixture(name: &str) -> String {
-        format!("{}/testdata/tls/{name}", env!("CARGO_MANIFEST_DIR"))
-    }
 
     /// The process-level rustls provider the otel-plugin binary installs at
     /// startup; tests share one process, so a repeat install is expected.
@@ -1343,16 +1334,92 @@ mod tests {
         let _ = rustls::crypto::ring::default_provider().install_default();
     }
 
-    fn tls_endpoint(mtls: bool) -> EndpointConfig {
-        EndpointConfig {
-            path: "127.0.0.1:0".to_string(),
-            tls_cert_path: None,
-            tls_key_path: None,
-            tls_ca_cert_path: None,
-            http_path: Some("127.0.0.1:0".to_string()),
-            http_tls_cert_path: Some(tls_fixture("server.pem")),
-            http_tls_key_path: Some(tls_fixture("server.key")),
-            http_tls_ca_cert_path: mtls.then(|| tls_fixture("ca.pem")),
+    /// A throwaway PKI generated per test, so no key material lives in the
+    /// repository: a CA, a server certificate for `localhost`/`127.0.0.1`,
+    /// and an mTLS client certificate. The listener reads PEM files, so the
+    /// CA and server material are also written under `dir`.
+    struct TestPki {
+        dir: tempfile::TempDir,
+        ca: rustls::pki_types::CertificateDer<'static>,
+        client_cert: rustls::pki_types::CertificateDer<'static>,
+        client_key: rustls::pki_types::PrivateKeyDer<'static>,
+    }
+
+    impl TestPki {
+        fn new() -> Self {
+            use rcgen::{
+                BasicConstraints, CertificateParams, ExtendedKeyUsagePurpose, IsCa, Issuer,
+                KeyPair, KeyUsagePurpose,
+            };
+
+            let ca_key = KeyPair::generate().unwrap();
+            let mut ca_params = CertificateParams::new(Vec::<String>::new()).unwrap();
+            ca_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+            ca_params.key_usages = vec![KeyUsagePurpose::KeyCertSign];
+            let ca_cert = ca_params.self_signed(&ca_key).unwrap();
+            let issuer = Issuer::new(ca_params, ca_key);
+
+            let leaf = |names: Vec<String>, usage: ExtendedKeyUsagePurpose| {
+                let key = KeyPair::generate().unwrap();
+                let mut params = CertificateParams::new(names).unwrap();
+                params.extended_key_usages = vec![usage];
+                let cert = params.signed_by(&key, &issuer).unwrap();
+                (cert, key)
+            };
+            let (server_cert, server_key) = leaf(
+                vec!["localhost".into(), "127.0.0.1".into()],
+                ExtendedKeyUsagePurpose::ServerAuth,
+            );
+            let (client_cert, client_key) = leaf(Vec::new(), ExtendedKeyUsagePurpose::ClientAuth);
+
+            let dir = tempfile::tempdir().unwrap();
+            std::fs::write(dir.path().join("ca.pem"), ca_cert.pem()).unwrap();
+            std::fs::write(dir.path().join("server.pem"), server_cert.pem()).unwrap();
+            std::fs::write(dir.path().join("server.key"), server_key.serialize_pem()).unwrap();
+            Self {
+                dir,
+                ca: ca_cert.der().clone(),
+                client_cert: client_cert.der().clone(),
+                client_key: rustls::pki_types::PrivatePkcs8KeyDer::from(client_key.serialize_der())
+                    .into(),
+            }
+        }
+
+        fn path(&self, name: &str) -> String {
+            self.dir.path().join(name).display().to_string()
+        }
+
+        fn endpoint(&self, mtls: bool) -> EndpointConfig {
+            EndpointConfig {
+                path: "127.0.0.1:0".to_string(),
+                tls_cert_path: None,
+                tls_key_path: None,
+                tls_ca_cert_path: None,
+                http_path: Some("127.0.0.1:0".to_string()),
+                http_tls_cert_path: Some(self.path("server.pem")),
+                http_tls_key_path: Some(self.path("server.key")),
+                http_tls_ca_cert_path: mtls.then(|| self.path("ca.pem")),
+            }
+        }
+
+        /// A client trusting the CA, offering exactly `alpn`, optionally
+        /// presenting the client certificate.
+        fn client(&self, alpn: &[&[u8]], client_cert: bool) -> tokio_rustls::TlsConnector {
+            let mut roots = rustls::RootCertStore::empty();
+            roots.add(self.ca.clone()).unwrap();
+            let builder = rustls::ClientConfig::builder().with_root_certificates(roots);
+            let mut config = if client_cert {
+                builder
+                    .with_client_auth_cert(
+                        vec![self.client_cert.clone()],
+                        self.client_key.clone_key(),
+                    )
+                    .unwrap()
+            } else {
+                builder.with_no_client_auth()
+            };
+            config.alpn_protocols = alpn.iter().map(|p| p.to_vec()).collect();
+            tokio_rustls::TlsConnector::from(Arc::new(config))
         }
     }
 
@@ -1373,31 +1440,6 @@ mod tests {
         (addr, server, tmp)
     }
 
-    /// A client trusting the fixture CA, offering exactly `alpn`, optionally
-    /// presenting the fixture client certificate.
-    fn tls_client(alpn: &[&[u8]], client_cert: bool) -> tokio_rustls::TlsConnector {
-        use rustls::pki_types::pem::PemObject;
-        use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-
-        let mut roots = rustls::RootCertStore::empty();
-        for cert in CertificateDer::pem_file_iter(tls_fixture("ca.pem")).unwrap() {
-            roots.add(cert.unwrap()).unwrap();
-        }
-        let builder = rustls::ClientConfig::builder().with_root_certificates(roots);
-        let mut config = if client_cert {
-            let certs = CertificateDer::pem_file_iter(tls_fixture("client.pem"))
-                .unwrap()
-                .collect::<Result<Vec<_>, _>>()
-                .unwrap();
-            let key = PrivateKeyDer::from_pem_file(tls_fixture("client.key")).unwrap();
-            builder.with_client_auth_cert(certs, key).unwrap()
-        } else {
-            builder.with_no_client_auth()
-        };
-        config.alpn_protocols = alpn.iter().map(|p| p.to_vec()).collect();
-        tokio_rustls::TlsConnector::from(Arc::new(config))
-    }
-
     async fn tls_connect(
         connector: &tokio_rustls::TlsConnector,
         addr: SocketAddr,
@@ -1410,11 +1452,12 @@ mod tests {
     #[tokio::test]
     async fn tls_listener_negotiates_http1_and_h2_and_lands_exports() {
         install_crypto_provider();
-        let (addr, server, tmp) = spawn_tls_server(&tls_endpoint(false)).await;
+        let pki = TestPki::new();
+        let (addr, server, tmp) = spawn_tls_server(&pki.endpoint(false)).await;
 
         // A client offering ONLY http/1.1 (Python requests/urllib3 does this)
         // must negotiate it, not fail the handshake.
-        let stream = tls_connect(&tls_client(&[b"http/1.1"], false), addr)
+        let stream = tls_connect(&pki.client(&[b"http/1.1"], false), addr)
             .await
             .unwrap();
         assert_eq!(stream.get_ref().1.alpn_protocol(), Some(&b"http/1.1"[..]));
@@ -1423,7 +1466,7 @@ mod tests {
         assert!(any_file_under(&tmp.path().join("logs/wal")));
 
         // A client preferring h2 gets h2.
-        let stream = tls_connect(&tls_client(&[b"h2", b"http/1.1"], false), addr)
+        let stream = tls_connect(&pki.client(&[b"h2", b"http/1.1"], false), addr)
             .await
             .unwrap();
         assert_eq!(stream.get_ref().1.alpn_protocol(), Some(&b"h2"[..]));
@@ -1434,13 +1477,14 @@ mod tests {
     #[tokio::test]
     async fn mtls_listener_rejects_anonymous_clients_and_keeps_serving() {
         install_crypto_provider();
-        let (addr, server, _tmp) = spawn_tls_server(&tls_endpoint(true)).await;
+        let pki = TestPki::new();
+        let (addr, server, _tmp) = spawn_tls_server(&pki.endpoint(true)).await;
 
         // Without a client certificate the request never gets a response.
         // TLS 1.3 completes the client side of the handshake before the server
         // checks the certificate, so the rejection may surface on connect or
         // on the first read; either way no HTTP response arrives.
-        let anonymous = match tls_connect(&tls_client(&[b"http/1.1"], false), addr).await {
+        let anonymous = match tls_connect(&pki.client(&[b"http/1.1"], false), addr).await {
             Ok(stream) => post_json_logs_http11(stream, addr).await,
             Err(e) => Err(e),
         };
@@ -1450,7 +1494,7 @@ mod tests {
         );
 
         // The failed handshake cost one connection, not the listener.
-        let stream = tls_connect(&tls_client(&[b"http/1.1"], true), addr)
+        let stream = tls_connect(&pki.client(&[b"http/1.1"], true), addr)
             .await
             .unwrap();
         let response = post_json_logs_http11(stream, addr).await.unwrap();
@@ -1462,8 +1506,9 @@ mod tests {
     #[tokio::test]
     async fn unreadable_tls_material_fails_the_bind() {
         install_crypto_provider();
-        let mut endpoint = tls_endpoint(false);
-        endpoint.http_tls_key_path = Some(tls_fixture("missing.key"));
+        let pki = TestPki::new();
+        let mut endpoint = pki.endpoint(false);
+        endpoint.http_tls_key_path = Some(pki.path("missing.key"));
         let err = bind_http(&endpoint)
             .await
             .err()
