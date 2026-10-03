@@ -64,7 +64,9 @@ func (c *Collector) collectGarnetExtraInfo(info string) string {
 
 	commandstats, err := c.rdb.Info(context.Background(), "commandstats").Result()
 	if err != nil {
-		c.Warningf("garnet: error on INFO commandstats: %v", err)
+		// Requested every cycle (unlike the throttled keyspace scan), so a
+		// persistent failure must not log a warning on every collection.
+		c.Debugf("garnet: error on INFO commandstats: %v", err)
 		return info
 	}
 	return appendInfoSection(info, commandstats)
