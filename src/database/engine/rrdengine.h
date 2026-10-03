@@ -194,6 +194,7 @@ struct jv2_metrics_info {
     time_t first_time_s;
     time_t last_time_s;
     Pvoid_t JudyL_pages_by_start_time;
+    uint64_t samples;           // stored slots of its indexed pages, set by the journal v2 writer
 };
 
 struct jv2_page_info {
@@ -332,6 +333,12 @@ struct extent_io_data {
     // indexed lookup that cannot touch freed memory; a dead metric simply
     // misses. NOT a uuidmap reference - see mrg_metric_uuidmap_id().
     UUIDMAP_ID uuid_id;
+
+    // The number of stored slots of this page (points, including empty ones),
+    // known for hot open-cache pages (from a flushed extent or a replayed v1
+    // journal) and summed per metric into the journal v2 samples section.
+    // 0 = unknown (pages loaded from a journal v2 file are never migrated).
+    uint32_t slots;
 };
 
 struct extent_io_descriptor {
@@ -492,50 +499,6 @@ static inline void ctx_io_error(struct rrdengine_instance *ctx) {
 static inline void ctx_fs_error(struct rrdengine_instance *ctx) {
     __atomic_add_fetch(&ctx->stats.fs_errors, 1, __ATOMIC_RELAXED);
     rrd_stat_atomic_add(&global_stats.global_fs_errors, 1);
-}
-
-static inline bool rrdeng_retention_samples_delta(
-    struct rrdengine_instance *ctx,
-    time_t first_time_s,
-    time_t last_time_s,
-    uint32_t update_every_s,
-    const char *reason,
-    uint64_t *samples)
-{
-    *samples = 0;
-
-    if(!update_every_s || !first_time_s || !last_time_s || first_time_s == last_time_s)
-        return false;
-
-    if(unlikely(first_time_s > last_time_s)) {
-        int tier = ctx ? ctx->config.tier : -1;
-
-        internal_fatal(
-            true,
-            "DBENGINE: tier %d: invalid retention interval while %s (first=%ld, last=%ld, update_every=%u)",
-            tier,
-            reason,
-            (long)first_time_s,
-            (long)last_time_s,
-            update_every_s);
-
-        nd_log_limit_static_global_var(erl, 60, 0);
-        nd_log_limit(
-            &erl,
-            NDLS_DAEMON,
-            NDLP_ERR,
-            "DBENGINE: tier %d: invalid retention interval while %s (first=%ld, last=%ld, update_every=%u); not updating sample counter",
-            tier,
-            reason,
-            (long)first_time_s,
-            (long)last_time_s,
-            update_every_s);
-
-        return false;
-    }
-
-    *samples = (last_time_s - first_time_s) / update_every_s;
-    return *samples > 0;
 }
 
 static inline bool rrdeng_atomic_uint64_sub_saturating(
