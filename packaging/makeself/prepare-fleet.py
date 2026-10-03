@@ -74,6 +74,8 @@ ABS_LINKS = {
     'etc/netdata/orig': '/opt/netdata/usr/lib/netdata/conf.d',
 }
 MANIFEST = 'usr/share/netdata/fleet-manifest.json'
+# Agent startup validates the web directory even when no dashboard is installed.
+REQUIRED_EMPTY_DIRS = {'usr/share/netdata/web'}
 
 
 def fail(message):
@@ -106,6 +108,43 @@ def normalized(name):
     return str(p)
 
 
+def validate_symlink(name, target):
+    if target.startswith('/'):
+        if ABS_LINKS.get(name) != target:
+            fail(f'unsupported absolute symlink: {name}')
+        return
+    parts = list(PurePosixPath(name).parent.parts)
+    for part in PurePosixPath(target).parts:
+        if part == '..':
+            if not parts:
+                fail(f'symlink escapes source: {name}')
+            parts.pop()
+        elif part != '.':
+            parts.append(part)
+    if not target or '\\' in target:
+        fail(f'invalid symlink: {name}')
+
+
+def validate_member_ancestors(records):
+    for name in records:
+        for parent in PurePosixPath(name).parents:
+            ancestor = records.get(str(parent))
+            if ancestor and not ancestor.isdir():
+                fail(f'member beneath non-directory: {name}')
+    for parent in PurePosixPath(MANIFEST).parents:
+        ancestor = records.get(str(parent))
+        if ancestor and not ancestor.isdir():
+            fail(f'non-directory ancestor of generated manifest: {parent}')
+
+
+def validate_required_files(records):
+    for required in ('bin/netdata', 'bin/srv/netdata', 'bin/bash', 'bin/nd-run',
+                     'bin/curl', 'bin/netdatacli', 'system/post-installer.sh',
+                     'system/functions.sh', 'system/install-or-update.sh'):
+        if required not in records or not records[required].isfile():
+            fail(f'not a supported static Netdata tree: missing {required}')
+
+
 def validate_members(members):
     records = {}
     for m in members:
@@ -117,35 +156,10 @@ def validate_members(members):
         if not (m.isfile() or m.isdir() or m.issym()):
             fail(f'unsupported member type: {name}')
         if m.issym():
-            if m.linkname.startswith('/'):
-                if ABS_LINKS.get(name) != m.linkname:
-                    fail(f'unsupported absolute symlink: {name}')
-            else:
-                parts = list(PurePosixPath(name).parent.parts)
-                for part in PurePosixPath(m.linkname).parts:
-                    if part == '..':
-                        if not parts:
-                            fail(f'symlink escapes source: {name}')
-                        parts.pop()
-                    elif part != '.':
-                        parts.append(part)
-                if not m.linkname or '\\' in m.linkname:
-                    fail(f'invalid symlink: {name}')
+            validate_symlink(name, m.linkname)
         records[name] = m
-    for name in records:
-        for parent in PurePosixPath(name).parents:
-            ancestor = records.get(str(parent))
-            if ancestor and not ancestor.isdir():
-                fail(f'member beneath non-directory: {name}')
-    for parent in PurePosixPath(MANIFEST).parents:
-        ancestor = records.get(str(parent))
-        if ancestor and not ancestor.isdir():
-            fail(f'non-directory ancestor of generated manifest: {parent}')
-    for required in ('bin/netdata', 'bin/srv/netdata', 'bin/bash', 'bin/nd-run',
-                     'bin/curl', 'bin/netdatacli', 'system/post-installer.sh',
-                     'system/functions.sh', 'system/install-or-update.sh'):
-        if required not in records or not records[required].isfile():
-            fail(f'not a supported static Netdata tree: missing {required}')
+    validate_member_ancestors(records)
+    validate_required_files(records)
     return records
 
 
@@ -176,7 +190,7 @@ def header_info(path, expected):
         fail('installer SHA-256 does not match --sha256 (required for archive inputs)')
     with path.open('rb') as f:
         prefix = f.read(65536)
-        matches = re.findall(rb'^skip="([0-9]+)"$', prefix, re.M)
+        matches = re.findall(rb'^skip="(\d+)"$', prefix, re.M)
         if len(matches) != 1 or not 1 <= int(matches[0]) <= 2000:
             fail('unsupported Makeself header line count')
         f.seek(0)
@@ -207,9 +221,11 @@ def patch_permissions(text):
         path = PLUGIN + plugin
         pattern = re.compile(r'(?m)^  if ! run setcap ([^\n]+) "' + re.escape(path)
                              + r'"; then\n    run chmod 4750 "' + re.escape(path) + r'"\n  fi$')
+
         def replacement(match):
             return ('  if [ -f "' + path + '" ]; then\n'
                     + '\n'.join('  ' + line for line in match[0].splitlines()) + '\n  fi')
+        # subn invokes this callback before the loop advances to another path.
         text, count = pattern.subn(replacement, text)
         if count == 0 and f'  if [ -f "{path}" ]; then' not in text:
             fail(f'unrecognized installer permission policy for {plugin}')
@@ -222,10 +238,7 @@ def patch_permissions(text):
     return text
 
 
-def elf_contract(path):
-    data = path.read_bytes()
-    if not data.startswith(b'\x7fELF'):
-        return None
+def elf_sections(data, path):
     if len(data) < 64 or data[4] not in (1, 2) or data[5] not in (1, 2):
         fail(f'unsupported ELF: {path}')
     endian = '<' if data[5] == 1 else '>'
@@ -238,6 +251,14 @@ def elf_contract(path):
     sections = [struct.unpack_from(fmt, data, offset + i * size) for i in range(count)]
     ns = sections[names_index]
     names = data[ns[4]:ns[4] + ns[5]]
+    return h, sections, names
+
+
+def elf_contract(path):
+    data = path.read_bytes()
+    if not data.startswith(b'\x7fELF'):
+        return None
+    h, sections, names = elf_sections(data, path)
     allocated = []
     for s in sections:
         if s[2] & 2:
@@ -269,7 +290,7 @@ def size_text(size):
     return f'{size / (1024 * 1024):.1f} MiB'
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(
         description='Prepare a new reduced static Netdata image. Never run on a live installation.')
     source = parser.add_mutually_exclusive_group()
@@ -285,43 +306,63 @@ def main():
     parser.add_argument('--list-capabilities', action='store_true')
     parser.add_argument('--verbose', action='store_true', help='include the detailed file report')
     args = parser.parse_args()
-    if args.list_capabilities:
-        print('\n'.join(f'{name}: {", ".join(paths)}' + (f' (requires {", ".join(deps)})' if deps else '')
-                        for name, (paths, deps) in CAPS.items()))
-        return
-    if not (args.input or args.source) or args.keep is None:
-        parser.error('provide --input or --source, and explicit --keep')
-    if args.apply and not args.output:
-        parser.error('--apply requires --output')
-    requested = args.keep.split(',')
-    if args.keep not in ('all', 'none') and any(n not in CAPS for n in requested):
+    if not args.list_capabilities:
+        if not (args.input or args.source) or args.keep is None:
+            parser.error('provide --input or --source, and explicit --keep')
+        if args.apply and not args.output:
+            parser.error('--apply requires --output')
+    return args
+
+
+def select_capabilities(keep):
+    requested = keep.split(',')
+    if keep not in ('all', 'none') and any(n not in CAPS for n in requested):
         fail('unknown capability; use --list-capabilities')
-    selected = set(CAPS) if args.keep == 'all' else set() if args.keep == 'none' else set(requested)
+    if keep == 'all':
+        selected = set(CAPS)
+    elif keep == 'none':
+        selected = set()
+    else:
+        selected = set(requested)
+    # Snapshot the set because dependency expansion can add capabilities.
     for name in list(selected):
         selected.update(CAPS[name][1])
-    input_path = (args.input or args.source).resolve(strict=True)
+    return requested, selected
+
+
+def refuse_live_path(path, message):
     live = Path('/opt/netdata')
-    if input_path == live or live in input_path.parents:
-        fail('refusing the live /opt/netdata installation; use an offline image tree')
-    output = None
-    if args.output:
-        parent = args.output.absolute().parent.resolve(strict=True)
-        output = parent / args.output.name
-        if output.exists() or output.is_symlink():
-            fail('output already exists; choose a fresh output')
-        if output == live or live in output.parents:
-            fail('refusing output in /opt/netdata')
-        if args.source and (output == input_path or input_path in output.parents or output in input_path.parents):
-            fail('source and output must not overlap')
-        if output == input_path:
-            fail('input and output must differ')
-    else:
-        parent = Path.cwd().resolve(strict=True)
-    header, offset, archive = None, None, None
+    if path == live or live in path.parents:
+        fail(message)
+
+
+def preparation_paths(args):
+    input_path = (args.input or args.source).resolve(strict=True)
+    refuse_live_path(input_path, 'refusing the live /opt/netdata installation; use an offline image tree')
+    if not args.output:
+        return input_path, Path.cwd().resolve(strict=True), None
+    parent = args.output.absolute().parent.resolve(strict=True)
+    output = parent / args.output.name
+    if output.exists() or output.is_symlink():
+        fail('output already exists; choose a fresh output')
+    refuse_live_path(output, 'refusing output in /opt/netdata')
+    if args.source and (output == input_path or input_path in output.parents or output in input_path.parents):
+        fail('source and output must not overlap')
+    if output == input_path:
+        fail('input and output must differ')
+    return input_path, parent, output
+
+
+def create_workspace(parent):
+    work = Path(tempfile.mkdtemp(prefix='.netdata-fleet-', dir=parent))
+    print(f'Workspace retained for inspection: {work}', file=sys.stderr)
+    return work
+
+
+def read_input(args, input_path, parent):
     if args.input:
         header, offset = header_info(input_path, args.sha256)
-        work = Path(tempfile.mkdtemp(prefix='.netdata-fleet-', dir=parent))
-        print(f'Workspace retained for inspection: {work}', file=sys.stderr)
+        work = create_workspace(parent)
         raw_tar = work / 'input.tar'
         with input_path.open('rb') as f, raw_tar.open('xb') as out:
             f.seek(offset)
@@ -329,12 +370,14 @@ def main():
                 shutil.copyfileobj(gz, out)
         archive = tarfile.open(raw_tar, 'r:')
         records = validate_members(archive.getmembers())
-    else:
-        if not input_path.is_dir():
-            fail('--source must be an offline directory')
-        records = validate_members(tree_members(input_path))
-        work = None
-    if args.keep != 'all':
+        return header, archive, records, work
+    if not input_path.is_dir():
+        fail('--source must be an offline directory')
+    return None, None, validate_members(tree_members(input_path)), None
+
+
+def available_capabilities(keep, selected, records):
+    if keep != 'all':
         for name in selected:
             primary = CAPS[name][0][0]
             if not present(records, primary):
@@ -344,45 +387,55 @@ def main():
         for companion in REQUIRED_COMPANIONS.get(name, []):
             if not present(records, companion):
                 fail(f'incomplete capability {name}: missing {companion}')
+    return available
+
+
+def plan_package(args, input_path, records, requested, selected):
+    available = available_capabilities(args.keep, selected, records)
     omitted = [p for name, (paths, _) in CAPS.items() if name not in selected for p in paths]
-    # Agent startup validates the web directory even when no dashboard is installed.
-    required_empty_dirs = {'usr/share/netdata/web'}
     removed = sorted(p for p in records
-                     if not (p in required_empty_dirs and records[p].isdir())
+                     if not (p in REQUIRED_EMPTY_DIRS and records[p].isdir())
                      and any(p == prefix or p.startswith(prefix + '/') for prefix in omitted))
-    removed_set = set(removed)
     original_bytes = sum(m.size for m in records.values() if m.isfile())
     removed_bytes = sum(records[p].size for p in removed if records[p].isfile())
-    report = dict(schema_version=1, requested=requested, resolved=sorted(available),
-                  strip_mode=args.strip_mode, source_sha256=digest(input_path) if args.input else None,
-                  original_regular_bytes=original_bytes, removed_regular_bytes=removed_bytes,
-                  removed_paths=removed, stripped_files=[])
+    report = {'schema_version': 1, 'requested': requested, 'resolved': sorted(available),
+              'strip_mode': args.strip_mode, 'source_sha256': digest(input_path) if args.input else None,
+              'original_regular_bytes': original_bytes, 'removed_regular_bytes': removed_bytes,
+              'removed_paths': removed, 'stripped_files': []}
     omitted_capabilities = sorted(name for name in CAPS if name not in selected and present(records, CAPS[name][0][0]))
+    return report, omitted_capabilities
+
+
+def show_plan(input_path, report, omitted_capabilities):
+    original_bytes = report['original_regular_bytes']
+    removed_bytes = report['removed_regular_bytes']
     show(f'Input: {input_path.name}')
-    show(f'Keep: {", ".join(sorted(available)) or "none"}')
+    show(f'Keep: {", ".join(report["resolved"]) or "none"}')
     show(f'Remove: {", ".join(omitted_capabilities) or "none"}')
-    show(f'Strip mode: {args.strip_mode}')
+    show(f'Strip mode: {report["strip_mode"]}')
     show(f'Original payload: {size_text(original_bytes)}')
     show(f'Removed bundles: {size_text(removed_bytes)}')
     show(f'Payload before stripping: {size_text(original_bytes - removed_bytes)}')
-    if not args.apply:
-        if args.verbose:
-            show(json.dumps(report, indent=2))
-        print('Preview only. Add --apply --output NEW_OUTPUT to prepare this package.', file=sys.stderr)
-        if archive:
-            archive.close()
+
+
+def strip_stock_file(name, target, args, work, report):
+    if args.strip_mode == 'none' or name not in STOCK_ELF:
         return
-    if work is None:
-        work = Path(tempfile.mkdtemp(prefix='.netdata-fleet-', dir=parent))
-        print(f'Workspace retained for inspection: {work}', file=sys.stderr)
-    stage = work / 'tree'
-    stage.mkdir()
-    kept = {p: copy.copy(m) for p, m in records.items() if p not in removed_set and p != MANIFEST}
-    for name in required_empty_dirs:
-        if name not in kept:
-            directory = tarfile.TarInfo(name)
-            directory.type, directory.mode = tarfile.DIRTYPE, 0o755
-            kept[name] = directory
+    before = elf_contract(target)
+    if before is None:
+        return
+    stripped = work / 'stripped-file'
+    command([args.strip_tool, '--strip-' + args.strip_mode, '-o', str(stripped), str(target)])
+    if elf_contract(stripped) != before:
+        fail(f'stripping changed allocated sections or ELF identity: {name}')
+    old_size = target.stat().st_size
+    os.replace(stripped, target)
+    new_size = target.stat().st_size
+    report['stripped_files'].append({'path': name, 'before': old_size, 'after': new_size})
+    show(f'Stripped {name}: {size_text(old_size)} -> {size_text(new_size)}')
+
+
+def copy_package_files(args, input_path, archive, work, stage, kept, report):
     # Create regular files before links, and never traverse an input symlink.
     for name, m in sorted(kept.items()):
         target = stage / name
@@ -395,26 +448,13 @@ def main():
                 shutil.copyfileobj(src, dest)
             if name == 'system/install-or-update.sh':
                 target.write_text(patch_permissions(target.read_text()))
-            if args.strip_mode != 'none' and name in STOCK_ELF:
-                before = elf_contract(target)
-                if before is not None:
-                    stripped = work / 'stripped-file'
-                    command([args.strip_tool, '--strip-' + args.strip_mode, '-o', str(stripped), str(target)])
-                    if elf_contract(stripped) != before:
-                        fail(f'stripping changed allocated sections or ELF identity: {name}')
-                    old_size = target.stat().st_size
-                    os.replace(stripped, target)
-                    new_size = target.stat().st_size
-                    report['stripped_files'].append(dict(path=name, before=old_size, after=new_size))
-                    show(f'Stripped {name}: {size_text(old_size)} -> {size_text(new_size)}')
+            strip_stock_file(name, target, args, work, report)
             m.size = target.stat().st_size
             os.chmod(target, m.mode)
             os.utime(target, (m.mtime, m.mtime))
-    for name, m in kept.items():
-        if m.issym():
-            target = stage / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            os.symlink(m.linkname, target)
+
+
+def write_manifest(stage, kept, report):
     report['output_regular_bytes_without_manifest'] = sum(m.size for m in kept.values() if m.isfile())
     manifest = stage / MANIFEST
     manifest.parent.mkdir(parents=True, exist_ok=True)
@@ -422,74 +462,114 @@ def main():
     mm = tarfile.TarInfo(MANIFEST)
     mm.size, mm.mode = manifest.stat().st_size, 0o644
     kept[MANIFEST] = mm
-    if archive:
-        archive.close()
-    if args.source:
-        # Restore directory permissions last so read-only directories can be populated.
-        for name, m in sorted(kept.items(), reverse=True):
-            if m.isdir():
-                os.chmod(stage / name, m.mode)
-                os.utime(stage / name, (m.mtime, m.mtime))
-        # mkdir reserves a fresh output; copytree never overwrites somebody else's directory.
-        output.mkdir()
-        shutil.copytree(stage, output, dirs_exist_ok=True, symlinks=True, copy_function=shutil.copy2)
-        print('Tree output retains modes and links; assign deployment ownership in the image pipeline.',
-              file=sys.stderr)
-    else:
-        tar_path = work / 'output.tar'
-        with tarfile.open(tar_path, 'w', format=tarfile.PAX_FORMAT) as tf:
-            for name, m in kept.items():
-                m.name = './' + name
-                if m.isfile():
-                    with (stage / name).open('rb') as f:
-                        tf.addfile(m, f)
-                else:
-                    tf.addfile(m)
-        payload = work / 'payload.gz'
-        with tar_path.open('rb') as src, payload.open('xb') as dest:
-            with gzip.GzipFile(filename='', fileobj=dest, mode='wb', mtime=0) as gz:
-                shutil.copyfileobj(src, gz)
-        md5, sha = hashlib.md5(), hashlib.sha256()
-        with payload.open('rb') as f:
-            for block in iter(lambda: f.read(1024 * 1024), b''):
-                md5.update(block)
-                sha.update(block)
-        crc = command(['cksum', str(payload)]).decode().split()[0]
-        values = dict(filesizes=str(payload.stat().st_size), totalsize=str(payload.stat().st_size),
-                      CRCsum=crc, MD5=md5.hexdigest(), SHA=sha.hexdigest())
-        for key, value in values.items():
-            header = re.sub(r'^' + key + r'="[^"\n]*"$', key + '="' + value + '"', header, flags=re.M)
-        usize = (tar_path.stat().st_size + 1023) // 1024
-        space_declarations = r'(?:(?<=extract )|(?<=size: )|(?<="\$leftspace" -lt )|(?<=\())\d+(?= KB|; then)'
-        header, count = re.subn(space_declarations, str(usize), header)
-        if count != 4:
-            fail('unrecognized Makeself uncompressed-space declarations')
-        prepared = work / 'installer.gz.run'
-        with prepared.open('xb') as dest, payload.open('rb') as src:
-            dest.write(header.encode())
-            shutil.copyfileobj(src, dest)
-        os.chmod(prepared, 0o755)
-        checksum_path = Path(str(output) + '.sha256')
-        if checksum_path.exists() or checksum_path.is_symlink():
-            fail('checksum output already exists')
-        checksum = work / 'installer.sha256'
-        checksum.write_text(f'{digest(prepared)}  {output.name}\n')
-        publish_file(prepared, output)
+
+
+def stage_package(args, input_path, archive, work, records, report):
+    stage = work / 'tree'
+    stage.mkdir()
+    removed = set(report['removed_paths'])
+    kept = {p: copy.copy(m) for p, m in records.items() if p not in removed and p != MANIFEST}
+    for name in REQUIRED_EMPTY_DIRS:
+        if name not in kept:
+            directory = tarfile.TarInfo(name)
+            directory.type, directory.mode = tarfile.DIRTYPE, 0o755
+            kept[name] = directory
+    copy_package_files(args, input_path, archive, work, stage, kept, report)
+    for name, m in kept.items():
+        if m.issym():
+            target = stage / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink(m.linkname, target)
+    write_manifest(stage, kept, report)
+    return stage, kept
+
+
+def publish_tree(stage, kept, output):
+    # Restore directory permissions last so read-only directories can be populated.
+    for name, m in sorted(kept.items(), reverse=True):
+        if m.isdir():
+            os.chmod(stage / name, m.mode)
+            os.utime(stage / name, (m.mtime, m.mtime))
+    # mkdir reserves a fresh output; copytree never overwrites somebody else's directory.
+    output.mkdir()
+    shutil.copytree(stage, output, dirs_exist_ok=True, symlinks=True, copy_function=shutil.copy2)
+    print('Tree output retains modes and links; assign deployment ownership in the image pipeline.',
+          file=sys.stderr)
+
+
+def write_payload(stage, kept, work):
+    tar_path = work / 'output.tar'
+    with tarfile.open(tar_path, 'w', format=tarfile.PAX_FORMAT) as tf:
+        for name, m in kept.items():
+            m.name = './' + name
+            if m.isfile():
+                with (stage / name).open('rb') as f:
+                    tf.addfile(m, f)
+            else:
+                tf.addfile(m)
+    payload = work / 'payload.gz'
+    with tar_path.open('rb') as src, payload.open('xb') as dest, \
+            gzip.GzipFile(filename='', fileobj=dest, mode='wb', mtime=0) as gz:
+        shutil.copyfileobj(src, gz)
+    return tar_path, payload
+
+
+def rewrite_makeself_header(header, tar_path, payload):
+    md5, sha = hashlib.md5(), hashlib.sha256()
+    with payload.open('rb') as f:
+        for block in iter(lambda: f.read(1024 * 1024), b''):
+            md5.update(block)
+            sha.update(block)
+    crc = command(['cksum', str(payload)]).decode().split()[0]
+    values = {'filesizes': str(payload.stat().st_size), 'totalsize': str(payload.stat().st_size),
+              'CRCsum': crc, 'MD5': md5.hexdigest(), 'SHA': sha.hexdigest()}
+    for key, value in values.items():
+        header = re.sub(r'^' + key + r'="[^"\n]*"$', key + '="' + value + '"', header, flags=re.M)
+    usize = (tar_path.stat().st_size + 1023) // 1024
+    space_declarations = r'(?:(?<=extract )|(?<=size: )|(?<="\$leftspace" -lt )|(?<=\())\d+(?= KB|; then)'
+    header, count = re.subn(space_declarations, str(usize), header)
+    if count != 4:
+        fail('unrecognized Makeself uncompressed-space declarations')
+    return header
+
+
+def publish_installer(prepared, output, work):
+    checksum_path = Path(str(output) + '.sha256')
+    if checksum_path.exists() or checksum_path.is_symlink():
+        fail('checksum output already exists')
+    checksum = work / 'installer.sha256'
+    checksum.write_text(f'{digest(prepared)}  {output.name}\n')
+    publish_file(prepared, output)
+    try:
+        publish_file(checksum, checksum_path)
+    except OSError as publication_error:
+        # Preserve an installer replaced by another publisher during the failure.
         try:
-            publish_file(checksum, checksum_path)
-        except OSError as publication_error:
-            # Preserve an installer replaced by another publisher during the failure.
-            try:
-                if output.samefile(prepared):
-                    output.unlink()
-            except FileNotFoundError:
-                pass
-            except OSError as rollback_error:
-                raise publication_error from rollback_error
-            raise
-        print(f'Published {output}', file=sys.stderr)
-        print(f'Published {checksum_path}', file=sys.stderr)
+            if output.samefile(prepared):
+                output.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError as rollback_error:
+            raise publication_error from rollback_error
+        raise
+    print(f'Published {output}', file=sys.stderr)
+    print(f'Published {checksum_path}', file=sys.stderr)
+
+
+def prepare_installer(header, stage, kept, work, output):
+    tar_path, payload = write_payload(stage, kept, work)
+    header = rewrite_makeself_header(header, tar_path, payload)
+    prepared = work / 'installer.gz.run'
+    with prepared.open('xb') as dest, payload.open('rb') as src:
+        dest.write(header.encode())
+        shutil.copyfileobj(src, dest)
+    os.chmod(prepared, 0o755)
+    publish_installer(prepared, output, work)
+
+
+def show_result(args, output, report):
     final_bytes = report['output_regular_bytes_without_manifest']
+    original_bytes = report['original_regular_bytes']
     show(f'Prepared payload: {size_text(final_bytes)}')
     if original_bytes:
         show(f'Disk reduction: {100 * (original_bytes - final_bytes) / original_bytes:.1f}%')
@@ -501,6 +581,36 @@ def main():
     show(f'Manifest: {MANIFEST}')
     if args.verbose:
         show(json.dumps(report, indent=2))
+
+
+def main():
+    args = parse_args()
+    if args.list_capabilities:
+        print('\n'.join(f'{name}: {", ".join(paths)}' + (f' (requires {", ".join(deps)})' if deps else '')
+                        for name, (paths, deps) in CAPS.items()))
+        return
+    requested, selected = select_capabilities(args.keep)
+    input_path, parent, output = preparation_paths(args)
+    header, archive, records, work = read_input(args, input_path, parent)
+    report, omitted_capabilities = plan_package(args, input_path, records, requested, selected)
+    show_plan(input_path, report, omitted_capabilities)
+    if not args.apply:
+        if args.verbose:
+            show(json.dumps(report, indent=2))
+        print('Preview only. Add --apply --output NEW_OUTPUT to prepare this package.', file=sys.stderr)
+        if archive:
+            archive.close()
+        return
+    if work is None:
+        work = create_workspace(parent)
+    stage, kept = stage_package(args, input_path, archive, work, records, report)
+    if archive:
+        archive.close()
+    if args.source:
+        publish_tree(stage, kept, output)
+    else:
+        prepare_installer(header, stage, kept, work, output)
+    show_result(args, output, report)
 
 
 if __name__ == '__main__':

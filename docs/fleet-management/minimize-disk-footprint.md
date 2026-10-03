@@ -8,14 +8,18 @@ Use the [fleet preparation script](https://github.com/netdata/netdata/blob/maste
 
 ## Prepare the build host
 
-Install the binary utilities on your build host; devices need no cross-compilation tools. On Debian or Ubuntu:
+Use a Linux or macOS build host with Python 3.9 or newer and a GNU binutils or [LLVM strip tool](https://llvm.org/docs/CommandGuide/llvm-strip.html) that supports Linux ELF files for your device architecture. Install these tools on the build host; devices need no cross-compilation tools.
+
+Reserve **4 GiB of workspace per ARM package** on a filesystem supporting Unix permissions, symbolic links and hard links, such as ext4, XFS or APFS. You can copy the completed installer and checksum to other storage.
+
+### Debian and Ubuntu
 
 ```bash
 sudo apt-get update
 sudo apt-get install python3 coreutils curl binutils-arm-linux-gnueabihf
 ```
 
-Use a Linux or macOS build host with Python 3.9 or newer. Choose a strip tool that supports the device architecture; your build host's default `strip` may support only its own architecture. The [ARM binutils package](https://packages.ubuntu.com/noble/binutils-arm-linux-gnueabihf) supplies `arm-linux-gnueabihf-strip` for both ARMv6 and ARMv7. For 64-bit ARM packages, use `binutils-aarch64-linux-gnu` and `aarch64-linux-gnu-strip`.
+The [ARM binutils package](https://packages.ubuntu.com/noble/binutils-arm-linux-gnueabihf) supplies `arm-linux-gnueabihf-strip` for both ARMv6 and ARMv7. For 64-bit ARM packages, use `binutils-aarch64-linux-gnu` and `aarch64-linux-gnu-strip`. Your build host's default `strip` may support only its own architecture.
 
 Alternatively, LLVM supplies one tool for multiple target architectures:
 
@@ -24,9 +28,31 @@ sudo apt-get install llvm
 llvm-strip --version
 ```
 
-Prebuilt toolchains are available from [LLVM releases](https://github.com/llvm/llvm-project/releases), including [LLVM 23.1.1](https://github.com/llvm/llvm-project/releases/tag/llvmorg-23.1.1). Choose the toolchain for your build host and put its `bin` directory on `PATH`.
+### macOS
 
-The examples use `--strip-tool llvm-strip`. Substitute `--strip-tool arm-linux-gnueabihf-strip` when using GNU binutils. Reserve **4 GiB of build-host workspace per ARM package** for extraction and repackaging.
+Install Python and [LLVM through Homebrew](https://formulae.brew.sh/formula/llvm), then add LLVM's tools to the current shell's `PATH`:
+
+```bash
+brew install python llvm
+export PATH="$(brew --prefix llvm)/bin:$PATH"
+python3 --version
+llvm-strip --version
+```
+
+Use `--strip-tool llvm-strip` for Netdata's Linux ELF binaries. macOS's built-in `strip` handles Mach-O files and is unsuitable for these packages.
+
+For checksum commands below, use macOS's `shasum -a 256` in place of `sha256sum`:
+
+```bash
+shasum -a 256 netdata-armv6l-v2.12.0-2-nightly.gz.run
+shasum -a 256 netdata-armv7l-v2.12.0-2-nightly.gz.run
+```
+
+### Choose the stripping tool
+
+Prebuilt toolchains are also available from [LLVM releases](https://github.com/llvm/llvm-project/releases), including [LLVM 23.1.1](https://github.com/llvm/llvm-project/releases/tag/llvmorg-23.1.1). Choose the toolchain for your build host and put its `bin` directory on `PATH`.
+
+The examples use `--strip-tool llvm-strip`. Substitute `--strip-tool arm-linux-gnueabihf-strip` when using GNU binutils.
 
 ## Choose what to keep
 
@@ -246,7 +272,7 @@ Save the package manifest and checksum with the image release. Use the [image-co
 | `ioping` | The bundled `ioping` executable and its collector/configuration | You need active storage-latency probes against configured devices, files or directories |
 | `log2journal` | The `log2journal` utility and stock conversion configurations | Your log pipeline converts application output into structured journal records |
 
-Use `python3 ./prepare-fleet.py --list-capabilities` to see selection names and their paths. `--keep all` keeps all available bundles; `--keep none` keeps the Agent and shared helpers. Select capabilities included in your package: ARMv6 in this example includes neither `journal`, `otel` nor `netflow`, while ARMv7 includes all three. Neither package includes `ipmi`, `xen`, `cups`, `ebpf` or `systemd-units`.
+Use `python3 ./prepare-fleet.py --list-capabilities` to see selection names and their paths. `--keep all` keeps all available bundles; `--keep none` keeps the Agent and shared helpers. Select capabilities available in your input package: the ARMv6 input used here lacks `journal`, `otel` and `netflow`; the ARMv7 input contains all three, which this example's `--keep apps,debugfs` selection removes. Neither input package includes `ipmi`, `xen`, `cups`, `ebpf` or `systemd-units`.
 
 Keep `go` when your devices need its collectors, then enable the jobs you use. Bundle selection controls disk space; collector configuration controls runtime work. Custom configuration in `etc/netdata` is retained. With customized source trees, use `--verbose` to inspect files inside bundles selected for removal.
 
