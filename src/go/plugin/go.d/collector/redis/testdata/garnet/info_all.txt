@@ -1,8 +1,8 @@
 # Server
 garnet_version:2.2.0
 server_name:garnet
-os:Unix 7.1.13.2
-processor_count:24
+os:Unix
+processor_count:8
 arch_bits:64
 uptime_in_seconds:0
 uptime_in_days:0
@@ -10,14 +10,14 @@ monitor_task:disabled
 monitor_freq:0
 latency_monitor:disabled
 commandstats_monitor:disabled
-run_id:8ddc01783686fffb6bdc942a5de9b215789d1e5b
+run_id:0000000000000000000000000000000000abcdef
 redis_version:7.4.3
 redis_mode:standalone
 
 # Memory
 system_page_size:4096
-total_system_memory:134886170624
-total_system_memory(MB):128637
+total_system_memory:8589934592
+total_system_memory(MB):8192
 available_system_memory:-1
 available_system_memory(MB):-1
 proc_paged_memory_size:0
