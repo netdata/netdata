@@ -31,9 +31,8 @@ modules:
       info_provided_to_referring_integrations:
         description: ""
     # Metric kinds, sum flavors, the `otel.` context prefix, and the mapping
-    # option keys are implemented in otel-ingestor (chart.rs, chart_config.rs,
-    # aggregation.rs); both endpoints (gRPC and OTLP/HTTP) are served from
-    # otel-ingestor/src/lib.rs.
+    # option keys are implemented in the otel-ingestor crate; both endpoints
+    # (gRPC and OTLP/HTTP) are served by the ingestor worker it powers.
     overview:
       data_collection:
         metrics_description: |
@@ -68,10 +67,10 @@ modules:
         auto_detection:
           description: |
             The plugin starts automatically and listens on `127.0.0.1:4317` for OTLP/gRPC connections and on `127.0.0.1:4318` for OTLP/HTTP connections.
-        # The ingest windows are bridge::config defaults (netdata-plugin/bridge/
-        # src/config.rs IngestConfig: 24h max_age, 10m future_skew); the chart cap
-        # is the stock-file value the ingestor enforces; retention evicts on
-        # whichever bound is hit first.
+        # The ingest windows are the bridge crate's IngestConfig defaults
+        # (24h max_age, 10m future_skew); the chart cap is the stock-file
+        # value the ingestor enforces; retention evicts on whichever bound
+        # is hit first.
         limits:
           description: |
             Each export request can create at most 100 new charts by default. This is a per-request throttle, not a total cardinality limit. By default, log timestamps are accepted from up to 24 hours in the past through 10 minutes in the future; records without a timestamp use their arrival time. A span is accepted when it started no more than 24 hours ago and ends no more than 10 minutes in the future. Log and trace retention are each bounded by whichever limit is reached first: retained file count, retained indexed-data size, or age.
@@ -93,8 +92,8 @@ modules:
         # The option rows' default_value entries mirror the stock
         # configs/otel.yaml.in (its @*_POST@ placeholders resolve to the standard
         # Linux package paths shown below); update both together. The env-var
-        # naming rules and strict-config behavior live in otel-plugin/src/config/
-        # (env.rs, mod.rs, legacy.rs).
+        # naming rules and strict-config behavior are owned by the otel-plugin
+        # supervisor's config layering (stock < user < env).
         options:
           description: |
             Edit `otel.yaml` with [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files). A user file can contain only the fields that differ from the stock configuration. Configuration resolves in this order: stock file, user file, then environment variables. Restart the Netdata Agent after changing `otel.yaml` or any `NETDATA_OTEL_CFG_*` environment variable.
@@ -182,7 +181,8 @@ modules:
               required: false
             # Cache and download claims are file-lifecycle behavior: the shared
             # `{base_dir}/remote-read` cache and the 30s + 1 MiB/s (5 min cap)
-            # deadline are remote_read.rs; fs/s3 select opendal backends.
+            # deadline are the file-lifecycle crate's remote-read path; fs/s3
+            # select opendal backends.
             - name: remote_storage.enabled
               description: Upload retained OpenTelemetry logs and traces to configured remote object storage.
               detailed_description: |
@@ -305,10 +305,11 @@ modules:
                       dimension_attribute_key: direction
                   "redis.cpu.time":
                     - dimension_attribute_key: state
-    # Quoted journal lines must match the shipped log text: the gRPC bind
-    # error is formatted in otel-ingestor/src/lib.rs, the disable line is
-    # emitted by src/plugins.d/plugins_d.c, and the "otel-plugin/ingestor"
-    # worker journal name is set in otel-plugin/src/main.rs.
+    # Quoted journal lines must match the shipped log text: the bind errors
+    # are formatted by the otel-ingestor worker (one per listener), the
+    # disable line is emitted by the Agent's external-plugins supervisor
+    # (plugins.d), and the "otel-plugin/ingestor" journal name is set by the
+    # otel-plugin supervisor when it spawns the worker.
     troubleshooting:
       errors:
         list:
