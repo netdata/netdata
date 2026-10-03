@@ -1,0 +1,2 @@
+# Commandstats
+Command stats monitoring is disabled. Enable with --commandstats-monitor flag.
