@@ -4,27 +4,6 @@
     "type": "object",
     "title": "Redis collector configuration.",
     "properties": {
-      "update_every": {
-        "title": "Update every",
-        "description": "Data collection interval, in seconds.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 1
-      },
-      "autodetection_retry": {
-        "title": "Detection retry",
-        "description": "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.",
-        "type": "integer",
-        "minimum": 0,
-        "default": 0
-      },
-      "ping_samples": {
-        "title": "Ping samples",
-        "description": "Number of PING commands sent each data collection interval to measure latency.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 5
-      },
       "address": {
         "title": "Address",
         "description": "Redis server address as a URL: `redis://` or `rediss://` (TLS) for TCP, `unix://` for a Unix socket.",
@@ -68,6 +47,27 @@
         "title": "TLS client key",
         "description": "Path to the client key file for mutual TLS. Requires a client certificate.",
         "type": "string"
+      },
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "ping_samples": {
+        "title": "Ping samples",
+        "description": "Number of PING commands sent each data collection interval to measure latency.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 5
       },
       "functions": {
         "title": "Functions",
@@ -115,8 +115,7 @@
   },
   "uiSchema": {
     "address": {
-      "ui:placeholder": "redis://user:password@host:port",
-      "ui:help": "TCP connection: `redis://user:password@host:port/db`. TLS: `rediss://user:password@host:port/db`. Unix socket: `unix://user:password@/path/to/redis.sock?db=0`.",
+      "ui:help": "TCP connection: `redis://user:password@host:port/db`. TLS: `rediss://user:password@host:port/db`. Unix socket: `unix://user:password@/path/to/redis.sock?db=0`.\n\nSetting any TLS option also enables TLS for a `redis://` address.",
       "ui:widget": "password"
     },
     "timeout": {
@@ -132,14 +131,6 @@
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
-        {
-          "title": "Collection",
-          "fields": [
-            "update_every",
-            "autodetection_retry",
-            "ping_samples"
-          ]
-        },
         {
           "title": "Target",
           "fields": [
@@ -161,6 +152,14 @@
             "tls_ca",
             "tls_cert",
             "tls_key"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "autodetection_retry",
+            "ping_samples"
           ]
         },
         {
