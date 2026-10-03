@@ -26,6 +26,7 @@ COLLECTOR_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'guides', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'collector', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'scripts.d' / 'collector', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'dem' / 'collector', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules' / 'websphere', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'otel-plugin' / 'metadata.yaml', False),

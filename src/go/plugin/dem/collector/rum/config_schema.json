@@ -1,0 +1,294 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "RUM rum collector configuration.",
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Site key",
+        "description": "Stable site identifier used in beacon URLs and history. Renaming creates a new history identity.",
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+      },
+      "display_name": {
+        "title": "Display name",
+        "description": "Human-readable site name. Leave empty to use the site key.",
+        "type": "string"
+      },
+      "allowed_origins": {
+        "title": "Allowed origins",
+        "description": "Web origins allowed to send telemetry, such as https://example.org. A leading *. allows subdomains only.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1
+      },
+      "public_url": {
+        "title": "Public URL",
+        "description": "Externally reachable collector base URL for this site. Leave empty to use the receiver public URL.",
+        "type": "string"
+      },
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "window": {
+        "title": "Measurement window",
+        "description": "Sliding window for browser measurements. Accepts durations between 1m and 30m.",
+        "type": "string",
+        "default": "5m"
+      },
+      "page_groups": {
+        "title": "Page groups",
+        "description": "Maximum individual page groups shown in breakdown charts. Remaining groups are combined as other.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 20
+      },
+      "countries": {
+        "title": "Countries",
+        "description": "Maximum individual countries shown in breakdown charts. Remaining countries are combined as other.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 20
+      },
+      "collect_console_logs": {
+        "title": "Collect console logs",
+        "description": "Export browser console logs through OTLP for investigated sessions.",
+        "type": "boolean",
+        "default": false
+      },
+      "measure_sample_rate": {
+        "title": "Measure sample rate",
+        "description": "Share of browser sessions measured, from 0 to 1. Zero preserves the default of measuring all sessions.",
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1,
+        "default": 1
+      },
+      "investigate": {
+        "title": "Investigation sampling",
+        "description": "Choose which measured sessions retain full history. Leave empty to retain all sessions.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "sample_rate": {
+            "title": "Investigation sample rate",
+            "description": "Share of measured sessions kept in full, from 0 to 1. Zero means all sessions.",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "always_keep": {
+            "title": "Always keep",
+            "description": "Conditions that retain a session regardless of sampling. Leave unset to keep errors and poor vitals; an empty list keeps neither.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "errors",
+                "poor_vitals"
+              ]
+            }
+          }
+        }
+      },
+      "bots": {
+        "title": "Bot handling",
+        "description": "Exclude crawlers and browser automation by default, or include them as bot traffic.",
+        "type": "string",
+        "enum": [
+          "exclude",
+          "include"
+        ],
+        "default": "exclude"
+      },
+      "tracing": {
+        "title": "Browser tracing",
+        "description": "Follow browser requests into backend services. Leave empty to disable tracing.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "enabled": {
+            "title": "Enable tracing",
+            "description": "Capture browser request spans and propagate trace headers.",
+            "type": "boolean"
+          },
+          "propagate_to": {
+            "title": "Trace propagation origins",
+            "description": "Additional API origins receiving trace headers. Same-origin requests receive them automatically.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "export_to": {
+            "title": "Span export destination",
+            "description": "OTLP gRPC host:port or https://host:port. Leave empty to use this site OTLP endpoint.",
+            "type": "string"
+          }
+        }
+      },
+      "redact_paths": {
+        "title": "Path redaction",
+        "description": "Replace private identifiers in URL paths before aggregation and export. Rules run before built-in path redaction.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Redaction rule",
+          "description": "One regular expression replacement.",
+          "type": "object",
+          "properties": {
+            "pattern": {
+              "title": "Pattern",
+              "description": "Go regular expression matching private path identifiers. Empty patterns are ignored.",
+              "type": "string"
+            },
+            "replace": {
+              "title": "Replacement",
+              "description": "Replacement text for matching path segments. Leave empty to remove them.",
+              "type": "string"
+            }
+          }
+        }
+      },
+      "otlp": {
+        "title": "OTLP export",
+        "description": "Export browser logs and spans to an OTLP gRPC receiver.",
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "title": "Log export",
+            "description": "Auto exports to an available receiver; yes enables export, and no disables log export. Export failures do not stop ingestion.",
+            "type": "string",
+            "enum": [
+              "auto",
+              "yes",
+              "no"
+            ],
+            "default": "auto"
+          },
+          "endpoint": {
+            "title": "OTLP endpoint",
+            "description": "OTLP gRPC host and port for logs and default browser span export.",
+            "type": "string",
+            "default": "127.0.0.1:4317"
+          },
+          "auth_token": {
+            "title": "Authentication token",
+            "description": "Bearer token sent to the OTLP receiver. Leave empty for no authentication.",
+            "type": "string"
+          },
+          "tls_cert": {
+            "title": "TLS certificate",
+            "description": "Client certificate file. Leave empty with TLS key to omit client authentication.",
+            "type": "string"
+          },
+          "tls_key": {
+            "title": "TLS key",
+            "description": "Client private key file. Set together with TLS certificate.",
+            "type": "string"
+          },
+          "tls_ca": {
+            "title": "TLS CA certificate",
+            "description": "CA certificate file for verifying the OTLP receiver. Leave empty to use system roots when TLS is enabled.",
+            "type": "string"
+          }
+        }
+      }
+    },
+    "required": [
+      "name",
+      "allowed_origins"
+    ]
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Site",
+          "fields": [
+            "name",
+            "display_name",
+            "allowed_origins",
+            "public_url"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "window",
+            "page_groups",
+            "countries",
+            "collect_console_logs",
+            "bots"
+          ]
+        },
+        {
+          "title": "Sampling",
+          "fields": [
+            "measure_sample_rate",
+            "investigate"
+          ]
+        },
+        {
+          "title": "Tracing",
+          "fields": [
+            "tracing",
+            "otlp"
+          ]
+        },
+        {
+          "title": "Privacy",
+          "fields": [
+            "redact_paths"
+          ]
+        }
+      ]
+    },
+    "bots": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      }
+    },
+    "otlp": {
+      "enabled": {
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "auth_token": {
+        "ui:widget": "password",
+        "ui:placeholder": "${env:OTLP_TOKEN}"
+      }
+    },
+    "redact_paths": {
+      "ui:listFlavour": "list"
+    },
+    "window": {
+      "ui:placeholder": "5m"
+    }
+  }
+}

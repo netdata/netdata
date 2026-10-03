@@ -1,0 +1,722 @@
+context_namespace: rum
+groups:
+    - charts:
+        - context: lcp
+          dimensions:
+            - name: p50
+              selector: lcp_p50
+            - name: p75
+              selector: lcp_p75
+            - name: p95
+              selector: lcp_p95
+          title: Largest Contentful Paint
+          units: milliseconds
+        - context: lcp_rating
+          dimensions:
+            - name: good
+              selector: lcp_good
+            - name: needs_improvement
+              selector: lcp_needs_improvement
+            - name: poor
+              selector: lcp_poor
+          title: Largest Contentful Paint ratings
+          type: stacked
+          units: samples
+        - context: fcp
+          dimensions:
+            - name: p50
+              selector: fcp_p50
+            - name: p75
+              selector: fcp_p75
+            - name: p95
+              selector: fcp_p95
+          title: First Contentful Paint
+          units: milliseconds
+        - context: fcp_rating
+          dimensions:
+            - name: good
+              selector: fcp_good
+            - name: needs_improvement
+              selector: fcp_needs_improvement
+            - name: poor
+              selector: fcp_poor
+          title: First Contentful Paint ratings
+          type: stacked
+          units: samples
+        - context: ttfb
+          dimensions:
+            - name: p50
+              selector: ttfb_p50
+            - name: p75
+              selector: ttfb_p75
+            - name: p95
+              selector: ttfb_p95
+          title: Time to First Byte
+          units: milliseconds
+        - context: ttfb_rating
+          dimensions:
+            - name: good
+              selector: ttfb_good
+            - name: needs_improvement
+              selector: ttfb_needs_improvement
+            - name: poor
+              selector: ttfb_poor
+          title: Time to First Byte ratings
+          type: stacked
+          units: samples
+        - context: inp
+          dimensions:
+            - name: p50
+              selector: inp_p50
+            - name: p75
+              selector: inp_p75
+            - name: p95
+              selector: inp_p95
+          title: Interaction to Next Paint
+          units: milliseconds
+        - context: inp_rating
+          dimensions:
+            - name: good
+              selector: inp_good
+            - name: needs_improvement
+              selector: inp_needs_improvement
+            - name: poor
+              selector: inp_poor
+          title: Interaction to Next Paint ratings
+          type: stacked
+          units: samples
+        - context: cls
+          dimensions:
+            - name: p50
+              selector: cls_p50
+            - name: p75
+              selector: cls_p75
+            - name: p95
+              selector: cls_p95
+          title: Cumulative Layout Shift
+          units: score
+        - context: cls_rating
+          dimensions:
+            - name: good
+              selector: cls_good
+            - name: needs_improvement
+              selector: cls_needs_improvement
+            - name: poor
+              selector: cls_poor
+          title: Cumulative Layout Shift ratings
+          type: stacked
+          units: samples
+      family: Web Vitals
+      metrics:
+        - lcp_p50
+        - lcp_p75
+        - lcp_p95
+        - lcp_good
+        - lcp_needs_improvement
+        - lcp_poor
+        - fcp_p50
+        - fcp_p75
+        - fcp_p95
+        - fcp_good
+        - fcp_needs_improvement
+        - fcp_poor
+        - ttfb_p50
+        - ttfb_p75
+        - ttfb_p95
+        - ttfb_good
+        - ttfb_needs_improvement
+        - ttfb_poor
+        - inp_p50
+        - inp_p75
+        - inp_p95
+        - inp_good
+        - inp_needs_improvement
+        - inp_poor
+        - cls_p50
+        - cls_p75
+        - cls_p95
+        - cls_good
+        - cls_needs_improvement
+        - cls_poor
+    - charts:
+        - context: load
+          dimensions:
+            - name: p50
+              selector: load_p50
+            - name: p75
+              selector: load_p75
+            - name: p95
+              selector: load_p95
+          title: Page load time
+          units: milliseconds
+        - context: dcl
+          dimensions:
+            - name: p50
+              selector: dcl_p50
+            - name: p75
+              selector: dcl_p75
+            - name: p95
+              selector: dcl_p95
+          title: DOMContentLoaded time
+          units: milliseconds
+        - context: api
+          dimensions:
+            - name: p50
+              selector: api_p50
+            - name: p75
+              selector: api_p75
+            - name: p95
+              selector: api_p95
+          title: First-party API request duration
+          units: milliseconds
+      family: Navigation
+      metrics:
+        - load_p50
+        - load_p75
+        - load_p95
+        - dcl_p50
+        - dcl_p75
+        - dcl_p95
+        - api_p50
+        - api_p75
+        - api_p95
+    - charts:
+        - context: pageviews
+          dimensions:
+            - name: views
+              selector: pageviews
+          title: Page views
+          units: views/s
+        - context: js_errors
+          dimensions:
+            - name: errors
+              selector: js_errors
+          title: JavaScript errors
+          units: errors/s
+        - context: sessions
+          dimensions:
+            - name: active
+              selector: active_sessions
+          title: Active sessions
+          units: sessions
+        - context: window_totals
+          dimensions:
+            - name: pageviews
+              selector: window_pageviews
+            - name: js_errors
+              selector: window_js_errors
+          title: Page views and JavaScript errors in the window
+          units: events
+        - context: frustration
+          dimensions:
+            - name: rage_clicks
+              selector: rage_clicks
+            - name: dead_clicks
+              selector: dead_clicks
+            - name: error_clicks
+              selector: error_clicks
+          title: Frustration signals
+          type: stacked
+          units: signals/s
+      family: Traffic
+      metrics:
+        - pageviews
+        - js_errors
+        - active_sessions
+        - window_pageviews
+        - window_js_errors
+        - rage_clicks
+        - dead_clicks
+        - error_clicks
+    - charts:
+        - context: resources
+          dimensions:
+            - name: first_party
+              selector: resources_first_party
+            - name: third_party
+              selector: resources_third_party
+          title: Resource requests
+          type: stacked
+          units: requests/s
+        - context: resource_host_p75
+          dimensions:
+            - name: p75
+              selector: resource_host_p75
+          instances:
+            by_labels:
+                - host
+          title: Resource duration by host
+          units: milliseconds
+        - context: resource_host_count
+          dimensions:
+            - name: count
+              selector: resource_host_count
+          instances:
+            by_labels:
+                - host
+          title: Resource requests by host
+          units: requests/s
+      family: Resources
+      metrics:
+        - resources_first_party
+        - resources_third_party
+        - resource_host_p75
+        - resource_host_count
+    - charts:
+        - context: error_groups
+          dimensions:
+            - name: errors
+              selector: error_group_total
+          instances:
+            by_labels:
+                - fingerprint
+          title: JavaScript error groups
+          units: errors/s
+      family: Errors
+      metrics:
+        - error_group_total
+    - charts:
+        - context: browser_lcp
+          dimensions:
+            - name: p75
+              selector: breakdown_browser_lcp
+          instances:
+            by_labels:
+                - browser
+          title: LCP by browser
+          units: milliseconds
+        - context: browser_fcp
+          dimensions:
+            - name: p75
+              selector: breakdown_browser_fcp
+          instances:
+            by_labels:
+                - browser
+          title: FCP by browser
+          units: milliseconds
+        - context: browser_ttfb
+          dimensions:
+            - name: p75
+              selector: breakdown_browser_ttfb
+          instances:
+            by_labels:
+                - browser
+          title: TTFB by browser
+          units: milliseconds
+        - context: browser_inp
+          dimensions:
+            - name: p75
+              selector: breakdown_browser_inp
+          instances:
+            by_labels:
+                - browser
+          title: INP by browser
+          units: milliseconds
+        - context: browser_cls
+          dimensions:
+            - name: p75
+              selector: breakdown_browser_cls
+          instances:
+            by_labels:
+                - browser
+          title: CLS by browser
+          units: score
+        - context: browser_pageviews
+          dimensions:
+            - name: views
+              selector: breakdown_browser_pageviews
+          instances:
+            by_labels:
+                - browser
+          title: Page views by browser
+          units: views/s
+        - context: browser_js_errors
+          dimensions:
+            - name: errors
+              selector: breakdown_browser_js_errors
+          instances:
+            by_labels:
+                - browser
+          title: JavaScript errors by browser
+          units: errors/s
+      family: Breakdowns/Browser
+      metrics:
+        - breakdown_browser_lcp
+        - breakdown_browser_fcp
+        - breakdown_browser_ttfb
+        - breakdown_browser_inp
+        - breakdown_browser_cls
+        - breakdown_browser_pageviews
+        - breakdown_browser_js_errors
+    - charts:
+        - context: device_lcp
+          dimensions:
+            - name: p75
+              selector: breakdown_device_lcp
+          instances:
+            by_labels:
+                - device
+          title: LCP by device
+          units: milliseconds
+        - context: device_fcp
+          dimensions:
+            - name: p75
+              selector: breakdown_device_fcp
+          instances:
+            by_labels:
+                - device
+          title: FCP by device
+          units: milliseconds
+        - context: device_ttfb
+          dimensions:
+            - name: p75
+              selector: breakdown_device_ttfb
+          instances:
+            by_labels:
+                - device
+          title: TTFB by device
+          units: milliseconds
+        - context: device_inp
+          dimensions:
+            - name: p75
+              selector: breakdown_device_inp
+          instances:
+            by_labels:
+                - device
+          title: INP by device
+          units: milliseconds
+        - context: device_cls
+          dimensions:
+            - name: p75
+              selector: breakdown_device_cls
+          instances:
+            by_labels:
+                - device
+          title: CLS by device
+          units: score
+        - context: device_pageviews
+          dimensions:
+            - name: views
+              selector: breakdown_device_pageviews
+          instances:
+            by_labels:
+                - device
+          title: Page views by device
+          units: views/s
+        - context: device_js_errors
+          dimensions:
+            - name: errors
+              selector: breakdown_device_js_errors
+          instances:
+            by_labels:
+                - device
+          title: JavaScript errors by device
+          units: errors/s
+      family: Breakdowns/Device
+      metrics:
+        - breakdown_device_lcp
+        - breakdown_device_fcp
+        - breakdown_device_ttfb
+        - breakdown_device_inp
+        - breakdown_device_cls
+        - breakdown_device_pageviews
+        - breakdown_device_js_errors
+    - charts:
+        - context: country_lcp
+          dimensions:
+            - name: p75
+              selector: breakdown_country_lcp
+          instances:
+            by_labels:
+                - country
+          title: LCP by country
+          units: milliseconds
+        - context: country_fcp
+          dimensions:
+            - name: p75
+              selector: breakdown_country_fcp
+          instances:
+            by_labels:
+                - country
+          title: FCP by country
+          units: milliseconds
+        - context: country_ttfb
+          dimensions:
+            - name: p75
+              selector: breakdown_country_ttfb
+          instances:
+            by_labels:
+                - country
+          title: TTFB by country
+          units: milliseconds
+        - context: country_inp
+          dimensions:
+            - name: p75
+              selector: breakdown_country_inp
+          instances:
+            by_labels:
+                - country
+          title: INP by country
+          units: milliseconds
+        - context: country_cls
+          dimensions:
+            - name: p75
+              selector: breakdown_country_cls
+          instances:
+            by_labels:
+                - country
+          title: CLS by country
+          units: score
+        - context: country_pageviews
+          dimensions:
+            - name: views
+              selector: breakdown_country_pageviews
+          instances:
+            by_labels:
+                - country
+          title: Page views by country
+          units: views/s
+        - context: country_js_errors
+          dimensions:
+            - name: errors
+              selector: breakdown_country_js_errors
+          instances:
+            by_labels:
+                - country
+          title: JavaScript errors by country
+          units: errors/s
+      family: Breakdowns/Country
+      metrics:
+        - breakdown_country_lcp
+        - breakdown_country_fcp
+        - breakdown_country_ttfb
+        - breakdown_country_inp
+        - breakdown_country_cls
+        - breakdown_country_pageviews
+        - breakdown_country_js_errors
+    - charts:
+        - context: page_lcp
+          dimensions:
+            - name: p75
+              selector: breakdown_page_lcp
+          instances:
+            by_labels:
+                - page
+          title: LCP by page
+          units: milliseconds
+        - context: page_fcp
+          dimensions:
+            - name: p75
+              selector: breakdown_page_fcp
+          instances:
+            by_labels:
+                - page
+          title: FCP by page
+          units: milliseconds
+        - context: page_ttfb
+          dimensions:
+            - name: p75
+              selector: breakdown_page_ttfb
+          instances:
+            by_labels:
+                - page
+          title: TTFB by page
+          units: milliseconds
+        - context: page_inp
+          dimensions:
+            - name: p75
+              selector: breakdown_page_inp
+          instances:
+            by_labels:
+                - page
+          title: INP by page
+          units: milliseconds
+        - context: page_cls
+          dimensions:
+            - name: p75
+              selector: breakdown_page_cls
+          instances:
+            by_labels:
+                - page
+          title: CLS by page
+          units: score
+        - context: page_pageviews
+          dimensions:
+            - name: views
+              selector: breakdown_page_pageviews
+          instances:
+            by_labels:
+                - page
+          title: Page views by page
+          units: views/s
+        - context: page_js_errors
+          dimensions:
+            - name: errors
+              selector: breakdown_page_js_errors
+          instances:
+            by_labels:
+                - page
+          title: JavaScript errors by page
+          units: errors/s
+      family: Breakdowns/Page
+      metrics:
+        - breakdown_page_lcp
+        - breakdown_page_fcp
+        - breakdown_page_ttfb
+        - breakdown_page_inp
+        - breakdown_page_cls
+        - breakdown_page_pageviews
+        - breakdown_page_js_errors
+    - charts:
+        - context: version_lcp
+          dimensions:
+            - name: p75
+              selector: breakdown_version_lcp
+          instances:
+            by_labels:
+                - version
+          title: LCP by version
+          units: milliseconds
+        - context: version_fcp
+          dimensions:
+            - name: p75
+              selector: breakdown_version_fcp
+          instances:
+            by_labels:
+                - version
+          title: FCP by version
+          units: milliseconds
+        - context: version_ttfb
+          dimensions:
+            - name: p75
+              selector: breakdown_version_ttfb
+          instances:
+            by_labels:
+                - version
+          title: TTFB by version
+          units: milliseconds
+        - context: version_inp
+          dimensions:
+            - name: p75
+              selector: breakdown_version_inp
+          instances:
+            by_labels:
+                - version
+          title: INP by version
+          units: milliseconds
+        - context: version_cls
+          dimensions:
+            - name: p75
+              selector: breakdown_version_cls
+          instances:
+            by_labels:
+                - version
+          title: CLS by version
+          units: score
+        - context: version_pageviews
+          dimensions:
+            - name: views
+              selector: breakdown_version_pageviews
+          instances:
+            by_labels:
+                - version
+          title: Page views by version
+          units: views/s
+        - context: version_js_errors
+          dimensions:
+            - name: errors
+              selector: breakdown_version_js_errors
+          instances:
+            by_labels:
+                - version
+          title: JavaScript errors by version
+          units: errors/s
+      family: Breakdowns/Version
+      metrics:
+        - breakdown_version_lcp
+        - breakdown_version_fcp
+        - breakdown_version_ttfb
+        - breakdown_version_inp
+        - breakdown_version_cls
+        - breakdown_version_pageviews
+        - breakdown_version_js_errors
+    - charts:
+        - context: beacons
+          dimensions:
+            - name: accepted
+              selector: accepted
+            - name: rejected_origin
+              selector: rejected_origin
+            - name: rejected_rate
+              selector: rejected_rate
+            - name: rejected_size
+              selector: rejected_size
+            - name: invalid
+              selector: invalid
+            - name: bots
+              selector: bots
+          title: RUM beacons
+          type: stacked
+          units: beacons/s
+        - context: otlp
+          dimensions:
+            - name: sent
+              selector: otlp_sent
+            - name: dropped
+              selector: otlp_dropped
+            - name: errors
+              selector: otlp_errors
+          title: OTLP log records
+          type: stacked
+          units: records/s
+        - context: history
+          dimensions:
+            - name: written
+              selector: history_written
+            - name: dropped
+              selector: history_dropped
+          title: RUM history writes
+          type: stacked
+          units: records/s
+        - context: spans
+          dimensions:
+            - name: sent
+              selector: spans_sent
+            - name: dropped
+              selector: spans_dropped
+            - name: errors
+              selector: spans_errors
+          title: Browser spans exported
+          type: stacked
+          units: spans/s
+        - context: samples_dropped
+          dimensions:
+            - name: dropped
+              selector: samples_dropped
+          title: Samples dropped from aggregation
+          units: samples/s
+        - context: ingress_state
+          dimensions:
+            - selector: ingress_state
+          title: RUM ingress availability
+          type: stacked
+          units: state
+      family: Diagnostics
+      metrics:
+        - accepted
+        - rejected_origin
+        - rejected_rate
+        - rejected_size
+        - invalid
+        - bots
+        - otlp_sent
+        - otlp_dropped
+        - otlp_errors
+        - history_written
+        - history_dropped
+        - spans_sent
+        - spans_dropped
+        - spans_errors
+        - samples_dropped
+        - ingress_state
+version: v1
