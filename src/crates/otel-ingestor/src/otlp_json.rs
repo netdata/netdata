@@ -280,9 +280,18 @@ fn normalize_metrics(root: &mut Value) -> Result<ExpectedMetrics, String> {
         for (s, scope) in objects(resource, "scopeMetrics") {
             for (m, metric) in objects(scope, "metrics") {
                 let path = format!("resourceMetrics[{r}].scopeMetrics[{s}].metrics[{m}]");
+                // `data` is a oneof: the derives would keep one kind and drop
+                // the rest without an error.
+                let mut kinds = DATA_KINDS.into_iter().filter(|k| metric.contains_key(*k));
+                let data = kinds.next();
+                if let (Some(first), Some(second)) = (data, kinds.next()) {
+                    return Err(format!(
+                        "{path}: {first} and {second} are mutually exclusive"
+                    ));
+                }
                 let mut entry = ExpectedMetric {
                     path,
-                    data: DATA_KINDS.into_iter().find(|k| metric.contains_key(*k)),
+                    data,
                     point_values: Vec::new(),
                 };
                 if let Some(kind) = entry.data {
@@ -1015,7 +1024,12 @@ mod tests {
                 "metrics[0].summary: cannot be decoded",
             ),
             // ...and both members of a value oneof, where one would be
-            // silently kept.
+            // silently kept — at the metric level too.
+            (
+                r#"{"resourceMetrics":[{"scopeMetrics":[{"metrics":[{"name":"m","gauge":{"dataPoints":[{"asDouble":1}]},"sum":{"dataPoints":[{"asDouble":2}]}}]}]}]}"#
+                    .to_string(),
+                "metrics[0]: gauge and sum are mutually exclusive",
+            ),
             (
                 gauge(r#"{"asInt":1,"asDouble":2.5}"#),
                 "metrics[0].gauge.dataPoints[0].value: asInt and asDouble are mutually exclusive",
