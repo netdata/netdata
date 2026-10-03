@@ -115,11 +115,31 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | uri | MongoDB connection string. See [URI syntax](https://www.mongodb.com/docs/manual/reference/connection-string/). | mongodb://localhost:27017 | yes |
 |  | timeout | Query timeout (seconds). | 1 | no |
-| **Filters** | databases | Database selector. Defines which databases to collect metrics from. |  | no |
+| **Filters** | [databases](#option-filters-databases) | Database selector. Defines which databases to collect metrics from. |  | no |
 | **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
 |  | functions.top_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
 |  | functions.top_queries.limit | Maximum number of queries to return. | 500 | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+<a id="option-filters-databases"></a>
+##### databases
+
+Metrics of databases matching the selector will be collected. When unset, no per-database metrics are collected.
+
+- Logic: (pattern1 OR pattern2) AND !(pattern3 OR pattern4)
+- Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format).
+- Syntax:
+
+  ```yaml
+  databases:
+    includes:
+      - pattern1
+      - pattern2
+    excludes:
+      - pattern3
+      - pattern4
+  ```
+
 
 
 </details>

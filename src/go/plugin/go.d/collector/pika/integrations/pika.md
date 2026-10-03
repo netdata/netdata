@@ -86,7 +86,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |:------|:-----|:------------|:--------|:---------:|
 | **Collection** | update_every | Data collection frequency (seconds). | 5 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-| **Target** | address | Pika server address. | redis://@localhost:9221 | yes |
+| **Target** | [address](#option-target-address) | Pika server address. | redis://@localhost:9221 | yes |
 |  | timeout | Dial (establishing new connections), read (socket reads), and write (socket writes) timeout (seconds). | 1 | no |
 | **Auth** | username | Username for authentication. |  | no |
 |  | password | Password for authentication. |  | no |
@@ -95,6 +95,15 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | tls_cert | Client TLS certificate. |  | no |
 |  | tls_key | Client TLS key. |  | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+<a id="option-target-address"></a>
+##### address
+
+There are two connection types: by TCP socket and by Unix socket.
+
+- TCP connection: `redis://<user>:<password>@<host>:<port>/<db_number>`
+- Unix connection: `unix://<user>:<password>@</path/to/redis.sock>?db=<db_number>`
+
 
 
 </details>

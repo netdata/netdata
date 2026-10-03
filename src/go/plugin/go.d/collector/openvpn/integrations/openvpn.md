@@ -95,8 +95,28 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | address | OpenVPN server address (`IP:PORT`). | 127.0.0.1:7505 | yes |
 |  | timeout | Connection, read, write, and name resolution timeout (seconds). | 1 | no |
-| **Filters** | per_user_stats | User selector. Defines which user metrics to collect. |  | no |
+| **Filters** | [per_user_stats](#option-filters-per-user-stats) | User selector. Defines which user metrics to collect. |  | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+<a id="option-filters-per-user-stats"></a>
+##### per_user_stats
+
+Metrics of users matching the selector will be collected. When unset, no per-user metrics are collected.
+
+- Logic: (pattern1 OR pattern2) AND !(pattern3 OR pattern4)
+- Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format).
+- Syntax:
+
+  ```yaml
+  per_user_stats:
+    includes:
+      - pattern1
+      - pattern2
+    excludes:
+      - pattern3
+      - pattern4
+  ```
+
 
 
 </details>
