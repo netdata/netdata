@@ -116,6 +116,9 @@ type (
 		pingSummary       oldmetrix.Summary
 		collectedCommands map[string]bool
 		collectedDbs      map[string]bool
+
+		garnetKeyspaceRefreshedAt time.Time
+		garnetKeyspaceInfo        string
 	}
 	redisClient interface {
 		Info(ctx context.Context, section ...string) *redis.StringCmd

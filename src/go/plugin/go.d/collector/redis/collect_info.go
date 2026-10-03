@@ -87,6 +87,11 @@ func (c *Collector) collectInfo(mx map[string]int64, info string) {
 			mx["master_link_status_up"] = oldmetrix.Bool(value == "up")
 			mx["master_link_status_down"] = oldmetrix.Bool(value == "down")
 		default:
+			if c.server == "garnet" {
+				if mapped, ok := garnetFieldMap[field]; ok {
+					field = mapped
+				}
+			}
 			collectNumericValue(mx, field, value)
 		}
 	}

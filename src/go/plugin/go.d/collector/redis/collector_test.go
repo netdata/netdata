@@ -5,6 +5,7 @@ package redis
 import (
 	"context"
 	"errors"
+	"maps"
 	"os"
 	"strings"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
@@ -23,17 +25,165 @@ var (
 
 	dataPikaInfoAll, _   = os.ReadFile("testdata/pika/info_all.txt")
 	dataVer609InfoAll, _ = os.ReadFile("testdata/v6.0.9/info_all.txt")
+
+	dataGarnetInfoAll, _             = os.ReadFile("testdata/garnet/info_all.txt")
+	dataGarnetInfoKeyspace, _        = os.ReadFile("testdata/garnet/info_keyspace.txt")
+	dataGarnetInfoCommandstats, _    = os.ReadFile("testdata/garnet/info_commandstats.txt")
+	dataGarnetInfoCommandstatsOff, _ = os.ReadFile("testdata/garnet/info_commandstats_disabled.txt")
 )
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataConfigJSON":    dataConfigJSON,
-		"dataConfigYAML":    dataConfigYAML,
-		"dataPikaInfoAll":   dataPikaInfoAll,
-		"dataVer609InfoAll": dataVer609InfoAll,
+		"dataConfigJSON":                dataConfigJSON,
+		"dataConfigYAML":                dataConfigYAML,
+		"dataPikaInfoAll":               dataPikaInfoAll,
+		"dataVer609InfoAll":             dataVer609InfoAll,
+		"dataGarnetInfoAll":             dataGarnetInfoAll,
+		"dataGarnetInfoKeyspace":        dataGarnetInfoKeyspace,
+		"dataGarnetInfoCommandstats":    dataGarnetInfoCommandstats,
+		"dataGarnetInfoCommandstatsOff": dataGarnetInfoCommandstatsOff,
 	} {
 		require.NotNil(t, data, name)
 	}
+}
+
+// garnetBaseMetrics is the complete collected map for the captured Garnet
+// fixture (INFO all + INFO keyspace), i.e. with commandstats reporting no data.
+var garnetBaseMetrics = map[string]int64{
+	"CurrentVersion":                              1,
+	"IndexBucketCount":                            2097152,
+	"IndexBucketSizeBytes":                        64,
+	"IndexMemorySizeBytes":                        134217728,
+	"IndexOverflowBucketCount":                    16,
+	"IndexOverflowMemorySizeBytes":                1024,
+	"IndexTotalMemorySizeBytes":                   134218752,
+	"LastCheckpointedVersion":                     0,
+	"Log.AllocatedPageCount":                      2,
+	"Log.BeginAddress":                            64,
+	"Log.CurrentHeapSizeBytes":                    0,
+	"Log.CurrentMemorySizeBytes":                  33554432,
+	"Log.FlushedUntilAddress":                     64,
+	"Log.HeadAddress":                             64,
+	"Log.MaxMemorySizeBytes":                      17179869184,
+	"Log.MaxPageCount":                            1024,
+	"Log.PageSizeBytes":                           16777216,
+	"Log.SafeReadOnlyAddress":                     64,
+	"Log.TailAddress":                             64,
+	"aof_memory_size":                             -1,
+	"arch_bits":                                   64,
+	"available_system_memory":                     -1,
+	"available_system_memory(MB)":                 -1,
+	"cluster_enabled":                             0,
+	"connected_clients":                           0,
+	"connected_slaves":                            0,
+	"db0_expires_keys":                            1,
+	"db0_keys":                                    6,
+	"garnet_hit_rate":                             0,
+	"gc_committed_bytes":                          181575680,
+	"gc_fragmented_bytes":                         29912,
+	"gc_heap_bytes":                               178939640,
+	"gc_managed_memory_bytes_excluding_heap":      2636040,
+	"instantaneous_net_input_KBps":                0,
+	"instantaneous_net_output_KBps":               0,
+	"instantaneous_ops_per_sec":                   0,
+	"keyspace_hit_rate":                           0,
+	"keyspace_hits":                               0,
+	"keyspace_misses":                             0,
+	"master_replid":                               0,
+	"master_replid2":                              0,
+	"monitor_freq":                                0,
+	"native_allocator_bytes":                      0,
+	"ping_latency_avg":                            0,
+	"ping_latency_count":                          5,
+	"ping_latency_max":                            0,
+	"ping_latency_min":                            0,
+	"ping_latency_sum":                            0,
+	"proc_pageable_memory_size":                   0,
+	"proc_pageable_memory_size(MB)":               0,
+	"proc_paged_memory_size":                      0,
+	"proc_paged_memory_size(MB)":                  0,
+	"proc_peak_paged_memory_size":                 0,
+	"proc_peak_paged_memory_size(MB)":             0,
+	"proc_peak_physical_memory_size":              78344192,
+	"proc_peak_physical_memory_size(MB)":          74,
+	"proc_peak_virtual_memory_size":               282296131584,
+	"proc_peak_virtual_memory_size(MB)":           269218,
+	"proc_physical_memory_size(MB)":               74,
+	"proc_private_memory_size":                    356024320,
+	"proc_private_memory_size(MB)":                339,
+	"proc_virtual_memory_size":                    282229350400,
+	"proc_virtual_memory_size(MB)":                269154,
+	"processor_count":                             24,
+	"rdb_last_bgsave_status":                      0,
+	"rejected_connections":                        0,
+	"store_heap_memory_target_size":               17179869184,
+	"store_index_size":                            134218752,
+	"store_mainlog_memory_size":                   33554432,
+	"store_readcache_memory_size":                 0,
+	"system_page_size":                            4096,
+	"total_cluster_commands_processed":            0,
+	"total_commands_processed":                    0,
+	"total_connections_active":                    0,
+	"total_connections_disposed":                  0,
+	"total_connections_received":                  0,
+	"total_main_store_size":                       167773184,
+	"total_net_input_bytes":                       0,
+	"total_net_output_bytes":                      0,
+	"total_number_resp_server_session_exceptions": 0,
+	"total_output_buffer_rentals":                 0,
+	"total_pending":                               0,
+	"total_read_commands_processed":               0,
+	"total_system_memory":                         134886170624,
+	"total_system_memory(MB)":                     128637,
+	"total_transaction_commands_execution_failed": 0,
+	"total_transaction_commands_received":         0,
+	"total_write_commands_processed":              0,
+	"uptime_in_days":                              0,
+	"uptime_in_seconds":                           0,
+	"used_memory_rss":                             78344192,
+}
+
+// garnetCommandstatsMetrics is the cmd_* subset of the captured Garnet
+// commandstats fixture (Garnet reports usec=0 for all commands).
+var garnetCommandstatsMetrics = map[string]int64{
+	"cmd_client|setinfo_calls":         2,
+	"cmd_client|setinfo_usec":          0,
+	"cmd_client|setinfo_usec_per_call": 0,
+	"cmd_dbsize_calls":                 1,
+	"cmd_dbsize_usec":                  0,
+	"cmd_dbsize_usec_per_call":         0,
+	"cmd_get_calls":                    1,
+	"cmd_get_usec":                     0,
+	"cmd_get_usec_per_call":            0,
+	"cmd_hello_calls":                  1,
+	"cmd_hello_usec":                   0,
+	"cmd_hello_usec_per_call":          0,
+	"cmd_hset_calls":                   1,
+	"cmd_hset_usec":                    0,
+	"cmd_hset_usec_per_call":           0,
+	"cmd_info_calls":                   4,
+	"cmd_info_usec":                    0,
+	"cmd_info_usec_per_call":           0,
+	"cmd_lpush_calls":                  1,
+	"cmd_lpush_usec":                   0,
+	"cmd_lpush_usec_per_call":          0,
+	"cmd_ping_calls":                   1,
+	"cmd_ping_usec":                    0,
+	"cmd_ping_usec_per_call":           0,
+	"cmd_set_calls":                    3,
+	"cmd_set_usec":                     0,
+	"cmd_set_usec_per_call":            0,
+}
+
+// garnetWantCollected returns a fresh complete expected map for the garnet
+// fixture; a per-call copy is required because copyTimeRelatedMetrics mutates it.
+func garnetWantCollected(withCommandstats bool) map[string]int64 {
+	want := make(map[string]int64, len(garnetBaseMetrics)+len(garnetCommandstatsMetrics))
+	maps.Copy(want, garnetBaseMetrics)
+	if withCommandstats {
+		maps.Copy(want, garnetCommandstatsMetrics)
+	}
+	return want
 }
 
 func TestCollector_ConfigurationSerialize(t *testing.T) {
@@ -87,6 +237,12 @@ func TestCollector_Check(t *testing.T) {
 		"success on valid response v6.0.9": {
 			prepare: prepareRedisV609,
 		},
+		"success on valid response garnet": {
+			prepare: prepareGarnetWithCommandstats,
+		},
+		"success on garnet with commandstats disabled": {
+			prepare: prepareGarnetCommandstatsDisabled,
+		},
 		"fails on error on Info": {
 			wantFail: true,
 			prepare:  prepareRedisErrorOnInfo,
@@ -130,10 +286,41 @@ func TestCollector_Cleanup(t *testing.T) {
 	assert.True(t, m.calledClose)
 }
 
+// garnetMissingDims holds chart dimension IDs whose backing INFO fields Garnet
+// does not emit (no equivalent data): CPU counters, redis allocator memory
+// fields, client timeout/tracking, expiration/eviction and persistence fields.
+// Their chart dimensions stay empty for Garnet.
+var garnetMissingDims = map[string]bool{
+	"blocked_clients":             true,
+	"clients_in_timeout_table":    true,
+	"evicted_keys":                true,
+	"expired_keys":                true,
+	"maxmemory":                   true,
+	"mem_fragmentation_ratio":     true,
+	"rdb_changes_since_last_save": true,
+	"rdb_current_bgsave_time_sec": true,
+	"rdb_last_save_time":          true,
+	"tracking_clients":            true,
+	"used_memory":                 true,
+	"used_memory_dataset":         true,
+	"used_memory_lua":             true,
+	"used_memory_peak":            true,
+	"used_memory_scripts":         true,
+	"used_cpu_sys":                true,
+	"used_cpu_sys_children":       true,
+	"used_cpu_user":               true,
+	"used_cpu_user_children":      true,
+}
+
+func skipGarnetMissingDims(_ *collectorapi.Chart, dim *collectorapi.Dim) bool {
+	return garnetMissingDims[dim.ID]
+}
+
 func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepare       func(t *testing.T) *Collector
 		wantCollected map[string]int64
+		dimsSkip      func(chart *collectorapi.Chart, dim *collectorapi.Dim) bool
 	}{
 		"success on valid response v6.0.9": {
 			prepare: prepareRedisV609,
@@ -286,6 +473,16 @@ func TestCollector_Collect(t *testing.T) {
 				"used_memory_startup":             803152,
 			},
 		},
+		"success on valid response garnet (commandstats enabled)": {
+			prepare:       prepareGarnetWithCommandstats,
+			wantCollected: garnetWantCollected(true),
+			dimsSkip:      skipGarnetMissingDims,
+		},
+		"success on valid response garnet (commandstats disabled)": {
+			prepare:       prepareGarnetCommandstatsDisabled,
+			wantCollected: garnetWantCollected(false),
+			dimsSkip:      skipGarnetMissingDims,
+		},
 		"fails on error on Info": {
 			prepare: prepareRedisErrorOnInfo,
 		},
@@ -304,7 +501,7 @@ func TestCollector_Collect(t *testing.T) {
 
 			assert.Equal(t, test.wantCollected, mx)
 			if len(test.wantCollected) > 0 {
-				collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, test.dimsSkip)
 				ensureCollectedCommandsAddedToCharts(t, collr)
 				ensureCollectedDbsAddedToCharts(t, collr)
 			}
@@ -317,6 +514,27 @@ func prepareRedisV609(t *testing.T) *Collector {
 	require.NoError(t, collr.Init(context.Background()))
 	collr.rdb = &mockRedisClient{
 		result: dataVer609InfoAll,
+	}
+	return collr
+}
+
+func prepareGarnetWithCommandstats(t *testing.T) *Collector {
+	return prepareGarnet(t, dataGarnetInfoCommandstats)
+}
+
+func prepareGarnetCommandstatsDisabled(t *testing.T) *Collector {
+	return prepareGarnet(t, dataGarnetInfoCommandstatsOff)
+}
+
+func prepareGarnet(t *testing.T, commandstats []byte) *Collector {
+	collr := New()
+	require.NoError(t, collr.Init(context.Background()))
+	collr.rdb = &mockRedisClient{
+		results: map[string][]byte{
+			"all":          dataGarnetInfoAll,
+			"keyspace":     dataGarnetInfoKeyspace,
+			"commandstats": commandstats,
+		},
 	}
 	return collr
 }
@@ -337,6 +555,31 @@ func prepareRedisWithPikaMetrics(t *testing.T) *Collector {
 		result: dataPikaInfoAll,
 	}
 	return collr
+}
+
+func TestCollector_GarnetExtraInfoRequests(t *testing.T) {
+	collr := New()
+	require.NoError(t, collr.Init(context.Background()))
+	mock := &mockRedisClient{
+		results: map[string][]byte{
+			"all":          dataGarnetInfoAll,
+			"keyspace":     dataGarnetInfoKeyspace,
+			"commandstats": dataGarnetInfoCommandstats,
+		},
+		infoCalls: make(map[string]int),
+	}
+	collr.rdb = mock
+
+	ctx := context.Background()
+	for i := 0; i < 3; i++ {
+		assert.NotEmpty(t, collr.Collect(ctx))
+	}
+
+	// keyspace is expensive on Garnet (full store scan): at most one request
+	// within the refresh interval; commandstats is requested every cycle.
+	assert.Equal(t, 3, mock.infoCalls["all"])
+	assert.Equal(t, 1, mock.infoCalls["keyspace"])
+	assert.Equal(t, 3, mock.infoCalls["commandstats"])
 }
 func ensureCollectedCommandsAddedToCharts(t *testing.T, collr *Collector) {
 	for _, id := range []string{
@@ -379,16 +622,30 @@ func copyTimeRelatedMetrics(dst, src map[string]int64) {
 type mockRedisClient struct {
 	errOnInfo   bool
 	result      []byte
+	results     map[string][]byte
+	infoCalls   map[string]int
 	calledClose bool
 }
 
-func (m *mockRedisClient) Info(_ context.Context, _ ...string) (cmd *redis.StringCmd) {
-	if m.errOnInfo {
-		cmd = redis.NewStringResult("", errors.New("error on Info"))
-	} else {
-		cmd = redis.NewStringResult(string(m.result), nil)
+func (m *mockRedisClient) Info(_ context.Context, sections ...string) (cmd *redis.StringCmd) {
+	section := "all"
+	if len(sections) > 0 {
+		section = sections[0]
 	}
-	return cmd
+	if m.infoCalls != nil {
+		m.infoCalls[section]++
+	}
+	if m.results != nil {
+		result, ok := m.results[section]
+		if !ok {
+			return redis.NewStringResult("", errors.New("error on Info"))
+		}
+		return redis.NewStringResult(string(result), nil)
+	}
+	if m.errOnInfo {
+		return redis.NewStringResult("", errors.New("error on Info"))
+	}
+	return redis.NewStringResult(string(m.result), nil)
 }
 
 func (m *mockRedisClient) Ping(_ context.Context) (cmd *redis.StatusCmd) {

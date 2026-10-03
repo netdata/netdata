@@ -38,6 +38,10 @@ func (c *Collector) collect() (map[string]int64, error) {
 		return nil, fmt.Errorf("unsupported server app, want=redis, got=%s", c.server)
 	}
 
+	if c.server == "garnet" {
+		info = c.collectGarnetExtraInfo(info)
+	}
+
 	mx := make(map[string]int64)
 	c.collectInfo(mx, info)
 	c.collectPingLatency(mx)
