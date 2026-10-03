@@ -144,8 +144,10 @@ fn from_value<T: DeserializeOwned>(root: Value) -> Result<T, String> {
 /// entries (proto3 JSON's "default value"), fill the `values` of an
 /// `ArrayValue`/`KeyValueList` and the `key` of a `KeyValue` when omitted, and
 /// drop an empty `AnyValue` (`{}`, unset) where a `KeyValue` or log body holds
-/// it. The JSON keys involved occur only in those messages, so matching on
-/// names is unambiguous.
+/// it. The `arrayValue`/`kvlistValue`/`body` keys and the attribute-list keys
+/// occur only in those messages, so matching on names is unambiguous; a
+/// `value` key also names a quantile's double, so an empty `value` is dropped
+/// only inside the `KeyValue`s those lists hold.
 fn prune(value: &mut Value) {
     match value {
         Value::Object(map) => {
@@ -170,10 +172,8 @@ fn prune(value: &mut Value) {
                     pairs.iter_mut().for_each(fill_key_value);
                 }
             }
-            for key in ["value", "body"] {
-                if map.get(key).is_some_and(is_empty_object) {
-                    map.remove(key);
-                }
+            if map.get("body").is_some_and(is_empty_object) {
+                map.remove("body");
             }
         }
         Value::Array(items) => items.iter_mut().for_each(prune),
@@ -181,11 +181,23 @@ fn prune(value: &mut Value) {
     }
 }
 
+/// Repair one `KeyValue` of an attribute list or `kvlistValue`.
 fn fill_key_value(pair: &mut Value) {
     if let Value::Object(pair) = pair {
         pair.entry("key")
             .or_insert_with(|| Value::String(String::new()));
+        if pair.get("value").is_some_and(is_empty_object) {
+            pair.remove("value");
+        }
     }
+}
+
+/// Reject a value oneof carried twice: the derives would silently keep one.
+fn single_value(object: &Object) -> Result<(), String> {
+    if object.contains_key("asInt") && object.contains_key("asDouble") {
+        return Err("value: asInt and asDouble are mutually exclusive".to_string());
+    }
+    Ok(())
 }
 
 fn is_empty_object(value: &Value) -> bool {
@@ -299,6 +311,7 @@ fn normalize_metric_data(
         (|| {
             match kind {
                 "gauge" | "sum" => {
+                    single_value(point)?;
                     as_string(point, "startTimeUnixNano")?;
                     as_string(point, "timeUnixNano")?;
                     as_number(point, "asInt", Sign::Signed)?;
@@ -385,6 +398,7 @@ fn normalize_exemplar(exemplar: &mut Object) -> Result<(), String> {
             ("traceId", Value::String(String::new())),
         ],
     );
+    single_value(exemplar)?;
     as_number(exemplar, "timeUnixNano", Sign::Unsigned)?;
     as_number(exemplar, "asInt", Sign::Signed)?;
     // The contract carries the oneof inline; the derives nest it.
@@ -992,6 +1006,24 @@ mod tests {
             (
                 histogram(r#"{"count":1.5}"#),
                 "metrics[0].histogram.dataPoints[0].count: expected an unsigned 64-bit integer",
+            ),
+            // Invalid input that must not decode into fabricated or partial
+            // values: an empty object where a quantile's double belongs...
+            (
+                format!(
+                    r#"{{"resourceMetrics":[{{"scopeMetrics":[{{"metrics":[{{"name":"m","summary":{{"dataPoints":[{{"quantileValues":[{{"quantile":0.5,"value":{{}}}}]}}]}}}}]}}]}}]}}"#
+                ),
+                "metrics[0].summary: cannot be decoded",
+            ),
+            // ...and both members of a value oneof, where one would be
+            // silently kept.
+            (
+                gauge(r#"{"asInt":1,"asDouble":2.5}"#),
+                "metrics[0].gauge.dataPoints[0].value: asInt and asDouble are mutually exclusive",
+            ),
+            (
+                gauge(r#"{"asDouble":1,"exemplars":[{"asInt":1,"asDouble":2.5}]}"#),
+                "metrics[0].gauge.dataPoints[0].exemplars[0].value: asInt and asDouble are mutually exclusive",
             ),
         ];
         for (json, want) in cases {
