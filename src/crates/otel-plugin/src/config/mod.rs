@@ -21,6 +21,7 @@ mod legacy;
 mod metrics;
 mod signal;
 
+use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -293,6 +294,24 @@ fn redact_uri(uri: &str) -> String {
     }
 }
 
+/// Whether two listener addresses would claim the same socket: one port and
+/// an equal IP, or a wildcard covering the other (`0.0.0.0` covers IPv4;
+/// `[::]` covers IPv4 too, as Linux binds it dual-stack by default). Port 0
+/// never clashes (the kernel picks a free port); unparseable addresses fail
+/// at bind, so only identical text is a clash here.
+fn listeners_overlap(a: &str, b: &str) -> bool {
+    let (Ok(a), Ok(b)) = (a.parse::<SocketAddr>(), b.parse::<SocketAddr>()) else {
+        return a == b;
+    };
+    let covers = |wild: IpAddr, other: IpAddr| match wild {
+        IpAddr::V6(w) => w.is_unspecified(),
+        IpAddr::V4(w) => w.is_unspecified() && other.is_ipv4(),
+    };
+    a.port() != 0
+        && a.port() == b.port()
+        && (a.ip() == b.ip() || covers(a.ip(), b.ip()) || covers(b.ip(), a.ip()))
+}
+
 /// The TLS pairing rules both listeners share: certificate and key come as a
 /// pair (neither alone), both non-empty when set, and the CA certificate
 /// (mutual TLS) requires the pair. `cert_field`/`key_field`/`ca_field` name
@@ -381,18 +400,18 @@ fn validate(config: &PluginConfig) -> Result<()> {
 
     // The OTLP/HTTP listener is optional (None disables it). When enabled it
     // carries the same host:port shape as the gRPC listener, and the two
-    // must not string-equal: whichever listener bound second would fail at
-    // bind time with a raw OS error, so the collision is rejected here with
-    // both field names instead. A shape check only — the HTTP transport
-    // does the full `SocketAddr` parse when it binds.
+    // must not claim one socket (see `listeners_overlap`): whichever bound
+    // second would fail with a raw OS error, so the collision is rejected
+    // here with both field names instead. The transports still do their own
+    // `SocketAddr` parse when they bind.
     if let Some(http_path) = &config.endpoint.http_path {
         if http_path.is_empty() || !http_path.contains(':') {
             anyhow::bail!("endpoint.http_path must be in format host:port, got: {http_path}");
         }
-        if *http_path == config.endpoint.path {
+        if listeners_overlap(http_path, &config.endpoint.path) {
             anyhow::bail!(
                 "endpoint.http_path ({http_path}) must differ from endpoint.path ({}): \
-                 the OTLP/HTTP and OTLP/gRPC listeners cannot bind the same address",
+                 the OTLP/HTTP and OTLP/gRPC listeners cannot share an address and port",
                 config.endpoint.path
             );
         }
@@ -1233,6 +1252,40 @@ logs:
         let msg = format!("{err:#}");
         assert!(msg.contains("must differ from endpoint.path"), "{msg}");
         assert!(msg.contains("127.0.0.1:4317"), "{msg}");
+    }
+
+    #[test]
+    fn validation_rejects_a_wildcard_grpc_path_over_the_http_port() {
+        // A gRPC listener moved to 0.0.0.0:4318 claims the stock HTTP
+        // listener's 127.0.0.1:4318 too, though the strings differ.
+        let err = resolve_with_user("endpoint:\n  path: '0.0.0.0:4318'\n").unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("must differ from endpoint.path"), "{msg}");
+        assert!(msg.contains("0.0.0.0:4318"), "{msg}");
+    }
+
+    #[test]
+    fn listeners_overlap_on_one_port_when_an_address_covers_the_other() {
+        let cases = [
+            ("127.0.0.1:4318", "127.0.0.1:4318", true),
+            ("0.0.0.0:4318", "127.0.0.1:4318", true),
+            ("127.0.0.1:4318", "0.0.0.0:4318", true),
+            // `[::]` is dual-stack on Linux by default: it claims IPv4 too.
+            ("[::]:4318", "127.0.0.1:4318", true),
+            ("0.0.0.0:4318", "[::]:4318", true),
+            ("[::]:4318", "[::1]:4318", true),
+            ("0.0.0.0:4318", "[::1]:4318", false),
+            ("127.0.0.1:4317", "127.0.0.1:4318", false),
+            ("127.0.0.1:4318", "127.0.0.2:4318", false),
+            // Port 0 asks the kernel for a free port, so two never clash.
+            ("127.0.0.1:0", "127.0.0.1:0", false),
+            // Unparseable addresses fail at bind; compare the text.
+            ("host:4318", "host:4318", true),
+            ("host:4318", "other:4318", false),
+        ];
+        for (a, b, expected) in cases {
+            assert_eq!(listeners_overlap(a, b), expected, "{a} vs {b}");
+        }
     }
 
     #[test]
