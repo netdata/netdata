@@ -3,19 +3,23 @@
 //! collector-parity semantics, so SDKs and exporters defaulting to
 //! `http/protobuf` or `http/json` reach the same ingestion cores as gRPC.
 //!
-//! Contract (mirrors open-telemetry/opentelemetry-collector
-//! `receiver/otlpreceiver/otlphttp.go`):
+//! Contract (follows open-telemetry/opentelemetry-collector
+//! `receiver/otlpreceiver/otlphttp.go`, except where marked "local"):
 //!
 //! - method mismatch → `405 text/plain` ("405 method not allowed, supported:
 //!   [POST]"); unmatched path → `404 text/plain`;
-//! - `Content-Type` is MIME-parsed (parameters stripped, case-insensitive):
-//!   exactly `application/x-protobuf` and `application/json` are accepted,
-//!   anything else → `415 text/plain`;
+//! - `Content-Type`: the media type before any `;` is matched
+//!   case-insensitively; exactly `application/x-protobuf` and
+//!   `application/json` are accepted, anything else → `415 text/plain`
+//!   (local: parameters are ignored, not validated — upstream's
+//!   `mime.ParseMediaType` 415s a malformed one);
 //! - `Content-Encoding`: `gzip` (flate2), `identity`/absent → raw, anything
-//!   else → `415 text/plain`;
+//!   else → `415 text/plain` (local: upstream answers `400` with a
+//!   `google.rpc.Status`);
 //! - bodies are capped (see [`MAX_BODY_BYTES`], applied to the wire body AND
 //!   the gzip-expanded body — the second cap is the decompression-bomb guard)
-//!   → over-limit `413 text/plain`;
+//!   → over-limit `413 text/plain` (local: upstream caps at 20 MiB and
+//!   answers `400` with a `google.rpc.Status`);
 //! - a body that fails to decompress or decode → `400` with a
 //!   `google.rpc.Status` body in the request's encoding;
 //! - tenant policy (`X-Scope-OrgID`) is identical to gRPC via
@@ -31,8 +35,9 @@
 //! decimal strings or numbers, omitted fields), decoded by
 //! [`crate::otlp_json`], which repairs the `opentelemetry-proto` derives'
 //! narrower JSON forms first. Deviations from the collector's decoder: enum
-//! names and the `NaN`/`Infinity` doubles are rejected with a `400` naming the
-//! offending field, never dropped silently.
+//! names and the `NaN`/`Infinity` doubles are rejected with a `400`, never
+//! dropped silently. Only metric losses name a field path; other decode
+//! errors carry serde's message alone.
 //!
 //! The listener binds during startup with the same strict fail-fast rule as
 //! the gRPC endpoint (user decision D4): a bind or TLS failure aborts the
@@ -73,7 +78,7 @@ use crate::trace_service::NetdataTracesService;
 const MAX_BODY_BYTES: usize = 4 * 1024 * 1024;
 
 /// The three signals' service handles plus the shared tenant policy. Cheap to
-/// clone (all fields are `Arc`-backed or `Copy`).
+/// clone: three `Arc`s and a one-flag `AuthConfig`.
 #[derive(Clone)]
 pub(crate) struct HttpState {
     pub(crate) logs: Arc<NetdataLogsService>,
@@ -225,8 +230,9 @@ pub(crate) async fn bind_http(endpoint: &EndpointConfig) -> Result<Option<HttpLi
 }
 
 /// Serve the router on the bound listener until the server future is dropped.
-/// Errors are fatal and surface to the worker's main loop like the gRPC
-/// server's own.
+/// axum's serve loop never returns (it retries accept errors itself), so the
+/// `Result` only satisfies axum's signature; the contexts name the transport
+/// should that ever change.
 pub(crate) async fn serve(listener: HttpListener, app: Router) -> Result<()> {
     match listener {
         HttpListener::Plain(listener) => axum::serve(listener, app)
@@ -572,9 +578,9 @@ where
 }
 
 /// The request's MIME type → codec. Parameters are stripped and the type is
-/// matched case-insensitively (`application/json; charset=utf-8` is JSON),
-/// the same normalization `mime.ParseMediaType` applies upstream. A missing
-/// header is unsupported, matching the collector.
+/// matched case-insensitively (`application/json; charset=utf-8` is JSON), as
+/// `mime.ParseMediaType` does upstream; unlike it, malformed parameters are
+/// not rejected. A missing header is unsupported, matching the collector.
 fn content_type_codec(value: Option<&axum::http::HeaderValue>) -> Option<Codec> {
     let mime = value?.to_str().ok()?.split(';').next().unwrap_or("").trim();
     if mime.eq_ignore_ascii_case("application/x-protobuf") {

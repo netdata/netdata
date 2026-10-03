@@ -22,8 +22,9 @@
 //!   the `X-Scope-OrgID` header). Each service exposes a transport-agnostic
 //!   core that the gRPC wrappers and the OTLP/HTTP front end both call.
 //! - Transports: `http_service` (OTLP/HTTP, `POST /v1/{logs,traces,metrics}`
-//!   with protobuf + JSON codecs on `endpoint.http_path`); gRPC serving is
-//!   wired inline in `run_ingestor` on `endpoint.path`.
+//!   with protobuf + JSON codecs on `endpoint.http_path`) and `otlp_json`
+//!   (its OTLP/JSON decoding over the `opentelemetry-proto` derives); gRPC
+//!   serving is wired inline in `run_ingestor` on `endpoint.path`.
 //! - Metrics support: `aggregation` (per-slot accumulation + cross-slot
 //!   contexts), `chart` (per-chart dimension state), `chart_config` (stock +
 //!   user chart config), `iter` (OTLP metric traversal), `otel` (proto
@@ -353,8 +354,10 @@ async fn run_ingestor(
         result = async {
             match http_server {
                 Some(server) => server.await,
-                // Disabled receiver: this arm then never resolves, which is
-                // the point — only the gRPC arm can drive the exit.
+                // Disabled receiver: this arm then never resolves. Neither
+                // does an enabled one in practice (axum's serve loop never
+                // returns), so the gRPC arm or the supervisor loop below
+                // drives the exit.
                 None => std::future::pending::<Result<()>>().await,
             }
         } => {

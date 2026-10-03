@@ -8,7 +8,8 @@
 //!   numbers or strings on decode; the derives accept exactly one form per
 //!   field — strings for the log/span/event and number/histogram point
 //!   timestamps, numbers for everything else (counts, bucket counts, `asInt`,
-//!   exponential-histogram, summary and exemplar fields). Real senders differ:
+//!   exponential-histogram, summary and exemplar fields); only
+//!   `AnyValue.intValue` takes both. Real senders differ:
 //!   the collector, Python, Go and C++ write strings; JS writes counts and
 //!   `asInt` as numbers; Rust writes `asInt` as a number.
 //! - Omitted fields: proto3 JSON lets any field be absent (or `null`), but the
