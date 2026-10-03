@@ -202,3 +202,90 @@ func TestFinalDrainSharesOneAdmissionDeadline(t *testing.T) {
 		assert.Equal(t, deadlines[0], d)
 	}
 }
+
+// Empty timer ticks must not dirty and fsync the shared journal per idle site.
+type recordingEventWriter struct {
+	appends int
+	syncs   int
+	syncErr error
+}
+
+func (w *recordingEventWriter) AppendRumEvent(context.Context, store.RumEventRecord) (bool, error) {
+	w.appends++
+	return true, nil
+}
+func (w *recordingEventWriter) Sync(context.Context) error {
+	w.syncs++
+	return w.syncErr
+}
+
+func TestEmptyFlushSkipsJournalSyncAndReportsQueueDrops(t *testing.T) {
+	counters := newFakeCounters()
+	w := New(nil, counters, nil)
+	disk := &recordingEventWriter{}
+	w.st = disk
+	for range queueCap + 1 {
+		w.Event(agg.HistoryEvent{
+			Site: "site",
+		})
+	}
+	assert.Zero(t, w.flush(context.Background(), nil))
+	assert.Zero(t, disk.syncs)
+	assert.EqualValues(t, 1, counters.get("site", agg.CounterHistoryDropped))
+	assert.Equal(t, 1, w.flush(context.Background(), []agg.HistoryEvent{{Site: "site", Type: "event"}}))
+	assert.Equal(t, 1, disk.appends)
+	assert.Equal(t, 1, disk.syncs)
+}
+
+type cancelLastAppendWriter struct {
+	cancel  context.CancelFunc
+	appends int
+	synced  bool
+}
+
+func (w *cancelLastAppendWriter) AppendRumEvent(context.Context, store.RumEventRecord) (bool, error) {
+	w.appends++
+	if w.appends == maxBatch {
+		w.cancel()
+	}
+	return true, nil
+}
+func (w *cancelLastAppendWriter) Sync(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	w.synced = true
+	return nil
+}
+func TestFinalDrainSyncsAfterCancellationFollowingLastAppend(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	w := New(nil, newFakeCounters(), nil)
+	disk := &cancelLastAppendWriter{
+		cancel: cancel,
+	}
+	w.st = disk
+	for range maxBatch {
+		w.Event(agg.HistoryEvent{
+			Site: "site",
+			Type: "event",
+		})
+	}
+	w.Run(ctx)
+	assert.Equal(t, maxBatch, disk.appends)
+	assert.True(t, disk.synced, "final drain must sync accepted appends with its detached context")
+}
+func TestIdleFlushRetriesFailedSyncWithoutReplayingAppend(t *testing.T) {
+	w := New(nil, newFakeCounters(), nil)
+	disk := &recordingEventWriter{
+		syncErr: errors.New("sync failed"),
+	}
+	w.st = disk
+	assert.Equal(t, 1, w.flush(context.Background(), []agg.HistoryEvent{{Site: "site", Type: "event"}}))
+	disk.syncErr = nil
+	assert.Zero(t, w.flush(context.Background(), nil))
+	assert.Equal(t, 1, disk.appends)
+	assert.Equal(t, 2, disk.syncs)
+	assert.Zero(t, w.flush(context.Background(), nil))
+	assert.Equal(t, 2, disk.syncs, "successful sync restores the idle shortcut")
+}

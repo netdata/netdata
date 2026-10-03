@@ -38,6 +38,8 @@ type Writer struct {
 	ch        chan agg.HistoryEvent
 	dropMu    sync.Mutex
 	chanDrops map[string]int
+	// Run owns pendingSync; attempted appends can need a sync even after an error.
+	pendingSync bool
 }
 
 func New(st *store.Store, counters Counters, redactor Redactor) *Writer {
@@ -134,6 +136,9 @@ steady:
 // for final drain: journal appends have no batch transaction or rollback.
 func (w *Writer) flush(ctx context.Context, batch []agg.HistoryEvent) int {
 	w.reportQueueDrops()
+	if len(batch) == 0 && !w.pendingSync {
+		return 0
+	}
 	for i, rec := range batch {
 		if ctx.Err() != nil {
 			return i
@@ -162,6 +167,9 @@ func (w *Writer) flush(ctx context.Context, batch []agg.HistoryEvent) int {
 			SampleStack: w.redact.Apply(rec.SampleStack),
 		}
 		attempted, err := w.st.AppendRumEvent(ctx, r)
+		if attempted {
+			w.pendingSync = true
+		}
 		if !attempted && ctx.Err() != nil {
 			return i
 		}
@@ -171,8 +179,12 @@ func (w *Writer) flush(ctx context.Context, batch []agg.HistoryEvent) int {
 		}
 		w.counters.Add(rec.Site, counter, 1)
 	}
-	if err := w.st.Sync(ctx); err != nil && ctx.Err() == nil {
-		logger.New().Warningf("syncing RUM journal failed: %v", err)
+	if w.pendingSync {
+		if err := w.st.Sync(ctx); err == nil {
+			w.pendingSync = false
+		} else if ctx.Err() == nil {
+			logger.New().Warningf("syncing RUM journal failed: %v", err)
+		}
 	}
 	return len(batch)
 }
