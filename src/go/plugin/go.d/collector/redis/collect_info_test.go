@@ -106,9 +106,13 @@ func TestCollector_ReplicationDowntimeAvailability(t *testing.T) {
 		"down without duration": {status: "down", want: map[string]int64{
 			"master_link_status_up": 0, "master_link_status_down": 1,
 		}},
-		"down with measured duration": {status: "down", duration: "master_link_down_since_seconds:15\n", want: map[string]int64{
-			"master_link_status_up": 0, "master_link_status_down": 1, "master_link_down_since_seconds": 15,
-		}},
+		"down with measured duration": {
+			status:   "down",
+			duration: "master_link_down_since_seconds:15\n",
+			want: map[string]int64{
+				"master_link_status_up": 0, "master_link_status_down": 1, "master_link_down_since_seconds": 15,
+			},
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := newInfoOnlyCollector(t, map[string][]byte{
@@ -163,11 +167,12 @@ func newInfoOnlyCollector(t *testing.T, info map[string][]byte) *Collector {
 
 // The parser is O(INFO bytes + metrics). Repeated cycles reuse discovered dimensions.
 func BenchmarkCollectorCollectInfo(b *testing.B) {
+	garnetEnabled := strings.ReplaceAll(string(dataGarnetInfoAll), "monitor_task:disabled", "monitor_task:enabled")
 	for name, test := range map[string]struct{ server, info string }{
 		"redis":           {server: "redis", info: string(dataVer609InfoAll)},
 		"kvrocks":         {server: "kvrocks", info: string(dataKvrocksInfoAll)},
 		"garnet_disabled": {server: "garnet", info: string(dataGarnetInfoAll) + string(dataGarnetInfoCommandstats)},
-		"garnet_enabled":  {server: "garnet", info: strings.ReplaceAll(string(dataGarnetInfoAll), "monitor_task:disabled", "monitor_task:enabled") + string(dataGarnetInfoCommandstats)},
+		"garnet_enabled":  {server: "garnet", info: garnetEnabled + string(dataGarnetInfoCommandstats)},
 	} {
 		b.Run(name, func(b *testing.B) {
 			c := New()

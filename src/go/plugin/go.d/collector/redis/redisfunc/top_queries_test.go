@@ -117,6 +117,20 @@ func TestFuncTopQueries_Handle(t *testing.T) {
 			deps:       newTestDeps(nil, errors.New("ERR unknown command")),
 			wantStatus: 500,
 		},
+		"zero limit uses the default": {
+			deps:       newTestDeps(numberedEntries(DefaultTopQueriesLimit+1), nil),
+			wantStatus: 200,
+			wantIDs:    descendingIDs(DefaultTopQueriesLimit+1, DefaultTopQueriesLimit),
+		},
+		"zero timeout uses the collector timeout": {
+			deps: testDeps{
+				client: blockingClient{},
+			},
+			cfg: FunctionsConfig{
+				Timeout: confopt.Duration(time.Millisecond),
+			},
+			wantStatus: 504,
+		},
 		"slowlog timeout": {
 			deps: testDeps{
 				client: blockingClient{},
@@ -178,6 +192,28 @@ func TestFuncTopQueries_HandleRow(t *testing.T) {
 		"app",
 	}}, resp.Data)
 	assert.Equal(t, topQueriesDefaultSort, resp.DefaultSortColumn)
+}
+
+// numberedEntries returns n entries whose durations grow with their IDs (1..n).
+func numberedEntries(n int) []redis.SlowLog {
+	entries := make([]redis.SlowLog, 0, n)
+	for id := range int64(n) {
+		entries = append(entries, redis.SlowLog{
+			ID:       id + 1,
+			Duration: time.Duration(id+1) * time.Microsecond,
+			Args:     []string{"GET", "k"},
+		})
+	}
+	return entries
+}
+
+// descendingIDs returns the first n IDs counting down from top.
+func descendingIDs(top, n int) []int64 {
+	ids := make([]int64, 0, n)
+	for id := range n {
+		ids = append(ids, int64(top-id))
+	}
+	return ids
 }
 
 func rowIDs(t *testing.T, data any) []int64 {
