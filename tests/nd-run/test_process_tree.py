@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Real Linux nd-run ownership tests; run inside a disposable PID namespace.
+"""Real Linux nd-run ownership tests; run in a disposable Linux environment.
 
 Compile from source with no installed Agent dependency. Tests use the current
 account, including an unprivileged container user. No process-wide searches or

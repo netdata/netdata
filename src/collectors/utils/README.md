@@ -108,7 +108,7 @@ frame separately from command output; they must not kill the supervisor to imple
 as successful drain. See the [Go helper contract](/src/go/plugin/go.d/docs/helper-packages.md#external-commands) for
 caller ownership, platform prerequisites and the supervisor-loss limitation.
 
-Run real ownership fixtures in a disposable Linux PID namespace:
+Run real ownership fixtures in a disposable Linux environment:
 
 ```sh
 python3 tests/nd-run/test_process_tree.py
