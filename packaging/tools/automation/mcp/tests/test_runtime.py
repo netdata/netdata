@@ -175,6 +175,12 @@ def test_generate_runtime_auto_ports_never_collide(tmp_path, monkeypatch):
     assert (otlp, http) == ("127.0.0.1:4317", "127.0.0.1:8000")
 
 
+def test_free_port_except_gives_up_instead_of_spinning(monkeypatch):
+    monkeypatch.setattr(runtime, "free_port", lambda: 5000)
+    with pytest.raises(RuntimeError, match="no free loopback port outside \\[5000\\]"):
+        runtime._free_port_except({5000}, attempts=3)
+
+
 def test_generate_runtime_otel_emits_journal_dir_when_set(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     # A unique sentinel (not the plugin's default journal dir) so the assertion

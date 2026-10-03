@@ -459,11 +459,19 @@ def generate_runtime(
     return rd, conf_path, otlp_endpoint, otlp_http_endpoint or None
 
 
-def _free_port_except(taken: set[int]) -> int:
-    """A free loopback port not in ``taken``."""
-    while (port := free_port()) in taken:
-        pass
-    return port
+def _free_port_except(taken: set[int], attempts: int = 64) -> int:
+    """A free loopback port not in ``taken``.
+
+    Bounded: the kernel normally hands out a different port on the next try,
+    so failing ``attempts`` times means something is wrong with the host's
+    ephemeral range — fail loudly instead of spinning.
+    """
+    for _ in range(attempts):
+        if (port := free_port()) not in taken:
+            return port
+    raise RuntimeError(
+        f"no free loopback port outside {sorted(taken)} after {attempts} attempts"
+    )
 
 
 def _endpoint_port(endpoint: str) -> int | None:
