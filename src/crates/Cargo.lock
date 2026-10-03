@@ -3604,7 +3604,6 @@ dependencies = [
  "anyhow",
  "axum",
  "bridge",
- "bytes",
  "bytesize",
  "ferryboat",
  "file-registry",

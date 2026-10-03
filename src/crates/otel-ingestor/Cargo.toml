@@ -33,7 +33,6 @@ wal = { workspace = true }
 # separate from tonic's gRPC TLS.
 anyhow = { workspace = true }
 axum = { workspace = true }
-bytes = { workspace = true }
 flate2 = { workspace = true }
 http = { workspace = true }
 http-body-util = { workspace = true }
