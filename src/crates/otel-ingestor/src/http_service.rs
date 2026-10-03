@@ -305,8 +305,8 @@ impl axum::serve::Listener for TlsListener {
 
     async fn accept(&mut self) -> (Self::Io, Self::Addr) {
         loop {
-            // Both branches are cancel-safe, as axum's graceful shutdown
-            // requires of `accept`.
+            // Both branches are cancel-safe: the worker drops the server
+            // future at shutdown, which can cancel `accept` mid-flight.
             tokio::select! {
                 accepted = self.listener.accept() => match accepted {
                     Ok((stream, peer)) => self.start_handshake(stream, peer),

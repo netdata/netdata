@@ -1010,9 +1010,8 @@ mod tests {
             // Invalid input that must not decode into fabricated or partial
             // values: an empty object where a quantile's double belongs...
             (
-                format!(
-                    r#"{{"resourceMetrics":[{{"scopeMetrics":[{{"metrics":[{{"name":"m","summary":{{"dataPoints":[{{"quantileValues":[{{"quantile":0.5,"value":{{}}}}]}}]}}}}]}}]}}]}}"#
-                ),
+                r#"{"resourceMetrics":[{"scopeMetrics":[{"metrics":[{"name":"m","summary":{"dataPoints":[{"quantileValues":[{"quantile":0.5,"value":{}}]}]}}]}]}]}"#
+                    .to_string(),
                 "metrics[0].summary: cannot be decoded",
             ),
             // ...and both members of a value oneof, where one would be
