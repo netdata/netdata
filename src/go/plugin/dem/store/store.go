@@ -127,7 +127,7 @@ func (s *Store) Close() error {
 }
 
 // EnforceRumHistoryRetention applies SDK whole-file policies. Closing and
-// eagerly reopening archives idle activity, so age expiry also runs without
+// lazily reopening archives idle activity, so age expiry also runs without
 // new events. The active file remains protected, so maxBytes is not a hard cap.
 // MaxBytes measures committed journal bytes, excluding filesystem preallocation.
 // Age is measured from each file's saved-time head, not from each event.
@@ -158,12 +158,19 @@ func (s *Store) EnforceRumHistoryRetention(ctx context.Context, days int, maxByt
 		s.log = nil
 	}
 	s.config.RetentionPolicy = policy
-	// NewLog derives rotation thresholds from the retention budget.
-	log, err := journal.NewLog(s.root, s.config)
+	// NewLog derives rotation thresholds from the retention budget. Keep its
+	// writer lazy, and own the log before retention can fail. Idle sweeps need
+	// no new active file; the next append creates one with a fresh time head.
+	config := s.config
+	config.OpenMode = journal.LogOpenLazy
+	log, err := journal.NewLog(s.root, config)
 	if err != nil {
 		return fmt.Errorf("reopen history journal: %w", err)
 	}
 	s.log = log
+	if err := s.log.EnforceRetention(); err != nil {
+		return fmt.Errorf("enforce history retention: %w", err)
+	}
 	return nil
 }
 

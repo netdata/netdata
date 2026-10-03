@@ -291,10 +291,7 @@ func TestRetentionWholeFilesAndLiveWriter(t *testing.T) {
 	require.NoError(t, s.EnforceRumHistoryRetention(ctx, 0, 1))
 	files, err := filepath.Glob(filepath.Join(s.root, "*", "dem@*.journal"))
 	require.NoError(t, err)
-	require.Len(t, files, 1, "the protected fresh active file survives an impossibly small budget")
-	info, err := os.Stat(files[0])
-	require.NoError(t, err)
-	assert.Greater(t, info.Size(), int64(1), "maxBytes is not a strict cap")
+	assert.Empty(t, files, "the idle sweep has no active file to protect")
 	has, err := reader.Step()
 	require.NoError(t, err)
 	assert.True(t, has, "opened snapshot survives archive unlink")
@@ -312,6 +309,12 @@ func TestRetentionWholeFilesAndLiveWriter(t *testing.T) {
 		},
 	)
 	require.NoError(t, s.Sync(ctx))
+	files, err = filepath.Glob(filepath.Join(s.root, "*", "dem@*.journal"))
+	require.NoError(t, err)
+	require.Len(t, files, 1, "a new append creates a protected active file")
+	info, err := os.Stat(files[0])
+	require.NoError(t, err)
+	assert.Greater(t, info.Size(), int64(1), "maxBytes is not a strict cap")
 	sessions, err = s.QueryRumSessions(ctx, "", 0, time.Now().Unix()+5, 0)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
@@ -566,4 +569,59 @@ func TestRelaxedRetentionDoesNotApplyPreviousAge(t *testing.T) {
 	after, err := s.QueryRumSessions(ctx, "shop", 0, time.Now().Unix()+5, 0)
 	require.NoError(t, err)
 	require.Len(t, after, 2, "an increased allowance must not enforce the retired shorter age")
+}
+
+func TestIdleRetentionDoesNotCreateActiveJournals(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	appendEvent(t, s, RumEventRecord{
+		Site:      "shop",
+		SessionID: "s",
+		Type:      "pageview",
+		TSUnixUS:  time.Now().UnixMicro(),
+	})
+	require.NoError(t, s.EnforceRumHistoryRetention(ctx, 30, 1<<30))
+	assert.Empty(t, s.log.ActivePath(), "idle sweep must leave the new chain lazy")
+	files, err := s.journalPaths(ctx)
+	require.NoError(t, err)
+	require.NoError(t, s.EnforceRumHistoryRetention(ctx, 30, 1<<30))
+	after, err := s.journalPaths(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, files, after, "repeated idle sweeps must not manufacture empty archives")
+}
+
+func TestRetentionRecoversAfterArchiveDirectoryFailure(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	appendEvent(t, s, RumEventRecord{
+		Site:      "shop",
+		SessionID: "s",
+		Type:      "pageview",
+		TSUnixUS:  time.Now().UnixMicro(),
+	})
+	machineDir := s.log.JournalDirectory()
+	moved := machineDir + ".moved"
+	require.NoError(t, os.Rename(machineDir, moved))
+	// Force the real SDK archive directory sync to fail after closing its writer.
+	require.NoError(t, os.WriteFile(machineDir, []byte("obstruction"), 0600))
+	require.Error(t, s.EnforceRumHistoryRetention(ctx, 30, 1<<30))
+	_, err := s.AppendRumEvent(ctx, RumEventRecord{
+		Site:     "shop",
+		Type:     "activity",
+		TSUnixUS: time.Now().UnixMicro(),
+	})
+	require.Error(t, err)
+	require.NoError(t, os.Remove(machineDir))
+	require.NoError(t, os.Rename(moved, machineDir))
+	require.NoError(t, s.EnforceRumHistoryRetention(ctx, 30, 1<<30))
+	appendEvent(t, s, RumEventRecord{
+		Site:      "shop",
+		SessionID: "s",
+		Type:      "pageview",
+		TSUnixUS:  time.Now().UnixMicro(),
+	})
+	rows, err := s.QueryRumSessions(ctx, "shop", 0, time.Now().Unix()+5, 0)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.EqualValues(t, 2, rows[0].Pageviews, "recovery preserves earlier history and resumes appends")
 }

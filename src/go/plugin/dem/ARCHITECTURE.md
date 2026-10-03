@@ -34,9 +34,10 @@ page and browser sets for that group. Queries materialize SDK entry offsets but 
 Query failures return errors instead of silently labeling corrupt or quarantined history as complete. Damaged
 `.journal~` files remain for operator investigation and are outside the SDK retention policy.
 
-One process worker archives/reopens idle history and applies the plugin-wide age/committed-byte policy even when all
-sites are disabled. Whole archives expire; the active file and filesystem preallocation can exceed the configured
-committed-byte target. Neither retention nor history scans hold a live site lease across disk work. Publication uses
+One process worker archives idle history, reopens lazily and applies the plugin-wide age/committed-byte policy even
+when all sites are disabled. Failed sweeps retry after five seconds; the store owns the reopened lazy Log before
+enforcing retention, and the next append creates its active file. Whole archives expire; the active file and filesystem
+preallocation can exceed the configured committed-byte target. Neither retention nor history scans hold a live site lease across disk work. Publication uses
 typed metrix snapshots and static chart templates, with no V1 map bridge.
 
 Stock native health templates own alert policy and attach independently to each site's charts. Site jobs publish

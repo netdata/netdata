@@ -22,21 +22,24 @@ type Retention struct {
 }
 
 func (r *Retention) Run(ctx context.Context) {
-	ticker := time.NewTicker(time.Hour)
-	defer ticker.Stop()
 	for {
 		if ctx.Err() != nil {
 			return
 		}
 		r.reloadPolicy()
+		delay := time.Hour
 		if err := r.store.EnforceRumHistoryRetention(ctx, r.policy.Days, r.policy.MaxBytes); err != nil &&
 			ctx.Err() == nil {
 			r.log.Warningf("RUM history retention failed: %v", err)
+			// A partial close/reopen can suspend writes; retry on the history flush cadence.
+			delay = 5 * time.Second
 		}
+		timer := time.NewTimer(delay)
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return
-		case <-ticker.C:
+		case <-timer.C:
 		}
 	}
 }

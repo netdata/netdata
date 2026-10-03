@@ -3,6 +3,7 @@ package dem
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -137,5 +138,36 @@ func TestRetentionReloadsValidPolicyAndRetainsItOnInvalidConfig(t *testing.T) {
 				MaxBytes: 8192,
 			}, service.policy)
 		})
+	}
+}
+
+type transientRetention struct{ calls chan int }
+
+func (r *transientRetention) EnforceRumHistoryRetention(context.Context, int, int64) error {
+	r.calls <- 1
+	return errors.New("temporary filesystem failure")
+}
+func TestRetentionRetriesTransientFailureBeforeHourlySweep(t *testing.T) {
+	backend := &transientRetention{
+		calls: make(chan int, 2),
+	}
+	service := &Retention{
+		store:  backend,
+		policy: DefaultConfig().History,
+		log:    logger.New(),
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { defer close(done); service.Run(ctx) }()
+	t.Cleanup(func() { cancel(); <-done })
+	select {
+	case <-backend.calls:
+	case <-time.After(time.Second):
+		t.Fatal("initial sweep did not run")
+	}
+	select {
+	case <-backend.calls:
+	case <-time.After(6 * time.Second):
+		t.Fatal("transient failure stalled retention and writer recovery until the hourly sweep")
 	}
 }

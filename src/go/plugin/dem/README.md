@@ -37,10 +37,12 @@ session, ordered by original observation time, without range filtering.
 One process-owned retention worker applies the whole-plugin `history.days` and `history.max_bytes` policy, including
 disabled sites. It removes oldest archived files by their saved-time head and committed journal bytes; it protects the active
 file. Filesystem preallocation can use more disk space than committed bytes. These are whole-file retention targets, not exact event TTLs or a hard instantaneous disk ceiling. The worker
-archives idle activity and applies policy changes at the next hourly sweep; invalid changes retain the last valid
-policy and produce a warning. Queued events flush every five seconds or 500 records, and each flush syncs the journal.
-A crash can lose records still queued or not synced. Queue overflow and append failures count dropped records; sync
-failures produce a warning. This is sampled investigation history, not a lossless event archive.
+archives idle activity without creating an empty replacement file and applies policy changes at the next hourly sweep;
+invalid changes retain the last valid policy and produce a warning. Queued events flush every five seconds or 500 records.
+Flushes sync pending appends and retry failed syncs; clean idle ticks skip sync. A crash can lose records still queued or
+not synced. Queue overflow and append failures count dropped records; sync failures produce a warning. Failed retention
+close/reopen retries after five seconds so a transient filesystem error does not suspend history writes until the next
+hourly sweep. This is sampled investigation history, not a lossless event archive.
 
 Stock health templates provide LCP, INP and CLS alerts using the average p75 over 10 minutes, plus a no-beacons alert
 using page views over one hour. They apply independently to each native site chart. Customize thresholds or disable
