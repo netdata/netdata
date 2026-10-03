@@ -51,6 +51,7 @@ struct ebpfgo_shm_header {
  * mode.  Consumers are separate processes and cannot see fd's config, so this bit
  * is what tells them whether the *_err fields may be charted. */
 #define EBPFGO_SHM_FLAG_FD_ERRORS 0x10u
+#define EBPFGO_SHM_FLAG_PROCESS   0x20u /* process per-PID fields are valid */
 
 struct ebpf_cachestat {
     uint32_t add_to_page_cache_lru;
