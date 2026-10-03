@@ -62,6 +62,9 @@ typedef struct query_engine_ops {
     size_t tier;
     struct query_metric_tier *tier_ptr;
     struct storage_engine_query_handle *seqh;
+    STORAGE_POINT pending_head_point;
+    size_t pending_head_plan;
+    bool pending_head;
 
     // aggregating points over time
     size_t group_points_non_zero;
@@ -94,6 +97,23 @@ typedef struct query_engine_ops {
     struct query_engine_ops *next;
 } QUERY_ENGINE_OPS;
 
+static inline STORAGE_POINT query_planer_next_metric(QUERY_ENGINE_OPS *ops) {
+    if(unlikely(ops->pending_head && ops->pending_head_plan == ops->current_plan)) {
+        ops->pending_head = false;
+        return ops->pending_head_point;
+    }
+
+    STORAGE_POINT point = storage_engine_query_next_metric(ops->seqh);
+    ops->db_points_read_per_tier[ops->tier]++;
+    ops->db_total_points_read++;
+    return point;
+}
+
+static inline bool query_planer_is_finished(QUERY_ENGINE_OPS *ops) {
+    return !(ops->pending_head && ops->pending_head_plan == ops->current_plan) &&
+           storage_engine_query_is_finished(ops->seqh);
+}
+
 typedef struct query_engine_ops_cache {
     QUERY_ENGINE_OPS *released_ops;
 } QUERY_ENGINE_OPS_CACHE;
@@ -103,6 +123,7 @@ typedef struct query_engine_ops_cache {
 #define query_result_plan_should_switch_plan(ops, now) \
     ((now) >= (ops)->result_plan_expire_time && !(ops)->result_plan_expire_time_overflow)
 bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time);
+void query_planer_prefer_complete_head(QUERY_ENGINE_OPS *ops);
 void query_planer_finalize_remaining_plans(QUERY_ENGINE_OPS *ops);
 QUERY_ENGINE_OPS *rrd2rrdr_query_ops_prep(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache, size_t query_metric_id);
 void rrd2rrdr_query_ops_release(QUERY_ENGINE_OPS_CACHE *cache, QUERY_ENGINE_OPS *ops);
