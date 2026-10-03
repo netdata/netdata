@@ -625,18 +625,21 @@ fn rpc_error(codec: Codec, status: Status) -> Response<Body> {
 /// invalid tenant), `Unauthenticated` (missing tenant header) and `Internal`
 /// (frame encoding and WAL failures). The other arms are kept so a future
 /// core error maps correctly without touching the transport — e.g.
-/// throttling's `ResourceExhausted` becomes the retryable 429.
+/// throttling's `ResourceExhausted` becomes the retryable 429. The 503 arm is
+/// the spec's retryable set; `Unimplemented` → 404 is the collector's choice.
 fn http_status_for(code: Code) -> StatusCode {
     match code {
-        Code::InvalidArgument | Code::OutOfRange | Code::FailedPrecondition => {
-            StatusCode::BAD_REQUEST
-        }
+        Code::Cancelled
+        | Code::DeadlineExceeded
+        | Code::Aborted
+        | Code::OutOfRange
+        | Code::Unavailable
+        | Code::DataLoss => StatusCode::SERVICE_UNAVAILABLE,
+        Code::ResourceExhausted => StatusCode::TOO_MANY_REQUESTS,
+        Code::InvalidArgument => StatusCode::BAD_REQUEST,
         Code::Unauthenticated => StatusCode::UNAUTHORIZED,
         Code::PermissionDenied => StatusCode::FORBIDDEN,
-        Code::NotFound => StatusCode::NOT_FOUND,
-        Code::ResourceExhausted => StatusCode::TOO_MANY_REQUESTS,
-        Code::Unimplemented => StatusCode::NOT_IMPLEMENTED,
-        Code::Unavailable | Code::DeadlineExceeded => StatusCode::SERVICE_UNAVAILABLE,
+        Code::Unimplemented => StatusCode::NOT_FOUND,
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
@@ -1184,6 +1187,34 @@ mod tests {
         )
         .await;
         assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    /// Every gRPC code, against the collector's table (otlpreceiver
+    /// `internal/errors/errors.go`, `GetHTTPStatusCodeFromStatus`).
+    #[test]
+    fn grpc_codes_map_to_the_collector_http_statuses() {
+        let cases = [
+            (Code::Ok, StatusCode::INTERNAL_SERVER_ERROR),
+            (Code::Cancelled, StatusCode::SERVICE_UNAVAILABLE),
+            (Code::Unknown, StatusCode::INTERNAL_SERVER_ERROR),
+            (Code::InvalidArgument, StatusCode::BAD_REQUEST),
+            (Code::DeadlineExceeded, StatusCode::SERVICE_UNAVAILABLE),
+            (Code::NotFound, StatusCode::INTERNAL_SERVER_ERROR),
+            (Code::AlreadyExists, StatusCode::INTERNAL_SERVER_ERROR),
+            (Code::PermissionDenied, StatusCode::FORBIDDEN),
+            (Code::ResourceExhausted, StatusCode::TOO_MANY_REQUESTS),
+            (Code::FailedPrecondition, StatusCode::INTERNAL_SERVER_ERROR),
+            (Code::Aborted, StatusCode::SERVICE_UNAVAILABLE),
+            (Code::OutOfRange, StatusCode::SERVICE_UNAVAILABLE),
+            (Code::Unimplemented, StatusCode::NOT_FOUND),
+            (Code::Internal, StatusCode::INTERNAL_SERVER_ERROR),
+            (Code::Unavailable, StatusCode::SERVICE_UNAVAILABLE),
+            (Code::DataLoss, StatusCode::SERVICE_UNAVAILABLE),
+            (Code::Unauthenticated, StatusCode::UNAUTHORIZED),
+        ];
+        for (code, expected) in cases {
+            assert_eq!(http_status_for(code), expected, "{code:?}");
+        }
     }
 
     #[tokio::test]
