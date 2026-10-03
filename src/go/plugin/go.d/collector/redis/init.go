@@ -5,6 +5,8 @@ package redis
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/url"
 
 	"github.com/redis/go-redis/v9"
 
@@ -21,6 +23,11 @@ func (c *Collector) validateConfig() error {
 func (c *Collector) initRedisClient(ctx context.Context) (*redis.Client, error) {
 	opts, err := redis.ParseURL(c.Address)
 	if err != nil {
+		// url.Error repeats the raw address, which may embed credentials.
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			return nil, fmt.Errorf("invalid 'address': %w", urlErr.Err)
+		}
 		return nil, err
 	}
 

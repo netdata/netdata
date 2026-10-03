@@ -113,6 +113,23 @@ func TestCollector_Init(t *testing.T) {
 	}
 }
 
+func TestCollector_InitErrorHidesAddressCredentials(t *testing.T) {
+	for name, address := range map[string]string{
+		"invalid port":   "redis://user:s3cret@localhost:63 79",
+		"invalid escape": "redis://user:s3cret@local%zzhost:6379",
+	} {
+		t.Run(name, func(t *testing.T) {
+			collr := New()
+			collr.Address = address
+
+			err := collr.Init(context.Background())
+
+			require.Error(t, err)
+			assert.NotContains(t, err.Error(), "s3cret")
+		})
+	}
+}
+
 func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		prepare  func(t *testing.T) *Collector
