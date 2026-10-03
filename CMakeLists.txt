@@ -2896,6 +2896,8 @@ endif()
 
 set(NDRUN_FILES
     src/collectors/utils/nd-run.c
+    src/collectors/utils/nd-process-tree.c
+    src/collectors/utils/nd-process-tree.h
     src/collectors/utils/nd-file-reader.c
     src/collectors/utils/nd-file-reader.h
     src/collectors/utils/exec-signals.h)
