@@ -30,7 +30,11 @@ func (c *Collector) collect() (map[string]int64, error) {
 		c.Debugf(`server="%s",version="%s"`, s, v)
 	}
 
-	if c.server != "redis" {
+	switch c.server {
+	// redis and redis protocol-compatible servers (kvrocks, garnet); identified
+	// by the first *_version line of the INFO response.
+	case "redis", "kvrocks", "garnet":
+	default:
 		return nil, fmt.Errorf("unsupported server app, want=redis, got=%s", c.server)
 	}
 

@@ -13,15 +13,17 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
+// Section names are matched case-insensitively: redis-compatible servers may
+// use different casing (e.g. Kvrocks emits "# CommandStats").
 const (
-	infoSectionServer       = "# Server"
-	infoSectionData         = "# Data"
-	infoSectionClients      = "# Clients"
-	infoSectionStats        = "# Stats"
-	infoSectionCommandstats = "# Commandstats"
-	infoSectionCPU          = "# CPU"
-	infoSectionRepl         = "# Replication"
-	infoSectionKeyspace     = "# Keyspace"
+	infoSectionServer       = "# server"
+	infoSectionData         = "# data"
+	infoSectionClients      = "# clients"
+	infoSectionStats        = "# stats"
+	infoSectionCommandstats = "# commandstats"
+	infoSectionCPU          = "# cpu"
+	infoSectionRepl         = "# replication"
+	infoSectionKeyspace     = "# keyspace"
 )
 
 var infoSections = map[string]struct{}{
@@ -35,7 +37,7 @@ var infoSections = map[string]struct{}{
 	infoSectionKeyspace:     {},
 }
 
-func isInfoSection(line string) bool { _, ok := infoSections[line]; return ok }
+func isInfoSection(line string) bool { _, ok := infoSections[strings.ToLower(line)]; return ok }
 
 func (c *Collector) collectInfo(mx map[string]int64, info string) {
 	// https://redis.io/commands/info
@@ -52,7 +54,7 @@ func (c *Collector) collectInfo(mx map[string]int64, info string) {
 		}
 		if strings.HasPrefix(line, "#") {
 			if isInfoSection(line) {
-				curSection = line
+				curSection = strings.ToLower(line)
 			}
 			continue
 		}
