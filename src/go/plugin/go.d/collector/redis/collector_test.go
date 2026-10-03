@@ -62,6 +62,12 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
+func TestCollector_ConfigSchemaMatchesMetadata(t *testing.T) {
+	collecttest.AssertConfigSchemaMatchesMetadataWith(t, "config_schema.json", "metadata.yaml", collecttest.ConfigSchemaCheck{
+		Defaults: true,
+	})
+}
+
 func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
