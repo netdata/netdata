@@ -42,7 +42,6 @@ use opentelemetry_proto::tonic::collector::metrics::v1::{
 use opentelemetry_proto::tonic::collector::trace::v1::{
     ExportTraceServiceRequest, ExportTraceServiceResponse,
 };
-use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
@@ -90,37 +89,56 @@ pub(crate) trait OtlpJsonResponse {
 
 impl OtlpJsonResponse for ExportLogsServiceResponse {
     fn encode_json(&self) -> Vec<u8> {
-        encode_response(self.partial_success.as_ref())
+        encode_response(self.partial_success.as_ref().map(|p| {
+            (
+                "rejectedLogRecords",
+                p.rejected_log_records,
+                p.error_message.as_str(),
+            )
+        }))
     }
 }
 
 impl OtlpJsonResponse for ExportTraceServiceResponse {
     fn encode_json(&self) -> Vec<u8> {
-        encode_response(self.partial_success.as_ref())
+        encode_response(
+            self.partial_success
+                .as_ref()
+                .map(|p| ("rejectedSpans", p.rejected_spans, p.error_message.as_str())),
+        )
     }
 }
 
 impl OtlpJsonResponse for ExportMetricsServiceResponse {
     fn encode_json(&self) -> Vec<u8> {
-        encode_response(self.partial_success.as_ref())
+        encode_response(self.partial_success.as_ref().map(|p| {
+            (
+                "rejectedDataPoints",
+                p.rejected_data_points,
+                p.error_message.as_str(),
+            )
+        }))
     }
 }
 
-/// A response's only field is its optional `partialSuccess`, a flat message
-/// (count + message). The derives would write an unset one as
-/// `"partialSuccess": null`; proto3 JSON (and the collector) omit it.
-fn encode_response<P: Serialize>(partial_success: Option<&P>) -> Vec<u8> {
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase")]
-    struct Response<'a, P> {
-        partial_success: &'a P,
-    }
-
-    match partial_success {
-        None => b"{}".to_vec(),
-        Some(partial_success) => serde_json::to_vec(&Response { partial_success })
-            .expect("serializing an integer and a string cannot fail"),
-    }
+/// A response's only field is its optional `partialSuccess`: a rejected
+/// count (keyed per signal) and a message. Written by hand because the
+/// derives write the `int64` count as a JSON number and an unset
+/// `partialSuccess` as `null`; proto3 JSON (and the collector) write 64-bit
+/// integers as decimal strings and omit unset messages.
+fn encode_response(partial_success: Option<(&str, i64, &str)>) -> Vec<u8> {
+    let Some((count_key, rejected, error_message)) = partial_success else {
+        return b"{}".to_vec();
+    };
+    let mut partial = Map::new();
+    partial.insert(count_key.to_string(), Value::String(rejected.to_string()));
+    partial.insert(
+        "errorMessage".to_string(),
+        Value::String(error_message.to_string()),
+    );
+    let mut root = Map::new();
+    root.insert("partialSuccess".to_string(), Value::Object(partial));
+    serde_json::to_vec(&Value::Object(root)).expect("serializing strings cannot fail")
 }
 
 fn parse(body: &[u8]) -> Result<Value, String> {
@@ -978,6 +996,49 @@ mod tests {
             unreachable!()
         };
         assert_eq!(e.data_points[0].count, 3);
+    }
+
+    #[test]
+    fn responses_write_rejected_counts_as_decimal_strings() {
+        use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsPartialSuccess;
+        use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsPartialSuccess;
+        use opentelemetry_proto::tonic::collector::trace::v1::ExportTracePartialSuccess;
+
+        let json = |bytes: Vec<u8>| serde_json::from_slice::<Value>(&bytes).unwrap();
+        let logs = ExportLogsServiceResponse {
+            partial_success: Some(ExportLogsPartialSuccess {
+                rejected_log_records: 2,
+                error_message: "too old".to_string(),
+            }),
+        };
+        let traces = ExportTraceServiceResponse {
+            partial_success: Some(ExportTracePartialSuccess {
+                rejected_spans: 3,
+                error_message: "too old".to_string(),
+            }),
+        };
+        let metrics = ExportMetricsServiceResponse {
+            partial_success: Some(ExportMetricsPartialSuccess {
+                rejected_data_points: i64::MAX,
+                error_message: String::new(),
+            }),
+        };
+        assert_eq!(
+            json(logs.encode_json()),
+            serde_json::json!({"partialSuccess": {"rejectedLogRecords": "2", "errorMessage": "too old"}})
+        );
+        assert_eq!(
+            json(traces.encode_json()),
+            serde_json::json!({"partialSuccess": {"rejectedSpans": "3", "errorMessage": "too old"}})
+        );
+        assert_eq!(
+            json(metrics.encode_json()),
+            serde_json::json!({"partialSuccess": {"rejectedDataPoints": "9223372036854775807", "errorMessage": ""}})
+        );
+        assert_eq!(
+            ExportLogsServiceResponse::default().encode_json(),
+            b"{}".to_vec()
+        );
     }
 
     #[test]

@@ -1028,7 +1028,7 @@ mod tests {
         let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(
             v["partialSuccess"]["rejectedLogRecords"],
-            serde_json::json!(2)
+            serde_json::json!("2")
         );
     }
 
