@@ -1,5 +1,6 @@
 import json
 import os
+from copy import deepcopy
 from pathlib import Path
 
 from jsonschema import Draft7Validator, FormatChecker, ValidationError
@@ -180,7 +181,12 @@ def load_collectors(sources=None):
         for module_id in sorted(set(profile_coverage) - module_ids):
             warn(f'Profile coverage references unknown module id {module_id!r}.', path)
 
-        for idx, item in enumerate(data['modules']):
+        # Modules may share merged sub-objects (YAML anchors/merge keys); later
+        # pipeline steps mutate items in place (e.g. scope names), so each item
+        # must own its data. Deepcopy per item: one deepcopy of the whole list
+        # would keep the shared references shared (memoization).
+        for idx, raw_item in enumerate(data['modules']):
+            item = deepcopy(raw_item)
             item['meta']['plugin_name'] = data['plugin_name']
             item['integration_type'] = 'collector'
             item['_src_path'] = path
