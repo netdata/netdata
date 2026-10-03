@@ -56,12 +56,11 @@ use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message as _;
-use serde::Serialize;
 use tonic::{Code, Status};
 
 use crate::logs_service::NetdataLogsService;
 use crate::metrics_service::NetdataMetricsService;
-use crate::otlp_json::OtlpJson;
+use crate::otlp_json::{OtlpJson, OtlpJsonResponse};
 use crate::tenant::extract_tenant_id_from_headers;
 use crate::trace_service::NetdataTracesService;
 
@@ -101,38 +100,12 @@ impl Codec {
         }
     }
 
-    /// Bytes for a successful export response, in this codec. JSON output is
-    /// normalized to omit null-valued fields: the `with-serde` derives emit
-    /// `"partialSuccess": null` where proto3 JSON (and the collector) omit
-    /// unset fields entirely, and senders' protojson parsers are entitled to
-    /// the canonical shape.
-    fn encode_response<R: prost::Message + Serialize>(self, resp: &R) -> Result<Vec<u8>> {
+    /// Bytes for a successful export response, in this codec.
+    fn encode_response<R: prost::Message + OtlpJsonResponse>(self, resp: &R) -> Vec<u8> {
         match self {
-            Codec::Protobuf => Ok(resp.encode_to_vec()),
-            Codec::Json => {
-                let value =
-                    serde_json::to_value(resp).context("serializing OTLP/HTTP response as JSON")?;
-                serde_json::to_vec(&without_nulls(value))
-                    .context("serializing OTLP/HTTP response as JSON")
-            }
+            Codec::Protobuf => resp.encode_to_vec(),
+            Codec::Json => resp.encode_json(),
         }
-    }
-}
-
-/// Recursively drop object entries whose value is JSON `null` (proto3 JSON's
-/// spelling of an unset field). Arrays are mapped; scalars pass through.
-fn without_nulls(value: serde_json::Value) -> serde_json::Value {
-    match value {
-        serde_json::Value::Object(map) => serde_json::Value::Object(
-            map.into_iter()
-                .filter(|(_, v)| !v.is_null())
-                .map(|(k, v)| (k, without_nulls(v)))
-                .collect(),
-        ),
-        serde_json::Value::Array(items) => {
-            serde_json::Value::Array(items.into_iter().map(without_nulls).collect())
-        }
-        other => other,
     }
 }
 
@@ -382,14 +355,14 @@ async fn export_logs(
     headers: HeaderMap,
     body: Body,
 ) -> Response<Body> {
-    // The closure needs the headers after `serve_export` is done reading
-    // content negotiation off them, so it takes its own copy (cheap:
-    // `HeaderMap` is Arc-backed).
-    let hdrs = headers.clone();
-    serve_export::<ExportLogsServiceRequest, _, _, _>(headers, body, move |req| async move {
-        let tenant: TenantId = extract_tenant_id_from_headers(&hdrs, &state.auth)?;
-        state.logs.export_logs(&tenant, req).await
-    })
+    serve_export::<ExportLogsServiceRequest, _, _, _>(
+        headers,
+        body,
+        move |headers, req| async move {
+            let tenant: TenantId = extract_tenant_id_from_headers(&headers, &state.auth)?;
+            state.logs.export_logs(&tenant, req).await
+        },
+    )
     .await
 }
 
@@ -398,11 +371,14 @@ async fn export_traces(
     headers: HeaderMap,
     body: Body,
 ) -> Response<Body> {
-    let hdrs = headers.clone();
-    serve_export::<ExportTraceServiceRequest, _, _, _>(headers, body, move |req| async move {
-        let tenant: TenantId = extract_tenant_id_from_headers(&hdrs, &state.auth)?;
-        state.traces.export_traces(&tenant, req).await
-    })
+    serve_export::<ExportTraceServiceRequest, _, _, _>(
+        headers,
+        body,
+        move |headers, req| async move {
+            let tenant: TenantId = extract_tenant_id_from_headers(&headers, &state.auth)?;
+            state.traces.export_traces(&tenant, req).await
+        },
+    )
     .await
 }
 
@@ -411,25 +387,30 @@ async fn export_metrics(
     headers: HeaderMap,
     body: Body,
 ) -> Response<Body> {
-    serve_export::<ExportMetricsServiceRequest, _, _, _>(headers, body, move |req| async move {
-        // Metrics carry no tenant (charts are agent-wide); the core's own
-        // signature says so.
-        state.metrics.export_metrics(req).await
-    })
+    serve_export::<ExportMetricsServiceRequest, _, _, _>(
+        headers,
+        body,
+        move |_headers, req| async move {
+            // Metrics carry no tenant (charts are agent-wide); the core's own
+            // signature says so.
+            state.metrics.export_metrics(req).await
+        },
+    )
     .await
 }
 
 /// The transport pipeline shared by all three signals: content negotiation,
 /// body limits, decompression, decode, then the signal's export.
 ///
-/// `run` receives the decoded request and answers with the core's
-/// `Result<Response, Status>` — the same cores the gRPC wrappers call — so
-/// the two transports cannot drift apart.
+/// `run` receives the request headers (handed over, not copied, once content
+/// negotiation is done with them) and the decoded request, and answers with
+/// the core's `Result<Response, Status>` — the same cores the gRPC wrappers
+/// call — so the two transports cannot drift apart.
 async fn serve_export<Req, Resp, F, Fut>(headers: HeaderMap, body: Body, run: F) -> Response<Body>
 where
     Req: prost::Message + OtlpJson + Default,
-    Resp: prost::Message + Serialize,
-    F: FnOnce(Req) -> Fut + Send,
+    Resp: prost::Message + OtlpJsonResponse,
+    F: FnOnce(HeaderMap, Req) -> Fut + Send,
     Fut: Future<Output = Result<Resp, Status>> + Send,
 {
     // Content-Type first, exactly like the collector's `readContentType`.
@@ -514,18 +495,12 @@ where
         },
     };
 
-    match run(req).await {
-        Ok(resp) => {
-            // A response-encoding failure is a server bug, not a sender
-            // error: 500 with the collector's fallback body shape.
-            match codec.encode_response(&resp) {
-                Ok(bytes) => response_bytes(StatusCode::OK, codec.content_type(), bytes),
-                Err(e) => rpc_error(
-                    codec,
-                    Status::internal(format!("failed to marshal response: {e:#}")),
-                ),
-            }
-        }
+    match run(headers, req).await {
+        Ok(resp) => response_bytes(
+            StatusCode::OK,
+            codec.content_type(),
+            codec.encode_response(&resp),
+        ),
         Err(status) => rpc_error(codec, status),
     }
 }
@@ -535,19 +510,13 @@ where
 /// the same normalization `mime.ParseMediaType` applies upstream. A missing
 /// header is unsupported, matching the collector.
 fn content_type_codec(value: Option<&axum::http::HeaderValue>) -> Option<Codec> {
-    let value = value?;
-    let mime = value
-        .to_str()
-        .ok()?
-        .split(';')
-        .next()
-        .unwrap_or("")
-        .trim()
-        .to_ascii_lowercase();
-    match mime.as_str() {
-        "application/x-protobuf" => Some(Codec::Protobuf),
-        "application/json" => Some(Codec::Json),
-        _ => None,
+    let mime = value?.to_str().ok()?.split(';').next().unwrap_or("").trim();
+    if mime.eq_ignore_ascii_case("application/x-protobuf") {
+        Some(Codec::Protobuf)
+    } else if mime.eq_ignore_ascii_case("application/json") {
+        Some(Codec::Json)
+    } else {
+        None
     }
 }
 
@@ -564,11 +533,13 @@ fn content_encoding(value: Option<&axum::http::HeaderValue>) -> Option<BodyCodin
     let Some(value) = value else {
         return Some(BodyCoding::Identity);
     };
-    let value = value.to_str().ok()?.trim().to_ascii_lowercase();
-    match value.as_str() {
-        "" | "identity" => Some(BodyCoding::Identity),
-        "gzip" => Some(BodyCoding::Gzip),
-        _ => None,
+    let coding = value.to_str().ok()?.trim();
+    if coding.is_empty() || coding.eq_ignore_ascii_case("identity") {
+        Some(BodyCoding::Identity)
+    } else if coding.eq_ignore_ascii_case("gzip") {
+        Some(BodyCoding::Gzip)
+    } else {
+        None
     }
 }
 

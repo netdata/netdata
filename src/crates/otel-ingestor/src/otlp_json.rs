@@ -33,9 +33,16 @@
 //! is tied to this crate version's quirks; the tests pin every form so an
 //! upgrade that changes them fails loudly.
 
-use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
-use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
-use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+use opentelemetry_proto::tonic::collector::logs::v1::{
+    ExportLogsServiceRequest, ExportLogsServiceResponse,
+};
+use opentelemetry_proto::tonic::collector::metrics::v1::{
+    ExportMetricsServiceRequest, ExportMetricsServiceResponse,
+};
+use opentelemetry_proto::tonic::collector::trace::v1::{
+    ExportTraceServiceRequest, ExportTraceServiceResponse,
+};
+use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
@@ -73,6 +80,46 @@ impl OtlpJson for ExportMetricsServiceRequest {
             None => Ok(request),
             Some(lost) => Err(explain_lost(body, &lost)),
         }
+    }
+}
+
+/// An OTLP export response encodable as OTLP/JSON.
+pub(crate) trait OtlpJsonResponse {
+    fn encode_json(&self) -> Vec<u8>;
+}
+
+impl OtlpJsonResponse for ExportLogsServiceResponse {
+    fn encode_json(&self) -> Vec<u8> {
+        encode_response(self.partial_success.as_ref())
+    }
+}
+
+impl OtlpJsonResponse for ExportTraceServiceResponse {
+    fn encode_json(&self) -> Vec<u8> {
+        encode_response(self.partial_success.as_ref())
+    }
+}
+
+impl OtlpJsonResponse for ExportMetricsServiceResponse {
+    fn encode_json(&self) -> Vec<u8> {
+        encode_response(self.partial_success.as_ref())
+    }
+}
+
+/// A response's only field is its optional `partialSuccess`, a flat message
+/// (count + message). The derives would write an unset one as
+/// `"partialSuccess": null`; proto3 JSON (and the collector) omit it.
+fn encode_response<P: Serialize>(partial_success: Option<&P>) -> Vec<u8> {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Response<'a, P> {
+        partial_success: &'a P,
+    }
+
+    match partial_success {
+        None => b"{}".to_vec(),
+        Some(partial_success) => serde_json::to_vec(&Response { partial_success })
+            .expect("serializing an integer and a string cannot fail"),
     }
 }
 
