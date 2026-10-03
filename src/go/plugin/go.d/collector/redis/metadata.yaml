@@ -628,7 +628,7 @@ modules:
         metrics_description: |
           Monitor Garnet server health and performance, including memory, connections, keyspace, replication, and persistence status.
 
-          Netdata monitors Garnet through the Redis protocol and reports the Garnet INFO fields that match Redis semantics. Per-command statistics require the Garnet server to run with `--commandstats-monitor`.
+          Netdata monitors Garnet through the Redis protocol and reports the Garnet INFO fields that match Redis semantics. Workload, connection, traffic, and lookup metrics require periodic sampling on the Garnet server. Per-command call counts require `--commandstats-monitor`.
         method_description: |
           It connects to the Garnet instance via a TCP or UNIX socket and executes the following commands:
           
@@ -643,10 +643,13 @@ modules:
           description: |
             The Garnet server does not expose some data the Redis protocol surfaces, so the following charts have no data for Garnet:
 
+            - Process CPU usage and per-command CPU time
             - Allocator memory: used, peak, max memory, dataset, Lua, scripts, and the memory fragmentation ratio
             - Key evictions and key expirations
             - The RDB save duration, the time since the last save, and the changes since the last save
             - Blocked and tracking clients
+
+            When Garnet reports `monitor_task:disabled`, workload, connection, traffic, and lookup charts stay empty because its counters are not sampled. Per-command call counts remain available with `--commandstats-monitor`; Garnet does not measure per-command CPU time.
 
             The keyspace section requires a full store scan on the Garnet server, so the collector requests it at most every 30 seconds; key counts can be up to 30 seconds old.
         performance_impact:
@@ -656,9 +659,14 @@ modules:
       <<: *setup
       prerequisites:
         list:
+          - title: Enable periodic metrics sampling
+            description: |
+              Start Garnet with `--metrics-sampling-freq 1` to sample workload, connections, network traffic, and key lookups every second. Sampling is disabled by default.
+
+              Verify that `redis-cli INFO SERVER` reports `monitor_task:enabled`. Enabling only `--commandstats-monitor` does not enable these general metrics.
           - title: Enable per-command statistics
             description: |
-              The commands charts are populated only when the Garnet server tracks per-command usage.
+              The calls-per-command chart is populated only when the Garnet server tracks per-command usage. CPU timing charts remain empty.
 
               Start the Garnet server with the `--commandstats-monitor` flag, then verify with `redis-cli`:
 

@@ -16,28 +16,11 @@ import (
 // Section names are matched case-insensitively: redis-compatible servers may
 // use different casing (e.g. Kvrocks emits "# CommandStats").
 const (
-	infoSectionServer       = "# server"
-	infoSectionData         = "# data"
 	infoSectionClients      = "# clients"
 	infoSectionStats        = "# stats"
 	infoSectionCommandstats = "# commandstats"
-	infoSectionCPU          = "# cpu"
-	infoSectionRepl         = "# replication"
 	infoSectionKeyspace     = "# keyspace"
 )
-
-var infoSections = map[string]struct{}{
-	infoSectionServer:       {},
-	infoSectionData:         {},
-	infoSectionClients:      {},
-	infoSectionStats:        {},
-	infoSectionCommandstats: {},
-	infoSectionCPU:          {},
-	infoSectionRepl:         {},
-	infoSectionKeyspace:     {},
-}
-
-func isInfoSection(line string) bool { _, ok := infoSections[strings.ToLower(line)]; return ok }
 
 func (c *Collector) collectInfo(mx map[string]int64, info string) {
 	// https://redis.io/commands/info
@@ -45,6 +28,7 @@ func (c *Collector) collectInfo(mx map[string]int64, info string) {
 	// All the properties are in the form of field:value terminated by \r\n.
 
 	var curSection string
+	var garnetSamplingDisabled bool
 	sc := bufio.NewScanner(strings.NewReader(info))
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
@@ -53,9 +37,7 @@ func (c *Collector) collectInfo(mx map[string]int64, info string) {
 			continue
 		}
 		if strings.HasPrefix(line, "#") {
-			if isInfoSection(line) {
-				curSection = strings.ToLower(line)
-			}
+			curSection = strings.ToLower(line)
 			continue
 		}
 
@@ -65,6 +47,12 @@ func (c *Collector) collectInfo(mx map[string]int64, info string) {
 		}
 
 		switch {
+		case c.server == "garnet" && field == "monitor_task":
+			// Garnet's Server section precedes Stats/Clients. Without periodic
+			// sampling those sections contain placeholders, even with commandstats enabled.
+			garnetSamplingDisabled = value == "disabled"
+		case garnetSamplingDisabled && (curSection == infoSectionStats || curSection == infoSectionClients):
+			continue
 		case curSection == infoSectionCommandstats:
 			c.collectInfoCommandstatsProperty(mx, field, value)
 		case curSection == infoSectionKeyspace:
@@ -140,8 +128,11 @@ func (c *Collector) collectInfoCommandstatsProperty(ms map[string]int64, field, 
 
 	calls, usec, usecPerCall := match[1], match[2], match[3]
 	collectNumericValue(ms, "cmd_"+cmd+"_calls", calls)
-	collectNumericValue(ms, "cmd_"+cmd+"_usec", usec)
-	collectNumericValue(ms, "cmd_"+cmd+"_usec_per_call", usecPerCall)
+	// Garnet reports literal zero timing fields, not measured execution times.
+	if c.server != "garnet" {
+		collectNumericValue(ms, "cmd_"+cmd+"_usec", usec)
+		collectNumericValue(ms, "cmd_"+cmd+"_usec_per_call", usecPerCall)
+	}
 
 	if !c.collectedCommands[cmd] {
 		c.collectedCommands[cmd] = true
@@ -194,6 +185,9 @@ func (c *Collector) addCmdToCommandsCharts(cmd string) {
 		Name: strings.ToUpper(cmd),
 		Algo: collectorapi.Incremental,
 	})
+	if c.server == "garnet" {
+		return
+	}
 	c.addDimToChart(chartCommandsUsec.ID, &collectorapi.Dim{
 		ID:   "cmd_" + cmd + "_usec",
 		Name: strings.ToUpper(cmd),
