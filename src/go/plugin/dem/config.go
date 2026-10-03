@@ -1,0 +1,58 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+package dem
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"gopkg.in/yaml.v2"
+)
+
+type HistoryConfig struct {
+	Days     int   `yaml:"days"`
+	MaxBytes int64 `yaml:"max_bytes"`
+}
+type Config struct {
+	History HistoryConfig `yaml:"history"`
+}
+
+func DefaultConfig() Config {
+	return Config{
+		History: HistoryConfig{
+			Days:     30,
+			MaxBytes: 1 << 30,
+		},
+	}
+}
+
+// LoadConfig reads the same highest-priority dem.conf as the Agent. Framework
+// fields are decoded by the Agent; this owner decodes process history policy.
+func LoadConfig(paths multipath.MultiPath) (Config, error) {
+	cfg := DefaultConfig()
+	path, err := paths.Find("dem.conf")
+	if multipath.IsNotFound(err) {
+		return cfg, nil
+	}
+	if err != nil {
+		return cfg, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return cfg, err
+	}
+	if err = yaml.Unmarshal(data, &cfg); err != nil {
+		return cfg, fmt.Errorf("read dem.conf: %w", err)
+	}
+	return cfg, cfg.History.validate()
+}
+
+func (c HistoryConfig) validate() error {
+	if c.Days < 1 || c.Days > 365 {
+		return fmt.Errorf("history.days must be between 1 and 365")
+	}
+	if c.MaxBytes <= 0 {
+		return fmt.Errorf("history.max_bytes must be positive")
+	}
+	return nil
+}

@@ -1,0 +1,1237 @@
+modules:
+    - alerts:
+        - info: p75 Largest Contentful Paint over the last 10 minutes for site ${label:_collect_job}
+          link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
+          metric: rum.lcp
+          name: rum_lcp_p75
+        - info: p75 Interaction to Next Paint over the last 10 minutes for site ${label:_collect_job}
+          link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
+          metric: rum.inp
+          name: rum_inp_p75
+        - info: p75 Cumulative Layout Shift over the last 10 minutes for site ${label:_collect_job}
+          link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
+          metric: rum.cls
+          name: rum_cls_p75
+        - info: No page views received from site ${label:_collect_job} in the last hour; is the RUM beacon installed?
+          link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
+          metric: rum.pageviews
+          name: rum_no_beacons
+        - info: RUM event records dropped before reaching the OTLP endpoint in the last 5 minutes
+          link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
+          metric: rum.otlp
+          name: rum_events_dropped
+      functions:
+        description: Use these process-wide Functions through the Netdata Agent or Cloud to inspect RUM setup, live activity
+          and retained investigation history. Invoke their public rum-* names; filter by site where supported.
+        list:
+        - id: rum-sites
+          function_name: rum-sites
+          name: RUM Sites
+          description: Inspect site setup, sampling, receiver availability and recent activity to diagnose missing browser
+            data.
+          parameters: []
+          returns:
+            description: One admitted site job. The response also includes collector public URL and ingress availability.
+            columns:
+            - name: site
+              type: string
+              unit: ""
+              description: Site.
+            - name: name
+              type: string
+              unit: ""
+              description: Name.
+            - name: status
+              type: string
+              unit: ""
+              description: Status.
+            - name: beacon_url
+              type: string
+              unit: ""
+              description: Beacon URL.
+            - name: snippet
+              type: string
+              unit: ""
+              description: Snippet.
+            - name: allowed_origins
+              type: string
+              unit: ""
+              description: Allowed Origins.
+            - name: beacons_per_min
+              type: integer
+              unit: ""
+              description: Beacons / min.
+            - name: last_beacon_age_s
+              type: integer
+              unit: ""
+              description: Last Beacon (s ago).
+            - name: active_sessions
+              type: integer
+              unit: ""
+              description: Active Sessions.
+            - name: pageviews_window
+              type: integer
+              unit: ""
+              description: Page Views (window).
+            - name: js_errors_window
+              type: integer
+              unit: ""
+              description: JS Errors (window).
+            - name: rejected_per_min
+              type: integer
+              unit: ""
+              description: Rejected / min.
+            - name: reachable
+              type: string
+              unit: ""
+              description: Reachable.
+            - name: reach_detail
+              type: string
+              unit: ""
+              description: Reachability Detail.
+            - name: measured
+              type: string
+              unit: ""
+              description: Measured.
+            - name: investigated
+              type: string
+              unit: ""
+              description: Investigated.
+            - name: investigated_sessions
+              type: integer
+              unit: ""
+              description: Investigated Sessions.
+            - name: bots_per_min
+              type: integer
+              unit: ""
+              description: Bots Filtered / min.
+            - name: snippet_check
+              type: string
+              unit: ""
+              description: Snippet On Site.
+            - name: snippet_detail
+              type: string
+              unit: ""
+              description: Snippet Detail.
+            - name: last_rejected_origin
+              type: string
+              unit: ""
+              description: Last Rejected Origin.
+            - name: last_rejected_age_s
+              type: integer
+              unit: ""
+              description: Last Rejection (s ago).
+          performance: Reads bounded local activity snapshots without contacting the monitored website.
+          security: Results can include page paths, browser metadata, user identifiers, error messages and stack traces.
+            Restrict access to authorized operators.
+          availability: Available while dem.plugin is running; activity comes from admitted site jobs.
+          require_cloud: false
+          prerequisites:
+            list: []
+        - id: rum-pages
+          function_name: rum-pages
+          name: RUM Pages
+          description: Compare traffic, Web Vitals and attributed page elements within the configured measurement window.
+          parameters:
+          - id: site
+            name: site
+            description: Filter by native site job name. Leave empty to include all sites.
+            type: string
+            required: false
+            default: ''
+            options: []
+          returns:
+            description: One page group for an admitted site; missing vital samples return null.
+            columns:
+            - name: site
+              type: string
+              unit: ""
+              description: Site.
+            - name: page
+              type: string
+              unit: ""
+              description: Page.
+            - name: pageviews_window
+              type: integer
+              unit: ""
+              description: Page Views (window).
+            - name: sessions
+              type: integer
+              unit: ""
+              description: Sessions.
+            - name: lcp_p75_ms
+              type: integer
+              unit: ""
+              description: LCP p75 (ms).
+            - name: inp_p75_ms
+              type: integer
+              unit: ""
+              description: INP p75 (ms).
+            - name: cls_p75
+              type: float
+              unit: ""
+              description: CLS p75.
+            - name: errors_window
+              type: integer
+              unit: ""
+              description: JS Errors (window).
+            - name: lcp_element
+              type: string
+              unit: ""
+              description: LCP Element.
+            - name: inp_element
+              type: string
+              unit: ""
+              description: INP Element.
+            - name: cls_element
+              type: string
+              unit: ""
+              description: CLS Element.
+            - name: frustration_window
+              type: integer
+              unit: ""
+              description: Frustration Signals (window).
+          performance: Reads bounded local activity snapshots without contacting the monitored website.
+          security: Results can include page paths, browser metadata, user identifiers, error messages and stack traces.
+            Restrict access to authorized operators.
+          availability: Available while dem.plugin is running; activity comes from admitted site jobs.
+          require_cloud: false
+          prerequisites:
+            list: []
+        - id: rum-live
+          function_name: rum-live
+          name: RUM Live
+          description: Read recent browser events for live activity views, optionally continuing from a previous response.
+          parameters:
+          - id: site
+            name: site
+            description: Filter by native site job name. Leave empty to include all sites.
+            type: string
+            required: false
+            default: ''
+            options: []
+          - id: after
+            name: after
+            description: Opaque next cursor from the previous rum-live response. Pass it unchanged; leave empty for recent
+              events.
+            type: string
+            required: false
+            default: ''
+            options: []
+          returns:
+            description: One recent browser event. The top-level next value is an opaque string cursor; pass it unchanged
+              as after. Event identifiers include the site and generation. Times are Unix microseconds.
+            columns:
+            - name: seq
+              type: string
+              unit: ""
+              description: Event.
+            - name: ts
+              type: timestamp
+              unit: ""
+              description: Time.
+            - name: site
+              type: string
+              unit: ""
+              description: Site.
+            - name: country
+              type: string
+              unit: ""
+              description: Country.
+            - name: city
+              type: string
+              unit: ""
+              description: City.
+            - name: lat
+              type: float
+              unit: ""
+              description: Latitude.
+            - name: lon
+              type: float
+              unit: ""
+              description: Longitude.
+            - name: page
+              type: string
+              unit: ""
+              description: Page.
+            - name: browser
+              type: string
+              unit: ""
+              description: Browser.
+            - name: device
+              type: string
+              unit: ""
+              description: Device.
+            - name: pageview
+              type: integer
+              unit: ""
+              description: Page View.
+            - name: lcp_ms
+              type: float
+              unit: ""
+              description: LCP (ms).
+            - name: inp_ms
+              type: float
+              unit: ""
+              description: INP (ms).
+            - name: fcp_ms
+              type: float
+              unit: ""
+              description: FCP (ms).
+            - name: ttfb_ms
+              type: float
+              unit: ""
+              description: TTFB (ms).
+            - name: cls
+              type: float
+              unit: ""
+              description: CLS.
+            - name: errors
+              type: integer
+              unit: ""
+              description: JS Errors.
+          performance: Reads bounded local activity snapshots without contacting the monitored website.
+          security: Results can include page paths, browser metadata, user identifiers, error messages and stack traces.
+            Restrict access to authorized operators.
+          availability: Available while dem.plugin is running; activity comes from admitted site jobs.
+          require_cloud: false
+          prerequisites:
+            list: []
+        - id: rum-sessions
+          function_name: rum-sessions
+          name: RUM Sessions
+          description: Investigate retained sampled sessions that overlap a time range, including pages, errors and user
+            frustration.
+          parameters:
+          - id: site
+            name: site
+            description: Filter by native site job name. Leave empty to include all sites.
+            type: string
+            required: false
+            default: ''
+            options: []
+          - id: after
+            name: after
+            description: Start of the saved-time range as Unix seconds or a negative offset from now.
+            type: integer
+            required: false
+            default: 15 minutes before before
+            options: []
+          - id: before
+            name: before
+            description: End of the saved-time range as Unix seconds or a negative offset from now.
+            type: integer
+            required: false
+            default: now
+            options: []
+          returns:
+            description: One session with retained activity saved in the selected range. Counts and activity span cover retained events, not lifetime totals. Results can include disabled sites until
+              their history expires.
+            columns:
+            - name: site
+              type: string
+              unit: ""
+              description: Site.
+            - name: session_id
+              type: string
+              unit: ""
+              description: Session.
+            - name: started_age_s
+              type: integer
+              unit: ""
+              description: First Retained Event (s ago).
+            - name: duration_s
+              type: integer
+              unit: ""
+              description: Retained Activity Span (s).
+            - name: pageviews
+              type: integer
+              unit: ""
+              description: Retained Page Views.
+            - name: errors
+              type: integer
+              unit: ""
+              description: JS Errors.
+            - name: browser
+              type: string
+              unit: ""
+              description: Browser.
+            - name: device
+              type: string
+              unit: ""
+              description: Device.
+            - name: country
+              type: string
+              unit: ""
+              description: Country.
+            - name: version
+              type: string
+              unit: ""
+              description: Version.
+            - name: entry_page
+              type: string
+              unit: ""
+              description: Entry Page.
+            - name: last_page
+              type: string
+              unit: ""
+              description: Last Page.
+            - name: user
+              type: string
+              unit: ""
+              description: User.
+            - name: frustrations
+              type: integer
+              unit: ""
+              description: Frustration Signals.
+          performance: Reads local retained history; work grows with the selected range and retained records.
+          security: Results can include page paths, browser metadata, user identifiers, error messages and stack traces.
+            Restrict access to authorized operators.
+          availability: Available while dem.plugin is running. History results require retained investigation data.
+          require_cloud: false
+          prerequisites:
+            list: []
+        - id: rum-errors
+          function_name: rum-errors
+          name: RUM Errors
+          description: Group errors saved in the selected range by fingerprint; select a fingerprint to investigate affected sessions, pages and browsers.
+          parameters:
+          - id: site
+            name: site
+            description: Filter by native site job name. Leave empty to include all sites.
+            type: string
+            required: false
+            default: ''
+            options: []
+          - id: fingerprint
+            name: fingerprint
+            description: Select an error fingerprint to compute affected-session, top-page and browser statistics. Leave empty for the count overview.
+            type: string
+            required: false
+            default: ''
+            options: []
+          - id: after
+            name: after
+            description: Start of the saved-time range as Unix seconds or a negative offset from now.
+            type: integer
+            required: false
+            default: 15 minutes before before
+            options: []
+          - id: before
+            name: before
+            description: End of the saved-time range as Unix seconds or a negative offset from now.
+            type: integer
+            required: false
+            default: now
+            options: []
+          returns:
+            description: One error fingerprint per site with events saved in the selected range. Affected-session, page and browser statistics are null until a fingerprint is selected; first and last seen use original event time. Results can include disabled sites
+              until their history expires.
+            columns:
+            - name: site
+              type: string
+              unit: ""
+              description: Site.
+            - name: fingerprint
+              type: string
+              unit: ""
+              description: Fingerprint.
+            - name: type
+              type: string
+              unit: ""
+              description: Type.
+            - name: message
+              type: string
+              unit: ""
+              description: Message.
+            - name: count_window
+              type: integer
+              unit: ""
+              description: Count (window).
+            - name: sessions_affected
+              type: integer
+              unit: ""
+              description: Sessions Affected (selected fingerprint).
+            - name: first_seen_age_s
+              type: integer
+              unit: ""
+              description: First Seen (s ago).
+            - name: last_seen_age_s
+              type: integer
+              unit: ""
+              description: Last Seen (s ago).
+            - name: top_page
+              type: string
+              unit: ""
+              description: Top Page (selected fingerprint).
+            - name: browsers
+              type: string
+              unit: ""
+              description: Browsers (selected fingerprint).
+            - name: sample_stack
+              type: string
+              unit: ""
+              description: Sample Stack.
+          performance: Reads local retained history; work grows with the selected range and retained records.
+          security: Results can include page paths, browser metadata, user identifiers, error messages and stack traces.
+            Restrict access to authorized operators.
+          availability: Available while dem.plugin is running. History results require retained investigation data.
+          require_cloud: false
+          prerequisites:
+            list: []
+        - id: rum-session-events
+          function_name: rum-session-events
+          name: RUM Session Events
+          description: Read the retained event timeline for a session to follow navigation, errors and traced requests.
+          parameters:
+          - id: site
+            name: site
+            description: Filter by native site job name. Leave empty to include all sites.
+            type: string
+            required: false
+            default: ''
+            options: []
+          - id: session_id
+            name: session_id
+            description: Session identifier returned by rum-sessions. Specify site when the same session identifier exists
+              on multiple sites.
+            type: string
+            required: true
+            default: ''
+            options: []
+          returns:
+            description: One retained or pending session event, with original observation time in Unix microseconds and an optional trace identifier. The full session timeline is returned without range filtering. Unknown
+              sessions return an error.
+            columns:
+            - name: ts
+              type: timestamp
+              unit: ""
+              description: Time.
+            - name: type
+              type: string
+              unit: ""
+              description: Event.
+            - name: page
+              type: string
+              unit: ""
+              description: Page.
+            - name: text
+              type: string
+              unit: ""
+              description: Details.
+            - name: trace_id
+              type: string
+              unit: ""
+              description: Trace.
+          performance: Reads local retained history; work grows with the selected range and retained records.
+          security: Results can include page paths, browser metadata, user identifiers, error messages and stack traces.
+            Restrict access to authorized operators.
+          availability: Available while dem.plugin is running. History results require retained investigation data.
+          require_cloud: false
+          prerequisites:
+            list: []
+      meta:
+        id: collector-dem.plugin-rum
+        info_provided_to_referring_integrations:
+            description: ""
+        keywords:
+            - rum
+            - browser
+            - web-vitals
+            - dem
+        module_name: rum
+        monitored_instance:
+            categories:
+                - data-collection.applications
+            icon_filename: netdata.png
+            link: https://www.netdata.cloud/
+            name: Real User Monitoring
+        plugin_name: dem.plugin
+        related_resources:
+            integrations:
+                list: []
+      metrics:
+        availability: []
+        description: All charts remain on this Agent. Native job identity scopes site charts; display_name is optional metadata. No vital samples means a gap, while an available but quiet receiver measures zero traffic.
+        folding:
+            enabled: false
+            title: Metrics
+        scopes:
+            - description: One configured site; breakdowns appear when matching observations are available.
+              labels:
+                - description: Optional human-readable site name, present when display_name differs from the native site job name.
+                  name: display_name
+              metrics:
+                - chart_type: line
+                  description: Largest Contentful Paint
+                  dimensions:
+                    - name: p50
+                    - name: p75
+                    - name: p95
+                  name: rum.lcp
+                  unit: milliseconds
+                - chart_type: stacked
+                  description: Largest Contentful Paint ratings
+                  dimensions:
+                    - name: good
+                    - name: needs_improvement
+                    - name: poor
+                  name: rum.lcp_rating
+                  unit: samples
+                - chart_type: line
+                  description: First Contentful Paint
+                  dimensions:
+                    - name: p50
+                    - name: p75
+                    - name: p95
+                  name: rum.fcp
+                  unit: milliseconds
+                - chart_type: stacked
+                  description: First Contentful Paint ratings
+                  dimensions:
+                    - name: good
+                    - name: needs_improvement
+                    - name: poor
+                  name: rum.fcp_rating
+                  unit: samples
+                - chart_type: line
+                  description: Time to First Byte
+                  dimensions:
+                    - name: p50
+                    - name: p75
+                    - name: p95
+                  name: rum.ttfb
+                  unit: milliseconds
+                - chart_type: stacked
+                  description: Time to First Byte ratings
+                  dimensions:
+                    - name: good
+                    - name: needs_improvement
+                    - name: poor
+                  name: rum.ttfb_rating
+                  unit: samples
+                - chart_type: line
+                  description: Interaction to Next Paint
+                  dimensions:
+                    - name: p50
+                    - name: p75
+                    - name: p95
+                  name: rum.inp
+                  unit: milliseconds
+                - chart_type: stacked
+                  description: Interaction to Next Paint ratings
+                  dimensions:
+                    - name: good
+                    - name: needs_improvement
+                    - name: poor
+                  name: rum.inp_rating
+                  unit: samples
+                - chart_type: line
+                  description: Cumulative Layout Shift
+                  dimensions:
+                    - name: p50
+                    - name: p75
+                    - name: p95
+                  name: rum.cls
+                  unit: score
+                - chart_type: stacked
+                  description: Cumulative Layout Shift ratings
+                  dimensions:
+                    - name: good
+                    - name: needs_improvement
+                    - name: poor
+                  name: rum.cls_rating
+                  unit: samples
+                - chart_type: line
+                  description: Page load time
+                  dimensions:
+                    - name: p50
+                    - name: p75
+                    - name: p95
+                  name: rum.load
+                  unit: milliseconds
+                - chart_type: line
+                  description: DOMContentLoaded time
+                  dimensions:
+                    - name: p50
+                    - name: p75
+                    - name: p95
+                  name: rum.dcl
+                  unit: milliseconds
+                - chart_type: line
+                  description: First-party API request duration
+                  dimensions:
+                    - name: p50
+                    - name: p75
+                    - name: p95
+                  name: rum.api
+                  unit: milliseconds
+                - chart_type: line
+                  description: Page views
+                  dimensions:
+                    - name: views
+                  name: rum.pageviews
+                  unit: views/s
+                - chart_type: line
+                  description: JavaScript errors
+                  dimensions:
+                    - name: errors
+                  name: rum.js_errors
+                  unit: errors/s
+                - chart_type: line
+                  description: Active sessions
+                  dimensions:
+                    - name: active
+                  name: rum.sessions
+                  unit: sessions
+                - chart_type: line
+                  description: Page views and JavaScript errors in the window
+                  dimensions:
+                    - name: pageviews
+                    - name: js_errors
+                  name: rum.window_totals
+                  unit: events
+                - chart_type: stacked
+                  description: Frustration signals
+                  dimensions:
+                    - name: rage_clicks
+                    - name: dead_clicks
+                    - name: error_clicks
+                  name: rum.frustration
+                  unit: signals/s
+                - chart_type: stacked
+                  description: Resource requests
+                  dimensions:
+                    - name: first_party
+                    - name: third_party
+                  name: rum.resources
+                  unit: requests/s
+                - chart_type: stacked
+                  description: RUM beacons
+                  dimensions:
+                    - name: accepted
+                    - name: rejected_origin
+                    - name: rejected_rate
+                    - name: rejected_size
+                    - name: invalid
+                    - name: bots
+                  name: rum.beacons
+                  unit: beacons/s
+                - chart_type: stacked
+                  description: OTLP log records
+                  dimensions:
+                    - name: sent
+                    - name: dropped
+                    - name: errors
+                  name: rum.otlp
+                  unit: records/s
+                - chart_type: stacked
+                  description: RUM history writes
+                  dimensions:
+                    - name: written
+                    - name: dropped
+                  name: rum.history
+                  unit: records/s
+                - chart_type: stacked
+                  description: Browser spans exported
+                  dimensions:
+                    - name: sent
+                    - name: dropped
+                    - name: errors
+                  name: rum.spans
+                  unit: spans/s
+                - chart_type: line
+                  description: Samples dropped from aggregation
+                  dimensions:
+                    - name: dropped
+                  name: rum.samples_dropped
+                  unit: samples/s
+                - chart_type: stacked
+                  description: RUM ingress availability
+                  dimensions:
+                    - name: available
+                    - name: unavailable
+                  name: rum.ingress_state
+                  unit: state
+              name: site
+            - description: One configured site host; breakdowns appear when matching observations are available.
+              labels:
+                - description: Optional human-readable site name, present when display_name differs from the native site job name.
+                  name: display_name
+                - description: Resource hostname.
+                  name: host
+              metrics:
+                - chart_type: line
+                  description: Resource duration by host
+                  dimensions:
+                    - name: p75
+                  name: rum.resource_host_p75
+                  unit: milliseconds
+                - chart_type: line
+                  description: Resource requests by host
+                  dimensions:
+                    - name: count
+                  name: rum.resource_host_count
+                  unit: requests/s
+              name: site host
+            - description: One configured site fingerprint; breakdowns appear when matching observations are available.
+              labels:
+                - description: Optional human-readable site name, present when display_name differs from the native site job name.
+                  name: display_name
+                - description: Stable JavaScript error fingerprint.
+                  name: fingerprint
+              metrics:
+                - chart_type: line
+                  description: JavaScript error groups
+                  dimensions:
+                    - name: errors
+                  name: rum.error_groups
+                  unit: errors/s
+              name: site fingerprint
+            - description: One configured site browser; breakdowns appear when matching observations are available.
+              labels:
+                - description: Optional human-readable site name, present when display_name differs from the native site job name.
+                  name: display_name
+                - description: Browser family reported by the SDK.
+                  name: browser
+              metrics:
+                - chart_type: line
+                  description: LCP by browser
+                  dimensions:
+                    - name: p75
+                  name: rum.browser_lcp
+                  unit: milliseconds
+                - chart_type: line
+                  description: FCP by browser
+                  dimensions:
+                    - name: p75
+                  name: rum.browser_fcp
+                  unit: milliseconds
+                - chart_type: line
+                  description: TTFB by browser
+                  dimensions:
+                    - name: p75
+                  name: rum.browser_ttfb
+                  unit: milliseconds
+                - chart_type: line
+                  description: INP by browser
+                  dimensions:
+                    - name: p75
+                  name: rum.browser_inp
+                  unit: milliseconds
+                - chart_type: line
+                  description: CLS by browser
+                  dimensions:
+                    - name: p75
+                  name: rum.browser_cls
+                  unit: score
+                - chart_type: line
+                  description: Page views by browser
+                  dimensions:
+                    - name: views
+                  name: rum.browser_pageviews
+                  unit: views/s
+                - chart_type: line
+                  description: JavaScript errors by browser
+                  dimensions:
+                    - name: errors
+                  name: rum.browser_js_errors
+                  unit: errors/s
+              name: site browser
+            - description: One configured site device; breakdowns appear when matching observations are available.
+              labels:
+                - description: Optional human-readable site name, present when display_name differs from the native site job name.
+                  name: display_name
+                - description: 'Device class: desktop, mobile, tablet or bot.'
+                  name: device
+              metrics:
+                - chart_type: line
+                  description: LCP by device
+                  dimensions:
+                    - name: p75
+                  name: rum.device_lcp
+                  unit: milliseconds
+                - chart_type: line
+                  description: FCP by device
+                  dimensions:
+                    - name: p75
+                  name: rum.device_fcp
+                  unit: milliseconds
+                - chart_type: line
+                  description: TTFB by device
+                  dimensions:
+                    - name: p75
+                  name: rum.device_ttfb
+                  unit: milliseconds
+                - chart_type: line
+                  description: INP by device
+                  dimensions:
+                    - name: p75
+                  name: rum.device_inp
+                  unit: milliseconds
+                - chart_type: line
+                  description: CLS by device
+                  dimensions:
+                    - name: p75
+                  name: rum.device_cls
+                  unit: score
+                - chart_type: line
+                  description: Page views by device
+                  dimensions:
+                    - name: views
+                  name: rum.device_pageviews
+                  unit: views/s
+                - chart_type: line
+                  description: JavaScript errors by device
+                  dimensions:
+                    - name: errors
+                  name: rum.device_js_errors
+                  unit: errors/s
+              name: site device
+            - description: One configured site country; breakdowns appear when matching observations are available.
+              labels:
+                - description: Optional human-readable site name, present when display_name differs from the native site job name.
+                  name: display_name
+                - description: ISO country code from IP geolocation.
+                  name: country
+              metrics:
+                - chart_type: line
+                  description: LCP by country
+                  dimensions:
+                    - name: p75
+                  name: rum.country_lcp
+                  unit: milliseconds
+                - chart_type: line
+                  description: FCP by country
+                  dimensions:
+                    - name: p75
+                  name: rum.country_fcp
+                  unit: milliseconds
+                - chart_type: line
+                  description: TTFB by country
+                  dimensions:
+                    - name: p75
+                  name: rum.country_ttfb
+                  unit: milliseconds
+                - chart_type: line
+                  description: INP by country
+                  dimensions:
+                    - name: p75
+                  name: rum.country_inp
+                  unit: milliseconds
+                - chart_type: line
+                  description: CLS by country
+                  dimensions:
+                    - name: p75
+                  name: rum.country_cls
+                  unit: score
+                - chart_type: line
+                  description: Page views by country
+                  dimensions:
+                    - name: views
+                  name: rum.country_pageviews
+                  unit: views/s
+                - chart_type: line
+                  description: JavaScript errors by country
+                  dimensions:
+                    - name: errors
+                  name: rum.country_js_errors
+                  unit: errors/s
+              name: site country
+            - description: One configured site page; breakdowns appear when matching observations are available.
+              labels:
+                - description: Optional human-readable site name, present when display_name differs from the native site job name.
+                  name: display_name
+                - description: Normalized page group.
+                  name: page
+              metrics:
+                - chart_type: line
+                  description: LCP by page
+                  dimensions:
+                    - name: p75
+                  name: rum.page_lcp
+                  unit: milliseconds
+                - chart_type: line
+                  description: FCP by page
+                  dimensions:
+                    - name: p75
+                  name: rum.page_fcp
+                  unit: milliseconds
+                - chart_type: line
+                  description: TTFB by page
+                  dimensions:
+                    - name: p75
+                  name: rum.page_ttfb
+                  unit: milliseconds
+                - chart_type: line
+                  description: INP by page
+                  dimensions:
+                    - name: p75
+                  name: rum.page_inp
+                  unit: milliseconds
+                - chart_type: line
+                  description: CLS by page
+                  dimensions:
+                    - name: p75
+                  name: rum.page_cls
+                  unit: score
+                - chart_type: line
+                  description: Page views by page
+                  dimensions:
+                    - name: views
+                  name: rum.page_pageviews
+                  unit: views/s
+                - chart_type: line
+                  description: JavaScript errors by page
+                  dimensions:
+                    - name: errors
+                  name: rum.page_js_errors
+                  unit: errors/s
+              name: site page
+            - description: One configured site version; breakdowns appear when matching observations are available.
+              labels:
+                - description: Optional human-readable site name, present when display_name differs from the native site job name.
+                  name: display_name
+                - description: Application version reported by the SDK.
+                  name: version
+              metrics:
+                - chart_type: line
+                  description: LCP by version
+                  dimensions:
+                    - name: p75
+                  name: rum.version_lcp
+                  unit: milliseconds
+                - chart_type: line
+                  description: FCP by version
+                  dimensions:
+                    - name: p75
+                  name: rum.version_fcp
+                  unit: milliseconds
+                - chart_type: line
+                  description: TTFB by version
+                  dimensions:
+                    - name: p75
+                  name: rum.version_ttfb
+                  unit: milliseconds
+                - chart_type: line
+                  description: INP by version
+                  dimensions:
+                    - name: p75
+                  name: rum.version_inp
+                  unit: milliseconds
+                - chart_type: line
+                  description: CLS by version
+                  dimensions:
+                    - name: p75
+                  name: rum.version_cls
+                  unit: score
+                - chart_type: line
+                  description: Page views by version
+                  dimensions:
+                    - name: views
+                  name: rum.version_pageviews
+                  unit: views/s
+                - chart_type: line
+                  description: JavaScript errors by version
+                  dimensions:
+                    - name: errors
+                  name: rum.version_js_errors
+                  unit: errors/s
+              name: site version
+      overview:
+        additional_permissions:
+            description: The Netdata service needs write access to its DEM state directory. Configured TLS and GeoIP files must be readable by the Netdata service account.
+        data_collection:
+            method_description: The Faro browser SDK sends measurements to the configured RUM receiver. Netdata aggregates accepted observations over a sliding window, retains sampled investigation history locally, and optionally exports browser logs and traces through OTLP gRPC.
+            metrics_description: Monitor browser Web Vitals, page traffic, JavaScript errors, resource timing and user frustration.
+        default_behavior:
+            auto_detection:
+                description: Sites are explicitly configured; websites are not discovered automatically.
+            limits:
+                description: Breakdown charts show bounded top groups. History uses one plugin-wide journal file-age and committed-byte retention target in dem.conf, including disabled sites. Whole archives expire; the active file is protected, so the size target is not a hard disk ceiling. Export/history queues count records dropped under backpressure.
+            performance_impact:
+                description: Resource usage depends on accepted browser traffic and the configured measurement window. Optional OTLP export and investigation history add network and local disk work.
+        multi_instance: true
+        supported_platforms:
+            exclude: []
+            include:
+                - Linux
+                - macOS
+      setup:
+        configuration:
+            examples:
+                folding:
+                    enabled: true
+                    title: Examples
+                list:
+                    - config: |
+                        jobs:
+                          - name: shop
+                            allowed_origins: [https://shop.example.org]
+                      description: Minimal native configuration.
+                      name: Website
+            file:
+                name: dem/rum.conf
+            options:
+                description: Options apply independently to each site job. Native job name is the beacon and history identity; display_name is human metadata.
+                folding:
+                    enabled: true
+                    title: Configuration options
+                list:
+                    - default_value: ""
+                      description: Stable site identifier used in beacon URLs and history. Renaming creates a new history identity.
+                      group: Site
+                      name: name
+                      required: true
+                    - default_value: ""
+                      description: Human-readable site name. Leave empty to use the site key.
+                      group: Site
+                      name: display_name
+                      required: false
+                    - default_value: ""
+                      description: Web origins allowed to send telemetry, such as https://example.org. A leading *. allows subdomains only.
+                      group: Site
+                      name: allowed_origins
+                      required: true
+                    - default_value: ""
+                      description: Externally reachable collector base URL for this site. Leave empty to use the receiver public URL.
+                      group: Site
+                      name: public_url
+                      required: false
+                    - default_value: 10
+                      description: Data collection interval, in seconds.
+                      group: Collection
+                      name: update_every
+                      required: false
+                    - default_value: 5m
+                      description: Sliding window for browser measurements. Accepts durations between 1m and 30m.
+                      group: Collection
+                      name: window
+                      required: false
+                    - default_value: 20
+                      description: Maximum individual page groups shown in breakdown charts. Remaining groups are combined as other.
+                      group: Collection
+                      name: page_groups
+                      required: false
+                    - default_value: 20
+                      description: Maximum individual countries shown in breakdown charts. Remaining countries are combined as other.
+                      group: Collection
+                      name: countries
+                      required: false
+                    - default_value: "no"
+                      description: Export browser console logs through OTLP for investigated sessions.
+                      group: Collection
+                      name: collect_console_logs
+                      required: false
+                    - default_value: exclude
+                      description: Exclude crawlers and browser automation by default, or include them as bot traffic.
+                      group: Collection
+                      name: bots
+                      required: false
+                    - default_value: 1
+                      description: Share of browser sessions measured, from 0 to 1. Zero preserves the default of measuring all sessions.
+                      group: Sampling
+                      name: measure_sample_rate
+                      required: false
+                    - default_value: ""
+                      description: Choose which measured sessions retain full history. Leave empty to retain all sessions.
+                      group: Sampling
+                      name: investigate
+                      required: false
+                    - default_value: ""
+                      description: Share of measured sessions kept in full, from 0 to 1. Zero means all sessions.
+                      group: Sampling
+                      name: investigate.sample_rate
+                      required: false
+                    - default_value: ""
+                      description: Conditions that retain a session regardless of sampling. Leave unset to keep errors and poor vitals; an empty list keeps neither.
+                      group: Sampling
+                      name: investigate.always_keep
+                      required: false
+                    - default_value: ""
+                      description: Follow browser requests into backend services. Leave empty to disable tracing.
+                      group: Tracing
+                      name: tracing
+                      required: false
+                    - default_value: ""
+                      description: Capture browser request spans and propagate trace headers.
+                      group: Tracing
+                      name: tracing.enabled
+                      required: false
+                    - default_value: ""
+                      description: Additional API origins receiving trace headers. Same-origin requests receive them automatically.
+                      group: Tracing
+                      name: tracing.propagate_to
+                      required: false
+                    - default_value: ""
+                      description: OTLP gRPC host:port or https://host:port. Leave empty to use this site OTLP endpoint.
+                      group: Tracing
+                      name: tracing.export_to
+                      required: false
+                    - default_value: ""
+                      description: Export browser logs and spans to an OTLP gRPC receiver.
+                      group: Tracing
+                      name: otlp
+                      required: false
+                    - default_value: auto
+                      description: Auto exports to an available receiver; yes enables export, and no disables log export. Export failures do not stop ingestion.
+                      group: Tracing
+                      name: otlp.enabled
+                      required: false
+                    - default_value: 127.0.0.1:4317
+                      description: OTLP gRPC host and port for logs and default browser span export.
+                      group: Tracing
+                      name: otlp.endpoint
+                      required: false
+                    - default_value: ""
+                      description: Bearer token sent to the OTLP receiver. Leave empty for no authentication.
+                      group: Tracing
+                      name: otlp.auth_token
+                      required: false
+                    - default_value: ""
+                      description: Client certificate file. Leave empty with TLS key to omit client authentication.
+                      group: Tracing
+                      name: otlp.tls_cert
+                      required: false
+                    - default_value: ""
+                      description: Client private key file. Set together with TLS certificate.
+                      group: Tracing
+                      name: otlp.tls_key
+                      required: false
+                    - default_value: ""
+                      description: CA certificate file for verifying the OTLP receiver. Leave empty to use system roots when TLS is enabled.
+                      group: Tracing
+                      name: otlp.tls_ca
+                      required: false
+                    - default_value: ""
+                      description: Replace private identifiers in URL paths before aggregation and export. Rules run before built-in path redaction.
+                      group: Privacy
+                      name: redact_paths
+                      required: false
+                    - default_value: ""
+                      description: Go regular expression matching private path identifiers. Empty patterns are ignored.
+                      group: Privacy
+                      name: redact_paths[].pattern
+                      required: false
+                    - default_value: ""
+                      description: Replacement text for matching path segments. Leave empty to remove them.
+                      group: Privacy
+                      name: redact_paths[].replace
+                      required: false
+        prerequisites:
+            list:
+                - description: DEM is experimental and opt-in. Build Netdata with `-DENABLE_PLUGIN_DEM=ON`, or use `--enable-plugin-dem` with the source installer. Install the resulting DEM plugin package.
+                  title: Install the DEM plugin
+                - description: Configure the canonical receiver in `dem/receiver.conf`, then add one job per website in `dem/rum.conf`. The native configuration UI exposes the receiver as a single object and sites as independently managed jobs.
+                  title: Configure the receiver and site
+                - description: Add `<script async src="https://rum.example.org/rum/shop.js"></script>` to the website, replacing the public receiver URL and site key. Allow this collector and the pinned Faro SDK CDN in the website Content Security Policy.
+                  title: Install the browser snippet
+                - description: Stock health templates provide Web Vital and no-beacon alerts independently for each site. Customize thresholds or disable alerts through normal Netdata health configuration; use the `_collect_plugin=dem` and `_collect_job` chart labels for site-specific policies.
+                  title: Customize alerts
+        single_job: false
+      troubleshooting:
+        problems:
+            list:
+                - description: Check receiver availability, the installed snippet URL and the site allowed origins. Open the rum-sites Function for reachability and rejected-origin diagnostics. Missing vital samples produce gaps, including when the receiver is unavailable.
+                  name: No browser measurements
+plugin_name: dem.plugin

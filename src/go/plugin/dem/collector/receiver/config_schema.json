@@ -1,0 +1,112 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "RUM receiver collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "listen": {
+        "title": "Listen address",
+        "description": "Address and port that accept browser telemetry. The default accepts connections from this host only.",
+        "type": "string",
+        "default": "127.0.0.1:19938"
+      },
+      "public_url": {
+        "title": "Public URL",
+        "description": "Externally reachable collector base URL. Leave empty to derive it from the listener or a trusted proxy.",
+        "type": "string"
+      },
+      "tls_cert": {
+        "title": "TLS certificate",
+        "description": "Server certificate file. Leave empty with TLS key to serve HTTP.",
+        "type": "string"
+      },
+      "tls_key": {
+        "title": "TLS key",
+        "description": "Server private key file. Set together with TLS certificate to serve HTTPS.",
+        "type": "string"
+      },
+      "trusted_proxies": {
+        "title": "Trusted proxies",
+        "description": "Proxy IP addresses or CIDR ranges allowed to supply forwarded client addresses and public URLs. Leave empty to distrust forwarded headers.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "geoip_db": {
+        "title": "GeoIP database",
+        "description": "MaxMind city database file. Leave empty to use the Agent IP intelligence database; unavailable data produces unknown locations.",
+        "type": "string"
+      },
+      "max_body_bytes": {
+        "title": "Maximum payload size",
+        "description": "Maximum accepted browser payload size, in bytes. Larger requests are rejected.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 262144
+      },
+      "rate_limit": {
+        "title": "Rate limits",
+        "description": "Limits for browser telemetry requests.",
+        "type": "object",
+        "properties": {
+          "per_ip_per_min": {
+            "title": "Requests per IP",
+            "description": "Maximum requests per client IP per minute.",
+            "type": "integer",
+            "minimum": 1,
+            "default": 120
+          },
+          "per_site_per_sec": {
+            "title": "Requests per site",
+            "description": "Maximum requests per site per second.",
+            "type": "integer",
+            "minimum": 1,
+            "default": 500
+          }
+        }
+      }
+    }
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Connection",
+          "fields": [
+            "listen",
+            "public_url",
+            "tls_cert",
+            "tls_key",
+            "trusted_proxies"
+          ]
+        },
+        {
+          "title": "Limits",
+          "fields": [
+            "max_body_bytes",
+            "rate_limit"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "geoip_db"
+          ]
+        }
+      ]
+    }
+  }
+}

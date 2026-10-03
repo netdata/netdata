@@ -223,6 +223,7 @@ option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATU
 cmake_dependent_option(ENABLE_ND_MCP "Build nd-mcp stdio-to-websocket bridge for MCP integration" ${DEFAULT_FEATURE_STATE} "ENABLE_PLUGIN_GO" False)
 option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" ON)
 option(ENABLE_PLUGIN_STATSD "Enable the experimental Go StatsD plugin (statsd.plugin)" OFF)
+option(ENABLE_PLUGIN_DEM "Enable the experimental digital experience monitoring plugin" OFF)
 cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_MACOS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETFLOW "Enable NetFlow/IPFIX/sFlow flow analysis plugin" False "NOT OS_WINDOWS" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
@@ -510,14 +511,14 @@ if(ENABLE_JEMALLOC)
 endif()
 
 set(ENABLE_PLUGIN_EBPF_GO OFF)
-if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_STATSD OR ENABLE_PLUGIN_NETFLOW OR ENABLE_CGROUP_NAME)
+if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_STATSD OR ENABLE_PLUGIN_DEM OR ENABLE_PLUGIN_NETFLOW OR ENABLE_CGROUP_NAME)
     include(NetdataGoTools)
 
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
 
     find_package(Go "${MIN_GO_VERSION}" QUIET)
     if(NOT GO_FOUND)
-        if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_STATSD OR ENABLE_PLUGIN_NETFLOW)
+        if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_STATSD OR ENABLE_PLUGIN_DEM OR ENABLE_PLUGIN_NETFLOW)
             find_package(Go "${MIN_GO_VERSION}" REQUIRED)
         endif()
     endif()
@@ -3949,6 +3950,28 @@ if(ENABLE_PLUGIN_STATSD)
     install(DIRECTORY src/go/plugin/statsd/config/statsd
             COMPONENT plugin-statsd
             DESTINATION usr/lib/netdata/conf.d
+            FILES_MATCHING PATTERN "*.conf")
+endif()
+
+#
+# Build dem.plugin
+#
+
+if(ENABLE_PLUGIN_DEM)
+    if(OS_WINDOWS)
+        set(DEM_PLUGIN_BIN dem.plugin.exe)
+    else()
+        set(DEM_PLUGIN_BIN dem.plugin)
+    endif()
+
+    add_go_target(dem-plugin ${DEM_PLUGIN_BIN} src/go cmd/demplugin)
+    netdata_add_deb_copyright(plugin-dem netdata-plugin-dem)
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/${DEM_PLUGIN_BIN}
+            COMPONENT plugin-dem DESTINATION usr/libexec/netdata/plugins.d)
+    install(FILES src/go/plugin/dem/config/dem.conf
+            COMPONENT plugin-dem DESTINATION usr/lib/netdata/conf.d)
+    install(DIRECTORY src/go/plugin/dem/config/dem
+            COMPONENT plugin-dem DESTINATION usr/lib/netdata/conf.d
             FILES_MATCHING PATTERN "*.conf")
 endif()
 
