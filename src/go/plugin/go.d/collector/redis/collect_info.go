@@ -57,6 +57,9 @@ func (c *Collector) collectInfo(mx map[string]int64, info string) {
 			c.collectInfoCommandstatsProperty(mx, field, value)
 		case curSection == infoSectionKeyspace:
 			c.collectInfoKeyspaceProperty(mx, field, value)
+		case field == "rejected_connections" && value == "-1":
+			// Dragonfly uses -1 when this counter is unsupported.
+			continue
 		case field == "rdb_last_bgsave_status":
 			collectNumericValue(mx, field, convertBgSaveStatus(value))
 		case field == "rdb_current_bgsave_time_sec" && value == "-1":
@@ -89,7 +92,8 @@ func (c *Collector) collectInfo(mx map[string]int64, info string) {
 	}
 	if has(mx, "master_last_io_seconds_ago") {
 		c.addReplSlaveChartsOnce.Do(c.addReplSlaveCharts)
-		if !has(mx, "master_link_down_since_seconds") {
+		if !has(mx, "master_link_down_since_seconds") && mx["master_link_status_up"] == 1 {
+			// A missing duration is zero only for an explicitly healthy link.
 			mx["master_link_down_since_seconds"] = 0
 		}
 	}

@@ -98,7 +98,6 @@
   "rdb_last_bgsave_status": 0,
   "rdb_save_count": 0,
   "rdb_save_usec": 0,
-  "rejected_connections": -1,
   "replication_full_sync_buffer_bytes": 0,
   "replication_streaming_buffer_bytes": 0,
   "rw_throttle_batches_total": 0,

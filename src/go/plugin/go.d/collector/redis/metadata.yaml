@@ -206,7 +206,8 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
         metric: redis.bgsave_now
         info: duration of the on-going RDB save operation
-      - name: redis_bgsave_broken
+      - &alert_bgsave_broken
+        name: redis_bgsave_broken
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
         metric: redis.bgsave_health
         info: 'status of the last RDB save operation (0: ok, 1: error)'
@@ -535,6 +536,13 @@ modules:
       default_behavior:
         <<: *default_behavior
         auto_detection: *auto_detection_compat
+        limits:
+          description: |
+            Dragonfly does not provide the Redis fields used for rejected connections, dataset and script memory, memory fragmentation, tracking and timeout-table clients, or RDB save duration, age, and changes-since-save charts.
+
+            Replica link status is available, but the duration of a down link is not. Of the stock Redis alerts, only background-save failure has the required measurements.
+    alerts:
+      - *alert_bgsave_broken
 
   - <<: *module
     meta:
@@ -603,6 +611,12 @@ modules:
       default_behavior:
         <<: *default_behavior
         auto_detection: *auto_detection_compat
+        limits:
+          description: |
+            Kvrocks does not provide the Redis fields used for rejected connections, key expiration and eviction events, allocator memory usage, memory fragmentation, tracking and timeout-table clients, or RDB save charts. RSS and Lua memory remain available.
+
+            Replica link status is available, but the duration of a down link is not. None of the stock Redis alerts has the required measurements for Kvrocks.
+    alerts: []
 
   - <<: *module
     meta:
@@ -648,6 +662,7 @@ modules:
             - Key evictions and key expirations
             - The RDB save duration, the time since the last save, and the changes since the last save
             - Blocked and tracking clients
+            - The duration of a down replica link; link status remains available
 
             When Garnet reports `monitor_task:disabled`, workload, connection, traffic, and lookup charts stay empty because its counters are not sampled. Per-command call counts remain available with `--commandstats-monitor`; Garnet does not measure per-command CPU time.
 
@@ -677,8 +692,8 @@ modules:
               The reply contains `cmdstat_` entries when tracking is enabled.
     alerts:
       # Garnet does not expose rdb_current_bgsave_time_sec, so the
-      # redis_bgsave_slow alert (redis.bgsave_now) has no data for Garnet and
-      # is excluded from the shared alert list.
+      # redis_bgsave_slow alert (redis.bgsave_now) has no data for Garnet.
+      # It also omits master_link_down_since_seconds, so no link-duration alert.
       - name: redis_connections_rejected
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
         metric: redis.connections
@@ -687,8 +702,3 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
         metric: redis.bgsave_health
         info: 'status of the last RDB save operation (0: ok, 1: error)'
-      - name: redis_master_link_down
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
-        metric: redis.master_link_down_since_time
-        info: time elapsed since the link between master and slave is down
-

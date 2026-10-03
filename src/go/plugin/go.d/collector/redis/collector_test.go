@@ -246,8 +246,9 @@ func skipGarnetMissingDims(_ *collectorapi.Chart, dim *collectorapi.Dim) bool {
 }
 
 // dragonflyMissingDims holds chart dimension IDs whose backing INFO fields
-// Dragonfly does not emit; their chart dimensions stay empty for Dragonfly.
+// Dragonfly does not measure; their chart dimensions stay empty for Dragonfly.
 var dragonflyMissingDims = map[string]bool{
+	"rejected_connections":        true,
 	"clients_in_timeout_table":    true,
 	"mem_fragmentation_ratio":     true,
 	"rdb_changes_since_last_save": true,

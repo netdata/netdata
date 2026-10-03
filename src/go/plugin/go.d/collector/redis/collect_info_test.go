@@ -104,6 +104,61 @@ func TestCollector_GarnetSamplingAvailability(t *testing.T) {
 	}
 }
 
+func TestCollector_ReplicationDowntimeAvailability(t *testing.T) {
+	for name, test := range map[string]struct {
+		status   string
+		duration string
+		want     map[string]int64
+	}{
+		"up without duration": {status: "up", want: map[string]int64{
+			"master_link_status_up": 1, "master_link_status_down": 0, "master_link_down_since_seconds": 0,
+		}},
+		"down without duration": {status: "down", want: map[string]int64{
+			"master_link_status_up": 0, "master_link_status_down": 1,
+		}},
+		"down with measured duration": {status: "down", duration: "master_link_down_since_seconds:15\n", want: map[string]int64{
+			"master_link_status_up": 0, "master_link_status_down": 1, "master_link_down_since_seconds": 15,
+		}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := New()
+			c.PingSamples = 0
+			require.NoError(t, c.Init(context.Background()))
+			c.rdb = &mockRedisClient{
+				result: []byte("# Server\nkvrocks_version:2.17.0\n\n# Replication\n" +
+					"master_link_status:" + test.status + "\nmaster_last_io_seconds_ago:20\n" + test.duration),
+			}
+			test.want["master_last_io_seconds_ago"] = 20
+			test.want["ping_latency_count"] = 0
+			test.want["ping_latency_sum"] = 0
+			assert.Equal(t, test.want, c.Collect(context.Background()))
+		})
+	}
+}
+
+func TestCollector_RejectedConnectionsAvailability(t *testing.T) {
+	for name, test := range map[string]struct {
+		value string
+		want  map[string]int64
+	}{
+		"unsupported sentinel": {value: "-1", want: map[string]int64{}},
+		"measured zero":        {value: "0", want: map[string]int64{"rejected_connections": 0}},
+		"measured rejections":  {value: "3", want: map[string]int64{"rejected_connections": 3}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := New()
+			c.PingSamples = 0
+			require.NoError(t, c.Init(context.Background()))
+			c.rdb = &mockRedisClient{
+				result: []byte("# Server\nredis_version:7.4.0\n\n# Stats\nrejected_connections:" + test.value + "\n"),
+			}
+			test.want["ping_latency_count"] = 0
+			test.want["ping_latency_sum"] = 0
+			assert.Equal(t, test.want, c.Collect(context.Background()))
+		})
+	}
+}
+
 // The parser is O(INFO bytes + metrics). Repeated cycles reuse discovered dimensions.
 func BenchmarkCollectorCollectInfo(b *testing.B) {
 	for name, test := range map[string]struct{ server, info string }{
