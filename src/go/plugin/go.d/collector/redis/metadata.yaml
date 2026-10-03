@@ -1,6 +1,7 @@
 plugin_name: go.d.plugin
 modules:
-  - meta:
+  - &module
+    meta: &meta
       id: collector-go.d.plugin-redis
       plugin_name: go.d.plugin
       module_name: redis
@@ -24,17 +25,24 @@ modules:
         description: ""
       keywords:
         - redis
+        - valkey
+        - dragonfly
+        - keydb
+        - kvrocks
+        - garnet
         - databases
-    overview:
-      data_collection:
+    overview: &overview
+      data_collection: &data_collection
         metrics_description: |
-          This collector monitors the health and performance of Redis servers and collects general statistics, CPU and memory consumption, replication information, command statistics, and more.
+          Monitor Redis server health and performance, including CPU, memory, replication, command statistics, connections, and keyspace activity.
+
+          The same collector also monitors Redis-compatible servers: Valkey, Dragonfly, KeyDB, Kvrocks, and Garnet. Each is covered by its own integration page.
         method_description: |
           It connects to the Redis instance via a TCP or UNIX socket and executes the following commands:
           
           - [INFO ALL](https://redis.io/commands/info)
           - [PING](https://redis.io/commands/ping/)
-      default_behavior:
+      default_behavior: &default_behavior
         auto_detection:
           description: |
             By default, it detects instances running on localhost by attempting to connect using known Redis TCP and UNIX sockets:
@@ -43,6 +51,11 @@ modules:
             - /tmp/redis.sock
             - /var/run/redis/redis.sock
             - /var/lib/redis/redis.sock
+
+            The Netdata Agent [service discovery](https://learn.netdata.cloud/docs/netdata-agent/configuration/find-anything-about-your-infrastructure/service-discovery) can also create jobs automatically:
+
+            - The `net_listeners` discoverer matches processes listening on TCP port 6379, or whose command name is `redis-server`, and creates a job with the discovered address. The rule lives in `go.d/sd/net_listeners.conf`.
+            - The `docker` discoverer matches containers exposing port 6379 or using a `redis` image and creates a job with the discovered address. The rule lives in `go.d/sd/docker.conf`.
         limits:
           description: ""
         performance_impact:
@@ -53,7 +66,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-    setup:
+    setup: &setup
       prerequisites:
         list: []
       configuration:
@@ -443,3 +456,213 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-valkey
+      monitored_instance:
+        name: Valkey
+        link: https://valkey.io/
+        categories:
+          - data-collection.databases
+        icon_filename: redis.svg
+        description: 'Monitor Valkey server health and performance, including CPU, memory, replication, command statistics, connections, and keyspace activity.'
+      keywords:
+        - valkey
+        - redis
+        - redis-compatible
+        - redis protocol
+        - databases
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: |
+          Monitor Valkey server health and performance, including CPU, memory, replication, command statistics, connections, and keyspace activity.
+
+          Netdata monitors Valkey through the Redis protocol and reports the same areas as for Redis.
+        method_description: |
+          It connects to the Valkey instance via a TCP or UNIX socket and executes the following commands:
+          
+          - [INFO ALL](https://redis.io/commands/info)
+          - [PING](https://redis.io/commands/ping/)
+      default_behavior:
+        <<: *default_behavior
+        auto_detection: &auto_detection_compat
+          description: |
+            By default, it detects instances running on localhost by attempting to connect using known Redis-compatible TCP and UNIX sockets:
+
+            - 127.0.0.1:6379
+            - /tmp/redis.sock
+            - /var/run/redis/redis.sock
+            - /var/lib/redis/redis.sock
+
+            The Netdata Agent [service discovery](https://learn.netdata.cloud/docs/netdata-agent/configuration/find-anything-about-your-infrastructure/service-discovery) can also create jobs automatically:
+
+            - The `net_listeners` discoverer matches processes listening on TCP port 6379, or whose command name is `redis-server`, and creates a job with the discovered address. The rule lives in `go.d/sd/net_listeners.conf`.
+            - The `docker` discoverer matches containers exposing port 6379 or using a `redis` image and creates a job with the discovered address. The rule lives in `go.d/sd/docker.conf`.
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-dragonfly
+      monitored_instance:
+        name: Dragonfly
+        link: https://www.dragonflydb.io/
+        categories:
+          - data-collection.databases
+        icon_filename: redis.svg
+        description: 'Monitor Dragonfly server health and performance, including memory, connections, command statistics, keyspace activity, and persistence status.'
+      keywords:
+        - dragonfly
+        - dragonflydb
+        - redis
+        - redis-compatible
+        - databases
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: |
+          Monitor Dragonfly server health and performance, including memory, connections, command statistics, keyspace activity, and persistence status.
+
+          Netdata monitors Dragonfly through the Redis protocol and reports the same core areas as for Redis.
+        method_description: |
+          It connects to the Dragonfly instance via a TCP or UNIX socket and executes the following commands:
+          
+          - [INFO ALL](https://redis.io/commands/info)
+          - [PING](https://redis.io/commands/ping/)
+      default_behavior:
+        <<: *default_behavior
+        auto_detection: *auto_detection_compat
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-keydb
+      monitored_instance:
+        name: KeyDB
+        link: https://docs.keydb.info/
+        categories:
+          - data-collection.databases
+        icon_filename: redis.svg
+        description: 'Monitor KeyDB server health and performance, including CPU, memory, replication, command statistics, connections, and keyspace activity.'
+      keywords:
+        - keydb
+        - redis
+        - redis-compatible
+        - redis protocol
+        - databases
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: |
+          Monitor KeyDB server health and performance, including CPU, memory, replication, command statistics, connections, and keyspace activity.
+
+          Netdata monitors KeyDB through the Redis protocol and reports the same areas as for Redis.
+        method_description: |
+          It connects to the KeyDB instance via a TCP or UNIX socket and executes the following commands:
+          
+          - [INFO ALL](https://redis.io/commands/info)
+          - [PING](https://redis.io/commands/ping/)
+      default_behavior:
+        <<: *default_behavior
+        auto_detection: *auto_detection_compat
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-kvrocks
+      monitored_instance:
+        name: Kvrocks
+        link: https://kvrocks.apache.org/
+        categories:
+          - data-collection.databases
+        icon_filename: redis.svg
+        description: 'Monitor Kvrocks server health and performance, including clients, keyspace, command statistics, replication, and memory.'
+      keywords:
+        - kvrocks
+        - rocksdb
+        - redis
+        - redis-compatible
+        - databases
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: |
+          Monitor Kvrocks server health and performance, including clients, keyspace, command statistics, replication, and memory.
+
+          Netdata monitors Kvrocks through the Redis protocol and reports the same core areas as for Redis.
+        method_description: |
+          It connects to the Kvrocks instance via a TCP or UNIX socket and executes the following commands:
+          
+          - [INFO ALL](https://redis.io/commands/info)
+          - [PING](https://redis.io/commands/ping/)
+      default_behavior:
+        <<: *default_behavior
+        auto_detection: *auto_detection_compat
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-garnet
+      monitored_instance:
+        name: Garnet
+        link: https://microsoft.github.io/garnet/
+        categories:
+          - data-collection.databases
+        icon_filename: redis.svg
+        description: 'Monitor Garnet server health and performance, including memory, connections, keyspace, replication, and persistence status.'
+      keywords:
+        - garnet
+        - microsoft garnet
+        - redis
+        - redis-compatible
+        - databases
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: |
+          Monitor Garnet server health and performance, including memory, connections, keyspace, replication, and persistence status.
+
+          Netdata monitors Garnet through the Redis protocol and reports the Garnet INFO fields that match Redis semantics. Per-command statistics require the Garnet server to run with `--commandstats-monitor`.
+        method_description: |
+          It connects to the Garnet instance via a TCP or UNIX socket and executes the following commands:
+          
+          - [INFO ALL](https://redis.io/commands/info)
+          - [PING](https://redis.io/commands/ping/)
+      default_behavior:
+        <<: *default_behavior
+        auto_detection: *auto_detection_compat
+        limits:
+          description: |
+            The Garnet server does not expose some data the Redis protocol surfaces, so the following charts have no data for Garnet:
+
+            - Allocator memory: used, peak, max memory, dataset, Lua, scripts, and the memory fragmentation ratio
+            - Key evictions and key expirations
+            - The RDB save duration, the time since the last save, and the changes since the last save
+            - Blocked and tracking clients
+
+            The keyspace section requires a full store scan on the Garnet server, so the collector requests it at most every 30 seconds; key counts can be up to 30 seconds old.
+        performance_impact:
+          description: |
+            Collection is lightweight for the Netdata Agent. The periodic `INFO KEYSPACE` request runs a full store scan on the Garnet server; on very large stores it may exceed the job timeout, in which case the keys and expires-keys charts stay empty until the `timeout` option is raised.
+    setup:
+      <<: *setup
+      prerequisites:
+        list:
+          - title: Enable per-command statistics
+            description: |
+              The commands charts are populated only when the Garnet server tracks per-command usage.
+
+              Start the Garnet server with the `--commandstats-monitor` flag, then verify with `redis-cli`:
+
+              ```bash
+              redis-cli INFO COMMANDSTATS
+              ```
+
+              The reply contains `cmdstat_` entries when tracking is enabled.
+
