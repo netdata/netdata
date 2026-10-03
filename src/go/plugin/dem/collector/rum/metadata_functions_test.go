@@ -125,6 +125,6 @@ func (metadataFunctionSource) Sessions(context.Context, string, int64, int64) ([
 func (metadataFunctionSource) SessionEvents(context.Context, string, string) ([]store.RumSessionEventRecord, error) {
 	return []store.RumSessionEventRecord{{Site: "shop", SessionID: "visit", Type: "pageview", Page: "/"}}, nil
 }
-func (metadataFunctionSource) Errors(context.Context, string, int64, int64) ([]store.RumErrorAgg, error) {
+func (metadataFunctionSource) Errors(context.Context, string, string, int64, int64) ([]store.RumErrorAgg, error) {
 	return nil, nil
 }

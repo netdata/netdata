@@ -407,30 +407,29 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) {
 		investigated = inv.rate() >= 1 || inv.alwaysKeep(b)
 	}
 	b.SampledOut = !investigated
-	if investigated && a.history != nil {
-		nowUnix := now.Unix()
+	// Sessions already emitted self-contained error events with their timeline.
+	// Sessionless errors remain investigable without creating a parent session.
+	if investigated && b.SessionID == "" && a.history != nil {
 		for _, e := range b.Errors {
-			// Mirrors recordError's "no fingerprint" guard; the collector
-			// always computes one.
 			if e.Fingerprint == "" {
 				continue
 			}
-			a.history.ErrorGroup(HistoryErrorGroup{
+			a.history.Event(HistoryEvent{
 				Site:        st.cfg.Key,
-				Fingerprint: e.Fingerprint,
-				Type:        e.Type,
-				Message:     e.Message,
-				SampleStack: truncateStack(e.Stack),
-				FirstSeen:   nowUnix,
-				LastSeen:    nowUnix,
-			})
-			a.history.ErrorOccurrence(HistoryErrorOccurrence{
-				Site:        st.cfg.Key,
-				Fingerprint: e.Fingerprint,
-				TS:          nowUnix,
-				SessionID:   b.SessionID,
+				TSUnixUS:    now.UnixMicro(),
+				Type:        "error",
 				Page:        b.PageGroup,
 				Browser:     b.Browser,
+				Device:      b.Device,
+				Country:     b.Country,
+				City:        b.City,
+				Version:     b.AppVersion,
+				UserID:      b.UserID,
+				Fingerprint: e.Fingerprint,
+				ErrorType:   e.Type,
+				Message:     e.Message,
+				Text:        truncateRunes(e.Type+": "+e.Message, sessionEventTextMax),
+				SampleStack: truncateStack(e.Stack),
 			})
 		}
 	}

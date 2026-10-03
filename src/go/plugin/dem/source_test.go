@@ -143,17 +143,13 @@ func TestHistoryFunctionsRemainAvailableWithoutActiveSites(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	now := time.Now().Unix()
-	_, _, err = st.WriteRumHistoryBatch(
-		context.Background(),
-		store.RumHistoryBatch{
-			Sessions: []store.RumSessionRecord{
-				{Site: "retired", SessionID: "session", StartedAt: now - 10, LastAt: now},
-			},
-			Events: []store.RumSessionEventRecord{
-				{Site: "retired", SessionID: "session", TSUnixUS: now * 1e6, Type: "pageview", Page: "/checkout"},
-			},
-		},
-	)
+	_, err = st.AppendRumEvent(context.Background(), store.RumEventRecord{
+		Site:      "retired",
+		SessionID: "session",
+		TSUnixUS:  now * 1e6,
+		Type:      "pageview",
+		Page:      "/checkout",
+	})
 	require.NoError(t, err)
 	registry, _ := NewRegistry(Dependencies{
 		History: st,
@@ -372,11 +368,18 @@ func TestFunctionPayloadsValidateAgainstNativeSchema(t *testing.T) {
 	require.NoError(t, err)
 	for _, method := range []string{"rum-sites", "rum-pages", "rum-live", "rum-sessions", "rum-errors", "rum-session-events"} {
 		t.Run(method, func(t *testing.T) {
+			var args []string
+			if method != "rum-sites" {
+				args = append(args, "site:site")
+			}
+			if method == "rum-session-events" {
+				args = append(args, "session_id:session")
+			}
 			response := handler.HandleRaw(
 				ctx,
 				funcapi.RawMethodRequest{
 					Method: method,
-					Args:   []string{"site:site", "session_id:session"},
+					Args:   args,
 				},
 			)
 			require.NotNil(t, response.RawResponse)
@@ -480,4 +483,74 @@ func TestConfiguredReceiverURLOverridesPreviouslyConfirmedObservedBase(t *testin
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.Equal(t, "https://rum.example.org/new-prefix", rows[0].PublicBase)
+}
+
+func TestJournalFunctionFingerprintDetailAndSavedTimeHelp(t *testing.T) {
+	ctx := context.Background()
+	st, err := store.Open(ctx, "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, st.Close()) })
+	original := time.Now().Add(-10 * time.Minute).UnixMicro()
+	for _, session := range []string{"a", "b", "a"} {
+		_, err := st.AppendRumEvent(
+			ctx,
+			store.RumEventRecord{
+				Site:        "retired",
+				SessionID:   session,
+				TSUnixUS:    original,
+				Type:        "error",
+				Fingerprint: "fp",
+				ErrorType:   "TypeError",
+				Message:     "boom",
+				Page:        "/checkout",
+				Browser:     "Chrome",
+			},
+		)
+		require.NoError(t, err)
+	}
+	handler := rumfunc.New(&source{
+		hub:     runtimehub.New(),
+		history: st,
+	})
+	overview := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
+		Method: "rum-errors",
+		Args:   []string{"site:retired"},
+	})
+	require.NotNil(t, overview.RawResponse)
+	rows := overview.RawResponse["data"].([][]any)
+	require.Len(t, rows, 1)
+	assert.EqualValues(t, 3, rows[0][4])
+	assert.Nil(t, rows[0][5])
+	assert.Nil(t, rows[0][8])
+	assert.Nil(t, rows[0][9])
+	assert.Contains(t, overview.RawResponse["help"], "saved")
+	detail := handler.HandleRaw(
+		ctx,
+		funcapi.RawMethodRequest{
+			Method: "rum-errors",
+			Args:   []string{"site:retired", "fingerprint:fp"},
+		},
+	)
+	require.NotNil(t, detail.RawResponse)
+	row := detail.RawResponse["data"].([][]any)[0]
+	assert.EqualValues(t, 2, row[5])
+	assert.Equal(t, "/checkout", row[8])
+	assert.Equal(t, "Chrome", row[9])
+	timeline := handler.HandleRaw(
+		ctx,
+		funcapi.RawMethodRequest{
+			Method: "rum-session-events",
+			Args:   []string{"site:retired", "session_id:b"},
+		},
+	)
+	require.NotNil(t, timeline.RawResponse)
+	assert.Equal(t, original, timeline.RawResponse["data"].([][]any)[0][0])
+	invalid := handler.HandleRaw(
+		ctx,
+		funcapi.RawMethodRequest{
+			Method: "rum-session-events",
+			Args:   []string{"session_id:b", "after:-60"},
+		},
+	)
+	assert.Equal(t, 400, invalid.Status, "unused range filters must not be silently accepted")
 }

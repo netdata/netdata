@@ -79,6 +79,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "opening DEM history: %v\n", err)
 		os.Exit(1)
 	}
+	// Apply the configured budget before any producer can append.
+	if err := history.EnforceRumHistoryRetention(context.Background(), cfg.History.Days, cfg.History.MaxBytes); err != nil {
+		_ = history.Close()
+		fmt.Fprintf(os.Stderr, "initializing DEM history policy: %v\n", err)
+		os.Exit(1)
+	}
 	registry, retention := dem.NewRegistry(
 		dem.Dependencies{
 			History:        history,
@@ -126,5 +132,5 @@ func historyPath(varLib string, debug bool) (string, error) {
 	if strings.TrimSpace(varLib) == "" {
 		return "", fmt.Errorf("NETDATA_LIB_DIR is required outside terminal/debug mode")
 	}
-	return filepath.Join(varLib, "dem", "history.db"), nil
+	return filepath.Join(varLib, "dem", "journal"), nil
 }

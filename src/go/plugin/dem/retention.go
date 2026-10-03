@@ -13,7 +13,7 @@ type historyRetention interface {
 }
 
 // Retention is process-owned so disabling every collector cannot stop history
-// expiry. It never closes the database: jobs retire after process services join.
+// expiry. It never releases the store: jobs retire after process services join.
 type Retention struct {
 	store      historyRetention
 	policy     HistoryConfig

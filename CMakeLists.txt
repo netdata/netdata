@@ -3966,8 +3966,6 @@ if(ENABLE_PLUGIN_DEM)
 
     add_go_target(dem-plugin ${DEM_PLUGIN_BIN} src/go cmd/demplugin)
     netdata_add_deb_copyright(plugin-dem netdata-plugin-dem)
-    install(FILES src/go/plugin/dem/THIRD_PARTY_NOTICES.md
-            COMPONENT plugin-dem DESTINATION usr/share/doc/netdata-plugin-dem)
     install(PROGRAMS ${CMAKE_BINARY_DIR}/${DEM_PLUGIN_BIN}
             COMPONENT plugin-dem DESTINATION usr/libexec/netdata/plugins.d)
     install(FILES src/go/plugin/dem/config/dem.conf

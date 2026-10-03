@@ -42,7 +42,7 @@ type Deps interface {
 	Live(context.Context, string, string, int) ([]LiveEvent, string, error)
 	Sessions(context.Context, string, int64, int64) ([]store.RumSessionRecord, error)
 	SessionEvents(context.Context, string, string) ([]store.RumSessionEventRecord, error)
-	Errors(context.Context, string, int64, int64) ([]store.RumErrorAgg, error)
+	Errors(context.Context, string, string, int64, int64) ([]store.RumErrorAgg, error)
 }
 
 // InvalidArgument identifies caller input rejected by a domain data source.
@@ -108,6 +108,16 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 		key, value, ok := strings.Cut(word, ":")
 		if !ok {
 			return funcapi.ErrorResponse(400, "expected key:value argument")
+		}
+		supported := false
+		for _, param := range spec.params {
+			if key == param {
+				supported = true
+				break
+			}
+		}
+		if !supported {
+			return funcapi.ErrorResponse(400, "unsupported argument %q", key)
 		}
 		args[key] = value
 	}
@@ -298,19 +308,16 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 			}
 		} else {
 			var groups []store.RumErrorAgg
-			groups, err = h.deps.Errors(ctx, args["site"], after, before)
+			groups, err = h.deps.Errors(ctx, args["site"], args["fingerprint"], after, before)
 			for _, g := range groups {
-				rows = append(rows, []any{g.Site, g.Fingerprint, g.Type, h.redact.Apply(g.Message), g.CountWindow, g.SessionsAffected, now - g.FirstSeen, now - g.LastSeen, g.TopPage, strings.Join(g.Browsers, ","), h.redact.Apply(g.SampleStack)})
+				rows = append(rows, []any{g.Site, g.Fingerprint, g.Type, h.redact.Apply(g.Message), g.CountWindow, detail(g.Details, g.SessionsAffected), now - g.FirstSeen, now - g.LastSeen, detail(g.Details, g.TopPage), detail(g.Details, strings.Join(g.Browsers, ",")), h.redact.Apply(g.SampleStack)})
 			}
 		}
 	case "rum-session-events":
-		if args["session"] == "" && args["session_id"] == "" {
+		if args["session_id"] == "" {
 			return funcapi.ErrorResponse(400, "session_id is required")
 		}
 		session := args["session_id"]
-		if session == "" {
-			session = args["session"]
-		}
 		var events []store.RumSessionEventRecord
 		events, err = h.deps.SessionEvents(ctx, args["site"], session)
 		if err == nil && len(events) == 0 {
@@ -328,6 +335,12 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	}
 	response["data"] = rows
 	return funcapi.RawResponse(response)
+}
+func detail(has bool, value any) any {
+	if has {
+		return value
+	}
+	return nil
 }
 func number(has bool, value float64) any {
 	if has {

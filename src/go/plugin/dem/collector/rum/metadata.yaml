@@ -312,20 +312,20 @@ modules:
             options: []
           - id: after
             name: after
-            description: Start of the range as Unix seconds or a negative offset from now.
+            description: Start of the saved-time range as Unix seconds or a negative offset from now.
             type: integer
             required: false
             default: 15 minutes before before
             options: []
           - id: before
             name: before
-            description: End of the range as Unix seconds or a negative offset from now.
+            description: End of the saved-time range as Unix seconds or a negative offset from now.
             type: integer
             required: false
             default: now
             options: []
           returns:
-            description: One retained session overlapping the selected range. Results can include disabled sites until
+            description: One session with retained activity saved in the selected range. Counts and activity span cover retained events, not lifetime totals. Results can include disabled sites until
               their history expires.
             columns:
             - name: site
@@ -339,15 +339,15 @@ modules:
             - name: started_age_s
               type: integer
               unit: ""
-              description: Started (s ago).
+              description: First Retained Event (s ago).
             - name: duration_s
               type: integer
               unit: ""
-              description: Duration (s).
+              description: Retained Activity Span (s).
             - name: pageviews
               type: integer
               unit: ""
-              description: Page Views.
+              description: Retained Page Views.
             - name: errors
               type: integer
               unit: ""
@@ -394,7 +394,7 @@ modules:
         - id: rum-errors
           function_name: rum-errors
           name: RUM Errors
-          description: Group retained JavaScript errors over a time range to find repeated failures and affected sessions.
+          description: Group errors saved in the selected range by fingerprint; select a fingerprint to investigate affected sessions, pages and browsers.
           parameters:
           - id: site
             name: site
@@ -403,22 +403,29 @@ modules:
             required: false
             default: ''
             options: []
+          - id: fingerprint
+            name: fingerprint
+            description: Select an error fingerprint to compute affected-session, top-page and browser statistics. Leave empty for the count overview.
+            type: string
+            required: false
+            default: ''
+            options: []
           - id: after
             name: after
-            description: Start of the range as Unix seconds or a negative offset from now.
+            description: Start of the saved-time range as Unix seconds or a negative offset from now.
             type: integer
             required: false
             default: 15 minutes before before
             options: []
           - id: before
             name: before
-            description: End of the range as Unix seconds or a negative offset from now.
+            description: End of the saved-time range as Unix seconds or a negative offset from now.
             type: integer
             required: false
             default: now
             options: []
           returns:
-            description: One error fingerprint per site within the selected range. Results can include disabled sites
+            description: One error fingerprint per site with events saved in the selected range. Affected-session, page and browser statistics are null until a fingerprint is selected; first and last seen use original event time. Results can include disabled sites
               until their history expires.
             columns:
             - name: site
@@ -444,7 +451,7 @@ modules:
             - name: sessions_affected
               type: integer
               unit: ""
-              description: Sessions Affected.
+              description: Sessions Affected (selected fingerprint).
             - name: first_seen_age_s
               type: integer
               unit: ""
@@ -456,11 +463,11 @@ modules:
             - name: top_page
               type: string
               unit: ""
-              description: Top Page.
+              description: Top Page (selected fingerprint).
             - name: browsers
               type: string
               unit: ""
-              description: Browsers.
+              description: Browsers (selected fingerprint).
             - name: sample_stack
               type: string
               unit: ""
@@ -492,22 +499,8 @@ modules:
             required: true
             default: ''
             options: []
-          - id: after
-            name: after
-            description: Accepted for compatibility; this parameter does not filter the retained session timeline.
-            type: string
-            required: false
-            default: ''
-            options: []
-          - id: before
-            name: before
-            description: Accepted for compatibility; this parameter does not filter the retained session timeline.
-            type: string
-            required: false
-            default: ''
-            options: []
           returns:
-            description: One retained session event, with Unix-microsecond time and an optional trace identifier. Unknown
+            description: One retained or pending session event, with original observation time in Unix microseconds and an optional trace identifier. The full session timeline is returned without range filtering. Unknown
               sessions return an error.
             columns:
             - name: ts
@@ -1055,7 +1048,7 @@ modules:
             auto_detection:
                 description: Sites are explicitly configured; websites are not discovered automatically.
             limits:
-                description: Breakdown charts show bounded top groups. History uses one plugin-wide age and approximate stored-byte budget in dem.conf, including disabled sites. Export/history queues count records dropped under backpressure.
+                description: Breakdown charts show bounded top groups. History uses one plugin-wide journal file-age and committed-byte retention target in dem.conf, including disabled sites. Whole archives expire; the active file is protected, so the size target is not a hard disk ceiling. Export/history queues count records dropped under backpressure.
             performance_impact:
                 description: Resource usage depends on accepted browser traffic and the configured measurement window. Optional OTLP export and investigation history add network and local disk work.
         multi_instance: true

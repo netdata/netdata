@@ -233,7 +233,7 @@ func (s *source) Sessions(ctx context.Context, site string, after, before int64)
 	return rows, err
 }
 func (s *source) SessionEvents(ctx context.Context, site, session string) ([]store.RumSessionEventRecord, error) {
-	// Copy the bounded active ring before SQL, releasing leases before any I/O.
+	// Copy the bounded active ring before journal I/O, releasing leases before any I/O.
 	// A retiring generation can then flush while this query reads persisted data.
 	var live []store.RumSessionEventRecord
 	redactors := map[string]*secrets.Redactor{}
@@ -286,8 +286,13 @@ func redactSessionEvent(row *store.RumSessionEventRecord, redact *secrets.Redact
 	row.Page = redact.Apply(row.Page)
 	row.Text = redact.Apply(row.Text)
 }
-func (s *source) Errors(ctx context.Context, site string, after, before int64) ([]store.RumErrorAgg, error) {
-	rows, err := s.history.QueryRumErrors(ctx, site, after, before)
+
+func (s *source) Errors(
+	ctx context.Context,
+	site, fingerprint string,
+	after, before int64,
+) ([]store.RumErrorAgg, error) {
+	rows, err := s.history.QueryRumErrors(ctx, site, fingerprint, after, before)
 	if err != nil {
 		return nil, err
 	}

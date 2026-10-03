@@ -15,22 +15,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type observedRetention struct {
+	*store.Store
+	swept chan error
+}
+
+func (r *observedRetention) EnforceRumHistoryRetention(ctx context.Context, days int, bytes int64) error {
+	err := r.Store.EnforceRumHistoryRetention(ctx, days, bytes)
+	r.swept <- err
+	return err
+}
+
 func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 	ctx := context.Background()
 	st, err := store.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	now := time.Now().Unix()
-	old := time.Now().Add(-48 * time.Hour).Unix()
-	_, _, err = st.WriteRumHistoryBatch(ctx, store.RumHistoryBatch{
-		Sessions: []store.RumSessionRecord{
-			{Site: "disabled", SessionID: "old", StartedAt: old, LastAt: old},
-			{Site: "disabled", SessionID: "recent", StartedAt: now, LastAt: now},
-		},
-		Events: []store.RumSessionEventRecord{
-			{Site: "disabled", SessionID: "old", TSUnixUS: old * 1e6, Type: "pageview"},
-			{Site: "disabled", SessionID: "recent", TSUnixUS: now * 1e6, Type: "pageview"},
-		},
+	_, err = st.AppendRumEvent(ctx, store.RumEventRecord{
+		Site:      "disabled",
+		SessionID: "recent",
+		TSUnixUS:  now * 1e6,
+		Type:      "pageview",
 	})
 	require.NoError(t, err)
 	_, service := NewRegistry(Dependencies{
@@ -41,21 +47,28 @@ func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 			MaxBytes: 1 << 30,
 		},
 	})
+	observed := &observedRetention{
+		Store: st,
+		swept: make(chan error, 1),
+	}
+	service.store = observed
 	runCtx, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
 	go func() { defer close(done); service.Run(runCtx) }()
 	t.Cleanup(func() { cancel(); <-done })
-	require.Eventually(t, func() bool {
-		rows, err := st.QueryRumSessions(ctx, "", 0, now+1, 2000)
-		return err == nil && len(rows) == 1 && rows[0].SessionID == "recent"
-	}, time.Second, 5*time.Millisecond)
+	select {
+	case err := <-observed.swept:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("retention did not sweep with no site jobs")
+	}
 	cancel()
 	select {
 	case <-done:
 	case <-time.After(time.Second):
 		t.Fatal("retention did not stop")
 	}
-	// The command still owns the database while native site jobs drain.
+	// The command still owns the journal while native site jobs drain.
 	rows, err := st.QueryRumSessions(ctx, "", 0, now+1, 2000)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
@@ -69,7 +82,7 @@ func (r *blockingRetention) EnforceRumHistoryRetention(ctx context.Context, _ in
 	<-ctx.Done()
 	return ctx.Err()
 }
-func TestRetentionPropagatesCancellationIntoSQLWork(t *testing.T) {
+func TestRetentionPropagatesCancellationIntoStoreWork(t *testing.T) {
 	backend := &blockingRetention{
 		entered: make(chan struct{}),
 	}

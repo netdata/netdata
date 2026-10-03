@@ -41,7 +41,7 @@ var methods = []method{
 	{
 		id:      "rum-sessions",
 		title:   "RUM Sessions",
-		help:    "Investigated sessions overlapping the selected range",
+		help:    "Sessions with retained activity saved in the selected range; counts and duration cover retained events, not lifetime totals",
 		sort:    "started_age_s",
 		every:   10,
 		history: true,
@@ -51,21 +51,21 @@ var methods = []method{
 	{
 		id:      "rum-errors",
 		title:   "RUM Errors",
-		help:    "Investigated errors in the selected range",
+		help:    "Retained errors saved in the selected range; select fingerprint for affected-session, page and browser statistics",
 		sort:    "count_window",
 		every:   10,
 		history: true,
-		params:  []string{"site", "after", "before"},
+		params:  []string{"site", "fingerprint", "after", "before"},
 		columns: rumErrorsColumns,
 	},
 	{
 		id:      "rum-session-events",
 		title:   "RUM Session Events",
-		help:    "Investigated event timeline for one session",
+		help:    "Full retained and pending timeline for one session, ordered by original event time",
 		sort:    "ts",
 		every:   10,
 		history: true,
-		params:  []string{"site", "session_id", "after", "before"},
+		params:  []string{"site", "session_id"},
 		columns: rumSessionEventsColumns,
 	},
 }
@@ -500,7 +500,7 @@ var rumSessionsColumns = map[string]any{
 	}).BuildColumn(),
 	"started_age_s": (funcapi.Column{
 		Index:         2,
-		Name:          "Started (s ago)",
+		Name:          "First Retained Event (s ago)",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
@@ -508,7 +508,7 @@ var rumSessionsColumns = map[string]any{
 	}).BuildColumn(),
 	"duration_s": (funcapi.Column{
 		Index:         3,
-		Name:          "Duration (s)",
+		Name:          "Retained Activity Span (s)",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
@@ -516,7 +516,7 @@ var rumSessionsColumns = map[string]any{
 	}).BuildColumn(),
 	"pageviews": (funcapi.Column{
 		Index:         4,
-		Name:          "Page Views",
+		Name:          "Retained Page Views",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
@@ -676,7 +676,7 @@ var rumErrorsColumns = map[string]any{
 	}).BuildColumn(),
 	"sessions_affected": (funcapi.Column{
 		Index:         5,
-		Name:          "Sessions Affected",
+		Name:          "Sessions Affected (selected fingerprint)",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
@@ -700,14 +700,14 @@ var rumErrorsColumns = map[string]any{
 	}).BuildColumn(),
 	"top_page": (funcapi.Column{
 		Index:         8,
-		Name:          "Top Page",
+		Name:          "Top Page (selected fingerprint)",
 		Type:          funcapi.FieldTypeString,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
 	}).BuildColumn(),
 	"browsers": (funcapi.Column{
 		Index:         9,
-		Name:          "Browsers",
+		Name:          "Browsers (selected fingerprint)",
 		Type:          funcapi.FieldTypeString,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,

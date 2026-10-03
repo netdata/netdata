@@ -1,95 +1,45 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package history batches RUM records from a bounded channel into SQLite.
-// Each site owns a writer, which flushes on timer/size triggers and drains
-// accepted records on shutdown after ingestion has stopped.
+// Package history queues investigation events off the ingestion lock and drains
+// accepted records after the owning site's producers have joined.
 package history
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
 )
 
-// Batching flushes after 5 seconds or 500 records. The 5000-record queue
-// bounds memory while absorbing bursts between flushes; overflow is counted
-// as dropped without blocking ingestion.
+// The existing burst budget bounds queued browser detail; a full queue reports
+// drops without blocking measurement. Small batches amortize counter updates.
 const (
 	maxBatch    = 500
 	batchPeriod = 5 * time.Second
 	queueCap    = 5000
 )
 
-// Counters receives the rum.history chart bookkeeping (written/dropped
-// dims). *agg.Aggregator satisfies this directly.
 type Counters interface {
 	Add(site, counter string, n uint64)
 }
-
-// Redactor scrubs secret-shaped content before storage. It runs off the
-// aggregator lock, rather than in HistorySink methods: regex scans must
-// not hold a.mu (see the HistorySink constant-time enqueue contract).
-type Redactor interface {
-	Apply(string) string
+type Redactor interface{ Apply(string) string }
+type eventWriter interface {
+	AppendRumEvent(context.Context, store.RumEventRecord) (attempted bool, err error)
+	Sync(context.Context) error
 }
 
-// recKind tags which payload a queued record carries.
-type recKind int
-
-const (
-	kindSession recKind = iota
-	kindEvent
-	kindErrGroup
-	kindErrOcc
-)
-
-type queued struct {
-	kind     recKind
-	session  agg.HistorySession
-	event    agg.HistorySessionEvent
-	errGroup agg.HistoryErrorGroup
-	errOcc   agg.HistoryErrorOccurrence
-}
-
-func (q queued) site() string {
-	switch q.kind {
-	case kindSession:
-		return q.session.Site
-	case kindEvent:
-		return q.event.Site
-	case kindErrGroup:
-		return q.errGroup.Site
-	default:
-		return q.errOcc.Site
-	}
-}
-
-type batchWriter interface {
-	WriteRumHistoryBatch(context.Context, store.RumHistoryBatch) (map[string]int, map[string]int, error)
-}
-
-// Writer implements agg.HistorySink and drives the batch flush loop.
 type Writer struct {
-	st       batchWriter
-	counters Counters
-	redact   Redactor
-	ch       chan queued
-
-	// chanDrops accumulates channel-full drops between flushes without
-	// blocking ingestion. Run merges them into the rum.history dropped
-	// counter. dropMu is separate from the aggregator lock: HistorySink
-	// methods must never call back into the aggregator while it holds a.mu.
+	st        eventWriter
+	counters  Counters
+	redact    Redactor
+	ch        chan agg.HistoryEvent
 	dropMu    sync.Mutex
 	chanDrops map[string]int
 }
 
-// New builds a writer. redactor may be nil (no redaction — callers should
-// always pass the real one; nil only eases tests).
 func New(st *store.Store, counters Counters, redactor Redactor) *Writer {
 	if redactor == nil {
 		redactor = noopRedactor{}
@@ -98,7 +48,7 @@ func New(st *store.Store, counters Counters, redactor Redactor) *Writer {
 		st:        st,
 		counters:  counters,
 		redact:    redactor,
-		ch:        make(chan queued, queueCap),
+		ch:        make(chan agg.HistoryEvent, queueCap),
 		chanDrops: map[string]int{},
 	}
 }
@@ -107,209 +57,122 @@ type noopRedactor struct{}
 
 func (noopRedactor) Apply(s string) string { return s }
 
-// ---- agg.HistorySink: called with the aggregator's lock held ----
-
-func (w *Writer) Session(rec agg.HistorySession) {
-	w.enqueue(queued{
-		kind:    kindSession,
-		session: rec,
-	})
-}
-func (w *Writer) SessionEvent(rec agg.HistorySessionEvent) {
-	w.enqueue(queued{
-		kind:  kindEvent,
-		event: rec,
-	})
-}
-func (w *Writer) ErrorGroup(rec agg.HistoryErrorGroup) {
-	w.enqueue(queued{
-		kind:     kindErrGroup,
-		errGroup: rec,
-	})
-}
-func (w *Writer) ErrorOccurrence(rec agg.HistoryErrorOccurrence) {
-	w.enqueue(queued{
-		kind:   kindErrOcc,
-		errOcc: rec,
-	})
-}
-
-// enqueue never blocks: a full channel drops the record and counts it
-// locally (flushed into the shared counters later, from Run's goroutine).
-func (w *Writer) enqueue(q queued) {
+func (w *Writer) Event(rec agg.HistoryEvent) {
 	select {
-	case w.ch <- q:
+	case w.ch <- rec:
 	default:
 		w.dropMu.Lock()
-		w.chanDrops[q.site()]++
+		w.chanDrops[rec.Site]++
 		w.dropMu.Unlock()
 	}
 }
-
-// takeChanDrops atomically reads and resets the accumulated drop counts.
-func (w *Writer) takeChanDrops() map[string]int {
+func (w *Writer) reportQueueDrops() {
 	w.dropMu.Lock()
-	defer w.dropMu.Unlock()
 	drops := w.chanDrops
 	w.chanDrops = map[string]int{}
-	return drops
+	w.dropMu.Unlock()
+	for site, n := range drops {
+		w.counters.Add(site, agg.CounterHistoryDropped, uint64(n))
+	}
 }
 
-// ---- flush loop ----
-
-// Run batches while producers are active and drains accepted records on stop.
-// The owner must join producers before cancellation. Final SQL work has a
-// fixed five-second deadline independent of public collection settings.
+// Run preserves only entries that were never admitted to append. Each attempted
+// append is counted once, even if retirement races success or a disk error.
+// The SDK cannot interrupt a filesystem write; contexts bound admission and
+// subsequent work, and the host's fail-stop path owns a non-quiescent process.
 func (w *Writer) Run(ctx context.Context) {
 	ticker := time.NewTicker(batchPeriod)
 	defer ticker.Stop()
-	batch := make([]queued, 0, maxBatch)
-	flush := func() bool {
-		if w.flush(ctx, batch) {
-			return false
-		}
-		batch = batch[:0]
-		return true
-	}
+	batch := make([]agg.HistoryEvent, 0, maxBatch)
 steady:
 	for {
 		select {
 		case <-ctx.Done():
 			break steady
-		case q := <-w.ch:
-			batch = append(batch, q)
-			if len(batch) >= maxBatch && !flush() {
-				break steady
+		case rec := <-w.ch:
+			batch = append(batch, rec)
+			if len(batch) >= maxBatch {
+				consumed := w.flush(ctx, batch)
+				if consumed == len(batch) {
+					batch = batch[:0]
+				} else {
+					batch = batch[consumed:]
+				}
+				if len(batch) != 0 {
+					break steady
+				}
 			}
 		case <-ticker.C:
-			if !flush() {
+			consumed := w.flush(ctx, batch)
+			if consumed == len(batch) {
+				batch = batch[:0]
+			} else {
+				batch = batch[consumed:]
+			}
+			if len(batch) != 0 {
 				break steady
 			}
 		}
 	}
 	finalCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	// Preserve a retirement-aborted batch and drain accepted queued records
-	// into one final transaction sharing the single shutdown deadline.
-	for drained := false; !drained; {
+	for {
 		select {
-		case q := <-w.ch:
-			batch = append(batch, q)
+		case rec := <-w.ch:
+			batch = append(batch, rec)
 		default:
-			drained = true
+			remaining := batch[w.flush(finalCtx, batch):]
+			for _, rec := range remaining {
+				w.counters.Add(rec.Site, agg.CounterHistoryDropped, 1)
+			}
+			return
 		}
-	}
-	if w.flush(finalCtx, batch) {
-		w.dropBatch(batch)
 	}
 }
 
-// flush partitions one batch by record kind, writes it in one transaction,
-// and reports written/dropped counts per site on rum.history. It returns true
-// only for a transaction aborted by cancellation, leaving the batch uncounted
-// for one final retry (or drop if the final shutdown deadline has expired).
-func (w *Writer) flush(ctx context.Context, batch []queued) bool {
-	chanDrops := w.takeChanDrops()
-	for site, n := range chanDrops {
-		if n > 0 {
-			w.counters.Add(site, agg.CounterHistoryDropped, uint64(n))
+// flush returns the consumed prefix. Only cancelled admission leaves a suffix
+// for final drain: journal appends have no batch transaction or rollback.
+func (w *Writer) flush(ctx context.Context, batch []agg.HistoryEvent) int {
+	w.reportQueueDrops()
+	for i, rec := range batch {
+		if ctx.Err() != nil {
+			return i
 		}
-	}
-	if len(batch) == 0 {
-		return false
-	}
-	var b store.RumHistoryBatch
-	for _, q := range batch {
-		switch q.kind {
-		case kindSession:
-			r := q.session
-			b.Sessions = append(b.Sessions, store.RumSessionRecord{
-				Site:      r.Site,
-				SessionID: r.SessionID,
-				StartedAt: r.StartedAt,
-				LastAt:    r.LastAt,
-				Pageviews: int64(r.Pageviews),
-				Errors:    int64(r.Errors),
-				Browser: w.redact.Apply(
-					r.Browser,
-				),
-				Device:       w.redact.Apply(r.Device),
-				Country:      w.redact.Apply(r.Country),
-				City:         w.redact.Apply(r.City),
-				Version:      w.redact.Apply(r.Version),
-				EntryPage:    w.redact.Apply(r.EntryPage),
-				LastPage:     w.redact.Apply(r.LastPage),
-				UserID:       w.redact.Apply(r.UserID),
-				Frustrations: int64(r.Frustrations),
-			})
-		case kindEvent:
-			r := q.event
-			b.Events = append(b.Events, store.RumSessionEventRecord{
-				Site:      r.Site,
-				SessionID: r.SessionID,
-				TSUnixUS:  r.TSUnixUS,
-				Type: w.redact.Apply(
-					r.Type,
-				),
-				Page:    w.redact.Apply(r.Page),
-				Text:    w.redact.Apply(r.Text),
-				TraceID: r.TraceID,
-			})
-		case kindErrGroup:
-			r := q.errGroup
-			b.ErrGroups = append(b.ErrGroups, store.RumErrorGroupRecord{
-				Site:        r.Site,
-				Fingerprint: r.Fingerprint,
-				Type:        w.redact.Apply(r.Type),
-				Message:     w.redact.Apply(r.Message),
-				SampleStack: w.redact.Apply(r.SampleStack),
-				FirstSeen:   r.FirstSeen,
-				LastSeen:    r.LastSeen,
-			})
-		case kindErrOcc:
-			r := q.errOcc
-			b.ErrOccs = append(b.ErrOccs, store.RumErrorOccurrenceRecord{
-				Site:        r.Site,
-				Fingerprint: r.Fingerprint,
-				TS:          r.TS,
-				SessionID:   r.SessionID,
-				Page:        w.redact.Apply(r.Page),
-				Browser:     w.redact.Apply(r.Browser),
-			})
+		r := store.RumEventRecord{
+			Site:      rec.Site,
+			SessionID: rec.SessionID,
+			TSUnixUS:  rec.TSUnixUS,
+			Type:      rec.Type,
+			Page:      w.redact.Apply(rec.Page),
+			Text:      w.redact.Apply(rec.Text),
+			TraceID:   rec.TraceID,
+			Browser: w.redact.Apply(
+				rec.Browser,
+			),
+			Device:      w.redact.Apply(rec.Device),
+			Country:     w.redact.Apply(rec.Country),
+			City:        w.redact.Apply(rec.City),
+			Version:     w.redact.Apply(rec.Version),
+			UserID:      w.redact.Apply(rec.UserID),
+			Fingerprint: rec.Fingerprint,
+			ErrorType: w.redact.Apply(
+				rec.ErrorType,
+			),
+			Message:     w.redact.Apply(rec.Message),
+			SampleStack: w.redact.Apply(rec.SampleStack),
 		}
-	}
-
-	written, dropped, err := w.st.WriteRumHistoryBatch(ctx, b)
-	if err != nil {
-		// database/sql can report ErrTxDone when its cancellation rollback
-		// wins the race. The retry waits for the transaction connection; a
-		// successful driver commit returns nil even if cancellation races it.
-		if ctx.Err() != nil && (errors.Is(err, ctx.Err()) || errors.Is(err, sql.ErrTxDone)) {
-			return true
+		attempted, err := w.st.AppendRumEvent(ctx, r)
+		if !attempted && ctx.Err() != nil {
+			return i
 		}
-		// Persistent SQL failures must not stall subsequent batches.
-		w.dropBatch(batch)
-		return false
-	}
-	for site, n := range written {
-		if n > 0 {
-			w.counters.Add(site, agg.CounterHistoryWritten, uint64(n))
+		counter := agg.CounterHistoryWritten
+		if err != nil {
+			counter = agg.CounterHistoryDropped
 		}
+		w.counters.Add(rec.Site, counter, 1)
 	}
-	for site, n := range dropped {
-		if n > 0 {
-			w.counters.Add(site, agg.CounterHistoryDropped, uint64(n))
-		}
+	if err := w.st.Sync(ctx); err != nil && ctx.Err() == nil {
+		logger.New().Warningf("syncing RUM journal failed: %v", err)
 	}
-	return false
-}
-
-func (w *Writer) dropBatch(batch []queued) {
-	dropped := make(map[string]int)
-	for _, q := range batch {
-		dropped[q.site()]++
-	}
-	for site, n := range dropped {
-		w.counters.Add(site, agg.CounterHistoryDropped, uint64(n))
-	}
+	return len(batch)
 }

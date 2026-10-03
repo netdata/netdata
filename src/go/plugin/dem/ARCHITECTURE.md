@@ -1,6 +1,6 @@
 # Native DEM ownership
 
-The command owns SQLite and the plugin-wide retention service. It closes SQLite only after `agenthost.Result` reports
+The command owns the investigation journal and the plugin-wide retention service. It closes it only after `agenthost.Result` reports
 `Err == nil` and `ExitRequired == false`. An error or recovery requiring process exit may leave consumers alive; process
 exit owns their handles. Process-service finalizers run before job retirement and cannot close resources used by jobs.
 
@@ -17,13 +17,27 @@ An HTTP request acquires one exact site registration containing both policy and 
 beacon endpoints use this same admission. Retirement removes future admission, cancels admitted request contexts and
 joins their leases. Cancellation interrupts socket reads through a response-controller deadline before closing bodies;
 closing a net/http request body alone can wait behind a stalled read. Cancellation callbacks join before leases release.
-Function reads lease domain state only while copying snapshots, and historical queries use caller-aware SQL contexts.
+Function reads lease domain state only while copying snapshots, and historical queries own independent journal snapshots and check caller cancellation between files and rows.
 
 A retiring site joins its HTTP and Function readers before cancelling the history/export worker context. Export queues
-drain using one shared fixed shutdown budget, and accepted history contributions flush under a detached five-second SQL
-budget. A cancelled steady-state SQL batch stays pending and joins the final transaction; successful commits and
-unrelated database failures are never replayed. Session contributions are deltas, allowing persistence to accumulate across site generations and session cache
-replacement. Publication uses typed metrix snapshots and static chart templates, with no V1 map bridge.
+drain using one shared fixed shutdown budget, and accepted history events flush under one detached five-second
+admission budget. Every event is self-contained: there are no session/group parent records or cumulative deltas.
+A cancelled admission leaves only unattempted entries pending for final drain; attempted appends are never replayed,
+including when an error or cancellation races them. Appends, sync, snapshot construction and retention serialize SDK
+Log access; the SDK disk operation itself is not interruptible. A non-quiescent exit uses the existing host fail-stop
+boundary. Snapshot scans release writer admission and copy SDK payloads before their borrowed lifetime ends.
+
+History filters select saved time; session timelines and retained activity spans use original observation time.
+Retained counts are derived from selected events, not reconstructed lifetime totals. Error fingerprint overview is
+linear in matched retained events and fingerprints; selected fingerprint details additionally retain distinct session,
+page and browser sets for that group. Queries materialize SDK entry offsets but no second complete event list.
+Query failures return errors instead of silently labeling corrupt or quarantined history as complete. Damaged
+`.journal~` files remain for operator investigation and are outside the SDK retention policy.
+
+One process worker archives/reopens idle history and applies the plugin-wide age/committed-byte policy even when all
+sites are disabled. Whole archives expire; the active file and filesystem preallocation can exceed the configured
+committed-byte target. Neither retention nor history scans hold a live site lease across disk work. Publication uses
+typed metrix snapshots and static chart templates, with no V1 map bridge.
 
 Stock native health templates own alert policy and attach independently to each site's charts. Site jobs publish
 measurements only; they do not write health configuration, invoke health reload or recover generated files. The command

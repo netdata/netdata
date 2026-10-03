@@ -295,8 +295,8 @@ func TestElementsFrustrationAndUser(t *testing.T) {
 	if got := one(a).Counters[CounterRageClicks]; got != 1 {
 		t.Fatalf("rage clicks = %d", got)
 	}
-	last := h.sessions[len(h.sessions)-1]
-	if last.UserID != "u_42" || last.Frustrations != 1 {
-		t.Fatalf("history session = %+v", last)
+	last := h.events[len(h.events)-1]
+	if last.UserID != "u_42" || last.Type != "frustration" {
+		t.Fatalf("history event = %+v", last)
 	}
 }

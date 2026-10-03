@@ -27,26 +27,30 @@ type sessionEvent struct {
 	page    string
 	text    string
 	traceID string // traced requests
+	error   *sessionError
 }
 
+// Only error events retain error metadata; ordinary timeline entries keep the
+// same small representation regardless of whether history is enabled.
+type sessionError struct{ fingerprint, typ, message, stack string }
+
 type sessionDetail struct {
-	id                                                   string
-	started, lastSeen                                    time.Time
-	pageviews, errors                                    uint64
-	frustrations                                         uint64 // rage, dead and error clicks
-	userID                                               string // the site's own user id
-	browser, device, country, city, version              string
-	entryPage, lastPage, lastView                        string // lastView is bookkeeping only, not exposed
-	events                                               []sessionEvent
-	historyPageviews, historyErrors, historyFrustrations uint64
-	investigated                                         bool // kept in full under investigate sampling
+	id                                      string
+	started, lastSeen                       time.Time
+	pageviews, errors                       uint64
+	frustrations                            uint64 // rage, dead and error clicks
+	userID                                  string // the site's own user id
+	browser, device, country, city, version string
+	entryPage, lastPage, lastView           string // lastView is bookkeeping only, not exposed
+	events                                  []sessionEvent
+	investigated                            bool // kept in full under investigate sampling
 }
 
 // touchSession updates (or creates) the session behind b.SessionID and
 // appends any events this beacon produced to its ring. Eviction (cap
 // maxTrackedSessions) drops the least-recently-seen session, same LRU
-// discipline as the error-group state. hist receives the session's
-// up-to-date summary plus every event freshly appended this call; nil disables persistence. Only investigated sessions reach
+// discipline as the error-group state. hist receives self-contained
+// events freshly appended this call; nil disables persistence. Only investigated sessions reach
 // history; a sampled-out session that hits an always-keep condition
 // is promoted and its in-memory timeline so far is written too. It returns
 // whether the session is investigated.
@@ -141,6 +145,12 @@ func (st *siteState) touchSession(b *beacon.Beacon, now time.Time, hist HistoryS
 					typ:  "error",
 					page: page,
 					text: truncateRunes(err.Type+": "+err.Message, sessionEventTextMax),
+					error: &sessionError{
+						fingerprint: err.Fingerprint,
+						typ:         err.Type,
+						message:     err.Message,
+						stack:       truncateStack(err.Stack),
+					},
 				},
 			),
 		)
@@ -189,36 +199,32 @@ func (st *siteState) touchSession(b *beacon.Beacon, now time.Time, hist HistoryS
 		newEvents = sd.events
 	}
 	if hist != nil && sd.investigated {
-		hist.Session(HistorySession{
-			Site:         st.cfg.Key,
-			SessionID:    sd.id,
-			StartedAt:    sd.started.Unix(),
-			LastAt:       sd.lastSeen.Unix(),
-			Pageviews:    sd.pageviews - sd.historyPageviews,
-			Errors:       sd.errors - sd.historyErrors,
-			Frustrations: sd.frustrations - sd.historyFrustrations,
-			UserID:       sd.userID,
-			Browser:      sd.browser,
-			Device:       sd.device,
-			Country:      sd.country,
-			City:         sd.city,
-			Version:      sd.version,
-			EntryPage:    sd.entryPage,
-			LastPage:     sd.lastPage,
-		})
-		sd.historyPageviews, sd.historyErrors, sd.historyFrustrations = sd.pageviews, sd.errors, sd.frustrations
+		if len(newEvents) == 0 {
+			newEvents = []sessionEvent{{ts: now, typ: "activity", page: page}}
+		}
 		for _, e := range newEvents {
-			hist.SessionEvent(
-				HistorySessionEvent{
-					Site:      st.cfg.Key,
-					SessionID: sd.id,
-					TSUnixUS:  e.ts.UnixMicro(),
-					Type:      e.typ,
-					Page:      e.page,
-					Text:      e.text,
-					TraceID:   e.traceID,
-				},
-			)
+			rec := HistoryEvent{
+				Site:      st.cfg.Key,
+				SessionID: sd.id,
+				TSUnixUS:  e.ts.UnixMicro(),
+				Type:      e.typ,
+				Page:      e.page,
+				Text:      e.text,
+				TraceID:   e.traceID,
+				Browser:   sd.browser,
+				Device:    sd.device,
+				Country:   sd.country,
+				City:      sd.city,
+				Version:   sd.version,
+				UserID:    sd.userID,
+			}
+			if e.error != nil {
+				rec.Fingerprint = e.error.fingerprint
+				rec.ErrorType = e.error.typ
+				rec.Message = e.error.message
+				rec.SampleStack = e.error.stack
+			}
+			hist.Event(rec)
 		}
 	}
 	return sd.investigated

@@ -11,10 +11,7 @@ import (
 
 type discardHistory struct{}
 
-func (discardHistory) Session(agg.HistorySession)                 {}
-func (discardHistory) SessionEvent(agg.HistorySessionEvent)       {}
-func (discardHistory) ErrorGroup(agg.HistoryErrorGroup)           {}
-func (discardHistory) ErrorOccurrence(agg.HistoryErrorOccurrence) {}
+func (discardHistory) Event(agg.HistoryEvent) {}
 
 // Fixed active identities isolate per-beacon work after bounded sample buffers
 // fill. Cardinality growth and the sliding window remain covered by domain tests.
@@ -71,5 +68,29 @@ func BenchmarkSnapshot(b *testing.B) {
 	b.ResetTimer()
 	for range b.N {
 		a.Snapshot()
+	}
+}
+
+// Error ingestion adds one immutable metadata object per error to retain detail
+// for later session promotion. Work stays bounded by the beacon and live ring;
+// it does not traverse persisted history. Timings are local trends, not CI gates.
+func BenchmarkIngestErrors(b *testing.B) {
+	a := agg.New(5 * time.Minute)
+	a.Configure(5*time.Minute, []agg.SiteCfg{{Key: "shop", PageGroups: 20, Countries: 20}})
+	a.SetHistorySink(discardHistory{})
+	input := &beacon.Beacon{
+		Site:      "shop",
+		SessionID: "browser",
+		PageGroup: "/checkout",
+		Browser:   "Chrome",
+		Received:  time.Now(),
+		Errors: []beacon.Error{
+			{Type: "TypeError", Message: "checkout failed", Stack: "at checkout()", Fingerprint: "checkout"},
+		},
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		a.Ingest(input)
 	}
 }

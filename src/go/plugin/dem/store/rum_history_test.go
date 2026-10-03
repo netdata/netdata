@@ -4,503 +4,566 @@ package store
 
 import (
 	"context"
-	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/netdata/systemd-journal-sdk/go/journal"
+	"github.com/netdata/systemd-journal-sdk/go/journalhost"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestRumHistoryTablesCreatedIdempotent(t *testing.T) {
-	s, dir := newStore(t)
-	// Reopening must preserve previously stored sessions.
-	if err := s.Close(); err != nil {
-		t.Fatal(err)
-	}
-	s2, err := Open(context.Background(), fmt.Sprintf("%s/test.db", dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = s2.Close() }()
-	if _, _, err := s2.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		Sessions: []RumSessionRecord{{Site: "s", SessionID: "sess1", StartedAt: 1, LastAt: 1}},
-	}); err != nil {
-		t.Fatalf("rum_sessions table must exist after reopen: %v", err)
-	}
-	rows, err := s2.QueryRumSessions(context.Background(), "s", 0, time.Now().Unix()+1000, 10)
-	if err != nil || len(rows) != 1 {
-		t.Fatalf("session must survive reopen: rows=%v err=%v", rows, err)
-	}
-}
-
-func TestRumSessionUpsert(t *testing.T) {
-	s, _ := newStore(t)
-	rec := RumSessionRecord{
-		Site:      "s",
-		SessionID: "sess1",
-		StartedAt: 100,
-		LastAt:    100,
-		Pageviews: 1,
-		Errors:    0,
-		Browser:   "Chrome",
-		Device:    "desktop",
-		Country:   "GR",
-		City:      "Athens",
-		Version:   "1.0",
-		EntryPage: "/a",
-		LastPage:  "/a",
-	}
-	if _, _, err := s.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		Sessions: []RumSessionRecord{rec},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	// Progress the same session: started_at/entry_page must stick, the rest updates.
-	rec2 := rec
-	rec2.LastAt = 200
-	rec2.Pageviews = 2 // two new views, added to the first contribution
-	rec2.Errors = 1
-	rec2.LastPage = "/b"
-	rec2.StartedAt = 999 // must be ignored on conflict
-	rec2.EntryPage = "/ignored"
-	if _, _, err := s.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		Sessions: []RumSessionRecord{rec2},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	got, err := s.QueryRumSessions(context.Background(), "s", 0, 1000, 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 1 {
-		t.Fatalf("expected exactly 1 session row (upsert, not insert), got %d", len(got))
-	}
-	g := got[0]
-	if g.StartedAt != 100 || g.EntryPage != "/a" {
-		t.Fatalf("started_at/entry_page must not change on conflict: %+v", g)
-	}
-	if g.LastAt != 200 || g.Pageviews != 3 || g.Errors != 1 || g.LastPage != "/b" {
-		t.Fatalf("progressed fields must update: %+v", g)
-	}
-	if g.City != "Athens" {
-		t.Fatalf("city must persist: %+v", g)
-	}
-}
-
-func TestRumSessionEventInsertAndQuery(t *testing.T) {
-	s, _ := newStore(t)
-	evs := []RumSessionEventRecord{
-		{Site: "s", SessionID: "sess1", TSUnixUS: 3_000_000, Type: "pageview", Page: "/b", Text: ""},
-		{Site: "s", SessionID: "sess1", TSUnixUS: 1_000_000, Type: "pageview", Page: "/a", Text: ""},
-		{Site: "s", SessionID: "sess1", TSUnixUS: 2_000_000, Type: "error", Page: "/a", Text: "boom"},
-	}
-	if _, _, err := s.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		Events: evs,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	got, err := s.QueryRumSessionEvents(context.Background(), "s", "sess1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 3 {
-		t.Fatalf("expected 3 events, got %d", len(got))
-	}
-	// oldest first
-	if got[0].TSUnixUS != 1_000_000 || got[1].TSUnixUS != 2_000_000 || got[2].TSUnixUS != 3_000_000 {
-		t.Fatalf("events must be ordered oldest-first: %+v", got)
-	}
-}
-
-// TestRumSessionEventsUnfilteredSite pins site=="" as "any site" (matches
-// the in-memory Aggregator.SessionEvents lookup rum-session-events falls
-// back to), not a literal empty-string site filter.
-func TestRumSessionEventsUnfilteredSite(t *testing.T) {
-	s, _ := newStore(t)
-	if _, _, err := s.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		Events: []RumSessionEventRecord{
-			{Site: "shop", SessionID: "sess1", TSUnixUS: 1, Type: "pageview", Page: "/a"},
-		},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	got, err := s.QueryRumSessionEvents(context.Background(), "", "sess1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 1 {
-		t.Fatalf("expected the session to be found across sites, got %+v", got)
-	}
-	if none, err := s.QueryRumSessionEvents(context.Background(), "other-site", "sess1"); err != nil || len(none) != 0 {
-		t.Fatalf("a specific, non-matching site filter must still exclude it: %+v err=%v", none, err)
-	}
-}
-
-func TestRumSessionEventCap(t *testing.T) {
-	s, _ := newStore(t)
-	var evs []RumSessionEventRecord
-	for i := 0; i < sessionEventCap+50; i++ {
-		evs = append(
-			evs,
-			RumSessionEventRecord{
-				Site:      "s",
-				SessionID: "sess1",
-				TSUnixUS:  int64(i),
-				Type:      "pageview",
-				Page:      "/a",
-			},
-		)
-	}
-	written, dropped, err := s.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		Events: evs,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if written["s"] != sessionEventCap {
-		t.Fatalf("written = %d, want %d", written["s"], sessionEventCap)
-	}
-	if dropped["s"] != 50 {
-		t.Fatalf("dropped = %d, want 50", dropped["s"])
-	}
-	got, err := s.QueryRumSessionEvents(context.Background(), "s", "sess1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != sessionEventCap {
-		t.Fatalf("stored events = %d, want cap %d", len(got), sessionEventCap)
-	}
-
-	// A second session must not be affected by the first's cap.
-	if _, _, err := s.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		Events: []RumSessionEventRecord{
-			{Site: "s", SessionID: "sess2", TSUnixUS: 1, Type: "pageview", Page: "/a"},
-		},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	got2, _ := s.QueryRumSessionEvents(context.Background(), "s", "sess2")
-	if len(got2) != 1 {
-		t.Fatalf("second session must not be capped by the first's count: %d", len(got2))
-	}
-}
-
-func TestRumErrorGroupUpsertKeepsFirstSeenAndSample(t *testing.T) {
-	s, _ := newStore(t)
-	g1 := RumErrorGroupRecord{
-		Site:        "s",
-		Fingerprint: "fp1",
-		Type:        "TypeError",
-		Message:     "boom",
-		SampleStack: "at f()",
-		FirstSeen:   100,
-		LastSeen:    100,
-	}
-	if _, _, err := s.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		ErrGroups: []RumErrorGroupRecord{g1},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	g2 := g1
-	g2.FirstSeen = 999     // must be ignored on conflict
-	g2.Message = "changed" // must be ignored on conflict (fixed at first sight, matches in-memory semantics)
-	g2.SampleStack = "other"
-	g2.LastSeen = 200
-	if _, _, err := s.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		ErrGroups: []RumErrorGroupRecord{g2},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	occs, err := s.QueryRumErrors(context.Background(), "s", 0, 1000)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// No occurrences recorded, so nothing should show from QueryRumErrors
-	// (it aggregates occurrences); verify group persistence directly instead.
-	if len(occs) != 0 {
-		t.Fatalf("no occurrences inserted yet, expected 0 aggregated rows, got %+v", occs)
-	}
-	var msg, stack string
-	var first, last int64
-	row := s.db.QueryRow(
-		`SELECT message, sample_stack, first_seen, last_seen FROM rum_error_groups WHERE site=? AND fingerprint=?`,
-		"s",
-		"fp1",
-	)
-	if err := row.Scan(&msg, &stack, &first, &last); err != nil {
-		t.Fatal(err)
-	}
-	if msg != "boom" || stack != "at f()" {
-		t.Fatalf("message/sample_stack must stick from first insert: %q %q", msg, stack)
-	}
-	if first != 100 || last != 200 {
-		t.Fatalf("first_seen must stick, last_seen must update: first=%d last=%d", first, last)
-	}
-}
-
-func TestQueryRumErrorsAggregatesOverRange(t *testing.T) {
-	s, _ := newStore(t)
-	if _, _, err := s.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		ErrGroups: []RumErrorGroupRecord{
-			{Site: "s", Fingerprint: "fp1", Type: "TypeError", Message: "boom", SampleStack: "stk", FirstSeen: 100, LastSeen: 100},
-		},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	occs := []RumErrorOccurrenceRecord{
-		{Site: "s", Fingerprint: "fp1", TS: 100, SessionID: "sess1", Page: "/a", Browser: "Chrome"},
-		{Site: "s", Fingerprint: "fp1", TS: 150, SessionID: "sess1", Page: "/a", Browser: "Chrome"},
-		{Site: "s", Fingerprint: "fp1", TS: 200, SessionID: "sess2", Page: "/b", Browser: "Firefox"},
-		{Site: "s", Fingerprint: "fp1", TS: 9999, SessionID: "sess3", Page: "/c", Browser: "Safari"}, // out of range
-	}
-	if _, _, err := s.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		ErrOccs: occs,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	got, err := s.QueryRumErrors(context.Background(), "s", 50, 500)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 1 {
-		t.Fatalf("expected 1 aggregated group, got %+v", got)
-	}
-	r := got[0]
-	if r.CountWindow != 3 {
-		t.Fatalf("count_window = %d, want 3 (range excludes the 9999 occurrence)", r.CountWindow)
-	}
-	if r.SessionsAffected != 2 {
-		t.Fatalf("sessions_affected = %d, want 2", r.SessionsAffected)
-	}
-	if r.FirstSeen != 100 || r.LastSeen != 200 {
-		t.Fatalf("first/last seen in range = %d/%d, want 100/200", r.FirstSeen, r.LastSeen)
-	}
-	if r.TopPage != "/a" {
-		t.Fatalf("top_page = %q, want /a (2 occurrences vs 1)", r.TopPage)
-	}
-	if len(r.Browsers) != 2 || r.Browsers[0] != "Chrome" {
-		t.Fatalf("browsers = %+v, want [Chrome Firefox]", r.Browsers)
-	}
-	if r.Message != "boom" || r.Type != "TypeError" || r.SampleStack != "stk" {
-		t.Fatalf("group fields not joined: %+v", r)
-	}
-}
-
-func TestQueryRumSessionsOverlapSemantics(t *testing.T) {
-	s, _ := newStore(t)
-	batch := RumHistoryBatch{Sessions: []RumSessionRecord{
-		{Site: "s", SessionID: "before", StartedAt: 0, LastAt: 50},          // ends before range
-		{Site: "s", SessionID: "overlap-start", StartedAt: 50, LastAt: 150}, // starts before, ends inside
-		{Site: "s", SessionID: "inside", StartedAt: 120, LastAt: 180},       // fully inside
-		{Site: "s", SessionID: "overlap-end", StartedAt: 190, LastAt: 300},  // starts inside, ends after
-		{Site: "s", SessionID: "after", StartedAt: 500, LastAt: 600},        // starts after range
-	}}
-	if _, _, err := s.WriteRumHistoryBatch(context.Background(), batch); err != nil {
-		t.Fatal(err)
-	}
-	got, err := s.QueryRumSessions(context.Background(), "s", 100, 200, 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := map[string]bool{"overlap-start": true, "inside": true, "overlap-end": true}
-	if len(got) != len(want) {
-		t.Fatalf("got %d sessions, want %d: %+v", len(got), len(want), got)
-	}
-	for _, g := range got {
-		if !want[g.SessionID] {
-			t.Fatalf("unexpected session in overlap result: %s", g.SessionID)
-		}
-	}
-	// newest last_at first
-	if got[0].SessionID != "overlap-end" {
-		t.Fatalf("expected newest-first ordering, got %+v", got)
-	}
-}
-
-func TestQueryRumSessionsCap(t *testing.T) {
-	s, _ := newStore(t)
-	var recs []RumSessionRecord
-	for i := 0; i < 2500; i++ {
-		recs = append(
-			recs,
-			RumSessionRecord{
-				Site:      "s",
-				SessionID: fmt.Sprintf("sess%04d", i),
-				StartedAt: int64(i),
-				LastAt:    int64(i),
-			},
-		)
-	}
-	if _, _, err := s.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		Sessions: recs,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	got, err := s.QueryRumSessions(context.Background(), "s", 0, 3000, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got) != 2000 {
-		t.Fatalf("expected the 2000 cap, got %d", len(got))
-	}
-}
-
-func TestRumHistoryRetentionByAge(t *testing.T) {
-	s, _ := newStore(t)
-	now := time.Now().Unix()
-	old := now - 40*86400
-	fresh := now - 1*86400
-
-	if _, _, err := s.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		Sessions:  []RumSessionRecord{{Site: "s", SessionID: "old", StartedAt: old, LastAt: old}, {Site: "s", SessionID: "fresh", StartedAt: fresh, LastAt: fresh}},
-		Events:    []RumSessionEventRecord{{Site: "s", SessionID: "old", TSUnixUS: old * 1_000_000, Type: "pageview"}, {Site: "s", SessionID: "fresh", TSUnixUS: fresh * 1_000_000, Type: "pageview"}},
-		ErrGroups: []RumErrorGroupRecord{{Site: "s", Fingerprint: "old", FirstSeen: old, LastSeen: old}, {Site: "s", Fingerprint: "fresh", FirstSeen: fresh, LastSeen: fresh}},
-		ErrOccs:   []RumErrorOccurrenceRecord{{Site: "s", Fingerprint: "old", TS: old}, {Site: "s", Fingerprint: "fresh", TS: fresh}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.EnforceRumHistoryRetention(context.Background(), 30, 0); err != nil {
-		t.Fatal(err)
-	}
-	sessions, _ := s.QueryRumSessions(context.Background(), "s", 0, now+1, 10)
-	if len(sessions) != 1 || sessions[0].SessionID != "fresh" {
-		t.Fatalf("age retention must keep only the fresh session: %+v", sessions)
-	}
-	events, _ := s.QueryRumSessionEvents(context.Background(), "s", "old")
-	if len(events) != 0 {
-		t.Fatalf("old session's events must be gone: %+v", events)
-	}
-	errs, _ := s.QueryRumErrors(context.Background(), "s", 0, now+1)
-	if len(errs) != 1 || errs[0].Fingerprint != "fresh" {
-		t.Fatalf("age retention must keep only the fresh error group's occurrences: %+v", errs)
-	}
-}
-
-// TestRumHistoryRetentionByAgePrunesOrphanSession covers a session whose
-// last_at was kept fresh by beacons that produced no event (e.g. repeat
-// vitals within the pageview dedup window): the events cutoff alone
-// removes its one stored event while last_at stays newer than the
-// cutoff, so the session row would otherwise survive with nothing left
-// pointing to it.
-func TestRumHistoryRetentionByAgePrunesOrphanSession(t *testing.T) {
-	s, _ := newStore(t)
-	now := time.Now().Unix()
-	oldEvent := now - 40*86400
-	freshLastAt := now - 1*86400
-
-	if _, _, err := s.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		Sessions: []RumSessionRecord{{Site: "s", SessionID: "sess1", StartedAt: oldEvent, LastAt: freshLastAt}},
-		Events:   []RumSessionEventRecord{{Site: "s", SessionID: "sess1", TSUnixUS: oldEvent * 1_000_000, Type: "pageview"}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.EnforceRumHistoryRetention(context.Background(), 30, 0); err != nil {
-		t.Fatal(err)
-	}
-	events, err := s.QueryRumSessionEvents(context.Background(), "s", "sess1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(events) != 0 {
-		t.Fatalf("the old event must be gone: %+v", events)
-	}
-	sessions, err := s.QueryRumSessions(context.Background(), "s", 0, now+1, 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(sessions) != 0 {
-		t.Fatalf("session with zero remaining events must be pruned even though last_at was still fresh: %+v", sessions)
-	}
-}
-
-func TestRumHistoryRetentionBySizeEvictsOldestDayFirst(t *testing.T) {
-	s, _ := newStore(t)
-	now := time.Now().Unix()
-	// Three distinct days of error occurrences, each with a sizable page value.
-	bigPage := strings.Repeat("x", 500)
-	var occs []RumErrorOccurrenceRecord
-	for day := 0; day < 3; day++ {
-		ts := now - int64(2-day)*86400 // day0 oldest .. day2 newest
-		for i := 0; i < 5; i++ {
-			occs = append(
-				occs,
-				RumErrorOccurrenceRecord{
-					Site:        "s",
-					Fingerprint: fmt.Sprintf("fp%d", day),
-					TS:          ts,
-					Page:        bigPage,
-					Browser:     "Chrome",
-				},
-			)
-		}
-	}
-	if _, _, err := s.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		ErrOccs: occs,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	before, err := s.rumHistoryBytes(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Cap tight enough to force evicting the oldest day only.
-	capBytes := before - 1
-	if err := s.EnforceRumHistoryRetention(context.Background(), 0, capBytes); err != nil {
-		t.Fatal(err)
-	}
-	after, err := s.rumHistoryBytes(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if after > capBytes {
-		t.Fatalf("size after retention (%d) must be <= cap (%d)", after, capBytes)
-	}
-	remaining, err := s.QueryRumErrors(context.Background(), "s", 0, now+1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, r := range remaining {
-		if r.Fingerprint == "fp0" {
-			t.Fatalf("oldest day's fingerprint fp0 must be evicted first: %+v", remaining)
-		}
-	}
-}
-
-func TestRumHistoryRetentionSizeCapPrunesOrphanParents(t *testing.T) {
-	s, _ := newStore(t)
-	now := time.Now().Unix()
-	oldDay := now - 2*86400
-	bigText := strings.Repeat("y", 1000)
-
-	if _, _, err := s.WriteRumHistoryBatch(context.Background(), RumHistoryBatch{
-		Sessions: []RumSessionRecord{{Site: "s", SessionID: "sess1", StartedAt: oldDay, LastAt: oldDay}},
-		Events:   []RumSessionEventRecord{{Site: "s", SessionID: "sess1", TSUnixUS: oldDay * 1_000_000, Type: "pageview", Text: bigText}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	before, err := s.rumHistoryBytes(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := s.EnforceRumHistoryRetention(context.Background(), 0, before-1); err != nil {
-		t.Fatal(err)
-	}
-	sessions, err := s.QueryRumSessions(context.Background(), "s", 0, now+1, 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(sessions) != 0 {
-		t.Fatalf("session with all events evicted must be pruned too: %+v", sessions)
-	}
-}
-
-func newStore(t *testing.T) (*Store, string) {
+func newTestStore(t *testing.T) *Store {
 	t.Helper()
-	dir := t.TempDir()
-	s, err := Open(context.Background(), filepath.Join(dir, "test.db"))
-	if err != nil {
-		t.Fatal(err)
+	s, err := Open(context.Background(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+	return s
+}
+
+func appendEvent(t *testing.T, s *Store, r RumEventRecord) {
+	t.Helper()
+	attempted, err := s.AppendRumEvent(context.Background(), r)
+	require.True(t, attempted)
+	require.NoError(t, err)
+}
+
+func TestJournalReopenAndPrivateCleanup(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "history")
+	s, err := Open(ctx, path)
+	require.NoError(t, err)
+	event := RumEventRecord{
+		Site:        "shop",
+		SessionID:   "session",
+		TSUnixUS:    time.Now().UnixMicro(),
+		Type:        "error",
+		Fingerprint: "fp",
+		ErrorType:   "TypeError",
+		Message:     "broken",
+		SampleStack: "stack",
+		Text:        "TypeError: broken",
+		Browser:     "browser",
+		Page:        "/cart",
+		TraceID:     "trace",
 	}
-	t.Cleanup(func() { _ = s.Close() })
-	return s, dir
+	appendEvent(t, s, event)
+	require.NoError(t, s.Sync(ctx))
+	require.NoError(t, s.Close())
+	s, err = Open(ctx, path)
+	require.NoError(t, err)
+	defer s.Close()
+	events, err := s.QueryRumSessionEvents(ctx, "shop", "session")
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, event.TSUnixUS, events[0].TSUnixUS)
+	assert.Equal(t, "trace", events[0].TraceID)
+	groups, err := s.QueryRumErrors(ctx, "shop", "fp", 0, time.Now().Unix()+1)
+	require.NoError(t, err)
+	require.Len(t, groups, 1)
+	assert.Equal(t, "stack", groups[0].SampleStack)
+	assert.Equal(t, "broken", groups[0].Message)
+	assert.Equal(t, 1, groups[0].CountWindow)
+	private := newTestStore(t)
+	privatePath := private.root
+	assert.NotEmpty(t, private.temporary)
+	appendEvent(t, private, event)
+	require.NoError(t, private.Close())
+	_, err = os.Stat(privatePath)
+	assert.ErrorIs(t, err, os.ErrNotExist)
+	_, err = os.Stat(path)
+	assert.NoError(t, err)
+}
+
+func TestSavedTimeFiltersAndOriginalTimeSummaries(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	saved := time.Now()
+	old := saved.Add(-10 * time.Minute)
+	records := []RumEventRecord{
+		{
+			Site:      "shop",
+			SessionID: "s",
+			TSUnixUS:  old.Add(time.Minute).UnixMicro(),
+			Type:      "error",
+			Page:      "/last",
+			Browser:   "latest",
+			UserID:    "u",
+		},
+		{Site: "shop", SessionID: "s", TSUnixUS: old.UnixMicro(), Type: "pageview", Page: "/first", Browser: "early"},
+		{Site: "shop", SessionID: "s", TSUnixUS: old.UnixMicro(), Type: "pageview", Page: "/first", Browser: "early"},
+		{Site: "shop", SessionID: "s", TSUnixUS: old.Add(time.Second).UnixMicro(), Type: "frustration", Page: "/first"},
+		{Site: "shop", SessionID: "activity", TSUnixUS: old.UnixMicro(), Type: "activity", Page: "/idle"},
+		{Site: "other", SessionID: "s", TSUnixUS: old.UnixMicro(), Type: "pageview"},
+	}
+	for _, r := range records {
+		appendEvent(t, s, r)
+	}
+	sessions, err := s.QueryRumSessions(ctx, "shop", saved.Unix()-1, saved.Unix()+5, 0)
+	require.NoError(t, err)
+	require.Len(t, sessions, 2)
+	got := sessions[0]
+	assert.Equal(t, "s", got.SessionID)
+	assert.Equal(t, int64(2), got.Pageviews)
+	assert.Equal(t, int64(1), got.Errors)
+	assert.Equal(t, int64(1), got.Frustrations)
+	assert.Equal(t, old.Unix(), got.StartedAt)
+	assert.Equal(t, old.Add(time.Minute).Unix(), got.LastAt)
+	assert.Equal(t, "/first", got.EntryPage)
+	assert.Equal(t, "/last", got.LastPage)
+	assert.Equal(t, "latest", got.Browser)
+	assert.Equal(t, "u", got.UserID)
+	events, err := s.QueryRumSessionEvents(ctx, "shop", "s")
+	require.NoError(t, err)
+	require.Len(t, events, 4)
+	assert.Equal(t, "pageview", events[0].Type)
+	assert.Equal(t, events[0], events[1], "identical records are separate immutable events")
+	assert.Equal(t, "error", events[3].Type)
+	events, err = s.QueryRumSessionEvents(ctx, "shop", "activity")
+	require.NoError(t, err)
+	assert.Empty(t, events)
+	sessions, err = s.QueryRumSessions(ctx, "shop", old.Unix()-1, old.Unix()+100, 0)
+	require.NoError(t, err)
+	assert.Empty(t, sessions, "saved-time filter must not match delayed original timestamps")
+	sessions, err = s.QueryRumSessions(ctx, "", 0, saved.Unix()+5, 1)
+	require.NoError(t, err)
+	assert.Len(t, sessions, 1)
+}
+
+func TestSelfContainedErrorsAndSelectedDetails(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	now := time.Now()
+	records := []RumEventRecord{
+		{
+			Site:        "shop",
+			TSUnixUS:    now.Add(-time.Minute).UnixMicro(),
+			Type:        "error",
+			Fingerprint: "fp",
+			ErrorType:   "TypeError",
+			Message:     "parentless",
+			SampleStack: "stack",
+			Page:        "/b",
+			Browser:     "z",
+		},
+		{
+			Site:        "shop",
+			SessionID:   "one",
+			TSUnixUS:    now.UnixMicro(),
+			Type:        "error",
+			Fingerprint: "fp",
+			ErrorType:   "TypeError",
+			Message:     "parentless",
+			Page:        "/a",
+			Browser:     "a",
+		},
+		{
+			Site:        "shop",
+			SessionID:   "one",
+			TSUnixUS:    now.UnixMicro(),
+			Type:        "error",
+			Fingerprint: "fp",
+			Page:        "/a",
+			Browser:     "z",
+		},
+		{
+			Site:        "shop",
+			SessionID:   "two",
+			TSUnixUS:    now.UnixMicro(),
+			Type:        "error",
+			Fingerprint: "other",
+			Page:        "/other",
+		},
+	}
+	for _, r := range records {
+		appendEvent(t, s, r)
+	}
+	groups, err := s.QueryRumErrors(ctx, "shop", "", now.Unix()-1, now.Unix()+5)
+	require.NoError(t, err)
+	require.Len(t, groups, 2)
+	assert.Equal(t, 3, groups[0].CountWindow)
+	assert.False(t, groups[0].Details)
+	assert.Zero(t, groups[0].SessionsAffected)
+	assert.Empty(t, groups[0].TopPage)
+	assert.Nil(t, groups[0].Browsers)
+	assert.Equal(t, "parentless", groups[0].Message)
+	assert.Equal(t, "stack", groups[0].SampleStack)
+	assert.Equal(t, now.Add(-time.Minute).Unix(), groups[0].FirstSeen)
+	groups, err = s.QueryRumErrors(ctx, "shop", "fp", now.Unix()-1, now.Unix()+5)
+	require.NoError(t, err)
+	require.Len(t, groups, 1)
+	assert.True(t, groups[0].Details)
+	assert.Equal(t, 1, groups[0].SessionsAffected)
+	assert.Equal(t, "/a", groups[0].TopPage)
+	assert.Equal(t, []string{"z", "a"}, groups[0].Browsers)
+	groups, err = s.QueryRumErrors(ctx, "shop", "missing", 0, now.Unix()+5)
+	require.NoError(t, err)
+	assert.Empty(t, groups)
+}
+
+// Seed an actual old journal through the SDK's lazy writer. An eager file's
+// name uses creation time even when its first event is backdated.
+func seedOldJournal(t *testing.T, root string, event RumEventRecord, saved time.Time) {
+	t.Helper()
+	host, err := journalhost.Load(journalhost.LoadOptions{
+		StateDir: filepath.Join(root, "identity"),
+	})
+	require.NoError(t, err)
+	log, err := journal.NewLog(
+		root,
+		journal.LogConfig{
+			Source: "dem",
+			Options: journal.Options{
+				MachineID: host.MachineID(),
+				BootID:    host.BootID(),
+				Compact:   true,
+			},
+		},
+	)
+	require.NoError(t, err)
+	opts := host.EntryOptions()
+	opts.RealtimeUsec = uint64(saved.UnixMicro())
+	require.NoError(t, log.Append(eventFields(event), opts))
+	require.NoError(t, log.Close())
+}
+
+func TestRetentionIdleExpiryAndRetainedCounts(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	old := time.Now().Add(-48 * time.Hour)
+	seedOldJournal(
+		t,
+		root,
+		RumEventRecord{
+			Site:      "shop",
+			SessionID: "s",
+			Type:      "pageview",
+			TSUnixUS:  old.UnixMicro(),
+			Page:      "/expired",
+		},
+		old,
+	)
+	s, err := Open(ctx, root)
+	require.NoError(t, err)
+	defer s.Close()
+	sessions, err := s.QueryRumSessions(ctx, "shop", 0, time.Now().Unix()+5, 0)
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	require.NoError(t, s.EnforceRumHistoryRetention(ctx, 1, 0))
+	sessions, err = s.QueryRumSessions(ctx, "shop", 0, time.Now().Unix()+5, 0)
+	require.NoError(t, err)
+	assert.Empty(t, sessions, "expiry must run without a new event or enabled site")
+	fresh := time.Now()
+	appendEvent(
+		t,
+		s,
+		RumEventRecord{
+			Site:      "shop",
+			SessionID: "s",
+			Type:      "pageview",
+			TSUnixUS:  fresh.UnixMicro(),
+			Page:      "/retained",
+		},
+	)
+	sessions, err = s.QueryRumSessions(ctx, "shop", 0, fresh.Unix()+5, 0)
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	assert.Equal(t, int64(1), sessions[0].Pageviews)
+	assert.Equal(t, fresh.Unix(), sessions[0].StartedAt)
+	assert.Equal(t, "/retained", sessions[0].EntryPage)
+}
+
+func TestRetentionWholeFilesAndLiveWriter(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	appendEvent(t, s, RumEventRecord{
+		Site:      "shop",
+		SessionID: "s",
+		Type:      "pageview",
+		TSUnixUS:  time.Now().UnixMicro(),
+	})
+	reader, release, err := s.openReader(ctx)
+	require.NoError(t, err)
+	defer release()
+	require.NoError(t, s.EnforceRumHistoryRetention(ctx, 0, 1))
+	files, err := filepath.Glob(filepath.Join(s.root, "*", "dem@*.journal"))
+	require.NoError(t, err)
+	require.Len(t, files, 1, "the protected fresh active file survives an impossibly small budget")
+	info, err := os.Stat(files[0])
+	require.NoError(t, err)
+	assert.Greater(t, info.Size(), int64(1), "maxBytes is not a strict cap")
+	has, err := reader.Step()
+	require.NoError(t, err)
+	assert.True(t, has, "opened snapshot survives archive unlink")
+	sessions, err := s.QueryRumSessions(ctx, "", 0, time.Now().Unix()+5, 0)
+	require.NoError(t, err)
+	assert.Empty(t, sessions)
+	appendEvent(
+		t,
+		s,
+		RumEventRecord{
+			Site:      "shop",
+			SessionID: "fresh",
+			Type:      "activity",
+			TSUnixUS:  time.Now().UnixMicro(),
+		},
+	)
+	require.NoError(t, s.Sync(ctx))
+	sessions, err = s.QueryRumSessions(ctx, "", 0, time.Now().Unix()+5, 0)
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	assert.Equal(t, "fresh", sessions[0].SessionID)
+}
+
+func TestChainContinuesAcrossBootIdentityChange(t *testing.T) {
+	root := t.TempDir()
+	ctx := context.Background()
+	host, err := journalhost.Load(journalhost.LoadOptions{
+		StateDir: filepath.Join(root, "identity"),
+	})
+	require.NoError(t, err)
+	oldBoot, err := journal.NewUUID()
+	require.NoError(t, err)
+	log, err := journal.NewLog(
+		root,
+		journal.LogConfig{
+			Source: "dem",
+			Options: journal.Options{
+				MachineID: host.MachineID(),
+				BootID:    oldBoot,
+				Compact:   true,
+			},
+		},
+	)
+	require.NoError(t, err)
+	opts := host.EntryOptions()
+	opts.BootID = oldBoot
+	require.NoError(
+		t,
+		log.Append(
+			eventFields(
+				RumEventRecord{
+					Site:      "shop",
+					SessionID: "s",
+					Type:      "pageview",
+					TSUnixUS:  time.Now().UnixMicro(),
+				},
+			),
+			opts,
+		),
+	)
+	firstPath := log.ActivePath()
+	require.NoError(t, log.Close())
+	first, err := journal.OpenFile(firstPath)
+	require.NoError(t, err)
+	sequenceID, sequence := first.Header().SeqnumID(), first.Header().TailEntrySeqnum()
+	require.NoError(t, first.Close())
+	s, err := Open(ctx, root)
+	require.NoError(t, err)
+	appendEvent(t, s, RumEventRecord{
+		Site:      "shop",
+		SessionID: "s",
+		Type:      "pageview",
+		TSUnixUS:  time.Now().UnixMicro(),
+	})
+	secondPath := s.log.ActivePath()
+	require.NoError(t, s.Close())
+	second, err := journal.OpenFile(secondPath)
+	require.NoError(t, err)
+	defer second.Close()
+	assert.Equal(t, sequenceID, second.Header().SeqnumID())
+	assert.Equal(t, sequence+1, second.Header().HeadEntrySeqnum())
+	assert.Equal(t, host.BootID(), second.Header().TailEntryBootID())
+	s, err = Open(ctx, root)
+	require.NoError(t, err)
+	defer s.Close()
+	sessions, err := s.QueryRumSessions(ctx, "shop", 0, time.Now().Unix()+5, 0)
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	assert.Equal(t, int64(2), sessions[0].Pageviews)
+}
+
+func TestAppendReportsAttemptedOnFilesystemFailure(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	require.NoError(t, s.EnforceRumHistoryRetention(ctx, 0, 1))
+	appendEvent(
+		t,
+		s,
+		RumEventRecord{
+			Site:      "shop",
+			SessionID: "s",
+			Type:      "pageview",
+			TSUnixUS:  time.Now().UnixMicro(),
+			Text:      strings.Repeat("x", 600*1024),
+		},
+	)
+	machineDir := filepath.Dir(s.log.ActivePath())
+	moved := machineDir + ".moved"
+	require.NoError(t, os.Rename(machineDir, moved))
+	attempted, err := s.AppendRumEvent(
+		ctx,
+		RumEventRecord{
+			Site:      "shop",
+			SessionID: "s",
+			Type:      "error",
+			TSUnixUS:  time.Now().UnixMicro(),
+		},
+	)
+	// Restore our task-owned directory before assertions and normal cleanup.
+	require.NoError(t, os.Rename(moved, machineDir))
+	assert.True(t, attempted, "the SDK was called even though archive publication failed")
+	assert.Error(t, err)
+	require.NoError(t, s.Sync(ctx))
+}
+
+func TestCorruptArchiveReturnsErrorInsteadOfPartialCounts(t *testing.T) {
+	s := newTestStore(t)
+	appendEvent(t, s, RumEventRecord{
+		Site:      "shop",
+		SessionID: "s",
+		Type:      "pageview",
+	})
+	// This filename is in the owned journal namespace but contains no journal.
+	path := filepath.Join(
+		filepath.Dir(s.log.ActivePath()),
+		"dem@ffffffffffffffffffffffffffffffff-0000000000000001-0000000000000001.journal",
+	)
+	require.NoError(t, os.WriteFile(path, []byte("invalid journal"), 0600))
+	_, err := s.QueryRumSessions(context.Background(), "shop", 0, time.Now().Unix()+5, 0)
+	assert.Error(t, err)
+	// Keep corrupt files out of retention's SDK chain parser on test shutdown.
+	require.NoError(t, os.Rename(path, path+".test-invalid"))
+}
+
+func BenchmarkAppendRumEvent(b *testing.B) {
+	s, err := Open(context.Background(), b.TempDir())
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer s.Close()
+	r := RumEventRecord{
+		Site:      "shop",
+		SessionID: "session",
+		TSUnixUS:  time.Now().UnixMicro(),
+		Type:      "pageview",
+		Page:      "/cart",
+		Browser:   "Firefox",
+		Device:    "desktop",
+		Country:   "DE",
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if _, err := s.AppendRumEvent(context.Background(), r); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func TestDamagedJournalIsReportedAndUnrelatedSourcesAreIgnored(t *testing.T) {
+	s := newTestStore(t)
+	appendEvent(t, s, RumEventRecord{
+		Site:      "shop",
+		SessionID: "s",
+		Type:      "pageview",
+	})
+	dir := filepath.Dir(s.log.ActivePath())
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "unrelated@broken.journal"), []byte("invalid"), 0600))
+	sessions, err := s.QueryRumSessions(context.Background(), "shop", 0, time.Now().Unix()+5, 0)
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	damaged := filepath.Join(dir, "dem@damaged.journal~")
+	require.NoError(t, os.WriteFile(damaged, []byte("quarantined"), 0600))
+	_, err = s.QueryRumSessions(context.Background(), "shop", 0, time.Now().Unix()+5, 0)
+	require.ErrorContains(t, err, "operator recovery is required")
+	appendEvent(t, s, RumEventRecord{
+		Site:      "shop",
+		SessionID: "fresh",
+		Type:      "activity",
+	})
+	require.NoError(t, s.EnforceRumHistoryRetention(context.Background(), 1, 100000000))
+	data, err := os.ReadFile(damaged)
+	require.NoError(t, err)
+	assert.Equal(t, "quarantined", string(data))
+}
+
+func TestMissingJournalDirectoryReturnsErrorInsteadOfEmptyHistory(t *testing.T) {
+	for _, scope := range []string{"root", "machine"} {
+		t.Run(scope, func(t *testing.T) {
+			s := newTestStore(t)
+			appendEvent(t, s, RumEventRecord{
+				Site:      "shop",
+				SessionID: "s",
+				Type:      "pageview",
+			})
+			path := s.root
+			if scope == "machine" {
+				path = filepath.Dir(s.log.ActivePath())
+			}
+			moved := path + ".temporarily-moved"
+			require.NoError(t, os.Rename(path, moved))
+			_, err := s.QueryRumSessions(context.Background(), "shop", 0, time.Now().Unix()+5, 0)
+			require.NoError(t, os.Rename(moved, path))
+			assert.ErrorIs(t, err, os.ErrNotExist)
+			sessions, err := s.QueryRumSessions(context.Background(), "shop", 0, time.Now().Unix()+5, 0)
+			require.NoError(t, err)
+			require.Len(t, sessions, 1)
+		})
+	}
+}
+
+// A short SDK age models an archive crossing the old limit between hourly
+// sweeps. Relaxing retention must preserve it under the newly loaded policy.
+func TestRelaxedRetentionDoesNotApplyPreviousAge(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	saved := time.Now()
+	seedOldJournal(t, root, RumEventRecord{
+		Site:      "shop",
+		SessionID: "retained",
+		Type:      "pageview",
+		TSUnixUS:  saved.UnixMicro(),
+	}, saved)
+	host, err := journalhost.Load(journalhost.LoadOptions{
+		StateDir: filepath.Join(root, "identity"),
+	})
+	require.NoError(t, err)
+	config := journal.LogConfig{
+		Source:   "dem",
+		OpenMode: journal.LogOpenEager,
+		Options: journal.Options{
+			MachineID: host.MachineID(),
+			BootID:    host.BootID(),
+			Compact:   true,
+		},
+		RetentionPolicy: journal.RetentionPolicy{}.WithMaxAge(time.Second).WithMaxBytes(1 << 30),
+	}
+	log, err := journal.NewLog(root, config)
+	require.NoError(t, err)
+	s := &Store{
+		gate:   make(chan struct{}, 1),
+		root:   root,
+		host:   host,
+		config: config,
+		log:    log,
+	}
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+	before, err := s.QueryRumSessions(ctx, "shop", 0, saved.Unix()+5, 0)
+	require.NoError(t, err)
+	require.Len(t, before, 1)
+	appendEvent(t, s, RumEventRecord{
+		Site:      "shop",
+		SessionID: "current",
+		Type:      "pageview",
+		TSUnixUS:  saved.UnixMicro(),
+	})
+	time.Sleep(time.Until(saved.Add(time.Second + 50*time.Millisecond)))
+	require.NoError(t, s.EnforceRumHistoryRetention(ctx, 30, 1<<30))
+	after, err := s.QueryRumSessions(ctx, "shop", 0, time.Now().Unix()+5, 0)
+	require.NoError(t, err)
+	require.Len(t, after, 2, "an increased allowance must not enforce the retired shorter age")
 }
