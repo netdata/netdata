@@ -1,0 +1,20 @@
+receivers:
+  journald:
+    directory: /var/log/journal
+    identifiers:
+      - myapp
+      - myapp-worker
+    priority: info
+    start_at: end
+
+exporters:
+  otlp:
+    endpoint: "localhost:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    logs:
+      receivers: [journald]
+      exporters: [otlp]
