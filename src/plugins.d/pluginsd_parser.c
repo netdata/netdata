@@ -1405,6 +1405,17 @@ bool parser_reconstruct_context(BUFFER *wb, void *ptr) {
     return true;
 }
 
+static int pluginsd_read_timeout_ms(int update_every) {
+    // Sparse plugins may remain silent for a full collection interval.
+    const int minimum_ms = 2 * 60 * MSEC_PER_SEC;
+    int64_t timeout_ms = (int64_t)update_every * 2 * (int64_t)MSEC_PER_SEC;
+    if(timeout_ms < minimum_ms)
+        return minimum_ms;
+    if(timeout_ms > INT_MAX)
+        return INT_MAX;
+    return (int)timeout_ms;
+}
+
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, int fd_output, int trust_durations, bool *retry, bool *protocol_error)
 {
     *retry = false;
@@ -1452,7 +1463,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
         if(unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
             buffered_reader_ret_t ret = buffered_reader_read_timeout(
                     &parser->reader, parser->fd_input,
-                    2 * 60 * MSEC_PER_SEC, true);
+                    pluginsd_read_timeout_ms(cd->update_every), true);
 
             if(unlikely(ret != BUFFERED_READER_READ_OK)) {
                 nd_log(NDLS_COLLECTORS, NDLP_INFO, "PLUGINSD: buffered reader not OK (%d)", ret);
@@ -1724,7 +1735,85 @@ static int pluginsd_parser_unittest_slot_bounds(size_t max_slot) {
     return 0;
 }
 
+#ifndef OS_WINDOWS
+struct pluginsd_unittest_writer {
+    int fd;
+    bool success;
+};
+
+static void pluginsd_unittest_delayed_output(void *arg) {
+    struct pluginsd_unittest_writer *writer = arg;
+    usec_t started_ut = now_monotonic_usec();
+    sleep_usec(150000);
+    if(now_monotonic_usec() - started_ut < 150000)
+        return;
+    ssize_t written;
+    do {
+        written = write(writer->fd, "\n", 1);
+    } while(written < 0 && errno == EINTR);
+    writer->success = written == 1;
+}
+#endif
+
+static int pluginsd_parser_unittest_read_timeout(void) {
+#ifndef OS_WINDOWS
+    // Scale seconds to milliseconds; allow scheduling slack while exceeding the old timeout.
+    int fds[2];
+    if(pipe(fds) != 0)
+        return 1;
+
+    struct pluginsd_unittest_writer writer_result = { .fd = fds[1] };
+    ND_THREAD *writer = nd_thread_create("pluginsd-ut", NETDATA_THREAD_OPTION_DONT_LOG,
+                                         pluginsd_unittest_delayed_output, &writer_result);
+    struct buffered_reader reader;
+    buffered_reader_init(&reader);
+    buffered_reader_ret_t ret = buffered_reader_read_timeout(
+        &reader, fds[0], pluginsd_read_timeout_ms(3000) / MSEC_PER_SEC, false);
+    nd_thread_join(writer);
+    close(fds[0]);
+    close(fds[1]);
+    if(!writer_result.success || ret != BUFFERED_READER_READ_OK || reader.read_len != 1 || reader.read_buffer[0] != '\n') {
+        netdata_log_error("PLUGINSD: sparse plugin output disconnected before its next sample");
+        return 1;
+    }
+
+    if(pipe(fds) != 0)
+        return 1;
+    buffered_reader_init(&reader);
+    ret = buffered_reader_read_timeout(
+        &reader, fds[0], pluginsd_read_timeout_ms(1) / MSEC_PER_SEC, false);
+    close(fds[0]);
+    close(fds[1]);
+    if(ret != BUFFERED_READER_READ_POLL_TIMEOUT) {
+        netdata_log_error("PLUGINSD: silent fast plugin did not time out");
+        return 1;
+    }
+#endif
+
+    const struct {
+        int interval;
+        int expected_ms;
+    } cases[] = {
+        { INT_MIN, 120000 }, { 0, 120000 }, { 1, 120000 },
+        { 60, 120000 }, { 61, 122000 }, { 300, 600000 }, { 600, 1200000 }, { 3000, 6000000 },
+        { INT_MAX / 2000, (INT_MAX / 2000) * 2000 },
+        { INT_MAX / 2000 + 1, INT_MAX }, { INT_MAX, INT_MAX },
+    };
+    for(size_t i = 0; i < _countof(cases); i++) {
+        int actual = pluginsd_read_timeout_ms(cases[i].interval);
+        if(actual != cases[i].expected_ms) {
+            netdata_log_error("PLUGINSD: read timeout for interval %d: expected %d ms, got %d ms",
+                              cases[i].interval, cases[i].expected_ms, actual);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int pluginsd_parser_unittest(void) {
+    if(pluginsd_parser_unittest_read_timeout())
+        return 1;
+
     if(pluginsd_parser_unittest_slot_bounds(PLUGINSD_DIMENSION_SLOT_MAX))
         return 1;
 
