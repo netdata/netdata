@@ -2,8 +2,8 @@
 //! and lands them in per-tenant WALs — the span analog of
 //! [`crate::logs_service::NetdataLogsService`]. The logic is
 //! transport-agnostic — it lives on the [`NetdataTracesService::export_traces`]
-//! core, which the gRPC `TraceService` wrapper calls today and the upcoming
-//! OTLP/HTTP front end calls next. Same two-phase export structure: prepare
+//! core, which both the gRPC `TraceService` wrapper and the OTLP/HTTP front
+//! end call. Same two-phase export structure: prepare
 //! every frame lock-free (normalize + interval time bounds + flatten +
 //! encode, all owned by [`ng_flatten::prepare_trace_frame`]; `Some(bounds)`
 //! here — production enforces the window, while the `ng-ingest` dev tool and

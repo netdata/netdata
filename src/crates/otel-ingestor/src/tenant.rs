@@ -3,9 +3,9 @@
 //! and is forwarded to the ledger. The metrics service shares the
 //! transports but is not tenant-scoped and does not use this path.
 //!
-//! Both transports — the gRPC wrappers today, the OTLP/HTTP front end
-//! landing next — resolve through one shared inner function, so the tenant
-//! policy exists exactly once. The id's validation policy lives on
+//! Both transports — the gRPC wrappers and the OTLP/HTTP front end —
+//! resolve through one shared inner function, so the tenant policy exists
+//! exactly once. The id's validation policy lives on
 //! `TenantId::validate_ingest` (file-registry); this module only extracts
 //! the header and maps the outcomes onto transport errors.
 

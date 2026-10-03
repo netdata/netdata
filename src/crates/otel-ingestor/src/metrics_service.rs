@@ -1,9 +1,8 @@
 //! The OTLP metrics ingestion service: receives
 //! `ExportMetricsServiceRequest`s and turns them into Netdata charts. The
 //! logic is transport-agnostic — it lives on the
-//! [`NetdataMetricsService::export_metrics`] core, which the gRPC
-//! `MetricsService` wrapper calls today and the upcoming OTLP/HTTP front
-//! end calls next.
+//! [`NetdataMetricsService::export_metrics`] core, which both the gRPC
+//! `MetricsService` wrapper and the OTLP/HTTP front end call.
 //!
 //! Per request (`export_metrics` → `process_request`): normalize the request (attribute order
 //! feeds the identity hash), then walk its data points via `iter.rs`'s

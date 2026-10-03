@@ -1,8 +1,7 @@
 //! The OTLP logs ingestion service: receives `ExportLogsServiceRequest`s
 //! and lands them in per-tenant WALs. The logic is transport-agnostic — it
-//! lives on the [`NetdataLogsService::export_logs`] core, which the gRPC
-//! `LogsService` wrapper calls today and the upcoming OTLP/HTTP front end
-//! calls next.
+//! lives on the [`NetdataLogsService::export_logs`] core, which both the
+//! gRPC `LogsService` wrapper and the OTLP/HTTP front end call.
 //!
 //! Export flow: the transport wrapper resolves the tenant (`x-scope-orgid`
 //! header) and calls the core, which groups
