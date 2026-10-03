@@ -10,8 +10,6 @@
 #include <atomic>
 #include <unordered_map>
 
-struct ml_queue_t;
-
 typedef struct machine_learning_stats_t {
     uint32_t num_machine_learning_status_enabled;
     uint32_t num_machine_learning_status_disabled_sp;
@@ -59,8 +57,6 @@ typedef struct ml_host {
     // could observe ml_running==true with an unchanged stop generation and
     // publish a snapshot spanning stop's in-flight resets.
     netdata_mutex_t start_stop_mutex;
-
-    ml_queue_t *queue;
 
     /*
      * bookkeeping for anomaly detection charts

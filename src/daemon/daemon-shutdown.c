@@ -239,7 +239,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     ml_stop_threads();
     // ml_stop_threads() only stops and joins the ML threads. It deliberately does
-    // NOT free the per-worker queues: the collector stop above is bounded to 20s,
+    // NOT free the training queue: the collector stop above is bounded to 20s,
     // so a slow collector can still reach ml_queue_push() from here on. The free
     // happens in ml_workers_free(), from the FSANITIZE_ADDRESS block below.
     //
@@ -439,7 +439,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     cgroup_netdev_link_destroy();
     bearer_tokens_destroy();
 
-    // Deferred from ml_stop_threads(): the ML worker queues must outlive every
+    // Deferred from ml_stop_threads(): the ML training queue must outlive every
     // collector that can reach ml_queue_push(), and the collector stop above is
     // time-bounded. Safe here, after rrdhost_free_all() removed all producers.
     ml_workers_free();

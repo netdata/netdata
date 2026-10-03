@@ -21,6 +21,16 @@ bool ml_should_publish_model_update(bool host_running,
                                     uint32_t expected_generation,
                                     bool *training_in_progress);
 
+// Whether the downstream model `km` may be installed on `dim`: not a duplicate, newer than the newest installed
+// model, and no local training in progress. The caller holds dim->slock and installs in the same critical section.
+bool ml_dimension_accept_downstream_model(const ml_dimension_t *dim, const ml_kmeans_inlined_t &km);
+
+// The models installed by any training thread and not yet written to ml.db (Cfg.pending_models).
+void ml_pending_models_add(const ml_model_info_t &model_info);
+size_t ml_pending_models_count();
+// Moves every pending model, in install order, into `batch` (cleared first).
+void ml_pending_models_take(std::vector<ml_model_info_t> &batch);
+
 extern sqlite3 *ml_db;
 extern const char *db_models_create_table;
 

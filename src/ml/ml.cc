@@ -809,17 +809,13 @@ ml_dimension_deserialize_kmeans(RRDHOST *host, const char *json_str)
 
     // ml_host may have been unpublished by ml_host_delete() concurrently;
     // the acquired RRDHOST keeps RH alive but not RH->ml_host.
-    ml_queue_t *queue;
     {
         AcquiredMLHost acquired_host = AcqDim.host();
-        ml_host_t *host = acquired_host.get();
-        if (!host) {
+        if (!acquired_host.get()) {
             pulse_ml_models_ignored();
             json_object_put(root);
             return true;
         }
-
-        queue = host->queue;
     }
 
     ml_queue_item_t item;
@@ -827,7 +823,7 @@ ml_dimension_deserialize_kmeans(RRDHOST *host, const char *json_str)
     item.add_existing_model = {
         DLI, inlined_km
     };
-    ml_queue_push(queue, item);
+    ml_queue_push(Cfg.training_queue, item);
 
     json_object_put(root);
     return true;
@@ -914,19 +910,40 @@ void ml_dimension_finalize_constant_state(ml_dimension_t *dim)
     dim->suppression_window_counter = 0;
 }
 
-static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, uint32_t expected_generation, bool from_downstream)
+void ml_pending_models_add(const ml_model_info_t &model_info)
+{
+    spinlock_lock(&Cfg.pending_models_spinlock);
+    Cfg.pending_models.push_back(model_info);
+    spinlock_unlock(&Cfg.pending_models_spinlock);
+}
+
+size_t ml_pending_models_count()
+{
+    spinlock_lock(&Cfg.pending_models_spinlock);
+    size_t n = Cfg.pending_models.size();
+    spinlock_unlock(&Cfg.pending_models_spinlock);
+    return n;
+}
+
+void ml_pending_models_take(std::vector<ml_model_info_t> &batch)
+{
+    batch.clear();
+    spinlock_lock(&Cfg.pending_models_spinlock);
+    batch.swap(Cfg.pending_models);
+    spinlock_unlock(&Cfg.pending_models_spinlock);
+}
+
+// Installs dim->kmeans as the dimension's newest model. The caller holds dim->slock.
+static bool ml_dimension_update_models_locked(ml_worker_t *worker, ml_dimension_t *dim, uint32_t expected_generation, bool from_downstream)
 {
     worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
 
     // Sample ml_running inside the same slock critical section as the
     // reset_generation check, so a stop that starts first cancels this install.
-    spinlock_lock(&dim->slock);
-
     if (!ml_should_publish_model_update(ml_running_load(dim->rd->rrdset->rrdhost),
                                         dim->reset_generation,
                                         expected_generation,
                                         &dim->training_in_progress)) {
-        spinlock_unlock(&dim->slock);
         return false;
     }
 
@@ -972,15 +989,25 @@ static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim,
     nd_uuid_t *rd_uuid = uuidmap_uuid_ptr(dim->rd->uuid);
     uuid_copy(model_info.metric_uuid, *rd_uuid);
     model_info.inlined_kmeans = dim->km_contexts.back();
-    worker->pending_model_info.push_back(model_info);
+
+    // into the shared list while still holding dim->slock, so two installs of this dimension (on any threads) are
+    // appended in install order
+    ml_pending_models_add(model_info);
 
     ml_dimension_stream_kmeans(worker, dim);
 
     // Clear the training in progress flag
     dim->training_in_progress = false;
 
-    spinlock_unlock(&dim->slock);
     return true;
+}
+
+static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim, uint32_t expected_generation, bool from_downstream)
+{
+    spinlock_lock(&dim->slock);
+    bool installed = ml_dimension_update_models_locked(worker, dim, expected_generation, from_downstream);
+    spinlock_unlock(&dim->slock);
+    return installed;
 }
 
 static enum ml_worker_result
@@ -1495,11 +1522,13 @@ void ml_detect_main(void *arg)
                 ml_worker_t *worker = &Cfg.workers[idx];
 
                 netdata_mutex_lock(&worker->nd_mutex);
-                ml_queue_stats_t queue_stats = worker->queue_stats;
+                ml_worker_stats_t training_stats = worker->training_stats;
                 netdata_mutex_unlock(&worker->nd_mutex);
 
-                ml_update_training_statistics_chart(worker, queue_stats);
+                ml_update_training_statistics_chart(worker, training_stats);
             }
+
+            ml_update_training_queue_charts(ml_queue_stats(Cfg.training_queue), ml_queue_size(Cfg.training_queue));
         }
     }
 
@@ -1509,9 +1538,18 @@ void ml_detect_main(void *arg)
     finalize_self_prepared_sql_statements();
 }
 
+// Called with db_mutex held. Takes every model pending in Cfg.pending_models as this thread's batch: the swap
+// happens under db_mutex, so batches reach the database in the order they were taken, and every dimension's models
+// in the order they were installed.
 static void ml_flush_pending_models(ml_worker_t *worker) {
     static time_t next_vacuum_run = 0;
     int op_no = 1;
+
+    ml_pending_models_take(worker->pending_model_info);
+
+    // another thread that reached the batch size at the same time took them first
+    if (worker->pending_model_info.empty())
+        return;
 
     // Bail when ml.db is missing OR poisoned. The NULL check covers
     // non-corruption init failures (sqlite3_open ENOSPC/EACCES, ...) that
@@ -1622,6 +1660,29 @@ static enum ml_worker_result ml_worker_create_new_model(ml_worker_t *worker, ml_
     return ml_dimension_train_model(worker, Dim);
 }
 
+bool ml_dimension_accept_downstream_model(const ml_dimension_t *dim, const ml_kmeans_inlined_t &km)
+{
+    // Loop detection: skip if we already have this exact model.
+    // The (after, before) pair uniquely identifies a model per dimension and is
+    // preserved across hops, so a model that loops back is detected as a duplicate.
+    for (const auto &ctx : dim->km_contexts) {
+        if (ctx.after == km.after && ctx.before == km.before)
+            return false;
+    }
+
+    // Reject models that are not newer than the newest accepted model. This
+    // prevents an older model from being re-accepted after it has been evicted
+    // from km_contexts and later loops back from downstream.
+    if (!dim->km_contexts.empty() && km.before <= dim->km_contexts.back().before)
+        return false;
+
+    // Skip while a local training is in progress: it uses dim->kmeans as its output buffer.
+    if (dim->training_in_progress)
+        return false;
+
+    return true;
+}
+
 static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, ml_request_add_existing_model_t req) {
     AcquiredDimension AcqDim(req.DLI);
 
@@ -1640,47 +1701,24 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
         return ML_WORKER_RESULT_OK;
     }
 
+    // Check, stage and install in ONE dim->slock critical section. Training threads share one queue, so two of them
+    // can hold models of the same dimension at once: done this way their installs serialise, and the newer-than check
+    // keeps the newest model whichever arrives first. The install, and the has_received_downstream_model flag-set,
+    // happen under the same slock as the publish-check, so a concurrent ml_host_stop() either commits both or
+    // cancels both.
     spinlock_lock(&Dim->slock);
 
-    // Loop detection: skip if we already have this exact model.
-    // The (after, before) pair uniquely identifies a model per dimension and is
-    // preserved across hops, so a model that loops back is detected as a duplicate.
-    for (const auto &km : Dim->km_contexts) {
-        if (km.after == req.inlined_km.after && km.before == req.inlined_km.before) {
-            spinlock_unlock(&Dim->slock);
-            pulse_ml_models_ignored();
-            return ML_WORKER_RESULT_OK;
-        }
-    }
-
-    // Reject models that are not newer than the newest accepted model. This
-    // prevents an older model from being re-accepted after it has been evicted
-    // from km_contexts and later loops back from downstream.
-    if (!Dim->km_contexts.empty()) {
-        const auto &latest_km = Dim->km_contexts.back();
-        if (req.inlined_km.before <= latest_km.before) {
-            spinlock_unlock(&Dim->slock);
-            pulse_ml_models_ignored();
-            return ML_WORKER_RESULT_OK;
-        }
-    }
-
-    // Skip if training is in progress to avoid race condition.
-    if (Dim->training_in_progress) {
+    if (!ml_dimension_accept_downstream_model(Dim, req.inlined_km)) {
         spinlock_unlock(&Dim->slock);
         pulse_ml_models_ignored();
         return ML_WORKER_RESULT_OK;
     }
 
-    // Stage the incoming kmeans into the dim's working buffer; the actual
-    // install into km_contexts and the has_received_downstream_model flag-set
-    // happen inside ml_dimension_update_models() under the same slock as the
-    // publish-check, so a concurrent ml_host_stop() either commits both or
-    // cancels both.
     Dim->kmeans = req.inlined_km;
-    uint32_t generation = Dim->reset_generation;
+    bool installed = ml_dimension_update_models_locked(worker, Dim, Dim->reset_generation, /*from_downstream=*/true);
     spinlock_unlock(&Dim->slock);
-    if (ml_dimension_update_models(worker, Dim, generation, /*from_downstream=*/true))
+
+    if (installed)
         pulse_ml_models_received();
 
     return ML_WORKER_RESULT_OK;
@@ -1711,18 +1749,23 @@ void ml_train_main(void *arg) {
 
         worker_is_busy(WORKER_TRAIN_QUEUE_POP);
 
-        ml_queue_stats_t loop_stats{};
+        ml_worker_stats_t loop_stats{};
+        ml_queue_pass_timing_t pass_timing;
 
-        ml_queue_item_t item = ml_queue_pop(worker->queue);
+        ml_queue_item_t item = ml_queue_pop(Cfg.training_queue, &pass_timing);
         if (item.type == ML_QUEUE_ITEM_STOP_REQUEST) {
             break;
         }
 
-        ml_queue_size_t queue_size = ml_queue_size(worker->queue);
+        ml_queue_size_t queue_size = ml_queue_size(Cfg.training_queue);
 
-        usec_t allotted_ut = (Cfg.train_every * USEC_PER_SEC) / (queue_size.create_new_model + 1);
-        if (allotted_ut > USEC_PER_SEC)
-            allotted_ut = USEC_PER_SEC;
+        // all training threads consume the one queue, so each paces itself to its share of it; this assumes the
+        // configured number of threads is running (a missing or throttled thread makes the pass longer). The cap
+        // keeps the threads TOGETHER at no more than one item per second when there are fewer queued dimensions than
+        // seconds in train_every - the rate one thread had when it held all of a host's dimensions.
+        usec_t allotted_ut = (Cfg.train_every * USEC_PER_SEC * Cfg.num_worker_threads) / (queue_size.create_new_model + 1);
+        if (allotted_ut > USEC_PER_SEC * Cfg.num_worker_threads)
+            allotted_ut = USEC_PER_SEC * Cfg.num_worker_threads;
 
         usec_t start_ut = now_monotonic_usec();
 
@@ -1732,7 +1775,7 @@ void ml_train_main(void *arg) {
             case ML_QUEUE_ITEM_TYPE_CREATE_NEW_MODEL: {
                 worker_res = ml_worker_create_new_model(worker, item.create_new_model);
                 if (ml_should_requeue_create_new_model(worker_res)) {
-                    ml_queue_push(worker->queue, item);
+                    ml_queue_push(Cfg.training_queue, item);
                 }
                 break;
             }
@@ -1754,22 +1797,15 @@ void ml_train_main(void *arg) {
         if (Cfg.enable_statistics_charts) {
             worker_is_busy(WORKER_TRAIN_UPDATE_HOST);
 
-            ml_queue_stats_t queue_stats = ml_queue_stats(worker->queue);
-
-            loop_stats.total_add_existing_model_requests_pushed = queue_stats.total_add_existing_model_requests_pushed;
-            loop_stats.total_add_existing_model_requests_popped = queue_stats.total_add_existing_model_requests_popped;
-            loop_stats.total_create_new_model_requests_pushed = queue_stats.total_create_new_model_requests_pushed;
-            loop_stats.total_create_new_model_requests_popped = queue_stats.total_create_new_model_requests_popped;
-
             loop_stats.allotted_ut = allotted_ut;
             loop_stats.consumed_ut = consumed_ut;
             loop_stats.remaining_ut = remaining_ut;
 
-            loop_stats.pass_resolve_ut = queue_stats.pass_resolve_ut;
-            loop_stats.pass_sort_ut = queue_stats.pass_sort_ut;
-            loop_stats.passes_sorted = queue_stats.passes_sorted;
-            loop_stats.pass_entries = queue_stats.pass_entries;
-            loop_stats.pass_key0_entries = queue_stats.pass_key0_entries;
+            // only the thread that sorted a pass accounts for its resolution and sorting
+            if (pass_timing.sorted) {
+                loop_stats.pass_resolve_ut = pass_timing.resolve_ut;
+                loop_stats.pass_sort_ut = pass_timing.sort_ut;
+            }
 
             switch (worker_res) {
                 case ML_WORKER_RESULT_OK:
@@ -1797,35 +1833,25 @@ void ml_train_main(void *arg) {
 
             netdata_mutex_lock(&worker->nd_mutex);
 
-            worker->queue_stats.total_add_existing_model_requests_pushed = loop_stats.total_add_existing_model_requests_pushed;
-            worker->queue_stats.total_add_existing_model_requests_popped = loop_stats.total_add_existing_model_requests_popped;
+            worker->training_stats.allotted_ut += loop_stats.allotted_ut;
+            worker->training_stats.consumed_ut += loop_stats.consumed_ut;
+            worker->training_stats.remaining_ut += loop_stats.remaining_ut;
 
-            worker->queue_stats.total_create_new_model_requests_pushed = loop_stats.total_create_new_model_requests_pushed;
-            worker->queue_stats.total_create_new_model_requests_popped = loop_stats.total_create_new_model_requests_popped;
+            worker->training_stats.pass_resolve_ut += loop_stats.pass_resolve_ut;
+            worker->training_stats.pass_sort_ut += loop_stats.pass_sort_ut;
 
-            worker->queue_stats.allotted_ut += loop_stats.allotted_ut;
-            worker->queue_stats.consumed_ut += loop_stats.consumed_ut;
-            worker->queue_stats.remaining_ut += loop_stats.remaining_ut;
-
-            // the queue keeps these cumulative (timings) or per last pass (counts); copy, do not add
-            worker->queue_stats.pass_resolve_ut = loop_stats.pass_resolve_ut;
-            worker->queue_stats.pass_sort_ut = loop_stats.pass_sort_ut;
-            worker->queue_stats.passes_sorted = loop_stats.passes_sorted;
-            worker->queue_stats.pass_entries = loop_stats.pass_entries;
-            worker->queue_stats.pass_key0_entries = loop_stats.pass_key0_entries;
-
-            worker->queue_stats.item_result_ok += loop_stats.item_result_ok;
-            worker->queue_stats.item_result_invalid_query_time_range += loop_stats.item_result_invalid_query_time_range;
-            worker->queue_stats.item_result_not_enough_collected_values += loop_stats.item_result_not_enough_collected_values;
-            worker->queue_stats.item_result_null_acquired_dimension += loop_stats.item_result_null_acquired_dimension;
-            worker->queue_stats.item_result_chart_under_replication += loop_stats.item_result_chart_under_replication;
+            worker->training_stats.item_result_ok += loop_stats.item_result_ok;
+            worker->training_stats.item_result_invalid_query_time_range += loop_stats.item_result_invalid_query_time_range;
+            worker->training_stats.item_result_not_enough_collected_values += loop_stats.item_result_not_enough_collected_values;
+            worker->training_stats.item_result_null_acquired_dimension += loop_stats.item_result_null_acquired_dimension;
+            worker->training_stats.item_result_chart_under_replication += loop_stats.item_result_chart_under_replication;
 
             netdata_mutex_unlock(&worker->nd_mutex);
         }
 
         bool should_sleep = true;
 
-        if (worker->pending_model_info.size() >= Cfg.flush_models_batch_size) {
+        if (ml_pending_models_count() >= Cfg.flush_models_batch_size) {
             worker_is_busy(WORKER_TRAIN_FLUSH_MODELS);
             netdata_mutex_lock(&db_mutex);
             ml_flush_pending_models(worker);
@@ -1841,7 +1867,14 @@ void ml_train_main(void *arg) {
             continue;
 
         worker_is_idle();
-        std::this_thread::sleep_for(std::chrono::microseconds{remaining_ut});
+
+        // the allotment can be several seconds (see above): sleep in slices of at most a second, so a stop request
+        // is noticed as quickly as it was with the 1-second cap
+        while (remaining_ut && !Cfg.training_stop) {
+            usec_t slice_ut = remaining_ut < USEC_PER_SEC ? remaining_ut : USEC_PER_SEC;
+            std::this_thread::sleep_for(std::chrono::microseconds{slice_ut});
+            remaining_ut -= slice_ut;
+        }
     }
     finalize_self_prepared_sql_statements();
 }

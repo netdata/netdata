@@ -10,32 +10,41 @@ typedef struct {
     ml_kmeans_inlined_t inlined_kmeans;
 } ml_model_info_t;
 
+// What one training thread did, cumulative; read by the detection thread under nd_mutex for the per-thread charts.
+typedef struct {
+    usec_t allotted_ut;
+    usec_t consumed_ut;
+    usec_t remaining_ut;
+
+    // resolving and sorting the passes this thread sorted
+    usec_t pass_resolve_ut;
+    usec_t pass_sort_ut;
+
+    size_t item_result_ok;
+    size_t item_result_invalid_query_time_range;
+    size_t item_result_not_enough_collected_values;
+    size_t item_result_null_acquired_dimension;
+    size_t item_result_chart_under_replication;
+} ml_worker_stats_t;
+
 typedef struct {
     size_t id;
     ND_THREAD *nd_thread;
     netdata_mutex_t nd_mutex;
 
-    ml_queue_t *queue;
-    ml_queue_stats_t queue_stats;
+    // the queue-level values (push/pop totals, last pass) are read from Cfg.training_queue instead
+    ml_worker_stats_t training_stats;
 
     calculated_number_t *training_cns;
     calculated_number_t *scratch_training_cns;
     std::vector<DSample> training_samples;
 
+    // the batch of Cfg.pending_models this thread is writing to ml.db (see ml_flush_pending_models())
     std::vector<ml_model_info_t> pending_model_info;
 
     // Reusable buffers for streaming kmeans models
     BUFFER *stream_payload_buffer;
     BUFFER *stream_wb_buffer;
-
-    RRDSET *queue_stats_rs;
-    RRDDIM *queue_stats_num_create_new_model_requests_rd;
-    RRDDIM *queue_stats_num_add_existing_model_requests_rd;
-    RRDDIM *queue_stats_num_create_new_model_requests_completed_rd;
-    RRDDIM *queue_stats_num_add_existing_model_requests_completed_rd;
-
-    RRDSET *queue_size_rs;
-    RRDDIM *queue_size_rd;
 
     RRDSET *training_time_stats_rs;
     RRDDIM *training_time_stats_allotted_rd;
@@ -43,10 +52,6 @@ typedef struct {
     RRDDIM *training_time_stats_remaining_rd;
     RRDDIM *training_time_stats_pass_resolve_rd;
     RRDDIM *training_time_stats_pass_sort_rd;
-
-    RRDSET *training_pass_rs;
-    RRDDIM *training_pass_entries_rd;
-    RRDDIM *training_pass_key0_entries_rd;
 
     RRDSET *training_results_rs;
     RRDDIM *training_results_ok_rd;

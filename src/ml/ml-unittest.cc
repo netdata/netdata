@@ -8,11 +8,16 @@
 #include "ml_queue.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <set>
 #include <string>
+#include <condition_variable>
+#include <functional>
+#include <mutex>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -1379,6 +1384,281 @@ static void test_queue_sort_pass_normalises_past_keys()
     ML_TEST_ASSERT(pass[4].key == 5000, "later closes sort last");
 }
 
+// ---- shared queue: several consumers --------------------------------------------------------------------------
+//
+// All training threads consume one queue. The key callback below parks the sorter on a gate on its first call, so a
+// test knows a pass is being sorted (the queue marks it and releases its mutex) while it starts the other consumers.
+
+struct ml_test_gate {
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool reached = false;
+    bool released = false;
+};
+
+static time_t ml_test_gated_key(const ml_request_create_new_model_t &req, void *arg)
+{
+    ml_test_gate *gate = static_cast<ml_test_gate *>(arg);
+    {
+        std::unique_lock<std::mutex> lock(gate->mutex);
+        if (!gate->reached) {
+            gate->reached = true;
+            gate->cv.notify_all();
+            gate->cv.wait(lock, [gate] { return gate->released; });
+        }
+    }
+    const char *id = req.DLI.dimensionId();
+    return now_realtime_sec() + strtol(id + 2, nullptr, 10);
+}
+
+static bool ml_test_wait_for(const std::function<bool()> &cond)
+{
+    // bounded: a broken queue fails an assertion (and the run is aborted) instead of hanging the test run
+    for (size_t i = 0; i < 5000; i++) {
+        if (cond())
+            return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return false;
+}
+
+static size_t ml_test_queue_waiters(ml_queue_t *q)
+{
+    netdata_mutex_lock(&q->mutex);
+    size_t n = q->waiters;
+    netdata_mutex_unlock(&q->mutex);
+    return n;
+}
+
+static void ml_test_join_or_abort(std::vector<std::thread> &threads, bool all_returned, const char *what)
+{
+    if (!all_returned) {
+        // a consumer is stuck in the queue; its thread references this test's locals, so it can be neither joined nor
+        // left behind: stop the test run here
+        fprintf(stderr, "  FAIL: %s - consumers did not return, aborting the test run\n", what);
+        abort();
+    }
+    for (auto &t : threads)
+        t.join();
+}
+
+static void test_queue_consumers_share_one_sort()
+{
+    fprintf(stderr, "  test_queue_consumers_share_one_sort...\n");
+
+    const size_t consumers = 4, entries = 200;
+    ml_test_gate gate;
+    ml_queue_t *q = ml_queue_init();
+    ml_queue_set_pass_key_fn(q, ml_test_gated_key, &gate);
+
+    for (size_t i = 0; i < entries; i++) {
+        char id[32];
+        snprintfz(id, sizeof(id), "k:%zu", (i * 7919) % entries);   // pushed out of key order
+        ml_queue_push(q, ml_test_create_item(id));
+    }
+
+    std::mutex popped_mutex;
+    std::vector<std::string> popped;
+    std::atomic<size_t> returned{0};
+    std::atomic<size_t> sorted_by{0};
+    std::atomic<size_t> add_models{0};
+
+    auto consume = [&]() {
+        while (true) {
+            ml_queue_pass_timing_t timing;
+            ml_queue_item_t item = ml_queue_pop(q, &timing);
+            if (timing.sorted)
+                sorted_by++;
+            if (item.type == ML_QUEUE_ITEM_STOP_REQUEST)
+                break;
+            if (item.type == ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL) {
+                add_models++;
+                continue;
+            }
+            std::lock_guard<std::mutex> lock(popped_mutex);
+            popped.emplace_back(item.create_new_model.DLI.dimensionId());
+        }
+        returned++;
+    };
+
+    std::vector<std::thread> threads;
+    threads.emplace_back(consume);
+    bool sorting = ml_test_wait_for([&] { std::lock_guard<std::mutex> l(gate.mutex); return gate.reached; });
+    ML_TEST_ASSERT(sorting, "the first consumer starts sorting the pass");
+
+    for (size_t i = 1; i < consumers; i++)
+        threads.emplace_back(consume);
+    bool parked = ml_test_wait_for([&] { return ml_test_queue_waiters(q) == consumers - 1; });
+    ML_TEST_ASSERT(parked, "consumers arriving during the sort wait instead of sorting again");
+
+    // the sorter is still parked in the key callback: a waiting consumer serves an add-model request meanwhile
+    ml_queue_item_t add;
+    add.type = ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL;
+    add.add_existing_model.DLI = DimensionLookupInfo("00000000-0000-0000-0000-000000000000", "chart", "add");
+    ml_queue_push(q, add);
+    bool served = ml_test_wait_for([&] { return add_models.load() == 1; });
+    ML_TEST_ASSERT(served, "an add-model request is served while another consumer sorts the pass");
+    bool reparked = ml_test_wait_for([&] { return ml_test_queue_waiters(q) == consumers - 1; });
+    ML_TEST_ASSERT(reparked && ml_queue_stats(q).passes_sorted == 0,
+                   "after serving it the consumer waits for the pass again, still inside the one sort");
+
+    {
+        std::lock_guard<std::mutex> l(gate.mutex);
+        gate.released = true;
+    }
+    gate.cv.notify_all();
+
+    bool drained = ml_test_wait_for([&] { std::lock_guard<std::mutex> l(popped_mutex); return popped.size() == entries; });
+    ML_TEST_ASSERT(drained, "the consumers drain the published pass");
+    bool idle = ml_test_wait_for([&] { return ml_test_queue_waiters(q) == consumers; });
+    ML_TEST_ASSERT(idle, "with the pass drained every consumer waits");
+
+    ml_queue_signal(q);
+    bool all_returned = ml_test_wait_for([&] { return returned.load() == consumers; });
+    ML_TEST_ASSERT(all_returned, "a stop request wakes every consumer");
+    ml_test_join_or_abort(threads, all_returned, "test_queue_consumers_share_one_sort");
+
+    std::set<std::string> unique(popped.begin(), popped.end());
+    ML_TEST_ASSERT(popped.size() == entries && unique.size() == entries, "every entry is popped exactly once");
+    ML_TEST_ASSERT(ml_queue_stats(q).passes_sorted == 1, "one sort serves every consumer");
+    ML_TEST_ASSERT(sorted_by.load() == 1, "only the consumer that sorted reports the pass timing");
+
+    ml_queue_destroy(q);
+}
+
+static void test_queue_stop_during_sort_wakes_every_consumer()
+{
+    fprintf(stderr, "  test_queue_stop_during_sort_wakes_every_consumer...\n");
+
+    const size_t consumers = 4, entries = 50;
+    ml_test_gate gate;
+    ml_queue_t *q = ml_queue_init();
+    ml_queue_set_pass_key_fn(q, ml_test_gated_key, &gate);
+
+    for (size_t i = 0; i < entries; i++) {
+        char id[32];
+        snprintfz(id, sizeof(id), "k:%zu", i);
+        ml_queue_push(q, ml_test_create_item(id));
+    }
+
+    std::atomic<size_t> stops{0};
+    auto consume = [&]() {
+        ml_queue_item_t item = ml_queue_pop(q);
+        if (item.type == ML_QUEUE_ITEM_STOP_REQUEST)
+            stops++;
+    };
+
+    std::vector<std::thread> threads;
+    threads.emplace_back(consume);
+    bool sorting = ml_test_wait_for([&] { std::lock_guard<std::mutex> l(gate.mutex); return gate.reached; });
+    ML_TEST_ASSERT(sorting, "the first consumer starts sorting the pass");
+
+    for (size_t i = 1; i < consumers; i++)
+        threads.emplace_back(consume);
+    bool parked = ml_test_wait_for([&] { return ml_test_queue_waiters(q) == consumers - 1; });
+    ML_TEST_ASSERT(parked, "the other consumers wait for the pass");
+
+    ml_queue_signal(q);
+    {
+        std::lock_guard<std::mutex> l(gate.mutex);
+        gate.released = true;
+    }
+    gate.cv.notify_all();
+
+    bool all_stopped = ml_test_wait_for([&] { return stops.load() == consumers; });
+    ML_TEST_ASSERT(all_stopped, "a stop during a sort returns STOP to the sorter and to every waiting consumer");
+    ml_test_join_or_abort(threads, all_stopped, "test_queue_stop_during_sort_wakes_every_consumer");
+
+    ML_TEST_ASSERT(ml_queue_size(q).create_new_model == entries, "the entries of the abandoned pass are kept");
+    ML_TEST_ASSERT(ml_queue_stats(q).passes_sorted == 0, "an abandoned pass is not counted as sorted");
+
+    ml_queue_destroy(q);
+}
+
+static void test_dimension_accept_downstream_model()
+{
+    fprintf(stderr, "  test_dimension_accept_downstream_model...\n");
+
+    ml_dimension_t dim = {};
+    spinlock_init(&dim.slock);
+
+    ml_kmeans_inlined_t older;
+    older.after = 100;
+    older.before = 200;
+    ml_kmeans_inlined_t newer;
+    newer.after = 150;
+    newer.before = 300;
+
+    ML_TEST_ASSERT(ml_dimension_accept_downstream_model(&dim, older), "a first model is accepted");
+
+    dim.km_contexts.emplace_back(newer);
+    ML_TEST_ASSERT(!ml_dimension_accept_downstream_model(&dim, newer), "the installed model is refused as a duplicate");
+    ML_TEST_ASSERT(!ml_dimension_accept_downstream_model(&dim, older),
+                   "a model older than the installed one is refused, whichever order two threads pop them in");
+
+    ml_kmeans_inlined_t newest = newer;
+    newest.after = 200;
+    newest.before = 400;
+    ML_TEST_ASSERT(ml_dimension_accept_downstream_model(&dim, newest), "a newer model is accepted");
+
+    dim.training_in_progress = true;
+    ML_TEST_ASSERT(!ml_dimension_accept_downstream_model(&dim, newest),
+                   "no downstream model is staged while a local training uses the dimension's buffer");
+}
+
+static void test_pending_models_keep_install_order()
+{
+    fprintf(stderr, "  test_pending_models_keep_install_order...\n");
+
+    spinlock_init(&Cfg.pending_models_spinlock);
+    Cfg.pending_models.clear();
+
+    // two threads install models of ONE dimension; in production its slock orders the installs, here dim_lock does,
+    // and the install sequence number is taken under it. A third thread takes batches meanwhile, as the flushes do.
+    const time_t per_thread = 2000;
+    SPINLOCK dim_lock;
+    spinlock_init(&dim_lock);
+    time_t next_seq = 0;
+    std::atomic<bool> installing{true};
+    std::vector<time_t> written;
+
+    auto install = [&]() {
+        for (time_t i = 0; i < per_thread; i++) {
+            ml_model_info_t info = {};
+            spinlock_lock(&dim_lock);
+            info.inlined_kmeans.before = next_seq++;
+            ml_pending_models_add(info);
+            spinlock_unlock(&dim_lock);
+        }
+    };
+    auto flush = [&]() {
+        std::vector<ml_model_info_t> batch;
+        while (installing.load()) {
+            ml_pending_models_take(batch);
+            for (const auto &m : batch)
+                written.push_back(m.inlined_kmeans.before);
+        }
+    };
+
+    std::thread flusher(flush);
+    std::thread a(install), b(install);
+    a.join();
+    b.join();
+    installing = false;
+    flusher.join();
+
+    std::vector<ml_model_info_t> batch;
+    ml_pending_models_take(batch);
+    for (const auto &m : batch)
+        written.push_back(m.inlined_kmeans.before);
+
+    bool in_order = written.size() == (size_t)(2 * per_thread);
+    for (size_t i = 0; in_order && i < written.size(); i++)
+        in_order = written[i] == (time_t)i;
+    ML_TEST_ASSERT(in_order, "the batches carry every model of the dimension once, in install order");
+    ML_TEST_ASSERT(ml_pending_models_count() == 0, "taking a batch empties the shared list");
+}
+
 // ---- host-backed ordering test --------------------------------------------------------------------------------
 //
 // Drives the real key function (ml_queue_dimension_pass_key(): resolve the dimension, read the capacity close of
@@ -1575,6 +1855,10 @@ extern "C" int ml_unittest()
     test_queue_stop_during_pass_sort();
     test_queue_stop_at_last_key();
     test_queue_sort_pass_normalises_past_keys();
+    test_queue_consumers_share_one_sort();
+    test_queue_stop_during_sort_wakes_every_consumer();
+    test_dimension_accept_downstream_model();
+    test_pending_models_keep_install_order();
 
     fprintf(stderr, "\nML tests: %d run, %d failed\n", tests_run, tests_failed);
 

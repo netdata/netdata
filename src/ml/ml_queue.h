@@ -43,6 +43,7 @@ typedef struct {
     size_t add_exisiting_model;
 } ml_queue_size_t;
 
+// The queue's own counters (the per-thread training values are ml_worker_stats_t, ml_worker.h).
 typedef struct {
     size_t total_create_new_model_requests_pushed;
     size_t total_create_new_model_requests_popped;
@@ -50,42 +51,46 @@ typedef struct {
     size_t total_add_existing_model_requests_pushed;
     size_t total_add_existing_model_requests_popped;
 
-    usec_t allotted_ut;
-    usec_t consumed_ut;
-    usec_t remaining_ut;
-
-    size_t item_result_ok;
-    size_t item_result_invalid_query_time_range;
-    size_t item_result_not_enough_collected_values;
-    size_t item_result_null_acquired_dimension;
-    size_t item_result_chart_under_replication;
-
-    // pass sorting (see ml_queue_pop()); the timings are cumulative, the counts are of the last sorted pass
-    usec_t pass_resolve_ut;
-    usec_t pass_sort_ut;
+    // pass sorting (see ml_queue_pop()): the number of passes sorted, and the counts of the last one; the time spent
+    // resolving and sorting is accounted by the thread that did it (ml_queue_pass_timing_t)
     size_t passes_sorted;
     size_t pass_entries;
     size_t pass_key0_entries;
 } ml_queue_stats_t;
 
-// The create-model requests of a worker are trained one PASS at a time, in ascending order of the capacity
-// close time of each dimension's current tier-0 page (the order dbengine packs pages into extents), so that
-// consecutive trainings load the same extents and the extent cache serves the siblings of every extent read.
+// Filled by ml_queue_pop() when that call resolved and sorted a pass (`sorted` set), so only the consumer that
+// did the work accounts for it.
+typedef struct {
+    bool sorted;
+    usec_t resolve_ut;
+    usec_t sort_ut;
+} ml_queue_pass_timing_t;
+
+// One queue serves all training threads. Its create-model requests are trained one PASS at a time, in ascending
+// order of the capacity close time of each dimension's current tier-0 page (the order dbengine packs pages into
+// extents), so consecutive trainings load the same extents and the extent cache serves the siblings of every extent
+// read. The threads draw nearby entries from the same sorted pass, so they work through the same part of it close
+// together instead of each sweeping its own pass from a different starting point.
 //
 //   create_next     - appended by ml_queue_push() (first enqueues and requeues); becomes the next pass
 //   create_current  - the sorted pass being trained, consumed from the front (deque blocks are released as
 //                     they empty, so the two containers together hold about one pass of entries)
 //
-// When create_current is empty and create_next is not, ml_queue_pop() (the worker is the only consumer) swaps
-// create_next out under the mutex, resolves the key of every entry and sorts it OFF the mutex, and swaps the
-// sorted pass into create_current under the mutex again. Entries pushed while a pass is being sorted land in
-// the new create_next and belong to the following pass. Keys below the sort time are normalised to 0 and sort
-// first, as one group. Add-model requests keep their own queue and are always served first.
+// When create_current is empty and create_next is not, the first consumer to see it in ml_queue_pop() becomes the
+// sorter: it swaps create_next out under the mutex, resolves the key of every entry and sorts it OFF the mutex, and
+// swaps the sorted pass into create_current under the mutex again. While a pass is being sorted (create_sorting is
+// not zero) the other consumers serve add-model requests or wait; they never start a second sort. Entries pushed
+// while a pass is being sorted land in the new create_next and belong to the following pass. An entry that is still
+// being trained when its pass empties is requeued into whatever pass is collecting at that moment - normally the
+// next one, but no bound is guaranteed. Keys below the sort time are normalised to 0 and sort first, as one group.
+// Add-model requests keep their own queue and are always served first.
 struct ml_queue_t {
     std::queue<ml_request_add_existing_model_t> add_model_queue;
     std::deque<ml_create_model_entry_t> create_next;
     std::deque<ml_create_model_entry_t> create_current;
-    size_t create_sorting;              // entries swapped out for sorting, counted in ml_queue_size()
+    size_t create_sorting;              // entries swapped out for sorting, counted in ml_queue_size(); not zero
+                                        // while a pass is being sorted (a pass is never empty)
+    size_t waiters;                     // consumers parked on cond_var (read by the tests)
     ml_queue_stats_t stats;
 
     ml_queue_pass_key_fn pass_key_fn;
@@ -102,12 +107,15 @@ void ml_queue_destroy(ml_queue_t *q);
 
 void ml_queue_push(ml_queue_t *q, const ml_queue_item_t &req);
 
-ml_queue_item_t ml_queue_pop(ml_queue_t *q);
+// Blocks until an item is available or the queue is signalled (then returns ML_QUEUE_ITEM_STOP_REQUEST). Safe for
+// any number of concurrent consumers. `timing` (optional) is set when this call sorted a pass.
+ml_queue_item_t ml_queue_pop(ml_queue_t *q, ml_queue_pass_timing_t *timing = nullptr);
 
 ml_queue_size_t ml_queue_size(ml_queue_t *q);
 
 ml_queue_stats_t ml_queue_stats(ml_queue_t *q);
 
+// Wakes every consumer; each ml_queue_pop() then returns ML_QUEUE_ITEM_STOP_REQUEST.
 void ml_queue_signal(ml_queue_t *q);
 
 void ml_queue_set_pass_key_fn(ml_queue_t *q, ml_queue_pass_key_fn fn, void *arg);
