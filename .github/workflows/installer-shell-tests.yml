@@ -1,0 +1,31 @@
+---
+name: Installer shell tests
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'packaging/installer/**'
+      - 'netdata-installer.sh'
+      - 'tests/kickstart-*-test.sh'
+      - '.github/workflows/installer-shell-tests.yml'
+  pull_request:
+    paths:
+      - 'packaging/installer/**'
+      - 'netdata-installer.sh'
+      - 'tests/kickstart-*-test.sh'
+      - '.github/workflows/installer-shell-tests.yml'
+permissions:
+  contents: read
+jobs:
+  installer-shell-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shell: [dash, bash]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run installer regressions
+        run: |
+          ${{ matrix.shell }} tests/kickstart-http-fallback-test.sh
+          ${{ matrix.shell }} tests/kickstart-warning-test.sh
+          ${{ matrix.shell }} tests/kickstart-path-sanitizer-test.sh
