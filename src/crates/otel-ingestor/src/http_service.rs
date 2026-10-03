@@ -208,7 +208,9 @@ pub(crate) async fn bind_http(endpoint: &EndpointConfig) -> Result<Option<HttpLi
             let acceptor =
                 build_tls_acceptor(cert_path, key_path, endpoint.http_tls_ca_cert_path.as_ref())
                     .context("failed to configure OTLP/HTTP TLS")?;
-            Ok(Some(HttpListener::Tls(TlsListener { listener, acceptor })))
+            Ok(Some(HttpListener::Tls(TlsListener::new(
+                listener, acceptor,
+            ))))
         }
         (None, None) => {
             tracing::warn!("TLS disabled, using insecure connection on OTLP/HTTP endpoint: {path}");
@@ -236,13 +238,65 @@ pub(crate) async fn serve(listener: HttpListener, app: Router) -> Result<()> {
     }
 }
 
-/// A `tokio-rustls` acceptor wrapper implementing axum's `Listener` contract,
-/// per the axum TLS recipe: `axum::serve` is generic over listeners whose
-/// IO types are async read/write, so TLS termination sits in front of the
-/// plain HTTP serving machinery instead of a second server stack.
+/// How long a client may take to complete its TLS handshake before the
+/// connection is dropped.
+const TLS_HANDSHAKE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// A `tokio-rustls` acceptor wrapper implementing axum's `Listener` contract:
+/// `axum::serve` is generic over listeners whose IO types are async
+/// read/write, so TLS termination sits in front of the plain HTTP serving
+/// machinery instead of a second server stack.
+///
+/// axum awaits `accept` before serving each connection, so the handshake must
+/// not run inline: one client that opens TCP and never sends a ClientHello
+/// would stop every other sender from being accepted. Each handshake runs on
+/// its own task with a timeout instead, and `accept` returns whichever
+/// completes first (tonic's server pattern). Dropping the listener — server
+/// shutdown — aborts the handshakes still in flight.
 pub(crate) struct TlsListener {
     listener: tokio::net::TcpListener,
     acceptor: tokio_rustls::TlsAcceptor,
+    /// In-flight handshakes; a task yields `None` when its handshake failed
+    /// or timed out (already logged).
+    handshakes: tokio::task::JoinSet<Option<TlsConnection>>,
+}
+
+type TlsConnection = (
+    tokio_rustls::server::TlsStream<tokio::net::TcpStream>,
+    SocketAddr,
+);
+
+impl TlsListener {
+    fn new(listener: tokio::net::TcpListener, acceptor: tokio_rustls::TlsAcceptor) -> Self {
+        Self {
+            listener,
+            acceptor,
+            handshakes: tokio::task::JoinSet::new(),
+        }
+    }
+
+    fn start_handshake(&mut self, stream: tokio::net::TcpStream, peer: SocketAddr) {
+        // Same default the gRPC path restores on its sockets.
+        if let Err(e) = stream.set_nodelay(true) {
+            tracing::warn!(%e, "failed to set TCP_NODELAY on OTLP/HTTP connection");
+        }
+        let acceptor = self.acceptor.clone();
+        self.handshakes.spawn(async move {
+            match tokio::time::timeout(TLS_HANDSHAKE_TIMEOUT, acceptor.accept(stream)).await {
+                Ok(Ok(io)) => Some((io, peer)),
+                // An untrusted client or a bad ALPN costs one connection,
+                // never the listener.
+                Ok(Err(e)) => {
+                    tracing::debug!(%e, %peer, "OTLP/HTTP TLS handshake failed");
+                    None
+                }
+                Err(_) => {
+                    tracing::debug!(%peer, "OTLP/HTTP TLS handshake timed out");
+                    None
+                }
+            }
+        });
+    }
 }
 
 impl axum::serve::Listener for TlsListener {
@@ -251,27 +305,23 @@ impl axum::serve::Listener for TlsListener {
 
     async fn accept(&mut self) -> (Self::Io, Self::Addr) {
         loop {
-            match self.listener.accept().await {
-                Ok((stream, peer)) => {
-                    // Same default the gRPC path restores on its sockets.
-                    if let Err(e) = stream.set_nodelay(true) {
-                        tracing::warn!(%e, "failed to set TCP_NODELAY on OTLP/HTTP connection");
-                    }
-                    // Handshake failures (untrusted client, bad ALPN) kill one
-                    // connection, never the listener: log and keep accepting.
-                    match self.acceptor.accept(stream).await {
-                        Ok(io) => return (io, peer),
+            // Both branches are cancel-safe, as axum's graceful shutdown
+            // requires of `accept`.
+            tokio::select! {
+                accepted = self.listener.accept() => match accepted {
+                    Ok((stream, peer)) => self.start_handshake(stream, peer),
+                    Err(e) => handle_accept_error(e).await,
+                },
+                // `join_next` on an empty set resolves at once; the guard
+                // keeps the loop from spinning.
+                Some(done) = self.handshakes.join_next(), if !self.handshakes.is_empty() => {
+                    match done {
+                        Ok(Some(connection)) => return connection,
+                        Ok(None) => {}
                         Err(e) => {
-                            tracing::debug!(%e, "OTLP/HTTP TLS handshake failed");
+                            tracing::debug!(%e, "OTLP/HTTP TLS handshake task ended abnormally");
                         }
                     }
-                }
-                // Transient accept failures (EMFILE under fd pressure, a
-                // reset connection) must not tear the receiver down either;
-                // axum's own TcpListener impl applies the same policy.
-                Err(e) => {
-                    tracing::warn!(%e, "OTLP/HTTP accept failed");
-                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 }
             }
         }
@@ -280,6 +330,22 @@ impl axum::serve::Listener for TlsListener {
     fn local_addr(&self) -> std::io::Result<Self::Addr> {
         self.listener.local_addr()
     }
+}
+
+/// axum's accept-error policy (axum `serve::listener`): a failure tied to one
+/// connection is retried at once; anything else (e.g. `EMFILE` under fd
+/// pressure) is logged and waited out for a second, since retrying a full
+/// descriptor table immediately would spin.
+async fn handle_accept_error(e: std::io::Error) {
+    use std::io::ErrorKind;
+    if matches!(
+        e.kind(),
+        ErrorKind::ConnectionRefused | ErrorKind::ConnectionAborted | ErrorKind::ConnectionReset
+    ) {
+        return;
+    }
+    tracing::error!(%e, "OTLP/HTTP accept failed");
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 }
 
 /// Build the TLS acceptor from the configured PEM files.
@@ -1499,6 +1565,31 @@ mod tests {
             .unwrap();
         let response = post_json_logs_http11(stream, addr).await.unwrap();
         assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn tls_listener_serves_others_while_a_handshake_stalls() {
+        // A client that opens TCP and never sends a ClientHello must not hold
+        // the listener: each handshake runs on its own, so other senders are
+        // still served while it hangs.
+        install_crypto_provider();
+        let pki = TestPki::new();
+        let (addr, server, _tmp) = spawn_tls_server(&pki.endpoint(false)).await;
+
+        let _stalled = tokio::net::TcpStream::connect(addr).await.unwrap();
+        // Let the listener pick the stalled connection up first.
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        let served = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            let stream = tls_connect(&pki.client(&[b"http/1.1"], false), addr).await?;
+            post_json_logs_http11(stream, addr).await
+        })
+        .await
+        .expect("a stalled handshake must not block other clients")
+        .unwrap();
+        assert!(served.starts_with("HTTP/1.1 200"), "{served}");
 
         server.abort();
     }
