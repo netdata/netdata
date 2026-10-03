@@ -634,6 +634,8 @@ modules:
           
           - [INFO ALL](https://redis.io/commands/info)
           - [PING](https://redis.io/commands/ping/)
+          - [INFO KEYSPACE](https://redis.io/commands/info) — requested at most every 30 seconds; Garnet answers it with a full store scan
+          - [INFO COMMANDSTATS](https://redis.io/commands/info) — requested every cycle; populated only when the server runs with `--commandstats-monitor`
       default_behavior:
         <<: *default_behavior
         auto_detection: *auto_detection_compat
@@ -665,4 +667,20 @@ modules:
               ```
 
               The reply contains `cmdstat_` entries when tracking is enabled.
+    alerts:
+      # Garnet does not expose rdb_current_bgsave_time_sec, so the
+      # redis_bgsave_slow alert (redis.bgsave_now) has no data for Garnet and
+      # is excluded from the shared alert list.
+      - name: redis_connections_rejected
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
+        metric: redis.connections
+        info: connections rejected because of maxclients limit in the last minute
+      - name: redis_bgsave_broken
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
+        metric: redis.bgsave_health
+        info: 'status of the last RDB save operation (0: ok, 1: error)'
+      - name: redis_master_link_down
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
+        metric: redis.master_link_down_since_time
+        info: time elapsed since the link between master and slave is down
 
