@@ -7,4 +7,4 @@ request examples:
 - License: Apache License 2.0 (the opentelemetry-proto repository license)
 
 The OTLP/HTTP receiver tests (`src/otlp_json.rs`) decode them to pin that spec-conformant JSON
-survives decoding with every metric and its values intact.
+decodes with every metric present, spot-checking a few data-point values.
