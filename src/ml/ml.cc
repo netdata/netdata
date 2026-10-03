@@ -1540,8 +1540,8 @@ void ml_detect_main(void *arg)
 
 // Called with db_mutex held. Takes every model pending in Cfg.pending_models as this thread's batch: the swap
 // happens under db_mutex, so batches reach the database in the order they were taken, and every dimension's models
-// in the order they were installed.
-static void ml_flush_pending_models(ml_worker_t *worker) {
+// in the order they were installed. Returns false when another thread took the batch first.
+static bool ml_flush_pending_models(ml_worker_t *worker) {
     static time_t next_vacuum_run = 0;
     int op_no = 1;
 
@@ -1549,7 +1549,7 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
 
     // another thread that reached the batch size at the same time took them first
     if (worker->pending_model_info.empty())
-        return;
+        return false;
 
     // Bail when ml.db is missing OR poisoned. The NULL check covers
     // non-corruption init failures (sqlite3_open ENOSPC/EACCES, ...) that
@@ -1558,7 +1558,7 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
     // flush and spam the log.
     if (unlikely(!ml_db || ml_db_is_unusable())) {
         worker->pending_model_info.clear();
-        return;
+        return true;
     }
 
     // begin transaction. Capture the SQLite rc so we can latch the corrupt
@@ -1628,6 +1628,7 @@ static void ml_flush_pending_models(ml_worker_t *worker) {
         vacuum_database(ml_db, "ML", 0, 0, &next_vacuum_run);
 
     worker->pending_model_info.clear();
+    return true;
 }
 
 time_t ml_queue_dimension_pass_key(const ml_request_create_new_model_t &req, void *arg __maybe_unused) {
@@ -1854,9 +1855,9 @@ void ml_train_main(void *arg) {
         if (ml_pending_models_count() >= Cfg.flush_models_batch_size) {
             worker_is_busy(WORKER_TRAIN_FLUSH_MODELS);
             netdata_mutex_lock(&db_mutex);
-            ml_flush_pending_models(worker);
+            // a thread that finds the batch already taken by another did no flush, so it still paces itself
+            should_sleep = !ml_flush_pending_models(worker);
             netdata_mutex_unlock(&db_mutex);
-            should_sleep = false;
         }
 
         if (item.type == ML_QUEUE_ITEM_TYPE_ADD_EXISTING_MODEL) {
