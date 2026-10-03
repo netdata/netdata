@@ -136,11 +136,23 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 }
 
 // the destructor - the dictionary is write locked while this runs
-static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost) {
-    RRDHOST *host = rrdhost; (void)host;
+static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
     RRDSET *st = rrdset;
 
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
+
+    // Release any outstanding receiver-replication contribution before the chart is gone: no other
+    // site can do it once the chart leaves the index, and the connect/disconnect reset in
+    // stream-receiver.c walks the index, so it cannot see this chart either. Reachable because
+    // rrdset_is_replicating() (rrdset.h) tests the two directions as one OR-pair while a chart is
+    // created with BOTH *_REPLICATION_FINISHED flags set, so it reads false for a receiver-replicating
+    // chart - and svc_rrdhost_cleanup_charts_marked_obsolete() (daemon/service.c) gates deletion on it.
+    //
+    // This runs under the dictionary write lock. rrdhost_receiver_replication_release() does only
+    // atomic flag and counter transitions plus pulse_host_status(), which is lock-free (a CAS on
+    // host->stream.pulse_state) - safe to call from here. Do NOT pass a 0 status to pulse_host_status()
+    // from this context: that variant calls rrdhost_status(), which takes rrdhost_receiver_lock().
+    rrdhost_receiver_replication_release(st, 0);
 
     rrdset_finalize_collection(st, false);
 
