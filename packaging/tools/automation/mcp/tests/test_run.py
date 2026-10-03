@@ -314,6 +314,9 @@ async def test_unpinned_port_is_auto_assigned(reg, tmp_path):
     run, _ = await reg.start("a", str(tmp_path), "debug", probe=_always_ready)
     assert await _wait(run, {"ready", "failed", "stopped"}) == "ready"
     assert run.port and not run.port_pinned
+    # both OTLP listeners are reported, on ports distinct from the web port
+    ports = {run.port, int(run.otlp_endpoint.rpartition(":")[2]), int(run.otlp_http_endpoint.rpartition(":")[2])}
+    assert len(ports) == 3
 
 
 async def test_pinned_port_in_use_fails_before_launch(reg, tmp_path, monkeypatch):

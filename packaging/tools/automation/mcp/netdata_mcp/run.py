@@ -53,6 +53,7 @@ class Run:
     run_dir: Path
     conf_path: Path
     otlp_endpoint: str = ""  # where the otel plugin listens for OTLP/gRPC data
+    otlp_http_endpoint: str = ""  # where it listens for OTLP/HTTP data; "" = disabled
     port_pinned: bool = False  # port came from the agent's declaration, not free_port()
     buffer: LogBuffer = field(default_factory=LogBuffer)
     state: RunState = "building"
@@ -163,12 +164,16 @@ class RunRegistry:
             else:
                 outcome = "started"
 
-            rd, conf, otlp_endpoint = runtime.generate_runtime(agent_id, otel=otel)
+            web_port = port if port is not None else runtime.free_port()
+            rd, conf, otlp_endpoint, otlp_http_endpoint = runtime.generate_runtime(
+                agent_id, otel=otel, reserved_ports=(web_port,)
+            )
             run = Run(
                 agent_id=agent_id, worktree=worktree, profile=profile,
-                port=port if port is not None else runtime.free_port(),
+                port=web_port,
                 port_pinned=port is not None,
                 run_dir=rd, conf_path=conf, otlp_endpoint=otlp_endpoint,
+                otlp_http_endpoint=otlp_http_endpoint or "",
             )
             self._runs[agent_id] = run
             run._task = asyncio.get_running_loop().create_task(

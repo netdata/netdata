@@ -13,7 +13,7 @@ import os
 import re
 import socket
 import urllib.request
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -404,9 +404,11 @@ def generate_runtime(
     agent_id: str,
     overrides: dict[str, dict[str, str]] | None = None,
     otel: OtelConfig | None = None,
-) -> tuple[Path, Path, str]:
+    reserved_ports: Iterable[int] = (),
+) -> tuple[Path, Path, str, str | None]:
     """Create the isolated run dir, write netdata.conf + otel.yaml; return
-    ``(run_dir, conf_path, otlp_endpoint)``.
+    ``(run_dir, conf_path, otlp_endpoint, otlp_http_endpoint)`` — the HTTP
+    endpoint is None when the config disables the OTLP/HTTP listener.
 
     ``overrides`` is the per-agent extension point ({section: {key: value}}),
     deep-merged over the defaults — the hook for runtime overrides (db mode,
@@ -420,8 +422,8 @@ def generate_runtime(
     free loopback port so parallel agents don't collide on 4317; the OTLP/HTTP
     listener gets its own free port for the same reason (the plugin fails fast on
     an occupied port), unless the config disables it (``otlp_http_endpoint=""``)
-    or pins it. The gRPC endpoint is returned so the caller can record where to
-    push OTLP data.
+    or pins it; ``reserved_ports`` (the web port) are never auto-assigned. Both
+    endpoints are returned so the caller can report where to push OTLP data.
     """
     rd = run_dir(agent_id)
     for sub in ("etc", "cache", "lib", "log", "run"):
@@ -436,17 +438,38 @@ def generate_runtime(
     conf_path.write_text(_render_ini(conf), encoding="utf-8")
 
     cfg = otel or OtelConfig()
-    otlp_endpoint = cfg.otlp_endpoint or f"127.0.0.1:{free_port()}"
+    # Every auto-assigned port must differ from the caller's (the web port)
+    # and from each other: free_port() releases its socket, so two calls can
+    # return the same port, and the plugin refuses to start when its two
+    # listeners collide.
+    taken = set(reserved_ports)
+    otlp_endpoint = cfg.otlp_endpoint or f"127.0.0.1:{_free_port_except(taken)}"
+    taken.add(_endpoint_port(otlp_endpoint))
     # "" (disable) must survive intact: only None auto-assigns.
     otlp_http_endpoint = (
-        cfg.otlp_http_endpoint if cfg.otlp_http_endpoint is not None else f"127.0.0.1:{free_port()}"
+        cfg.otlp_http_endpoint
+        if cfg.otlp_http_endpoint is not None
+        else f"127.0.0.1:{_free_port_except(taken)}"
     )
     otel_yaml = yaml.safe_dump(
         _otel_doc(cfg, rd, otlp_endpoint, otlp_http_endpoint), sort_keys=False
     )
     (rd / "etc" / "otel.yaml").write_text(otel_yaml, encoding="utf-8")
 
-    return rd, conf_path, otlp_endpoint
+    return rd, conf_path, otlp_endpoint, otlp_http_endpoint or None
+
+
+def _free_port_except(taken: set[int]) -> int:
+    """A free loopback port not in ``taken``."""
+    while (port := free_port()) in taken:
+        pass
+    return port
+
+
+def _endpoint_port(endpoint: str) -> int | None:
+    """The port of a ``host:port`` endpoint (None if it has none)."""
+    _, _, port = endpoint.rpartition(":")
+    return int(port) if port.isdigit() else None
 
 
 def launch_command(netdata_bin: Path, port: int, conf_path: Path) -> list[str]:
