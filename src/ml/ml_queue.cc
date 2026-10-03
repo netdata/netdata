@@ -12,6 +12,7 @@ ml_queue_t *ml_queue_init()
     netdata_mutex_init(&q->mutex);
     netdata_cond_init(&q->cond_var);
     q->create_sorting = 0;
+    q->waiters = 0;
     q->pass_key_fn = nullptr;
     q->pass_key_arg = nullptr;
     q->exit = false;
@@ -78,11 +79,12 @@ void ml_queue_sort_pass(std::deque<ml_create_model_entry_t> &pass, time_t now_s,
         *key0_entries = key0;
 }
 
-// Start a pass: called with the mutex held and create_current empty, create_next not empty. Returns with the
-// mutex held. Resolution and sorting run without the mutex, so pushes and the stop signal are never blocked
-// behind them; a stop request ends the key resolution and skips the sort (a sort already running completes),
-// and hands the entries back to create_next.
-static void ml_queue_start_pass(ml_queue_t *q)
+// Start a pass: called with the mutex held, create_current empty, create_next not empty and no other pass being
+// sorted. Returns with the mutex held. Resolution and sorting run without the mutex, so pushes, the other consumers
+// and the stop signal are never blocked behind them; a stop request ends the key resolution and skips the sort (a
+// sort already running completes), and hands the entries back to create_next. Either way every waiting consumer is
+// woken: there is a pass to consume, or a stop to return.
+static void ml_queue_start_pass(ml_queue_t *q, ml_queue_pass_timing_t *timing)
 {
     std::deque<ml_create_model_entry_t> pass;
     pass.swap(q->create_next);
@@ -131,20 +133,30 @@ static void ml_queue_start_pass(ml_queue_t *q)
         // (copying only the few arrivals of the scan window, never the pass itself)
         pass.insert(pass.end(), q->create_next.begin(), q->create_next.end());
         q->create_next.swap(pass);
+        netdata_cond_broadcast(&q->cond_var);
         return;
     }
 
     q->create_current.swap(pass);
 
-    q->stats.pass_resolve_ut += sort_started_ut - resolve_started_ut;
-    q->stats.pass_sort_ut += sort_finished_ut - sort_started_ut;
     q->stats.passes_sorted += 1;
     q->stats.pass_entries = q->create_current.size();
     q->stats.pass_key0_entries = key0_entries;
+
+    if (timing) {
+        timing->sorted = true;
+        timing->resolve_ut = sort_started_ut - resolve_started_ut;
+        timing->sort_ut = sort_finished_ut - sort_started_ut;
+    }
+
+    netdata_cond_broadcast(&q->cond_var);
 }
 
-ml_queue_item_t ml_queue_pop(ml_queue_t *q)
+ml_queue_item_t ml_queue_pop(ml_queue_t *q, ml_queue_pass_timing_t *timing)
 {
+    if (timing)
+        *timing = ml_queue_pass_timing_t{};
+
     netdata_mutex_lock(&q->mutex);
 
     ml_queue_item_t req;
@@ -173,13 +185,18 @@ ml_queue_item_t ml_queue_pop(ml_queue_t *q)
             break;
         }
 
-        if (!q->create_next.empty()) {
-            // the current pass is over: sort the next one (releases and re-takes the mutex)
-            ml_queue_start_pass(q);
+        if (!q->create_next.empty() && !q->create_sorting) {
+            // the current pass is over and nobody sorts the next one yet: this consumer does it (releases and
+            // re-takes the mutex)
+            ml_queue_start_pass(q, timing);
             continue;
         }
 
+        // nothing to pop, or another consumer is sorting the next pass: wait for a push, the published pass or a
+        // stop
+        q->waiters++;
         netdata_cond_wait(&q->cond_var, &q->mutex);
+        q->waiters--;
     }
 
     netdata_mutex_unlock(&q->mutex);
@@ -202,7 +219,7 @@ void ml_queue_signal(ml_queue_t *q)
 {
     netdata_mutex_lock(&q->mutex);
     q->exit = true;
-    netdata_cond_signal(&q->cond_var);
+    netdata_cond_broadcast(&q->cond_var);
     netdata_mutex_unlock(&q->mutex);
 }
 
