@@ -143,18 +143,16 @@ bool is_socket_closed(int fd) {
         return true;
     }
     else if (result < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK
 #if defined(OS_WINDOWS)
-            // WinSock sets WSAGetLastError() but not errno for WSAEWOULDBLOCK
-            || WSAGetLastError() == WSAEWOULDBLOCK
-#endif
-        ) {
-            // No data available, but socket is still open
+        // Winsock owns socket errors; errno may still contain an unrelated CRT error.
+        if (WSAGetLastError() == WSAEWOULDBLOCK)
             return false;
-        } else {
-            // An error occurred
-            return true;
-        }
+        return true;
+#else
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return false;
+        return true;
+#endif
     }
 
     // Data is available, socket is open
@@ -429,6 +427,7 @@ inline int wait_on_socket_or_cancel_with_timeout(
         HANDLE h = (HANDLE)_get_osfhandle(fd);
         if(h != INVALID_HANDLE_VALUE && GetFileType(h) == FILE_TYPE_PIPE) {
             bool forever = (timeout_ms <= 0);
+            unsigned int aborted_retries = 0;
             if(revents)
                 *revents = 0;
             while(timeout_ms > 0 || forever) {
@@ -465,6 +464,13 @@ inline int wait_on_socket_or_cancel_with_timeout(
                                 return -1;
                             }
 
+                            if (++aborted_retries >= 3) {
+                                errno = EIO;
+                                if(revents)
+                                    *revents = POLLERR;
+                                return 2;
+                            }
+
                             // Keep the same bounded, cancellable polling cadence as an empty pipe.
                             const DWORD retry_ms = (DWORD)((timeout_ms >= ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS || forever) ?
                                                           ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS : timeout_ms);
@@ -480,6 +486,8 @@ inline int wait_on_socket_or_cancel_with_timeout(
                     if(revents) *revents = pipe_revents;
                     return 2;
                 }
+
+                aborted_retries = 0;
 
                 if(available > 0) {
                     if(revents) *revents = POLLIN;

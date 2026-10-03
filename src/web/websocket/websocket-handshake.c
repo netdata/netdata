@@ -25,6 +25,7 @@ void websocket_threads_init(void) {
         websocket_threads[i].ndpl = NULL;
         websocket_threads[i].cmd.pipe[PIPE_READ] = -1;
         websocket_threads[i].cmd.pipe[PIPE_WRITE] = -1;
+        websocket_threads[i].cmd.partial_header_bytes = 0;
         websocket_threads[i].cmd.buffer = NULL;
         websocket_threads[i].cmd.buffer_size = 0;
         websocket_threads[i].cmd.broadcast_pending = false;

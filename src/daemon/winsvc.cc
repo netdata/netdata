@@ -199,11 +199,10 @@ static NORETURN void call_netdata_cleanup(void *arg)
         SetEvent(svc_heartbeat_done_event);
         if (heartbeat_thread) {
             WaitForSingleObject(heartbeat_thread, 5000);
-            CloseHandle(heartbeat_thread);
         }
-        CloseHandle(svc_heartbeat_done_event);
-        svc_heartbeat_done_event = nullptr;
-        heartbeat_thread = nullptr;
+        // Keep these handles valid until process exit. The timeout callback can
+        // have loaded its function pointer just before normal cleanup clears it.
+        // Closing here would race a late callback waiting on either handle.
     }
 
     // Set status to stopped

@@ -143,7 +143,10 @@ static STRING *reformat_path_list(STRING *value) {
             if((size_t)(p - segment_start) == 1 && isalpha((unsigned char)segment_start[0]))
                 continue;
 
-            if(p[1] == '/') {
+            bool msys_separator = p[1] == '/';
+            bool native_drive_separator = isalpha((unsigned char)p[1]) && p[2] == ':' &&
+                                          (p[3] == '/' || p[3] == '\\');
+            if(msys_separator || native_drive_separator) {
                 separator = p;
                 break;
             }

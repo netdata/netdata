@@ -405,6 +405,15 @@ static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_r
     return false;
 }
 
+static void stream_thread_startup_failed(struct stream_thread *sth) {
+    // The creator stores the thread handle while holding this lock. Clearing it
+    // under the same lock lets a later opcode retry the slot after startup fails.
+    spinlock_lock(&stream_thread_globals.assign.spinlock);
+    sth->thread = NULL;
+    sth->tid = 0;
+    spinlock_unlock(&stream_thread_globals.assign.spinlock);
+}
+
 void stream_thread(void *ptr) {
     struct stream_thread *sth = ptr;
 
@@ -510,15 +519,17 @@ void stream_thread(void *ptr) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: cannot create required pipe.", sth->id);
         sth->pipe.fds[PIPE_READ] = -1;
         sth->pipe.fds[PIPE_WRITE] = -1;
+        stream_thread_startup_failed(sth);
         return;
     }
 #if defined(OS_WINDOWS)
-    if (sock_setnonblock(sth->pipe.fds[PIPE_READ], true) == -1) {
+    if (sock_setnonblock(sth->pipe.fds[PIPE_READ], true) != 1) {
         sock_close(sth->pipe.fds[PIPE_READ]);
         sock_close(sth->pipe.fds[PIPE_WRITE]);
         sth->pipe.fds[PIPE_READ] = -1;
         sth->pipe.fds[PIPE_WRITE] = -1;
         nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: cannot set wakeup socket non-blocking.", sth->id);
+        stream_thread_startup_failed(sth);
         return;
     }
 #endif

@@ -853,8 +853,8 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
 
 #if defined(OS_WINDOWS)
     // Verify the peer on the first read, before retaining or parsing command bytes.
-    if (!cmd_ctx->client_authorized && (nread > 0 || nread == UV_EOF)) {
-        if (nread <= 0 || !command_pipe_client_authorized(&cmd_ctx->client)) {
+    if (!cmd_ctx->client_authorized && nread > 0) {
+        if (!command_pipe_client_authorized(&cmd_ctx->client)) {
             netdata_log_error("COMMAND: rejected unauthorized Windows command-pipe client.");
             (void)uv_read_stop(client);
             if (buf && buf->len)

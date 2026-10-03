@@ -65,11 +65,11 @@ function(netdata_bundle_sqlite3)
                 if(NOT _ND_SQLITE_MAKE OR NOT _ND_SQLITE_TCLSH)
                         message(FATAL_ERROR "MSYS2 make and tclsh are required to build SQLite")
                 endif()
-                set(_SQLITE_CONFIGURE_CMD "${_ND_SQLITE_BASH}" -c "PATH='/ucrt64/bin:/usr/bin':\$PATH '${sqlite_SOURCE_DIR}/configure' --enable-update-limit")
+                set(_SQLITE_CONFIGURE_CMD "${_ND_SQLITE_BASH}" -c "PATH='/ucrt64/bin:/usr/bin':\$PATH \"\$1/configure\" --enable-update-limit" _ "${sqlite_SOURCE_DIR}")
                 # CMake may be launched outside an MSYS2 login shell.  Put the
                 # discovered MSYS2 tools first so bash resolves the matching
                 # make/tcl runtime rather than an unrelated PATH installation.
-                set(_SQLITE_BUILD_CMD     "${_ND_SQLITE_BASH}" -c "PATH='/ucrt64/bin:/usr/bin':\$PATH MAKEFLAGS= '${_ND_SQLITE_MAKE}' sqlite3.c sqlite3.h")
+                set(_SQLITE_BUILD_CMD     "${_ND_SQLITE_BASH}" -c "PATH='/ucrt64/bin:/usr/bin':\$PATH MAKEFLAGS= \"\$1\" sqlite3.c sqlite3.h" _ "${_ND_SQLITE_MAKE}")
         else()
                 set(_SQLITE_CONFIGURE_CMD "${sqlite_SOURCE_DIR}/configure" --enable-update-limit)
                 set(_SQLITE_BUILD_CMD     "${CMAKE_COMMAND}" -E env MAKEFLAGS= make sqlite3.c sqlite3.h)

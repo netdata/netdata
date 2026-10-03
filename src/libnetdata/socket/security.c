@@ -907,6 +907,8 @@ bool netdata_ssl_load_windows_ca_certs(SSL_CTX *ctx) {
                     ERR_clear_error();
                 X509_free(cert);
             }
+            else
+                ERR_clear_error();
         }
         CertCloseStore(stores[i], 0);
     }

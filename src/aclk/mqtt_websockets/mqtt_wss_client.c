@@ -548,9 +548,12 @@ int mqtt_wss_connect(
 
     if (!(client->ssl_flags & MQTT_WSS_SSL_DONT_CHECK_CERTS)) {
 #if defined(OS_WINDOWS)
-        if (!netdata_ssl_load_windows_ca_certs(client->ssl_ctx))
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "ACLK: failed to load CA certs from Windows Certificate Store; SSL verify will fail");
+        if (!netdata_ssl_load_windows_ca_certs(client->ssl_ctx)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "ACLK: failed to load CA certs from Windows Certificate Store");
+            mqtt_wss_close_sockfd(client);
+            return -1;
+        }
 #else
         SSL_CTX_set_default_verify_paths(client->ssl_ctx);
 #endif

@@ -176,6 +176,8 @@ typedef struct websocket_thread {
 
     struct {
         int pipe[2];                 // Command pipe [0] = read, [1] = write
+        uint8_t partial_header[8];
+        size_t partial_header_bytes;
         char *buffer;                // Reusable scratch buffer for command payloads
         size_t buffer_size;
         bool broadcast_pending;

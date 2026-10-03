@@ -7,21 +7,34 @@ function(netdata_find_msys2_program output)
         message(FATAL_ERROR "netdata_find_msys2_program requires NAMES")
     endif()
 
-    unset(_netdata_msys2_program CACHE)
-    unset(_netdata_msys2_program)
-    find_program(_netdata_msys2_program
-                 NAMES ${ARG_NAMES}
-                 HINTS ${ARG_HINTS})
+    set(_netdata_msys2_program "")
+    set(_netdata_msys2_search_dirs ${ARG_HINTS})
+    file(TO_CMAKE_PATH "$ENV{PATH}" _netdata_msys2_path_dirs)
+    list(APPEND _netdata_msys2_search_dirs ${_netdata_msys2_path_dirs})
 
-    if(_netdata_msys2_program)
-        get_filename_component(_netdata_msys2_bin "${_netdata_msys2_program}" DIRECTORY)
-        get_filename_component(_netdata_msys2_root "${_netdata_msys2_bin}/../.." ABSOLUTE)
-        if(NOT EXISTS "${_netdata_msys2_bin}/msys-2.0.dll"
-           OR NOT IS_DIRECTORY "${_netdata_msys2_root}/ucrt64/bin")
-            unset(_netdata_msys2_program CACHE)
-            unset(_netdata_msys2_program)
+    foreach(_netdata_msys2_hint IN LISTS _netdata_msys2_search_dirs)
+        if(NOT _netdata_msys2_hint)
+            continue()
         endif()
-    endif()
+        unset(_netdata_msys2_candidate CACHE)
+        unset(_netdata_msys2_candidate)
+        find_program(_netdata_msys2_candidate
+                     NAMES ${ARG_NAMES}
+                     HINTS "${_netdata_msys2_hint}"
+                     NO_DEFAULT_PATH)
+
+        if(NOT _netdata_msys2_candidate)
+            continue()
+        endif()
+
+        get_filename_component(_netdata_msys2_bin "${_netdata_msys2_candidate}" DIRECTORY)
+        get_filename_component(_netdata_msys2_root "${_netdata_msys2_bin}/../.." ABSOLUTE)
+        if(EXISTS "${_netdata_msys2_bin}/msys-2.0.dll"
+           AND IS_DIRECTORY "${_netdata_msys2_root}/ucrt64/bin")
+            set(_netdata_msys2_program "${_netdata_msys2_candidate}")
+            break()
+        endif()
+    endforeach()
 
     set(${output} "${_netdata_msys2_program}" PARENT_SCOPE)
 endfunction()

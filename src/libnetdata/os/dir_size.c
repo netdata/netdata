@@ -60,7 +60,8 @@ static void calc_dir_size_recursive(const char *base_path, const char *rel_path,
 
     HANDLE handle = CreateFileW(wide_path, FILE_READ_ATTRIBUTES,
                                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+                                NULL, OPEN_EXISTING,
+                                FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
     freez(wide_path);
     BY_HANDLE_FILE_INFORMATION info;
     if (handle == INVALID_HANDLE_VALUE || !GetFileInformationByHandle(handle, &info)) {
@@ -73,7 +74,29 @@ static void calc_dir_size_recursive(const char *base_path, const char *rel_path,
             return;
     }
     else {
+        if (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+            FILE_ATTRIBUTE_TAG_INFO tag_info;
+            if (!GetFileInformationByHandleEx(handle, FileAttributeTagInfo,
+                                              &tag_info, sizeof(tag_info))) {
+                CloseHandle(handle);
+                result->errors++;
+                return;
+            }
+            // Name-surrogate tags (for example symlinks and junctions) redirect
+            // path traversal. Other reparse tags can describe ordinary files.
+            if (IsReparseTagNameSurrogate(tag_info.ReparseTag)) {
+                CloseHandle(handle);
+                return;
+            }
+        }
         CloseHandle(handle);
+
+        // Some filesystems report a zero file index when stable identities are
+        // unavailable. Count the object without deduplication instead of
+        // treating every such object as the same visited path.
+        if (info.nFileIndexHigh == 0 && info.nFileIndexLow == 0) {
+            goto have_identity;
+        }
 
         char name[64];
         snprintfz(name, sizeof(name), "W_%08lx_%08lx%08lx",
@@ -84,6 +107,7 @@ static void calc_dir_size_recursive(const char *base_path, const char *rel_path,
             return;
         dictionary_set(visited_inodes, name, NULL, sizeof(void *));
     }
+have_identity:
 #else
     INODE_DEVICE_PAIR id_pair = {
         .inode = statbuf.st_ino,

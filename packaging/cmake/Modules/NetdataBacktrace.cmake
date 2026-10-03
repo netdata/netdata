@@ -35,9 +35,11 @@ function(netdata_bundle_libbacktrace)
                         message(FATAL_ERROR "MSYS2 make not found next to the selected bash")
                 endif()
                 set(_bt_configure_cmd ${BASH_EXECUTABLE} -c
-                        "PATH='/ucrt64/bin:/usr/bin':\$PATH '${libbacktrace_SOURCE_DIR}/configure' --prefix='${libbacktrace_INSTALL_DIR}' --enable-static")
+                        "PATH='/ucrt64/bin:/usr/bin':\$PATH \"\$1/configure\" --prefix=\"\$2\" --enable-static"
+                        _ "${libbacktrace_SOURCE_DIR}" "${libbacktrace_INSTALL_DIR}")
                 set(_bt_build_cmd ${BASH_EXECUTABLE} -c
-                        "PATH='/ucrt64/bin:/usr/bin':\$PATH MAKEFLAGS= '${_BT_MAKE_EXECUTABLE}' install")
+                        "PATH='/ucrt64/bin:/usr/bin':\$PATH MAKEFLAGS= \"\$1\" install"
+                        _ "${_BT_MAKE_EXECUTABLE}")
         else()
                 set(_BT_MAKE_EXECUTABLE make)
                 set(_bt_configure_cmd "${libbacktrace_SOURCE_DIR}/configure" --prefix=${libbacktrace_INSTALL_DIR} --enable-static)

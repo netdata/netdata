@@ -236,7 +236,6 @@ static struct {
     size_t                  head, tail, count;
     bool                    stopped;
     bool                    stop_complete;
-    uint64_t                dropped;
     netdata_mutex_t         mutex;
     netdata_cond_t          not_empty;
     HANDLE                  drain_ack;  // auto-reset; consumer sets it on exit
@@ -301,8 +300,10 @@ static bool etw_entry_process(struct etw_queue_entry *e) {
             if (utf8_size > 0) {
                 char *utf8 = malloc((size_t)utf8_size + 1);
                 if (utf8 && WideCharToMultiByte(CP_UTF8, 0, message, (int)message_len,
-                                        utf8, utf8_size, NULL, NULL) > 0)
+                                        utf8, utf8_size, NULL, NULL) > 0) {
+                    utf8[utf8_size] = '\0';
                     fprintf(stderr, "Netdata ETW message fallback: %s\n", utf8);
+                }
                 free(utf8);
             }
         }
@@ -612,14 +613,30 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
         e->opcode     = source->Opcode;
         e->task       = source->Task;
         e->keyword    = source->Keyword;
-        // Snapshot the global buffers into the queue slot before releasing the mutex.
-        memcpy(e->small,  small_wide_buffers,  sizeof(small_wide_buffers));
-        memcpy(e->medium, medium_wide_buffers, sizeof(medium_wide_buffers));
-        memcpy(e->big,    big_wide_buffers,    sizeof(big_wide_buffers));
+        // Copy only populated field strings while the shared buffers are protected.
+        for(size_t i = 1; i < _NDF_MAX; i++) {
+            wchar_t *dst;
+            size_t capacity;
+            if(i == NDF_NIDL_INSTANCE) {
+                dst = e->medium[0];
+                capacity = MEDIUM_WIDE_BUFFERS_SIZE;
+            }
+            else if(i == NDF_REQUEST || i == NDF_MESSAGE) {
+                dst = e->big[i == NDF_REQUEST ? 0 : 1];
+                capacity = BIG_WIDE_BUFFERS_SIZE;
+            }
+            else {
+                dst = e->small[i];
+                capacity = SMALL_WIDE_BUFFERS_SIZE;
+            }
+
+            const wchar_t *src = fields_buffers[i].buf;
+            size_t chars = etw_wcslen_bounded(src, capacity);
+            wmemcpy(dst, src, chars + 1);
+            dst[chars] = L'\0';
+        }
 
         netdata_cond_signal(&etw_queue.not_empty);
-    } else {
-        etw_queue.dropped++;
     }
 
     netdata_mutex_unlock(&etw_queue.mutex);

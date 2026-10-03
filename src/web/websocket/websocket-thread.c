@@ -105,6 +105,8 @@ struct pipe_header {
     };
 };
 
+_Static_assert(sizeof(struct pipe_header) == 8, "websocket command header layout changed");
+
 static void websocket_thread_close_command_pipe(WEBSOCKET_THREAD *wth) {
     if(wth->cmd.pipe[PIPE_READ] != -1) {
 #if defined(OS_WINDOWS)
@@ -123,6 +125,7 @@ static void websocket_thread_close_command_pipe(WEBSOCKET_THREAD *wth) {
 #endif
         wth->cmd.pipe[PIPE_WRITE] = -1;
     }
+    wth->cmd.partial_header_bytes = 0;
 }
 
 static void websocket_thread_close_command_pipe_write(WEBSOCKET_THREAD *wth) {
@@ -415,18 +418,32 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
 
         worker_is_busy(WORKERS_WEBSOCKET_CMD_READ);
 
-        ssize_t bytes = read_pipe_block(wth->cmd.pipe[PIPE_READ], &header, sizeof(header));
-        if(bytes <= 0) {
-            if(bytes < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        ssize_t bytes = read_pipe_available(
+            wth->cmd.pipe[PIPE_READ],
+            wth->cmd.partial_header + wth->cmd.partial_header_bytes,
+            sizeof(header) - wth->cmd.partial_header_bytes);
+        if(bytes < 0) {
+            if(errno != EAGAIN && errno != EWOULDBLOCK) {
                 netdata_log_error("WEBSOCKET[%zu]: Failed to read command header from pipe", wth->id);
             }
             break;
         }
 
-        if(bytes != sizeof(header)) {
-            netdata_log_error("WEBSOCKET[%zu]: Read partial command header (%zd/%zu bytes)", wth->id, bytes, sizeof(header));
+        if(bytes == 0) {
+            if(wth->cmd.partial_header_bytes) {
+                netdata_log_error("WEBSOCKET[%zu]: Command pipe closed during a partial header (%zu/%zu bytes)",
+                                  wth->id, wth->cmd.partial_header_bytes, sizeof(header));
+                websocket_thread_close_command_pipe(wth);
+            }
             break;
         }
+
+        wth->cmd.partial_header_bytes += (size_t)bytes;
+        if(wth->cmd.partial_header_bytes != sizeof(header))
+            break;
+
+        memcpy(&header, wth->cmd.partial_header, sizeof(header));
+        wth->cmd.partial_header_bytes = 0;
 
         // Process command
         switch(header.cmd) {

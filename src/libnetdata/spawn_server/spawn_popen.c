@@ -194,7 +194,7 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
                 return spawn_popen_run_argv(argv);
             }
 
-            if (strcmp(windows_path_basename(prog), NETDATA_WINDOWS_SUPPORTED_SCRIPT_PLUGIN) == 0) {
+            if (strcasecmp(windows_path_basename(prog), NETDATA_WINDOWS_SUPPORTED_SCRIPT_PLUGIN) == 0) {
                 // python.d.plugin — needs a Python interpreter.
                 // Parse args first: a -p<interpreter> option works even when Python is
                 // absent from PATH, matching the Linux bash wrapper that strips -p before

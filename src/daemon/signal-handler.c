@@ -300,10 +300,32 @@ void nd_cleanup_deadly_signals(void) {
 void nd_initialize_signals(bool chain_existing) {
 #if defined(OS_WINDOWS)
     (void)chain_existing;
-    if (!windows_console_signal_event)
+    DWORD error = ERROR_SUCCESS;
+    if (!windows_console_signal_event) {
         windows_console_signal_event = CreateEvent(NULL, FALSE, FALSE, NULL);
-    if (!windows_console_shutdown_complete_event)
+        if (!windows_console_signal_event)
+            error = GetLastError();
+    }
+    if (!windows_console_shutdown_complete_event) {
         windows_console_shutdown_complete_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+        if (!windows_console_shutdown_complete_event)
+            error = GetLastError();
+    }
+
+    if (!windows_console_signal_event || !windows_console_shutdown_complete_event) {
+        if (windows_console_signal_event) {
+            CloseHandle(windows_console_signal_event);
+            windows_console_signal_event = NULL;
+        }
+        if (windows_console_shutdown_complete_event) {
+            CloseHandle(windows_console_shutdown_complete_event);
+            windows_console_shutdown_complete_event = NULL;
+        }
+        fprintf(stderr, "SIGNAL: Failed to create Windows console signal events (error %lu)\n",
+                (unsigned long)error);
+        fflush(stderr);
+        exit(EXIT_FAILURE);
+    }
 
     if (!windows_console_handler_registered) {
         if (SetConsoleCtrlHandler(windows_console_control_handler, TRUE))

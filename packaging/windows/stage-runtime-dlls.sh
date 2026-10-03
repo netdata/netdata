@@ -12,8 +12,24 @@ destination="$2"
 runtime_dll_dir="${NETDATA_WINDOWS_RUNTIME_DLL_DIR:-/ucrt64/bin}"
 dependency_manifest="${3:-}"
 resolved_dlls=()
+windows_system_root="${SYSTEMROOT:-${SystemRoot:-}}"
+_netdata_windows_system32=""
+if [ -n "${windows_system_root}" ] && command -v cygpath >/dev/null 2>&1; then
+    if system_root_msys="$(cygpath -u -- "${windows_system_root}")"; then
+        _netdata_windows_system32="${system_root_msys%/}/system32"
+        _netdata_windows_system32="${_netdata_windows_system32,,}"
+    fi
+fi
 
-if [ -n "${dependency_manifest}" ] && [ -f "${dependency_manifest}" ]; then
+if [ -n "${dependency_manifest}" ] && { [ -e "${dependency_manifest}" ] || [ -L "${dependency_manifest}" ]; }; then
+    if [ ! -f "${dependency_manifest}" ]; then
+        echo "ERROR: dependency manifest is not a regular file: ${dependency_manifest}" >&2
+        exit 1
+    fi
+    if [ ! -r "${dependency_manifest}" ]; then
+        echo "ERROR: dependency manifest is not readable: ${dependency_manifest}" >&2
+        exit 1
+    fi
     while IFS= read -r dll; do
         [ -n "${dll}" ] && resolved_dlls+=("${dll}")
     done < "${dependency_manifest}"
@@ -79,8 +95,8 @@ copy_missing_dlls_once() {
     local normalized_resolved_path
 
     local dependency_output
-    if ! dependency_output="$(PATH="${destination}:${runtime_dll_dir}:${PATH}" ldd.exe "${executable}" 2>/dev/null)"; then
-        echo "ERROR: ldd.exe failed while inspecting ${executable}" >&2
+    if ! dependency_output="$(PATH="${destination}:${runtime_dll_dir}:${PATH}" ldd.exe "${executable}" 2>&1)"; then
+        echo "ERROR: ldd.exe failed while inspecting ${executable}: ${dependency_output:-no diagnostic}" >&2
         return 3
     fi
     if [ -z "${dependency_output}" ]; then
@@ -105,11 +121,10 @@ copy_missing_dlls_once() {
                     continue
                 fi
 
-                case "${normalized_resolved_path}" in
-                    /c/windows/system32/*|[a-z]:/windows/system32/*)
+                if [ -n "${_netdata_windows_system32:-}" ] &&
+                   [[ "${normalized_resolved_path}" == "${_netdata_windows_system32}"/* ]]; then
                         continue
-                        ;;
-                esac
+                fi
 
                 if is_ignored_dll "${dll}"; then
                     continue

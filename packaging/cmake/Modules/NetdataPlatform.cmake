@@ -13,7 +13,7 @@ macro(_nd_windows_config)
   set(OS_WINDOWS True)
 
   if(NOT "${CMAKE_INSTALL_PREFIX}" MATCHES "/opt/netdata$")
-    message(FATAL_ERROR "CMAKE_INSTALL_PREFIX must be set to /opt/netdata, but it is set to ${CMAKE_INSTALL_PREFIX}")
+    message(FATAL_ERROR "CMAKE_INSTALL_PREFIX must end with /opt/netdata, but it is set to ${CMAKE_INSTALL_PREFIX}")
   endif()
 
   if(BUILD_FOR_PACKAGING)

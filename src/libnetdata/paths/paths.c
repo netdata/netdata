@@ -314,7 +314,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
 
                 }
 
-                netdata_log_debug(D_HEALTH, "CONFIG ignoring stock-config file '%s/%s' of type %d", udir, de->d_name, (int)type);
+                netdata_log_debug(D_HEALTH, "CONFIG ignoring stock-config file '%s/%s' of type %d", sdir, de->d_name, (int)type);
             }
         }
         closedir(dir);

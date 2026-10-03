@@ -1014,6 +1014,9 @@ static inline int getrusage(int who __maybe_unused, struct rusage *r) {
 // use statvfs() only to validate a path still work correctly.
 #ifndef _STATVFS_DEFINED
 #define _STATVFS_DEFINED
+// Declared here because the Windows statvfs compatibility wrapper uses it
+// before the platform path helpers are declared below.
+wchar_t *os_translate_msys_to_windows_pathW(const char *src);
 struct statvfs {
     unsigned long  f_bsize;   // filesystem block size
     unsigned long  f_frsize;  // fundamental block size
@@ -1031,7 +1034,18 @@ static inline int statvfs(const char *path, struct statvfs *buf) {
     if (!buf) { errno = EINVAL; return -1; }
     memset(buf, 0, sizeof(*buf));
     ULARGE_INTEGER free_bytes, total_bytes, total_free_bytes;
-    if (!path || !GetDiskFreeSpaceExA(path, &free_bytes, &total_bytes, &total_free_bytes)) {
+    if (!path) { errno = EINVAL; return -1; }
+    wchar_t *native_path = os_translate_msys_to_windows_pathW(path);
+    if (!native_path)
+        return -1;
+    if (GetFileAttributesW(native_path) == INVALID_FILE_ATTRIBUTES) {
+        freez(native_path);
+        errno = ENOENT;
+        return -1;
+    }
+    BOOL ok = GetDiskFreeSpaceExW(native_path, &free_bytes, &total_bytes, &total_free_bytes);
+    freez(native_path);
+    if (!ok) {
         errno = ENOENT;
         return -1;
     }

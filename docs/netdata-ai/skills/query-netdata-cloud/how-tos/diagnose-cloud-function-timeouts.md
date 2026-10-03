@@ -38,19 +38,22 @@ How can an operator distinguish a slow Windows Function from an ACLK/Cloud trans
    agents_call_function --via agent --node "$NODE_UUID" --host "$AGENT_TARGET" \
      --machine-guid "$MACHINE_GUID" --function 'netdata-metrics-cardinality%20info' \
      --body '{"info":true}' >/dev/null 2>&1 || true
-   direct_start="$(date +%s%N)"
+   direct_start="$(date +%s)"
    direct_rc=0
    agents_call_function --via agent --node "$NODE_UUID" --host "$AGENT_TARGET" \
      --machine-guid "$MACHINE_GUID" --function 'netdata-metrics-cardinality%20info' \
      --body '{"info":true}' \
      > "$AUDIT_DIR/function-timeout-direct.json" || direct_rc=$?
-   direct_elapsed="$(awk -v s="$direct_start" -v e="$(date +%s%N)" 'BEGIN { printf "%.3f", (e-s)/1000000000 }')"
+   direct_elapsed="$(awk -v s="$direct_start" -v e="$(date +%s)" 'BEGIN { printf "%.0f", e-s }')"
    if [[ "$direct_rc" -eq 0 ]] && jq -e . "$AUDIT_DIR/function-timeout-direct.json" >/dev/null 2>&1; then
        jq --arg elapsed "${direct_elapsed}s" '{status: (.status // null), total: $elapsed}' \
          "$AUDIT_DIR/function-timeout-direct.json"
-   else
+   elif [[ "$direct_rc" -ne 0 ]]; then
        jq -n --arg elapsed "${direct_elapsed}s" --arg rc "$direct_rc" \
          '{status: null, total: $elapsed, transport_error: $rc}'
+   else
+       jq -n --arg elapsed "${direct_elapsed}s" \
+         '{status: null, total: $elapsed, response_parse_error: true}'
    fi
    ```
 
@@ -65,8 +68,10 @@ How can an operator distinguish a slow Windows Function from an ACLK/Cloud trans
    if [[ "$cloud_rc" -eq 0 ]] && jq -e . "$AUDIT_DIR/function-timeout-cloud.json" >/dev/null 2>&1; then
        jq '{status, type, errorMessage, errorMsgKey, errorCode}' \
          "$AUDIT_DIR/function-timeout-cloud.json"
-   else
+   elif [[ "$cloud_rc" -ne 0 ]]; then
        jq -n --arg rc "$cloud_rc" '{status: null, transport_error: $rc}'
+   else
+       jq -n '{status: null, response_parse_error: true}'
    fi
    ```
 
