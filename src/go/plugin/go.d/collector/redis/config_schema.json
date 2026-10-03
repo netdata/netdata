@@ -60,7 +60,7 @@
         "description": "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.",
         "type": "integer",
         "minimum": 0,
-        "default": 0
+        "default": 60
       },
       "ping_samples": {
         "title": "Ping samples",

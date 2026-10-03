@@ -63,14 +63,9 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 }
 
 func TestCollector_ConfigSchemaMatchesMetadata(t *testing.T) {
-	collecttest.AssertConfigSchemaMatchesMetadataWith(
-		t,
-		"config_schema.json",
-		"metadata.yaml",
-		collecttest.ConfigSchemaCheck{
-			Defaults: true,
-		},
-	)
+	// Defaults are not compared: the form pre-fills autodetection_retry with 60 so UI-created jobs retry a failed
+	// start, while file-based jobs default to 0 as documented.
+	collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")
 }
 
 func TestCollector_Init(t *testing.T) {
