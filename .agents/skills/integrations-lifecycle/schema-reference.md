@@ -20,7 +20,8 @@ Referenced by most other schemas as `./shared.json#/$defs/<name>`, so an edit he
 - `short_setup` and `full_setup`: the two setup shapes; `setup-generic.md` renders both. In `full_setup`, an option's
   `detailed_description` turns the table cell into a link to an `h5` section below the table, `group` adds a Group
   column, and for collectors only `render_collectors` defaults a per-example `folding` to the parent
-  `examples.folding.enabled`.
+  `examples.folding.enabled`. The option entry is closed: any other key (`details`, a per-option `section_name`) fails
+  validation, because the template would drop it silently.
 - `troubleshooting`: `errors.list[]` (`error`, `cause`, `fix` required; `when`, `source` optional; the entry is closed
   with `additionalProperties: false`) rendered as `### Known Errors`, and the legacy `problems.list[]` (both fields
   optional) rendered as `### Other Problems`. The template adds `### Diagnostics` for `go.d.plugin`, `python.d.plugin`,
@@ -56,8 +57,8 @@ Behavior not visible in the schema:
   by `templates/functions.md`; the `hidden` value does not suppress the column. Function display-name capitalization:
   `.agents/skills/collectors-metadata-yaml/alerts-and-meta.md#5-functions-live-data`.
 - `additionalProperties: false` is set only on `profile_coverage`, the two `metrics.dynamic_*` list entries, and (via
-  `shared.json`) `instance.variables` and the troubleshooting `errors.list[]` entry, so unknown module keys pass through
-  (`gotchas.md`, `alternative_monitored_instances`).
+  `shared.json`) `instance.variables`, the `full_setup` option entry and the troubleshooting `errors.list[]` entry, so
+  unknown module keys pass through (`gotchas.md`, `alternative_monitored_instances`).
 
 ### `flows.json` and `device.json`
 
