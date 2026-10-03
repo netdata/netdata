@@ -18,13 +18,13 @@ exporters:
 
 ```yaml
 exporters:
-  otlphttp/netdata:
+  otlp_http/netdata:
     endpoint: "http://127.0.0.1:4318"
     tls:
       insecure: true
 ```
 
-Either transport works: `otlp_grpc` sends to port `4317`, while `otlphttp` sends OTLP/HTTP to port `4318` with a full-URL `endpoint`. Reference the exporter you chose in the `exporters` arrays of the recipes below.
+Either transport works: `otlp_grpc` sends to port `4317`, while `otlp_http` sends OTLP/HTTP to port `4318` with a full-URL `endpoint`. Reference the exporter you chose in the `exporters` arrays of the recipes below.
 
 After starting or reloading the Collector, verify an actual chart in Netdata. A successful connection to the port does not prove that the receiver is producing metrics or that Netdata accepted them.
 

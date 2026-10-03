@@ -18,16 +18,16 @@ exporters:
 
 ```yaml
 exporters:
-  otlphttp/netdata:
+  otlp_http/netdata:
     endpoint: "http://127.0.0.1:4318"
     tls:
       insecure: true
 ```
 
-Either transport works: `otlp_grpc` sends to port `4317`, while `otlphttp` sends OTLP/HTTP to port `4318` with a full-URL `endpoint`. Reference the exporter you chose in the `exporters` arrays of the recipes below.
+Either transport works: `otlp_grpc` sends to port `4317`, while `otlp_http` sends OTLP/HTTP to port `4318` with a full-URL `endpoint`. Reference the exporter you chose in the `exporters` arrays of the recipes below.
 
 When the Collector sends to a remote Netdata Agent, use TLS and give the exporter a persistent queue so a Collector
-restart or a network outage does not lose records (shown for gRPC; `otlphttp` takes the same `tls` and `sending_queue`
+restart or a network outage does not lose records (shown for gRPC; `otlp_http` takes the same `tls` and `sending_queue`
 blocks with an `https://` endpoint):
 
 ```yaml

@@ -73,7 +73,7 @@ modules:
         # is hit first.
         limits:
           description: |
-            Each export request can create at most 100 new charts by default. This is a per-request throttle, not a total cardinality limit. By default, log timestamps are accepted from up to 24 hours in the past through 10 minutes in the future; records without a timestamp use their arrival time. A span is accepted when it started no more than 24 hours ago and ends no more than 10 minutes in the future. Log and trace retention are each bounded by whichever limit is reached first: retained file count, retained indexed-data size, or age.
+            Each export request is limited to 4 MiB on both transports: an OTLP/HTTP request whose body exceeds it, before or after gzip decompression, gets `413 Payload Too Large`, and an OTLP/gRPC message over it gets `OUT_OF_RANGE`. Each export request can create at most 100 new charts by default. This is a per-request throttle, not a total cardinality limit. By default, log timestamps are accepted from up to 24 hours in the past through 10 minutes in the future; records without a timestamp use their arrival time. A span is accepted when it started no more than 24 hours ago and ends no more than 10 minutes in the future. Log and trace retention are each bounded by whichever limit is reached first: retained file count, retained indexed-data size, or age.
         performance_impact:
           description: |
             Resource use depends on the number and cardinality of received metrics, log and span volume, retention, and query activity. Keep unbounded attributes out of metric identities and dimension names.
@@ -346,6 +346,9 @@ modules:
           - name: A metric does not create the expected chart
             description: |
               Exponential histograms are not currently ingested. For other supported metrics, inspect the Agent journal for rejected user mapping files and verify the metric name, instrumentation scope, and `dimension_attribute_key`. The resulting chart context is `otel.<metric-name>`.
+          - name: Large exports are rejected
+            description: |
+              An export request larger than 4 MiB is rejected as a whole: OTLP/HTTP answers `413 Payload Too Large`, which senders do not retry, so the batch is dropped at once; OTLP/gRPC answers `OUT_OF_RANGE`, which OTLP classes as retryable, so the sender retries the same oversized batch until its retry limit runs out and then drops it. Make the sender's batches smaller. For an OpenTelemetry Collector exporter, cap the batch by size with `sending_queue: { batch: { sizer: bytes, max_size: 3000000 } }`, or lower `send_batch_max_size` on the `batch` processor.
           - name: Some exported logs are missing
             description: |
               By default, the plugin rejects log records timestamped more than 24 hours in the past or more than 10 minutes in the future. It reports rejected records through OTLP `partial_success`; whether this is visible depends on the sender or exporter. Check the sender's clock, backfill age, sender logs, and Netdata Agent journal.
