@@ -96,7 +96,6 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 	site := rum.New(rum.Dependencies{
 		Hub:     hub,
 		History: db,
-		Debug:   true,
 	})
 	site.Key = "shop"
 	site.Name = "Shop"
@@ -167,7 +166,6 @@ func TestCancelledOTLPPreparationHonorsCaller(t *testing.T) {
 	site := rum.New(rum.Dependencies{
 		Hub:     runtimehub.New(),
 		History: db,
-		Debug:   true,
 	})
 	site.Key = "shop"
 	site.AllowedOrigins = []string{"https://example.org"}

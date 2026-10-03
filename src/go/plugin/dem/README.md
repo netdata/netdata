@@ -30,14 +30,11 @@ whole-plugin `history.days` and approximate stored-byte `history.max_bytes` budg
 changes apply at the next hourly sweep; invalid changes retain the last valid policy and produce a warning. Queue or SQL
 failures count dropped records. This is sampled investigation history, not a lossless event archive.
 
-Site alert policies generate only their own `rum.<name>.conf` in `${NETDATA_LIB_DIR}/dem/health.d`. The installer creates
-`health.d/dem-generated` pointing to that writable directory because the normal service cannot write under `/etc`.
-If the Agent's health configuration or state directory is customized, arrange the corresponding link in the effective
-health configuration directory. The `rum.*.conf` namespace in this directory is reserved for generated files. Startup
-recovers abandoned generated regular files before jobs start, preserving symlinks, directories and unrelated files.
-Native jobs atomically write their policy and remove only their exact file on retirement; bounded health reload failures
-are reported and retried. Terminal/debug runs use an in-memory database and do not write health configuration or reload
-the running Agent.
+Stock health templates provide LCP, INP and CLS alerts using the average p75 over 10 minutes, plus a no-beacons alert
+using page views over one hour. They apply independently to each native site chart. Customize thresholds or disable
+alerts through normal Netdata health configuration, using `_collect_plugin=dem` and `_collect_job=<site>` chart-label
+filters for site-specific policies. The plugin does not generate health files or reload Agent health configuration.
+Terminal/debug runs use an in-memory database and leave live state untouched.
 
 The browser normalization, bounded aggregation, OTLP and query behavior originated in the experimental
 [Netdata digital-experience POC](https://github.com/netdata/digital-experience), commit

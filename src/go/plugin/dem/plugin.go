@@ -17,8 +17,6 @@ import (
 type Dependencies struct {
 	History        *store.Store
 	ConfigProvider func() (Config, error)
-	HealthDir      string
-	Debug          bool
 }
 
 // NewRegistry keeps the shared store caller-owned across Agent run generations.
@@ -31,10 +29,8 @@ func NewRegistry(deps Dependencies, cfg Config) (collectorapi.Registry, *Retenti
 	}
 	handler := rumfunc.New(source)
 	site := rum.Creator(rum.Dependencies{
-		Hub:       hub,
-		History:   deps.History,
-		HealthDir: deps.HealthDir,
-		Debug:     deps.Debug,
+		Hub:     hub,
+		History: deps.History,
 	})
 	site.AgentFunctions = rumfunc.Declarations
 	site.MethodHandler = func(collectorapi.RuntimeJob) funcapi.MethodHandler { return handler }

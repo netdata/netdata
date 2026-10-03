@@ -40,13 +40,12 @@ type RumRateLimit struct {
 // RumSite is one monitored web property. AllowedOrigins is required
 // Native job admission determines whether its endpoints exist.
 type RumSite struct {
-	Key                string     `yaml:"name"                           json:"name"`
-	Name               string     `yaml:"display_name"                   json:"display_name"`
-	CollectConsoleLogs bool       `yaml:"collect_console_logs,omitempty" json:"collect_console_logs"`
-	AllowedOrigins     []string   `yaml:"allowed_origins"                json:"allowed_origins"`
-	PageGroups         int        `yaml:"page_groups"                    json:"page_groups"` // top-N page groups kept as instances (1..100)
-	Countries          int        `yaml:"countries"                      json:"countries"`   // top-N countries (1..100)
-	Alerts             *RumAlerts `yaml:"alerts,omitempty"               json:"alerts"`
+	Key                string   `yaml:"name"                           json:"name"`
+	Name               string   `yaml:"display_name"                   json:"display_name"`
+	CollectConsoleLogs bool     `yaml:"collect_console_logs,omitempty" json:"collect_console_logs"`
+	AllowedOrigins     []string `yaml:"allowed_origins"                json:"allowed_origins"`
+	PageGroups         int      `yaml:"page_groups"                    json:"page_groups"` // top-N page groups kept as instances (1..100)
+	Countries          int      `yaml:"countries"                      json:"countries"`   // top-N countries (1..100)
 	// PublicURL is the externally reachable collector base (reverse
 	// proxy/TLS) used in the setup snippet; "" derives one
 	// from rum.listen via PublicBase.
@@ -247,22 +246,4 @@ func (s RumSite) PublicBase(listen string, tls bool) string {
 		}
 	}
 	return scheme + net.JoinHostPort(host, port)
-}
-
-// RumAlerts controls the generated per-site CWV health templates. Enabled nil
-// means true. Thresholds override the CWV defaults (LCP 2500/4000 ms,
-// INP 200/500 ms, CLS 0.1/0.25).
-type RumAlerts struct {
-	Enabled *bool         `yaml:"enabled,omitempty" json:"enabled"`
-	LCP     *RumThreshold `yaml:"lcp,omitempty"     json:"lcp"`
-	INP     *RumThreshold `yaml:"inp,omitempty"     json:"inp"`
-	CLS     *RumThreshold `yaml:"cls,omitempty"     json:"cls"`
-}
-
-// IsEnabled treats nil alerts or a missing flag as enabled.
-func (a *RumAlerts) IsEnabled() bool { return a == nil || a.Enabled == nil || *a.Enabled }
-
-type RumThreshold struct {
-	Warn float64 `yaml:"warn" json:"warn"`
-	Crit float64 `yaml:"crit" json:"crit"`
 }

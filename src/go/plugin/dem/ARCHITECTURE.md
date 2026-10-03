@@ -25,10 +25,9 @@ budget. A cancelled steady-state SQL batch stays pending and joins the final tra
 unrelated database failures are never replayed. Session contributions are deltas, allowing persistence to accumulate across site generations and session cache
 replacement. Publication uses typed metrix snapshots and static chart templates, with no V1 map bridge.
 
-Each site owns its exact generated health file. At command startup, before admission, recovery removes abandoned regular
-files only in the reserved RUM output namespace; subsequent process-service work retries health reload and never sweeps
-files while jobs are active. Health reload uses the existing nd-run command containment with the application environment
-preserved, including a customized Agent pipe name. Template selectors bind native chart labels rather than host labels.
+Stock native health templates own alert policy and attach independently to each site's charts. Site jobs publish
+measurements only; they do not write health configuration, invoke health reload or recover generated files. The command
+creates its history directory as the service account under the existing writable Agent state root.
 
 Reachability probes use an explicitly configured site or receiver public URL first. With neither configured, they probe
 the address learned from trusted proxy requests directly; setup Functions advertise it after successful confirmation.

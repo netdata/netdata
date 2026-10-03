@@ -810,13 +810,7 @@ if(ENABLE_PLUGIN_DEM)
   set(CPACK_RPM_PLUGIN-DEM_DEFAULT_USER "root")
   set(CPACK_RPM_PLUGIN-DEM_DEFAULT_GROUP "netdata")
   set(CPACK_RPM_PLUGIN-DEM_USER_FILELIST
-      "%attr(0750,root,${netdata_group_POST}) ${PLUGINS_DIR}/dem.plugin"
-      "%attr(0750,${netdata_user_POST},${netdata_group_POST}) %dir ${VARLIB_DIR}/dem"
-      "%attr(0750,${netdata_user_POST},${netdata_group_POST}) %dir ${VARLIB_DIR}/dem/health.d")
-  configure_file("${PKG_FILES_PATH}/rpm/plugin-dem/post.in"
-                 "${CMAKE_BINARY_DIR}/packaging/plugin-dem/post" @ONLY)
-  set(CPACK_RPM_PLUGIN-DEM_POST_INSTALL_SCRIPT_FILE
-      "${CMAKE_BINARY_DIR}/packaging/plugin-dem/post")
+      "%attr(0750,root,${netdata_group_POST}) ${PLUGINS_DIR}/dem.plugin")
 endif()
 
 #

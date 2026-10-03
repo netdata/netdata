@@ -829,14 +829,6 @@ install_netdata_snmp_trap_log_dir() {
   return 0
 }
 
-install_netdata_dem_health_dir() {
-  dem_plugins_dir="${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d"
-  [ -x "${dem_plugins_dir}/dem.plugin" ] || return 0
-  if ! run "${dem_plugins_dir}/dem-install-health.sh" "${NETDATA_LIB_DIR}" "${NETDATA_USER_CONFIG_DIR}" "${NETDATA_USER}" "${NETDATA_GROUP}"; then
-    warning "Failed to prepare DEM generated health configuration. Check the installer output."
-  fi
-}
-
 install_netdata_dirs() {
   _DIRS_INSTALLED=0
   if install_netdata_tmpfiles && command -v systemd-tmpfiles >/dev/null 2>&1 ; then
@@ -868,7 +860,6 @@ install_netdata_dirs() {
   fi
 
   install_netdata_snmp_trap_log_dir
-  install_netdata_dem_health_dir
 }
 
 # -----------------------------------------------------------------------------

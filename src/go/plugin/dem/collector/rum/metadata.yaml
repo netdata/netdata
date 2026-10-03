@@ -1,5 +1,21 @@
 modules:
     - alerts:
+        - info: p75 Largest Contentful Paint over the last 10 minutes for site ${label:_collect_job}
+          link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
+          metric: rum.lcp
+          name: rum_lcp_p75
+        - info: p75 Interaction to Next Paint over the last 10 minutes for site ${label:_collect_job}
+          link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
+          metric: rum.inp
+          name: rum_inp_p75
+        - info: p75 Cumulative Layout Shift over the last 10 minutes for site ${label:_collect_job}
+          link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
+          metric: rum.cls
+          name: rum_cls_p75
+        - info: No page views received from site ${label:_collect_job} in the last hour; is the RUM beacon installed?
+          link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
+          metric: rum.pageviews
+          name: rum_no_beacons
         - info: RUM event records dropped before reaching the OTLP endpoint in the last 5 minutes
           link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
           metric: rum.otlp
@@ -1070,7 +1086,7 @@ modules:
                     title: Configuration options
                 list:
                     - default_value: ""
-                      description: Stable site identifier used in beacon URLs and history. Renaming creates a new history identity. Up to 246 ASCII characters fit the generated health filename.
+                      description: Stable site identifier used in beacon URLs and history. Renaming creates a new history identity.
                       group: Site
                       name: name
                       required: true
@@ -1209,70 +1225,6 @@ modules:
                       group: Privacy
                       name: redact_paths[].replace
                       required: false
-                    - default_value: ""
-                      description: Per-site warning and critical thresholds. Leave empty to use the standard Core Web Vital thresholds.
-                      detailed_description: |
-                        Each enabled site generates LCP, INP and CLS alerts using the average p75 over the last
-                        10 minutes. Thresholds are configurable below. A separate no-beacons alert warns when
-                        the site receives no page views for one hour. Missing data does not count as zero traffic.
-
-                        Set `alerts.enabled` to false to disable all four generated site alerts. Disabling or
-                        removing the site removes its generated alerts. Netdata stores these files under its DEM
-                        state directory and loads them through `health.d/dem-generated`; edit the site configuration
-                        instead of the generated files. Debug mode does not install generated alerts.
-                      group: Alerts
-                      name: alerts
-                      required: false
-                    - default_value: ""
-                      description: Enable Core Web Vital alerts for this site. Leave unset to enable them.
-                      group: Alerts
-                      name: alerts.enabled
-                      required: false
-                    - default_value: ""
-                      description: Override the default lcp thresholds, in milliseconds.
-                      group: Alerts
-                      name: alerts.lcp
-                      required: false
-                    - default_value: 2500
-                      description: Warning threshold, in milliseconds.
-                      group: Alerts
-                      name: alerts.lcp.warn
-                      required: false
-                    - default_value: 4000
-                      description: Critical threshold, in milliseconds. Must be at least the warning threshold.
-                      group: Alerts
-                      name: alerts.lcp.crit
-                      required: false
-                    - default_value: ""
-                      description: Override the default inp thresholds, in milliseconds.
-                      group: Alerts
-                      name: alerts.inp
-                      required: false
-                    - default_value: 200
-                      description: Warning threshold, in milliseconds.
-                      group: Alerts
-                      name: alerts.inp.warn
-                      required: false
-                    - default_value: 500
-                      description: Critical threshold, in milliseconds. Must be at least the warning threshold.
-                      group: Alerts
-                      name: alerts.inp.crit
-                      required: false
-                    - default_value: ""
-                      description: Override the default cls thresholds, in score.
-                      group: Alerts
-                      name: alerts.cls
-                      required: false
-                    - default_value: 0.1
-                      description: Warning threshold, in score.
-                      group: Alerts
-                      name: alerts.cls.warn
-                      required: false
-                    - default_value: 0.25
-                      description: Critical threshold, in score. Must be at least the warning threshold.
-                      group: Alerts
-                      name: alerts.cls.crit
-                      required: false
         prerequisites:
             list:
                 - description: DEM is experimental and opt-in. Build Netdata with `-DENABLE_PLUGIN_DEM=ON`, or use `--enable-plugin-dem` with the source installer. Install the resulting DEM plugin package.
@@ -1281,8 +1233,8 @@ modules:
                   title: Configure the receiver and site
                 - description: Add `<script async src="https://rum.example.org/rum/shop.js"></script>` to the website, replacing the public receiver URL and site key. Allow this collector and the pinned Faro SDK CDN in the website Content Security Policy.
                   title: Install the browser snippet
-                - description: The installer links `health.d/dem-generated` to the writable DEM health directory under the Agent state path. If `[directories] health config` or the state path is customized, create the corresponding directory link in the effective health configuration directory. Each job controls its own Web Vital alert thresholds.
-                  title: Make generated alerts visible
+                - description: Stock health templates provide Web Vital and no-beacon alerts independently for each site. Customize thresholds or disable alerts through normal Netdata health configuration; use the `_collect_plugin=dem` and `_collect_job` chart labels for site-specific policies.
+                  title: Customize alerts
         single_job: false
       troubleshooting:
         problems:

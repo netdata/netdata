@@ -20,7 +20,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/healthgen"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
@@ -45,10 +44,8 @@ type Config struct {
 	OTLP           config.OTelCfg `yaml:"otlp"                   json:"otlp"`
 }
 type Dependencies struct {
-	Hub       *runtimehub.Hub
-	History   *store.Store
-	HealthDir string
-	Debug     bool
+	Hub     *runtimehub.Hub
+	History *store.Store
 }
 type Collector struct {
 	collectorapi.Base
@@ -57,7 +54,6 @@ type Collector struct {
 	store      metrix.CollectorStore
 	aggregator *agg.Aggregator
 	redactor   *secrets.Redactor
-	health     *healthgen.Site
 }
 
 func Creator(deps Dependencies) collectorapi.Creator {
@@ -150,14 +146,6 @@ func (c *Collector) Init(ctx context.Context) error {
 			return errors.New("public_url must be an http(s) base URL")
 		}
 	}
-	if c.Alerts != nil {
-		for _, th := range []*config.RumThreshold{c.Alerts.LCP, c.Alerts.INP, c.Alerts.CLS} {
-			if th != nil &&
-				(math.IsNaN(th.Warn) || math.IsNaN(th.Crit) || math.IsInf(th.Warn, 0) || math.IsInf(th.Crit, 0) || th.Warn < 0 || th.Crit < th.Warn) {
-				return errors.New("alert thresholds must be finite, nonnegative and ordered")
-			}
-		}
-	}
 	if c.OTLP.Enabled != "auto" && c.OTLP.Enabled != "yes" && c.OTLP.Enabled != "no" {
 		return errors.New("otlp.enabled must be auto, yes or no")
 	}
@@ -165,15 +153,6 @@ func (c *Collector) Init(ctx context.Context) error {
 		return err
 	}
 	c.redactor = secrets.NewRedactor(c.OTLP.AuthToken)
-	health, err := healthgen.NewSite(c.deps.HealthDir, c.RumSite, healthgen.Options{
-		Debug:   c.deps.Debug,
-		OnError: func(err error) { c.Warningf("site health configuration: %v", err) },
-		Redact:  c.redactor.Apply,
-	})
-	if err != nil {
-		return err
-	}
-	c.health = health
 	c.aggregator = agg.New(time.Duration(c.Window))
 	c.aggregator.Configure(
 		time.Duration(c.Window),
@@ -234,7 +213,6 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	var workers sync.WaitGroup
 	workers.Go(func() { writer.Run(workersCtx) })
 	workers.Go(func() { exporter.Run(workersCtx) })
-	workers.Go(func() { c.health.Run(ctx) })
 	probeCtx, stopProbes := context.WithCancel(ctx)
 	probesDone := make(chan struct{})
 	client := &http.Client{

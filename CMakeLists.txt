@@ -3970,17 +3970,11 @@ if(ENABLE_PLUGIN_DEM)
             COMPONENT plugin-dem DESTINATION usr/share/doc/netdata-plugin-dem)
     install(PROGRAMS ${CMAKE_BINARY_DIR}/${DEM_PLUGIN_BIN}
             COMPONENT plugin-dem DESTINATION usr/libexec/netdata/plugins.d)
-    install(PROGRAMS packaging/cmake/pkg-files/deb/plugin-dem/install-health.sh
-            RENAME dem-install-health.sh
-            COMPONENT plugin-dem DESTINATION usr/libexec/netdata/plugins.d)
     install(FILES src/go/plugin/dem/config/dem.conf
             COMPONENT plugin-dem DESTINATION usr/lib/netdata/conf.d)
     install(DIRECTORY src/go/plugin/dem/config/dem
             COMPONENT plugin-dem DESTINATION usr/lib/netdata/conf.d
             FILES_MATCHING PATTERN "*.conf")
-    install(DIRECTORY COMPONENT plugin-dem DESTINATION etc/netdata/dem)
-    install(DIRECTORY COMPONENT plugin-dem DESTINATION var/lib/netdata/dem/health.d
-            DIRECTORY_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE)
 endif()
 
 #

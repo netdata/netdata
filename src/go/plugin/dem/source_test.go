@@ -157,7 +157,6 @@ func TestHistoryFunctionsRemainAvailableWithoutActiveSites(t *testing.T) {
 	require.NoError(t, err)
 	registry, _ := NewRegistry(Dependencies{
 		History: st,
-		Debug:   true,
 	}, DefaultConfig())
 	handler := registry["rum"].MethodHandler(nil).(*rumfunc.Handler)
 	response := handler.HandleRaw(

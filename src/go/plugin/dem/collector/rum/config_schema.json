@@ -6,10 +6,9 @@
     "properties": {
       "name": {
         "title": "Site key",
-        "description": "Stable site identifier used in beacon URLs and history. Renaming creates a new history identity. Up to 246 ASCII characters fit the generated health filename.",
+        "description": "Stable site identifier used in beacon URLs and history. Renaming creates a new history identity.",
         "type": "string",
-        "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$",
-        "maxLength": 246
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
       },
       "display_name": {
         "title": "Display name",
@@ -214,96 +213,6 @@
             "type": "string"
           }
         }
-      },
-      "alerts": {
-        "title": "Web Vital alerts",
-        "description": "Per-site warning and critical thresholds. Leave empty to use the standard Core Web Vital thresholds.",
-        "type": [
-          "object",
-          "null"
-        ],
-        "properties": {
-          "enabled": {
-            "title": "Enable alerts",
-            "description": "Enable Core Web Vital alerts for this site. Leave unset to enable them.",
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
-          "lcp": {
-            "title": "LCP",
-            "description": "Override the default lcp thresholds, in milliseconds.",
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "warn": {
-                "title": "Warning threshold",
-                "description": "Warning threshold, in milliseconds.",
-                "type": "number",
-                "minimum": 0,
-                "default": 2500
-              },
-              "crit": {
-                "title": "Critical threshold",
-                "description": "Critical threshold, in milliseconds. Must be at least the warning threshold.",
-                "type": "number",
-                "minimum": 0,
-                "default": 4000
-              }
-            }
-          },
-          "inp": {
-            "title": "INP",
-            "description": "Override the default inp thresholds, in milliseconds.",
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "warn": {
-                "title": "Warning threshold",
-                "description": "Warning threshold, in milliseconds.",
-                "type": "number",
-                "minimum": 0,
-                "default": 200
-              },
-              "crit": {
-                "title": "Critical threshold",
-                "description": "Critical threshold, in milliseconds. Must be at least the warning threshold.",
-                "type": "number",
-                "minimum": 0,
-                "default": 500
-              }
-            }
-          },
-          "cls": {
-            "title": "CLS",
-            "description": "Override the default cls thresholds, in score.",
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "warn": {
-                "title": "Warning threshold",
-                "description": "Warning threshold, in score.",
-                "type": "number",
-                "minimum": 0,
-                "default": 0.1
-              },
-              "crit": {
-                "title": "Critical threshold",
-                "description": "Critical threshold, in score. Must be at least the warning threshold.",
-                "type": "number",
-                "minimum": 0,
-                "default": 0.25
-              }
-            }
-          }
-        }
       }
     },
     "required": [
@@ -353,12 +262,6 @@
           "title": "Privacy",
           "fields": [
             "redact_paths"
-          ]
-        },
-        {
-          "title": "Alerts",
-          "fields": [
-            "alerts"
           ]
         }
       ]

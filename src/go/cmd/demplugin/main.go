@@ -24,7 +24,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/healthgen"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
 	"go.uber.org/automaxprocs/maxprocs"
 )
@@ -80,24 +79,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "opening DEM history: %v\n", err)
 		os.Exit(1)
 	}
-	healthDir := filepath.Join(pluginconfig.VarLibDir(), "dem", "health.d")
-	startupLog := logger.New()
-	recovery := healthgen.NewRecovery(
-		healthDir,
-		healthgen.Options{
-			Debug:   debug,
-			OnError: func(err error) { startupLog.Warningf("DEM health recovery: %v", err) },
-		},
-	)
-	if err := recovery.Prepare(); err != nil {
-		startupLog.Warningf("DEM health file recovery: %v", err)
-	}
 	registry, retention := dem.NewRegistry(
 		dem.Dependencies{
 			History:        history,
 			ConfigProvider: func() (dem.Config, error) { return dem.LoadConfig(pluginconfig.ConfigDir()) },
-			HealthDir:      filepath.Join(pluginconfig.VarLibDir(), "dem", "health.d"),
-			Debug:          debug,
 		},
 		cfg,
 	)
@@ -108,7 +93,7 @@ func main() {
 		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
 		VarLibDir:                 pluginconfig.VarLibDir(),
 		ModuleRegistry:            registry,
-		Services:                  []composition.ProcessService{retention, recovery},
+		Services:                  []composition.ProcessService{retention},
 		Secrets:                   secrets,
 		IsInsideK8s:               hostinfo.IsInsideK8sCluster(),
 		RunModePolicy:             policy.Agent(isTerminal),

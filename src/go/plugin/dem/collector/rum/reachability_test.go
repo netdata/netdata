@@ -46,7 +46,6 @@ func TestProductionProbeConfirmsTrustedProxyPublicBase(t *testing.T) {
 	site := New(Dependencies{
 		Hub:     hub,
 		History: db,
-		Debug:   true,
 	})
 	site.Key = "shop"
 	site.AllowedOrigins = []string{server.URL}
