@@ -2,19 +2,22 @@
 """Exercise fleet preparation with offline fixtures; never execute an installer."""
 import gzip
 import hashlib
+import importlib.util
 import io
 import json
 import os
 from pathlib import Path
+import runpy
 import shutil
 import struct
 import subprocess
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
-SCRIPT = ROOT / 'packaging/makeself/prepare-fleet.sh'
+SCRIPT = ROOT / 'packaging/makeself/prepare-fleet.py'
 
 
 class PrepareFleetTests(unittest.TestCase):
@@ -65,6 +68,17 @@ class PrepareFleetTests(unittest.TestCase):
         path.write_bytes(data)
         return path
 
+    def require_elf_strip(self):
+        tool = shutil.which('llvm-strip') or shutil.which('strip')
+        if not tool:
+            self.skipTest('ELF-compatible strip unavailable')
+        source = self.elf_fixture(str(self.root / 'strip-probe'))
+        result = subprocess.run([tool, '--strip-debug', '-o', str(self.root / 'strip-probe-output'), str(source)],
+                                capture_output=True)
+        if result.returncode:
+            self.skipTest('available strip does not support the Linux ELF fixture')
+        return tool
+
     def run_script(self, *args, success=True, env=None):
         result = subprocess.run([str(SCRIPT), *map(str, args)], cwd=self.root, capture_output=True, text=True, env=env)
         self.assertEqual(result.returncode == 0, success, result.stderr)
@@ -74,8 +88,8 @@ class PrepareFleetTests(unittest.TestCase):
         target = self.root / 'output'
         args = ['--source', self.source, '--keep', keep, '--strip-mode', options.get('strip', 'none'),
                 '--apply', '--output', target]
-        if 'objcopy' in options:
-            args += ['--objcopy', options['objcopy']]
+        if 'strip_tool' in options:
+            args += ['--strip-tool', options['strip_tool']]
         result = self.run_script(*args, success=options.get('success', True))
         return target, result
 
@@ -128,12 +142,11 @@ class PrepareFleetTests(unittest.TestCase):
         for path in paths:
             self.assertTrue((self.root / 'ebpf' / path).is_file())
 
-    @unittest.skipUnless(shutil.which('objcopy'), 'native objcopy unavailable')
     def test_retained_netflow_downloader_is_stripped(self):
         self.put('usr/libexec/netdata/plugins.d/netflow-plugin', 'plugin')
         downloader = self.elf_fixture('usr/sbin/topology-ip-intel-downloader')
         downloader.chmod(0o755)
-        target, _ = self.prepare('netflow', strip='debug')
+        target, _ = self.prepare('netflow', strip='debug', strip_tool=self.require_elf_strip())
         manifest = json.loads((target / 'usr/share/netdata/fleet-manifest.json').read_text())
         self.assertIn('usr/sbin/topology-ip-intel-downloader',
                       [item['path'] for item in manifest['stripped_files']])
@@ -145,6 +158,19 @@ class PrepareFleetTests(unittest.TestCase):
         self.assertFalse((self.root / 'preview').exists())
         self.assertIn('Keep: none', result.stdout)
         self.assertNotIn('removed_paths', result.stdout)
+
+    def test_import_does_not_execute_cli(self):
+        spec = importlib.util.spec_from_file_location('prepare_fleet', SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        with patch('sys.argv', ['unrelated-program', '--invalid']), patch('builtins.print') as output:
+            spec.loader.exec_module(module)
+        output.assert_not_called()
+        self.assertTrue(callable(module.main))
+
+    def test_windows_cli_fails_with_platform_message(self):
+        with patch.object(os, 'name', 'nt'):
+            with self.assertRaisesRegex(RuntimeError, 'Windows is not supported'):
+                runpy.run_path(str(SCRIPT), run_name='__main__')
 
     @unittest.skipUnless(os.name == 'posix' and os.geteuid() != 0, 'requires unprivileged POSIX permissions')
     def test_unreadable_source_subtree_refused(self):
@@ -243,13 +269,13 @@ class PrepareFleetTests(unittest.TestCase):
                         ignore=lambda directory, names: ['bash'] if Path(directory).name == 'bin' else [])
         self.run_script('--source', other, '--keep', 'none', success=False)
 
-    @unittest.skipUnless(shutil.which('objcopy'), 'native objcopy unavailable')
     def test_successful_default_debug_strip_preserves_executable_mode(self):
         self.elf_fixture('bin/srv/netdata')
         (self.source / 'bin/srv/netdata').chmod(0o755)
         self.elf_fixture('bin/nd-run')
         target = self.root / 'debug-output'
-        result = self.run_script('--source', self.source, '--keep', 'apps', '--apply', '--output', target)
+        result = self.run_script('--source', self.source, '--keep', 'apps', '--apply', '--output', target,
+                                 '--strip-tool', self.require_elf_strip())
         self.assertIn('Stripped bin/srv/netdata:', result.stdout)
         self.assertIn('Prepared payload:', result.stdout)
         self.assertIn('Disk reduction:', result.stdout)
@@ -259,7 +285,7 @@ class PrepareFleetTests(unittest.TestCase):
         self.assertEqual(manifest['strip_mode'], 'debug')
         self.assertEqual(len(manifest['stripped_files']), 2)
 
-    @unittest.skipUnless(shutil.which('objcopy') and shutil.which('cc'), 'native compiler or objcopy unavailable')
+    @unittest.skipUnless(shutil.which('cc'), 'native compiler unavailable')
     def test_user_state_and_unknown_elf_files_remain_byte_identical(self):
         source = self.root / 'fixture.c'
         source.write_text('int main(void) { return 0; }\n')
@@ -277,24 +303,24 @@ class PrepareFleetTests(unittest.TestCase):
 
     def test_strip_failure_does_not_publish(self):
         self.elf_fixture('bin/srv/netdata')
-        tool = self.root / 'fail-objcopy'
+        tool = self.root / 'fail-strip'
         tool.write_text('#!/bin/sh\nexit 1\n')
         tool.chmod(0o755)
-        target, result = self.prepare(strip='debug', objcopy=tool, success=False)
+        target, result = self.prepare(strip='debug', strip_tool=tool, success=False)
         self.assertFalse(target.exists())
         self.assertIn('command failed (1)', result.stderr)
 
     def test_allocated_section_mutation_refused(self):
         self.elf_fixture('bin/srv/netdata')
-        tool = self.root / 'bad-objcopy'
+        tool = self.root / 'bad-strip'
         tool.write_text('#!/usr/bin/env python3\n'
                         'import pathlib, sys\n'
-                        'p = pathlib.Path(sys.argv[2])\n'
+                        'p = pathlib.Path(sys.argv[-1])\n'
                         'd = bytearray(p.read_bytes())\n'
                         'd[24] ^= 1\n'
-                        'pathlib.Path(sys.argv[3]).write_bytes(d)\n')
+                        'pathlib.Path(sys.argv[-2]).write_bytes(d)\n')
         tool.chmod(0o755)
-        target, result = self.prepare(strip='all', objcopy=tool, success=False)
+        target, result = self.prepare(strip='all', strip_tool=tool, success=False)
         self.assertFalse(target.exists())
         self.assertIn('changed allocated sections or ELF identity', result.stderr)
 
@@ -348,6 +374,50 @@ class PrepareFleetTests(unittest.TestCase):
     def test_checksum_publication_failure_preserves_replaced_installer(self):
         target = self.checksum_publication_race(replace_installer=True)
         self.assertEqual(target.read_text(), 'competing installer')
+
+    def publication_failure(self, injection_code):
+        path, sha = self.installer()
+        target = self.root / 'failure.gz.run'
+        injection = self.root / 'injection'
+        injection.mkdir()
+        (injection / 'sitecustomize.py').write_text(injection_code)
+        result = self.run_script('--input', path, '--sha256', sha, '--keep', 'none',
+                                 '--strip-mode', 'none', '--apply', '--output', target,
+                                 success=False, env=dict(os.environ, PYTHONPATH=str(injection)))
+        return target, result
+
+    def test_checksum_logging_failure_preserves_published_pair(self):
+        target, result = self.publication_failure(
+            'import builtins\n'
+            'original = builtins.print\n'
+            'def faulty(*args, **kwargs):\n'
+            '    if args and str(args[0]).startswith("Published ") and str(args[0]).endswith(".sha256"):\n'
+            '        raise OSError("checksum logging failed")\n'
+            '    return original(*args, **kwargs)\n'
+            'builtins.print = faulty\n')
+        self.assertIn('checksum logging failed', result.stderr)
+        self.assertTrue(target.exists())
+        self.assertTrue(Path(str(target) + '.sha256').exists())
+
+    def test_rollback_failure_preserves_original_error(self):
+        target, result = self.publication_failure(
+            'import os, pathlib\n'
+            'link = os.link\n'
+            'unlink = pathlib.Path.unlink\n'
+            'def faulty_link(source, target, *args, **kwargs):\n'
+            '    if pathlib.Path(source).name == "installer.sha256":\n'
+            '        raise PermissionError("checksum publication denied")\n'
+            '    return link(source, target, *args, **kwargs)\n'
+            'def faulty_unlink(self, *args, **kwargs):\n'
+            '    if self.name == "failure.gz.run":\n'
+            '        raise PermissionError("rollback denied")\n'
+            '    return unlink(self, *args, **kwargs)\n'
+            'os.link = faulty_link\n'
+            'pathlib.Path.unlink = faulty_unlink\n')
+        self.assertIn('checksum publication denied', result.stderr.splitlines()[-1])
+        self.assertIn('rollback denied', result.stderr)
+        self.assertTrue(target.exists())
+        self.assertFalse(Path(str(target) + '.sha256').exists())
 
     def installer(self, extra=None, omit_directories=False):
         data = io.BytesIO()

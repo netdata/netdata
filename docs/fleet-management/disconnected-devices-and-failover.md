@@ -32,6 +32,7 @@ Choose the storage mode that matches the device's recovery needs:
 | Child storage | Recovery capability |
 |:--|:--|
 | `ram` | Backfills network outages while the Agent stays running, with metric history kept off the SD card |
+| `alloc` | Backfills from memory with a smaller allocation and shorter recovery window at low retention settings |
 | `dbengine` | Backfills from persistent history that survives Agent restarts and device power loss |
 | `none` | Resumes current monitoring on reconnection, with the smallest local history footprint |
 

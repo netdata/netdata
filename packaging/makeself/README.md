@@ -20,7 +20,7 @@ Netdata provides pre-built static binaries for Linux systems where native packag
 
 ## Prepare Packages for Edge Device Monitoring
 
-Reduce the installed size of Netdata on robots and other edge devices with the [fleet preparation script](https://github.com/netdata/netdata/blob/master/packaging/makeself/prepare-fleet.sh). Run it on your build host to strip symbols and keep the optional capabilities your devices use, then include the reduced package in your device image.
+Reduce the installed size of Netdata on robots and other edge devices with the [fleet preparation script](https://github.com/netdata/netdata/blob/master/packaging/makeself/prepare-fleet.py). Run it on your build host to strip symbols and keep the optional capabilities your devices use, then include the reduced package in your device image.
 
 See [Minimize the Disk Footprint of Fleet Devices](/docs/fleet-management/minimize-disk-footprint.md) for the capability policy, tools, validation and image-controlled updates. The standard static updater downloads the full package again, so reduced images need a fleet-managed release workflow.
 

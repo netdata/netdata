@@ -1,18 +1,15 @@
-#!/usr/bin/env bash
+#!/usr/bin/env python3
+# Copyright (c) 2026 Netdata Inc.
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Prepare new fleet images without changing an installed Agent or the source package.
-set -eu
-printf >&2 '%q > ' "$PWD"
-printf >&2 '%q ' bash "${BASH_SOURCE[0]}" "$@"
-printf >&2 '\n'
-python3 - "$@" <<'PY'
+
+"""Prepare new fleet images without changing an installed Agent or the source package."""
+
 import argparse
 import copy
 import gzip
 import hashlib
 import json
 import os
-from pathlib import Path, PurePosixPath
 import re
 import shlex
 import shutil
@@ -22,6 +19,8 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+
+from pathlib import Path, PurePosixPath
 
 PLUGIN = 'usr/libexec/netdata/plugins.d/'
 CONF = 'usr/lib/netdata/conf.d/'
@@ -208,8 +207,9 @@ def patch_permissions(text):
         path = PLUGIN + plugin
         pattern = re.compile(r'(?m)^  if ! run setcap ([^\n]+) "' + re.escape(path)
                              + r'"; then\n    run chmod 4750 "' + re.escape(path) + r'"\n  fi$')
-        replacement = lambda m: ('  if [ -f "' + path + '" ]; then\n'
-                                 + '\n'.join('  ' + line for line in m[0].splitlines()) + '\n  fi')
+        def replacement(match):
+            return ('  if [ -f "' + path + '" ]; then\n'
+                    + '\n'.join('  ' + line for line in match[0].splitlines()) + '\n  fi')
         text, count = pattern.subn(replacement, text)
         if count == 0 and f'  if [ -f "{path}" ]; then' not in text:
             fail(f'unrecognized installer permission policy for {plugin}')
@@ -252,11 +252,26 @@ def elf_contract(path):
 def publish_file(source, target):
     # A hard link provides atomic publication without overwriting an existing output.
     os.link(source, target)
-    print(f'Published {target}', file=sys.stderr)
+
+
+def present(records, path):
+    # Static archives can list only files, leaving directories implicit.
+    return path in records or any(p.startswith(path + '/') for p in records)
+
+
+def show(message):
+    print(message, flush=True)
+
+
+def size_text(size):
+    if size < 1024 * 1024:
+        return f'{size / 1024:.1f} KiB'
+    return f'{size / (1024 * 1024):.1f} MiB'
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Prepare a new reduced static Netdata image. Never run on a live installation.')
+    parser = argparse.ArgumentParser(
+        description='Prepare a new reduced static Netdata image. Never run on a live installation.')
     source = parser.add_mutually_exclusive_group()
     source.add_argument('--input', type=Path, help='official single-gzip .gz.run installer')
     source.add_argument('--source', type=Path, help='offline static package tree')
@@ -264,8 +279,9 @@ def main():
     parser.add_argument('--output', type=Path, help='new installer file or new staging directory')
     parser.add_argument('--keep', help='required: all, none, or comma-separated capabilities')
     parser.add_argument('--strip-mode', choices=('debug', 'all', 'none'), default='debug')
-    parser.add_argument('--objcopy', default='objcopy', help='objcopy supporting the target architecture')
-    parser.add_argument('--apply', action='store_true', help='write the new output; default only previews removal policy')
+    parser.add_argument('--strip-tool', default='strip', help='strip supporting the target architecture')
+    parser.add_argument('--apply', action='store_true',
+                        help='write the new output; default only previews removal policy')
     parser.add_argument('--list-capabilities', action='store_true')
     parser.add_argument('--verbose', action='store_true', help='include the detailed file report')
     args = parser.parse_args()
@@ -318,19 +334,15 @@ def main():
             fail('--source must be an offline directory')
         records = validate_members(tree_members(input_path))
         work = None
-    # Static archives can list only files, leaving directories implicit.
-    def present(path):
-        return path in records or any(p.startswith(path + '/') for p in records)
-
     if args.keep != 'all':
         for name in selected:
             primary = CAPS[name][0][0]
-            if not present(primary):
+            if not present(records, primary):
                 fail(f'requested capability {name} is absent ({primary})')
-    available = {name for name in selected if present(CAPS[name][0][0])}
+    available = {name for name in selected if present(records, CAPS[name][0][0])}
     for name in available:
         for companion in REQUIRED_COMPANIONS.get(name, []):
-            if not present(companion):
+            if not present(records, companion):
                 fail(f'incomplete capability {name}: missing {companion}')
     omitted = [p for name, (paths, _) in CAPS.items() if name not in selected for p in paths]
     # Agent startup validates the web directory even when no dashboard is installed.
@@ -345,15 +357,7 @@ def main():
                   strip_mode=args.strip_mode, source_sha256=digest(input_path) if args.input else None,
                   original_regular_bytes=original_bytes, removed_regular_bytes=removed_bytes,
                   removed_paths=removed, stripped_files=[])
-    def show(message):
-        print(message, flush=True)
-
-    def size_text(size):
-        if size < 1024 * 1024:
-            return f'{size / 1024:.1f} KiB'
-        return f'{size / (1024 * 1024):.1f} MiB'
-
-    omitted_capabilities = sorted(name for name in CAPS if name not in selected and present(CAPS[name][0][0]))
+    omitted_capabilities = sorted(name for name in CAPS if name not in selected and present(records, CAPS[name][0][0]))
     show(f'Input: {input_path.name}')
     show(f'Keep: {", ".join(sorted(available)) or "none"}')
     show(f'Remove: {", ".join(omitted_capabilities) or "none"}')
@@ -395,7 +399,7 @@ def main():
                 before = elf_contract(target)
                 if before is not None:
                     stripped = work / 'stripped-file'
-                    command([args.objcopy, '--strip-' + args.strip_mode, str(target), str(stripped)])
+                    command([args.strip_tool, '--strip-' + args.strip_mode, '-o', str(stripped), str(target)])
                     if elf_contract(stripped) != before:
                         fail(f'stripping changed allocated sections or ELF identity: {name}')
                     old_size = target.stat().st_size
@@ -429,7 +433,8 @@ def main():
         # mkdir reserves a fresh output; copytree never overwrites somebody else's directory.
         output.mkdir()
         shutil.copytree(stage, output, dirs_exist_ok=True, symlinks=True, copy_function=shutil.copy2)
-        print('Tree output retains modes and links; assign deployment ownership in the image pipeline.', file=sys.stderr)
+        print('Tree output retains modes and links; assign deployment ownership in the image pipeline.',
+              file=sys.stderr)
     else:
         tar_path = work / 'output.tar'
         with tarfile.open(tar_path, 'w', format=tarfile.PAX_FORMAT) as tf:
@@ -455,7 +460,8 @@ def main():
         for key, value in values.items():
             header = re.sub(r'^' + key + r'="[^"\n]*"$', key + '="' + value + '"', header, flags=re.M)
         usize = (tar_path.stat().st_size + 1023) // 1024
-        header, count = re.subn(r'(?:(?<=extract )|(?<=size: )|(?<="\$leftspace" -lt )|(?<=\())\d+(?= KB|; then)', str(usize), header)
+        space_declarations = r'(?:(?<=extract )|(?<=size: )|(?<="\$leftspace" -lt )|(?<=\())\d+(?= KB|; then)'
+        header, count = re.subn(space_declarations, str(usize), header)
         if count != 4:
             fail('unrecognized Makeself uncompressed-space declarations')
         prepared = work / 'installer.gz.run'
@@ -471,15 +477,18 @@ def main():
         publish_file(prepared, output)
         try:
             publish_file(checksum, checksum_path)
-        except OSError:
+        except OSError as publication_error:
             # Preserve an installer replaced by another publisher during the failure.
             try:
                 if output.samefile(prepared):
                     output.unlink()
-                    print(f'Rolled back installer after checksum publication failed: {output}', file=sys.stderr)
             except FileNotFoundError:
                 pass
+            except OSError as rollback_error:
+                raise publication_error from rollback_error
             raise
+        print(f'Published {output}', file=sys.stderr)
+        print(f'Published {checksum_path}', file=sys.stderr)
     final_bytes = report['output_regular_bytes_without_manifest']
     show(f'Prepared payload: {size_text(final_bytes)}')
     if original_bytes:
@@ -494,9 +503,8 @@ def main():
         show(json.dumps(report, indent=2))
 
 
-try:
+if __name__ == '__main__':
+    if os.name != 'posix':
+        raise RuntimeError('Fleet preparation requires a POSIX build host; Windows is not supported.')
+    print(f'{shlex.quote(os.getcwd())} > {shlex.join(["python3", sys.argv[0], *sys.argv[1:]])}', file=sys.stderr)
     main()
-except (OSError, ValueError, tarfile.TarError, EOFError, struct.error) as error:
-    print(f'ERROR: {error}', file=sys.stderr)
-    sys.exit(1)
-PY

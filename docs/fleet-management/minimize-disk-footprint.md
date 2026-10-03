@@ -4,7 +4,7 @@ Fit full device monitoring into a small image. Remove unused plugin bundles and 
 
 The example package keeps system metrics, process monitoring and hardware sensors in **54.0 MiB on ARMv6** or **40.6 MiB on ARMv7**—a payload reduction of about **90%** and **94%** respectively. The compressed installers are **21.8 MiB** and **19.3 MiB**.
 
-Use the [fleet preparation script](https://github.com/netdata/netdata/blob/master/packaging/makeself/prepare-fleet.sh) to create a new installer from the upstream static package. The examples and size reference below use **Netdata v2.12.0-2-nightly** and **LLVM 23.1.1**.
+Use the [fleet preparation script](https://github.com/netdata/netdata/blob/master/packaging/makeself/prepare-fleet.py) to create a new installer from the upstream static package. The examples and size reference below use **Netdata v2.12.0-2-nightly** and **LLVM 23.1.1**.
 
 ## Prepare the build host
 
@@ -12,21 +12,21 @@ Install the binary utilities on your build host; devices need no cross-compilati
 
 ```bash
 sudo apt-get update
-sudo apt-get install bash python3 coreutils curl binutils-arm-linux-gnueabihf
+sudo apt-get install python3 coreutils curl binutils-arm-linux-gnueabihf
 ```
 
-Use Python 3.9 or newer. The [ARM binutils package](https://packages.ubuntu.com/noble/binutils-arm-linux-gnueabihf) supplies `arm-linux-gnueabihf-objcopy` for both ARMv6 and ARMv7. For 64-bit ARM packages, use `binutils-aarch64-linux-gnu` and `aarch64-linux-gnu-objcopy`.
+Use a Linux or macOS build host with Python 3.9 or newer. Choose a strip tool that supports the device architecture; your build host's default `strip` may support only its own architecture. The [ARM binutils package](https://packages.ubuntu.com/noble/binutils-arm-linux-gnueabihf) supplies `arm-linux-gnueabihf-strip` for both ARMv6 and ARMv7. For 64-bit ARM packages, use `binutils-aarch64-linux-gnu` and `aarch64-linux-gnu-strip`.
 
 Alternatively, LLVM supplies one tool for multiple target architectures:
 
 ```bash
 sudo apt-get install llvm
-llvm-objcopy --version
+llvm-strip --version
 ```
 
 Prebuilt toolchains are available from [LLVM releases](https://github.com/llvm/llvm-project/releases), including [LLVM 23.1.1](https://github.com/llvm/llvm-project/releases/tag/llvmorg-23.1.1). Choose the toolchain for your build host and put its `bin` directory on `PATH`.
 
-The examples use `--objcopy llvm-objcopy`. Substitute `--objcopy arm-linux-gnueabihf-objcopy` when using GNU binutils. Reserve **4 GiB of build-host workspace per ARM package** for extraction and repackaging.
+The examples use `--strip-tool llvm-strip`. Substitute `--strip-tool arm-linux-gnueabihf-strip` when using GNU binutils. Reserve **4 GiB of build-host workspace per ARM package** for extraction and repackaging.
 
 ## Choose what to keep
 
@@ -47,8 +47,8 @@ Choose a stripping mode:
 Download the script, package and published checksums:
 
 ```bash
-curl -fL -o prepare-fleet.sh \
-  https://raw.githubusercontent.com/netdata/netdata/master/packaging/makeself/prepare-fleet.sh
+curl -fL -o prepare-fleet.py \
+  https://raw.githubusercontent.com/netdata/netdata/master/packaging/makeself/prepare-fleet.py
 curl -fL -o netdata-armv6l-v2.12.0-2-nightly.gz.run \
   https://github.com/netdata/netdata-nightlies/releases/download/v2.12.0-2-nightly/netdata-armv6l-v2.12.0-2-nightly.gz.run
 curl -fL -o sha256sums.txt \
@@ -65,12 +65,12 @@ Compare the checksum with `sha256sums.txt`. For this package it is:
 Run preparation:
 
 ```bash
-bash ./prepare-fleet.sh \
+python3 ./prepare-fleet.py \
   --input netdata-armv6l-v2.12.0-2-nightly.gz.run \
   --sha256 4bbb1c330137f8b53f895d173ae176fd71015032c2d75c843a0d5981e0184ebe \
   --keep apps,debugfs \
   --strip-mode all \
-  --objcopy llvm-objcopy \
+  --strip-tool llvm-strip \
   --apply \
   --output netdata-armv6l-edge.gz.run
 ```
@@ -78,7 +78,7 @@ bash ./prepare-fleet.sh \
 The script shows each command before running it, the before/after size of each stripped executable, and the completed package. This example uses `/build/edge` as the working directory; temporary workspace names vary:
 
 ```text
-/build/edge > bash ./prepare-fleet.sh --input netdata-armv6l-v2.12.0-2-nightly.gz.run --sha256 4bbb1c330137f8b53f895d173ae176fd71015032c2d75c843a0d5981e0184ebe --keep apps\,debugfs --strip-mode all --objcopy llvm-objcopy --apply --output netdata-armv6l-edge.gz.run
+/build/edge > python3 ./prepare-fleet.py --input netdata-armv6l-v2.12.0-2-nightly.gz.run --sha256 4bbb1c330137f8b53f895d173ae176fd71015032c2d75c843a0d5981e0184ebe --keep apps,debugfs --strip-mode all --strip-tool llvm-strip --apply --output netdata-armv6l-edge.gz.run
 Workspace retained for inspection: /build/edge/.netdata-fleet-example
 Input: netdata-armv6l-v2.12.0-2-nightly.gz.run
 Keep: apps, debugfs
@@ -87,27 +87,27 @@ Strip mode: all
 Original payload: 514.7 MiB
 Removed bundles: 305.7 MiB
 Payload before stripping: 209.0 MiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/bin/bash /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/bin/bash
 Stripped bin/bash: 1.9 MiB -> 1.9 MiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/bin/curl /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/bin/curl
 Stripped bin/curl: 7.4 MiB -> 7.4 MiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/bin/nd-run /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/bin/nd-run
 Stripped bin/nd-run: 475.1 KiB -> 65.4 KiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/bin/netdatacli /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/bin/netdatacli
 Stripped bin/netdatacli: 2.5 MiB -> 358.7 KiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/bin/srv/netdata /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/bin/srv/netdata
 Stripped bin/srv/netdata: 169.0 MiB -> 30.2 MiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/bin/systemd-cat-native /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/bin/systemd-cat-native
 Stripped bin/systemd-cat-native: 11.1 MiB -> 7.3 MiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/usr/libexec/netdata/plugins.d/apps.plugin /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/usr/libexec/netdata/plugins.d/apps.plugin
 Stripped usr/libexec/netdata/plugins.d/apps.plugin: 7.0 MiB -> 1.2 MiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/usr/libexec/netdata/plugins.d/debugfs.plugin /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/usr/libexec/netdata/plugins.d/debugfs.plugin
 Stripped usr/libexec/netdata/plugins.d/debugfs.plugin: 4.8 MiB -> 879.2 KiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/usr/libexec/netdata/plugins.d/ndsudo /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/usr/libexec/netdata/plugins.d/ndsudo
 Stripped usr/libexec/netdata/plugins.d/ndsudo: 399.0 KiB -> 62.1 KiB
 /build/edge > cksum /build/edge/.netdata-fleet-example/payload.gz
-Published /build/edge/netdata-armv6l-edge.gz.run.sha256
 Published /build/edge/netdata-armv6l-edge.gz.run
+Published /build/edge/netdata-armv6l-edge.gz.run.sha256
 Prepared payload: 54.0 MiB
 Disk reduction: 89.5%
 Installer: netdata-armv6l-edge.gz.run (21.8 MiB)
@@ -136,12 +136,12 @@ Expected checksum:
 Run preparation:
 
 ```bash
-bash ./prepare-fleet.sh \
+python3 ./prepare-fleet.py \
   --input netdata-armv7l-v2.12.0-2-nightly.gz.run \
   --sha256 0994f644457a0c273fdef0a3c05e5e5c8f2fd9ca61843f5a1e1a231b15e74281 \
   --keep apps,debugfs \
   --strip-mode all \
-  --objcopy llvm-objcopy \
+  --strip-tool llvm-strip \
   --apply \
   --output netdata-armv7l-edge.gz.run
 ```
@@ -149,7 +149,7 @@ bash ./prepare-fleet.sh \
 Expected output, using the same workspace convention:
 
 ```text
-/build/edge > bash ./prepare-fleet.sh --input netdata-armv7l-v2.12.0-2-nightly.gz.run --sha256 0994f644457a0c273fdef0a3c05e5e5c8f2fd9ca61843f5a1e1a231b15e74281 --keep apps\,debugfs --strip-mode all --objcopy llvm-objcopy --apply --output netdata-armv7l-edge.gz.run
+/build/edge > python3 ./prepare-fleet.py --input netdata-armv7l-v2.12.0-2-nightly.gz.run --sha256 0994f644457a0c273fdef0a3c05e5e5c8f2fd9ca61843f5a1e1a231b15e74281 --keep apps,debugfs --strip-mode all --strip-tool llvm-strip --apply --output netdata-armv7l-edge.gz.run
 Workspace retained for inspection: /build/edge/.netdata-fleet-example
 Input: netdata-armv7l-v2.12.0-2-nightly.gz.run
 Keep: apps, debugfs
@@ -158,27 +158,27 @@ Strip mode: all
 Original payload: 676.4 MiB
 Removed bundles: 482.7 MiB
 Payload before stripping: 193.7 MiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/bin/bash /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/bin/bash
 Stripped bin/bash: 1.3 MiB -> 1.3 MiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/bin/curl /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/bin/curl
 Stripped bin/curl: 5.4 MiB -> 5.4 MiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/bin/nd-run /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/bin/nd-run
 Stripped bin/nd-run: 452.4 KiB -> 45.4 KiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/bin/netdatacli /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/bin/netdatacli
 Stripped bin/netdatacli: 2.3 MiB -> 258.7 KiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/bin/srv/netdata /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/bin/srv/netdata
 Stripped bin/srv/netdata: 158.9 MiB -> 22.0 MiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/bin/systemd-cat-native /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/bin/systemd-cat-native
 Stripped bin/systemd-cat-native: 9.1 MiB -> 5.4 MiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/usr/libexec/netdata/plugins.d/apps.plugin /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/usr/libexec/netdata/plugins.d/apps.plugin
 Stripped usr/libexec/netdata/plugins.d/apps.plugin: 6.6 MiB -> 921.1 KiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/usr/libexec/netdata/plugins.d/debugfs.plugin /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/usr/libexec/netdata/plugins.d/debugfs.plugin
 Stripped usr/libexec/netdata/plugins.d/debugfs.plugin: 4.6 MiB -> 647.2 KiB
-/build/edge > llvm-objcopy --strip-all /build/edge/.netdata-fleet-example/tree/usr/libexec/netdata/plugins.d/ndsudo /build/edge/.netdata-fleet-example/stripped-file
+/build/edge > llvm-strip --strip-all -o /build/edge/.netdata-fleet-example/stripped-file /build/edge/.netdata-fleet-example/tree/usr/libexec/netdata/plugins.d/ndsudo
 Stripped usr/libexec/netdata/plugins.d/ndsudo: 378.1 KiB -> 46.1 KiB
 /build/edge > cksum /build/edge/.netdata-fleet-example/payload.gz
-Published /build/edge/netdata-armv7l-edge.gz.run.sha256
 Published /build/edge/netdata-armv7l-edge.gz.run
+Published /build/edge/netdata-armv7l-edge.gz.run.sha256
 Prepared payload: 40.6 MiB
 Disk reduction: 94.0%
 Installer: netdata-armv7l-edge.gz.run (19.3 MiB)
@@ -246,7 +246,7 @@ Save the package manifest and checksum with the image release. Use the [image-co
 | `ioping` | The bundled `ioping` executable and its collector/configuration | You need active storage-latency probes against configured devices, files or directories |
 | `log2journal` | The `log2journal` utility and stock conversion configurations | Your log pipeline converts application output into structured journal records |
 
-Use `bash ./prepare-fleet.sh --list-capabilities` to see selection names and their paths. `--keep all` keeps all available bundles; `--keep none` keeps the Agent and shared helpers. Select capabilities included in your package: ARMv6 in this example includes neither `journal`, `otel` nor `netflow`, while ARMv7 includes all three. Neither package includes `ipmi`, `xen`, `cups`, `ebpf` or `systemd-units`.
+Use `python3 ./prepare-fleet.py --list-capabilities` to see selection names and their paths. `--keep all` keeps all available bundles; `--keep none` keeps the Agent and shared helpers. Select capabilities included in your package: ARMv6 in this example includes neither `journal`, `otel` nor `netflow`, while ARMv7 includes all three. Neither package includes `ipmi`, `xen`, `cups`, `ebpf` or `systemd-units`.
 
 Keep `go` when your devices need its collectors, then enable the jobs you use. Bundle selection controls disk space; collector configuration controls runtime work. Custom configuration in `etc/netdata` is retained. With customized source trees, use `--verbose` to inspect files inside bundles selected for removal.
 
