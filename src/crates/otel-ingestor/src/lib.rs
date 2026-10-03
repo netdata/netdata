@@ -358,7 +358,8 @@ async fn run_ingestor(
                 None => std::future::pending::<Result<()>>().await,
             }
         } => {
-            result.context("OTLP/HTTP server error")?;
+            // `serve` already names the transport (plain or TLS).
+            result?;
         }
         _ = async {
             loop {
