@@ -175,6 +175,29 @@ def test_generate_runtime_auto_ports_never_collide(tmp_path, monkeypatch):
     assert (otlp, http) == ("127.0.0.1:4317", "127.0.0.1:8000")
 
 
+def test_generate_runtime_auto_grpc_port_avoids_a_pinned_http_port(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    picks = iter([4318, 9000])
+    monkeypatch.setattr(runtime, "free_port", lambda: next(picks))
+    _rd, _conf, otlp, http = runtime.generate_runtime(
+        "agent-ports3", otel=runtime.OtelConfig(otlp_http_endpoint="127.0.0.1:4318")
+    )
+    assert (otlp, http) == ("127.0.0.1:9000", "127.0.0.1:4318")
+
+
+def test_generate_runtime_portless_pinned_endpoint_still_fails_cleanly(tmp_path, monkeypatch):
+    # A pinned endpoint without a numeric port reserves nothing; running out of
+    # ports must still raise the intended RuntimeError, not a sort TypeError.
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(runtime, "free_port", lambda: 5000)
+    with pytest.raises(RuntimeError, match="no free loopback port"):
+        runtime.generate_runtime(
+            "agent-ports4",
+            reserved_ports=(5000,),
+            otel=runtime.OtelConfig(otlp_endpoint="localhost:grpc"),
+        )
+
+
 def test_free_port_except_gives_up_instead_of_spinning(monkeypatch):
     monkeypatch.setattr(runtime, "free_port", lambda: 5000)
     with pytest.raises(RuntimeError, match="no free loopback port outside \\[5000\\]"):

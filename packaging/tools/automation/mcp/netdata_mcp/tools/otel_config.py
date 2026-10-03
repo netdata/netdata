@@ -23,12 +23,12 @@ from .models import RunInfo, agent_declared, agent_error, run_info, unknown_agen
 
 # Reject a malformed OTLP endpoint here so the caller gets a clean error now,
 # instead of an opaque agent-launch failure several tool calls later.
-_HOST_PORT_RE = re.compile(r"^[^\s:]+:(\d{1,5})$")
+_HOST_PORT_RE = re.compile(r"[^\s:]+:(\d{1,5})")
 
 
 def _endpoint_error(agent_id: str, value: str, name: str = "otlp_endpoint") -> RunInfo | None:
     """Return an error RunInfo if ``value`` is not a valid host:port, else None."""
-    m = _HOST_PORT_RE.match(value)
+    m = _HOST_PORT_RE.fullmatch(value)
     if m is None:
         return agent_error(agent_id, f"{name} must be 'host:port', got {value!r}")
     if not (1 <= int(m.group(1)) <= 65535):

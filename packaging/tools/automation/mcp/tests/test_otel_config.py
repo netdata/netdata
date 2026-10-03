@@ -36,6 +36,12 @@ def test_http_endpoint_error_names_the_parameter():
     assert err is not None and "otlp_http_endpoint" in err.message and "range" in err.message
 
 
+def test_endpoint_error_rejects_trailing_newline():
+    # `$` matches before a final newline; the plugin's SocketAddr parse would not.
+    assert _endpoint_error("a", "127.0.0.1:4317\n") is not None
+    assert _endpoint_error("a", "127.0.0.1:4318\n", name="otlp_http_endpoint") is not None
+
+
 def test_http_endpoint_error_rejects_garbage():
     assert _endpoint_error("a", "127.0.0.1", name="otlp_http_endpoint") is not None
     assert _endpoint_error("a", "http://127.0.0.1:4318", name="otlp_http_endpoint") is not None
