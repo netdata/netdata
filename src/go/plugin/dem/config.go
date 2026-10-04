@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/runner"
+
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"gopkg.in/yaml.v2"
 )
@@ -14,11 +16,15 @@ type HistoryConfig struct {
 	MaxBytes int64 `yaml:"max_bytes"`
 }
 type Config struct {
-	History HistoryConfig `yaml:"history"`
+	History   HistoryConfig `yaml:"history"`
+	Artifacts HistoryConfig `yaml:"artifacts"`
+	Runtime   runner.Config `yaml:"runtime"`
 }
 
 func DefaultConfig() Config {
 	return Config{
+		Artifacts: HistoryConfig{Days: 7, MaxBytes: 2 << 30},
+		Runtime:   runner.Config{NodePath: "/usr/bin/node"},
 		History: HistoryConfig{
 			Days:     30,
 			MaxBytes: 1 << 30,
@@ -27,7 +33,7 @@ func DefaultConfig() Config {
 }
 
 // LoadConfig reads the same highest-priority dem.conf as the Agent. Framework
-// fields are decoded by the Agent; this owner decodes process history policy.
+// fields are decoded by the Agent; this owner decodes process runtime and retention policy.
 func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	cfg := DefaultConfig()
 	path, err := paths.Find("dem.conf")
@@ -44,15 +50,21 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	if err = yaml.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("read dem.conf: %w", err)
 	}
-	return cfg, cfg.History.validate()
+	if err = cfg.History.validate(); err != nil {
+		return cfg, fmt.Errorf("history.%w", err)
+	}
+	if err = cfg.Artifacts.validate(); err != nil {
+		return cfg, fmt.Errorf("artifacts.%w", err)
+	}
+	return cfg, nil
 }
 
 func (c HistoryConfig) validate() error {
 	if c.Days < 1 || c.Days > 365 {
-		return fmt.Errorf("history.days must be between 1 and 365")
+		return fmt.Errorf("days must be between 1 and 365")
 	}
 	if c.MaxBytes <= 0 {
-		return fmt.Errorf("history.max_bytes must be positive")
+		return fmt.Errorf("max_bytes must be positive")
 	}
 	return nil
 }

@@ -31,7 +31,7 @@ func TestCancelledAdmissionDoesNotAppend(t *testing.T) {
 	_, err = s.QueryRumErrors(ctx, "", "", 0, time.Now().Unix())
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.ErrorIs(t, s.Sync(ctx), context.DeadlineExceeded)
-	assert.ErrorIs(t, s.EnforceRumHistoryRetention(ctx, 1, 1), context.DeadlineExceeded)
+	assert.ErrorIs(t, s.EnforceHistoryRetention(ctx, 1, 1), context.DeadlineExceeded)
 	s.release()
 	sessions, err := s.QueryRumSessions(context.Background(), "", 0, time.Now().Unix()+1, 0)
 	require.NoError(t, err)

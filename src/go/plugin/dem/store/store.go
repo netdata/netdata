@@ -126,12 +126,12 @@ func (s *Store) Close() error {
 	return err
 }
 
-// EnforceRumHistoryRetention applies SDK whole-file policies. Closing and
+// EnforceHistoryRetention applies SDK whole-file policies. Closing and
 // lazily reopening archives idle activity, so age expiry also runs without
 // new events. The active file remains protected, so maxBytes is not a hard cap.
 // MaxBytes measures committed journal bytes, excluding filesystem preallocation.
 // Age is measured from each file's saved-time head, not from each event.
-func (s *Store) EnforceRumHistoryRetention(ctx context.Context, days int, maxBytes int64) error {
+func (s *Store) EnforceHistoryRetention(ctx context.Context, days int, maxBytes int64) error {
 	if err := s.acquire(ctx); err != nil {
 		return err
 	}
