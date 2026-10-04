@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	shared "github.com/netdata/netdata/go/plugins/plugin/dem/collector/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/secrets"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -80,7 +81,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 			JobID:          "lighthouse:" + c.Name,
 			Kind:           model.Lighthouse,
 			Name:           c.Name,
-			Target:         c.URL,
+			Target:         secrets.NewRedactor().Apply(c.URL),
 			CadenceSeconds: c.UpdateEvery,
 			TimeoutSeconds: time.Duration(c.Timeout).Seconds(),
 		},

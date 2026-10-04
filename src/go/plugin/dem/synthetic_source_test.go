@@ -3,16 +3,19 @@ package dem_test
 
 import (
 	"context"
+	"encoding/json"
+	"testing"
+	"time"
+
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/artifacts"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/syntheticfunc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func TestRegistryPublishesSyntheticHistoryWithoutActiveJobs(t *testing.T) {
@@ -42,4 +45,41 @@ func TestRegistryPublishesSyntheticHistoryWithoutActiveJobs(t *testing.T) {
 	assert.Equal(t, run.Outcome, retained["outcome"])
 	assert.Nil(t, retained["metrics"])
 	assert.Len(t, detail.RawResponse["data"], 1)
+}
+
+// This executor makes inventory preparation independent of an installed browser.
+// An inventory read must never execute a workflow.
+type inventoryExecutor struct{}
+
+func (inventoryExecutor) Check(context.Context, synthetic.Kind) error { return nil }
+func (inventoryExecutor) Execute(context.Context, synthetic.Request, func(string)) synthetic.Execution {
+	panic("inventory must not execute a browser")
+}
+
+func TestRegistrySyntheticInventoryRedactsTargetCredentials(t *testing.T) {
+	registry, _ := dem.NewRegistry(dem.Dependencies{Executor: inventoryExecutor{}}, dem.DefaultConfig())
+	collector := registry["lighthouse"].CreateV2().(*lighthouse.Collector)
+	collector.Name = "home"
+	collector.URL = "https://example.org/?token=fixture-token&password=fixture-password&page=home"
+	require.NoError(t, collector.Init(context.Background()))
+	require.NoError(t, collector.Check(context.Background()))
+	ctx, cancel := context.WithCancel(context.Background())
+	ready, done := make(chan struct{}), make(chan error, 1)
+	go func() { done <- collector.Run(ctx, func() { close(ready) }) }()
+	defer func() { cancel(); require.NoError(t, <-done) }()
+	select {
+	case <-ready:
+	case <-time.After(2 * time.Second):
+		t.Fatal("collector did not become ready")
+	}
+	handler := registry["journey"].MethodHandler(nil).(*syntheticfunc.Handler)
+	checks := handler.HandleRaw(ctx, funcapi.RawMethodRequest{Method: "synthetics-checks", Permissions: "0x1b"})
+	require.NotNil(t, checks.RawResponse)
+	require.Len(t, checks.RawResponse["data"], 1)
+	encoded, err := json.Marshal(checks.RawResponse["data"])
+	require.NoError(t, err)
+	assert.NotContains(t, string(encoded), "fixture-token")
+	assert.NotContains(t, string(encoded), "fixture-password")
+	assert.Contains(t, string(encoded), "[REDACTED]")
+	assert.Equal(t, "https://example.org/?token=fixture-token&password=fixture-password&page=home", collector.URL)
 }
