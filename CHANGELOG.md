@@ -25,6 +25,11 @@
 - Docs(otel-plugin): comment-only documentation pass and citation sweep over the otel plugin crates ([#24123](https://github.com/netdata/netdata/issues/24123))
 - Feat(scripts.d): support scalar line snapshots in native scripts ([#24125](https://github.com/netdata/netdata/issues/24125))
 - Regenerate integrations docs ([#24124](https://github.com/netdata/netdata/issues/24124))
+- Go.d/redis: support Redis-compatible servers (Valkey, Dragonfly, KeyDB, Kvrocks, Garnet) ([#24130](https://github.com/netdata/netdata/issues/24130))
+- Regenerate integrations docs ([#24131](https://github.com/netdata/netdata/issues/24131))
+- Docs(go.d): render option details for mongodb, openvpn, pika and openvpn_status_log ([#24132](https://github.com/netdata/netdata/issues/24132))
+- Regenerate integrations docs ([#24133](https://github.com/netdata/netdata/issues/24133))
+- Feat(go): add native RUM plugin ([#24129](https://github.com/netdata/netdata/issues/24129))
 
 ## [2.12.0] - 2026-09-30
 
