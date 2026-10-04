@@ -277,8 +277,11 @@ The existing `exec.Cmd` constructors retain their existing behavior; they do not
 
 For Linux commands that may create detached groups, use `StartUnprivilegedProcessTree` instead. It uses an
 opt-in per-run `nd-run` subreaper which stays alive independently of the command, terminates remaining children
-when the command exits or cancellation is requested, and reaps adopted descendants. `Wait` returns a `TreeResult`:
-`Err` describes the command/cancellation outcome, while `Drained` records verified descendant cleanup. A failed
+when the command exits or cancellation is requested, and reaps adopted descendants. Before launch the supervisor
+sets and verifies inherited `no_new_privs`, so setuid/setgid exec and file capabilities cannot regain privileges
+that prevent it from signaling the payload. Failure refuses launch. `Wait` returns a `TreeResult`:
+`Err` includes command, cancellation, setup, supervisor and completion-protocol failures; it is not exclusively the
+payload result. `Drained` records verified descendant cleanup independently of `Err`. A failed
 command can still be drained. Command stdout/stderr never supplies completion evidence; a private descriptor carries
 the helper's terminal frame and the Go owner also joins the helper. The payload cannot inherit control/status descriptors.
 

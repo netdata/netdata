@@ -32,6 +32,32 @@ pid_t __wrap_waitpid(pid_t pid, int *status, int options) {
     return 0;
 }
 #endif
+#elif defined(TREE_NNP_SET_FAIL) || defined(TREE_NNP_GET_FAIL)
+#include <sys/prctl.h>
+int __real_prctl(int option, ...);
+int __wrap_prctl(int option, ...) {
+#ifdef TREE_NNP_SET_FAIL
+    if (option == PR_SET_NO_NEW_PRIVS) {
+        errno = EPERM;
+        return -1;
+    }
+#else
+    if (option == PR_GET_NO_NEW_PRIVS)
+        return 0;
+#endif
+    return __real_prctl(option, 1UL, 0UL, 0UL, 0UL);
+}
+#elif defined(TREE_PRIVILEGE_PROBE)
+#include <sys/prctl.h>
+int main(void) {
+    int gained = setresuid(0, 0, 0);
+    uid_t real, effective, saved;
+    if (getresuid(&real, &effective, &saved) != 0)
+        return 90;
+    printf("%d %ld %ld %ld %d\n", gained, (long)real, (long)effective, (long)saved,
+           prctl(PR_GET_NO_NEW_PRIVS, 0, 0, 0, 0));
+    return 0;
+}
 #elif defined(TREE_SETUP_FAIL)
 int __wrap_prctl(int option, ...) {
     (void)option;

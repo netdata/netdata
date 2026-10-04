@@ -52,3 +52,4 @@ jobs:
           sudo useradd --system --user-group nd-run-test
           sudo python3 tests/nd-run/test_nd_run.py --user nd-run-test -v
           sudo python3 tests/nd-run/test_nd_run.py --user nd-run-test --no-setres -v
+          sudo python3 tests/nd-run/test_process_tree.py TreeTests.test_setuid_exec_cannot_escape_supervisor_identity

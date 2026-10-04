@@ -97,12 +97,17 @@ nd-run --supervise-tree <control-fd> <status-fd> -- command [args...]
 ```
 
 This Linux-only mode applies the existing identity and minimal-environment policy, then remains a per-run subreaper.
+Before launching the payload it sets and verifies inherited `no_new_privs`, preventing setuid/setgid executables and
+file capabilities from granting privileges that would invalidate the supervisor's signal authority. Setup failure
+refuses launch; legacy exec and file-reader modes retain their existing policies.
 Control and status must be distinct private pipes above descriptor 2, with no inherited aliases. The payload closes
 both channels before exec. Control input/EOF, signal requests, status-reader loss or command exit starts descendant
 termination and reaping. Detached process groups are included through orphan adoption; no process-wide scan is used.
 
 A final `NDTREE1 <raw-wait-status>` line follows kernel `ECHILD`, including after a failed command. The supervisor exits
-with the normalized command status. `NDTREE1 unavailable` plus exit 126 means verified empty setup refusal before launch.
+with the normalized command status only when that command-status frame is successfully delivered. An unavailable
+command outcome or frame-delivery failure exits 126 without valid command-status evidence.
+`NDTREE1 unavailable` plus exit 126 means verified empty setup refusal before launch.
 Missing/invalid completion evidence does not establish cleanup. Callers must join the helper and validate its private
 frame separately from command output; they must not kill the supervisor to implement cancellation or treat a deadline
 as successful drain. See the [Go helper contract](/src/go/plugin/go.d/docs/helper-packages.md#external-commands) for

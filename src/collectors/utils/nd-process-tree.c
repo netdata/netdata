@@ -191,6 +191,20 @@ int nd_process_tree_run(int control_fd, int status_fd, char **command) {
         goto setup_failed;
     }
 
+    // Descendants must not gain identities the dropped supervisor cannot signal.
+    // This flag is inherited across fork/exec and cannot be cleared by payloads.
+    if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0) {
+        close(signal_fd);
+        goto setup_failed;
+    }
+    int no_new_privs = prctl(PR_GET_NO_NEW_PRIVS, 0, 0, 0, 0);
+    if (no_new_privs != 1) {
+        if (no_new_privs >= 0)
+            errno = EPERM;
+        close(signal_fd);
+        goto setup_failed;
+    }
+
     pid_t child = fork();
     if (child < 0) {
         close(signal_fd);

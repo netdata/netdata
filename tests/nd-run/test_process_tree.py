@@ -26,9 +26,9 @@ HELPER = None
 PROBE = None
 
 
-def compile_binary(output, sources, *flags):
+def compile_binary(output, sources, *flags, config=None):
     command = [os.environ.get("CC", "cc"), "-std=gnu11", "-Wall", "-Wextra", "-Werror",
-               "-g", "-I", str(BUILD), *map(str, sources), *flags, "-o", str(output)]
+               "-g", "-I", str(config or BUILD), *map(str, sources), *flags, "-o", str(output)]
     print(shlex.join(command), file=sys.stderr)
     subprocess.run(command, check=True)
 
@@ -163,7 +163,8 @@ class TreeTests(unittest.TestCase):
         self.assertIn(b"tree execvp", process.stderr.read())
 
     def test_capability_unavailable_does_not_launch_target(self):
-        for name in ("no-children", "bad-namespace", "setup-failed", "fork-failed"):
+        for name in ("no-children", "bad-namespace",
+                     "setup-failed", "fork-failed", "nnp-set-failed", "nnp-get-failed"):
             with self.subTest(helper=name):
                 process, _, status = self.start([PROBE, "detached"], helper=BUILD / name)
                 process.wait(timeout=10)
@@ -172,6 +173,25 @@ class TreeTests(unittest.TestCase):
                 self.assertEqual(os.read(status, 256), b"NDTREE1 unavailable\n")
                 self.assertEqual(os.read(status, 1), b"")
                 self.assertTrue(process.stderr.read())
+
+    @unittest.skipUnless(os.geteuid() == 0, "setuid authority fixture requires root")
+    def test_setuid_exec_cannot_escape_supervisor_identity(self):
+        account = pwd.getpwnam("nobody")
+        probe = BUILD / "setuid-probe"
+        # Establish that this filesystem/kernel actually permits the privilege
+        # gain; a nosuid mount or inherited NNP must not yield a false positive.
+        direct = subprocess.run([probe], user=account.pw_uid, group=account.pw_gid,
+                                extra_groups=[], capture_output=True, check=True)
+        if direct.stdout != b"0 0 0 0 0\n":
+            self.skipTest("fixture cannot establish setuid exec privilege gain")
+        # Legacy exec policy is intentionally unchanged by the tree-mode fix.
+        legacy = subprocess.run([BUILD / "nd-run-nobody", probe],
+                                capture_output=True, check=True)
+        self.assertEqual(legacy.stdout, direct.stdout)
+        process, _, status = self.start([probe], helper=BUILD / "nd-run-nobody")
+        self.complete(process, status, 0)
+        expected = f"-1 {account.pw_uid} {account.pw_uid} {account.pw_uid} 1\n".encode()
+        self.assertEqual(process.stdout.read(), expected)
 
     def test_unavailable_without_echild_has_no_frame(self):
         process, _, status = self.start([PROBE, "detached"], helper=BUILD / "wait-not-empty")
@@ -246,4 +266,17 @@ if __name__ == "__main__":
         compile_binary(BUILD / "wait-not-empty", [*sources, fixture],
                        "-DTREE_MISSING_CHILDREN", "-DTREE_WAIT_NOT_EMPTY",
                        "-Wl,--wrap=fopen", "-Wl,--wrap=waitpid")
+        for name, define in (("nnp-set-failed", "TREE_NNP_SET_FAIL"),
+                             ("nnp-get-failed", "TREE_NNP_GET_FAIL")):
+            compile_binary(BUILD / name, [*sources, fixture], f"-D{define}", "-Wl,--wrap=prctl")
+        if os.geteuid() == 0:
+            BUILD.chmod(0o755)
+            unprivileged = BUILD / "nobody-config"
+            unprivileged.mkdir()
+            (unprivileged / "config.h").write_text(
+                '#define _GNU_SOURCE 1\n#define HAVE_SETRESUID 1\n#define HAVE_SETRESGID 1\n'
+                '#define NETDATA_USER "nobody"\n')
+            compile_binary(BUILD / "nd-run-nobody", sources, config=unprivileged)
+            compile_binary(BUILD / "setuid-probe", [fixture], "-DTREE_PRIVILEGE_PROBE")
+            (BUILD / "setuid-probe").chmod(0o4755)
         unittest.main(verbosity=2)
