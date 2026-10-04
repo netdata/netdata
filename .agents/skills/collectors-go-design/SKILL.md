@@ -167,9 +167,9 @@ observations; check every early return against the table. Comparisons follow the
 ## Lifecycle Entry Points
 
 When a migration changes the ownership unit, trace subordinate constructors, workers and read APIs as well as the
-native collector. A per-job owner SHOULD construct single-entity state directly; remove obsolete reconciliation,
-entity selectors and per-entity bookkeeping from its private components. Retain cross-entity routing and aggregation
-only at owners that still serve multiple jobs, and retain identity in self-contained transport/history records.
+native collector. When the approved ownership unit is one entity, the job SHOULD construct that state directly; remove
+obsolete reconciliation, entity selectors and per-entity bookkeeping from its private components. Retain inventories,
+routing and aggregation at owners that still serve multiple entities or jobs, and retain identity in transport/history records.
 Validate isolation using independently constructed jobs, including replacement and retirement of one while another runs.
 
 **When:** designing `Init`, `Check`, `Collect`, `Cleanup`, and any `Run`. **Do:** review every entry point, including

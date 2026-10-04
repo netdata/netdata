@@ -470,3 +470,39 @@ func TestOutcomesAndMissingObservations(t *testing.T) {
 		})
 	}
 }
+
+// Cancellation can retire Run before the executor proves whether it drained.
+// Collect must still return the ownership error without waiting for a Run reader.
+func TestUnverifiedCompletionAfterRunCancellation(t *testing.T) {
+	hub := model.NewHub()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	t.Cleanup(unblock)
+	c := newLighthouse(executor{
+		execute: func(context.Context, model.Request, func(string)) model.Execution {
+			close(entered)
+			<-release
+			return model.Execution{Run: model.Run{Outcome: model.Error}, Drained: false}
+		},
+	}, hub)
+	stop := start(t, c)
+	collected := make(chan error, 1)
+	go func() { _, err := collecttest.CollectScalarSeries(c); collected <- err }()
+	select {
+	case <-entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("execution did not start")
+	}
+	stop()
+	require.Empty(t, hub.Snapshot(time.Now()))
+	unblock()
+	select {
+	case err := <-collected:
+		require.ErrorContains(t, err, "completion is unverified")
+	case <-time.After(3 * time.Second):
+		t.Fatal("collection blocked after Run cancellation")
+	}
+	assert.Empty(t, hub.Snapshot(time.Now()))
+}
