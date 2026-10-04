@@ -20,8 +20,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
+	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -77,11 +79,11 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
-			history, err := store.Open(ctx, "")
+			history, err := demjournal.Open(ctx, "")
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, history.Close()) })
 			now := time.Now().UnixMicro()
-			_, err = history.AppendRumEvent(ctx, store.RumEventRecord{
+			_, err = rumhistory.NewStore(history).AppendEvent(ctx, rumhistory.EventRecord{
 				Site:      "retired",
 				SessionID: "session",
 				TSUnixUS:  now,
@@ -99,7 +101,7 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 				Outcome:      synthetic.Failed,
 				CaptureState: "disabled",
 			}
-			_, err = history.AppendSyntheticRun(ctx, "complete", run)
+			_, err = synthetichistory.NewStore(history).AppendRun(ctx, "complete", run)
 			require.NoError(t, err)
 			components := dem.New(dem.Dependencies{
 				History: history,
@@ -133,7 +135,10 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 				RunModule:               test.module,
 				ShutdownTimeout:         time.Second,
 				DisableServiceDiscovery: true,
-				DiscoveryProviders:      []discovery.ProviderFactory{discoveryproviders.File(), discoveryproviders.Dummy()},
+				DiscoveryProviders: []discovery.ProviderFactory{
+					discoveryproviders.File(),
+					discoveryproviders.Dummy(),
+				},
 			})
 			reader, writer := io.Pipe()
 			output := &functionWire{}
@@ -152,7 +157,8 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 				}
 			})
 			require.Eventually(t, func() bool {
-				return strings.Contains(output.String(), `FUNCTION GLOBAL "rum-sessions"`) && strings.Contains(output.String(), `FUNCTION GLOBAL "synthetics-run"`)
+				return strings.Contains(output.String(), `FUNCTION GLOBAL "rum-sessions"`) &&
+					strings.Contains(output.String(), `FUNCTION GLOBAL "synthetics-run"`)
 			}, 3*time.Second, time.Millisecond)
 			for generation := 0; generation < 2; generation++ {
 				suffix := fmt.Sprint(generation)
@@ -160,7 +166,12 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 				rows := response["data"].([]any)
 				require.Len(t, rows, 1)
 				assert.Equal(t, "retired", rows[0].([]any)[0])
-				response = output.call(t, writer, "synthetic"+suffix, "synthetics-run job_id:journey:retired run_id:"+run.ID)
+				response = output.call(
+					t,
+					writer,
+					"synthetic"+suffix,
+					"synthetics-run job_id:journey:retired run_id:"+run.ID,
+				)
 				assert.Equal(t, run.ID, response["run"].(map[string]any)["id"])
 				assert.Equal(t, string(synthetic.Failed), response["run"].(map[string]any)["outcome"])
 				info := output.call(t, writer, "info"+suffix, "synthetics-runs info")

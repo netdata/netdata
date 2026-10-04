@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 
-	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 )
 
 func (c *Collector) Run(ctx context.Context, ready func()) error {
@@ -15,7 +15,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	registration, err := c.deps.Hub.Register(model.Job{
+	registration, err := c.deps.Registry.Register(syntheticregistry.Job{
 		JobID:          c.request.JobID(),
 		Kind:           c.request.Kind,
 		Name:           c.request.Name,

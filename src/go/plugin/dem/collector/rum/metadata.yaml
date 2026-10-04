@@ -191,6 +191,11 @@ modules:
               type: integer
               unit: ""
               description: Frustration Signals (window).
+            - name: row_id
+              type: string
+              unit: ""
+              visibility: hidden
+              description: Stable row identity scoped to the site; the visible values remain available for filtering.
           performance: Reads bounded local activity snapshots without contacting the monitored website.
           security: Results can include page paths, browser metadata, user identifiers, error messages and stack traces.
             Restrict access to authorized operators.
@@ -384,6 +389,11 @@ modules:
               type: integer
               unit: ""
               description: Frustration Signals.
+            - name: row_id
+              type: string
+              unit: ""
+              visibility: hidden
+              description: Stable row identity scoped to the site; the visible values remain available for filtering.
           performance: Reads local retained history; work grows with the selected range and retained records.
           security: Results can include page paths, browser metadata, user identifiers, error messages and stack traces.
             Restrict access to authorized operators.
@@ -472,6 +482,11 @@ modules:
               type: string
               unit: ""
               description: Sample Stack.
+            - name: row_id
+              type: string
+              unit: ""
+              visibility: hidden
+              description: Stable row identity scoped to the site; the visible values remain available for filtering.
           performance: Reads local retained history; work grows with the selected range and retained records.
           security: Results can include page paths, browser metadata, user identifiers, error messages and stack traces.
             Restrict access to authorized operators.

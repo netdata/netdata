@@ -17,9 +17,9 @@ import (
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/secrets"
 	"github.com/stretchr/testify/require"
 )
 
@@ -103,12 +103,12 @@ func startServer(t *testing.T, svc *fakeLogsService) string {
 	return lis.Addr().String()
 }
 
-func newRedactor(t *testing.T, secretValue string) *secrets.Redactor {
+func newRedactor(t *testing.T, secretValue string) *redact.Redactor {
 	t.Helper()
-	return secrets.NewRedactor(secretValue)
+	return redact.NewRedactor(secretValue)
 }
 
-func newExporter(t *testing.T, endpoint string, counters Counters, redact *secrets.Redactor) *Exporter {
+func newExporter(t *testing.T, endpoint string, counters Counters, redact *redact.Redactor) *Exporter {
 	t.Helper()
 	e, err := New(context.Background(), Config{
 		Enabled:  "yes",
@@ -615,7 +615,7 @@ func configuredExporter(
 	cfg Config,
 	site, destination string,
 	counters Counters,
-	redact *secrets.Redactor,
+	redact *redact.Redactor,
 ) *Exporter {
 	t.Helper()
 	e, err := New(context.Background(), cfg, site, destination, counters, redact)

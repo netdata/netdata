@@ -15,7 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/ingest"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
+	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 )
 
 // Run admits an independent site without waiting for receiver startup. Worker
@@ -36,16 +36,16 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 		return err
 	}
 	defer exporter.Close()
-	writer := history.New(c.Name, c.deps.History, c.aggregator, c.redactor)
+	writer := history.NewWriter(c.Name, c.deps.History, c.aggregator, c.redactor)
 	c.aggregator.SetHistorySink(writer)
 	route := ingest.NewRoute(c.Site, beacon.MultiSink{c.aggregator, exporter})
 	var id [16]byte
 	if _, err := rand.Read(id[:]); err != nil {
 		return err
 	}
-	retire, err := c.deps.Hub.Register(
+	retire, err := c.deps.Registry.Register(
 		c.Name,
-		&runtimehub.Site{
+		&rumregistry.Site{
 			Route:      route,
 			Aggregator: c.aggregator,
 			Generation: hex.EncodeToString(id[:]),
@@ -85,5 +85,5 @@ func (c *Collector) probeBase() string {
 	if c.PublicURL != "" {
 		return c.PublicURL
 	}
-	return c.deps.Hub.Availability().PublicURL
+	return c.deps.Registry.Availability().PublicURL
 }

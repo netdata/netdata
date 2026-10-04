@@ -259,5 +259,5 @@ corrosion/
 _deps/
 
 # DEM owns an optional capture store; this is source, not generated artifacts.
-!/src/go/plugin/dem/artifacts/
-!/src/go/plugin/dem/artifacts/**
+!/src/go/plugin/dem/synthetic/artifacts/
+!/src/go/plugin/dem/synthetic/artifacts/**

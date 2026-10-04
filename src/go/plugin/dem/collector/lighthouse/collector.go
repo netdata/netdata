@@ -3,6 +3,7 @@
 package lighthouse
 
 import (
+	"context"
 	_ "embed"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/attemptmetrics"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
@@ -27,9 +29,16 @@ type Config struct {
 	SaveReport  bool             `yaml:"save_report"  json:"save_report"`
 }
 
+// Executor owns process-wide admission and supervised completion. Drained=false
+// requires process fail-stop even if the collector has already retired.
+type Executor interface {
+	Check(context.Context, model.Kind) error
+	Execute(context.Context, model.Request, func(string)) model.Execution
+}
+
 type Dependencies struct {
-	Executor model.Executor
-	Hub      *model.Hub
+	Executor Executor
+	Registry *syntheticregistry.Registry
 }
 type Collector struct {
 	collectorapi.Base
@@ -41,7 +50,7 @@ type Collector struct {
 	request     model.Request
 	initialized bool
 	// Assigned before readiness; retained after retirement for in-flight callbacks.
-	registration *model.Registration
+	registration *syntheticregistry.Registration
 	terminal     chan error
 }
 

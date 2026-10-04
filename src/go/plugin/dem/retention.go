@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/artifacts"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 )
 
 type historyRetention interface {
@@ -39,7 +39,8 @@ func (r *Retention) Run(ctx context.Context) {
 		now := time.Now()
 		if !now.Before(historyDue) || r.policy != historyPolicy {
 			delay := time.Hour
-			if err := r.store.EnforceHistoryRetention(ctx, r.policy.Days, r.policy.MaxBytes); err != nil && ctx.Err() == nil {
+			if err := r.store.EnforceHistoryRetention(ctx, r.policy.Days, r.policy.MaxBytes); err != nil &&
+				ctx.Err() == nil {
 				r.log.Warningf("DEM history retention failed: %v", err)
 				// A partial close/reopen can suspend writes; retry on the history flush cadence.
 				delay = 5 * time.Second

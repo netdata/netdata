@@ -6,12 +6,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
+	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCancelledTLSPreparationHonorsCaller(t *testing.T) {
-	c := New(runtimehub.New())
+	c := New(rumregistry.New())
 	c.TLSCert, c.TLSKey = "synthetic-certificate.pem", "synthetic-key.pem"
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

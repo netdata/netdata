@@ -12,16 +12,18 @@ import (
 	"testing"
 	"time"
 
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+
+	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/ingest"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
+	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/stretchr/testify/require"
 )
 
 func TestProductionProbeConfirmsTrustedProxyPublicBase(t *testing.T) {
-	hub := runtimehub.New()
-	db, err := store.Open(context.Background(), "")
+	hub := rumregistry.New()
+	db, err := demjournal.Open(context.Background(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	server := httptest.NewServer(
@@ -38,14 +40,14 @@ func TestProductionProbeConfirmsTrustedProxyPublicBase(t *testing.T) {
 	t.Cleanup(server.Close)
 	backend, err := url.Parse(server.URL)
 	require.NoError(t, err)
-	revoke := hub.PublishReceiver(runtimehub.Availability{
+	revoke := hub.PublishReceiver(rumregistry.Availability{
 		Serving: true,
 		Listen:  backend.Host,
 	})
 	t.Cleanup(revoke)
 	site := New(Dependencies{
-		Hub:     hub,
-		History: db,
+		Registry: hub,
+		History:  rumhistory.NewStore(db),
 	})
 	site.Name = "shop"
 	site.AllowedOrigins = []string{server.URL}
@@ -54,7 +56,7 @@ func TestProductionProbeConfirmsTrustedProxyPublicBase(t *testing.T) {
 	route := ingest.NewRoute(site.Site, site.aggregator)
 	retire, err := hub.Register(
 		site.Name,
-		&runtimehub.Site{
+		&rumregistry.Site{
 			Route:      route,
 			Aggregator: site.aggregator,
 			Generation: "test",

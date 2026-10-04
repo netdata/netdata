@@ -13,10 +13,10 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/secrets"
 )
 
 var siteKey = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*$`)
@@ -25,7 +25,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if c.deps.Hub == nil || c.deps.History == nil {
+	if c.deps.Registry == nil || c.deps.History == nil {
 		return errors.New("missing runtime/history dependencies")
 	}
 	if !siteKey.MatchString(c.Name) {
@@ -84,7 +84,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	if err := otlp.ValidateConfig(ctx, c.OTLP); err != nil {
 		return err
 	}
-	c.redactor = secrets.NewRedactor(c.OTLP.AuthToken)
+	c.redactor = redact.NewRedactor(c.OTLP.AuthToken)
 	c.aggregator = agg.New(time.Duration(c.Window), agg.SiteCfg{
 		Name:        c.Name,
 		DisplayName: c.Label(),

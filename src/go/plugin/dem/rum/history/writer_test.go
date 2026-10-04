@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
+	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/secrets"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,9 +37,9 @@ func (c *fakeCounters) get(key string) uint64 {
 	return c.values[key]
 }
 
-type eventWriterFunc func(context.Context, store.RumEventRecord) (bool, error)
+type eventWriterFunc func(context.Context, EventRecord) (bool, error)
 
-func (f eventWriterFunc) AppendRumEvent(ctx context.Context, r store.RumEventRecord) (bool, error) {
+func (f eventWriterFunc) AppendEvent(ctx context.Context, r EventRecord) (bool, error) {
 	return f(ctx, r)
 }
 func (eventWriterFunc) Sync(context.Context) error { return nil }
@@ -48,11 +48,11 @@ func drain(w *Writer) { ctx, cancel := context.WithCancel(context.Background());
 
 func TestWriterDrainsRealJournalWithRedaction(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, "")
+	st, err := demjournal.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	counters := newFakeCounters()
-	w := New("site", st, counters, secrets.NewRedactor("opaque-secret"))
+	w := NewWriter("site", NewStore(st), counters, redact.NewRedactor("opaque-secret"))
 	now := time.Now().UnixMicro()
 	w.Event(
 		agg.HistoryEvent{
@@ -81,17 +81,17 @@ func TestWriterDrainsRealJournalWithRedaction(t *testing.T) {
 		},
 	)
 	drain(w)
-	rows, err := st.QueryRumSessionEvents(ctx, "site", "session")
+	rows, err := NewStore(st).QuerySessionEvents(ctx, "site", "session")
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
 	assert.Equal(t, "/[REDACTED]", rows[0].Page)
-	sessions, err := st.QueryRumSessions(ctx, "site", 0, time.Now().Unix()+1, 2000)
+	sessions, err := NewStore(st).QuerySessions(ctx, "site", 0, time.Now().Unix()+1, 2000)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
 	assert.Equal(t, "[REDACTED]", sessions[0].UserID)
 	assert.EqualValues(t, 1, sessions[0].Pageviews)
 	assert.EqualValues(t, 1, sessions[0].Errors)
-	groups, err := st.QueryRumErrors(ctx, "site", "fp", 0, time.Now().Unix()+1)
+	groups, err := NewStore(st).QueryErrors(ctx, "site", "fp", 0, time.Now().Unix()+1)
 	require.NoError(t, err)
 	require.Len(t, groups, 1)
 	assert.Equal(t, "[REDACTED] failed", groups[0].Message)
@@ -101,9 +101,9 @@ func TestWriterDrainsRealJournalWithRedaction(t *testing.T) {
 }
 func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 	counters := newFakeCounters()
-	w := New("site", nil, counters, nil)
+	w := NewWriter("site", nil, counters, nil)
 	calls := 0
-	w.st = eventWriterFunc(func(context.Context, store.RumEventRecord) (bool, error) { calls++; return true, nil })
+	w.st = eventWriterFunc(func(context.Context, EventRecord) (bool, error) { calls++; return true, nil })
 	for i := 0; i < queueCap+7; i++ {
 		w.Event(agg.HistoryEvent{
 			Site: "site",
@@ -117,12 +117,12 @@ func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 }
 func TestCancellationPreservesOnlyUnattemptedSuffix(t *testing.T) {
 	counters := newFakeCounters()
-	w := New("site", nil, counters, nil)
+	w := NewWriter("site", nil, counters, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	attempts := map[string]int{}
 	calls := 0
-	w.st = eventWriterFunc(func(writeCtx context.Context, r store.RumEventRecord) (bool, error) {
+	w.st = eventWriterFunc(func(writeCtx context.Context, r EventRecord) (bool, error) {
 		calls++
 		if calls == 4 {
 			cancel()
@@ -150,11 +150,11 @@ func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 	for name, writeErr := range map[string]error{"disk error": errors.New("disk full"), "cancelled write": context.Canceled, "successful cancellation race": nil} {
 		t.Run(name, func(t *testing.T) {
 			counters := newFakeCounters()
-			w := New("site", nil, counters, nil)
+			w := NewWriter("site", nil, counters, nil)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			calls := 0
-			w.st = eventWriterFunc(func(_ context.Context, r store.RumEventRecord) (bool, error) {
+			w.st = eventWriterFunc(func(_ context.Context, r EventRecord) (bool, error) {
 				calls++
 				if calls == 1 {
 					cancel()
@@ -182,9 +182,9 @@ func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 }
 func TestFinalDrainSharesOneAdmissionDeadline(t *testing.T) {
 	counters := newFakeCounters()
-	w := New("site", nil, counters, nil)
+	w := NewWriter("site", nil, counters, nil)
 	deadlines := []time.Time{}
-	w.st = eventWriterFunc(func(ctx context.Context, r store.RumEventRecord) (bool, error) {
+	w.st = eventWriterFunc(func(ctx context.Context, r EventRecord) (bool, error) {
 		deadline, ok := ctx.Deadline()
 		require.True(t, ok)
 		deadlines = append(deadlines, deadline)
@@ -210,7 +210,7 @@ type recordingEventWriter struct {
 	syncErr error
 }
 
-func (w *recordingEventWriter) AppendRumEvent(context.Context, store.RumEventRecord) (bool, error) {
+func (w *recordingEventWriter) AppendEvent(context.Context, EventRecord) (bool, error) {
 	w.appends++
 	return true, nil
 }
@@ -221,7 +221,7 @@ func (w *recordingEventWriter) Sync(context.Context) error {
 
 func TestEmptyFlushSkipsJournalSyncAndReportsQueueDrops(t *testing.T) {
 	counters := newFakeCounters()
-	w := New("site", nil, counters, nil)
+	w := NewWriter("site", nil, counters, nil)
 	disk := &recordingEventWriter{}
 	w.st = disk
 	for range queueCap + 1 {
@@ -243,7 +243,7 @@ type cancelLastAppendWriter struct {
 	synced  bool
 }
 
-func (w *cancelLastAppendWriter) AppendRumEvent(context.Context, store.RumEventRecord) (bool, error) {
+func (w *cancelLastAppendWriter) AppendEvent(context.Context, EventRecord) (bool, error) {
 	w.appends++
 	if w.appends == maxBatch {
 		w.cancel()
@@ -260,7 +260,7 @@ func (w *cancelLastAppendWriter) Sync(ctx context.Context) error {
 func TestFinalDrainSyncsAfterCancellationFollowingLastAppend(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	w := New("site", nil, newFakeCounters(), nil)
+	w := NewWriter("site", nil, newFakeCounters(), nil)
 	disk := &cancelLastAppendWriter{
 		cancel: cancel,
 	}
@@ -276,7 +276,7 @@ func TestFinalDrainSyncsAfterCancellationFollowingLastAppend(t *testing.T) {
 	assert.True(t, disk.synced, "final drain must sync accepted appends with its detached context")
 }
 func TestIdleFlushRetriesFailedSyncWithoutReplayingAppend(t *testing.T) {
-	w := New("site", nil, newFakeCounters(), nil)
+	w := NewWriter("site", nil, newFakeCounters(), nil)
 	disk := &recordingEventWriter{
 		syncErr: errors.New("sync failed"),
 	}
@@ -291,11 +291,11 @@ func TestIdleFlushRetriesFailedSyncWithoutReplayingAppend(t *testing.T) {
 }
 
 func TestWrongSiteDoesNotQueueOrCount(t *testing.T) {
-	st, err := store.Open(context.Background(), "")
+	st, err := demjournal.Open(context.Background(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	counters := newFakeCounters()
-	w := New("site", st, counters, nil)
+	w := NewWriter("site", NewStore(st), counters, nil)
 	for range queueCap + 1 {
 		w.Event(agg.HistoryEvent{
 			Site:      "other",
@@ -307,10 +307,10 @@ func TestWrongSiteDoesNotQueueOrCount(t *testing.T) {
 	require.Empty(t, w.ch)
 	drain(w)
 	require.Empty(t, counters.values)
-	rows, err := st.QueryRumSessionEvents(context.Background(), "other", "session")
+	rows, err := NewStore(st).QuerySessionEvents(context.Background(), "other", "session")
 	require.NoError(t, err)
 	require.Empty(t, rows)
-	rows, err = st.QueryRumSessionEvents(context.Background(), "site", "session")
+	rows, err = NewStore(st).QuerySessionEvents(context.Background(), "site", "session")
 	require.NoError(t, err)
 	require.Empty(t, rows)
 }

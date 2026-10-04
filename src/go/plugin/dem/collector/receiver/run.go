@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/ingest"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
+	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 )
 
 // Run owns the socket and joins every admitted handler before returning. Init
@@ -30,7 +30,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	if c.geo != nil {
 		geo = c.geo
 	}
-	domain := ingest.New(&c.Receiver, c.hub, geo)
+	domain := ingest.New(&c.Receiver, c.registry, geo)
 	handler := domain.Handler()
 	var mu sync.Mutex
 	var active sync.WaitGroup
@@ -92,8 +92,8 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 			serving <- srv.Serve(ln)
 		}
 	}()
-	revoke := c.hub.PublishReceiver(
-		runtimehub.Availability{
+	revoke := c.registry.PublishReceiver(
+		rumregistry.Availability{
 			Serving:   true,
 			Listen:    ln.Addr().String(),
 			TLS:       c.tlsConfig != nil,

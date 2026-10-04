@@ -8,6 +8,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 )
 
 type benchmarkExecutor struct{ result model.Execution }
@@ -40,7 +41,7 @@ func BenchmarkCollect(b *testing.B) {
 	}
 	c := journey.New(journey.Dependencies{
 		Executor: e,
-		Hub:      model.NewHub(),
+		Registry: syntheticregistry.New(),
 	})
 	c.Name = "benchmark"
 	c.Script = "export {};"

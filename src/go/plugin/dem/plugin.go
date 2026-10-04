@@ -4,25 +4,38 @@
 package dem
 
 import (
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/artifacts"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rumfunc"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	rumfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+	rumquery "github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
+	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/syntheticfunc"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
+	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
+	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	syntheticquery "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
+	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
+// Executor is the browser capability injected into native collectors.
+type Executor interface {
+	Check(context.Context, synthetic.Kind) error
+	Execute(context.Context, synthetic.Request, func(string)) synthetic.Execution
+}
+
 type Dependencies struct {
-	History        *store.Store
+	History        *journal.Store
 	Artifacts      *artifacts.Store
-	Executor       synthetic.Executor
+	Executor       Executor
 	ConfigProvider func() (Config, error)
 }
 
@@ -34,51 +47,63 @@ type Components struct {
 }
 
 // New keeps the shared stores caller-owned across Agent run generations.
-// The hub contains admitted runtimes only; configuration stays in the framework.
+// The registries contain admitted runtimes only; configuration stays in the framework.
 func New(deps Dependencies, cfg Config) Components {
-	hub := runtimehub.New()
-	source := &source{
-		hub:     hub,
-		history: deps.History,
+	rumRegistry := rumregistry.New()
+	var rumHistory *rumhistory.Store
+	var syntheticHistory syntheticquery.History
+	if deps.History != nil {
+		rumHistory = rumhistory.NewStore(deps.History)
+		syntheticHistory = synthetichistory.NewStore(deps.History)
 	}
+	rumQueries := rumquery.New(rumRegistry, rumHistory)
 	site := rum.Creator(rum.Dependencies{
-		Hub:     hub,
-		History: deps.History,
+		Registry: rumRegistry,
+		History:  rumHistory,
 	})
-	registry := collectorapi.Registry{}
-	registry.Register("receiver", receiver.Creator(hub))
-	registry.Register("rum", site)
-	syntheticHub := synthetic.NewHub()
-	syntheticSource := &syntheticSource{
-		hub:       syntheticHub,
-		history:   deps.History,
-		artifacts: deps.Artifacts,
+	collectors := collectorapi.Registry{}
+	collectors.Register("receiver", receiver.Creator(rumRegistry))
+	collectors.Register("rum", site)
+	syntheticRegistry := syntheticregistry.New()
+	var captures syntheticquery.Artifacts
+	if deps.Artifacts != nil {
+		captures = deps.Artifacts
 	}
+	syntheticQueries := syntheticquery.New(syntheticRegistry, syntheticHistory, captures)
 	workflow := journey.Creator(journey.Dependencies{
-		Hub:      syntheticHub,
+		Registry: syntheticRegistry,
 		Executor: deps.Executor,
 	})
-	registry.Register("journey", workflow)
-	registry.Register("lighthouse", lighthouse.Creator(lighthouse.Dependencies{
-		Hub:      syntheticHub,
+	collectors.Register("journey", workflow)
+	collectors.Register("lighthouse", lighthouse.Creator(lighthouse.Dependencies{
+		Registry: syntheticRegistry,
 		Executor: deps.Executor,
 	}))
 	retention := &Retention{
-		store:  deps.History,
-		policy: cfg.History,
-
+		policy:         cfg.History,
 		artifactPolicy: cfg.Artifacts,
 		loadConfig:     deps.ConfigProvider,
 		log:            logger.New(),
+	}
+	if deps.History != nil {
+		retention.store = deps.History
 	}
 	if deps.Artifacts != nil {
 		retention.artifactStore = deps.Artifacts
 	}
 	return Components{
-		Collectors: registry,
+		Collectors: collectors,
 		Functions: []funcapi.ProcessFunctionProvider{
-			{ID: "rum", Functions: rumfunc.Declarations, NewHandler: func() funcapi.MethodHandler { return rumfunc.New(source) }},
-			{ID: "synthetics", Functions: syntheticfunc.Declarations, NewHandler: func() funcapi.MethodHandler { return syntheticfunc.New(syntheticSource) }},
+			{
+				ID:         "rum",
+				Functions:  rumfunctions.Declarations,
+				NewHandler: func() funcapi.MethodHandler { return rumfunctions.New(rumQueries) },
+			},
+			{
+				ID:         "synthetics",
+				Functions:  syntheticfunctions.Declarations,
+				NewHandler: func() funcapi.MethodHandler { return syntheticfunctions.New(syntheticQueries) },
+			},
 		},
 		Retention: retention,
 	}

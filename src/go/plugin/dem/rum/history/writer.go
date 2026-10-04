@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package history queues investigation events off the ingestion lock and drains
-// accepted records after the owning site's producers have joined.
+// Package history persists and queries RUM investigation records. Its queued
+// writer drains accepted records after the owning site's producers have joined.
 package history
 
 import (
@@ -11,7 +11,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
 )
 
 // The existing burst budget bounds queued browser detail; a full queue reports
@@ -27,7 +26,7 @@ type Counters interface {
 }
 type Redactor interface{ Apply(string) string }
 type eventWriter interface {
-	AppendRumEvent(context.Context, store.RumEventRecord) (attempted bool, err error)
+	AppendEvent(context.Context, EventRecord) (attempted bool, err error)
 	Sync(context.Context) error
 }
 
@@ -43,7 +42,7 @@ type Writer struct {
 	pendingSync bool
 }
 
-func New(siteName string, st *store.Store, counters Counters, redactor Redactor) *Writer {
+func NewWriter(siteName string, st *Store, counters Counters, redactor Redactor) *Writer {
 	if redactor == nil {
 		redactor = noopRedactor{}
 	}
@@ -147,7 +146,7 @@ func (w *Writer) flush(ctx context.Context, batch []agg.HistoryEvent) int {
 		if ctx.Err() != nil {
 			return i
 		}
-		r := store.RumEventRecord{
+		r := EventRecord{
 			Site:      rec.Site,
 			SessionID: rec.SessionID,
 			TSUnixUS:  rec.TSUnixUS,
@@ -170,7 +169,7 @@ func (w *Writer) flush(ctx context.Context, batch []agg.HistoryEvent) int {
 			Message:     w.redact.Apply(rec.Message),
 			SampleStack: w.redact.Apply(rec.SampleStack),
 		}
-		attempted, err := w.st.AppendRumEvent(ctx, r)
+		attempted, err := w.st.AppendEvent(ctx, r)
 		if attempted {
 			w.pendingSync = true
 		}

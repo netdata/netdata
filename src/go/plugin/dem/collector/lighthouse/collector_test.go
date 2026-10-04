@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +25,7 @@ func (prepared) Execute(context.Context, model.Request, func(string)) model.Exec
 func configured() *Collector {
 	c := New(Dependencies{
 		Executor: prepared{},
-		Hub:      model.NewHub(),
+		Registry: syntheticregistry.New(),
 	})
 	c.Name = "home"
 	c.URL = "https://example.org/"

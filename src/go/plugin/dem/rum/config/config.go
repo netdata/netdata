@@ -3,7 +3,6 @@
 package config
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"regexp"
@@ -170,40 +169,6 @@ func (s Site) keeps(cond string) bool {
 		}
 	}
 	return false
-}
-
-// SamplingLabels describes the site's sampling for the Sites table,
-// e.g. "25% of sessions" and "10% of measured + errors, poor vitals".
-func (s Site) SamplingLabels() (measured, investigated string) {
-	measured = percent(s.MeasureRate()) + " of sessions"
-	investigated = percent(s.InvestigateRate()) + " of measured"
-	if s.InvestigateRate() < 1 {
-		var keep []string
-		if s.KeepsErrors() {
-			keep = append(keep, "errors")
-		}
-		if s.KeepsPoorVitals() {
-			keep = append(keep, "poor vitals")
-		}
-		if len(keep) > 0 {
-			investigated += " + " + strings.Join(keep, ", ")
-		}
-	}
-	return measured, investigated
-}
-
-// SamplingNote explains, for the Sessions and Errors tables, why they hold
-// fewer sessions than the charts count; "" when nothing is sampled.
-func (s Site) SamplingNote() string {
-	if s.MeasureRate() >= 1 && s.InvestigateRate() >= 1 {
-		return ""
-	}
-	measured, investigated := s.SamplingLabels()
-	return fmt.Sprintf("%s: measuring %s, keeping %s in full", s.Label(), measured, investigated)
-}
-
-func percent(rate float64) string {
-	return strconv.FormatFloat(rate*100, 'f', -1, 64) + "%"
 }
 
 // Label falls back to the stable name when no display name is configured.
