@@ -534,7 +534,8 @@ void ml_update_training_queue_charts(const ml_queue_stats_t &stats, const ml_que
     }
 
     /*
-     * training pass: entries of the last sorted pass and how many of them had no open page (key 0);
+     * training pass: entries of the last sorted pass and how many had key 0 (no open page, not a dbengine
+     * dimension, or not resolvable);
      * nothing is reported before the first pass is sorted, as there is no last pass yet
     */
     if (stats.passes_sorted) {

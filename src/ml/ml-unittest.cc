@@ -1718,7 +1718,8 @@ static void ml_host_test_store_next(RRDDIM *rd, time_t *t)
 }
 
 // Store consecutive points (update_every 1) after *t until the open page needs exactly `target` more seconds. A page
-// holds at least max_slots / 3 = 341 points, so any target below 340 is reached by counting down a fresh page.
+// holds at least max_slots / 3 points (341 on 64-bit builds, 170 on 32-bit ones, whose tier-0 pages are half the
+// size), so any target below 169 is reached by counting down a fresh page.
 static bool ml_host_test_fill_to(RRDDIM *rd, time_t *t, time_t target)
 {
     for (size_t i = 0; i < 5000; i++) {
@@ -1735,8 +1736,8 @@ extern "C" int ml_queue_host_order_unittest(RRDHOST *host)
     ml_host_test_failures = 0;
 
     // Each chart is filled until its open page needs a known number of seconds, so the order of page completion is
-    // a (50) < b (150) < c (250) < e (330), and the update_every 5 chart d, which needs at least 341 points * 5 s,
-    // completes last. Filling stores at most 1024 points, so every chart starts far enough back that none is written
+    // a (20) < b (60) < c (100) < e (140), and the update_every 5 chart d, which needs at least 169 * 5 s, completes
+    // last. Filling stores at most 1024 points, so every chart starts far enough back that none is written
     // in the future: a and e end over an hour and over half an hour behind the local clock, b and c a few minutes.
     time_t now = now_realtime_sec();
     time_t t_a = now - 4800, t_b = now - 1200, t_c = now - 1200, t_e = now - 3000;
@@ -1752,11 +1753,11 @@ extern "C" int ml_queue_host_order_unittest(RRDHOST *host)
     const char *id_a = rrdset_id(rd_a->rrdset), *id_b = rrdset_id(rd_b->rrdset), *id_c = rrdset_id(rd_c->rrdset), *id_d = rrdset_id(rd_d->rrdset);
     std::string id_e = rrdset_id(rd_e->rrdset);      // a copy: the chart's dimension is freed mid-test
 
-    bool filled = ml_host_test_fill_to(rd_a, &t_a, 50) && ml_host_test_fill_to(rd_b, &t_b, 150) &&
-                  ml_host_test_fill_to(rd_c, &t_c, 250) && ml_host_test_fill_to(rd_e, &t_e, 330);
+    bool filled = ml_host_test_fill_to(rd_a, &t_a, 20) && ml_host_test_fill_to(rd_b, &t_b, 60) &&
+                  ml_host_test_fill_to(rd_c, &t_c, 100) && ml_host_test_fill_to(rd_e, &t_e, 140);
     ML_HOST_TEST_CHECK(filled, "every chart reached its target seconds-to-close");
-    ML_HOST_TEST_CHECK(ml_host_test_to_close(rd_d) >= 340 * 5, "the update_every 5 chart's page needs at least 341 points");
-    ML_HOST_TEST_CHECK(t_a + 50 < now - 3600 && t_e + 330 < now - 1800 && t_b + 150 < now && t_c + 250 < now,
+    ML_HOST_TEST_CHECK(ml_host_test_to_close(rd_d) > 140, "the update_every 5 chart's page fills after chart e's");
+    ML_HOST_TEST_CHECK(t_a + 20 < now - 3600 && t_e + 140 < now - 1800 && t_b + 60 < now && t_c + 100 < now,
                        "every chart's page close, in its own timestamps, is in the local past (an hour and half an hour for a and e)");
 
     // the real key function turns the seconds still needed into a local completion time
@@ -1764,7 +1765,7 @@ extern "C" int ml_queue_host_order_unittest(RRDHOST *host)
     time_t before = now_realtime_sec();
     time_t key_a = ml_queue_dimension_pass_key(req_a, nullptr);
     time_t after = now_realtime_sec();
-    ML_HOST_TEST_CHECK(key_a >= before + 50 && key_a <= after + 50, "ml_queue_dimension_pass_key() returns now + the seconds the page still needs, for a lagging chart too");
+    ML_HOST_TEST_CHECK(key_a >= before + 20 && key_a <= after + 20, "ml_queue_dimension_pass_key() returns now + the seconds the page still needs, for a lagging chart too");
     ml_request_create_new_model_t req_missing = { DimensionLookupInfo(host->machine_guid, id_a, "no-such-dim") };
     ML_HOST_TEST_CHECK(ml_queue_dimension_pass_key(req_missing, nullptr) == 0, "an unresolvable dimension gets key 0");
 
@@ -1790,12 +1791,12 @@ extern "C" int ml_queue_host_order_unittest(RRDHOST *host)
     ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_a, "pass 2 (the mid-pass arrival alone): a");
 
     // phase change: chart a collects until its page fills and flushes, and opens a new one; a fresh page needs at
-    // least 340 more seconds, so among a, b, c, e it now fills last (still before d's, which is not part of the
+    // least 169 more seconds, so among a, b, c, e it now fills last (still before d's, which is not part of the
     // following passes)
     for (size_t i = 0; i < 5000 && ml_host_test_to_close(rd_a) >= 0; i++)
         ml_host_test_store_next(rd_a, &t_a);
     ml_host_test_store_next(rd_a, &t_a);
-    ML_HOST_TEST_CHECK(ml_host_test_to_close(rd_a) > 330, "chart a's new page fills after chart e's");
+    ML_HOST_TEST_CHECK(ml_host_test_to_close(rd_a) > 140, "chart a's new page fills after chart e's");
 
     // pass 3: a, b, c, e requeued in the old order - the new key moves a to the end. MID-PASS, chart c is
     // obsoleted and chart e's dimension is deleted outright: both entries keep the place their keys earned at
