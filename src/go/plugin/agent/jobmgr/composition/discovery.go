@@ -20,6 +20,7 @@ import (
 const discoveryResourceID = "__jobmgr_discovery__"
 
 type runDiscoveryServices struct {
+	Disabled     bool                            // Functions-only process: no collector discovery
 	BuildContext agentdiscovery.BuildContext     // discovery build context (paths, defaults, output/registration seams)
 	Providers    *agentdiscovery.ProviderCatalog // frozen discovery provider catalog
 	RunJob       []string                        // allow-list filter of job names (empty = allow all)
@@ -27,12 +28,15 @@ type runDiscoveryServices struct {
 }
 
 func (rds runDiscoveryServices) valid() bool {
-	return rds.Providers != nil && rds.Providers.Len() > 0
+	return rds.Disabled || (rds.Providers != nil && rds.Providers.Len() > 0)
 }
 
 func (rg *runGeneration) startDiscovery(ctx context.Context) error {
 	if rg == nil || ctx == nil || !rg.discovery.valid() {
 		return errors.New("jobmgr composition: invalid discovery start")
+	}
+	if rg.discovery.Disabled {
+		return nil
 	}
 	pipeline, err := agentdiscovery.NewPipelineGeneration(
 		agentdiscovery.PipelineConfig{
