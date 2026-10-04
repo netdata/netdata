@@ -506,3 +506,38 @@ func TestUnverifiedCompletionAfterRunCancellation(t *testing.T) {
 	}
 	assert.Empty(t, hub.Snapshot(time.Now()))
 }
+
+func TestUnverifiedExecutionDoesNotPublishLatest(t *testing.T) {
+	hub := model.NewHub()
+	c := newLighthouse(executor{
+		execute: func(context.Context, model.Request, func(string)) model.Execution {
+			return model.Execution{Run: model.Run{Outcome: model.Error, StartedUS: time.Now().UnixMicro()}, Drained: false}
+		},
+	}, hub)
+	require.NoError(t, c.Init(context.Background()))
+	ready := make(chan struct{})
+	release := make(chan struct{})
+	done := make(chan error, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { done <- c.Run(ctx, func() { close(ready); <-release }) }()
+	t.Cleanup(func() {
+		cancel()
+		close(release)
+		select {
+		case <-done:
+		case <-time.After(3 * time.Second):
+			t.Error("Run did not finish")
+		}
+	})
+	select {
+	case <-ready:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Run did not become ready")
+	}
+	_, err := collecttest.CollectScalarSeries(c)
+	require.ErrorContains(t, err, "completion is unverified")
+	jobs := hub.Snapshot(time.Now())
+	require.Len(t, jobs, 1)
+	assert.Nil(t, jobs[0].Latest, "incomplete execution is not a terminal run")
+	assert.Equal(t, "unknown", jobs[0].State)
+}

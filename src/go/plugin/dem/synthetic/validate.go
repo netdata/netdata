@@ -23,8 +23,11 @@ func ValidateRequest(r Request) error {
 	}
 	switch r.Kind {
 	case Journey:
-		if (r.Script == "") == (r.ScriptPath == "") || (r.Script != "" && strings.TrimSpace(r.Script) == "") {
+		if (r.Script == "") == (r.ScriptPath == "") {
 			return errors.New("set exactly one of script and script_path")
+		}
+		if r.Script != "" && strings.TrimSpace(r.Script) == "" {
+			return errors.New("script must not be blank")
 		}
 		if r.ScriptPath != "" && (!filepath.IsAbs(r.ScriptPath) || !scriptExtension.MatchString(r.ScriptPath)) {
 			return errors.New("script_path must be an absolute JS or TS file")

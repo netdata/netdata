@@ -176,7 +176,17 @@ func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, snap.maxBody))
+	// MaxBytesReader needs net/http's concrete writer to signal HTTP/1 close
+	// on oversized bodies; it does not follow middleware Unwrap methods.
+	bodyWriter := w
+	for {
+		unwrapper, ok := bodyWriter.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			break
+		}
+		bodyWriter = unwrapper.Unwrap()
+	}
+	body, err := io.ReadAll(http.MaxBytesReader(bodyWriter, r.Body, snap.maxBody))
 	if err != nil {
 		var tooBig *http.MaxBytesError
 		if errors.As(err, &tooBig) {

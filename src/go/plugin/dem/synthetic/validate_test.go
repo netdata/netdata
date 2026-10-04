@@ -29,6 +29,7 @@ func TestValidateRequest(t *testing.T) {
 		"secret name":        {func(r *Request) { r.Secrets = map[string]string{"PATH": "x"} }, false},
 		"secret NUL":         {func(r *Request) { r.Secrets = map[string]string{"DEM_SECRET_TOKEN": "a\x00b"} }, false},
 		"lighthouse":         {func(r *Request) { r.Kind = Lighthouse; r.URL = "https://example.org/" }, true},
+		"uppercase scheme":   {func(r *Request) { r.Kind = Lighthouse; r.URL = "HTTPS://example.org/" }, true},
 		"relative URL":       {func(r *Request) { r.Kind = Lighthouse; r.URL = "/home" }, false},
 		"credential URL":     {func(r *Request) { r.Kind = Lighthouse; r.URL = "https://user:pass@example.org/" }, false},
 	} {
@@ -48,4 +49,10 @@ func TestValidateRequest(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBlankScriptDiagnostic(t *testing.T) {
+	require.EqualError(t, ValidateRequest(Request{
+		Kind: Journey, Name: "check", Script: " \t\n\u2003", Timeout: time.Minute,
+	}), "script must not be blank")
 }

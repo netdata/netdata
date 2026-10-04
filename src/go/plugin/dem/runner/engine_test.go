@@ -470,5 +470,5 @@ func TestWhitespaceScriptRejectedBeforeExecution(t *testing.T) {
 	got := e.Execute(context.Background(), request, nil)
 	require.True(t, got.Drained)
 	assert.Equal(t, synthetic.Error, got.Run.Outcome)
-	assert.Contains(t, got.Run.Error, "exactly one")
+	assert.Equal(t, "script must not be blank", got.Run.Error)
 }

@@ -16,10 +16,17 @@ import (
 )
 
 func (c *Collector) Init(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if c.hub == nil {
 		return errors.New("missing runtime routes")
 	}
-	if _, _, err := net.SplitHostPort(c.Listen); err != nil {
+	_, port, err := net.SplitHostPort(c.Listen)
+	if err != nil {
+		return fmt.Errorf("listen: %w", err)
+	}
+	if _, err := net.DefaultResolver.LookupPort(ctx, "tcp", port); err != nil {
 		return fmt.Errorf("listen: %w", err)
 	}
 	if c.MaxBodyBytes <= 0 || c.RateLimit.PerIPPerMin <= 0 || c.RateLimit.PerSitePerSec <= 0 {
@@ -34,7 +41,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 	if c.PublicURL != "" {
 		u, err := url.Parse(c.PublicURL)
-		if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil ||
+		if err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil ||
 			u.RawQuery != "" ||
 			u.Fragment != "" {
 			return errors.New("public_url must be an http(s) base URL without credentials, query or fragment")

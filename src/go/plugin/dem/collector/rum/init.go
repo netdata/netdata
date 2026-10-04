@@ -22,6 +22,9 @@ import (
 var siteKey = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*$`)
 
 func (c *Collector) Init(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if c.deps.Hub == nil || c.deps.History == nil {
 		return errors.New("missing runtime/history dependencies")
 	}
@@ -39,7 +42,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 	for _, origin := range c.AllowedOrigins {
 		u, err := url.Parse(origin)
-		if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil ||
+		if err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil ||
 			(u.Path != "" && u.Path != "/") ||
 			u.RawQuery != "" ||
 			u.Fragment != "" {
@@ -69,7 +72,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 	if c.PublicURL != "" {
 		u, err := url.Parse(c.PublicURL)
-		if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil ||
+		if err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil ||
 			u.RawQuery != "" ||
 			u.Fragment != "" {
 			return errors.New("public_url must be an http(s) base URL")

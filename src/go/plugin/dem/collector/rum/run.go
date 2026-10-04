@@ -21,6 +21,9 @@ import (
 // Run admits an independent site without waiting for receiver startup. Worker
 // cancellation occurs only after exact route/read leases have drained.
 func (c *Collector) Run(ctx context.Context, ready func()) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if c.aggregator == nil {
 		return errors.New("site is not initialized")
 	}

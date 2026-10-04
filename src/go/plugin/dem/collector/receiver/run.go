@@ -19,6 +19,9 @@ import (
 // Run owns the socket and joins every admitted handler before returning. Init
 // and Check never bind, including native DynCfg test/update preflight.
 func (c *Collector) Run(ctx context.Context, ready func()) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	ln, err := net.Listen("tcp", c.Listen)
 	if err != nil {
 		return err

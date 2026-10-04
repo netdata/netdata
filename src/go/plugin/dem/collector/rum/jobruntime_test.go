@@ -2,8 +2,10 @@
 package rum_test
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -246,5 +248,42 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 		require.Len(t, rows, 1)
 		require.Equal(t, "same-session", rows[0].SessionID)
 		require.EqualValues(t, want, rows[0].Pageviews)
+	}
+}
+
+func TestOversizedChunkedUploadClosesConnectionPromptly(t *testing.T) {
+	hub := runtimehub.New()
+	db, err := store.Open(context.Background(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	site := rum.New(rum.Dependencies{Hub: hub, History: db})
+	site.Name = "shop"
+	site.AllowedOrigins = []string{"https://example.org"}
+	site.OTLP.Enabled = "no"
+	startJob(t, "rum", "shop", site)
+	listener := receiver.New(hub)
+	listener.Listen = "127.0.0.1:0"
+	listener.MaxBodyBytes = 32
+	startJob(t, "receiver", "receiver", listener)
+	for _, complete := range []bool{false, true} {
+		t.Run(fmt.Sprintf("complete=%v", complete), func(t *testing.T) {
+			conn, err := net.Dial("tcp", hub.Availability().Listen)
+			require.NoError(t, err)
+			defer conn.Close()
+			require.NoError(t, conn.SetDeadline(time.Now().Add(2*time.Second)))
+			body := strings.Repeat("x", 64)
+			request := "POST /rum/shop/collect HTTP/1.1\r\nHost: example.org\r\nOrigin: https://example.org\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36\r\nTransfer-Encoding: chunked\r\n\r\n"
+			request += fmt.Sprintf("%x\r\n%s\r\n", len(body), body)
+			if complete {
+				request += "0\r\n\r\n"
+			}
+			_, err = io.WriteString(conn, request)
+			require.NoError(t, err)
+			response, err := http.ReadResponse(bufio.NewReader(conn), &http.Request{Method: http.MethodPost})
+			require.NoError(t, err, "oversize response must not wait for the terminating chunk")
+			defer response.Body.Close()
+			assert.Equal(t, http.StatusRequestEntityTooLarge, response.StatusCode)
+			assert.True(t, response.Close, "an oversized upload must not leave this connection reusable")
+		})
 	}
 }

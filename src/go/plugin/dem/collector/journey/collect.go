@@ -15,7 +15,6 @@ func (c *Collector) Collect(ctx context.Context) error {
 		return err
 	}
 	execution := c.deps.Executor.Execute(ctx, c.request, registration.SetState)
-	registration.Complete(execution.Run)
 	if !execution.Drained {
 		err := errors.New("synthetic execution tree completion is unverified")
 		select {
@@ -24,6 +23,7 @@ func (c *Collector) Collect(ctx context.Context) error {
 		}
 		return err
 	}
+	registration.Complete(execution.Run)
 	// Execution inability is an observed outcome, not a discarded collection cycle.
 	c.attempt.Write(execution.Run.Outcome, execution.Run.DurationMS)
 	c.metrics.write(execution.Run)
