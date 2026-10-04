@@ -51,20 +51,20 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 		return cfg, fmt.Errorf("read dem.conf: %w", err)
 	}
 	if err = cfg.History.validate(); err != nil {
-		return cfg, err
+		return cfg, fmt.Errorf("history.%w", err)
 	}
 	if err = cfg.Artifacts.validate(); err != nil {
-		return cfg, fmt.Errorf("artifacts policy: %w", err)
+		return cfg, fmt.Errorf("artifacts.%w", err)
 	}
 	return cfg, nil
 }
 
 func (c HistoryConfig) validate() error {
 	if c.Days < 1 || c.Days > 365 {
-		return fmt.Errorf("retention days must be between 1 and 365")
+		return fmt.Errorf("days must be between 1 and 365")
 	}
 	if c.MaxBytes <= 0 {
-		return fmt.Errorf("retention max_bytes must be positive")
+		return fmt.Errorf("max_bytes must be positive")
 	}
 	return nil
 }

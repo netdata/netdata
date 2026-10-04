@@ -184,7 +184,7 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 		response["truncated"] = page.Truncated
 		response["limit"] = filter.Limit
 		response["after"] = filter.After
-		response["before"] = filter.Before
+		response["before"] = *filter.Before
 	case "synthetics-run", "synthetics-artifact":
 		if args["job_id"] == "" || args["run_id"] == "" {
 			return funcapi.ErrorResponse(400, "job_id and run_id are required")
@@ -374,11 +374,12 @@ func validKind(value string) error {
 	return nil
 }
 func runFilter(args map[string]string, now int64) (model.RunFilter, error) {
+	before := now
 	f := model.RunFilter{
 		JobID:   args["job_id"],
 		Kind:    model.Kind(args["kind"]),
 		Outcome: model.Outcome(args["outcome"]),
-		Before:  now,
+		Before:  &before,
 	}
 	if err := validKind(args["kind"]); err != nil {
 		return f, err
@@ -400,7 +401,7 @@ func runFilter(args map[string]string, now int64) (model.RunFilter, error) {
 	if err != nil {
 		return f, err
 	}
-	for key, dst := range map[string]*int64{"after": &f.After, "before": &f.Before} {
+	for key, dst := range map[string]*int64{"after": &f.After, "before": f.Before} {
 		if args[key] != "" {
 			v, err := strconv.ParseInt(args[key], 10, 64)
 			if err != nil {
@@ -415,7 +416,7 @@ func runFilter(args map[string]string, now int64) (model.RunFilter, error) {
 			*dst = v
 		}
 	}
-	if f.After > f.Before {
+	if f.After > *f.Before {
 		return f, errors.New("after must not exceed before")
 	}
 	return f, nil

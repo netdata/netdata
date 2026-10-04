@@ -81,7 +81,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 			JobID:          "lighthouse:" + c.Name,
 			Kind:           model.Lighthouse,
 			Name:           c.Name,
-			Target:         secrets.NewRedactor().Apply(c.URL),
+			Target:         secrets.NewRedactor().ApplyURL(c.URL),
 			CadenceSeconds: c.UpdateEvery,
 			TimeoutSeconds: time.Duration(c.Timeout).Seconds(),
 		},

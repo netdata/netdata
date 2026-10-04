@@ -15,6 +15,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/artifacts"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/syntheticfunc"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -296,6 +297,7 @@ func TestInventoryTruncation(t *testing.T) {
 }
 
 func TestHistoryFiltersAndUnavailableValues(t *testing.T) {
+	upperBound := int64(200)
 	evidence := model.Run{
 		ID:           "r",
 		JobID:        "lighthouse:home",
@@ -327,7 +329,7 @@ func TestHistoryFiltersAndUnavailableValues(t *testing.T) {
 			Kind:    model.Lighthouse,
 			Outcome: model.Unknown,
 			After:   100,
-			Before:  200,
+			Before:  &upperBound,
 			Limit:   3,
 		},
 		src.filter,
@@ -341,7 +343,8 @@ func TestHistoryFiltersAndUnavailableValues(t *testing.T) {
 	before := time.Now().Unix()
 	responseData(t, call(syntheticfunc.New(src), "synthetics-runs", "after:-60"))
 	assert.GreaterOrEqual(t, src.filter.After, before-60)
-	assert.LessOrEqual(t, src.filter.Before, time.Now().Unix())
+	require.NotNil(t, src.filter.Before)
+	assert.LessOrEqual(t, *src.filter.Before, time.Now().Unix())
 	assert.Equal(t, 2000, src.filter.Limit)
 	src.queryErr = errors.New("private path and credential")
 	got = call(syntheticfunc.New(src), "synthetics-runs")
@@ -511,4 +514,32 @@ func TestCaptureAbsenceStates(t *testing.T) {
 			validate(t, got)
 		})
 	}
+}
+
+type journalSource struct {
+	*source
+	journal *store.Store
+}
+
+func (s *journalSource) QuerySyntheticRuns(ctx context.Context, filter model.RunFilter) (model.RunPage, error) {
+	return s.journal.QuerySyntheticRuns(ctx, filter)
+}
+func TestHistoryExplicitEpochBoundThroughJournal(t *testing.T) {
+	ctx := context.Background()
+	journal, err := store.Open(ctx, t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, journal.Close()) })
+	run := model.Run{ID: "epoch-bound", JobID: "journey:epoch", Kind: model.Journey, StartedUS: time.Now().UnixMicro(), Outcome: model.Success}
+	run.CompletedUS = run.StartedUS + 1
+	_, err = journal.AppendSyntheticRun(ctx, "complete", run)
+	require.NoError(t, err)
+	h := syntheticfunc.New(&journalSource{source: &source{}, journal: journal})
+	require.Len(t, responseData(t, call(h, "synthetics-runs")), 1)
+	got := call(h, "synthetics-runs", "before:0")
+	assert.Empty(t, responseData(t, got), "Unix epoch upper bound must exclude contemporary records")
+	assert.Equal(t, int64(0), got.RawResponse["before"])
+	// Internal detail lookup still has no saved-time bound.
+	retained, err := journal.GetSyntheticRun(ctx, run.JobID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, run.ID, retained.ID)
 }

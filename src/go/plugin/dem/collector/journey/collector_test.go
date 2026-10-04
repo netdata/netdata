@@ -85,6 +85,7 @@ func TestInitValidation(t *testing.T) {
 		"directory":              {func(c *Collector) { c.Script = ""; c.ScriptPath = t.TempDir() }, false},
 		"missing name":           {func(c *Collector) { c.Name = " " }, false},
 		"zero interval":          {func(c *Collector) { c.UpdateEvery = 0 }, false},
+		"submillisecond timeout": {func(c *Collector) { c.Timeout = 999999 }, false},
 		"zero timeout":           {func(c *Collector) { c.Timeout = 0 }, false},
 		"negative timeout":       {func(c *Collector) { c.Timeout = -1 }, false},
 		"secret":                 {func(c *Collector) { c.Secrets = []Secret{{Name: "DEM_SECRET_TOKEN", Value: "test"}} }, true},

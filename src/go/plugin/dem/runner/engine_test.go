@@ -441,3 +441,20 @@ func TestCancellationRedactsLateBootstrapAndProtocolOutputBeforeHistory(t *testi
 	assert.NotContains(t, string(raw), "fixture-only-secret-")
 	assert.Contains(t, string(raw), "observable evidence")
 }
+
+func TestLighthouseTargetRedactionBeforeHistory(t *testing.T) {
+	e, h, _ := testEngine(t)
+	request := journey()
+	request.Kind = synthetic.Lighthouse
+	request.URL = "https://example.org/?client%5Fsecret=private-query-value&view=home"
+	e.start = starter(t, func(_ context.Context, _ []string, _ []byte, out, _ *os.File) ndexec.TreeResult {
+		r := success()
+		emit(out, frame{Type: "result", Result: &r})
+		return ndexec.TreeResult{Drained: true}
+	})
+	got := e.Execute(context.Background(), request, nil)
+	assert.NotContains(t, got.Run.Target, "private-query-value")
+	for _, run := range h.runs {
+		assert.NotContains(t, run.Target, "private-query-value")
+	}
+}

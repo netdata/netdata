@@ -141,13 +141,14 @@ type History interface {
 	Sync(context.Context) error
 }
 
-// RunFilter selects journal saved-time, in seconds. Zero Before means no upper bound.
+// RunFilter selects journal saved-time, in seconds. Nil Before means no upper bound.
 type RunFilter struct {
-	JobID         string
-	Kind          Kind
-	Outcome       Outcome
-	After, Before int64
-	Limit         int
+	JobID   string
+	Kind    Kind
+	Outcome Outcome
+	After   int64
+	Before  *int64
+	Limit   int
 }
 type RunPage struct {
 	Runs      []Run `json:"runs"`

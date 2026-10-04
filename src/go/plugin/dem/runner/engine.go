@@ -90,7 +90,7 @@ type wireRequest struct {
 
 func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state func(string)) synthetic.Execution {
 	redact := newRedactor(request.Secrets)
-	run := synthetic.Run{JobID: request.JobID(), Kind: request.Kind, Name: redact.text(request.Name), Target: redact.text(request.URL), Outcome: synthetic.Error, CaptureState: "disabled", Events: []synthetic.Event{}, Artifacts: []synthetic.Artifact{}}
+	run := synthetic.Run{JobID: request.JobID(), Kind: request.Kind, Name: redact.text(request.Name), Target: redact.text(redact.patterns.ApplyURL(request.URL)), Outcome: synthetic.Error, CaptureState: "disabled", Events: []synthetic.Event{}, Artifacts: []synthetic.Artifact{}}
 	if request.Capture {
 		run.CaptureState = "unavailable"
 	}

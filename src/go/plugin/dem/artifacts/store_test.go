@@ -93,7 +93,7 @@ func TestPublishFetchAndRestart(t *testing.T) {
 func TestStrictCapturePathsAndKinds(t *testing.T) {
 	for _, which := range []string{"escape", "absolute", "clean", "link-file", "link-parent", "directory", "wrong-mime", "wrong-kind", "bad-png", "duplicate"} {
 		t.Run(which, func(t *testing.T) {
-			s, _ := store(t)
+			s, root := store(t)
 			work, c := captured(t, s, run1, []byte("report"))
 			outside := filepath.Join(t.TempDir(), "outside")
 			require.NoError(t, os.WriteFile(outside, []byte("outside remains"), 0600))
@@ -129,11 +129,15 @@ func TestStrictCapturePathsAndKinds(t *testing.T) {
 			_, err = s.Enforce(context.Background(), 1, 1)
 			require.NoError(t, err)
 			_, err = os.Stat(work)
-			assert.NoError(t, err, "failed publication remains protected for this owner")
+			assert.ErrorIs(t, err, os.ErrNotExist, "drained unpublished work is removed")
+			for _, dir := range []string{"work", "staging", "drained", "runs"} {
+				_, err = os.Lstat(filepath.Join(root, dir, run1))
+				assert.ErrorIs(t, err, os.ErrNotExist, dir)
+			}
 			got, err := os.ReadFile(outside)
 			require.NoError(t, err)
 			assert.Equal(t, "outside remains", string(got))
-			assert.Positive(t, s.Stats().ProtectedBytes)
+			assert.Zero(t, s.Stats().ProtectedBytes)
 		})
 	}
 }
@@ -152,11 +156,20 @@ func TestPNGCapture(t *testing.T) {
 }
 func TestFetchBoundAndCorruption(t *testing.T) {
 	s, root := store(t)
-	_, c := captured(t, s, run1, []byte(strings.Repeat("x", int(artifacts.FetchMaxBytes+1))))
-	_, err := s.Finalize(context.Background(), run1, []synthetic.Capture{c})
-	require.NoError(t, err)
+	work, c := captured(t, s, run1, []byte(strings.Repeat("x", int(artifacts.FetchMaxBytes+1))))
+	require.NoError(t, os.WriteFile(filepath.Join(work, "output", "small.html"), []byte("small"), 0600))
+	small := synthetic.Capture{ID: "small-report", Kind: "report", MIME: "text/html", Path: "output/small.html"}
+	_, err := s.Finalize(context.Background(), run1, []synthetic.Capture{small, c})
+	require.ErrorIs(t, err, artifacts.ErrTooLarge)
 	_, _, err = s.Fetch(context.Background(), run1, c.ID)
-	assert.ErrorIs(t, err, artifacts.ErrTooLarge)
+	assert.ErrorIs(t, err, artifacts.ErrNotFound)
+	assert.Zero(t, s.Stats().ProtectedBytes)
+	for _, dir := range []string{"work", "staging", "drained", "runs"} {
+		_, err = os.Lstat(filepath.Join(root, dir, run1))
+		assert.ErrorIs(t, err, os.ErrNotExist, dir)
+	}
+	_, err = os.Lstat(work)
+	assert.ErrorIs(t, err, os.ErrNotExist)
 	_, c = captured(t, s, run2, []byte("good"))
 	_, err = s.Finalize(context.Background(), run2, []synthetic.Capture{c})
 	require.NoError(t, err)
@@ -193,26 +206,31 @@ func TestRetentionAndProtectedWork(t *testing.T) {
 	_, _, err = reopened.Fetch(context.Background(), run1, c.ID)
 	assert.ErrorIs(t, err, artifacts.ErrNotFound)
 }
-func TestDrainedFailedPublicationIsRecoveredAfterRestart(t *testing.T) {
+func TestDrainedFailedCaptureCleanupRetries(t *testing.T) {
 	s, root := store(t)
 	work, c := captured(t, s, run1, []byte("invalid candidate"))
+	actual, err := os.Readlink(work)
+	require.NoError(t, err)
+	require.NoError(t, os.Remove(work))
+	require.NoError(t, os.Symlink(t.TempDir(), work))
+	defer os.Remove(work)
 	c.Path = "outside"
-	_, err := s.Finalize(context.Background(), run1, []synthetic.Capture{c})
-	require.Error(t, err)
+	_, err = s.Finalize(context.Background(), run1, []synthetic.Capture{c})
+	require.ErrorIs(t, err, artifacts.ErrInvalidCapture)
+	assert.Contains(t, err.Error(), "ownership does not match")
+	assert.Positive(t, s.Stats().CleanupErrors)
+	_, err = os.Stat(filepath.Join(root, "drained", run1))
+	require.NoError(t, err)
+	// Restore this fixture's alias and retry in the same owner, without restart.
+	require.NoError(t, os.Remove(work))
+	require.NoError(t, os.Symlink(actual, work))
 	_, err = s.Enforce(context.Background(), 7, 1)
 	require.NoError(t, err)
-	_, err = os.Stat(work)
-	require.NoError(t, err)
-	require.NoError(t, s.Close())
-	reopened, err := artifacts.Open(root)
-	require.NoError(t, err)
-	defer reopened.Close()
-	_, err = reopened.Enforce(context.Background(), 7, 1)
-	require.NoError(t, err)
-	_, err = os.Stat(work)
-	assert.ErrorIs(t, err, os.ErrNotExist, "durable marker proves cleanup permission")
-	assert.Zero(t, reopened.Stats().ProtectedBytes)
+	_, err = os.Lstat(work)
+	assert.ErrorIs(t, err, os.ErrNotExist)
+	assert.Zero(t, s.Stats().ProtectedBytes)
 }
+
 func TestFetchExpiryRace(t *testing.T) {
 	s, _ := store(t)
 	payload := []byte(strings.Repeat("x", 50000))
@@ -293,11 +311,18 @@ func TestTemporaryClosePreservesUnverifiedWork(t *testing.T) {
 func TestInvalidDrainMarkerCannotAuthorizeCleanup(t *testing.T) {
 	s, root := store(t)
 	work, c := captured(t, s, run1, []byte("retained uncertainty"))
+	actual, err := os.Readlink(work)
+	require.NoError(t, err)
+	require.NoError(t, os.Remove(work))
+	require.NoError(t, os.Symlink(t.TempDir(), work))
+	defer os.Remove(work)
 	c.Path = "invalid"
-	_, err := s.Finalize(context.Background(), run1, []synthetic.Capture{c})
-	require.Error(t, err)
+	_, err = s.Finalize(context.Background(), run1, []synthetic.Capture{c})
+	require.ErrorIs(t, err, artifacts.ErrInvalidCapture)
+	require.NoError(t, os.Remove(work))
+	require.NoError(t, os.Symlink(actual, work))
 	require.NoError(t, s.Close())
-	// Corrupt a real published marker to model interrupted persistence.
+	// Corrupt a real marker whose cleanup failed to model interrupted persistence.
 	require.NoError(t, os.WriteFile(filepath.Join(root, "drained", run1), nil, 0600))
 	reopened, err := artifacts.Open(root)
 	require.NoError(t, err)
@@ -339,7 +364,7 @@ func TestShortAliasKeepsLongPrivateWork(t *testing.T) {
 	assert.Equal(t, "long-path report", string(raw))
 }
 func TestExistingAliasIsNeverAdoptedOrRemoved(t *testing.T) {
-	s, _ := store(t)
+	s, root := store(t)
 	alias := filepath.Join("/tmp", "nd-dem-"+run1)
 	unrelated := t.TempDir()
 	require.NoError(t, os.Symlink(unrelated, alias))
@@ -351,6 +376,8 @@ func TestExistingAliasIsNeverAdoptedOrRemoved(t *testing.T) {
 	target, err := os.Readlink(alias)
 	require.NoError(t, err)
 	assert.Equal(t, unrelated, target)
+	_, err = os.Stat(filepath.Join(root, "work", run1))
+	assert.ErrorIs(t, err, os.ErrNotExist, "failed setup must remove its new empty work")
 }
 func TestMismatchedAliasBlocksDrainedCleanup(t *testing.T) {
 	s, root := store(t)
@@ -361,9 +388,14 @@ func TestMismatchedAliasBlocksDrainedCleanup(t *testing.T) {
 	unrelated := t.TempDir()
 	require.NoError(t, os.Symlink(unrelated, work))
 	defer os.Remove(work)
-	_, err = s.Finalize(context.Background(), run1, []synthetic.Capture{c})
-	require.Error(t, err)
-	_, err = s.Enforce(context.Background(), 7, 1)
+	published, err := s.Finalize(context.Background(), run1, []synthetic.Capture{c})
+	require.NoError(t, err, "owned-work cleanup does not undo durable publication")
+	require.Len(t, published, 1)
+	_, raw, err := s.Fetch(context.Background(), run1, c.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "candidate", string(raw))
+	assert.Positive(t, s.Stats().CleanupErrors)
+	_, err = s.Enforce(context.Background(), 7, 2<<30)
 	require.Error(t, err)
 	target, err := os.Readlink(work)
 	require.NoError(t, err)
@@ -374,9 +406,94 @@ func TestMismatchedAliasBlocksDrainedCleanup(t *testing.T) {
 	reopened, err := artifacts.Open(root)
 	require.NoError(t, err)
 	defer reopened.Close()
-	_, err = reopened.Enforce(context.Background(), 7, 1)
+	_, err = reopened.Enforce(context.Background(), 7, 2<<30)
 	require.Error(t, err)
 	target, err = os.Readlink(work)
 	require.NoError(t, err)
 	assert.Equal(t, unrelated, target)
+	require.NoError(t, os.Remove(work))
+	require.NoError(t, os.Symlink(actual, work))
+	_, err = reopened.Enforce(context.Background(), 7, 2<<30)
+	require.NoError(t, err)
+	assert.Zero(t, reopened.Stats().ProtectedBytes)
+	_, raw, err = reopened.Fetch(context.Background(), run1, c.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "candidate", string(raw))
+}
+
+// Trigger real filesystem errors without changing shared directories. Skip
+// systems/users that do not enforce directory read permissions.
+func denyDirectoryReads(t *testing.T, dir string) {
+	t.Helper()
+	require.NoError(t, os.Chmod(dir, 0300))
+	t.Cleanup(func() { require.NoError(t, os.Chmod(dir, 0700)) })
+	f, err := os.Open(dir)
+	if err == nil {
+		require.NoError(t, f.Close())
+		t.Skip("directory read permissions are not enforced")
+	}
+	require.ErrorIs(t, err, os.ErrPermission)
+}
+
+func TestFailedPublicationAttemptStaysProtectedUntilRestart(t *testing.T) {
+	s, root := store(t)
+	work, c := captured(t, s, run1, []byte("published candidate"))
+	runs := filepath.Join(root, "runs")
+	denyDirectoryReads(t, runs)
+	_, err := s.Finalize(context.Background(), run1, []synthetic.Capture{c})
+	require.ErrorIs(t, err, os.ErrPermission)
+	require.NoError(t, os.Chmod(runs, 0700))
+	_, err = os.Stat(filepath.Join(root, "staging", run1, c.ID))
+	require.NoError(t, err, "completed staging remains protected after a failed publication attempt")
+	_, err = s.Enforce(context.Background(), 7, 1)
+	require.NoError(t, err)
+	_, err = os.Stat(work)
+	require.NoError(t, err, "uncertain publication preserves original work")
+	_, err = s.Manifest(context.Background(), run1)
+	require.ErrorContains(t, err, "uncertain")
+	require.NoError(t, s.Close())
+	reopened, err := artifacts.Open(root)
+	require.NoError(t, err)
+	defer reopened.Close()
+	_, err = reopened.Enforce(context.Background(), 7, 2<<30)
+	require.NoError(t, err)
+	_, err = os.Lstat(work)
+	assert.ErrorIs(t, err, os.ErrNotExist)
+	_, _, err = reopened.Fetch(context.Background(), run1, c.ID)
+	assert.ErrorIs(t, err, artifacts.ErrNotFound)
+	assert.Zero(t, reopened.Stats().ProtectedBytes)
+}
+
+// Grow the fixture at the copy's first cancellation check, after its initial Stat.
+type growBeforeReadContext struct {
+	context.Context
+	checks int
+	grow   func()
+}
+
+func (c *growBeforeReadContext) Err() error {
+	c.checks++
+	if c.checks == 3 {
+		c.grow()
+	}
+	return c.Context.Err()
+}
+
+func TestCaptureGrowingPastFetchLimitIsNotPublished(t *testing.T) {
+	s, root := store(t)
+	work, c := captured(t, s, run1, []byte(strings.Repeat("x", int(artifacts.FetchMaxBytes))))
+	ctx := &growBeforeReadContext{Context: context.Background(), grow: func() {
+		file, err := os.OpenFile(filepath.Join(work, c.Path), os.O_APPEND|os.O_WRONLY, 0600)
+		require.NoError(t, err)
+		_, err = file.Write([]byte("extra"))
+		require.NoError(t, err)
+		require.NoError(t, file.Close())
+	}}
+	_, err := s.Finalize(ctx, run1, []synthetic.Capture{c})
+	require.ErrorIs(t, err, artifacts.ErrTooLarge)
+	for _, dir := range []string{"work", "staging", "drained", "runs"} {
+		_, err = os.Lstat(filepath.Join(root, dir, run1))
+		assert.ErrorIs(t, err, os.ErrNotExist, dir)
+	}
+	assert.Zero(t, s.Stats().ProtectedBytes)
 }

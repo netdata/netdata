@@ -2,11 +2,14 @@
 package dem
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -194,4 +197,119 @@ func TestArtifactSweepStillRunsWhenJournalSweepFails(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("journal failure prevented independent artifact expiry")
 	}
+}
+
+type historyRetentionFunc func(context.Context, int, int64) error
+
+func (f historyRetentionFunc) EnforceHistoryRetention(ctx context.Context, days int, maxBytes int64) error {
+	return f(ctx, days, maxBytes)
+}
+
+type artifactRetentionFunc func(context.Context, int, int64) (artifacts.Stats, error)
+
+func (f artifactRetentionFunc) Enforce(ctx context.Context, days int, maxBytes int64) (artifacts.Stats, error) {
+	return f(ctx, days, maxBytes)
+}
+func TestRetentionRetriesOnlyFailedStore(t *testing.T) {
+	for _, failedStore := range []string{"history", "artifacts"} {
+		t.Run(failedStore, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var historyCalls, artifactCalls atomic.Int32
+				service := &Retention{
+					store: historyRetentionFunc(func(context.Context, int, int64) error {
+						historyCalls.Add(1)
+						if failedStore == "history" {
+							return errors.New("history unavailable")
+						}
+						return nil
+					}),
+					artifactStore: artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Stats, error) {
+						artifactCalls.Add(1)
+						if failedStore == "artifacts" {
+							return artifacts.Stats{}, errors.New("artifacts unavailable")
+						}
+						return artifacts.Stats{}, nil
+					}),
+					policy:         DefaultConfig().History,
+					artifactPolicy: DefaultConfig().Artifacts,
+					log:            logger.NewWithWriter(&bytes.Buffer{}),
+				}
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				go service.Run(ctx)
+				synctest.Wait()
+				require.Equal(t, int32(1), historyCalls.Load())
+				require.Equal(t, int32(1), artifactCalls.Load())
+				time.Sleep(10 * time.Second)
+				synctest.Wait()
+				if failedStore == "history" {
+					assert.Equal(t, int32(3), historyCalls.Load())
+					assert.Equal(t, int32(1), artifactCalls.Load())
+				} else {
+					assert.Equal(t, int32(1), historyCalls.Load())
+					assert.Equal(t, int32(3), artifactCalls.Load())
+				}
+			})
+		})
+	}
+}
+func TestRetentionBudgetWarningRequiresSuccessfulSweep(t *testing.T) {
+	for _, failed := range []bool{false, true} {
+		t.Run(map[bool]string{false: "fresh", true: "stale"}[failed], func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var logs bytes.Buffer
+				service := &Retention{
+					store: historyRetentionFunc(func(context.Context, int, int64) error { return nil }),
+					artifactStore: artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Stats, error) {
+						stats := artifacts.Stats{ProtectedBytes: DefaultConfig().Artifacts.MaxBytes + 1}
+						if failed {
+							return stats, errors.New("artifact sweep failed")
+						}
+						return stats, nil
+					}),
+					policy:         DefaultConfig().History,
+					artifactPolicy: DefaultConfig().Artifacts,
+					log:            logger.NewWithWriter(&logs),
+				}
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				go service.Run(ctx)
+				synctest.Wait()
+				if failed {
+					assert.Contains(t, logs.String(), "DEM artifact retention failed")
+					assert.NotContains(t, logs.String(), "protected run files exceed artifact budget")
+				} else {
+					assert.Contains(t, logs.String(), "protected run files exceed artifact budget")
+				}
+			})
+		})
+	}
+}
+
+func TestRetentionMaintainsHourlySweep(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var historyCalls, artifactCalls atomic.Int32
+		service := &Retention{
+			store: historyRetentionFunc(func(context.Context, int, int64) error { historyCalls.Add(1); return nil }),
+			artifactStore: artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Stats, error) {
+				artifactCalls.Add(1)
+				return artifacts.Stats{}, nil
+			}),
+			policy:         DefaultConfig().History,
+			artifactPolicy: DefaultConfig().Artifacts,
+			log:            logger.NewWithWriter(&bytes.Buffer{}),
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go service.Run(ctx)
+		synctest.Wait()
+		time.Sleep(time.Hour - time.Second)
+		synctest.Wait()
+		assert.Equal(t, int32(1), historyCalls.Load())
+		assert.Equal(t, int32(1), artifactCalls.Load())
+		time.Sleep(time.Second)
+		synctest.Wait()
+		assert.Equal(t, int32(2), historyCalls.Load())
+		assert.Equal(t, int32(2), artifactCalls.Load())
+	})
 }

@@ -61,7 +61,7 @@ function secretStream(emit) {
   return {
     write(chunk) {
       if (ended) throw new Error('diagnostic stream already ended');
-      append(Buffer.isBuffer(chunk) ? decoder.write(chunk) : decoder.end() + String(chunk));
+      append(decoder.write(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk))));
     },
     end() { if (!ended) { ended = true; append(decoder.end()); drain(true); } },
   };

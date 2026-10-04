@@ -2,6 +2,7 @@
 package runner
 
 import (
+	"bytes"
 	"strings"
 	"unicode/utf8"
 )
@@ -13,7 +14,7 @@ import (
 type diagnosticStream struct {
 	redact     *textRedactor
 	emit       func(string)
-	pending    string
+	pending    bytes.Buffer
 	utf8Tail   string
 	line       []rune
 	window     [11]byte
@@ -35,7 +36,7 @@ func (d *diagnosticStream) write(value string) {
 	}
 	for len(value) > 0 {
 		n := min(len(value), 4096)
-		d.pending += value[:n]
+		d.pending.WriteString(value[:n])
 		value = value[n:]
 		d.drain(false)
 	}
@@ -55,47 +56,49 @@ func (d *diagnosticStream) end() {
 	}
 }
 func (d *diagnosticStream) drain(final bool) {
-	safe := max(0, len(d.pending)-d.redact.longest+1)
+	pending := d.pending.Bytes()
+	safe := max(0, len(pending)-d.redact.longest+1)
 	if final {
-		safe = len(d.pending)
+		safe = len(pending)
 	}
 	partial := 0
 	if final {
 		for _, secret := range d.redact.known {
-			partial = max(partial, secretPrefixSuffix(d.pending, secret))
+			partial = max(partial, secretPrefixSuffix(pending, secret))
 		}
 	}
-	partialStart := len(d.pending) - partial
+	partialStart := len(pending) - partial
 	consumed := 0
 	for consumed < safe {
 		index, length := -1, 0
 		for _, secret := range d.redact.known {
-			if at := strings.Index(d.pending[consumed:], secret); at >= 0 && (index < 0 || at < index) {
+			if at := bytes.Index(pending[consumed:], []byte(secret)); at >= 0 && (index < 0 || at < index) {
 				index, length = at, len(secret)
 			}
 		}
 		if index < 0 || consumed+index >= min(safe, partialStart) {
 			break
 		}
-		d.decoded(d.pending[consumed : consumed+index])
+		d.decoded(string(pending[consumed : consumed+index]))
 		d.decoded("[REDACTED]")
 		consumed += index + length
 		if partial > 0 && consumed > partialStart {
-			consumed = len(d.pending)
+			consumed = len(pending)
 			break
 		}
 	}
 	end := max(safe, consumed)
-	tail := d.pending[consumed:end]
 	if partial > 0 && consumed <= partialStart {
-		tail = d.pending[consumed:partialStart] + "[REDACTED]"
+		d.decoded(string(pending[consumed:partialStart]))
+		d.decoded("[REDACTED]")
+	} else {
+		d.decoded(string(pending[consumed:end]))
 	}
-	d.decoded(tail)
-	d.pending = d.pending[end:]
+	d.pending.Next(end)
 }
 
 // Linear suffix matching avoids quadratic work for long repeated-prefix secrets.
-func secretPrefixSuffix(value, secret string) int {
+func secretPrefixSuffix(value []byte, secret string) int {
 	if len(value) == 0 || len(secret) < 2 {
 		return 0
 	}

@@ -50,8 +50,8 @@ func (r *Runtime) Init(name string, cadence int, timeout time.Duration) error {
 	if cadence <= 0 {
 		return errors.New("update_every must be positive")
 	}
-	if timeout <= 0 {
-		return errors.New("timeout must be positive")
+	if timeout < time.Millisecond {
+		return errors.New("timeout must be at least one millisecond")
 	}
 	r.initialized = true
 	return nil

@@ -82,14 +82,13 @@ test('retry override is rejected before the workflow executes', async () => {
   await assert.rejects(fs.access(marker));
 });
 
-test('secrets are controlled and stdout remains framed',async()=>{
-  const source=prefix+"test('env',async()=>{expect(process.env.DEM_SECRET_TOKEN).toBe('synthetic-value');expect(process.env.DEM_SECRET_UNPASSED).toBeUndefined();expect(process.env.NODE_OPTIONS).toBeUndefined();console.log('not a protocol frame');console.error('diagnostic');await test.step('observed step',async()=>{});});";
+test('transported secrets are not persisted and stdout remains framed',async()=>{
+  const source=prefix+"test('env',async()=>{expect(process.env.DEM_SECRET_TOKEN).toBe(['synthetic','value'].join('-'));expect(process.env.DEM_SECRET_UNPASSED).toBeUndefined();expect(process.env.NODE_OPTIONS).toBeUndefined();console.log('not a protocol frame');console.error('diagnostic');await test.step('observed step',async()=>{});});";
   const result=await run(source,{secrets:{DEM_SECRET_TOKEN:'synthetic-value'}});
   assert.equal(result.result.status,'success');
   assert.ok(result.events.filter(e=>e.kind==='stdout').map(e=>e.message).join('').includes('not a protocol frame'));
   assert.ok(result.events.some(e=>e.kind==='step'&&e.title==='observed step'));
-  const files=await fs.readdir(result.dir);
-  for(const name of files){const p=path.join(result.dir,name);if((await fs.stat(p)).isFile())assert.ok(!(await fs.readFile(p,'utf8')).includes('synthetic-value'));}
+  for(const name of await fs.readdir(result.dir,{recursive:true})){const p=path.join(result.dir,name);if((await fs.stat(p)).isFile())assert.ok(!(await fs.readFile(p,'utf8')).includes('synthetic-value'),name);}
 });
 
 test('external formats use real helpers, hooks, and one prepared module instance',async()=>{
@@ -207,4 +206,27 @@ test('known stream prefixes stay protected for every byte partition', async()=>{
 test('secret redaction cannot change browser-start failure classification',async()=>{
   const actual=await run(prefix+"test('browser',async({page})=>{});",{secrets:{DEM_SECRET_SHORT:'a'}});
   assert.equal(actual.result.status,'error');
+});
+
+
+test('assertion failure takes precedence over launch inability in the same test',async()=>{
+  const actual=await run("import {test,expect,chromium} from '@playwright/test'; test('mixed',async()=>{expect.soft(1).toBe(2);await chromium.launch({executablePath:'/missing-prepared-browser'});});");
+  assert.equal(actual.result.tests.failed,1);
+  assert.equal(actual.result.status,'failed');
+});
+
+test('mixed stream chunks preserve byte ordering and empty UTF-8 boundaries',async()=>{
+  const {default:protocol}=await import('../protocol.cjs');
+  for(const chunks of [[Buffer.from([0xe7]),'',Buffer.from([0x95,0x8c])],[Buffer.from([0xe7]),'middle',Buffer.from([0x95,0x8c])]]){
+    let recovered='';const stream=protocol.secretStream(value=>recovered+=value);
+    for(const chunk of chunks)stream.write(chunk);
+    stream.end();
+    assert.equal(recovered,Buffer.concat(chunks.map(chunk=>Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk))).toString('utf8'));
+  }
+  protocol.configureSecrets({DEM_SECRET_UTF:'界'});
+  try{
+    let recovered='';const stream=protocol.secretStream(value=>recovered+=value);
+    stream.write(Buffer.from([0xe7]));stream.write('');stream.write(Buffer.from([0x95,0x8c]));stream.end();
+    assert.equal(recovered,'[REDACTED]');
+  }finally{protocol.configureSecrets();}
 });

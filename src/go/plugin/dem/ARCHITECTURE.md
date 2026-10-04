@@ -54,7 +54,7 @@ credential-file reads. Site redaction covers stored/exported payloads and remote
 
 Synthetic collectors share only execution mechanics and measurement instruments. Each native job owns its generation
 registration and cadence; the command owns the execution admission slot, artifact store and journal. Process Functions
-are registered once on the journey Creator and published even without active journey jobs. Their narrow source copies
+are registered through separate process providers and published independently of collector selection. Their narrow source copies
 active snapshots before independent history I/O; no Function acquires browser admission.
 
 The real Node adapter selects exactly one configured entry with explicit config/tsconfig and a private reporter pipe.

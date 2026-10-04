@@ -158,6 +158,7 @@ to 2 GiB. Oldest finalized runs expire together; active or unverified work is pr
 The inventory exposes retained/protected bytes and cleanup errors. Capture states distinguish disabled, not needed,
 unavailable and published evidence. Retained history may outlive its files; absent recorded files mean “expired or
 unavailable”. Metadata presence alone does not verify file availability; fetch verifies the manifest, size and digest.
+Captures exceeding 5 MiB are marked unavailable and are not published.
 Downloads require administrator-equivalent caller permissions and are limited to 5 MiB; HTML is returned as base64 data.
 
 The runner retains admission and private files until Linux supervision proves the entire child tree is reaped.

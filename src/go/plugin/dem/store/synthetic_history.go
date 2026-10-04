@@ -58,9 +58,9 @@ func (s *Store) scanSynthetic(ctx context.Context, f synthetic.RunFilter, runID 
 	if reader == nil {
 		return ctx.Err()
 	}
-	before := f.Before
-	if before == 0 {
-		before = int64(^uint64(0) >> 1)
+	before := int64(^uint64(0) >> 1)
+	if f.Before != nil {
+		before = *f.Before
 	}
 	if f.After < 0 || before < f.After {
 		return fmt.Errorf("invalid synthetic saved-time range")

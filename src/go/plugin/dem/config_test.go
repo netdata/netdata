@@ -61,3 +61,16 @@ func TestArtifactDefaultsAndIndependentPolicy(t *testing.T) {
 	_, err = LoadConfig(multipath.New(dir))
 	require.ErrorContains(t, err, "artifacts")
 }
+
+func TestInvalidRetentionIdentifiesSetting(t *testing.T) {
+	for _, field := range []string{"history", "artifacts"} {
+		for _, setting := range []string{"days", "max_bytes"} {
+			t.Run(field+"."+setting, func(t *testing.T) {
+				dir := t.TempDir()
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(field+": {"+setting+": 0}"), 0600))
+				_, err := LoadConfig(multipath.New(dir))
+				require.ErrorContains(t, err, field+"."+setting)
+			})
+		}
+	}
+}

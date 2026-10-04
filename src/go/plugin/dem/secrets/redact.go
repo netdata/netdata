@@ -3,6 +3,7 @@
 package secrets
 
 import (
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -23,9 +24,10 @@ var standalonePattern = regexp.MustCompile(
 		`)`,
 )
 
-var keyValuePattern = regexp.MustCompile(
-	`(?i)\b((?:api_key|apikey|access_token|token|password|secret))=[^&\s"']*`,
-)
+const credentialKeys = `api_key|apikey|access_token|client_secret|token|password|secret`
+
+var keyValuePattern = regexp.MustCompile(`(?i)\b((?:` + credentialKeys + `))=[^&\s"']*`)
+var queryKeyPattern = regexp.MustCompile(`(?i)^(?:` + credentialKeys + `)$`)
 
 func NewRedactor(values ...string) *Redactor {
 	return &Redactor{
@@ -57,4 +59,23 @@ var HeaderDenylist = map[string]bool{
 	"set-cookie":          true,
 	"proxy-authorization": true,
 	"x-api-key":           true,
+}
+
+// ApplyURL recognizes query names after URL decoding, including repeated keys.
+// Only the display/history target changes; navigation uses the original URL.
+func (r *Redactor) ApplyURL(value string) string {
+	u, err := url.Parse(value)
+	if err != nil {
+		return r.Apply(value)
+	}
+	parts := strings.Split(u.RawQuery, "&")
+	for i, part := range parts {
+		key, _, hasValue := strings.Cut(part, "=")
+		decoded, err := url.QueryUnescape(key)
+		if err == nil && hasValue && queryKeyPattern.MatchString(decoded) {
+			parts[i] = key + "=" + url.QueryEscape(redacted)
+		}
+	}
+	u.RawQuery = strings.Join(parts, "&")
+	return r.Apply(u.String())
 }

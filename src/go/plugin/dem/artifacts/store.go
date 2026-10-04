@@ -148,7 +148,7 @@ func Open(name string) (_ *Store, retErr error) {
 	return s, nil
 }
 
-func (s *Store) Begin(runID string) (string, error) {
+func (s *Store) Begin(runID string) (_ string, retErr error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
@@ -169,6 +169,18 @@ func (s *Store) Begin(runID string) (string, error) {
 	if err := s.root.Mkdir("work/"+runID, 0700); err != nil {
 		return "", err
 	}
+	aliasCreated := false
+	defer func() {
+		if retErr == nil {
+			return
+		}
+		// Ownership was never handed to a child; only this setup's new resources
+		// can be rolled back without a drainage marker.
+		if aliasCreated {
+			retErr = errors.Join(retErr, s.removeWorkAlias(runID))
+		}
+		retErr = errors.Join(retErr, s.root.Remove("work/"+runID), syncDir(s.root, "work"))
+	}()
 	if err := syncDir(s.root, "work"); err != nil {
 		return "", err
 	}
@@ -177,6 +189,7 @@ func (s *Store) Begin(runID string) (string, error) {
 	if err := os.Symlink(filepath.Join(s.path, "work", runID), workAlias(runID)); err != nil {
 		return "", fmt.Errorf("create private browser work alias: %w", err)
 	}
+	aliasCreated = true
 	if err := syncExternalDir("/tmp"); err != nil {
 		return "", err
 	}
@@ -185,8 +198,9 @@ func (s *Store) Begin(runID string) (string, error) {
 }
 
 // Finalize's caller MUST already have verified process-tree drainage. A marker
-// outside the child's work folder durably records that permission. Publication
-// errors leave uncertainty protected until a later store owner reconciles disk.
+// outside the child's work folder durably records that permission. Failures before
+// publication clean drained work; an attempted publication stays protected until
+// both parent directories are synced or a later store owner reconciles disk.
 func (s *Store) Finalize(ctx context.Context, runID string, captures []synthetic.Capture) (_ []synthetic.Artifact, retErr error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -211,6 +225,15 @@ func (s *Store) Finalize(ctx context.Context, runID string, captures []synthetic
 	if err := syncDir(s.root, "drained"); err != nil {
 		return nil, err
 	}
+	delete(s.uncertain, runID)
+	defer func() {
+		if retErr != nil && !s.uncertain[runID] {
+			if err := s.cleanupDrained(runID); err != nil {
+				s.stats.CleanupErrors++
+				retErr = errors.Join(retErr, err)
+			}
+		}
+	}()
 	stage := "staging/" + runID
 	if err := s.root.Mkdir(stage, 0700); err != nil {
 		return nil, err
@@ -243,6 +266,13 @@ func (s *Store) Finalize(ctx context.Context, runID string, captures []synthetic
 		if err != nil {
 			return nil, fmt.Errorf("%w: %v", ErrInvalidCapture, err)
 		}
+		info, err := source.Stat()
+		if err != nil {
+			return nil, errors.Join(err, source.Close())
+		}
+		if info.Size() > FetchMaxBytes {
+			return nil, errors.Join(ErrTooLarge, source.Close())
+		}
 		if capture.Kind == "screenshot" {
 			var header [8]byte
 			_, err = io.ReadFull(source, header[:])
@@ -263,7 +293,12 @@ func (s *Store) Finalize(ctx context.Context, runID string, captures []synthetic
 			return nil, err
 		}
 		hash := sha256.New()
-		count, copyErr := io.Copy(io.MultiWriter(dest, hash), &contextReader{ctx: ctx, r: source})
+		// Published captures must be fetchable. Bound the copy too, even if the
+		// source grows after Stat, rather than trusting the initial size alone.
+		count, copyErr := io.Copy(io.MultiWriter(dest, hash), io.LimitReader(&contextReader{ctx: ctx, r: source}, FetchMaxBytes+1))
+		if count > FetchMaxBytes {
+			copyErr = errors.Join(copyErr, ErrTooLarge)
+		}
 		closeErr := errors.Join(dest.Sync(), dest.Close(), source.Close())
 		if err = errors.Join(copyErr, closeErr); err != nil {
 			return nil, err
@@ -280,6 +315,7 @@ func (s *Store) Finalize(ctx context.Context, runID string, captures []synthetic
 	if err = syncDir(s.root, stage); err != nil {
 		return nil, err
 	}
+	s.uncertain[runID] = true
 	if err = s.root.Rename(stage, "runs/"+runID); err != nil {
 		return nil, err
 	}
@@ -290,7 +326,6 @@ func (s *Store) Finalize(ctx context.Context, runID string, captures []synthetic
 	// Work includes scripts, browser profiles and any unselected attachments.
 	if err = s.cleanupDrained(runID); err != nil {
 		s.stats.CleanupErrors++
-		return m.Artifacts, err
 	}
 	return m.Artifacts, nil
 }
@@ -542,6 +577,24 @@ func (s *Store) cleanupDrained(id string) error {
 	if string(raw) != "1\n" {
 		return fmt.Errorf("invalid drained marker")
 	}
+	if err := s.removeWorkAlias(id); err != nil {
+		return err
+	}
+	for _, dir := range []string{"work", "staging"} {
+		if err := s.root.RemoveAll(dir + "/" + id); err != nil {
+			return err
+		}
+		if err := syncDir(s.root, dir); err != nil {
+			return err
+		}
+	}
+	if err := s.root.Remove("drained/" + id); err != nil {
+		return err
+	}
+	return syncDir(s.root, "drained")
+}
+
+func (s *Store) removeWorkAlias(id string) error {
 	alias := workAlias(id)
 	target, linkErr := os.Readlink(alias)
 	if linkErr == nil {
@@ -557,18 +610,7 @@ func (s *Store) cleanupDrained(id string) error {
 	} else if !errors.Is(linkErr, fs.ErrNotExist) {
 		return linkErr
 	}
-	for _, dir := range []string{"work", "staging"} {
-		if err := s.root.RemoveAll(dir + "/" + id); err != nil {
-			return err
-		}
-		if err := syncDir(s.root, dir); err != nil {
-			return err
-		}
-	}
-	if err := s.root.Remove("drained/" + id); err != nil {
-		return err
-	}
-	return syncDir(s.root, "drained")
+	return nil
 }
 
 func (s *Store) refresh() error {

@@ -69,19 +69,20 @@ func TestInitValidation(t *testing.T) {
 		change func(*Collector)
 		valid  bool
 	}{
-		"https":             {func(*Collector) {}, true},
-		"http":              {func(c *Collector) { c.URL = "http://127.0.0.1:8000/" }, true},
-		"empty":             {func(c *Collector) { c.URL = "" }, false},
-		"relative":          {func(c *Collector) { c.URL = "/home" }, false},
-		"protocol relative": {func(c *Collector) { c.URL = "//example.org" }, false},
-		"credentials":       {func(c *Collector) { c.URL = "https://user:pass@example.org" }, false},
-		"username only":     {func(c *Collector) { c.URL = "https://user@example.org" }, false},
-		"file scheme":       {func(c *Collector) { c.URL = "file:///tmp/index.html" }, false},
-		"empty host":        {func(c *Collector) { c.URL = "http://:80" }, false},
-		"invalid":           {func(c *Collector) { c.URL = "https://bad host/" }, false},
-		"missing name":      {func(c *Collector) { c.Name = "" }, false},
-		"zero interval":     {func(c *Collector) { c.UpdateEvery = 0 }, false},
-		"zero timeout":      {func(c *Collector) { c.Timeout = 0 }, false},
+		"https":                  {func(*Collector) {}, true},
+		"http":                   {func(c *Collector) { c.URL = "http://127.0.0.1:8000/" }, true},
+		"empty":                  {func(c *Collector) { c.URL = "" }, false},
+		"relative":               {func(c *Collector) { c.URL = "/home" }, false},
+		"protocol relative":      {func(c *Collector) { c.URL = "//example.org" }, false},
+		"credentials":            {func(c *Collector) { c.URL = "https://user:pass@example.org" }, false},
+		"username only":          {func(c *Collector) { c.URL = "https://user@example.org" }, false},
+		"file scheme":            {func(c *Collector) { c.URL = "file:///tmp/index.html" }, false},
+		"empty host":             {func(c *Collector) { c.URL = "http://:80" }, false},
+		"invalid":                {func(c *Collector) { c.URL = "https://bad host/" }, false},
+		"missing name":           {func(c *Collector) { c.Name = "" }, false},
+		"zero interval":          {func(c *Collector) { c.UpdateEvery = 0 }, false},
+		"submillisecond timeout": {func(c *Collector) { c.Timeout = 999999 }, false},
+		"zero timeout":           {func(c *Collector) { c.Timeout = 0 }, false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := configured()

@@ -29,29 +29,40 @@ type Retention struct {
 }
 
 func (r *Retention) Run(ctx context.Context) {
+	var historyDue, artifactsDue time.Time
 	for {
 		if ctx.Err() != nil {
 			return
 		}
+		historyPolicy, artifactPolicy := r.policy, r.artifactPolicy
 		r.reloadPolicy()
-		delay := time.Hour
-		if err := r.store.EnforceHistoryRetention(ctx, r.policy.Days, r.policy.MaxBytes); err != nil &&
-			ctx.Err() == nil {
-			r.log.Warningf("DEM history retention failed: %v", err)
-			// A partial close/reopen can suspend writes; retry on the history flush cadence.
-			delay = 5 * time.Second
+		now := time.Now()
+		if !now.Before(historyDue) || r.policy != historyPolicy {
+			delay := time.Hour
+			if err := r.store.EnforceHistoryRetention(ctx, r.policy.Days, r.policy.MaxBytes); err != nil && ctx.Err() == nil {
+				r.log.Warningf("DEM history retention failed: %v", err)
+				// A partial close/reopen can suspend writes; retry on the history flush cadence.
+				delay = 5 * time.Second
+			}
+			historyDue = time.Now().Add(delay)
 		}
-		if r.artifactStore != nil {
+		if r.artifactStore != nil && (!now.Before(artifactsDue) || r.artifactPolicy != artifactPolicy) {
+			delay := time.Hour
 			stats, err := r.artifactStore.Enforce(ctx, r.artifactPolicy.Days, r.artifactPolicy.MaxBytes)
 			if err != nil && ctx.Err() == nil {
 				r.log.Warningf("DEM artifact retention failed: %v", err)
 				delay = 5 * time.Second
 			}
-			if stats.ProtectedBytes > r.artifactPolicy.MaxBytes {
+			if err == nil && stats.ProtectedBytes > r.artifactPolicy.MaxBytes {
 				r.log.Warningf("DEM protected run files exceed artifact budget: %d bytes", stats.ProtectedBytes)
 			}
+			artifactsDue = time.Now().Add(delay)
 		}
-		timer := time.NewTimer(delay)
+		next := historyDue
+		if r.artifactStore != nil && artifactsDue.Before(next) {
+			next = artifactsDue
+		}
+		timer := time.NewTimer(time.Until(next))
 		select {
 		case <-ctx.Done():
 			timer.Stop()

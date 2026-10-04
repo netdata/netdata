@@ -14,7 +14,8 @@
         "title": "URL",
         "description": "Absolute HTTP or HTTPS URL of the page to audit. Embedded credentials are not accepted.",
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^\\s/:@?#][^\\s/@?#]*(?:[/?#][^\\r\\n]*)?$"
       },
       "save_report": {
         "title": "Save HTML report",
@@ -34,7 +35,7 @@
         "description": "Browser attempt timeout, in seconds. Waiting for another browser attempt is excluded.",
         "type": "number",
         "default": 180,
-        "exclusiveMinimum": 0
+        "minimum": 0.001
       }
     },
     "required": [

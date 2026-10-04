@@ -3,6 +3,7 @@ package runner
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -114,4 +115,22 @@ func TestExactStreamOverlapUnicodeAndShortValues(t *testing.T) {
 func TestStructuredPEMRemainsRedactedWhenUpstreamClipsEnd(t *testing.T) {
 	message := "context -----BEGIN PRIVATE KEY-----\n" + strings.Repeat("private-key-material", 200) + "\n-----END PRIVATE KEY-----"
 	assert.Equal(t, "context [REDACTED]", newRedactor(nil).text(clip(message)))
+}
+
+func BenchmarkDiagnosticLongSecretCarry(b *testing.B) {
+	for _, size := range []int{64 << 10, 1 << 20, 4 << 20} {
+		b.Run(fmt.Sprint(size), func(b *testing.B) {
+			secret := strings.Repeat("s", size)
+			input := strings.Repeat("x", size) + "\n"
+			r := newRedactor(map[string]string{"DEM_SECRET_TOKEN": secret})
+			b.ReportAllocs()
+			b.SetBytes(int64(len(input)))
+			b.ResetTimer()
+			for b.Loop() {
+				d := newDiagnosticStream(r, func(string) {})
+				d.write(input)
+				d.end()
+			}
+		})
+	}
 }

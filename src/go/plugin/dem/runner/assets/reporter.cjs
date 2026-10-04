@@ -47,19 +47,20 @@ module.exports = class DEMReporter {
     const visit = steps => { for (const step of steps) { if (step.error) failureSteps.push(step); visit(step.steps || []); } };
     visit(result.steps || []);
     const phase = failureSteps.at(-1)?.category || 'test';
-    let launchError = false;
+    let launchOnly = result.errors.length > 0;
     for (const error of result.errors) {
       const original = String(error.message || error.value || error);
       const message = text(original);
       // Classify original evidence; redaction must not change monitoring truth.
       if (/browserType\.launch(?:PersistentContext)?:/.test(original)) {
         this.executionError = true;
-        launchError = true;
+      } else {
+        launchOnly = false;
       }
       if (!this.errors.length) this.errors.push(message);
       this.emit('error', {test_id: test.id, title: text(test.title), phase: text(phase), status: result.status, expected_status: test.expectedStatus, message});
     }
-    if (result.status === 'failed' && test.expectedStatus !== 'failed' && !launchError) this.confirmedFailure = true;
+    if (result.status === 'failed' && test.expectedStatus !== 'failed' && !launchOnly) this.confirmedFailure = true;
     this.emit('test', {test_id: test.id, title: text(test.title), phase: 'end', status: result.status, expected_status: test.expectedStatus, duration_ms: result.duration});
     if (this.options.capture && ['failed', 'timedOut'].includes(result.status)) {
       for (const attachment of result.attachments) {

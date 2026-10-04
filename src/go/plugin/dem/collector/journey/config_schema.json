@@ -13,7 +13,8 @@
       "script": {
         "title": "Script",
         "description": "Inline Playwright Test JavaScript or TypeScript source. Leave empty when using Script path.",
-        "type": "string"
+        "type": "string",
+        "pattern": "^$|\\S"
       },
       "script_path": {
         "title": "Script path",
@@ -67,7 +68,7 @@
         "description": "Browser attempt timeout, in seconds. Waiting for another browser attempt is excluded.",
         "type": "number",
         "default": 120,
-        "exclusiveMinimum": 0
+        "minimum": 0.001
       }
     },
     "required": [
