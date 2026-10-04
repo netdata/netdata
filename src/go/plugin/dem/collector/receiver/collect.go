@@ -8,7 +8,7 @@ import (
 
 func (c *Collector) Collect(context.Context) error {
 	state := "unavailable"
-	if c.hub.Availability().Serving {
+	if c.registry.Availability().Serving {
 		state = "serving"
 	}
 	c.metrics.state.Enable(state)

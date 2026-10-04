@@ -10,7 +10,7 @@ import (
 
 func (c *Collector) Collect(context.Context) error {
 	m := c.metrics.meter
-	available := c.deps.Hub.Availability().Serving
+	available := c.deps.Registry.Availability().Serving
 	state := "unavailable"
 	if available {
 		state = "available"

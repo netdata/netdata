@@ -14,8 +14,8 @@ func (c *Collector) Init(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if c.deps.Executor == nil || c.deps.Hub == nil {
-		return errors.New("missing synthetic executor or observation hub")
+	if c.deps.Executor == nil || c.deps.Registry == nil {
+		return errors.New("missing synthetic executor or observation registry")
 	}
 	if c.UpdateEvery <= 0 {
 		return errors.New("update_every must be positive")

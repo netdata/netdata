@@ -14,11 +14,13 @@ import (
 	"testing"
 	"time"
 
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
+	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
+	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/stretchr/testify/assert"
@@ -92,13 +94,13 @@ func tickUntil(t *testing.T, job *jobruntime.JobV2, out *output, needle string) 
 
 // Receiver reload must preserve an independent site's measurements and history.
 func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
-	hub := runtimehub.New()
-	db, err := store.Open(context.Background(), "")
+	hub := rumregistry.New()
+	db, err := demjournal.Open(context.Background(), "")
 	require.NoError(t, err)
 	defer db.Close()
 	site := rum.New(rum.Dependencies{
-		Hub:     hub,
-		History: db,
+		Registry: hub,
+		History:  rumhistory.NewStore(db),
 	})
 	site.Name = "shop"
 	site.DisplayName = "Shop"
@@ -154,7 +156,7 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 	send("/checkout")
 	stopNext()
 	stopSite()
-	rows, err := db.QueryRumSessions(context.Background(), "shop", 0, time.Now().Unix()+10, 10)
+	rows, err := rumhistory.NewStore(db).QuerySessions(context.Background(), "shop", 0, time.Now().Unix()+10, 10)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.EqualValues(t, 2, rows[0].Pageviews)
@@ -163,12 +165,12 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 }
 
 func TestCancelledOTLPPreparationHonorsCaller(t *testing.T) {
-	db, err := store.Open(context.Background(), "")
+	db, err := demjournal.Open(context.Background(), "")
 	require.NoError(t, err)
 	defer db.Close()
 	site := rum.New(rum.Dependencies{
-		Hub:     runtimehub.New(),
-		History: db,
+		Registry: rumregistry.New(),
+		History:  rumhistory.NewStore(db),
 	})
 	site.Name = "shop"
 	site.AllowedOrigins = []string{"https://example.org"}
@@ -180,14 +182,14 @@ func TestCancelledOTLPPreparationHonorsCaller(t *testing.T) {
 
 func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 	ctx := context.Background()
-	db, err := store.Open(ctx, "")
+	db, err := demjournal.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	hub := runtimehub.New()
+	hub := rumregistry.New()
 	startSite := func(name string) func() {
 		c := rum.New(rum.Dependencies{
-			Hub:     hub,
-			History: db,
+			Registry: hub,
+			History:  rumhistory.NewStore(db),
 		})
 		c.Name, c.AllowedOrigins, c.OTLP.Enabled = name, []string{"https://example.org"}, "no"
 		_, _, stop := startJob(t, "rum", name, c)
@@ -243,7 +245,7 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 	stopBeta()
 	stopNext()
 	for name, want := range map[string]uint64{"alpha": 1, "beta": 2} {
-		rows, err := db.QueryRumSessions(ctx, name, 0, time.Now().Unix()+10, 10)
+		rows, err := rumhistory.NewStore(db).QuerySessions(ctx, name, 0, time.Now().Unix()+10, 10)
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
 		require.Equal(t, "same-session", rows[0].SessionID)
@@ -252,11 +254,14 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 }
 
 func TestOversizedChunkedUploadRespondsPromptlyAndDisablesKeepAlive(t *testing.T) {
-	hub := runtimehub.New()
-	db, err := store.Open(context.Background(), "")
+	hub := rumregistry.New()
+	db, err := demjournal.Open(context.Background(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	site := rum.New(rum.Dependencies{Hub: hub, History: db})
+	site := rum.New(rum.Dependencies{
+		Registry: hub,
+		History:  rumhistory.NewStore(db),
+	})
 	site.Name = "shop"
 	site.AllowedOrigins = []string{"https://example.org"}
 	site.OTLP.Enabled = "no"
@@ -279,7 +284,9 @@ func TestOversizedChunkedUploadRespondsPromptlyAndDisablesKeepAlive(t *testing.T
 			}
 			_, err = io.WriteString(conn, request)
 			require.NoError(t, err)
-			response, err := http.ReadResponse(bufio.NewReader(conn), &http.Request{Method: http.MethodPost})
+			response, err := http.ReadResponse(bufio.NewReader(conn), &http.Request{
+				Method: http.MethodPost,
+			})
 			require.NoError(t, err, "oversize response must not wait for the terminating chunk")
 			defer response.Body.Close()
 			assert.Equal(t, http.StatusRequestEntityTooLarge, response.StatusCode)

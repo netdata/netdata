@@ -3971,13 +3971,13 @@ if(ENABLE_PLUGIN_DEM)
     install(PROGRAMS ${CMAKE_BINARY_DIR}/${DEM_PLUGIN_BIN}
             COMPONENT plugin-dem DESTINATION usr/libexec/netdata/plugins.d)
     install(FILES
-            src/go/plugin/dem/runner/assets/run.mjs
-            src/go/plugin/dem/runner/assets/reporter.cjs
-            src/go/plugin/dem/runner/assets/protocol.cjs
-            src/go/plugin/dem/runner/assets/lighthouse.mjs
-            src/go/plugin/dem/runner/assets/manifest.json
-            src/go/plugin/dem/runner/assets/package.json
-            src/go/plugin/dem/runner/assets/package-lock.json
+            src/go/plugin/dem/synthetic/runner/assets/run.mjs
+            src/go/plugin/dem/synthetic/runner/assets/reporter.cjs
+            src/go/plugin/dem/synthetic/runner/assets/protocol.cjs
+            src/go/plugin/dem/synthetic/runner/assets/lighthouse.mjs
+            src/go/plugin/dem/synthetic/runner/assets/manifest.json
+            src/go/plugin/dem/synthetic/runner/assets/package.json
+            src/go/plugin/dem/synthetic/runner/assets/package-lock.json
             COMPONENT plugin-dem DESTINATION usr/libexec/netdata/plugins.d/dem)
     install(FILES src/go/plugin/dem/config/dem.conf
             COMPONENT plugin-dem DESTINATION usr/lib/netdata/conf.d)

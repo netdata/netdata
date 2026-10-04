@@ -12,7 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/geoip"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
+	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
@@ -29,7 +29,7 @@ type Config struct {
 type Collector struct {
 	collectorapi.Base
 	Config    `yaml:",inline" json:""`
-	hub       *runtimehub.Hub
+	registry  *rumregistry.Registry
 	store     metrix.CollectorStore
 	metrics   collectorMetrics
 	tlsConfig *tls.Config
@@ -37,19 +37,19 @@ type Collector struct {
 	requests  [3]atomic.Uint64
 }
 
-func Creator(hub *runtimehub.Hub) collectorapi.Creator {
+func Creator(registry *rumregistry.Registry) collectorapi.Creator {
 	return collectorapi.Creator{
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
 		InstancePolicy:  collectorapi.InstancePolicySingle,
-		CreateV2:        func() collectorapi.CollectorV2 { return New(hub) },
+		CreateV2:        func() collectorapi.CollectorV2 { return New(registry) },
 		Config:          func() any { return &Config{} },
 		JobConfigSchema: schema,
 		StoreFirst:      true,
 	}
 }
-func New(hub *runtimehub.Hub) *Collector {
+func New(registry *rumregistry.Registry) *Collector {
 	c := &Collector{
 		Config: Config{
 			Receiver: config.Receiver{
@@ -61,8 +61,8 @@ func New(hub *runtimehub.Hub) *Collector {
 				},
 			},
 		},
-		hub:   hub,
-		store: metrix.NewCollectorStore(),
+		registry: registry,
+		store:    metrix.NewCollectorStore(),
 	}
 	c.metrics = newCollectorMetrics(c.store.Write().SnapshotMeter(""))
 	return c
@@ -71,7 +71,7 @@ func (c *Collector) Configuration() any                 { return c.Config }
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 func (c *Collector) ChartTemplateYAML() string          { return charts }
 func (c *Collector) Check(context.Context) error {
-	if c.hub == nil {
+	if c.registry == nil {
 		return errors.New("missing runtime routes")
 	}
 	return nil

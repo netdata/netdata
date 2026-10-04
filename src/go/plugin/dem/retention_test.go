@@ -14,14 +14,15 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/artifacts"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
+	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type observedRetention struct {
-	*store.Store
+	*demjournal.Store
 	swept chan error
 }
 
@@ -33,11 +34,11 @@ func (r *observedRetention) EnforceHistoryRetention(ctx context.Context, days in
 
 func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 	ctx := context.Background()
-	st, err := store.Open(ctx, "")
+	st, err := demjournal.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	now := time.Now().Unix()
-	_, err = st.AppendRumEvent(ctx, store.RumEventRecord{
+	_, err = rumhistory.NewStore(st).AppendEvent(ctx, rumhistory.EventRecord{
 		Site:      "disabled",
 		SessionID: "recent",
 		TSUnixUS:  now * 1e6,
@@ -75,7 +76,7 @@ func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 		t.Fatal("retention did not stop")
 	}
 	// The command still owns the journal while native site jobs drain.
-	rows, err := st.QueryRumSessions(ctx, "", 0, now+1, 2000)
+	rows, err := rumhistory.NewStore(st).QuerySessions(ctx, "", 0, now+1, 2000)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "recent", rows[0].SessionID)
@@ -181,12 +182,25 @@ func TestRetentionRetriesTransientFailureBeforeHourlySweep(t *testing.T) {
 type observedArtifactRetention struct{ sweeps chan HistoryConfig }
 
 func (r *observedArtifactRetention) Enforce(_ context.Context, days int, bytes int64) (artifacts.Stats, error) {
-	r.sweeps <- HistoryConfig{Days: days, MaxBytes: bytes}
+	r.sweeps <- HistoryConfig{
+		Days:     days,
+		MaxBytes: bytes,
+	}
 	return artifacts.Stats{}, nil
 }
 func TestArtifactSweepStillRunsWhenJournalSweepFails(t *testing.T) {
-	artifact := &observedArtifactRetention{sweeps: make(chan HistoryConfig, 1)}
-	service := &Retention{store: &transientRetention{calls: make(chan int, 1)}, policy: DefaultConfig().History, artifactStore: artifact, artifactPolicy: DefaultConfig().Artifacts, log: logger.New()}
+	artifact := &observedArtifactRetention{
+		sweeps: make(chan HistoryConfig, 1),
+	}
+	service := &Retention{
+		store: &transientRetention{
+			calls: make(chan int, 1),
+		},
+		policy:         DefaultConfig().History,
+		artifactStore:  artifact,
+		artifactPolicy: DefaultConfig().Artifacts,
+		log:            logger.New(),
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { defer close(done); service.Run(ctx) }()
@@ -261,7 +275,9 @@ func TestRetentionBudgetWarningRequiresSuccessfulSweep(t *testing.T) {
 				service := &Retention{
 					store: historyRetentionFunc(func(context.Context, int, int64) error { return nil }),
 					artifactStore: artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Stats, error) {
-						stats := artifacts.Stats{ProtectedBytes: DefaultConfig().Artifacts.MaxBytes + 1}
+						stats := artifacts.Stats{
+							ProtectedBytes: DefaultConfig().Artifacts.MaxBytes + 1,
+						}
 						if failed {
 							return stats, errors.New("artifact sweep failed")
 						}

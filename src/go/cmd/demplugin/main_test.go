@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
+	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +15,7 @@ func TestDebugHistoryLeavesLiveDirectoryUntouched(t *testing.T) {
 	dir := t.TempDir()
 	path, err := historyPath(dir, true)
 	require.NoError(t, err)
-	history, err := store.Open(context.Background(), path)
+	history, err := demjournal.Open(context.Background(), path)
 	require.NoError(t, err)
 	require.NoError(t, history.Close())
 	entries, err := os.ReadDir(dir)

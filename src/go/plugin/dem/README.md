@@ -2,7 +2,7 @@
 
 `dem.plugin` runs native Netdata jobs for browser real user monitoring, Playwright journeys and desktop Lighthouse audits. It is experimental and built explicitly with
 `ENABLE_PLUGIN_DEM=ON` (source installer: `--enable-plugin-dem`). The integration metadata beside each collector is the
-source of operator configuration documentation.
+source of operator configuration documentation. The [ownership guide](ARCHITECTURE.md) maps packages and runtime lifetimes.
 
 The stock configuration starts one loopback receiver and no sites. Configuration follows the normal Go Agent layout:
 `dem.conf` for plugin policy and `dem/receiver.conf` / `dem/rum.conf` for collectors. The receiver is a canonical single

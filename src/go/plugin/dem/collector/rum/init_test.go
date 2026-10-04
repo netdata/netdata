@@ -5,20 +5,25 @@ import (
 	"context"
 	"testing"
 
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
+	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestInitRejectsURLsWithoutHostname(t *testing.T) {
-	db, err := store.Open(context.Background(), "")
+	db, err := demjournal.Open(context.Background(), "")
 	require.NoError(t, err)
 	defer db.Close()
 	for _, field := range []string{"public_url", "allowed_origins"} {
 		t.Run(field, func(t *testing.T) {
-			c := rum.New(rum.Dependencies{Hub: runtimehub.New(), History: db})
+			c := rum.New(rum.Dependencies{
+				Registry: rumregistry.New(),
+				History:  rumhistory.NewStore(db),
+			})
 			c.Name = "shop"
 			c.AllowedOrigins = []string{"https://example.org"}
 			if field == "public_url" {
@@ -32,10 +37,13 @@ func TestInitRejectsURLsWithoutHostname(t *testing.T) {
 }
 
 func TestCancelledPlaintextPreparationAndRun(t *testing.T) {
-	db, err := store.Open(context.Background(), "")
+	db, err := demjournal.Open(context.Background(), "")
 	require.NoError(t, err)
 	defer db.Close()
-	c := rum.New(rum.Dependencies{Hub: runtimehub.New(), History: db})
+	c := rum.New(rum.Dependencies{
+		Registry: rumregistry.New(),
+		History:  rumhistory.NewStore(db),
+	})
 	c.Name = "shop"
 	c.AllowedOrigins = []string{"https://example.org"}
 	ctx, cancel := context.WithCancel(context.Background())

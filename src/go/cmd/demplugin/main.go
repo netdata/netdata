@@ -24,9 +24,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/artifacts"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/runner"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
+	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
+	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	"go.uber.org/automaxprocs/maxprocs"
 )
 
@@ -76,7 +77,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "initializing DEM history: %v\n", err)
 		os.Exit(1)
 	}
-	history, err := store.Open(context.Background(), path)
+	history, err := demjournal.Open(context.Background(), path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "opening DEM history: %v\n", err)
 		os.Exit(1)
@@ -104,7 +105,7 @@ func main() {
 		os.Exit(1)
 	}
 	cfg.Runtime.AssetsPath = filepath.Join(executable.Directory, "dem")
-	executor := runner.New(cfg.Runtime, history, captures)
+	executor := runner.New(cfg.Runtime, synthetichistory.NewStore(history), captures)
 	components := dem.New(
 		dem.Dependencies{
 			History:        history,

@@ -27,9 +27,9 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
+	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/secrets"
 )
 
 var exportLog = logger.New()
@@ -65,7 +65,7 @@ type Exporter struct {
 	conn             *grpc.ClientConn
 	client           collogspb.LogsServiceClient
 	counters         Counters
-	redactor         *secrets.Redactor
+	redactor         *redact.Redactor
 	authMD           metadata.MD
 
 	disabled bool // otel.enabled == "no": events have nowhere to go
@@ -87,7 +87,7 @@ func New(
 	siteName string,
 	traceDestination string,
 	counters Counters,
-	redactor *secrets.Redactor,
+	redactor *redact.Redactor,
 ) (*Exporter, error) {
 	e := &Exporter{
 		siteName:         siteName,

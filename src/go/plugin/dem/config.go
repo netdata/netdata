@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/runner"
-
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	"gopkg.in/yaml.v2"
 )
 
@@ -23,8 +22,13 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		Artifacts: HistoryConfig{Days: 7, MaxBytes: 2 << 30},
-		Runtime:   runner.Config{NodePath: "/usr/bin/node"},
+		Artifacts: HistoryConfig{
+			Days:     7,
+			MaxBytes: 2 << 30,
+		},
+		Runtime: runner.Config{
+			NodePath: "/usr/bin/node",
+		},
 		History: HistoryConfig{
 			Days:     30,
 			MaxBytes: 1 << 30,

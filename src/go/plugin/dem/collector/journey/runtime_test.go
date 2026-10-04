@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -36,10 +37,10 @@ func (e executor) Execute(ctx context.Context, r model.Request, state func(strin
 	return e.execute(ctx, r, state)
 }
 func ptr(v float64) *float64 { return &v }
-func newJourney(e model.Executor, hub *model.Hub) *journey.Collector {
+func newJourney(e journey.Executor, hub *syntheticregistry.Registry) *journey.Collector {
 	c := journey.New(journey.Dependencies{
 		Executor: e,
-		Hub:      hub,
+		Registry: hub,
 	})
 	c.Name = "checkout"
 	c.Script = "import { test } from '@playwright/test'; test('checkout', async () => {});"
@@ -79,7 +80,7 @@ func start(t *testing.T, c interface {
 }
 
 func TestPreparationDoesNotRunOrRegister(t *testing.T) {
-	hub := model.NewHub()
+	hub := syntheticregistry.New()
 	calls := 0
 	c := newJourney(executor{
 		check: func(ctx context.Context, kind model.Kind) error {
@@ -105,7 +106,7 @@ func TestPreparationDoesNotRunOrRegister(t *testing.T) {
 }
 
 func TestActiveRegistrationAndReplacement(t *testing.T) {
-	hub := model.NewHub()
+	hub := syntheticregistry.New()
 	deps := executor{}
 	current := newJourney(deps, hub)
 	stop := start(t, current)
@@ -133,7 +134,7 @@ func TestOutcomesAndMissingObservations(t *testing.T) {
 	// terminal result and its diagnosis rather than infer success from counts.
 	for _, outcome := range []model.Outcome{model.Success, model.Failed, model.Timeout, model.Inconclusive, model.Error, model.Cancelled, model.Unknown} {
 		t.Run(string(outcome), func(t *testing.T) {
-			hub := model.NewHub()
+			hub := syntheticregistry.New()
 			evidence := model.Run{
 				ID:          "run-1",
 				JobID:       "journey:checkout",
@@ -184,7 +185,7 @@ func TestOutcomesAndMissingObservations(t *testing.T) {
 }
 
 func TestJourneyEvidenceAndSecretRequest(t *testing.T) {
-	hub := model.NewHub()
+	hub := syntheticregistry.New()
 	c := newJourney(executor{
 		execute: func(ctx context.Context, req model.Request, state func(string)) model.Execution {
 			assert.Equal(t, map[string]string{"DEM_SECRET_LOGIN": "synthetic-password"}, req.Secrets)
@@ -245,7 +246,7 @@ func (o *output) Write(p []byte) (int, error) {
 func (o *output) String() string { o.mu.Lock(); defer o.mu.Unlock(); return o.buf.String() }
 
 func TestNativeJobExecutionCancellationAndOutput(t *testing.T) {
-	hub := model.NewHub()
+	hub := syntheticregistry.New()
 	entered := make(chan struct{})
 	cancelled := make(chan struct{})
 	var mu sync.Mutex
@@ -353,7 +354,7 @@ func TestNativeJobExecutionCancellationAndOutput(t *testing.T) {
 }
 
 func TestUnverifiedCompletionFailsRuntime(t *testing.T) {
-	hub := model.NewHub()
+	hub := syntheticregistry.New()
 	c := newJourney(executor{
 		execute: func(context.Context, model.Request, func(string)) model.Execution {
 			return model.Execution{
@@ -379,14 +380,14 @@ func TestUnverifiedCompletionFailsRuntime(t *testing.T) {
 	assert.Empty(t, hub.Snapshot(time.Now()))
 }
 
-var _ model.Executor = executor{}
+var _ journey.Executor = executor{}
 var _ collectorapi.CollectorV2 = (*journey.Collector)(nil)
 var _ collectorapi.CollectorV2Runner = (*journey.Collector)(nil)
 
 // Run cancellation can retire the registration while Execute is still joining
 // readers. Late callbacks belong to that retired generation only.
 func TestLateCallbacksCannotChangeSuccessor(t *testing.T) {
-	hub := model.NewHub()
+	hub := syntheticregistry.New()
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	var once sync.Once
@@ -437,7 +438,7 @@ func TestCollectionRequiresActivationAndHonorsCancellation(t *testing.T) {
 			t.Error("inactive or cancelled collection executed")
 			return model.Execution{}
 		},
-	}, model.NewHub())
+	}, syntheticregistry.New())
 	require.EqualError(t, c.Collect(context.Background()), "synthetic job is not active")
 	start(t, c)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -465,7 +466,7 @@ func TestJourneyZeroCountsAndLaterGaps(t *testing.T) {
 				Run:     run,
 			}
 		},
-	}, model.NewHub())
+	}, syntheticregistry.New())
 	start(t, c)
 	got, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
 	require.NoError(t, err)
@@ -493,7 +494,7 @@ func TestJourneyZeroCountsAndLaterGaps(t *testing.T) {
 // Cancellation can retire Run before the executor proves whether it drained.
 // Collect must still return the ownership error without waiting for a Run reader.
 func TestUnverifiedCompletionAfterRunCancellation(t *testing.T) {
-	hub := model.NewHub()
+	hub := syntheticregistry.New()
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	var once sync.Once
@@ -503,7 +504,12 @@ func TestUnverifiedCompletionAfterRunCancellation(t *testing.T) {
 		execute: func(context.Context, model.Request, func(string)) model.Execution {
 			close(entered)
 			<-release
-			return model.Execution{Run: model.Run{Outcome: model.Error}, Drained: false}
+			return model.Execution{
+				Run: model.Run{
+					Outcome: model.Error,
+				},
+				Drained: false,
+			}
 		},
 	}, hub)
 	stop := start(t, c)
@@ -527,10 +533,16 @@ func TestUnverifiedCompletionAfterRunCancellation(t *testing.T) {
 }
 
 func TestUnverifiedExecutionDoesNotPublishLatest(t *testing.T) {
-	hub := model.NewHub()
+	hub := syntheticregistry.New()
 	c := newJourney(executor{
 		execute: func(context.Context, model.Request, func(string)) model.Execution {
-			return model.Execution{Run: model.Run{Outcome: model.Error, StartedUS: time.Now().UnixMicro()}, Drained: false}
+			return model.Execution{
+				Run: model.Run{
+					Outcome:   model.Error,
+					StartedUS: time.Now().UnixMicro(),
+				},
+				Drained: false,
+			}
 		},
 	}, hub)
 	require.NoError(t, c.Init(context.Background()))

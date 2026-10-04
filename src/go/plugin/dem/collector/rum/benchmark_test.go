@@ -8,11 +8,13 @@ import (
 	"testing"
 	"time"
 
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
+	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
+	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,17 +28,17 @@ func BenchmarkCollect(b *testing.B) {
 		}
 		b.Run(name, func(b *testing.B) {
 			ctx := context.Background()
-			db, err := store.Open(ctx, "")
+			db, err := demjournal.Open(ctx, "")
 			require.NoError(b, err)
 			defer db.Close()
-			hub := runtimehub.New()
-			revoke := hub.PublishReceiver(runtimehub.Availability{
+			hub := rumregistry.New()
+			revoke := hub.PublishReceiver(rumregistry.Availability{
 				Serving: true,
 			})
 			defer revoke()
 			c := New(Dependencies{
-				Hub:     hub,
-				History: db,
+				Registry: hub,
+				History:  rumhistory.NewStore(db),
 			})
 			require.NoError(
 				b,
@@ -82,7 +84,7 @@ func BenchmarkCollect(b *testing.B) {
 }
 
 func BenchmarkReceiverCollect(b *testing.B) {
-	c := receiver.New(runtimehub.New())
+	c := receiver.New(rumregistry.New())
 	managed, ok := metrix.AsCycleManagedStore(c.MetricStore())
 	require.True(b, ok)
 	cycle := managed.CycleController()
