@@ -166,6 +166,12 @@ observations; check every early return against the table. Comparisons follow the
 
 ## Lifecycle Entry Points
 
+When a migration changes the ownership unit, trace subordinate constructors, workers and read APIs as well as the
+native collector. A per-job owner SHOULD construct single-entity state directly; remove obsolete reconciliation,
+entity selectors and per-entity bookkeeping from its private components. Retain cross-entity routing and aggregation
+only at owners that still serve multiple jobs, and retain identity in self-contained transport/history records.
+Validate isolation using independently constructed jobs, including replacement and retirement of one while another runs.
+
 **When:** designing `Init`, `Check`, `Collect`, `Cleanup`, and any `Run`. **Do:** review every entry point, including
 partial initialization, DynCfg `test`, autodetection, reload, and stop, not only `Collect` followed by a clean
 shutdown. Decide, per entry point, what it may do, and record it; the V2 skill's Core Style owns the resulting rules
