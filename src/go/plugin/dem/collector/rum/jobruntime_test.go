@@ -251,7 +251,7 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 	}
 }
 
-func TestOversizedChunkedUploadClosesConnectionPromptly(t *testing.T) {
+func TestOversizedChunkedUploadRespondsPromptlyAndDisablesKeepAlive(t *testing.T) {
 	hub := runtimehub.New()
 	db, err := store.Open(context.Background(), "")
 	require.NoError(t, err)
