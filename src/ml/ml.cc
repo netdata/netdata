@@ -1642,12 +1642,17 @@ time_t ml_queue_dimension_pass_key(const ml_request_create_new_model_t &req, voi
         return 0;
 
     // the tier spinlock keeps the collect handle alive across the read (rrddim_free finalizes it under the
-    // same lock); the handle's fields are read atomically (see storage_engine_store_page_close_time_s())
+    // same lock); the handle's fields are read atomically (see storage_engine_store_page_time_to_close_s())
     spinlock_lock(&rd->tiers[0].spinlock);
-    time_t close_s = storage_engine_store_page_close_time_s(rd->tiers[0].sch);
+    time_t to_close_s = storage_engine_store_page_time_to_close_s(rd->tiers[0].sch);
     spinlock_unlock(&rd->tiers[0].spinlock);
 
-    return close_s;
+    if (to_close_s < 0)
+        return 0;
+
+    // the local time the page will complete: the data it still needs arrives at the collection rate from now on,
+    // however far this dimension's timestamps lag the local clock (a child behind its parent)
+    return now_realtime_sec() + to_close_s;
 }
 
 static enum ml_worker_result ml_worker_create_new_model(ml_worker_t *worker, ml_request_create_new_model_t req) {

@@ -285,27 +285,29 @@ static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *sch) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-time_t rrdeng_store_metric_page_close_time_s(STORAGE_COLLECT_HANDLE *sch);
+time_t rrdeng_store_metric_page_time_to_close_s(STORAGE_COLLECT_HANDLE *sch);
 
-// The time the dimension's current tier page will be complete, i.e. the time of the point that fills it and
-// makes it flush (start + (capacity - 1) * update_every), or 0 when there is no open page or the backend has
-// no pages. It is a capacity close: it is the flush time only while the dimension keeps collecting, and it is
-// in the past for a page left idle by a collection gap. The caller MUST hold rd->tiers[tier].spinlock so the
-// handle cannot be finalized under it; the fields themselves are read atomically, without the collector's
-// cooperation, so a page change racing the read yields a value that is off by one page - acceptable for the
-// ML training scheduler, its only user (see src/ml/ml_queue.h).
-static inline time_t storage_engine_store_page_close_time_s(STORAGE_COLLECT_HANDLE *sch) {
+// How many seconds of collected data the dimension's current tier page still needs before it is complete (the
+// distance from its last stored point to the point that fills it and makes it flush, start + (capacity - 1) *
+// update_every), or -1 when there is no open page or the backend has no pages. It is measured in the dimension's
+// own timestamps, so it does not depend on how far a child's data lags the local clock: while the dimension keeps
+// collecting, the page completes about that many seconds from now. A page left idle by a collection gap keeps the
+// value it had when collection stopped. The caller MUST hold rd->tiers[tier].spinlock so the handle cannot be
+// finalized under it; the fields themselves are read atomically, without the collector's cooperation, so a page
+// change racing the read yields a value that is off by one page or -1 - acceptable for the ML training scheduler,
+// its only user (see src/ml/ml_queue.h).
+static inline time_t storage_engine_store_page_time_to_close_s(STORAGE_COLLECT_HANDLE *sch) {
     if(unlikely(!sch))
-        return 0;
+        return -1;
 
     internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
     if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_store_metric_page_close_time_s(sch);
+        return rrdeng_store_metric_page_time_to_close_s(sch);
 #endif
 
-    return 0;
+    return -1;
 }
 
 // --------------------------------------------------------------------------------------------------------------------

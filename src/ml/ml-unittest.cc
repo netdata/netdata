@@ -1170,7 +1170,8 @@ static void test_dimension_lookup_info_short_machine_guid()
 //
 // The key function used by the workers resolves the dimension and reads its page close; here the dimension id
 // carries the key so the queue can be tested without a running RRD tree: "k:<seconds from now>", "k:none" (no
-// page), or "k:past" (an idle page whose close is already behind). "stop" makes the key function signal the queue, to test a stop request during the sort.
+// page), or "k:past" (a key earlier than the sort, which the queue must not treat as missing). "stop" makes the key
+// function signal the queue, to test a stop request during the sort.
 
 static ml_queue_item_t ml_test_create_item(const char *dim_id)
 {
@@ -1219,7 +1220,7 @@ static void test_queue_pass_is_sorted_by_key()
     ml_queue_t *q = ml_queue_init();
     ml_queue_set_pass_key_fn(q, ml_test_pass_key, q);
 
-    // push order is deliberately not key order; two entries have no usable future close
+    // push order is deliberately not key order; one entry has no open page
     const char *ids[] = { "k:300", "k:none", "k:100", "k:past", "k:200" };
     for (const char *id : ids)
         ml_queue_push(q, ml_test_create_item(id));
@@ -1227,11 +1228,9 @@ static void test_queue_pass_is_sorted_by_key()
     ML_TEST_ASSERT(ml_queue_size(q).create_new_model == 5, "all pushed entries are counted before the pass starts");
 
     bool stopped = false;
-    std::string first = ml_test_pop_id(q, &stopped);
-    std::string second = ml_test_pop_id(q, &stopped);
-    bool key0_first = (first == "k:none" || first == "k:past") && (second == "k:none" || second == "k:past") && first != second;
-    ML_TEST_ASSERT(key0_first, "the two key-0 entries (no page, idle page in the past) are trained first, as one group");
-    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:100", "then the earliest page close");
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:none", "the key-0 entry (no page) is trained first");
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:past", "then the key earlier than the sort, in its own place");
+    ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:100", "then the earliest page completion");
     ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:200", "then the next page close");
     ML_TEST_ASSERT(ml_test_pop_id(q, &stopped) == "k:300", "then the latest page close");
     ML_TEST_ASSERT(!stopped, "no stop request was seen");
@@ -1239,7 +1238,7 @@ static void test_queue_pass_is_sorted_by_key()
     ml_queue_stats_t stats = ml_queue_stats(q);
     ML_TEST_ASSERT(stats.passes_sorted == 1, "exactly one pass was sorted");
     ML_TEST_ASSERT(stats.pass_entries == 5, "the pass had all five entries");
-    ML_TEST_ASSERT(stats.pass_key0_entries == 2, "two entries had no usable future close");
+    ML_TEST_ASSERT(stats.pass_key0_entries == 1, "one entry had no open page");
     ML_TEST_ASSERT(stats.total_create_new_model_requests_popped == 5, "five entries were popped");
     ML_TEST_ASSERT(ml_queue_size(q).create_new_model == 0, "the queue is empty after the pass");
 
@@ -1362,26 +1361,27 @@ static void test_queue_stop_at_last_key()
     ml_queue_destroy(q);
 }
 
-static void test_queue_sort_pass_normalises_past_keys()
+static void test_queue_sort_pass_orders_by_key()
 {
-    fprintf(stderr, "  test_queue_sort_pass_normalises_past_keys...\n");
+    fprintf(stderr, "  test_queue_sort_pass_orders_by_key...\n");
 
     std::deque<ml_create_model_entry_t> pass;
     ml_create_model_entry_t e;
     e.req.DLI = DimensionLookupInfo("00000000-0000-0000-0000-000000000000", "chart", "d");
     e.key = 1000; pass.push_back(e);
-    e.key = 999;  pass.push_back(e);   // one second before "now": an idle page, no usable future close
+    e.key = 999;  pass.push_back(e);   // an early key is a valid completion time, not an idle page
     e.key = 5000; pass.push_back(e);
     e.key = 0;    pass.push_back(e);
     e.key = 1000; pass.push_back(e);   // equal keys are allowed and stay adjacent
 
     size_t key0 = 0;
-    ml_queue_sort_pass(pass, 1000, &key0);
+    ml_queue_sort_pass(pass, &key0);
 
-    ML_TEST_ASSERT(key0 == 2, "a key before now and a zero key are both counted as key 0");
-    ML_TEST_ASSERT(pass[0].key == 0 && pass[1].key == 0, "key-0 entries sort first");
-    ML_TEST_ASSERT(pass[2].key == 1000 && pass[3].key == 1000, "a key equal to now is a usable future close");
-    ML_TEST_ASSERT(pass[4].key == 5000, "later closes sort last");
+    ML_TEST_ASSERT(key0 == 1, "only the zero key is counted as key 0");
+    ML_TEST_ASSERT(pass[0].key == 0, "the key-0 entry sorts first");
+    ML_TEST_ASSERT(pass[1].key == 999, "an early key keeps its place instead of becoming key 0");
+    ML_TEST_ASSERT(pass[2].key == 1000 && pass[3].key == 1000, "equal keys sort together");
+    ML_TEST_ASSERT(pass[4].key == 5000, "later completions sort last");
 }
 
 // ---- shared queue: several consumers --------------------------------------------------------------------------
@@ -1661,11 +1661,11 @@ static void test_pending_models_keep_install_order()
 
 // ---- host-backed ordering test --------------------------------------------------------------------------------
 //
-// Drives the real key function (ml_queue_dimension_pass_key(): resolve the dimension, read the capacity close of
-// its current tier-0 page) against dbengine-backed charts on a live host. Called from test_dbengine() with the
-// dbengine unit-test host, because ML's own test entry point has no RRD tree. Page times are wall-clock
-// relative: the pass sort normalises closes that are already behind the sort time to key 0, so the pages under
-// test must complete in the future.
+// Drives the real key function (ml_queue_dimension_pass_key(): resolve the dimension, read how many seconds of data
+// its current tier-0 page still needs) against dbengine-backed charts on a live host. Called from test_dbengine()
+// with the dbengine unit-test host, because ML's own test entry point has no RRD tree. Two of the charts store data
+// that lags the local clock by 30 and 60 minutes, as a parent's children do when it falls behind: their page closes,
+// in their own timestamps, are already in the local past, and they must still be ordered by when their pages fill.
 
 static size_t ml_host_test_failures = 0;
 #define ML_HOST_TEST_CHECK(cond, msg) do { \
@@ -1703,12 +1703,30 @@ static std::string ml_host_test_pop(ml_queue_t *q)
     return std::string(item.create_new_model.DLI.chartId());
 }
 
-static time_t ml_host_test_close(RRDDIM *rd)
+static time_t ml_host_test_to_close(RRDDIM *rd)
 {
     spinlock_lock(&rd->tiers[0].spinlock);
-    time_t close = storage_engine_store_page_close_time_s(rd->tiers[0].sch);
+    time_t to_close = storage_engine_store_page_time_to_close_s(rd->tiers[0].sch);
     spinlock_unlock(&rd->tiers[0].spinlock);
-    return close;
+    return to_close;
+}
+
+static void ml_host_test_store_next(RRDDIM *rd, time_t *t)
+{
+    *t += 1;
+    storage_engine_store_metric(rd->tiers[0].sch, (usec_t)*t * USEC_PER_SEC, 1, 1, 1, 1, 0, SN_DEFAULT_FLAGS);
+}
+
+// Store consecutive points (update_every 1) after *t until the open page needs exactly `target` more seconds. A page
+// holds at least max_slots / 3 = 341 points, so any target below 340 is reached by counting down a fresh page.
+static bool ml_host_test_fill_to(RRDDIM *rd, time_t *t, time_t target)
+{
+    for (size_t i = 0; i < 5000; i++) {
+        if (ml_host_test_to_close(rd) == target)
+            return true;
+        ml_host_test_store_next(rd, t);
+    }
+    return false;
 }
 
 extern "C" int ml_queue_host_order_unittest(RRDHOST *host)
@@ -1716,15 +1734,17 @@ extern "C" int ml_queue_host_order_unittest(RRDHOST *host)
     fprintf(stderr, "  ml_queue_host_order_unittest...\n");
     ml_host_test_failures = 0;
 
-    // four charts whose first points are far enough apart that their page closes are strictly ordered
-    // a < b < c < d whatever alignment shortening does: a page holds at most 1024 points, so at most 1024 s
-    // for the update_every 1 charts a, b, c and at most 5120 s for the update_every 5 chart d
+    // Each chart is filled until its open page needs a known number of seconds, so the order of page completion is
+    // a (50) < b (150) < c (250) < e (330), and the update_every 5 chart d, which needs at least 341 points * 5 s,
+    // completes last. Filling stores at most 1024 points, so every chart starts far enough back that none is written
+    // in the future: a and e end over an hour and over half an hour behind the local clock, b and c a few minutes.
     time_t now = now_realtime_sec();
-    RRDDIM *rd_a = ml_host_test_create(host, "a", now - 100, 1);
-    RRDDIM *rd_b = ml_host_test_create(host, "b", now + 3000, 1);
-    RRDDIM *rd_c = ml_host_test_create(host, "c", now + 6000, 1);
-    RRDDIM *rd_d = ml_host_test_create(host, "d", now + 20000, 5);
-    RRDDIM *rd_e = ml_host_test_create(host, "e", now + 9000, 1);    // deleted mid-pass later
+    time_t t_a = now - 4800, t_b = now - 1200, t_c = now - 1200, t_e = now - 3000;
+    RRDDIM *rd_a = ml_host_test_create(host, "a", t_a, 1);
+    RRDDIM *rd_b = ml_host_test_create(host, "b", t_b, 1);
+    RRDDIM *rd_c = ml_host_test_create(host, "c", t_c, 1);
+    RRDDIM *rd_d = ml_host_test_create(host, "d", now - 1200, 5);
+    RRDDIM *rd_e = ml_host_test_create(host, "e", t_e, 1);    // deleted mid-pass later
     if (!rd_a || !rd_b || !rd_c || !rd_d || !rd_e) {
         fprintf(stderr, " >>> ML host-order: could not create dbengine-backed charts\n");
         return 1;
@@ -1732,46 +1752,50 @@ extern "C" int ml_queue_host_order_unittest(RRDHOST *host)
     const char *id_a = rrdset_id(rd_a->rrdset), *id_b = rrdset_id(rd_b->rrdset), *id_c = rrdset_id(rd_c->rrdset), *id_d = rrdset_id(rd_d->rrdset);
     std::string id_e = rrdset_id(rd_e->rrdset);      // a copy: the chart's dimension is freed mid-test
 
-    time_t close_a = ml_host_test_close(rd_a), close_b = ml_host_test_close(rd_b), close_c = ml_host_test_close(rd_c), close_d = ml_host_test_close(rd_d), close_e = ml_host_test_close(rd_e);
-    ML_HOST_TEST_CHECK(close_a > now && close_a < close_b && close_b < close_c && close_c < close_e && close_e < close_d, "the five open pages close in the future, in order a < b < c < e < d");
-    ML_HOST_TEST_CHECK(close_d >= now + 20000 && ((close_d - (now + 20000)) % 5) == 0, "the update_every 5 chart's close is on its own cadence");
+    bool filled = ml_host_test_fill_to(rd_a, &t_a, 50) && ml_host_test_fill_to(rd_b, &t_b, 150) &&
+                  ml_host_test_fill_to(rd_c, &t_c, 250) && ml_host_test_fill_to(rd_e, &t_e, 330);
+    ML_HOST_TEST_CHECK(filled, "every chart reached its target seconds-to-close");
+    ML_HOST_TEST_CHECK(ml_host_test_to_close(rd_d) >= 340 * 5, "the update_every 5 chart's page needs at least 341 points");
+    ML_HOST_TEST_CHECK(t_a + 50 < now - 3600 && t_e + 330 < now - 1800 && t_b + 150 < now && t_c + 250 < now,
+                       "every chart's page close, in its own timestamps, is in the local past (an hour and half an hour for a and e)");
 
-    // the real key function reads the same closes through the acquired dimension
+    // the real key function turns the seconds still needed into a local completion time
     ml_request_create_new_model_t req_a = { DimensionLookupInfo(host->machine_guid, id_a, "dim") };
-    ML_HOST_TEST_CHECK(ml_queue_dimension_pass_key(req_a, nullptr) == close_a, "ml_queue_dimension_pass_key() resolves the dimension and returns its page close");
+    time_t before = now_realtime_sec();
+    time_t key_a = ml_queue_dimension_pass_key(req_a, nullptr);
+    time_t after = now_realtime_sec();
+    ML_HOST_TEST_CHECK(key_a >= before + 50 && key_a <= after + 50, "ml_queue_dimension_pass_key() returns now + the seconds the page still needs, for a lagging chart too");
     ml_request_create_new_model_t req_missing = { DimensionLookupInfo(host->machine_guid, id_a, "no-such-dim") };
     ML_HOST_TEST_CHECK(ml_queue_dimension_pass_key(req_missing, nullptr) == 0, "an unresolvable dimension gets key 0");
 
     ml_queue_t *q = ml_queue_init();
     ml_queue_set_pass_key_fn(q, ml_queue_dimension_pass_key, nullptr);
 
-    // pass 1: pushed d, c, e, a, b - trained a, b, c, e, d (mixed update_every, ordered by actual page close)
+    // pass 1: pushed d, c, e, a, b - trained a, b, c, e, d (lagging and current charts, mixed update_every, ordered
+    // by when their pages fill)
     ml_queue_push(q, ml_host_test_item(host, id_d, "dim"));
     ml_queue_push(q, ml_host_test_item(host, id_c, "dim"));
     ml_queue_push(q, ml_host_test_item(host, id_e.c_str(), "dim"));
     ml_queue_push(q, ml_host_test_item(host, id_a, "dim"));
     ml_queue_push(q, ml_host_test_item(host, id_b, "dim"));
-    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_a, "pass 1: the earliest page close is trained first");
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_a, "pass 1: the hour-behind chart whose page fills first is trained first");
     // a mid-pass arrival (a requeue of a) belongs to the next pass, whatever its key
     ml_queue_push(q, ml_host_test_item(host, id_a, "dim"));
     ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_b, "pass 1: then the next");
     ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_c, "pass 1: then c");
-    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_e, "pass 1: then e");
-    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_d, "pass 1: the update_every 5 chart closes last and is trained last");
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_e, "pass 1: then the half-hour-behind chart e");
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_d, "pass 1: the update_every 5 chart fills last and is trained last");
     ml_queue_stats_t stats = ml_queue_stats(q);
-    ML_HOST_TEST_CHECK(stats.pass_entries == 5 && stats.pass_key0_entries == 0, "pass 1: five entries, none with key 0");
+    ML_HOST_TEST_CHECK(stats.pass_entries == 5 && stats.pass_key0_entries == 0, "pass 1: five entries, none with key 0 although two charts lag the clock");
     ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_a, "pass 2 (the mid-pass arrival alone): a");
 
-    // phase change: chart a collects past its page close and beyond e's close, so among a, b, c, e its new
-    // page now closes last (still before d's, which is not part of the following passes)
-    time_t t_a = now - 99;
-    for (; t_a <= close_e + 200; t_a++)
-        storage_engine_store_metric(rd_a->tiers[0].sch, (usec_t)t_a * USEC_PER_SEC, 1, 1, 1, 1, 0, SN_DEFAULT_FLAGS);
-    // the last point may have filled and flushed the page (page boundaries follow the wall clock): open a new one
-    if (!ml_host_test_close(rd_a))
-        storage_engine_store_metric(rd_a->tiers[0].sch, (usec_t)t_a * USEC_PER_SEC, 1, 1, 1, 1, 0, SN_DEFAULT_FLAGS);
-    time_t close_a2 = ml_host_test_close(rd_a);
-    ML_HOST_TEST_CHECK(close_a2 > close_e, "chart a's current page now closes after chart e's");
+    // phase change: chart a collects until its page fills and flushes, and opens a new one; a fresh page needs at
+    // least 340 more seconds, so among a, b, c, e it now fills last (still before d's, which is not part of the
+    // following passes)
+    for (size_t i = 0; i < 5000 && ml_host_test_to_close(rd_a) >= 0; i++)
+        ml_host_test_store_next(rd_a, &t_a);
+    ml_host_test_store_next(rd_a, &t_a);
+    ML_HOST_TEST_CHECK(ml_host_test_to_close(rd_a) > 330, "chart a's new page fills after chart e's");
 
     // pass 3: a, b, c, e requeued in the old order - the new key moves a to the end. MID-PASS, chart c is
     // obsoleted and chart e's dimension is deleted outright: both entries keep the place their keys earned at
@@ -1780,13 +1804,13 @@ extern "C" int ml_queue_host_order_unittest(RRDHOST *host)
     ml_queue_push(q, ml_host_test_item(host, id_b, "dim"));
     ml_queue_push(q, ml_host_test_item(host, id_c, "dim"));
     ml_queue_push(q, ml_host_test_item(host, id_e.c_str(), "dim"));
-    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_b, "pass 3: b first, its page close is now the earliest");
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_b, "pass 3: b first, its page now fills first");
     rrdset_is_obsolete___safe_from_collector_thread(rd_c->rrdset);
     rrddim_free(rd_e->rrdset, rd_e);
     rd_e = nullptr;
     ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_c, "pass 3: c is still served in its sorted place after its chart was obsoleted mid-pass");
     ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_e, "pass 3: e is still served in its sorted place after its dimension was deleted mid-pass");
-    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_a, "pass 3: a last, its key was re-read at the pass start (its page now closes after e's)");
+    ML_HOST_TEST_CHECK(ml_host_test_pop(q) == id_a, "pass 3: a last, its key was re-read at the pass start (its page now fills after e's)");
 
     // pass 4: the obsoleted chart's dimension, the deleted dimension and one that never existed get key 0 and
     // are trained first, as one group, ahead of every resolvable dimension
@@ -1854,7 +1878,7 @@ extern "C" int ml_unittest()
     test_queue_add_model_served_before_create_model();
     test_queue_stop_during_pass_sort();
     test_queue_stop_at_last_key();
-    test_queue_sort_pass_normalises_past_keys();
+    test_queue_sort_pass_orders_by_key();
     test_queue_consumers_share_one_sort();
     test_queue_stop_during_sort_wakes_every_consumer();
     test_dimension_accept_downstream_model();

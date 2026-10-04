@@ -651,11 +651,17 @@ cleanup:
 }
 
 
-// The ML training scheduler orders dimensions by rrdeng_store_metric_page_close_time_s(): the time of the point
-// that fills the current page and makes it flush. Verify it against the engine's own page sequence, for a
-// cadence whose pages align (1 s) and one whose pages are irregular (5 s: aligned_allocation_entries() works in
-// seconds while a page advances slots * update_every, and the max_slots / 3 floor kicks in), by storing points
-// one by one and watching when the page actually flushes.
+// The ML training scheduler orders dimensions by rrdeng_store_metric_page_time_to_close_s(): how many seconds of data
+// the current page still needs before the point that fills it and makes it flush. Verify it against the engine's own
+// page sequence, for a cadence whose pages align (1 s) and one whose pages are irregular (5 s: aligned_allocation_
+// entries() works in seconds while a page advances slots * update_every, and the max_slots / 3 floor kicks in), by
+// storing points one by one and watching when the page actually flushes. The data is dated months before the local
+// clock, so this also checks that the value depends only on the dimension's own timestamps (a lagging child).
+static time_t test_dbengine_page_close_of(STORAGE_COLLECT_HANDLE *sch, time_t last_point_s) {
+    time_t to_close = rrdeng_store_metric_page_time_to_close_s(sch);
+    return to_close < 0 ? 0 : last_point_s + to_close;
+}
+
 static size_t test_dbengine_page_close_time(RRDHOST *host) {
     size_t errors = 0;
     const int cadences[] = { 1, 5 };
@@ -671,8 +677,8 @@ static size_t test_dbengine_page_close_time(RRDHOST *host) {
 
         STORAGE_COLLECT_HANDLE *sch = rd->tiers[0].sch;
 
-        if(rrdeng_store_metric_page_close_time_s(sch) != 0) {
-            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: a handle without a page must report 0\n", ue);
+        if(rrdeng_store_metric_page_time_to_close_s(sch) != -1) {
+            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: a handle without a page must report -1\n", ue);
             errors++;
         }
 
@@ -688,7 +694,7 @@ static size_t test_dbengine_page_close_time(RRDHOST *host) {
             dbengine_cadence_test_store_point(rd, t, (NETDATA_DOUBLE)points);
             points++;
 
-            time_t close = rrdeng_store_metric_page_close_time_s(sch);
+            time_t close = test_dbengine_page_close_of(sch, t);
 
             if(!predicted) {
                 // the point just stored opened a page
@@ -696,10 +702,6 @@ static size_t test_dbengine_page_close_time(RRDHOST *host) {
                     fprintf(stderr, " >>> DBENGINE: page-close ue=%d: a stored point must open a page (t=%ld)\n", ue, (long)t);
                     errors++;
                     break;
-                }
-                if(close < t) {
-                    fprintf(stderr, " >>> DBENGINE: page-close ue=%d: close %ld is before the page start %ld\n", ue, (long)close, (long)t);
-                    errors++;
                 }
                 predicted = close;
             }
@@ -726,11 +728,11 @@ static size_t test_dbengine_page_close_time(RRDHOST *host) {
             errors++;
         }
 
-        // an explicit flush (chart reset after a gap) leaves no page: no usable close
+        // an explicit flush (chart reset after a gap) leaves no page
         dbengine_cadence_test_store_point(rd, t, 0);
         unittest_storage_engine_store_flush(sch);
-        if(rrdeng_store_metric_page_close_time_s(sch) != 0) {
-            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: a flushed handle must report 0\n", ue);
+        if(rrdeng_store_metric_page_time_to_close_s(sch) != -1) {
+            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: a flushed handle must report -1\n", ue);
             errors++;
         }
 
@@ -738,15 +740,15 @@ static size_t test_dbengine_page_close_time(RRDHOST *host) {
         t += ue;
         dbengine_cadence_test_store_point(rd, t, 0);
         unittest_storage_engine_store_change_collection_frequency(sch, ue * 2);
-        if(rrdeng_store_metric_page_close_time_s(sch) != 0) {
+        if(rrdeng_store_metric_page_time_to_close_s(sch) != -1) {
             fprintf(stderr, " >>> DBENGINE: page-close ue=%d: a frequency change must flush the page\n", ue);
             errors++;
         }
         t += ue * 2;
         dbengine_cadence_test_store_point(rd, t, 0);
-        time_t close = rrdeng_store_metric_page_close_time_s(sch);
-        if(close < t || ((close - t) % (ue * 2)) != 0) {
-            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: close %ld after a frequency change to %d is not on the new cadence from %ld\n", ue, (long)close, ue * 2, (long)t);
+        time_t to_close = rrdeng_store_metric_page_time_to_close_s(sch);
+        if(to_close <= 0 || (to_close % (ue * 2)) != 0) {
+            fprintf(stderr, " >>> DBENGINE: page-close ue=%d: %ld seconds to close after a frequency change to %d is not on the new cadence\n", ue, (long)to_close, ue * 2);
             errors++;
         }
         unittest_storage_engine_store_flush(sch);

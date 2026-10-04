@@ -45,7 +45,7 @@ static void rrddim_reinitialize_collection(RRDDIM *rd) {
 
     for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         // published under the same lock that finalizes it (rrddim_free), so a reader holding the tier
-        // spinlock (storage_engine_store_page_close_time_s() callers) sees either NULL or a live handle
+        // spinlock (storage_engine_store_page_time_to_close_s() callers) sees either NULL or a live handle
         spinlock_lock(&rd->tiers[tier].spinlock);
         if (!rd->tiers[tier].sch)
             rd->tiers[tier].sch =
