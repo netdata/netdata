@@ -1067,25 +1067,23 @@ bool rrdhost_receiver_replication_claim(RRDSET *st) {
     // claimer whose increment made it 2, so the winner would publish replication while nobody emits
     // RCV_REPLICATING.
     //
-    // Residual, and NOT fixed here: this is still a read separated from the CAS, so a concurrent
-    // duplicate claim that has added its unit but not yet withdrawn it makes the winner read 2 and
-    // skip the pulse, while the duplicate publishes nothing when it withdraws. Concretely, the gauge
-    // then stays on whatever the connection last published - RCV_REPLICATION_WAIT on a fresh
-    // connection - until something else moves it, and the parent streaming charts read that gauge.
-    // Bounded to the gauge, though: the accounting word, and therefore `InStatus`,
-    // `InReplInstances`, `InReplCompletion` and the idle-disconnect suppression, all read the counter
-    // and are unaffected. Fixing it needs the publish linearized with the CAS - a separate change,
-    // because deciding the pulse from this thread's own increment instead is wrong for the reason
-    // above.
+    // Residual, test-only: this is still a read separated from the CAS, so a concurrent duplicate claim
+    // that has added its unit but not yet withdrawn it makes the winner read 2 and skip the pulse, and
+    // the duplicate publishes nothing when it withdraws. Production never interleaves two claims on one
+    // host: the only caller is pluginsd_chart_definition_end(), on the parser thread of the host's single
+    // receiver (stream-receiver.c attaches one only while host->receiver is NULL). Only the stress test
+    // claims concurrently, and it does not assert on the gauge. Were it reachable, it would be bounded to
+    // the pulse gauge: the accounting word, and with it `InStatus`, `InReplInstances`,
+    // `InReplCompletion` and the idle-disconnect suppression, are unaffected.
     if(rrdhost_receiver_replicating_charts(host) == 1)
         pulse_host_status(host, PULSE_HOST_STATUS_RCV_REPLICATING, 0);
 
     return true;
 }
 
-// ONE implementation of the receiver-replication release, used by replay completion (both branches),
-// the connect/disconnect reset, chart teardown, and the tests. `also_clear` carries any extra flags the
-// caller wants cleared in the same atomic transition (RRDSET_FLAG_SYNC_CLOCK for the replay paths).
+// ONE implementation of the receiver-replication release, used by every release site listed in rrdset.h
+// and by the tests. `also_clear` carries any extra flags the caller wants cleared in the same atomic
+// transition (RRDSET_FLAG_SYNC_CLOCK for the replay paths).
 //
 // Returns the OLD flags, so a caller can additionally test what it found - the replay path uses it to
 // decide whether to log "there was no replication in progress for this chart".

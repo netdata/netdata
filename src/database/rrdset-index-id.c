@@ -135,20 +135,19 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     ml_chart_new(st);
 }
 
-// the destructor - the dictionary is write locked while this runs
+// the destructor - runs under the dictionary write lock when garbage collection frees the chart,
+// and with no dictionary lock held when dictionary_del() frees an unreferenced one
 static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
     RRDSET *st = rrdset;
 
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
 
-    // Release any outstanding receiver-replication contribution before the chart is gone: no other
-    // site can do it once the chart leaves the index, and the connect/disconnect reset in
-    // stream-receiver.c walks the index, so it cannot see this chart either. The reachable path is a
-    // chart freed with its replication still in progress: rrdset_free(), or rrdset_index_destroy() when
-    // the host is freed. Obsolete-chart cleanup normally finds nothing here, because marking a chart
-    // obsolete already released it (rrdset.c).
+    // Fallback release for a chart freed without rrdset_free(): rrdset_index_flush() when the host is
+    // archived, or rrdset_index_destroy() when it is freed - both after its receiver has stopped, so
+    // there is no next connection to take a unit from. rrdset_free() has already released while the
+    // chart was indexed, so for it this finds IN_PROGRESS clear and does nothing.
     //
-    // This runs under the dictionary write lock. rrdhost_receiver_replication_release() does only
+    // This may run under the dictionary write lock. rrdhost_receiver_replication_release() does only
     // atomic flag and counter transitions plus pulse_host_status(), which is lock-free (a CAS on
     // host->stream.pulse_state) - safe to call from here. Do NOT pass a 0 status to pulse_host_status()
     // from this context: that variant calls rrdhost_status(), which takes rrdhost_receiver_lock().
@@ -594,6 +593,22 @@ RRDSET *rrdset_create_custom(
 
 void rrdset_free(RRDSET *st) {
     if(unlikely(!st)) return;
+
+    // Release any receiver-replication contribution while the chart is still indexed, where the
+    // connect/disconnect reset walk can see it. Once dictionary_del() unlinks it, the delete callback
+    // may run later (a referenced item waits for garbage collection), possibly after the reset has
+    // zeroed the accounting and the next connection has claimed - and its release would then take a
+    // unit that connection owns.
+    //
+    // Under the receiver lock, which both resets hold: a release is a flag CAS and then a decrement,
+    // and this one runs off the receiver's thread (the obsolete-chart cleanup), so without the lock it
+    // could clear the flag before the reset walk, be preempted, and decrement after the reset zeroed
+    // the word and the next connection claimed. Callers hold no rrdset dictionary lock here, and the
+    // reset takes the receiver lock before the dictionary, so the order is the reset's.
+    rrdhost_receiver_lock(st->rrdhost);
+    rrdhost_receiver_replication_release(st, 0);
+    rrdhost_receiver_unlock(st->rrdhost);
+
     rrdset_index_del_name(st->rrdhost, st);
     rrdset_index_del(st->rrdhost, st);
 }

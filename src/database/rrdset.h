@@ -88,11 +88,12 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
 //
 // The SINGLE implementation of the receiver-replication claim and release. Every lifecycle site uses
 // these - the parser's CHART_DEFINITION_END, both REPLAY_END branches, the connect/disconnect reset,
-// chart obsolete marking and chart teardown. Do NOT open-code the flag CAS plus the counter movement
-// anywhere else: the ownership invariant is only enforceable while it lives in one place. Every
-// decrement must be either a release that cleared IN_PROGRESS in its own CAS old value, or the
-// speculative-increment rollback in claim() for a duplicate CHART_DEFINITION_END. The rollback does not clear the flag because the
-// chart still holds its contribution; a child resends CHART_DEFINITION_END when it adds dimensions.
+// chart obsolete marking and chart teardown (rrdset_free(), and the delete callback when a host is
+// archived or freed). Do NOT open-code the flag CAS plus the counter movement anywhere else: the
+// ownership invariant is only enforceable while it lives in one place. Every decrement must be either a
+// release that cleared IN_PROGRESS in its own CAS old value, or the speculative-increment rollback in
+// claim() for a duplicate CHART_DEFINITION_END. The rollback does not clear the flag because the chart
+// still holds its contribution; a child resends CHART_DEFINITION_END when it adds dimensions.
 //
 // claim():   true when THIS call caused the not-replicating -> replicating transition, i.e. the chart's
 //            contribution is now held. False means the chart already held one and this call's
@@ -101,8 +102,7 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
 //            `also_clear` carries extra flags to clear in the same atomic transition.
 bool rrdhost_receiver_replication_claim(RRDSET *st);
 // The macro captures the CALLING function, so the refusal log names the release site that
-// over-released (replay completion, its forced branch, the reset, or chart teardown) rather than
-// this one shared implementation.
+// over-released (one of those listed above) rather than this one shared implementation.
 RRDSET_FLAGS rrdhost_receiver_replication_release_with_caller(RRDSET *st, RRDSET_FLAGS also_clear, const char *function, bool pulse);
 #define rrdhost_receiver_replication_release(st, also_clear) \
     rrdhost_receiver_replication_release_with_caller(st, also_clear, __FUNCTION__, true)

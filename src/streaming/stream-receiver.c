@@ -1350,11 +1350,14 @@ static void stream_receiver_replication_reset(RRDHOST *host) {
     }
     rrdset_foreach_done(st);
 
-    // Safe to zero outside the walk: chart teardown does BOTH its flag CAS and its decrement inside
-    // rrdset_delete_callback(), under the rrdset dictionary WRITE lock, which the walk's read lock
-    // excludes - so a teardown can never be sitting between the two while we iterate. Any teardown
-    // that runs after the walk finds IN_PROGRESS already cleared by the release above and decrements
-    // nothing, and no new claim can arrive because the parser for this connection is gone.
+    // Zero outside the walk. No new claim can arrive: the parser for this connection is gone, and the
+    // caller holds the receiver lock. Every chart still indexed was released above. rrdset_free()
+    // releases under this same lock before unlinking a chart, so its flag CAS and decrement land
+    // entirely before this reset or entirely after it, and a later delete callback for that chart
+    // finds IN_PROGRESS clear and decrements nothing. Replay-completion releases run on this
+    // connection's parser thread, which is this thread or already stopped; obsolete marking off that
+    // thread (svc_rrdhost_obsolete_all_charts()) runs only on a host disconnected for longer than the
+    // cleanup delay, after this reset cleared every flag.
     if(rrdhost_receiver_replicating_charts(host) != 0) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM REPLAY ERROR: receiver replication instances counter should be zero, but it is %u"

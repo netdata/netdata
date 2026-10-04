@@ -235,10 +235,12 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
                 // generation while `host->receiver` here describes the new one. `connections` is
                 // bumped once per accepted connection under this same lock, so a change means
                 // exactly that, and reporting the mixed pair would be worse than losing the snapshot.
-                // A connected status, its since/reason and the connection id were derived from that
-                // same previous generation, so a generation change re-derives them too.
+                // The connection id follows the receiver, like the capabilities and peers below; a
+                // connected status and its since/reason were derived from the previous generation
+                // too, so a generation change re-derives them.
                 uint32_t connections_now = __atomic_load_n(&host->stream.rcv.status.connections, __ATOMIC_RELAXED);
                 if(connections_now != connections) {
+                    connections = connections_now;
                     replication_completion = rrdhost_receiver_replication_completion(host, &replicating_instances);
 
                     if(status == RRDHOST_INGEST_STATUS_REPLICATING || status == RRDHOST_INGEST_STATUS_ONLINE) {
@@ -247,7 +249,6 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
                         s->ingest.status = status;
                         s->ingest.collected.metrics = collected_metrics;
 
-                        connections = connections_now;
                         since = MAX(host->stream.rcv.status.last_connected, host->stream.rcv.status.last_disconnected);
                         s->ingest.since = since ? since : netdata_start_time;
                         s->ingest.reason = host->stream.rcv.status.reason;

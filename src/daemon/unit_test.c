@@ -2270,6 +2270,35 @@ static int test_receiver_replication_release_does_not_steal(void) {
         rc = 1;
     }
 
+    // (3) claimed and still referenced when freed: dictionary_del() only marks a referenced chart
+    //     deleted and defers its delete callback until the last reference goes. The reset walk skips
+    //     it from then on, so the release must happen in rrdset_free() itself, not later.
+    RRDSET *held = rrdset_create_localhost(
+        "netdata", "unittest-rcv-repl-held", "unittest-rcv-repl-held", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    rrdhost_receiver_replication_claim(held);
+
+    RRDSET_ACQUIRED *held_ref = rrdset_find_and_acquire(host, rrdset_id(held), true);
+    if(!held_ref) {
+        fprintf(stderr, "%s: could not acquire the chart to hold a reference on it\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    rrdset_free(held);
+
+    uint32_t after_held_teardown = rrdhost_receiver_replicating_charts(host);
+    if(after_held_teardown != before + 1) {
+        fprintf(stderr,
+                "%s: freeing a referenced claimed chart left the counter at %u, expected %u - "
+                "its release waited for the deferred delete callback\n",
+                __FUNCTION__, after_held_teardown, before + 1);
+        rc = 1;
+    }
+
+    if(held_ref)
+        rrdset_acquired_release(held_ref);
+
     // the owner's claim must have survived all of it, and must be released by its own teardown
     rrdset_free(owner);
 
