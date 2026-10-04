@@ -347,7 +347,7 @@ func newFunctionBundle(
 		return nil, errors.New("jobmgr Function bundle: invalid construction")
 	}
 	if len(methods) != 0 && create == nil {
-		return nil, errors.New("jobmgr Function bundle: collector has no method handler")
+		return nil, errors.New("jobmgr Function bundle: no method handler factory")
 	}
 	var handler funcapi.MethodHandler
 	if len(methods) != 0 {
@@ -357,7 +357,7 @@ func newFunctionBundle(
 			return nil, err
 		}
 		if nilMethodHandler(handler) {
-			return nil, errors.New("jobmgr Function bundle: collector returned a nil method handler")
+			return nil, errors.New("jobmgr Function bundle: handler factory returned a nil method handler")
 		}
 	}
 	bundle := &functionBundle{

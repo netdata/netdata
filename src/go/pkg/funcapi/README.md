@@ -13,7 +13,9 @@ collection modules are disabled. Each `funcapi.ProcessFunctionProvider` has a st
 factory. Providers require no collector, config schema, discovery provider or scheduled job.
 The default public name is `ID:method`; `FunctionName` and `Aliases` retain their normal meaning.
 
-For example, the command composition root can inject an existing history reader:
+For example, the command composition root can inject an existing history reader.
+In this schematic example, `historyfunc` represents your handler package and
+`historyReader` represents your process-owned history reader:
 
 ```go
 agent.Config{

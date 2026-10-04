@@ -5,6 +5,7 @@ package funcapi
 // ProcessFunctionProvider declares Functions owned by the plugin process,
 // independently of collector selection or running jobs. ID is stable across
 // run generations and supplies the default public name prefix (ID:method).
+// Provider IDs must be unique among process providers, even when public names differ.
 // Providers and collector modules may share an ID, but public names must not collide.
 //
 // Functions runs once per generation under framework containment; NewHandler
