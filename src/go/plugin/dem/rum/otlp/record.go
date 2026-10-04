@@ -6,13 +6,12 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
-
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
-// maxStackBytes bounds error.stack (≤4 KiB). faro.go already
+// maxStackBytes bounds error.stack (≤4 KiB). the Faro decoder already
 // truncates at this length before the beacon reaches here; this is a
 // defensive second cap so a future producer cannot regress it silently.
 const maxStackBytes = 4096
@@ -25,7 +24,7 @@ type queued struct{ rec *logspb.LogRecord }
 // error, one per custom event, one per console log line (already
 // filtered upstream by collect_console_logs). Free-form text is redacted
 // before it reaches the record.
-func (e *Exporter) build(b *beacon.Beacon) []queued {
+func (e *Exporter) build(b *beacon.Beacon, pageView bool) []queued {
 	base := baseAttrs(b)
 	now := e.now()
 	var out []queued
@@ -33,7 +32,7 @@ func (e *Exporter) build(b *beacon.Beacon) []queued {
 	if b.SessionID != "" && e.sessions.starts(b.SessionID, now) {
 		out = append(out, e.record(base, "session_start", b.Received, sevInfo, "session start"))
 	}
-	if b.PageView {
+	if pageView {
 		out = append(out, e.record(base, "pageview", b.Received, sevInfo, "pageview "+b.Path))
 	}
 	for _, err := range b.Errors {

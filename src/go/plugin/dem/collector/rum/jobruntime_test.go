@@ -19,7 +19,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
@@ -227,7 +227,7 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 		generations[name] = data.Generation
 		snapshot := data.Aggregator.Snapshot()
 		release()
-		require.EqualValues(t, 1, snapshot.Counters[agg.CounterPageviews])
+		require.EqualValues(t, 1, snapshot.Counters[aggregate.CounterPageviews])
 		require.Equal(t, 1, snapshot.ActiveSessions)
 	}
 	stopReceiver()

@@ -10,15 +10,17 @@ import (
 	"sync"
 
 	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/ingest"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 )
 
 type Site struct {
-	Route      *ingest.Route
-	Aggregator *agg.Aggregator
-	Generation string
-	Redactor   *redact.Redactor
+	Route       *httpapi.Route
+	Diagnostics *diagnostics.State
+	Aggregator  *aggregate.Aggregator
+	Generation  string
+	Redactor    *redact.Redactor
 }
 type Availability struct {
 	Serving   bool
@@ -84,7 +86,7 @@ func (h *Registry) AcquireSite(key string) (*Site, context.Context, func(), bool
 	entry.users.Add(1)
 	return entry.data, entry.ctx, entry.users.Done, true
 }
-func (h *Registry) Acquire(key string) (*ingest.Route, context.Context, func(), bool) {
+func (h *Registry) Acquire(key string) (*httpapi.Route, context.Context, func(), bool) {
 	data, ctx, release, ok := h.AcquireSite(key)
 	if !ok {
 		return nil, nil, nil, false

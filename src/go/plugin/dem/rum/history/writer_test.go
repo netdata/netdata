@@ -11,7 +11,7 @@ import (
 
 	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -55,7 +55,7 @@ func TestWriterDrainsRealJournalWithRedaction(t *testing.T) {
 	w := NewWriter("site", NewStore(st), counters, redact.NewRedactor("opaque-secret"))
 	now := time.Now().UnixMicro()
 	w.Event(
-		agg.HistoryEvent{
+		aggregate.HistoryEvent{
 			Site:      "site",
 			SessionID: "session",
 			TSUnixUS:  now,
@@ -66,7 +66,7 @@ func TestWriterDrainsRealJournalWithRedaction(t *testing.T) {
 		},
 	)
 	w.Event(
-		agg.HistoryEvent{
+		aggregate.HistoryEvent{
 			Site:        "site",
 			SessionID:   "session",
 			TSUnixUS:    now + 1,
@@ -96,8 +96,8 @@ func TestWriterDrainsRealJournalWithRedaction(t *testing.T) {
 	require.Len(t, groups, 1)
 	assert.Equal(t, "[REDACTED] failed", groups[0].Message)
 	assert.Equal(t, "at [REDACTED]", groups[0].SampleStack)
-	assert.EqualValues(t, 2, counters.get(agg.CounterHistoryWritten))
-	assert.Zero(t, counters.get(agg.CounterHistoryDropped))
+	assert.EqualValues(t, 2, counters.get(aggregate.CounterHistoryWritten))
+	assert.Zero(t, counters.get(aggregate.CounterHistoryDropped))
 }
 func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 	counters := newFakeCounters()
@@ -105,15 +105,15 @@ func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 	calls := 0
 	w.st = eventWriterFunc(func(context.Context, EventRecord) (bool, error) { calls++; return true, nil })
 	for i := 0; i < queueCap+7; i++ {
-		w.Event(agg.HistoryEvent{
+		w.Event(aggregate.HistoryEvent{
 			Site: "site",
 			Type: "event",
 		})
 	}
 	drain(w)
 	assert.Equal(t, queueCap, calls)
-	assert.EqualValues(t, queueCap, counters.get(agg.CounterHistoryWritten))
-	assert.EqualValues(t, 7, counters.get(agg.CounterHistoryDropped))
+	assert.EqualValues(t, queueCap, counters.get(aggregate.CounterHistoryWritten))
+	assert.EqualValues(t, 7, counters.get(aggregate.CounterHistoryDropped))
 }
 func TestCancellationPreservesOnlyUnattemptedSuffix(t *testing.T) {
 	counters := newFakeCounters()
@@ -132,7 +132,7 @@ func TestCancellationPreservesOnlyUnattemptedSuffix(t *testing.T) {
 		return true, nil
 	})
 	for i := 0; i < maxBatch+7; i++ {
-		w.Event(agg.HistoryEvent{
+		w.Event(aggregate.HistoryEvent{
 			Site: "site",
 			Type: "event",
 			Text: fmt.Sprint(i),
@@ -143,8 +143,8 @@ func TestCancellationPreservesOnlyUnattemptedSuffix(t *testing.T) {
 	for text, n := range attempts {
 		assert.Equal(t, 1, n, "event %s replayed", text)
 	}
-	assert.EqualValues(t, maxBatch+7, counters.get(agg.CounterHistoryWritten))
-	assert.Zero(t, counters.get(agg.CounterHistoryDropped))
+	assert.EqualValues(t, maxBatch+7, counters.get(aggregate.CounterHistoryWritten))
+	assert.Zero(t, counters.get(aggregate.CounterHistoryDropped))
 }
 func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 	for name, writeErr := range map[string]error{"disk error": errors.New("disk full"), "cancelled write": context.Canceled, "successful cancellation race": nil} {
@@ -163,7 +163,7 @@ func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 				return true, nil
 			})
 			for range maxBatch {
-				w.Event(agg.HistoryEvent{
+				w.Event(aggregate.HistoryEvent{
 					Site: "site",
 					Type: "event",
 				})
@@ -175,8 +175,8 @@ func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 				wantWritten--
 				wantDropped++
 			}
-			assert.EqualValues(t, wantWritten, counters.get(agg.CounterHistoryWritten))
-			assert.EqualValues(t, wantDropped, counters.get(agg.CounterHistoryDropped))
+			assert.EqualValues(t, wantWritten, counters.get(aggregate.CounterHistoryWritten))
+			assert.EqualValues(t, wantDropped, counters.get(aggregate.CounterHistoryDropped))
 		})
 	}
 }
@@ -191,7 +191,7 @@ func TestFinalDrainSharesOneAdmissionDeadline(t *testing.T) {
 		return true, nil
 	})
 	for range maxBatch + 7 {
-		w.Event(agg.HistoryEvent{
+		w.Event(aggregate.HistoryEvent{
 			Site: "site",
 			Type: "event",
 		})
@@ -225,14 +225,14 @@ func TestEmptyFlushSkipsJournalSyncAndReportsQueueDrops(t *testing.T) {
 	disk := &recordingEventWriter{}
 	w.st = disk
 	for range queueCap + 1 {
-		w.Event(agg.HistoryEvent{
+		w.Event(aggregate.HistoryEvent{
 			Site: "site",
 		})
 	}
 	assert.Zero(t, w.flush(context.Background(), nil))
 	assert.Zero(t, disk.syncs)
-	assert.EqualValues(t, 1, counters.get(agg.CounterHistoryDropped))
-	assert.Equal(t, 1, w.flush(context.Background(), []agg.HistoryEvent{{Site: "site", Type: "event"}}))
+	assert.EqualValues(t, 1, counters.get(aggregate.CounterHistoryDropped))
+	assert.Equal(t, 1, w.flush(context.Background(), []aggregate.HistoryEvent{{Site: "site", Type: "event"}}))
 	assert.Equal(t, 1, disk.appends)
 	assert.Equal(t, 1, disk.syncs)
 }
@@ -266,7 +266,7 @@ func TestFinalDrainSyncsAfterCancellationFollowingLastAppend(t *testing.T) {
 	}
 	w.st = disk
 	for range maxBatch {
-		w.Event(agg.HistoryEvent{
+		w.Event(aggregate.HistoryEvent{
 			Site: "site",
 			Type: "event",
 		})
@@ -281,7 +281,7 @@ func TestIdleFlushRetriesFailedSyncWithoutReplayingAppend(t *testing.T) {
 		syncErr: errors.New("sync failed"),
 	}
 	w.st = disk
-	assert.Equal(t, 1, w.flush(context.Background(), []agg.HistoryEvent{{Site: "site", Type: "event"}}))
+	assert.Equal(t, 1, w.flush(context.Background(), []aggregate.HistoryEvent{{Site: "site", Type: "event"}}))
 	disk.syncErr = nil
 	assert.Zero(t, w.flush(context.Background(), nil))
 	assert.Equal(t, 1, disk.appends)
@@ -297,7 +297,7 @@ func TestWrongSiteDoesNotQueueOrCount(t *testing.T) {
 	counters := newFakeCounters()
 	w := NewWriter("site", NewStore(st), counters, nil)
 	for range queueCap + 1 {
-		w.Event(agg.HistoryEvent{
+		w.Event(aggregate.HistoryEvent{
 			Site:      "other",
 			SessionID: "session",
 			Type:      "event",

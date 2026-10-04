@@ -10,13 +10,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/ingest"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type measurementProcessor struct{ *aggregate.Aggregator }
+
+func (p measurementProcessor) Ingest(b *beacon.Beacon) { p.Aggregator.Ingest(b) }
 
 type observedRoutes struct {
 	hub      *rumregistry.Registry
@@ -24,7 +31,7 @@ type observedRoutes struct {
 	once     sync.Once
 }
 
-func (r *observedRoutes) Acquire(key string) (*ingest.Route, context.Context, func(), bool) {
+func (r *observedRoutes) Acquire(key string) (*httpapi.Route, context.Context, func(), bool) {
 	route, ctx, release, ok := r.hub.Acquire(key)
 	if ok {
 		r.once.Do(func() { close(r.acquired) })
@@ -35,17 +42,20 @@ func (r *observedRoutes) Acquire(key string) (*ingest.Route, context.Context, fu
 // A site must retire even when an admitted client stops sending its body.
 func TestRetirementInterruptsNetworkBody(t *testing.T) {
 	hub := rumregistry.New()
-	aggregator := agg.New(time.Minute, agg.SiteCfg{
+	aggregator := aggregate.New(time.Minute, aggregate.SiteCfg{
 		Name: "shop",
 	})
-	route := ingest.NewRoute(config.Site{
+	cfg := config.Site{
 		Name:           "shop",
 		AllowedOrigins: []string{"https://example.org"},
-	}, aggregator)
+	}
+	state := diagnostics.New(cfg)
+	route := httpapi.NewRoute(cfg, measurementProcessor{aggregator}, state)
 	retire, err := hub.Register("shop", &rumregistry.Site{
-		Route:      route,
-		Aggregator: aggregator,
-		Generation: "first",
+		Route:       route,
+		Diagnostics: state,
+		Aggregator:  aggregator,
+		Generation:  "first",
 	})
 	require.NoError(t, err)
 	observed := &observedRoutes{
@@ -59,7 +69,7 @@ func TestRetirementInterruptsNetworkBody(t *testing.T) {
 			PerSitePerSec: 500,
 		},
 	}
-	server := httptest.NewServer(ingest.New(&transport, observed, nil).Handler())
+	server := httptest.NewServer(httpapi.New(&transport, observed, nil).Handler())
 	defer server.Close()
 	conn, err := net.Dial("tcp", server.Listener.Addr().String())
 	require.NoError(t, err)

@@ -10,18 +10,16 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/metadata"
-
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
-
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 // Browser spans share the owning site's immutable trace destination.
@@ -49,7 +47,7 @@ func (e *Exporter) enqueueSpans(b *beacon.Beacon) {
 	}
 	n := uint64(len(b.Spans))
 	if e.disabled && e.traceDestination == "" {
-		e.counters.Add(agg.CounterSpansDropped, n)
+		e.counters.Add(aggregate.CounterSpansDropped, n)
 		return
 	}
 	select {
@@ -58,7 +56,7 @@ func (e *Exporter) enqueueSpans(b *beacon.Beacon) {
 		rs: rs,
 	}:
 	default:
-		e.counters.Add(agg.CounterSpansDropped, n)
+		e.counters.Add(aggregate.CounterSpansDropped, n)
 	}
 }
 
@@ -193,7 +191,7 @@ func (e *Exporter) exportSpans(parent context.Context, batch []spanItem, timeout
 	}
 	client := e.traceClient()
 	if client == nil {
-		e.counters.Add(agg.CounterSpansErrors, n)
+		e.counters.Add(aggregate.CounterSpansErrors, n)
 		return
 	}
 	ctx, cancel := context.WithTimeout(parent, timeout)
@@ -203,7 +201,7 @@ func (e *Exporter) exportSpans(parent context.Context, batch []spanItem, timeout
 	}
 	resp, err := client.Export(ctx, req)
 	if err != nil {
-		e.counters.Add(agg.CounterSpansErrors, n)
+		e.counters.Add(aggregate.CounterSpansErrors, n)
 		return
 	}
 	if ps := resp.GetPartialSuccess(); ps != nil && ps.RejectedSpans > 0 {
@@ -213,10 +211,10 @@ func (e *Exporter) exportSpans(parent context.Context, batch []spanItem, timeout
 			ps.RejectedSpans,
 			e.redact(ps.ErrorMessage),
 		)
-		e.counters.Add(agg.CounterSpansErrors, n)
+		e.counters.Add(aggregate.CounterSpansErrors, n)
 		return
 	}
-	e.counters.Add(agg.CounterSpansSent, n)
+	e.counters.Add(aggregate.CounterSpansSent, n)
 }
 
 // traceClient lazily opens the site's fixed destination. Empty uses the logs

@@ -11,57 +11,62 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
+
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	rumfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/ingest"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func addSite(t *testing.T, hub *rumregistry.Registry, key, generation string) (*agg.Aggregator, func()) {
+type measurementProcessor struct{ *aggregate.Aggregator }
+
+func (p measurementProcessor) Ingest(b *beacon.Beacon) { p.Aggregator.Ingest(b) }
+
+func addSite(t *testing.T, hub *rumregistry.Registry, key, generation string) (*aggregate.Aggregator, func()) {
 	t.Helper()
-	a := agg.New(5*time.Minute, agg.SiteCfg{
+	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
 		Name:       key,
 		PageGroups: 20,
 		Countries:  20,
 	})
-	route := ingest.NewRoute(
-		config.Site{
-			Name:           key,
-			DisplayName:    "site opaque-secret",
-			AllowedOrigins: []string{"https://example.org"},
-		},
-		a,
-	)
+	cfg := config.Site{
+		Name:           key,
+		DisplayName:    "site opaque-secret",
+		AllowedOrigins: []string{"https://example.org"},
+	}
+	state := diagnostics.New(cfg)
+	route := httpapi.NewRoute(cfg, measurementProcessor{a}, state)
 	retire, err := hub.Register(
 		key,
 		&rumregistry.Site{
-			Route:      route,
-			Aggregator: a,
-			Generation: generation,
-			Redactor:   redact.NewRedactor("opaque-secret"),
+			Route:       route,
+			Diagnostics: state,
+			Aggregator:  a,
+			Generation:  generation,
+			Redactor:    redact.NewRedactor("opaque-secret"),
 		},
 	)
 	require.NoError(t, err)
 	t.Cleanup(retire)
 	return a, retire
 }
-func page(a *agg.Aggregator, site, path string) {
+func page(a *aggregate.Aggregator, site, path string) {
 	a.Ingest(&beacon.Beacon{
 		Site:      site,
 		SessionID: path,
 		PageGroup: path,
-		PageView:  true,
 	})
 }
 
@@ -170,7 +175,6 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 			Site:      "site",
 			SessionID: "session",
 			PageGroup: "/first",
-			PageView:  true,
 			Events:    []beacon.Event{{Name: "opaque-secret"}, {Name: "opaque-secret"}},
 		},
 	)
@@ -357,7 +361,7 @@ func TestHistoryFunctionsExplainSampling(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	st := history.NewStore(journalStore)
 	hub := rumregistry.New()
-	a := agg.New(5*time.Minute, agg.SiteCfg{
+	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
 		Name: "shop",
 	})
 	cfg := config.Site{
@@ -369,12 +373,14 @@ func TestHistoryFunctionsExplainSampling(t *testing.T) {
 			AlwaysKeep: []string{},
 		},
 	}
+	state := diagnostics.New(cfg)
 	retire, err := hub.Register(
 		"shop",
 		&rumregistry.Site{
-			Route:      ingest.NewRoute(cfg, a),
-			Aggregator: a,
-			Generation: "first",
+			Route:       httpapi.NewRoute(cfg, measurementProcessor{a}, state),
+			Diagnostics: state,
+			Aggregator:  a,
+			Generation:  "first",
 		},
 	)
 	require.NoError(t, err)
@@ -400,7 +406,7 @@ func TestConfiguredReceiverURLOverridesPreviouslyConfirmedObservedBase(t *testin
 	require.True(t, ok)
 	defer release()
 	server := httptest.NewServer(
-		ingest.New(&config.Receiver{
+		httpapi.New(&config.Receiver{
 			TrustedProxies: []string{"127.0.0.1/32"},
 			MaxBodyBytes:   262144,
 			RateLimit: config.RateLimit{
@@ -414,8 +420,12 @@ func TestConfiguredReceiverURLOverridesPreviouslyConfirmedObservedBase(t *testin
 	response, err := server.Client().Get(server.URL + "/rum/shop.js")
 	require.NoError(t, err)
 	require.NoError(t, response.Body.Close())
-	require.Equal(t, server.URL, data.Route.ObservedBase())
-	require.Equal(t, ingest.ReachOK, data.Route.Probe(context.Background(), server.Client(), server.URL).State)
+	require.Equal(t, server.URL, data.Diagnostics.ObservedBase())
+	require.Equal(
+		t,
+		diagnostics.ReachOK,
+		data.Diagnostics.Probe(context.Background(), server.Client(), server.URL).State,
+	)
 	revoke := hub.PublishReceiver(
 		rumregistry.Availability{
 			Serving:   true,

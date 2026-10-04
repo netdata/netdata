@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/ingest"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 )
@@ -38,7 +38,11 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	defer exporter.Close()
 	writer := history.NewWriter(c.Name, c.deps.History, c.aggregator, c.redactor)
 	c.aggregator.SetHistorySink(writer)
-	route := ingest.NewRoute(c.Site, beacon.MultiSink{c.aggregator, exporter})
+	state := diagnostics.New(c.Site)
+	route := httpapi.NewRoute(c.Site, &processor{
+		aggregator: c.aggregator,
+		exporter:   exporter,
+	}, state)
 	var id [16]byte
 	if _, err := rand.Read(id[:]); err != nil {
 		return err
@@ -46,10 +50,11 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	retire, err := c.deps.Registry.Register(
 		c.Name,
 		&rumregistry.Site{
-			Route:      route,
-			Aggregator: c.aggregator,
-			Generation: hex.EncodeToString(id[:]),
-			Redactor:   c.redactor,
+			Route:       route,
+			Diagnostics: state,
+			Aggregator:  c.aggregator,
+			Generation:  hex.EncodeToString(id[:]),
+			Redactor:    c.redactor,
 		},
 	)
 	if err != nil {
@@ -66,7 +71,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	}
 	go func() {
 		defer close(probesDone)
-		route.RunReachability(probeCtx, 5*time.Minute, c.probeBase, client)
+		state.RunReachability(probeCtx, 5*time.Minute, c.probeBase, client)
 	}()
 	ready()
 	<-ctx.Done()
@@ -80,7 +85,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 }
 
 // probeBase supplies only an explicitly configured address. With none, the
-// route probes the trusted-proxy address it learned before promoting it.
+// diagnostic owner probes the trusted-proxy address it learned before promoting it.
 func (c *Collector) probeBase() string {
 	if c.PublicURL != "" {
 		return c.PublicURL

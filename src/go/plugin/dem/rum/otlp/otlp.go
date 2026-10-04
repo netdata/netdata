@@ -14,22 +14,20 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
+	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
-
-	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
-	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
-	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
-	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
-
-	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
-	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
 var exportLog = logger.New()
@@ -51,14 +49,13 @@ const (
 )
 
 // Counters receives the rum.otlp chart bookkeeping (sent/dropped/errors
-// dimensions). *agg.Aggregator satisfies this directly.
+// dimensions). *aggregate.Aggregator satisfies this directly.
 type Counters interface {
 	Add(counter string, n uint64)
 }
 
 // Exporter batches beacon-derived records and exports them as OTLP logs.
-// It implements beacon.Sink so it can sit in the collector's fan-out
-// alongside the in-memory aggregator.
+// The collector passes the aggregation result before any records are queued.
 type Exporter struct {
 	siteName         string
 	traceDestination string
@@ -245,38 +242,35 @@ func (e *Exporter) Close() error {
 	return nil
 }
 
-// Ingest implements beacon.Sink: it builds records and enqueues them,
+// Ingest consumes an aggregation result, builds records and enqueues them,
 // counting queue overflow as dropped. When OTLP is disabled, records
 // are counted as dropped because there is no fallback export path.
-func (e *Exporter) Ingest(b *beacon.Beacon) {
-	if b.Site != e.siteName {
+func (e *Exporter) Ingest(b *beacon.Beacon, result aggregate.Result) {
+	if !result.Accepted || b.Site != e.siteName {
 		return
 	}
-	if b.SampledOut {
+	if !result.Investigated {
 		return // measured, but its session is not investigated
 	}
 	if len(b.Spans) > 0 {
 		e.enqueueSpans(b)
 	}
-	recs := e.build(b)
+	recs := e.build(b, result.PageView)
 	if len(recs) == 0 {
 		return
 	}
 	if e.disabled {
-		e.counters.Add(agg.CounterOTLPDropped, uint64(len(recs)))
+		e.counters.Add(aggregate.CounterOTLPDropped, uint64(len(recs)))
 		return
 	}
 	for _, q := range recs {
 		select {
 		case e.ch <- q:
 		default:
-			e.counters.Add(agg.CounterOTLPDropped, 1)
+			e.counters.Add(aggregate.CounterOTLPDropped, 1)
 		}
 	}
 }
-
-// Reject is a no-op: rejected beacons never produced a valid record.
-func (e *Exporter) Reject(string, string) {}
 
 func (e *Exporter) redact(s string) string {
 	if e.redactor == nil || s == "" {
@@ -312,7 +306,7 @@ func (e *Exporter) export(parent context.Context, batch []queued, timeout time.D
 	}
 	resp, err := e.client.Export(ctx, req)
 	if err != nil {
-		e.counters.Add(agg.CounterOTLPErrors, uint64(len(batch)))
+		e.counters.Add(aggregate.CounterOTLPErrors, uint64(len(batch)))
 		return
 	}
 	if ps := resp.GetPartialSuccess(); ps != nil && ps.RejectedLogRecords > 0 {
@@ -322,8 +316,8 @@ func (e *Exporter) export(parent context.Context, batch []queued, timeout time.D
 			ps.RejectedLogRecords,
 			e.redact(ps.ErrorMessage),
 		)
-		e.counters.Add(agg.CounterOTLPErrors, uint64(len(batch)))
+		e.counters.Add(aggregate.CounterOTLPErrors, uint64(len(batch)))
 		return
 	}
-	e.counters.Add(agg.CounterOTLPSent, uint64(len(batch)))
+	e.counters.Add(aggregate.CounterOTLPSent, uint64(len(batch)))
 }

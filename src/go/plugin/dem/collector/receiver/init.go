@@ -12,7 +12,7 @@ import (
 	"net/url"
 
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/geoip"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
 )
 
 func (c *Collector) Init(ctx context.Context) error {

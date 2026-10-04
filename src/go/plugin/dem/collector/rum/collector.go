@@ -11,7 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
@@ -40,7 +40,7 @@ type Collector struct {
 	Config     `yaml:",inline" json:""`
 	deps       Dependencies
 	store      metrix.CollectorStore
-	aggregator *agg.Aggregator
+	aggregator *aggregate.Aggregator
 	redactor   *redact.Redactor
 	metrics    collectorMetrics
 }

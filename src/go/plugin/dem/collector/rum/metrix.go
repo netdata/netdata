@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
@@ -46,13 +46,13 @@ func newCollectorMetrics(m metrix.SnapshotMeter) collectorMetrics {
 		firstPartyResources: m.Counter("resources_first_party"),
 		thirdPartyResources: m.Counter("resources_third_party"),
 	}
-	for _, name := range []string{agg.CounterOTLPSent, agg.CounterOTLPDropped, agg.CounterOTLPErrors, agg.CounterHistoryWritten, agg.CounterHistoryDropped, agg.CounterSpansSent, agg.CounterSpansDropped, agg.CounterSpansErrors} {
+	for _, name := range []string{aggregate.CounterOTLPSent, aggregate.CounterOTLPDropped, aggregate.CounterOTLPErrors, aggregate.CounterHistoryWritten, aggregate.CounterHistoryDropped, aggregate.CounterSpansSent, aggregate.CounterSpansDropped, aggregate.CounterSpansErrors} {
 		metrics.diagnostics = append(metrics.diagnostics, counterMetric{
 			name:       name,
 			instrument: m.Counter(name),
 		})
 	}
-	for _, name := range []string{agg.CounterPageviews, agg.CounterJSErrors, agg.CounterAccepted, beacon.RejectOrigin, beacon.RejectRate, beacon.RejectSize, beacon.RejectInvalid, beacon.RejectBot, agg.CounterRageClicks, agg.CounterDeadClicks, agg.CounterErrorClicks, agg.CounterSamplesDropped} {
+	for _, name := range []string{aggregate.CounterPageviews, aggregate.CounterJSErrors, aggregate.CounterAccepted, beacon.RejectOrigin, beacon.RejectRate, beacon.RejectSize, beacon.RejectInvalid, beacon.RejectBot, aggregate.CounterRageClicks, aggregate.CounterDeadClicks, aggregate.CounterErrorClicks, aggregate.CounterSamplesDropped} {
 		metrics.traffic = append(metrics.traffic, counterMetric{
 			name:       name,
 			instrument: m.Counter(name),
@@ -76,7 +76,7 @@ func newPercentileMetrics(m metrix.SnapshotMeter, name string) percentileMetrics
 		p95: m.Gauge(name+"_p95", metrix.WithFloat(true)),
 	}
 }
-func (m percentileMetrics) observe(st agg.VitalStats) {
+func (m percentileMetrics) observe(st aggregate.VitalStats) {
 	if st.N == 0 {
 		return
 	}

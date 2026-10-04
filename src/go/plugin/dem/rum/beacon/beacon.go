@@ -38,16 +38,14 @@ const TabletViewportMinWidth = 600
 // one starts a new session.
 const SessionTTL = 30 * time.Minute
 
-// Faro event names carrying navigation/resource timing.
-// Verified against a captured beacon from the Faro 2.11 web SDK — see
-// ingest/faro.go's parseNavigationEvent/parseResourceEvent.
+// EventKind describes normalized event semantics independently of wire names.
+type EventKind uint8
+
 const (
-	NavigationEvent = "faro.performance.navigation"
-	ResourceEvent   = "faro.performance.resource"
-	// FetchTraceEvent is the tracing add-on's record of one traced
-	// fetch/XHR, carrying the request's trace id.
-	FetchTraceEvent = "faro.tracing.fetch"
-	XHRTraceEvent   = "faro.tracing.xml-http-request"
+	EventCustom EventKind = iota
+	EventNavigation
+	EventResource
+	EventRequest
 )
 
 // Frustration signals the snippet detects; each event carries a
@@ -87,11 +85,7 @@ type Beacon struct {
 	UserID         string  // netdataRum.setUser({id}) → Faro meta.user.id; never email or name
 	Environment    string  // bootstrap data-env → Faro app.environment
 
-	Vitals []Vital
-	// SampledOut is set by the aggregator when this beacon's session is not
-	// kept in full under investigate sampling: it is still measured,
-	// but history and events skip it. The zero value keeps everything.
-	SampledOut bool
+	Vitals     []Vital
 	Errors     []Error
 	Events     []Event
 	Logs       []Log
@@ -102,11 +96,6 @@ type Beacon struct {
 	// the backend; ServiceName is their resource service.name.
 	Spans       []Span
 	ServiceName string
-
-	// PageView is set by the aggregator when this beacon counts as a new
-	// page view (session+page de-duplication); the OTLP
-	// exporter emits a pageview record only then.
-	PageView bool
 }
 
 // Navigation is page-load timing extracted from a faro.performance.navigation
@@ -148,6 +137,7 @@ type Error struct {
 }
 
 type Event struct {
+	Kind    EventKind
 	Name    string
 	Domain  string
 	Attrs   map[string]string
@@ -182,13 +172,6 @@ type Log struct {
 	Time    time.Time
 }
 
-// Sink consumes collector outcomes. Reject reasons are the rum.beacons
-// dimension ids: rejected_origin, rejected_rate, rejected_size, invalid.
-type Sink interface {
-	Ingest(b *Beacon)
-	Reject(site, reason string)
-}
-
 // Reject reasons.
 const (
 	RejectOrigin  = "rejected_origin"
@@ -198,18 +181,3 @@ const (
 	// RejectBot counts bot beacons a site filters out.
 	RejectBot = "bots"
 )
-
-// MultiSink fans out to several sinks in order.
-type MultiSink []Sink
-
-func (m MultiSink) Ingest(b *Beacon) {
-	for _, s := range m {
-		s.Ingest(b)
-	}
-}
-
-func (m MultiSink) Reject(site, reason string) {
-	for _, s := range m {
-		s.Reject(site, reason)
-	}
-}

@@ -9,13 +9,12 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/stretchr/testify/require"
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
-
-	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
-
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
 type fakeTraceService struct {
@@ -129,11 +128,18 @@ func TestSpansReachTheirDestination(t *testing.T) {
 	)
 	first, second := tracedBeacon(), tracedBeacon()
 	second.Site = "s2"
-	localExporter.Ingest(first)
-	remoteExporter.Ingest(second)
+	localExporter.Ingest(first, aggregate.Result{
+		Accepted:     true,
+		Investigated: true,
+	})
+	remoteExporter.Ingest(second, aggregate.Result{
+		Accepted:     true,
+		Investigated: true,
+	})
 	sampled := tracedBeacon()
-	sampled.SampledOut = true
-	localExporter.Ingest(sampled)
+	localExporter.Ingest(sampled, aggregate.Result{
+		Accepted: true,
+	})
 	// Each site sees the same session identifier for the first time independently.
 	require.Len(t, localExporter.ch, 1)
 	require.Len(t, remoteExporter.ch, 1)
@@ -166,7 +172,10 @@ func TestExternalTracingWithLogsDisabled(t *testing.T) {
 	e := configuredExporter(t, Config{
 		Enabled: "no",
 	}, "s1", startTraceServer(t, remote), counters, nil)
-	e.Ingest(tracedBeacon())
+	e.Ingest(tracedBeacon(), aggregate.Result{
+		Accepted:     true,
+		Investigated: true,
+	})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	e.Run(ctx)
@@ -190,8 +199,14 @@ func TestTraceBatchPreservesPerBeaconResourcesAndScopes(t *testing.T) {
 	extra.Scope = "other-scope"
 	extra.ScopeVersion = "2"
 	first.Spans = append(first.Spans, extra, first.Spans[0])
-	e.Ingest(first)
-	e.Ingest(second)
+	e.Ingest(first, aggregate.Result{
+		Accepted:     true,
+		Investigated: true,
+	})
+	e.Ingest(second, aggregate.Result{
+		Accepted:     true,
+		Investigated: true,
+	})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	e.Run(ctx)
@@ -234,8 +249,14 @@ func TestTraceAuthenticationStaysWithLocalEndpoint(t *testing.T) {
 	first.SessionID = ""
 	second.SessionID = ""
 	second.Site = "s2"
-	localExporter.Ingest(first)
-	remoteExporter.Ingest(second)
+	localExporter.Ingest(first, aggregate.Result{
+		Accepted:     true,
+		Investigated: true,
+	})
+	remoteExporter.Ingest(second, aggregate.Result{
+		Accepted:     true,
+		Investigated: true,
+	})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	localExporter.Run(ctx)
