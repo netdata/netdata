@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Package agg is the in-memory RUM aggregator: a sliding
-// window of web-vital samples per (site, vital, breakdown) with
+// window of web-vital samples per (vital, breakdown) for one site with
 // percentiles and CWV ratings computed at snapshot time, monotonic
 // counters, a session LRU and top-N breakdown folding into "other".
 package agg
@@ -76,12 +76,13 @@ const (
 	maxPageElements      = 300  // per page group, attributed vital samples kept for rum-pages
 )
 
-// SiteCfg is what the aggregator needs per site.
+// SiteCfg is the immutable configuration for one site. Name is the stable
+// identity; DisplayName is presentation metadata.
 type SiteCfg struct {
-	Key, Name   string
-	PageGroups  int
-	Countries   int
-	Investigate InvestigateCfg
+	Name, DisplayName string
+	PageGroups        int
+	Countries         int
+	Investigate       InvestigateCfg
 }
 
 // InvestigateCfg is investigate sampling: the share of measured
@@ -105,12 +106,12 @@ func (c InvestigateCfg) alwaysKeep(b *beacon.Beacon) bool {
 	return (c.KeepErrors && len(b.Errors) > 0) || (c.KeepPoorVitals && b.HasPoorVital())
 }
 
-// Aggregator implements beacon.Sink and produces Snapshots.
+// Aggregator implements beacon.Sink and produces snapshots for one site.
 type Aggregator struct {
 	mu     sync.Mutex
 	window time.Duration
 	now    func() time.Time
-	sites  map[string]*siteState
+	site   siteState
 
 	// live is the rum-live FUNCTION ring for this aggregator runtime, guarded by mu.
 	live      []LiveRow
@@ -196,30 +197,13 @@ type tsCount struct {
 	n uint64
 }
 
-// New creates an aggregator with the given sliding window.
-func New(window time.Duration) *Aggregator {
+// New creates an aggregator for one site with immutable configuration.
+func New(window time.Duration, cfg SiteCfg) *Aggregator {
 	return &Aggregator{
 		window: window,
 		now:    time.Now,
-		sites:  map[string]*siteState{},
-	}
-}
-
-// Configure applies window and per-site limits; sites absent from the
-// list are dropped. Native site jobs configure a fresh aggregator before admission.
-func (a *Aggregator) Configure(window time.Duration, sites []SiteCfg) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.window = window
-	want := map[string]bool{}
-	for _, sc := range sites {
-		want[sc.Key] = true
-		if st, ok := a.sites[sc.Key]; ok {
-			st.cfg = sc
-			continue
-		}
-		a.sites[sc.Key] = &siteState{
-			cfg:         sc,
+		site: siteState{
+			cfg:         cfg,
 			series:      map[seriesKey]*series{},
 			groups:      map[groupKey]*group{},
 			groupN:      map[string]int{},
@@ -232,12 +216,7 @@ func (a *Aggregator) Configure(window time.Duration, sites []SiteCfg) {
 			errGroups:   list.New(),
 			errGroupIdx: map[string]*list.Element{},
 			resHosts:    map[string]*resHostGroup{},
-		}
-	}
-	for k := range a.sites {
-		if !want[k] {
-			delete(a.sites, k)
-		}
+		},
 	}
 }
 
@@ -246,8 +225,8 @@ func (a *Aggregator) Configure(window time.Duration, sites []SiteCfg) {
 func (a *Aggregator) Reject(site, reason string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	st, ok := a.sites[site]
-	if !ok {
+	st := &a.site
+	if site != st.cfg.Name {
 		return
 	}
 	st.counters[reason]++
@@ -260,13 +239,11 @@ func (a *Aggregator) Reject(site, reason string) {
 }
 
 // Add bumps a site-level monotonic counter (used by the OTLP exporter for
-// otlp_sent/dropped/errors). Unknown sites are ignored.
-func (a *Aggregator) Add(site, counter string, n uint64) {
+// otlp_sent/dropped/errors).
+func (a *Aggregator) Add(counter string, n uint64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if st, ok := a.sites[site]; ok {
-		st.counters[counter] += n
-	}
+	a.site.counters[counter] += n
 }
 
 // Ingest records one accepted beacon. It sets b.PageView when the beacon
@@ -274,8 +251,8 @@ func (a *Aggregator) Add(site, counter string, n uint64) {
 func (a *Aggregator) Ingest(b *beacon.Beacon) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	st, ok := a.sites[b.Site]
-	if !ok {
+	st := &a.site
+	if b.Site != st.cfg.Name {
 		return
 	}
 	now := b.Received
@@ -415,7 +392,7 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) {
 				continue
 			}
 			a.history.Event(HistoryEvent{
-				Site:        st.cfg.Key,
+				Site:        st.cfg.Name,
 				TSUnixUS:    now.UnixMicro(),
 				Type:        "error",
 				Page:        b.PageGroup,
@@ -462,35 +439,31 @@ type SiteActivity struct {
 	JSErrorsWindow       uint64
 }
 
-// Activity returns the current read for every tracked site. A site absent
-// from the result has no state in this aggregator runtime.
-func (a *Aggregator) Activity() map[string]SiteActivity {
+// Activity returns the current read for this site.
+func (a *Aggregator) Activity() SiteActivity {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	now := a.now()
-	out := make(map[string]SiteActivity, len(a.sites))
-	for k, st := range a.sites {
-		st.evictActivity(now, a.window)
-		age := -1
-		if !st.lastAccepted.IsZero() {
-			age = int(now.Sub(st.lastAccepted) / time.Second)
-		}
-		var jsErr uint64
-		for _, tc := range st.jsErrWindow {
-			jsErr += tc.n
-		}
-		out[k] = SiteActivity{
-			BeaconsPerMin:        len(st.accepted),
-			RejectedPerMin:       len(st.rejected),
-			BotsPerMin:           len(st.bots),
-			LastBeaconAgeS:       age,
-			ActiveSessions:       st.sess.Len(),
-			InvestigatedSessions: st.investigatedSessions(),
-			PageviewsWindow:      len(st.pvWindow),
-			JSErrorsWindow:       jsErr,
-		}
+	st := &a.site
+	st.evictActivity(now, a.window)
+	age := -1
+	if !st.lastAccepted.IsZero() {
+		age = int(now.Sub(st.lastAccepted) / time.Second)
 	}
-	return out
+	var jsErr uint64
+	for _, tc := range st.jsErrWindow {
+		jsErr += tc.n
+	}
+	return SiteActivity{
+		BeaconsPerMin:        len(st.accepted),
+		RejectedPerMin:       len(st.rejected),
+		BotsPerMin:           len(st.bots),
+		LastBeaconAgeS:       age,
+		ActiveSessions:       st.sess.Len(),
+		InvestigatedSessions: st.investigatedSessions(),
+		PageviewsWindow:      len(st.pvWindow),
+		JSErrorsWindow:       jsErr,
+	}
 }
 
 // evictActivity evicts the rings behind Activity independently of the
@@ -607,10 +580,10 @@ type Group struct {
 	JSErrors  uint64
 }
 
-// SiteSnapshot is the emission-ready state of one site.
-type SiteSnapshot struct {
-	Site           string
+// Snapshot is the emission-ready state of one site.
+type Snapshot struct {
 	Name           string
+	DisplayName    string
 	Vitals         map[string]VitalStats // only vitals with samples
 	Counters       map[string]uint64
 	ActiveSessions int
@@ -641,26 +614,16 @@ type SiteSnapshot struct {
 	PageviewsWindow, JSErrorsWindow uint64
 }
 
-// Snapshot evicts expired samples/sessions/groups and returns per-site
-// snapshots sorted by key. It also fixes the top sets used to route
-// counters until the next call.
-func (a *Aggregator) Snapshot() []SiteSnapshot {
+// Snapshot evicts expired samples/sessions/groups and returns this site's
+// emission state. It also fixes the top sets used to route counters until
+// the next call.
+func (a *Aggregator) Snapshot() Snapshot {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	now := a.now()
-	keys := make([]string, 0, len(a.sites))
-	for k := range a.sites {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	out := make([]SiteSnapshot, 0, len(keys))
-	for _, k := range keys {
-		out = append(out, a.sites[k].snapshot(now, a.window))
-	}
-	return out
+	return a.site.snapshot(a.now(), a.window)
 }
 
-func (st *siteState) snapshot(now time.Time, window time.Duration) SiteSnapshot {
+func (st *siteState) snapshot(now time.Time, window time.Duration) Snapshot {
 	cutoff := now.Add(-window)
 	expire := now.Add(-2 * window)
 
@@ -712,9 +675,9 @@ func (st *siteState) snapshot(now time.Time, window time.Duration) SiteSnapshot 
 		st.dropSession(el)
 	}
 
-	snap := SiteSnapshot{
-		Site:           st.cfg.Key,
+	snap := Snapshot{
 		Name:           st.cfg.Name,
+		DisplayName:    st.cfg.DisplayName,
 		Vitals:         map[string]VitalStats{},
 		Counters:       make(map[string]uint64, len(st.counters)),
 		ActiveSessions: st.sess.Len(),

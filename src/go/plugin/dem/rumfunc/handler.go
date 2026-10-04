@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/ingest"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/secrets"
@@ -21,7 +21,7 @@ import (
 )
 
 type Observation struct {
-	Config     config.RumSite
+	Config     config.Site
 	Activity   agg.SiteActivity
 	Reach      ingest.Reach
 	Snippet    ingest.SnippetCheck
@@ -138,7 +138,7 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 		}
 		var notes []string
 		for _, site := range sites {
-			if args["site"] != "" && args["site"] != site.Config.Key {
+			if args["site"] != "" && args["site"] != site.Config.Name {
 				continue
 			}
 			if note := site.Config.SamplingNote(); note != "" {
@@ -192,12 +192,12 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 			if !s.Rejected.At.IsZero() {
 				rejectAge = now - s.Rejected.At.Unix()
 			}
-			beaconURL := strings.TrimRight(s.PublicBase, "/") + "/rum/" + cfg.Key + ".js"
+			beaconURL := strings.TrimRight(s.PublicBase, "/") + "/rum/" + cfg.Name + ".js"
 			rows = append(
 				rows,
 				[]any{
-					cfg.Key,
-					cfg.DisplayName(),
+					cfg.Name,
+					cfg.Label(),
 					state,
 					beaconURL,
 					`<script async src="` + beaconURL + `"></script>`,

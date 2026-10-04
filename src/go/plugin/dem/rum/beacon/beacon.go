@@ -99,11 +99,9 @@ type Beacon struct {
 	Resources  []Resource  // from faro.performance.resource events
 
 	// Spans are browser trace spans when the site follows requests into
-	// the backend; ServiceName is their resource service.name and
-	// TraceExportTo the site's tracing.export_to ("" = otel.endpoint).
-	Spans         []Span
-	ServiceName   string
-	TraceExportTo string
+	// the backend; ServiceName is their resource service.name.
+	Spans       []Span
+	ServiceName string
 
 	// PageView is set by the aggregator when this beacon counts as a new
 	// page view (session+page de-duplication); the OTLP

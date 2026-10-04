@@ -17,7 +17,6 @@ import (
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/secrets"
@@ -31,7 +30,7 @@ var t0 = time.Date(2030, 1, 1, 12, 0, 0, 0, time.UTC)
 // recCounters records Add() calls (the rum.otlp chart dims).
 type recCounters struct {
 	mu sync.Mutex
-	n  map[string]uint64 // site+"/"+counter -> n
+	n  map[string]uint64 // counter -> n
 }
 
 func newRecCounters() *recCounters {
@@ -40,10 +39,10 @@ func newRecCounters() *recCounters {
 	}
 }
 
-func (r *recCounters) Add(site, counter string, n uint64) {
+func (r *recCounters) Add(counter string, n uint64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.n[site+"/"+counter] += n
+	r.n[counter] += n
 }
 
 func (r *recCounters) snapshot() map[string]uint64 {
@@ -111,10 +110,10 @@ func newRedactor(t *testing.T, secretValue string) *secrets.Redactor {
 
 func newExporter(t *testing.T, endpoint string, counters Counters, redact *secrets.Redactor) *Exporter {
 	t.Helper()
-	e, err := New(context.Background(), config.OTelCfg{
+	e, err := New(context.Background(), Config{
 		Enabled:  "yes",
 		Endpoint: endpoint,
-	}, counters, redact)
+	}, "s1", "", counters, redact)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -141,7 +140,6 @@ func mkBeacon() *beacon.Beacon {
 }
 
 type simpleRec struct {
-	site     string
 	body     string
 	severity string
 	attrs    map[string]string
@@ -153,7 +151,6 @@ func simplify(q queued) simpleRec {
 		attrs[kv.Key] = kv.GetValue().GetStringValue()
 	}
 	return simpleRec{
-		site:     q.site,
 		body:     q.rec.GetBody().GetStringValue(),
 		severity: q.rec.SeverityText,
 		attrs:    attrs,
@@ -163,7 +160,6 @@ func simplify(q queued) simpleRec {
 // sessionStart is the record every case using mkBeacon()'s default
 // SessionID produces first, since each subtest starts a fresh tracker.
 var sessionStart = simpleRec{
-	site:     "s1",
 	body:     "session start",
 	severity: "INFO",
 	attrs: map[string]string{
@@ -185,7 +181,7 @@ func TestBuild(t *testing.T) {
 				return b
 			},
 			want: []simpleRec{sessionStart, {
-				site: "s1", body: "pageview /pricing", severity: "INFO",
+				body: "pageview /pricing", severity: "INFO",
 				attrs: map[string]string{
 					"rum.type": "pageview", "session.id": "sess1", "page.path": "/pricing", "page.group": "/pricing",
 					"browser.name": "Chrome", "browser.version": "120", "os": "Linux", "device": "desktop", "country": "GR",
@@ -204,7 +200,7 @@ func TestBuild(t *testing.T) {
 				return b
 			},
 			want: []simpleRec{{
-				site: "s1", body: "pageview /pricing", severity: "INFO",
+				body: "pageview /pricing", severity: "INFO",
 				attrs: map[string]string{
 					"rum.type": "pageview", "page.path": "/pricing", "page.group": "/pricing",
 					"browser.name": "Chrome", "browser.version": "120", "os": "Linux", "device": "desktop", "country": "GR",
@@ -226,7 +222,7 @@ func TestBuild(t *testing.T) {
 			},
 			secret: "SEKRET1234",
 			want: []simpleRec{sessionStart, {
-				site: "s1", body: "TypeError: token=[REDACTED] undefined @ /pricing", severity: "ERROR",
+				body: "TypeError: token=[REDACTED] undefined @ /pricing", severity: "ERROR",
 				attrs: map[string]string{
 					"rum.type": "error", "session.id": "sess1", "page.path": "/pricing", "page.group": "/pricing",
 					"browser.name": "Chrome", "browser.version": "120", "os": "Linux", "device": "desktop", "country": "GR",
@@ -244,7 +240,7 @@ func TestBuild(t *testing.T) {
 			},
 			secret: "SEKRET1234",
 			want: []simpleRec{sessionStart, {
-				site: "s1", body: "event checkout @ /pricing", severity: "INFO",
+				body: "event checkout @ /pricing", severity: "INFO",
 				attrs: map[string]string{
 					"rum.type": "event", "session.id": "sess1", "page.path": "/pricing", "page.group": "/pricing",
 					"browser.name": "Chrome", "browser.version": "120", "os": "Linux", "device": "desktop", "country": "GR",
@@ -261,7 +257,7 @@ func TestBuild(t *testing.T) {
 			},
 			want: []simpleRec{
 				{
-					site: "s1", body: "session start", severity: "INFO",
+					body: "session start", severity: "INFO",
 					attrs: map[string]string{
 						"rum.type": "session_start", "session.id": "sess1", "page.path": "/pricing", "page.group": "/pricing", "page.view": "checkout-view",
 						"browser.name": "Chrome", "browser.version": "120", "os": "Linux", "device": "desktop", "country": "GR",
@@ -269,7 +265,7 @@ func TestBuild(t *testing.T) {
 					},
 				},
 				{
-					site: "s1", body: "TypeError: boom @ /pricing", severity: "ERROR",
+					body: "TypeError: boom @ /pricing", severity: "ERROR",
 					attrs: map[string]string{
 						"rum.type": "error", "session.id": "sess1", "page.path": "/pricing", "page.group": "/pricing", "page.view": "checkout-view",
 						"browser.name": "Chrome", "browser.version": "120", "os": "Linux", "device": "desktop", "country": "GR",
@@ -286,7 +282,7 @@ func TestBuild(t *testing.T) {
 				return b
 			},
 			want: []simpleRec{sessionStart, {
-				site: "s1", body: "console warn: slow request", severity: "INFO",
+				body: "console warn: slow request", severity: "INFO",
 				attrs: map[string]string{
 					"rum.type": "console", "session.id": "sess1", "page.path": "/pricing", "page.group": "/pricing",
 					"browser.name": "Chrome", "browser.version": "120", "os": "Linux", "device": "desktop", "country": "GR",
@@ -336,7 +332,7 @@ func TestExport(t *testing.T) {
 		want    map[string]uint64
 	}{
 		"success counts sent": {
-			want: map[string]uint64{"s1/otlp_sent": 1},
+			want: map[string]uint64{"otlp_sent": 1},
 		},
 		"partial success counts errors not sent": {
 			resp: &collogspb.ExportLogsServiceResponse{
@@ -345,11 +341,11 @@ func TestExport(t *testing.T) {
 					ErrorMessage:       "boom",
 				},
 			},
-			want: map[string]uint64{"s1/otlp_errors": 1},
+			want: map[string]uint64{"otlp_errors": 1},
 		},
 		"rpc failure counts errors": {
 			failRPC: true,
-			want:    map[string]uint64{"s1/otlp_errors": 1},
+			want:    map[string]uint64{"otlp_errors": 1},
 		},
 	}
 	for name, tc := range tests {
@@ -404,7 +400,7 @@ func TestIngestDropsOnFullQueue(t *testing.T) {
 	b2.SessionID = "sess2" // a different session so it still produces a record to drop
 	e.Ingest(b2)
 
-	want := map[string]uint64{"s1/otlp_dropped": 1}
+	want := map[string]uint64{"otlp_dropped": 1}
 	if got := counters.snapshot(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("counters = %#v, want %#v", got, want)
 	}
@@ -412,9 +408,9 @@ func TestIngestDropsOnFullQueue(t *testing.T) {
 
 func TestDisabledCountsDrops(t *testing.T) {
 	counters := newRecCounters()
-	e, err := New(context.Background(), config.OTelCfg{
+	e, err := New(context.Background(), Config{
 		Enabled: "no",
-	}, counters, nil)
+	}, "s1", "", counters, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -425,18 +421,18 @@ func TestDisabledCountsDrops(t *testing.T) {
 	b.PageView = true
 	e.Ingest(b)
 	got := counters.snapshot()
-	if got["s1/otlp_dropped"] != 2 { // session_start + pageview
+	if got["otlp_dropped"] != 2 { // session_start + pageview
 		t.Fatalf("counters = %#v, want 2 dropped", got)
 	}
 }
 
 func TestDialCredsBothOrNeither(t *testing.T) {
-	if _, err := dialCreds(context.Background(), config.OTelCfg{
+	if _, err := dialCreds(context.Background(), Config{
 		TLSCert: "/x.pem",
 	}); err == nil {
 		t.Fatal("tls_cert without tls_key must error")
 	}
-	if _, err := dialCreds(context.Background(), config.OTelCfg{}); err != nil {
+	if _, err := dialCreds(context.Background(), Config{}); err != nil {
 		t.Fatalf("plaintext default must not error: %v", err)
 	}
 }
@@ -533,13 +529,21 @@ func TestShutdownDrainsAcceptedQueues(t *testing.T) {
 	logs := &fakeLogsService{}
 	traces := &fakeTraceService{}
 	counters := newRecCounters()
-	e := newExporter(t, startServer(t, logs), counters, nil)
-	traceDest := startTraceServer(t, traces)
+	e := configuredExporter(
+		t,
+		Config{
+			Enabled:  "yes",
+			Endpoint: startServer(t, logs),
+		},
+		"s1",
+		startTraceServer(t, traces),
+		counters,
+		nil,
+	)
 	var logRecords int
 	for range 300 {
 		b := tracedBeacon()
 		b.PageView = true
-		b.TraceExportTo = traceDest
 		e.Ingest(b)
 	}
 	logRecords = len(e.ch)
@@ -548,8 +552,8 @@ func TestShutdownDrainsAcceptedQueues(t *testing.T) {
 	cancel()
 	e.Run(ctx)
 	got := counters.snapshot()
-	require.EqualValues(t, logRecords, got["s1/"+agg.CounterOTLPSent])
-	require.EqualValues(t, 300, got["s1/"+agg.CounterSpansSent])
+	require.EqualValues(t, logRecords, got[agg.CounterOTLPSent])
+	require.EqualValues(t, 300, got[agg.CounterSpansSent])
 	require.Empty(t, e.ch)
 	require.Empty(t, e.spanCh)
 }
@@ -572,7 +576,7 @@ func TestPartialRejectionDiagnosticsRedactSecrets(t *testing.T) {
 	counters := newRecCounters()
 	e := newExporter(t, startServer(t, logs), counters, newRedactor(t, secret))
 	e.export(context.Background(), e.build(mkBeacon()), exportTimeout)
-	require.Equal(t, uint64(1), counters.snapshot()["s1/otlp_errors"])
+	require.Equal(t, uint64(1), counters.snapshot()["otlp_errors"])
 	require.Contains(t, output.String(), "partial rejection")
 	require.NotContains(t, output.String(), secret)
 	require.Contains(t, output.String(), "[REDACTED]")
@@ -587,12 +591,63 @@ func TestPartialRejectionDiagnosticsRedactSecrets(t *testing.T) {
 		},
 	}
 	b := tracedBeacon()
-	b.TraceExportTo = startTraceServer(t, traces)
-	e.exportSpans(context.Background(), []spanItem{{
-		site: b.Site, dest: b.TraceExportTo, rs: e.resourceSpans(b), n: 1,
+	traceExporter := configuredExporter(
+		t,
+		Config{
+			Enabled: "no",
+		},
+		"s1",
+		startTraceServer(t, traces),
+		counters,
+		newRedactor(t, secret),
+	)
+	traceExporter.exportSpans(context.Background(), []spanItem{{
+		rs: traceExporter.resourceSpans(b), n: 1,
 	}}, exportTimeout)
-	require.Equal(t, uint64(1), counters.snapshot()["s1/spans_errors"])
+	require.Equal(t, uint64(1), counters.snapshot()["spans_errors"])
 	require.Contains(t, output.String(), "partially rejected")
 	require.NotContains(t, output.String(), secret)
 	require.Contains(t, output.String(), "[REDACTED]")
+}
+
+func configuredExporter(
+	t *testing.T,
+	cfg Config,
+	site, destination string,
+	counters Counters,
+	redact *secrets.Redactor,
+) *Exporter {
+	t.Helper()
+	e, err := New(context.Background(), cfg, site, destination, counters, redact)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, e.Close()) })
+	return e
+}
+
+func TestWrongSiteHasNoEffects(t *testing.T) {
+	for _, enabled := range []string{"yes", "no"} {
+		t.Run(enabled, func(t *testing.T) {
+			counters := newRecCounters()
+			e := configuredExporter(t, Config{
+				Enabled:  enabled,
+				Endpoint: "127.0.0.1:1",
+			}, "s1", "", counters, nil)
+			wrong := tracedBeacon()
+			wrong.Site = "other"
+			wrong.PageView = true
+			e.Ingest(wrong)
+			e.Reject("other", "invalid")
+			require.Empty(t, e.ch)
+			require.Empty(t, e.spanCh)
+			require.Empty(t, counters.snapshot())
+			// The rejected session ID must still yield a start on first owned traffic.
+			e.Ingest(mkBeacon())
+			if enabled == "yes" {
+				require.Len(t, e.ch, 1)
+				require.Equal(t, "session_start", simplify(<-e.ch).attrs["rum.type"])
+			} else {
+				require.EqualValues(t, 1, counters.snapshot()[agg.CounterOTLPDropped])
+			}
+		})
+	}
 }

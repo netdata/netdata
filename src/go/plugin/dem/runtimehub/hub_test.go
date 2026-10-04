@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/ingest"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
 	"github.com/stretchr/testify/assert"
@@ -35,9 +35,11 @@ func (r *observedRoutes) Acquire(key string) (*ingest.Route, context.Context, fu
 // A site must retire even when an admitted client stops sending its body.
 func TestRetirementInterruptsNetworkBody(t *testing.T) {
 	hub := runtimehub.New()
-	aggregator := agg.New(time.Minute)
-	route := ingest.NewRoute(config.RumSite{
-		Key:            "shop",
+	aggregator := agg.New(time.Minute, agg.SiteCfg{
+		Name: "shop",
+	})
+	route := ingest.NewRoute(config.Site{
+		Name:           "shop",
 		AllowedOrigins: []string{"https://example.org"},
 	}, aggregator)
 	retire, err := hub.Register("shop", &runtimehub.Site{
@@ -50,9 +52,9 @@ func TestRetirementInterruptsNetworkBody(t *testing.T) {
 		hub:      hub,
 		acquired: make(chan struct{}),
 	}
-	transport := config.RumCfg{
+	transport := config.Receiver{
 		MaxBodyBytes: 262144,
-		RateLimit: config.RumRateLimit{
+		RateLimit: config.RateLimit{
 			PerIPPerMin:   120,
 			PerSitePerSec: 500,
 		},

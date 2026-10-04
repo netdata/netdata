@@ -86,7 +86,7 @@ func TestHistoryRecordsActivityWithoutTimelineEvents(t *testing.T) {
 	a.Ingest(b)
 	require.Len(t, sink.events, 2)
 	assert.Equal(t, "activity", sink.events[1].Type)
-	timeline, _ := a.SessionEvents("s", "session")
+	timeline, _ := a.SessionEvents("session")
 	require.Len(t, timeline, 1)
 	assert.Equal(t, "pageview", timeline[0].Type)
 }

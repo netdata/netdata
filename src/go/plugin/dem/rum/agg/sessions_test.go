@@ -21,7 +21,7 @@ func TestSessionDetailAccumulates(t *testing.T) {
 	a.Ingest(b2)
 	*now = now.Add(5 * time.Second)
 
-	got := trackedSessions(a, "s")
+	got := trackedSessions(a)
 	if len(got) != 1 {
 		t.Fatalf("sessions = %+v", got)
 	}
@@ -40,11 +40,11 @@ func TestSessionDetailAccumulates(t *testing.T) {
 	}
 }
 
-func trackedSessions(a *Aggregator, site string) []*sessionDetail {
+func trackedSessions(a *Aggregator) []*sessionDetail {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	var out []*sessionDetail
-	for el := a.sites[site].sess.Front(); el != nil; el = el.Next() {
+	for el := a.site.sess.Front(); el != nil; el = el.Next() {
 		out = append(out, el.Value.(*sessionDetail))
 	}
 	return out
@@ -62,7 +62,7 @@ func TestSessionEventsRing(t *testing.T) {
 	b2.Events = []beacon.Event{{Name: "checkout"}}
 	a.Ingest(b2)
 
-	events, ok := a.SessionEvents("s", "sess1")
+	events, ok := a.SessionEvents("sess1")
 	if !ok {
 		t.Fatal("session must be found")
 	}
@@ -90,7 +90,7 @@ func TestSessionEventsFiltersNavigationAndResource(t *testing.T) {
 	a.Ingest(b)
 	*now = now.Add(time.Second)
 
-	events, ok := a.SessionEvents("s", "sess1")
+	events, ok := a.SessionEvents("sess1")
 	if !ok {
 		t.Fatal("session must be found")
 	}
@@ -110,7 +110,7 @@ func TestSessionViewChangeEmitsViewEvent(t *testing.T) {
 	b2.View = "checkout"
 	a.Ingest(b2)
 
-	events, ok := a.SessionEvents("s", "sess1")
+	events, ok := a.SessionEvents("sess1")
 	if !ok {
 		t.Fatal("session must be found")
 	}
@@ -130,7 +130,7 @@ func TestSessionViewChangeEmitsViewEvent(t *testing.T) {
 
 func TestSessionEventsUnknownID(t *testing.T) {
 	a, _ := newAgg(30 * time.Minute)
-	if _, ok := a.SessionEvents("s", "nope"); ok {
+	if _, ok := a.SessionEvents("nope"); ok {
 		t.Fatal("unknown session must report not found")
 	}
 }
@@ -142,7 +142,7 @@ func TestSessionEventRingBounded(t *testing.T) {
 		a.Ingest(b)
 		*now = now.Add(time.Second)
 	}
-	events, ok := a.SessionEvents("s", "sess1")
+	events, ok := a.SessionEvents("sess1")
 	if !ok || len(events) != sessionEventRingCap {
 		t.Fatalf("events len = %d want %d (ok=%v)", len(events), sessionEventRingCap, ok)
 	}
@@ -153,7 +153,7 @@ func TestSessionLRUEvictsOldest(t *testing.T) {
 	for i := 0; i < maxTrackedSessions+50; i++ {
 		a.Ingest(mk(*now, fmt.Sprintf("sess-%d", i), "/a"))
 	}
-	got := trackedSessions(a, "s")
+	got := trackedSessions(a)
 	if len(got) != maxTrackedSessions {
 		t.Fatalf("tracked sessions = %d want %d", len(got), maxTrackedSessions)
 	}
@@ -165,47 +165,25 @@ func TestSessionLRUEvictsOldest(t *testing.T) {
 	_ = now
 }
 
-func TestSessionsFilterBySite(t *testing.T) {
-	a, now := newAgg(
-		30*time.Minute,
-		SiteCfg{
-			Key:        "a",
-			Name:       "A",
+func TestSessionsStayWithTheirOwner(t *testing.T) {
+	for _, site := range []string{"a", "b"} {
+		a, now := newAgg(30*time.Minute, SiteCfg{
+			Name:       site,
 			PageGroups: 20,
 			Countries:  20,
-		},
-		SiteCfg{
-			Key:        "b",
-			Name:       "B",
-			PageGroups: 20,
-			Countries:  20,
-		},
-	)
-	ba := &beacon.Beacon{
-		Site:      "a",
-		SessionID: "s1",
-		Path:      "/x",
-		PageGroup: "/x",
-		Browser:   "Chrome",
-		Device:    "desktop",
-	}
-	a.Ingest(ba)
-	bb := &beacon.Beacon{
-		Site:      "b",
-		SessionID: "s2",
-		Path:      "/y",
-		PageGroup: "/y",
-		Browser:   "Chrome",
-		Device:    "desktop",
-	}
-	a.Ingest(bb)
-	*now = now.Add(time.Second)
-
-	if got := trackedSessions(a, "a"); len(got) != 1 || got[0].id != "s1" {
-		t.Fatalf("site a = %+v", got)
-	}
-	if _, ok := a.SessionEvents("b", "s1"); ok {
-		t.Fatal("s1 must not be found when searching only site b")
+		})
+		for _, incoming := range []string{"a", "b"} {
+			a.Ingest(&beacon.Beacon{
+				Site:      incoming,
+				Received:  *now,
+				SessionID: "shared",
+				PageGroup: "/" + incoming,
+			})
+		}
+		events, ok := a.SessionEvents("shared")
+		if !ok || len(events) != 1 || events[0].Page != "/"+site {
+			t.Fatalf("site %s events = %+v, found=%v", site, events, ok)
+		}
 	}
 }
 
@@ -217,7 +195,7 @@ func TestActiveSessionsGaugeUsesSessionLRU(t *testing.T) {
 	*now = now.Add(20 * time.Minute)
 	a.Ingest(mk(*now, "s1", "/b"))
 	*now = t0.Add(31 * time.Minute) // s2 idle 31m, s1 idle 11m
-	if got := one(a).ActiveSessions; got != 1 {
+	if got := a.Snapshot().ActiveSessions; got != 1 {
 		t.Fatalf("active=%d want 1", got)
 	}
 }
@@ -236,7 +214,7 @@ func TestTracedRequestInSessionTimeline(t *testing.T) {
 		},
 	}}
 	a.Ingest(b)
-	events, ok := a.SessionEvents("s", "s1")
+	events, ok := a.SessionEvents("s1")
 	if !ok {
 		t.Fatal("session missing")
 	}
@@ -256,7 +234,7 @@ func TestBotsFilteredPerMinute(t *testing.T) {
 	a, _ := newAgg(5 * time.Minute)
 	a.Reject("s", beacon.RejectBot)
 	a.Reject("s", beacon.RejectBot)
-	if got := a.Activity()["s"].BotsPerMin; got != 2 {
+	if got := a.Activity().BotsPerMin; got != 2 {
 		t.Fatalf("bots per min = %d", got)
 	}
 }
@@ -278,7 +256,7 @@ func TestElementsFrustrationAndUser(t *testing.T) {
 	a.Ingest(b)
 	a.Snapshot()
 
-	events, _ := a.SessionEvents("s", "s1")
+	events, _ := a.SessionEvents("s1")
 	var texts []string
 	for _, e := range events {
 		if e.Type == "vital" || e.Type == "frustration" {
@@ -288,11 +266,11 @@ func TestElementsFrustrationAndUser(t *testing.T) {
 	if len(texts) != 2 || texts[0] != "poor LCP 5200 ms on #hero img" || texts[1] != "rage click on button#buy" {
 		t.Fatalf("timeline = %v", texts)
 	}
-	pages := a.Pages("s")
+	pages := a.Pages()
 	if len(pages) != 1 || pages[0].LCPElement != "#hero img" || pages[0].FrustrationWindow != 1 {
 		t.Fatalf("pages = %+v", pages)
 	}
-	if got := one(a).Counters[CounterRageClicks]; got != 1 {
+	if got := a.Snapshot().Counters[CounterRageClicks]; got != 1 {
 		t.Fatalf("rage clicks = %d", got)
 	}
 	last := h.events[len(h.events)-1]

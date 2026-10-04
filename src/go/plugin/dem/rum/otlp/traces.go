@@ -24,24 +24,21 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
-// Browser spans are batched like log records but by destination:
-// "" is otel.endpoint (the logs connection), anything else a site's
-// tracing.export_to.
+// Browser spans share the owning site's immutable trace destination.
 const (
 	spanQueueCap = 2000
 	maxSpanBatch = 50
 )
 
 type spanItem struct {
-	site, dest string
-	n          uint64
-	rs         *tracepb.ResourceSpans
+	n  uint64
+	rs *tracepb.ResourceSpans
 }
 
-type traceClients struct {
-	mu      sync.Mutex
-	clients map[string]coltracepb.TraceServiceClient
-	conns   []*grpc.ClientConn
+type traceConnection struct {
+	mu     sync.Mutex
+	client coltracepb.TraceServiceClient
+	conn   *grpc.ClientConn
 }
 
 // enqueueSpans builds this beacon's ResourceSpans and queues them.
@@ -51,19 +48,17 @@ func (e *Exporter) enqueueSpans(b *beacon.Beacon) {
 		return
 	}
 	n := uint64(len(b.Spans))
-	if e.disabled && b.TraceExportTo == "" {
-		e.counters.Add(b.Site, agg.CounterSpansDropped, n)
+	if e.disabled && e.traceDestination == "" {
+		e.counters.Add(agg.CounterSpansDropped, n)
 		return
 	}
 	select {
 	case e.spanCh <- spanItem{
-		site: b.Site,
-		dest: b.TraceExportTo,
-		n:    n,
-		rs:   rs,
+		n:  n,
+		rs: rs,
 	}:
 	default:
-		e.counters.Add(b.Site, agg.CounterSpansDropped, n)
+		e.counters.Add(agg.CounterSpansDropped, n)
 	}
 }
 
@@ -188,94 +183,79 @@ func (e *Exporter) runSpans(ctx context.Context, final func() context.Context) {
 }
 
 func (e *Exporter) exportSpans(parent context.Context, batch []spanItem, timeout time.Duration) {
-	byDest := map[string][]spanItem{}
+	req := &coltracepb.ExportTraceServiceRequest{
+		ResourceSpans: make([]*tracepb.ResourceSpans, 0, len(batch)),
+	}
+	var n uint64
 	for _, it := range batch {
-		byDest[it.dest] = append(byDest[it.dest], it)
+		req.ResourceSpans = append(req.ResourceSpans, it.rs)
+		n += it.n
 	}
-	for dest, items := range byDest {
-		req := &coltracepb.ExportTraceServiceRequest{}
-		for _, it := range items {
-			req.ResourceSpans = append(req.ResourceSpans, it.rs)
-		}
-		count := func(counter string) {
-			for _, it := range items {
-				e.counters.Add(it.site, counter, it.n)
-			}
-		}
-		client := e.traceClient(dest)
-		if client == nil {
-			count(agg.CounterSpansErrors)
-			continue
-		}
-		ctx, cancel := context.WithTimeout(parent, timeout)
-		if dest == "" && e.authMD != nil {
-			ctx = metadata.NewOutgoingContext(ctx, e.authMD)
-		}
-		resp, err := client.Export(ctx, req)
-		cancel()
-		if err != nil {
-			count(agg.CounterSpansErrors)
-			continue
-		}
-		if ps := resp.GetPartialSuccess(); ps != nil && ps.RejectedSpans > 0 {
-			exportLog.Warningf(
-				"rum/otlp: span export to %q partially rejected: %d spans — %s",
-				e.redact(dest),
-				ps.RejectedSpans,
-				e.redact(ps.ErrorMessage),
-			)
-			count(agg.CounterSpansErrors)
-			continue
-		}
-		count(agg.CounterSpansSent)
+	client := e.traceClient()
+	if client == nil {
+		e.counters.Add(agg.CounterSpansErrors, n)
+		return
 	}
+	ctx, cancel := context.WithTimeout(parent, timeout)
+	defer cancel()
+	if e.traceDestination == "" && e.authMD != nil {
+		ctx = metadata.NewOutgoingContext(ctx, e.authMD)
+	}
+	resp, err := client.Export(ctx, req)
+	if err != nil {
+		e.counters.Add(agg.CounterSpansErrors, n)
+		return
+	}
+	if ps := resp.GetPartialSuccess(); ps != nil && ps.RejectedSpans > 0 {
+		exportLog.Warningf(
+			"rum/otlp: span export to %q partially rejected: %d spans — %s",
+			e.redact(e.traceDestination),
+			ps.RejectedSpans,
+			e.redact(ps.ErrorMessage),
+		)
+		e.counters.Add(agg.CounterSpansErrors, n)
+		return
+	}
+	e.counters.Add(agg.CounterSpansSent, n)
 }
 
-// traceClient returns the trace client for dest, dialing a site's
-// export_to on first use (plaintext host:port, or TLS for https://).
-func (e *Exporter) traceClient(dest string) coltracepb.TraceServiceClient {
-	if dest == "" {
+// traceClient lazily opens the site's fixed destination. Empty uses the logs
+// connection; an external endpoint is plaintext unless prefixed with https://.
+func (e *Exporter) traceClient() coltracepb.TraceServiceClient {
+	e.traces.mu.Lock()
+	defer e.traces.mu.Unlock()
+	if e.traces.client != nil {
+		return e.traces.client
+	}
+	if e.traceDestination == "" {
 		if e.conn == nil {
 			return nil
 		}
-		dest = "\x00local"
+		e.traces.client = coltracepb.NewTraceServiceClient(e.conn)
+		return e.traces.client
 	}
-	e.traces.mu.Lock()
-	defer e.traces.mu.Unlock()
-	if c, ok := e.traces.clients[dest]; ok {
-		return c
-	}
-	if e.traces.clients == nil {
-		e.traces.clients = map[string]coltracepb.TraceServiceClient{}
-	}
-	if dest == "\x00local" {
-		c := coltracepb.NewTraceServiceClient(e.conn)
-		e.traces.clients[dest] = c
-		return c
-	}
-	target, creds := strings.TrimPrefix(dest, "https://"), insecure.NewCredentials()
-	if strings.HasPrefix(dest, "https://") {
+	target, creds := strings.TrimPrefix(e.traceDestination, "https://"), insecure.NewCredentials()
+	if strings.HasPrefix(e.traceDestination, "https://") {
 		creds = credentials.NewTLS(&tls.Config{
 			MinVersion: tls.VersionTLS12,
 		})
 	}
 	conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(creds))
 	if err != nil {
-		exportLog.Errorf("rum/otlp: span destination %s: %v", e.redact(dest), e.redact(err.Error()))
+		exportLog.Errorf("rum/otlp: span destination %s: %v", e.redact(e.traceDestination), e.redact(err.Error()))
 		return nil
 	}
 	conn.Connect()
-	e.traces.conns = append(e.traces.conns, conn)
-	c := coltracepb.NewTraceServiceClient(conn)
-	e.traces.clients[dest] = c
-	return c
+	e.traces.conn = conn
+	e.traces.client = coltracepb.NewTraceServiceClient(conn)
+	return e.traces.client
 }
 
-func (e *Exporter) closeTraceConns() {
+func (e *Exporter) closeTraceConn() {
 	e.traces.mu.Lock()
 	defer e.traces.mu.Unlock()
-	for _, c := range e.traces.conns {
-		_ = c.Close()
+	if e.traces.conn != nil {
+		_ = e.traces.conn.Close()
+		e.traces.conn = nil
 	}
-	e.traces.conns = nil
 }

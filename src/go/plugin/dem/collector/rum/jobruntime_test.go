@@ -14,6 +14,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -97,8 +98,8 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 		Hub:     hub,
 		History: db,
 	})
-	site.Key = "shop"
-	site.Name = "Shop"
+	site.Name = "shop"
+	site.DisplayName = "Shop"
 	site.AllowedOrigins = []string{"https://example.org"}
 	site.OTLP.Enabled = "no"
 	siteJob, siteOut, stopSite := startJob(t, "rum", "shop", site)
@@ -167,10 +168,83 @@ func TestCancelledOTLPPreparationHonorsCaller(t *testing.T) {
 		Hub:     runtimehub.New(),
 		History: db,
 	})
-	site.Key = "shop"
+	site.Name = "shop"
 	site.AllowedOrigins = []string{"https://example.org"}
 	site.OTLP.TLSCA = "synthetic-ca.pem"
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	require.ErrorIs(t, site.Init(ctx), context.Canceled)
+}
+
+func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.Open(ctx, "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	hub := runtimehub.New()
+	startSite := func(name string) func() {
+		c := rum.New(rum.Dependencies{
+			Hub:     hub,
+			History: db,
+		})
+		c.Name, c.AllowedOrigins, c.OTLP.Enabled = name, []string{"https://example.org"}, "no"
+		_, _, stop := startJob(t, "rum", name, c)
+		return stop
+	}
+	stopAlpha, stopBeta := startSite("alpha"), startSite("beta")
+	startReceiver := func() func() {
+		c := receiver.New(hub)
+		c.Listen = "127.0.0.1:0"
+		_, _, stop := startJob(t, "receiver", "receiver", c)
+		return stop
+	}
+	stopReceiver := startReceiver()
+	send := func(site, page string, status int) {
+		body := `{"meta":{"page":{"url":"https://example.org` + page + `"},"session":{"id":"same-session"},"browser":{"name":"Chrome"}}}`
+		req, err := http.NewRequestWithContext(
+			ctx,
+			http.MethodPost,
+			"http://"+hub.Availability().Listen+"/rum/"+site+"/collect",
+			strings.NewReader(body),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Origin", "https://example.org")
+		req.Header.Set("User-Agent", "Mozilla/5.0 Chrome/124.0.0.0 Safari/537.36")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		require.Equal(t, status, resp.StatusCode)
+	}
+	generations := make(map[string]string)
+	for _, name := range []string{"alpha", "beta"} {
+		send(name, "/first", http.StatusAccepted)
+		data, _, release, ok := hub.AcquireSite(name)
+		require.True(t, ok)
+		generations[name] = data.Generation
+		snapshot := data.Aggregator.Snapshot()
+		release()
+		require.EqualValues(t, 1, snapshot.Counters[agg.CounterPageviews])
+		require.Equal(t, 1, snapshot.ActiveSessions)
+	}
+	stopReceiver()
+	stopNext := startReceiver()
+	for _, name := range []string{"alpha", "beta"} {
+		data, _, release, ok := hub.AcquireSite(name)
+		require.True(t, ok)
+		generation := data.Generation
+		release()
+		require.Equal(t, generations[name], generation)
+	}
+	stopAlpha()
+	send("alpha", "/retired", http.StatusNotFound)
+	send("beta", "/second", http.StatusAccepted)
+	stopBeta()
+	stopNext()
+	for name, want := range map[string]uint64{"alpha": 1, "beta": 2} {
+		rows, err := db.QueryRumSessions(ctx, name, 0, time.Now().Unix()+10, 10)
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		require.Equal(t, "same-session", rows[0].SessionID)
+		require.EqualValues(t, want, rows[0].Pageviews)
+	}
 }

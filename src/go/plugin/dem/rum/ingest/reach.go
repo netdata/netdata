@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
 )
 
 var log = logger.New()
@@ -36,11 +35,14 @@ type Reach struct {
 // reachState holds what the collector learned about how browsers reach
 // it: the address seen through a trusted proxy, and the latest probe.
 type reachState struct {
-	mu       sync.Mutex
-	observed map[string]string
-	results  map[string]Reach
-	snippets map[string]SnippetCheck
-	rejects  map[string]RejectedOrigin
+	mu                sync.Mutex
+	observed          string
+	result            Reach
+	hasResult         bool
+	snippet           SnippetCheck
+	hasSnippet        bool
+	rejectedOrigin    RejectedOrigin
+	hasRejectedOrigin bool
 }
 
 // RejectedOrigin is the last origin whose beacons a site refused.
@@ -49,98 +51,82 @@ type RejectedOrigin struct {
 	At     time.Time
 }
 
-func (r *reachState) rejected(key, origin string, at time.Time) {
+func (r *reachState) rejected(origin string, at time.Time) {
 	if origin == "" {
 		return
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.rejects == nil {
-		r.rejects = map[string]RejectedOrigin{}
-	}
-	r.rejects[key] = RejectedOrigin{
+	r.rejectedOrigin = RejectedOrigin{
 		Origin: origin,
 		At:     at,
 	}
+	r.hasRejectedOrigin = true
 }
 
-// LastRejectedOrigin is the last origin refused for site key, if any.
-func (s *Route) LastRejectedOrigin(key string) (RejectedOrigin, bool) {
+// LastRejectedOrigin is the last origin refused by this site, if any.
+func (s *Route) LastRejectedOrigin() (RejectedOrigin, bool) {
 	s.reach.mu.Lock()
 	defer s.reach.mu.Unlock()
-	r, ok := s.reach.rejects[key]
-	return r, ok
+	return s.reach.rejectedOrigin, s.reach.hasRejectedOrigin
 }
 
-// Snippet reports the latest check of site key's home page.
-func (s *Route) Snippet(key string) (SnippetCheck, bool) {
+// Snippet reports the latest check of this site's home page.
+func (s *Route) Snippet() (SnippetCheck, bool) {
 	s.reach.mu.Lock()
 	defer s.reach.mu.Unlock()
-	c, ok := s.reach.snippets[key]
-	return c, ok
+	return s.reach.snippet, s.reach.hasSnippet
 }
 
-func (s *Route) recordSnippet(key string, c SnippetCheck) {
+func (s *Route) recordSnippet(c SnippetCheck) {
 	s.reach.mu.Lock()
-	if s.reach.snippets == nil {
-		s.reach.snippets = map[string]SnippetCheck{}
-	}
-	prev, seen := s.reach.snippets[key]
-	s.reach.snippets[key] = c
+	prev, seen := s.reach.snippet, s.reach.hasSnippet
+	s.reach.snippet, s.reach.hasSnippet = c, true
 	s.reach.mu.Unlock()
 	if !seen || prev.State != c.State {
-		log.Noticef("rum: site %s snippet check: %s %s", key, c.State, c.Detail)
+		log.Noticef("rum: site %s snippet check: %s %s", s.config.Name, c.State, c.Detail)
 	}
 }
 
-func (r *reachState) observe(key, base string) {
+func (r *reachState) observe(base string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.observed == nil {
-		r.observed = map[string]string{}
-	}
-	r.observed[key] = base
+	r.observed = base
 }
 
-// ObservedBase is the public address of site key as last seen on a
-// request through a trusted proxy ("" when none).
-func (s *Route) ObservedBase(key string) string {
+// ObservedBase is the public address last seen through a trusted proxy.
+func (s *Route) ObservedBase() string {
 	s.reach.mu.Lock()
 	defer s.reach.mu.Unlock()
-	return s.reach.observed[key]
+	return s.reach.observed
 }
 
-// Reachability returns the latest probe of site key.
-func (s *Route) Reachability(key string) (Reach, bool) {
+// Reachability returns this site's latest probe, if one has completed.
+func (s *Route) Reachability() (Reach, bool) {
 	s.reach.mu.Lock()
 	defer s.reach.mu.Unlock()
-	r, ok := s.reach.results[key]
-	return r, ok
+	return s.reach.result, s.reach.hasResult
 }
 
-// Probe fetches base/rum/<key>.js the way a visitor's browser would and
-// records whether this collector answered it.
-func (s *Route) Probe(ctx context.Context, client *http.Client, key, base string) Reach {
+// Probe fetches this site's bootstrap and records whether this receiver answers.
+func (s *Route) Probe(ctx context.Context, client *http.Client, base string) Reach {
 	r := Reach{
 		State:     ReachOK,
 		Base:      base,
 		CheckedAt: time.Now(),
 	}
-	if err := fetchOwnBootstrap(ctx, client, key, base); err != nil {
+	if err := fetchOwnBootstrap(ctx, client, s.config.Name, base); err != nil {
 		r.State, r.Error = ReachFailed, err.Error()
 	}
 	s.reach.mu.Lock()
-	if s.reach.results == nil {
-		s.reach.results = map[string]Reach{}
-	}
-	prev, seen := s.reach.results[key]
-	s.reach.results[key] = r
+	prev, seen := s.reach.result, s.reach.hasResult
+	s.reach.result, s.reach.hasResult = r, true
 	s.reach.mu.Unlock()
 	if !seen || prev.State != r.State || prev.Base != r.Base {
 		if r.State == ReachOK {
-			log.Noticef("rum: site %s public URL %s reachable", key, base)
+			log.Noticef("rum: site %s public URL %s reachable", s.config.Name, base)
 		} else {
-			log.Warningf("rum: site %s public URL %s unreachable: %s", key, base, r.Error)
+			log.Warningf("rum: site %s public URL %s unreachable: %s", s.config.Name, base, r.Error)
 		}
 	}
 	return r
@@ -175,31 +161,32 @@ func fetchOwnBootstrap(ctx context.Context, client *http.Client, key, base strin
 // PublicBase is the base URL for site's snippet: public_url when set,
 // else the address learned through a trusted proxy once a probe confirmed
 // it reaches this collector, else fallback (the listener).
-func (s *Route) PublicBase(site config.RumSite, fallback string) string {
-	if site.PublicURL != "" {
-		return strings.TrimRight(site.PublicURL, "/")
+func (s *Route) PublicBase(fallback string) string {
+	if s.config.PublicURL != "" {
+		return strings.TrimRight(s.config.PublicURL, "/")
 	}
-	observed := s.ObservedBase(site.Key)
-	if r, ok := s.Reachability(site.Key); ok && observed != "" && r.State == ReachOK && r.Base == observed {
-		return observed
+	s.reach.mu.Lock()
+	defer s.reach.mu.Unlock()
+	if s.reach.hasResult && s.reach.observed != "" && s.reach.result.State == ReachOK &&
+		s.reach.result.Base == s.reach.observed {
+		return s.reach.observed
 	}
 	return fallback
 }
 
-// RunReachability probes every site now and then every interval, until
-// ctx ends. Sites with neither public_url nor a learned address stay
-// unknown.
+// RunReachability probes this site immediately and then every interval.
+// Without a configured or learned public address, reachability stays unknown.
 func (s *Route) RunReachability(ctx context.Context, every time.Duration, base func() string, client *http.Client) {
 	t := time.NewTicker(every)
 	defer t.Stop()
 	for {
 		publicBase := strings.TrimRight(base(), "/")
 		if publicBase == "" {
-			publicBase = s.ObservedBase(s.config.Key)
+			publicBase = s.ObservedBase()
 		}
 		if publicBase != "" {
-			s.Probe(ctx, client, s.config.Key, publicBase)
-			s.recordSnippet(s.config.Key, CheckSnippet(ctx, client, s.config, publicBase))
+			s.Probe(ctx, client, publicBase)
+			s.recordSnippet(CheckSnippet(ctx, client, s.config, publicBase))
 		}
 		select {
 		case <-ctx.Done():

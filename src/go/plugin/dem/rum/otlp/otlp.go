@@ -27,7 +27,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/secrets"
@@ -54,18 +53,20 @@ const (
 // Counters receives the rum.otlp chart bookkeeping (sent/dropped/errors
 // dimensions). *agg.Aggregator satisfies this directly.
 type Counters interface {
-	Add(site, counter string, n uint64)
+	Add(counter string, n uint64)
 }
 
 // Exporter batches beacon-derived records and exports them as OTLP logs.
 // It implements beacon.Sink so it can sit in the collector's fan-out
 // alongside the in-memory aggregator.
 type Exporter struct {
-	conn     *grpc.ClientConn
-	client   collogspb.LogsServiceClient
-	counters Counters
-	redactor *secrets.Redactor
-	authMD   metadata.MD
+	siteName         string
+	traceDestination string
+	conn             *grpc.ClientConn
+	client           collogspb.LogsServiceClient
+	counters         Counters
+	redactor         *secrets.Redactor
+	authMD           metadata.MD
 
 	disabled bool // otel.enabled == "no": events have nowhere to go
 	sessions *sessionTracker
@@ -73,21 +74,30 @@ type Exporter struct {
 
 	ch     chan queued
 	spanCh chan spanItem
-	traces traceClients
+	traces traceConnection
 }
 
 // New builds an exporter for the site OTLP configuration. grpc.NewClient
 // is nonblocking; Connect starts the first attempt in the background,
 // with reconnect backoff from 1s to 60s. Configuration errors, such as bad
 // TLS material, prevent the site runtime from starting.
-func New(ctx context.Context, cfg config.OTelCfg, counters Counters, redactor *secrets.Redactor) (*Exporter, error) {
+func New(
+	ctx context.Context,
+	cfg Config,
+	siteName string,
+	traceDestination string,
+	counters Counters,
+	redactor *secrets.Redactor,
+) (*Exporter, error) {
 	e := &Exporter{
-		counters: counters,
-		redactor: redactor,
-		sessions: newSessionTracker(),
-		now:      time.Now,
-		ch:       make(chan queued, queueCap),
-		spanCh:   make(chan spanItem, spanQueueCap),
+		siteName:         siteName,
+		traceDestination: traceDestination,
+		counters:         counters,
+		redactor:         redactor,
+		sessions:         newSessionTracker(),
+		now:              time.Now,
+		ch:               make(chan queued, queueCap),
+		spanCh:           make(chan spanItem, spanQueueCap),
 	}
 	if cfg.Enabled == "no" {
 		e.disabled = true
@@ -123,7 +133,7 @@ func New(ctx context.Context, cfg config.OTelCfg, counters Counters, redactor *s
 
 // dialCreds builds transport credentials: plaintext unless TLS options
 // are set. A client certificate and key must be supplied together.
-func dialCreds(ctx context.Context, cfg config.OTelCfg) (credentials.TransportCredentials, error) {
+func dialCreds(ctx context.Context, cfg Config) (credentials.TransportCredentials, error) {
 	if cfg.TLSCert == "" && cfg.TLSKey == "" && cfg.TLSCA == "" {
 		return insecure.NewCredentials(), nil
 	}
@@ -146,7 +156,7 @@ func dialCreds(ctx context.Context, cfg config.OTelCfg) (credentials.TransportCr
 }
 
 // ValidateConfig checks transport material without starting a gRPC client.
-func ValidateConfig(ctx context.Context, cfg config.OTelCfg) error {
+func ValidateConfig(ctx context.Context, cfg Config) error {
 	if cfg.Enabled == "no" {
 		return nil
 	}
@@ -165,7 +175,7 @@ func (e *Exporter) Run(ctx context.Context) {
 	var once sync.Once
 	var finalCtx context.Context
 	var finalCancel context.CancelFunc
-	// Logs, spans and all destinations share one finalization budget.
+	// Logs and spans share one finalization budget.
 	final := func() context.Context {
 		once.Do(func() { finalCtx, finalCancel = context.WithTimeout(context.Background(), shutdownFlushTimeout) })
 		return finalCtx
@@ -228,7 +238,7 @@ func (e *Exporter) Run(ctx context.Context) {
 // Close releases the gRPC connection. Safe to call once Run has
 // returned (or concurrently — the conn is only touched here).
 func (e *Exporter) Close() error {
-	e.closeTraceConns()
+	e.closeTraceConn()
 	if e.conn != nil {
 		return e.conn.Close()
 	}
@@ -239,6 +249,9 @@ func (e *Exporter) Close() error {
 // counting queue overflow as dropped. When OTLP is disabled, records
 // are counted as dropped because there is no fallback export path.
 func (e *Exporter) Ingest(b *beacon.Beacon) {
+	if b.Site != e.siteName {
+		return
+	}
 	if b.SampledOut {
 		return // measured, but its session is not investigated
 	}
@@ -250,14 +263,14 @@ func (e *Exporter) Ingest(b *beacon.Beacon) {
 		return
 	}
 	if e.disabled {
-		e.counters.Add(b.Site, agg.CounterOTLPDropped, uint64(len(recs)))
+		e.counters.Add(agg.CounterOTLPDropped, uint64(len(recs)))
 		return
 	}
 	for _, q := range recs {
 		select {
 		case e.ch <- q:
 		default:
-			e.counters.Add(q.site, agg.CounterOTLPDropped, 1)
+			e.counters.Add(agg.CounterOTLPDropped, 1)
 		}
 	}
 }
@@ -272,35 +285,26 @@ func (e *Exporter) redact(s string) string {
 	return e.redactor.Apply(s)
 }
 
-// export sends one batch, grouping records into per-site ResourceLogs
-// (resource attrs are exactly service.name + rum.site).
-// Successes/failures are counted per site on the rum.otlp chart.
+// export sends one batch with the owning site's resource attributes.
 func (e *Exporter) export(parent context.Context, batch []queued, timeout time.Duration) {
-	bySite := map[string][]*logspb.LogRecord{}
-	countBySite := map[string]uint64{}
+	recs := make([]*logspb.LogRecord, 0, len(batch))
 	for _, q := range batch {
-		bySite[q.site] = append(bySite[q.site], q.rec)
-		countBySite[q.site]++
+		recs = append(recs, q.rec)
 	}
 	req := &collogspb.ExportLogsServiceRequest{
-		ResourceLogs: make([]*logspb.ResourceLogs, 0, len(bySite)),
-	}
-	for site, recs := range bySite {
-		req.ResourceLogs = append(req.ResourceLogs, &logspb.ResourceLogs{
+		ResourceLogs: []*logspb.ResourceLogs{{
 			Resource: &resourcepb.Resource{
 				Attributes: []*commonpb.KeyValue{
-					strAttr("service.name", serviceName), strAttr("rum.site", site),
+					strAttr("service.name", serviceName), strAttr("rum.site", e.siteName),
 				},
 			},
-			ScopeLogs: []*logspb.ScopeLogs{{
-				Scope: &commonpb.InstrumentationScope{
+			ScopeLogs: []*logspb.ScopeLogs{
+				{Scope: &commonpb.InstrumentationScope{
 					Name: "digital-experience-rum",
-				},
-				LogRecords: recs,
-			}},
-		})
+				}, LogRecords: recs},
+			},
+		}},
 	}
-
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 	if e.authMD != nil {
@@ -308,25 +312,18 @@ func (e *Exporter) export(parent context.Context, batch []queued, timeout time.D
 	}
 	resp, err := e.client.Export(ctx, req)
 	if err != nil {
-		for site, n := range countBySite {
-			e.counters.Add(site, agg.CounterOTLPErrors, n)
-		}
+		e.counters.Add(agg.CounterOTLPErrors, uint64(len(batch)))
 		return
 	}
 	if ps := resp.GetPartialSuccess(); ps != nil && ps.RejectedLogRecords > 0 {
-		// OTLP does not say which records were rejected; count the whole
-		// batch as errors rather than overclaiming success.
+		// OTLP cannot identify rejected records; count the whole batch as errors.
 		exportLog.Warningf(
 			"rum/otlp: export partial rejection: %d records — %s",
 			ps.RejectedLogRecords,
 			e.redact(ps.ErrorMessage),
 		)
-		for site, n := range countBySite {
-			e.counters.Add(site, agg.CounterOTLPErrors, n)
-		}
+		e.counters.Add(agg.CounterOTLPErrors, uint64(len(batch)))
 		return
 	}
-	for site, n := range countBySite {
-		e.counters.Add(site, agg.CounterOTLPSent, n)
-	}
+	e.counters.Add(agg.CounterOTLPSent, uint64(len(batch)))
 }

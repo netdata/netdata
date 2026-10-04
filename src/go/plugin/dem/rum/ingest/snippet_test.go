@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 )
 
 const collectorBase = "https://abc123.collectors.example.net"
@@ -44,8 +44,8 @@ func TestCheckSnippet(t *testing.T) {
 			}))
 			defer site.Close()
 			got := CheckSnippet(context.Background(), site.Client(),
-				config.RumSite{
-					Key:            "shop",
+				config.Site{
+					Name:           "shop",
 					AllowedOrigins: []string{site.URL},
 				}, collectorBase)
 			if got.State != tc.want || !strings.Contains(got.Detail, tc.detail) {
@@ -56,8 +56,8 @@ func TestCheckSnippet(t *testing.T) {
 }
 
 func TestCheckSnippetWithoutOrigins(t *testing.T) {
-	if got := CheckSnippet(context.Background(), http.DefaultClient, config.RumSite{
-		Key: "shop",
+	if got := CheckSnippet(context.Background(), http.DefaultClient, config.Site{
+		Name: "shop",
 	}, collectorBase); got.State != SnippetUnchecked {
 		t.Fatalf("state = %s", got.State)
 	}
@@ -88,7 +88,7 @@ func TestPingAndRejectedOrigin(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("collect from a foreign origin = %d", rec.Code)
 	}
-	got, ok := s.LastRejectedOrigin("shop")
+	got, ok := s.route("shop").LastRejectedOrigin()
 	if !ok || got.Origin != "https://www.shop.example.com" {
 		t.Fatalf("last rejected = %+v %v", got, ok)
 	}

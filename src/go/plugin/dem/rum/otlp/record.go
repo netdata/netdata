@@ -17,13 +17,8 @@ import (
 // defensive second cap so a future producer cannot regress it silently.
 const maxStackBytes = 4096
 
-// queued is one record waiting on the export queue, tagged with the site
-// its resource attributes belong to (a single beacon never spans sites,
-// but the batcher groups many beacons together).
-type queued struct {
-	site string
-	rec  *logspb.LogRecord
-}
+// queued is one record waiting on the owning site's export queue.
+type queued struct{ rec *logspb.LogRecord }
 
 // build turns one accepted beacon into zero or more queued records:
 // pageview, session_start (first sighting per session/TTL), one per JS
@@ -36,10 +31,10 @@ func (e *Exporter) build(b *beacon.Beacon) []queued {
 	var out []queued
 
 	if b.SessionID != "" && e.sessions.starts(b.SessionID, now) {
-		out = append(out, e.record(b, base, "session_start", b.Received, sevInfo, "session start"))
+		out = append(out, e.record(base, "session_start", b.Received, sevInfo, "session start"))
 	}
 	if b.PageView {
-		out = append(out, e.record(b, base, "pageview", b.Received, sevInfo, "pageview "+b.Path))
+		out = append(out, e.record(base, "pageview", b.Received, sevInfo, "pageview "+b.Path))
 	}
 	for _, err := range b.Errors {
 		msg := e.redact(err.Message)
@@ -50,7 +45,7 @@ func (e *Exporter) build(b *beacon.Beacon) []queued {
 			attrs = append(attrs, strAttr("error.fingerprint", err.Fingerprint))
 		}
 		body := err.Type + ": " + msg + " @ " + b.Path
-		out = append(out, e.recordAttrs(b, attrs, "error", err.Time, sevError, body))
+		out = append(out, e.record(attrs, "error", err.Time, sevError, body))
 	}
 	for _, ev := range b.Events {
 		attrs := append(append([]*commonpb.KeyValue{}, base...), strAttr("event.name", ev.Name))
@@ -58,12 +53,12 @@ func (e *Exporter) build(b *beacon.Beacon) []queued {
 			attrs = append(attrs, strAttr("event.attr."+k, e.redact(v)))
 		}
 		body := "event " + ev.Name + " @ " + b.Path
-		out = append(out, e.recordAttrs(b, attrs, "event", ev.Time, sevInfo, body))
+		out = append(out, e.record(attrs, "event", ev.Time, sevInfo, body))
 	}
 	for _, l := range b.Logs {
 		msg := e.redact(l.Message)
 		body := "console " + l.Level + ": " + msg
-		out = append(out, e.record(b, base, "console", l.Time, sevInfo, body))
+		out = append(out, e.record(base, "console", l.Time, sevInfo, body))
 	}
 	return out
 }
@@ -97,18 +92,6 @@ func baseAttrs(b *beacon.Beacon) []*commonpb.KeyValue {
 }
 
 func (e *Exporter) record(
-	b *beacon.Beacon,
-	base []*commonpb.KeyValue,
-	typ string,
-	ts time.Time,
-	sev logspb.SeverityNumber,
-	body string,
-) queued {
-	return e.recordAttrs(b, base, typ, ts, sev, body)
-}
-
-func (e *Exporter) recordAttrs(
-	b *beacon.Beacon,
 	attrs []*commonpb.KeyValue,
 	typ string,
 	ts time.Time,
@@ -132,8 +115,7 @@ func (e *Exporter) recordAttrs(
 		Attributes: all,
 	}
 	return queued{
-		site: b.Site,
-		rec:  rec,
+		rec: rec,
 	}
 }
 

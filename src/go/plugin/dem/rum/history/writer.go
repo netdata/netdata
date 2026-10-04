@@ -23,7 +23,7 @@ const (
 )
 
 type Counters interface {
-	Add(site, counter string, n uint64)
+	Add(counter string, n uint64)
 }
 type Redactor interface{ Apply(string) string }
 type eventWriter interface {
@@ -32,26 +32,27 @@ type eventWriter interface {
 }
 
 type Writer struct {
+	siteName  string
 	st        eventWriter
 	counters  Counters
 	redact    Redactor
 	ch        chan agg.HistoryEvent
 	dropMu    sync.Mutex
-	chanDrops map[string]int
+	chanDrops uint64
 	// Run owns pendingSync; attempted appends can need a sync even after an error.
 	pendingSync bool
 }
 
-func New(st *store.Store, counters Counters, redactor Redactor) *Writer {
+func New(siteName string, st *store.Store, counters Counters, redactor Redactor) *Writer {
 	if redactor == nil {
 		redactor = noopRedactor{}
 	}
 	return &Writer{
-		st:        st,
-		counters:  counters,
-		redact:    redactor,
-		ch:        make(chan agg.HistoryEvent, queueCap),
-		chanDrops: map[string]int{},
+		st:       st,
+		counters: counters,
+		redact:   redactor,
+		ch:       make(chan agg.HistoryEvent, queueCap),
+		siteName: siteName,
 	}
 }
 
@@ -60,21 +61,24 @@ type noopRedactor struct{}
 func (noopRedactor) Apply(s string) string { return s }
 
 func (w *Writer) Event(rec agg.HistoryEvent) {
+	if rec.Site != w.siteName {
+		return
+	}
 	select {
 	case w.ch <- rec:
 	default:
 		w.dropMu.Lock()
-		w.chanDrops[rec.Site]++
+		w.chanDrops++
 		w.dropMu.Unlock()
 	}
 }
 func (w *Writer) reportQueueDrops() {
 	w.dropMu.Lock()
 	drops := w.chanDrops
-	w.chanDrops = map[string]int{}
+	w.chanDrops = 0
 	w.dropMu.Unlock()
-	for site, n := range drops {
-		w.counters.Add(site, agg.CounterHistoryDropped, uint64(n))
+	if drops != 0 {
+		w.counters.Add(agg.CounterHistoryDropped, drops)
 	}
 }
 
@@ -124,8 +128,8 @@ steady:
 			batch = append(batch, rec)
 		default:
 			remaining := batch[w.flush(finalCtx, batch):]
-			for _, rec := range remaining {
-				w.counters.Add(rec.Site, agg.CounterHistoryDropped, 1)
+			if len(remaining) != 0 {
+				w.counters.Add(agg.CounterHistoryDropped, uint64(len(remaining)))
 			}
 			return
 		}
@@ -177,7 +181,7 @@ func (w *Writer) flush(ctx context.Context, batch []agg.HistoryEvent) int {
 		if err != nil {
 			counter = agg.CounterHistoryDropped
 		}
-		w.counters.Add(rec.Site, counter, 1)
+		w.counters.Add(counter, 1)
 	}
 	if w.pendingSync {
 		if err := w.st.Sync(ctx); err == nil {

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 )
 
 // Snippet check states, for the Connect panel's checklist.
@@ -40,7 +40,7 @@ type SnippetCheck struct {
 // snippet is in its HTML and whether its Content-Security-Policy lets the
 // loader, the SDK and the beacons through. Tag managers insert the tag
 // after load, so "missing" is only a hint until a beacon arrives.
-func CheckSnippet(ctx context.Context, client *http.Client, site config.RumSite, base string) SnippetCheck {
+func CheckSnippet(ctx context.Context, client *http.Client, site config.Site, base string) SnippetCheck {
 	page := homePage(site.AllowedOrigins)
 	c := SnippetCheck{
 		Page:      page,
@@ -75,7 +75,7 @@ func CheckSnippet(ctx context.Context, client *http.Client, site config.RumSite,
 		return c
 	}
 	doc := string(body)
-	if !strings.Contains(doc, "/rum/"+site.Key+".js") {
+	if !strings.Contains(doc, "/rum/"+site.Name+".js") {
 		c.State, c.Detail = SnippetMissing, "the snippet is not in the HTML of "+page
 		return c
 	}

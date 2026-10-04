@@ -140,14 +140,3 @@ func (st *siteState) rankErrorGroups() []ErrorChartGroup {
 	}
 	return out
 }
-
-// siteKeys returns the aggregator's site keys sorted, for deterministic
-// FUNCTION output ordering.
-func (a *Aggregator) siteKeys() []string {
-	keys := make([]string, 0, len(a.sites))
-	for k := range a.sites {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}

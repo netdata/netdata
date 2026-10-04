@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 )
 
 const headlessUA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/120.0.0.0 Safari/537.36"
@@ -64,7 +64,7 @@ func TestBootstrapBotsAndTracingOptions(t *testing.T) {
 		}
 	}
 	cfg := testCfg()
-	cfg.Sites[0].Tracing = &config.RumTracing{
+	cfg.Sites[0].Tracing = &config.Tracing{
 		Enabled:     true,
 		PropagateTo: []string{"https://api.example.com"},
 	}

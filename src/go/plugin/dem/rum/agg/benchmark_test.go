@@ -22,8 +22,11 @@ func BenchmarkIngest(b *testing.B) {
 			name = "investigate"
 		}
 		b.Run(name, func(b *testing.B) {
-			a := agg.New(5 * time.Minute)
-			a.Configure(5*time.Minute, []agg.SiteCfg{{Key: "shop", PageGroups: 20, Countries: 20}})
+			a := agg.New(5*time.Minute, agg.SiteCfg{
+				Name:       "shop",
+				PageGroups: 20,
+				Countries:  20,
+			})
 			if history {
 				a.SetHistorySink(discardHistory{})
 			}
@@ -47,8 +50,11 @@ func BenchmarkIngest(b *testing.B) {
 	}
 }
 func BenchmarkSnapshot(b *testing.B) {
-	a := agg.New(5 * time.Minute)
-	a.Configure(5*time.Minute, []agg.SiteCfg{{Key: "shop", PageGroups: 20, Countries: 20}})
+	a := agg.New(5*time.Minute, agg.SiteCfg{
+		Name:       "shop",
+		PageGroups: 20,
+		Countries:  20,
+	})
 	for i := range 100 {
 		a.Ingest(
 			&beacon.Beacon{
@@ -75,8 +81,11 @@ func BenchmarkSnapshot(b *testing.B) {
 // for later session promotion. Work stays bounded by the beacon and live ring;
 // it does not traverse persisted history. Timings are local trends, not CI gates.
 func BenchmarkIngestErrors(b *testing.B) {
-	a := agg.New(5 * time.Minute)
-	a.Configure(5*time.Minute, []agg.SiteCfg{{Key: "shop", PageGroups: 20, Countries: 20}})
+	a := agg.New(5*time.Minute, agg.SiteCfg{
+		Name:       "shop",
+		PageGroups: 20,
+		Countries:  20,
+	})
 	a.SetHistorySink(discardHistory{})
 	input := &beacon.Beacon{
 		Site:      "shop",
