@@ -58,13 +58,10 @@ void ml_queue_push(ml_queue_t *q, const ml_queue_item_t &req)
     netdata_mutex_unlock(&q->mutex);
 }
 
-void ml_queue_sort_pass(std::deque<ml_create_model_entry_t> &pass, time_t now_s, size_t *key0_entries)
+void ml_queue_sort_pass(std::deque<ml_create_model_entry_t> &pass, size_t *key0_entries)
 {
     size_t key0 = 0;
-    for (auto &e : pass) {
-        // a close in the past is an idle page (or a stale read): no usable future close
-        if (e.key < now_s)
-            e.key = 0;
+    for (const auto &e : pass) {
         if (!e.key)
             key0++;
     }
@@ -90,10 +87,6 @@ static void ml_queue_start_pass(ml_queue_t *q, ml_queue_pass_timing_t *timing)
     pass.swap(q->create_next);
     q->create_sorting = pass.size();
 
-    // the pass boundary: keys are normalised against the time the pass was taken out, so a page whose close
-    // passes while the keys are being gathered keeps its (then valid) close instead of becoming key 0
-    time_t pass_started_s = now_realtime_sec();
-
     ml_queue_pass_key_fn key_fn = q->pass_key_fn;
     void *key_arg = q->pass_key_arg;
 
@@ -117,7 +110,7 @@ static void ml_queue_start_pass(ml_queue_t *q, ml_queue_pass_timing_t *timing)
 
     if (!aborted) {
         if (key_fn)
-            ml_queue_sort_pass(pass, pass_started_s, &key0_entries);
+            ml_queue_sort_pass(pass, &key0_entries);
         else
             key0_entries = pass.size();     // no key function: the pass keeps its push order
     }

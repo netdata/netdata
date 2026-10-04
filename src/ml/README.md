@@ -124,10 +124,11 @@ which is also the order it packs pages into extents on disk. Dimensions whose pa
 train back to back, so the extents loaded for one dimension are still in the extent cache when its siblings are
 trained, instead of being reloaded and decompressed once per dimension hours apart. All training threads draw nearby
 entries from one shared sorted pass, so they work through the same part of it close together instead of each
-sweeping its own pass from a different starting point. Dimensions with no open page at the start of a pass, or whose
-open page is idle and already past its expected completion (a collection gap), or that are not stored in the
-database engine, are trained first, as one group. A dimension that is still being trained when its pass runs out is
-trained again in a later pass, normally the next one.
+sweeping its own pass from a different starting point. The completion time is estimated from how much data the page
+still needs, so dimensions of children whose data arrives late (a parent behind its children) keep their place.
+Dimensions with no open page at the start of a pass, or that are not stored in the database engine, are trained
+first, as one group. A dimension that is still being trained when its pass runs out is trained again in a later
+pass, normally the next one.
 
 The `netdata.ml_training_pass` chart shows the size of the last sorted pass and how many of its dimensions fell into
 that first group (it appears once the first pass has been sorted). The per-thread `netdata.ml_training_time_stats`
