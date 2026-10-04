@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Exercise fleet preparation with offline fixtures; never execute an installer."""
+import errno
 import gzip
 import hashlib
 import importlib.util
@@ -116,6 +117,17 @@ class PrepareFleetTests(unittest.TestCase):
         result = self.run_script('--source', other, '--keep', 'go', success=False)
         self.assertIn('incomplete capability go', result.stderr)
 
+    def test_all_rejects_missing_declared_dependency(self):
+        other = self.root / 'incomplete-network'
+        shutil.copytree(self.source, other, symlinks=True,
+                        ignore=lambda directory, names: ['apps.plugin'])
+        target = self.root / 'incomplete-network-output'
+        result = self.run_script('--source', other, '--keep', 'all', '--strip-mode', 'none',
+                                 '--apply', '--output', target, success=False)
+        self.assertIn('incomplete capability network: missing dependency apps', result.stderr)
+        self.assertFalse(target.exists())
+        self.assertTrue((other / 'usr/libexec/netdata/plugins.d/network-viewer.plugin').exists())
+
     def test_netflow_downloader_follows_capability(self):
         paths = ('usr/libexec/netdata/plugins.d/netflow-plugin',
                  'usr/sbin/topology-ip-intel-downloader')
@@ -217,6 +229,24 @@ class PrepareFleetTests(unittest.TestCase):
             with self.subTest(keep=name):
                 self.run_script('--source', self.source, '--keep', name, success=False)
 
+    def test_cli_validation_errors_are_concise(self):
+        path, _ = self.installer()
+        cases = (
+            (['--source', self.source, '--keep', 'unknown'], 'unknown capability'),
+            (['--input', path, '--sha256', '0' * 64, '--keep', 'none'], 'installer SHA-256 does not match'),
+            (['--source', self.source, '--keep', 'none', '--apply', '--output', self.source / 'nested'],
+             'source and output must not overlap'),
+        )
+        for args, reason in cases:
+            with self.subTest(reason=reason):
+                result = self.run_script(*args, success=False)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn('ERROR: ' + reason, result.stderr)
+                self.assertNotIn('Traceback', result.stderr)
+        result = self.run_script('--strip-mode', 'invalid', success=False)
+        self.assertEqual(result.returncode, 2)
+        self.assertNotIn('Traceback', result.stderr)
+
     def test_capability_list_accepts_whitespace(self):
         self.put('usr/libexec/netdata/plugins.d/debugfs.plugin', 'debugfs')
         target, _ = self.prepare(' apps, debugfs ')
@@ -247,6 +277,9 @@ class PrepareFleetTests(unittest.TestCase):
         target, _ = self.prepare('all')
         self.assertTrue((target / 'usr/libexec/netdata/plugins.d/go.d.plugin').exists())
         self.assertTrue((target / 'usr/share/netdata/web/index.html').exists())
+        manifest = json.loads((target / 'usr/share/netdata/fleet-manifest.json').read_text())
+        self.assertIn('network', manifest['resolved'])
+        self.assertIn('apps', manifest['resolved'])
 
     def test_repeat_output_refuses_overwrite(self):
         target, _ = self.prepare()
@@ -413,6 +446,107 @@ class PrepareFleetTests(unittest.TestCase):
                         path.write_bytes(data)
                         with self.assertRaisesRegex(ValueError, 'ELF section name'):
                             contract(path)
+
+    def tree_publication_fixture(self, suffix=''):
+        stage = self.root / ('tree-stage' + suffix)
+        directory = stage / 'readonly'
+        directory.mkdir(parents=True)
+        for name in ('first', 'second'):
+            (directory / name).write_text(name)
+        outside = self.root / ('outside' + suffix)
+        outside.mkdir()
+        (outside / 'sentinel').write_text('preserve linked target')
+        outside.chmod(0o555)
+        os.symlink('../../' + outside.name, directory / 'external')
+        member = tarfile.TarInfo('readonly')
+        member.type, member.mode = tarfile.DIRTYPE, 0o555
+        return stage, {'readonly': member}, self.root / ('tree-output' + suffix), outside
+
+    def fail_second_tree_copy(self):
+        original = shutil.copy2
+        count = 0
+
+        def failing_copy(*args, **kwargs):
+            nonlocal count
+            count += 1
+            if count == 2:
+                raise OSError(errno.ENOSPC, 'tree copy disk full')
+            return original(*args, **kwargs)
+
+        return failing_copy
+
+    def test_failed_tree_copy_rolls_back_readonly_output(self):
+        publish = runpy.run_path(str(SCRIPT))['publish_tree']
+        stage, kept, target, outside = self.tree_publication_fixture()
+        with patch('shutil.copy2', side_effect=self.fail_second_tree_copy()):
+            with self.assertRaisesRegex(OSError, 'tree copy disk full'):
+                publish(stage, kept, target)
+        self.assertFalse(target.exists())
+        for name in ('first', 'second'):
+            self.assertEqual((stage / 'readonly' / name).read_text(), name)
+        self.assertEqual((stage / 'readonly').stat().st_mode & 0o777, 0o555)
+        self.assertEqual(outside.stat().st_mode & 0o777, 0o555)
+        self.assertEqual((outside / 'sentinel').read_text(), 'preserve linked target')
+
+    def test_existing_tree_output_survives_reservation_failure(self):
+        publish = runpy.run_path(str(SCRIPT))['publish_tree']
+        stage, kept, target, _ = self.tree_publication_fixture()
+        target.mkdir()
+        (target / 'sentinel').write_text('competing tree')
+        with patch('shutil.rmtree') as cleanup, patch('shutil.copytree') as copying:
+            with self.assertRaises(FileExistsError):
+                publish(stage, kept, target)
+        cleanup.assert_not_called()
+        copying.assert_not_called()
+        self.assertEqual((target / 'sentinel').read_text(), 'competing tree')
+
+    def test_tree_copy_failure_preserves_replaced_output(self):
+        publish = runpy.run_path(str(SCRIPT))['publish_tree']
+        for variant in ('directory', 'symlink', 'missing'):
+            with self.subTest(variant=variant):
+                stage, kept, target, _ = self.tree_publication_fixture('-' + variant)
+                original = self.root / ('interrupted-tree-' + variant)
+
+                def interrupted_copy(*args, **kwargs):
+                    target.rename(original)
+                    (original / 'partial').write_text('this publication')
+                    if variant == 'directory':
+                        target.mkdir()
+                        (target / 'sentinel').write_text('competing tree')
+                    elif variant == 'symlink':
+                        os.symlink(original.name, target)
+                    raise OSError('tree copy interrupted')
+
+                with patch('shutil.copytree', side_effect=interrupted_copy):
+                    with self.assertRaisesRegex(OSError, 'tree copy interrupted'):
+                        publish(stage, kept, target)
+                self.assertEqual((original / 'partial').read_text(), 'this publication')
+                if variant == 'directory':
+                    self.assertEqual((target / 'sentinel').read_text(), 'competing tree')
+                elif variant == 'symlink':
+                    self.assertEqual(os.readlink(target), original.name)
+                else:
+                    self.assertFalse(target.exists())
+
+    def test_tree_cleanup_failure_preserves_original_error(self):
+        publish = runpy.run_path(str(SCRIPT))['publish_tree']
+        stage, kept, target, _ = self.tree_publication_fixture()
+        with patch('shutil.copy2', side_effect=self.fail_second_tree_copy()):
+            with patch('shutil.rmtree', side_effect=PermissionError('tree rollback denied')):
+                with self.assertRaisesRegex(OSError, 'tree copy disk full') as raised:
+                    publish(stage, kept, target)
+        self.assertIsInstance(raised.exception.__cause__, PermissionError)
+        self.assertEqual(str(raised.exception.__cause__), 'tree rollback denied')
+        self.assertTrue(target.is_dir())
+
+    def test_successful_tree_publish_retains_readonly_modes_and_links(self):
+        publish = runpy.run_path(str(SCRIPT))['publish_tree']
+        stage, kept, target, outside = self.tree_publication_fixture()
+        publish(stage, kept, target)
+        self.assertEqual((target / 'readonly').stat().st_mode & 0o777, 0o555)
+        self.assertEqual(os.readlink(target / 'readonly/external'), '../../' + outside.name)
+        for name in ('first', 'second'):
+            self.assertEqual((target / 'readonly' / name).read_text(), name)
 
     def test_concurrent_installer_publication_leaves_no_checksum(self):
         path, sha = self.installer()

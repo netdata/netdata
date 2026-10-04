@@ -389,6 +389,15 @@ def read_input(args, input_path, parent):
     return None, None, validate_members(tree_members(input_path)), None
 
 
+def validate_capability_bundle(name, available, records):
+    for dependency in CAPS[name][1]:
+        if dependency not in available:
+            fail(f'incomplete capability {name}: missing dependency {dependency}')
+    for companion in REQUIRED_COMPANIONS.get(name, []):
+        if not present(records, companion):
+            fail(f'incomplete capability {name}: missing {companion}')
+
+
 def available_capabilities(keep, selected, records):
     if keep != 'all':
         for name in selected:
@@ -397,9 +406,7 @@ def available_capabilities(keep, selected, records):
                 fail(f'requested capability {name} is absent ({primary})')
     available = {name for name in selected if present(records, CAPS[name][0][0])}
     for name in available:
-        for companion in REQUIRED_COMPANIONS.get(name, []):
-            if not present(records, companion):
-                fail(f'incomplete capability {name}: missing {companion}')
+        validate_capability_bundle(name, available, records)
     return available
 
 
@@ -497,6 +504,23 @@ def stage_package(args, input_path, archive, work, records, report):
     return stage, kept
 
 
+def remove_partial_tree(output, reserved):
+    try:
+        current = output.lstat()
+    except FileNotFoundError:
+        return
+    if not os.path.samestat(current, reserved):
+        return
+    # Copies can restore read-only directory modes before a later file fails.
+    directories = [output]
+    while directories:
+        directory = directories.pop()
+        os.chmod(directory, 0o700, follow_symlinks=False)
+        with os.scandir(directory) as entries:
+            directories.extend(Path(entry.path) for entry in entries if entry.is_dir(follow_symlinks=False))
+    shutil.rmtree(output)
+
+
 def publish_tree(stage, kept, output):
     # Restore directory permissions last so read-only directories can be populated.
     for name, m in sorted(kept.items(), reverse=True):
@@ -505,7 +529,15 @@ def publish_tree(stage, kept, output):
             os.utime(stage / name, (m.mtime, m.mtime))
     # mkdir reserves a fresh output; copytree never overwrites somebody else's directory.
     output.mkdir()
-    shutil.copytree(stage, output, dirs_exist_ok=True, symlinks=True, copy_function=shutil.copy2)
+    reserved = output.lstat()
+    try:
+        shutil.copytree(stage, output, dirs_exist_ok=True, symlinks=True, copy_function=shutil.copy2)
+    except OSError as publication_error:
+        try:
+            remove_partial_tree(output, reserved)
+        except OSError as rollback_error:
+            raise publication_error from rollback_error
+        raise
     print('Tree output retains modes and links; assign deployment ownership in the image pipeline.',
           file=sys.stderr)
 
@@ -630,4 +662,7 @@ if __name__ == '__main__':
     if os.name != 'posix':
         raise RuntimeError('Fleet preparation requires a POSIX build host; Windows is not supported.')
     print(f'{shlex.quote(os.getcwd())} > {shlex.join(["python3", sys.argv[0], *sys.argv[1:]])}', file=sys.stderr)
-    main()
+    try:
+        main()
+    except ValueError as error:
+        sys.exit(f'ERROR: {error}')

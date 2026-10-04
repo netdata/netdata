@@ -30,7 +30,7 @@ Keep the preceding working image and configuration available for rollback. Retai
 
 | Symptom | What to do |
 |:--|:--|
-| The stripping tool fails | Select an `objcopy` that supports the device architecture and rerun preparation into a fresh output |
+| The stripping tool fails | Select a `strip` tool that supports the device architecture with `--strip-tool` and rerun preparation into a fresh output |
 | A selected plugin is unavailable | Choose a package containing it or adjust the device class's selection |
 | Metrics or live Functions are missing | Check the retained collector, job settings, permissions and Child connection |
 | The package is larger than expected | Review retained bundles such as `go`, dashboard assets and IP-intelligence data |
