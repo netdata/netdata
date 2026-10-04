@@ -2177,7 +2177,14 @@ static int test_receiver_replication_counter_does_not_wrap(void) {
     rrdhost_receiver_replication_accounting_set(host, 0, 1);
     fprintf(stderr, "%s: expecting a second STREAM REPLAY ERROR ... refused line, for the same reason\n",
             __FUNCTION__);
-    rrdhost_receiver_replication_withdraw(host);
+    // The refusal must report the outstanding work it saw, not 0: the claim reads 0 as "nothing left"
+    // and would publish RCV_RUNNING while a contribution is still outstanding.
+    uint32_t withdraw_remaining = rrdhost_receiver_replication_withdraw(host);
+    if(withdraw_remaining != 1) {
+        fprintf(stderr, "%s: a refused withdrawal with one outstanding contribution returned %u, expected 1\n",
+                __FUNCTION__, withdraw_remaining);
+        rc = 1;
+    }
 
     uint64_t empty_cohort = rrdhost_receiver_replication_accounting(host);
     if(empty_cohort != rrdhost_receiver_replication_accounting_pack(0, 1)) {

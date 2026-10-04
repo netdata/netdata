@@ -143,10 +143,10 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     // Release any outstanding receiver-replication contribution before the chart is gone: no other
     // site can do it once the chart leaves the index, and the connect/disconnect reset in
-    // stream-receiver.c walks the index, so it cannot see this chart either. Reachable because
-    // rrdset_is_replicating() (rrdset.h) tests the two directions as one OR-pair while a chart is
-    // created with BOTH *_REPLICATION_FINISHED flags set, so it reads false for a receiver-replicating
-    // chart - and svc_rrdhost_cleanup_charts_marked_obsolete() (daemon/service.c) gates deletion on it.
+    // stream-receiver.c walks the index, so it cannot see this chart either. The reachable path is a
+    // chart freed with its replication still in progress: rrdset_free(), or rrdset_index_destroy() when
+    // the host is freed. Obsolete-chart cleanup normally finds nothing here, because marking a chart
+    // obsolete already released it (rrdset.c).
     //
     // This runs under the dictionary write lock. rrdhost_receiver_replication_release() does only
     // atomic flag and counter transitions plus pulse_host_status(), which is lock-free (a CAS on

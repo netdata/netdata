@@ -506,6 +506,9 @@ static inline void rrdhost_receiver_replicating_charts_zero(RRDHOST *host) {
 // what stops an unowned one corrupting the word, and the refusal is how a test sees it happen. Reach it
 // through rrdhost_receiver_replication_release() (rrdset.h) unless you are a test driving the guard
 // itself: that function is what pairs the decrement with the flag transition that authorises it.
+//
+// Both decrements return the outstanding count: after the subtraction, or, when the guard refuses,
+// as observed in the word the refusal was decided on. Zero is a count, not a success indicator.
 uint32_t rrdhost_receiver_replicating_charts_decrement(RRDHOST *host, const char *function);
 
 // The duplicate-CHART_DEFINITION_END rollback: withdraw the speculative unit this same thread just

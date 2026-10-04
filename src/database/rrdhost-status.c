@@ -148,6 +148,14 @@ static inline RRDHOST_DB_STATUS rrdhost_status_db(RRDHOST *host, time_t now, RRD
     return status;
 }
 
+// The ingest status of a connected, non-local child that has finished initializing.
+static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest_connected(uint32_t replicating_instances, uint32_t collected_metrics) {
+    if(replicating_instances > 0 || !collected_metrics)
+        return RRDHOST_INGEST_STATUS_REPLICATING;
+
+    return RRDHOST_INGEST_STATUS_ONLINE;
+}
+
 static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST_STATUS *s, RRDHOST_FLAGS flags, RRDHOST_DB_STATUS db_status, bool online) {
     RRDHOST_INGEST_STATUS status;
 
@@ -190,11 +198,7 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
             replication_completion = rrdhost_receiver_replication_completion(host, &replicating_instances);
 
             collected_metrics = __atomic_load_n(&host->collected.metrics_count, __ATOMIC_RELAXED);
-
-            if(replicating_instances > 0 || !collected_metrics)
-                status = RRDHOST_INGEST_STATUS_REPLICATING;
-            else
-                status = RRDHOST_INGEST_STATUS_ONLINE;
+            status = rrdhost_status_ingest_connected(replicating_instances, collected_metrics);
         }
     }
     else {
@@ -231,8 +235,25 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
                 // generation while `host->receiver` here describes the new one. `connections` is
                 // bumped once per accepted connection under this same lock, so a change means
                 // exactly that, and reporting the mixed pair would be worse than losing the snapshot.
-                if(replicating_instances == UINT32_MAX ||
-                   __atomic_load_n(&host->stream.rcv.status.connections, __ATOMIC_RELAXED) != connections)
+                // A connected status, its since/reason and the connection id were derived from that
+                // same previous generation, so a generation change re-derives them too.
+                uint32_t connections_now = __atomic_load_n(&host->stream.rcv.status.connections, __ATOMIC_RELAXED);
+                if(connections_now != connections) {
+                    replication_completion = rrdhost_receiver_replication_completion(host, &replicating_instances);
+
+                    if(status == RRDHOST_INGEST_STATUS_REPLICATING || status == RRDHOST_INGEST_STATUS_ONLINE) {
+                        collected_metrics = __atomic_load_n(&host->collected.metrics_count, __ATOMIC_RELAXED);
+                        status = rrdhost_status_ingest_connected(replicating_instances, collected_metrics);
+                        s->ingest.status = status;
+                        s->ingest.collected.metrics = collected_metrics;
+
+                        connections = connections_now;
+                        since = MAX(host->stream.rcv.status.last_connected, host->stream.rcv.status.last_disconnected);
+                        s->ingest.since = since ? since : netdata_start_time;
+                        s->ingest.reason = host->stream.rcv.status.reason;
+                    }
+                }
+                else if(replicating_instances == UINT32_MAX)
                     replication_completion = rrdhost_receiver_replication_completion(host, &replicating_instances);
 
                 s->ingest.replication.instances = replicating_instances;

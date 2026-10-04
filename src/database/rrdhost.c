@@ -1020,9 +1020,6 @@ static ALWAYS_INLINE void rrdhost_receiver_replication_race_pause(RRDSET *st) {
 #define rrdhost_receiver_replication_race_pause(st) debug_dummy()
 #endif
 
-// Defined below, next to the release it shares its underflow guard with.
-uint32_t rrdhost_receiver_replication_withdraw(RRDHOST *host);
-
 // ONE implementation of the receiver-replication claim, used by the parser and by the tests.
 // Returns true when THIS call caused the not-replicating -> replicating transition, i.e. when the
 // caller now owns the chart's contribution.
@@ -1154,10 +1151,13 @@ NETDATA_DOUBLE rrdhost_receiver_replication_completion(RRDHOST *host, uint32_t *
 size_t rrdhost_receiver_replication_refusals = 0;
 #endif
 
-// Subtract `delta` from the packed accounting word, refusing when the outstanding half is already
-// zero. Both callers must be checked: on a 64-bit word an unguarded subtract does not merely wrap the
-// outstanding half to UINT32_MAX and pin the host in `replicating`, it BORROWS out of the cohort half
-// and destroys the completion denominator too.
+// Subtract `delta` from the packed accounting word, refusing when either half would underflow.
+// Returns the outstanding count after the subtraction or, on refusal, the one in the word the refusal
+// was decided on - so a caller testing for zero acts on what the counter holds, and a refused
+// withdrawal with work still outstanding does not read as "nothing left". Both callers must be
+// checked: on a 64-bit word an unguarded subtract does not merely wrap the outstanding half to
+// UINT32_MAX and pin the host in `replicating`, it BORROWS out of the cohort half and destroys the
+// completion denominator too.
 static uint32_t rrdhost_receiver_replication_subtract(RRDHOST *host, uint64_t delta, const char *what, const char *function) {
     // Test EACH half against the matching half of delta. Testing only the outstanding half would be
     // right for the release (delta moves that half alone) but not for the withdrawal (delta moves
@@ -1182,10 +1182,11 @@ static uint32_t rrdhost_receiver_replication_subtract(RRDHOST *host, uint64_t de
 
     nd_log(NDLS_DAEMON, NDLP_ERR,
            "STREAM REPLAY ERROR: 'host:%s': %s() %s a receiver replication contribution it does not own - "
-           "the counter is already zero. Refusing to wrap it.",
-           rrdhost_hostname(host), function, what);
+           "started=%u remaining=%u. Refusing to wrap it.",
+           rrdhost_hostname(host), function, what,
+           rrdhost_receiver_replication_started_of(cur), rrdhost_receiver_replication_remaining_of(cur));
 
-    return 0;
+    return rrdhost_receiver_replication_remaining_of(cur);
 }
 
 uint32_t rrdhost_receiver_replicating_charts_decrement(RRDHOST *host, const char *function) {
