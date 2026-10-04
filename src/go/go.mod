@@ -32,7 +32,7 @@ require (
 	github.com/catonetworks/cato-go-sdk v0.4.2
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
-	github.com/cloudflare/cfssl v1.6.5
+	github.com/cloudflare/cfssl v1.7.0
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/docker/go-units v0.5.0
 	github.com/facebook/time v0.0.0-20250211113239-e3e1421a0980
@@ -155,7 +155,7 @@ require (
 	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/google/certificate-transparency-go v1.1.7 // indirect
+	github.com/google/certificate-transparency-go v1.1.8 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/gqlgo/gqlgenc v0.37.0 // indirect
