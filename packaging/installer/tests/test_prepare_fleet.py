@@ -53,18 +53,21 @@ class PrepareFleetTests(unittest.TestCase):
         path.write_text(data)
         return path
 
-    def elf_fixture(self, name):
+    def elf_fixture(self, name, wide=True, byte_order='<'):
         # Linux package fixtures must also work on non-ELF build hosts.
         path = self.put(name, '')
         names = b'\0.text\0.shstrtab\0'
-        section_offset = 88
-        header = struct.pack('<16sHHIQQQIHHHHHH', b'\x7fELF\x02\x01\x01' + bytes(9),
-                             2, 62, 1, 0x1000, 0, section_offset, 0, 64, 0, 0, 64, 3, 2)
+        header_size, section_size, section_offset = (64, 64, 88) if wide else (52, 40, 76)
+        ident = b'\x7fELF' + bytes((2 if wide else 1, 1 if byte_order == '<' else 2, 1)) + bytes(9)
+        header = struct.pack(byte_order + ('16sHHIQQQIHHHHHH' if wide else '16sHHIIIIIHHHHHH'), ident,
+                             2, 62 if wide else 40, 1, 0x1000, 0, section_offset, 0,
+                             header_size, 0, 0, section_size, 3, 2)
         data = header + b'\xc3' + names
         data += bytes(section_offset - len(data))
-        data += bytes(64)
-        data += struct.pack('<IIQQQQIIQQ', 1, 1, 6, 0x1000, 64, 1, 0, 0, 1, 0)
-        data += struct.pack('<IIQQQQIIQQ', 7, 3, 0, 0, 65, len(names), 0, 0, 1, 0)
+        section_format = byte_order + ('IIQQQQIIQQ' if wide else 'IIIIIIIIII')
+        data += bytes(section_size)
+        data += struct.pack(section_format, 1, 1, 6, 0x1000, header_size, 1, 0, 0, 1, 0)
+        data += struct.pack(section_format, 7, 3, 0, 0, header_size + 1, len(names), 0, 0, 1, 0)
         path.write_bytes(data)
         return path
 
@@ -128,19 +131,23 @@ class PrepareFleetTests(unittest.TestCase):
 
     def test_ebpf_stock_bundle_follows_capability(self):
         paths = ('usr/libexec/netdata/plugins.d/ebpf.plugin',
+                 'usr/libexec/netdata/plugins.d/ebpf-go.plugin',
+                 'usr/libexec/netdata/plugins.d/ebpf.d/pnetdata_ebpf_socket.5.4.o',
                  'usr/lib/netdata/conf.d/ebpf.d.conf',
                  'usr/lib/netdata/conf.d/ebpf.d/socket.conf')
         for path in paths:
             self.put(path, 'ebpf stock')
+        legacy_object = self.elf_fixture(paths[2])
         self.put('etc/netdata/ebpf.d/socket.conf', 'custom user configuration')
         target, _ = self.prepare()
         for path in paths:
             self.assertFalse((target / path).exists())
         self.assertTrue((target / 'etc/netdata/ebpf.d/socket.conf').is_file())
-        self.run_script('--source', self.source, '--keep', 'ebpf', '--strip-mode', 'none',
+        self.run_script('--source', self.source, '--keep', 'ebpf', '--strip-mode', 'all',
                         '--apply', '--output', self.root / 'ebpf')
         for path in paths:
             self.assertTrue((self.root / 'ebpf' / path).is_file())
+        self.assertEqual((self.root / 'ebpf' / paths[2]).read_bytes(), legacy_object.read_bytes())
 
     def test_retained_netflow_downloader_is_stripped(self):
         self.put('usr/libexec/netdata/plugins.d/netflow-plugin', 'plugin')
@@ -206,8 +213,26 @@ class PrepareFleetTests(unittest.TestCase):
         self.assertIn('usr/share/netdata/web/index.html', result.stdout)
 
     def test_unknown_or_missing_capability_fails(self):
-        for name in ('unrecognized', 'journal'):
-            self.run_script('--source', self.source, '--keep', name, success=False)
+        for name in ('unrecognized', 'journal', 'apps,', 'none,apps', 'all,apps', ' , '):
+            with self.subTest(keep=name):
+                self.run_script('--source', self.source, '--keep', name, success=False)
+
+    def test_capability_list_accepts_whitespace(self):
+        self.put('usr/libexec/netdata/plugins.d/debugfs.plugin', 'debugfs')
+        target, _ = self.prepare(' apps, debugfs ')
+        manifest = json.loads((target / 'usr/share/netdata/fleet-manifest.json').read_text())
+        self.assertEqual(manifest['requested'], ['apps', 'debugfs'])
+        self.assertEqual(manifest['resolved'], ['apps', 'debugfs'])
+        for name in ('apps.plugin', 'debugfs.plugin'):
+            self.assertTrue((target / 'usr/libexec/netdata/plugins.d' / name).is_file())
+
+    def test_capability_sentinels_accept_whitespace(self):
+        for name in ('all', 'none'):
+            with self.subTest(keep=name):
+                plain = self.run_script('--source', self.source, '--keep', name)
+                padded = self.run_script('--source', self.source, '--keep', ' ' + name + ' ')
+                self.assertEqual(padded.stdout, plain.stdout)
+                self.assertIn('Preview only.', padded.stderr)
 
     def test_dashboard_removal_retains_required_empty_web_directory(self):
         target, _ = self.prepare('none')
@@ -323,6 +348,71 @@ class PrepareFleetTests(unittest.TestCase):
         target, result = self.prepare(strip='all', strip_tool=tool, success=False)
         self.assertFalse(target.exists())
         self.assertIn('changed allocated sections or ELF identity', result.stderr)
+
+    def test_elf_contract_accepts_both_classes_and_byte_orders(self):
+        contract = runpy.run_path(str(SCRIPT))['elf_contract']
+        for wide in (False, True):
+            for byte_order in ('<', '>'):
+                for variant in ('named', 'nameless', 'nobits'):
+                    with self.subTest(wide=wide, byte_order=byte_order, variant=variant):
+                        path = self.elf_fixture('bin/srv/netdata', wide, byte_order)
+                        data = bytearray(path.read_bytes())
+                        header_size, section_size, section_offset = (64, 64, 88) if wide else (52, 40, 76)
+                        name, section_type, contents = b'.text', 1, b'\xc3'
+                        if variant == 'nameless':
+                            struct.pack_into(byte_order + 'H', data, header_size - 2, 0)
+                            struct.pack_into(byte_order + 'I', data, section_offset + section_size, 0)
+                            name = b''
+                        elif variant == 'nobits':
+                            struct.pack_into(byte_order + 'I', data, section_offset + section_size + 4, 8)
+                            struct.pack_into(byte_order + ('Q' if wide else 'I'), data,
+                                             section_offset + section_size + (24 if wide else 16), len(data) + 1)
+                            section_type, contents = 8, b''
+                        path.write_bytes(data)
+                        expected = (bytes((2 if wide else 1, 1 if byte_order == '<' else 2)),
+                                    (2, 62 if wide else 40, 1, 0x1000),
+                                    [(name, section_type, 6, 0x1000, 1, hashlib.sha256(contents).hexdigest())])
+                        self.assertEqual(contract(path), expected)
+
+    def test_elf_table_ranges_are_validated(self):
+        contract = runpy.run_path(str(SCRIPT))['elf_contract']
+        for wide in (False, True):
+            for byte_order in ('<', '>'):
+                for variant in ('section_start', 'section_end', 'names_start', 'names_end'):
+                    with self.subTest(wide=wide, byte_order=byte_order, variant=variant):
+                        path = self.elf_fixture('bin/srv/netdata', wide, byte_order)
+                        data = bytearray(path.read_bytes())
+                        word_format = byte_order + ('Q' if wide else 'I')
+                        section_size, section_offset = (64, 88) if wide else (40, 76)
+                        if variant == 'section_start':
+                            struct.pack_into(word_format, data, 40 if wide else 32, len(data) + 1)
+                        elif variant == 'section_end':
+                            data = data[:-1]
+                        else:
+                            field_offset = (24 if wide else 16) if variant == 'names_start' else (32 if wide else 20)
+                            struct.pack_into(word_format, data, section_offset + 2 * section_size + field_offset,
+                                             len(data) + 1)
+                        path.write_bytes(data)
+                        message = 'ELF section table' if variant.startswith('section') else 'ELF string table'
+                        with self.assertRaisesRegex(ValueError, message):
+                            contract(path)
+
+    def test_elf_allocated_section_names_are_validated(self):
+        contract = runpy.run_path(str(SCRIPT))['elf_contract']
+        for wide in (False, True):
+            for byte_order in ('<', '>'):
+                for variant in ('out_of_range', 'unterminated'):
+                    with self.subTest(wide=wide, byte_order=byte_order, variant=variant):
+                        path = self.elf_fixture('bin/srv/netdata', wide, byte_order)
+                        data = bytearray(path.read_bytes())
+                        header_size, section_size, section_offset = (64, 64, 88) if wide else (52, 40, 76)
+                        if variant == 'out_of_range':
+                            struct.pack_into(byte_order + 'I', data, section_offset + section_size, 999)
+                        else:
+                            data[header_size + 2:header_size + 18] = b'x' * 16
+                        path.write_bytes(data)
+                        with self.assertRaisesRegex(ValueError, 'ELF section name'):
+                            contract(path)
 
     def test_concurrent_installer_publication_leaves_no_checksum(self):
         path, sha = self.installer()

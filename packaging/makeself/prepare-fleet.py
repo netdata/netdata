@@ -52,7 +52,7 @@ CAPS = {
     'ipmi': ([PLUGIN + 'freeipmi.plugin'], []),
     'xen': ([PLUGIN + 'xenstat.plugin'], []),
     'cups': ([PLUGIN + 'cups.plugin'], []),
-    'ebpf': ([PLUGIN + 'ebpf.plugin', PLUGIN + 'ebpf-go.plugin',
+    'ebpf': ([PLUGIN + 'ebpf.plugin', PLUGIN + 'ebpf-go.plugin', PLUGIN + 'ebpf.d',
               CONF + 'ebpf.d.conf', CONF + 'ebpf.d'], []),
     'systemd-units': ([PLUGIN + 'systemd-units.plugin'], []),
     'ioping': ([PLUGIN + 'ioping', PLUGIN + 'ioping.plugin', CONF + 'ioping.conf'], []),
@@ -246,12 +246,22 @@ def elf_sections(data, path):
     h = struct.unpack_from(endian + ('16sHHIQQQIHHHHHH' if wide else '16sHHIIIIIHHHHHH'), data)
     offset, size, count, names_index = h[6], h[11], h[12], h[13]
     fmt = endian + ('IIQQQQIIQQ' if wide else 'IIIIIIIIII')
-    if not count or count > 10000 or size != struct.calcsize(fmt) or names_index >= count:
+    if (not count or count > 10000 or size != struct.calcsize(fmt) or names_index >= count
+            or offset + count * size > len(data)):
         fail(f'unsupported ELF section table: {path}')
     sections = [struct.unpack_from(fmt, data, offset + i * size) for i in range(count)]
     ns = sections[names_index]
+    if ns[4] + ns[5] > len(data):
+        fail(f'truncated ELF string table: {path}')
     names = data[ns[4]:ns[4] + ns[5]]
     return h, sections, names
+
+
+def elf_section_name(names, offset, path):
+    end = names.find(b'\0', offset)
+    if end < 0:
+        fail(f'invalid ELF section name: {path}')
+    return names[offset:end]
 
 
 def elf_contract(path):
@@ -265,7 +275,8 @@ def elf_contract(path):
             if s[1] != 8 and s[4] + s[5] > len(data):
                 fail(f'truncated ELF: {path}')
             contents = data[s[4]:s[4] + s[5]] if s[1] != 8 else b''
-            allocated.append((names[s[0]:].split(b'\0', 1)[0], s[1], s[2], s[3], s[5],
+            name = elf_section_name(names, s[0], path) if h[13] else b''
+            allocated.append((name, s[1], s[2], s[3], s[5],
                               hashlib.sha256(contents).hexdigest()))
     return (data[4:6], h[1:5], allocated)
 
@@ -306,6 +317,8 @@ def parse_args():
     parser.add_argument('--list-capabilities', action='store_true')
     parser.add_argument('--verbose', action='store_true', help='include the detailed file report')
     args = parser.parse_args()
+    if args.keep is not None:
+        args.keep = ','.join(name.strip() for name in args.keep.split(','))
     if not args.list_capabilities:
         if not (args.input or args.source) or args.keep is None:
             parser.error('provide --input or --source, and explicit --keep')

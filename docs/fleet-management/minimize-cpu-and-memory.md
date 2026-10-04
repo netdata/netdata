@@ -2,7 +2,7 @@
 
 Keep monitoring small on the device while retaining fleet-wide dashboards, history, alerts, anomaly detection and live troubleshooting. Let the Child collect and stream metrics; let the Parent provide the storage and analysis capacity.
 
-You control the device's monitoring budget through three settings: which collectors run, how often they collect, and how much history stays locally. On a Raspberry Pi 3 B+, sparse system, process and sensor monitoring used under 1% of one CPU core and about 30 MiB of memory, with troubleshooting available through the Parent.
+You control the device's monitoring budget through three settings: which collectors run, how often they collect, and how much history stays locally. On a Raspberry Pi 3 B+, five-minute system collection with one-minute process and sensor collection and StatsD disabled used under 1% of one CPU core and about 30 MiB of memory, with troubleshooting available through the Parent.
 
 ## Configure a lightweight Child
 
@@ -72,7 +72,7 @@ Set the default interval to `300` or `600`. For the **v2.12.0-2-nightly** packag
 
 These settings keep process and sensor collection within that release's plugin timeout, while system metrics follow the slower interval. To use five- or ten-minute intervals for these plugins too, use an Agent version with cadence-aware plugin read timeouts.
 
-On Pi 3 B+, five-minute system collection with these one-minute overrides used **0.69% of one CPU core and 28.1 MiB of memory**. The processes and sensors Functions remained available. With the Parent's default automatic keepalives, these one-minute charts set keepalive idle to 30 seconds; the [cellular guide](./minimize-cellular-traffic.md#match-keepalives-to-collection) explains how collection intervals affect bandwidth.
+On Pi 3 B+, five-minute system collection with these one-minute overrides and StatsD disabled used **0.69% of one CPU core and 28.1 MiB of memory**. The processes and sensors Functions remained available. With the Parent's default automatic keepalives, these one-minute charts set keepalive idle to 30 seconds; the [cellular guide](./minimize-cellular-traffic.md#match-keepalives-to-collection) explains how collection intervals affect bandwidth.
 
 ## Choose local history
 
