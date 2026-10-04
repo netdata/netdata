@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/ingest"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 )
 
@@ -26,11 +26,11 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	if err != nil {
 		return err
 	}
-	var geo ingest.CountryResolver
+	var geo httpapi.CountryResolver
 	if c.geo != nil {
 		geo = c.geo
 	}
-	domain := ingest.New(&c.Receiver, c.registry, geo)
+	domain := httpapi.New(&c.Receiver, c.registry, geo)
 	handler := domain.Handler()
 	var mu sync.Mutex
 	var active sync.WaitGroup

@@ -39,7 +39,6 @@ func TestLiveOutOfOrderReceivedTimesDoNotSkipOrReplay(t *testing.T) {
 						Site:      observation.site,
 						SessionID: observation.page,
 						PageGroup: observation.page,
-						PageView:  true,
 						Received:  observation.received,
 					},
 				)

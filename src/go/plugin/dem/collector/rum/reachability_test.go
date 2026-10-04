@@ -12,11 +12,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
+
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/ingest"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +30,7 @@ func TestProductionProbeConfirmsTrustedProxyPublicBase(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	server := httptest.NewServer(
-		ingest.New(&config.Receiver{
+		httpapi.New(&config.Receiver{
 			TrustedProxies: []string{"127.0.0.1/32"},
 			MaxBodyBytes:   262144,
 			RateLimit: config.RateLimit{
@@ -53,13 +56,21 @@ func TestProductionProbeConfirmsTrustedProxyPublicBase(t *testing.T) {
 	site.AllowedOrigins = []string{server.URL}
 	site.OTLP.Enabled = "no"
 	require.NoError(t, site.Init(context.Background()))
-	route := ingest.NewRoute(site.Site, site.aggregator)
+	exporter, err := otlp.New(context.Background(), site.OTLP, site.Name, "", site.aggregator, site.redactor)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, exporter.Close()) })
+	state := diagnostics.New(site.Site)
+	route := httpapi.NewRoute(site.Site, &processor{
+		aggregator: site.aggregator,
+		exporter:   exporter,
+	}, state)
 	retire, err := hub.Register(
 		site.Name,
 		&rumregistry.Site{
-			Route:      route,
-			Aggregator: site.aggregator,
-			Generation: "test",
+			Route:       route,
+			Diagnostics: state,
+			Aggregator:  site.aggregator,
+			Generation:  "test",
 		},
 	)
 	require.NoError(t, err)
@@ -77,17 +88,17 @@ func TestProductionProbeConfirmsTrustedProxyPublicBase(t *testing.T) {
 	_, err = io.Copy(io.Discard, resp.Body)
 	require.NoError(t, err)
 	require.NoError(t, resp.Body.Close())
-	require.Equal(t, proxy.URL, route.ObservedBase())
+	require.Equal(t, proxy.URL, state.ObservedBase())
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		route.RunReachability(ctx, 10*time.Millisecond, site.probeBase, proxy.Client())
+		state.RunReachability(ctx, 10*time.Millisecond, site.probeBase, proxy.Client())
 	}()
 	t.Cleanup(func() { cancel(); <-done })
 	require.Eventually(t, func() bool {
-		reach, ok := route.Reachability()
-		return ok && reach.State == ingest.ReachOK && reach.Base == proxy.URL
+		reach, ok := state.Reachability()
+		return ok && reach.State == diagnostics.ReachOK && reach.Base == proxy.URL
 	}, time.Second, 10*time.Millisecond)
-	require.Equal(t, proxy.URL, route.PublicBase(server.URL))
+	require.Equal(t, proxy.URL, state.PublicBase(server.URL))
 }

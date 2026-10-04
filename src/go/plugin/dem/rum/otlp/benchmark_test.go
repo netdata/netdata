@@ -4,6 +4,8 @@ package otlp
 import (
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 )
 
 type benchmarkCounters struct{}
@@ -23,8 +25,11 @@ func BenchmarkIngest(b *testing.B) {
 		spanCh:   make(chan spanItem, spanQueueCap),
 	}
 	event := tracedBeacon()
-	event.PageView = true
-	e.Ingest(event)
+	e.Ingest(event, aggregate.Result{
+		Accepted:     true,
+		Investigated: true,
+		PageView:     true,
+	})
 	for len(e.ch) != 0 {
 		<-e.ch
 	}
@@ -32,7 +37,11 @@ func BenchmarkIngest(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		e.Ingest(event)
+		e.Ingest(event, aggregate.Result{
+			Accepted:     true,
+			Investigated: true,
+			PageView:     true,
+		})
 		<-e.ch
 		<-e.spanCh
 	}

@@ -14,7 +14,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
 )
@@ -85,12 +85,12 @@ func (c *Collector) Init(ctx context.Context) error {
 		return err
 	}
 	c.redactor = redact.NewRedactor(c.OTLP.AuthToken)
-	c.aggregator = agg.New(time.Duration(c.Window), agg.SiteCfg{
+	c.aggregator = aggregate.New(time.Duration(c.Window), aggregate.SiteCfg{
 		Name:        c.Name,
 		DisplayName: c.Label(),
 		PageGroups:  c.PageGroups,
 		Countries:   c.Countries,
-		Investigate: agg.InvestigateCfg{
+		Investigate: aggregate.InvestigateCfg{
 			Rate:           c.InvestigateRate(),
 			KeepErrors:     c.KeepsErrors(),
 			KeepPoorVitals: c.KeepsPoorVitals(),

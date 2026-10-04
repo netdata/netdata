@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 )
 
 // The existing burst budget bounds queued browser detail; a full queue reports
@@ -35,7 +35,7 @@ type Writer struct {
 	st        eventWriter
 	counters  Counters
 	redact    Redactor
-	ch        chan agg.HistoryEvent
+	ch        chan aggregate.HistoryEvent
 	dropMu    sync.Mutex
 	chanDrops uint64
 	// Run owns pendingSync; attempted appends can need a sync even after an error.
@@ -50,7 +50,7 @@ func NewWriter(siteName string, st *Store, counters Counters, redactor Redactor)
 		st:       st,
 		counters: counters,
 		redact:   redactor,
-		ch:       make(chan agg.HistoryEvent, queueCap),
+		ch:       make(chan aggregate.HistoryEvent, queueCap),
 		siteName: siteName,
 	}
 }
@@ -59,7 +59,7 @@ type noopRedactor struct{}
 
 func (noopRedactor) Apply(s string) string { return s }
 
-func (w *Writer) Event(rec agg.HistoryEvent) {
+func (w *Writer) Event(rec aggregate.HistoryEvent) {
 	if rec.Site != w.siteName {
 		return
 	}
@@ -77,7 +77,7 @@ func (w *Writer) reportQueueDrops() {
 	w.chanDrops = 0
 	w.dropMu.Unlock()
 	if drops != 0 {
-		w.counters.Add(agg.CounterHistoryDropped, drops)
+		w.counters.Add(aggregate.CounterHistoryDropped, drops)
 	}
 }
 
@@ -88,7 +88,7 @@ func (w *Writer) reportQueueDrops() {
 func (w *Writer) Run(ctx context.Context) {
 	ticker := time.NewTicker(batchPeriod)
 	defer ticker.Stop()
-	batch := make([]agg.HistoryEvent, 0, maxBatch)
+	batch := make([]aggregate.HistoryEvent, 0, maxBatch)
 steady:
 	for {
 		select {
@@ -128,7 +128,7 @@ steady:
 		default:
 			remaining := batch[w.flush(finalCtx, batch):]
 			if len(remaining) != 0 {
-				w.counters.Add(agg.CounterHistoryDropped, uint64(len(remaining)))
+				w.counters.Add(aggregate.CounterHistoryDropped, uint64(len(remaining)))
 			}
 			return
 		}
@@ -137,7 +137,7 @@ steady:
 
 // flush returns the consumed prefix. Only cancelled admission leaves a suffix
 // for final drain: journal appends have no batch transaction or rollback.
-func (w *Writer) flush(ctx context.Context, batch []agg.HistoryEvent) int {
+func (w *Writer) flush(ctx context.Context, batch []aggregate.HistoryEvent) int {
 	w.reportQueueDrops()
 	if len(batch) == 0 && !w.pendingSync {
 		return 0
@@ -176,9 +176,9 @@ func (w *Writer) flush(ctx context.Context, batch []agg.HistoryEvent) int {
 		if !attempted && ctx.Err() != nil {
 			return i
 		}
-		counter := agg.CounterHistoryWritten
+		counter := aggregate.CounterHistoryWritten
 		if err != nil {
-			counter = agg.CounterHistoryDropped
+			counter = aggregate.CounterHistoryDropped
 		}
 		w.counters.Add(counter, 1)
 	}

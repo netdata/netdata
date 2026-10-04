@@ -4,7 +4,7 @@ package query
 import (
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 )
 
@@ -36,9 +36,9 @@ type Rejection struct {
 
 // These distinct result types preserve the underlying snapshot value vocabulary.
 // Service owns their copies and redaction; callers receive no runtime owner.
-type Activity agg.SiteActivity
-type Page agg.PageInfo
-type LiveObservation agg.LiveRow
+type Activity aggregate.SiteActivity
+type Page aggregate.PageInfo
+type LiveObservation aggregate.LiveRow
 type LiveEvent struct {
 	LiveObservation
 	Generation string

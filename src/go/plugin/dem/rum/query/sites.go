@@ -5,7 +5,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/ingest"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 )
 
@@ -16,22 +16,22 @@ func (s *Service) Sites(ctx context.Context) ([]Site, error) {
 		cfg := site.Route.Config()
 		fallback := state.PublicURL
 		if fallback == "" && state.Listen != "" {
-			fallback = cfg.PublicBase(state.Listen, state.TLS)
+			fallback = diagnostics.ListenerBase(state.Listen, state.TLS)
 		}
 		// Explicit receiver configuration takes effect immediately, even while
 		// the site's last successful probe still describes an older proxy URL.
 		publicBase := strings.TrimRight(state.PublicURL, "/")
 		if cfg.PublicURL != "" || publicBase == "" {
-			publicBase = site.Route.PublicBase(fallback)
+			publicBase = site.Diagnostics.PublicBase(fallback)
 		}
-		reach, _ := site.Route.Reachability()
-		snippet, _ := site.Route.Snippet()
-		rejected, _ := site.Route.LastRejectedOrigin()
+		reach, _ := site.Diagnostics.Reachability()
+		snippet, _ := site.Diagnostics.Snippet()
+		rejected, _ := site.Diagnostics.LastRejectedOrigin()
 		if reach.State == "" {
-			reach.State = ingest.ReachUnknown
+			reach.State = diagnostics.ReachUnknown
 		}
 		if snippet.State == "" {
-			snippet.State = ingest.SnippetUnchecked
+			snippet.State = diagnostics.SnippetUnchecked
 		}
 		redact := siteRedactor(site)
 		reach.Error = redact.Apply(reach.Error)

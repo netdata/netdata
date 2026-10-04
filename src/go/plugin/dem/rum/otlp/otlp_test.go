@@ -11,16 +11,14 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/grpc"
-
-	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
-	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
-
 	"github.com/netdata/netdata/go/plugins/logger"
 	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/stretchr/testify/require"
+	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	"google.golang.org/grpc"
 )
 
 var t0 = time.Date(2030, 1, 1, 12, 0, 0, 0, time.UTC)
@@ -170,14 +168,16 @@ var sessionStart = simpleRec{
 
 func TestBuild(t *testing.T) {
 	tests := map[string]struct {
-		beacon func() *beacon.Beacon
-		secret string // known secret value the redactor must strip
-		want   []simpleRec
+		pageView bool
+		beacon   func() *beacon.Beacon
+		secret   string // known secret value the redactor must strip
+		want     []simpleRec
 	}{
 		"pageview": {
+			pageView: true,
 			beacon: func() *beacon.Beacon {
 				b := mkBeacon()
-				b.PageView = true
+
 				return b
 			},
 			want: []simpleRec{sessionStart, {
@@ -193,10 +193,11 @@ func TestBuild(t *testing.T) {
 			want:   []simpleRec{sessionStart},
 		},
 		"no session id never starts a session": {
+			pageView: true,
 			beacon: func() *beacon.Beacon {
 				b := mkBeacon()
 				b.SessionID = ""
-				b.PageView = true
+
 				return b
 			},
 			want: []simpleRec{{
@@ -298,7 +299,7 @@ func TestBuild(t *testing.T) {
 				redactor: newRedactor(t, tc.secret),
 			}
 			var got []simpleRec
-			for _, q := range e.build(tc.beacon()) {
+			for _, q := range e.build(tc.beacon(), tc.pageView) {
 				got = append(got, simplify(q))
 			}
 			if !reflect.DeepEqual(got, tc.want) {
@@ -313,11 +314,11 @@ func TestBuildSessionStartOnlyOnce(t *testing.T) {
 		sessions: newSessionTracker(),
 		now:      func() time.Time { return t0 },
 	}
-	first := e.build(mkBeacon())
+	first := e.build(mkBeacon(), false)
 	if len(first) != 1 || first[0].rec.Attributes[0].GetValue().GetStringValue() != "session_start" {
 		t.Fatalf("first beacon of a session must emit session_start: %#v", first)
 	}
-	second := e.build(mkBeacon())
+	second := e.build(mkBeacon(), false)
 	if len(second) != 0 {
 		t.Fatalf("second beacon within TTL must not re-emit session_start: %#v", second)
 	}
@@ -362,7 +363,7 @@ func TestExport(t *testing.T) {
 
 			// a fresh session on a fresh tracker yields exactly one
 			// session_start record — enough to exercise one export call.
-			recs := e.build(mkBeacon())
+			recs := e.build(mkBeacon(), false)
 			e.export(context.Background(), recs, exportTimeout)
 
 			if got := counters.snapshot(); !reflect.DeepEqual(got, tc.want) {
@@ -395,10 +396,16 @@ func TestIngestDropsOnFullQueue(t *testing.T) {
 	e.ch = make(chan queued, 1)
 
 	b1 := mkBeacon() // produces session_start + (no pageview) = 1 record, fills the queue
-	e.Ingest(b1)
+	e.Ingest(b1, aggregate.Result{
+		Accepted:     true,
+		Investigated: true,
+	})
 	b2 := mkBeacon()
 	b2.SessionID = "sess2" // a different session so it still produces a record to drop
-	e.Ingest(b2)
+	e.Ingest(b2, aggregate.Result{
+		Accepted:     true,
+		Investigated: true,
+	})
 
 	want := map[string]uint64{"otlp_dropped": 1}
 	if got := counters.snapshot(); !reflect.DeepEqual(got, want) {
@@ -418,8 +425,11 @@ func TestDisabledCountsDrops(t *testing.T) {
 		t.Fatal("disabled exporter must never dial")
 	}
 	b := mkBeacon()
-	b.PageView = true
-	e.Ingest(b)
+	e.Ingest(b, aggregate.Result{
+		Accepted:     true,
+		Investigated: true,
+		PageView:     true,
+	})
 	got := counters.snapshot()
 	if got["otlp_dropped"] != 2 { // session_start + pageview
 		t.Fatalf("counters = %#v, want 2 dropped", got)
@@ -442,7 +452,10 @@ func TestDialCredsBothOrNeither(t *testing.T) {
 // the regular export timeout (the agent's SIGTERM grace is 3s).
 func TestShutdownFlushIsBounded(t *testing.T) {
 	e := newExporter(t, "192.0.2.1:4317", newRecCounters(), nil)
-	e.Ingest(mkBeacon())
+	e.Ingest(mkBeacon(), aggregate.Result{
+		Accepted:     true,
+		Investigated: true,
+	})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
@@ -494,7 +507,10 @@ func TestInFlightPeriodicExportAbortsOnCancel(t *testing.T) {
 		e.Run(ctx)
 		close(done)
 	}()
-	e.Ingest(mkBeacon())
+	e.Ingest(mkBeacon(), aggregate.Result{
+		Accepted:     true,
+		Investigated: true,
+	})
 	time.Sleep(batchPeriod + 300*time.Millisecond) // ticker fired: export now in flight
 	cancel()
 	start := time.Now()
@@ -515,8 +531,9 @@ func TestIngestSkipsSampledOutBeacons(t *testing.T) {
 	counters := newRecCounters()
 	e := newExporter(t, "127.0.0.1:1", counters, nil)
 	b := mkBeacon()
-	b.SampledOut = true
-	e.Ingest(b)
+	e.Ingest(b, aggregate.Result{
+		Accepted: true,
+	})
 	if n := len(e.ch); n != 0 {
 		t.Fatalf("queued %d records for a sampled-out beacon", n)
 	}
@@ -543,8 +560,11 @@ func TestShutdownDrainsAcceptedQueues(t *testing.T) {
 	var logRecords int
 	for range 300 {
 		b := tracedBeacon()
-		b.PageView = true
-		e.Ingest(b)
+		e.Ingest(b, aggregate.Result{
+			Accepted:     true,
+			Investigated: true,
+			PageView:     true,
+		})
 	}
 	logRecords = len(e.ch)
 	require.Greater(t, logRecords, maxBatch)
@@ -552,8 +572,8 @@ func TestShutdownDrainsAcceptedQueues(t *testing.T) {
 	cancel()
 	e.Run(ctx)
 	got := counters.snapshot()
-	require.EqualValues(t, logRecords, got[agg.CounterOTLPSent])
-	require.EqualValues(t, 300, got[agg.CounterSpansSent])
+	require.EqualValues(t, logRecords, got[aggregate.CounterOTLPSent])
+	require.EqualValues(t, 300, got[aggregate.CounterSpansSent])
 	require.Empty(t, e.ch)
 	require.Empty(t, e.spanCh)
 }
@@ -575,7 +595,7 @@ func TestPartialRejectionDiagnosticsRedactSecrets(t *testing.T) {
 	}
 	counters := newRecCounters()
 	e := newExporter(t, startServer(t, logs), counters, newRedactor(t, secret))
-	e.export(context.Background(), e.build(mkBeacon()), exportTimeout)
+	e.export(context.Background(), e.build(mkBeacon(), false), exportTimeout)
 	require.Equal(t, uint64(1), counters.snapshot()["otlp_errors"])
 	require.Contains(t, output.String(), "partial rejection")
 	require.NotContains(t, output.String(), secret)
@@ -634,20 +654,43 @@ func TestWrongSiteHasNoEffects(t *testing.T) {
 			}, "s1", "", counters, nil)
 			wrong := tracedBeacon()
 			wrong.Site = "other"
-			wrong.PageView = true
-			e.Ingest(wrong)
-			e.Reject("other", "invalid")
+			e.Ingest(wrong, aggregate.Result{
+				Accepted:     true,
+				Investigated: true,
+				PageView:     true,
+			})
 			require.Empty(t, e.ch)
 			require.Empty(t, e.spanCh)
 			require.Empty(t, counters.snapshot())
 			// The rejected session ID must still yield a start on first owned traffic.
-			e.Ingest(mkBeacon())
+			e.Ingest(mkBeacon(), aggregate.Result{
+				Accepted:     true,
+				Investigated: true,
+			})
 			if enabled == "yes" {
 				require.Len(t, e.ch, 1)
 				require.Equal(t, "session_start", simplify(<-e.ch).attrs["rum.type"])
 			} else {
-				require.EqualValues(t, 1, counters.snapshot()[agg.CounterOTLPDropped])
+				require.EqualValues(t, 1, counters.snapshot()[aggregate.CounterOTLPDropped])
 			}
 		})
 	}
+}
+
+// A zero disposition must not consume an export session or account drops, even
+// when the normalized observation's site matches this exporter.
+func TestUnacceptedResultHasNoEffects(t *testing.T) {
+	counters := newRecCounters()
+	e := configuredExporter(t, Config{
+		Enabled: "no",
+	}, "s1", "", counters, nil)
+	e.Ingest(tracedBeacon(), aggregate.Result{})
+	require.Empty(t, e.ch)
+	require.Empty(t, e.spanCh)
+	require.Empty(t, counters.snapshot())
+	e.Ingest(mkBeacon(), aggregate.Result{
+		Accepted:     true,
+		Investigated: true,
+	})
+	require.EqualValues(t, 1, counters.snapshot()[aggregate.CounterOTLPDropped])
 }
