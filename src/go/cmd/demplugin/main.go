@@ -24,6 +24,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/artifacts"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/runner"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
 	"go.uber.org/automaxprocs/maxprocs"
 )
@@ -80,14 +82,34 @@ func main() {
 		os.Exit(1)
 	}
 	// Apply the configured budget before any producer can append.
-	if err := history.EnforceRumHistoryRetention(context.Background(), cfg.History.Days, cfg.History.MaxBytes); err != nil {
+	if err := history.EnforceHistoryRetention(context.Background(), cfg.History.Days, cfg.History.MaxBytes); err != nil {
 		_ = history.Close()
 		fmt.Fprintf(os.Stderr, "initializing DEM history policy: %v\n", err)
 		os.Exit(1)
 	}
+	artifactPath := ""
+	if !debug {
+		artifactPath = filepath.Join(pluginconfig.VarLibDir(), "dem", "artifacts")
+	}
+	captures, err := artifacts.Open(artifactPath)
+	if err != nil {
+		_ = history.Close()
+		fmt.Fprintf(os.Stderr, "opening DEM artifacts: %v\n", err)
+		os.Exit(1)
+	}
+	if _, err = captures.Enforce(context.Background(), cfg.Artifacts.Days, cfg.Artifacts.MaxBytes); err != nil {
+		_ = captures.Close()
+		_ = history.Close()
+		fmt.Fprintf(os.Stderr, "initializing DEM artifact policy: %v\n", err)
+		os.Exit(1)
+	}
+	cfg.Runtime.AssetsPath = filepath.Join(executable.Directory, "dem")
+	executor := runner.New(cfg.Runtime, history, captures)
 	registry, retention := dem.NewRegistry(
 		dem.Dependencies{
 			History:        history,
+			Artifacts:      captures,
+			Executor:       executor,
 			ConfigProvider: func() (dem.Config, error) { return dem.LoadConfig(pluginconfig.ConfigDir()) },
 		},
 		cfg,
@@ -110,7 +132,22 @@ func main() {
 		MinUpdateEvery:            opts.UpdateEvery,
 	})
 	a.Infof("plugin: name=%s, %s", a.Name, buildinfo.Info())
-	result := agenthost.Run(a)
+	completed := make(chan agenthost.Result, 1)
+	go func() { completed <- agenthost.Run(a) }()
+	var result agenthost.Result
+	select {
+	case result = <-completed:
+	case err := <-executor.Fatal():
+		a.Errorf("plugin exiting with retained unverified synthetic work: %v", err)
+		os.Exit(1)
+	}
+	// A completed Agent and a simultaneous poison must still fail-stop.
+	select {
+	case err := <-executor.Fatal():
+		a.Errorf("unverified synthetic completion: %v", err)
+		os.Exit(1)
+	default:
+	}
 	// An error or forced recovery can leave active consumers. Process exit owns
 	// their resources; only a joined, successful shutdown may close shared state.
 	if result.Err != nil {
@@ -119,6 +156,10 @@ func main() {
 	}
 	if result.ExitRequired {
 		os.Exit(0)
+	}
+	if err := captures.Close(); err != nil {
+		a.Errorf("closing DEM artifacts: %v", err)
+		os.Exit(1)
 	}
 	if err := history.Close(); err != nil {
 		a.Errorf("closing DEM history: %v", err)

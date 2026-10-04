@@ -29,6 +29,6 @@ func TestShippedArtifacts(t *testing.T) {
 	)
 	health, err := os.ReadFile("../../../../../health/health.d/dem.conf")
 	require.NoError(t, err)
-	collecttest.AssertHealthAlertsTargetChartTemplate(t, health, charts)
-	collecttest.AssertMetadataAlertsMatchHealthConfig(t, metadata, health)
+	collecttest.AssertHealthAlertsTargetChartTemplateWith(t, health, charts, collecttest.HealthAlertsCheck{ContextPrefix: "rum."})
+	collecttest.AssertMetadataAlertsMatchHealthConfigWith(t, metadata, health, collecttest.MetadataAlertsCheck{SharedHealthConfig: true})
 }

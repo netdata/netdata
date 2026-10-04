@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/artifacts"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,8 +22,8 @@ type observedRetention struct {
 	swept chan error
 }
 
-func (r *observedRetention) EnforceRumHistoryRetention(ctx context.Context, days int, bytes int64) error {
-	err := r.Store.EnforceRumHistoryRetention(ctx, days, bytes)
+func (r *observedRetention) EnforceHistoryRetention(ctx context.Context, days int, bytes int64) error {
+	err := r.Store.EnforceHistoryRetention(ctx, days, bytes)
 	r.swept <- err
 	return err
 }
@@ -78,7 +79,7 @@ func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 
 type blockingRetention struct{ entered chan struct{} }
 
-func (r *blockingRetention) EnforceRumHistoryRetention(ctx context.Context, _ int, _ int64) error {
+func (r *blockingRetention) EnforceHistoryRetention(ctx context.Context, _ int, _ int64) error {
 	close(r.entered)
 	<-ctx.Done()
 	return ctx.Err()
@@ -143,7 +144,7 @@ func TestRetentionReloadsValidPolicyAndRetainsItOnInvalidConfig(t *testing.T) {
 
 type transientRetention struct{ calls chan int }
 
-func (r *transientRetention) EnforceRumHistoryRetention(context.Context, int, int64) error {
+func (r *transientRetention) EnforceHistoryRetention(context.Context, int, int64) error {
 	r.calls <- 1
 	return errors.New("temporary filesystem failure")
 }
@@ -169,5 +170,26 @@ func TestRetentionRetriesTransientFailureBeforeHourlySweep(t *testing.T) {
 	case <-backend.calls:
 	case <-time.After(6 * time.Second):
 		t.Fatal("transient failure stalled retention and writer recovery until the hourly sweep")
+	}
+}
+
+type observedArtifactRetention struct{ sweeps chan HistoryConfig }
+
+func (r *observedArtifactRetention) Enforce(_ context.Context, days int, bytes int64) (artifacts.Stats, error) {
+	r.sweeps <- HistoryConfig{Days: days, MaxBytes: bytes}
+	return artifacts.Stats{}, nil
+}
+func TestArtifactSweepStillRunsWhenJournalSweepFails(t *testing.T) {
+	artifact := &observedArtifactRetention{sweeps: make(chan HistoryConfig, 1)}
+	service := &Retention{store: &transientRetention{calls: make(chan int, 1)}, policy: DefaultConfig().History, artifactStore: artifact, artifactPolicy: DefaultConfig().Artifacts, log: logger.New()}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { defer close(done); service.Run(ctx) }()
+	defer func() { cancel(); <-done }()
+	select {
+	case policy := <-artifact.sweeps:
+		assert.Equal(t, DefaultConfig().Artifacts, policy)
+	case <-time.After(time.Second):
+		t.Fatal("journal failure prevented independent artifact expiry")
 	}
 }

@@ -3970,6 +3970,15 @@ if(ENABLE_PLUGIN_DEM)
     netdata_add_deb_copyright(plugin-dem netdata-plugin-dem)
     install(PROGRAMS ${CMAKE_BINARY_DIR}/${DEM_PLUGIN_BIN}
             COMPONENT plugin-dem DESTINATION usr/libexec/netdata/plugins.d)
+    install(FILES
+            src/go/plugin/dem/runner/assets/run.mjs
+            src/go/plugin/dem/runner/assets/reporter.cjs
+            src/go/plugin/dem/runner/assets/protocol.cjs
+            src/go/plugin/dem/runner/assets/lighthouse.mjs
+            src/go/plugin/dem/runner/assets/manifest.json
+            src/go/plugin/dem/runner/assets/package.json
+            src/go/plugin/dem/runner/assets/package-lock.json
+            COMPONENT plugin-dem DESTINATION usr/libexec/netdata/plugins.d/dem)
     install(FILES src/go/plugin/dem/config/dem.conf
             COMPONENT plugin-dem DESTINATION usr/lib/netdata/conf.d)
     install(DIRECTORY src/go/plugin/dem/config/dem

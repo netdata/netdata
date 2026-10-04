@@ -6,16 +6,23 @@ package dem
 import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/artifacts"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rumfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/syntheticfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 type Dependencies struct {
 	History        *store.Store
+	Artifacts      *artifacts.Store
+	Executor       synthetic.Executor
 	ConfigProvider func() (Config, error)
 }
 
@@ -37,10 +44,23 @@ func NewRegistry(deps Dependencies, cfg Config) (collectorapi.Registry, *Retenti
 	registry := collectorapi.Registry{}
 	registry.Register("receiver", receiver.Creator(hub))
 	registry.Register("rum", site)
-	return registry, &Retention{
-		store:      deps.History,
-		policy:     cfg.History,
-		loadConfig: deps.ConfigProvider,
-		log:        logger.New(),
+	syntheticHub := synthetic.NewHub()
+	syntheticHandler := syntheticfunc.New(&syntheticSource{hub: syntheticHub, history: deps.History, artifacts: deps.Artifacts})
+	workflow := journey.Creator(journey.Dependencies{Hub: syntheticHub, Executor: deps.Executor})
+	workflow.AgentFunctions = syntheticfunc.Declarations
+	workflow.MethodHandler = func(collectorapi.RuntimeJob) funcapi.MethodHandler { return syntheticHandler }
+	registry.Register("journey", workflow)
+	registry.Register("lighthouse", lighthouse.Creator(lighthouse.Dependencies{Hub: syntheticHub, Executor: deps.Executor}))
+	retention := &Retention{
+		store:  deps.History,
+		policy: cfg.History,
+
+		artifactPolicy: cfg.Artifacts,
+		loadConfig:     deps.ConfigProvider,
+		log:            logger.New(),
 	}
+	if deps.Artifacts != nil {
+		retention.artifactStore = deps.Artifacts
+	}
+	return registry, retention
 }
