@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package synthetic_test
+package journey_test
 
 import (
 	"bytes"
 	"context"
 	"errors"
-	"math"
 	"strings"
 	"sync"
 	"testing"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
@@ -200,6 +198,9 @@ func TestJourneyEvidenceAndSecretRequest(t *testing.T) {
 					CompletedUS: time.Now().UnixMicro(),
 					Outcome:     model.Failed,
 					DurationMS:  ptr(1250.5),
+					Metrics: &model.LabMetrics{
+						Performance: ptr(100),
+					},
 					Tests: &model.TestCounts{
 						Declared:        7,
 						Passed:          1,
@@ -218,6 +219,7 @@ func TestJourneyEvidenceAndSecretRequest(t *testing.T) {
 	start(t, c)
 	got, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
 	require.NoError(t, err)
+	assert.NotContains(t, got, "performance", "journey owns no lab instruments")
 	for key, want := range map[string]float64{"duration": 1250.5, "tests_declared": 7, "tests_passed": 1, "tests_failed": 1, "tests_timed_out": 1, "tests_skipped": 1, "tests_expected_failure": 1, "tests_not_run": 2} {
 		assert.EqualValues(t, want, got[key], key)
 	}
@@ -228,72 +230,6 @@ func TestJourneyEvidenceAndSecretRequest(t *testing.T) {
 			}, "dem_synthetic.journey.declared_tests": {"declared"}, "dem_synthetic.journey.test_outcomes": {"passed", "failed", "timed_out", "skipped", "expected_failure", "not_run"},
 		},
 	})
-}
-
-func TestLighthouseValuesAndLaterGaps(t *testing.T) {
-	hub := model.NewHub()
-	attempts := 0
-	c := lighthouse.New(
-		lighthouse.Dependencies{
-			Hub: hub,
-			Executor: executor{
-				execute: func(ctx context.Context, req model.Request, state func(string)) model.Execution {
-					attempts++
-					assert.Equal(t, model.Lighthouse, req.Kind)
-					assert.Equal(t, "https://example.org/", req.URL)
-					assert.Equal(t, 3*time.Minute, req.Timeout)
-					assert.True(t, req.Capture)
-					run := model.Run{
-						CompletedUS: time.Now().UnixMicro(),
-						Outcome:     model.Success,
-						DurationMS:  ptr(5000),
-						Metrics: &model.LabMetrics{
-							Performance: ptr(0),
-							FCPMS:       ptr(100.5),
-							LCPMS:       ptr(200.5),
-							TBTMS:       ptr(0),
-							SIMS:        ptr(300.5),
-							CLS:         ptr(0.12),
-						},
-					}
-					if attempts == 2 {
-						run.Outcome = model.Error
-						run.DurationMS = nil
-						run.Metrics = &model.LabMetrics{
-							Performance: ptr(math.NaN()),
-							LCPMS:       ptr(math.Inf(1)),
-						}
-					}
-					return model.Execution{
-						Run:     run,
-						Drained: true,
-					}
-				},
-			},
-		},
-	)
-	c.Name = "home"
-	c.URL = "https://example.org/"
-	c.SaveReport = true
-	start(t, c)
-	got, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
-	require.NoError(t, err)
-	for key, want := range map[string]float64{"performance": 0, "fcp": 100.5, "lcp": 200.5, "tbt": 0, "si": 300.5, "cls": 0.12, "duration": 5000} {
-		assert.EqualValues(t, want, got[key], key)
-	}
-	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{
-		RequiredContexts: map[string][]string{
-			"dem_synthetic.lighthouse.performance": {
-				"performance",
-			}, "dem_synthetic.lighthouse.timings": {"fcp", "lcp", "tbt", "speed_index"}, "dem_synthetic.lighthouse.cls": {"cls"},
-		},
-	})
-	got, err = collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
-	require.NoError(t, err)
-	for _, key := range []string{"performance", "fcp", "lcp", "tbt", "si", "cls", "duration"} {
-		assert.NotContains(t, got, key, "old values are not fresh measurements")
-	}
-	assert.EqualValues(t, 1, got[`execution_state{execution_state="error"}`])
 }
 
 type output struct {
@@ -446,5 +382,110 @@ func TestUnverifiedCompletionFailsRuntime(t *testing.T) {
 var _ model.Executor = executor{}
 var _ collectorapi.CollectorV2 = (*journey.Collector)(nil)
 var _ collectorapi.CollectorV2Runner = (*journey.Collector)(nil)
-var _ collectorapi.CollectorV2 = (*lighthouse.Collector)(nil)
-var _ collectorapi.CollectorV2Runner = (*lighthouse.Collector)(nil)
+
+// Run cancellation can retire the registration while Execute is still joining
+// readers. Late callbacks belong to that retired generation only.
+func TestLateCallbacksCannotChangeSuccessor(t *testing.T) {
+	hub := model.NewHub()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	t.Cleanup(unblock)
+	c := newJourney(executor{
+		execute: func(ctx context.Context, req model.Request, state func(string)) model.Execution {
+			close(entered)
+			<-release
+			state("running")
+			return model.Execution{
+				Drained: true,
+				Run: model.Run{
+					Outcome: model.Failed,
+				},
+			}
+		},
+	}, hub)
+	stop := start(t, c)
+	collected := make(chan error, 1)
+	go func() { _, err := collecttest.CollectScalarSeries(c); collected <- err }()
+	select {
+	case <-entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("execution did not start")
+	}
+	stop()
+	next := newJourney(executor{}, hub)
+	start(t, next)
+	unblock()
+	select {
+	case err := <-collected:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("collection did not finish")
+	}
+	jobs := hub.Snapshot(time.Now())
+	require.Len(t, jobs, 1)
+	assert.Equal(t, "unknown", jobs[0].State)
+	assert.Nil(t, jobs[0].Latest)
+	c.Cleanup(context.Background())
+	assert.Len(t, hub.Snapshot(time.Now()), 1)
+}
+
+func TestCollectionRequiresActivationAndHonorsCancellation(t *testing.T) {
+	c := newJourney(executor{
+		execute: func(context.Context, model.Request, func(string)) model.Execution {
+			t.Error("inactive or cancelled collection executed")
+			return model.Execution{}
+		},
+	}, model.NewHub())
+	require.EqualError(t, c.Collect(context.Background()), "synthetic job is not active")
+	start(t, c)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.ErrorIs(t, c.Collect(ctx), context.Canceled)
+}
+
+func TestJourneyZeroCountsAndLaterGaps(t *testing.T) {
+	attempts := 0
+	c := newJourney(executor{
+		execute: func(context.Context, model.Request, func(string)) model.Execution {
+			attempts++
+			run := model.Run{
+				Outcome:    model.Inconclusive,
+				DurationMS: ptr(0),
+				Tests:      &model.TestCounts{},
+			}
+			if attempts == 2 {
+				run.Outcome = model.Error
+				run.DurationMS = nil
+				run.Tests = nil
+			}
+			return model.Execution{
+				Drained: true,
+				Run:     run,
+			}
+		},
+	}, model.NewHub())
+	start(t, c)
+	got, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+	require.NoError(t, err)
+	names := []string{
+		"duration",
+		"tests_declared",
+		"tests_passed",
+		"tests_failed",
+		"tests_timed_out",
+		"tests_skipped",
+		"tests_expected_failure",
+		"tests_not_run",
+	}
+	for _, name := range names {
+		require.Contains(t, got, name)
+		assert.Zero(t, got[name])
+	}
+	got, err = collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+	require.NoError(t, err)
+	for _, name := range names {
+		assert.NotContains(t, got, name)
+	}
+}

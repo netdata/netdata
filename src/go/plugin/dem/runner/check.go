@@ -7,12 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
@@ -20,8 +18,6 @@ import (
 )
 
 var packagePins = map[string]string{"@playwright/test": "1.63.0", "playwright": "1.63.0", "playwright-core": "1.63.0", "lighthouse": "13.4.1", "chrome-launcher": "1.2.1"}
-var secretName = regexp.MustCompile(`^DEM_SECRET_[A-Za-z0-9_]+$`)
-var scriptExtension = regexp.MustCompile(`\.(?:[cm]?[jt]s)$`)
 
 func runtimeAllowed() error {
 	if runtime.GOOS != "linux" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
@@ -160,35 +156,4 @@ func (e *Engine) probe(ctx context.Context, args []string) ([]byte, error) {
 		return nil, fmt.Errorf("version probe failed: %w (%s)", result.Err, diagnostic)
 	}
 	return output, nil
-}
-
-func validateRequest(r synthetic.Request) error {
-	if r.Timeout < time.Millisecond {
-		return errors.New("synthetic timeout must be at least one millisecond")
-	}
-	if strings.TrimSpace(r.Name) == "" {
-		return errors.New("synthetic job name is required")
-	}
-	switch r.Kind {
-	case synthetic.Journey:
-		if (r.Script == "") == (r.ScriptPath == "") {
-			return errors.New("set exactly one of script and script_path")
-		}
-		if r.ScriptPath != "" && (!filepath.IsAbs(r.ScriptPath) || !scriptExtension.MatchString(r.ScriptPath)) {
-			return errors.New("script_path must be an absolute JS or TS file")
-		}
-	case synthetic.Lighthouse:
-		u, err := url.Parse(r.URL)
-		if err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil {
-			return errors.New("audit URL must be absolute HTTP(S) without credentials")
-		}
-	default:
-		return errors.New("unsupported synthetic kind")
-	}
-	for name, value := range r.Secrets {
-		if !secretName.MatchString(name) || strings.ContainsRune(value, 0) {
-			return errors.New("invalid DEM_SECRET_ environment entry")
-		}
-	}
-	return nil
 }

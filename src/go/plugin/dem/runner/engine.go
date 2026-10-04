@@ -142,7 +142,7 @@ func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state f
 	run.StartedUS = time.Now().UnixMicro()
 	attempt, cancel := context.WithTimeout(ctx, request.Timeout)
 	defer cancel()
-	if err := validateRequest(request); err != nil {
+	if err := synthetic.ValidateRequest(request); err != nil {
 		return finishUnstarted(err, true)
 	}
 	if err := e.platform(); err != nil {
