@@ -44,7 +44,7 @@ modules:
       prerequisites:
         list:
           - title: DNS Server role
-            description: Install the Windows DNS Server role to collect these metrics. If installed after the Agent starts, collection begins after Windows refreshes its performance counter registry.
+            description: Install the Windows DNS Server role to collect these metrics. If it is installed after the Agent starts, restart the Agent.
       configuration:
         file:
           name: "netdata.conf"
