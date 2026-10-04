@@ -25,7 +25,7 @@ modules:
         metrics_description: |
           Monitor DNS Server query traffic, recursion, zone transfers, dynamic updates, memory, response handling, and WINS lookups on Windows.
         method_description: |
-          It reads the DNS performance object from Windows Perflib. If the DNS Server role is installed later, collection begins automatically after Windows refreshes the performance counter registry.
+          It reads the DNS performance object from Windows Perflib. If the DNS Server role is installed after the Agent starts, restart the Agent to begin collection.
       supported_platforms:
         include: ["windows"]
         exclude: []
