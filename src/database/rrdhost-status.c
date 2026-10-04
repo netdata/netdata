@@ -235,12 +235,22 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
                 // generation while `host->receiver` here describes the new one. `connections` is
                 // bumped once per accepted connection under this same lock, so a change means
                 // exactly that, and reporting the mixed pair would be worse than losing the snapshot.
-                // The connection id follows the receiver, like the capabilities and peers below; a
-                // connected status and its since/reason were derived from the previous generation
-                // too, so a generation change re-derives them.
+                // The connection id follows the receiver, like the capabilities and peers below, so a
+                // generation change always refreshes it. Since and reason are refreshed only when the
+                // status came from a live connection (`online`): OFFLINE and ARCHIVED describe the
+                // snapshot's disconnected state, and ARCHIVED's since is the database's last time. Of
+                // those, only REPLICATING and ONLINE are re-derived - INITIALIZING depends on the
+                // database, not on the connection.
                 uint32_t connections_now = __atomic_load_n(&host->stream.rcv.status.connections, __ATOMIC_RELAXED);
                 if(connections_now != connections) {
                     connections = connections_now;
+
+                    if(online) {
+                        since = MAX(host->stream.rcv.status.last_connected, host->stream.rcv.status.last_disconnected);
+                        s->ingest.since = since ? since : netdata_start_time;
+                        s->ingest.reason = host->stream.rcv.status.reason;
+                    }
+
                     replication_completion = rrdhost_receiver_replication_completion(host, &replicating_instances);
 
                     if(status == RRDHOST_INGEST_STATUS_REPLICATING || status == RRDHOST_INGEST_STATUS_ONLINE) {
@@ -248,10 +258,6 @@ static inline RRDHOST_INGEST_STATUS rrdhost_status_ingest(RRDHOST *host, RRDHOST
                         status = rrdhost_status_ingest_connected(replicating_instances, collected_metrics);
                         s->ingest.status = status;
                         s->ingest.collected.metrics = collected_metrics;
-
-                        since = MAX(host->stream.rcv.status.last_connected, host->stream.rcv.status.last_disconnected);
-                        s->ingest.since = since ? since : netdata_start_time;
-                        s->ingest.reason = host->stream.rcv.status.reason;
                     }
                 }
                 else if(replicating_instances == UINT32_MAX)

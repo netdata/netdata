@@ -437,6 +437,10 @@ extern RRDHOST *localhost;
 // the child reconnects via normal backoff. With cleanup off the lock, all
 // other readers (status, ACLK, capabilities, paths, event-driven sends)
 // keep blocking-lock semantics and stay truthful.
+//
+// Error logs are tolerated under it, as on the attach and replication-reset paths. rrdset_free()
+// releases a chart's receiver-replication claim under it, and a refused release logs an error; a
+// refusal means the accounting is already corrupt, which the ownership invariant makes unreachable.
 #define rrdhost_receiver_lock(host) spinlock_lock(&(host)->receiver_lock)
 #define rrdhost_receiver_unlock(host) spinlock_unlock(&(host)->receiver_lock)
 
