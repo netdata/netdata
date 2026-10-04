@@ -42,7 +42,7 @@ func TestErrorGroupRankingAndOtherFold(t *testing.T) {
 		}
 	}
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 	if len(snap.ErrorGroups) != errorGroupsTopN+1 { // top 10 + other
 		t.Fatalf("ErrorGroups = %+v, want %d entries", snap.ErrorGroups, errorGroupsTopN+1)
 	}
@@ -70,7 +70,7 @@ func TestErrorGroupRankChangePreservesCounts(t *testing.T) {
 		a.Ingest(b)
 	}
 	*now = now.Add(10 * time.Second)
-	one(a) // first ranking = {fp00..fp09}
+	a.Snapshot() // first ranking = {fp00..fp09}
 
 	// A new, much more frequent fingerprint displaces fp09 (the lowest-ranked, ties by string).
 	for i := 0; i < 5; i++ {
@@ -81,7 +81,7 @@ func TestErrorGroupRankChangePreservesCounts(t *testing.T) {
 		}))
 	}
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 	want := []ErrorChartGroup{{Fingerprint: "zzz", Message: "m", Total: 5}}
 	for i := 0; i < 9; i++ {
 		want = append(want, ErrorChartGroup{
@@ -118,7 +118,7 @@ func TestErrorGroupRankChangePreservesCounts(t *testing.T) {
 		Fingerprint: Other,
 		Total:       1,
 	})
-	assert.Equal(t, want, one(a).ErrorGroups)
+	assert.Equal(t, want, a.Snapshot().ErrorGroups)
 }
 
 func TestErrorGroupLRUBounds(t *testing.T) {
@@ -131,7 +131,7 @@ func TestErrorGroupLRUBounds(t *testing.T) {
 			Fingerprint: fp,
 		}))
 	}
-	got := trackedErrorFingerprints(a, "s")
+	got := trackedErrorFingerprints(a)
 	if len(got) != maxErrorGroups {
 		t.Fatalf("tracked groups = %d, want %d", len(got), maxErrorGroups)
 	}
@@ -144,11 +144,11 @@ func TestErrorGroupLRUBounds(t *testing.T) {
 	_ = now
 }
 
-func trackedErrorFingerprints(a *Aggregator, site string) []string {
+func trackedErrorFingerprints(a *Aggregator) []string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	var out []string
-	for el := a.sites[site].errGroups.Front(); el != nil; el = el.Next() {
+	for el := a.site.errGroups.Front(); el != nil; el = el.Next() {
 		out = append(out, el.Value.(*errEntry).fp)
 	}
 	return out

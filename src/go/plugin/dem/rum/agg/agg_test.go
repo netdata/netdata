@@ -14,15 +14,22 @@ import (
 
 var t0 = time.Date(2030, 1, 1, 12, 0, 0, 0, time.UTC)
 
-func newAgg(window time.Duration, sites ...SiteCfg) (*Aggregator, *time.Time) {
-	now := t0
-	a := New(window)
-	a.now = func() time.Time { return now }
-	a.liveSeq = 0 // deterministic 1-based seqs in tests
-	if len(sites) == 0 {
-		sites = []SiteCfg{{Key: "s", Name: "S", PageGroups: 20, Countries: 20}}
+func newAgg(window time.Duration, cfgs ...SiteCfg) (*Aggregator, *time.Time) {
+	cfg := SiteCfg{
+		Name:        "s",
+		DisplayName: "S",
+		PageGroups:  20,
+		Countries:   20,
 	}
-	a.Configure(window, sites)
+	if len(cfgs) > 1 {
+		panic("newAgg accepts one site config")
+	}
+	if len(cfgs) == 1 {
+		cfg = cfgs[0]
+	}
+	now := t0
+	a := New(window, cfg)
+	a.now = func() time.Time { return now }
 	return a, &now
 }
 
@@ -45,14 +52,6 @@ func v(name string, val float64) beacon.Vital {
 		Name:  name,
 		Value: val,
 	}
-}
-
-func one(a *Aggregator) SiteSnapshot {
-	snaps := a.Snapshot()
-	if len(snaps) != 1 {
-		panic("expected one site")
-	}
-	return snaps[0]
 }
 
 func TestPercentiles(t *testing.T) {
@@ -148,11 +147,10 @@ func TestTotalsAndCounters(t *testing.T) {
 	a.Ingest(b)
 	a.Reject("s", beacon.RejectOrigin)
 	a.Reject("s", beacon.RejectOrigin)
-	a.Add("s", CounterOTLPSent, 5)
-	a.Add("nope", CounterOTLPSent, 5) // unknown site ignored
+	a.Add(CounterOTLPSent, 5)
 	*now = now.Add(3 * time.Second)
 
-	snap := one(a)
+	snap := a.Snapshot()
 	wantVitals := map[string]VitalStats{
 		beacon.LCP: {N: 2, P50: 1000, P75: 3000, P95: 3000, Good: 1, NeedsImpr: 1, Poor: 0},
 		beacon.CLS: {N: 1, P50: 0.05, P75: 0.05, P95: 0.05, Good: 1, NeedsImpr: 0, Poor: 0},
@@ -166,8 +164,8 @@ func TestTotalsAndCounters(t *testing.T) {
 	if !reflect.DeepEqual(snap.Counters, wantCounters) {
 		t.Fatalf("counters:\ngot  %v\nwant %v", snap.Counters, wantCounters)
 	}
-	if snap.ActiveSessions != 2 || snap.Site != "s" || snap.Name != "S" {
-		t.Fatalf("sessions=%d site=%s name=%s", snap.ActiveSessions, snap.Site, snap.Name)
+	if snap.ActiveSessions != 2 || snap.Name != "s" || snap.DisplayName != "S" {
+		t.Fatalf("sessions=%d site=%s name=%s", snap.ActiveSessions, snap.Name, snap.DisplayName)
 	}
 }
 
@@ -222,7 +220,7 @@ func TestPageviewDedup(t *testing.T) {
 				flags = append(flags, b.PageView)
 			}
 			*now = now.Add(30 * time.Second)
-			snap := one(a)
+			snap := a.Snapshot()
 			if snap.Counters[CounterPageviews] != tc.want {
 				t.Fatalf("pageviews=%d want %d (flags %v)", snap.Counters[CounterPageviews], tc.want, flags)
 			}
@@ -245,15 +243,15 @@ func TestWindowEviction(t *testing.T) {
 	a.Ingest(mk(now.Add(30*time.Second), "s1", "/a", v(beacon.LCP, 3000)))
 
 	*now = now.Add(45 * time.Second) // both inside the 1m window
-	if got := one(a).Vitals[beacon.LCP]; got.N != 2 || got.P95 != 3000 {
+	if got := a.Snapshot().Vitals[beacon.LCP]; got.N != 2 || got.P95 != 3000 {
 		t.Fatalf("inside window: %+v", got)
 	}
 	*now = t0.Add(75 * time.Second) // first sample is now older than 1m
-	if got := one(a).Vitals[beacon.LCP]; got.N != 1 || got.P50 != 3000 {
+	if got := a.Snapshot().Vitals[beacon.LCP]; got.N != 1 || got.P50 != 3000 {
 		t.Fatalf("after partial eviction: %+v", got)
 	}
 	*now = t0.Add(3 * time.Minute)
-	if snap := one(a); len(snap.Vitals) != 0 {
+	if snap := a.Snapshot(); len(snap.Vitals) != 0 {
 		t.Fatalf("after full eviction vitals must be absent (gap), got %+v", snap.Vitals)
 	}
 }
@@ -263,7 +261,7 @@ func TestSampleCap(t *testing.T) {
 	for i := 1; i <= maxSamplesPerSeries+5; i++ {
 		a.Ingest(mk(*now, "s1", "/a", v(beacon.INP, float64(i))))
 	}
-	snap := one(a)
+	snap := a.Snapshot()
 	got := snap.Vitals[beacon.INP]
 	if got.N != maxSamplesPerSeries {
 		t.Fatalf("N=%d want %d", got.N, maxSamplesPerSeries)
@@ -280,10 +278,10 @@ func TestSampleCap(t *testing.T) {
 
 func TestTopNFoldingIntoOther(t *testing.T) {
 	a, now := newAgg(5*time.Minute, SiteCfg{
-		Key:        "s",
-		Name:       "S",
-		PageGroups: 2,
-		Countries:  20,
+		Name:        "s",
+		DisplayName: "S",
+		PageGroups:  2,
+		Countries:   20,
 	})
 	views := map[string]int{"/a": 3, "/b": 2, "/c": 1, "/d": 1}
 	i := 0
@@ -294,7 +292,7 @@ func TestTopNFoldingIntoOther(t *testing.T) {
 		}
 	}
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 
 	// Round 1: the top set did not exist yet, so every count routed to other.
 	got := snap.Breakdowns[KindPage]
@@ -312,7 +310,7 @@ func TestTopNFoldingIntoOther(t *testing.T) {
 	a.Ingest(mk(*now, "x1", "/a", v(beacon.LCP, 100)))
 	a.Ingest(mk(*now, "x2", "/c", v(beacon.LCP, 100)))
 	*now = now.Add(10 * time.Second)
-	got = one(a).Breakdowns[KindPage]
+	got = a.Snapshot().Breakdowns[KindPage]
 	want := []Group{
 		{Value: "/a", P75: got[0].P75, Pageviews: 1, JSErrors: 0},
 		{Value: "/b", P75: got[1].P75, Pageviews: 0, JSErrors: 0},
@@ -325,19 +323,19 @@ func TestTopNFoldingIntoOther(t *testing.T) {
 
 func TestLeavingTopSetRoutesFutureCountsToOther(t *testing.T) {
 	a, now := newAgg(5*time.Minute, SiteCfg{
-		Key:        "s",
-		Name:       "S",
-		PageGroups: 1,
-		Countries:  20,
+		Name:        "s",
+		DisplayName: "S",
+		PageGroups:  1,
+		Countries:   20,
 	})
 	a.Ingest(mk(*now, "s1", "/a"))
 	*now = now.Add(10 * time.Second)
-	one(a) // top = {/a}
+	a.Snapshot() // top = {/a}
 	for i := 0; i < 3; i++ {
 		a.Ingest(mk(*now, "t"+string(rune('0'+i)), "/b"))
 	}
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 	if got := snap.Breakdowns[KindPage]; len(got) != 2 || got[0].Value != "/b" || got[1].Value != Other {
 		t.Fatalf("ranking: %+v", got)
 	}
@@ -346,7 +344,7 @@ func TestLeavingTopSetRoutesFutureCountsToOther(t *testing.T) {
 		{Value: Other, P75: map[string]float64{}, Pageviews: 4},
 	}, snap.Breakdowns[KindPage])
 	a.Ingest(mk(*now, "after-demotion", "/a", v(beacon.LCP, 700)))
-	snap = one(a)
+	snap = a.Snapshot()
 	assert.Equal(t, []Group{
 		{Value: "/b", P75: map[string]float64{}},
 		{Value: Other, P75: map[string]float64{beacon.LCP: 700}, Pageviews: 5},
@@ -357,13 +355,13 @@ func TestInstanceExpiryAfterTwiceWindow(t *testing.T) {
 	a, now := newAgg(time.Minute)
 	a.Ingest(mk(*now, "s1", "/a", v(beacon.LCP, 1)))
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 	// /a plus the other fold bucket (round-one routing, see TestTopNFoldingIntoOther).
 	if got := snap.Breakdowns[KindPage]; len(got) != 2 || got[0].Value != "/a" || got[1].Value != Other {
 		t.Fatalf("setup: %+v", got)
 	}
 	*now = t0.Add(2*time.Minute + time.Second)
-	snap = one(a)
+	snap = a.Snapshot()
 	// Only the monotonic other bucket survives expiry (its counters keep
 	// emitting) — for the four kinds every beacon populates. version is
 	// never set by mk() and stays empty (declared only once
@@ -377,7 +375,7 @@ func TestInstanceExpiryAfterTwiceWindow(t *testing.T) {
 	// Reappearance creates active samples and preserves monotonic fold totals.
 	a.Ingest(mk(*now, "s9", "/a", v(beacon.LCP, 7)))
 	*now = now.Add(10 * time.Second)
-	snap = one(a)
+	snap = a.Snapshot()
 	for kind, value := range map[string]string{KindBrowser: "Chrome", KindDevice: "desktop", KindCountry: "GR", KindPage: "/a"} {
 		assert.Equal(t, []Group{
 			{Value: value, P75: map[string]float64{beacon.LCP: 7}},
@@ -392,7 +390,7 @@ func TestUnknownCountryExcludedFromBreakdown(t *testing.T) {
 	b.Country = ""
 	a.Ingest(b)
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 	if len(snap.Breakdowns[KindCountry]) != 0 {
 		t.Fatalf("country breakdown must be empty: %+v", snap.Breakdowns[KindCountry])
 	}
@@ -418,7 +416,7 @@ func TestNavigationTiming(t *testing.T) {
 	} // no DCL sample
 	a.Ingest(b2)
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 	if snap.Load.N != 2 || snap.Load.P50 != 1000 || snap.Load.P95 != 2000 {
 		t.Fatalf("Load = %+v", snap.Load)
 	}
@@ -434,7 +432,7 @@ func TestNavigationTimingAbsentWhenNoEvent(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
 	a.Ingest(mk(*now, "s1", "/a"))
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 	if snap.Load.N != 0 || snap.DCL.N != 0 {
 		t.Fatalf("expected no navigation timing samples: load=%+v dcl=%+v", snap.Load, snap.DCL)
 	}
@@ -445,7 +443,7 @@ func TestVersionBreakdownDeclaredOnlyWhenSeen(t *testing.T) {
 	// No beacon ever carries a version: the breakdown must stay empty.
 	a.Ingest(mk(*now, "s0", "/a", v(beacon.LCP, 1000)))
 	*now = now.Add(10 * time.Second)
-	if got := one(a).Breakdowns[KindVersion]; len(got) != 0 {
+	if got := a.Snapshot().Breakdowns[KindVersion]; len(got) != 0 {
 		t.Fatalf("version breakdown must be empty until a version is seen: %+v", got)
 	}
 
@@ -456,7 +454,7 @@ func TestVersionBreakdownDeclaredOnlyWhenSeen(t *testing.T) {
 	b2.AppVersion = "2.0.0"
 	a.Ingest(b2)
 	*now = now.Add(10 * time.Second)
-	one(a) // round 1: materializes the top set (see TestTopNFoldingIntoOther)
+	a.Snapshot() // round 1: materializes the top set (see TestTopNFoldingIntoOther)
 
 	b1 = mk(
 		*now,
@@ -470,7 +468,7 @@ func TestVersionBreakdownDeclaredOnlyWhenSeen(t *testing.T) {
 	b2.AppVersion = "2.0.0"
 	a.Ingest(b2)
 	*now = now.Add(10 * time.Second)
-	got := one(a).Breakdowns[KindVersion]
+	got := a.Snapshot().Breakdowns[KindVersion]
 	// 1.0.0 + 2.0.0 plus the "other" fold bucket, which persists (monotonic
 	// counters) from round 1's pre-top routing — same precedent as
 	// TestTopNFoldingIntoOther's round 2.
@@ -496,45 +494,77 @@ func TestSessionsLRU(t *testing.T) {
 	*now = now.Add(20 * time.Minute)
 	a.Ingest(mk(*now, "s1", "/b"))
 	*now = t0.Add(31 * time.Minute) // s2 idle 31m, s1 idle 11m
-	if got := one(a).ActiveSessions; got != 1 {
+	if got := a.Snapshot().ActiveSessions; got != 1 {
 		t.Fatalf("active=%d want 1", got)
 	}
 	*now = t0.Add(52 * time.Minute)
-	if got := one(a).ActiveSessions; got != 0 {
+	if got := a.Snapshot().ActiveSessions; got != 0 {
 		t.Fatalf("active=%d want 0", got)
 	}
 }
 
-func TestConfigureDropsAndUpdates(t *testing.T) {
-	a, now := newAgg(
-		5*time.Minute,
-		SiteCfg{
-			Key:        "a",
-			PageGroups: 1,
-			Countries:  1,
-		},
-		SiteCfg{
-			Key:        "b",
-			PageGroups: 1,
-			Countries:  1,
-		},
-	)
-	a.Ingest(&beacon.Beacon{
-		Site:      "a",
-		Received:  *now,
-		SessionID: "x",
-		PageGroup: "/",
-	})
-	a.Configure(5*time.Minute, []SiteCfg{{Key: "a", Name: "A", PageGroups: 5, Countries: 5}})
-	snaps := a.Snapshot()
-	if len(snaps) != 1 || snaps[0].Site != "a" || snaps[0].Name != "A" || snaps[0].Counters[CounterAccepted] != 1 {
-		t.Fatalf("configure: %+v", snaps)
+func TestConstructorOwnsConfiguration(t *testing.T) {
+	cfg := SiteCfg{
+		Name:        "a",
+		DisplayName: "A",
+		PageGroups:  1,
+		Countries:   1,
+	}
+	a, now := newAgg(5*time.Minute, cfg)
+	cfg.Name, cfg.DisplayName, cfg.PageGroups = "b", "B", 10
+	for _, page := range []string{"/a", "/b"} {
+		a.Ingest(&beacon.Beacon{
+			Site:      "a",
+			Received:  *now,
+			PageGroup: page,
+		})
+	}
+	snap := a.Snapshot()
+	assert.Equal(t, "a", snap.Name)
+	assert.Equal(t, "A", snap.DisplayName)
+	assert.Equal(t, uint64(2), snap.Counters[CounterAccepted])
+	assert.Len(t, snap.Breakdowns[KindPage], 2) // one ranked group plus other
+}
+
+func TestMismatchedIdentityHasNoEffects(t *testing.T) {
+	a, now := newAgg(5 * time.Minute)
+	history := &fakeHistorySink{}
+	a.SetHistorySink(history)
+	before := a.Snapshot()
+	activity := a.Activity()
+	b := mk(*now, "shared", "/wrong", v(beacon.LCP, 5000))
+	b.Site = "other"
+	b.Errors = []beacon.Error{{Fingerprint: "fp", Type: "Error", Message: "wrong"}}
+	a.Ingest(b)
+	assert.False(t, b.PageView)
+	assert.False(t, b.SampledOut)
+	for _, reason := range []string{beacon.RejectOrigin, beacon.RejectRate, beacon.RejectSize, beacon.RejectBot} {
+		a.Reject("other", reason)
+	}
+	assert.Equal(t, before, a.Snapshot())
+	assert.Equal(t, activity, a.Activity())
+	assert.Empty(t, a.Pages())
+	events, ok := a.SessionEvents("shared")
+	assert.False(t, ok)
+	assert.Empty(t, events)
+	rows, next := a.Live(0, 10)
+	assert.Empty(t, rows)
+	assert.Zero(t, next)
+	assert.Empty(t, history.events)
+	// The same session and page remain a fresh page view for the owner.
+	b.Site = "s"
+	a.Ingest(b)
+	assert.True(t, b.PageView)
+	assert.Equal(t, uint64(1), a.Snapshot().Counters[CounterAccepted])
+	assert.NotEmpty(t, history.events)
+	for _, event := range history.events {
+		assert.Equal(t, "s", event.Site)
 	}
 }
 
 func TestTrackedGroupCapFoldsNewValues(t *testing.T) {
 	a, now := newAgg(5*time.Minute, SiteCfg{
-		Key:        "s",
+		Name:       "s",
 		PageGroups: 100,
 		Countries:  100,
 	})
@@ -542,7 +572,7 @@ func TestTrackedGroupCapFoldsNewValues(t *testing.T) {
 		a.Ingest(mk(*now, "", "/p"+itoa(i)))
 	}
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 	groups := snap.Breakdowns[KindPage]
 	if len(groups) != 101 || groups[100].Value != Other || groups[100].Pageviews != uint64(maxTrackedGroups+50) {
 		t.Fatalf("cap: n=%d last=%+v", len(groups), groups[len(groups)-1])
@@ -552,7 +582,7 @@ func TestTrackedGroupCapFoldsNewValues(t *testing.T) {
 func TestActivity(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
 
-	act := a.Activity()["s"]
+	act := a.Activity()
 	if act != (SiteActivity{
 		LastBeaconAgeS: -1,
 	}) {
@@ -565,7 +595,7 @@ func TestActivity(t *testing.T) {
 	a.Reject("s", beacon.RejectOrigin)
 	a.Reject("s", beacon.RejectInvalid) // must not count toward rejected_per_min
 
-	act = a.Activity()["s"]
+	act = a.Activity()
 	want := SiteActivity{
 		BeaconsPerMin:        1,
 		RejectedPerMin:       1,
@@ -580,7 +610,7 @@ func TestActivity(t *testing.T) {
 	}
 
 	*now = now.Add(90 * time.Second) // past the fixed 60s cutoff, inside the 5m window
-	act = a.Activity()["s"]
+	act = a.Activity()
 	want = SiteActivity{
 		LastBeaconAgeS:       90,
 		ActiveSessions:       1,
@@ -593,16 +623,9 @@ func TestActivity(t *testing.T) {
 	}
 
 	*now = now.Add(5 * time.Minute) // past the aggregation window too
-	act = a.Activity()["s"]
+	act = a.Activity()
 	if act.PageviewsWindow != 0 || act.JSErrorsWindow != 0 || act.LastBeaconAgeS != 390 {
 		t.Fatalf("after window elapsed: %+v", act)
-	}
-}
-
-func TestActivityUnknownSiteIsZeroValue(t *testing.T) {
-	a, _ := newAgg(5 * time.Minute)
-	if _, ok := a.Activity()["does-not-exist"]; ok {
-		t.Fatal("an untracked (e.g. disabled) site must be absent from Activity")
 	}
 }
 
@@ -623,10 +646,10 @@ func itoa(i int) string {
 // two groups map to one chart instance and overwrite each other.
 func TestRankNeverPromotesTheOtherSentinel(t *testing.T) {
 	a, now := newAgg(5*time.Minute, SiteCfg{
-		Key:        "s",
-		Name:       "S",
-		PageGroups: 20,
-		Countries:  20,
+		Name:        "s",
+		DisplayName: "S",
+		PageGroups:  20,
+		Countries:   20,
 	})
 	for i := 0; i < browserTopN+2; i++ {
 		b := mk(*now, fmt.Sprintf("s%d", i), "/p")
@@ -638,7 +661,7 @@ func TestRankNeverPromotesTheOtherSentinel(t *testing.T) {
 		b.Browser = Other
 		a.Ingest(b)
 	}
-	groups := a.Snapshot()[0].Breakdowns[KindBrowser]
+	groups := a.Snapshot().Breakdowns[KindBrowser]
 	var others int
 	for _, g := range groups {
 		if g.Value == Other {
@@ -660,11 +683,11 @@ func TestWindowTotalsSlideWithTheWindow(t *testing.T) {
 	b.Errors = []beacon.Error{{Type: "Error", Message: "x"}, {Type: "Error", Message: "y"}}
 	a.Ingest(b)
 	*now = now.Add(10 * time.Second)
-	if s := one(a); s.PageviewsWindow != 2 || s.JSErrorsWindow != 2 {
+	if s := a.Snapshot(); s.PageviewsWindow != 2 || s.JSErrorsWindow != 2 {
 		t.Fatalf("in window: pageviews=%d errors=%d, want 2/2", s.PageviewsWindow, s.JSErrorsWindow)
 	}
 	*now = now.Add(6 * time.Minute)
-	if s := one(a); s.PageviewsWindow != 0 || s.JSErrorsWindow != 0 {
+	if s := a.Snapshot(); s.PageviewsWindow != 0 || s.JSErrorsWindow != 0 {
 		t.Fatalf("after window: pageviews=%d errors=%d, want 0/0", s.PageviewsWindow, s.JSErrorsWindow)
 	}
 }

@@ -6,14 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 )
 
 // Route is one immutable site policy and its runtime-owned sinks/diagnostics.
 // Registration leases fence access; receiver replacement does not replace it.
 type Route struct {
-	config config.RumSite
+	config config.Site
 	policy *site
 	sink   beacon.Sink
 	reach  reachState
@@ -22,14 +22,14 @@ type Route struct {
 	bucket bucket
 }
 
-func NewRoute(cfg config.RumSite, sink beacon.Sink) *Route {
+func NewRoute(cfg config.Site, sink beacon.Sink) *Route {
 	return &Route{
 		config: cfg,
 		policy: compileSite(cfg),
 		sink:   sink,
 	}
 }
-func (s *Route) Config() config.RumSite { return s.config }
+func (s *Route) Config() config.Site { return s.config }
 func (s *Route) allowSite(rate float64, now time.Time) bool {
 	s.rateMu.Lock()
 	defer s.rateMu.Unlock()

@@ -204,7 +204,7 @@ func (st *siteState) touchSession(b *beacon.Beacon, now time.Time, hist HistoryS
 		}
 		for _, e := range newEvents {
 			rec := HistoryEvent{
-				Site:      st.cfg.Key,
+				Site:      st.cfg.Name,
 				SessionID: sd.id,
 				TSUnixUS:  e.ts.UnixMicro(),
 				Type:      e.typ,
@@ -292,35 +292,27 @@ type SessionEventInfo struct {
 	TraceID string
 }
 
-// SessionEvents returns one session's event ring (oldest first). site
-// narrows the search ("" = all sites); ok is false when the session id
-// is unknown (caller: 404).
-func (a *Aggregator) SessionEvents(site, sessionID string) ([]SessionEventInfo, bool) {
+// SessionEvents returns one session's event ring (oldest first).
+// ok is false when the session id is unknown (caller: 404).
+func (a *Aggregator) SessionEvents(sessionID string) ([]SessionEventInfo, bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	for _, key := range a.siteKeys() {
-		if site != "" && key != site {
-			continue
-		}
-		st := a.sites[key]
-		el, ok := st.sessIdx[sessionID]
-		if !ok {
-			continue
-		}
-		sd := el.Value.(*sessionDetail)
-		out := make([]SessionEventInfo, len(sd.events))
-		for i, e := range sd.events {
-			out[i] = SessionEventInfo{
-				TS:      e.ts,
-				Type:    e.typ,
-				Page:    e.page,
-				Text:    e.text,
-				TraceID: e.traceID,
-			}
-		}
-		return out, true
+	el, ok := a.site.sessIdx[sessionID]
+	if !ok {
+		return nil, false
 	}
-	return nil, false
+	sd := el.Value.(*sessionDetail)
+	out := make([]SessionEventInfo, len(sd.events))
+	for i, e := range sd.events {
+		out[i] = SessionEventInfo{
+			TS:      e.ts,
+			Type:    e.typ,
+			Page:    e.page,
+			Text:    e.text,
+			TraceID: e.traceID,
+		}
+	}
+	return out, true
 }
 
 func (st *siteState) investigatedSessions() int {

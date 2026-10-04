@@ -19,8 +19,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 )
 
 // FaroVersion is the pinned Faro web SDK served by the bootstrap.
@@ -47,7 +47,7 @@ type Server struct {
 	siteRate float64
 }
 
-func New(cfg *config.RumCfg, routes Routes, geo CountryResolver) *Server {
+func New(cfg *config.Receiver, routes Routes, geo CountryResolver) *Server {
 	return &Server{
 		snap:     compile(cfg),
 		routes:   routes,
@@ -139,7 +139,7 @@ func ping(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) rejectOrigin(route *Route, r *http.Request) {
 	route.sink.Reject(route.policy.key, beacon.RejectOrigin)
-	route.reach.rejected(route.policy.key, r.Header.Get("Origin"), s.now())
+	route.reach.rejected(r.Header.Get("Origin"), s.now())
 }
 
 func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
@@ -176,7 +176,17 @@ func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, snap.maxBody))
+	// MaxBytesReader needs net/http's concrete writer to signal HTTP/1 close
+	// on oversized bodies; it does not follow middleware Unwrap methods.
+	bodyWriter := w
+	for {
+		unwrapper, ok := bodyWriter.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			break
+		}
+		bodyWriter = unwrapper.Unwrap()
+	}
+	body, err := io.ReadAll(http.MaxBytesReader(bodyWriter, r.Body, snap.maxBody))
 	if err != nil {
 		var tooBig *http.MaxBytesError
 		if errors.As(err, &tooBig) {
@@ -217,7 +227,6 @@ func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
 	if bot {
 		b.Device = beacon.DeviceBot
 	}
-	b.TraceExportTo = st.exportTo
 	route.sink.Ingest(b)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
@@ -248,7 +257,7 @@ func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
 		base = s.baseURL(r)
 	}
 	if remote := parseAddr(r.RemoteAddr); remote.IsValid() && s.snap.isTrusted(remote) {
-		route.reach.observe(key, base)
+		route.reach.observe(base)
 	}
 	// The snippet carries the site's settings, so it is revalidated on every
 	// page load (ETag, usually a bodyless 304) instead of cached.
@@ -317,7 +326,7 @@ func (s *Server) demo(w http.ResponseWriter, r *http.Request) {
 	defer release()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	_ = rumDemoPage.Execute(w, map[string]string{"Key": key})
+	_ = rumDemoPage.Execute(w, map[string]string{"Name": key})
 }
 
 const faroBootstrap = `(function (k, base, opt) {
@@ -432,11 +441,11 @@ const faroBootstrap = `(function (k, base, opt) {
 
 var rumDemoPage = template.Must(template.New("demo").Parse(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Netdata RUM demo</title>
-<script async src="/rum/{{.Key}}.js"></script></head>
+<script async src="/rum/{{.Name}}.js"></script></head>
 <body>
 <h1>RUM demo page</h1>
 <p>This page carries the Netdata RUM bootstrap for site
-<code>{{.Key}}</code>. Open it in a real browser and the Faro web SDK reports
+<code>{{.Name}}</code>. Open it in a real browser and the Faro web SDK reports
 web vitals (LCP, FCP, CLS, TTFB, INP) and errors to the collector.</p>
 <ul><li><a href="#" id="link" onclick="return false">A dummy link to interact with (INP)</a></li>
 <li><a href="#" id="boom" onclick="throw new Error('demo error'); return false">Throw a JS error</a></li></ul>

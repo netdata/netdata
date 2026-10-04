@@ -101,11 +101,10 @@ func (a *Aggregator) evictLive(now time.Time) {
 	}
 }
 
-// Live returns ring rows with Seq > after, oldest first, optionally filtered
-// to one site and capped at maxRows. next is the max seq among returned rows,
+// Live returns ring rows with Seq > after, oldest first, capped at maxRows. next is the max seq among returned rows,
 // or after unchanged when nothing matched. A cursor ahead of this runtime
 // sequence is treated as 0; the Function routing owner fences generations.
-func (a *Aggregator) Live(site string, after uint64, maxRows int) ([]LiveRow, uint64) {
+func (a *Aggregator) Live(after uint64, maxRows int) ([]LiveRow, uint64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.evictLive(a.now())
@@ -119,9 +118,6 @@ func (a *Aggregator) Live(site string, after uint64, maxRows int) ([]LiveRow, ui
 	out := make([]LiveRow, 0, maxRows)
 	for _, row := range a.live[a.liveStart:] {
 		if row.Seq <= after {
-			continue
-		}
-		if site != "" && row.Site != site {
 			continue
 		}
 		out = append(out, row)

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/ingest"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
@@ -25,10 +25,10 @@ func TestProductionProbeConfirmsTrustedProxyPublicBase(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	server := httptest.NewServer(
-		ingest.New(&config.RumCfg{
+		ingest.New(&config.Receiver{
 			TrustedProxies: []string{"127.0.0.1/32"},
 			MaxBodyBytes:   262144,
-			RateLimit: config.RumRateLimit{
+			RateLimit: config.RateLimit{
 				PerIPPerMin:   120,
 				PerSitePerSec: 500,
 			},
@@ -47,13 +47,13 @@ func TestProductionProbeConfirmsTrustedProxyPublicBase(t *testing.T) {
 		Hub:     hub,
 		History: db,
 	})
-	site.Key = "shop"
+	site.Name = "shop"
 	site.AllowedOrigins = []string{server.URL}
 	site.OTLP.Enabled = "no"
 	require.NoError(t, site.Init(context.Background()))
-	route := ingest.NewRoute(site.RumSite, site.aggregator)
+	route := ingest.NewRoute(site.Site, site.aggregator)
 	retire, err := hub.Register(
-		site.Key,
+		site.Name,
 		&runtimehub.Site{
 			Route:      route,
 			Aggregator: site.aggregator,
@@ -75,7 +75,7 @@ func TestProductionProbeConfirmsTrustedProxyPublicBase(t *testing.T) {
 	_, err = io.Copy(io.Discard, resp.Body)
 	require.NoError(t, err)
 	require.NoError(t, resp.Body.Close())
-	require.Equal(t, proxy.URL, route.ObservedBase(site.Key))
+	require.Equal(t, proxy.URL, route.ObservedBase())
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
@@ -84,8 +84,8 @@ func TestProductionProbeConfirmsTrustedProxyPublicBase(t *testing.T) {
 	}()
 	t.Cleanup(func() { cancel(); <-done })
 	require.Eventually(t, func() bool {
-		reach, ok := route.Reachability(site.Key)
+		reach, ok := route.Reachability()
 		return ok && reach.State == ingest.ReachOK && reach.Base == proxy.URL
 	}, time.Second, 10*time.Millisecond)
-	require.Equal(t, proxy.URL, route.PublicBase(site.RumSite, server.URL))
+	require.Equal(t, proxy.URL, route.PublicBase(server.URL))
 }

@@ -52,7 +52,7 @@ func TestLiveQualifyingBeaconsOnly(t *testing.T) {
 		Vitals:    []beacon.Vital{{Name: beacon.LCP, Value: 1200}},
 	})
 
-	rows, next := a.Live("", 0, 10)
+	rows, next := a.Live(0, 10)
 	if len(rows) != 3 {
 		t.Fatalf("expected 3 qualifying rows, got %d: %+v", len(rows), rows)
 	}
@@ -93,7 +93,7 @@ func TestLiveGeoAndPageFieldsCarried(t *testing.T) {
 		Lon:       23.7,
 		HasGeo:    true,
 	})
-	rows, _ := a.Live("", 0, 10)
+	rows, _ := a.Live(0, 10)
 	if len(rows) != 1 {
 		t.Fatalf("expected 1 row (no-session beacons always count as a page view), got %d", len(rows))
 	}
@@ -115,18 +115,18 @@ func TestLiveAfterCursor(t *testing.T) {
 			Vitals:   []beacon.Vital{{Name: beacon.LCP, Value: 1000}},
 		})
 	}
-	all, next := a.Live("", 0, 10)
+	all, next := a.Live(0, 10)
 	if len(all) != 3 || next != 3 {
 		t.Fatalf("all = %+v next=%d", all, next)
 	}
-	rows, next := a.Live("", 1, 10)
+	rows, next := a.Live(1, 10)
 	if len(rows) != 2 || rows[0].Seq != 2 || rows[1].Seq != 3 {
 		t.Fatalf("after=1: rows = %+v", rows)
 	}
 	if next != 3 {
 		t.Fatalf("next = %d, want 3", next)
 	}
-	rows, next = a.Live("", 3, 10)
+	rows, next = a.Live(3, 10)
 	if len(rows) != 0 {
 		t.Fatalf("after=3 (caught up): rows = %+v", rows)
 	}
@@ -135,58 +135,38 @@ func TestLiveAfterCursor(t *testing.T) {
 	}
 }
 
-// TestLiveSiteFilter checks the optional site: filter excludes other
-// sites' rows without disturbing their seq numbers.
-func TestLiveSiteFilter(t *testing.T) {
-	a, now := newAgg(
-		5*time.Minute,
-		SiteCfg{
-			Key:        "a",
-			Name:       "A",
-			PageGroups: 5,
-			Countries:  5,
-		},
-		SiteCfg{
-			Key:        "b",
-			Name:       "B",
-			PageGroups: 5,
-			Countries:  5,
-		},
-	)
-	a.Ingest(&beacon.Beacon{
-		Site:     "a",
-		Received: *now,
-		Vitals:   []beacon.Vital{{Name: beacon.LCP, Value: 1}},
+func TestLiveStaysWithItsOwner(t *testing.T) {
+	a, now := newAgg(5*time.Minute, SiteCfg{
+		Name:       "a",
+		PageGroups: 5,
+		Countries:  5,
 	})
-	a.Ingest(&beacon.Beacon{
-		Site:     "b",
-		Received: *now,
-		Vitals:   []beacon.Vital{{Name: beacon.LCP, Value: 1}},
+	other, _ := newAgg(5*time.Minute, SiteCfg{
+		Name:       "b",
+		PageGroups: 5,
+		Countries:  5,
 	})
-	a.Ingest(&beacon.Beacon{
-		Site:     "a",
-		Received: *now,
-		Vitals:   []beacon.Vital{{Name: beacon.LCP, Value: 1}},
-	})
-
-	rows, next := a.Live("a", 0, 10)
-	if len(rows) != 2 {
-		t.Fatalf("site a rows = %+v", rows)
-	}
-	for _, r := range rows {
-		if r.Site != "a" {
-			t.Fatalf("leaked row from another site: %+v", r)
+	for _, site := range []string{"a", "b", "a"} {
+		for _, target := range []*Aggregator{a, other} {
+			target.Ingest(&beacon.Beacon{
+				Site:     site,
+				Received: *now,
+				Vitals:   []beacon.Vital{{Name: beacon.LCP, Value: 1}},
+			})
 		}
 	}
-	// next reflects the max seq among the *matched* rows (seq 3), not the
-	// global ring max, even though a seq-2 row (site b) exists in between.
-	if next != 3 {
-		t.Fatalf("next = %d, want 3", next)
+	rows, next := a.Live(0, 10)
+	if len(rows) != 2 || next != 2 {
+		t.Fatalf("site a rows=%+v next=%d", rows, next)
 	}
-
-	rows, next = a.Live("nope", 0, 10)
-	if len(rows) != 0 || next != 0 {
-		t.Fatalf("unknown site filter: rows=%+v next=%d", rows, next)
+	for _, row := range rows {
+		if row.Site != "a" {
+			t.Fatalf("leaked row from another site: %+v", row)
+		}
+	}
+	rows, next = other.Live(0, 10)
+	if len(rows) != 1 || next != 1 || rows[0].Site != "b" {
+		t.Fatalf("site b rows=%+v next=%d", rows, next)
 	}
 }
 
@@ -202,14 +182,14 @@ func TestLiveMaxRowsCap(t *testing.T) {
 			Vitals:   []beacon.Vital{{Name: beacon.LCP, Value: 1}},
 		})
 	}
-	rows, next := a.Live("", 0, 2)
+	rows, next := a.Live(0, 2)
 	if len(rows) != 2 || rows[0].Seq != 1 || rows[1].Seq != 2 {
 		t.Fatalf("capped rows = %+v", rows)
 	}
 	if next != 2 {
 		t.Fatalf("next = %d, want 2 (the last row actually returned)", next)
 	}
-	rows, next = a.Live("", next, 2)
+	rows, next = a.Live(next, 2)
 	if len(rows) != 2 || rows[0].Seq != 3 || rows[1].Seq != 4 {
 		t.Fatalf("second page = %+v", rows)
 	}
@@ -230,7 +210,7 @@ func TestLiveRingCap(t *testing.T) {
 			Vitals:   []beacon.Vital{{Name: beacon.LCP, Value: 1}},
 		})
 	}
-	rows, next := a.Live("", 0, liveRingCap+10)
+	rows, next := a.Live(0, liveRingCap+10)
 	if len(rows) != liveRingCap {
 		t.Fatalf("ring length = %d, want %d", len(rows), liveRingCap)
 	}
@@ -256,13 +236,13 @@ func TestLiveWindowEviction(t *testing.T) {
 		Received: *now,
 		Vitals:   []beacon.Vital{{Name: beacon.LCP, Value: 1}},
 	})
-	rows, _ := a.Live("", 0, 10)
+	rows, _ := a.Live(0, 10)
 	if len(rows) != 1 {
 		t.Fatalf("expected the fresh row, got %+v", rows)
 	}
 
 	*now = now.Add(2 * time.Minute) // past the 1m window
-	rows, _ = a.Live("", 0, 10)
+	rows, _ = a.Live(0, 10)
 	if len(rows) != 0 {
 		t.Fatalf("expected the stale row evicted on read, got %+v", rows)
 	}
@@ -273,7 +253,7 @@ func TestLiveWindowEviction(t *testing.T) {
 		Received: *now,
 		Vitals:   []beacon.Vital{{Name: beacon.LCP, Value: 1}},
 	})
-	rows, _ = a.Live("", 0, 10)
+	rows, _ = a.Live(0, 10)
 	if len(rows) != 1 {
 		t.Fatalf("expected exactly the new row, got %+v", rows)
 	}
@@ -283,7 +263,7 @@ func TestLiveCursorFromBeforeRestartServesTheRing(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
 	a.Ingest(mk(*now, "s1", "/a"))
 	a.Ingest(mk(*now, "s2", "/b"))
-	rows, next := a.Live("", 9999, 0)
+	rows, next := a.Live(9999, 0)
 	if len(rows) != 2 || next != 2 {
 		t.Fatalf("stale cursor: got %d rows, next %d; want the whole ring (2 rows, next 2)", len(rows), next)
 	}
@@ -301,7 +281,7 @@ func TestLiveRingSurvivesManyWraps(t *testing.T) {
 		b.PageView = true
 		a.Ingest(b)
 	}
-	rows, next := a.Live("", 0, 10*liveRingCap)
+	rows, next := a.Live(0, 10*liveRingCap)
 	if len(rows) != liveRingCap {
 		t.Fatalf("rows = %d, want %d", len(rows), liveRingCap)
 	}
@@ -324,7 +304,7 @@ func TestLiveRingSurvivesManyWraps(t *testing.T) {
 	b := mk(*now, "s1", "/a")
 	b.PageView = true
 	a.Ingest(b)
-	if rows, _ := a.Live("", 0, 10*liveRingCap); len(rows) != 1 {
+	if rows, _ := a.Live(0, 10*liveRingCap); len(rows) != 1 {
 		t.Fatalf("after the window only the new row remains, got %d", len(rows))
 	}
 }

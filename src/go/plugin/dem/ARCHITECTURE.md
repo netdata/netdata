@@ -14,6 +14,17 @@ signals readiness. Each site initializes its immutable policy, then independentl
 and runtime generation. Site readiness does not depend on receiver readiness. Receiver replacement preserves site
 aggregation and pending investigation/export queues.
 
+Each package in `collector/` is a registered native collector. Its lifecycle methods show acquisition, readiness,
+collection and retirement; its metric definitions show the measurements it publishes. Fixed instruments are prepared
+once, with site labels bound during initialization. Dynamic breakdown handles are not retained in an unbounded cache.
+
+One RUM job constructs one aggregator, route, history writer and OTLP exporter. These objects have no site inventory
+or reconfiguration API. The route owns scalar reachability/snippet diagnostics; aggregation and export reject a beacon
+for another site before changing state. Ordered fan-out lets aggregation establish page-view and sampling decisions
+before export. The history writer accounts for its own queue; the exporter binds its trace destination at construction,
+while preserving each beacon's trace resource attributes. Shared receiver/site policy belongs to `rum/config`, and OTLP
+connection options belong to `rum/otlp`. Native `Name` identifies the site; `DisplayName` is presentation metadata.
+
 An HTTP request acquires one exact site registration containing both policy and sinks. Bootstrap, preflight, demo and
 beacon endpoints use this same admission. Retirement removes future admission, cancels admitted request contexts and
 joins their leases. Cancellation interrupts socket reads through a response-controller deadline before closing bodies;
@@ -52,10 +63,15 @@ An explicit receiver public URL takes effect immediately, including when an olde
 Receiver and OTLP TLS preparation use the shared context-aware TLS helper, so native preflight cancellation reaches
 credential-file reads. Site redaction covers stored/exported payloads and remote OTLP diagnostic messages.
 
-Synthetic collectors share only execution mechanics and measurement instruments. Each native job owns its generation
-registration and cadence; the command owns the execution admission slot, artifact store and journal. Process Functions
-are registered through separate process providers and published independently of collector selection. Their narrow source copies
-active snapshots before independent history I/O; no Function acquires browser admission.
+Journey and Lighthouse each own their prepared request, metric store, product instruments and explicit execution flow.
+They share an executor, pure request validation and the common outcome/duration instrument helper. `Run` registers one
+observation generation before readiness; `Collect` executes through that exact registration and records terminal
+outcomes. Retirement fences late callbacks without replacing the collector's registration pointer. Ordinary execution
+errors remain measured outcomes; unverified drainage notifies an active `Run`, while the independent engine fatal signal
+stops the process even if cancellation already finished `Run`. Framework scheduling owns cadence; the command owns
+the execution admission slot, artifact store and journal. Process Functions are registered through separate process
+providers and published independently of collector selection. Their narrow source copies active snapshots before
+independent history I/O; no Function acquires browser admission.
 
 The real Node adapter selects exactly one configured entry with explicit config/tsconfig and a private reporter pipe.
 Standard import mappings target real pinned package entries, never a fake test harness. Retry overrides fail before a

@@ -18,23 +18,23 @@ import (
 
 type fakeCounters struct {
 	mu     sync.Mutex
-	values map[[2]string]uint64
+	values map[string]uint64
 }
 
 func newFakeCounters() *fakeCounters {
 	return &fakeCounters{
-		values: map[[2]string]uint64{},
+		values: map[string]uint64{},
 	}
 }
-func (c *fakeCounters) Add(site, key string, n uint64) {
+func (c *fakeCounters) Add(key string, n uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.values[[2]string{site, key}] += n
+	c.values[key] += n
 }
-func (c *fakeCounters) get(site, key string) uint64 {
+func (c *fakeCounters) get(key string) uint64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.values[[2]string{site, key}]
+	return c.values[key]
 }
 
 type eventWriterFunc func(context.Context, store.RumEventRecord) (bool, error)
@@ -52,7 +52,7 @@ func TestWriterDrainsRealJournalWithRedaction(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	counters := newFakeCounters()
-	w := New(st, counters, secrets.NewRedactor("opaque-secret"))
+	w := New("site", st, counters, secrets.NewRedactor("opaque-secret"))
 	now := time.Now().UnixMicro()
 	w.Event(
 		agg.HistoryEvent{
@@ -96,12 +96,12 @@ func TestWriterDrainsRealJournalWithRedaction(t *testing.T) {
 	require.Len(t, groups, 1)
 	assert.Equal(t, "[REDACTED] failed", groups[0].Message)
 	assert.Equal(t, "at [REDACTED]", groups[0].SampleStack)
-	assert.EqualValues(t, 2, counters.get("site", agg.CounterHistoryWritten))
-	assert.Zero(t, counters.get("site", agg.CounterHistoryDropped))
+	assert.EqualValues(t, 2, counters.get(agg.CounterHistoryWritten))
+	assert.Zero(t, counters.get(agg.CounterHistoryDropped))
 }
 func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 	counters := newFakeCounters()
-	w := New(nil, counters, nil)
+	w := New("site", nil, counters, nil)
 	calls := 0
 	w.st = eventWriterFunc(func(context.Context, store.RumEventRecord) (bool, error) { calls++; return true, nil })
 	for i := 0; i < queueCap+7; i++ {
@@ -112,12 +112,12 @@ func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 	}
 	drain(w)
 	assert.Equal(t, queueCap, calls)
-	assert.EqualValues(t, queueCap, counters.get("site", agg.CounterHistoryWritten))
-	assert.EqualValues(t, 7, counters.get("site", agg.CounterHistoryDropped))
+	assert.EqualValues(t, queueCap, counters.get(agg.CounterHistoryWritten))
+	assert.EqualValues(t, 7, counters.get(agg.CounterHistoryDropped))
 }
 func TestCancellationPreservesOnlyUnattemptedSuffix(t *testing.T) {
 	counters := newFakeCounters()
-	w := New(nil, counters, nil)
+	w := New("site", nil, counters, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	attempts := map[string]int{}
@@ -143,14 +143,14 @@ func TestCancellationPreservesOnlyUnattemptedSuffix(t *testing.T) {
 	for text, n := range attempts {
 		assert.Equal(t, 1, n, "event %s replayed", text)
 	}
-	assert.EqualValues(t, maxBatch+7, counters.get("site", agg.CounterHistoryWritten))
-	assert.Zero(t, counters.get("site", agg.CounterHistoryDropped))
+	assert.EqualValues(t, maxBatch+7, counters.get(agg.CounterHistoryWritten))
+	assert.Zero(t, counters.get(agg.CounterHistoryDropped))
 }
 func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 	for name, writeErr := range map[string]error{"disk error": errors.New("disk full"), "cancelled write": context.Canceled, "successful cancellation race": nil} {
 		t.Run(name, func(t *testing.T) {
 			counters := newFakeCounters()
-			w := New(nil, counters, nil)
+			w := New("site", nil, counters, nil)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			calls := 0
@@ -175,14 +175,14 @@ func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 				wantWritten--
 				wantDropped++
 			}
-			assert.EqualValues(t, wantWritten, counters.get("site", agg.CounterHistoryWritten))
-			assert.EqualValues(t, wantDropped, counters.get("site", agg.CounterHistoryDropped))
+			assert.EqualValues(t, wantWritten, counters.get(agg.CounterHistoryWritten))
+			assert.EqualValues(t, wantDropped, counters.get(agg.CounterHistoryDropped))
 		})
 	}
 }
 func TestFinalDrainSharesOneAdmissionDeadline(t *testing.T) {
 	counters := newFakeCounters()
-	w := New(nil, counters, nil)
+	w := New("site", nil, counters, nil)
 	deadlines := []time.Time{}
 	w.st = eventWriterFunc(func(ctx context.Context, r store.RumEventRecord) (bool, error) {
 		deadline, ok := ctx.Deadline()
@@ -221,7 +221,7 @@ func (w *recordingEventWriter) Sync(context.Context) error {
 
 func TestEmptyFlushSkipsJournalSyncAndReportsQueueDrops(t *testing.T) {
 	counters := newFakeCounters()
-	w := New(nil, counters, nil)
+	w := New("site", nil, counters, nil)
 	disk := &recordingEventWriter{}
 	w.st = disk
 	for range queueCap + 1 {
@@ -231,7 +231,7 @@ func TestEmptyFlushSkipsJournalSyncAndReportsQueueDrops(t *testing.T) {
 	}
 	assert.Zero(t, w.flush(context.Background(), nil))
 	assert.Zero(t, disk.syncs)
-	assert.EqualValues(t, 1, counters.get("site", agg.CounterHistoryDropped))
+	assert.EqualValues(t, 1, counters.get(agg.CounterHistoryDropped))
 	assert.Equal(t, 1, w.flush(context.Background(), []agg.HistoryEvent{{Site: "site", Type: "event"}}))
 	assert.Equal(t, 1, disk.appends)
 	assert.Equal(t, 1, disk.syncs)
@@ -260,7 +260,7 @@ func (w *cancelLastAppendWriter) Sync(ctx context.Context) error {
 func TestFinalDrainSyncsAfterCancellationFollowingLastAppend(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	w := New(nil, newFakeCounters(), nil)
+	w := New("site", nil, newFakeCounters(), nil)
 	disk := &cancelLastAppendWriter{
 		cancel: cancel,
 	}
@@ -276,7 +276,7 @@ func TestFinalDrainSyncsAfterCancellationFollowingLastAppend(t *testing.T) {
 	assert.True(t, disk.synced, "final drain must sync accepted appends with its detached context")
 }
 func TestIdleFlushRetriesFailedSyncWithoutReplayingAppend(t *testing.T) {
-	w := New(nil, newFakeCounters(), nil)
+	w := New("site", nil, newFakeCounters(), nil)
 	disk := &recordingEventWriter{
 		syncErr: errors.New("sync failed"),
 	}
@@ -288,4 +288,29 @@ func TestIdleFlushRetriesFailedSyncWithoutReplayingAppend(t *testing.T) {
 	assert.Equal(t, 2, disk.syncs)
 	assert.Zero(t, w.flush(context.Background(), nil))
 	assert.Equal(t, 2, disk.syncs, "successful sync restores the idle shortcut")
+}
+
+func TestWrongSiteDoesNotQueueOrCount(t *testing.T) {
+	st, err := store.Open(context.Background(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, st.Close()) })
+	counters := newFakeCounters()
+	w := New("site", st, counters, nil)
+	for range queueCap + 1 {
+		w.Event(agg.HistoryEvent{
+			Site:      "other",
+			SessionID: "session",
+			Type:      "event",
+			TSUnixUS:  time.Now().UnixMicro(),
+		})
+	}
+	require.Empty(t, w.ch)
+	drain(w)
+	require.Empty(t, counters.values)
+	rows, err := st.QueryRumSessionEvents(context.Background(), "other", "session")
+	require.NoError(t, err)
+	require.Empty(t, rows)
+	rows, err = st.QueryRumSessionEvents(context.Background(), "site", "session")
+	require.NoError(t, err)
+	require.Empty(t, rows)
 }

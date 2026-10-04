@@ -3,16 +3,12 @@
 package lighthouse
 
 import (
-	"context"
 	_ "embed"
-	"errors"
-	"net/url"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	shared "github.com/netdata/netdata/go/plugins/plugin/dem/collector/synthetic"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/secrets"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/attemptmetrics"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -31,12 +27,22 @@ type Config struct {
 	SaveReport  bool             `yaml:"save_report"  json:"save_report"`
 }
 
-type Dependencies = shared.Dependencies
-
+type Dependencies struct {
+	Executor model.Executor
+	Hub      *model.Hub
+}
 type Collector struct {
 	collectorapi.Base
-	Config  `yaml:",inline" json:""`
-	runtime *shared.Runtime
+	Config      `yaml:",inline" json:""`
+	deps        Dependencies
+	store       metrix.CollectorStore
+	attempt     attemptmetrics.Instruments
+	metrics     metrics
+	request     model.Request
+	initialized bool
+	// Assigned before readiness; retained after retirement for in-flight callbacks.
+	registration *model.Registration
+	terminal     chan error
 }
 
 func Creator(deps Dependencies) collectorapi.Creator {
@@ -51,52 +57,20 @@ func Creator(deps Dependencies) collectorapi.Creator {
 	}
 }
 func New(deps Dependencies) *Collector {
+	store := metrix.NewCollectorStore()
+	meter := store.Write().SnapshotMeter("")
 	return &Collector{
 		Config: Config{
 			UpdateEvery: 1800,
 			Timeout:     confopt.Duration(3 * time.Minute),
 		},
-		runtime: shared.New(deps),
+		deps:     deps,
+		store:    store,
+		attempt:  attemptmetrics.New(meter),
+		metrics:  newMetrics(meter),
+		terminal: make(chan error, 1),
 	}
 }
 func (c *Collector) Configuration() any                 { return c.Config }
-func (c *Collector) MetricStore() metrix.CollectorStore { return c.runtime.MetricStore() }
+func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 func (c *Collector) ChartTemplateYAML() string          { return charts }
-func (c *Collector) Init(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	u, err := url.Parse(c.URL)
-	if err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil {
-		return errors.New("url must be an absolute HTTP(S) URL without credentials")
-	}
-	return c.runtime.Init(c.Name, c.UpdateEvery, time.Duration(c.Timeout))
-}
-func (c *Collector) Check(ctx context.Context) error { return c.runtime.Check(ctx, model.Lighthouse) }
-func (c *Collector) Run(ctx context.Context, ready func()) error {
-	return c.runtime.Run(
-		ctx,
-		ready,
-		model.Job{
-			JobID:          "lighthouse:" + c.Name,
-			Kind:           model.Lighthouse,
-			Name:           c.Name,
-			Target:         secrets.NewRedactor().ApplyURL(c.URL),
-			CadenceSeconds: c.UpdateEvery,
-			TimeoutSeconds: time.Duration(c.Timeout).Seconds(),
-		},
-	)
-}
-func (c *Collector) Collect(ctx context.Context) error {
-	return c.runtime.Collect(
-		ctx,
-		model.Request{
-			Kind:    model.Lighthouse,
-			Name:    c.Name,
-			URL:     c.URL,
-			Timeout: time.Duration(c.Timeout),
-			Capture: c.SaveReport,
-		},
-	)
-}
-func (c *Collector) Cleanup(context.Context) {}

@@ -12,10 +12,10 @@ import (
 
 func sampledAgg(rate float64, keepErrors, keepPoor bool) (*Aggregator, *time.Time, *fakeHistorySink) {
 	a, now := newAgg(5*time.Minute, SiteCfg{
-		Key:        "s",
-		Name:       "S",
-		PageGroups: 20,
-		Countries:  20,
+		Name:        "s",
+		DisplayName: "S",
+		PageGroups:  20,
+		Countries:   20,
 		Investigate: InvestigateCfg{
 			Rate:           rate,
 			KeepErrors:     keepErrors,
@@ -39,7 +39,7 @@ func TestInvestigateSamplingKeepsMeasuringEverything(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		a.Ingest(pageview(*now, fmt.Sprintf("s%d", i)))
 	}
-	if got := one(a).Counters[CounterPageviews]; got != 50 {
+	if got := a.Snapshot().Counters[CounterPageviews]; got != 50 {
 		t.Fatalf("page views counted = %d, want 50", got)
 	}
 	if len(h.events) != 0 {
@@ -121,7 +121,7 @@ func TestErrorsFollowTheSessionDecisionWhenNotAlwaysKept(t *testing.T) {
 	if len(h.events) != 0 {
 		t.Fatalf("errors of a sampled-out session reached history: %+v", h.events)
 	}
-	if got := one(a).Counters[CounterJSErrors]; got != 1 {
+	if got := a.Snapshot().Counters[CounterJSErrors]; got != 1 {
 		t.Fatalf("the error must still be measured: %d", got)
 	}
 }
@@ -141,7 +141,7 @@ func TestActivityCountsInvestigatedSessions(t *testing.T) {
 	b := mk(*now, "broken", "/a")
 	b.Errors = []beacon.Error{{Type: "E", Message: "m", Fingerprint: "fp"}}
 	a.Ingest(b)
-	act := a.Activity()["s"]
+	act := a.Activity()
 	if act.ActiveSessions != 2 || act.InvestigatedSessions != 1 {
 		t.Fatalf("activity = %+v, want 2 active, 1 investigated", act)
 	}

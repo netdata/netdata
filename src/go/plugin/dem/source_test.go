@@ -15,9 +15,9 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/ingest"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rumfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
@@ -29,12 +29,15 @@ import (
 
 func addSite(t *testing.T, hub *runtimehub.Hub, key, generation string) (*agg.Aggregator, func()) {
 	t.Helper()
-	a := agg.New(5 * time.Minute)
-	a.Configure(5*time.Minute, []agg.SiteCfg{{Key: key, PageGroups: 20, Countries: 20}})
+	a := agg.New(5*time.Minute, agg.SiteCfg{
+		Name:       key,
+		PageGroups: 20,
+		Countries:  20,
+	})
 	route := ingest.NewRoute(
-		config.RumSite{
-			Key:            key,
-			Name:           "site opaque-secret",
+		config.Site{
+			Name:           key,
+			DisplayName:    "site opaque-secret",
 			AllowedOrigins: []string{"https://example.org"},
 		},
 		a,
@@ -125,12 +128,12 @@ func TestSourceRedactsCopiesAndRejectsCancelledReads(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "/[REDACTED]", rows[0].Page)
-	original, _ := a.Live("site", 0, 10)
+	original, _ := a.Live(0, 10)
 	assert.Equal(t, "/opaque-secret", original[0].Page)
 	sites, err := s.Sites(context.Background())
 	require.NoError(t, err)
 	require.Len(t, sites, 1)
-	assert.Equal(t, "site [REDACTED]", sites[0].Config.Name)
+	assert.Equal(t, "site [REDACTED]", sites[0].Config.DisplayName)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err = s.Pages(ctx, "")
@@ -212,7 +215,7 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 		cancel()
 		w.Run(runCtx)
 	}
-	first := history.New(st, a, secrets.NewRedactor("opaque-secret"))
+	first := history.New("site", st, a, secrets.NewRedactor("opaque-secret"))
 	a.SetHistorySink(first)
 	a.Ingest(
 		&beacon.Beacon{
@@ -229,7 +232,7 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 	assert.Equal(t, pending[1], pending[2], "identical repeated events are real occurrences")
 	flush(first)
 	assert.Equal(t, pending, request(), "flushing must not duplicate the live ring")
-	second := history.New(st, a, secrets.NewRedactor("opaque-secret"))
+	second := history.New("site", st, a, secrets.NewRedactor("opaque-secret"))
 	a.SetHistorySink(second)
 	a.Ingest(
 		&beacon.Beacon{
@@ -337,7 +340,7 @@ func TestFunctionPayloadsValidateAgainstNativeSchema(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	hub := runtimehub.New()
 	a, _ := addSite(t, hub, "site", "first")
-	writer := history.New(st, a, secrets.NewRedactor("opaque-secret"))
+	writer := history.New("site", st, a, secrets.NewRedactor("opaque-secret"))
 	a.SetHistorySink(writer)
 	a.Ingest(
 		&beacon.Beacon{
@@ -409,17 +412,18 @@ func TestHistoryFunctionsExplainSampling(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	hub := runtimehub.New()
-	a := agg.New(5 * time.Minute)
-	cfg := config.RumSite{
-		Key:               "shop",
-		Name:              "Shop",
+	a := agg.New(5*time.Minute, agg.SiteCfg{
+		Name: "shop",
+	})
+	cfg := config.Site{
+		Name:              "shop",
+		DisplayName:       "Shop",
 		MeasureSampleRate: .25,
-		Investigate: &config.RumInvestigate{
+		Investigate: &config.Investigate{
 			SampleRate: .1,
 			AlwaysKeep: []string{},
 		},
 	}
-	a.Configure(5*time.Minute, []agg.SiteCfg{{Key: "shop"}})
 	retire, err := hub.Register(
 		"shop",
 		&runtimehub.Site{
@@ -454,10 +458,10 @@ func TestConfiguredReceiverURLOverridesPreviouslyConfirmedObservedBase(t *testin
 	require.True(t, ok)
 	defer release()
 	server := httptest.NewServer(
-		ingest.New(&config.RumCfg{
+		ingest.New(&config.Receiver{
 			TrustedProxies: []string{"127.0.0.1/32"},
 			MaxBodyBytes:   262144,
-			RateLimit: config.RumRateLimit{
+			RateLimit: config.RateLimit{
 				PerIPPerMin:   120,
 				PerSitePerSec: 500,
 			},
@@ -468,8 +472,8 @@ func TestConfiguredReceiverURLOverridesPreviouslyConfirmedObservedBase(t *testin
 	response, err := server.Client().Get(server.URL + "/rum/shop.js")
 	require.NoError(t, err)
 	require.NoError(t, response.Body.Close())
-	require.Equal(t, server.URL, data.Route.ObservedBase("shop"))
-	require.Equal(t, ingest.ReachOK, data.Route.Probe(context.Background(), server.Client(), "shop", server.URL).State)
+	require.Equal(t, server.URL, data.Route.ObservedBase())
+	require.Equal(t, ingest.ReachOK, data.Route.Probe(context.Background(), server.Client(), server.URL).State)
 	revoke := hub.PublishReceiver(
 		runtimehub.Availability{
 			Serving:   true,

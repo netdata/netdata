@@ -8,9 +8,10 @@ import (
 	"net"
 	"sync"
 	"testing"
-	"time"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 
@@ -19,18 +20,21 @@ import (
 
 type fakeTraceService struct {
 	coltracepb.UnimplementedTraceServiceServer
-	mu   sync.Mutex
-	reqs []*coltracepb.ExportTraceServiceRequest
-	resp *coltracepb.ExportTraceServiceResponse
+	mu            sync.Mutex
+	reqs          []*coltracepb.ExportTraceServiceRequest
+	authorization []string
+	resp          *coltracepb.ExportTraceServiceResponse
 }
 
 func (f *fakeTraceService) Export(
-	_ context.Context,
+	ctx context.Context,
 	req *coltracepb.ExportTraceServiceRequest,
 ) (*coltracepb.ExportTraceServiceResponse, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.reqs = append(f.reqs, req)
+	md, _ := metadata.FromIncomingContext(ctx)
+	f.authorization = append(f.authorization, md.Get("authorization")...)
 	if f.resp != nil {
 		return f.resp, nil
 	}
@@ -96,34 +100,148 @@ func TestResourceSpans(t *testing.T) {
 	}
 }
 
-// Spans go to otel.endpoint by default and to export_to when a site sets it.
+// Independently configured exporters keep destinations and session starts isolated.
 func TestSpansReachTheirDestination(t *testing.T) {
 	local, remote := &fakeTraceService{}, &fakeTraceService{}
-	localAddr, remoteAddr := startTraceServer(t, local), startTraceServer(t, remote)
-	counters := newRecCounters()
-	e := newExporter(t, localAddr, counters, nil)
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() { e.Run(ctx); close(done) }()
-
-	e.Ingest(tracedBeacon())
-	b := tracedBeacon()
-	b.TraceExportTo = remoteAddr
-	e.Ingest(b)
+	logs := &fakeLogsService{}
+	localCounters, remoteCounters := newRecCounters(), newRecCounters()
+	localExporter := configuredExporter(
+		t,
+		Config{
+			Enabled:  "yes",
+			Endpoint: startTraceServer(t, local),
+		},
+		"s1",
+		"",
+		localCounters,
+		nil,
+	)
+	remoteExporter := configuredExporter(
+		t,
+		Config{
+			Enabled:  "yes",
+			Endpoint: startServer(t, logs),
+		},
+		"s2",
+		startTraceServer(t, remote),
+		remoteCounters,
+		nil,
+	)
+	first, second := tracedBeacon(), tracedBeacon()
+	second.Site = "s2"
+	localExporter.Ingest(first)
+	remoteExporter.Ingest(second)
 	sampled := tracedBeacon()
 	sampled.SampledOut = true
-	e.Ingest(sampled)
-
-	deadline := time.Now().Add(5 * time.Second)
-	for (local.count() == 0 || remote.count() == 0) && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
-	}
+	localExporter.Ingest(sampled)
+	// Each site sees the same session identifier for the first time independently.
+	require.Len(t, localExporter.ch, 1)
+	require.Len(t, remoteExporter.ch, 1)
+	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	<-done
-	if local.count() != 1 || remote.count() != 1 {
-		t.Fatalf("exports: local %d, remote %d", local.count(), remote.count())
+	localExporter.Run(ctx)
+	remoteExporter.Run(ctx)
+	require.Equal(t, 1, local.count())
+	require.Equal(t, 1, remote.count())
+	require.EqualValues(t, 1, localCounters.snapshot()["spans_sent"])
+	require.EqualValues(t, 1, remoteCounters.snapshot()["spans_sent"])
+	require.EqualValues(t, 1, remoteCounters.snapshot()["otlp_sent"])
+	require.Equal(t, "s1", resourceSite(local.reqs[0]))
+	require.Equal(t, "s2", resourceSite(remote.reqs[0]))
+	require.Equal(t, "s2", logs.requests()[0].ResourceLogs[0].Resource.Attributes[1].Value.GetStringValue())
+}
+
+func resourceSite(req *coltracepb.ExportTraceServiceRequest) string {
+	for _, attr := range req.ResourceSpans[0].Resource.Attributes {
+		if attr.Key == "rum.site" {
+			return attr.Value.GetStringValue()
+		}
 	}
-	if got := counters.snapshot()["s1/spans_sent"]; got != 2 {
-		t.Fatalf("spans_sent = %d, want 2 (sampled-out session skipped)", got)
+	return ""
+}
+
+func TestExternalTracingWithLogsDisabled(t *testing.T) {
+	remote := &fakeTraceService{}
+	counters := newRecCounters()
+	e := configuredExporter(t, Config{
+		Enabled: "no",
+	}, "s1", startTraceServer(t, remote), counters, nil)
+	e.Ingest(tracedBeacon())
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	e.Run(ctx)
+	require.Equal(t, 1, remote.count())
+	require.EqualValues(t, 1, counters.snapshot()["spans_sent"])
+	require.EqualValues(t, 1, counters.snapshot()["otlp_dropped"])
+}
+
+func TestTraceBatchPreservesPerBeaconResourcesAndScopes(t *testing.T) {
+	remote := &fakeTraceService{}
+	e := configuredExporter(t, Config{
+		Enabled: "no",
+	}, "s1", startTraceServer(t, remote), newRecCounters(), nil)
+	first, second := tracedBeacon(), tracedBeacon()
+	second.ServiceName = "other-service"
+	second.SessionID = "another-session"
+	second.Browser = "Firefox"
+	second.Device = "mobile"
+	second.Country = "US"
+	extra := first.Spans[0]
+	extra.Scope = "other-scope"
+	extra.ScopeVersion = "2"
+	first.Spans = append(first.Spans, extra, first.Spans[0])
+	e.Ingest(first)
+	e.Ingest(second)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	e.Run(ctx)
+	require.Equal(t, 1, remote.count())
+	resources := remote.reqs[0].ResourceSpans
+	require.Len(t, resources, 2)
+	require.Len(t, resources[0].ScopeSpans, 2)
+	require.Len(t, resources[0].ScopeSpans[0].Spans, 2)
+	require.Equal(t, "other-scope", resources[0].ScopeSpans[1].Scope.Name)
+	require.Equal(t, "2", resources[0].ScopeSpans[1].Scope.Version)
+	attrs := map[string]string{}
+	for _, attr := range resources[1].Resource.Attributes {
+		attrs[attr.Key] = attr.Value.GetStringValue()
 	}
+	require.Equal(
+		t,
+		map[string]string{
+			"service.name":        "other-service",
+			"rum.site":            "s1",
+			"rum.session_id":      "another-session",
+			"rum.browser":         "Firefox",
+			"rum.browser_version": "120",
+			"rum.device":          "mobile",
+			"rum.country":         "US",
+		},
+		attrs,
+	)
+}
+
+func TestTraceAuthenticationStaysWithLocalEndpoint(t *testing.T) {
+	local, remote := &fakeTraceService{}, &fakeTraceService{}
+	cfg := Config{
+		Enabled:   "yes",
+		Endpoint:  startTraceServer(t, local),
+		AuthToken: "local-token",
+	}
+	localExporter := configuredExporter(t, cfg, "s1", "", newRecCounters(), nil)
+	remoteExporter := configuredExporter(t, cfg, "s2", startTraceServer(t, remote), newRecCounters(), nil)
+	first, second := tracedBeacon(), tracedBeacon()
+	first.SessionID = ""
+	second.SessionID = ""
+	second.Site = "s2"
+	localExporter.Ingest(first)
+	remoteExporter.Ingest(second)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	localExporter.Run(ctx)
+	remoteExporter.Run(ctx)
+	require.Equal(t, 1, local.count())
+	require.Equal(t, 1, remote.count())
+	require.Equal(t, []string{"Bearer local-token"}, local.authorization)
+	require.Empty(t, remote.authorization)
 }

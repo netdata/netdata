@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/agg"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rumfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/runtimehub"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/store"
@@ -109,8 +109,8 @@ func (metadataFunctionSource) Receiver() runtimehub.Availability {
 	}
 }
 func (metadataFunctionSource) Sites(context.Context) ([]rumfunc.Observation, error) {
-	return []rumfunc.Observation{{Config: config.RumSite{
-		Key: "shop",
+	return []rumfunc.Observation{{Config: config.Site{
+		Name: "shop",
 	}}}, nil
 }
 func (metadataFunctionSource) Pages(context.Context, string) ([]agg.PageInfo, error) {

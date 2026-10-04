@@ -67,16 +67,16 @@ func (s *source) Sites(ctx context.Context) ([]rumfunc.Observation, error) {
 		// the site's last successful probe still describes an older proxy URL.
 		publicBase := strings.TrimRight(state.PublicURL, "/")
 		if cfg.PublicURL != "" || publicBase == "" {
-			publicBase = site.Route.PublicBase(cfg, fallback)
+			publicBase = site.Route.PublicBase(fallback)
 		}
-		reach, _ := site.Route.Reachability(key)
-		snippet, _ := site.Route.Snippet(key)
-		rejected, _ := site.Route.LastRejectedOrigin(key)
+		reach, _ := site.Route.Reachability()
+		snippet, _ := site.Route.Snippet()
+		rejected, _ := site.Route.LastRejectedOrigin()
 		redact := siteRedactor(site)
 		reach.Error = redact.Apply(reach.Error)
 		snippet.Detail = redact.Apply(snippet.Detail)
 		rejected.Origin = redact.Apply(rejected.Origin)
-		cfg.Name = redact.Apply(cfg.Name)
+		cfg.DisplayName = redact.Apply(cfg.DisplayName)
 		cfg.AllowedOrigins = append([]string(nil), cfg.AllowedOrigins...)
 		for i := range cfg.AllowedOrigins {
 			cfg.AllowedOrigins[i] = redact.Apply(cfg.AllowedOrigins[i])
@@ -85,7 +85,7 @@ func (s *source) Sites(ctx context.Context) ([]rumfunc.Observation, error) {
 			out,
 			rumfunc.Observation{
 				Config:     cfg,
-				Activity:   site.Aggregator.Activity()[key],
+				Activity:   site.Aggregator.Activity(),
 				Reach:      reach,
 				Snippet:    snippet,
 				Rejected:   rejected,
@@ -98,7 +98,7 @@ func (s *source) Sites(ctx context.Context) ([]rumfunc.Observation, error) {
 func (s *source) Pages(ctx context.Context, filter string) ([]agg.PageInfo, error) {
 	var out []agg.PageInfo
 	err := s.visit(ctx, filter, func(key string, site *runtimehub.Site) {
-		rows := site.Aggregator.Pages(key)
+		rows := site.Aggregator.Pages()
 		redact := siteRedactor(site)
 		for i := range rows {
 			r := &rows[i]
@@ -162,7 +162,7 @@ func (s *source) Live(ctx context.Context, filter, after string, limit int) ([]r
 			}
 		}
 		cursor.Sites[key] = pos
-		batch, _ := site.Aggregator.Live(key, pos.Sequence, limit)
+		batch, _ := site.Aggregator.Live(pos.Sequence, limit)
 		redact := siteRedactor(site)
 		for _, row := range batch {
 			row.Page = redact.Apply(row.Page)
@@ -240,7 +240,7 @@ func (s *source) SessionEvents(ctx context.Context, site, session string) ([]sto
 	err := s.visit(ctx, site, func(key string, runtime *runtimehub.Site) {
 		redact := siteRedactor(runtime)
 		redactors[key] = redact
-		events, _ := runtime.Aggregator.SessionEvents(key, session)
+		events, _ := runtime.Aggregator.SessionEvents(session)
 		for _, event := range events {
 			row := store.RumSessionEventRecord{
 				Site:      key,

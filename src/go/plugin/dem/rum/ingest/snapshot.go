@@ -10,8 +10,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 )
 
 // snapshot is the immutable, compiled receiver configuration used by
@@ -30,10 +30,9 @@ type site struct {
 	measureRate float64 // measure sampling in the snippet
 	includeBots bool    // bots: include
 	// tracing enables browser spans. propagate lists cross-origin trace
-	// header patterns; exportTo is the span destination ("" = otel.endpoint).
+	// header patterns.
 	tracing   bool
 	propagate []string
-	exportTo  string
 	pathRules []beacon.PathRule // redact_paths
 }
 
@@ -45,7 +44,7 @@ type originRule struct {
 	wildcard bool
 }
 
-func compile(cfg *config.RumCfg) *snapshot {
+func compile(cfg *config.Receiver) *snapshot {
 	s := &snapshot{
 		maxBody:   cfg.MaxBodyBytes,
 		publicURL: strings.TrimRight(cfg.PublicURL, "/"),
@@ -60,15 +59,15 @@ func compile(cfg *config.RumCfg) *snapshot {
 	return s
 }
 
-func compileSite(sc config.RumSite) *site {
+func compileSite(sc config.Site) *site {
 	st := &site{
-		key:         sc.Key,
-		name:        sc.DisplayName(),
+		key:         sc.Name,
+		name:        sc.Label(),
 		measureRate: sc.MeasureRate(),
 		includeBots: sc.IncludesBots(),
 	}
 	if sc.TracingOn() {
-		st.tracing, st.exportTo = true, sc.Tracing.ExportTo
+		st.tracing = true
 		for _, o := range sc.Tracing.PropagateTo {
 			st.propagate = append(st.propagate, "^"+regexp.QuoteMeta(strings.TrimRight(o, "/"))+"(/|$)")
 		}

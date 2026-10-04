@@ -55,7 +55,7 @@ func TestResourcesNotSeenBeforeAnyEvent(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
 	a.Ingest(mk(*now, "s1", "/a"))
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 	if snap.ResourcesSeen || len(snap.ResourceHosts) != 0 {
 		t.Fatalf("expected no resource state before any resource event: %+v", snap)
 	}
@@ -77,7 +77,7 @@ func TestResourceFirstThirdPartyCounters(t *testing.T) {
 	)
 	a.Ingest(b)
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 	if !snap.ResourcesSeen || snap.FirstPartyResources != 1 || snap.ThirdPartyResources != 1 {
 		t.Fatalf(
 			"counters: seen=%v first=%d third=%d",
@@ -107,7 +107,7 @@ func TestResourceHostRankingTop10(t *testing.T) {
 		}
 	}
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 	if len(snap.ResourceHosts) != resourceHostTopN {
 		t.Fatalf("ResourceHosts = %+v want %d entries (no other fold)", snap.ResourceHosts, resourceHostTopN)
 	}
@@ -132,7 +132,7 @@ func TestResourceHostRankChangePreservesCounts(t *testing.T) {
 		}))
 	}
 	*now = now.Add(10 * time.Second)
-	one(a) // first ranking = {h00..h09}
+	a.Snapshot() // first ranking = {h00..h09}
 
 	for i := 0; i < 5; i++ {
 		a.Ingest(resBeacon("page.example.com", beacon.Resource{
@@ -141,7 +141,7 @@ func TestResourceHostRankChangePreservesCounts(t *testing.T) {
 		}))
 	}
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 	want := []ResourceHostGroup{{Host: "zzz.example.com", Count: 5, HasDuration: true, P75Duration: 50}}
 	for i := 0; i < 9; i++ {
 		want = append(
@@ -176,7 +176,7 @@ func TestResourceHostRankChangePreservesCounts(t *testing.T) {
 			},
 		)
 	}
-	assert.Equal(t, want, one(a).ResourceHosts)
+	assert.Equal(t, want, a.Snapshot().ResourceHosts)
 }
 
 func TestResourceHostsBounded(t *testing.T) {
@@ -189,7 +189,7 @@ func TestResourceHostsBounded(t *testing.T) {
 		}))
 	}
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 	// Only top-10 are charted, but the site-level totals must count every
 	// resource regardless of per-host tracking bound.
 	if snap.FirstPartyResources+snap.ThirdPartyResources != uint64(maxTrackedGroups+50) {
@@ -209,7 +209,7 @@ func TestResourceNoDurationSampleP75Zero(t *testing.T) {
 		DurationMS: 0,
 	}))
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 	if len(snap.ResourceHosts) != 1 || snap.ResourceHosts[0].P75Duration != 0 {
 		t.Fatalf("expected a zero p75 with no duration sample: %+v", snap.ResourceHosts)
 	}
@@ -228,8 +228,8 @@ func TestResourceHostDurationSeriesIsCapped(t *testing.T) {
 	}
 	*now = now.Add(10 * time.Second)
 	a.mu.Lock()
-	g := a.sites["s"].resHosts["cdn.other.com"]
-	n, dropped := len(g.dur.vals), a.sites["s"].counters[CounterSamplesDropped]
+	g := a.site.resHosts["cdn.other.com"]
+	n, dropped := len(g.dur.vals), a.site.counters[CounterSamplesDropped]
 	a.mu.Unlock()
 	if n != maxSamplesPerSeries || dropped != 50 {
 		t.Fatalf("series len = %d (want %d), dropped = %d (want 50)", n, maxSamplesPerSeries, dropped)
@@ -273,7 +273,7 @@ func TestAPIResponseTime(t *testing.T) {
 		}, // no timing
 	))
 	*now = now.Add(10 * time.Second)
-	snap := one(a)
+	snap := a.Snapshot()
 	if snap.API.N != 2 || snap.API.P50 != 100 || snap.API.P95 != 300 {
 		t.Fatalf("API stats = %+v, want N=2 p50=100 p95=300", snap.API)
 	}
@@ -289,7 +289,7 @@ func TestAPIResponseTimeWindowed(t *testing.T) {
 		}),
 	)
 	*now = now.Add(6 * time.Minute)
-	if snap := one(a); snap.API.N != 0 {
+	if snap := a.Snapshot(); snap.API.N != 0 {
 		t.Fatalf("API sample should leave the window: %+v", snap.API)
 	}
 }

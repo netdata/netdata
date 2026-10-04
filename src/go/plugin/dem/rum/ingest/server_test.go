@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 )
 
 // recSink records outcomes for assertions.
@@ -60,19 +60,19 @@ func (g fixedGeo) Lookup(string) (string, string, float64, float64, bool) {
 
 func testCfg() *fixtureConfig {
 	return &fixtureConfig{
-		RumCfg: config.RumCfg{
+		Receiver: config.Receiver{
 			Listen:         "127.0.0.1:0",
 			TrustedProxies: []string{"127.0.0.1/32", "::1/128", "10.0.0.0/8"},
 			MaxBodyBytes:   2048,
-			RateLimit: config.RumRateLimit{
+			RateLimit: config.RateLimit{
 				PerIPPerMin:   5,
 				PerSitePerSec: 100,
 			},
 		},
-		Sites: []config.RumSite{
+		Sites: []config.Site{
 			{
-				Key:            "shop",
-				Name:           "Shop",
+				Name:           "shop",
+				DisplayName:    "Shop",
 				AllowedOrigins: []string{"https://shop.example.com", "https://*.example.org", "http://127.0.0.1:19938"},
 				PageGroups:     20,
 				Countries:      20,
@@ -381,7 +381,7 @@ func TestPerIPRateLimit(t *testing.T) {
 
 func TestPerSiteRateLimit(t *testing.T) {
 	cfg := testCfg()
-	cfg.RateLimit = config.RumRateLimit{
+	cfg.RateLimit = config.RateLimit{
 		PerIPPerMin:   100000,
 		PerSitePerSec: 3,
 	}
@@ -410,7 +410,7 @@ func TestPerSiteRateLimit(t *testing.T) {
 }
 
 func TestClientIPTrustedProxies(t *testing.T) {
-	snap := compile(&testCfg().RumCfg)
+	snap := compile(&testCfg().Receiver)
 	tests := map[string]struct {
 		remote string
 		hdr    map[string]string
@@ -572,7 +572,7 @@ func TestIngestedBeaconShape(t *testing.T) {
 
 func TestBootstrapAndDemo(t *testing.T) {
 	cfg := testCfg()
-	cfg.Sites[0].Key = "demo"
+	cfg.Sites[0].Name = "demo"
 	sink := newRecSink()
 	_, ts := newTestServer(t, cfg, sink, nil)
 

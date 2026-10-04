@@ -458,3 +458,17 @@ func TestLighthouseTargetRedactionBeforeHistory(t *testing.T) {
 		assert.NotContains(t, run.Target, "private-query-value")
 	}
 }
+
+func TestWhitespaceScriptRejectedBeforeExecution(t *testing.T) {
+	e, _, _ := testEngine(t)
+	e.start = func(context.Context, ndexec.ProcessOptions, string, ...string) (treeProcess, error) {
+		t.Error("invalid script started a child")
+		return nil, errors.New("unexpected process start")
+	}
+	request := journey()
+	request.Script = " \t\n\u2003"
+	got := e.Execute(context.Background(), request, nil)
+	require.True(t, got.Drained)
+	assert.Equal(t, synthetic.Error, got.Run.Outcome)
+	assert.Equal(t, "script must not be blank", got.Run.Error)
+}

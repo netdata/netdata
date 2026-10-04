@@ -16,7 +16,7 @@ func TestPagesReturnsRankedInstancesOnly(t *testing.T) {
 	a.Ingest(mk(*now, "s1", "/a", v(beacon.LCP, 1000)))
 	a.Ingest(mk(*now, "s2", "/b", v(beacon.LCP, 2000)))
 	*now = now.Add(10 * time.Second)
-	one(a)
+	a.Snapshot()
 
 	// Round 2: real activity lands on the now-promoted groups.
 	b1 := mk(*now, "t1", "/a", v(beacon.LCP, 1200), v(beacon.INP, 80))
@@ -26,7 +26,7 @@ func TestPagesReturnsRankedInstancesOnly(t *testing.T) {
 	a.Ingest(b2)
 	*now = now.Add(10 * time.Second)
 
-	got := a.Pages("s")
+	got := a.Pages()
 	byPage := map[string]PageInfo{}
 	for _, p := range got {
 		byPage[p.Page] = p
@@ -52,53 +52,31 @@ func TestPagesEmptyBeforeAnyRank(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
 	a.Ingest(mk(*now, "s1", "/a"))
 	// No Snapshot()/rank() has run yet: top["page"] is nil.
-	if got := a.Pages("s"); len(got) != 0 {
+	if got := a.Pages(); len(got) != 0 {
 		t.Fatalf("expected no pages before the first rank, got %+v", got)
 	}
 }
 
-func TestPagesFilterBySite(t *testing.T) {
-	a, now := newAgg(
-		5*time.Minute,
-		SiteCfg{
-			Key:        "a",
-			Name:       "A",
+func TestPagesStayWithTheirOwner(t *testing.T) {
+	for _, site := range []string{"a", "b"} {
+		a, now := newAgg(5*time.Minute, SiteCfg{
+			Name:       site,
 			PageGroups: 20,
 			Countries:  20,
-		},
-		SiteCfg{
-			Key:        "b",
-			Name:       "B",
-			PageGroups: 20,
-			Countries:  20,
-		},
-	)
-	ba := &beacon.Beacon{
-		Site:      "a",
-		SessionID: "s1",
-		Path:      "/x",
-		PageGroup: "/x",
-		Browser:   "Chrome",
-		Device:    "desktop",
-	}
-	a.Ingest(ba)
-	bb := &beacon.Beacon{
-		Site:      "b",
-		SessionID: "s2",
-		Path:      "/y",
-		PageGroup: "/y",
-		Browser:   "Chrome",
-		Device:    "desktop",
-	}
-	a.Ingest(bb)
-	*now = now.Add(10 * time.Second)
-	a.Snapshot() // materialize both sites' top sets
-
-	if got := a.Pages("a"); len(got) != 1 || got[0].Page != "/x" {
-		t.Fatalf("site a = %+v", got)
-	}
-	if got := a.Pages(""); len(got) != 2 {
-		t.Fatalf("all sites = %+v", got)
+		})
+		for _, incoming := range []string{"a", "b"} {
+			a.Ingest(&beacon.Beacon{
+				Site:      incoming,
+				Received:  *now,
+				SessionID: "shared",
+				PageGroup: "/" + incoming,
+			})
+		}
+		a.Snapshot()
+		got := a.Pages()
+		if len(got) != 1 || got[0].Site != site || got[0].Page != "/"+site {
+			t.Fatalf("site %s pages = %+v", site, got)
+		}
 	}
 }
 
@@ -106,14 +84,14 @@ func TestPagesSessionsBounded(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
 	a.Ingest(mk(*now, "s0", "/a"))
 	*now = now.Add(10 * time.Second)
-	one(a) // materialize top set
+	a.Snapshot() // materialize top set
 
 	for i := 0; i < maxPageGroupSessions+50; i++ {
 		b := mk(*now, "sess"+strconv.Itoa(i), "/a")
 		a.Ingest(b)
 	}
 	*now = now.Add(10 * time.Second)
-	got := a.Pages("s")
+	got := a.Pages()
 	if len(got) != 1 || got[0].Sessions != maxPageGroupSessions {
 		t.Fatalf("sessions bound: %+v", got)
 	}
@@ -123,7 +101,7 @@ func TestPageVitalPresenceDistinguishesZeroFromMissing(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
 	a.Ingest(mk(*now, "browser", "/shop", v(beacon.CLS, 0)))
 	a.Snapshot()
-	pages := a.Pages("s")
+	pages := a.Pages()
 	if len(pages) != 1 {
 		t.Fatalf("missing observed page: %+v", pages)
 	}
