@@ -379,7 +379,7 @@ fn build_tls_acceptor(
         .with_context(|| format!("failed to parse TLS private key from: {key_path}"))?;
 
     // With a client CA the listener requires client certificates (mTLS),
-    // mirroring `tls_ca_cert_path` on the gRPC endpoint; without one it serves
+    // mirroring `grpc_tls_ca_cert_path` on the gRPC endpoint; without one it serves
     // plain server-TLS.
     let builder = ServerConfig::builder();
     let config = match ca_path {
@@ -1495,9 +1495,9 @@ mod tests {
         fn endpoint(&self, mtls: bool) -> EndpointConfig {
             EndpointConfig {
                 path: "127.0.0.1:0".to_string(),
-                tls_cert_path: None,
-                tls_key_path: None,
-                tls_ca_cert_path: None,
+                grpc_tls_cert_path: None,
+                grpc_tls_key_path: None,
+                grpc_tls_ca_cert_path: None,
                 http_path: Some("127.0.0.1:0".to_string()),
                 http_tls_cert_path: Some(self.path("server.pem")),
                 http_tls_key_path: Some(self.path("server.key")),

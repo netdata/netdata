@@ -198,15 +198,18 @@ impl LegacyLogsConfig {
 pub struct EndpointConfig {
     /// Bind address for the OTLP/gRPC listener (e.g., "127.0.0.1:4317").
     pub path: String,
-    /// TLS certificate file path.
-    #[serde(default)]
-    pub tls_cert_path: Option<String>,
-    /// TLS private key file path.
-    #[serde(default)]
-    pub tls_key_path: Option<String>,
-    /// CA certificate for client authentication.
-    #[serde(default)]
-    pub tls_ca_cert_path: Option<String>,
+    /// TLS certificate file path for the OTLP/gRPC listener. The aliases
+    /// keep a stock file written before the `grpc_` prefix parsing; the user
+    /// and env layers accept the old names too, with a deprecation warning.
+    #[serde(default, alias = "tls_cert_path")]
+    pub grpc_tls_cert_path: Option<String>,
+    /// TLS private key file path for the OTLP/gRPC listener.
+    #[serde(default, alias = "tls_key_path")]
+    pub grpc_tls_key_path: Option<String>,
+    /// CA certificate for client authentication (mutual TLS) on the
+    /// OTLP/gRPC listener.
+    #[serde(default, alias = "tls_ca_cert_path")]
+    pub grpc_tls_ca_cert_path: Option<String>,
     /// Bind address for the OTLP/HTTP listener (e.g., "127.0.0.1:4318");
     /// `None` disables the listener (gRPC alone is served). Like `path`,
     /// this is a network address, not a filesystem path. Optional so the
@@ -215,7 +218,7 @@ pub struct EndpointConfig {
     #[serde(default)]
     pub http_path: Option<String>,
     /// TLS certificate file path for the OTLP/HTTP listener. Kept separate
-    /// from the gRPC `tls_cert_path` so one transport can be protected while
+    /// from `grpc_tls_cert_path` so one transport can be protected while
     /// the other is not.
     #[serde(default)]
     pub http_tls_cert_path: Option<String>,

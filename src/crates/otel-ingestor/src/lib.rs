@@ -280,8 +280,8 @@ async fn run_ingestor(
     let mut server_builder = Server::builder();
 
     if let (Some(cert_path), Some(key_path)) = (
-        &config.endpoint.tls_cert_path,
-        &config.endpoint.tls_key_path,
+        &config.endpoint.grpc_tls_cert_path,
+        &config.endpoint.grpc_tls_key_path,
     ) {
         let cert = std::fs::read(cert_path)
             .with_context(|| format!("failed to read TLS certificate from: {}", cert_path))?;
@@ -291,7 +291,7 @@ async fn run_ingestor(
 
         let mut tls_config = ServerTlsConfig::new().identity(identity);
 
-        if let Some(ref ca_cert_path) = config.endpoint.tls_ca_cert_path {
+        if let Some(ref ca_cert_path) = config.endpoint.grpc_tls_ca_cert_path {
             let ca_cert = std::fs::read(ca_cert_path)
                 .with_context(|| format!("failed to read CA certificate from: {}", ca_cert_path))?;
             tls_config =

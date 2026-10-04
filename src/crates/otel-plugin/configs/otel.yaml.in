@@ -22,17 +22,21 @@ endpoint:
   # access controls.
   path: "127.0.0.1:4317"
 
-  # Server TLS certificate (PEM). TLS is enabled only when both this and
-  # tls_key_path are set; providing either one alone fails at startup.
-  tls_cert_path: null
+  # Server TLS certificate (PEM) for the OTLP/gRPC listener. TLS is enabled
+  # only when both this and grpc_tls_key_path are set; providing either one
+  # alone fails at startup. The former names of these three keys
+  # (tls_cert_path, tls_key_path, tls_ca_cert_path) still work but log a
+  # deprecation warning; setting a key under both names fails at startup.
+  grpc_tls_cert_path: null
 
-  # Server TLS private key (PEM). Required when tls_cert_path is set.
-  tls_key_path: null
+  # Server TLS private key (PEM) for the OTLP/gRPC listener. Required when
+  # grpc_tls_cert_path is set.
+  grpc_tls_key_path: null
 
-  # CA certificate (PEM) for mutual TLS: senders must present a client
-  # certificate signed by this CA. Requires both tls_cert_path and
-  # tls_key_path to be set.
-  tls_ca_cert_path: null
+  # CA certificate (PEM) for mutual TLS on the OTLP/gRPC listener: senders
+  # must present a client certificate signed by this CA. Requires both
+  # grpc_tls_cert_path and grpc_tls_key_path to be set.
+  grpc_tls_ca_cert_path: null
 
   # Bind address (host:port) for the OTLP/HTTP listener — the same OTLP
   # receiver as the gRPC listener above, served over HTTP POST

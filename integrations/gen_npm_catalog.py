@@ -479,9 +479,9 @@ SYSLOG_SETUP = setup_block(
     '[Syslog via the OpenTelemetry Collector](/docs/npm/syslog/otel-collector.md). '
     'The endpoint listens on loopback by default, which accepts '
     'only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP '
-    'endpoint reachable off-host must be protected with TLS or mutual TLS (`endpoint.tls_cert_path`, '
-    '`endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path` for mTLS) plus network access controls — otherwise '
-    'anyone who can reach it can inject telemetry. Prefer keeping the Collector on the same host as the Agent.',
+    'endpoint reachable off-host must be protected with TLS or mutual TLS (`endpoint.grpc_tls_cert_path`, '
+    '`endpoint.grpc_tls_key_path`, and `endpoint.grpc_tls_ca_cert_path` for mTLS) plus network access controls — '
+    'otherwise anyone who can reach it can inject telemetry. Prefer keeping the Collector on the same host as the Agent.',
     [('The OpenTelemetry plugin',
       'The Netdata Agent must include the `otel` plugin, which is available on Linux and macOS. See the '
       'OpenTelemetry collector documentation for how it is enabled in each installation method.'),
@@ -495,12 +495,12 @@ SYSLOG_SETUP = setup_block(
                                                  'only local senders; bind a non-loopback address to accept a '
                                                  'Collector on another host, and protect it when you do.',
          'default_value': '127.0.0.1:4317', 'required': False},
-        {'name': 'endpoint.tls_cert_path', 'description': 'Server TLS certificate. Set together with '
-                                                          '`endpoint.tls_key_path`.',
+        {'name': 'endpoint.grpc_tls_cert_path', 'description': 'Server TLS certificate. Set together with '
+                                                               '`endpoint.grpc_tls_key_path`.',
          'default_value': '', 'required': False},
-        {'name': 'endpoint.tls_key_path', 'description': 'Server TLS private key.',
+        {'name': 'endpoint.grpc_tls_key_path', 'description': 'Server TLS private key.',
          'default_value': '', 'required': False},
-        {'name': 'endpoint.tls_ca_cert_path',
+        {'name': 'endpoint.grpc_tls_ca_cert_path',
          'description': 'CA certificate used to verify client certificates. Setting it enables mutual TLS and '
                         'therefore also requires the server certificate and key.',
          'default_value': '', 'required': False},
@@ -513,9 +513,9 @@ SYSLOG_SETUP = setup_block(
                        'telemetry from anyone who can reach it.',
         'config': 'endpoint:\n'
                   '  path: 0.0.0.0:4317\n'
-                  '  tls_cert_path: /etc/netdata/ssl/otel.crt\n'
-                  '  tls_key_path: /etc/netdata/ssl/otel.key\n'
-                  '  tls_ca_cert_path: /etc/netdata/ssl/ca.crt\n',
+                  '  grpc_tls_cert_path: /etc/netdata/ssl/otel.crt\n'
+                  '  grpc_tls_key_path: /etc/netdata/ssl/otel.key\n'
+                  '  grpc_tls_ca_cert_path: /etc/netdata/ssl/ca.crt\n',
     }],
 )
 

@@ -1,9 +1,9 @@
 //! Partial overrides for the OTLP listener endpoints: the addresses the
 //! ingestor binds for OTLP exporters plus their TLS certificate material
 //! (`otel-ingestor` serves them; not the ferryboat IPC sockets between
-//! supervisor and workers). The gRPC listener is mandatory (`path` + TLS
-//! trio); the OTLP/HTTP listener is optional (`http_path` + its own trio,
-//! clearable to disable).
+//! supervisor and workers). The gRPC listener is mandatory (`path` +
+//! `grpc_tls_*` trio); the OTLP/HTTP listener is optional (`http_path` +
+//! `http_tls_*` trio, clearable to disable).
 //!
 //! Two of the layers `ConfigResolver` merges with stock < user < env
 //! precedence surface this struct: the user YAML's `endpoint:` section
@@ -12,8 +12,20 @@
 //! [`EndpointConfig`]; the merged result is validated in `mod.rs`
 //! (`validate`: host:port shape, TLS cert/key pairing, distinct listener
 //! addresses).
+use anyhow::Result;
 use bridge::config::EndpointConfig;
 use serde::Deserialize;
+
+/// The gRPC TLS keys before they took the `grpc_` prefix (symmetric with
+/// `http_tls_*`), each paired with its current name. Existing user files and
+/// env vars keep working: an old name is accepted with a deprecation warning,
+/// and setting both names in one layer is an error, since neither can be
+/// silently preferred. `env.rs` derives the env var names from this table.
+pub(super) const RENAMED_KEYS: [(&str, &str); 3] = [
+    ("tls_cert_path", "grpc_tls_cert_path"),
+    ("tls_key_path", "grpc_tls_key_path"),
+    ("tls_ca_cert_path", "grpc_tls_ca_cert_path"),
+];
 
 /// Serde for the double-`Option` clear semantics of `http_path`. Without
 /// this, serde's `Option` handling collapses YAML `null` into the OUTER
@@ -44,6 +56,15 @@ pub(super) struct EndpointOverride {
     #[serde(default)]
     pub(super) path: Option<String>,
     #[serde(default)]
+    pub(super) grpc_tls_cert_path: Option<String>,
+    #[serde(default)]
+    pub(super) grpc_tls_key_path: Option<String>,
+    #[serde(default)]
+    pub(super) grpc_tls_ca_cert_path: Option<String>,
+    /// Deprecated names of the `grpc_tls_*` trio ([`RENAMED_KEYS`]), read only
+    /// from YAML; [`EndpointOverride::migrate_renamed_keys`] moves them onto
+    /// the current fields before the layer is applied.
+    #[serde(default)]
     pub(super) tls_cert_path: Option<String>,
     #[serde(default)]
     pub(super) tls_key_path: Option<String>,
@@ -71,13 +92,39 @@ impl EndpointOverride {
     /// an all-empty env override into `None`.
     pub(super) fn has_any(&self) -> bool {
         self.path.is_some()
-            || self.tls_cert_path.is_some()
-            || self.tls_key_path.is_some()
-            || self.tls_ca_cert_path.is_some()
+            || self.grpc_tls_cert_path.is_some()
+            || self.grpc_tls_key_path.is_some()
+            || self.grpc_tls_ca_cert_path.is_some()
             || self.http_path.is_some()
             || self.http_tls_cert_path.is_some()
             || self.http_tls_key_path.is_some()
             || self.http_tls_ca_cert_path.is_some()
+    }
+
+    /// Move each deprecated key's value onto its `grpc_` name, logging a
+    /// warning that names `source` (the user file). Both names set is an
+    /// error. A deprecated key set to `null` carries no value and is ignored,
+    /// so a copy of the former stock file needs no edit.
+    pub(super) fn migrate_renamed_keys(&mut self, source: &str) -> Result<()> {
+        let pairs = [
+            (&mut self.tls_cert_path, &mut self.grpc_tls_cert_path),
+            (&mut self.tls_key_path, &mut self.grpc_tls_key_path),
+            (&mut self.tls_ca_cert_path, &mut self.grpc_tls_ca_cert_path),
+        ];
+        for ((old_slot, new_slot), (old, new)) in pairs.into_iter().zip(RENAMED_KEYS) {
+            let Some(value) = old_slot.take() else {
+                continue;
+            };
+            if new_slot.is_some() {
+                anyhow::bail!(
+                    "endpoint.{old} and endpoint.{new} are both set; endpoint.{old} is the \
+                     deprecated name of endpoint.{new}, remove it"
+                );
+            }
+            tracing::warn!("{source}: endpoint.{old} is deprecated, use endpoint.{new}");
+            *new_slot = Some(value);
+        }
+        Ok(())
     }
 }
 
@@ -92,14 +139,14 @@ pub(super) fn apply(config: &mut EndpointConfig, o: &EndpointOverride) {
     if let Some(v) = &o.path {
         config.path = v.clone();
     }
-    if let Some(v) = &o.tls_cert_path {
-        config.tls_cert_path = Some(v.clone());
+    if let Some(v) = &o.grpc_tls_cert_path {
+        config.grpc_tls_cert_path = Some(v.clone());
     }
-    if let Some(v) = &o.tls_key_path {
-        config.tls_key_path = Some(v.clone());
+    if let Some(v) = &o.grpc_tls_key_path {
+        config.grpc_tls_key_path = Some(v.clone());
     }
-    if let Some(v) = &o.tls_ca_cert_path {
-        config.tls_ca_cert_path = Some(v.clone());
+    if let Some(v) = &o.grpc_tls_ca_cert_path {
+        config.grpc_tls_ca_cert_path = Some(v.clone());
     }
     if let Some(v) = &o.http_path {
         config.http_path = v.clone();

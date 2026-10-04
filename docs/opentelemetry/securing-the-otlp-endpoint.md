@@ -21,11 +21,11 @@ Bind beyond loopback only with TLS, and prefer mutual TLS:
 ```yaml
 endpoint:
   path: "0.0.0.0:4317"
-  tls_cert_path: /etc/netdata/ssl/server-cert.pem
-  tls_key_path: /etc/netdata/ssl/server-key.pem
+  grpc_tls_cert_path: /etc/netdata/ssl/server-cert.pem
+  grpc_tls_key_path: /etc/netdata/ssl/server-key.pem
   # Require client certificates (mutual TLS): senders must present a
   # certificate signed by this CA.
-  tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
+  grpc_tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
   # The OTLP/HTTP listener has its own address and its own TLS settings,
   # separate from the gRPC trio above. Set http_path to null instead to
   # serve gRPC only.

@@ -25,7 +25,7 @@ use std::time::Duration;
 use anyhow::Result;
 
 use super::ConfigOverride;
-use super::endpoint::EndpointOverride;
+use super::endpoint::{EndpointOverride, RENAMED_KEYS};
 use super::metrics::MetricsOverride;
 use super::signal::{
     AuthOverride, CatalogOverride, IngestOverride, RemoteStorageOverride, SignalOverride,
@@ -171,6 +171,30 @@ fn parse_env_bool(env: &EnvReader<'_>, name: &str) -> Result<Option<bool>> {
     }
 }
 
+/// Look up a renamed endpoint key under both env names, derived from the
+/// YAML keys in [`RENAMED_KEYS`] (`grpc_tls_cert_path` →
+/// `NETDATA_OTEL_CFG_ENDPOINT_GRPC_TLS_CERT_PATH`). The old name still works
+/// with a deprecation warning; both set is an error, mirroring the YAML layer
+/// (`EndpointOverride::migrate_renamed_keys`).
+fn get_renamed_endpoint_env<'a>(
+    env: &EnvReader<'a>,
+    old_key: &str,
+    new_key: &str,
+) -> Result<Option<&'a str>> {
+    let old = var("ENDPOINT", &old_key.to_uppercase());
+    let new = var("ENDPOINT", &new_key.to_uppercase());
+    match (get_env(env, &old)?, get_env(env, &new)?) {
+        (Some(_), Some(_)) => anyhow::bail!(
+            "{old} and {new} are both set; {old} is the deprecated name of {new}, remove it"
+        ),
+        (Some(value), None) => {
+            tracing::warn!("{old} is deprecated, use {new}");
+            Ok(Some(value))
+        }
+        (None, value) => Ok(value),
+    }
+}
+
 impl ConfigOverride {
     /// Build the config overrides from an [`EnvMap`] snapshot of the
     /// `NETDATA_OTEL_CFG_*` variables. Pure: reads only the provided map,
@@ -216,14 +240,13 @@ impl ConfigOverride {
 
 impl EndpointOverride {
     fn from_map(env: &EnvReader<'_>) -> Result<Self> {
+        let [cert, key, ca] =
+            RENAMED_KEYS.map(|(old, new)| get_renamed_endpoint_env(env, old, new));
         Ok(Self {
             path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_PATH")?.map(str::to_string),
-            tls_cert_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH")?
-                .map(str::to_string),
-            tls_key_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_TLS_KEY_PATH")?
-                .map(str::to_string),
-            tls_ca_cert_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_TLS_CA_CERT_PATH")?
-                .map(str::to_string),
+            grpc_tls_cert_path: cert?.map(str::to_string),
+            grpc_tls_key_path: key?.map(str::to_string),
+            grpc_tls_ca_cert_path: ca?.map(str::to_string),
             // An EMPTY value maps to `Some(None)` — the explicit clear that
             // `http_path: null` expresses in YAML. The env layer cannot
             // convey "unset" any other way for a knob the stock file already
@@ -243,6 +266,9 @@ impl EndpointOverride {
                 .map(str::to_string),
             http_tls_ca_cert_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_HTTP_TLS_CA_CERT_PATH")?
                 .map(str::to_string),
+            // The deprecated YAML-only names; the env layer resolved its own
+            // old names above.
+            ..Self::default()
         })
     }
 }

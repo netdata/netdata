@@ -100,9 +100,11 @@ modules:
 
             The absolute paths shown below are the defaults for standard Linux packages. The installed stock configuration resolves its configuration and log directories for the installation layout, so macOS and custom-prefix installations use different paths. Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) with `otel.yaml` to inspect the installed values.
 
-            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Names are the uppercase option path with dots replaced by underscores. For example, `endpoint.tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH`, and `endpoint.http_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_HTTP_PATH` — set the latter to an empty value to disable the OTLP/HTTP listener. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
+            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Names are the uppercase option path with dots replaced by underscores. For example, `endpoint.grpc_tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_GRPC_TLS_CERT_PATH`, and `endpoint.http_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_HTTP_PATH` — set the latter to an empty value to disable the OTLP/HTTP listener. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
 
             Configuration is strict. Unknown YAML fields, unknown `NETDATA_OTEL_CFG_*` variables, malformed values, and the former experimental schema prevent the plugin from starting. The effective configuration is logged at startup; `remote_storage.uri` is redacted in that log.
+
+            The gRPC TLS options were previously named `endpoint.tls_cert_path`, `endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path` (environment variables `NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH` and so on). The former names still work and log a deprecation warning at startup. Setting one option under both its former and its current name in the same file, or in both environment variables, prevents the plugin from starting.
           folding:
             title: Config options
             enabled: true
@@ -113,16 +115,16 @@ modules:
                 The default IPv4 loopback address accepts only local senders. To accept remote senders, bind a non-loopback address and protect the endpoint with TLS or mutual TLS and network access controls.
               default_value: "127.0.0.1:4317"
               required: false
-            - name: endpoint.tls_cert_path
-              description: Path to the server TLS certificate. Set it together with `endpoint.tls_key_path`.
+            - name: endpoint.grpc_tls_cert_path
+              description: Path to the server TLS certificate for the OTLP/gRPC listener. Set it together with `endpoint.grpc_tls_key_path`.
               default_value: ""
               required: false
-            - name: endpoint.tls_key_path
-              description: Path to the server TLS private key. Set it together with `endpoint.tls_cert_path`.
+            - name: endpoint.grpc_tls_key_path
+              description: Path to the server TLS private key for the OTLP/gRPC listener. Set it together with `endpoint.grpc_tls_cert_path`.
               default_value: ""
               required: false
-            - name: endpoint.tls_ca_cert_path
-              description: Path to a CA certificate used to verify client certificates.
+            - name: endpoint.grpc_tls_ca_cert_path
+              description: Path to a CA certificate used to verify client certificates on the OTLP/gRPC listener.
               detailed_description: |
                 Setting a CA certificate enables mutual TLS and therefore also requires the server certificate and key. Clients must present a certificate signed by this CA.
               default_value: ""
@@ -144,7 +146,7 @@ modules:
             - name: endpoint.http_tls_ca_cert_path
               description: Path to a CA certificate used to verify client certificates on the OTLP/HTTP listener.
               detailed_description: |
-                The `http_tls_*` options configure TLS for the OTLP/HTTP listener independently of the gRPC `tls_*` options, so one transport can be protected while the other is not. Setting a CA certificate enables mutual TLS and therefore also requires the HTTP server certificate and key. Clients must present a certificate signed by this CA.
+                The `http_tls_*` options configure TLS for the OTLP/HTTP listener independently of the gRPC `grpc_tls_*` options, so one transport can be protected while the other is not. Setting a CA certificate enables mutual TLS and therefore also requires the HTTP server certificate and key. Clients must present a certificate signed by this CA.
               default_value: ""
               required: false
             - name: metrics.chart_configs_dir
@@ -260,13 +262,13 @@ modules:
               folding:
                 enabled: false
               description: |
-                Bind beyond loopback only when the endpoint is protected. This example requires each sender to present a certificate signed by the configured CA. Each listener has its own address and its own TLS settings: the `http_tls_*` trio protects the OTLP/HTTP listener independently of the gRPC `tls_*` trio, so one transport can be protected while the other is not, and setting `http_path` to `null` disables the HTTP listener entirely.
+                Bind beyond loopback only when the endpoint is protected. This example requires each sender to present a certificate signed by the configured CA. Each listener has its own address and its own TLS settings: the `http_tls_*` trio protects the OTLP/HTTP listener independently of the gRPC `grpc_tls_*` trio, so one transport can be protected while the other is not, and setting `http_path` to `null` disables the HTTP listener entirely.
               config: |
                 endpoint:
                   path: "0.0.0.0:4317"
-                  tls_cert_path: /etc/netdata/ssl/server-cert.pem
-                  tls_key_path: /etc/netdata/ssl/server-key.pem
-                  tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
+                  grpc_tls_cert_path: /etc/netdata/ssl/server-cert.pem
+                  grpc_tls_key_path: /etc/netdata/ssl/server-key.pem
+                  grpc_tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
                   http_path: "0.0.0.0:4318"
                   http_tls_cert_path: /etc/netdata/ssl/server-cert.pem
                   http_tls_key_path: /etc/netdata/ssl/server-key.pem

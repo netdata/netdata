@@ -358,7 +358,7 @@ def test_generate_runtime_otel_extra_yaml_cannot_override_pins(tmp_path, monkeyp
             "endpoint:\n"
             '  path: "1.2.3.4:1"\n'
             '  http_path: "1.2.3.4:2"\n'
-            "  tls_cert_path: /x.pem\n"
+            "  grpc_tls_cert_path: /x.pem\n"
             "  http_tls_cert_path: /y.pem\n"
         )
     )
@@ -370,7 +370,7 @@ def test_generate_runtime_otel_extra_yaml_cannot_override_pins(tmp_path, monkeyp
     assert doc["endpoint"]["http_path"].startswith("127.0.0.1:")
     assert doc["endpoint"]["http_path"] != otlp
     # Non-pinned endpoint siblings (either listener's TLS) still pass through.
-    assert doc["endpoint"]["tls_cert_path"] == "/x.pem"
+    assert doc["endpoint"]["grpc_tls_cert_path"] == "/x.pem"
     assert doc["endpoint"]["http_tls_cert_path"] == "/y.pem"
 
 
