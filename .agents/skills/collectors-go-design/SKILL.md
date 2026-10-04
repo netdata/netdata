@@ -81,6 +81,13 @@ requests follow the exceptions above. Remote mutation or durable local state sel
    fakes carry independent semantics, and what cannot be verified locally and is therefore stated as unverified. Test
    rules live in the V2 skill's Tests section.
 
+## Function Ownership
+
+When designing Functions over process-owned data, choose the owner independently from collector selection.
+Use `src/go/pkg/funcapi/README.md#process-function-providers` for provider, module-bound and job-backed lifetimes.
+A collector switch and a Function over retained history are distinct operator contracts; record their intended
+relationship in the design note before choosing registration.
+
 ## Architecture Gate
 
 For configured vnode acquisition and named attachment, use

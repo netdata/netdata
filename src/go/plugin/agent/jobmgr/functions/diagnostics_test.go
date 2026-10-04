@@ -71,7 +71,7 @@ func TestAvailabilityAttemptDiagnosticsDistinguishControlAndMixedFailures(t *tes
 			require.True(t, poll.attempt.Cut(test.cause))
 			finished := make(chan struct{})
 			go func() {
-				controller.finishAvailabilityPoll("module", collectorapi.Creator{}, poll)
+				controller.finishAvailabilityPoll(functionOwner{name: "module"}, poll)
 				close(finished)
 			}()
 			waitBundleContainmentTestValue(t, finished, "availability failure diagnostic")
