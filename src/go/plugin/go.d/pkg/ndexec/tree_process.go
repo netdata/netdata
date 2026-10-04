@@ -20,8 +20,9 @@ var (
 	ErrTreeNotDrained             = errors.New("process tree cleanup was not verified")
 )
 
-// TreeResult separates command outcome from descendant cleanup. A failed or
-// canceled command can be Drained. A false Drained requires the caller to retain
+// TreeResult records command, cancellation, setup and supervisor/protocol errors
+// independently of verified descendant cleanup. A failed or canceled command can
+// be Drained. A false Drained requires the caller to retain
 // resource ownership and stop further admission; it is not an ordinary job error.
 type TreeResult struct {
 	Err     error
