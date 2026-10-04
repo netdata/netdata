@@ -35,7 +35,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            This collector is enabled by default. It creates charts only for counters available from the DNS performance object; hosts without the DNS Server role produce no DNS charts. It retries automatically after the performance counter registry changes.
+            This collector is enabled by default. It creates charts only for counters available from the DNS performance object; hosts without the DNS Server role produce no DNS charts.
         limits:
           description: ""
         performance_impact:
