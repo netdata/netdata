@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
@@ -42,11 +43,13 @@ func TestFormsRejectInvalidWorkflowInputs(t *testing.T) {
 				{"timeout", 0.000999, false}, {"timeout", 0.001, true},
 			}
 			if kind == "journey" {
-				cases = append(cases, struct {
-					field string
-					value any
-					valid bool
-				}{"script", " \t\n", false})
+				for _, value := range []string{" \t\n", "\n", "\u0085", "\u00a0", "\u2003"} {
+					cases = append(cases, struct {
+						field string
+						value any
+						valid bool
+					}{"script", value, false})
+				}
 			} else {
 				for _, v := range []string{"/relative", "ftp://example.org/", "https://user:password@example.org/", "https://user@example.org/", "http://:80/"} {
 					cases = append(cases, struct {
@@ -63,6 +66,17 @@ func TestFormsRejectInvalidWorkflowInputs(t *testing.T) {
 					}{"url", v, true})
 				}
 			}
+			if kind == "journey" {
+				file := filepath.Join(t.TempDir(), "entry.ts")
+				require.NoError(t, os.WriteFile(file, []byte("export {};"), 0600))
+				cfg := map[string]any{"name": "test", "script": "", "script_path": file}
+				require.NoError(t, schema.Validate(cfg))
+				c := journey.New(shared.Dependencies{Executor: prepared{}, Hub: model.NewHub()})
+				c.Name = "test"
+				c.ScriptPath = file
+				require.NoError(t, c.Init(context.Background()))
+			}
+
 			for _, tc := range cases {
 				t.Run(tc.field+"/"+fmt.Sprint(tc.value), func(t *testing.T) {
 					cfg := map[string]any{"name": "test"}
