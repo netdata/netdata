@@ -603,7 +603,7 @@ func TestBootstrapAndDemo(t *testing.T) {
 	}
 	body, _ = io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	if resp.StatusCode != 200 || !strings.Contains(string(body), `src="/rum/demo.js"`) {
+	if resp.StatusCode != 200 || !strings.Contains(string(body), `src="demo.js"`) {
 		t.Fatalf("demo status %d body %s", resp.StatusCode, body)
 	}
 }

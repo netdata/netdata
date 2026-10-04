@@ -39,7 +39,7 @@ type LiveRow struct {
 }
 
 // appendLive records one ring entry when the beacon qualifies (page view,
-// any vital, or JS errors) and evicts anything past the aggregation window.
+// any vital, or JS errors) and reclaims expired prefix rows.
 // Called from Ingest, which already holds a.mu.
 func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) {
 	if !pageView && len(b.Vitals) == 0 && len(b.Errors) == 0 {
@@ -82,7 +82,8 @@ func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) 
 	a.evictLive(now)
 }
 
-// evictLive drops ring entries older than the aggregation window. Called
+// evictLive drops the expired prefix of the ring. Live also filters stale
+// rows behind fresh ones, because receipt times can arrive out of order. Called
 // on every Ingest and Live read — rum-live is polled directly, never
 // through Snapshot's chart-emission cadence, so eviction can't ride on
 // that path alone.
@@ -107,7 +108,9 @@ func (a *Aggregator) evictLive(now time.Time) {
 func (a *Aggregator) Live(after uint64, maxRows int) ([]LiveRow, uint64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.evictLive(a.now())
+	now := a.now()
+	a.evictLive(now)
+	cutoff := now.Add(-a.window)
 
 	// A cursor beyond anything this runtime issued cannot identify a row
 	// in this ring; serve the current ring from its start.
@@ -117,7 +120,7 @@ func (a *Aggregator) Live(after uint64, maxRows int) ([]LiveRow, uint64) {
 	next := after
 	out := make([]LiveRow, 0, maxRows)
 	for _, row := range a.live[a.liveStart:] {
-		if row.Seq <= after {
+		if row.Seq <= after || row.TS.Before(cutoff) {
 			continue
 		}
 		out = append(out, row)

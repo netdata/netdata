@@ -6,31 +6,45 @@ import (
 	"time"
 )
 
+// Receipts can arrive out of order when concurrent HTTP body reads finish.
+// Filter in place and preserve timestamp/value pairing and ingestion order.
 func (s *series) evict(cutoff time.Time) {
-	i := 0
-	for i < len(s.ts) && s.ts[i].Before(cutoff) {
-		i++
+	n := 0
+	for i, ts := range s.ts {
+		if !ts.Before(cutoff) {
+			if n != i {
+				s.ts[n], s.vals[n] = ts, s.vals[i]
+			}
+			n++
+		}
 	}
-	if i > 0 {
-		s.ts = append(s.ts[:0], s.ts[i:]...)
-		s.vals = append(s.vals[:0], s.vals[i:]...)
-	}
+	s.ts, s.vals = s.ts[:n], s.vals[:n]
 }
 
 func evictTimes(ts []time.Time, cutoff time.Time) []time.Time {
-	i := 0
-	for i < len(ts) && ts[i].Before(cutoff) {
-		i++
+	n := 0
+	for i, t := range ts {
+		if !t.Before(cutoff) {
+			if n != i {
+				ts[n] = t
+			}
+			n++
+		}
 	}
-	return append(ts[:0], ts[i:]...)
+	return ts[:n]
 }
 
 func evictTsCounts(tc []tsCount, cutoff time.Time) []tsCount {
-	i := 0
-	for i < len(tc) && tc[i].t.Before(cutoff) {
-		i++
+	n := 0
+	for i, c := range tc {
+		if !c.t.Before(cutoff) {
+			if n != i {
+				tc[n] = c
+			}
+			n++
+		}
 	}
-	return append(tc[:0], tc[i:]...)
+	return tc[:n]
 }
 
 // countTsCounts sums n for entries at/after cutoff, without mutating tc

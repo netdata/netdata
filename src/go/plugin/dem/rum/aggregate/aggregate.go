@@ -153,6 +153,8 @@ type elemSample struct {
 	poor       bool
 }
 
+type pageviewKey struct{ session, page string }
+
 type siteState struct {
 	cfg      SiteCfg
 	series   map[seriesKey]*series
@@ -161,7 +163,7 @@ type siteState struct {
 	other    map[string]*group          // kind → fold counters
 	top      map[string]map[string]bool // kind → values emitted as own instances (last snapshot)
 	counters map[string]uint64
-	dedup    map[string]time.Time
+	dedup    map[pageviewKey]time.Time
 	sess     *list.List // front = most recent
 	sessIdx  map[string]*list.Element
 
@@ -208,7 +210,7 @@ func New(window time.Duration, cfg SiteCfg) *Aggregator {
 			other:       map[string]*group{},
 			top:         map[string]map[string]bool{},
 			counters:    map[string]uint64{},
-			dedup:       map[string]time.Time{},
+			dedup:       map[pageviewKey]time.Time{},
 			sess:        list.New(),
 			sessIdx:     map[string]*list.Element{},
 			errGroups:   list.New(),

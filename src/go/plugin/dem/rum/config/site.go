@@ -56,7 +56,8 @@ type Tracing struct {
 	PropagateTo []string `yaml:"propagate_to,omitempty" json:"propagate_to"`
 	// ExportTo is where browser spans go: "" is the agent's own otel.plugin
 	// (otel.endpoint), else a gRPC host:port (plaintext) or
-	// https://host:port (TLS), such as the backend's agent.
+	// https://host:port (TLS), such as the backend's agent. IPv6 literals
+	// use brackets, for example [::1]:4317; ports must be 1-65535.
 	ExportTo string `yaml:"export_to,omitempty"    json:"export_to"`
 }
 

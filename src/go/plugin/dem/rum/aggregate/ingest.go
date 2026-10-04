@@ -57,7 +57,9 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 	}
 	st.counters[CounterAccepted]++
 	st.accepted = append(st.accepted, now)
-	st.lastAccepted = now
+	if now.After(st.lastAccepted) {
+		st.lastAccepted = now
+	}
 
 	var pageView bool
 	// Page view: one per (session, page) within pageviewDedup. Beacons
@@ -69,11 +71,17 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 	if b.SessionID == "" {
 		pageView = true
 	} else {
-		key := b.SessionID + "|" + page
-		if last, seen := st.dedup[key]; !seen || now.Sub(last) > pageviewDedup {
+		key := pageviewKey{
+			session: b.SessionID,
+			page:    page,
+		}
+		last, seen := st.dedup[key]
+		if !seen || now.Sub(last) > pageviewDedup {
 			pageView = true
 		}
-		st.dedup[key] = now
+		if !seen || now.After(last) {
+			st.dedup[key] = now
+		}
 	}
 
 	var frustrations uint64
@@ -106,14 +114,18 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 			if pageView {
 				real.pvTimes = append(real.pvTimes, now)
 			}
-			real.lastSeen = now
+			if now.After(real.lastSeen) {
+				real.lastSeen = now
+			}
 			st.recordVitals(b, kv.kind, kv.value, now)
 			target = st.otherGroup(kv.kind)
 		} else {
 			if pageView {
 				real.pvTimes = append(real.pvTimes, now)
 			}
-			real.lastSeen = now
+			if now.After(real.lastSeen) {
+				real.lastSeen = now
+			}
 			st.recordVitals(b, kv.kind, kv.value, now)
 		}
 		if pageView {

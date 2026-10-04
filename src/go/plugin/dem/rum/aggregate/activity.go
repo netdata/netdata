@@ -29,6 +29,7 @@ func (a *Aggregator) Activity() SiteActivity {
 	now := a.now()
 	st := &a.site
 	st.evictActivity(now, a.window)
+	st.evictSessions(now)
 	age := -1
 	if !st.lastAccepted.IsZero() {
 		age = int(now.Sub(st.lastAccepted) / time.Second)

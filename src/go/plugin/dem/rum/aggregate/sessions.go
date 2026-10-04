@@ -80,7 +80,9 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 	if promoted {
 		sd.investigated = true
 	}
-	sd.lastSeen = now
+	if now.After(sd.lastSeen) {
+		sd.lastSeen = now
+	}
 	if b.Browser != "" {
 		sd.browser = b.Browser
 	}
@@ -274,6 +276,17 @@ func truncateRunes(s string, n int) string {
 		return string(r[:n])
 	}
 	return s
+}
+
+// LRU order follows ingestion, which can differ from receipt time.
+func (st *siteState) evictSessions(now time.Time) {
+	for el := st.sess.Back(); el != nil; {
+		previous := el.Prev()
+		if now.Sub(el.Value.(*sessionDetail).lastSeen) > beacon.SessionTTL {
+			st.dropSession(el)
+		}
+		el = previous
+	}
 }
 
 func (st *siteState) dropSession(el *list.Element) {

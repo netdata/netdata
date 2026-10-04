@@ -101,11 +101,17 @@ func (st *siteState) snapshot(now time.Time, window time.Duration) Snapshot {
 		if k.kind == KindPage {
 			g.errWindow = evictTsCounts(g.errWindow, cutoff)
 			g.frWindow = evictTsCounts(g.frWindow, cutoff)
-			i := 0
-			for i < len(g.elements) && g.elements[i].ts.Before(cutoff) {
-				i++
+			n := 0
+			for i, e := range g.elements {
+				if !e.ts.Before(cutoff) {
+					if n != i {
+						g.elements[n] = e
+					}
+					n++
+				}
 			}
-			g.elements = g.elements[i:]
+			clear(g.elements[n:])
+			g.elements = g.elements[:n]
 		}
 	}
 	for k, t := range st.dedup {
@@ -113,13 +119,7 @@ func (st *siteState) snapshot(now time.Time, window time.Duration) Snapshot {
 			delete(st.dedup, k)
 		}
 	}
-	// Sessions: TTL from the back (least recent).
-	for el := st.sess.Back(); el != nil; el = st.sess.Back() {
-		if now.Sub(el.Value.(*sessionDetail).lastSeen) <= beacon.SessionTTL {
-			break
-		}
-		st.dropSession(el)
-	}
+	st.evictSessions(now)
 
 	snap := Snapshot{
 		Name:           st.cfg.Name,

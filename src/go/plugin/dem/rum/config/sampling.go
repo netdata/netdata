@@ -12,6 +12,19 @@ type Investigate struct {
 	AlwaysKeep []string `yaml:"always_keep,omitempty" json:"always_keep"`
 }
 
+// MarshalYAML preserves unset (default conditions) versus explicitly empty
+// conditions; ordinary slice omitempty treats both as absent.
+func (i Investigate) MarshalYAML() (any, error) {
+	var keep *[]string
+	if i.AlwaysKeep != nil {
+		keep = &i.AlwaysKeep
+	}
+	return struct {
+		SampleRate float64   `yaml:"sample_rate,omitempty"`
+		AlwaysKeep *[]string `yaml:"always_keep,omitempty"`
+	}{SampleRate: i.SampleRate, AlwaysKeep: keep}, nil
+}
+
 // Investigate always-keep conditions.
 const (
 	KeepErrors     = "errors"
