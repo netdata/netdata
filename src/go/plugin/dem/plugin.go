@@ -26,31 +26,43 @@ type Dependencies struct {
 	ConfigProvider func() (Config, error)
 }
 
-// NewRegistry keeps the shared store caller-owned across Agent run generations.
+// Components separates collector selection from process-owned investigation.
+type Components struct {
+	Collectors collectorapi.Registry
+	Functions  []funcapi.ProcessFunctionProvider
+	Retention  *Retention
+}
+
+// New keeps the shared stores caller-owned across Agent run generations.
 // The hub contains admitted runtimes only; configuration stays in the framework.
-func NewRegistry(deps Dependencies, cfg Config) (collectorapi.Registry, *Retention) {
+func New(deps Dependencies, cfg Config) Components {
 	hub := runtimehub.New()
 	source := &source{
 		hub:     hub,
 		history: deps.History,
 	}
-	handler := rumfunc.New(source)
 	site := rum.Creator(rum.Dependencies{
 		Hub:     hub,
 		History: deps.History,
 	})
-	site.AgentFunctions = rumfunc.Declarations
-	site.MethodHandler = func(collectorapi.RuntimeJob) funcapi.MethodHandler { return handler }
 	registry := collectorapi.Registry{}
 	registry.Register("receiver", receiver.Creator(hub))
 	registry.Register("rum", site)
 	syntheticHub := synthetic.NewHub()
-	syntheticHandler := syntheticfunc.New(&syntheticSource{hub: syntheticHub, history: deps.History, artifacts: deps.Artifacts})
-	workflow := journey.Creator(journey.Dependencies{Hub: syntheticHub, Executor: deps.Executor})
-	workflow.AgentFunctions = syntheticfunc.Declarations
-	workflow.MethodHandler = func(collectorapi.RuntimeJob) funcapi.MethodHandler { return syntheticHandler }
+	syntheticSource := &syntheticSource{
+		hub:       syntheticHub,
+		history:   deps.History,
+		artifacts: deps.Artifacts,
+	}
+	workflow := journey.Creator(journey.Dependencies{
+		Hub:      syntheticHub,
+		Executor: deps.Executor,
+	})
 	registry.Register("journey", workflow)
-	registry.Register("lighthouse", lighthouse.Creator(lighthouse.Dependencies{Hub: syntheticHub, Executor: deps.Executor}))
+	registry.Register("lighthouse", lighthouse.Creator(lighthouse.Dependencies{
+		Hub:      syntheticHub,
+		Executor: deps.Executor,
+	}))
 	retention := &Retention{
 		store:  deps.History,
 		policy: cfg.History,
@@ -62,5 +74,12 @@ func NewRegistry(deps Dependencies, cfg Config) (collectorapi.Registry, *Retenti
 	if deps.Artifacts != nil {
 		retention.artifactStore = deps.Artifacts
 	}
-	return registry, retention
+	return Components{
+		Collectors: registry,
+		Functions: []funcapi.ProcessFunctionProvider{
+			{ID: "rum", Functions: rumfunc.Declarations, NewHandler: func() funcapi.MethodHandler { return rumfunc.New(source) }},
+			{ID: "synthetics", Functions: syntheticfunc.Declarations, NewHandler: func() funcapi.MethodHandler { return syntheticfunc.New(syntheticSource) }},
+		},
+		Retention: retention,
+	}
 }

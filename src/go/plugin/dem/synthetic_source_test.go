@@ -30,11 +30,11 @@ func TestRegistryPublishesSyntheticHistoryWithoutActiveJobs(t *testing.T) {
 	run.CompletedUS = run.StartedUS + 1
 	_, err = history.AppendSyntheticRun(ctx, "complete", run)
 	require.NoError(t, err)
-	registry, _ := dem.NewRegistry(dem.Dependencies{History: history, Artifacts: captures}, dem.DefaultConfig())
-	require.Contains(t, registry, "journey")
-	require.Contains(t, registry, "lighthouse")
-	require.Len(t, registry["journey"].AgentFunctions(), 4)
-	handler := registry["journey"].MethodHandler(nil).(*syntheticfunc.Handler)
+	components := dem.New(dem.Dependencies{History: history, Artifacts: captures}, dem.DefaultConfig())
+	require.Contains(t, components.Collectors, "journey")
+	require.Contains(t, components.Collectors, "lighthouse")
+	require.Len(t, components.Functions[1].Functions(), 4)
+	handler := components.Functions[1].NewHandler().(*syntheticfunc.Handler)
 	checks := handler.HandleRaw(ctx, funcapi.RawMethodRequest{Method: "synthetics-checks", Permissions: "0x7b"})
 	require.NotNil(t, checks.RawResponse)
 	assert.Empty(t, checks.RawResponse["data"])
@@ -57,8 +57,8 @@ func (inventoryExecutor) Execute(context.Context, synthetic.Request, func(string
 }
 
 func TestRegistrySyntheticInventoryRedactsTargetCredentials(t *testing.T) {
-	registry, _ := dem.NewRegistry(dem.Dependencies{Executor: inventoryExecutor{}}, dem.DefaultConfig())
-	collector := registry["lighthouse"].CreateV2().(*lighthouse.Collector)
+	components := dem.New(dem.Dependencies{Executor: inventoryExecutor{}}, dem.DefaultConfig())
+	collector := components.Collectors["lighthouse"].CreateV2().(*lighthouse.Collector)
 	collector.Name = "home"
 	collector.URL = "https://example.org/?token=fixture-token&password=fixture-password&page=home"
 	require.NoError(t, collector.Init(context.Background()))
@@ -72,7 +72,7 @@ func TestRegistrySyntheticInventoryRedactsTargetCredentials(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("collector did not become ready")
 	}
-	handler := registry["journey"].MethodHandler(nil).(*syntheticfunc.Handler)
+	handler := components.Functions[1].NewHandler().(*syntheticfunc.Handler)
 	checks := handler.HandleRaw(ctx, funcapi.RawMethodRequest{Method: "synthetics-checks", Permissions: "0x1b"})
 	require.NotNil(t, checks.RawResponse)
 	require.Len(t, checks.RawResponse["data"], 1)

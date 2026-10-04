@@ -105,7 +105,7 @@ func main() {
 	}
 	cfg.Runtime.AssetsPath = filepath.Join(executable.Directory, "dem")
 	executor := runner.New(cfg.Runtime, history, captures)
-	registry, retention := dem.NewRegistry(
+	components := dem.New(
 		dem.Dependencies{
 			History:        history,
 			Artifacts:      captures,
@@ -120,8 +120,9 @@ func main() {
 		CollectorsConfigDir:       pluginconfig.CollectorsDir(),
 		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
 		VarLibDir:                 pluginconfig.VarLibDir(),
-		ModuleRegistry:            registry,
-		Services:                  []composition.ProcessService{retention},
+		ModuleRegistry:            components.Collectors,
+		ProcessFunctions:          components.Functions,
+		Services:                  []composition.ProcessService{components.Retention},
 		Secrets:                   secrets,
 		IsInsideK8s:               hostinfo.IsInsideK8sCluster(),
 		RunModePolicy:             policy.Agent(isTerminal),

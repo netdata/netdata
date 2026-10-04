@@ -41,7 +41,7 @@ func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 		Type:      "pageview",
 	})
 	require.NoError(t, err)
-	_, service := NewRegistry(Dependencies{
+	components := New(Dependencies{
 		History: st,
 	}, Config{
 		History: HistoryConfig{
@@ -49,6 +49,7 @@ func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 			MaxBytes: 1 << 30,
 		},
 	})
+	service := components.Retention
 	observed := &observedRetention{
 		Store: st,
 		swept: make(chan error, 1),
@@ -109,12 +110,13 @@ func TestRetentionPropagatesCancellationIntoStoreWork(t *testing.T) {
 func TestRetentionReloadsValidPolicyAndRetainsItOnInvalidConfig(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "dem.conf")
-	_, service := NewRegistry(
+	components := New(
 		Dependencies{
 			ConfigProvider: func() (Config, error) { return LoadConfig(multipath.New(dir)) },
 		},
 		DefaultConfig(),
 	)
+	service := components.Retention
 	require.NoError(t, os.WriteFile(path, []byte("history: {days: 7, max_bytes: 4096}"), 0600))
 	service.reloadPolicy()
 	assert.Equal(t, HistoryConfig{

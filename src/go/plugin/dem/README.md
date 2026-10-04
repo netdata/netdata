@@ -14,6 +14,11 @@ Expose the receiver through HTTPS, configure its public URL and actual trusted p
 reverse-proxy path prefix. The bootstrap pins Faro 2.11.0 and loads the SDK from jsDelivr; the website's Content Security
 Policy must allow the SDK and receiver. Client IP addresses are used for rate limiting/geolocation and are not stored.
 
+RUM and synthetic Function providers are independent of collector selection. Disabling `rum` or `journey`, selecting
+only `lighthouse`, or disabling all collectors preserves investigation of retained history while the plugin is enabled.
+Setting `enabled: no` disables the whole plugin. Handler instances belong to each framework run generation; the command
+keeps shared stores open until a clean shutdown.
+
 Six process Functions use the regular Netdata Function transport: `rum-sites`, `rum-pages`, `rum-live`, `rum-sessions`,
 `rum-errors`, and `rum-session-events`. Runtime observations include only admitted site jobs. Consumers join native
 DynCfg state to show disabled or failed configurations. Journal history remains queryable after a site stops. History range

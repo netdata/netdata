@@ -151,10 +151,10 @@ func TestHistoryFunctionsRemainAvailableWithoutActiveSites(t *testing.T) {
 		Page:      "/checkout",
 	})
 	require.NoError(t, err)
-	registry, _ := NewRegistry(Dependencies{
+	components := New(Dependencies{
 		History: st,
 	}, DefaultConfig())
-	handler := registry["rum"].MethodHandler(nil).(*rumfunc.Handler)
+	handler := components.Functions[0].NewHandler().(*rumfunc.Handler)
 	response := handler.HandleRaw(
 		context.Background(),
 		funcapi.RawMethodRequest{

@@ -5,7 +5,8 @@ The command owns the investigation journal and the plugin-wide retention service
 exit owns their handles. Process-service finalizers run before job retirement and cannot close resources used by jobs.
 
 The framework owns desired configuration, preflight, scheduling, admission, retries, status and DynCfg. The constructor
-injects a runtime hub into collectors and a domain-only source into process Functions. The hub contains actual admitted
+injects a runtime hub into collectors and a domain-only source into process Function providers. Providers construct
+fresh handlers for each contained framework run generation and remain available independently of collector selection. The hub contains actual admitted
 site registrations and receiver availability. It has no desired config mirror, scheduler or job status.
 
 Receiver `Init` / `Check` validate and prepare without binding. `Run` binds the listener, publishes availability and
