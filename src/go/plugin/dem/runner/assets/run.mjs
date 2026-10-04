@@ -84,8 +84,9 @@ async function main() {
   let terminal;
   let protocolError;
   for (const [kind, stream] of [['stdout', child.stdout], ['stderr', child.stderr]]) {
-    stream.setEncoding('utf8');
-    stream.on('data', chunk => emit({type: 'event', event: event(kind, {message: text(chunk)})}));
+    const safe = protocol.secretStream(message => emit({type: 'event', event: event(kind, {phase: 'cli', message})}));
+    stream.on('data', chunk => safe.write(chunk));
+    stream.on('end', () => safe.end());
   }
   const lines = createInterface({input: child.stdio[3], crlfDelay: Infinity});
   lines.on('line', line => {

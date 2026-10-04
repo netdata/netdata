@@ -19,6 +19,8 @@ import (
 )
 
 type textRedactor struct {
+	known    []string
+	longest  int
 	exact    *strings.Replacer
 	patterns *secrets.Redactor
 }
@@ -35,10 +37,20 @@ func newRedactor(values map[string]string) *textRedactor {
 	for _, value := range known {
 		pairs = append(pairs, value, "[REDACTED]")
 	}
-	return &textRedactor{exact: strings.NewReplacer(pairs...), patterns: secrets.NewRedactor()}
+	longest := 1
+	for _, value := range known {
+		longest = max(longest, len(value))
+	}
+	return &textRedactor{known: known, longest: longest, exact: strings.NewReplacer(pairs...), patterns: secrets.NewRedactor()}
 }
 func (r *textRedactor) text(value string) string {
-	return clip(r.patterns.Apply(r.exact.Replace(value)))
+	value = r.patterns.Apply(r.exact.Replace(value))
+	// An upstream text cap or cancellation may remove a PEM closing marker.
+	// Retain no suffix of an unfinished block just because it no longer matches.
+	if start := strings.Index(strings.ToLower(value), "-----begin "); start >= 0 {
+		value = value[:start] + "[REDACTED]"
+	}
+	return clip(value)
 }
 func clip(s string) string {
 	if utf8.RuneCountInString(s) <= TextLimit {
@@ -53,16 +65,18 @@ type frame struct {
 	Result *synthetic.Result `json:"result,omitempty"`
 }
 type sink struct {
-	mu       sync.Mutex
-	kind     synthetic.Kind
-	capture  bool
-	redact   *textRedactor
-	events   []synthetic.Event
-	dropped  int
-	result   *synthetic.Result
-	err      error
-	declared int
-	tests    map[string]synthetic.Event
+	streams      map[string]*diagnosticStream
+	streamEvents map[string]synthetic.Event
+	mu           sync.Mutex
+	kind         synthetic.Kind
+	capture      bool
+	redact       *textRedactor
+	events       []synthetic.Event
+	dropped      int
+	result       *synthetic.Result
+	err          error
+	declared     int
+	tests        map[string]synthetic.Event
 }
 type sinkSnapshot struct {
 	events  []synthetic.Event
@@ -73,9 +87,16 @@ type sinkSnapshot struct {
 }
 
 func newSink(kind synthetic.Kind, capture bool, redact *textRedactor) *sink {
-	return &sink{kind: kind, capture: capture, redact: redact, events: []synthetic.Event{}, tests: make(map[string]synthetic.Event)}
+	return &sink{streams: make(map[string]*diagnosticStream), streamEvents: make(map[string]synthetic.Event), kind: kind, capture: capture, redact: redact, events: []synthetic.Event{}, tests: make(map[string]synthetic.Event)}
 }
 func (s *sink) consume(reader io.Reader) error {
+	defer func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		for _, stream := range s.streams {
+			stream.end()
+		}
+	}()
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 64<<10), FrameMaxBytes+1)
 	for scanner.Scan() {
@@ -143,6 +164,30 @@ func (s *sink) fail(err error) error {
 // add is called under the sink lock. Diagnostic accounting continues after the
 // retention cap so truncation cannot manufacture missing test results.
 func (s *sink) add(event synthetic.Event) {
+	if event.Kind == "stdout" || event.Kind == "stderr" {
+		// The two shipped producers are distinct streams; test IDs and callbacks
+		// must not split redaction state. Unknown phases share the protocol stream.
+		source := event.Phase
+		if source != "worker" && source != "cli" {
+			source = "protocol"
+		}
+		key := event.Kind + ":" + source
+		s.streamEvents[key] = event
+		stream := s.streams[key]
+		if stream == nil {
+			stream = newDiagnosticStream(s.redact, func(message string) {
+				e := s.streamEvents[key]
+				e.Message = message
+				s.retain(e)
+			})
+			s.streams[key] = stream
+		}
+		stream.write(event.Message)
+		return
+	}
+	s.retain(event)
+}
+func (s *sink) retain(event synthetic.Event) {
 	if event.Kind == "suite" && event.Phase == "discovery" {
 		var n int
 		if _, err := fmt.Sscanf(event.Title, "Discovered %d tests", &n); err == nil && n >= 0 {
@@ -162,13 +207,17 @@ func (s *sink) add(event synthetic.Event) {
 	}
 }
 func (s *sink) stderr(reader io.Reader) {
+	stream := newDiagnosticStream(s.redact, func(message string) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		s.retain(synthetic.Event{Kind: "stderr", AtMS: time.Now().UnixMilli(), Phase: "bootstrap", Message: message})
+	})
+	defer stream.end()
 	buffer := make([]byte, 4096)
 	for {
 		n, err := reader.Read(buffer)
 		if n > 0 {
-			s.mu.Lock()
-			s.add(synthetic.Event{Kind: "stderr", AtMS: time.Now().UnixMilli(), Phase: "bootstrap", Message: string(buffer[:n])})
-			s.mu.Unlock()
+			stream.write(string(buffer[:n]))
 		}
 		if err != nil {
 			return

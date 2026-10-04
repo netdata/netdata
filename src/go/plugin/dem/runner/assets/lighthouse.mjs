@@ -43,8 +43,12 @@ async function main() {
     if (audit.lhr.runtimeError) throw new Error('Lighthouse runtime error: ' + audit.lhr.runtimeError.code + ': ' + audit.lhr.runtimeError.message);
     const artifacts = [];
     if (request.capture && Array.isArray(audit.report) && typeof audit.report[1] === 'string') {
-      await fs.writeFile(path.join(request.work_dir, 'output', 'lighthouse.html'), audit.report[1], {mode: 0o600});
-      artifacts.push({id: 'lighthouse-report', kind: 'report', path: 'output/lighthouse.html', mime: 'text/html'});
+      try {
+        await fs.writeFile(path.join(request.work_dir, 'output', 'lighthouse.html'), audit.report[1], {mode: 0o600});
+        artifacts.push({id: 'lighthouse-report', kind: 'report', path: 'output/lighthouse.html', mime: 'text/html'});
+      } catch (error) {
+        emit({type: 'event', event: event('error', {phase: 'capture', status: 'error', message: text('Lighthouse report unavailable: ' + error.message)})});
+      }
     }
     result = {status: 'success', metrics: metricsFromLHR(audit.lhr), artifacts,
       capture_state: request.capture ? (artifacts.length ? 'available' : 'unavailable') : 'disabled'};

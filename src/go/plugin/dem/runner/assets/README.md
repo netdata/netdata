@@ -22,8 +22,25 @@ application variables are not inherited.
 
 Stdout is newline-delimited event/result JSON, never raw user output. The
 Playwright reporter uses a separate child descriptor; ordinary child stdout and
-stderr are diagnostic events. Text is clipped to 2000 characters; the Go reader
-owns the 500-event retention limit and dropped count. Reporter completion is
+stderr are diagnostic events. Worker and CLI streams have separate redaction
+state across callbacks and UTF-8 reads; stream events describe that source rather
+than assigning delayed bytes to a test. Structured test/step/error events retain
+their test identity and remain incremental. Exact resolved values, including
+short values and values longer than the text budget, are removed before clipping.
+An unfinished matching prefix is withheld or redacted on stream termination.
+The carry per stream is bounded by the longest supplied value plus one read;
+resolved values themselves are bounded by the 4 MiB request transport limit.
+
+Go assembles diagnostic lines before applying its common credential patterns.
+A line longer than 2000 characters is omitted with an explicit truncation marker,
+then input is discarded through newline; its remainder cannot become a fresh
+unredacted diagnostic. PEM blocks are suppressed across lines without buffering
+the block. Incomplete lines may wait until stream completion, and forced process
+termination can lose buffered output. Structured diagnosis is clipped to 2000
+characters after redaction. The Go reader owns the 500-event retention limit
+and dropped count, including line/truncation events. These measures cover exact
+resolved text and recognized credential shapes; they do not promise to scrub
+arbitrarily encoded or transformed credentials. Reporter completion is
 not process completion: Go must join the Linux supervised tree before publishing
 artifacts, releasing admission or replacing the job.
 
@@ -60,7 +77,9 @@ execution errors. CLI exit alone does not determine monitoring success.
 Optional failure screenshots use Playwright's own capture path. Only PNG
 screenshot attachments inside output are candidate artifacts. They may be absent
 on forced termination. Lighthouse uses its actual desktop preset and retains
-nullable metrics; a missing observation never becomes zero. Its optional HTML
+nullable metrics; a missing observation never becomes zero. Failure to save its
+optional report preserves completed measurements and adds an unavailable-capture
+diagnostic. Its optional HTML
 report, like screenshots, may contain sensitive page content and is not claimed
 to be sanitized. Capture paths are relative to work_dir and begin with output/;
 Go validates and publishes them after verified drainage.

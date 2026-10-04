@@ -3,8 +3,9 @@ package dem
 
 import (
 	"fmt"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/runner"
 	"os"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/runner"
 
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"gopkg.in/yaml.v2"

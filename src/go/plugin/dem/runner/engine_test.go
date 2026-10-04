@@ -316,7 +316,7 @@ func TestSecretInputRedactionAndDiagnosticBounds(t *testing.T) {
 		require.NoError(t, json.Unmarshal(raw, &sent))
 		assert.Equal(t, request.Secrets, sent.Secrets)
 		for i := 0; i < EventLimit+4; i++ {
-			emit(out, frame{Type: "event", Event: &synthetic.Event{Kind: "stdout", Message: "long-secret x " + strings.Repeat("界", TextLimit+10)}})
+			emit(out, frame{Type: "event", Event: &synthetic.Event{Kind: "stdout", Message: "long-secret x " + strings.Repeat("界", TextLimit+10) + "\n"}})
 		}
 		r := success()
 		emit(out, frame{Type: "result", Result: &r})
@@ -412,4 +412,32 @@ func TestHistorySnapshotOwnsNullableMetricsAndEventDurations(t *testing.T) {
 	assert.Equal(t, 55.0, *saved.Metrics.SIMS)
 	assert.Zero(t, *saved.Metrics.CLS)
 	assert.Equal(t, 3.5, *saved.Events[0].DurationMS)
+}
+
+func TestCancellationRedactsLateBootstrapAndProtocolOutputBeforeHistory(t *testing.T) {
+	e, h, _ := testEngine(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	request := journey()
+	request.Timeout = 10 * time.Second
+	request.Secrets = map[string]string{"DEM_SECRET_TOKEN": "fixture-only-secret-0123456789"}
+	e.start = starter(t, func(processCtx context.Context, _ []string, _ []byte, out, stderr *os.File) ndexec.TreeResult {
+		fmt.Fprint(stderr, "fixture-only-secret-")
+		emit(out, frame{Type: "event", Event: &synthetic.Event{Kind: "stdout", Phase: "worker", Message: "fixture-only-secret-"}})
+		emit(out, frame{Type: "event", Event: &synthetic.Event{Kind: "step", Title: "observable evidence", Status: "failed"}})
+		cancel()
+		<-processCtx.Done()
+		// Pipes may still produce bytes during the verified-drain wait.
+		fmt.Fprint(stderr, "0123456789\nunfinished fixture-only-secret-")
+		emit(out, frame{Type: "event", Event: &synthetic.Event{Kind: "stdout", Phase: "worker", Message: "0123456789\nunfinished fixture-only-secret-"}})
+		return ndexec.TreeResult{Drained: true, Err: processCtx.Err()}
+	})
+	got := e.Execute(ctx, request, nil)
+	require.True(t, got.Drained)
+	assert.Equal(t, synthetic.Cancelled, got.Run.Outcome)
+	assert.Contains(t, diagnosticText(got.Run.Events), "[REDACTED]")
+	raw, err := json.Marshal(h.runs)
+	require.NoError(t, err)
+	assert.NotContains(t, string(raw), "fixture-only-secret-")
+	assert.Contains(t, string(raw), "observable evidence")
 }

@@ -86,7 +86,7 @@ test('secrets are controlled and stdout remains framed',async()=>{
   const source=prefix+"test('env',async()=>{expect(process.env.DEM_SECRET_TOKEN).toBe('synthetic-value');expect(process.env.DEM_SECRET_UNPASSED).toBeUndefined();expect(process.env.NODE_OPTIONS).toBeUndefined();console.log('not a protocol frame');console.error('diagnostic');await test.step('observed step',async()=>{});});";
   const result=await run(source,{secrets:{DEM_SECRET_TOKEN:'synthetic-value'}});
   assert.equal(result.result.status,'success');
-  assert.ok(result.events.some(e=>e.kind==='stdout'&&e.message.includes('not a protocol frame')));
+  assert.ok(result.events.filter(e=>e.kind==='stdout').map(e=>e.message).join('').includes('not a protocol frame'));
   assert.ok(result.events.some(e=>e.kind==='step'&&e.title==='observed step'));
   const files=await fs.readdir(result.dir);
   for(const name of files){const p=path.join(result.dir,name);if((await fs.stat(p)).isFile())assert.ok(!(await fs.readFile(p,'utf8')).includes('synthetic-value'));}
@@ -124,4 +124,87 @@ test('resolved secret text is redacted before upstream clipping',async()=>{
   assert.equal(actual.result.status,'success');
   assert.ok(actual.events.some(e=>e.kind==='stdout'));
   assert.ok(actual.events.every(e=>!(e.message||'').includes(secret.slice(0,80))));
+});
+
+
+test('fragmented worker and CLI output cannot reconstruct controlled secrets', async()=>{
+  const secret='fixture-only-secret-0123456789';
+  const writes="process.stdout.write(process.env.DEM_SECRET_TOKEN.slice(0,20));await new Promise(r=>setTimeout(r,30));process.stdout.write(process.env.DEM_SECRET_TOKEN.slice(20)+'\\n');";
+  for (const [source,scope] of [[prefix+"test('stream',async()=>{"+writes+"});",'worker'],[prefix+"import fs from 'node:fs';"+writes.replaceAll('process.stdout.write(', 'fs.writeSync(1,')+"test('pass',async()=>{});",'cli']]) {
+    const actual=await run(source,{secrets:{DEM_SECRET_TOKEN:secret}});
+    assert.equal(actual.result.status,'success');
+    assert.ok(actual.events.some(e=>e.kind==='stdout'&&e.phase===scope),scope);
+    const recovered=actual.events.filter(e=>e.kind==='stdout').map(e=>e.message).join('');
+    assert.ok(!recovered.includes(secret),recovered);
+    assert.ok(!recovered.includes('fixture-only-secret-'),recovered);
+    assert.ok(recovered.includes('[REDACTED]'),recovered);
+  }
+});
+
+test('actual reporter protects fragmented buffers and unfinished secret prefixes', async()=>{
+  const script=`const p=require(${JSON.stringify(path.join(assets,'protocol.cjs'))});
+    p.configureSecrets({DEM_SECRET_TOKEN:'fixture-only-secret-0123456789',DEM_SECRET_UTF:'秘密🔐value'});
+    const Reporter=require(${JSON.stringify(path.join(assets,'reporter.cjs'))});const r=new Reporter({});
+    r.onStdOut('fixture-only-secret-');r.onStdOut('0123456789\\n');
+    const b=Buffer.from('秘密🔐value\\n');for(const byte of b)r.onStdErr(Buffer.from([byte]));
+    r.onStdOut('safe-prefix fixture-only-secret-');r.finish();`;
+  const child=spawn(process.execPath,['-e',script],{stdio:['ignore','ignore','pipe','pipe']});
+  let wire='';child.stdio[3].on('data',b=>wire+=b);
+  assert.equal(await new Promise(r=>child.on('close',r)),0);
+  const records=wire.trim().split('\n').map(JSON.parse);
+  const recovered=records.filter(r=>r.type==='event').map(r=>r.event.message||'').join('');
+  assert.ok(!recovered.includes('fixture-only-secret-'),recovered);
+  assert.ok(!recovered.includes('秘密'),recovered);
+  assert.ok(recovered.includes('safe-prefix'),recovered);
+  assert.ok(recovered.includes('[REDACTED]'),recovered);
+});
+
+
+test('optional Lighthouse report write failure preserves completed measurements', async()=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'dem-report-failure-'));
+  const modules=path.join(dir,'node_modules');
+  for(const packageName of ['lighthouse','chrome-launcher']) {
+    await fs.mkdir(path.join(modules,packageName),{recursive:true});
+    await fs.writeFile(path.join(modules,packageName,'package.json'),'{"type":"module"}');
+  }
+  await fs.mkdir(path.join(modules,'lighthouse/core/config'),{recursive:true});
+  await fs.mkdir(path.join(modules,'chrome-launcher/dist'),{recursive:true});
+  await fs.writeFile(path.join(modules,'lighthouse/core/index.js'),`export default async()=>({lhr:{categories:{performance:{score:0.88}},audits:{'largest-contentful-paint':{numericValue:123}}},report:['{}','<html>fixture</html>']});`);
+  await fs.writeFile(path.join(modules,'lighthouse/core/config/lr-desktop-config.js'),'export default {};');
+  const closed=path.join(dir,'closed');
+  await fs.writeFile(path.join(modules,'chrome-launcher/dist/index.js'),`import fs from 'node:fs/promises';export const launch=async()=>({port:1,kill:async()=>fs.writeFile(${JSON.stringify(closed)},'closed')});`);
+  await fs.mkdir(path.join(dir,'output/lighthouse.html'),{recursive:true});
+  const child=spawn(process.execPath,[path.join(assets,'lighthouse.mjs')],{stdio:['pipe','ignore','pipe','pipe']});
+  let wire='';child.stdio[3].on('data',b=>wire+=b);
+  child.stdin.end(JSON.stringify({dependencies_path:dir,browser_path:process.execPath,work_dir:dir,url:'http://fixture.invalid',timeout_ms:1000,capture:true}));
+  await new Promise(r=>child.on('close',r));
+  const records=wire.trim().split('\n').map(JSON.parse);
+  const result=records.find(r=>r.type==='result').result;
+  assert.equal(result.status,'success');
+  assert.deepEqual(result.metrics,{performance:88,lcp_ms:123});
+  assert.equal(result.capture_state,'unavailable');
+  assert.deepEqual(result.artifacts,[]);
+  assert.ok(records.some(r=>r.event?.phase==='capture'&&r.event.message.includes('EISDIR')));
+  assert.equal(await fs.readFile(closed,'utf8'),'closed');
+});
+
+
+test('known stream prefixes stay protected for every byte partition', async()=>{
+  const {default:protocol}=await import('../protocol.cjs');
+  protocol.configureSecrets({DEM_SECRET_A:'abc',DEM_SECRET_B:'abcdef',DEM_SECRET_UTF:'秘密🔐value',DEM_SECRET_NEWLINE:'first\nsecond',DEM_SECRET_SHORT:'!'});
+  try {
+    const input=Buffer.from('ordinary 界 abc abcdef 秘密🔐value first\nsecond ! tail abcde');
+    for(let width=1;width<=input.length;width++) {
+      let recovered='';const stream=protocol.secretStream(value=>recovered+=value);
+      for(let i=0;i<input.length;i+=width)stream.write(input.subarray(i,i+width));
+      stream.end();
+      assert.equal(recovered,'ordinary 界 [REDACTED] [REDACTED] [REDACTED] [REDACTED] [REDACTED] tail [REDACTED]',String(width));
+    }
+  } finally {protocol.configureSecrets();}
+});
+
+
+test('secret redaction cannot change browser-start failure classification',async()=>{
+  const actual=await run(prefix+"test('browser',async({page})=>{});",{secrets:{DEM_SECRET_SHORT:'a'}});
+  assert.equal(actual.result.status,'error');
 });

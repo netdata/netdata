@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
-const {text, event, write, captureState, screenshotCandidate} = require('./protocol.cjs');
+const {text, event, write, captureState, screenshotCandidate, secretStream} = require('./protocol.cjs');
 
 module.exports = class DEMReporter {
   constructor(options) {
@@ -11,6 +11,8 @@ module.exports = class DEMReporter {
     this.executionError = false;
     this.confirmedFailure = false;
     this.finished = false;
+    this.stdio = Object.fromEntries(['stdout', 'stderr'].map(kind => [kind,
+      secretStream(message => this.emit(kind, {phase: 'worker', message}))]));
   }
   // Suppress Playwright's automatic fallback terminal reporter.
   printsToStdio() { return true; }
@@ -31,8 +33,8 @@ module.exports = class DEMReporter {
   onStepEnd(test, result, step) {
     this.emit('step', {test_id: test.id, title: text(step.title), phase: text(step.category), status: step.error ? 'failed' : 'passed', duration_ms: step.duration, ...(step.error ? {message: text(step.error.message || step.error.value)} : {})});
   }
-  onStdOut(chunk, test) { this.emit('stdout', {test_id: test?.id, message: text(chunk)}); }
-  onStdErr(chunk, test) { this.emit('stderr', {test_id: test?.id, message: text(chunk)}); }
+  onStdOut(chunk) { this.stdio.stdout.write(chunk); }
+  onStdErr(chunk) { this.stdio.stderr.write(chunk); }
   onError(error) {
     const message = text(error.message || error.value || error);
     this.executionError = true;
@@ -47,9 +49,10 @@ module.exports = class DEMReporter {
     const phase = failureSteps.at(-1)?.category || 'test';
     let launchError = false;
     for (const error of result.errors) {
-      const message = text(error.message || error.value || error);
-      // Playwright's managed browser launch failure is executor inability.
-      if (/browserType\.launch(?:PersistentContext)?:/.test(message)) {
+      const original = String(error.message || error.value || error);
+      const message = text(original);
+      // Classify original evidence; redaction must not change monitoring truth.
+      if (/browserType\.launch(?:PersistentContext)?:/.test(original)) {
         this.executionError = true;
         launchError = true;
       }
@@ -72,6 +75,7 @@ module.exports = class DEMReporter {
   finish(fullResult) {
     if (this.finished) return;
     this.finished = true;
+    for (const stream of Object.values(this.stdio)) stream.end();
     const counts = {declared: this.tests.size, passed: 0, failed: 0, timed_out: 0, skipped: 0, expected_failure: 0, not_run: 0};
     for (const {test, result} of this.tests.values()) {
       if (!result || result.status === 'interrupted') counts.not_run++;

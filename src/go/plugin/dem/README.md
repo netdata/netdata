@@ -126,7 +126,7 @@ Functions show current execution and retained diagnosis.
 
 Lighthouse performance is a desktop lab score in points from 0 to 100; FCP, LCP, TBT and Speed Index are milliseconds,
 and CLS is dimensionless. Missing values are gaps/null, distinct from measured zero. Audit completion is separate from
-page performance. These lab measurements are not browser field Web Vitals; no lab-score alert threshold is enabled.
+page performance. A failed optional report save marks capture unavailable and retains its diagnostic while preserving completed audit measurements. These lab measurements are not browser field Web Vitals; no lab-score alert threshold is enabled.
 
 ## Synthetic diagnosis and captures
 
@@ -143,7 +143,7 @@ a start without a retained completion remains unknown. History errors appear in 
 best effort; ambiguous append failures are never replayed, and history is not a lossless archive.
 
 Basic diagnosis includes bounded test, step, error, stdout and stderr events (500 records, 2000 characters per text),
-with dropped-event counts. There is no automatic page-console/network capture; scripts can forward diagnostics with
+with dropped-event counts. Stdout/stderr use bounded stream redaction: lines longer than 2000 characters are omitted with a marker, and forced termination can lose buffered text. Structured test/step/error evidence remains incremental. There is no automatic page-console/network capture; scripts can forward diagnostics with
 Playwright APIs. Optional failure PNG screenshots and Lighthouse HTML reports are disabled by default. Enable
 `screenshot_on_failure` or `save_report` before an incident if these captures are needed. Forced browser termination
 can prevent capture. Trace, HAR, video and filmstrip are not initial capabilities.
