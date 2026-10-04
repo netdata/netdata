@@ -40,6 +40,7 @@ func (h *Handler) sessionsRows(ctx context.Context, site string, after, before, 
 				s.LastPage,
 				h.redact.Apply(s.UserID),
 				s.Frustrations,
+				rowID(s.Site, s.SessionID),
 			},
 		)
 	}
@@ -47,6 +48,13 @@ func (h *Handler) sessionsRows(ctx context.Context, site string, after, before, 
 }
 
 var rumSessionsColumns = map[string]any{
+	"row_id": (funcapi.Column{
+		Index:         14,
+		Name:          "Row ID",
+		Type:          funcapi.FieldTypeString,
+		Visualization: funcapi.FieldVisualValue,
+		UniqueKey:     true,
+	}).BuildColumn(),
 	"site": (funcapi.Column{
 		Index:         0,
 		Name:          "Site",
@@ -57,7 +65,6 @@ var rumSessionsColumns = map[string]any{
 	}).BuildColumn(),
 	"session_id": (funcapi.Column{
 		Index:         1,
-		UniqueKey:     true,
 		Name:          "Session",
 		Type:          funcapi.FieldTypeString,
 		Visualization: funcapi.FieldVisualValue,

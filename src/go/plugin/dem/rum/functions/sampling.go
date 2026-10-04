@@ -41,5 +41,6 @@ func samplingNote(site query.Site) string {
 }
 
 func percent(rate float64) string {
-	return strconv.FormatFloat(rate*100, 'f', -1, 64) + "%"
+	// Significant digits suppress multiplication noise without rounding tiny rates to zero.
+	return strconv.FormatFloat(rate*100, 'g', 15, 64) + "%"
 }

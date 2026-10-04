@@ -151,6 +151,9 @@ func (s *Store) Finalize(
 			},
 		)
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	raw, err := json.Marshal(m)
 	if err != nil {
 		return nil, err
@@ -161,6 +164,10 @@ func (s *Store) Finalize(
 	if err = syncDir(s.root, stage); err != nil {
 		return nil, err
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	// Once publication starts, finish its durability checks even if cancellation races it.
 	s.uncertain[runID] = true
 	if err = s.root.Rename(stage, "runs/"+runID); err != nil {
 		return nil, err

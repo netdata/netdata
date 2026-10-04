@@ -515,3 +515,39 @@ func TestCaptureGrowingPastFetchLimitIsNotPublished(t *testing.T) {
 	}
 	assert.Zero(t, s.Stats().ProtectedBytes)
 }
+
+// Return the admission result, then cancel: a deadline can expire immediately
+// after admission while synchronous marker/staging I/O is still running.
+type cancelAfterAdmissionContext struct {
+	context.Context
+	cancel context.CancelFunc
+	once   sync.Once
+}
+
+func (c *cancelAfterAdmissionContext) Err() error {
+	err := c.Context.Err()
+	c.once.Do(c.cancel)
+	return err
+}
+
+func TestCancelledEmptyFinalizeCleansDrainedWorkWithoutPublishing(t *testing.T) {
+	s, root := store(t)
+	id := fixtureRunID()
+	alias, err := s.Begin(id)
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	admitted := &cancelAfterAdmissionContext{
+		Context: ctx,
+		cancel:  cancel,
+	}
+	_, err = s.Finalize(admitted, id, nil)
+	require.ErrorIs(t, err, context.Canceled)
+	for _, dir := range []string{"work", "staging", "drained", "runs"} {
+		_, err := os.Stat(filepath.Join(root, dir, id))
+		assert.ErrorIs(t, err, os.ErrNotExist, dir)
+	}
+	_, err = os.Lstat(alias)
+	assert.ErrorIs(t, err, os.ErrNotExist)
+	assert.Zero(t, s.Stats().ProtectedBytes)
+}

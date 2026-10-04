@@ -73,6 +73,8 @@ An HTTP request acquires one exact site registration containing both policy and 
 beacon endpoints use this same admission. Retirement removes future admission, cancels admitted request contexts and
 joins their leases. Cancellation interrupts socket reads through a response-controller deadline before closing bodies;
 closing a net/http request body alone can wait behind a stalled read. Cancellation callbacks join before leases release.
+Live queries merge per-site stream heads by receipt time while preserving each stream's sequence prefix; concurrent receipt and ingestion order can differ.
+All-site Errors, Pages and Sessions use a separate site-scoped row key without replacing their filter values.
 Function reads lease domain state only while copying snapshots, and historical queries own independent journal snapshots and check caller cancellation between files and rows.
 
 A retiring site joins its HTTP and Function readers before cancelling the history/export worker context. Export queues

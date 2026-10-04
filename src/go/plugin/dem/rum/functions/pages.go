@@ -37,6 +37,7 @@ func (h *Handler) pagesRows(ctx context.Context, site string) (rows [][]any, err
 				h.redact.Apply(p.INPElement),
 				h.redact.Apply(p.CLSElement),
 				p.FrustrationWindow,
+				rowID(p.Site, p.Page),
 			},
 		)
 	}
@@ -45,6 +46,13 @@ func (h *Handler) pagesRows(ctx context.Context, site string) (rows [][]any, err
 }
 
 var rumPagesColumns = map[string]any{
+	"row_id": (funcapi.Column{
+		Index:         12,
+		Name:          "Row ID",
+		Type:          funcapi.FieldTypeString,
+		Visualization: funcapi.FieldVisualValue,
+		UniqueKey:     true,
+	}).BuildColumn(),
 	"site": (funcapi.Column{
 		Index:         0,
 		Name:          "Site",
@@ -55,7 +63,6 @@ var rumPagesColumns = map[string]any{
 	}).BuildColumn(),
 	"page": (funcapi.Column{
 		Index:         1,
-		UniqueKey:     true,
 		Name:          "Page",
 		Type:          funcapi.FieldTypeString,
 		Visualization: funcapi.FieldVisualValue,

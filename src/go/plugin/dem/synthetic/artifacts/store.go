@@ -67,6 +67,12 @@ func Open(name string) (_ *Store, retErr error) {
 		if err != nil {
 			return nil, err
 		}
+		temporaryRoot := name
+		defer func() {
+			if retErr != nil {
+				retErr = errors.Join(retErr, os.RemoveAll(temporaryRoot))
+			}
+		}()
 	}
 	name, err := filepath.Abs(name)
 	if err != nil {

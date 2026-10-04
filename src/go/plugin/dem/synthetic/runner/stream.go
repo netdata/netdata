@@ -100,7 +100,7 @@ func (d *diagnosticStream) drain(final bool) {
 	d.pending.Next(end)
 }
 
-// Linear suffix matching avoids quadratic work for long repeated-prefix redact.
+// Linear suffix matching avoids quadratic work for long repeated-prefix secrets.
 func secretPrefixSuffix(value []byte, secret string) int {
 	if len(value) == 0 || len(secret) < 2 {
 		return 0

@@ -42,6 +42,7 @@ func (h *Handler) errorsRows(
 				detail(g.Details, g.TopPage),
 				detail(g.Details, strings.Join(g.Browsers, ",")),
 				h.redact.Apply(g.SampleStack),
+				rowID(g.Site, g.Fingerprint),
 			},
 		)
 	}
@@ -49,6 +50,13 @@ func (h *Handler) errorsRows(
 }
 
 var rumErrorsColumns = map[string]any{
+	"row_id": (funcapi.Column{
+		Index:         11,
+		Name:          "Row ID",
+		Type:          funcapi.FieldTypeString,
+		Visualization: funcapi.FieldVisualValue,
+		UniqueKey:     true,
+	}).BuildColumn(),
 	"site": (funcapi.Column{
 		Index:         0,
 		Name:          "Site",
@@ -59,7 +67,6 @@ var rumErrorsColumns = map[string]any{
 	}).BuildColumn(),
 	"fingerprint": (funcapi.Column{
 		Index:         1,
-		UniqueKey:     true,
 		Name:          "Fingerprint",
 		Type:          funcapi.FieldTypeString,
 		Visualization: funcapi.FieldVisualValue,
