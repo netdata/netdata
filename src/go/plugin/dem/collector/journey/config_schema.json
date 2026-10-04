@@ -13,15 +13,7 @@
       "script": {
         "title": "Script",
         "description": "Inline Playwright Test JavaScript or TypeScript source. Leave empty when using Script path.",
-        "type": "string",
-        "anyOf": [
-          {
-            "maxLength": 0
-          },
-          {
-            "pattern": "[^\\t\\n\\v\\f\\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
-          }
-        ]
+        "type": "string"
       },
       "script_path": {
         "title": "Script path",
@@ -97,6 +89,9 @@
           "properties": {
             "script_path": {
               "maxLength": 0
+            },
+            "script": {
+              "pattern": "[^\\t\\n\\v\\f\\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
             }
           }
         },
