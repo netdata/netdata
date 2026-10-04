@@ -68,7 +68,13 @@ func TestTreePayload(t *testing.T) {
 	mode, dir := os.Args[sep+1], os.Args[sep+2]
 	signal.Ignore(syscall.SIGTERM, syscall.SIGINT)
 	if mode == "leaf" {
-		if os.WriteFile(filepath.Join(dir, "leaf.pid"), []byte(strconv.Itoa(os.Getpid())), 0600) != nil {
+		pidPath := filepath.Join(dir, "leaf.pid")
+		pendingPath := pidPath + ".pending"
+		// File existence signals readiness; publish only after the PID is written and closed.
+		if os.WriteFile(pendingPath, []byte(strconv.Itoa(os.Getpid())), 0600) != nil {
+			os.Exit(2)
+		}
+		if os.Rename(pendingPath, pidPath) != nil {
 			os.Exit(2)
 		}
 		time.Sleep(30 * time.Second)
