@@ -180,13 +180,14 @@ class OtelConfig:
     Every field is optional: ``None`` means "leave the plugin default" and the
     key is omitted from the generated otel.yaml (which the plugin partial-merges
     over its own stock defaults), except the two endpoint fields, which are
-    always emitted: ``otlp_endpoint`` resolves to a free loopback port and
+    always resolved: ``otlp_endpoint`` to a free loopback port and
     ``otlp_http_endpoint`` to another one (or to a disable when set to ``""``),
     so parallel agents never collide on the stock 4317/4318 — the plugin fails
     fast on an occupied port. The local storage layout is derived from a
     single ``base_dir`` that is always pinned under the run dir for per-agent
-    isolation (re-pinned after the ``extra_yaml`` merge, alongside both
-    listener endpoints and the HTTP listener's ``enabled``). Caller-supplied paths do
+    isolation (re-pinned after the ``extra_yaml`` merge, alongside the gRPC
+    endpoint, the HTTP listener's ``enabled``, and its endpoint while it is
+    enabled). Caller-supplied paths do
     exist beyond the pin: ``remote_storage_uri``, ``journal_dir``, and whatever
     ``extra_yaml`` reaches — the server is a localhost-only developer tool, so
     the caller is trusted. The rotation/retention knobs are the edge-case
@@ -294,9 +295,10 @@ def _signal_tuning(
 
 
 def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint: str | None) -> dict:
-    """The otel.yaml override document: pinned per-agent base_dir + both endpoints, plus any set knobs.
+    """The otel.yaml override document: pinned per-agent base_dir + listener pins, plus any set knobs.
 
-    Apart from ``base_dir`` and the two endpoint addresses, which are always
+    Apart from ``base_dir``, the gRPC endpoint and the HTTP listener's
+    ``enabled`` (plus its endpoint while it is enabled), which are always
     emitted, only fields the caller set are emitted; the plugin keeps its stock
     defaults for the rest. ``base_dir`` is always pinned under the run dir, so every
     derived dir (``{base_dir}/{logs,traces}/{wal,index,catalog}``, the shared
@@ -370,8 +372,9 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint:
     # the reported OTLP/gRPC endpoint and the gRPC push tools without a
     # listener), every tls key, and a deprecated `endpoint:` block (the plugin
     # warns and the pinned receivers.* value wins). A disabled HTTP section
-    # keeps only the pin, so the file never shows an address that is not
-    # bound.
+    # keeps only its enabled pin, so it never shows an address that is not
+    # bound (a gRPC section disabled by the passthrough still carries the
+    # pinned gRPC address).
     if cfg.extra_yaml:
         try:
             extra = yaml.safe_load(cfg.extra_yaml)
@@ -503,8 +506,9 @@ def web_port_clash(cfg: OtelConfig | None, web_port: int | None) -> str | None:
     """Why a pinned OTLP endpoint in ``cfg`` cannot share ``web_port``, or None.
 
     The web server binds 127.0.0.1 (``_default_conf``), so only an endpoint
-    whose address overlaps it clashes: 127.0.0.1 itself, its IPv4-mapped
-    form, or a wildcard. ``[::1]:P`` or ``127.0.0.2:P`` can share the port.
+    whose address may overlap it clashes: 127.0.0.1 itself, its IPv4-mapped
+    form, a wildcard, or a host that is not an IP literal (it may resolve to
+    127.0.0.1). ``[::1]:P`` or ``127.0.0.2:P`` can share the port.
     """
     if cfg is None or web_port is None:
         return None

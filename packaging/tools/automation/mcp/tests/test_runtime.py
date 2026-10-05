@@ -226,7 +226,7 @@ def test_web_port_clash_only_on_the_same_port():
         ("localhost", True),
     ],
 )
-def test_web_port_clash_only_where_the_address_overlaps_the_web_bind(host, clashes):
+def test_web_port_clash_only_where_the_address_may_overlap_the_web_bind(host, clashes):
     # The web server binds 127.0.0.1 only.
     cfg = runtime.OtelConfig(otlp_endpoint=f"{host}:5000")
     assert (runtime.web_port_clash(cfg, 5000) is not None) == clashes
@@ -447,12 +447,8 @@ def test_generate_runtime_otel_extra_yaml_cannot_override_pins(tmp_path, monkeyp
     assert doc["endpoint"] == {"path": "1.2.3.4:0"}
 
 
-def test_generate_runtime_otel_extra_yaml_pins_survive_non_mapping_receivers(tmp_path, monkeypatch):
+def test_generate_runtime_disabled_http_section_holds_only_the_pin(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    # The re-pin must hold even when the passthrough replaces a level of
-    # receivers.otlp.protocols with something that is not a mapping. The HTTP
-    # listener is disabled here so the expected section is exactly the pins
-    # (a disable must also survive the passthrough).
     # A disabled listener's section holds only the pin, even when the
     # passthrough set an address for it.
     cfg = runtime.OtelConfig(
@@ -462,6 +458,14 @@ def test_generate_runtime_otel_extra_yaml_pins_survive_non_mapping_receivers(tmp
     rd, _conf, _otlp, _http = runtime.generate_runtime("agent-off", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert _protocols(doc)["http"] == {"enabled": False}
+
+
+def test_generate_runtime_otel_extra_yaml_pins_survive_non_mapping_receivers(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    # The re-pin must hold even when the passthrough replaces a level of
+    # receivers.otlp.protocols with something that is not a mapping. The HTTP
+    # listener is disabled here so the expected section is exactly the pins
+    # (a disable must also survive the passthrough).
     for evil in (
         "receivers: null\n",
         "receivers: 42\n",
