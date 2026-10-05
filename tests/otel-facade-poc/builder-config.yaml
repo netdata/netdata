@@ -1,0 +1,26 @@
+dist:
+  module: github.com/netdata/netdata/otel-facade-poc/distribution
+  name: otel-facade
+  description: Experimental Netdata DynCfg facade for OpenTelemetry
+  version: 0.0.1
+  output_path: .build/collector
+
+providers:
+  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.63.0
+  - gomod: github.com/netdata/netdata/otel-facade-poc v0.0.0
+    import: github.com/netdata/netdata/otel-facade-poc/netdataprovider
+    path: .
+extensions:
+  - gomod: github.com/netdata/netdata/otel-facade-poc v0.0.0
+    import: github.com/netdata/netdata/otel-facade-poc/netdataextension
+    path: .
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.157.0
+receivers:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.157.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.157.0
+processors:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.157.0
+exporters:
+  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.157.0
+replaces:
+  - github.com/netdata/netdata/go/plugins => ../../../../src/go

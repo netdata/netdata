@@ -16,7 +16,7 @@ The DynCfg system allows external plugins to:
 DynCfg for external plugins uses the following plugins.d protocol commands:
 
 1. `CONFIG`: Sent from the plugin to Netdata to register, update status, or delete configurations
-2. `FUNCTION`/`FUNCTION_PAYLOAD_BEGIN`: Received by the plugin to handle configuration commands
+2. `FUNCTION`/`FUNCTION_PAYLOAD`: Received by the plugin to handle configuration commands
 3. `FUNCTION_RESULT_BEGIN`: Sent from the plugin to respond to commands
 
 ## Implementing DynCfg in External Plugins
@@ -26,7 +26,7 @@ DynCfg for external plugins uses the following plugins.d protocol commands:
 To register a configuration, the plugin sends the CONFIG command:
 
 ```
-CONFIG <id> CREATE <status> <type> <path> <source_type> <source> <cmds> <view_access> <edit_access>
+CONFIG <id> create <status> <type> <path> <source_type> <source> <cmds> <view_access> <edit_access>
 ```
 
 Where:
@@ -50,7 +50,7 @@ Where:
     - `dyncfg`: Configuration received via this mechanism
     - `discovered`: Dynamically discovered by the plugin
 - `source` provides more details about the exact source
-- `cmds` is a space or pipe (|) separated list of supported commands:
+- `cmds` is a space-separated, quoted list of supported commands:
     - `schema`: Get JSON schema for the configuration
     - `get`: Get current configuration values
     - `update`: Receive configuration updates
@@ -65,8 +65,8 @@ Where:
 Example:
 
 ```
-CONFIG go.d:nginx CREATE accepted template /collectors internal internal schema|add|enable|disable 0 0
-CONFIG go.d:nginx:local_server CREATE running job /collectors dyncfg user schema|get|update|remove|enable|disable|restart 0 0
+CONFIG go.d:nginx create accepted template /collectors internal internal "schema add enable disable" 0 0
+CONFIG go.d:nginx:local_server create running job /collectors dyncfg user "schema get update remove enable disable restart" 0 0
 ```
 
 ### 2. Respond to Configuration Commands
@@ -76,7 +76,7 @@ The plugin receives configuration commands from Netdata as plugin functions. The
 #### Without Payload:
 
 ```
-FUNCTION <transaction_id> <timeout_ms> "config <id> <command>" "<http_access>" "<source>"
+FUNCTION <transaction_id> <timeout_seconds> "config <id> <command>" "<http_access_hex>" "<source>"
 ```
 
 Used for commands like: `schema`, `get`, `remove`, `enable`, `disable`, `restart`
@@ -84,13 +84,13 @@ Used for commands like: `schema`, `get`, `remove`, `enable`, `disable`, `restart
 Example:
 
 ```
-FUNCTION abcd1234 60 "config go.d:nginx:local_server get" "member" "netdata-cli"
+FUNCTION abcd1234 60 "config go.d:nginx:local_server get" "0xffff" "netdata-cli"
 ```
 
 #### With Payload:
 
 ```
-FUNCTION_PAYLOAD_BEGIN <transaction_id> <timeout_ms> "config <id> <command>" "<http_access>" "<source>" "<content_type>"
+FUNCTION_PAYLOAD <transaction_id> <timeout_seconds> "config <id> <command>" "<http_access_hex>" "<source>" "<content_type>"
 <payload_data>
 FUNCTION_PAYLOAD_END
 ```
@@ -100,7 +100,7 @@ Used for commands like: `update`, `add`, `test` that require additional data.
 Example:
 
 ```
-FUNCTION_PAYLOAD_BEGIN abcd1234 60 "config go.d:nginx:local_server update" "member" "netdata-cli" "application/json"
+FUNCTION_PAYLOAD abcd1234 60 "config go.d:nginx:local_server update" "0xffff" "netdata-cli" "application/json"
 {
   "url": "http://localhost:80/stub_status",
   "timeout": 5,
@@ -142,7 +142,7 @@ update status or record plugin rejection; they do not replace the already saved 
 - A plugin MUST answer 2xx only when it now holds the requested configuration and state.
 - A completed plugin rejection MUST preserve the previous configuration and enabled intent. Validate before
   adoption; after adoption, runtime failure is a status outcome rather than a rejection.
-- Report the health of an adopted configuration, such as a job that failed to start, with `CONFIG <id> STATUS`, not
+- Report the health of an adopted configuration, such as a job that failed to start, with `CONFIG <id> status`, not
   with the response code.
 - `test` and `restart` are not saved; their codes only report the outcome.
 
@@ -153,7 +153,7 @@ Clients MUST NOT turn an uncertain update result into an `add` attempt.
 
 For Go collector and service-discovery jobs, `update` that accepts a replacement for activation and non-running
 `enable` return `202`, without waiting for runtime readiness or physical cleanup. Disabled `update` and an identical running DynCfg-source
-`update` return `200`. `CONFIG <id> STATUS` reports later health. `add` is passive until Netdata echoes enabledness;
+`update` return `200`. `CONFIG <id> status` reports later health. `add` is passive until Netdata echoes enabledness;
 `add` and disabled `update` validate structure without acquiring external
 dependencies. Interactive `update` still rejects any failed preflight, irrespective of retry policy.
 
@@ -190,13 +190,13 @@ FUNCTION_RESULT_END
 To update the status of a configuration after it's been created:
 
 ```
-CONFIG <id> STATUS <new_status>
+CONFIG <id> status <new_status>
 ```
 
 Example:
 
 ```
-CONFIG go.d:nginx:local_server STATUS running
+CONFIG go.d:nginx:local_server status running
 ```
 
 This is useful when a configuration transitions from "accepted" to "running" or "failed" after being tested.
@@ -206,13 +206,13 @@ This is useful when a configuration transitions from "accepted" to "running" or 
 When a configuration is no longer available (e.g., the monitored service is removed):
 
 ```
-CONFIG <id> DELETE
+CONFIG <id> delete
 ```
 
 Example:
 
 ```
-CONFIG go.d:nginx:local_server DELETE
+CONFIG go.d:nginx:local_server delete
 ```
 
 ## JSON Schema for Configuration UI
@@ -451,11 +451,11 @@ Here's a complete example showing how a Go-based external plugin might implement
 
 ```
 # Register the template for Nginx configurations
-CONFIG go.d:nginx CREATE accepted template /collectors internal internal schema|add|enable|disable 0 0
+CONFIG go.d:nginx create accepted template /collectors internal internal "schema add enable disable" 0 0
 
 # Register existing jobs
-CONFIG go.d:nginx:local_server CREATE running job /collectors user /etc/netdata/go.d/nginx.conf schema|get|update|remove|enable|disable|restart 0 0
-CONFIG go.d:nginx:production CREATE running job /collectors user /etc/netdata/go.d/nginx.conf schema|get|update|remove|enable|disable|restart 0 0
+CONFIG go.d:nginx:local_server create running job /collectors user /etc/netdata/go.d/nginx.conf "schema get update remove enable disable restart" 0 0
+CONFIG go.d:nginx:production create running job /collectors user /etc/netdata/go.d/nginx.conf "schema get update remove enable disable restart" 0 0
 ```
 
 ### 2. Handle Schema Command
@@ -463,7 +463,7 @@ CONFIG go.d:nginx:production CREATE running job /collectors user /etc/netdata/go
 When receiving:
 
 ```
-FUNCTION abcd1234 60 "config go.d:nginx schema" "member" "netdata-cli"
+FUNCTION abcd1234 60 "config go.d:nginx schema" "0xffff" "netdata-cli"
 ```
 
 Respond with the two-member schema document described in "JSON Schema for Configuration UI":
@@ -497,7 +497,7 @@ FUNCTION_RESULT_END
 When receiving:
 
 ```
-FUNCTION abcd1234 60 "config go.d:nginx:local_server get" "member" "netdata-cli"
+FUNCTION abcd1234 60 "config go.d:nginx:local_server get" "0xffff" "netdata-cli"
 ```
 
 Respond with:
@@ -517,7 +517,7 @@ FUNCTION_RESULT_END
 When receiving:
 
 ```
-FUNCTION_PAYLOAD_BEGIN abcd1234 60 "config go.d:nginx:local_server update" "member" "netdata-cli" "application/json"
+FUNCTION_PAYLOAD abcd1234 60 "config go.d:nginx:local_server update" "0xffff" "netdata-cli" "application/json"
 {
   "url": "http://localhost:8080/stub_status",
   "timeout": 3,
@@ -553,9 +553,8 @@ FUNCTION_RESULT_END
 When receiving:
 
 ```
-FUNCTION_PAYLOAD_BEGIN abcd1234 60 "config go.d:nginx add" "member" "netdata-cli" "application/json"
+FUNCTION_PAYLOAD abcd1234 60 "config go.d:nginx add staging" "0xffff" "netdata-cli" "application/json"
 {
-  "name": "staging",
   "url": "http://staging:80/stub_status",
   "timeout": 5,
   "update_every": 10
@@ -566,18 +565,18 @@ FUNCTION_PAYLOAD_END
 Process the new job and respond:
 
 ```
-FUNCTION_RESULT_BEGIN abcd1234 200 application/json 0
+FUNCTION_RESULT_BEGIN abcd1234 202 application/json 0
 {
-  "status": 200,
-  "message": "Job 'staging' created successfully"
+  "status": 202,
+  "message": "Job 'staging' accepted; waiting for enable or disable"
 }
 FUNCTION_RESULT_END
 ```
 
-Then register the new job:
+Then register the passive job. Start collection only after Netdata sends an `enable` command; report `running` after activation succeeds:
 
 ```
-CONFIG go.d:nginx:staging CREATE running job /collectors dyncfg netdata-cli schema|get|update|remove|enable|disable|restart 0 0
+CONFIG go.d:nginx:staging create accepted job /collectors dyncfg netdata-cli "schema get update remove enable disable restart" 0 0
 ```
 
 ## Best Practices
@@ -589,7 +588,7 @@ CONFIG go.d:nginx:staging CREATE running job /collectors dyncfg netdata-cli sche
    longer explanations in `ui:help` (see "What The UI Renders")
 5. **Handle Errors Gracefully**: Return appropriate HTTP status codes and error messages
 6. **Update Status Promptly**: When a configuration changes state (e.g., from "accepted" to "running"), update its status
-7. **Clean Up Configurations**: When a monitored resource is gone, delete its configuration with `CONFIG id DELETE`
+7. **Clean Up Configurations**: When a monitored resource is gone, delete its configuration with `CONFIG id delete`
 
 ## Debugging Tips
 
