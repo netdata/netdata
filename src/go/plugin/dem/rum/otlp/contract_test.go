@@ -158,6 +158,73 @@ func TestPartialCountsAndSafeDiagnostics(t *testing.T) {
 	require.NotContains(t, output.String(), "server-secret")
 }
 
+func TestRepeatedReceiverFailuresHaveBoundedDiagnostics(t *testing.T) {
+	for _, partial := range []bool{false, true} {
+		t.Run(map[bool]string{false: "RPC failure", true: "partial rejection"}[partial], func(t *testing.T) {
+			var output bytes.Buffer
+			previous := exportLog
+			exportLog = logger.NewWithWriter(&output)
+			t.Cleanup(func() { exportLog = previous })
+
+			lis, err := net.Listen("tcp", "127.0.0.1:0")
+			require.NoError(t, err)
+			srv := grpc.NewServer(grpc.UnaryInterceptor(func(
+				ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+			) (any, error) {
+				if !partial {
+					return nil, status.Error(codes.Unavailable, "receiver-secret")
+				}
+				return handler(ctx, req)
+			}))
+			logs.RegisterLogsServiceServer(srv, &fakeLogsService{
+				resp: &logs.ExportLogsServiceResponse{
+					PartialSuccess: &logs.ExportLogsPartialSuccess{
+						RejectedLogRecords: 1,
+					},
+				},
+			})
+			traces.RegisterTraceServiceServer(srv, &fakeTraceService{
+				resp: &traces.ExportTraceServiceResponse{
+					PartialSuccess: &traces.ExportTracePartialSuccess{
+						RejectedSpans: 1,
+					},
+				},
+			})
+			go func() { _ = srv.Serve(lis) }()
+			t.Cleanup(srv.Stop)
+
+			const attempts = 8
+			for _, site := range []string{"shop", "checkout"} {
+				c := newRecCounters()
+				l, err := NewLogs(context.Background(), destination(lis.Addr().String()), site, c, nil)
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, l.Close()) })
+				tr := newTraceExporter(t, lis.Addr().String(), site, c, nil)
+				b := tracedBeacon()
+				b.Site = site
+				for range attempts {
+					l.Ingest(b, accepted())
+					tr.Ingest(b, accepted())
+					l.export(context.Background(), []queued{<-l.ch}, exportTimeout)
+					tr.exportSpans(context.Background(), []spanItem{<-tr.spanCh}, exportTimeout)
+				}
+				// Suppressing repeated diagnostics must not suppress delivery accounting.
+				require.EqualValues(t, attempts, c.snapshot()[aggregate.CounterOTLPErrors])
+				require.EqualValues(t, attempts, c.snapshot()[aggregate.CounterSpansErrors])
+				require.Zero(t, c.snapshot()[aggregate.CounterOTLPSent])
+				require.Zero(t, c.snapshot()[aggregate.CounterSpansSent])
+			}
+			for _, site := range []string{"shop", "checkout"} {
+				for _, signal := range []string{"logs", "traces"} {
+					prefix := fmt.Sprintf(`site \"%s\" %s `, site, signal)
+					require.Equal(t, 1, strings.Count(output.String(), prefix), output.String())
+				}
+			}
+			require.NotContains(t, output.String(), "receiver-secret")
+		})
+	}
+}
+
 func TestConsoleSeverityAndErrorDetails(t *testing.T) {
 	e := &Logs{
 		transport: &transport{

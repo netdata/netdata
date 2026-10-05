@@ -1069,7 +1069,7 @@ modules:
         additional_permissions:
             description: The Netdata service needs write access to its DEM state directory. Configured TLS and GeoIP files must be readable by the Netdata service account.
         data_collection:
-            method_description: The Faro browser SDK sends measurements to the configured RUM receiver. Netdata aggregates accepted observations over a sliding window, retains sampled investigation history locally, and optionally exports event logs and browser traces through OTLP/gRPC. Native charts, session timelines and errors need no OTLP receiver. Event logs add searchable custom-event attributes and optional console messages; tracing adds full browser request spans. Both are disabled by default and have independent destinations.
+            method_description: The Faro browser SDK sends measurements to the configured RUM receiver. Netdata aggregates accepted observations over a sliding window, retains sampled investigation history locally, and optionally exports event logs and browser traces through OTLP/gRPC. Native charts, session timelines and errors need no OTLP receiver. Event logs add searchable custom-event attributes and optional console messages; tracing adds sampled browser request spans. Both are disabled by default and have independent destinations.
             metrics_description: Monitor browser Web Vitals, page traffic, JavaScript errors, resource timing and user frustration.
         default_behavior:
             auto_detection:

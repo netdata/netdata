@@ -70,7 +70,7 @@ for deeper investigation, each disabled by default and configured independently 
   info, warn and error messages. Search by site, session and time in the destination's logs to inspect that evidence.
   Console errors remain logs with severity and bounded, redacted error type/stack when supplied; actual uncaught
   exceptions and unhandled rejections remain core RUM errors.
-- **Browser tracing** exports full browser request spans and propagates trace context. To follow requests into a
+- **Browser tracing** exports sampled browser request spans and propagates trace context. To follow requests into a
   backend, instrument its services, accept propagated context, coordinate sampling and send browser and backend
   spans to the same tracing system. Cross-origin APIs must allow trace headers in CORS. Browser spans alone show
   browser requests; they do not establish backend execution or trace completeness.

@@ -104,11 +104,19 @@ func (t *transport) redact(s string) string {
 }
 
 // Receiver error strings may echo credentials or payloads; log only the status code.
+// Limit repeated failures per site/signal/class; counters still account for every record.
 func (t *transport) failed(signal string, err error) {
-	exportLog.Warningf("rum/otlp: site %q %s export failed: %s", t.redact(t.siteName), signal, status.Code(err))
+	code := status.Code(err)
+	key := t.siteName + "\x00" + signal + "\x00" + code.String()
+	exportLog.Limit(key, 1, time.Minute).Warningf(
+		"rum/otlp: site %q %s export failed: %s", t.redact(t.siteName), signal, code,
+	)
 }
 func (t *transport) rejected(signal string, n uint64) {
-	exportLog.Warningf("rum/otlp: site %q %s partial rejection: %d", t.redact(t.siteName), signal, n)
+	key := t.siteName + "\x00" + signal + "\x00partial"
+	exportLog.Limit(key, 1, time.Minute).Warningf(
+		"rum/otlp: site %q %s partial rejection: %d", t.redact(t.siteName), signal, n,
+	)
 }
 func rejectedCount(n int64, total uint64) uint64 {
 	if n <= 0 {
