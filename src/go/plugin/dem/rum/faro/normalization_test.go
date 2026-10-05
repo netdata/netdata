@@ -99,3 +99,18 @@ func TestCaptureSpanAttributeSemanticsPrecedeKeyRedaction(t *testing.T) {
 	require.Len(t, b.Spans[0].Attrs, 1)
 	assert.Equal(t, "https://example.org/api", b.Spans[0].Attrs[0].Str)
 }
+
+func TestCapturePerformanceEventNamesAreStructuredURLs(t *testing.T) {
+	for _, name := range []string{navigationEvent, resourceEvent} {
+		t.Run(name, func(t *testing.T) {
+			raw, err := json.Marshal(map[string]any{"events": []any{map[string]any{
+				"name": name, "attributes": map[string]string{"name": "page.html?private=value#fragment"},
+			}}})
+			require.NoError(t, err)
+			b, err := Decode(raw, Options{Now: now, EventLogs: true})
+			require.NoError(t, err)
+			require.Len(t, b.Events, 1)
+			assert.Equal(t, "page.html", b.Events[0].Attrs["name"])
+		})
+	}
+}

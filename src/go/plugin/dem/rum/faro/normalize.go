@@ -91,7 +91,7 @@ func keepEventAttr(kind beacon.EventKind, name, key string) bool {
 // Numeric protocol values are measurements, not free text. Interpret each field
 // by its original key, before custom-key redaction can change that meaning.
 func (o Options) eventAttr(kind beacon.EventKind, key, value string) string {
-	if kind == beacon.EventResource && key == "name" {
+	if (kind == beacon.EventResource || kind == beacon.EventNavigation) && key == "name" {
 		return o.url(value, maxAttrLen)
 	}
 	numeric := false
