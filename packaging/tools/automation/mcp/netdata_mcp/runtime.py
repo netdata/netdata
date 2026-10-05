@@ -8,6 +8,7 @@ line, and the HTTP readiness probe.
 from __future__ import annotations
 
 import asyncio
+import errno
 import json
 import os
 import re
@@ -94,22 +95,27 @@ def free_port() -> int:
         sock.close()
 
 
-def port_available(port: int) -> bool:
-    """True if ``port`` can be bound on loopback right now.
+def port_unavailable_reason(port: int) -> str | None:
+    """Why ``port`` cannot be bound on loopback right now, or None if it can.
 
     Used for a pinned (declared) port, which the kernel did not pick: a
     listener already holding it — another agent, or a survivor of a previous
-    server — must fail the run up front with a clear reason instead of
-    netdata's bind error. SO_REUSEADDR mirrors netdata's own bind, so a socket
-    of a just-stopped agent lingering in TIME_WAIT does not count as taken.
+    server — or a privileged port must fail the run up front with a clear
+    reason instead of netdata's bind error. SO_REUSEADDR mirrors netdata's own
+    bind, so a socket of a just-stopped agent lingering in TIME_WAIT does not
+    count as taken.
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(("127.0.0.1", port))
-        return True
-    except OSError:
-        return False
+        return None
+    except OSError as e:
+        if e.errno == errno.EADDRINUSE:
+            return "is already in use on 127.0.0.1 (another agent, or a survivor of a previous MCP server?)"
+        if e.errno in (errno.EACCES, errno.EPERM):
+            return "needs privileges to bind (ports below 1024 do); declare a port of 1024 or above"
+        return f"cannot be bound on 127.0.0.1: {e.strerror or e}"
     finally:
         sock.close()
 

@@ -1,4 +1,7 @@
+import errno
+import os
 import socket
+import types
 from pathlib import Path
 
 import pytest
@@ -477,13 +480,33 @@ def test_free_port_is_bindable_and_in_range():
         s.close()
 
 
-def test_port_available_detects_a_listener():
+def test_port_unavailable_reason_detects_a_listener():
     holder = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     holder.bind(("127.0.0.1", 0))
     holder.listen()
     try:
         taken = holder.getsockname()[1]
-        assert runtime.port_available(taken) is False
+        assert "already in use" in runtime.port_unavailable_reason(taken)
     finally:
         holder.close()
-    assert runtime.port_available(taken) is True
+    assert runtime.port_unavailable_reason(taken) is None
+
+
+@pytest.mark.parametrize("code", [errno.EACCES, errno.EPERM])
+def test_port_unavailable_reason_names_a_privileged_port(monkeypatch, code):
+    # Not "already in use": nothing holds the port, the bind is refused.
+    class Refusing:
+        def setsockopt(self, *a):
+            pass
+
+        def bind(self, addr):
+            raise PermissionError(code, os.strerror(code))
+
+        def close(self):
+            pass
+
+    fake = types.SimpleNamespace(**{k: getattr(socket, k) for k in ("AF_INET", "SOCK_STREAM", "SOL_SOCKET", "SO_REUSEADDR")})
+    fake.socket = lambda *a: Refusing()
+    monkeypatch.setattr(runtime, "socket", fake)
+    reason = runtime.port_unavailable_reason(443)
+    assert "needs privileges" in reason and "already in use" not in reason

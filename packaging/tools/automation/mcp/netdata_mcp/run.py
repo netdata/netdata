@@ -241,11 +241,9 @@ class RunRegistry:
         run.current_phase = "launch"
         # Checked here, after the build and after a restart's stop, so the port
         # the previous run of this agent held is already released.
-        if run.port_pinned and not runtime.port_available(run.port):
-            run.error = (
-                f"declared port {run.port} is already in use on 127.0.0.1 "
-                "(another agent, or a survivor of a previous MCP server?)"
-            )
+        reason = runtime.port_unavailable_reason(run.port) if run.port_pinned else None
+        if reason is not None:
+            run.error = f"declared port {run.port} {reason}"
             run.state = "failed"
             run.buffer.append(f"[launch refused: {run.error}]")
             return
