@@ -160,7 +160,8 @@ def register(mcp: FastMCP) -> None:
             "first-class param (auth, ingest windows, retention max_age/horizon, "
             "per-tenant overrides) or for strict-config refusal tests, pass a raw "
             "YAML mapping via extra_yaml — it deep-merges over the generated file "
-            "and wins on conflicts (base_dir and the listener endpoints stay pinned)."
+            "and wins on conflicts (base_dir, both listener endpoints, and the HTTP "
+            "listener's enabled flag stay pinned)."
         ),
     )
     async def netdata_agent_otel_config(

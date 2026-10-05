@@ -366,9 +366,12 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint:
     # harness invariants (per-agent isolation; the reported OTLP endpoints; no
     # undeclared 4318 bind), not plugin knobs to reach; everything else,
     # including keys the plugin will refuse, passes through untouched. That
-    # covers grpc.enabled (an HTTP-only plugin), every tls key, and a
-    # deprecated `endpoint:` block (the plugin warns and the pinned
-    # receivers.* value wins).
+    # covers grpc.enabled (a caller may run the plugin HTTP-only, which leaves
+    # the reported OTLP/gRPC endpoint and the gRPC push tools without a
+    # listener), every tls key, and a deprecated `endpoint:` block (the plugin
+    # warns and the pinned receivers.* value wins). A disabled HTTP section
+    # keeps only the pin, so the file never shows an address that is not
+    # bound.
     if cfg.extra_yaml:
         try:
             extra = yaml.safe_load(cfg.extra_yaml)
@@ -396,6 +399,7 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint:
         protocols["http"]["endpoint"] = otlp_http_endpoint
     else:
         protocols["http"]["enabled"] = False
+        protocols["http"].pop("endpoint", None)
     return doc
 
 

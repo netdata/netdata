@@ -222,6 +222,8 @@ def test_web_port_clash_only_on_the_same_port():
         ("[::ffff:127.0.0.1]", True),
         ("[::1]", False),
         ("127.0.0.2", False),
+        # Not an IP literal: it may resolve to the web address, so it clashes.
+        ("localhost", True),
     ],
 )
 def test_web_port_clash_only_where_the_address_overlaps_the_web_bind(host, clashes):
@@ -434,9 +436,11 @@ def test_generate_runtime_otel_extra_yaml_cannot_override_pins(tmp_path, monkeyp
     assert protocols["http"]["endpoint"] == http
     assert protocols["http"]["enabled"] is True
     assert http.startswith("127.0.0.1:") and http != otlp
-    # Everything else passes through: gRPC's enabled flag (HTTP-only tests),
-    # either listener's TLS, and the deprecated endpoint block (the plugin
-    # warns and uses the pinned receivers value).
+    # Everything else passes through: gRPC's enabled flag (a caller may run
+    # the plugin HTTP-only, which leaves the reported OTLP/gRPC endpoint and
+    # the gRPC push tools without a listener), either listener's TLS, and the
+    # deprecated endpoint block (the plugin warns and uses the pinned
+    # receivers value).
     assert protocols["grpc"]["enabled"] is False
     assert protocols["grpc"]["tls"] == {"cert_file": "/x.pem"}
     assert protocols["http"]["tls"] == {"cert_file": "/y.pem"}
@@ -449,6 +453,15 @@ def test_generate_runtime_otel_extra_yaml_pins_survive_non_mapping_receivers(tmp
     # receivers.otlp.protocols with something that is not a mapping. The HTTP
     # listener is disabled here so the expected section is exactly the pins
     # (a disable must also survive the passthrough).
+    # A disabled listener's section holds only the pin, even when the
+    # passthrough set an address for it.
+    cfg = runtime.OtelConfig(
+        otlp_http_endpoint="",
+        extra_yaml="receivers: {otlp: {protocols: {http: {endpoint: '0.0.0.0:4318'}}}}\n",
+    )
+    rd, _conf, _otlp, _http = runtime.generate_runtime("agent-off", otel=cfg)
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    assert _protocols(doc)["http"] == {"enabled": False}
     for evil in (
         "receivers: null\n",
         "receivers: 42\n",
