@@ -76,6 +76,7 @@ create_manifest() {
     fi
 }
 
+# Semantic equivalent to X > Y for versions.
 version_compare() {
     local v1 v2
     local IFS=.-
@@ -83,16 +84,16 @@ version_compare() {
     read -ra v1 <<< "$1"
     read -ra v2 <<< "$2"
 
-    if (( 10#${v1[0]} > 10#${v2[0]} )); then return 1; fi
-    if (( 10#${v1[0]} < 10#${v2[0]} )); then return 0; fi
+    if (( 10#${v1[0]} > 10#${v2[0]} )); then return 0; fi
+    if (( 10#${v1[0]} < 10#${v2[0]} )); then return 1; fi
 
-    if (( 10#${v1[1]} > 10#${v2[1]} )); then return 1; fi
-    if (( 10#${v1[1]} < 10#${v2[1]} )); then return 0; fi
+    if (( 10#${v1[1]} > 10#${v2[1]} )); then return 0; fi
+    if (( 10#${v1[1]} < 10#${v2[1]} )); then return 1; fi
 
-    if (( 10#${v1[2]} > 10#${v2[2]} )); then return 1; fi
-    if (( 10#${v1[2]} < 10#${v2[2]} )); then return 0; fi
+    if (( 10#${v1[2]} > 10#${v2[2]} )); then return 0; fi
+    if (( 10#${v1[2]} < 10#${v2[2]} )); then return 1; fi
 
-    return 1
+    return 0
 }
 
 echo "Using ${artifacts} as source directory for artifacts"
