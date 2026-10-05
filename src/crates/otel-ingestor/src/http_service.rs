@@ -13,15 +13,17 @@
 //!   `application/json` are accepted, anything else → `415 text/plain`
 //!   (local: parameters are ignored, not validated — upstream's
 //!   `mime.ParseMediaType` 415s a malformed one);
-//! - `Content-Encoding` (local): absent, `identity` and `gzip` (flate2) are
-//!   accepted, anything else → `415 text/plain`. Upstream also decompresses
-//!   `zstd`, `zlib`, `deflate`, `snappy`, `lz4` and `x-snappy-framed`, and
-//!   answers `400` with a `google.rpc.Status` for any other coding —
-//!   including an explicit `identity`, which its own tests flag as a bug;
+//! - `Content-Encoding`: absent, `identity` and `gzip` (flate2) are
+//!   accepted, anything else → `400` with a `google.rpc.Status` (local: the
+//!   set — upstream also decompresses `zstd`, `zlib`, `deflate`, `snappy`,
+//!   `lz4` and `x-snappy-framed`, and 400s an explicit `identity`, which its
+//!   own tests flag as a bug; and the order — upstream's decompressor runs
+//!   before the Content-Type check, so a request bad in both gets its 400
+//!   where this receiver answers the Content-Type 415);
 //! - bodies are capped (see [`MAX_BODY_BYTES`], applied to the wire body AND
 //!   the gzip-expanded body — the second cap is the decompression-bomb guard)
-//!   → over-limit `413 text/plain` (local: upstream caps at 20 MiB and
-//!   answers `400` with a `google.rpc.Status`);
+//!   → over-limit `400` with a `google.rpc.Status` (local: the limit —
+//!   upstream caps at 20 MiB);
 //! - a body that fails to decompress or decode → `400` with a
 //!   `google.rpc.Status` body in the request's encoding;
 //! - tenant policy (`X-Scope-OrgID`) is identical to gRPC via
@@ -495,10 +497,18 @@ where
         );
     };
 
-    let Some(coding) = content_encoding(headers.get(axum::http::header::CONTENT_ENCODING)) else {
-        return plain_text(
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            "415 unsupported content coding, supported: [gzip, identity]",
+    // An unsupported coding and an oversized body get the collector's
+    // answer: 400 with a google.rpc.Status (its decompressor middleware and
+    // MaxBytesReader), not the plain HTTP 415/413.
+    let encoding = headers.get(axum::http::header::CONTENT_ENCODING);
+    let Some(coding) = content_encoding(encoding) else {
+        let name = encoding.map(|v| String::from_utf8_lossy(v.as_bytes()).into_owned());
+        return rpc_error(
+            codec,
+            Status::invalid_argument(format!(
+                "unsupported Content-Encoding: {}, supported: [gzip, identity]",
+                name.unwrap_or_default()
+            )),
         );
     };
 
@@ -510,7 +520,7 @@ where
             if std::error::Error::source(&err)
                 .is_some_and(|s| s.is::<http_body_util::LengthLimitError>())
             {
-                return plain_text(StatusCode::PAYLOAD_TOO_LARGE, "413 request body too large");
+                return too_large(codec);
             }
             return rpc_error(
                 codec,
@@ -535,9 +545,7 @@ where
                 Ok(_) if out.len() <= MAX_BODY_BYTES => out.into(),
                 // Ok with more than the cap: the `take` bound, not EOF, ended
                 // the read — the expanded body is over the limit.
-                Ok(_) => {
-                    return plain_text(StatusCode::PAYLOAD_TOO_LARGE, "413 request body too large");
-                }
+                Ok(_) => return too_large(codec),
                 Err(e) => {
                     return rpc_error(
                         codec,
@@ -597,6 +605,17 @@ fn content_type_codec(value: Option<&axum::http::HeaderValue>) -> Option<Codec> 
 enum BodyCoding {
     Identity,
     Gzip,
+}
+
+/// The over-limit answer, on the wire or after gzip expansion.
+fn too_large(codec: Codec) -> Response<Body> {
+    rpc_error(
+        codec,
+        Status::invalid_argument(format!(
+            "request body exceeds the {} MiB limit",
+            MAX_BODY_BYTES / (1024 * 1024)
+        )),
+    )
 }
 
 /// The request's `Content-Encoding` (case-insensitive). Absent or
@@ -1163,7 +1182,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn unsupported_content_encoding_is_text_415() {
+    async fn unsupported_content_encoding_is_400_rpc_status() {
         let (state, _tmp) = test_state(AuthConfig::default());
         let resp = post(
             state,
@@ -1174,10 +1193,14 @@ mod tests {
             b"{}".to_vec(),
         )
         .await;
-        assert_eq!(resp.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+        // Collector parity: its decompressor answers 400 with a
+        // google.rpc.Status, in the request's encoding.
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let v: serde_json::Value = serde_json::from_slice(&body_bytes(resp).await).unwrap();
+        assert_eq!(v["code"], serde_json::json!(3));
         assert_eq!(
-            String::from_utf8(body_bytes(resp).await).unwrap(),
-            "415 unsupported content coding, supported: [gzip, identity]"
+            v["message"],
+            serde_json::json!("unsupported Content-Encoding: br, supported: [gzip, identity]")
         );
     }
 
@@ -1292,7 +1315,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn body_over_wire_limit_is_413() {
+    async fn body_over_wire_limit_is_400_rpc_status() {
         let (state, _tmp) = test_state(AuthConfig::default());
         let over = vec![0u8; MAX_BODY_BYTES + 1];
         let resp = post(
@@ -1304,8 +1327,7 @@ mod tests {
             over,
         )
         .await;
-        assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
-        assert_eq!(body_bytes(resp).await, b"413 request body too large");
+        assert_too_large(resp).await;
     }
 
     #[tokio::test]
@@ -1348,7 +1370,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn gzip_expansion_over_limit_is_413() {
+    async fn gzip_expansion_over_limit_is_400_rpc_status() {
         // A small gzip stream expanding past the cap must be refused, not
         // buffered into memory (decompression-bomb guard).
         let (state, _tmp) = test_state(AuthConfig::default());
@@ -1363,7 +1385,20 @@ mod tests {
             body,
         )
         .await;
-        assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        assert_too_large(resp).await;
+    }
+
+    /// The over-limit answer for a protobuf request: collector parity, 400
+    /// with a protobuf google.rpc.Status (its MaxBytesReader error).
+    async fn assert_too_large(resp: Response<Body>) {
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            resp.headers().get(header::CONTENT_TYPE).unwrap(),
+            "application/x-protobuf"
+        );
+        let decoded = RpcStatus::decode(body_bytes(resp).await.as_ref()).unwrap();
+        assert_eq!(decoded.code, Code::InvalidArgument as i32);
+        assert_eq!(decoded.message, "request body exceeds the 4 MiB limit");
     }
 
     #[tokio::test]
