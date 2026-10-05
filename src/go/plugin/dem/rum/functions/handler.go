@@ -112,18 +112,25 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 			return functionError(err)
 		}
 		var notes []string
+		problemBiased := false
 		for _, site := range sites {
 			if args["site"] != "" && args["site"] != site.Name {
 				continue
 			}
-			if note := samplingNote(site); note != "" {
-				notes = append(notes, note)
+			notes = append(notes, samplingNote(site))
+			sampling := site.Sampling
+			if sampling.InvestigateRate < 1 && (sampling.KeepErrors || sampling.KeepPoorVitals) {
+				problemBiased = true
 			}
 		}
 		if len(notes) > 0 {
-			response["help"] = spec.help + ". Current sampling policy: " + strings.Join(notes, "; ") +
+			help := spec.help + ". Current sampling policy: " + strings.Join(notes, "; ") +
 				". Historical evidence may reflect earlier policies, bounded context, retention and delivery loss. " +
-				"Problem overrides bias retained detail toward failures; these rows do not estimate all visitors or errors."
+				"These rows do not estimate all visitors or errors."
+			if problemBiased {
+				help += " Problem overrides bias retained detail toward failures."
+			}
+			response["help"] = help
 		}
 	}
 	if len(spec.params) > 0 {
