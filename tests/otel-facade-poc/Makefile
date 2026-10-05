@@ -1,4 +1,4 @@
-.PHONY: build test integration linux agent-smoke
+.PHONY: build test integration linux linux-amd64 agent-smoke
 
 IMAGE ?= netdata/netdata:edge
 
@@ -15,6 +15,11 @@ integration: build
 
 linux: build
 	cd .build/collector && CGO_ENABLED=0 GOOS=linux go build -o ../otel-facade-linux .
+
+linux-amd64: build
+	mkdir -p .build/linux-amd64
+	cd .build/collector && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o ../linux-amd64/otel-facade .
+	cp otel-facade.plugin .build/linux-amd64/otel-facade.plugin
 
 agent-smoke: linux
 	python3 agent_smoke.py --image "$(IMAGE)"

@@ -250,6 +250,10 @@ func startDistribution(t *testing.T) (*distribution, *telemetrySink) {
 	if binary == "" {
 		t.Skip("set OTEL_POC_BINARY to the generated OCB executable")
 	}
+	binary, err := filepath.Abs(binary)
+	if err != nil {
+		t.Fatal(err)
+	}
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -261,7 +265,7 @@ func startDistribution(t *testing.T) (*distribution, *telemetrySink) {
 	go server.Serve(listener)
 	t.Cleanup(server.Stop)
 	p := &distribution{t: t, done: make(chan struct{})}
-	p.cmd = exec.Command(binary, "--config=netdata:local", "--feature-gates=service.AllowNoPipelines")
+	p.cmd = exec.Command(stageLauncher(t, binary), "1")
 	stateDir := filepath.Join(t.TempDir(), "state$$-${unsupported:value}")
 	p.cmd.Env = append(os.Environ(), "NETDATA_OTEL_POC_ENDPOINT="+listener.Addr().String(), "NETDATA_OTEL_POC_STATE_DIR="+stateDir)
 	p.stdin, err = p.cmd.StdinPipe()

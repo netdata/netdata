@@ -31,11 +31,13 @@ Contrib checkout is not modified or required.
 make test          # controller/provider race tests and go vet
 make integration   # build with OCB, then test the actual executable
 make agent-smoke   # Linux build plus an isolated real Netdata Docker Agent
+make linux-amd64   # Linux x86-64 binary and plugins.d launcher for a VM
 ```
 
-`agent-smoke` also needs Python 3 and Docker. The Linux binary uses the build
-machine's architecture; select `GOARCH=amd64` or `GOARCH=arm64` when the Docker
-daemon uses a different architecture. Override the image with
+`agent-smoke` also needs Python 3 and Docker. Its Linux binary uses the build
+machine's architecture and expects a matching Docker daemon. `linux-amd64`
+runs OCB on the build host and cross-compiles only the resulting Collector.
+Override the smoke-test image with
 `make agent-smoke IMAGE=netdata/netdata:<tag-or-digest>`.
 
 Generated sources and binaries live under `.build/`, which is gitignored.
@@ -43,6 +45,61 @@ Generated sources and binaries live under `.build/`, which is gitignored.
 receivers, file storage, resource processing, and the standard OTLP exporter.
 The environment provider is included because the Collector CLI uses `env` as its
 default scheme even when `--config=netdata:local` is explicit.
+
+## Install the POC on a Linux x86-64 VM
+
+Build and copy **both** files:
+
+```sh
+make linux-amd64
+scp .build/linux-amd64/otel-facade .build/linux-amd64/otel-facade.plugin user@vm:/tmp/
+```
+
+On the VM, use the same plugins directory for the binary and launcher. The usual
+custom-plugin directory is shown below; use the directory where the POC was
+already installed if different. Keep one `otel-facade.plugin` in Netdata's plugin
+search path, rather than installing a second copy in another directory.
+
+```sh
+sudo install -d -m 0755 /etc/netdata/custom-plugins.d
+sudo install -m 0755 /tmp/otel-facade /etc/netdata/custom-plugins.d/otel-facade
+sudo install -m 0755 /tmp/otel-facade.plugin /etc/netdata/custom-plugins.d/otel-facade.plugin
+```
+
+`otel-facade` is the raw Collector executable and has **no `.plugin` suffix**.
+`otel-facade.plugin` is the Bash launcher Netdata starts. If the raw binary was
+previously named `otel-facade.plugin`, the launcher replaces it at that location.
+An already-built POC binary can be reused; this startup correction does not require
+rebuilding Netdata or the Collector.
+
+Ensure the following entries are set in the existing `[plugins]` section of
+`netdata.conf`, then restart the Agent. Restart is needed if the previous failed
+startup caused Netdata to disable the plugin for the current Agent process.
+
+```ini
+[plugins]
+    otel-facade = yes
+    otel = yes
+```
+
+```sh
+sudo systemctl restart netdata
+sudo journalctl -u netdata -n 100 --no-pager
+```
+
+The launcher consumes Netdata's positional update interval (usually `1`) and
+executes the Collector with `--config=netdata:local` and
+`--feature-gates=service.AllowNoPipelines`. **No YAML config file is required**:
+`netdata:local` selects this distribution's custom configuration provider, which
+supplies the initial empty service and generates pipelines as DynCfg jobs arrive.
+The feature gate permits startup before the first job exists.
+
+Netdata supplies `NETDATA_LIB_DIR`; the launcher defaults its file-offset directory
+to `${NETDATA_LIB_DIR}/otel-facade-poc`. The Collector creates it as the plugin user,
+so that parent directory must be writable. `NETDATA_OTEL_POC_STATE_DIR` can override
+it. `NETDATA_OTEL_POC_ENDPOINT` defaults to `127.0.0.1:4317`. Bash and the executable
+are required; no Go runtime or compiler is needed on the VM. The global positional
+interval is not forwarded: each host-metrics job keeps its own DynCfg interval.
 
 ## What the user configures
 
@@ -94,10 +151,9 @@ FUNCTION enable-host 30 "config otel-poc:hostmetrics:host enable" "0xffff" "poc"
 FUNCTION get-host 30 "config otel-poc:hostmetrics:host get" "0xffff" "poc"
 ```
 
-With Netdata supervising the executable, the daemon sends the enable/disable
-decision itself. A plugins.d launcher must ignore Netdata's numeric update-interval
-argument and execute the command above. The smoke test provides such a launcher
-inside its temporary container; it does not install anything on the host.
+With Netdata supervising `otel-facade.plugin`, the daemon sends the enable/disable
+decision itself. Both executable tests and the smoke test use this delivered
+launcher; the smoke test installs it only inside its temporary container.
 
 ## Ownership and reload behavior
 
@@ -126,7 +182,8 @@ ADD, rejected updates, rapid edits, stale readiness, cross-job reload with file
 offset retention, literal dollar/expression strings, disable/remove, and EOF/QUIT shutdown.
 
 The Docker smoke test was validated with Netdata `v2.11.0-305-nightly` on Linux
-arm64. It checks daemon-issued enable commands, actual numeric chart samples,
+arm64, and with the Linux amd64 Collector under Docker Desktop emulation using
+the delivered launcher. It checks daemon-issued enable commands, actual numeric chart samples,
 a synthetic log marker stored in the OTLP plugin's WAL, accepted/rejected updates,
 job replay after Agent restart, disabled-state replay, and removal.
 

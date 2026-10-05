@@ -49,12 +49,15 @@ def main():
         root = pathlib.Path(directory)
         root.chmod(0o755)
         (root / "otel-facade").touch()
+        launcher = root / "otel-facade.plugin"
+        launcher.write_bytes(pathlib.Path(__file__).with_name("otel-facade.plugin").read_bytes())
+        launcher.chmod(0o755)
         (root / "plugins").mkdir()
         wrapper = root / "plugins/otel-facade.plugin"
         # Test-only permissions relay: the stock Agent requires Cloud SSO for
         # DynCfg. Grant anonymous access only to this isolated plugin's CONFIG
         # registrations. The actual distribution retains normal permissions.
-        pipeline = shlex.join(["/poc/otel-facade", "--config=netdata:local", "--feature-gates=service.AllowNoPipelines"])
+        pipeline = shlex.join(["/poc/otel-facade.plugin"]) + ' "$@"'
         pipeline += " | " + shlex.join(["sed", "-u", "/^CONFIG .* create /s/ 0x0000 0x0000$/ 0x0008 0x0008/"])
         wrapper.write_text("#!/bin/bash\nset -o pipefail\n"
                            "printf '%s\\n' " + shlex.quote("+ " + pipeline) + " >&2\n"
@@ -101,7 +104,6 @@ def main():
             run("docker", "create", "--name", name, "--network", "none",
                 "--mount", f"type=bind,src={root},dst=/poc,readonly",
                 "--mount", f"type=bind,src={binary},dst=/poc/otel-facade,readonly",
-                "-e", "NETDATA_OTEL_POC_STATE_DIR=/var/lib/netdata/otel-facade-poc",
                 "-e", "NETDATA_OTEL_POC_ENDPOINT=127.0.0.1:4317",
                 "-e", "NETDATA_OTEL_CFG_METRICS_INTERVAL_SECS=1",
                 "-e", "NETDATA_OTEL_CFG_LOGS_COMPRESSION_ENABLED=false",

@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Netdata supplies update_every; each receiver's interval is managed by DynCfg.
+set -u
+
+if (( $# > 1 )) || { (( $# == 1 )) && [[ ! $1 =~ ^[1-9][0-9]*$ ]]; }; then
+    printf '%s\n' 'Usage: otel-facade.plugin [update_every_seconds]' >&2
+    exit 2
+fi
+
+launcher_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd) || exit 2
+if [[ -z ${NETDATA_OTEL_POC_STATE_DIR:-} ]]; then
+    if [[ ${NETDATA_LIB_DIR:-} != /* ]]; then
+        printf '%s\n' 'Set NETDATA_OTEL_POC_STATE_DIR to an absolute writable directory when running outside Netdata.' >&2
+        exit 2
+    fi
+    export NETDATA_OTEL_POC_STATE_DIR="${NETDATA_LIB_DIR}/otel-facade-poc"
+fi
+
+launcher_command=("${launcher_dir}/otel-facade" --config=netdata:local --feature-gates=service.AllowNoPipelines)
+printf '+ ' >&2
+printf '%q ' "${launcher_command[@]}" >&2
+printf '\n' >&2
+
+# Replace the shell so the Collector owns Netdata's pipes and receives signals.
+shopt -s execfail
+exec "${launcher_command[@]}"
+launcher_status=$?
+printf 'Launching otel-facade failed in %q with status %s\n' "$PWD" "$launcher_status" >&2
+exit "$launcher_status"
