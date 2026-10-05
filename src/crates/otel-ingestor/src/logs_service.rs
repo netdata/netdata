@@ -164,9 +164,9 @@ struct CollisionCheck {
 /// - If the entry mismatches, reject as a collision and record it for the
 ///   response's `partial_success`.
 ///
-/// Pure with respect to the I/O of the gRPC handler — the only side
-/// effect is mutating the canonical table. Extracted from `export` so it
-/// can be unit-tested without spinning up a writer or a tonic Request.
+/// Pure with respect to the I/O of the export path — the only side effect
+/// is mutating the canonical table. Extracted from `export_logs` so it can
+/// be unit-tested without spinning up a writer or a request.
 fn check_collisions(
     canonical: &mut HashMap<(TenantId, u64), ServiceStream>,
     tenant_id: &TenantId,

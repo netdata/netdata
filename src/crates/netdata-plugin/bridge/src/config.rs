@@ -56,8 +56,8 @@ pub struct PluginConfig {
     /// Remote object storage — global across signals (one on/off + one
     /// backend). Each signal uploads under its own `v2/{signal}/...` prefix.
     pub remote_storage: RemoteStorageConfig,
-    /// Tenant authentication — global across signals (one gRPC tenant policy
-    /// for the process).
+    /// Tenant authentication — global across signals (one tenant policy for
+    /// the process, applied on both transports).
     #[serde(default)]
     pub auth: AuthConfig,
     /// Per-signal tuning for logs (rotation, retention, catalog rotation count,

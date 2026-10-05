@@ -654,8 +654,8 @@ fn as_numbers(object: &mut Object, key: &str) -> Result<(), String> {
 
 /// A 64-bit integer given as a JSON integer or a decimal string (the forms
 /// senders write), as a JSON number in the field's range. The fraction and
-/// exponent forms proto3 JSON also permits (`3.0`, `1e3`) are rejected, as
-/// docs/opentelemetry/otlp-ingestion.md states.
+/// exponent forms proto3 JSON also permits (`3.0`, `1e3`) are rejected with
+/// a 400: no surveyed sender writes them (user decision D15).
 fn integer(value: &Value, sign: Sign) -> Result<Value, String> {
     let parsed = match (value, sign) {
         (Value::Number(n), Sign::Unsigned) => n.as_u64().map(Value::from),

@@ -862,8 +862,8 @@ sidebar:
       - meta:
           label: OTLP Ingestion
           edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/otlp-ingestion.md
-          description: Export metrics, logs, and traces from an OpenTelemetry Collector or SDK to a Netdata Agent
-          keywords: [opentelemetry, otel, otlp, grpc, metrics, logs, traces, collector]
+          description: Export metrics, logs, and traces from an OpenTelemetry Collector to a Netdata Agent
+          keywords: [opentelemetry, otel, otlp, grpc, http, metrics, logs, traces, collector]
       - meta:
           label: Securing the OTLP Endpoint
           edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/securing-the-otlp-endpoint.md
