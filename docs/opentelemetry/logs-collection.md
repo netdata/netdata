@@ -1,22 +1,12 @@
 # Collect Logs with OpenTelemetry Collector
 
-Use these recipes to send systemd journal entries, application log files,
-Windows event channels, Kubernetes container logs, and the macOS unified log
-through an OpenTelemetry Collector to Netdata. For network-device syslog, use
-the dedicated [OpenTelemetry Collector syslog
-setup](/docs/npm/syslog/otel-collector.md). For when to centralize a source at
-all, see [Centralizing Logs with
-OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md).
+Use these recipes to send systemd journal entries, application log files, Windows event channels, Kubernetes container logs, and the macOS unified log through an OpenTelemetry Collector to Netdata. For network-device syslog, use the dedicated [OpenTelemetry Collector syslog setup](/docs/npm/syslog/otel-collector.md). For when to centralize a source at all, see [Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md).
 
-Before you begin, complete [Ingest OpenTelemetry Metrics, Logs, and
-Traces](/docs/opentelemetry/otlp-ingestion.md). The examples use OpenTelemetry
-Collector Contrib `0.157.0` and the local, plaintext loopback endpoint from that
-guide. Use TLS when the Collector and Netdata Agent are on different hosts.
+Before you begin, complete [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md). The examples use OpenTelemetry Collector Contrib `0.157.0` and the local, plaintext loopback endpoint from that guide. Use TLS when the Collector and Netdata Agent are on different hosts.
 
 ## Shared exporter
 
-Add one of these exporters once, then combine it with a receiver and pipeline
-block from a recipe below:
+Add one of these exporters once, then combine it with a receiver and pipeline block from a recipe below:
 
 ```yaml
 exporters:
@@ -34,14 +24,11 @@ exporters:
       insecure: true
 ```
 
-Either transport works: `otlp_grpc` sends to port `4317`, while `otlp_http`
-sends OTLP/HTTP to port `4318` with a full-URL `endpoint`. Reference the
-exporter you chose in the `exporters` arrays of the recipes below.
+Either transport works: `otlp_grpc` sends to port `4317`, while `otlp_http` sends OTLP/HTTP to port `4318` with a full-URL `endpoint`. Reference the exporter you chose in the `exporters` arrays of the recipes below.
 
-When the Collector sends to a remote Netdata Agent, use TLS and give the
-exporter a persistent queue so a Collector restart or a network outage does not
-lose records (shown for gRPC; `otlp_http` takes the same `tls` and
-`sending_queue` blocks with an `https://` endpoint):
+When the Collector sends to a remote Netdata Agent, use TLS and give the exporter a persistent queue so a Collector
+restart or a network outage does not lose records (shown for gRPC; `otlp_http` takes the same `tls` and `sending_queue`
+blocks with an `https://` endpoint):
 
 ```yaml
 extensions:
@@ -64,41 +51,28 @@ service:
   extensions: [file_storage/netdata]
 ```
 
-The receiving Agent's endpoint and TLS settings are described in [Securing the
-OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md). When you
-combine blocks, list every extension you use in one `service.extensions` list.
+The receiving Agent's endpoint and TLS settings are described in
+[Securing the OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md). When you combine blocks, list every
+extension you use in one `service.extensions` list.
 
-Set `service.name` and, when useful, `service.namespace` as resource attributes
-so operators can identify each stream consistently in the Netdata Logs tab.
+Set `service.name` and, when useful, `service.namespace` as resource attributes so operators can identify each stream consistently in the Netdata Logs tab.
 
-The `service.pipelines.logs` blocks are alternatives. To run several receivers
-in one Collector, define one logs pipeline and list every enabled receiver in
-its `receivers` array; apply only processors appropriate to all records in that
-pipeline or use separate named pipelines.
+The `service.pipelines.logs` blocks are alternatives. To run several receivers in one Collector, define one logs pipeline and list every enabled receiver in its `receivers` array; apply only processors appropriate to all records in that pipeline or use separate named pipelines.
 
 ## Systemd journal
 
-The `journald` receiver runs `journalctl`, so the binary must be available to
-the Collector and the Collector service account must be able to read the
-journal. On a typical host installation, add that account to the
-`systemd-journal` group and restart the Collector service. Container deployments
-also need the host journal, a compatible `journalctl` binary, and the required
-permissions mounted into the container.
+The `journald` receiver runs `journalctl`, so the binary must be available to the Collector and the Collector service account must be able to read the journal. On a typical host installation, add that account to the `systemd-journal` group and restart the Collector service. Container deployments also need the host journal, a compatible `journalctl` binary, and the required permissions mounted into the container.
 
-For an installation whose service account and unit are both named
-`otelcol-contrib`, grant access with:
+For an installation whose service account and unit are both named `otelcol-contrib`, grant access with:
 
 ```bash
 sudo usermod -aG systemd-journal otelcol-contrib
 sudo systemctl restart otelcol-contrib
 ```
 
-Check the service unit and substitute its configured user when your package uses
-a different account.
+Check the service unit and substitute its configured user when your package uses a different account.
 
-This configuration reads new warning-or-higher entries from two units, persists
-the journal cursor across Collector restarts, and identifies the stream in
-Netdata:
+This configuration reads new warning-or-higher entries from two units, persists the journal cursor across Collector restarts, and identifies the stream in Netdata:
 
 ```yaml
 receivers:
@@ -129,9 +103,7 @@ service:
       exporters: [otlp_grpc/netdata]
 ```
 
-The Collector service account needs write access to the storage directory. With
-storage enabled, the receiver resumes from its saved cursor instead of replaying
-entries after a normal restart.
+The Collector service account needs write access to the storage directory. With storage enabled, the receiver resumes from its saved cursor instead of replaying entries after a normal restart.
 
 Useful journald options:
 
@@ -145,9 +117,7 @@ Useful journald options:
 | `start_at`    | `end`                                | Start at `beginning` or `end` when no saved cursor applies.                         |
 | `storage`     | none                                 | Persist cursors through a named storage extension.                                  |
 
-Different filter families are combined with logical AND; values within `units`,
-`identifiers`, or `matches` are combined with logical OR. To collect all units
-at `info` or higher, omit `units` and `identifiers`:
+Different filter families are combined with logical AND; values within `units`, `identifiers`, or `matches` are combined with logical OR. To collect all units at `info` or higher, omit `units` and `identifiers`:
 
 ```yaml
 receivers:
@@ -156,23 +126,15 @@ receivers:
     start_at: end
 ```
 
-Use `start_at: beginning` only for an intentional backfill. It can replay a
-large journal, increase Collector load, and send records that Netdata rejects
-because their timestamps are outside its acceptance window.
+Use `start_at: beginning` only for an intentional backfill. It can replay a large journal, increase Collector load, and send records that Netdata rejects because their timestamps are outside its acceptance window.
 
-See the upstream [journald receiver
-documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/journaldreceiver)
-for container settings, field matches, namespaces, retry behavior, and the
-complete option set.
+See the upstream [journald receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/journaldreceiver) for container settings, field matches, namespaces, retry behavior, and the complete option set.
 
 ## Application log files
 
-The `file_log` receiver tails files matched by glob patterns. The Collector
-service account must be able to read every selected file and write to the
-storage directory when persistent offsets are enabled.
+The `file_log` receiver tails files matched by glob patterns. The Collector service account must be able to read every selected file and write to the storage directory when persistent offsets are enabled.
 
-This configuration tails application logs, excludes a noisy debug file, persists
-offsets, and identifies the stream in Netdata:
+This configuration tails application logs, excludes a noisy debug file, persists offsets, and identifies the stream in Netdata:
 
 ```yaml
 receivers:
@@ -207,17 +169,11 @@ service:
       exporters: [otlp_grpc/netdata]
 ```
 
-The receiver tracks files by identity and fingerprint, including through common
-rotation patterns. Persistent storage lets it resume from saved offsets after a
-restart. Without storage, offsets exist only in memory; restarting with
-`start_at: beginning` can re-ingest old records, while `start_at: end` can skip
-existing records that are no longer being written.
+The receiver tracks files by identity and fingerprint, including through common rotation patterns. Persistent storage lets it resume from saved offsets after a restart. Without storage, offsets exist only in memory; restarting with `start_at: beginning` can re-ingest old records, while `start_at: end` can skip existing records that are no longer being written.
 
 ### Parse JSON lines
 
-When each physical line is one JSON object, add a `json_parser` operator. The
-embedded timestamp and severity settings promote fields into the OpenTelemetry
-log record:
+When each physical line is one JSON object, add a `json_parser` operator. The embedded timestamp and severity settings promote fields into the OpenTelemetry log record:
 
 ```yaml
 receivers:
@@ -233,13 +189,11 @@ receivers:
           parse_from: attributes.level
 ```
 
-If formats vary or transformation must happen after several receivers, use the
-shared [Transformations](/docs/opentelemetry/transformations.md) guide instead.
+If formats vary or transformation must happen after several receivers, use the shared [Transformations](/docs/opentelemetry/transformations.md) guide instead.
 
 ### Join multiline entries
 
-For stack traces in which each new record starts with an ISO-style timestamp,
-add a multiline rule:
+For stack traces in which each new record starts with an ISO-style timestamp, add a multiline rule:
 
 ```yaml
 receivers:
@@ -250,9 +204,7 @@ receivers:
       line_start_pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
 ```
 
-Configure exactly one of `line_start_pattern` or `line_end_pattern`. Test the
-expression against real samples: a wrong boundary can merge many records into a
-very large entry or split a stack trace into unrelated records.
+Configure exactly one of `line_start_pattern` or `line_end_pattern`. Test the expression against real samples: a wrong boundary can merge many records into a very large entry or split a stack trace into unrelated records.
 
 ### Important file options
 
@@ -267,16 +219,12 @@ very large entry or split a stack trace into unrelated records.
 | `poll_interval` | `200ms`  | Control how often the receiver checks for file changes.                           |
 | `storage`       | none     | Persist offsets through a named storage extension.                                |
 
-See the upstream [file log receiver
-documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver)
-for rotation behavior, retry settings, maximum record size, supported encodings,
-and the complete operator set.
+See the upstream [file log receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver) for rotation behavior, retry settings, maximum record size, supported encodings, and the complete operator set.
 
 ## Windows event channels
 
-Install the Collector as a Windows service and use one `windows_event_log`
-receiver per channel. The service account needs read access to each channel; the
-Security channel in particular requires it explicitly.
+Install the Collector as a Windows service and use one `windows_event_log` receiver per channel. The service account
+needs read access to each channel; the Security channel in particular requires it explicitly.
 
 ```yaml
 extensions:
@@ -317,22 +265,18 @@ service:
       exporters: [otlp_grpc/netdata]
 ```
 
-On a Windows Event Collector, add a receiver for the `ForwardedEvents` channel
-to centralize what the forwarders send. The `storage` extension keeps a bookmark
-per channel, so a restart resumes where it stopped. Event bodies are structured
-records by default; set `raw: true` to keep the original XML instead. The
-receiver builds only on Windows, so validate this configuration on a Windows
-host. See the upstream [windowseventlog receiver
-documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/windowseventlogreceiver)
+On a Windows Event Collector, add a receiver for the `ForwardedEvents` channel to centralize what the forwarders send.
+The `storage` extension keeps a bookmark per channel, so a restart resumes where it stopped. Event bodies are
+structured records by default; set `raw: true` to keep the original XML instead. The receiver builds only on Windows,
+so validate this configuration on a Windows host. See the upstream
+[windowseventlog receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/windowseventlogreceiver)
 for remote collection, XML queries, and the complete option set.
 
 ## Kubernetes and containers
 
-Container logs are files under `/var/log/pods` on each node, not journal
-entries. Run the Collector as a DaemonSet with the OpenTelemetry Collector Helm
-chart, whose `logsCollection` preset configures the file receiver and the
-container log parser, and whose `kubernetesAttributes` preset adds pod,
-namespace, and workload metadata:
+Container logs are files under `/var/log/pods` on each node, not journal entries. Run the Collector as a DaemonSet with
+the OpenTelemetry Collector Helm chart, whose `logsCollection` preset configures the file receiver and the container
+log parser, and whose `kubernetesAttributes` preset adds pod, namespace, and workload metadata:
 
 ```yaml
 mode: daemonset
@@ -390,34 +334,26 @@ helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm
 helm install otel-logs open-telemetry/opentelemetry-collector -n otel-logs -f values.yaml
 ```
 
-The `k8sattributes` processor derives `service.namespace` and `service.name`
-from the pod's labels and annotations following the OpenTelemetry semantic
-conventions — from the `app.kubernetes.io` labels and
-`resource.opentelemetry.io` annotations, falling back to the workload name and
-the Kubernetes namespace — so each workload appears as its own service in the
-Logs tab; the container parser adds the pod, namespace, and container from the
-file path.
+The `k8sattributes` processor derives `service.namespace` and `service.name` from the pod's labels and annotations
+following the OpenTelemetry semantic conventions — from the `app.kubernetes.io` labels and
+`resource.opentelemetry.io` annotations, falling back to the workload name and the Kubernetes namespace — so each
+workload appears as its own service in the Logs tab; the
+container parser adds the pod, namespace, and container from the file path.
 
-`storeCheckpoints` keeps the file receiver's offsets in `/var/lib/otelcol` on
-the node, so a restarted Collector resumes where it stopped instead of starting
-at the end of each file (the preset's `start_at: end`). It has two consequences.
-The chart runs the Collector as root (`runAsUser: 0`) to write that host
-directory; to run as a non-root user instead, set `securityContext` yourself,
-which the chart then leaves untouched, and make `/var/lib/otelcol` writable by
-that user on every node. And checkpoints cover reading only: records already
-read but still in the exporter's in-memory queue are lost if the Collector is
-killed or crashes before the queue drains. The `sending_queue.storage` line
-above keeps that queue on the same `file_storage` extension the preset
-registers, so queued records survive that too.
+`storeCheckpoints` keeps the file receiver's offsets in `/var/lib/otelcol` on the node, so a restarted Collector
+resumes where it stopped instead of starting at the end of each file (the preset's `start_at: end`). It has two
+consequences. The chart runs the Collector as root (`runAsUser: 0`) to write that host directory; to run as a
+non-root user instead, set `securityContext` yourself, which the chart then leaves untouched, and make
+`/var/lib/otelcol` writable by that user on every node. And checkpoints cover reading only: records already read but
+still in the exporter's in-memory queue are lost if the Collector is killed or crashes before the queue drains. The
+`sending_queue.storage` line above keeps that queue on the same `file_storage` extension the preset registers, so
+queued records survive that too.
 
-The values above are validated by rendering them with the
-`opentelemetry-collector` Helm chart 0.172.0 and validating the resulting
-Collector configuration with Contrib 0.157.0. The chart deploys its own
-Collector build (chart 0.172.0 ships Collector 0.159.0); pin `image.tag` to run
-a specific Collector version.
+The values above are validated by rendering them with the `opentelemetry-collector` Helm chart 0.172.0 and
+validating the resulting Collector configuration with Contrib 0.157.0. The chart deploys its own Collector build
+(chart 0.172.0 ships Collector 0.159.0); pin `image.tag` to run a specific Collector version.
 
-Size the receiving Agent's log retention for the cluster's volume; the defaults
-keep 7 days, up to 1GB:
+Size the receiving Agent's log retention for the cluster's volume; the defaults keep 7 days, up to 1GB:
 
 ```yaml
 logs:
@@ -427,14 +363,11 @@ logs:
       max_age: "30 days"
 ```
 
-See [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) for how
-retention and offloading work.
+See [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) for how retention and offloading work.
 
-Without Helm, this is the receiver the preset generates, abridged — the rendered
-configuration also carries the collector's own log exclusions and the parser's
-`max_log_size`. It is not a standalone recipe; pair it with an exporter, a
-storage extension for the checkpoints, and a logs pipeline as in the recipes
-above:
+Without Helm, this is the receiver the preset generates, abridged — the rendered configuration also carries the
+collector's own log exclusions and the parser's `max_log_size`. It is not a standalone recipe; pair it with an
+exporter, a storage extension for the checkpoints, and a logs pipeline as in the recipes above:
 
 ```yaml
 receivers:
@@ -451,20 +384,16 @@ receivers:
         id: container-parser
 ```
 
-Mount `/var/log/pods` and `/var/lib/otelcol` from the node into the Collector
-pod, and grant the service account the read permissions the `k8sattributes`
-processor needs (pods, namespaces, and replica sets across the cluster). See the
-upstream [opentelemetry-collector Helm chart
-documentation](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-collector)
-and the [k8sattributes processor
-documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
+Mount `/var/log/pods` and `/var/lib/otelcol` from the node into the Collector pod, and grant the service account the
+read permissions the `k8sattributes` processor needs (pods, namespaces, and replica sets across the cluster). See the
+upstream [opentelemetry-collector Helm chart documentation](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-collector)
+and the [k8sattributes processor documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/k8sattributesprocessor)
 for every preset and association option.
 
 ## macOS unified log
 
-macOS has no OS-native log forwarding. The Collector Contrib
-`macos_unified_logging` receiver, at alpha stability, runs the macOS `log`
-command and streams the unified log:
+macOS has no OS-native log forwarding. The Collector Contrib `macos_unified_logging` receiver, at alpha stability,
+runs the macOS `log` command and streams the unified log:
 
 ```yaml
 receivers:
@@ -490,44 +419,23 @@ service:
       exporters: [otlp_grpc/netdata]
 ```
 
-`max_log_age` bounds how far back the receiver reads on its first start. Run the
-Collector as a `launchd` service with permission to read system logs. The
-receiver builds only on macOS, so validate this configuration on a Mac. See the
-upstream [macOS unified logging receiver
-documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/macosunifiedloggingreceiver)
+`max_log_age` bounds how far back the receiver reads on its first start. Run the Collector as a `launchd` service
+with permission to read system logs. The receiver builds only on macOS, so validate this configuration on a Mac. See
+the upstream
+[macOS unified logging receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/macosunifiedloggingreceiver)
 for archive mode, predicates, and the complete option set.
 
 ## Syslog
 
-The Collector Contrib `syslog` receiver can listen over TCP or UDP and parse RFC
-3164 or RFC 5424 records. Netdata maintains a separate end-to-end guide because
-durable network ingestion also requires listener exposure, firewall rules,
-transport choices, and persistent Collector queues. Follow the dedicated
-[OpenTelemetry Collector syslog setup](/docs/npm/syslog/otel-collector.md)
-instead of duplicating that configuration here.
+The Collector Contrib `syslog` receiver can listen over TCP or UDP and parse RFC 3164 or RFC 5424 records. Netdata maintains a separate end-to-end guide because durable network ingestion also requires listener exposure, firewall rules, transport choices, and persistent Collector queues. Follow the dedicated [OpenTelemetry Collector syslog setup](/docs/npm/syslog/otel-collector.md) instead of duplicating that configuration here.
 
 ## Verify and troubleshoot logs
 
-- In Netdata, open the node's Logs tab, select `otel-logs`, then choose the
-  configured service with the **Services** selector. The stored service field is
-  `resource.attributes.service.name`.
-- If journald reports permission errors, verify access by running `journalctl`
-  as the Collector service account, then restart the Collector after changing
-  group membership.
-- If existing file lines are absent, check `start_at` and whether a saved cursor
-  or offset already exists. Do not delete storage state casually; doing so can
-  replay data.
-- If the Collector reports successful export but records are absent, inspect
-  their timestamps. Netdata accepts records from up to 24 hours in the past
-  through 10 minutes in the future and reports rejected records through OTLP
-  `partial_success`.
-- If records are duplicated after restart, enable a `file_storage` extension and
-  reference it from the receiver. Confirm that its directory survives service
-  and container restarts.
-- On Windows, if a channel is missing, check that the Collector service account
-  can read it; the Security channel needs explicit permission.
-- On Kubernetes, if pods show no logs, check the DaemonSet pods with
-  `kubectl logs` for file permission errors on `/var/log/pods` and for RBAC
-  errors from the `k8sattributes` processor.
-- On macOS, if the receiver reports permission errors, run the Collector with an
-  account allowed to read system logs with the `log` command.
+- In Netdata, open the node's Logs tab, select `otel-logs`, then choose the configured service with the **Services** selector. The stored service field is `resource.attributes.service.name`.
+- If journald reports permission errors, verify access by running `journalctl` as the Collector service account, then restart the Collector after changing group membership.
+- If existing file lines are absent, check `start_at` and whether a saved cursor or offset already exists. Do not delete storage state casually; doing so can replay data.
+- If the Collector reports successful export but records are absent, inspect their timestamps. Netdata accepts records from up to 24 hours in the past through 10 minutes in the future and reports rejected records through OTLP `partial_success`.
+- If records are duplicated after restart, enable a `file_storage` extension and reference it from the receiver. Confirm that its directory survives service and container restarts.
+- On Windows, if a channel is missing, check that the Collector service account can read it; the Security channel needs explicit permission.
+- On Kubernetes, if pods show no logs, check the DaemonSet pods with `kubectl logs` for file permission errors on `/var/log/pods` and for RBAC errors from the `k8sattributes` processor.
+- On macOS, if the receiver reports permission errors, run the Collector with an account allowed to read system logs with the `log` command.

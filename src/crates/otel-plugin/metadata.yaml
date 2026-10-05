@@ -1,8 +1,7 @@
-# otel.plugin collector metadata. The YAML values are the integration page
-# copy: the integrations pipeline renders them into README.md and the Learn
-# page, so edit claims here, never in the generated outputs. Other comments
-# anchor where each group of claims is implemented, for re-verification when
-# the plugin changes.
+# otel.plugin collector metadata. The YAML values are the integration page copy:
+# the integrations pipeline renders them into README.md and the Learn page, so edit
+# claims here, never in the generated outputs. Other comments anchor where each
+# group of claims is implemented, for re-verification when the plugin changes.
 plugin_name: otel.plugin
 modules:
   - meta:
@@ -37,38 +36,15 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Receive OpenTelemetry metrics, logs, and traces from an OpenTelemetry
-          Collector over OTLP/gRPC or OTLP/HTTP. The plugin converts supported
-          metrics into Netdata charts, indexes logs for exploration in the Logs
-          tab, and indexes traces for exploration in the Traces tab.
+          Receive OpenTelemetry metrics, logs, and traces from an OpenTelemetry Collector over OTLP/gRPC or OTLP/HTTP. The plugin converts supported metrics into Netdata charts, indexes logs for exploration in the Logs tab, and indexes traces for exploration in the Traces tab.
 
-          The plugin accepts gauges, sums, explicit-bucket histograms, and
-          summaries. It does not currently ingest exponential histograms.
-          Monotonic cumulative and delta sums are rate-normalized; non-monotonic
-          cumulative sums behave as gauges.
+          The plugin accepts gauges, sums, explicit-bucket histograms, and summaries. It does not currently ingest exponential histograms. Monotonic cumulative and delta sums are rate-normalized; non-monotonic cumulative sums behave as gauges.
 
-          For a maintained Collector configuration and end-to-end verification
-          steps, see [Ingest OpenTelemetry Metrics, Logs, and
-          Traces](/docs/opentelemetry/otlp-ingestion.md). The separate
-          [OpenTelemetry Logs
-          integration](/integrations/logs/integrations/opentelemetry_logs.md)
-          explains how received logs appear in Netdata, and [Trace Storage and
-          Retention](/docs/opentelemetry/trace-storage-and-retention.md)
-          explains how received traces are stored and kept.
+          For a maintained Collector configuration and end-to-end verification steps, see [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md). The separate [OpenTelemetry Logs integration](/integrations/logs/integrations/opentelemetry_logs.md) explains how received logs appear in Netdata, and [Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md) explains how received traces are stored and kept.
         method_description: |
-          The plugin starts automatically and listens on two OTLP endpoints:
-          OTLP/gRPC on port `4317` and OTLP/HTTP on port `4318`. Point the
-          Collector's `otlp_grpc` or `otlp_http` exporter at one of them. Keep
-          the exporter's default protobuf encoding and gzip compression: the
-          plugin rejects other compression algorithms, and with `encoding: json`
-          it rejects any request that carries a NaN or infinite metric value.
+          The plugin starts automatically and listens on two OTLP endpoints: OTLP/gRPC on port `4317` and OTLP/HTTP on port `4318`. Point the Collector's `otlp_grpc` or `otlp_http` exporter at one of them. Keep the exporter's default protobuf encoding and gzip compression: the plugin rejects other compression algorithms, and with `encoding: json` it rejects any request that carries a NaN or infinite metric value.
 
-          Each metric name becomes a Netdata chart context prefixed with
-          `otel.`. YAML mapping rules can match a metric name and
-          instrumentation scope, select a data point attribute for dimension
-          names, and override chart timing. User mapping files take priority
-          over the stock hostmetrics mappings compiled into the plugin. Metrics
-          without a matching mapping still create charts using default settings.
+          Each metric name becomes a Netdata chart context prefixed with `otel.`. YAML mapping rules can match a metric name and instrumentation scope, select a data point attribute for dimension names, and override chart timing. User mapping files take priority over the stock hostmetrics mappings compiled into the plugin. Metrics without a matching mapping still create charts using default settings.
 
           | Mapping file option             | Description                                                   |
           | :------------------------------ | :------------------------------------------------------------ |
@@ -78,9 +54,7 @@ modules:
           | `interval_secs`                 | Per-metric chart update interval override                     |
           | `grace_period_secs`             | Per-metric gap-filling grace period override                  |
 
-          Invalid user mapping files are logged and skipped without disabling
-          the stock mappings. Charts expire after their configured inactivity
-          period.
+          Invalid user mapping files are logged and skipped without disabling the stock mappings. Charts expire after their configured inactivity period.
       supported_platforms:
         include:
           - Linux
@@ -92,46 +66,26 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The plugin starts automatically and listens on `127.0.0.1:4317` for
-            OTLP/gRPC connections and on `127.0.0.1:4318` for OTLP/HTTP
-            connections.
+            The plugin starts automatically and listens on `127.0.0.1:4317` for OTLP/gRPC connections and on `127.0.0.1:4318` for OTLP/HTTP connections.
         # The ingest windows are the bridge crate's IngestConfig defaults
         # (24h max_age, 10m future_skew); the chart cap is the stock-file
         # value the ingestor enforces; retention evicts on whichever bound
         # is hit first.
         limits:
           description: |
-            Each export request is limited to 4 MiB, measured after
-            decompression. The plugin rejects a larger request as a whole. Each
-            export request can create at most 100 new charts by default. This is
-            a per-request throttle, not a total cardinality limit. By default,
-            log timestamps are accepted from up to 24 hours in the past through
-            10 minutes in the future; records without a timestamp use their
-            arrival time. A span is accepted when it started no more than 24
-            hours ago and ends no more than 10 minutes in the future. Log and
-            trace retention are each bounded by whichever limit is reached
-            first: retained file count, retained indexed-data size, or age.
+            Each export request is limited to 4 MiB, measured after decompression. The plugin rejects a larger request as a whole. Each export request can create at most 100 new charts by default. This is a per-request throttle, not a total cardinality limit. By default, log timestamps are accepted from up to 24 hours in the past through 10 minutes in the future; records without a timestamp use their arrival time. A span is accepted when it started no more than 24 hours ago and ends no more than 10 minutes in the future. Log and trace retention are each bounded by whichever limit is reached first: retained file count, retained indexed-data size, or age.
         performance_impact:
           description: |
-            Resource use depends on the number and cardinality of received
-            metrics, log and span volume, retention, and query activity. Keep
-            unbounded attributes out of metric identities and dimension names.
+            Resource use depends on the number and cardinality of received metrics, log and span volume, retention, and query activity. Keep unbounded attributes out of metric identities and dimension names.
     setup:
       prerequisites:
         list:
           - title: A Netdata installation that includes the OpenTelemetry plugin
             description: |
-              Official Linux packages, static builds, containers, and supported
-              macOS packages include the plugin. Linux source installs using
-              `netdata-installer.sh` require a compatible Rust toolchain and
-              `--enable-plugin-otel`; on macOS, the installer enables the plugin
-              automatically when it finds a compatible Rust toolchain.
+              Official Linux packages, static builds, containers, and supported macOS packages include the plugin. Linux source installs using `netdata-installer.sh` require a compatible Rust toolchain and `--enable-plugin-otel`; on macOS, the installer enables the plugin automatically when it finds a compatible Rust toolchain.
           - title: An OTLP data source
             description: |
-              An OpenTelemetry Collector that exports metrics, logs, or traces
-              to the Agent: the `otlp_grpc` exporter to port `4317`, or the
-              `otlp_http` exporter to port `4318`. The default loopback
-              endpoints accept only a Collector on the same host.
+              An OpenTelemetry Collector that exports metrics, logs, or traces to the Agent: the `otlp_grpc` exporter to port `4317`, or the `otlp_http` exporter to port `4318`. The default loopback endpoints accept only a Collector on the same host.
       configuration:
         file:
           name: otel.yaml
@@ -142,43 +96,15 @@ modules:
         # supervisor's config layering (stock < user < env).
         options:
           description: |
-            Edit `otel.yaml` with
-            [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
-            A user file can contain only the fields that differ from the stock
-            configuration. Configuration resolves in this order: stock file,
-            user file, then environment variables. Restart the Netdata Agent
-            after changing `otel.yaml` or any `NETDATA_OTEL_CFG_*` environment
-            variable.
+            Edit `otel.yaml` with [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files). A user file can contain only the fields that differ from the stock configuration. Configuration resolves in this order: stock file, user file, then environment variables. Restart the Netdata Agent after changing `otel.yaml` or any `NETDATA_OTEL_CFG_*` environment variable.
 
-            The absolute paths shown below are the defaults for standard Linux
-            packages. The installed stock configuration resolves its
-            configuration and log directories for the installation layout, so
-            macOS and custom-prefix installations use different paths. Use
-            [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files)
-            with `otel.yaml` to inspect the installed values.
+            The absolute paths shown below are the defaults for standard Linux packages. The installed stock configuration resolves its configuration and log directories for the installation layout, so macOS and custom-prefix installations use different paths. Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) with `otel.yaml` to inspect the installed values.
 
-            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Names are
-            the uppercase option path with dots replaced by underscores. For
-            example, `endpoint.grpc_tls_cert_path` becomes
-            `NETDATA_OTEL_CFG_ENDPOINT_GRPC_TLS_CERT_PATH`, and
-            `endpoint.http_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_HTTP_PATH` —
-            set the latter to an empty value to disable the OTLP/HTTP listener.
-            For the `default` rotation and retention entries, omit the `default`
-            path segment: `logs.retention.default.max_age` becomes
-            `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and
-            `traces.retention.default.max_age` becomes
-            `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
+            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Names are the uppercase option path with dots replaced by underscores. For example, `endpoint.grpc_tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_GRPC_TLS_CERT_PATH`, and `endpoint.http_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_HTTP_PATH` — set the latter to an empty value to disable the OTLP/HTTP listener. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
 
-            Configuration is strict. Unknown YAML fields, unknown
-            `NETDATA_OTEL_CFG_*` variables, malformed values, and the former
-            experimental schema prevent the plugin from starting. The effective
-            configuration is logged at startup; `remote_storage.uri` is redacted
-            in that log.
+            Configuration is strict. Unknown YAML fields, unknown `NETDATA_OTEL_CFG_*` variables, malformed values, and the former experimental schema prevent the plugin from starting. The effective configuration is logged at startup; `remote_storage.uri` is redacted in that log.
 
-            The `endpoint.grpc_*` options were previously named without the
-            `grpc_` prefix (`endpoint.path`, `endpoint.tls_cert_path`, and so
-            on). The former names still work and log a deprecation warning. If
-            one option is set under both names, the plugin does not start.
+            The `endpoint.grpc_*` options were previously named without the `grpc_` prefix (`endpoint.path`, `endpoint.tls_cert_path`, and so on). The former names still work and log a deprecation warning. If one option is set under both names, the plugin does not start.
           folding:
             title: Config options
             enabled: true
@@ -186,89 +112,57 @@ modules:
             - name: endpoint.grpc_path
               description: OTLP/gRPC endpoint on which the Agent listens.
               detailed_description: |
-                The default IPv4 loopback address accepts only local senders. To
-                accept remote senders, bind a non-loopback address and protect
-                the endpoint with TLS or mutual TLS and network access controls.
+                The default IPv4 loopback address accepts only local senders. To accept remote senders, bind a non-loopback address and protect the endpoint with TLS or mutual TLS and network access controls.
               default_value: "127.0.0.1:4317"
               required: false
             - name: endpoint.grpc_tls_cert_path
-              description: >-
-                Path to the server TLS certificate for the OTLP/gRPC listener.
-                Set it together with `endpoint.grpc_tls_key_path`.
+              description: Path to the server TLS certificate for the OTLP/gRPC listener. Set it together with `endpoint.grpc_tls_key_path`.
               default_value: ""
               required: false
             - name: endpoint.grpc_tls_key_path
-              description: >-
-                Path to the server TLS private key for the OTLP/gRPC listener.
-                Set it together with `endpoint.grpc_tls_cert_path`.
+              description: Path to the server TLS private key for the OTLP/gRPC listener. Set it together with `endpoint.grpc_tls_cert_path`.
               default_value: ""
               required: false
             - name: endpoint.grpc_tls_ca_cert_path
-              description: >-
-                Path to a CA certificate used to verify client certificates on
-                the OTLP/gRPC listener.
+              description: Path to a CA certificate used to verify client certificates on the OTLP/gRPC listener.
               detailed_description: |
-                Setting a CA certificate enables mutual TLS and therefore also
-                requires the server certificate and key. Clients must present a
-                certificate signed by this CA.
+                Setting a CA certificate enables mutual TLS and therefore also requires the server certificate and key. Clients must present a certificate signed by this CA.
               default_value: ""
               required: false
             - name: endpoint.http_path
-              description: >-
-                OTLP/HTTP endpoint on which the Agent listens; `null` disables
-                the HTTP listener.
+              description: OTLP/HTTP endpoint on which the Agent listens; `null` disables the HTTP listener.
               detailed_description: |
-                Set it to `null` to disable the listener and serve gRPC only.
-                The default IPv4 loopback address accepts only local senders. To
-                accept remote senders, bind a non-loopback address and protect
-                the listener with TLS or mutual TLS and network access controls.
+                Set it to `null` to disable the listener and serve gRPC only. The default IPv4 loopback address accepts only local senders. To accept remote senders, bind a non-loopback address and protect the listener with TLS or mutual TLS and network access controls.
               default_value: "127.0.0.1:4318"
               required: false
             - name: endpoint.http_tls_cert_path
-              description: >-
-                Path to the server TLS certificate for the OTLP/HTTP listener.
-                Set it together with `endpoint.http_tls_key_path`.
+              description: Path to the server TLS certificate for the OTLP/HTTP listener. Set it together with `endpoint.http_tls_key_path`.
               default_value: ""
               required: false
             - name: endpoint.http_tls_key_path
-              description: >-
-                Path to the server TLS private key for the OTLP/HTTP listener.
-                Set it together with `endpoint.http_tls_cert_path`.
+              description: Path to the server TLS private key for the OTLP/HTTP listener. Set it together with `endpoint.http_tls_cert_path`.
               default_value: ""
               required: false
             - name: endpoint.http_tls_ca_cert_path
-              description: >-
-                Path to a CA certificate used to verify client certificates on
-                the OTLP/HTTP listener.
+              description: Path to a CA certificate used to verify client certificates on the OTLP/HTTP listener.
               detailed_description: |
-                Setting a CA certificate enables mutual TLS and therefore also
-                requires the HTTP server certificate and key. Clients must
-                present a certificate signed by this CA.
+                Setting a CA certificate enables mutual TLS and therefore also requires the HTTP server certificate and key. Clients must present a certificate signed by this CA.
               default_value: ""
               required: false
             - name: metrics.chart_configs_dir
               description: Directory containing user metric mapping YAML files.
               detailed_description: |
-                User mappings take priority over the stock mappings compiled
-                into the plugin. Files are processed in filename order. An
-                invalid file is logged and skipped.
+                User mappings take priority over the stock mappings compiled into the plugin. Files are processed in filename order. An invalid file is logged and skipped.
               default_value: "/etc/netdata/otel.d/v1/metrics"
               required: false
             - name: metrics.interval_secs
               description: Default Netdata chart update interval in seconds.
               detailed_description: |
-                Timing must satisfy `0 < interval <= 3600`, `interval < grace`,
-                and `grace <= expiry`. Because the stock configuration
-                explicitly sets all three values, set compatible values together
-                when changing the global timing. An invalid resolved timing
-                configuration logs a warning and falls back to the plugin's
-                hardcoded chart defaults.
+                Timing must satisfy `0 < interval <= 3600`, `interval < grace`, and `grace <= expiry`. Because the stock configuration explicitly sets all three values, set compatible values together when changing the global timing. An invalid resolved timing configuration logs a warning and falls back to the plugin's hardcoded chart defaults.
               default_value: 10
               required: false
             - name: metrics.grace_period_secs
-              description: >-
-                Time after the last data point before the plugin begins filling
-                chart gaps.
+              description: Time after the last data point before the plugin begins filling chart gaps.
               default_value: 60
               required: false
             - name: metrics.expiry_duration_secs
@@ -276,24 +170,15 @@ modules:
               default_value: 900
               required: false
             - name: metrics.max_new_charts_per_request
-              description: >-
-                Maximum number of new charts one OTLP export request can create.
+              description: Maximum number of new charts one OTLP export request can create.
               detailed_description: |
-                This limits a single request's cardinality burst. It does not
-                cap the total number of charts that successive requests can
-                create.
+                This limits a single request's cardinality burst. It does not cap the total number of charts that successive requests can create.
               default_value: 100
               required: false
             - name: base_dir
-              description: >-
-                Absolute root directory for locally stored OpenTelemetry logs
-                and traces.
+              description: Absolute root directory for locally stored OpenTelemetry logs and traces.
               detailed_description: |
-                Retention limits govern retained indexed files. Write-ahead
-                logs, catalogs, and the download cache for offloaded data (in
-                the `remote-read` subdirectory under your configured base
-                directory) can make total usage below this directory exceed the
-                `retention.*.max_total_size` limits.
+                Retention limits govern retained indexed files. Write-ahead logs, catalogs, and the download cache for offloaded data (in the `remote-read` subdirectory under your configured base directory) can make total usage below this directory exceed the `retention.*.max_total_size` limits.
               default_value: "/var/log/netdata/otel/v2"
               required: false
             # Cache and download claims are file-lifecycle behavior: the shared
@@ -301,46 +186,25 @@ modules:
             # deadline are the file-lifecycle crate's remote-read path; fs/s3
             # select opendal backends.
             - name: remote_storage.enabled
-              description: >-
-                Upload retained OpenTelemetry logs and traces to configured
-                remote object storage.
+              description: Upload retained OpenTelemetry logs and traces to configured remote object storage.
               detailed_description: |
-                Sealed indexed files are uploaded in addition to being kept
-                under local retention. When a query needs a remotely cataloged
-                file that is no longer local, the plugin downloads it into the
-                bounded download cache shared by logs and traces. Each download
-                may take 30 seconds plus one second per MiB, at most 5 minutes;
-                a file that takes longer or cannot be served is left out (traces
-                report the answer as partial). A query needing more data than
-                the cache holds fails with a message to narrow its time range.
+                Sealed indexed files are uploaded in addition to being kept under local retention. When a query needs a remotely cataloged file that is no longer local, the plugin downloads it into the bounded download cache shared by logs and traces. Each download may take 30 seconds plus one second per MiB, at most 5 minutes; a file that takes longer or cannot be served is left out (traces report the answer as partial). A query needing more data than the cache holds fails with a message to narrow its time range.
               default_value: false
               required: false
             - name: remote_storage.uri
-              description: >-
-                Remote storage URI. Supported schemes are `fs` and `s3`.
+              description: Remote storage URI. Supported schemes are `fs` and `s3`.
               detailed_description: |
-                Put non-secret backend options in the query string. Never put
-                credentials in this file or URI. For S3, use the standard AWS
-                environment, credentials file, or instance-role mechanisms
-                available to the Netdata service account.
+                Put non-secret backend options in the query string. Never put credentials in this file or URI. For S3, use the standard AWS environment, credentials file, or instance-role mechanisms available to the Netdata service account.
               default_value: "fs:///var/log/netdata/otel/v2/remote"
               required: false
             - name: remote_storage.read_cache_max_size
-              description: >-
-                Maximum size of the local download cache, shared by logs and
-                traces, for data fetched back from remote storage during
-                queries.
+              description: Maximum size of the local download cache, shared by logs and traces, for data fetched back from remote storage during queries.
               default_value: "1GB"
               required: false
             - name: auth.enabled
-              description: >-
-                Require the `X-Scope-OrgID` header (gRPC metadata or HTTP
-                header) to select a log or trace tenant.
+              description: Require the `X-Scope-OrgID` header (gRPC metadata or HTTP header) to select a log or trace tenant.
               detailed_description: |
-                This is tenant selection, not credential authentication. When
-                disabled, all logs and traces belong to the `default` tenant.
-                When enabled, trust the header only behind TLS or mutual TLS and
-                suitable network controls. Metrics are not tenant-scoped.
+                This is tenant selection, not credential authentication. When disabled, all logs and traces belong to the `default` tenant. When enabled, trust the header only behind TLS or mutual TLS and suitable network controls. Metrics are not tenant-scoped.
               default_value: false
               required: false
             - name: logs.rotation.default.max_file_size
@@ -358,8 +222,7 @@ modules:
             - name: logs.retention.default.max_total_size
               description: Maximum retained indexed-data size.
               detailed_description: |
-                This is not a cap on all plugin disk use. Write-ahead logs,
-                catalogs, and cache are additional.
+                This is not a cap on all plugin disk use. Write-ahead logs, catalogs, and cache are additional.
               default_value: "1GB"
               required: false
             - name: logs.retention.default.max_age
@@ -367,13 +230,11 @@ modules:
               default_value: "7 days"
               required: false
             - name: traces.rotation.default.max_file_size
-              description: >-
-                Trace write-ahead log file size that triggers rotation.
+              description: Trace write-ahead log file size that triggers rotation.
               default_value: "25MB"
               required: false
             - name: traces.rotation.default.max_entries
-              description: >-
-                Trace write-ahead log span count that triggers rotation.
+              description: Trace write-ahead log span count that triggers rotation.
               default_value: 50000
               required: false
             - name: traces.retention.default.max_files
@@ -383,16 +244,13 @@ modules:
             - name: traces.retention.default.max_total_size
               description: Maximum retained indexed trace-data size.
               detailed_description: |
-                This is not a cap on all plugin disk use. Write-ahead logs,
-                catalogs, and cache are additional.
+                This is not a cap on all plugin disk use. Write-ahead logs, catalogs, and cache are additional.
               default_value: "1GB"
               required: false
             # File age here is judged on the newest span's start time (ng-index
             # row timestamps; sfst registry eviction).
             - name: traces.retention.default.max_age
-              description: >-
-                Maximum retained indexed trace-file age, measured on the start
-                time of its newest span.
+              description: Maximum retained indexed trace-file age, measured on the start time of its newest span.
               default_value: "7 days"
               required: false
         examples:
@@ -404,10 +262,7 @@ modules:
               folding:
                 enabled: false
               description: |
-                Bind beyond loopback only when the endpoint is protected. This
-                example requires each sender to present a certificate signed by
-                the configured CA. Each listener has its own TLS settings. If no
-                sender uses OTLP/HTTP, set `http_path` to `null` instead.
+                Bind beyond loopback only when the endpoint is protected. This example requires each sender to present a certificate signed by the configured CA. Each listener has its own TLS settings. If no sender uses OTLP/HTTP, set `http_path` to `null` instead.
               config: |
                 endpoint:
                   grpc_path: "0.0.0.0:4317"
@@ -422,11 +277,7 @@ modules:
               folding:
                 enabled: true
               description: |
-                A user file needs only the fields that change; omitted fields
-                keep their stock values. Logs and traces have separate settings,
-                each tenant entry inherits omitted fields from `default`, and a
-                per-tenant key must match the sender's `X-Scope-OrgID` value
-                when `auth.enabled` is true.
+                A user file needs only the fields that change; omitted fields keep their stock values. Logs and traces have separate settings, each tenant entry inherits omitted fields from `default`, and a per-tenant key must match the sender's `X-Scope-OrgID` value when `auth.enabled` is true.
               config: |
                 logs:
                   retention:
@@ -442,14 +293,7 @@ modules:
               folding:
                 enabled: true
               description: |
-                Without a mapping, all data point attributes contribute to chart
-                identity and the dimension is named `value`. A mapping selects
-                one string attribute as the dimension name and removes it from
-                chart identity, grouping data points that differ only by that
-                attribute into one multi-dimension chart. Place user mapping
-                files in `metrics.chart_configs_dir`; omit
-                `instrumentation_scope` when the metric name alone is
-                unambiguous.
+                Without a mapping, all data point attributes contribute to chart identity and the dimension is named `value`. A mapping selects one string attribute as the dimension name and removes it from chart identity, grouping data points that differ only by that attribute into one multi-dimension chart. Place user mapping files in `metrics.chart_configs_dir`; omit `instrumentation_scope` when the metric name alone is unambiguous.
               config: |
                 metrics:
                   "system.cpu.time":
@@ -471,31 +315,13 @@ modules:
     troubleshooting:
       errors:
         list:
-          - error: >-
-              `failed to bind gRPC endpoint 127.0.0.1:4317: Address already in use (os error 98)`
+          - error: "`failed to bind gRPC endpoint 127.0.0.1:4317: Address already in use (os error 98)`"
             when: |
-              Logged in the Agent journal at startup by the
-              `otel-plugin/ingestor` worker, followed by
-              `exited with error code 1 and haven't collected any data. Disabling it.`
-              from the Agent. A conflict on the OTLP/HTTP listener fails the
-              same strict way:
-              `failed to bind OTLP/HTTP endpoint 127.0.0.1:4318: Address already in use (os error 98)`.
+              Logged in the Agent journal at startup by the `otel-plugin/ingestor` worker, followed by `exited with error code 1 and haven't collected any data. Disabling it.` from the Agent. A conflict on the OTLP/HTTP listener fails the same strict way: `failed to bind OTLP/HTTP endpoint 127.0.0.1:4318: Address already in use (os error 98)`.
             cause: |
-              Another process already listens on the configured address. Typical
-              sources are a standalone OpenTelemetry Collector on the same host
-              — its own OTLP receivers default to the same conventional ports,
-              `4317` for gRPC and `4318` for HTTP — or several Netdata Agents
-              running in containers that share the host network namespace
-              (`--network host`), where only one of them can own a given port.
-              The plugin binds both listeners before it advertises anything, so
-              on a conflict it exits once and the Agent disables it until the
-              next Agent restart.
+              Another process already listens on the configured address. Typical sources are a standalone OpenTelemetry Collector on the same host — its own OTLP receivers default to the same conventional ports, `4317` for gRPC and `4318` for HTTP — or several Netdata Agents running in containers that share the host network namespace (`--network host`), where only one of them can own a given port. The plugin binds both listeners before it advertises anything, so on a conflict it exits once and the Agent disables it until the next Agent restart.
             fix: |
-              Find the owner with `ss -ltnp 'sport = :4317'` (or `sport = :4318`
-              for the OTLP/HTTP listener). Then stop that listener, or give this
-              Agent its own addresses in `otel.yaml` and point every OTLP sender
-              at the new ports. The OTLP/HTTP listener can also be disabled
-              outright with `http_path: null`:
+              Find the owner with `ss -ltnp 'sport = :4317'` (or `sport = :4318` for the OTLP/HTTP listener). Then stop that listener, or give this Agent its own addresses in `otel.yaml` and point every OTLP sender at the new ports. The OTLP/HTTP listener can also be disabled outright with `http_path: null`:
 
               ```yaml
               endpoint:
@@ -505,9 +331,7 @@ modules:
                 # http_path: null
               ```
 
-              When several Agents share one network namespace and only one needs
-              to receive OTLP, disable the plugin on the others in
-              `netdata.conf`:
+              When several Agents share one network namespace and only one needs to receive OTLP, disable the plugin on the others in `netdata.conf`:
 
               ```ini
               [plugins]
@@ -517,68 +341,31 @@ modules:
         list:
           - name: The plugin does not start
             description: |
-              Check the Agent journal for `otel-plugin` configuration errors.
-              User YAML and `NETDATA_OTEL_CFG_*` variables are validated
-              strictly, so a typo or an option from the former experimental
-              schema stops startup. For a source install, confirm that a
-              compatible Rust toolchain is available; Linux installs using
-              `netdata-installer.sh` also require `--enable-plugin-otel`.
+              Check the Agent journal for `otel-plugin` configuration errors. User YAML and `NETDATA_OTEL_CFG_*` variables are validated strictly, so a typo or an option from the former experimental schema stops startup. For a source install, confirm that a compatible Rust toolchain is available; Linux installs using `netdata-installer.sh` also require `--enable-plugin-otel`.
           - name: The endpoint is reachable but no data appears
             description: |
-              A successful TCP connection proves only that something is
-              listening. Check that the Collector's exporter uses the right
-              port: `4317` for `otlp_grpc`, `4318` for `otlp_http`. With the
-              default endpoints, use `127.0.0.1`, not `localhost`, which can
-              resolve to IPv6. Then look for rejected exports in the Collector
-              log, and verify the resulting chart, log entry, or trace.
+              A successful TCP connection proves only that something is listening. Check that the Collector's exporter uses the right port: `4317` for `otlp_grpc`, `4318` for `otlp_http`. With the default endpoints, use `127.0.0.1`, not `localhost`, which can resolve to IPv6. Then look for rejected exports in the Collector log, and verify the resulting chart, log entry, or trace.
           - name: A metric does not create the expected chart
             description: |
-              Exponential histograms are not currently ingested. For other
-              supported metrics, inspect the Agent journal for rejected user
-              mapping files and verify the metric name, instrumentation scope,
-              and `dimension_attribute_key`. The resulting chart context is
-              `otel.<metric-name>`.
+              Exponential histograms are not currently ingested. For other supported metrics, inspect the Agent journal for rejected user mapping files and verify the metric name, instrumentation scope, and `dimension_attribute_key`. The resulting chart context is `otel.<metric-name>`.
           - name: Large exports are rejected
             description: |
-              The plugin rejects an export request larger than 4 MiB as a whole,
-              and the Collector drops that batch. Make the batches smaller. On
-              the exporter, cap them by size with
-              `sending_queue: { batch: { sizer: bytes, max_size: 3000000 } }`.
-              Alternatively, lower `send_batch_max_size` on the `batch`
-              processor; it counts items (spans, data points, log records), not
-              bytes.
+              The plugin rejects an export request larger than 4 MiB as a whole, and the Collector drops that batch. Make the batches smaller. On the exporter, cap them by size with `sending_queue: { batch: { sizer: bytes, max_size: 3000000 } }`. Alternatively, lower `send_batch_max_size` on the `batch` processor; it counts items (spans, data points, log records), not bytes.
           - name: Some exported logs are missing
             description: |
-              By default, the plugin rejects log records timestamped more than
-              24 hours in the past or more than 10 minutes in the future. The
-              Collector logs a `Partial success response` warning for rejected
-              records. Check the clock of the host that produced the logs, how
-              old the backfilled records are, the Collector log, and the Agent
-              journal.
+              By default, the plugin rejects log records timestamped more than 24 hours in the past or more than 10 minutes in the future. The Collector logs a `Partial success response` warning for rejected records. Check the clock of the host that produced the logs, how old the backfilled records are, the Collector log, and the Agent journal.
           - name: Some exported spans are missing
             description: |
-              By default, the plugin rejects a span that started more than 24
-              hours ago or ends more than 10 minutes in the future; a span
-              without an end time is judged by its start. The Collector logs a
-              `Partial success response` warning for rejected spans, and the
-              plugin logs a warning in the Agent journal. Check the clock of the
-              instrumented application's host, how old the backfilled spans are,
-              the Collector log, and the Agent journal.
+              By default, the plugin rejects a span that started more than 24 hours ago or ends more than 10 minutes in the future; a span without an end time is judged by its start. The Collector logs a `Partial success response` warning for rejected spans, and the plugin logs a warning in the Agent journal. Check the clock of the instrumented application's host, how old the backfilled spans are, the Collector log, and the Agent journal.
           - name: Logs from the former experimental plugin are not visible
             description: |
-              A former-schema `otel.yaml` stops the current plugin and prints a
-              migration guide. Replace it with a partial configuration based on
-              the current stock file. The legacy `logs.journal_dir` key is
-              accepted only to locate the former plugin's read-only journals; it
-              is not part of the current storage layout.
+              A former-schema `otel.yaml` stops the current plugin and prints a migration guide. Replace it with a partial configuration based on the current stock file. The legacy `logs.journal_dir` key is accepted only to locate the former plugin's read-only journals; it is not part of the current storage layout.
     alerts: []
     metrics:
       folding:
         title: Metrics
         enabled: false
       description: |
-        Metrics are created dynamically from supported OpenTelemetry data. The
-        exact charts depend on the received metric names, attributes,
-        instrumentation scopes, and mapping rules.
+        Metrics are created dynamically from supported OpenTelemetry data. The exact charts depend on the received metric names, attributes, instrumentation scopes, and mapping rules.
       availability: []
       scopes: []
