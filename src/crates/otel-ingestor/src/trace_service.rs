@@ -128,9 +128,9 @@ fn build_partial_success(out_of_window: usize) -> Option<ExportTracePartialSucce
 }
 
 /// Transport-agnostic sink for OTLP span exports: appends flattened frames to
-/// per-tenant WALs and forwards lifecycle events to the ledger. Serves gRPC
-/// today via the thin `TraceService` wrapper; the OTLP/HTTP front end calls
-/// the same core. See the module docs for the request flow.
+/// per-tenant WALs and forwards lifecycle events to the ledger. The gRPC
+/// path reaches it via the thin `TraceService` wrapper; the OTLP/HTTP front
+/// end calls the same core. See the module docs for the request flow.
 pub struct NetdataTracesService {
     /// Per-tenant WAL writers. The map mutex is held only for lookup/insert;
     /// each request then locks ONLY its tenant's writer for the write+sync

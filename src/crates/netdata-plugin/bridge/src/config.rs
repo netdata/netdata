@@ -251,9 +251,9 @@ pub struct MetricsConfig {
     /// Seconds before removing inactive charts.
     #[serde(default)]
     pub expiry_duration_secs: Option<u64>,
-    /// New-chart budget per gRPC request (cardinality limit): once exhausted,
-    /// data points for not-yet-existing charts are dropped until the next
-    /// request; existing charts keep ingesting.
+    /// New-chart budget per export request on either transport (cardinality
+    /// limit): once exhausted, data points for not-yet-existing charts are
+    /// dropped until the next request; existing charts keep ingesting.
     pub max_new_charts_per_request: usize,
 }
 
@@ -890,14 +890,15 @@ impl From<RetentionPolicy> for HashMap<String, RetentionEntry> {
 #[serde(deny_unknown_fields)]
 pub struct AuthConfig {
     /// When false, all data routes to the "default" tenant. When true, every
-    /// logs/traces request must carry [`AuthConfig::TENANT_HEADER`] (missing
-    /// or invalid values are gRPC errors).
+    /// logs/traces request must carry [`AuthConfig::TENANT_HEADER`] on either
+    /// transport: missing is `UNAUTHENTICATED`, invalid is `INVALID_ARGUMENT`
+    /// (HTTP 401 / 400 on OTLP/HTTP).
     #[serde(default)]
     pub enabled: bool,
 }
 
 impl AuthConfig {
-    /// The gRPC metadata key used for tenant identification.
+    /// The tenant header: gRPC metadata key and OTLP/HTTP header name.
     pub const TENANT_HEADER: &str = "x-scope-orgid";
 }
 

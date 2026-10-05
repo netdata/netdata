@@ -36,7 +36,7 @@ endpoint:
 ```
 
 - Never expose a plaintext listener beyond loopback.
-- Restrict ports `4317` (OTLP/gRPC) and `4318` (OTLP/HTTP) with network access controls (firewall, security groups) to the senders' addresses; disable the transport you do not use (`http_path: null`) instead of leaving it exposed.
+- Restrict ports `4317` (OTLP/gRPC) and `4318` (OTLP/HTTP) with network access controls (firewall, security groups) to the senders' addresses. If no sender uses OTLP/HTTP, disable it (`http_path: null`) instead of leaving it exposed; the OTLP/gRPC listener cannot be disabled, so keep it on loopback when only HTTP senders exist.
 - Issue the server certificate from whatever your infrastructure already trusts — an internal CA or your certificate
   automation; the senders configure the matching `ca_file` (and, for mutual TLS, their client certificate and key) as
   shown in [Collect Logs with OpenTelemetry Collector](/docs/opentelemetry/logs-collection.md#shared-exporter).
@@ -52,5 +52,5 @@ and is not stored in Netdata Cloud.
 
 - [ ] Endpoint bound only where senders need it; plaintext only on loopback.
 - [ ] TLS server certificate and key in place; mutual TLS where the network is not trusted.
-- [ ] Ports 4317 (OTLP/gRPC) and 4318 (OTLP/HTTP) restricted to known sender addresses, or the unused transport disabled.
+- [ ] Ports 4317 (OTLP/gRPC) and 4318 (OTLP/HTTP) restricted to known sender addresses, and OTLP/HTTP disabled if unused.
 - [ ] A restart procedure for certificate rotation.

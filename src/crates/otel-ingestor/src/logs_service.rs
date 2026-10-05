@@ -334,7 +334,7 @@ fn identity_preview(s: &str) -> String {
 
 /// Transport-agnostic sink for OTLP log exports: polices per-tenant stream
 /// identities, appends flattened frames to per-tenant WALs, and forwards
-/// lifecycle events to the ledger. Serves gRPC today via the thin
+/// lifecycle events to the ledger. The gRPC path reaches it via the thin
 /// `LogsService` wrapper; the OTLP/HTTP front end calls the same core. See
 /// the module docs for the request flow.
 pub struct NetdataLogsService {

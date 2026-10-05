@@ -133,7 +133,7 @@ impl ChartManager {
 
 /// The OTLP metrics ingestion service: OTLP metric exports in, chart
 /// accumulations out. Transport-agnostic — the gRPC `MetricsService`
-/// wrapper (today) and the OTLP/HTTP front end both funnel into the
+/// wrapper and the OTLP/HTTP front end both funnel into the
 /// `export_metrics` core. Shared with lib.rs, whose tick loop drains
 /// `chart_manager` once per second.
 pub struct NetdataMetricsService {
@@ -622,7 +622,7 @@ impl NetdataMetricsService {
     /// The transport-agnostic OTLP metrics export core: process the decoded
     /// request and always answer Ok, even when points were dropped
     /// (`partial_success` is never set). The gRPC `MetricsService::export`
-    /// wrapper (today) and the OTLP/HTTP front end both call this, so both
+    /// wrapper and the OTLP/HTTP front end both call this, so both
     /// transports share one behavior. Metrics carry no tenant, so unlike
     /// logs/traces there is no header to resolve first.
     pub(crate) async fn export_metrics(
@@ -651,9 +651,9 @@ impl Default for NetdataMetricsService {
 
 #[tonic::async_trait]
 impl MetricsService for NetdataMetricsService {
-    /// gRPC entry point: decode the request, then run the transport-agnostic
-    /// core both front ends share. Metrics carry no tenant, so there is no
-    /// header to resolve first.
+    /// gRPC entry point: unwrap the request tonic decoded, then run the
+    /// transport-agnostic core both front ends share. Metrics carry no
+    /// tenant, so there is no header to resolve first.
     async fn export(
         &self,
         request: Request<ExportMetricsServiceRequest>,

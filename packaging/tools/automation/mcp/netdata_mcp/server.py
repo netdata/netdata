@@ -10,7 +10,7 @@ Surface (fire-and-poll; no synchronous tool):
     - netdata_job_logs(job_id, offset)           -> incremental output
     - netdata_job_cancel(job_id)
   run (by agent-id):
-    - netdata_agent_declare(agent_id, worktree, profile)
+    - netdata_agent_declare(agent_id, worktree, profile, port=None)
     - netdata_run_start(agent_id, restart=False) -> build+install if needed, then launch
                                                     (restart=True: stop + rebuild + relaunch)
     - netdata_run_status(agent_id)               -> building|starting|ready|stopped|failed

@@ -216,8 +216,8 @@ tonic = "0.14"
 # tokio-rustls TLS termination for the plain-HTTP listener. Axum runs with
 # default features off: the receiver decodes bodies itself (prost + serde_json
 # with mirrored Content-Type) and never uses the Json/Form/Query extractors,
-# and skipping them keeps serde_urlencoded/serde_path_to_error out of the
-# graph. http2 is enabled so the h2 ALPN entry the TLS listener advertises is
+# and skipping them keeps serde_path_to_error out of the graph (and keeps
+# axum from adding serde_urlencoded, which opendal's S3 signer pulls in anyway). http2 is enabled so the h2 ALPN entry the TLS listener advertises is
 # honest; http1 + tokio are what axum::serve needs.
 axum = { version = "0.8", default-features = false, features = ["http1", "http2", "tokio"] }
 http = "1"

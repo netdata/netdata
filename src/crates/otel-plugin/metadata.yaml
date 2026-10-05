@@ -311,7 +311,7 @@ modules:
     # are formatted by the otel-ingestor worker (one per listener), the
     # disable line is emitted by the Agent's external-plugins supervisor
     # (plugins.d), and the "otel-plugin/ingestor" journal name is set by the
-    # otel-plugin supervisor when it spawns the worker.
+    # ingestor worker itself when it starts.
     troubleshooting:
       errors:
         list:
