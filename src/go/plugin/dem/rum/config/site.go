@@ -20,6 +20,8 @@ type Site struct {
 	// Investigate selects detail for native history and enabled event-log/trace
 	// exports. Nil selects all received sessions.
 	Investigate *Investigate `yaml:"investigate,omitempty"         json:"investigate"`
+	// Capture selects optional location and interaction evidence. Nil uses defaults.
+	Capture *Capture `yaml:"capture,omitempty" json:"capture"`
 	// Bots is BotsExclude (default: crawlers, headless browsers and other
 	// automation send nothing and are counted as filtered) or BotsInclude
 	// (kept, with device "bot").
@@ -91,6 +93,13 @@ func (s Site) ConsoleLogsOn() bool { return s.EventLogsOn() && s.EventLogs.Inclu
 
 // Effective returns defaults without changing the stored configuration.
 func (s Site) Effective() Site {
+	capture := Capture{}
+	if s.Capture != nil {
+		capture = *s.Capture
+	}
+	geolocation := s.GeolocationMode()
+	capture.Geolocation = &geolocation
+	s.Capture = &capture
 	measure, detail := s.MeasureRate(), s.InvestigateRate()
 	s.MeasureSampleRate = &measure
 	investigate := Investigate{}

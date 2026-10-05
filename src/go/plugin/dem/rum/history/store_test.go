@@ -118,7 +118,7 @@ func TestSavedTimeFiltersAndOriginalTimeSummaries(t *testing.T) {
 	for _, r := range records {
 		appendEvent(t, s, r)
 	}
-	sessions, err := s.QuerySessions(ctx, "shop", saved.Unix()-1, saved.Unix()+5, 0)
+	sessions, err := s.QuerySessions(ctx, "shop", "", saved.Unix()-1, saved.Unix()+5, 0)
 	require.NoError(t, err)
 	require.Len(t, sessions, 2)
 	got := sessions[0]
@@ -131,7 +131,7 @@ func TestSavedTimeFiltersAndOriginalTimeSummaries(t *testing.T) {
 	assert.Equal(t, "/first", got.EntryPage)
 	assert.Equal(t, "/last", got.LastPage)
 	assert.Equal(t, "latest", got.Browser)
-	assert.Equal(t, "u", got.UserID)
+	assert.Equal(t, []string{"u"}, got.UserIDs)
 	events, err := s.QuerySessionEvents(ctx, "shop", "s")
 	require.NoError(t, err)
 	require.Len(t, events, 4)
@@ -141,10 +141,10 @@ func TestSavedTimeFiltersAndOriginalTimeSummaries(t *testing.T) {
 	events, err = s.QuerySessionEvents(ctx, "shop", "activity")
 	require.NoError(t, err)
 	assert.Empty(t, events)
-	sessions, err = s.QuerySessions(ctx, "shop", old.Unix()-1, old.Unix()+100, 0)
+	sessions, err = s.QuerySessions(ctx, "shop", "", old.Unix()-1, old.Unix()+100, 0)
 	require.NoError(t, err)
 	assert.Empty(t, sessions, "saved-time filter must not match delayed original timestamps")
-	sessions, err = s.QuerySessions(ctx, "", 0, saved.Unix()+5, 1)
+	sessions, err = s.QuerySessions(ctx, "", "", 0, saved.Unix()+5, 1)
 	require.NoError(t, err)
 	assert.Len(t, sessions, 1)
 }
@@ -266,11 +266,11 @@ func TestRetentionIdleExpiryAndRetainedCounts(t *testing.T) {
 	s := NewStore(owner)
 	require.NoError(t, err)
 	defer s.journal.Close()
-	sessions, err := s.QuerySessions(ctx, "shop", 0, time.Now().Unix()+5, 0)
+	sessions, err := s.QuerySessions(ctx, "shop", "", 0, time.Now().Unix()+5, 0)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
 	require.NoError(t, s.journal.EnforceHistoryRetention(ctx, 1, 0))
-	sessions, err = s.QuerySessions(ctx, "shop", 0, time.Now().Unix()+5, 0)
+	sessions, err = s.QuerySessions(ctx, "shop", "", 0, time.Now().Unix()+5, 0)
 	require.NoError(t, err)
 	assert.Empty(t, sessions, "expiry must run without a new event or enabled site")
 	fresh := time.Now()
@@ -285,7 +285,7 @@ func TestRetentionIdleExpiryAndRetainedCounts(t *testing.T) {
 			Page:      "/retained",
 		},
 	)
-	sessions, err = s.QuerySessions(ctx, "shop", 0, fresh.Unix()+5, 0)
+	sessions, err = s.QuerySessions(ctx, "shop", "", 0, fresh.Unix()+5, 0)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
 	assert.Equal(t, int64(1), sessions[0].Pageviews)
@@ -312,7 +312,7 @@ func TestRetentionWholeFilesAndLiveWriter(t *testing.T) {
 	has, err := reader.Step()
 	require.NoError(t, err)
 	assert.True(t, has, "opened snapshot survives archive unlink")
-	sessions, err := s.QuerySessions(ctx, "", 0, time.Now().Unix()+5, 0)
+	sessions, err := s.QuerySessions(ctx, "", "", 0, time.Now().Unix()+5, 0)
 	require.NoError(t, err)
 	assert.Empty(t, sessions)
 	appendEvent(
@@ -332,7 +332,7 @@ func TestRetentionWholeFilesAndLiveWriter(t *testing.T) {
 	info, err := os.Stat(files[0])
 	require.NoError(t, err)
 	assert.Greater(t, info.Size(), int64(1), "maxBytes is not a strict cap")
-	sessions, err = s.QuerySessions(ctx, "", 0, time.Now().Unix()+5, 0)
+	sessions, err = s.QuerySessions(ctx, "", "", 0, time.Now().Unix()+5, 0)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
 	assert.Equal(t, "fresh", sessions[0].SessionID)
@@ -402,7 +402,7 @@ func TestChainContinuesAcrossBootIdentityChange(t *testing.T) {
 	s = NewStore(owner)
 	require.NoError(t, err)
 	defer s.journal.Close()
-	sessions, err := s.QuerySessions(ctx, "shop", 0, time.Now().Unix()+5, 0)
+	sessions, err := s.QuerySessions(ctx, "shop", "", 0, time.Now().Unix()+5, 0)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
 	assert.Equal(t, int64(2), sessions[0].Pageviews)
@@ -455,7 +455,7 @@ func TestCorruptArchiveReturnsErrorInsteadOfPartialCounts(t *testing.T) {
 		"dem@ffffffffffffffffffffffffffffffff-0000000000000001-0000000000000001.journal",
 	)
 	require.NoError(t, os.WriteFile(path, []byte("invalid journal"), 0600))
-	_, err := s.QuerySessions(context.Background(), "shop", 0, time.Now().Unix()+5, 0)
+	_, err := s.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+5, 0)
 	assert.Error(t, err)
 	// Keep corrupt files out of retention's SDK chain parser on test shutdown.
 	require.NoError(t, os.Rename(path, path+".test-invalid"))
@@ -496,12 +496,12 @@ func TestDamagedJournalIsReportedAndUnrelatedSourcesAreIgnored(t *testing.T) {
 	})
 	dir := filepath.Dir(activeJournal(t, root))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "unrelated@broken.journal"), []byte("invalid"), 0600))
-	sessions, err := s.QuerySessions(context.Background(), "shop", 0, time.Now().Unix()+5, 0)
+	sessions, err := s.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+5, 0)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
 	damaged := filepath.Join(dir, "dem@damaged.journal~")
 	require.NoError(t, os.WriteFile(damaged, []byte("quarantined"), 0600))
-	_, err = s.QuerySessions(context.Background(), "shop", 0, time.Now().Unix()+5, 0)
+	_, err = s.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+5, 0)
 	require.ErrorContains(t, err, "operator recovery is required")
 	appendEvent(t, s, EventRecord{
 		Site:      "shop",
@@ -529,10 +529,10 @@ func TestMissingJournalDirectoryReturnsErrorInsteadOfEmptyHistory(t *testing.T) 
 			}
 			moved := path + ".temporarily-moved"
 			require.NoError(t, os.Rename(path, moved))
-			_, err := s.QuerySessions(context.Background(), "shop", 0, time.Now().Unix()+5, 0)
+			_, err := s.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+5, 0)
 			require.NoError(t, os.Rename(moved, path))
 			assert.ErrorIs(t, err, os.ErrNotExist)
-			sessions, err := s.QuerySessions(context.Background(), "shop", 0, time.Now().Unix()+5, 0)
+			sessions, err := s.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+5, 0)
 			require.NoError(t, err)
 			require.Len(t, sessions, 1)
 		})
@@ -588,7 +588,7 @@ func TestRetentionRecoversAfterArchiveDirectoryFailure(t *testing.T) {
 		Type:      "pageview",
 		TSUnixUS:  time.Now().UnixMicro(),
 	})
-	rows, err := s.QuerySessions(ctx, "shop", 0, time.Now().Unix()+5, 0)
+	rows, err := s.QuerySessions(ctx, "shop", "", 0, time.Now().Unix()+5, 0)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.EqualValues(t, 2, rows[0].Pageviews, "recovery preserves earlier history and resumes appends")

@@ -23,12 +23,19 @@ func (h *Handler) sessionEventsRows(ctx context.Context, site, session string) (
 	var events []query.SessionEvent
 	events, err = h.deps.SessionEvents(ctx, site, session)
 	for _, e := range events {
-		rows = append(rows, []any{e.TSUnixUS, e.Type, e.Page, h.redact.Apply(e.Text), e.TraceID})
+		rows = append(rows, []any{e.TSUnixUS, e.Type, e.Page, h.redact.Apply(e.Text), e.TraceID, h.redact.Apply(e.UserID)})
 	}
 	return rows, err
 }
 
 var rumSessionEventsColumns = map[string]any{
+	"user_id": (funcapi.Column{
+		Index:         5,
+		Name:          "User ID at Event",
+		Type:          funcapi.FieldTypeString,
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+	}).BuildColumn(),
 	"ts": (funcapi.Column{
 		Index:         0,
 		Name:          "Time",

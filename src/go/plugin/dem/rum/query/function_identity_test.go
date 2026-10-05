@@ -75,3 +75,70 @@ func TestFunctionRowsHaveSiteScopedIdentities(t *testing.T) {
 		})
 	}
 }
+
+func TestFunctionsExposeRetainedIdentityAfterLogoutAndRetirement(t *testing.T) {
+	ctx := context.Background()
+	journalStore, err := journal.Open(ctx, "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
+	retained := history.NewStore(journalStore)
+	sites := registry.New()
+	owner, retire := addSite(t, sites, "shop", "first")
+	writer := history.NewWriter("shop", retained, owner)
+	owner.SetHistorySink(writer)
+	// A shared SDK session can contain login, logout, and another login.
+	ids := []string{"550e8400-e29b-41d4-a716-446655440000", "", "123456"}
+	now := time.Now()
+	for i, id := range ids {
+		owner.Ingest(&beacon.Beacon{
+			Site:      "shop",
+			SessionID: "shared",
+			UserID:    id,
+			PageGroup: "/checkout",
+			Received:  now.Add(time.Duration(i) * time.Second),
+			Events:    []beacon.Event{{Name: "milestone"}},
+		})
+	}
+	handler := functions.New(query.New(sites, retained))
+	timeline := func() [][]any {
+		response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
+			Method: "rum-session-events",
+			Args:   []string{"site:shop", "session_id:shared"},
+		})
+		require.NotNil(t, response.RawResponse)
+		return response.RawResponse["data"].([][]any)
+	}
+	pending := timeline()
+	// The first beacon also creates the initial page view.
+	require.Len(t, pending, 4)
+	assert.Equal(t, ids[0], pending[0][5])
+	for i, id := range ids {
+		assert.Equal(t, id, pending[i+1][5])
+	}
+	flushCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	writer.Run(flushCtx)
+	assert.Equal(t, pending, timeline(), "journal/live overlap includes event attribution")
+	retire()
+	assert.Equal(t, pending, timeline(), "history remains attributable without a running site")
+	for _, id := range []string{ids[0], ids[2]} {
+		response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
+			Method: "rum-sessions",
+			Args:   []string{"site:shop", "user_id:" + id},
+		})
+		require.NotNil(t, response.RawResponse)
+		rows := response.RawResponse["data"].([][]any)
+		require.Len(t, rows, 1)
+		assert.Equal(t, []string{ids[2], ids[0]}, rows[0][12])
+		assert.EqualValues(t, 1, rows[0][4])
+		columns := response.RawResponse["columns"].(map[string]any)
+		assert.Contains(t, columns, "user_ids")
+		assert.NotContains(t, columns, "user")
+	}
+	response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
+		Method: "rum-sessions",
+		Args:   []string{"site:shop", "user_id:123"},
+	})
+	require.NotNil(t, response.RawResponse)
+	assert.Empty(t, response.RawResponse["data"])
+}

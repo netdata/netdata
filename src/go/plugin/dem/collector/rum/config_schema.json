@@ -186,7 +186,7 @@
       },
       "redact_paths": {
         "title": "Path redaction",
-        "description": "Replace private identifiers in URL paths before aggregation and export. Rules run before built-in path redaction.",
+        "description": "Apply site-specific URL-path replacements before built-in normalization. These rules do not anonymize user IDs or provide general data-loss prevention.",
         "type": [
           "array",
           "null"
@@ -244,6 +244,40 @@
             "$ref": "#/definitions/enabled_destination"
           }
         ]
+      },
+      "capture": {
+        "title": "Capture",
+        "description": "Choose optional location and interaction evidence independently of sampling. Defaults retain country comparisons and disable frustration heuristics.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "geolocation": {
+            "title": "Geolocation",
+            "description": "IP-derived location detail: off disables lookup, country retains country comparisons, and city adds approximate live map markers. Omitted or null means country; coordinates are never retained in history or exported.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "off",
+              "country",
+              "city",
+              null
+            ],
+            "default": "country"
+          },
+          "frustration_signals": {
+            "title": "Frustration signals",
+            "description": "Enable rage, dead and error click heuristics and their browser instrumentation. Disabled by default; these signals do not establish user intent or causality.",
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": false
+          }
+        }
       }
     },
     "required": [
@@ -484,6 +518,12 @@
           ]
         },
         {
+          "title": "Capture",
+          "fields": [
+            "capture"
+          ]
+        },
+        {
           "title": "Sampling",
           "fields": [
             "measure_sample_rate",
@@ -503,7 +543,7 @@
           ]
         },
         {
-          "title": "Privacy",
+          "title": "Normalization",
           "fields": [
             "redact_paths"
           ]
@@ -551,6 +591,20 @@
     },
     "investigate": {
       "ui:help": "For problems-only detail, set the baseline rate to 0 and keep the default overrides. For measurements and live views without retained or exported detail, also set always_keep to an empty list. Problem overrides preserve available recent native context plus current and future detail while the session remains tracked. Earlier event logs and spans are not exported retrospectively; complete sessions and traces are not guaranteed."
+    },
+    "capture": {
+      "geolocation": {
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true,
+          "enumNames": [
+            "Off",
+            "Country",
+            "City",
+            "Default (country)"
+          ]
+        }
+      }
     }
   }
 }

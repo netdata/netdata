@@ -4,18 +4,22 @@ package history
 
 import (
 	"context"
+	"slices"
 	"sort"
 )
 
+// QuerySessions matches an optional exact user ID in the selected saved-time range
+// before limiting results, while summarizing every selected event in a matching session.
 func (s *Store) QuerySessions(
 	ctx context.Context,
-	site string,
+	site, userID string,
 	after, before int64,
 	limit int,
 ) ([]SessionRecord, error) {
 	type summary struct {
 		record      SessionRecord
 		first, last int64
+		userIDs     map[string]struct{}
 	}
 	groups := make(map[[2]string]*summary)
 	err := s.scan(ctx, site, after, before, func(r EventRecord) {
@@ -44,8 +48,14 @@ func (s *Store) QuerySessions(
 			g.last = r.TSUnixUS
 			g.record.LastPage = r.Page
 			g.record.Browser, g.record.Device = r.Browser, r.Device
-			g.record.Country, g.record.City = r.Country, r.City
-			g.record.Version, g.record.UserID = r.Version, r.UserID
+			g.record.Country = r.Country
+			g.record.Version = r.Version
+		}
+		if r.UserID != "" {
+			if g.userIDs == nil {
+				g.userIDs = make(map[string]struct{})
+			}
+			g.userIDs[r.UserID] = struct{}{}
 		}
 		switch r.Type {
 		case "pageview":
@@ -61,6 +71,16 @@ func (s *Store) QuerySessions(
 	}
 	out := make([]SessionRecord, 0, len(groups))
 	for _, g := range groups {
+		if userID != "" {
+			if _, ok := g.userIDs[userID]; !ok {
+				continue
+			}
+		}
+		g.record.UserIDs = make([]string, 0, len(g.userIDs))
+		for id := range g.userIDs {
+			g.record.UserIDs = append(g.record.UserIDs, id)
+		}
+		slices.Sort(g.record.UserIDs)
 		g.record.StartedAt, g.record.LastAt = g.first/1_000_000, g.last/1_000_000
 		out = append(out, g.record)
 	}
@@ -97,6 +117,7 @@ func (s *Store) QuerySessionEvents(ctx context.Context, site, sessionID string) 
 				Page:      r.Page,
 				Text:      r.Text,
 				TraceID:   r.TraceID,
+				UserID:    r.UserID,
 			},
 		)
 	})

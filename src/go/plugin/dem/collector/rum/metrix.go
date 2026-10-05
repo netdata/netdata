@@ -28,7 +28,7 @@ type collectorMetrics struct {
 	firstPartyResources, thirdPartyResources        metrix.SnapshotCounter
 }
 
-func newCollectorMetrics(m metrix.SnapshotMeter, logs, traces bool) collectorMetrics {
+func newCollectorMetrics(m metrix.SnapshotMeter, logs, traces, frustrationSignals bool) collectorMetrics {
 	metrics := collectorMetrics{
 		meter: m,
 		ingress: m.StateSet(
@@ -69,7 +69,11 @@ func newCollectorMetrics(m metrix.SnapshotMeter, logs, traces bool) collectorMet
 			instrument: m.Counter(name),
 		})
 	}
-	for _, name := range []string{aggregate.CounterPageviews, aggregate.CounterJSErrors, aggregate.CounterAccepted, beacon.RejectOrigin, beacon.RejectRate, beacon.RejectSize, beacon.RejectInvalid, beacon.RejectBot, aggregate.CounterRageClicks, aggregate.CounterDeadClicks, aggregate.CounterErrorClicks, aggregate.CounterSamplesDropped} {
+	traffic := []string{aggregate.CounterPageviews, aggregate.CounterJSErrors, aggregate.CounterAccepted, beacon.RejectOrigin, beacon.RejectRate, beacon.RejectSize, beacon.RejectInvalid, beacon.RejectBot, aggregate.CounterSamplesDropped}
+	if frustrationSignals {
+		traffic = append(traffic, aggregate.CounterRageClicks, aggregate.CounterDeadClicks, aggregate.CounterErrorClicks)
+	}
+	for _, name := range traffic {
 		metrics.traffic = append(metrics.traffic, counterMetric{
 			name:       name,
 			instrument: m.Counter(name),

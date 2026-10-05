@@ -133,3 +133,31 @@ func TestSamplingFormAndRuntimeValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestCaptureFormAndRuntimeValidation(t *testing.T) {
+	var bundle map[string]any
+	require.NoError(t, json.Unmarshal([]byte(schema), &bundle))
+	compiler := jsonschema.NewCompiler()
+	require.NoError(t, compiler.AddResource("rum.json", bundle["jsonSchema"]))
+	form, err := compiler.Compile("rum.json")
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		capture string
+		valid   bool
+	}{
+		{`null`, true}, {`{}`, true}, {`{"geolocation":null,"frustration_signals":null}`, true},
+		{`{"geolocation":"off"}`, true}, {`{"geolocation":"country"}`, true}, {`{"geolocation":"city","frustration_signals":true}`, true},
+		{`{"geolocation":""}`, false}, {`{"geolocation":"precise"}`, false}, {`{"geolocation":1}`, false}, {`{"frustration_signals":"true"}`, false}, {`{"frustration_signals":1}`, false},
+	} {
+		t.Run(tc.capture, func(t *testing.T) {
+			raw := []byte(`{"name":"shop","allowed_origins":["https://shop.example.org"],"capture":` + tc.capture + `}`)
+			var input map[string]any
+			require.NoError(t, json.Unmarshal(raw, &input))
+			assert.Equal(t, tc.valid, form.Validate(input) == nil, "form")
+			var site config.Site
+			err := json.Unmarshal(raw, &site)
+			valid := err == nil && len(config.ValidateSiteExtras(site)) == 0
+			assert.Equal(t, tc.valid, valid, "runtime")
+		})
+	}
+}

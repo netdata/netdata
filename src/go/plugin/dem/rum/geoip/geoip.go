@@ -143,7 +143,7 @@ func (r *Resolver) Country(ipStr string) string {
 
 // Lookup resolves country plus city-level location for an IP in a single
 // mmdb read. Coordinates are rounded to 1 decimal
-// degree (~11km) before they leave this package; the IP itself is never
+// degree before they leave this package; this reduces precision, not database error. The IP itself is never
 // stored or returned. hasGeo is false when the record carries no
 // location block — private ranges, some hosting/anycast allocations, or
 // no database at all — city/lat/lon are then the zero value.
@@ -176,7 +176,7 @@ func (r *Resolver) Lookup(ipStr string) (country, city string, lat, lon float64,
 	return country, city, lat, lon, hasGeo
 }
 
-// round1 rounds to 1 decimal degree (~11km) before coordinates leave the resolver.
+// round1 rounds to 1 decimal degree before coordinates leave the resolver.
 func round1(f float64) float64 {
 	r := math.Round(f*10) / 10
 	if r == 0 {

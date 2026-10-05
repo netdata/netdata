@@ -121,7 +121,7 @@ func TestSamplingDetailThroughNativeJobs(t *testing.T) {
 			}
 			live, _ := a.Live(0, 10)
 			assert.Len(t, live, observations, "live measurements remain independent of detail sampling")
-			rows, err := store.QuerySessions(context.Background(), "shop", 0, time.Now().Unix()+10, 10)
+			rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10)
 			require.NoError(t, err)
 			timeline, err := store.QuerySessionEvents(context.Background(), "shop", session)
 			require.NoError(t, err)

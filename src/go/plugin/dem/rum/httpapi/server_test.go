@@ -508,10 +508,12 @@ func (g fullGeo) Lookup(string) (string, string, float64, float64, bool) {
 }
 
 func TestGeoCityLatLonAppliedFromResolver(t *testing.T) {
+	cfg := testCfg()
+	cfg.Sites[0].Capture = &config.Capture{Geolocation: new(config.GeolocationCity)}
 	sink := newRecSink()
 	_, ts := newTestServer(
 		t,
-		testCfg(),
+		cfg,
 		sink,
 		fullGeo{
 			country: "GR",

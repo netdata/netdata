@@ -14,28 +14,30 @@ import (
 // EventRecord is an immutable self-contained investigation event. TSUnixUS
 // is original event time; the journal entry realtime records when it was saved.
 type EventRecord struct {
-	Site, SessionID                                 string
-	TSUnixUS                                        int64
-	Type, Page, Text, TraceID                       string
-	Browser, Device, Country, City, Version, UserID string
-	Fingerprint, ErrorType, Message, SampleStack    string
+	Site, SessionID                              string
+	TSUnixUS                                     int64
+	Type, Page, Text, TraceID                    string
+	Browser, Device, Country, Version, UserID    string
+	Fingerprint, ErrorType, Message, SampleStack string
 }
 
 // SessionRecord summarizes only retained events selected by the saved-time
 // filter. Timestamps and page/metadata ordering use original event time.
+// UserIDs are the sorted distinct nonempty IDs on those events, not session ownership.
 type SessionRecord struct {
-	Site, SessionID                         string
-	StartedAt, LastAt                       int64
-	Pageviews, Errors                       int64
-	Browser, Device, Country, City, Version string
-	EntryPage, LastPage, UserID             string
-	Frustrations                            int64
+	Site, SessionID                   string
+	StartedAt, LastAt                 int64
+	Pageviews, Errors                 int64
+	Browser, Device, Country, Version string
+	EntryPage, LastPage               string
+	UserIDs                           []string
+	Frustrations                      int64
 }
 
 type SessionEventRecord struct {
-	Site, SessionID           string
-	TSUnixUS                  int64
-	Type, Page, Text, TraceID string
+	Site, SessionID                   string
+	TSUnixUS                          int64
+	Type, Page, Text, TraceID, UserID string
 }
 
 // ErrorGroup counts the selected retained errors. Details is true only for a
@@ -59,7 +61,7 @@ func eventFields(r EventRecord) []journal.Field {
 		{"DEM_SITE", r.Site}, {"DEM_SESSION_ID", r.SessionID}, {"DEM_TYPE", r.Type},
 		{"DEM_PAGE", r.Page}, {"DEM_TEXT", r.Text}, {"DEM_TRACE_ID", r.TraceID},
 		{"DEM_BROWSER", r.Browser}, {"DEM_DEVICE", r.Device}, {"DEM_COUNTRY", r.Country},
-		{"DEM_CITY", r.City}, {"DEM_VERSION", r.Version}, {"DEM_USER_ID", r.UserID},
+		{"DEM_VERSION", r.Version}, {"DEM_USER_ID", r.UserID},
 		{"DEM_FINGERPRINT", r.Fingerprint}, {"DEM_ERROR_TYPE", r.ErrorType},
 		{"DEM_MESSAGE", r.Message}, {"DEM_SAMPLE_STACK", r.SampleStack},
 	} {
@@ -111,8 +113,6 @@ func decodeEvent(reader *demjournal.Snapshot) (EventRecord, bool, error) {
 			r.Device = string(value)
 		case "DEM_COUNTRY":
 			r.Country = string(value)
-		case "DEM_CITY":
-			r.City = string(value)
 		case "DEM_VERSION":
 			r.Version = string(value)
 		case "DEM_USER_ID":

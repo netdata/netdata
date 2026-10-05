@@ -29,8 +29,8 @@ RUM processing is separate from investigation queries and Function presentation:
 
 | Package | Responsibility |
 |---|---|
-| `rum/beacon` | Normalized browser observations, event kinds and pure sampling/privacy rules |
-| `rum/config` | Receiver/site declarations, validation and effective sampling policy |
+| `rum/beacon` | Normalized browser observations, event kinds and pure sampling and normalization rules |
+| `rum/config` | Receiver/site declarations, validation and effective capture and sampling policy |
 | `rum/faro` | Faro wire decoding, spans, event classification and pinned bootstrap rendering/assets |
 | `rum/httpapi` | HTTP endpoints, exact route leases, origin/proxy/body/rate policy, caching and demo responses |
 | `rum/diagnostics` | Per-site public-address observations, reachability, snippet/CSP probes and rejected origins |
@@ -85,6 +85,21 @@ create none of these resources. The destinations have identical security options
 These objects have no site inventory or reconfiguration API. The registry admits references to those exact owners;
 it does not construct them. The route records address/rejection observations in the separate diagnostic state.
 Aggregation and each exporter reject an observation for another site before changing state.
+
+Each site owns immutable capture policy. Config materializes country-only geolocation and disabled frustration
+heuristics without mutating the stored input. Browser bootstrap limits instrumentation and outgoing metadata; the
+receiver independently enforces the same policy and normalizes supported URLs, paths and text before aggregation,
+retained history or enabled exports. Geolocation off skips lookup while HTTP IP admission remains active. Country mode
+retains only country; city mode adds approximate city/coordinates to live observations only. Journals and OTLP never
+receive city coordinates. Disabled frustration has no instruments or page counts. Application-provided user IDs use bounded text normalization without path-style numeric/UUID substitution; per-event attribution and retained observed-ID membership are distinct from display summaries.
+These targeted transformations do not constitute general privacy or consent enforcement.
+
+Faro's `beforeSend` runs before its session sampling hook. Browser shaping clones metadata and preserves the
+`isSampled` session attribute until the SDK consumes it; removing it early silently drops telemetry. Session lifecycle
+and `view_changed` envelopes carry metadata even on quiet pages, so they stay on the wire. Native history suppresses
+generic session lifecycle rows and uses explicit view events to preserve transitions between identically normalized
+routes. The pinned-SDK capture and sampling fixtures exercise the real metadata providers and transport hooks,
+including selected/excluded session rollover; SDK upgrades MUST verify this ordering against the new bundle.
 
 The collector's processor calls aggregation and then each enabled exporter directly. Aggregation leaves the normalized Beacon
 unchanged and returns Accepted, PageView and Investigated decisions. Every accepted observation contributes to

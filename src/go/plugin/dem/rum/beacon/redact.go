@@ -43,19 +43,22 @@ func RedactPath(path string, rules []PathRule) string {
 	return strings.Join(segs, "/")
 }
 
-// RedactURL applies RedactPath to the path of an absolute URL, keeping
-// scheme and host; query and fragment must already be gone.
+// RedactURL strips credentials, query and fragment and applies the site's path
+// rules. Relative paths and stack source URLs follow the same policy.
 func RedactURL(raw string, rules []PathRule) string {
-	i := strings.Index(raw, "://")
-	if i < 0 {
-		return RedactPath(raw, rules)
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Opaque != "" {
+		return ""
 	}
-	rest := raw[i+3:]
-	j := strings.IndexByte(rest, '/')
-	if j < 0 {
-		return raw
+	u.User, u.RawQuery, u.Fragment, u.RawFragment = nil, "", "", ""
+	u.ForceQuery = false
+	path := RedactPath(u.EscapedPath(), rules)
+	plain, err := url.PathUnescape(path)
+	if err != nil {
+		plain = path
 	}
-	return raw[:i+3] + rest[:j] + RedactPath(rest[j:], rules)
+	u.Path, u.RawPath = plain, path
+	return u.String()
 }
 
 func isEmail(s string) bool {

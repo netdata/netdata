@@ -46,7 +46,7 @@ func (c *Collector) Collect(context.Context) error {
 		for _, g := range groups {
 			gm := m.WithLabels(metrix.Label{
 				Key:   kind,
-				Value: c.redactor.Apply(g.Value),
+				Value: g.Value,
 			})
 			gm.Counter("breakdown_" + kind + "_pageviews").ObserveTotal(float64(g.Pageviews))
 			gm.Counter("breakdown_" + kind + "_js_errors").ObserveTotal(float64(g.JSErrors))
@@ -56,7 +56,7 @@ func (c *Collector) Collect(context.Context) error {
 		}
 	}
 	for _, g := range s.ErrorGroups {
-		msg := []rune(c.redactor.Apply(g.Message))
+		msg := []rune(g.Message)
 		if len(msg) > 80 {
 			msg = msg[:80]
 		}
@@ -76,7 +76,7 @@ func (c *Collector) Collect(context.Context) error {
 		for _, host := range s.ResourceHosts {
 			hm := m.WithLabels(metrix.Label{
 				Key:   "host",
-				Value: c.redactor.Apply(host.Host),
+				Value: host.Host,
 			})
 			hm.Counter("resource_host_count").ObserveTotal(float64(host.Count))
 			if host.HasDuration {

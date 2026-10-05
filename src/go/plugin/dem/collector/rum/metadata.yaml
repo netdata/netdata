@@ -125,6 +125,14 @@ modules:
               type: integer
               unit: ""
               description: Last Rejection (s ago).
+            - name: capture_geolocation
+              type: string
+              unit: ""
+              description: Current Geolocation Capture.
+            - name: capture_frustration_signals
+              type: boolean
+              unit: ""
+              description: Current Frustration Capture.
           performance: Reads bounded local activity snapshots without contacting the monitored website.
           security: Results can include page paths, browser metadata, user identifiers, error messages and stack traces.
             Restrict access to authorized operators.
@@ -145,7 +153,7 @@ modules:
             default: ''
             options: []
           returns:
-            description: One page group for an admitted site; missing vital samples return null.
+            description: One page group for an admitted site; missing vital samples and disabled frustration signals return null.
             columns:
             - name: site
               type: string
@@ -309,12 +317,18 @@ modules:
         - id: rum-sessions
           function_name: rum-sessions
           name: RUM Sessions
-          description: Investigate retained sampled sessions that overlap a time range, including pages, errors and user
-            frustration.
+          description: Investigate retained sampled sessions that overlap a time range, including pages, errors and optional interaction heuristics.
           parameters:
           - id: site
             name: site
             description: Filter by native site job name. Leave empty to include all sites.
+            type: string
+            required: false
+            default: ''
+            options: []
+          - id: user_id
+            name: user_id
+            description: Exact application user ID observed in retained events in the selected range. Leave empty to include all sessions.
             type: string
             required: false
             default: ''
@@ -385,14 +399,14 @@ modules:
               type: string
               unit: ""
               description: Last Page.
-            - name: user
-              type: string
+            - name: user_ids
+              type: array
               unit: ""
-              description: User.
+              description: Observed User IDs.
             - name: frustrations
               type: integer
               unit: ""
-              description: Frustration Signals.
+              description: Retained Frustration Signals.
             - name: row_id
               type: string
               unit: ""
@@ -542,6 +556,10 @@ modules:
               type: string
               unit: ""
               description: Trace.
+            - name: user_id
+              type: string
+              unit: ""
+              description: User ID at Event.
           performance: Reads local retained history; work grows with the selected range and retained records.
           security: Results can include page paths, browser metadata, user identifiers, error messages and stack traces.
             Restrict access to authorized operators.
@@ -719,7 +737,7 @@ modules:
                   name: rum.window_totals
                   unit: events
                 - chart_type: stacked
-                  description: Frustration signals
+                  description: Frustration heuristics
                   dimensions:
                     - name: rage_clicks
                     - name: dead_clicks
@@ -1069,8 +1087,8 @@ modules:
         additional_permissions:
             description: The Netdata service needs write access to its DEM state directory. Configured TLS and GeoIP files must be readable by the Netdata service account.
         data_collection:
-            method_description: The Faro browser SDK sends measurements to the configured RUM receiver. Netdata aggregates accepted observations over a sliding window, retains sampled investigation history locally, and optionally exports event logs and browser traces through OTLP/gRPC. Native charts, session timelines and errors need no OTLP receiver. Event logs add searchable custom-event attributes and optional console messages; tracing adds sampled browser request spans. Both are disabled by default and have independent destinations.
-            metrics_description: Monitor browser Web Vitals, page traffic, JavaScript errors, resource timing and user frustration.
+            method_description: The Faro browser SDK sends measurements to the configured RUM receiver. Netdata aggregates accepted observations over a sliding window, retains sampled investigation history locally, and optionally exports event logs and browser traces through OTLP/gRPC. Native charts, session timelines and errors need no OTLP receiver. Country-only geolocation is the default; approximate city markers require explicit opt-in and remain live-only. Frustration heuristics are disabled by default and do not establish intent or causality. Application-provided user IDs remain original application-controlled identifiers, not anonymous values. URL/path and targeted text normalization are limited transformations, not general anonymization or consent handling. Event logs add searchable custom-event attributes and optional console messages; tracing adds sampled browser request spans. Both are disabled by default and have independent destinations.
+            metrics_description: Monitor browser Web Vitals, page traffic, JavaScript errors and resource timing, with optional interaction heuristics.
         default_behavior:
             auto_detection:
                 description: Sites are explicitly configured; websites are not discovered automatically.
@@ -1095,7 +1113,7 @@ modules:
                         jobs:
                           - name: shop
                             allowed_origins: [https://shop.example.org]
-                      description: Native charts, session timelines and errors, with no OTLP receiver required.
+                      description: Native charts, session timelines and errors, with country-only location and frustration heuristics disabled. No OTLP receiver is required.
                       name: Website
                     - config: |
                         jobs:
@@ -1187,6 +1205,21 @@ modules:
                       description: Exclude crawlers and browser automation by default, or include them as bot traffic.
                       group: Collection
                       name: bots
+                      required: false
+                    - default_value: ""
+                      description: "Choose optional location and interaction evidence independently of sampling. Defaults retain country comparisons and disable frustration heuristics."
+                      group: Capture
+                      name: capture
+                      required: false
+                    - default_value: country
+                      description: "IP-derived location detail: off disables lookup, country retains country comparisons, and city adds approximate live map markers. Omitted or null means country; coordinates are never retained in history or exported."
+                      group: Capture
+                      name: capture.geolocation
+                      required: false
+                    - default_value: "no"
+                      description: "Enable rage, dead and error click heuristics and their browser instrumentation. Disabled by default; these signals do not establish user intent or causality."
+                      group: Capture
+                      name: capture.frustration_signals
                       required: false
                     - default_value: 1
                       description: Share of browser sessions collected, from 0 to 1. Omitted or null means all; zero disables collection. Browser measurement charts are absent while collection is disabled; receiver diagnostics remain available.
@@ -1299,18 +1332,18 @@ modules:
                       name: tracing.destination.tls_key
                       required: false
                     - default_value: ""
-                      description: Replace private identifiers in URL paths before aggregation and export. Rules run before built-in path redaction.
-                      group: Privacy
+                      description: Apply site-specific URL-path replacements before built-in normalization. These rules do not anonymize user IDs or provide general data-loss prevention.
+                      group: Normalization
                       name: redact_paths
                       required: false
                     - default_value: ""
                       description: Go regular expression matching private path identifiers. Empty patterns are ignored.
-                      group: Privacy
+                      group: Normalization
                       name: redact_paths[].pattern
                       required: false
                     - default_value: ""
                       description: Replacement text for matching path segments. Leave empty to remove them.
-                      group: Privacy
+                      group: Normalization
                       name: redact_paths[].replace
                       required: false
         prerequisites:

@@ -11,7 +11,7 @@ import (
 var pagesMethod = method{
 	id:      "rum-pages",
 	title:   "RUM Pages",
-	help:    "Windowed page activity, Web Vitals and attributed elements",
+	help:    "Windowed page activity, Web Vitals and attributed elements; frustration signals are unavailable when capture is disabled",
 	sort:    "pageviews_window",
 	every:   10,
 	columns: rumPagesColumns,
@@ -36,7 +36,7 @@ func (h *Handler) pagesRows(ctx context.Context, site string) (rows [][]any, err
 				h.redact.Apply(p.LCPElement),
 				h.redact.Apply(p.INPElement),
 				h.redact.Apply(p.CLSElement),
-				p.FrustrationWindow,
+				detail(p.FrustrationsKnown, p.FrustrationWindow),
 				rowID(p.Site, p.Page),
 			},
 		)

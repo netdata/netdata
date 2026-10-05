@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/stretchr/testify/assert"
@@ -46,13 +45,13 @@ func (eventWriterFunc) Sync(context.Context) error { return nil }
 
 func drain(w *Writer) { ctx, cancel := context.WithCancel(context.Background()); cancel(); w.Run(ctx) }
 
-func TestWriterDrainsRealJournalWithRedaction(t *testing.T) {
+func TestWriterDrainsAlreadyNormalizedRecords(t *testing.T) {
 	ctx := context.Background()
 	st, err := demjournal.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	counters := newFakeCounters()
-	w := NewWriter("site", NewStore(st), counters, redact.NewRedactor("opaque-secret"))
+	w := NewWriter("site", NewStore(st), counters)
 	now := time.Now().UnixMicro()
 	w.Event(
 		aggregate.HistoryEvent{
@@ -60,8 +59,8 @@ func TestWriterDrainsRealJournalWithRedaction(t *testing.T) {
 			SessionID: "session",
 			TSUnixUS:  now,
 			Type:      "pageview",
-			Page:      "/opaque-secret",
-			UserID:    "opaque-secret",
+			Page:      "/[REDACTED]",
+			UserID:    "[REDACTED]",
 			Browser:   "Chrome",
 		},
 	)
@@ -71,12 +70,12 @@ func TestWriterDrainsRealJournalWithRedaction(t *testing.T) {
 			SessionID:   "session",
 			TSUnixUS:    now + 1,
 			Type:        "error",
-			Page:        "/opaque-secret",
-			UserID:      "opaque-secret",
+			Page:        "/[REDACTED]",
+			UserID:      "[REDACTED]",
 			Fingerprint: "fp",
 			ErrorType:   "TypeError",
-			Message:     "opaque-secret failed",
-			SampleStack: "at opaque-secret",
+			Message:     "[REDACTED] failed",
+			SampleStack: "at [REDACTED]",
 			Browser:     "Chrome",
 		},
 	)
@@ -85,10 +84,10 @@ func TestWriterDrainsRealJournalWithRedaction(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
 	assert.Equal(t, "/[REDACTED]", rows[0].Page)
-	sessions, err := NewStore(st).QuerySessions(ctx, "site", 0, time.Now().Unix()+1, 2000)
+	sessions, err := NewStore(st).QuerySessions(ctx, "site", "", 0, time.Now().Unix()+1, 2000)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
-	assert.Equal(t, "[REDACTED]", sessions[0].UserID)
+	assert.Equal(t, []string{"[REDACTED]"}, sessions[0].UserIDs)
 	assert.EqualValues(t, 1, sessions[0].Pageviews)
 	assert.EqualValues(t, 1, sessions[0].Errors)
 	groups, err := NewStore(st).QueryErrors(ctx, "site", "fp", 0, time.Now().Unix()+1)
@@ -101,7 +100,7 @@ func TestWriterDrainsRealJournalWithRedaction(t *testing.T) {
 }
 func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 	counters := newFakeCounters()
-	w := NewWriter("site", nil, counters, nil)
+	w := NewWriter("site", nil, counters)
 	calls := 0
 	w.st = eventWriterFunc(func(context.Context, EventRecord) (bool, error) { calls++; return true, nil })
 	for i := 0; i < queueCap+7; i++ {
@@ -117,7 +116,7 @@ func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 }
 func TestCancellationPreservesOnlyUnattemptedSuffix(t *testing.T) {
 	counters := newFakeCounters()
-	w := NewWriter("site", nil, counters, nil)
+	w := NewWriter("site", nil, counters)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	attempts := map[string]int{}
@@ -150,7 +149,7 @@ func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 	for name, writeErr := range map[string]error{"disk error": errors.New("disk full"), "cancelled write": context.Canceled, "successful cancellation race": nil} {
 		t.Run(name, func(t *testing.T) {
 			counters := newFakeCounters()
-			w := NewWriter("site", nil, counters, nil)
+			w := NewWriter("site", nil, counters)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			calls := 0
@@ -182,7 +181,7 @@ func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 }
 func TestFinalDrainSharesOneAdmissionDeadline(t *testing.T) {
 	counters := newFakeCounters()
-	w := NewWriter("site", nil, counters, nil)
+	w := NewWriter("site", nil, counters)
 	deadlines := []time.Time{}
 	w.st = eventWriterFunc(func(ctx context.Context, r EventRecord) (bool, error) {
 		deadline, ok := ctx.Deadline()
@@ -221,7 +220,7 @@ func (w *recordingEventWriter) Sync(context.Context) error {
 
 func TestEmptyFlushSkipsJournalSyncAndReportsQueueDrops(t *testing.T) {
 	counters := newFakeCounters()
-	w := NewWriter("site", nil, counters, nil)
+	w := NewWriter("site", nil, counters)
 	disk := &recordingEventWriter{}
 	w.st = disk
 	for range queueCap + 1 {
@@ -260,7 +259,7 @@ func (w *cancelLastAppendWriter) Sync(ctx context.Context) error {
 func TestFinalDrainSyncsAfterCancellationFollowingLastAppend(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	w := NewWriter("site", nil, newFakeCounters(), nil)
+	w := NewWriter("site", nil, newFakeCounters())
 	disk := &cancelLastAppendWriter{
 		cancel: cancel,
 	}
@@ -276,7 +275,7 @@ func TestFinalDrainSyncsAfterCancellationFollowingLastAppend(t *testing.T) {
 	assert.True(t, disk.synced, "final drain must sync accepted appends with its detached context")
 }
 func TestIdleFlushRetriesFailedSyncWithoutReplayingAppend(t *testing.T) {
-	w := NewWriter("site", nil, newFakeCounters(), nil)
+	w := NewWriter("site", nil, newFakeCounters())
 	disk := &recordingEventWriter{
 		syncErr: errors.New("sync failed"),
 	}
@@ -295,7 +294,7 @@ func TestWrongSiteDoesNotQueueOrCount(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	counters := newFakeCounters()
-	w := NewWriter("site", NewStore(st), counters, nil)
+	w := NewWriter("site", NewStore(st), counters)
 	for range queueCap + 1 {
 		w.Event(aggregate.HistoryEvent{
 			Site:      "other",

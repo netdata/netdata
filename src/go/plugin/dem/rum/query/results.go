@@ -19,10 +19,15 @@ type Site struct {
 	Name, Label    string
 	AllowedOrigins []string
 	Sampling       Sampling
+	Capture        Capture
 	Activity       Activity
 	Reach, Snippet Diagnostic
 	Rejected       Rejection
 	PublicBase     string
+}
+type Capture struct {
+	Geolocation        string
+	FrustrationSignals bool
 }
 type Sampling struct {
 	MeasureRate, InvestigateRate float64

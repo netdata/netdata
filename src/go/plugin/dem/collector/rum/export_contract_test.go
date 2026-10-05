@@ -184,7 +184,7 @@ func TestOptionalExportsThroughNativeJobs(t *testing.T) {
 				assert.Positive(t, counters[aggregate.CounterOTLPErrors])
 				assert.Zero(t, counters[aggregate.CounterOTLPSent])
 			}
-			rows, err := store.QuerySessions(context.Background(), "shop", 0, time.Now().Unix()+10, 10)
+			rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10)
 			require.NoError(t, err)
 			require.Len(t, rows, 1)
 			assert.EqualValues(t, 1, rows[0].Pageviews)
@@ -224,7 +224,7 @@ func TestOTLPReceiverStorageSmoke(t *testing.T) {
 	require.EqualValues(t, 4, counters[aggregate.CounterOTLPSent])
 	require.Zero(t, counters[aggregate.CounterOTLPErrors])
 	require.Zero(t, counters[aggregate.CounterJSErrors])
-	rows, err := store.QuerySessions(context.Background(), "shop", 0, time.Now().Unix()+10, 10)
+	rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 }
@@ -276,7 +276,7 @@ func TestEventExportRecoveryKeepsNativeHistory(t *testing.T) {
 	assert.EqualValues(t, 1, counters[aggregate.CounterOTLPErrors])
 	assert.EqualValues(t, 1, counters[aggregate.CounterOTLPSent])
 	assert.Zero(t, counters[aggregate.CounterOTLPDropped])
-	rows, err := store.QuerySessions(context.Background(), "shop", 0, time.Now().Unix()+10, 10)
+	rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.EqualValues(t, 2, rows[0].Pageviews)

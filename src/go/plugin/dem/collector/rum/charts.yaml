@@ -215,7 +215,7 @@ groups:
               selector: dead_clicks
             - name: error_clicks
               selector: error_clicks
-          title: Frustration signals
+          title: Frustration heuristics
           type: stacked
           units: signals/s
       family: Traffic

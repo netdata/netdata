@@ -34,7 +34,7 @@ type sessionEvent struct {
 // eventContext is captured when an observation arrives. Replayed context must
 // not acquire the identity, release or location of a later promoting event.
 type eventContext struct {
-	browser, device, country, city, version, userID string
+	browser, device, country, version, userID string
 }
 
 // Only error events retain error metadata; ordinary timeline entries keep the
@@ -100,7 +100,6 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 		browser: b.Browser,
 		device:  b.Device,
 		country: b.Country,
-		city:    b.City,
 		version: b.AppVersion,
 		userID:  b.UserID,
 	}
@@ -121,19 +120,22 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 			page: page,
 		})
 	}
-	// A changed Faro view identifies a SPA transition; the first view only
-	// establishes the baseline because the SDK emits no dedicated view event.
+	// Explicit SDK view changes preserve navigation even when different raw
+	// routes normalize to the same label. Infer only when that evidence is absent.
+	explicitView := false
+	for _, event := range b.Events {
+		if event.Kind == beacon.EventView {
+			explicitView = true
+			break
+		}
+	}
 	if b.View != "" {
-		if sd.lastView != "" && sd.lastView != b.View {
-			record(sessionEvent{
-				ts:   now,
-				typ:  "view",
-				page: page,
-				text: b.View,
-			})
+		if !explicitView && sd.lastView != "" && sd.lastView != b.View {
+			record(sessionEvent{ts: now, typ: "view", page: page, text: b.View})
 		}
 		sd.lastView = b.View
 	}
+
 	for _, v := range b.Vitals {
 		if v.Poor() {
 			record(
@@ -162,7 +164,15 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 		})
 	}
 	for _, ev := range b.Events {
-		if ev.Kind == beacon.EventNavigation || ev.Kind == beacon.EventResource {
+		if ev.Kind == beacon.EventNavigation || ev.Kind == beacon.EventResource || ev.Kind == beacon.EventSession {
+			continue
+		}
+		if ev.Kind == beacon.EventView {
+			target := ev.Attrs["toView"]
+			if target == "" {
+				target = page
+			}
+			record(sessionEvent{ts: now, typ: "view", page: target, text: target})
 			continue
 		}
 		if beacon.IsFrustration(ev.Name) {
@@ -221,7 +231,6 @@ func (e sessionEvent) history(site, sessionID string) HistoryEvent {
 		Browser:   e.context.browser,
 		Device:    e.context.device,
 		Country:   e.context.country,
-		City:      e.context.city,
 		Version:   e.context.version,
 		UserID:    e.context.userID,
 	}
@@ -304,6 +313,7 @@ type SessionEventInfo struct {
 	Page    string
 	Text    string
 	TraceID string
+	UserID  string
 }
 
 // SessionEvents returns one session's event ring (oldest first).
@@ -324,6 +334,7 @@ func (a *Aggregator) SessionEvents(sessionID string) ([]SessionEventInfo, bool) 
 			Page:    e.page,
 			Text:    e.text,
 			TraceID: e.traceID,
+			UserID:  e.context.userID,
 		}
 	}
 	return out, true

@@ -77,10 +77,11 @@ const (
 // SiteCfg is the immutable configuration for one site. Name is the stable
 // identity; DisplayName is presentation metadata.
 type SiteCfg struct {
-	Name, DisplayName string
-	PageGroups        int
-	Countries         int
-	Investigate       InvestigateCfg
+	Name, DisplayName  string
+	PageGroups         int
+	Countries          int
+	Investigate        InvestigateCfg
+	FrustrationSignals bool
 }
 
 // InvestigateCfg contains effective detail-selection policy. Rate is the

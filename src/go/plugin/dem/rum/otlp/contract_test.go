@@ -10,6 +10,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -26,8 +27,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
 	"github.com/stretchr/testify/require"
 	logs "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	traces "go.opentelemetry.io/proto/otlp/collector/trace/v1"
@@ -233,22 +234,26 @@ func TestConsoleSeverityAndErrorDetails(t *testing.T) {
 		now: func() time.Time { return t0 },
 	}
 	for level, want := range map[string]string{"info": "INFO", "warn": "WARN", "error": "ERROR", "debug": "DEBUG", "trace": "TRACE"} {
-		b := mkBeacon()
-		b.Logs = []beacon.Log{
-			{
-				Level:     level,
-				Message:   "secret-value",
-				ErrorType: "secret-value TypeError",
-				Stack:     strings.Repeat("é", 3000) + "secret-value",
-			},
-		}
+		frame, err := json.Marshal(map[string]any{"function": strings.Repeat("é", 3000) + "secret-value", "filename": "app.js"})
+		require.NoError(t, err)
+		raw, err := json.Marshal(map[string]any{"logs": []any{map[string]any{
+			"level": level, "message": "secret-value",
+			"context": map[string]any{"type": "secret-value TypeError", "stackFrames": string(frame)},
+		}}})
+		require.NoError(t, err)
+		b, err := faro.Decode(raw, faro.Options{
+			Now:         t0,
+			ConsoleLogs: true,
+			Redactor:    newRedactor(t, "secret-value"),
+		})
+		require.NoError(t, err)
 		recs := e.build(b, false)
 		require.Len(t, recs, 1)
 		rec := simplify(recs[0])
 		require.Equal(t, want, rec.severity)
 		require.NotContains(t, rec.body, "secret-value")
 		require.Equal(t, "[REDACTED] TypeError", rec.attrs["error.type"])
-		require.LessOrEqual(t, len(rec.attrs["error.stack"]), maxStackBytes)
+		require.LessOrEqual(t, len(rec.attrs["error.stack"]), 4096)
 	}
 }
 

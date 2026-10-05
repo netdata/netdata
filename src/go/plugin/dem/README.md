@@ -61,6 +61,46 @@ The browser normalization, bounded aggregation, OTLP and query behavior originat
 `b3de4662f567dc63d33fee6201f8c2313568301b`. Its private configuration controller, scheduler, protocol emitter and root
 state reconciliation are replaced by the native Agent framework. Embedded third-party asset notices remain beside their source.
 
+## Browser capture contract
+
+Core capture supports page and SPA-view activity, Web Vitals and attribution selectors, navigation/resource timing,
+uncaught exceptions and unhandled rejections with structured error frames, and the browser/OS/device, release,
+session and view dimensions used by native diagnosis. Selectors locate the element involved; they are not DOM snapshots
+or entered form values. Unsupported SDK metadata is removed before transmission and again at native normalization.
+
+| Evidence | Browser/native capture | Live and measurements | Retained native history | Optional export |
+|---|---|---|---|---|
+| Core activity, vitals, timings and errors | Enabled for collected sessions | Relevant measurements and live entries | Selected investigation entries | Supported event logs; request spans only with tracing |
+| Application user ID | Explicit `setUser` ID only | Original ID on attributed activity | Original per-event ID and every observed ID for session lookup | Original ID on supported records |
+| Country | Receiver IP lookup; default `capture.geolocation: country` | Country comparisons | Country on retained entries | Country on supported records |
+| Approximate city and coordinates | Only `capture.geolocation: city` | City and map markers | No city or coordinates | No city or coordinates |
+| Rage, dead and error clicks | Only `capture.frustration_signals: true` | Heuristic counts and activity; absent when disabled | Selected heuristic entries | Selected events when event logs are enabled |
+| Custom-event attributes | Only with event logs enabled | No arbitrary attribute dimensions | No generic attributes | Searchable event attributes |
+| Console messages | Only with event logs and `include_console_logs` enabled | No core-error substitution | No console archive | Selected console logs |
+| Browser request spans | Only with tracing enabled | Native resource timing remains independent | No span archive | Selected browser spans |
+
+`capture.geolocation` accepts `off`, `country` and `city`. Omission or `null` selects `country`; an empty string is
+invalid. Quote `'off'` in YAML because unquoted `off` is a YAML boolean. Country-only capture supplies no map coordinates. City mode provides approximate IP-derived locations,
+not browser GPS or precise visitor positions. `off` skips location lookup entirely; network IP handling for request
+admission, trusted proxies and rate limiting still operates. Client IP addresses are not stored as telemetry.
+
+Frustration signals default to false, including omission or `null`. Enabling them adds browser interaction listeners
+and heuristic evidence; repeated clicks, clicks without a detected response and clicks near an error do not prove user
+intent, frustration or causality. A disabled signal is unavailable, not a measured zero.
+
+An application-provided user ID is an explicit capture choice. IDs remain application-controlled values and are not
+hashed or anonymized by DEM. Use an internal, non-sensitive ID of at most 128 bytes and clear it on logout. IDs undergo the same bounded text
+normalization as other diagnostic strings; numeric and UUID IDs are not generalized as URL paths. Per-event attribution survives login,
+logout and user changes; session lookup matches every observed retained ID within the selected saved-time range.
+User names, email fields and arbitrary user attributes are not part of this identity contract.
+
+URLs lose query strings, fragments and credentials; path grouping and configured `redact_paths` rules normalize
+supported URL paths. Targeted text transformations apply to diagnostic strings before grouping, history and export.
+These limited transformations are not a general anonymization, data-loss-prevention or consent system: application IDs,
+error text, selectors and explicitly exported attributes can still be identifying. Choose application instrumentation
+and optional capture settings accordingly. Sampling and the independent event-log/trace switches retain their existing
+roles; capture choices do not imply consent or reconstruct evidence that was never collected.
+
 ## Collection and retained detail
 
 RUM has two sampling decisions, both defaulting to 100%. Omitted or `null` rates use that default; explicit zero

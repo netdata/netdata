@@ -155,7 +155,6 @@ func TestBuild(t *testing.T) {
 	tests := map[string]struct {
 		pageView bool
 		beacon   func() *beacon.Beacon
-		secret   string // known secret value the redactor must strip
 		want     []simpleRec
 	}{
 		"pageview": {
@@ -189,20 +188,19 @@ func TestBuild(t *testing.T) {
 				},
 			}},
 		},
-		"error is redacted and severity ERROR": {
+		"normalized error preserves severity ERROR": {
 			beacon: func() *beacon.Beacon {
 				b := mkBeacon()
 				b.Errors = []beacon.Error{
 					{
 						Type:    "TypeError",
-						Message: "token=SEKRET1234 undefined",
-						Stack:   "at f (x.js:1:1) SEKRET1234",
+						Message: "token=[REDACTED] undefined",
+						Stack:   "at f (x.js:1:1) [REDACTED]",
 						Time:    t0,
 					},
 				}
 				return b
 			},
-			secret: "SEKRET1234",
 			want: []simpleRec{{
 				body: "TypeError: token=[REDACTED] undefined @ /pricing", severity: "ERROR",
 				attrs: map[string]string{
@@ -212,15 +210,14 @@ func TestBuild(t *testing.T) {
 				},
 			}},
 		},
-		"event carries name and redacted attrs": {
+		"event carries normalized name and attrs": {
 			beacon: func() *beacon.Beacon {
 				b := mkBeacon()
 				b.Events = []beacon.Event{
-					{Name: "checkout", Attrs: map[string]string{"coupon": "SEKRET1234"}, Time: t0},
+					{Name: "checkout", Attrs: map[string]string{"coupon": "[REDACTED]"}, Time: t0},
 				}
 				return b
 			},
-			secret: "SEKRET1234",
 			want: []simpleRec{{
 				body: "event checkout @ /pricing", severity: "INFO",
 				attrs: map[string]string{
@@ -268,9 +265,6 @@ func TestBuild(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			e := &Logs{
 				now: func() time.Time { return t0 },
-				transport: &transport{
-					redactor: newRedactor(t, tc.secret),
-				},
 			}
 			var got []simpleRec
 			for _, q := range e.build(tc.beacon(), tc.pageView) {

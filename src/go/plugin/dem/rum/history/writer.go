@@ -24,7 +24,6 @@ const (
 type Counters interface {
 	Add(counter string, n uint64)
 }
-type Redactor interface{ Apply(string) string }
 type eventWriter interface {
 	AppendEvent(context.Context, EventRecord) (attempted bool, err error)
 	Sync(context.Context) error
@@ -34,7 +33,6 @@ type Writer struct {
 	siteName  string
 	st        eventWriter
 	counters  Counters
-	redact    Redactor
 	ch        chan aggregate.HistoryEvent
 	dropMu    sync.Mutex
 	chanDrops uint64
@@ -42,22 +40,15 @@ type Writer struct {
 	pendingSync bool
 }
 
-func NewWriter(siteName string, st *Store, counters Counters, redactor Redactor) *Writer {
-	if redactor == nil {
-		redactor = noopRedactor{}
-	}
+// NewWriter persists receiver-normalized observations without transforming them again.
+func NewWriter(siteName string, st *Store, counters Counters) *Writer {
 	return &Writer{
 		st:       st,
 		counters: counters,
-		redact:   redactor,
 		ch:       make(chan aggregate.HistoryEvent, queueCap),
 		siteName: siteName,
 	}
 }
-
-type noopRedactor struct{}
-
-func (noopRedactor) Apply(s string) string { return s }
 
 func (w *Writer) Event(rec aggregate.HistoryEvent) {
 	if rec.Site != w.siteName {
@@ -147,27 +138,22 @@ func (w *Writer) flush(ctx context.Context, batch []aggregate.HistoryEvent) int 
 			return i
 		}
 		r := EventRecord{
-			Site:      rec.Site,
-			SessionID: rec.SessionID,
-			TSUnixUS:  rec.TSUnixUS,
-			Type:      rec.Type,
-			Page:      w.redact.Apply(rec.Page),
-			Text:      w.redact.Apply(rec.Text),
-			TraceID:   rec.TraceID,
-			Browser: w.redact.Apply(
-				rec.Browser,
-			),
-			Device:      w.redact.Apply(rec.Device),
-			Country:     w.redact.Apply(rec.Country),
-			City:        w.redact.Apply(rec.City),
-			Version:     w.redact.Apply(rec.Version),
-			UserID:      w.redact.Apply(rec.UserID),
+			Site:        rec.Site,
+			SessionID:   rec.SessionID,
+			TSUnixUS:    rec.TSUnixUS,
+			Type:        rec.Type,
+			Page:        rec.Page,
+			Text:        rec.Text,
+			TraceID:     rec.TraceID,
+			Browser:     rec.Browser,
+			Device:      rec.Device,
+			Country:     rec.Country,
+			Version:     rec.Version,
+			UserID:      rec.UserID,
 			Fingerprint: rec.Fingerprint,
-			ErrorType: w.redact.Apply(
-				rec.ErrorType,
-			),
-			Message:     w.redact.Apply(rec.Message),
-			SampleStack: w.redact.Apply(rec.SampleStack),
+			ErrorType:   rec.ErrorType,
+			Message:     rec.Message,
+			SampleStack: rec.SampleStack,
 		}
 		attempted, err := w.st.AppendEvent(ctx, r)
 		if attempted {

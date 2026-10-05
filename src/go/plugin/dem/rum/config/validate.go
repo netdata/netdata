@@ -37,10 +37,15 @@ func tracingAddress(raw string, destination bool) bool {
 	return err == nil && n >= 1 && n <= 65535
 }
 
-// ValidateSiteExtras checks the bot and tracing settings,
+// ValidateSiteExtras checks optional site settings,
 // shared by file config and dynamic configuration.
 func ValidateSiteExtras(s Site) []string {
 	var errs []string
+	switch s.GeolocationMode() {
+	case GeolocationOff, GeolocationCountry, GeolocationCity:
+	default:
+		errs = append(errs, "capture.geolocation must be off, country or city")
+	}
 	if s.Bots != "" && s.Bots != BotsExclude && s.Bots != BotsInclude {
 		errs = append(errs, "bots must be exclude or include")
 	}

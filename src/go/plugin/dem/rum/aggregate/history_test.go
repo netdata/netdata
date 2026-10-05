@@ -19,7 +19,7 @@ func TestHistoryEventsAreSelfContained(t *testing.T) {
 	sink := &fakeHistorySink{}
 	a.SetHistorySink(sink)
 	b := mk(*now, "sess1", "/a")
-	b.City = "Athens"
+
 	b.UserID = "customer"
 	a.Ingest(b)
 	*now = now.Add(5 * time.Second)
@@ -30,9 +30,7 @@ func TestHistoryEventsAreSelfContained(t *testing.T) {
 	last := sink.events[1]
 	assert.Equal(t, "sess1", last.SessionID)
 	assert.Equal(t, "/b", last.Page)
-	assert.Equal(t, "Athens", sink.events[0].City)
 	assert.Equal(t, "customer", sink.events[0].UserID)
-	assert.Empty(t, last.City)
 	assert.Empty(t, last.UserID)
 	assert.Equal(t, now.UnixMicro(), last.TSUnixUS)
 }
