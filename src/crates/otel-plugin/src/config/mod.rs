@@ -779,17 +779,19 @@ traces:
     }
 
     #[test]
-    fn deprecated_and_current_tls_key_in_one_file_is_rejected() {
-        let err = resolve_with_user(
-            "endpoint:\n  tls_cert_path: /old.pem\n  grpc_tls_cert_path: /new.pem\n",
-        )
-        .unwrap_err();
-        let msg = format!("{err:#}");
-        assert!(
-            msg.contains("endpoint.tls_cert_path and endpoint.grpc_tls_cert_path are both set"),
-            "{msg}"
-        );
-        assert!(msg.contains("user.yaml"), "names the file: {msg}");
+    fn deprecated_and_current_name_in_one_file_is_rejected() {
+        for (old, new) in endpoint::RENAMED_KEYS {
+            let err = resolve_with_user(&format!(
+                "endpoint:\n  {old}: '127.0.0.1:1'\n  {new}: '127.0.0.1:2'\n"
+            ))
+            .unwrap_err();
+            let msg = format!("{err:#}");
+            assert!(
+                msg.contains(&format!("endpoint.{old} and endpoint.{new} are both set")),
+                "{msg}"
+            );
+            assert!(msg.contains("user.yaml"), "names the file: {msg}");
+        }
     }
 
     #[test]
@@ -1582,18 +1584,15 @@ logs:
             assert_eq!(grpc_keys(&o), expected, "{pairs:?}");
         }
         // Both names of one key set → rejected, naming the deprecated one.
-        let err = ConfigOverride::from_map(&env_map(&[
-            ("NETDATA_OTEL_CFG_ENDPOINT_TLS_KEY_PATH", "/old"),
-            ("NETDATA_OTEL_CFG_ENDPOINT_GRPC_TLS_KEY_PATH", "/new"),
-        ]))
-        .unwrap_err();
-        assert!(
-            err.to_string().contains(
-                "NETDATA_OTEL_CFG_ENDPOINT_TLS_KEY_PATH is the deprecated name of \
-                 NETDATA_OTEL_CFG_ENDPOINT_GRPC_TLS_KEY_PATH"
-            ),
-            "{err}"
-        );
+        for (old, new) in names {
+            let err =
+                ConfigOverride::from_map(&env_map(&[(old, "/old"), (new, "/new")])).unwrap_err();
+            assert!(
+                err.to_string()
+                    .contains(&format!("{old} is the deprecated name of {new}")),
+                "{err}"
+            );
+        }
     }
 
     #[test]
