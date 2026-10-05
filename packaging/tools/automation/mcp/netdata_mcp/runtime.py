@@ -448,25 +448,27 @@ def generate_runtime(
     conf_path.write_text(_render_ini(conf), encoding="utf-8")
 
     cfg = otel or OtelConfig()
+    # A pinned endpoint on the web port would lose the bind to netdata itself,
+    # while the run still reports that port as the OTLP endpoint.
+    for web_port in reserved_ports:
+        if (clash := web_port_clash(cfg, web_port)) is not None:
+            raise ValueError(clash)
     # Every auto-assigned port must differ from the caller's (the web port),
     # from any pinned endpoint and from each other: free_port() releases its
     # socket, so two calls can return the same port, and the plugin refuses
     # to start when its two listeners collide.
-    taken = set(reserved_ports)
-    for pinned in (cfg.otlp_endpoint, cfg.otlp_http_endpoint):
-        if pinned and (port := _endpoint_port(pinned)) is not None:
-            taken.add(port)
+    taken = set(reserved_ports) | pinned_ports(cfg)
     if cfg.otlp_endpoint:
         otlp_endpoint = cfg.otlp_endpoint
     else:
-        port = _free_port_except(taken)
+        port = free_port_except(taken)
         taken.add(port)
         otlp_endpoint = f"127.0.0.1:{port}"
     # "" (disable) must survive intact: only None auto-assigns.
     otlp_http_endpoint = (
         cfg.otlp_http_endpoint
         if cfg.otlp_http_endpoint is not None
-        else f"127.0.0.1:{_free_port_except(taken)}"
+        else f"127.0.0.1:{free_port_except(taken)}"
     )
     otel_yaml = yaml.safe_dump(
         _otel_doc(cfg, rd, otlp_endpoint, otlp_http_endpoint), sort_keys=False
@@ -476,7 +478,26 @@ def generate_runtime(
     return rd, conf_path, otlp_endpoint, otlp_http_endpoint or None
 
 
-def _free_port_except(taken: set[int], attempts: int = 64) -> int:
+def pinned_ports(cfg: OtelConfig | None) -> set[int]:
+    """The ports of the OTLP endpoints ``cfg`` pins (none when auto-assigned)."""
+    ports = set()
+    for pinned in (cfg.otlp_endpoint, cfg.otlp_http_endpoint) if cfg else ():
+        if pinned and (port := _endpoint_port(pinned)) is not None:
+            ports.add(port)
+    return ports
+
+
+def web_port_clash(cfg: OtelConfig | None, web_port: int | None) -> str | None:
+    """Why a pinned OTLP endpoint in ``cfg`` cannot share ``web_port``, or None."""
+    if cfg is None or web_port is None:
+        return None
+    for name, endpoint in (("otlp_endpoint", cfg.otlp_endpoint), ("otlp_http_endpoint", cfg.otlp_http_endpoint)):
+        if endpoint and _endpoint_port(endpoint) == web_port:
+            return f"{name} {endpoint} uses the agent's web port {web_port}; pin another port"
+    return None
+
+
+def free_port_except(taken: set[int], attempts: int = 64) -> int:
     """A free loopback port not in ``taken``.
 
     Bounded: the kernel normally hands out a different port on the next try,

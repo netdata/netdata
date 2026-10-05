@@ -18,7 +18,7 @@ import yaml
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import Field
 
-from ..runtime import OtelConfig
+from ..runtime import OtelConfig, web_port_clash
 from ._common import get_agents, get_runs
 from .models import RunInfo, agent_declared, agent_error, run_info, unknown_agent
 
@@ -227,6 +227,8 @@ def register(mcp: FastMCP) -> None:
             journal_dir=journal_dir,
             extra_yaml=extra_yaml,
         )
+        if (clash := web_port_clash(cfg, get_agents(ctx).get(agent_id).port)) is not None:
+            return agent_error(agent_id, clash)
         spec = get_agents(ctx).set_otel(agent_id, cfg)
         live = get_runs(ctx).get(agent_id)
         if live is not None and not live.done:

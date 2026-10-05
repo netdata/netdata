@@ -319,6 +319,15 @@ async def test_unpinned_port_is_auto_assigned(reg, tmp_path):
     assert len(ports) == 3
 
 
+async def test_auto_web_port_avoids_a_pinned_otlp_port(reg, tmp_path, monkeypatch):
+    picks = iter([4317, 9000, 9001])
+    monkeypatch.setattr(runtime, "free_port", lambda: next(picks))
+    otel = runtime.OtelConfig(otlp_endpoint="127.0.0.1:4317", otlp_http_endpoint="")
+    run, _ = await reg.start("a", str(tmp_path), "debug", otel=otel, probe=_always_ready)
+    assert run.port == 9000 and run.otlp_endpoint == "127.0.0.1:4317"
+    await reg.stop("a")
+
+
 async def test_pinned_port_in_use_fails_before_launch(reg, tmp_path, monkeypatch):
     launched = []
     monkeypatch.setattr(runtime, "launch_command", lambda b, port, conf: launched.append(port) or ["sh", "-c", "sleep 30"])

@@ -188,6 +188,25 @@ def test_generate_runtime_auto_grpc_port_avoids_a_pinned_http_port(tmp_path, mon
     assert (otlp, http) == ("127.0.0.1:9000", "127.0.0.1:4318")
 
 
+@pytest.mark.parametrize("field", ["otlp_endpoint", "otlp_http_endpoint"])
+def test_generate_runtime_refuses_a_pinned_endpoint_on_the_web_port(tmp_path, monkeypatch, field):
+    # netdata binds its web port first, so the plugin's listener would fail
+    # while the run reports the web port as the OTLP endpoint.
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    cfg = runtime.OtelConfig(**{field: "127.0.0.1:19999"})
+    with pytest.raises(ValueError, match=f"{field} 127.0.0.1:19999 uses the agent's web port 19999"):
+        runtime.generate_runtime("agent-clash", otel=cfg, reserved_ports=(19999,))
+
+
+def test_web_port_clash_only_on_the_same_port():
+    cfg = runtime.OtelConfig(otlp_endpoint="127.0.0.1:4317", otlp_http_endpoint="")
+    assert runtime.web_port_clash(cfg, 19999) is None
+    assert runtime.web_port_clash(cfg, None) is None
+    assert runtime.web_port_clash(None, 4317) is None
+    assert "otlp_endpoint 127.0.0.1:4317" in runtime.web_port_clash(cfg, 4317)
+    assert runtime.pinned_ports(cfg) == {4317}
+
+
 def test_generate_runtime_portless_pinned_endpoint_still_fails_cleanly(tmp_path, monkeypatch):
     # A pinned endpoint without a numeric port reserves nothing; running out of
     # ports must still raise the intended RuntimeError, not a sort TypeError.
@@ -204,7 +223,7 @@ def test_generate_runtime_portless_pinned_endpoint_still_fails_cleanly(tmp_path,
 def test_free_port_except_gives_up_instead_of_spinning(monkeypatch):
     monkeypatch.setattr(runtime, "free_port", lambda: 5000)
     with pytest.raises(RuntimeError, match="no free loopback port outside \\[5000\\]"):
-        runtime._free_port_except({5000}, attempts=3)
+        runtime.free_port_except({5000}, attempts=3)
 
 
 def test_generate_runtime_otel_emits_journal_dir_when_set(tmp_path, monkeypatch):

@@ -164,7 +164,7 @@ class RunRegistry:
             else:
                 outcome = "started"
 
-            web_port = port if port is not None else runtime.free_port()
+            web_port = port if port is not None else runtime.free_port_except(runtime.pinned_ports(otel))
             rd, conf, otlp_endpoint, otlp_http_endpoint = runtime.generate_runtime(
                 agent_id, otel=otel, reserved_ports=(web_port,)
             )

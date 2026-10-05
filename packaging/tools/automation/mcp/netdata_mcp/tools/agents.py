@@ -7,7 +7,7 @@ from typing import Annotated
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import Field
 
-from .. import buildcfg
+from .. import buildcfg, runtime
 from ._common import Profile, _Worktree, get_agents, get_runs
 from .models import RunInfo, agent_declared, agent_error, run_info
 
@@ -52,6 +52,9 @@ def register(mcp: FastMCP) -> None:
                 f"Agent {agent_id!r} is running ({live.profile} @ {live.worktree}); "
                 f"stop it (netdata_run_stop) before re-declaring with a different worktree/profile.",
             )
+        known = get_agents(ctx).get(agent_id)
+        if (clash := runtime.web_port_clash(known.otel if known else None, port)) is not None:
+            return agent_error(agent_id, clash)
         try:
             spec = get_agents(ctx).declare(agent_id, worktree, profile, port=port)
         except ValueError as exc:
