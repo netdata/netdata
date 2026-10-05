@@ -331,7 +331,7 @@ modules:
     troubleshooting:
       errors:
         list:
-          - error: "`failed to bind gRPC endpoint 127.0.0.1:4317: Address already in use (os error 98)`"
+          - error: "`failed to bind OTLP/gRPC endpoint 127.0.0.1:4317: Address already in use (os error 98)`"
             when: |
               Logged in the Agent journal at startup by the `otel-plugin/ingestor` worker, followed by `exited with error code 1 and haven't collected any data. Disabling it.` from the Agent. A conflict on the OTLP/HTTP listener fails the same strict way: `failed to bind OTLP/HTTP endpoint 127.0.0.1:4318: Address already in use (os error 98)`.
             cause: |

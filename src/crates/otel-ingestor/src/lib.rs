@@ -491,13 +491,13 @@ fn bind_grpc(listener: &ProtocolConfig) -> Result<Option<TcpIncoming>> {
     let endpoint = &listener.endpoint;
     let addr: std::net::SocketAddr = endpoint
         .parse()
-        .with_context(|| format!("failed to parse endpoint address: {endpoint}"))?;
+        .with_context(|| format!("failed to parse OTLP/gRPC endpoint address: {endpoint}"))?;
     // `serve_with_incoming` discards the builder's TCP options, so restore the
     // TCP_NODELAY default that `serve(addr)` used to apply to accepted sockets.
     let incoming = TcpIncoming::bind(addr)
-        .with_context(|| format!("failed to bind gRPC endpoint {endpoint}"))?
+        .with_context(|| format!("failed to bind OTLP/gRPC endpoint {endpoint}"))?
         .with_nodelay(Some(true));
-    tracing::info!(%endpoint, "gRPC endpoint bound");
+    tracing::info!(%endpoint, "OTLP/gRPC endpoint bound");
     Ok(Some(incoming))
 }
 
@@ -533,7 +533,7 @@ fn grpc_server(
             .tls_config(tls_config)
             .context("failed to configure TLS")?;
     } else {
-        tracing::warn!("TLS disabled, using insecure connection on endpoint: {endpoint}");
+        tracing::warn!("TLS disabled, using insecure connection on OTLP/gRPC endpoint: {endpoint}");
     }
 
     let metrics_svc = MetricsServiceServer::from_arc(Arc::clone(metrics_service))
@@ -543,7 +543,7 @@ fn grpc_server(
     let traces_svc = TraceServiceServer::from_arc(Arc::clone(traces_service))
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
 
-    tracing::info!(%endpoint, "gRPC server starting (metrics + logs + traces)");
+    tracing::info!(%endpoint, "OTLP/gRPC server starting (metrics + logs + traces)");
     let server = server_builder
         .add_service(metrics_svc)
         .add_service(logs_svc)
@@ -552,7 +552,7 @@ fn grpc_server(
     Ok(async move {
         server
             .await
-            .with_context(|| format!("gRPC server error on {endpoint}"))
+            .with_context(|| format!("OTLP/gRPC server error on {endpoint}"))
     })
 }
 
@@ -797,7 +797,7 @@ mod grpc_listener_tests {
 
         let err = bind_grpc(&grpc(true, "not-an-address")).unwrap_err();
         assert!(
-            format!("{err:#}").contains("failed to parse endpoint address"),
+            format!("{err:#}").contains("failed to parse OTLP/gRPC endpoint address"),
             "{err:#}"
         );
 
@@ -805,7 +805,7 @@ mod grpc_listener_tests {
         let addr = taken.local_addr().unwrap().to_string();
         let err = bind_grpc(&grpc(true, &addr)).unwrap_err();
         assert!(
-            format!("{err:#}").contains("failed to bind gRPC endpoint"),
+            format!("{err:#}").contains("failed to bind OTLP/gRPC endpoint"),
             "{err:#}"
         );
     }
