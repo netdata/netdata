@@ -1,9 +1,13 @@
-//! Offline inspector for OTel logs stored in Netdata's WAL/SFST files.
+//! Offline inspector for OTel logs and traces stored in Netdata's WAL/SFST
+//! files.
 //!
 //! The CLI is a thin shell over the wire-neutral `sfsq` query engine: it
 //! resolves the WAL/SFST directories ([`config`]), discovers query sources off
-//! disk ([`discover`]), builds a neutral query ([`query`]), runs the engine,
-//! and formats the result ([`output`]). No running agent is required.
+//! disk (the `discover` module), builds a neutral query ([`query`]), runs the engine,
+//! and formats the result ([`output`]). No running agent is required. The
+//! [`traces`] module is the front door of `sfsq::traces`, powering the
+//! `trace`/`attributes`/`attribute-values`/`search` subcommands, which take
+//! explicit file flags rather than directories.
 //!
 //! [`Args`] and [`run`] live here (not in the binary) so both front doors —
 //! the standalone `sfsq-cli` binary and the `otel-plugin logs` subcommand —
@@ -132,7 +136,7 @@ pub fn init_tracing() {
         .try_init();
 }
 
-/// Whether the error chain is rooted in a broken pipe (downstream reader gone).
+/// Whether any error in the chain is a broken pipe (downstream reader gone).
 /// Exposed so both binaries can treat `… | head` as a clean exit.
 pub fn is_broken_pipe(err: &anyhow::Error) -> bool {
     err.chain().any(|cause| {
@@ -143,8 +147,8 @@ pub fn is_broken_pipe(err: &anyhow::Error) -> bool {
 }
 
 /// `--tenant` is path-joined to the storage dirs, so it must be a single,
-/// benign path segment — reject empty, `.`/`..`, and separators to avoid a
-/// typo silently pointing at a sibling directory.
+/// benign path segment — reject empty, `.`/`..`, and any `/`, `\`, or NUL to
+/// avoid a typo silently pointing at a sibling directory.
 fn validate_tenant(tenant: &str) -> Result<()> {
     if tenant.is_empty()
         || tenant == "."

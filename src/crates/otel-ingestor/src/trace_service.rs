@@ -1,8 +1,12 @@
-//! Production OTLP **traces** ingestion — the span analog of
-//! [`crate::logs_service::NetdataLogsService`], same two-phase export
-//! structure: prepare every frame lock-free (normalize + interval time bounds
-//! + flatten + encode, all owned by [`ng_flatten::prepare_trace_frame`]),
-//! then write + sync + drain-events under the tenant's writer lock only.
+//! The OTLP traces ingestion service: the gRPC `TraceService` implementation
+//! that receives `ExportTraceServiceRequest`s and lands them in per-tenant
+//! WALs — the span analog of [`crate::logs_service::NetdataLogsService`], same
+//! two-phase export structure: prepare every frame lock-free (normalize +
+//! interval time bounds + flatten + encode, all owned by
+//! [`ng_flatten::prepare_trace_frame`]; `Some(bounds)` here — production
+//! enforces the window, while the `ng-ingest` dev tool and the tests pass
+//! `None`), then write + sync + drain-events under the tenant's writer lock
+//! only.
 //!
 //! ## Partitioning (the D7 seam)
 //!
@@ -24,7 +28,14 @@
 //! only if its whole `[start, effective end]` interval lies inside
 //! `[now - max_age, now + future_skew]` (see
 //! [`ng_flatten::normalize_trace_request`]). Rejected spans are reported via
-//! OTLP `partial_success.rejected_spans`.
+//! OTLP `partial_success.rejected_spans`; the RPC still succeeds, and the ack
+//! is returned only after the WAL sync.
+//!
+//! Consumers: the ledger's per-signal indexer turns sealed WAL files into
+//! SFST indexes (`ng-index`), reacting to the fire-and-forget lifecycle
+//! events ([`LedgerSender`]); between exports, the periodic
+//! [`NetdataTracesService::sweep_expired_rotations`] seals quiet streams so
+//! they still get indexed (and uploaded, with remote storage).
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -61,7 +72,7 @@ struct StorableSpans {
     request: ExportTraceServiceRequest,
 }
 
-/// THE traces partitioning seam (plan decision D7, 2026-07-10).
+/// THE traces partitioning seam (plan decision D7).
 ///
 /// Today: unpartitioned — the whole request becomes ONE group on the
 /// *unattributed* stream, reusing the logs identity convention
@@ -96,7 +107,7 @@ struct PreparedSpans {
 
 /// Build the OTLP `partial_success` payload from a request's rejected spans.
 /// `None` only when nothing was rejected (full success). Out-of-window is the
-/// single rejection class while unpartitioned (D7); the identity classes the
+/// single rejection class while unpartitioned; the identity classes the
 /// logs service reports (collision, oversized) gain entries here when the
 /// partitioning seam is switched.
 fn build_partial_success(out_of_window: usize) -> Option<ExportTracePartialSuccess> {
@@ -114,15 +125,19 @@ fn build_partial_success(out_of_window: usize) -> Option<ExportTracePartialSucce
     })
 }
 
+/// gRPC sink for OTLP span exports: appends flattened frames to per-tenant
+/// WALs and forwards lifecycle events to the ledger. See the module docs for
+/// the request flow.
 pub struct NetdataTracesService {
     /// Per-tenant WAL writers. The map mutex is held only for lookup/insert;
     /// each request then locks ONLY its tenant's writer for the write+sync
     /// region, so tenants ingest in parallel (same discipline as the logs
     /// service).
     writers: Mutex<HashMap<TenantId, Arc<Mutex<wal::Writer>>>>,
-    /// Process-wide monotonic clock, shared across signals (the WAL writer's
-    /// doc requires a single clock so per-frame `ingestion_ns` is consistent
-    /// across every stream/signal).
+    /// Process-wide monotonic clock, shared across tenants, streams, and
+    /// signals (lib.rs creates one instance for logs + traces): the WAL writer
+    /// stamps per-frame `ingestion_ns` from it, so one clock keeps frame
+    /// ordering consistent across every stream and signal.
     clock: Arc<Mutex<MonotonicClock>>,
     /// Shared with the logs ingestion service: the writer → ledger IPC accepts
     /// exactly one connection (the ledger gap-checks frame sequences per
@@ -134,7 +149,8 @@ pub struct NetdataTracesService {
     /// end]` interval falls outside `[now - max_age, now + future_skew]`.
     /// Applied per span inside `prepare_trace_frame`.
     ingest_bounds: bridge::config::IngestConfig,
-    /// Shared global seq allocator (file `seq` is globally unique across signals).
+    /// Shared global seq allocator (lib.rs hands the same one to the logs and
+    /// traces services), so file `seq` is unique across signals.
     seq: Arc<wal::SeqAllocator>,
     auth: AuthConfig,
     /// Identity stamped into every WAL FileId (the machine GUID resolved by the
@@ -168,6 +184,8 @@ impl NetdataTracesService {
         }
     }
 
+    /// The tenant's effective WAL rotation config: its per-tenant override,
+    /// or the global default when it has none (see `RotationPolicy::resolve`).
     fn resolve_wal_config(&self, tenant_id: &str) -> wal::Config {
         let rotation = self.wal_config.rotation.resolve(tenant_id);
         wal::Config {
@@ -183,7 +201,8 @@ impl NetdataTracesService {
 
     /// The default (non-overridden) WAL rotation `max_duration` — the value the
     /// idle-rotation sweep enforces for most streams. Used at startup to warn
-    /// when it is below the sweep granularity.
+    /// when it is at or below the sweep interval (idle streams then rotate at
+    /// sweep granularity).
     pub fn default_max_file_duration(&self) -> std::time::Duration {
         self.wal_config.rotation.resolve("default").max_file_duration
     }
@@ -201,12 +220,18 @@ impl NetdataTracesService {
     }
 
     /// Rotate any per-tenant WAL stream whose active file has passed a rotation
-    /// threshold as of now, without a new frame (the idle-rotation sweep) —
-    /// the traces twin of the logs service's sweep, same lock discipline:
-    /// clock read once before any writer lock (no AB-BA with the export path's
-    /// writer-then-clock order), handles snapshotted under the map lock only,
-    /// and per writer: rotate, then drain AND send UNDER that writer's lock so
-    /// the sealed file's events reach the ledger in order.
+    /// threshold as of now, without a new frame (the idle-rotation sweep, the
+    /// traces twin of the logs service's). lib.rs runs it periodically per
+    /// signal, off the async worker pool (it does serial fsyncs), so quiet
+    /// streams still get indexed (and, with remote storage, uploaded).
+    /// Lock discipline mirrors the export path:
+    /// - the clock is read ONCE before any writer lock, so the sweep never
+    ///   nests clock → writer and cannot AB-BA with the export path's one
+    ///   nesting (writer → clock, for the per-frame `ingestion_ns` tick);
+    /// - writer handles are snapshotted under the map lock only (held just for
+    ///   the clone), so exports are not blocked by the sweep;
+    /// - per writer: rotate, then drain AND send UNDER that writer's lock so
+    ///   the sealed file's events reach the ledger in order.
     pub fn sweep_expired_rotations(&self) {
         let now_ns = self.clock.lock().unwrap().now_ns();
 
@@ -222,10 +247,10 @@ impl NetdataTracesService {
             let (result, forwarded) = {
                 let mut w = writer.lock().unwrap();
                 let result = w.rotate_expired(now_ns);
-                // Drain UNCONDITIONALLY, even if a later stream errored mid-loop:
-                // `rotate_expired` may have already sealed earlier streams before
-                // the error, and their `Closed` events must still reach the
-                // ledger. Send under the lock (ordering, as in export).
+                // Drain UNCONDITIONALLY, even when the rotation errored: it is
+                // best-effort per stream, so it may have already sealed earlier
+                // streams and queued their `Closed` events — those must still
+                // reach the ledger. Send under the lock (ordering, as in export).
                 let events = w.take_all_events();
                 let forwarded = events.len();
                 if forwarded > 0 {
@@ -279,10 +304,12 @@ impl TraceService for NetdataTracesService {
         // header's `ingestion_ns` is ticked separately at write time, inside
         // the writer lock, so it stays monotonic per file.
         let fallback_base_ns = self.clock.lock().unwrap().now_ns().as_u64();
-        // Inclusive window on the span's whole interval: `start >= min_ns` AND
-        // `effective end <= max_ns` (decision 4's interval rule). Synthesized
-        // (now-based) starts land inside by construction; a client-provided
-        // absurd end is still policed by the future bound.
+        // Inclusive window on the span's whole interval: a client-provided
+        // start must be >= min_ns and the effective end (an end before the
+        // start clamps up to the start) <= max_ns. A start-less span gets a
+        // synthesized (now-based) start that is never judged against min_ns —
+        // only its raw client-supplied end faces the future bound (the exact
+        // rule lives in ng_flatten::normalize_trace_request).
         let bounds = ng_flatten::TimeBounds {
             min_ns: fallback_base_ns.saturating_sub(self.ingest_bounds.max_age_ns()),
             max_ns: fallback_base_ns.saturating_add(self.ingest_bounds.future_skew_ns()),
@@ -327,8 +354,9 @@ impl TraceService for NetdataTracesService {
 
         // Phase 2 — the serialized region, under THIS TENANT's writer lock
         // only (the map lock is held just for lookup/insert): frame writes,
-        // one durability sync (ack ⇒ synced), event drain. All sync code —
-        // no `.await` while a guard is held.
+        // one durability sync (a successful ack implies the frames are on
+        // disk), event drain. All sync code — no `.await` while a guard is
+        // held.
         let writer = {
             let mut writers = self.writers.lock().unwrap();
             if let Some(w) = writers.get(&tenant_id) {
@@ -369,9 +397,9 @@ impl TraceService for NetdataTracesService {
                         wal::FrameMeta {
                             entry_count: p.frame.records,
                             ingestion_ns,
-                            // Always Some here: a prepared frame carries at
-                            // least one span, and ts_range is None iff
-                            // records == 0.
+                            // Always Some here: zero-record frames were
+                            // skipped above, and `prepare_trace_frame` sets
+                            // `ts_range` whenever it keeps a record.
                             log_ts_range: p.frame.ts_range.map(|(min, max)| {
                                 (
                                     file_registry::TimestampNs(min),
@@ -391,9 +419,10 @@ impl TraceService for NetdataTracesService {
             })?;
             // Drain AND forward the lifecycle events while STILL holding the
             // writer lock, so drain+send is atomic per tenant: a file's
-            // Created→Synced→Closed reach the single ledger channel in
-            // lock-acquisition (== logical) order. `send_events` is synchronous
-            // and non-blocking (unbounded channel), so no `.await` under the lock.
+            // Created→Synced→Closed reach the one ledger channel in the order
+            // the lock serialized their writes. `send_events` is synchronous
+            // and non-blocking (unbounded channel), so no `.await` under the
+            // lock.
             let events = writer.take_all_events();
             self.sender.send_events(tenant_id, events);
         }

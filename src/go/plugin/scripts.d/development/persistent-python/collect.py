@@ -25,9 +25,11 @@ def main():
             continue
         emit({"id": request["id"], "result": {
             "version": "v1",
-            "metrics": [{"name": "processed_total", "value": count, "labels": {"queue": "mail"}}],
-            "checks": [{"id": "backlog", "state": "critical" if count == 1 else "ok",
-                        "labels": {"queue": "mail"}}],
+            "metrics": [{"name": "processed_total", "type": "counter", "unit": "jobs",
+                         "samples": [{"value": count, "labels": {"queue": "mail"}}]}],
+            "checks": [{"id": "backlog", "title": "Queue Backlog", "by_labels": ["queue"],
+                        "samples": [{"state": "critical" if count == 1 else "ok",
+                                     "labels": {"queue": "mail"}}]}],
         }})
     return 0
 

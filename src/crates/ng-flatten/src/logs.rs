@@ -1,15 +1,32 @@
 //! OTel **logs** flattening: the log-specific request/record types, the log
 //! flatten + normalization entry points, and the log frame codec. The neutral
 //! substrate they build on (the [`Flattener`], [`SchemaTree`], ids, rendering,
-//! bincode codec) lives in [`crate::common`].
+//! bincode codec) lives in [`crate::common`]; the span analog is [`crate::traces`].
 //!
-//! VERSIONING: the frame payload is the bincode of [`FlattenedLogRequest`] —
-//! positional, not self-describing — identified per WAL file by
-//! [`LOG_FRAME_PAYLOAD_FORMAT`] in the WAL header. Any change to these types
-//! (new [`Record`] fields, [`Value`]/[`Kind`] variants) changes the wire shape
-//! and MUST ship under a NEW format id; readers check the id before decoding
-//! and reject a mismatch. A file with a superseded id is skipped as a logged
-//! orphan unless a decoder for it is deliberately kept.
+//! One record → one SFST row. What becomes what at seal time (the builder is
+//! `src/crates/ng-index/src/sfst_build.rs::populate_row_index`):
+//! - interned facets: `severity_number`, `severity_text`, `event_name`,
+//!   `body.*` (a JSON-object string body arrives pre-parsed into a kvlist, so
+//!   its keys explode into typed leaves), `attributes.*`, plus the per-group
+//!   `resource.attributes.*` / `scope.*` entries — searchable tokens in the
+//!   shared [`SchemaTree`], persisted whole as the on-disk field descriptor;
+//! - per-row columns from [`Record`]: `ts` (the row key) plus the five optional
+//!   chunks fed from the other fields — `observed_ts`/`trace_id`/`span_id`/
+//!   `flags`/`dropped_attributes_count` (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`).
+//!   No trace-id index or bloom here: those are span-only.
+//!
+//! FRAME VERSIONING: a frame's payload is the bincode of [`FlattenedLogRequest`]
+//! — positional, not self-describing — identified per file by the
+//! [`LOG_FRAME_PAYLOAD_FORMAT`] id in the WAL header. Any wire-shape change (a
+//! new [`Record`] field, a new [`Value`]/[`Kind`] variant) MUST ship under a
+//! NEW id: readers check the id first and reject a mismatch, so a superseded
+//! file fails loudly instead of mis-decoding positional bytes as garbage.
+//!
+//! [`prepare_log_frame`] is the single normalize → flatten → encode recipe;
+//! producers: `ng-ingest::write_request` (no bounds) and the `otel-ingestor`
+//! logs service (with ingestion bounds). Readers decode via [`decode_log_frame`]:
+//! `ng-index::sfst_build` (seal-time index build) and `sfsq::logs` (unindexed
+//! WAL-tail scan).
 
 use serde::{Deserialize, Serialize};
 
@@ -21,11 +38,10 @@ use opentelemetry_proto::tonic::common::v1::{
 use crate::common::*;
 
 /// WAL `payload_format` id of the bincode [`FlattenedLogRequest`] frame codec.
-/// Producers stamp it via `wal::Writer::new`; every consumer that decodes log
-/// frames checks it first. The id space is append-only: `0` is reserved, `2`
-/// is retired (the removed traces proof scaffold's raw-OTLP payload — never
-/// reuse), `3` is the traces frame codec; a changed logs wire shape takes the
-/// next free id, never reuses this one.
+/// Producers stamp it via `wal::Writer::new`; readers check it before decoding.
+/// The id space is append-only: `0` is reserved, `2` is retired (the removed
+/// traces proof scaffold's raw-OTLP payload — never reuse), `3` is the traces
+/// frame codec; a changed logs wire shape takes the next free id.
 pub const LOG_FRAME_PAYLOAD_FORMAT: u16 = 1;
 
 /// A flattened request: one schema tree shared by all its records, plus the OTLP
@@ -52,32 +68,28 @@ pub struct LogScopeGroup {
     pub records: Vec<Record>,
 }
 
-/// One log record: its per-row scalar fields plus its flattened entries. The frame
-/// is **lossless w.r.t. the normalized request** — every `LogRecord` field is
-/// carried here, either as a per-row column (the scalars below) or as flattened
-/// `entries`. "Normalized" is the key qualifier: [`normalize_log_request`] runs
-/// first and rewrites some fields (resolves timestamps, clears malformed ids,
-/// and replaces a JSON-object string body with its parsed structure, dropping
-/// the raw string); the frame preserves that post-normalization record, not the
-/// original bytes on the wire. What the SFST actually stores is decided later at
-/// index time (`build_sfst`), not at flatten time.
+/// One log record: its per-row scalar columns plus its flattened entries. The
+/// frame is **lossless w.r.t. the normalized request** — every `LogRecord` field
+/// is carried here, as a column below or as flattened `entries`. "Normalized" is
+/// the qualifier: [`normalize_log_request`] runs first and rewrites fields
+/// (resolves timestamps, clears malformed ids, replaces a JSON-object string
+/// body with its parsed structure), so the frame stores the post-normalization
+/// record, not the original wire bytes. What the SFST keeps of each field is
+/// decided later, at index time (`build_sfst`).
 ///
-/// Per-row columns (identifiers/scalars, NOT FST facets):
-/// - `ts`: the resolved `time_unix_nano`. The caller MUST normalize timestamps before
-///   flattening (see `ng-ingest::write_request`): `time_unix_nano` else
-///   `observed_time_unix_nano` else a monotonic clock. A caller that skips
-///   normalization and flattens a record with `time_unix_nano == 0` gets `ts == 0`
-///   (a year-1970 row) — so always normalize first.
-/// - `observed_ts`: the raw `observed_time_unix_nano` (0 if unset). Carried verbatim
-///   for losslessness; `ts` is the value used for row ordering.
-/// - `trace_id` / `span_id`: raw OTLP bytes (empty if unset). Carried as columns, NOT
-///   flattened into `entries` (see [`Flattener::flatten_record`]) — they are
-///   near-unique identifiers, wrong to FST-index.
-/// - `flags` / `dropped_attributes_count`: carried for losslessness (the frame keeps
-///   them); whether the SFST stores them is an index-time choice.
-///
-/// `ts` and `observed_ts` use a saturating `u64 → i64` cast (a value past `i64::MAX`
-/// clamps rather than wrapping negative).
+/// Columns — identifiers/scalars retrieved per row, deliberately NOT FST facets:
+/// - `ts` / `observed_ts`: the resolved `time_unix_nano` and the raw
+///   `observed_time_unix_nano`, both `0` when unset and both saturating
+///   `u64 → i64` casts (past `i64::MAX` clamps, never wraps negative). `ts`
+///   drives row ordering; `observed_ts` rides along for losslessness. The
+///   caller MUST normalize first (see [`flatten_log_into`]) or an unresolved
+///   `time_unix_nano == 0` flattens to `ts == 0` — a year-1970 row.
+/// - `trace_id` / `span_id`: the typed id newtypes, `UNSET` when absent or
+///   wrong-length. Carried as columns, not entries (see
+///   [`Flattener::flatten_record`]) — near-unique identifiers are wrong to
+///   FST-index.
+/// - `flags` / `dropped_attributes_count`: carried for losslessness; whether
+///   the SFST stores them is an index-time choice.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {
     pub ts: i64,
@@ -89,12 +101,14 @@ pub struct Record {
     pub entries: Vec<Entry>,
 }
 
-/// Flatten one decoded request INTO a shared [`Flattener`], returning the request's
-/// grouped entries. The tree stays in `flattener`, so it can span many requests.
-/// Resource is flattened once per `ResourceLogs`, scope once per `ScopeLogs`.
+/// Flatten one decoded request INTO a shared [`Flattener`], returning the
+/// request's grouped entries. The tree stays in `flattener`, so it can span
+/// many requests; resource is flattened once per `ResourceLogs`, scope once
+/// per `ScopeLogs`.
 ///
-/// Each [`Record`]'s `ts` is read from `time_unix_nano`, which the caller is expected
-/// to have normalized so it is always set (see `ng-ingest`).
+/// The caller MUST normalize first ([`normalize_log_request`]): `ts` is read
+/// from `time_unix_nano` verbatim, so a record that reaches flattening with
+/// `time_unix_nano == 0` flattens to a `ts == 0` (year-1970) row.
 pub fn flatten_log_into(
     flattener: &mut Flattener,
     request: ExportLogsServiceRequest,
@@ -115,13 +129,13 @@ pub fn flatten_log_into(
                 .log_records
                 .into_iter()
                 .map(|r| Record {
-                    // Saturating: a u64 past i64::MAX (year ~2262 / adversarial input)
-                    // clamps to i64::MAX rather than wrapping negative — keeps row
+                    // Saturating: a u64 past i64::MAX (year ~2262 or adversarial
+                    // input) clamps rather than wrapping negative — keeps row
                     // ordering sane.
                     ts: i64::try_from(r.time_unix_nano).unwrap_or(i64::MAX),
                     observed_ts: i64::try_from(r.observed_time_unix_nano).unwrap_or(i64::MAX),
-                    // Ingest normalization (normalize_log_request) already cleared any
-                    // wrong-length id to empty → from_bytes(empty) → UNSET.
+                    // Wrong-length ids (normalization clears them to empty) fail
+                    // from_bytes → UNSET; garbage bytes can never land here.
                     trace_id: TraceId::from_bytes(&r.trace_id).unwrap_or_default(),
                     span_id: SpanId::from_bytes(&r.span_id).unwrap_or_default(),
                     flags: r.flags,
@@ -150,13 +164,10 @@ pub struct LogNormalization {
     /// ingestion [`TimeBounds`] (0 when no bounds were applied).
     pub rejected: usize,
     /// String bodies that were a JSON object and got rewritten in place into
-    /// an OTLP kvlist (their raw string dropped) so the flattener emits typed
-    /// `body.*` columns. See [`try_parse_json_body`].
-    ///
-    /// Normalization-local by design: unlike [`Self::bad_ids`] /
-    /// `sanitized_keys`, it counts normal, desired behavior (not malformed
-    /// input), so [`prepare_log_frame`] deliberately does NOT forward it into
-    /// [`PreparedLogFrame`] or log it.
+    /// an OTLP kvlist (raw string dropped) so the flattener emits typed
+    /// `body.*` columns. See `try_parse_json_body`. Deliberately not
+    /// forwarded into [`PreparedLogFrame`] or logged: unlike [`Self::bad_ids`]
+    /// or `sanitized_keys`, this counts desired behavior, not malformed input.
     pub parsed_bodies: usize,
 }
 
@@ -166,28 +177,32 @@ pub struct LogNormalization {
 /// 1. **Resolves timestamps** by the OTLP single-timestamp rule: keep
 ///    `time_unix_nano` if set, else fall back to `observed_time_unix_nano`,
 ///    else synthesize `fallback_base_ns + k` for the k-th timestamp-less
-///    record (strictly increasing, so intra-frame ordering is preserved
-///    without touching a shared clock per record; not globally unique across
-///    frames — they tie-break deterministically). The resolved value is
-///    written into `time_unix_nano`; `Record.ts` is read straight from it.
-/// 2. **Clears malformed trace/span ids**: a non-empty id whose length is not
+///    record — strictly increasing, so intra-frame ordering holds without
+///    touching a shared clock per record (values repeat across frames, which
+///    tie-break deterministically). The result is written into
+///    `time_unix_nano`; `Record.ts` reads straight from it.
+/// 2. **Enforces the ingestion window** ([`TimeBounds`]) on the resolved
+///    timestamp, dropping out-of-window records. Synthesized values always
+///    pass: a "now" value we just stamped is never out-of-window.
+/// 3. **Clears malformed trace/span ids**: a non-empty id whose length is not
 ///    the spec width becomes absent (the SFST id columns later store it as the
 ///    all-zero "unset" sentinel); conformant and absent ids pass untouched.
-/// 3. **Rewrites JSON-object string bodies**: a body that is a string holding a
-///    JSON object is parsed and replaced in place by the equivalent OTLP kvlist
-///    (see [`try_parse_json_body`]), so the flattener explodes it into typed
-///    `body.*` columns instead of one opaque string. The raw string is dropped
-///    on success; any other body (non-JSON, or JSON that is not an object) is
-///    left verbatim.
+/// 4. **Rewrites JSON-object string bodies** in place (see
+///    `try_parse_json_body`) so the flattener emits typed `body.*` columns
+///    instead of one opaque string; any other body is left verbatim.
+///
+/// Scopes and resources the window filter empties are pruned too, so their
+/// attributes are never interned as zero-row values.
 ///
 /// Returns [`LogNormalization`]: the cleared-id counts (for one aggregated
-/// warning per request), the record count, the `(min, max)` of the resolved
-/// timestamps — computed here, from the same resolution the rows store, so the
-/// frame's time range can never drift from the rows' `ts` — and the count of
-/// rewritten JSON bodies.
+/// warning per request), the kept-record count, the `(min, max)` of the
+/// resolved timestamps — computed here, from the same resolution the rows
+/// store, so the frame's time range can never drift from the rows' `ts` — and
+/// the rewritten-body count.
 ///
-/// The caller MUST run this before [`flatten_log_request`]. Shared by
-/// `ng-ingest` and the production OTel-logs ingestor.
+/// The caller MUST run this before [`flatten_log_request`]. It runs inside
+/// [`prepare_log_frame`], which `ng-ingest` and the production OTel-logs
+/// ingestor share.
 pub fn normalize_log_request(
     req: &mut ExportLogsServiceRequest,
     fallback_base_ns: u64,
@@ -236,11 +251,8 @@ pub fn normalize_log_request(
                     r.span_id.clear();
                     out.bad_ids.span += 1;
                 }
-                // A string body that is a JSON object is rewritten into the
-                // equivalent OTLP kvlist so the flattener emits typed `body.*`
-                // columns; the raw string is dropped (decision 1B). Computed in
-                // its own step so the immutable body borrow ends before we
-                // reassign. Any other body is left verbatim.
+                // The immutable borrow of `r.body` must end before reassignment,
+                // so parse in its own step (decision 1B).
                 let parsed_body = match &r.body {
                     Some(AnyValue {
                         value: Some(Av::StringValue(s)),
@@ -273,19 +285,17 @@ pub fn normalize_log_request(
 /// Try to interpret a log body STRING as a JSON object, returning the
 /// equivalent OTLP [`AnyValue`] (always a `KvlistValue`) so the flattener can
 /// explode it into typed `body.*` columns. Returns `None` — leaving the body a
-/// verbatim string — in every case that is not a JSON object:
+/// verbatim string — unless all of these hold:
 ///
-/// - the trimmed text does not start with `{` and end with `}`: a cheap
-///   pre-check that skips the parse for the common non-JSON body (guard
-///   decision 3A; `serde_json`'s default recursion limit still bounds nesting);
-/// - `serde_json` fails to parse it; or
-/// - it parses to a non-object (a number, bool, array, null, or bare string
-///   stays verbatim — object-only gate, decision 2A).
+/// - the trimmed text starts with `{` and ends with `}`: a cheap pre-check
+///   that skips the parse for common non-JSON bodies (guard decision 3A;
+///   `serde_json`'s default recursion limit still bounds nesting);
+/// - `serde_json` parses it; and
+/// - it parses to an object (numbers, bools, arrays, null, and bare strings
+///   stay verbatim — object-only gate, decision 2A).
 ///
 /// Only the top level is gated on being an object; nested values convert by
-/// their own JSON type via [`json_to_any_value`]. A string VALUE inside the
-/// object is NOT re-parsed — one that itself looks like JSON stays a
-/// `StringValue` leaf (decision 2A: no recursive re-parse).
+/// their own JSON type via `json_to_any_value`.
 fn try_parse_json_body(s: &str) -> Option<AnyValue> {
     let trimmed = s.trim();
     if !(trimmed.starts_with('{') && trimmed.ends_with('}')) {
@@ -300,14 +310,14 @@ fn try_parse_json_body(s: &str) -> Option<AnyValue> {
 
 /// Convert a [`serde_json::Value`] into the OTLP [`AnyValue`] the flattener
 /// consumes — one-to-one by JSON type. Recurses through arrays and objects; a
-/// string value is carried verbatim (never re-parsed as JSON).
+/// string value is carried verbatim, never re-parsed as JSON (decision 2A: no
+/// recursive re-parse).
 ///
-/// Object key emission order follows `serde_json`'s feature-unified `Map`:
-/// insertion order when any crate in the build graph enables `preserve_order`
-/// (`otel-ingestor`, `otel-ledger`, `journal-function` do), else BTreeMap-sorted
-/// (e.g. `cargo test -p ng-flatten` in isolation). So key order MUST NOT be
-/// relied on for frame byte-stability; column identity is unaffected either way
-/// (nodes intern by path + kind, independent of entry order).
+/// Object keys keep `serde_json`'s `Map` order: insertion order when any crate
+/// in the build graph enables `preserve_order` (`otel-ingestor`, `otel-ledger`,
+/// `journal-function` do), else sorted. Key order MUST NOT be relied on for
+/// frame byte-stability; column identity is unaffected (nodes intern by path +
+/// kind, independent of entry order).
 fn json_to_any_value(value: serde_json::Value) -> AnyValue {
     let v = match value {
         serde_json::Value::Null => None,
@@ -347,10 +357,9 @@ fn json_number_to_value(n: serde_json::Number) -> Av {
     }
 }
 
-/// Flatten a request into its own per-frame tree (convenience over [`flatten_log_into`])
-/// — the form stored in a flattened WAL frame. Callers MUST normalize record
-/// timestamps first (see [`normalize_log_request`] / [`Record`]); a record with
-/// `time_unix_nano == 0` flattens to `ts == 0`.
+/// Flatten a request into its own per-frame tree (convenience over
+/// [`flatten_log_into`]) — the form stored in a flattened WAL frame. The
+/// normalize-first rule applies (see [`flatten_log_into`]).
 ///
 /// Also returns the number of attribute keys sanitized (`'='` → `'_'` per the
 /// key=value delimiter rule; empty keys degraded to `"_"`) so the caller can
@@ -390,15 +399,15 @@ pub struct PreparedLogFrame {
     pub rejected: usize,
 }
 
-/// The single owner of the logs frame-payload recipe: normalize (ONE record
-/// walk — [`normalize_log_request`]) → flatten ([`flatten_log_request`]) →
-/// (entry hashes are filled at emit time by the flattener) → bincode-encode
+/// The single owner of the logs frame-payload recipe: normalize (one record
+/// walk — [`normalize_log_request`]) → flatten ([`flatten_log_request`]; entry
+/// hashes are filled at emit time by the flattener) → bincode-encode
 /// ([`encode_log_frame`]). Shared by `ng-ingest` and the production OTel-logs
 /// ingestor so the recipe exists exactly once.
 ///
 /// Logs the aggregated per-request warnings itself (cleared malformed ids,
-/// sanitized keys) — one owner for the message text too; the counts are
-/// still returned for callers that want them.
+/// sanitized keys) — one owner for the message text too; the counts are still
+/// returned for callers that want them.
 pub fn prepare_log_frame(
     mut req: ExportLogsServiceRequest,
     fallback_base_ns: u64,
@@ -406,13 +415,11 @@ pub fn prepare_log_frame(
 ) -> Result<PreparedLogFrame, bincode::error::EncodeError> {
     let norm = normalize_log_request(&mut req, fallback_base_ns, bounds);
     // Nothing to flatten or encode without kept records; callers skip writing
-    // (`ts_range` is `None`). This also covers a frame whose every record was
-    // dropped as out-of-window — `rejected` still carries the count so the
-    // caller can report it. Recordless resource/scope attributes are skipped
-    // too — same as not writing the frame.
+    // (`ts_range` is `None`). A frame whose every record was out-of-window
+    // lands here too, with `rejected` still carrying the count to report.
     if norm.records == 0 {
-        // `bad_ids` is necessarily zero here (normalization clears ids only on
-        // kept records) — carried through so the invariant is visible.
+        // `bad_ids` is necessarily zero here: normalization clears ids only
+        // on kept records.
         return Ok(PreparedLogFrame {
             data: Vec::new(),
             records: 0,

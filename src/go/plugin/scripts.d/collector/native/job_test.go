@@ -64,8 +64,10 @@ nd_ready
 while nd_next; do
     if [[ -f $dir/fail ]]; then exit 7; fi
     nd_begin
-    nd_metric depth 17 queue mail
-    nd_check backlog critical queue mail
+    nd_metric depth gauge jobs
+    nd_sample "$ND_FAMILY" 17 queue mail
+    nd_check backlog "Queue Backlog" queue
+    nd_check_sample "$ND_FAMILY" critical queue mail
     nd_end
 done
 `)
@@ -97,8 +99,10 @@ done
 nd_ready
 while nd_next; do
     nd_begin
-    nd_metric depth 17 queue mail
-    nd_check backlog critical queue mail
+    nd_metric depth gauge jobs
+    nd_sample "$ND_FAMILY" 17 queue mail
+    nd_check backlog "Queue Backlog" queue
+    nd_check_sample "$ND_FAMILY" critical queue mail
     nd_end
 done
 `)

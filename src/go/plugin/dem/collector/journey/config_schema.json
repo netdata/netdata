@@ -1,0 +1,159 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Journey collector configuration.",
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "description": "Native job name used to identify this monitor and its history. Renaming creates a separate monitor.",
+        "type": "string",
+        "minLength": 1
+      },
+      "script": {
+        "title": "Script",
+        "description": "Inline Playwright Test JavaScript or TypeScript source. Leave empty when using Script path.",
+        "type": "string"
+      },
+      "script_path": {
+        "title": "Script path",
+        "description": "Absolute path to a readable Playwright Test JavaScript or TypeScript entry file. Leave empty when using Script.",
+        "type": "string"
+      },
+      "secrets": {
+        "title": "Secrets",
+        "description": "Credentials passed to the workflow as named environment variables. Leave empty for workflows without credentials.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Secret",
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Environment name",
+              "description": "Unique environment variable name starting with DEM_SECRET_, followed by letters, digits or underscores.",
+              "type": "string",
+              "pattern": "^DEM_SECRET_[A-Za-z0-9_]+$"
+            },
+            "value": {
+              "title": "Value",
+              "description": "Credential value or a native secret reference, such as ${env:WORKFLOW_PASSWORD}.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "value"
+          ]
+        }
+      },
+      "screenshot_on_failure": {
+        "title": "Capture failure screenshot",
+        "description": "Save a screenshot when a workflow check fails. Screenshots can contain sensitive page content; timeout capture is best effort.",
+        "type": "boolean",
+        "default": false
+      },
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 900
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Browser attempt timeout, in seconds. Waiting for another browser attempt is excluded.",
+        "type": "number",
+        "default": 120,
+        "minimum": 0.001
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "allOf": [
+      {
+        "if": {
+          "required": [
+            "script"
+          ],
+          "properties": {
+            "script": {
+              "minLength": 1
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "script_path": {
+              "maxLength": 0
+            },
+            "script": {
+              "pattern": "[^\\t\\n\\v\\f\\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+            }
+          }
+        },
+        "else": {
+          "required": [
+            "script_path"
+          ],
+          "properties": {
+            "script_path": {
+              "minLength": 1
+            }
+          }
+        }
+      }
+    ]
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Journey",
+          "fields": [
+            "name",
+            "script",
+            "script_path"
+          ]
+        },
+        {
+          "title": "Secrets",
+          "fields": [
+            "secrets"
+          ]
+        },
+        {
+          "title": "Diagnosis",
+          "fields": [
+            "screenshot_on_failure"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "timeout"
+          ]
+        }
+      ]
+    },
+    "script": {
+      "ui:widget": "textarea",
+      "ui:options": {
+        "rows": 12
+      }
+    },
+    "secrets": {
+      "ui:listFlavour": "list",
+      "items": {
+        "value": {
+          "ui:widget": "password"
+        }
+      }
+    }
+  }
+}

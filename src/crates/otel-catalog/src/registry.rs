@@ -1,19 +1,61 @@
-//! Registry for catalog files on local disk.
+//! The registry of locally-present catalog files.
 //!
-//! Catalog files are immutable snapshots produced by a `CatalogBuilder`
-//! whenever a per-scope accumulator is rotated. Each file is named
-//! `{machine_id}-{instance_id}-{max_seq}-{min_ts_s}-{max_ts_s}.catalog` and
-//! lives under a date-partitioned directory:
-//! `{base}/{YYYY-MM-DD}/{tenant_id}/{name}.catalog`.
+//! A catalog file is an immutable snapshot the catalog builder rotates once
+//! per `(tenant, date, machine, instance)` scope (file-lifecycle
+//! `catalog_builder.rs`). One [`Registry`] per tenant tracks the files of
+//! one signal's catalog dir; it is the third registry of file-lifecycle's
+//! per-tenant composition, beside `wal::Registry` and `sfst::Registry`.
 //!
-//! The `[min_ts_s, max_ts_s]` segments encode the union of the
-//! contained entries' time ranges. The query planner uses them to
-//! skip files whose range doesn't overlap a query window, without
-//! opening the file.
+//! Path and filename contract, owned here:
+//! `{base}/{YYYY-MM-DD}/{tenant}/{machine:32}-{instance:32}-{max_seq:010}-{min_ts:010}-{max_ts:010}.catalog`.
+//! The 32-hex `{machine}-{instance}` prefix is the shared stem codec of
+//! `file_registry::stem`; the `{max_seq:010}-{min_ts:010}-{max_ts:010}` tail
+//! and the `.catalog` extension are this module's, with [`filename`] and
+//! [`parse_stem`] as the one codec pair. The two timestamp fields are
+//! [`Catalog::fold`]'s union of the entries' ranges (sibling `catalog.rs`),
+//! which is what lets [`Registry::files_overlapping`] skip a file without
+//! opening its body. `base` is the signal's derived catalog dir
+//! (`{base_dir}/{signal}/catalog`): dedicated to catalogs, so no local
+//! `catalog/` segment — the remote key adds one under the signal segment
+//! instead (file-lifecycle `remote_keys.rs`).
 //!
-//! The registry tracks locally-present catalog files, mirrors the API
-//! shape of `sfst::Registry`, and is consulted by retention and by
-//! query-time discovery.
+//! Lifecycle: [`Registry::recover`] rebuilds the map from disk at startup
+//! (filenames only, lossy); the ledger's catalog-builder response handler
+//! tracks each rotation ([`Registry::track`]); queries select through
+//! [`Registry::files_overlapping`] (in memory, over the filename bounds) and
+//! read through [`read_entries`] (the query-path parser of
+//! `Catalog::from_container_bytes`); retention evicts through
+//! [`Registry::evaluate_retention`].
+//!
+//! Retention interplay: an SFST is not evicted until its catalog entry is
+//! confirmed present on the remote (`is_remote_cataloged`, file-lifecycle
+//! `registry.rs`) — the catalog is the remote-durability evidence, so a
+//! failed catalog upload must not orphan the remote SFST. Catalog files
+//! themselves are evicted on date age alone (they outlive the SFSTs they
+//! index; the horizon is config-validated above SFST `max_age`), through the
+//! mark → send → clear-on-send-failure chain of otel-ledger
+//! `ledger/retention.rs`. A catalog stays the query-time doorway for evicted
+//! SFSTs: file-lifecycle `query.rs` plans the fetch-back (its
+//! `remote_read.rs`) from the entries [`read_entries`] returns.
+//!
+//! Error semantics: [`Registry::recover`] is lossy by design (warn-and-skip
+//! everything unreadable, never fatal); [`scan_max_sequence`] is the
+//! deliberate opposite (completeness-or-error — a short scan could under-seed
+//! the seq counter); [`read_entries`] maps a vanished file to `Ok(None)`
+//! (the plan skips it) and an unreadable or corrupt body to `Err` (the
+//! caller reports it).
+//!
+//! Consumers (grep-verified): file-lifecycle `registry.rs` (composition and
+//! recovery), `query.rs` ([`Registry::files_overlapping`] + [`read_entries`]),
+//! `remote_keys.rs` ([`filename`] stamps remote keys, [`parse_stem`] parses
+//! listed ones), `recovery/local.rs` (retention, seeding, untracking) and
+//! `recovery/startup.rs` (diff-sync install paths, corrupt-catalog heal);
+//! otel-ledger `ledger/catalog_builder.rs` ([`File::new`] +
+//! [`Registry::track`] on rotation), `ledger/retention.rs` (evaluate +
+//! mark/clear pending deletion), `ledger/cleaner.rs` (untrack on
+//! confirmation), `ledger/rpc/logs/handler.rs` (the `files: true` inventory
+//! over [`Registry::iter`]); otel-ingestor `lib.rs` ([`scan_max_sequence`]
+//! in the startup seq seed).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -23,11 +65,19 @@ use file_registry::{ByteSize, Identity, InstanceId, MachineId, Query, TenantId};
 
 use crate::{Catalog, CatalogEntry};
 
+/// The `.catalog` filename extension. file-lifecycle `remote_keys.rs`
+/// carries its own copy for remote keys, matched to this filename shape.
 const CATALOG_EXT: &str = "catalog";
 
-/// One catalog file present on disk.
+/// One catalog file present on disk: the path-encoded identity (`date`,
+/// machine, instance), the filename-encoded fold fields and the on-disk
+/// size. Recovered from the filename plus a stat ([`Registry::recover`]);
+/// tracked at rotation time via [`File::new`].
 #[derive(Debug, Clone)]
 pub struct File {
+    /// The `{YYYY-MM-DD}` directory partition the file lives under — the
+    /// rotation scope's date, and the age key
+    /// [`Registry::evaluate_retention`] compares against its cutoff.
     pub date: NaiveDate,
     pub machine_id: MachineId,
     pub instance_id: InstanceId,
@@ -42,8 +92,10 @@ pub struct File {
 }
 
 impl File {
-    /// Build a new `File` entry with `pending_deletion = false`. Used by the
-    /// ledger when a new catalog file is written.
+    /// Build a new `File` with `pending_deletion = false`. The ledger's
+    /// catalog-builder response handler uses it to track a rotation
+    /// (otel-ledger `ledger/catalog_builder.rs`); [`Registry::recover`]
+    /// builds the struct directly from the filename instead.
     pub fn new(
         date: NaiveDate,
         identity: Identity,
@@ -64,24 +116,36 @@ impl File {
         }
     }
 
+    /// Whether this file is queued for retention eviction: excluded from
+    /// [`Registry::files_overlapping`] and [`Registry::evaluate_retention`],
+    /// still tracked until the delete confirms ([`Registry::remove`]).
     pub fn is_pending_deletion(&self) -> bool {
         self.pending_deletion
     }
 }
 
+/// One tenant's locally-present catalog files, keyed by path.
+///
+/// Purely in-memory and unsynchronized; population is the callers' —
+/// [`Registry::recover`] at startup, [`Registry::track`] on each rotation —
+/// and the lock lives above, on file-lifecycle's per-tenant
+/// `TenantRegistries` (its `registry.rs` documents the model). The API
+/// mirrors `sfst::Registry`'s, keyed by path instead of seq, with
+/// [`Registry::files_overlapping`] standing in for `candidates`.
 pub struct Registry {
-    /// Shared base directory (the signal's derived catalog dir,
-    /// `{base_dir}/{signal}/catalog`). Per-tenant
-    /// catalog files live under `{base_dir}/{date}/{tenant_id}/` — matching
-    /// the flat-per-tenant convention used for WAL and SFST files. The
-    /// remote key layout adds a `catalog/` segment to discriminate artifact
-    /// types inside the shared bucket.
+    /// The signal's derived catalog dir (`{base_dir}/{signal}/catalog`, per
+    /// the plugin config's per-signal lifecycle derivation). Per-tenant files
+    /// live under `{base}/{date}/{tenant_id}/` — the date-partitioned
+    /// per-tenant layout of `file_registry::layout` — with no extra
+    /// `catalog/` segment locally because the dir is dedicated to catalogs;
+    /// the remote key adds one under the signal segment instead
+    /// (file-lifecycle `remote_keys.rs`).
     base_dir: PathBuf,
     /// The tenant this `Registry` owns. Recovery filters to this tenant.
     tenant_id: TenantId,
-    /// Keyed by on-disk path. Catalog files are identified by their full
-    /// `(date, machine, instance, max_seq, min_ts, max_ts)` tuple which the
-    /// path encodes.
+    /// Keyed by on-disk path. The path encodes the file's full
+    /// `(date, machine, instance, max_seq, min_ts, max_ts)` identity, and
+    /// catalog files are immutable — a file's tracked key never changes.
     files: BTreeMap<PathBuf, File>,
 }
 
@@ -102,7 +166,14 @@ impl Registry {
         &self.tenant_id
     }
 
-    /// Derive the canonical on-disk path for a catalog file.
+    /// Derive the canonical on-disk path for a catalog file:
+    /// `{base}/{date}/{tenant}/{filename}` via
+    /// `file_registry::layout::date_tenant_dir`. Both producers build this
+    /// same path from the same two primitives — the rotation writer
+    /// (file-lifecycle `catalog_builder.rs::scope_path`) and the diff-sync
+    /// installer (`recovery/startup.rs::local_catalog_path`) — so every
+    /// tracked path has this shape. No local `catalog/` segment
+    /// (test-pinned; see the [`Registry`] field docs).
     pub fn file_path(
         &self,
         date: NaiveDate,
@@ -115,11 +186,18 @@ impl Registry {
             .join(filename(identity, max_seq, min_timestamp_s, max_timestamp_s))
     }
 
-    /// Register a catalog file that has been written to disk.
+    /// Register a catalog file that has been written to disk. Called from
+    /// the ledger's catalog-builder response handler, right after the
+    /// rotation and before the upload request is sent (otel-ledger
+    /// `ledger/catalog_builder.rs`).
     pub fn track(&mut self, file: File, path: PathBuf) {
         self.files.insert(path, file);
     }
 
+    /// Untrack the file at `path`, returning the removed entry. Called on
+    /// the cleaner's delete confirmation (otel-ledger `ledger/cleaner.rs`)
+    /// and on the startup eviction pass (file-lifecycle
+    /// `recovery/local.rs::recover_retention`).
     pub fn remove(&mut self, path: &Path) -> Option<File> {
         self.files.remove(path)
     }
@@ -132,14 +210,23 @@ impl Registry {
         self.files.values()
     }
 
+    /// Every tracked file with its path. Cross-module consumers rebuild
+    /// remote keys and parsed keys from this `(path, File)` pairing
+    /// (file-lifecycle `recovery/local.rs::seed_from_catalog_files`), and
+    /// the rpc inventory walks it (otel-ledger
+    /// `ledger/rpc/logs/handler.rs`).
     pub fn iter(&self) -> impl Iterator<Item = (&PathBuf, &File)> {
         self.files.iter()
     }
 
     /// The tracked catalog files a query over `q`'s window must read: those
-    /// whose filename-encoded range overlaps it (so a file outside the window
-    /// is skipped without opening its body), skipping files marked
-    /// `pending_deletion`. Reads nothing from disk; [`read_entries`] reads one.
+    /// whose filename-encoded range overlaps it, skipping files marked
+    /// `pending_deletion`. A file outside the window is skipped without
+    /// opening its body — this reads nothing from disk; [`read_entries`]
+    /// reads one. Selection is by time range only: the partition filter
+    /// applies per entry (`Catalog::find`, sibling `catalog.rs`), and the
+    /// remote-plan caller feeds this the query hull with empty partitions
+    /// (file-lifecycle `query.rs::remote_plan_input`).
     pub fn files_overlapping<'a>(
         &'a self,
         q: &Query,
@@ -151,6 +238,7 @@ impl Registry {
             .filter(move |(_, f)| file_overlaps(f, &q))
     }
 
+    /// Number of tracked files, including pending-deletion ones.
     pub fn len(&self) -> usize {
         self.files.len()
     }
@@ -159,6 +247,9 @@ impl Registry {
         self.files.is_empty()
     }
 
+    /// Mark the tracked file at `path` pending deletion (the steady-state
+    /// retention pass, around the delete request). A no-op for an untracked
+    /// path.
     pub fn mark_pending_deletion(&mut self, path: &Path) {
         if let Some(entry) = self.files.get_mut(path) {
             entry.pending_deletion = true;
@@ -179,10 +270,20 @@ impl Registry {
     }
 
     /// Return paths of catalog files whose date is strictly older than
-    /// `today - max_days`. Files already `pending_deletion` are excluded
-    /// to avoid double-scheduling. Does not mutate retention state — the
-    /// caller is expected to `mark_pending_deletion` on each returned
-    /// path before dispatching the delete.
+    /// `today - max_days` (a file dated exactly on the cutoff is kept).
+    /// Files already `pending_deletion` are excluded to avoid
+    /// double-scheduling. `max_days` comes from file-lifecycle
+    /// `helpers::catalog_retention_days` — the tenant's remote-archive
+    /// horizon in whole days, config-validated above SFST `max_age`. A
+    /// cutoff that underflows `NaiveDate` evicts nothing (the fail-safe
+    /// direction; test-pinned with a huge `max_days`).
+    ///
+    /// Pure query: does not mutate retention state. The steady-state caller
+    /// marks each returned path `pending_deletion` before dispatching the
+    /// delete and clears the mark when the send fails (otel-ledger
+    /// `ledger/retention.rs`); the startup pass sends without marking, safe
+    /// because `batch_recover` drains every response before the event loop
+    /// starts (file-lifecycle `recovery/local.rs::recover_retention`).
     pub fn evaluate_retention(&self, max_days: u32, today: NaiveDate) -> Vec<PathBuf> {
         let cutoff = match today.checked_sub_signed(chrono::Duration::days(max_days as i64)) {
             Some(d) => d,
@@ -195,29 +296,34 @@ impl Registry {
             .collect()
     }
 
-    /// Scan `{base_dir}/{date}/{tenant_id}/*.catalog` and reconstruct
-    /// registry state from disk. Only files belonging to this `Registry`'s
-    /// tenant are loaded; other tenants' subdirs under the same date are
-    /// skipped.
+    /// Scan `{base}/{date}/{tenant}/*.catalog` and rebuild the registry from
+    /// disk. Startup-only; the per-tenant composition recovers all three
+    /// registries together (file-lifecycle `registry.rs::recover`).
     ///
-    /// All identifying data (machine, instance, seq, time bounds) comes from
-    /// the filename — the body is not read during recovery.
+    /// Only this `Registry`'s tenant's files are loaded: the layout walker
+    /// (`file_registry::layout::date_tenant_dirs_lossy`) enumerates the
+    /// `{date}/{tenant}` partitions, other tenants' subdirs under the same
+    /// date are skipped, and the walk drops non-date directories. Everything
+    /// identifying comes from the filename — `date` from the directory,
+    /// machine/instance/seq/bounds from the stem — plus a stat for the
+    /// size; no catalog body is read here. The pass that replays entries
+    /// into the lifecycle state parses bodies separately (file-lifecycle
+    /// `recovery/local.rs::seed_from_catalog_files`).
     ///
-    /// Files with unparseable names are logged and skipped. Date
-    /// subdirectories that don't parse as `YYYY-MM-DD` are skipped, and
-    /// an unreadable directory is warned about and skipped — recovery
-    /// never fails outright; it loads whatever is readable.
+    /// Error policy: lossy by design. An unreadable directory is warned
+    /// about and skipped, an unparseable filename is warned about and
+    /// skipped, a file that fails to stat likewise — recovery loads
+    /// whatever is readable and never fails outright. (Contrast
+    /// [`scan_max_sequence`], which propagates I/O errors because its
+    /// caller needs completeness to seed the seq counter.)
     ///
-    /// Stale `*.catalog.tmp` files — left behind when a rotation was
-    /// interrupted between writing the temp file and renaming it — are
-    /// deleted while walking via the shared temp helpers (the SFST dir
-    /// gets the same treatment through
-    /// [`file_registry::durable::sweep_tmp`] in otel-ledger's
-    /// `Registry::recover`); nothing else ever reaps them.
+    /// Stale `*.catalog.tmp` files — left behind when a tmp+rename write
+    /// ([`file_registry::durable::write_atomic`]: rotations and diff-sync
+    /// installs) was interrupted between write and rename — are deleted
+    /// while walking via the shared temp helpers; the SFST dir gets the
+    /// same sweep through [`file_registry::durable::sweep_tmp`] in
+    /// file-lifecycle's `Registry::recover`. Nothing else ever reaps them.
     pub fn recover(&mut self) {
-        // Structural enumeration through the shared layout walker, with
-        // recovery's error policy: an unreadable directory is warned
-        // about and skipped, and everything readable is still recovered.
         for partition in file_registry::layout::date_tenant_dirs_lossy(&self.base_dir) {
             if partition.tenant != self.tenant_id.as_str() {
                 continue;
@@ -287,25 +393,35 @@ impl Registry {
     }
 }
 
-/// File-level overlap check using the filename-encoded bounds. Same
-/// semantics as [`Catalog::find`]'s per-entry filter: inclusive
-/// `[min, max]` against the query's half-open `[start, end)`.
+/// File-level overlap check on the filename-encoded bounds. Same semantics
+/// as [`Catalog::find`]'s per-entry filter: inclusive `[min, max]` against
+/// the query's half-open `[start, end)` — the shared `range_overlaps` rule.
 fn file_overlaps(f: &File, q: &Query) -> bool {
     if q.time_range.start >= q.time_range.end {
         return false;
     }
     // A catalog file with all-zero bounds could only arise from a catalog of
-    // entirely empty SFSTs, and those are now suppressed before cataloging (see
-    // the ledger's `handle_indexer_resp`), so such a file is no longer produced.
-    // If a legacy one exists it holds no queryable data, so the normal overlap
-    // check — which excludes a `[0, 0]` range from any present-day query —
-    // correctly skips it instead of opening every catalog on every query.
+    // entirely empty SFSTs, and empty SFSTs are suppressed before cataloging
+    // (an empty WAL's 0-row index is deleted, not tracked: the ledger's
+    // `handle_indexer_resp`), so such a file is no longer produced. The
+    // shared overlap rule would select one only from a window starting at
+    // second 0, and a legacy survivor holds no queryable data, so the plain
+    // check needs no special case.
     q.overlaps(f.min_timestamp_s, f.max_timestamp_s)
 }
 
-/// Read and parse the catalog file at `path` and return its entries matching
-/// `q`, or `None` when the file no longer exists (catalog retention removed
-/// it). An unreadable or corrupt file is an error for the caller to report.
+/// Read the catalog file at `path` and return its entries matching `q` —
+/// the per-entry filter of [`Catalog::find`] (window and partition rules,
+/// sibling `catalog.rs`). The query path's reader and the only in-crate
+/// caller of `Catalog::from_container_bytes`; the stack's other readers
+/// live in file-lifecycle recovery (diff-sync validation, seeding, seq
+/// replay).
+///
+/// Returns `Ok(None)` when the file no longer exists (catalog retention
+/// removed it between selection and read; the plan layer skips it). An
+/// unreadable or corrupt file is `Err` for the caller to report — the
+/// remote plan logs it and lists the file in its `unreadable` set
+/// (file-lifecycle `query.rs::plan_bounded`).
 pub fn read_entries(path: &Path, q: &Query) -> Result<Option<Vec<CatalogEntry>>, crate::Error> {
     let bytes = match std::fs::read(path) {
         Ok(b) => b,
@@ -317,16 +433,22 @@ pub fn read_entries(path: &Path, q: &Query) -> Result<Option<Vec<CatalogEntry>>,
 }
 
 /// Highest `max_seq` encoded in any catalog filename under
-/// `{catalog_base}/{date}/{tenant}/*.catalog`, across **all** tenants.
-/// Returns `0` when the base dir is missing or holds no catalogs.
+/// `{catalog_base}/{date}/{tenant}/*.catalog`, across **all** tenants —
+/// filenames only, never a catalog body. Returns `0` when the base dir is
+/// missing or holds no catalogs.
 ///
-/// Used at startup as a defense-in-depth input to the seq-counter
-/// seed: catalogs outlive the SFSTs they describe, so they can bound
-/// the seed even after every data file at a higher seq was evicted.
-/// Reads filenames only — never a catalog body. The generic
-/// [`file_registry::scan_max_sequence_recursive`] is not reusable here:
-/// it walks one directory level and parses the FileId stem, while
-/// catalogs are two levels deep with their own stem shape.
+/// Startup input to the ingestor's seq-counter seed (`scan_seq_dirs`):
+/// catalogs outlive the SFSTs they describe, so they still bound the seed
+/// after every higher-seq data file was evicted — defense-in-depth against
+/// a new seq colliding with a surviving local file.
+///
+/// Errors propagate rather than being skipped: the layout walk is
+/// completeness-or-error, because a silently short scan could under-seed
+/// the counter — the deliberate contrast to [`Registry::recover`]'s lossy
+/// policy. [`file_registry::scan_max_sequence_recursive`] is not reusable
+/// here: it walks the flat per-tenant layout and parses the data-file
+/// (`FileId`) stem, while catalogs sit two levels deep with this module's
+/// own stem tail.
 pub fn scan_max_sequence(catalog_base: &Path) -> std::io::Result<u64> {
     let mut max_seq = 0u64;
     for partition in file_registry::layout::date_tenant_dirs(catalog_base)? {
@@ -353,6 +475,11 @@ pub fn scan_max_sequence(catalog_base: &Path) -> std::io::Result<u64> {
 
 /// Format a catalog filename:
 /// `{machine:32}-{instance:32}-{max_seq:010}-{min_ts:010}-{max_ts:010}.catalog`.
+/// The one codec, shared by the rotation writer (file-lifecycle
+/// `catalog_builder.rs::scope_path`), the diff-sync installer
+/// (`recovery/startup.rs::local_catalog_path`) and the remote-key builder
+/// (`remote_keys.rs::catalog`); [`parse_stem`] is its inverse (round-trip
+/// test-pinned).
 pub fn filename(
     identity: Identity,
     max_seq: u64,
@@ -371,9 +498,11 @@ pub fn filename(
     )
 }
 
-/// Parse the stem `{machine:32}-{instance:32}-{max_seq}-{min_ts}-{max_ts}` into
-/// its components. A nil-bearing name is rejected (the [`Identity`] newtypes
-/// refuse nil), so a corrupt or pre-identity file surfaces as unparseable.
+/// Parse the stem `{machine:32}-{instance:32}-{max_seq}-{min_ts}-{max_ts}`
+/// into `(identity, max_seq, min_ts, max_ts)`. The 32-hex prefix is the
+/// shared `file_registry::stem` codec; the tail is this module's. A
+/// nil-bearing name is rejected (the [`Identity`] newtypes refuse nil), so
+/// a corrupt or pre-identity file surfaces as unparseable.
 pub fn parse_stem(stem: &str) -> Option<(Identity, u64, u32, u32)> {
     let (machine_uuid, instance_uuid, tail) = file_registry::stem::parse_uuid_pair(stem)?;
     // Split the remaining "max_seq-min_ts-max_ts" by '-'. `splitn(3)`

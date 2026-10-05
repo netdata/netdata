@@ -7,6 +7,13 @@
 //! the schema tree (the field descriptor); the flat field table — used
 //! to bucket secondary chunks into mid/high subtypes — is derived from
 //! it and cached alongside.
+//!
+//! Consumers (grep-verified): the query plane —
+//! [`IndexReader`](crate::IndexReader) (`index_reader.rs`) — wraps a
+//! [`ChunkReader`] and is the only user of the crate-internal accessors
+//! (`primary`, `mid_field`, `high_field`); `registry` recovers through
+//! [`read_summary_path`]; [`ChunkReader`] itself is re-exported under
+//! `test-util` for fixtures, the `inspect` example, and `benches/decode.rs`.
 
 use std::cell::OnceCell;
 
@@ -36,9 +43,9 @@ pub fn read_summary(data: &[u8]) -> Result<Summary, Error> {
 
 /// Read ONLY the [`Summary`] of a sealed SFST on disk, cheaply: the file
 /// is memory-mapped and just the header + TOC + `SUMR` pages fault in —
-/// never the whole file (`Advice::Random` suppresses readahead). The
-/// pattern the registry's recovery uses, exposed for tools that need a
-/// summary without loading the file (e.g. building query candidates).
+/// never the whole file (`Advice::Random` suppresses readahead, on unix).
+/// The pattern the registry's recovery uses, exposed for tools that need
+/// a summary without loading the file (e.g. building query candidates).
 ///
 /// Sealed SFSTs are immutable once finalized, so the short-lived read-only
 /// mapping is sound.
@@ -53,8 +60,10 @@ pub fn read_summary_path(path: &std::path::Path) -> Result<Summary, Error> {
     read_summary(&mmap)
 }
 
-/// Decompress zstd, then deserialize with bincode. Crate-internal:
-/// consumers read through [`ChunkReader`]'s typed accessors.
+/// Decompress zstd, then deserialize with bincode (the standard config).
+/// Crate-internal: consumers read through [`ChunkReader`]'s typed
+/// accessors. `benches/decode.rs` mirrors this exact pipeline for its
+/// baselines — keep the two in sync.
 pub(crate) fn unpack<T: DeserializeOwned>(data: &[u8]) -> Result<T, Error> {
     let decompressed = zstd::decode_all(data).map_err(|e| Error::Zstd(e.to_string()))?;
     let (val, _len) =
@@ -83,8 +92,9 @@ pub struct ChunkReader<'a> {
 }
 
 // The accessor surface is intentionally wider than what the lib alone calls:
-// it serves the `test-util` consumers (fixtures, the `inspect` example) and
-// the internal format tests, so a feature-off lib build sees unused methods.
+// it serves the `test-util` consumers (fixtures, the `inspect` example, the
+// decode bench) and the internal format tests, so a feature-off lib build
+// sees unused methods.
 #[cfg_attr(not(feature = "test-util"), allow(dead_code))]
 impl<'a> ChunkReader<'a> {
     /// Open an SFST file from a byte slice (typically an mmap).
@@ -164,7 +174,7 @@ impl<'a> ChunkReader<'a> {
     }
 
     /// Number of mid-cardinality fields (one secondary chunk per mid
-    /// field, sitting at positions `0..num_mid`).
+    /// field, at tier-relative chunk indices `0..num_mid`).
     pub fn num_mid(&self) -> Result<u16, Error> {
         let count = self
             .fields()?
@@ -175,7 +185,8 @@ impl<'a> ChunkReader<'a> {
     }
 
     /// Number of high-cardinality fields (one secondary chunk per high
-    /// field, sitting at positions `num_mid..num_mid + num_high`).
+    /// field, at tier-relative chunk indices `0..num_high` — each tier
+    /// has its own index space, not one shared offset).
     pub fn num_high(&self) -> Result<u16, Error> {
         let count = self
             .fields()?
@@ -186,9 +197,10 @@ impl<'a> ChunkReader<'a> {
     }
 
     /// Byte span `(offset, len)` of the **cold suffix** — everything after
-    /// the hot prefix (`SUMR`/`META`/`TIMS`/`PRIM`): the optional per-row column
-    /// chunks (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`, when present), the optional
-    /// `trace_id` index (`TIDX`, when present), the mid/high field chunks, and
+    /// the hot prefix (`SUMR`/`META`/`TIMS`/`PRIM`): the optional per-row
+    /// column chunks (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`/`PSPN`/`DURN`,
+    /// when present), the optional trace signal chunks
+    /// (`TIDX`/`TBLM`/`EVNB`/`LNKB`/`TRSU`), the mid/high field chunks, and
     /// the stream batches.
     ///
     /// Offsets are relative to the start of the slice, so the span is
@@ -197,8 +209,8 @@ impl<'a> ChunkReader<'a> {
     /// EOF, so the span is `[end of PRIM's span (crc32 trailer included),
     /// end of file)`. Resolved from the TOC alone — no payload byte is
     /// read or verified, so computing the boundary never faults pages in
-    /// or pays a CRC pass over PRIM. Returns `None`
-    /// only if the primary chunk is absent. The span is **not**
+    /// or pays a CRC pass over PRIM. Returns `None` when the primary
+    /// chunk is absent, or when nothing follows it. The span is **not**
     /// page-aligned — a caller advising the kernel should align it inward
     /// to avoid touching the primary's edge page.
     pub fn cold_region(&self) -> Option<(usize, usize)> {
@@ -214,7 +226,9 @@ impl<'a> ChunkReader<'a> {
 
     // ── PRIM ─────────────────────────────────────────────────────────
 
-    /// Decompress and deserialize the primary FST.
+    /// Decompress and deserialize the primary FST. Crate-internal:
+    /// [`IndexReader`](crate::IndexReader)::open is the only caller, and it
+    /// caches the decode.
     pub(crate) fn primary(&self) -> Result<PrefixMap<BitmapValue>, Error> {
         unpack(self.primary_raw()?)
     }
@@ -286,16 +300,16 @@ impl<'a> ChunkReader<'a> {
         self.chunk_raw_by_id(CHUNK_TIMS)
     }
 
-    // ── Per-row columns (OBTS / TRCE / SPAN) ─────────────────────────
+    // ── Per-row columns (OBTS/TRCE/SPAN/FLAG/DRAC/PSPN/DURN) ────────
     //
     // Each column is its own chunk, so a reader decodes only the one it needs.
     // All are chronological, parallel to `timestamps` and the stream batches:
     // entry `i` is global row `i`. Presence + type are recorded in the META
     // `ColumnsTable` (the authoritative manifest), not by probing for chunks.
-    // Present only when the file was built with per-row columns.
 
     /// The per-row columns manifest (META `columns`): which columns this file
-    /// carries and their types. Empty when none.
+    /// carries and their types. Empty when none. Served from the cached
+    /// META decode — no chunk work once `metadata` has run once.
     pub fn columns_table(&self) -> Result<&ColumnsTable, Error> {
         Ok(&self.metadata()?.columns)
     }
@@ -321,7 +335,8 @@ impl<'a> ChunkReader<'a> {
     }
 
     /// The file's row count (`SUMR.record_count`), used to check that each per-row
-    /// column has exactly one value per row.
+    /// column has exactly one value per row and to bound the trace-signal
+    /// validations. Not cached — every call re-decodes the `SUMR` chunk.
     fn record_count(&self) -> Result<usize, Error> {
         Ok(self.summary()?.record_count as usize)
     }
@@ -453,19 +468,16 @@ impl<'a> ChunkReader<'a> {
     /// contract as [`trace_id_index`](Self::trace_id_index); callers gate on
     /// [`has_trace_id_bloom`](Self::has_trace_id_bloom).
     pub fn trace_id_bloom(&self) -> Result<crate::TraceIdBloom, Error> {
-        // The bloom derives from TIDX — the writer guarantees TBLM ⟹ TIDX at
-        // seal; this is the symmetric read-side guard for a file produced
-        // out-of-band. Without it, a definite bloom miss on such a file would
-        // silently report "trace absent" instead of surfacing the corruption.
+        // Guard the full dependency chain TBLM ⟹ TIDX ⟹ TRCE — the writer
+        // guarantees it at seal; this is the read-side check for files
+        // produced out-of-band. Without it, a definite bloom miss on such a
+        // file would silently answer "trace absent" instead of surfacing
+        // the corruption.
         if !self.has_trace_id_index() {
             return Err(Error::CorruptIndex(
                 "trace_id bloom without the trace_id index it derives from".into(),
             ));
         }
-        // ...and the full dependency chain TBLM ⟹ TIDX ⟹ TRCE: a crafted file
-        // with the two chunks but no trace_id column would otherwise let a
-        // bloom miss answer "trace absent" where the exact path would have
-        // surfaced the corruption.
         self.require_column(TraceIds::NAME, TraceIds::COLUMN_TYPE)?;
         let bloom: crate::TraceIdBloom = unpack(self.chunk_raw_by_id(crate::CHUNK_TRACE_BLOOM)?)?;
         bloom.validate(self.record_count()?)?;
@@ -505,11 +517,9 @@ impl<'a> ChunkReader<'a> {
     /// guard — a length mismatch is a decode error, not a panic later).
     pub fn trace_rollup(&self) -> Result<crate::TraceRollup, Error> {
         // The rollup summarizes the `TRCE` column — the writer guarantees
-        // TRSU ⟹ trace_id at seal; this is the symmetric read-side guard for
-        // a file produced out-of-band (the same guard TIDX and TBLM carry).
-        // Without it, a missing rollup row on such a file would let the
-        // trace-level gate prove "trace absent" where assembly would have
-        // surfaced the corruption.
+        // TRSU ⟹ trace_id at seal; this is the read-side guard for files
+        // produced out-of-band, same as TIDX and TBLM (without it a missing
+        // rollup row would answer "trace absent" instead of surfacing it).
         self.require_column(TraceIds::NAME, TraceIds::COLUMN_TYPE)?;
         let rollup: crate::TraceRollup =
             unpack(self.chunk_raw_by_id(crate::CHUNK_TRACE_ROLLUP)?)?;

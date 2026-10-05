@@ -4,7 +4,10 @@
 //! of *what to match, how to bucket, and which page to return* — no
 //! transport or wire concerns. A consumer parses its own request format
 //! (HTTP params, CLI flags, a UI payload) and assembles a [`LogsQuery`]
-//! with [`LogsQueryBuilder`]; the engine never sees the wire shape.
+//! with [`LogsQueryBuilder`]; the engine never sees the wire shape. The
+//! in-tree consumers: the otel-ledger HTTP adapter (`into_query`,
+//! `src/crates/otel-ledger/src/ledger/rpc/logs/adapter.rs`) and the CLI
+//! (`build_query`, `src/crates/sfsq-cli/src/query.rs`).
 
 use std::collections::HashMap;
 
@@ -13,17 +16,18 @@ use sfst::Filter;
 
 use super::cursor::Cursor;
 
-/// Default histogram dimension when the query doesn't specify one.
-/// `severity_text` — the OTel canonical log-level field; what makes a
-/// meaningful chart is the producer's responsibility, and the consumer
-/// exposes `available_fields` for users to pick another.
+/// Default histogram dimension when the query doesn't specify one:
+/// `severity_text`, the OTel canonical log-level field. Choosing a
+/// meaningful dimension is the caller's presentation choice; the
+/// response's `available_fields` lists what else is pickable.
 const DEFAULT_HISTOGRAM_FIELD: &str = "severity_text";
 
-/// Default facet field when the query doesn't specify any. Same
-/// `severity_text` rationale as the histogram default: a first-load
-/// request typically carries no facets and the engine can't infer the
-/// user's intent (cardinality composes unpredictably across files), so it
-/// surfaces just this one. Users add more via `facet_fields`.
+/// Default facet field when the query doesn't specify any — the same
+/// `severity_text` as the histogram default. A first-load request
+/// typically carries no facets, and the engine can't infer the user's
+/// intent (what is facetable — present and low-card — is per-file
+/// knowledge it only gets at run time), so it surfaces just this one.
+/// Users add more via `facet_fields`.
 const DEFAULT_FACET_FIELD: &str = "severity_text";
 
 /// A multi-file log query in engine terms — fully resolved and ready to
@@ -78,9 +82,13 @@ impl LogsQuery {
     pub fn anchor(&self) -> Option<Anchor> {
         self.anchor
     }
+    /// Page direction relative to the anchor — toward older
+    /// ([`Direction::Backward`], the default) or newer rows.
     pub fn direction(&self) -> Direction {
         self.direction
     }
+    /// Maximum rows on the returned page; the `has_newer` / `has_older`
+    /// flags still report rows beyond the cap.
     pub fn limit(&self) -> usize {
         self.limit
     }
@@ -90,7 +98,8 @@ impl LogsQuery {
 /// (the one required input); every other field defaults — empty filter
 /// (matches everything), the engine's default histogram and facet field, no
 /// anchor, [`Direction::Backward`], and a zero `limit`.
-/// [`build`](Self::build) resolves the defaults and converts the selections.
+/// [`build`](Self::build) applies those defaults, so the engine always
+/// sees a fully-specified query.
 #[derive(Debug, Clone)]
 pub struct LogsQueryBuilder {
     grid: sfst::Grid,
@@ -147,26 +156,38 @@ impl LogsQueryBuilder {
         self
     }
 
+    /// Set the histogram dimension; unset falls back to the engine default
+    /// (`severity_text`) at [`build`](Self::build).
     pub fn histogram_field(mut self, field: impl Into<String>) -> Self {
         self.histogram_field = Some(field.into());
         self
     }
 
+    /// Set the fields to tabulate as facets (replacing any earlier list);
+    /// an empty list falls back to the single default facet at
+    /// [`build`](Self::build).
     pub fn facet_fields(mut self, fields: Vec<String>) -> Self {
         self.facet_fields = fields;
         self
     }
 
+    /// Set the pagination anchor; without one the page starts at the edge
+    /// — the newest rows for [`Direction::Backward`], the oldest for
+    /// [`Direction::Forward`].
     pub fn anchor(mut self, anchor: Anchor) -> Self {
         self.anchor = Some(anchor);
         self
     }
 
+    /// Set the page direction; defaults to [`Direction::Backward`]
+    /// (toward older rows).
     pub fn direction(mut self, direction: Direction) -> Self {
         self.direction = direction;
         self
     }
 
+    /// Cap the page at this many rows — `0` (the default) yields an empty
+    /// page; the has-more flags still look past the cap.
     pub fn limit(mut self, limit: usize) -> Self {
         self.limit = limit;
         self

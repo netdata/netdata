@@ -3,10 +3,9 @@
 //! A self-describing framing for durable chunk-based artifacts —
 //! files that outlive the process that wrote them (and possibly the
 //! machine, once shipped to long-lived remote storage), where silent
-//! corruption must surface as an error rather than wrong data. Each
-//! file carries magic + version (self-describing) and a crc32 per
-//! chunk (integrity-checked). Consumers supply their own magic and
-//! format version and own the meaning of their chunk payloads.
+//! corruption must surface as an error rather than wrong data.
+//! Consumers supply their own magic and format version and own the
+//! meaning of their chunk payloads.
 //!
 //! On-disk layout:
 //!
@@ -21,22 +20,32 @@
 //! The crc32 ([`crc32fast`]) covers the stored payload bytes only —
 //! for compressed payloads that is the compressed form, which is where
 //! at-rest / in-transit corruption happens; if the stored bytes verify,
-//! decompression is deterministic. The TOC records each chunk's length
-//! as `payload_len + 4` (CRC included in the span). TOC corruption is
-//! caught at parse time by the TOC validators, and a corrupt offset
-//! that still parses resolves the wrong span, whose CRC then fails.
+//! decompression reproduces exactly what the producer wrote. The TOC
+//! records each chunk's length as `payload_len + 4` (the CRC trailer
+//! is part of the span). The TOC itself is not checksummed: corrupt
+//! TOCs are rejected by the parse validators, and a corrupt offset
+//! that still parses resolves the wrong span, whose CRC then fails —
+//! pinned by the TOC-flip property test below.
 //!
 //! Two writers produce identical bytes:
 //!
 //! - [`ContainerBuilder`] buffers borrowed payloads and writes
 //!   header → TOC → payloads in one pass. Right for small files whose
-//!   chunks already exist in memory (catalogs).
+//!   chunks already exist in memory (otel-catalog's NCAT catalog).
 //! - [`StreamingWriter`] reserves the header + TOC region, streams
 //!   each chunk (and its crc32) to a `Write + Seek` sink as it is
 //!   produced — so the producer can drop each payload immediately —
 //!   and patches the TOC on [`finish`](StreamingWriter::finish). Right
 //!   for large files built chunk-by-chunk (SFST indexes): peak memory
 //!   is one chunk, not the whole file.
+//!
+//! Consumers (grep-verified): sfst writes its indexes through
+//! [`StreamingWriter`] (sfst/src/writer.rs) and reads them through
+//! [`Container`] (sfst/src/reader.rs, typically an mmap); otel-catalog
+//! builds its NCAT catalog with [`ContainerBuilder`] and reads it back
+//! with [`Container`] (otel-catalog/src/catalog.rs). file-lifecycle
+//! and sfsq reach this module only from tests (catalog-recovery
+//! fixtures; the corruption gate flipping CRCs in sealed SFSTs).
 
 use std::collections::HashSet;
 use std::io::{Seek, SeekFrom, Write};
@@ -69,14 +78,15 @@ pub enum Error {
     /// The TOC failed to parse or validate — carries the raw layer's
     /// structured error so callers can match the specific failure
     /// (duplicate id, non-monotonic offset, out-of-bounds, ...).
-    /// Transparent: embedding the source in the message while also
-    /// chaining it would print it twice in anyhow chains.
+    /// Transparent rather than hand-formatted: the source is already
+    /// printed via the anyhow chain, so repeating it in the message
+    /// would print it twice.
     #[error(transparent)]
     Toc(#[from] crate::Error),
 
     /// The container framing is malformed beyond the TOC itself —
-    /// a chunkless header, an implausible chunk count, or a chunk span
-    /// too short for its crc32 trailer.
+    /// a chunkless header, an implausible chunk count, or a bad chunk
+    /// span (out of bounds, or too short for its crc32 trailer).
     #[error("malformed container: {0}")]
     Malformed(String),
 
@@ -122,10 +132,10 @@ fn encode_header(magic: [u8; 4], version: u32, num_chunks: u32) -> [u8; HEADER_S
 
 /// Zero-copy view over a container file (typically an mmap).
 ///
-/// [`open`](Container::open) parses only the header and TOC — the TOC
-/// is borrowed in place, not materialized; payloads are resolved — and
-/// CRC-verified — lazily, per chunk, so an mmap'd file is only paged in
-/// where it is actually read.
+/// [`open`](Container::open) parses only the header and TOC, borrowing
+/// the TOC in place instead of materializing it; payloads are resolved
+/// and CRC-verified lazily, per chunk, so an mmap'd file is only paged
+/// in where it is actually read.
 pub struct Container<'a> {
     data: &'a [u8],
     toc: Toc<'a>,
@@ -326,12 +336,12 @@ impl<'a> ContainerBuilder<'a> {
         let chunk_writer = toc
             .write_toc(&mut *w, HEADER_SIZE as u64)
             .map_err(io_from_raw)?;
-        // Skip the raw ChunkWriter's per-chunk id/size validation: the
-        // plan above was built from the same `self.chunks` this loop
-        // walks, so the invariants hold by construction, and writing
-        // payload + trailer directly avoids copying each payload into
-        // an intermediate buffer (the streaming writer's pattern; the
-        // byte-equality test pins that both writers agree).
+        // Skip the raw ChunkWriter: its per-chunk check matches one
+        // `data` slice against the planned size (payload + crc here),
+        // which would force staging payload + trailer in a buffer.
+        // Direct writes are safe — the plan was built from the same
+        // `self.chunks` this loop walks — and the byte-equality test
+        // pins that both writers produce the same bytes.
         let w = chunk_writer.into_inner();
         for (_, payload) in &self.chunks {
             w.write_all(payload)?;
@@ -378,10 +388,8 @@ fn io_from_raw(e: crate::Error) -> std::io::Error {
 /// ```
 pub struct StreamingWriter<W> {
     out: W,
-    /// Sink position at construction — the container's first byte. All
-    /// patch seeks are relative to it, so a container can be written at
-    /// any offset within a larger file; TOC offsets stay
-    /// container-relative either way.
+    /// Sink position captured by [`new`](StreamingWriter::new); the
+    /// TOC patch seek anchors to it.
     base: u64,
     num_chunks: u32,
     /// (id, on-disk span = payload + crc) per chunk written so far —
@@ -394,12 +402,15 @@ pub struct StreamingWriter<W> {
 
 impl<W: Write + Seek> StreamingWriter<W> {
     /// Write the header and reserve the TOC region for `num_chunks`
-    /// chunks. The container starts wherever the sink is currently
-    /// positioned — the position is captured and the TOC patch seeks
-    /// relative to it, so a container can be written at a non-zero
-    /// offset within a larger file (the reader is then handed the
-    /// sub-slice starting there); TOC offsets are container-relative
-    /// either way.
+    /// chunks. Zero is rejected up front (`Error::Misuse`); the reader
+    /// likewise refuses a zero `num_chunks` header.
+    ///
+    /// The container starts wherever the sink is currently positioned;
+    /// the position is captured (see `base`) and the TOC patch
+    /// seeks relative to it, so a container can be written at a
+    /// non-zero offset within a larger file. TOC offsets stay
+    /// container-relative either way — the reader opens the sub-slice
+    /// starting there, as [`Container::open`] documents.
     pub fn new(mut out: W, magic: [u8; 4], version: u32, num_chunks: u32) -> Result<Self, Error> {
         if num_chunks == 0 {
             return Err(Error::Misuse(
@@ -423,7 +434,8 @@ impl<W: Write + Seek> StreamingWriter<W> {
     }
 
     /// Stream one chunk: payload bytes followed by their crc32 trailer.
-    /// Chunks land in call order; `id` must be unique.
+    /// Chunks land in call order; `id` must be unique and must not be
+    /// the reserved end-marker sentinel.
     pub fn write_chunk(&mut self, id: ChunkId, payload: &[u8]) -> Result<(), Error> {
         if id == END_MARKER_ID {
             return Err(Error::Misuse(

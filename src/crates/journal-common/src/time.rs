@@ -1,32 +1,37 @@
-//! Time units for journal timestamps.
-//!
-//! Provides type-safe wrappers for seconds and microseconds to prevent unit confusion.
+//! Type-safe time units for the journal stack: `Seconds`/`Microseconds`
+//! newtypes, the strictly monotonic `RealtimeClock`, and `monotonic_now`;
+//! imported via the flat crate-root re-export ([`crate::Seconds`],
+//! [`crate::Microseconds`], [`crate::RealtimeClock`],
+//! [`crate::monotonic_now`]), not this path.
 
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 use std::ops::{Add, Rem, Sub};
 
-/// Timestamp in seconds since Unix epoch.
-///
-/// Used for histogram buckets, time ranges, and coarse-grained time operations.
+/// A count of seconds (`u32`): epoch seconds for timestamps (registry time
+/// ranges, index `indexed_at`), plain seconds for durations (histogram
+/// bucket widths). The tuple field is public; the stack reads `.0` directly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct Seconds(pub u32);
 
-/// Timestamp in microseconds since Unix epoch.
-///
-/// Used for journal entry timestamps and fine-grained time operations.
+/// A count of microseconds (`u64`): epoch microseconds for journal entry
+/// timestamps and histogram timestamp pairs. The tuple field is public;
+/// `u64` spans ~584k years, so there is no practical wrap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct Microseconds(pub u64);
 
 impl Seconds {
-    /// Create a timestamp from seconds.
+    /// Wraps a raw seconds count.
     pub fn new(seconds: u32) -> Self {
         Self(seconds)
     }
 
-    /// Get the current time as seconds since Unix epoch.
+    /// Current wall-clock time as epoch seconds.
+    ///
+    /// Panics if the system clock is before the Unix epoch; past `u32`
+    /// capacity (year 2106) the `u64`-to-`u32` cast keeps only the low bits.
     pub fn now() -> Self {
         Self(
             std::time::SystemTime::now()
@@ -41,17 +46,17 @@ impl Seconds {
         self.0
     }
 
-    /// Convert to microseconds.
+    /// Converts to microseconds (exact).
     pub fn to_microseconds(self) -> Microseconds {
         Microseconds(self.0 as u64 * 1_000_000)
     }
 
-    /// Add two durations with saturation at the numeric bounds.
+    /// Adds `other`, saturating at `u32::MAX`.
     pub fn saturating_add(self, other: Self) -> Self {
         Seconds(self.0.saturating_add(other.0))
     }
 
-    /// Subtract two durations with saturation at the numeric bounds.
+    /// Subtracts `other`, saturating at 0.
     pub fn saturating_sub(self, other: Self) -> Self {
         Seconds(self.0.saturating_sub(other.0))
     }
@@ -66,21 +71,30 @@ impl Seconds {
         self.0.checked_sub(other.0).map(Seconds)
     }
 
-    /// Returns true if this duration is a multiple of the other duration.
+    /// Returns `true` if `self` is an integer multiple of `other`.
     ///
-    /// Useful for checking if bucket durations align.
+    /// A zero divisor yields `false` rather than panicking (unlike
+    /// `journal_common::compat::is_multiple_of`, which panics); zero is a
+    /// multiple of every non-zero divisor. Used for bucket-duration
+    /// compatibility in `journal-engine/src/indexing.rs`
+    /// (`batch_compute_file_indexes`); journal-index instead checks histogram
+    /// alignment through the compat function on raw integers
+    /// (`journal-index/src/histogram.rs`
+    /// `Histogram::count_entries_in_time_range`).
     pub fn is_multiple_of(self, other: Self) -> bool {
         other.0 != 0 && self.0 % other.0 == 0
     }
 }
 
 impl Microseconds {
-    /// Create a timestamp from microseconds.
+    /// Wraps a raw microsecond count.
     pub fn new(microseconds: u64) -> Self {
         Self(microseconds)
     }
 
-    /// Get the current time as microseconds since Unix epoch.
+    /// Current wall-clock time as epoch microseconds.
+    ///
+    /// Panics if the system clock is before the Unix epoch.
     pub fn now() -> Self {
         Self(
             std::time::SystemTime::now()
@@ -100,12 +114,12 @@ impl Microseconds {
         Seconds((self.0 / 1_000_000) as u32)
     }
 
-    /// Add two durations with saturation at the numeric bounds.
+    /// Adds `other`, saturating at `u64::MAX`.
     pub fn saturating_add(self, other: Self) -> Self {
         Microseconds(self.0.saturating_add(other.0))
     }
 
-    /// Subtract two durations with saturation at the numeric bounds.
+    /// Subtracts `other`, saturating at 0.
     pub fn saturating_sub(self, other: Self) -> Self {
         Microseconds(self.0.saturating_sub(other.0))
     }
@@ -120,9 +134,10 @@ impl Microseconds {
         self.0.checked_sub(other.0).map(Microseconds)
     }
 
-    /// Returns true if this duration is a multiple of the other duration.
+    /// Returns `true` if `self` is an integer multiple of `other`.
     ///
-    /// Useful for checking if bucket durations align.
+    /// Same semantics as [`Seconds::is_multiple_of`]: a zero divisor yields
+    /// `false`; zero is a multiple of every non-zero divisor.
     pub fn is_multiple_of(self, other: Self) -> bool {
         other.0 != 0 && self.0 % other.0 == 0
     }
@@ -146,7 +161,11 @@ impl From<u64> for Microseconds {
     }
 }
 
-// Arithmetic operators for Seconds
+// The `Add`/`Sub`/`Rem` impls below (both types) are plain integer
+// arithmetic: `Add`/`Sub` panic on overflow/underflow when debug assertions
+// are on (dev/test builds) and wrap silently in release; `%` by zero panics
+// in every profile. Use the saturating_*/checked_* methods above when that is
+// unacceptable.
 impl Add for Seconds {
     type Output = Self;
 
@@ -171,7 +190,6 @@ impl Rem for Seconds {
     }
 }
 
-// Arithmetic operators for Microseconds
 impl Add for Microseconds {
     type Output = Self;
 
@@ -208,35 +226,48 @@ impl std::fmt::Display for Microseconds {
     }
 }
 
-/// A monotonic realtime clock that ensures timestamps always move forward.
+/// A strictly monotonic stream of wall-clock microseconds.
 ///
-/// Wraps `SystemTime` but guarantees each `now()` call returns a timestamp
-/// strictly greater than all previous calls, even if the system clock jumps
-/// backwards. When the clock goes backwards, it increments from the last seen
-/// timestamp by one microsecond.
+/// Wraps `SystemTime`-based wall-clock time but never returns a value at or
+/// below its floor (the highest value returned or seeded): when the system
+/// clock stalls or steps backwards (NTP correction), the next value is
+/// `floor + 1µs` instead. `now()` and `observe()` share one floor, so
+/// interleaving them keeps the combined stream strictly increasing — until
+/// saturation at `u64::MAX`, where the +1µs bump can no longer move it.
+///
+/// The floor is a `Cell`, so both methods take only `&self`; that makes the
+/// clock `Send` but `!Sync` — not shareable across threads.
 #[derive(Debug)]
 pub struct RealtimeClock {
     max_seen: Cell<u64>,
 }
 
 impl RealtimeClock {
-    /// Create a new realtime clock initialized with the current system time.
+    /// Creates a clock whose floor is the current system time.
+    ///
+    /// Panics if the system clock is before the Unix epoch (via
+    /// `Microseconds::now()`).
     pub fn new() -> Self {
         Self::with_initial(Microseconds::now())
     }
 
-    /// Create a realtime clock initialized with a specific timestamp.
+    /// Creates a clock seeded with a known timestamp.
     ///
-    /// Useful for resuming from a persisted state (e.g., last journal entry).
+    /// Values at or below `initial` are bumped to `initial + 1µs` on the next
+    /// read. journal-log-writer seeds this from the persisted chain's tail
+    /// realtime timestamp on open (`journal-log-writer/src/log/mod.rs`
+    /// `Log::new`).
     pub fn with_initial(initial: Microseconds) -> Self {
         Self {
             max_seen: Cell::new(initial.get()),
         }
     }
 
-    /// Get the current monotonic timestamp in microseconds since Unix epoch.
+    /// Current wall-clock time as microseconds since the Unix epoch, kept
+    /// strictly increasing.
     ///
-    /// Returns system time if it moved forward, otherwise returns last seen + 1µs.
+    /// Returns the system time when it is ahead of the floor; otherwise
+    /// `floor + 1µs` (saturating). Shares the floor with `observe()`.
     pub fn now(&self) -> Microseconds {
         let current = Microseconds::now();
         let max = self.max_seen.get();
@@ -251,10 +282,13 @@ impl RealtimeClock {
         Microseconds::new(next)
     }
 
-    /// Observe an external timestamp and return a monotonic realtime value.
+    /// Admits an externally supplied timestamp, keeping the stream monotonic.
     ///
-    /// If the provided value is not strictly greater than the last seen timestamp,
-    /// returns `last_seen + 1us` to preserve strict monotonicity.
+    /// Returns `candidate` when it is ahead of the floor; otherwise
+    /// `floor + 1µs` (saturating). Shares the floor with `now()`.
+    /// journal-log-writer routes caller-supplied entry realtime overrides
+    /// through this (`journal-log-writer/src/log/mod.rs`
+    /// `Log::capture_dual_timestamp`).
     pub fn observe(&self, candidate: Microseconds) -> Microseconds {
         let max = self.max_seen.get();
         let next = if candidate.get() > max {
@@ -279,13 +313,18 @@ impl Default for RealtimeClock {
     }
 }
 
-/// Gets the current monotonic timestamp in microseconds since boot.
+/// Reads `CLOCK_MONOTONIC` as microseconds since boot.
 ///
-/// Uses CLOCK_MONOTONIC which provides a monotonically increasing timestamp
-/// that is not affected by system clock adjustments but does not count time
-/// when the system is suspended.
+/// Not tied to the Unix epoch and unaffected by system-clock adjustments, but
+/// it does not advance while the system is suspended. Matches the monotonic
+/// half of systemd's journal dual timestamps. Consecutive calls can repeat
+/// within one microsecond, so per-entry distinctness needs clamping —
+/// journal-log-writer clamps against the last written monotonic value for the
+/// boot (`journal-log-writer/src/log/mod.rs`
+/// `Log::capture_dual_timestamp`).
 ///
-/// This matches systemd's behavior for journal entry monotonic timestamps.
+/// The error carries the raw `clock_gettime` errno as `io::Error`;
+/// effectively unreachable for `CLOCK_MONOTONIC` on Linux.
 pub fn monotonic_now() -> std::io::Result<Microseconds> {
     use nix::sys::time::TimeValLike;
     use nix::time::ClockId;
@@ -331,7 +370,6 @@ mod tests {
         assert_eq!(us.get(), 42000);
     }
 
-    // Arithmetic operator tests for Seconds
     #[test]
     fn test_seconds_add() {
         let a = Seconds::new(10);
@@ -416,7 +454,6 @@ mod tests {
         assert!(!g.is_multiple_of(h)); // Division by zero case
     }
 
-    // Arithmetic operator tests for Microseconds
     #[test]
     fn test_microseconds_add() {
         let a = Microseconds::new(1000);
@@ -501,7 +538,6 @@ mod tests {
         assert!(!g.is_multiple_of(h)); // Division by zero case
     }
 
-    // RealtimeClock tests
     #[test]
     fn test_realtime_clock_monotonic() {
         let clock = RealtimeClock::new();
@@ -526,11 +562,10 @@ mod tests {
 
     #[test]
     fn test_realtime_clock_handles_same_time() {
-        // Start with a specific timestamp
+        // two now() calls within one wall-clock microsecond still differ by 1µs
         let initial = Microseconds::new(1000000);
         let clock = RealtimeClock::with_initial(initial);
 
-        // Even if system time doesn't advance, clock should increment
         let t1 = clock.now();
         let t2 = clock.now();
 
@@ -551,11 +586,10 @@ mod tests {
 
     #[test]
     fn test_realtime_clock_forward_jump() {
-        // Start with a timestamp in the past
         let past = Microseconds::new(1000000);
         let clock = RealtimeClock::with_initial(past);
 
-        // When system time is ahead, it should use system time
+        // the real clock is ahead of the floor, so it wins
         let t1 = clock.now();
         assert!(t1.get() > past.get());
     }

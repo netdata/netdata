@@ -1,24 +1,57 @@
-//! Message types for communication between the ledger and its components.
+//! The file-lifecycle substrate's IPC boundary: the ledger's message
+//! vocabulary plus the one cross-process link it accepts.
 //!
-//! Component message types use plain tokio channels (no serialization needed).
-//! The ingestor connection uses ferryboat IPC since it runs in a separate process.
+//! Two transport classes share this module:
+//!
+//! - The worker request/response enum pairs ([`CleanerRequest`],
+//!   [`IndexerRequest`], [`UploaderRequest`], [`CatalogBuilderRequest`] and
+//!   their responses) ride the unbounded tokio mpsc channels of
+//!   [`crate::component::ComponentHandle`]; they derive no serde traits, so
+//!   they can never cross a ferryboat link. The components behind them are
+//!   this crate's `cleaner`, `uploader` and `catalog_builder` plus
+//!   otel-ledger's indexer; the ledger — run loop and recovery — sends every
+//!   request and routes every response (each enum doc says which workers are
+//!   shared across signals and which are per-pipeline).
+//! - [`accept_writer`] and [`WRITER_SOCKET_PATH`]: the ledger's end of the
+//!   single ingestor → ledger WAL-event link, a ferryboat IPC connection
+//!   carrying [`wal::Message`]. Those wire types live in the `wal` crate;
+//!   this module owns only the accept plumbing, and the connecting side is
+//!   otel-ingestor's `LedgerSender`. The supervisor↔worker links are
+//!   `bridge`'s — its documented lib.rs records the carve-out that keeps
+//!   this socket's types here rather than in the bridge enums.
+//!
+//! The WAL-event link runs at ferryboat's 8 MiB default size limit with no
+//! compression: neither end sets an override, so
+//! `bridge::IPC_MAX_MESSAGE_SIZE` (the supervisor↔worker ceiling) does not
+//! apply. Framing, size-limit enforcement and link error semantics are
+//! ferryboat's (see its documented lib.rs); what the ledger does with a
+//! received event is otel-ledger's `handle_ingestor_msg`.
 
 use std::path::PathBuf;
 
 use ferryboat::{Connection, Endpoint, Listener};
 use file_registry::{Identity, SeqKey, TenantId};
 
-/// Default socket path for the writer → ledger connection.
+/// Socket path for the writer → ledger link — a default, not the value
+/// production uses: nothing in-tree references this constant. The
+/// otel-plugin supervisor assigns the runtime path at startup
+/// (`PluginConfig::writer_socket_path`, set per run and not read from YAML)
+/// and passes it to both workers through the bridge config.
 pub const WRITER_SOCKET_PATH: &str = "/tmp/netdata-ledger-writer.sock";
 
 /// Requests sent from the ledger to the cleaner.
 ///
-/// The cleaner is a single worker shared by every signal pipeline (stateless
-/// path deletion). Each request carries the `pipeline_id` of the pipeline that
-/// owns the file so the cleaner can echo it back on the response, letting the
-/// run-loop route the registry mutation to the right pipeline. For requests
-/// built from a [`FileId`](file_registry::FileId) it is simply `id.pipeline_id`;
-/// for the path-keyed catalog delete it is supplied by the owning pipeline.
+/// The cleaner is one shared worker per ledger process (stateless path
+/// deletion), not one per pipeline. Each request carries the `pipeline_id` of
+/// the pipeline that owns the file so the cleaner can echo it back on the
+/// response, letting the run-loop route the registry mutation to the right
+/// pipeline: `id.pipeline_id` for requests built from a
+/// [`FileId`](file_registry::FileId), the sending pipeline's own id for the
+/// path-keyed catalog delete (catalog files carry no signal axis). Senders:
+/// the indexer-response handler (post-index WAL cleanup), the retention pass,
+/// and recovery (`recovery/local.rs`). What a response means on disk —
+/// `NotFound` counts as success, failures leave the caller's pending-deletion
+/// flags to clear — is the cleaner component's contract (`crate::cleaner`).
 #[derive(Debug, Clone)]
 pub enum CleanerRequest {
     /// Delete a WAL file that has been successfully indexed.
@@ -41,9 +74,10 @@ pub enum CleanerRequest {
     DeleteCatalogFile { pipeline_id: u16, path: PathBuf },
 }
 
-/// Responses sent from the cleaner back to the ledger. `pipeline_id` is echoed
-/// from the request so the run-loop can route the registry mutation to the
-/// owning pipeline.
+/// Responses sent from the cleaner back to the ledger. `pipeline_id` is
+/// echoed from the request so the run-loop can route the registry mutation to
+/// the owning pipeline. `*Deleted` confirms the path is gone (or was never
+/// there); `*Failed` leaves it on disk and carries the error string.
 #[derive(Debug, Clone)]
 pub enum CleanerResponse {
     /// A WAL file has been deleted.
@@ -72,7 +106,11 @@ pub enum CleanerResponse {
     },
 }
 
-/// Requests sent from the ledger to the indexer.
+/// Requests sent from the ledger to the indexer: one component per signal
+/// pipeline, spawned by otel-ledger with that signal's seal function (the
+/// indexer itself lives in otel-ledger because sealing is content-aware).
+/// Sent on a `Closed` WAL event at runtime, and for unindexed WALs during
+/// recovery (`recovery/local.rs`, via `batch_recover`).
 #[derive(Debug, Clone)]
 pub enum IndexerRequest {
     /// Build an SFST index for the given WAL file.
@@ -89,7 +127,12 @@ pub enum IndexerRequest {
 pub enum IndexerResponse {
     /// The SFST has been written successfully.
     Indexed {
+        /// Seq of the indexed WAL file, parsed from its filename (`0` if the
+        /// name doesn't decode).
         seq: u64,
+        /// Path the SFST was written to. Informational only: both consumers
+        /// (otel-ledger's response handler and recovery) recompute the path
+        /// from the registry, so nothing reads this field today.
         path: PathBuf,
         /// Cheap summary fields (min/max timestamp, record count, opaque content_meta).
         /// Stored on the registry entry on `track`; used by the uploader
@@ -99,17 +142,22 @@ pub enum IndexerResponse {
         /// Byte size of the written SFST file.
         size: file_registry::ByteSize,
     },
-    /// Indexing failed for a file.
+    /// Indexing failed for a file. Nothing is retried at runtime: the file
+    /// stays WAL-tracked (still queryable) until the next restart's recovery
+    /// retries the seal and otherwise orphans it.
     IndexFailed { path: PathBuf, error: String },
 }
 
 /// Requests sent from the ledger to the uploader.
 ///
-/// The uploader is a single worker shared by every signal pipeline (one global
-/// upload-concurrency budget + shared storage handle). Each request carries the
-/// owning `pipeline_id` so the uploader can echo it back, letting the run-loop
-/// route the response (mark-uploaded, `AddEntry`, mark-remote-cataloged) to the
-/// right pipeline.
+/// The uploader is one shared worker per ledger process (one global
+/// upload-concurrency budget + shared storage handle), absent entirely when
+/// remote storage is disabled. Each request carries the owning `pipeline_id`
+/// so the uploader can echo it back, letting the run-loop route the response
+/// (mark-uploaded, `AddEntry`, mark-remote-cataloged) to the right pipeline.
+/// A failed upload lands in the ledger's upload-retry queue, which re-sends
+/// the stored request verbatim on its timer — hence the failure responses
+/// carry every field the retry needs.
 #[derive(Debug, Clone)]
 pub enum UploaderRequest {
     /// Upload an index (SFST) file to remote object storage.
@@ -148,8 +196,10 @@ pub enum UploaderResponse {
         seq: SeqKey,
         remote_key: String,
         /// Remote object validator (S3 ETag) returned by the write, if the
-        /// backend supplied one. Recorded on the catalog entry for later
-        /// integrity/scrub checks.
+        /// backend supplied one. Recorded on the catalog entry the upload
+        /// produces (`otel_catalog::CatalogEntry::remote_etag`). No
+        /// production code reads the recorded value today — kept for
+        /// future integrity/scrub use.
         etag: Option<String>,
     },
     /// Failed to upload an SFST file. `local_path`/`remote_key` are carried so
@@ -162,7 +212,8 @@ pub enum UploaderResponse {
         error: String,
     },
     /// A catalog file has been uploaded successfully. `seqs` are the SFSTs it
-    /// covers; they become eligible for local eviction once this lands.
+    /// covers; the ledger marks them remote-cataloged, the state the retention
+    /// pass requires before it may evict them locally.
     CatalogUploaded {
         pipeline_id: u16,
         local_path: PathBuf,
@@ -185,7 +236,12 @@ pub enum UploaderResponse {
     },
 }
 
-/// Requests sent from the ledger to the catalog builder.
+/// Requests sent from the ledger to the catalog builder: one component per
+/// signal pipeline (signal-neutral code; spawned by otel-ledger's
+/// `build_pipeline`). Senders: the uploader response handler (`AddEntry` on
+/// each `Uploaded`), the startup remote reconcile (`AddEntry` for
+/// uploaded-but-uncataloged SFSTs), and the clean-shutdown flush (`Flush`
+/// through the pipeline's sender).
 #[derive(Debug, Clone)]
 pub enum CatalogBuilderRequest {
     /// Add a newly-uploaded SFST's catalog entry to the in-memory accumulator
@@ -210,16 +266,18 @@ pub enum CatalogBuilderRequest {
 /// Responses sent from the catalog builder back to the ledger.
 #[derive(Debug, Clone)]
 pub enum CatalogBuilderResponse {
-    /// The entry joined the accumulator; no rotation was triggered.
+    /// The entry joined the accumulator; no rotation was triggered (the
+    /// ledger only logs it).
     EntryAccepted { seq: u64 },
-    /// The accumulator reached the rotation threshold and a new catalog
-    /// file was written to `path`. The accumulator for this scope is now
-    /// empty. The ledger is responsible for registering the file and
-    /// sending it to the uploader.
+    /// A scope's accumulator rotated and a new catalog file was written to
+    /// `path` (count, time, or `Flush` trigger). The accumulator for this
+    /// scope is now empty. The ledger is responsible for registering the file
+    /// and sending it to the uploader.
     Rotated {
         tenant_id: TenantId,
         date: chrono::NaiveDate,
         identity: file_registry::Identity,
+        /// Highest SFST seq covered by the rotated catalog.
         max_seq: u64,
         /// Union `[min_timestamp_s, max_timestamp_s]` across all
         /// entries in the rotated catalog. Encoded into the filename
@@ -232,7 +290,8 @@ pub enum CatalogBuilderResponse {
         seqs: Vec<u64>,
     },
     /// Rotation failed (serialization or local write). The accumulator is
-    /// left intact so the next `AddEntry` will retry.
+    /// left intact; the next trigger (`AddEntry`, check tick, `Flush`)
+    /// retries.
     RotationFailed {
         tenant_id: TenantId,
         date: chrono::NaiveDate,
@@ -251,7 +310,34 @@ pub enum CatalogBuilderResponse {
     FlushComplete,
 }
 
-/// Accept a WAL event connection from the ingestor on the given socket path.
+/// Accept the ingestor's WAL-event connection — the ledger side of the single
+/// ingestor → ledger link, `Connection<(), wal::Message>`: the ledger only
+/// receives (`()` is its never-used send half).
+///
+/// Sole caller: otel-ledger's `Ledger::new` (`ledger/mod.rs`), after the
+/// supervisor handshake signals `Ready` and before the run loop starts. The
+/// connecting side is otel-ingestor's `LedgerSender`, which retries forever
+/// (`max_retries(None)`, 1 s interval), so an `Err` here means the bind
+/// failed, not that no writer showed up yet. While this call waits, the
+/// ledger reads no supervisor traffic, so a graceful `Shutdown` sent in that
+/// window is not honored (deliberate ordering; see the supervisor's
+/// configure-before-bind comment and `Ledger::new`'s doc).
+///
+/// On success the connection is stored on the `Ledger` and driven by the run
+/// loop's `select!`; a `recv` error there is fatal (exits `run`, dropping the
+/// supervisor connection so the supervisor reaps the workers). The ingestor
+/// side treats the same loss as fire-and-forget (`ledger_sender.rs`).
+///
+/// Exactly one writer connection is served: the function accepts once and
+/// returns, dropping the listener — which also unlinks the Unix socket path
+/// (ferryboat transport drop), so a second writer cannot attach.
+///
+/// The leading unlink is belt-and-suspenders: ferryboat's `Listener::open`
+/// already removes a stale Unix socket file at the same path, and Windows
+/// named pipes need no file removal, so the ignored error only covers the
+/// no-file / not-a-file cases. Both ends run at ferryboat's default 8 MiB
+/// limit and no compression (see the module docs); bind and accept errors
+/// surface as [`ferryboat::Error`].
 pub async fn accept_writer(
     socket_path: &str,
 ) -> Result<Connection<(), wal::Message>, ferryboat::Error> {

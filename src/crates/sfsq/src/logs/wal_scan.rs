@@ -5,8 +5,17 @@
 //! once ([`scan_flattened`](WalScan::scan_flattened)) and computes the
 //! statistics with plain per-row loops ([`evaluate`](WalScan::evaluate)).
 //! It exists for data the indexer hasn't reached yet — the sub-chunk
-//! *tail* of an active WAL file, whose bounded size is what makes
-//! re-scanning per query affordable.
+//! *tail* of an active WAL file, bounded to less than one chunk by
+//! construction, which is what makes re-scanning it per query affordable.
+//!
+//! Consumers: [`run`](super::run) evaluates a `LogSource::Tail` with
+//! [`scan_flattened_range`](WalScan::scan_flattened_range) +
+//! [`evaluate`](WalScan::evaluate) (the statistics pass); the page pass
+//! (`paginate` via its `scan_tails` helper) runs its own scan of the same
+//! range and drives [`page_shard`](WalScan::page_shard) +
+//! [`materialize_rows`](WalScan::materialize_rows). The whole-file
+//! [`scan_flattened`](WalScan::scan_flattened) is the equivalence
+//! harness's entry point (tests/ng_wal_equivalence.rs).
 //!
 //! # Semantic equality with the SFST engine
 //!
@@ -16,8 +25,8 @@
 //!
 //! - the *rows* are identical by construction: the tail and the sealed
 //!   `ng-index` build render every row from the **same** ng-flatten frame
-//!   through the **same** [`ng_flatten::build_kv`] renderer and order by
-//!   the **same** frozen `Record.ts`;
+//!   through the **same** [`ng_flatten::build_kv`] renderer, timestamped
+//!   by the **same** frozen `Record.ts`;
 //! - filter patterns anchor identically: both compile through
 //!   [`sfst::compile_pattern`] / [`sfst::compile_query`];
 //! - field tables classify identically: same distinct-pair cardinality
@@ -52,8 +61,8 @@ use super::query::LogsQuery;
 #[derive(Debug, thiserror::Error)]
 pub enum FlattenedScanError {
     /// The WAL container could not be read (open or frame iteration).
-    /// Transparent: embedding the source in the message while also
-    /// chaining it would print it twice in anyhow chains.
+    /// Transparent: the display comes from the source error, and chaining
+    /// it as well would print it twice in anyhow chains.
     #[error(transparent)]
     Wal(#[from] wal::Error),
     /// The WAL header names a frame codec other than the ng-flatten logs
@@ -73,10 +82,10 @@ struct Pair {
     /// The full `key=value` string, exactly as interned by the indexer.
     kv: String,
     /// Byte offset of the `=` separator: field is `kv[..eq]`, value is
-    /// `kv[eq + 1..]`. Same field-extraction rule as the indexer's
-    /// interner: first `=`, or the whole string when none (cannot
-    /// arise — `ng_flatten::build_kv` always emits the separator; handled
-    /// defensively).
+    /// `kv[eq + 1..]` (empty when `eq == kv.len()`). First-`=` split —
+    /// the indexer interner's rule too. The no-separator case cannot
+    /// arise (`ng_flatten::build_kv` always emits one) but is handled
+    /// defensively.
     eq: usize,
 }
 
@@ -103,11 +112,14 @@ struct Row {
 
 /// The decoded rows of one WAL file, ready to evaluate queries against.
 ///
-/// Build once with [`scan_flattened`](Self::scan_flattened), evaluate any
-/// number of queries with [`evaluate`](Self::evaluate). The pair table is
-/// deduplicated by
-/// full string (`u32` tokens), so per-row storage and all evaluation
-/// loops work on small integers.
+/// Build once with [`scan_flattened`](Self::scan_flattened) or
+/// [`scan_flattened_range`](Self::scan_flattened_range), then evaluate any
+/// number of queries: [`evaluate`](Self::evaluate) for statistics,
+/// [`page_shard`](Self::page_shard) +
+/// [`materialize_rows`](Self::materialize_rows) for pagination. Each
+/// distinct pair is deduplicated by full string and assigned a dense
+/// `u32` token, so per-row storage and all evaluation loops work on
+/// small integers.
 pub struct WalScan {
     pairs: Vec<Pair>,
     /// Full `key=value` string → token. Retained for exact-matcher
@@ -133,15 +145,17 @@ impl WalScan {
     /// [`ng_flatten::build_kv`] and uses `Record.ts` as the row timestamp,
     /// mirroring `ng-index`'s sealed build (`build_sfst`) exactly — same
     /// resource→scope→record token assembly, same per-occurrence rendering —
-    /// so the tail and an SFST built from the same frames agree by construction.
+    /// so a scan and an SFST built from the same frames agree by construction.
     pub fn scan_flattened(path: &Path) -> Result<WalScan, FlattenedScanError> {
         Self::drain_flattened(wal::Reader::open(path)?)
     }
 
-    /// Range counterpart of [`scan_flattened`](Self::scan_flattened) — the
-    /// active-WAL tail (a chunk-end frame boundary to the durable bound). See
-    /// [`wal::FrameRange`] / [`wal::Reader::open_range`]. An empty range yields
-    /// a zero-row scan.
+    /// Range counterpart of [`scan_flattened`](Self::scan_flattened):
+    /// decodes only `[start, end)`. Production queries pass the active-WAL
+    /// tail — the end of the last indexed chunk to the durable bound, both
+    /// frame-aligned (see [`wal::FrameRange`] / [`wal::Reader::open_range`]
+    /// and `wal::prefix::tail_start`). An empty range yields a zero-row
+    /// scan.
     pub fn scan_flattened_range(
         path: &Path,
         range: wal::FrameRange,
@@ -149,10 +163,11 @@ impl WalScan {
         Self::drain_flattened(wal::Reader::open_range(path, range)?)
     }
 
-    /// Drive the shared [`ScanSink`] from a flattened-frame WAL reader. Mirrors
-    /// `ng_index::build_sfst`'s token assembly (resource ++ scope ++ record,
-    /// per record) and `Record.ts` ordering so the rows fed here are the rows
-    /// the sealed builder indexes.
+    /// Drive the shared [`ScanSink`] from a flattened-frame WAL reader.
+    /// Mirrors `ng_index::build_sfst`'s row construction — per record, the
+    /// resource ++ scope ++ record token assembly with `Record.ts` as the
+    /// timestamp — so the rows fed here are the rows the sealed builder
+    /// indexes.
     fn drain_flattened(mut reader: wal::Reader) -> Result<WalScan, FlattenedScanError> {
         let found = reader.header().payload_format;
         if found != ng_flatten::LOG_FRAME_PAYLOAD_FORMAT {
@@ -191,7 +206,8 @@ impl WalScan {
                             intern_flattened(&mut sink, &record.entries, &paths, &mut kv);
                         tokens.truncate(resource_tokens.len() + scope_tokens.len());
                         tokens.extend_from_slice(&record_tokens);
-                        // ts resolved at ingest (time/observed/clock); concrete.
+                        // `ts` was normalized at ingest (time → observed →
+                        // clock); a concrete value here, used as-is.
                         sink.row(record.ts, &tokens);
                     }
                     tokens.truncate(resource_tokens.len());
@@ -210,10 +226,10 @@ impl WalScan {
     /// [`PageShard::evaluate`]. Every row matching the filter within the
     /// window becomes a [`Cursor`] tagged [`Part::Tail`] (the tail sorts
     /// after all chunks of the same `seq`) with `position` the row's
-    /// **insertion index** — stable while the row stays in the tail.
-    /// Unlike an SFST the tail isn't
-    /// time-ordered, so the cursors are sorted explicitly before the
-    /// shared split/order/bound.
+    /// **insertion index** in this scan — stable while the row stays in
+    /// the tail. Unlike an SFST's rows the tail isn't time-ordered (rows
+    /// come in stream order), so the cursors are sorted explicitly before
+    /// [`PageShard::from_cursors`] applies direction, anchor, and bound.
     pub fn page_shard(
         &self,
         seq: u64,
@@ -247,8 +263,8 @@ impl WalScan {
 
     /// Materialize tail rows by insertion index — the row-scan
     /// counterpart of `IndexReader::materialize_rows`. Each row's pairs
-    /// are emitted in stored (stream) order, keys not deduplicated, to
-    /// match the SFST path.
+    /// are emitted in stored (stream) order, duplicates kept, to match
+    /// the SFST path.
     pub fn materialize_rows(&self, positions: &[u32]) -> Vec<sfst::MaterializedRow> {
         positions
             .iter()
@@ -386,19 +402,18 @@ impl WalScan {
         let mut set = TokenSet::new(self.pairs.len());
 
         // Absent field → empty set, before any pattern compiles — the
-        // same gate order as the SFST path, whose `field_values_or`
-        // returns empty on a `locate_field` miss without touching the
-        // matchers (so a malformed pattern on an absent field is not an
-        // error there, and must not be one here).
+        // same gate order as the SFST path: `field_values_or` returns
+        // empty on a `locate_field` miss without touching the matchers,
+        // so a malformed pattern on an absent field is not an error
+        // there, and must not be one here.
         //
-        // The gate also makes the exact-match lookup below sound. Field
-        // names in `field_tokens` never contain `=` (extraction splits
-        // on the first one), so for any field that passes the gate,
-        // `"{field}={value}"` re-splits at the intended boundary.
-        // Without the gate, a requested field `a=b` with exact value
-        // `c` would concatenate to `a=b=c` and false-match that stored
-        // pair — whose field is `a` — where the SFST path matches
-        // nothing.
+        // The gate also makes the exact-match lookup below sound: field
+        // names never contain `=` (extraction splits on the first one),
+        // so for a field that passes the gate, `"{field}={value}"`
+        // re-splits at the intended boundary. Without it, a filter on
+        // field `a=b` with exact value `c` would build `a=b=c` and
+        // false-match that stored pair — whose field is `a` — where the
+        // SFST path matches nothing.
         if !self.field_tokens.contains_key(field) {
             return Ok(set);
         }
@@ -435,11 +450,10 @@ impl WalScan {
 // Scan sink
 // ---------------------------------------------------------------------------
 
-/// The row sink that accumulates a [`WalScan`].
-///
-/// Tokens are dense indexes into the pair table, deduplicated by full
-/// `key=value` string, so collision safety is structural — every pair is
-/// formatted and deduped by string (no hash index is kept).
+/// The row sink that accumulates a [`WalScan`]: the pair table, the
+/// string → token dedup map, and the decoded rows. Tokens are dense
+/// indexes into the pair table; dedup compares the full `key=value`
+/// string, so results never depend on hash uniqueness.
 #[derive(Default)]
 struct ScanSink {
     pairs: Vec<Pair>,
@@ -761,6 +775,8 @@ impl TimelineAcc {
         }
     }
 
+    /// Fold one matching row into its bucket; a degraded timeline
+    /// (`state: None`) or a row outside the grid contributes nothing.
     fn accumulate(&mut self, ts_ns: i64, conjuncts: &RowMatch, distinct_tokens: &[u32]) {
         let Some(state) = &mut self.state else { return };
         let grid = state.grid;
@@ -788,6 +804,9 @@ impl TimelineAcc {
         }
     }
 
+    /// Transpose the accumulators into per-bucket [`sfst::Bucket`]s — a
+    /// bucket's `unset` is its full-filter matches that carried none of
+    /// the field's values (`bucket_total - with_field`).
     fn finish(self) -> Option<Timeline> {
         let state = self.state?;
         let buckets = (0..state.grid.num_buckets)

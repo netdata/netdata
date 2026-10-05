@@ -1,11 +1,45 @@
-// String tokenizer and parser for field names with compact encoding
-//
-// Tokenizes strings into words (lowercase, UPPERCASE, Capitalized) and separators (. _ -)
-// Parses tokens into fields: Lowercase, Uppercase, LowerCamel, UpperCamel, Empty
-// Encodes token stream into compact lossless representation
-//
-// Example: "log.body.HostName" → encoded: "C3aao" (5 chars: 2-char checksum + 3-char structure)
+//! Field-name normalization for the journal stack: turns arbitrary field
+//! names into names journald accepts as field names — uppercase ASCII
+//! letters, digits and underscores, at most 64 bytes.
+//!
+//! The pipeline behind the single public entry point `encode_full`:
+//! `tokenize` splits the name into words (lowercase / UPPERCASE /
+//! Capitalized; digits count as uppercase) and separators (`. _ -`), `parse`
+//! merges words into typed fields, `encode_nodes` emits one structure
+//! character per field+separator pair (alphabet a-x) plus a 2-character
+//! checksum when camelCase fields are present, and `encode_full`
+//! run-length-compresses the structure characters (never the checksum),
+//! uppercases, and appends the original name normalized to uppercase with
+//! `.`/`-` mapped to `_` and common attribute prefixes shortened
+//! (RA_/LA_/LB_).
+//!
+//! Output shapes (the contract the journal stack keys on):
+//! - Normal: `ND<checksum?><compressed-structure>_<NORMALIZED-NAME>` — e.g.
+//!   `log.body.hostname` → `NDAAE_LB_HOSTNAME`.
+//! - MD5 fallback: `ND_` + 32 uppercase hex = 35 bytes — for inputs that are
+//!   not tokenizable (non-UTF-8 or any byte outside [A-Za-z0-9._-]) or whose
+//!   normal shape would exceed 64 bytes. The shapes are distinguishable
+//!   because structure characters are lowercase a-x (A-X after uppercasing)
+//!   and checksum characters A-Z/0-9; neither alphabet contains `_`.
+//!
+//! Consumers: journal-log-writer remaps non-journald-compatible field names
+//! at write time (`journal-log-writer/src/log/mod.rs`
+//! `write_entry_with_timestamps`) and persists the otel→systemd mapping as
+//! `ND_REMAPPING=1` entries (same file, `write_remapping_entry`);
+//! journal-core's reader rebuilds the reverse mapping by accepting only
+//! fields that start with `ND_` and are exactly 35 bytes
+//! (`journal-core/src/file/reader.rs` `parse_remapping_entry`), so
+//! normal-shape mappings are written but silently dropped on load — only
+//! MD5-fallback mappings round-trip; journal-core's FieldMap tests drive
+//! `encode_full` directly (`journal-core/src/field_map.rs` test
+//! `test_remapping_registry`). The
+//! published systemd-journal-sdk-* crates carry no twin (grep-verified
+//! 0.8.1; their engine's cache notes v3 dropped ND_REMAPPING-specific
+//! indexing). The `rdp` bin (main.rs) prints the encodings of a fixed key
+//! list with a checksum of the whole output — a dev tool. Dependency: `md5`
+//! only (Cargo.toml). Nothing in the repo expands the crate name.
 
+// The character classes `tokenize` recognizes; digits classify as uppercase.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CharType {
     Lowercase,
@@ -15,6 +49,9 @@ enum CharType {
     Hyphen,
 }
 
+// Classifies one byte; `None` marks everything outside [A-Za-z0-9._-] — the
+// condition that makes `tokenize` (and with it `encode`) fail and take the
+// MD5 fallback.
 fn char_type(c: u8) -> Option<CharType> {
     if c.is_ascii_lowercase() {
         Some(CharType::Lowercase)
@@ -31,9 +68,18 @@ fn char_type(c: u8) -> Option<CharType> {
     }
 }
 
-/// Prefix for field names that were remapped due to containing invalid characters.
+/// Prefix of the MD5 fallback shape: `encode` emits `ND_` + 32 uppercase hex
+/// (35 bytes) for names it cannot tokenize, and `encode_full` re-checks this
+/// prefix to tell fallback outputs from structure encodings. A structure
+/// encoding can never start with `ND_` — structure characters are lowercase
+/// a-x and checksum characters A-Z/0-9, and neither alphabet contains `_`.
+/// journal-core's reader gate keys on this shape to recognize remapping
+/// fields (`journal-core/src/file/reader.rs` `parse_remapping_entry`).
 const REMAPPED_PREFIX: &str = "ND_";
 
+// Word shapes as `tokenize` sees them: all-lowercase, all-uppercase-class
+// (letters and digits), or Capitalized (uppercase-class first character,
+// lowercase tail).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TokenType {
     Lowercase,
@@ -41,6 +87,8 @@ enum TokenType {
     Capitalized,
 }
 
+// The separators the encoder distinguishes; each kind maps to its own
+// structure character, so the separator kind survives encoding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Separator {
     Dot,
@@ -48,6 +96,8 @@ enum Separator {
     Underscore,
 }
 
+// One `tokenize` output element: a word (carrying its byte range in the
+// input) or a single separator character.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Token {
     Word {
@@ -58,6 +108,8 @@ enum Token {
     Separator(Separator),
 }
 
+// Builds the token for one scanned word from its first character's class and
+// the flags accumulated while scanning it.
 fn create_token(
     first: CharType,
     has_lowercase: bool,
@@ -67,6 +119,8 @@ fn create_token(
 ) -> Token {
     match first {
         CharType::Lowercase => {
+            // A lowercase-started word cannot contain an uppercase-class
+            // character: (Lower, Upper) transitions always split the word.
             assert!(!has_uppercase);
             Token::Word {
                 kind: TokenType::Lowercase,
@@ -75,6 +129,8 @@ fn create_token(
             }
         }
         CharType::Uppercase => {
+            // Both flags can never be set on one word: the character that
+            // would set the second flag splits the word first.
             assert!(!(has_lowercase && has_uppercase));
 
             if has_lowercase {
@@ -99,6 +155,12 @@ fn create_token(
     }
 }
 
+// Splits the input into words and separators. A new word starts at each
+// separator and at class transitions: lower→upper always splits ("fooBar" →
+// foo|Bar), upper→upper splits only when a lowercase run follows
+// ("HTTPResponse" → HTTP|Response), and upper→lower keeps the word going
+// (the tail of a Capitalized word). Returns `None` when any byte has no
+// class — the trigger for `encode`'s MD5 fallback.
 fn tokenize(s: &[u8]) -> Option<Vec<Token>> {
     let mut tokens = Vec::new();
 
@@ -143,7 +205,10 @@ fn tokenize(s: &[u8]) -> Option<Vec<Token>> {
 
             // Uppercase to Lowercase can be Capitalized - don't split yet
             (CharType::Uppercase, CharType::Lowercase) => {
-                // only continue if we're at the first transition (potential Capitalized word)
+                // has_uppercase/has_lowercase are always both false at this
+                // transition: the uppercase run before the lowercase tail
+                // already split the word and reset the flags, so this never
+                // splits — a Capitalized word just keeps absorbing.
                 has_uppercase && has_lowercase
             }
 
@@ -175,7 +240,8 @@ fn tokenize(s: &[u8]) -> Option<Vec<Token>> {
 
     // add the last word
     if start < s.len() {
-        // make sure the rest of the word contains valid chars
+        // Belt-and-braces guard: the loop above already validated every byte
+        // via `char_type(ch)?`, so this always passes.
         if !s[start..].iter().all(|ch| char_type(*ch).is_some()) {
             return None;
         };
@@ -187,6 +253,8 @@ fn tokenize(s: &[u8]) -> Option<Vec<Token>> {
     Some(tokens)
 }
 
+// The field shapes `parse` assembles from words: single-case runs and the
+// two camel shapes. `Empty` marks a leading, doubled or trailing separator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Field<'a> {
     Lowercase(&'a [u8]),
@@ -196,12 +264,14 @@ enum Field<'a> {
     Empty,
 }
 
+// `parse` output: one field or one separator, in input order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Node<'a> {
     Field(Field<'a>),
     Separator(Separator),
 }
 
+// The builder's view of a field's shape (`Empty` needs no builder).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FieldType {
     Lowercase,
@@ -210,6 +280,11 @@ enum FieldType {
     UpperCamel,
 }
 
+// Accumulates consecutive words into one field. A word joins the current
+// field only when the (field type, word type) pair composes (`can_add`); the
+// one special case turns a lone lowercase word followed by Capitalized words
+// into a LowerCamel field ("helloWorld"); anything else finishes the current
+// field and starts a new one.
 #[derive(Debug, Clone, Copy)]
 struct FieldBuilder {
     field_type: FieldType,
@@ -263,6 +338,7 @@ impl FieldBuilder {
     }
 }
 
+// Unused helper (dead code kept with an allow): unwraps a word token's kind.
 #[allow(dead_code)]
 fn token_type(word: &Token) -> TokenType {
     match word {
@@ -271,6 +347,10 @@ fn token_type(word: &Token) -> TokenType {
     }
 }
 
+// Groups tokens into fields: same-shape words merge (see `FieldBuilder`),
+// separators finish the current field, and a leading separator, two
+// consecutive separators, or a trailing separator each contribute an `Empty`
+// field so the surrounding shape is preserved. Output order matches input.
 fn parse<'a>(source: &'a [u8], tokens: &[Token]) -> Vec<Node<'a>> {
     let mut nodes = Vec::new();
 
@@ -342,6 +422,11 @@ fn parse<'a>(source: &'a [u8], tokens: &[Token]) -> Vec<Node<'a>> {
     nodes
 }
 
+// The structure alphabet: one character per (field shape, what follows) —
+// the following separator kind, another field with no separator in between,
+// or end of input. 24 codes (a-x): five per field shape plus Empty's four
+// (u-x), since an `Empty` field only ever faces a separator. `encode_full`
+// uppercases these to A-X.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FieldSeparatorPair {
     // Lowercase field followed by...
@@ -379,6 +464,7 @@ enum FieldSeparatorPair {
     EmptyEnd,
 }
 
+// The a-x code table; `from_char` below is its (currently unused) inverse.
 impl FieldSeparatorPair {
     fn to_char(self) -> char {
         match self {
@@ -418,6 +504,7 @@ impl FieldSeparatorPair {
         }
     }
 
+    // Inverse of `to_char`; never called (dead code kept with an allow).
     #[allow(dead_code)]
     fn from_char(c: char) -> Option<Self> {
         match c {
@@ -455,6 +542,10 @@ impl FieldSeparatorPair {
     }
 }
 
+// 2-character checksum over the whole input string, via std's DefaultHasher:
+// index 0-25 maps to A-Z, 26-35 to 0-9. Distinct inputs can collide, and std
+// gives no cross-release stability guarantee for DefaultHasher — a toolchain
+// update can change the checksums of the names persisted in journals.
 fn compute_checksum(s: &str) -> String {
     use std::hash::{DefaultHasher, Hash, Hasher};
 
@@ -481,8 +572,10 @@ fn compute_checksum(s: &str) -> String {
     format!("{}{}", first_char, second_char)
 }
 
-/// Returns true if the encoded string contains a checksum prefix.
-/// Checksums are added for strings containing camel case fields.
+/// Detects the checksum prefix by first character. Only called on `encode`
+/// output that already passed the `ND_` fallback check in `encode_full`, so
+/// an uppercase/digit first character can only be a checksum: structure
+/// characters are lowercase a-x.
 fn has_checksum(encoded: &str) -> bool {
     if let Some(first_char) = encoded.chars().next() {
         // Checksum uses A-Z and 0-9, structure encoding uses a-x
@@ -492,6 +585,11 @@ fn has_checksum(encoded: &str) -> bool {
     }
 }
 
+// Renders the structure encoding: one lowercase a-x character per
+// field(+separator) pair. A 2-character checksum prefixes the output when
+// any field is camelCase — `has_checksum` and `encode_full` rely on the
+// resulting first-character split. Consecutive separators survive as
+// Empty+separator pairs, so separator kinds and counts are preserved.
 fn encode_nodes(source: &str, nodes: &[Node]) -> String {
     // Check if any field is camel case
     let has_camel_case = nodes.iter().any(|node| {
@@ -623,39 +721,36 @@ fn encode_nodes(source: &str, nodes: &[Node]) -> String {
     result
 }
 
-/// Encodes a key string into a compact representation.
-///
-/// The encoding is lossless for all practical naming conventions and includes:
-/// - Structure encoding: captures field types (lowercase, UPPERCASE, camelCase) and separators (. _ -)
-/// - Checksum: 2-character prefix (A-Z, 0-9) added for strings with camel case fields
-///
-/// # Examples
-///
-/// The private unit tests cover the examples because this is an implementation
-/// detail behind `encode_full`.
+/// The private core of `encode_full`: encodes a tokenizable field name into
+/// its compact structure representation — lowercase a-x characters capturing
+/// field shapes and separators, with a 2-character checksum prefix (A-Z,
+/// 0-9) when the name has camelCase fields. Camel-case word boundaries
+/// collapse within a field ("HelloWorld" and "Helloworld" share a structure
+/// character); the checksum over the raw input keeps distinct names apart
+/// except for 1-in-1296 collisions. Inputs that cannot be tokenized (any
+/// byte outside [A-Za-z0-9._-], including non-UTF-8) take the MD5 fallback
+/// instead: `ND_` + 32 uppercase hex characters (35 bytes). The structure
+/// encoding of an empty input is the empty string.
 fn encode(b: &[u8]) -> String {
     let Some(tokens) = tokenize(b) else {
         let digest = md5::compute(b);
         return format!("{}{:X}", REMAPPED_PREFIX, digest);
     };
 
-    // SAFETY: We'll only get tokens when we have valid ASCII characters in
-    // the input byte slice.
+    // SAFETY: `tokenize` returning `Some` proves every input byte passed
+    // `char_type`, i.e. the input is ASCII over [A-Za-z0-9._-] — valid UTF-8.
     let s = unsafe { str::from_utf8_unchecked(b) };
 
     let nodes = parse(b, &tokens);
     encode_nodes(s, &nodes)
 }
 
-/// Compresses runs of 3 or more consecutive identical characters using run-length encoding.
-///
-/// Runs are encoded as count + character, with a maximum count of 9 per segment.
-/// For runs longer than 9, multiple segments are created.
-///
-/// # Examples
-///
-/// The private unit tests cover the examples because this is an implementation
-/// detail behind `encode_full`.
+/// Run-length-compresses runs of 3 or more identical characters as
+/// `count` + character, splitting runs longer than 9 into 9-character chunks
+/// with a literal remainder; runs of 1-2 stay literal. Only the structure
+/// encoding goes through this (the checksum is exempt — see `encode_full`),
+/// and its characters are a-x, so the digits in the output are unambiguously
+/// run counts. Pinned by `tests::compress_runs_examples_match_private_contract`.
 fn compress_runs(s: &str) -> String {
     if s.is_empty() {
         return String::new();
@@ -708,29 +803,34 @@ fn compress_runs(s: &str) -> String {
     result
 }
 
-/// Returns the fully encoded key: ND prefix + compressed uppercase structure encoding + normalized key.
+/// Encodes a field name into a systemd-journal-compatible field name: the
+/// single public entry point of this crate. journal-log-writer calls it for
+/// every field name that is not already journald-compatible
+/// (`journal-log-writer/src/log/mod.rs` `write_entry_with_timestamps`).
 ///
-/// The result combines:
-/// - "ND" prefix (Netdata namespace identifier)
-/// - The compact structure encoding with run-length compression and uppercased
-/// - An underscore separator
-/// - The original key converted to uppercase with dots and hyphens replaced by underscores,
-///   and common prefixes shortened:
-///   - "RESOURCE_ATTRIBUTES_" → "RA_"
-///   - "LOG_ATTRIBUTES_" → "LA_"
-///   - "LOG_BODY_" → "LB_"
+/// The result has one of two shapes:
 ///
-/// Run-length compression replaces 3+ consecutive identical characters with count + character.
-/// The checksum (first 2 characters if present) is never compressed.
+/// - Normal: `ND<checksum?><compressed-structure>_<NORMALIZED>` — the `ND`
+///   (Netdata) prefix, the optional 2-character checksum (present only for
+///   names with camelCase fields), the run-length-compressed structure
+///   encoding uppercased (A-X letters with 0-9 run counts), an underscore,
+///   and the original name uppercased with `.` and `-` mapped to `_` plus
+///   the common prefixes shortened: `RESOURCE_ATTRIBUTES_` → `RA_`,
+///   `LOG_ATTRIBUTES_` → `LA_`, `LOG_BODY_` → `LB_` (matched on the
+///   uppercased name, so dotted and underscored spellings both hit).
+/// - MD5 fallback: `ND_` + 32 uppercase hex characters = 35 bytes — used
+///   when the input is not valid UTF-8, contains any byte outside
+///   [A-Za-z0-9._-], or the normal shape would exceed 64 bytes (journald's
+///   field-name limit). The result is always ≤ 64 bytes and
+///   journald-compatible.
 ///
-/// # MD5 Fallback
-///
-/// Falls back to `ND_<32-hex-chars>` format when:
-/// - Input is not valid UTF-8
-/// - Input contains invalid characters (anything except a-z, A-Z, '.', '-', '_')
-/// - Encoded result would exceed 64 bytes (systemd's field name limit)
-///
-/// The result is guaranteed to be systemd-compatible and ≤ 64 bytes.
+/// The checksum is computed over the raw input and is never compressed
+/// (see `compute_checksum` for its stability caveats). The mapping is
+/// deterministic for a given toolchain but not idempotent: re-encoding an
+/// output produces a different name (the normalized part keeps growing, e.g.
+/// `NDE_HELLO` → `NDQT_NDE_HELLO`). Edge case: an empty input yields the
+/// 3-byte `ND_` (empty structure and empty normalized name), which resembles
+/// but is not the MD5 fallback shape.
 ///
 /// # Examples
 ///
@@ -791,6 +891,9 @@ pub fn encode_full(field_name: &[u8]) -> String {
         compress_runs(&encoded)
     };
 
+    // SAFETY: reaching this line means `encode` took the structure path, so
+    // every input byte passed `char_type` — the input is ASCII, hence valid
+    // UTF-8.
     let s = unsafe { String::from_utf8_unchecked(field_name.to_vec()) };
     let mut normalized = s.to_uppercase().replace(['.', '-'], "_");
 
@@ -814,6 +917,9 @@ pub fn encode_full(field_name: &[u8]) -> String {
     result
 }
 
+// Pinned-output contract tests: these values are the documented behavior of
+// `encode_full`, `encode` and `compress_runs` — keep them in sync with the
+// doc comments (the `encode_full` doctest duplicates the third test here).
 #[cfg(test)]
 mod tests {
     use super::*;

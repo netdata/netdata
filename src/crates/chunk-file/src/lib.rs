@@ -1,21 +1,23 @@
-//! Chunk-based file formats: zero-copy TOC codec + integrity container.
+//! Chunk-based on-disk file formats for the OTel storage stack: a
+//! zero-copy table-of-contents (TOC) codec plus an integrity container
+//! layered on top, so a reader can jump directly to any named chunk's
+//! byte range within a buffer (typically an mmap).
 //!
-//! The foundation for on-disk formats assembled from independently
-//! addressable chunks — index files, catalogs, any artifact whose
-//! reader wants O(1) random access to named sections of an mmap.
 //! Two layers:
 //!
-//! - **Raw TOC codec** (this module): a table of contents mapping
-//!   4-byte chunk IDs to byte ranges within a file. Designed for
-//!   memory-mapped files: the TOC is parsed zero-copy via [`zerocopy`],
-//!   and [`ChunkMeta`] exposes raw offsets so callers can issue
-//!   `madvise` hints per chunk.
-//! - **Integrity container** ([`container`]): a self-describing file
-//!   framing on top of the TOC — magic + version + num_chunks header
-//!   and a crc32 trailer per chunk — with a buffer-all builder and a
-//!   streaming `Write + Seek` writer. Most consumers want this layer;
-//!   the raw codec is for formats that bring their own header and
-//!   integrity story.
+//! - **Raw TOC codec** (crate root): a TOC mapping 4-byte chunk ids to
+//!   byte ranges. Parsed zero-copy via [`zerocopy`]; [`ChunkMeta`]
+//!   exposes raw offsets so a reader can compute memory ranges for mmap
+//!   advice. It serves the container below and formats that bring their
+//!   own header and integrity story.
+//! - **Integrity container** ([`container`]): self-describing framing on
+//!   top of the TOC — magic + version + num_chunks header, crc32 trailer
+//!   per chunk — with a buffer-all builder and a streaming `Write + Seek`
+//!   writer. Every current consumer frames its files through this layer.
+//!
+//! Export surface: raw-layer types are defined at the crate root
+//! ([`ChunkId`], [`TocEntry`], [`ChunkMeta`], [`Toc`], [`TocWriter`],
+//! [`ChunkWriter`], [`Error`]); the container's under [`container`].
 //!
 //! # On-disk TOC layout
 //!
@@ -28,14 +30,15 @@
 //! entry[N]:  0000 + offset_le(8)     end marker (zero id, offset = end of last chunk)
 //! ```
 //!
-//! Offsets are little-endian and relative to one shared origin: the
-//! start of the slice handed to [`Toc::parse`], which is the same
-//! origin `base_offset` named at write time
-//! ([`TocWriter::write_toc`]). For a standalone file that origin is
-//! byte 0; for a TOC embedded in a larger file it is wherever the
-//! embedding starts. The TOC may sit at any `toc_offset` past that
-//! origin (the container places it after its 12-byte header); chunk
-//! bodies follow the TOC.
+//! Offsets are little-endian and absolute within the buffer the TOC
+//! lives in — the same start as the slice handed to [`Toc::parse`]. A
+//! chunk's size is the delta between its entry's offset and the next
+//! entry's, so offsets must be strictly increasing and the last chunk
+//! ends at the end-marker offset. The TOC itself may sit anywhere in
+//! the buffer: [`TocWriter::write_toc`] takes `base_offset`, the buffer
+//! offset the TOC is written at (the container places it after its
+//! 12-byte header), and the first chunk's data begins at `base_offset`
+//! + TOC size. Chunk bodies follow the TOC.
 //!
 //! ```
 //! use chunk_file::{Toc, TocWriter};
@@ -54,6 +57,18 @@
 //! assert_eq!(toc.data(&file, *b"BODY")?, b"defgh");
 //! # Ok::<(), chunk_file::Error>(())
 //! ```
+//!
+//! # Consumers (grep-verified)
+//!
+//! Direct dependents (`src/crates/*/Cargo.toml`): `sfst` — the primary
+//! one, writing `.sfst` indexes through [`container::StreamingWriter`],
+//! reading them via [`container::Container`], and folding
+//! [`container::Error`] into its own error type — and `otel-catalog`,
+//! which serializes the catalog as a container file holding a single
+//! `JSON` chunk. Test-only dependents: `sfsq` (corruption tests flip
+//! CRCs located via the container TOC) and `file-lifecycle` (synthesizes
+//! a catalog container with an arbitrary envelope version for its heal
+//! test). The raw codec layer has no external consumer.
 
 pub mod container;
 
@@ -79,7 +94,7 @@ pub const END_MARKER_ID: ChunkId = [0; 4];
 pub struct TocEntry {
     /// Chunk identifier.  For the end-marker entry this is [`END_MARKER_ID`].
     pub id: ChunkId,
-    /// Byte offset from the TOC's origin (see the crate docs),
+    /// Byte offset, absolute within the buffer (see the crate docs),
     /// little-endian.
     offset_le: [u8; 8],
 }
@@ -104,16 +119,16 @@ impl TocEntry {
     }
 }
 
-/// A chunk's location and size within a file.
+/// A chunk's location and size within the buffer.
 ///
-/// Exposes raw byte offsets so callers can compute memory ranges for
-/// `madvise(MADV_WILLNEED)`, `madvise(MADV_SEQUENTIAL)`, etc.
+/// Exposes raw offsets so callers can compute memory ranges for mmap
+/// advice (`madvise` hints, `advise_range`).
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ChunkMeta {
     /// Chunk identifier.
     pub id: ChunkId,
-    /// Byte offset of the chunk's first byte, from the TOC's origin
-    /// (see the crate docs).
+    /// Byte offset of the chunk's first byte, absolute within the
+    /// buffer (see the crate docs).
     pub offset: u64,
     /// Byte length of the chunk data.
     pub size: u64,
@@ -203,9 +218,10 @@ pub enum Error {
 
 // ── Toc (zero-copy reader) ──────────────────────────────────────
 
-/// Zero-copy TOC parsed from a memory-mapped file.
+/// A validated table of contents, parsed zero-copy.
 ///
-/// Borrows directly from the underlying byte slice with no allocation.
+/// The entries borrow directly from the byte slice handed to
+/// [`parse`](Toc::parse).
 pub struct Toc<'a> {
     /// N+1 entries: entries[0..N] are chunks, entries[N] is the end marker.
     entries: Ref<&'a [u8], [TocEntry]>,
@@ -262,11 +278,8 @@ impl<'a> Toc<'a> {
                 actual: toc_bytes.len(),
             })?;
 
-        // Validate: chunks start past the TOC, offsets monotonically
-        // increasing and within bounds, end marker id is zero, no
-        // duplicate ids.
         let data_len = file.len();
-        let num_entries = entries.len(); // N+1
+        let num_entries = entries.len(); // N + 1 (chunks + end marker)
         if entries[0].offset() < toc_end as u64 {
             return Err(Error::ChunkOverlapsToc {
                 offset: entries[0].offset(),
@@ -290,8 +303,7 @@ impl<'a> Toc<'a> {
                 });
             }
             // The zero id is reserved for the end marker; a chunk entry
-            // carrying it would be unaddressable (and ambiguous with
-            // the marker).
+            // carrying it would be unaddressable by id lookups.
             if i < n && entries[i].id == END_MARKER_ID {
                 return Err(Error::ReservedChunkId { index: i });
             }
@@ -300,15 +312,11 @@ impl<'a> Toc<'a> {
             return Err(Error::BadEndMarker { id: entries[n].id });
         }
         // Duplicate-id check in O(n log n): sort (id, index) pairs and
-        // compare neighbors. Today's TOCs hold dozens of entries, but
-        // the format itself doesn't bound n — don't let the validator
-        // become the ceiling for a future consumer. The tuple's
-        // lexicographic Ord sorts by id then index, so equal-id pairs
-        // are ordered by index *by the comparator* — the unstable sort
-        // is still fully deterministic because the distinct indices
-        // make every pair unique (stability only matters for elements
-        // that compare equal). The reported index is therefore the
-        // later occurrence of the sorted-first duplicated id.
+        // compare neighbors — the format doesn't bound n, so validation
+        // must not go quadratic. The tuple Ord sorts by id then index
+        // (pairs are unique, so sort_unstable is deterministic), so the
+        // reported index is the later occurrence of the sorted-first
+        // duplicated id.
         let mut ids: Vec<(ChunkId, usize)> = (0..n).map(|i| (entries[i].id, i)).collect();
         ids.sort_unstable();
         for pair in ids.windows(2) {
@@ -328,7 +336,7 @@ impl<'a> Toc<'a> {
         self.entries.len() - 1
     }
 
-    /// Look up a chunk's metadata by ID.
+    /// Look up a chunk's metadata by ID (linear scan, first match).
     pub fn get(&self, id: ChunkId) -> Option<ChunkMeta> {
         let n = self.num_chunks();
         for i in 0..n {
@@ -386,7 +394,8 @@ struct PlannedChunk {
     size: u64,
 }
 
-/// Build a TOC by planning chunks, then write it out.
+/// Build a TOC by planning chunks, then write the TOC out and stream
+/// the chunk bodies through the returned [`ChunkWriter`].
 pub struct TocWriter {
     chunks: Vec<PlannedChunk>,
 }
@@ -396,14 +405,16 @@ impl TocWriter {
         Self { chunks: Vec::new() }
     }
 
-    /// Declare a chunk to be written.  Chunks are written in the order
+    /// Declare a chunk to be written. Chunks are written in the order
     /// they are planned.
     ///
-    /// Duplicate ids get debug-only protection here — the container
-    /// writers guard at runtime before reaching this point
+    /// Debug-only guards here: the id must not be the reserved
+    /// end-marker id and must not duplicate an earlier plan. In release
+    /// builds neither is checked — the container writers guard at
+    /// runtime before reaching this point
     /// ([`container::ContainerBuilder::write_to`] /
     /// [`container::StreamingWriter::write_chunk`]), and
-    /// [`Toc::parse`] rejects duplicates at read time. Direct raw-layer
+    /// [`Toc::parse`] rejects bad ids at read time; direct raw-layer
     /// producers are expected to have a fixed id set.
     pub fn plan(&mut self, id: ChunkId, size: u64) {
         debug_assert!(
@@ -501,10 +512,10 @@ impl<W: Write> ChunkWriter<W> {
     }
 
     /// Return the underlying writer without the all-chunks-written
-    /// check that [`finish`](ChunkWriter::finish) performs. For callers
-    /// that enforce the plan by construction (they build the plan and
-    /// the payload sequence from the same list) and write payloads
-    /// directly to avoid intermediate copies.
+    /// check [`finish`](ChunkWriter::finish) performs. For callers that
+    /// build the plan and the payload sequence from the same list (the
+    /// plan then holds by construction) and write payloads directly to
+    /// avoid intermediate copies — e.g. the container builder.
     pub fn into_inner(self) -> W {
         self.inner
     }
@@ -669,11 +680,10 @@ mod tests {
 
     #[test]
     fn duplicate_report_is_deterministic_with_multiple_duplicated_ids() {
-        // Two distinct ids each duplicated, with the lexicographically
-        // smaller id appearing later in TOC order: BBBB@0, BBBB@1,
-        // AAAA@2, AAAA@3. The validator reports the later occurrence of
-        // the sorted-first duplicated id (AAAA, index 3) — pinned here
-        // so the (id, index) tuple sort stays deterministic.
+        // Two distinct ids, each duplicated, with the lexicographically
+        // smaller id later in TOC order: BBBB@0, BBBB@1, AAAA@2, AAAA@3.
+        // The validator reports the later occurrence of the sorted-first
+        // duplicated id (AAAA, index 3) — pinned for determinism.
         let mut file = Vec::new();
         let toc_size = Toc::byte_size(4) as u64;
         for (k, id) in [*b"BBBB", *b"BBBB", *b"AAAA", *b"AAAA"]

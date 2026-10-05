@@ -16,7 +16,7 @@ discovery. It does not own a dispatcher, worker pool, scheduler, invocation ledg
 The active Job Manager generation owns routing, UID admission, cancellation, deadlines, ordering, task execution,
 terminal-once behavior, and runtime metrics. Those responsibilities live under `plugin/agent/jobmgr`.
 
-Collector method declarations, raw input versus response passthrough, and managed job-scoped metadata are documented
+Collector and process provider declarations, raw input versus response passthrough, and managed metadata are documented
 in [`pkg/funcapi`](../../../pkg/funcapi/README.md).
 
 ## Wire field identity

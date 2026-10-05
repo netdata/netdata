@@ -9,7 +9,7 @@
         "description": "Data collection interval, measured in seconds.",
         "type": "integer",
         "minimum": 1,
-        "default": 1
+        "default": 10
       },
       "autodetection_retry": {
         "title": "Detection retry",

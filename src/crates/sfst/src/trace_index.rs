@@ -21,6 +21,17 @@
 //! "posting list" for a trace is that slice — the permutation IS the index, with
 //! no per-id dictionary or offsets stored (the `TRCE` column is the dictionary,
 //! compared indirectly).
+//!
+//! # Lifecycle
+//!
+//! Built at seal from the just-written chronological `TRCE` column (`build.rs`;
+//! traces only — the logs path leaves the TIDX flag unset). Written as the
+//! bincode `TIDX` chunk (zstd-packed, cold region, `writer.rs`). On read,
+//! `reader.rs` decodes and [`validate`](TraceIdIndex::validate)s it;
+//! `index_reader.rs` re-exposes it and `session.rs` resolves each bloom
+//! "maybe" with [`positions`](TraceIdIndex::positions) — the exact-lookup path
+//! a corrupt `TBLM` bloom demotes to. `trace_bloom.rs` also derives the `TBLM`
+//! id set from the index via [`distinct_ids`](TraceIdIndex::distinct_ids).
 
 use std::ops::Range;
 
@@ -59,8 +70,8 @@ impl Fanout {
     }
 
     /// The half-open `sort_perm` range holding the positions whose `trace_id`
-    /// first byte is `first_byte`. Never inverts (`Fanout` is always monotonic),
-    /// and the `u32 → usize` casts never lose bits: `TraceIdIndex::validate`
+    /// first byte is `first_byte`. Never inverts (`Fanout` is always
+    /// monotonic) and never goes out of bounds: `TraceIdIndex::validate`
     /// guarantees `total() == sort_perm.len()`, so every `hi` is a valid
     /// `sort_perm` endpoint.
     fn bucket(&self, first_byte: u8) -> Range<usize> {
@@ -186,7 +197,8 @@ impl TraceIdIndex {
     /// The file's DISTINCT set trace ids, each yielded once, in sorted order —
     /// adjacent-dedup over the sorted permutation, so no hashing and no
     /// allocation. `trace_ids` MUST be the `TRCE` column this index was built
-    /// from (same coupling as [`positions`](Self::positions)).
+    /// from (same coupling as [`positions`](Self::positions)). Sole consumer:
+    /// the `TBLM` bloom build (`trace_bloom.rs`).
     pub(crate) fn distinct_ids<'s>(
         &'s self,
         trace_ids: &'s TraceIds,
@@ -439,7 +451,7 @@ mod tests {
     /// the linear-scan positions, in chronological order.
     #[test]
     fn matches_linear_scan_over_many_ids() {
-        // Deterministic pseudo-random ids (no Math.random / rand needed).
+        // Deterministic pseudo-random ids (a plain LCG; no rng dependency).
         let mut ids = Vec::new();
         let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
         for _ in 0..2000 {

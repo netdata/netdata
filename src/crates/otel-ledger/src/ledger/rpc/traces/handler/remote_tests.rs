@@ -1,6 +1,17 @@
 //! Reading evicted files back from remote storage, end to end through the
 //! Function: the answers equal the same files served locally, and every way
 //! remote data can be missing is reported, never silent.
+//!
+//! Fixtures come from the traces suite's shared `fixtures` module: real
+//! seals, either installed as local SFSTs or stored as remote objects
+//! behind `TestRemote`'s `fs://` store and download cache. One corpus
+//! carries the file: files 1-2 under one test identity, traces A/B/C/E
+//! across a 100 s window. The mode contracts themselves — page and
+//! aggregate semantics, pagination, error shapes — are pinned in
+//! `tests.rs`; nothing here re-tests them.
+//!
+//! Not pinned here: cancellation, the planning-task panic error, and the
+//! live-WAL sources a real query walks beside remote files.
 
 use super::*;
 use crate::ledger::rpc::traces::fixtures::{
@@ -27,7 +38,8 @@ fn file_one() -> Vec<opentelemetry_proto::tonic::collector::trace::v1::ExportTra
     ]
 }
 
-/// File 2: traces C (3 spans) and E (1 span) in its second half.
+/// File 2: traces C (3 spans) and E (1 span) later in the window than
+/// file 1's, at +30 s and +40 s.
 fn file_two() -> Vec<opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest> {
     vec![
         otlp_req_svc(0x0C, 3, base_ns(30), "svc-a"),
@@ -75,7 +87,8 @@ fn search_body(limit: usize) -> serde_json::Value {
     json!({"search": {"after": T_S, "before": T_S + 100, "limit": limit}})
 }
 
-/// The Functions view over the corpus window (no mode selector).
+/// The Functions view over the corpus window: the mode a request
+/// without an explicit selector deserializes as.
 fn functions_body(last: usize) -> serde_json::Value {
     json!({"after": T_S, "before": T_S + 100, "last": last})
 }
@@ -106,6 +119,8 @@ async fn evicted_setup(capacity: u64) -> (OtelTracesHandler, TestRemote, [Evicte
     (handler(registries, &remote), remote, [one, two])
 }
 
+/// Each returned trace's id cut to its first two hex chars — the
+/// fixture's trace byte (`"0a"` is trace A).
 fn traces_of(v: &serde_json::Value) -> Vec<String> {
     v["traces"]
         .as_array()
@@ -175,8 +190,9 @@ async fn a_failed_download_is_reported_and_leaves_search_inexact() {
 
 #[tokio::test]
 async fn a_storage_error_costs_only_its_own_file() {
-    // File 1 downloads first and fails with a storage error, not as a missing
-    // object; file 2 is still downloaded and served.
+    // File 1 is cataloged under a directory-style key, so its read fails
+    // as a storage error, not a missing object; file 2 still downloads
+    // and serves.
     let registries = make_registries();
     let remote = TestRemote::new(64 * MIB);
     remote
@@ -196,6 +212,8 @@ async fn a_storage_error_costs_only_its_own_file() {
 #[tokio::test]
 async fn an_unreadable_catalog_is_reported() {
     let (h, _remote, [one, _]) = evicted_setup(64 * MIB).await;
+    // Each evicted() call writes its own catalog file: corrupting file 1's
+    // makes its entries unknown, but file 2 still answers.
     std::fs::write(&one.catalog, b"not a catalog").unwrap();
     let partial = json!({"partial": ["remote_unavailable"]});
 
@@ -211,6 +229,8 @@ async fn an_unreadable_catalog_is_reported() {
 #[tokio::test]
 async fn a_query_too_large_for_the_download_cache_is_a_hard_error() {
     let (h, remote, _) = evicted_setup(100).await;
+    // Any fixture file alone exceeds the 100 B cache, so every query
+    // shape fails at remote planning, before anything downloads.
 
     for body in [trace_body(0x0B), search_body(20), functions_body(2)] {
         let err = call(&h, body.clone()).await.unwrap_err().to_string();
@@ -328,9 +348,11 @@ async fn half_evicted_setup() -> (OtelTracesHandler, TestRemote) {
 
 #[tokio::test]
 async fn progress_counts_the_downloads_beside_the_sources() {
-    // Every walked source ticks, and so does each planned download: two
-    // sources plus one download; the Functions view walks both of its
-    // ranges' two sources.
+    // Every walked source ticks, as does each planned download. Trace
+    // and search plan one range: two sources plus one download. The
+    // Functions view plans two distinct ranges — the page's completion
+    // range and the aggregate's grid range — each selecting both files:
+    // four source ticks plus the same one download.
     for (body, expected) in [
         (trace_body(0x0C), (3, 3)),
         (search_body(20), (3, 3)),

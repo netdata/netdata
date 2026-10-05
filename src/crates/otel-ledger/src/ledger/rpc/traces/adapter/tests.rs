@@ -1,3 +1,40 @@
+//! Tests for the otel-traces wire adapter ([`super::adapter`]) — the
+//! pure mapping between the `otel-traces` wire types and the
+//! wire-neutral [`sfsq::traces`] engine, consumed by `handler.rs`.
+//! Fixtures are synthetic `sfst` spans/summaries and hand-written
+//! cursor strings; `now` is always an argument, so nothing here
+//! touches the clock, files, or a runtime.
+//!
+//! Pins:
+//!
+//! - [`parse_trace_id`]: trim + case-insensitive accept with a
+//!   canonical lowercase echo, the "32 hex" rejection message, and
+//!   the all-zero id parsing here (its rejection is the handler's
+//!   pin);
+//! - [`to_trace_result`]: the whole wire envelope — echoed lowercase
+//!   id, coverage echo, status, items, summary_root, roots/children,
+//!   an ABSENT `parent_span_id` for roots, event/link sub-shapes and
+//!   `field_kinds` words — plus the empty-trace degenerate;
+//! - the selection-key grammar: `BUILTIN_WORDS`/`OWNER_WORDS` in
+//!   lockstep with the engine enums (a new owner fails compilation,
+//!   a new builtin fails this suite), render ∘ parse identity, owner
+//!   words, and selection-key parsing with its rejections;
+//! - [`build_predicate`]: sorted-key Eq conditions, empty selections
+//!   validate but constrain nothing, span + trace duration bounds,
+//!   inverted trace-duration bounds as client errors;
+//! - the cursor codec: encode/parse round-trip, malformed
+//!   rejections, over-cap walks advised to narrow;
+//! - window canonicalization: the now-derived default window, the
+//!   anchor-frozen window, inverted explicit bounds;
+//! - search pagination: a cursor only for a full complete page,
+//!   after-key filtering with tie runs and no straddling duplicates,
+//!   served accumulation + cap, partial statuses ending the walk
+//!   with the reason on the wire, the service breakdown, and the
+//!   completion-coverage vs frozen-window split.
+//!
+//! Not pinned here: `validate_trace_bounds` and the overview /
+//! slowest / attributes converters (covered end-to-end by the
+//! handler tests) and request deserialization (the wire tests).
 use super::*;
 use serde_json::json;
 use sfsq::traces::QueryStatus;
@@ -24,15 +61,18 @@ fn rejects_wrong_length_and_non_hex() {
 
 #[test]
 fn unset_id_parses_here_and_is_the_engines_call() {
-    // The all-zero sentinel is syntactically valid hex; the ENGINE
-    // rejects the lookup with its precise message (pinned in the
-    // handler test).
+    // The all-zero sentinel is syntactically valid hex and parses
+    // here; rejecting the lookup is the ENGINE's job (its precise
+    // message is pinned in the handler tests).
     let id = parse_trace_id("00000000000000000000000000000000").unwrap();
     assert!(id.is_unset());
 }
 
 // ── to_trace_result ─────────────────────────────────────────────────
 
+/// A span fixture: the id byte fills the 8-byte span id, with one
+/// event and one link attached so the shape test sees every converted
+/// sub-object.
 fn span(id: u8, parent: Option<u8>, start_ns: i64) -> sfst::TraceSpan {
     sfst::TraceSpan {
         span_id: sfst::SpanId::from([id; 8]),
@@ -64,6 +104,8 @@ fn span(id: u8, parent: Option<u8>, start_ns: i64) -> sfst::TraceSpan {
     }
 }
 
+// A two-span trace (root + child) through `to_trace_result`,
+// asserted envelope field by field.
 #[test]
 fn trace_result_shape_is_pinned() {
     let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
@@ -120,8 +162,11 @@ fn trace_result_shape_is_pinned() {
 
 #[test]
 fn every_builtin_has_a_wire_word_and_nothing_stale() {
-    // The wire table must stay in lockstep with the engine's builtin
-    // set (the CLI's own guard pattern).
+    // Bidirectional lockstep with the engine's builtin set: every
+    // BuiltinField::ALL entry has exactly one wire word, and the
+    // table holds nothing stale (same length, distinct words). Same
+    // guard pattern as sfsq-cli/src/traces.rs
+    // (every_builtin_has_a_cli_word).
     for builtin in BuiltinField::ALL {
         assert!(
             BUILTIN_WORDS.iter().any(|(_, f)| *f == builtin),
@@ -161,8 +206,10 @@ fn every_engine_owner_is_deliberately_placed_in_the_wire_grammar() {
 
 #[test]
 fn rendered_keys_round_trip_through_the_selection_grammar() {
-    // render ∘ parse = identity: every enumerated key feeds straight
-    // back as a selection key or a values request.
+    // render ∘ parse = identity, so a facet rail can feed enumerated
+    // keys straight back as selection keys or values requests: every
+    // owner-qualified attribute form round-trips below, then every
+    // builtin word.
     let cases: Vec<(AttributeOwner, AttributeKey)> = vec![
         (
             AttributeOwner::Resource,
@@ -238,8 +285,8 @@ fn predicate_builds_sorted_eq_conditions_plus_duration_bounds() {
     selections.insert("span.empty".to_string(), vec![]); // no constraint
     let p = build_predicate(&selections, Some(5), Some(10), Some(100), Some(200)).unwrap();
     assert_eq!(p.conditions.len(), 6);
-    // Sorted keys: resource.service.name, status; then span-duration
-    // bounds, then trace-duration bounds.
+    // Sorted selection keys first, then the span-duration bounds
+    // (BuiltinField::Duration), then the trace-duration bounds.
     assert_eq!(
         p.conditions[0].target,
         PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into())
@@ -273,6 +320,7 @@ fn inverted_trace_duration_bounds_are_a_client_error() {
 
 // ── Search: cursor ──────────────────────────────────────────────────
 
+/// A cursor fixture: the id byte fills the 16-byte trace id.
 fn cursor(after: u32, before: u32, rank: i64, id_byte: u8, served: usize) -> SearchCursor {
     SearchCursor {
         after_s: after,
@@ -329,6 +377,7 @@ fn window_defaults_to_the_recent_span_and_anchors_freeze_it() {
 
 // ── Search: result mapping + after-key pagination ───────────────────
 
+/// A summary whose rank key equals its envelope start.
 fn summary(id_byte: u8, start_ns: i64) -> sfsq::traces::TraceSummary {
     summary_ranked(id_byte, start_ns, start_ns)
 }
@@ -365,12 +414,18 @@ fn search_data(traces: Vec<sfsq::traces::TraceSummary>) -> SearchData {
     }
 }
 
+// The shared fixture window and its completion capture — the window
+// widened by the 1h minimum slack, exactly `completion_capture_range`
+// of WIN.
 const WIN: (u32, u32) = (9_000, 10_000);
 const WIN_COVERAGE: CoverageWire = CoverageWire {
     after: 5_400,
     before: 13_600,
 };
 
+// The window widened by clamp(width, 1h, 24h) per side, saturating
+// at the u32 bounds: a middle-width window widens by its own width,
+// a multi-day one by the 1d cap.
 #[test]
 fn completion_capture_range_clamps_and_saturates() {
     assert_eq!(completion_capture_range(&(9_000..10_000)), 5_400..13_600);
@@ -389,6 +444,8 @@ fn completion_capture_range_clamps_and_saturates() {
     );
 }
 
+// The page-1 cursor carries the MATCH window; the widened capture
+// range travels separately as `completion_coverage`.
 #[test]
 fn cursor_freezes_the_original_window_while_coverage_declares_the_widened_range() {
     let r = to_search_result(
@@ -407,6 +464,8 @@ fn cursor_freezes_the_original_window_while_coverage_declares_the_widened_range(
     assert_eq!((cursor.after_s, cursor.before_s), WIN);
 }
 
+// The engine's per-service span counts map onto the wire breakdown:
+// `top` as value/spans pairs, then the other/unattributed counters.
 #[test]
 fn search_rows_carry_the_service_breakdown() {
     let mut t = summary(1, 300);
@@ -451,8 +510,8 @@ fn full_page_emits_a_cursor_and_short_page_does_not() {
 
 #[test]
 fn anchor_page_drops_everything_at_or_above_the_after_key() {
-    // Served: ranks above 200, plus rank-200 ids ≤ 02. The engine
-    // re-emits the whole prefix (same query, larger limit).
+    // Already-served: ranks above 200, plus rank-200 ids ≤ 02 (the
+    // engine re-emits the whole prefix — same query, larger limit).
     let c = cursor(WIN.0, WIN.1, 200, 0x02, 2);
     let data = search_data(vec![
         summary(1, 300),  // above the key → served
@@ -472,11 +531,11 @@ fn anchor_page_drops_everything_at_or_above_the_after_key() {
 
 #[test]
 fn straddling_trace_does_not_duplicate_below_the_boundary() {
-    // The review-caught flaw: trace F matched spans at 70 and 10; page 1
-    // served it at rank 70 with tail U at rank 50. The next page reruns
-    // the SAME window, so F still ranks 70 — at-or-above the key — and
-    // drops, instead of re-entering at rank 10 as the narrowed-window
-    // design allowed.
+    // The review-caught flaw of the first (window-narrowing) design:
+    // trace F matched spans at ranks 70 and 10; page 1 served it at
+    // rank 70 with tail U at 50. The next page reruns the SAME
+    // window, so F still ranks 70 — at-or-above the key — and drops
+    // instead of re-entering at rank 10.
     let c = cursor(WIN.0, WIN.1, 50, 0x1A, 2); // tail U(50), served F+U
     let data = search_data(vec![
         summary_ranked(0x0F, 10, 70), // F: full-window rank stays 70
@@ -490,8 +549,9 @@ fn straddling_trace_does_not_duplicate_below_the_boundary() {
 
 #[test]
 fn a_walk_at_the_served_cap_emits_no_further_cursor() {
-    // The over-fetch allowance can't grow past the cap: the final page
-    // is full but carries no continuation.
+    // The over-fetch allowance can't grow past the cap: served 9_999
+    // plus a full page exceeds CURSOR_SERVED_CAP (10_000), so the
+    // final page fills but carries no continuation.
     let c = cursor(WIN.0, WIN.1, 500, 0x01, 9_999);
     let data = search_data(vec![summary(0x02, 400), summary(0x03, 300), summary(0x04, 200)]);
     let r = to_search_result(data, 2, Some(&c), WIN, WIN_COVERAGE);
@@ -525,9 +585,9 @@ fn partial_full_page_ends_the_walk_with_the_status_saying_why() {
 
 #[test]
 fn remote_unavailable_full_page_ends_the_walk() {
-    // A source that could not be downloaded may hold better-ranked
-    // traces: the page is not a stable prefix, so no cursor, and the
-    // status names the reason.
+    // An unavailable remote source may hold better-ranked traces (its
+    // spans are simply absent), so the page is not a stable prefix:
+    // no cursor, and the status names the reason.
     let mut b = sfsq::traces::StatusBuilder::new();
     b.add(sfsq::traces::PartialReason::RemoteUnavailable);
     let data = SearchData {
@@ -544,6 +604,8 @@ fn remote_unavailable_full_page_ends_the_walk() {
     );
 }
 
+// Partial reasons map onto the wire regardless of pagination — pinned
+// on a short page, where the no-cursor rule above isn't in play.
 #[test]
 fn work_ceiling_partial_reaches_the_wire() {
     let mut b = sfsq::traces::StatusBuilder::new();
@@ -560,6 +622,8 @@ fn work_ceiling_partial_reaches_the_wire() {
     );
 }
 
+// An empty trace is still a complete, well-formed result: zero
+// spans, a null summary_root.
 #[test]
 fn empty_trace_maps_to_complete_zero_span_result() {
     let trace_id = parse_trace_id("22222222222222222222222222222222").unwrap();

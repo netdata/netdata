@@ -1,20 +1,19 @@
-//! `OtelLogsHandler` — typed `FunctionHandler` implementation.
+//! `OtelLogsHandler` — the typed `FunctionHandler` for the `otel-logs`
+//! Function.
 //!
-//! A thin adapter over the [`sfsq::logs`] query engine. Holds a shared,
-//! read-only handle to the tenant registries: the run-loop's mutators
-//! take brief write locks; this handler takes a read lock just long
-//! enough to enumerate the SFST candidates whose time range overlaps the
-//! request window, then drops it and runs the (sync) query off the
-//! runtime thread via `spawn_blocking`.
-//!
-//! The engine is wire-neutral: it consumes a [`sfsq::logs::LogsQuery`]
-//! and produces a [`sfsq::logs::LogsData`]. The netdata function wire
-//! shape — the request/response types and the response envelope — lives
-//! in [`super::wire`], and the mapping to and from the engine in
-//! [`super::adapter`]. What stays here is the netdata-plugin glue: the
+//! A thin adapter over the wire-neutral [`sfsq::logs`] engine (a
+//! [`sfsq::logs::LogsQuery`] in, a [`sfsq::logs::LogsData`] out): the
+//! netdata wire shapes live in [`super::wire`], the mapping in
+//! [`super::adapter`], and what stays here is the plugin glue — the
 //! `FunctionHandler` impl, the capability declaration, and the
-//! lock/scheduling dance. (The LOGS-ONLY GET args→payload shim lives in
-//! the parent `rpc` module; traces installs its own.)
+//! lock/scheduling discipline. [`OtelLogsHandler::on_call`] runs one
+//! request flow: canonicalize the request, snapshot the overlapping
+//! sources (sealed SFSTs + active WALs) under a brief registry read lock
+//! dropped before any I/O, resolve WALs into in-memory chunks + tails,
+//! fetch remote-only SFSTs, then run the sync query via `spawn_blocking`.
+//! The registries are shared with the run loop's mutators (brief write
+//! locks); this handler only reads. The LOGS-only GET args→payload shim
+//! lives in the parent `rpc` module; traces installs its own.
 
 use std::sync::Arc;
 
@@ -51,8 +50,10 @@ fn stream_id_from_content_meta(content_meta: &[u8]) -> StreamId {
 }
 
 /// Build the `files: true` inventory snapshot from a read-locked registry set.
-/// Read-only; tenants and per-kind files are sorted for stable output (the
-/// registries are HashMap-backed, so iteration order is otherwise arbitrary).
+/// Read-only; tenants and per-kind files are sorted for stable output — the
+/// tenants map is a HashMap (arbitrary iteration order), and the per-kind
+/// lists pin their order explicitly rather than trusting the file
+/// registries' current iteration order.
 fn build_files_response(tr: &TenantRegistries) -> FilesResponse {
     let mut tenants: Vec<TenantFiles> = tr
         .tenants
@@ -160,26 +161,29 @@ impl OtelLogsHandler {
     }
 
     /// Resolve one active-WAL descriptor into in-memory chunk SFST
-    /// candidates plus the WAL-tail byte ranges to row-scan. Off the
-    /// registry lock. Polls `cancel` between chunk builds (each build is
-    /// one `spawn_blocking`); a cancelled call returns empty — the
-    /// caller is about to discard the result anyway.
+    /// candidates plus the byte range to row-scan as its tail. Runs off
+    /// the registry lock, over the descriptor's `valid_up_to` durable
+    /// bound. Polls `cancel` between chunk builds (each build is one
+    /// `spawn_blocking`); a cancelled call returns empty — the caller is
+    /// about to discard the result anyway.
     ///
-    /// Scans the durable prefix's frame headers, groups them into chunks
-    /// at `min_entries`, and builds each through the cache (singleflight).
-    /// A chunk that fails to build or parse makes the **whole WAL**
-    /// un-queryable for this query: it returns no candidates and no tails,
-    /// so none of the WAL's data is served. That data reappears once the
-    /// WAL rotates into a sealed SFST — or, for a transient failure (e.g. a
-    /// count mismatch on an actively-written WAL), on a later query, since
-    /// build errors are not cached. The same empty result covers a WAL that
-    /// can't be read at all (rotated/deleted under us).
+    /// Scans the durable prefix's frame boundaries, groups them into
+    /// chunks of at least `min_entries` records, and builds each through
+    /// the chunk cache (singleflight per `(seq, index)`). Failure policy:
+    /// a chunk that fails to build or parse makes the **whole WAL**
+    /// un-queryable for this query — no candidates and no tails — rather
+    /// than silently dropping only the broken range. The WAL's data
+    /// reappears once it rotates into a sealed SFST — or, for a transient
+    /// failure (e.g. a count mismatch on an actively-written WAL), on a
+    /// later query, since build errors are not cached. The same empty
+    /// result covers a WAL that can't be read at all (rotated/deleted
+    /// under us).
     ///
-    /// Refusing the whole WAL keeps **at most one tail per `file_seq`** (the
-    /// trailing un-chunked suffix). The pagination cursor routes tails by
-    /// `(file_seq, Part::Tail)`, which assumes one tail per WAL — covering a
-    /// failed chunk with its own extra tail would break that (C-5 in
-    /// docs/sfsq-readability-refactors.md).
+    /// Refusing the whole WAL also keeps the **at most one tail per
+    /// `file_seq`** invariant the engine assumes: the pagination cursor
+    /// addresses a WAL's tail as `(file_seq, Part::Tail)`, so a second
+    /// tail under one WAL would double-count the stats pass and misroute
+    /// rows (the engine drops duplicate tails loudly; `sfsq::logs::run`).
     async fn resolve_wal(
         &self,
         wal: WalDesc,
@@ -215,8 +219,8 @@ impl OtelLogsHandler {
             let (range, expected) = (chunk.range, chunk.entry_count);
             // The build future: index the byte range on a blocking
             // thread and cross-check the record count (the truncation
-            // check open_range defers). Runs once per (seq, index) under
-            // singleflight; skipped entirely on a cache hit.
+            // check wal::Reader::open_range defers). Runs at most once
+            // per (seq, index) — singleflight; skipped on a cache hit.
             let init = async move {
                 match tokio::task::spawn_blocking(move || ng_index::build_sfst_range(&path, range))
                     .await
@@ -241,13 +245,14 @@ impl OtelLogsHandler {
                     Ok(reader) => candidates.push(SfstCandidate {
                         summary: reader.summary().clone(),
                         file_seq: seq,
-                        // Distinguishes this chunk from the WAL's other
-                        // chunks and tail, which share `seq`.
+                        // Chunks and the tail of one WAL share `seq`;
+                        // the chunk index disambiguates them in the
+                        // cursor order.
                         part: sfsq::logs::Part::Indexed(chunk.index),
                         source: Source::Memory(bytes),
                     }),
-                    // Parsed-back failure is unexpected. Refuse the whole
-                    // WAL this query rather than serve it partially.
+                    // Unexpected — the bytes were just built. Same
+                    // policy: refuse the whole WAL (see above).
                     Err(e) => {
                         tracing::warn!(
                             seq,
@@ -257,10 +262,8 @@ impl OtelLogsHandler {
                         return (Vec::new(), Vec::new());
                     }
                 },
-                // Build failed (decode error, count mismatch, panic).
-                // Refuse the whole WAL this query; its data returns via the
-                // sealed SFST after rotation (or next query for a transient
-                // failure — build errors aren't cached).
+                // Build failure (decode error, count mismatch, panic):
+                // refuse the whole WAL — see the failure policy above.
                 Err(e) => {
                     tracing::warn!(
                         seq,
@@ -272,9 +275,9 @@ impl OtelLogsHandler {
             }
         }
 
-        // Every chunk indexed cleanly. The final tail after the last
-        // complete chunk is the only row-scanned range (skip it when empty —
-        // the prefix divided evenly into chunks).
+        // Every chunk indexed cleanly. The records after the last
+        // complete chunk are the WAL's one row-scanned tail (skipped when
+        // empty — the prefix divided evenly into chunks).
         let mut tails = Vec::new();
         let tail_begin = tail_start(&chunks, header);
         if tail_begin < wal.valid_up_to {
@@ -310,9 +313,8 @@ impl FunctionHandler for OtelLogsHandler {
         }
 
         // Canonicalize the wire request into the neutral query (defaulting
-        // + bucket alignment + grid), then enumerate the SFST candidates
-        // overlapping the grid's window under a brief read lock — dropped
-        // before any I/O.
+        // + bucket alignment + grid); the source snapshot below runs under
+        // a brief read lock, dropped before any I/O.
         let last = req.last;
         let tenant = resolve_query_tenant(req.tenant.as_deref());
         // Pull the reserved stream-selector picks out of `selections`
@@ -337,20 +339,23 @@ impl FunctionHandler for OtelLogsHandler {
             time_range,
             partition_keys,
         };
-        // Snapshot under a brief read lock, in memory only: on-disk SFSTs plus
-        // the unindexed WALs overlapping the window, the local half of the
-        // stream selector, and (with remote storage) which catalog files to read
-        // and what each range already serves locally. All owned, so the lock
-        // drops before any file is read — catalogs included. `valid_up_to` is
-        // captured here, once — every chunk and tail derives from this single
-        // value, so the whole query sees one consistent durable prefix even as
-        // ingestion advances it.
+        // Snapshot under a brief read lock, in memory only: on-disk SFSTs
+        // plus the unindexed WALs (durable prefix only — a WAL without a
+        // trustworthy `valid_up_to` bound is never served) overlapping the
+        // window, the local half of the stream selector, and (with remote
+        // storage) which catalog files to read and what each range already
+        // serves locally. All owned, so the lock drops before any file is
+        // read — catalogs included. `valid_up_to` is captured here, once —
+        // every chunk and tail derives from this single value, so the whole
+        // query sees one consistent durable prefix even as ingestion
+        // advances it.
         let (mut sfst_candidates, wal_descs, local_streams, remote_input) = {
             let guard = self.registries.read().await;
             let (sfsts, wals) = guard.query_snapshot(&tenant, &q);
             let local_streams = guard.local_streams(&tenant, &stream_q);
-            // Plan remote reads ONLY when remote is configured: otherwise the
-            // selector would advertise evicted streams that can't be fetched.
+            // Plan remote reads only when remote storage is configured —
+            // planning anyway would put remote-only (evicted) streams in
+            // the selector that the fetch below can never download.
             // Range 0 is the selector's window, range 1 the user's fetch.
             let remote_input = self
                 .remote
@@ -365,9 +370,9 @@ impl FunctionHandler for OtelLogsHandler {
 
         // Read the catalogs off the lock (blocking file I/O) and finish the
         // selector with the remote-only streams. A catalog that cannot be read
-        // is logged and skipped: the logs wire has no partial status. Logs
-        // plans without a size limit, so a too-large query is refused by the
-        // download cache below, with its own message.
+        // is logged and skipped: the logs wire has no partial status. The
+        // logs plan is unbounded in size, so a too-large query is refused
+        // later by the download cache, mapped to its own message below.
         // A failed planning task is an error: answering without the remote
         // data and the remote-only streams would be a silent gap.
         let (selector_catalog, remote_cands) = match remote_input {
@@ -400,15 +405,15 @@ impl FunctionHandler for OtelLogsHandler {
             wal_tails.extend(tails);
         }
 
-        // Progress spans two phases: the remote fetch (one unit per attempted
-        // download) then the engine scan (one unit per source). Set `total` upfront —
-        // `remote_count` downloads + the eventual scan-source count (local sources
-        // plus the fetched remotes) — so the fetch phase, which can be the slow
-        // network-bound part, advances a real bar instead of sitting at the
-        // indeterminate 1%. With no remote candidates this reduces to the scan
-        // count, identical to before. `total` is an upper bound (cache hits and
-        // failed downloads make `done` finish just under it); the bar caps at 99%
-        // regardless and completion is signaled by the RESULT, so that is benign.
+        // Progress spans two phases: the remote fetch (one unit per planned
+        // download; cache hits don't tick) then the engine scan (one unit per
+        // source). `total` is set upfront — `remote_count` downloads + the
+        // eventual scan-source count (local sources plus the fetched remotes)
+        // — so the slow, network-bound fetch phase advances a real bar
+        // instead of the indeterminate 1%. `total` is an upper bound (cache
+        // hits and failed downloads leave `done` finishing just under it);
+        // the bar caps at 99% regardless and completion is signaled by the
+        // RESULT, so that is benign.
         let remote_count = remote_cands.len();
         let local_scan = sfst_candidates.len() + wal_tails.len();
         ctx.progress.set_total(local_scan + 2 * remote_count);
@@ -469,9 +474,10 @@ impl FunctionHandler for OtelLogsHandler {
         };
 
         // One mixed source list for the engine: indexed SFSTs (sealed +
-        // in-memory chunks) and the row-scanned WAL tails. Order is
-        // cosmetic — `run` re-partitions by kind and the stats merge is an
-        // order-independent monoid, so it sorts purely by the cursor order.
+        // in-memory chunks) and the row-scanned WAL tails. Input order is
+        // cosmetic — `run` evaluates each source by its variant and the
+        // stats merge is an order-independent monoid, so rows sort purely
+        // by the cursor order.
         let sources: Vec<LogSource> = sfst_candidates
             .into_iter()
             .map(LogSource::Sfst)
@@ -520,6 +526,10 @@ impl FunctionHandler for OtelLogsHandler {
         Ok(OtelLogsResponse::Logs(result))
     }
 
+    /// Advertise the function to the agent/Cloud: `global` (not scoped to
+    /// one node), tagged `logs`, accessible to signed-in users of the same
+    /// space, with the SENSITIVE_DATA flag since log payloads may carry
+    /// sensitive content.
     fn declaration(&self) -> FunctionDeclaration {
         let mut d = FunctionDeclaration::new("otel-logs", "Query OpenTelemetry logs");
         d.global = true;
@@ -532,9 +542,10 @@ impl FunctionHandler for OtelLogsHandler {
 
 /// Resolve the request's tenant selector to the registry key the query
 /// reads — the permissive query-side policy on the type itself
-/// ([`TenantId::resolve_query`]): omitted/invalid falls back to the
-/// default tenant, never an implicit all-tenant union, and the literal
-/// `default` stays nameable (unlike ingest's strict validation).
+/// ([`TenantId::resolve_query`]): omitted, empty, or over-long values
+/// fall back to the default tenant, and an unknown tenant simply
+/// matches nothing — never an implicit all-tenant union. The literal
+/// `default` stays nameable here, unlike ingest's strict validation.
 fn resolve_query_tenant(raw: Option<&str>) -> TenantId {
     TenantId::resolve_query(raw)
 }

@@ -1,6 +1,7 @@
 plugin_name: go.d.plugin
 modules:
-  - meta:
+  - &module
+    meta: &meta
       id: collector-go.d.plugin-redis
       plugin_name: go.d.plugin
       module_name: redis
@@ -24,17 +25,24 @@ modules:
         description: ""
       keywords:
         - redis
+        - valkey
+        - dragonfly
+        - keydb
+        - kvrocks
+        - garnet
         - databases
-    overview:
-      data_collection:
+    overview: &overview
+      data_collection: &data_collection
         metrics_description: |
-          This collector monitors the health and performance of Redis servers and collects general statistics, CPU and memory consumption, replication information, command statistics, and more.
+          Monitor Redis server health and performance, including CPU, memory, replication, command statistics, connections, and keyspace activity.
+
+          The same collector also monitors Redis-compatible servers: Valkey, Dragonfly, KeyDB, Kvrocks, and Garnet. Each is covered by its own integration page.
         method_description: |
           It connects to the Redis instance via a TCP or UNIX socket and executes the following commands:
           
           - [INFO ALL](https://redis.io/commands/info)
           - [PING](https://redis.io/commands/ping/)
-      default_behavior:
+      default_behavior: &default_behavior
         auto_detection:
           description: |
             By default, it detects instances running on localhost by attempting to connect using known Redis TCP and UNIX sockets:
@@ -43,6 +51,11 @@ modules:
             - /tmp/redis.sock
             - /var/run/redis/redis.sock
             - /var/lib/redis/redis.sock
+
+            The Netdata Agent [service discovery](https://learn.netdata.cloud/docs/netdata-agent/configuration/find-anything-about-your-infrastructure/service-discovery) can also create jobs automatically:
+
+            - The `net_listeners` discoverer matches processes listening on TCP port 6379, or whose command name is `redis-server`, and creates a job with the discovered address. The rule lives in `go.d/sd/net_listeners.conf`.
+            - The `docker` discoverer matches containers exposing port 6379 or using a `redis` image and creates a job with the discovered address. The rule lives in `go.d/sd/docker.conf`.
         limits:
           description: ""
         performance_impact:
@@ -53,7 +66,7 @@ modules:
       supported_platforms:
         include: []
         exclude: []
-    setup:
+    setup: &setup
       prerequisites:
         list: []
       configuration:
@@ -66,83 +79,90 @@ modules:
             title: Config options
             enabled: true
           list:
-            - name: update_every
-              description: Data collection interval (seconds).
-              default_value: 5
-              required: false
-              group: Collection
-            - name: autodetection_retry
-              description: Autodetection retry interval (seconds). Set 0 to disable.
-              default_value: 0
-              required: false
-              group: Collection
-
             - name: address
-              description: Redis server address (TCP or Unix socket).
+              description: "Redis server address as a URL: `redis://` or `rediss://` (TLS) for TCP, `unix://` for a Unix socket."
               default_value: redis://@localhost:6379
               required: true
               group: Target
-              details: |
+              detailed_description: |
                 There are two connection types: TCP socket and Unix socket.
                 
-                - TCP: `redis://<user>:<password>@<host>:<port>/<db_number>`
+                - TCP: `redis://<user>:<password>@<host>:<port>/<db_number>` (`rediss://` for TLS)
                 - Unix: `unix://<user>:<password>@</path/to/redis.sock>?db=<db_number>`
+
+                Setting any TLS option also enables TLS for a `redis://` address.
             - name: timeout
-              description: Dial, read, and write timeout (seconds).
+              description: Connection and read/write timeout, in seconds.
               default_value: 1
               required: false
               group: Target
 
             - name: username
-              description: Username for authentication.
+              description: Username for authentication. A username in the address takes precedence.
               default_value: ""
               required: false
               group: Auth
             - name: password
-              description: Password for authentication.
+              description: Password for authentication. A password in the address takes precedence.
               default_value: ""
               required: false
               group: Auth
 
             - name: tls_skip_verify
-              description: Skip TLS certificate and hostname verification (insecure).
+              description: Skip TLS certificate and hostname verification. Insecure.
               default_value: no
               required: false
               group: TLS
             - name: tls_ca
-              description: Path to CA bundle used to validate the server certificate.
+              description: Path to a CA bundle used to verify the server certificate. Leave empty to use the system trust store.
               default_value: ""
               required: false
               group: TLS
             - name: tls_cert
-              description: Path to client TLS certificate (for mTLS).
+              description: Path to a client certificate file for mutual TLS. Requires a client key.
               default_value: ""
               required: false
               group: TLS
             - name: tls_key
-              description: Path to client TLS private key (for mTLS).
+              description: Path to the client key file for mutual TLS. Requires a client certificate.
               default_value: ""
               required: false
               group: TLS
 
+            - name: update_every
+              description: Data collection interval, in seconds.
+              default_value: 1
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.
+              default_value: 0
+              required: false
+              group: Collection
+            - name: ping_samples
+              description: Number of PING commands sent each data collection interval to measure latency.
+              default_value: 5
+              required: false
+              group: Collection
+
             - name: functions.top_queries.disabled
-              description: Disable the [top-queries](#top-queries) function.
+              description: Disable the Top Queries function.
               default_value: false
               required: false
               group: Functions
             - name: functions.top_queries.timeout
-              description: Query timeout (seconds). Uses collector timeout if not set.
+              description: Query timeout, in seconds. Zero uses the collector timeout.
               default_value: ""
               required: false
               group: Functions
             - name: functions.top_queries.limit
-              description: Maximum number of queries to return.
+              description: Maximum number of slow log entries to return. Zero uses the default (500).
               default_value: 500
               required: false
               group: Functions
 
             - name: vnode
-              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              description: Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
               default_value: ""
               required: false
               group: Virtual Node
@@ -193,7 +213,8 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
         metric: redis.bgsave_now
         info: duration of the on-going RDB save operation
-      - name: redis_bgsave_broken
+      - &alert_bgsave_broken
+        name: redis_bgsave_broken
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
         metric: redis.bgsave_health
         info: 'status of the last RDB save operation (0: ok, 1: error)'
@@ -443,3 +464,248 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-valkey
+      monitored_instance:
+        name: Valkey
+        link: https://valkey.io/
+        categories:
+          - data-collection.databases
+        icon_filename: redis.svg
+        description: 'Monitor Valkey server health and performance, including CPU, memory, replication, command statistics, connections, and keyspace activity.'
+      keywords:
+        - valkey
+        - redis
+        - redis-compatible
+        - redis protocol
+        - databases
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: |
+          Monitor Valkey server health and performance, including CPU, memory, replication, command statistics, connections, and keyspace activity.
+
+          Netdata monitors Valkey through the Redis protocol and reports the same areas as for Redis.
+        method_description: |
+          It connects to the Valkey instance via a TCP or UNIX socket and executes the following commands:
+          
+          - [INFO ALL](https://redis.io/commands/info)
+          - [PING](https://redis.io/commands/ping/)
+      default_behavior:
+        <<: *default_behavior
+        auto_detection: &auto_detection_compat
+          description: |
+            By default, it detects instances running on localhost by attempting to connect using known Redis-compatible TCP and UNIX sockets:
+
+            - 127.0.0.1:6379
+            - /tmp/redis.sock
+            - /var/run/redis/redis.sock
+            - /var/lib/redis/redis.sock
+
+            The Netdata Agent [service discovery](https://learn.netdata.cloud/docs/netdata-agent/configuration/find-anything-about-your-infrastructure/service-discovery) can also create jobs automatically:
+
+            - The `net_listeners` discoverer matches processes listening on TCP port 6379, or whose command name is `redis-server`, and creates a job with the discovered address. The rule lives in `go.d/sd/net_listeners.conf`.
+            - The `docker` discoverer matches containers exposing port 6379 or using a `redis` image and creates a job with the discovered address. The rule lives in `go.d/sd/docker.conf`.
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-dragonfly
+      monitored_instance:
+        name: Dragonfly
+        link: https://www.dragonflydb.io/
+        categories:
+          - data-collection.databases
+        icon_filename: redis.svg
+        description: 'Monitor Dragonfly server health and performance, including memory, connections, command statistics, keyspace activity, and persistence status.'
+      keywords:
+        - dragonfly
+        - dragonflydb
+        - redis
+        - redis-compatible
+        - databases
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: |
+          Monitor Dragonfly server health and performance, including memory, connections, command statistics, keyspace activity, and persistence status.
+
+          Netdata monitors Dragonfly through the Redis protocol and reports the same core areas as for Redis.
+        method_description: |
+          It connects to the Dragonfly instance via a TCP or UNIX socket and executes the following commands:
+          
+          - [INFO ALL](https://redis.io/commands/info)
+          - [PING](https://redis.io/commands/ping/)
+      default_behavior:
+        <<: *default_behavior
+        auto_detection: *auto_detection_compat
+        limits:
+          description: |
+            Dragonfly does not provide the Redis fields used for rejected connections, dataset and script memory, memory fragmentation, tracking and timeout-table clients, or RDB save duration, age, and changes-since-save charts.
+
+            Replica link status is available, but the duration of a down link is not. Of the stock Redis alerts, only background-save failure has the required measurements.
+    alerts:
+      - *alert_bgsave_broken
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-keydb
+      monitored_instance:
+        name: KeyDB
+        link: https://docs.keydb.info/
+        categories:
+          - data-collection.databases
+        icon_filename: redis.svg
+        description: 'Monitor KeyDB server health and performance, including CPU, memory, replication, command statistics, connections, and keyspace activity.'
+      keywords:
+        - keydb
+        - redis
+        - redis-compatible
+        - redis protocol
+        - databases
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: |
+          Monitor KeyDB server health and performance, including CPU, memory, replication, command statistics, connections, and keyspace activity.
+
+          Netdata monitors KeyDB through the Redis protocol and reports the same areas as for Redis.
+        method_description: |
+          It connects to the KeyDB instance via a TCP or UNIX socket and executes the following commands:
+          
+          - [INFO ALL](https://redis.io/commands/info)
+          - [PING](https://redis.io/commands/ping/)
+      default_behavior:
+        <<: *default_behavior
+        auto_detection: *auto_detection_compat
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-kvrocks
+      monitored_instance:
+        name: Kvrocks
+        link: https://kvrocks.apache.org/
+        categories:
+          - data-collection.databases
+        icon_filename: redis.svg
+        description: 'Monitor Kvrocks server health and performance, including clients, keyspace, command statistics, replication, and memory.'
+      keywords:
+        - kvrocks
+        - rocksdb
+        - redis
+        - redis-compatible
+        - databases
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: |
+          Monitor Kvrocks server health and performance, including clients, keyspace, command statistics, replication, and memory.
+
+          Netdata monitors Kvrocks through the Redis protocol and reports the same core areas as for Redis.
+        method_description: |
+          It connects to the Kvrocks instance via a TCP or UNIX socket and executes the following commands:
+          
+          - [INFO ALL](https://redis.io/commands/info)
+          - [PING](https://redis.io/commands/ping/)
+      default_behavior:
+        <<: *default_behavior
+        auto_detection: *auto_detection_compat
+        limits:
+          description: |
+            Kvrocks does not provide the Redis fields used for rejected connections, key expiration and eviction events, allocator memory usage, memory fragmentation, tracking and timeout-table clients, or RDB save charts. RSS and Lua memory remain available.
+
+            Replica link status is available, but the duration of a down link is not. None of the stock Redis alerts has the required measurements for Kvrocks.
+    alerts: []
+
+  - <<: *module
+    meta:
+      <<: *meta
+      id: collector-go.d.plugin-garnet
+      monitored_instance:
+        name: Garnet
+        link: https://microsoft.github.io/garnet/
+        categories:
+          - data-collection.databases
+        icon_filename: redis.svg
+        description: 'Monitor Garnet server health and performance, including memory, connections, keyspace, replication, and persistence status.'
+      keywords:
+        - garnet
+        - microsoft garnet
+        - redis
+        - redis-compatible
+        - databases
+    overview:
+      <<: *overview
+      data_collection:
+        <<: *data_collection
+        metrics_description: |
+          Monitor Garnet server health and performance, including memory, connections, keyspace, replication, and persistence status.
+
+          Netdata monitors Garnet through the Redis protocol and reports the Garnet INFO fields that match Redis semantics. Workload, connection, traffic, and lookup metrics require periodic sampling on the Garnet server. Per-command call counts require `--commandstats-monitor`.
+        method_description: |
+          It connects to the Garnet instance via a TCP or UNIX socket and executes the following commands:
+          
+          - [INFO ALL](https://redis.io/commands/info)
+          - [PING](https://redis.io/commands/ping/)
+          - [INFO KEYSPACE](https://redis.io/commands/info) — requested at most every 30 seconds; Garnet answers it with a full store scan
+          - [INFO COMMANDSTATS](https://redis.io/commands/info) — requested every cycle; populated only when the server runs with `--commandstats-monitor`
+      default_behavior:
+        <<: *default_behavior
+        auto_detection: *auto_detection_compat
+        limits:
+          description: |
+            The Garnet server does not expose some data the Redis protocol surfaces, so the following charts have no data for Garnet:
+
+            - Process CPU usage and per-command CPU time
+            - Allocator memory: used, peak, max memory, dataset, Lua, scripts, and the memory fragmentation ratio
+            - Key evictions and key expirations
+            - The RDB save duration, the time since the last save, and the changes since the last save
+            - Blocked and tracking clients
+            - The duration of a down replica link; link status remains available
+
+            When Garnet reports `monitor_task:disabled`, workload, connection, traffic, and lookup charts stay empty because its counters are not sampled. Per-command call counts remain available with `--commandstats-monitor`; Garnet does not measure per-command CPU time.
+
+            The keyspace section requires a full store scan on the Garnet server, so the collector requests it at most every 30 seconds; key counts can be up to 30 seconds old.
+        performance_impact:
+          description: |
+            Collection is lightweight for the Netdata Agent. The periodic `INFO KEYSPACE` request runs a full store scan on the Garnet server; on very large stores it may exceed the job timeout, in which case the keys and expires-keys charts stay empty until the `timeout` option is raised.
+    setup:
+      <<: *setup
+      prerequisites:
+        list:
+          - title: Enable periodic metrics sampling
+            description: |
+              Start Garnet with `--metrics-sampling-freq 1` to sample workload, connections, network traffic, and key lookups every second. Sampling is disabled by default.
+
+              Verify that `redis-cli INFO SERVER` reports `monitor_task:enabled`. Enabling only `--commandstats-monitor` does not enable these general metrics.
+          - title: Enable per-command statistics
+            description: |
+              The calls-per-command chart is populated only when the Garnet server tracks per-command usage. CPU timing charts remain empty.
+
+              Start the Garnet server with the `--commandstats-monitor` flag, then verify with `redis-cli`:
+
+              ```bash
+              redis-cli INFO COMMANDSTATS
+              ```
+
+              The reply contains `cmdstat_` entries when tracking is enabled.
+    alerts:
+      # Garnet does not expose rdb_current_bgsave_time_sec, so the
+      # redis_bgsave_slow alert (redis.bgsave_now) has no data for Garnet.
+      # It also omits master_link_down_since_seconds, so no link-duration alert.
+      - name: redis_connections_rejected
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
+        metric: redis.connections
+        info: connections rejected because of maxclients limit in the last minute
+      - name: redis_bgsave_broken
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf
+        metric: redis.bgsave_health
+        info: 'status of the last RDB save operation (0: ok, 1: error)'

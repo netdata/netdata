@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/discovery"
@@ -33,19 +34,20 @@ type runJobServices struct {
 }
 
 type runGenerationConfig struct {
-	Generation      uint64                    // this run's generation number
-	ShutdownTimeout time.Duration             // per-run shutdown budget
-	Diagnostics     jobmgr.DiagnosticObserver // process-wide operational log sink
-	UIDs            *lifecycle.UIDLedger      // process-lifetime UID ledger
-	Publication     *hostoutput.Publisher
-	Frames          *lifecycle.FrameOwner        // the one frame writer
-	CleanupOutput   *joboutput.CleanupOutputGate // process-lifetime accepted-cleanup output
-	Modules         collectorapi.Registry        // collector module registry
-	Jobs            runJobServices               // job services
-	Secrets         *SecretsConfig               // secret services
-	Discovery       runDiscoveryServices         // discovery services
-	SecretEpoch     *processSecretEpoch          // process-owned Store epoch for this run
-	Attempts        *containment.Authority       // process-owned opaque-work authority
+	Generation       uint64                    // this run's generation number
+	ShutdownTimeout  time.Duration             // per-run shutdown budget
+	Diagnostics      jobmgr.DiagnosticObserver // process-wide operational log sink
+	UIDs             *lifecycle.UIDLedger      // process-lifetime UID ledger
+	Publication      *hostoutput.Publisher
+	Frames           *lifecycle.FrameOwner        // the one frame writer
+	CleanupOutput    *joboutput.CleanupOutputGate // process-lifetime accepted-cleanup output
+	ProcessFunctions []funcapi.ProcessFunctionProvider
+	Modules          collectorapi.Registry  // collector module registry
+	Jobs             runJobServices         // job services
+	Secrets          *SecretsConfig         // secret services
+	Discovery        runDiscoveryServices   // discovery services
+	SecretEpoch      *processSecretEpoch    // process-owned Store epoch for this run
+	Attempts         *containment.Authority // process-owned opaque-work authority
 }
 
 type runGeneration struct {
@@ -228,12 +230,13 @@ func newRunGeneration(
 		config.Discovery.BuildContext.DyncfgOutput = serviceDiscovery
 		config.Discovery.BuildContext.FnReg = serviceDiscovery
 	}
-	functions, err = NewContainedFunctionAssembly(
+	functions, err = newContainedFunctionAssembly(
 		ctx,
 		config.Generation,
 		config.Attempts,
 		config.Diagnostics,
 		config.Modules,
+		config.ProcessFunctions,
 		config.Frames,
 		initialRoutes...,
 	)
@@ -548,4 +551,9 @@ func (jrf joinedRunFinalizer) FinalizeRun(ctx context.Context, generation uint64
 		result = errors.Join(result, jrf.secrets.CloseProjection())
 	}
 	return result
+}
+
+// tick shares the process cadence with collector scheduling; providers need no job.
+func (rg *runGeneration) tick(ctx context.Context, clock int) error {
+	return errors.Join(rg.scheduler.Tick(ctx, clock), rg.functions.controller.ReconcileProcessProviders(ctx))
 }

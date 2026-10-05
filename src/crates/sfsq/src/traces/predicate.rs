@@ -1,39 +1,37 @@
-//! The neutral, owner-aware search predicate AST (phase-4c decision
-//! 26A) — the FULL recorded form grammar as typed data over the
-//! [`vocab`](super::vocab) enums, never grammar strings (decision 16A:
-//! each wire adapter is a pure translator onto this type and owns its
-//! own rendering).
+//! The neutral, owner-aware search predicate AST (design-record
+//! decision 26A) — the FULL recorded form grammar as typed data over
+//! the [`vocab`](super::vocab) enums, never grammar strings (decision
+//! 16A: each wire adapter is a pure translator onto this type and owns
+//! its own rendering).
 //!
-//! The whole grammar PARSES into this AST and validates structurally in
-//! every build; stage A EVALUATES only the positive subset (conjunctions
-//! of `=`/`=~` terms on resource/span/instrumentation attributes and the
-//! dictionary-backed builtins except `event:name`, plus duration
-//! bounds). A structurally valid construct outside that subset is
-//! rejected at the request boundary with the named
-//! [`PredicateError::NotYetEvaluable`] error — a clean gap, never a
-//! silently wrong answer. Stage B adds evaluation arms only; this type
-//! does not change shape between stages.
+//! The whole grammar parses into this AST and validates structurally in
+//! every build ([`Predicate::validate`]); only the currently evaluable
+//! subset is evaluated — a structurally valid construct outside that
+//! subset is rejected at the request boundary with the named
+//! [`PredicateError::NotYetEvaluable`] error: a clean gap, never a
+//! silently wrong answer. The AST never changes shape; widening the
+//! evaluable set only adds arms to [`Condition::unevaluable_construct`],
+//! which owns the exact boundary.
 //!
 //! # One lowering, two evaluators
 //!
-//! [`Predicate::to_trace_plan`] lowers the span-local conditions into the
-//! neutral [`sfst::TracePlan`] (storage names constructed ONLY through
-//! the vocabulary), and the span-side evaluator ([`span_matches`] /
-//! [`EvalPredicate`]) is BUILT FROM THAT SAME PLAN — the raw index path
-//! and the canonical span path cannot disagree on what a condition means,
-//! because there is exactly one lowering (the phase-1/phase-2 consistency
-//! risk pinned in the SOW).
+//! [`Predicate::to_trace_plan`] lowers the span-local conditions into
+//! the neutral [`sfst::TracePlan`] (storage names constructed ONLY
+//! through the vocabulary), and the span-side evaluator
+//! ([`span_matches`] / `EvalPredicate`) is built from that same plan —
+//! the raw index path and the canonical span path cannot disagree on
+//! what a condition means, because there is exactly one lowering.
 
 use sfst::{PlanTerm, TracePlan, TraceSpan};
 
 use super::vocab::{AttributeOwner, BuiltinField};
 use super::window::TimeWindow;
 
-/// What a condition tests. Attribute owners come from the key vocabulary
+/// What a condition tests. Attribute keys carry an [`AttributeOwner`]
 /// ([`AttributeOwner::Builtin`] is not an attribute owner — request
 /// error); [`AttributeOwner::Any`] is the owner-agnostic attribute
-/// (pinned as the resource ∪ span disjunction, stage B); builtins are
-/// the full fixed set, colon forms included (`span:id` =
+/// (the resource ∪ span disjunction); builtins are the full fixed
+/// [`BuiltinField`] set, colon forms included (`span:id` =
 /// [`BuiltinField::SpanId`], …).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PredicateTarget {
@@ -80,10 +78,12 @@ impl CompareOp {
     }
 }
 
-/// One comparison value. Durations arrive as [`Integer`](Self::Integer)
-/// nanoseconds (the wire adapter converts its duration literals);
+/// One comparison value. Duration comparisons take
+/// [`Integer`](Self::Integer) nanoseconds only — the wire carries its
+/// duration bounds as integer nanoseconds, and a text value there is a
+/// request error ([`PredicateError::NonIntegerDuration`]);
 /// [`Float`](Self::Float)/`Integer` against attributes are the
-/// dictionary-numeric comparisons (stage B).
+/// dictionary-numeric comparisons.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PredicateValue {
     Text(String),
@@ -208,10 +208,11 @@ impl Condition {
         });
         // One condition compares against ONE value class: mixing text
         // and numbers has no coherent multi-value semantics (and the
-        // form grammar never generates it); a NaN never compares.
+        // form grammar never generates it).
         if !all_text && !all_numeric {
             return Err(PredicateError::MixedValueTypes { target });
         }
+        // A NaN matches nothing — reject it up front.
         if self
             .values
             .iter()
@@ -225,7 +226,7 @@ impl Condition {
                 return Err(PredicateError::AttributeUnderBuiltinOwner { key: key.clone() });
             }
             // Attributes take every op; regex needs text patterns,
-            // ordering needs numbers (dictionary-numeric, stage B).
+            // ordering needs numbers (the dictionary-numeric path).
             PredicateTarget::Attribute(..) => {
                 if self.op.is_regex() && !all_text {
                     return Err(PredicateError::TextValueRequired { op: self.op, target });
@@ -282,6 +283,8 @@ impl Condition {
             },
         }
 
+        // Patterns must compile in the engine's anchored form: a bad
+        // pattern is a request error, never a mid-query failure.
         if self.op.is_regex() {
             for value in &self.values {
                 let PredicateValue::Text(pattern) = value else {
@@ -298,11 +301,15 @@ impl Condition {
 
     /// Whether this build evaluates this condition — see the module
     /// docs. `None` = evaluable; `Some(construct)` names the
-    /// not-yet-evaluable construct. After stage-B step 6 the evaluable
-    /// set covers negation, the any-owner disjunction, and
-    /// dictionary-numeric comparisons; the remaining gaps are the
-    /// colon-set ids, event/link structural refine, and the
-    /// trace-level builtins (steps 7-9).
+    /// not-yet-evaluable construct. Evaluable: everything span-local —
+    /// attributes (any owner incl. `Any`, every op), the dictionary
+    /// builtins, duration bounds/equality, and the span/parent/trace
+    /// ids (both polarities) — plus the POSITIVE event/link subgroup
+    /// forms and the trace-level builtins. The gaps are the NEGATED
+    /// subgroup forms — link ids, `event:name`, event/link attributes,
+    /// `event:timeSinceStart` — which sit on the recorded open
+    /// subgroup-semantics question. Assumes structural validity
+    /// ([`Condition::validate`] runs first).
     fn unevaluable_construct(&self) -> Option<String> {
         use BuiltinField::*;
         match (&self.target, self.op) {
@@ -1062,15 +1069,14 @@ fn eval_group_condition(c: &sfst::GroupCondition) -> EvalGroupCondition {
 
 /// The post-assembly evaluator of the TRACE-LEVEL partition half
 /// (decision 15 / pin R3-2): boolean over the assembled trace's root
-/// name, root service, and envelope duration — the ENGINE owns the
-/// tri-state (an assembled trace whose values are unreliable — capped
-/// or degraded — is excluded as indeterminate before this evaluator is
-/// consulted). The root inputs are the TRUE root's values only
-/// (decision 1D — see [`search`](super::search)'s module docs): a
-/// rootless trace passes `None`s, never the display-side promoted
-/// root. Absent root values never satisfy a condition, negated
-/// forms included (the absent-never-satisfies rule; values are
-/// single-valued per trace, so no subgroup fork exists).
+/// name, root service, and envelope duration. The ENGINE owns the
+/// tri-state — an assembled trace with unreliable (capped or degraded)
+/// values is excluded as indeterminate before this evaluator runs. The
+/// root inputs are the TRUE root's values only (decision 1D — see
+/// [`search`](super::search)'s module docs): a rootless trace passes
+/// `None`s, never the display-side promoted root. Absent values never
+/// satisfy a condition, negated forms included; values are single-valued
+/// per trace, so no subgroup fork exists.
 pub(crate) struct TraceLevelEval {
     conditions: Vec<TraceLevelCondition>,
 }
@@ -1251,7 +1257,7 @@ impl TraceLevelEval {
 /// Whether one span (with its resource/scope context — a span's fields
 /// carry the flattened resource and scope entries) satisfies the
 /// SPAN-LOCAL `predicate` and the optional window. The pinned span-side
-/// seam (R2-9); engine loops use the pre-compiled [`EvalPredicate`] this
+/// seam (R2-9); engine loops use the pre-compiled `EvalPredicate` this
 /// delegates to, so the two can never diverge.
 ///
 /// `predicate` must be validated and span-local (partitioned); a
@@ -1383,8 +1389,9 @@ mod tests {
         ));
     }
 
-    /// The stage boundary: the positive subset passes; every recorded
-    /// B-construct is named, not silently mis-evaluated.
+    /// The evaluability boundary: the evaluable set passes; every
+    /// not-yet-evaluable construct is named, not silently
+    /// mis-evaluated.
     #[test]
     fn evaluability_boundary() {
         let evaluable = |c: Condition| {

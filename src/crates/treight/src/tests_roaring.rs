@@ -1,3 +1,33 @@
+//! Differential tests for the roaring bridges ([`RawBitmap::from_roaring`]
+//! /[`RawBitmap::to_roaring`], roaring.rs): every operation treight offers
+//! is replayed on a `RoaringBitmap` built from the same values, and the
+//! answers must match — the proptest complement of the fuzz target
+//! (fuzz/fuzz_targets/against_roaring.rs), which runs the same oracle over
+//! long random op sequences and tree depths up to 8 levels. These tests
+//! are also the bridges' only callers in the tree. Compiled only under
+//! `all(test, feature = "roaring")` (the module gate in `lib.rs`). By area:
+//!
+//! - Queries (`contains`/`iter`/`len`/`min`/`max`/`range_cardinality`),
+//!   in-place `insert`/`remove`/`remove_range`, the serialize roundtrip
+//!   and the four blob set ops equal roaring case for case, as proptests
+//!   over generated sets.
+//! - `estimate_data_size` equals the real appended blob length — the
+//!   treight-vs-roaring size comparison input.
+//! - Set-algebra identities hold on treight blobs directly:
+//!   commutativity, empty identities, `a − a` = `a ⊕ a` = ∅,
+//!   intersection ⊆ union.
+//! - The inverted-flag `Bitmap` wrapper's `and`/`or` match a membership
+//!   oracle across all flag combinations (the per-row unit pins live in
+//!   tests_bitmap.rs).
+//! - The bridges themselves (the `test_rawbitmap_from_roaring*` /
+//!   `test_roaring_*` unit tests and the `roaring_roundtrip`
+//!   proptest): explicit universe adoption,
+//!   empty in both directions, exact treight↔roaring roundtrip.
+//!
+//! Universes stay ≤ `MAX_UNIVERSE` so each generated case is checked
+//! exhaustively over all values. Not pinned here: out-of-range values in
+//! a `from_roaring` input — there is no bounds check (see roaring.rs),
+//! keeping `rb` within `0..universe_size` is on the caller.
 use crate::*;
 use ::roaring::RoaringBitmap;
 use proptest::prelude::*;
@@ -6,7 +36,9 @@ use proptest::prelude::*;
 /// exhaustive membership checks (0..universe) are fast.
 const MAX_UNIVERSE: u32 = 4096;
 
-/// Strategy: generate a (universe_size, sorted-deduped values) pair.
+/// Oracle harness strategy: a (universe_size, values) pair, the universe
+/// in 1..=MAX_UNIVERSE and up to 256 values drawn from 0..universe,
+/// sorted and deduped so `from_sorted_iter`'s ascending contract holds.
 fn arb_bitmap() -> impl Strategy<Value = (u32, Vec<u32>)> {
     (1u32..=MAX_UNIVERSE).prop_flat_map(|universe| {
         proptest::collection::vec(0..universe, 0..=(universe.min(256) as usize)).prop_map(
@@ -19,7 +51,8 @@ fn arb_bitmap() -> impl Strategy<Value = (u32, Vec<u32>)> {
     })
 }
 
-/// Build both a (RawBitmap, data) and a RoaringBitmap from the same values.
+/// Build the comparison pair for `vals`: a treight (descriptor, blob) and
+/// a `RoaringBitmap`, same values under the same caller-chosen universe.
 fn make_pair(universe: u32, vals: &[u32]) -> (RawBitmap, Vec<u8>, RoaringBitmap) {
     let mut data = Vec::new();
     let raw = RawBitmap::from_sorted_iter(vals.iter().copied(), universe, &mut data);
@@ -27,6 +60,8 @@ fn make_pair(universe: u32, vals: &[u32]) -> (RawBitmap, Vec<u8>, RoaringBitmap)
     (raw, data, roaring)
 }
 
+/// Build a treight (descriptor, blob) from arbitrary values: sorted and
+/// deduped first, so the input is always ascending.
 fn make_bitmap(universe_size: u32, values: &[u32]) -> (RawBitmap, Vec<u8>) {
     let mut sorted = values.to_vec();
     sorted.sort_unstable();
@@ -39,6 +74,8 @@ fn make_bitmap(universe_size: u32, values: &[u32]) -> (RawBitmap, Vec<u8>) {
 // ===== Construction & queries =====
 
 proptest! {
+    /// Point membership matches roaring for every value in the
+    /// universe, not only the stored ones.
     #[test]
     fn contains_matches_roaring((universe, vals) in arb_bitmap()) {
         let (raw, data, roaring) = make_pair(universe, &vals);
@@ -51,6 +88,8 @@ proptest! {
         }
     }
 
+    /// Full iteration yields roaring's exact element sequence — the
+    /// strictly-ascending order the `to_roaring` bridge relies on.
     #[test]
     fn iter_matches_roaring((universe, vals) in arb_bitmap()) {
         let (raw, data, roaring) = make_pair(universe, &vals);
@@ -59,12 +98,14 @@ proptest! {
         prop_assert_eq!(raw_vals, roaring_vals);
     }
 
+    /// Cardinality matches roaring, empty sets included.
     #[test]
     fn len_matches_roaring((universe, vals) in arb_bitmap()) {
         let (raw, data, roaring) = make_pair(universe, &vals);
         prop_assert_eq!(raw.len(&data), roaring.len());
     }
 
+    /// min/max match roaring, including the empty case (both `None`).
     #[test]
     fn min_max_match_roaring((universe, vals) in arb_bitmap()) {
         let (raw, data, roaring) = make_pair(universe, &vals);
@@ -72,6 +113,10 @@ proptest! {
         prop_assert_eq!(raw.max(&data), roaring.max());
     }
 
+    /// `estimate_data_size` predicts the exact blob length a real build
+    /// appends (its documented contract in lib.rs); the fuzz target
+    /// re-asserts it after op sequences
+    /// (`fuzz/fuzz_targets/against_roaring.rs`).
     #[test]
     fn estimate_data_size_is_exact((universe, vals) in arb_bitmap()) {
         let est = estimate_data_size(universe, vals.iter().copied());
@@ -84,6 +129,9 @@ proptest! {
 // ===== Insert / remove =====
 
 proptest! {
+    /// In-place `insert` matches roaring across a round of extra values
+    /// (folded into 0..universe, possibly already present), compared by
+    /// full iteration.
     #[test]
     fn insert_matches_roaring(
         (universe, vals) in arb_bitmap(),
@@ -101,6 +149,8 @@ proptest! {
         prop_assert_eq!(raw_vals, roaring_vals);
     }
 
+    /// In-place `remove` matches roaring, including removals of absent
+    /// values, compared by full iteration.
     #[test]
     fn remove_matches_roaring(
         (universe, vals) in arb_bitmap(),
@@ -122,6 +172,8 @@ proptest! {
 // ===== Set operations =====
 
 proptest! {
+    /// `union` equals roaring's `|`: two generated operands sharing the
+    /// universe, results compared by iterating the output blob.
     #[test]
     fn union_matches_roaring(
         (universe, a_vals) in arb_bitmap(),
@@ -146,6 +198,7 @@ proptest! {
         prop_assert_eq!(raw_out, roaring_out);
     }
 
+    /// `intersect` equals roaring's `&`, same setup as the union test.
     #[test]
     fn intersection_matches_roaring(
         (universe, a_vals) in arb_bitmap(),
@@ -170,6 +223,7 @@ proptest! {
         prop_assert_eq!(raw_out, roaring_out);
     }
 
+    /// `difference` equals roaring's `-`, same setup as the union test.
     #[test]
     fn difference_matches_roaring(
         (universe, a_vals) in arb_bitmap(),
@@ -194,6 +248,8 @@ proptest! {
         prop_assert_eq!(raw_out, roaring_out);
     }
 
+    /// `symmetric_difference` equals roaring's `^`, same setup as the
+    /// union test.
     #[test]
     fn symmetric_difference_matches_roaring(
         (universe, a_vals) in arb_bitmap(),
@@ -222,6 +278,8 @@ proptest! {
 // ===== Algebraic set properties =====
 
 proptest! {
+    /// a ∪ b and b ∪ a produce identical blobs — treight-internal
+    /// algebra, no oracle involved.
     #[test]
     fn union_is_commutative((universe, a_vals) in arb_bitmap(), b_frac in proptest::collection::vec(0u32..MAX_UNIVERSE, 0..=128usize)) {
         let b_vals = {
@@ -239,6 +297,7 @@ proptest! {
         prop_assert_eq!(c1.iter(&out1).collect::<Vec<_>>(), c2.iter(&out2).collect::<Vec<_>>());
     }
 
+    /// a ∩ b and b ∩ a produce identical blobs.
     #[test]
     fn intersection_is_commutative((universe, a_vals) in arb_bitmap(), b_frac in proptest::collection::vec(0u32..MAX_UNIVERSE, 0..=128usize)) {
         let b_vals = {
@@ -256,6 +315,7 @@ proptest! {
         prop_assert_eq!(c1.iter(&out1).collect::<Vec<_>>(), c2.iter(&out2).collect::<Vec<_>>());
     }
 
+    /// a ⊕ b and b ⊕ a produce identical blobs.
     #[test]
     fn xor_is_commutative((universe, a_vals) in arb_bitmap(), b_frac in proptest::collection::vec(0u32..MAX_UNIVERSE, 0..=128usize)) {
         let b_vals = {
@@ -273,6 +333,8 @@ proptest! {
         prop_assert_eq!(c1.iter(&out1).collect::<Vec<_>>(), c2.iter(&out2).collect::<Vec<_>>());
     }
 
+    /// Union with `empty(universe)` over a zero-byte blob is the
+    /// identity in both operand orders.
     #[test]
     fn union_with_empty_is_identity((universe, vals) in arb_bitmap()) {
         let (a, da, _) = make_pair(universe, &vals);
@@ -285,6 +347,8 @@ proptest! {
         prop_assert_eq!(c2.iter(&out2).collect::<Vec<_>>(), a.iter(&da).collect::<Vec<_>>());
     }
 
+    /// Intersecting with the empty bitmap yields an empty result, in
+    /// both operand orders.
     #[test]
     fn intersection_with_empty_is_empty((universe, vals) in arb_bitmap()) {
         let (a, da, _) = make_pair(universe, &vals);
@@ -295,6 +359,7 @@ proptest! {
         prop_assert!(empty.intersect(&[], &a, &da, &mut out).is_empty(&out));
     }
 
+    /// a − a is empty.
     #[test]
     fn difference_with_self_is_empty((universe, vals) in arb_bitmap()) {
         let (a, da, _) = make_pair(universe, &vals);
@@ -302,6 +367,7 @@ proptest! {
         prop_assert!(a.difference(&da, &a, &da, &mut out).is_empty(&out));
     }
 
+    /// a ⊕ a is empty.
     #[test]
     fn xor_with_self_is_empty((universe, vals) in arb_bitmap()) {
         let (a, da, _) = make_pair(universe, &vals);
@@ -309,6 +375,8 @@ proptest! {
         prop_assert!(a.symmetric_difference(&da, &a, &da, &mut out).is_empty(&out));
     }
 
+    /// Every intersection member lies in the union, and
+    /// inter.len() <= union.len().
     #[test]
     fn intersection_is_subset_of_union(
         (universe, a_vals) in arb_bitmap(),
@@ -337,13 +405,15 @@ proptest! {
 
 // ===== Bitmap (De Morgan wrapper) property tests =====
 
-/// Strategy: generate a (universe, vals, inverted) triple.
+/// Extends `arb_bitmap` with a random inverted flag, driving the
+/// complement-storage dimension of the `Bitmap` wrapper tests.
 fn arb_bitmap_wrapper() -> impl Strategy<Value = (u32, Vec<u32>, bool)> {
     arb_bitmap().prop_flat_map(|(universe, vals)| {
         proptest::bool::ANY.prop_map(move |inv| (universe, vals.clone(), inv))
     })
 }
 
+/// Build a `Bitmap` from vals, stored as the complement when `inverted`.
 fn make_bitmap_wrapper(universe: u32, vals: &[u32], inverted: bool) -> (Bitmap, Vec<u8>) {
     let mut data = Vec::new();
     let bm = if inverted {
@@ -355,6 +425,8 @@ fn make_bitmap_wrapper(universe: u32, vals: &[u32], inverted: bool) -> (Bitmap, 
 }
 
 proptest! {
+    /// Wrapper membership is the oracle's, complemented when inverted:
+    /// checked for every value in the universe.
     #[test]
     fn bitmap_contains_matches_roaring(
         (universe, vals, inverted) in arb_bitmap_wrapper(),
@@ -373,6 +445,8 @@ proptest! {
         }
     }
 
+    /// Wrapper len is stored.len(), or universe − stored.len() when
+    /// complement-stored.
     #[test]
     fn bitmap_len_matches_roaring(
         (universe, vals, inverted) in arb_bitmap_wrapper(),
@@ -387,6 +461,8 @@ proptest! {
         prop_assert_eq!(bm.len(&data), expected);
     }
 
+    /// `and` across all four inverted-flag combinations equals the
+    /// per-value logical AND of the two oracle memberships.
     #[test]
     fn bitmap_and_matches_oracle(
         (universe, a_vals) in arb_bitmap(),
@@ -420,6 +496,8 @@ proptest! {
         }
     }
 
+    /// `or` across all four inverted-flag combinations equals the
+    /// per-value logical OR of the two oracle memberships.
     #[test]
     fn bitmap_or_matches_oracle(
         (universe, a_vals) in arb_bitmap(),
@@ -454,9 +532,12 @@ proptest! {
     }
 }
 
-// ===== Serialization roundtrip =====
+// ===== Serialization, roaring roundtrip & range ops =====
 
 proptest! {
+    /// The serialize wire format round-trips: `deserialize_from` of a
+    /// `serialize_into` buffer reproduces the exact value sequence
+    /// (same wire-format pin as tests_raw.rs, no roaring involved).
     #[test]
     fn serialize_roundtrip((universe, vals) in arb_bitmap()) {
         let mut data = Vec::new();
@@ -467,6 +548,8 @@ proptest! {
         prop_assert_eq!(raw.iter(&data).collect::<Vec<_>>(), raw2.iter(&data2).collect::<Vec<_>>());
     }
 
+    /// treight → roaring → treight preserves the value sequence: the
+    /// `to_roaring`/`from_roaring` pair under the same universe.
     #[test]
     fn roaring_roundtrip((universe, vals) in arb_bitmap()) {
         let mut data = Vec::new();
@@ -477,6 +560,8 @@ proptest! {
         prop_assert_eq!(raw.iter(&data).collect::<Vec<_>>(), raw2.iter(&data2).collect::<Vec<_>>());
     }
 
+    /// range_cardinality matches roaring over a random in-universe
+    /// half-open range (ends folded into range, then ordered).
     #[test]
     fn range_cardinality_matches_roaring(
         (universe, vals) in arb_bitmap(),
@@ -494,6 +579,8 @@ proptest! {
         );
     }
 
+    /// The unbounded range counts everything:
+    /// range_cardinality(..) equals len.
     #[test]
     fn range_cardinality_full_equals_len((universe, vals) in arb_bitmap()) {
         let mut data = Vec::new();
@@ -501,6 +588,8 @@ proptest! {
         prop_assert_eq!(raw.range_cardinality(&data, ..), raw.len(&data));
     }
 
+    /// In-place `remove_range` matches roaring over the same folded,
+    /// ordered range construction as above.
     #[test]
     fn remove_range_matches_roaring(
         (universe, vals) in arb_bitmap(),
@@ -522,6 +611,8 @@ proptest! {
 
 // ===== Roaring conversion unit tests =====
 
+/// `from_roaring` adopts the caller-chosen universe (512) and reproduces
+/// the rb's membership: {0, 42, 511} present, len 3.
 #[test]
 fn test_rawbitmap_from_roaring() {
     let mut rb = RoaringBitmap::new();
@@ -539,6 +630,8 @@ fn test_rawbitmap_from_roaring() {
     assert_eq!(bm.len(&data), 3);
 }
 
+/// An empty rb converts to the empty descriptor while still adopting the
+/// requested universe — nothing is appended to `data`.
 #[test]
 fn test_rawbitmap_from_roaring_empty() {
     let rb = RoaringBitmap::new();
@@ -549,6 +642,8 @@ fn test_rawbitmap_from_roaring_empty() {
     assert_eq!(bm.universe_size(), 64);
 }
 
+/// `to_roaring` carries the full member set ({0, 42, 255, 511}) across
+/// to a `RoaringBitmap`.
 #[test]
 fn test_roaring_from_rawbitmap() {
     let (bm, data) = make_bitmap(512, &[0, 42, 255, 511]);
@@ -560,6 +655,7 @@ fn test_roaring_from_rawbitmap() {
     assert!(rb.contains(511));
 }
 
+/// An empty treight blob converts to an empty `RoaringBitmap`.
 #[test]
 fn test_roaring_from_rawbitmap_empty() {
     let bm = RawBitmap::empty(64);
@@ -567,6 +663,9 @@ fn test_roaring_from_rawbitmap_empty() {
     assert!(rb.is_empty());
 }
 
+/// The full bridge roundtrip is exact on 8-bit boundary values
+/// (0/1/7/8/63/64/255/256/511): `from_roaring` then `to_roaring` yields
+/// an equal `RoaringBitmap`.
 #[test]
 fn test_roaring_roundtrip() {
     let values = [0, 1, 7, 8, 63, 64, 255, 256, 511];

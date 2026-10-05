@@ -9,11 +9,41 @@
 //! output it folds; it is pure framing math — nothing here knows what
 //! the frames contain or what the consumer builds from a chunk.
 //!
+//! The fold's input is one scan over the WAL's durable bound:
+//! `FrameRange::new(HEADER_SIZE, valid_up_to)` — `valid_up_to` is the
+//! registry-tracked end of the last fsynced frame
+//! (`registry::File::valid_up_to`, updated by `Synced` events,
+//! frame-aligned by construction). The scan's soundness rules live in
+//! `reader.rs`: the bound must be physically present, and a frame
+//! crossing it is a torn tail that ends the scan — so every boundary
+//! this module sees is a whole frame's end `<= valid_up_to`.
+//!
+//! Both parts are read back with
+//! [`Reader::open_range`](crate::Reader::open_range), the bounded mode
+//! of `reader.rs`. A chunk's range is one window: the ledger builds it
+//! into an SFST with `ng_index::build_sfst_range` (record count
+//! cross-checked against [`ChunkBoundary::entry_count`]) and memoizes
+//! the image (file-lifecycle's `ChunkCache`). The tail from
+//! [`tail_start`] to `valid_up_to` is row-scanned per query by sfsq's
+//! WAL scans; a frame crossing the bound stops the read cleanly.
+//!
 //! Chunk boundaries are **append-only and immutable**: a boundary is
 //! fixed by the frame entry counts up to it, so a durable bound
 //! advancing only ever appends new higher-index chunks — it never
 //! moves or invalidates an existing one. That is what lets consumers
 //! memoize per-chunk artifacts keyed `(wal_seq, chunk_index)`.
+//!
+//! # Consumers (grep-verified)
+//!
+//! `otel-ledger` (`rpc/logs/handler.rs`, `rpc/traces/sources.rs`):
+//! per-query chunk + tail planning, `min_entries` wired from its
+//! `CHUNK_MIN_ENTRIES` (16_384, a fixed default today). `sfsq`
+//! (`tests/ng_wal_equivalence.rs`): partitions fixtures with this rule
+//! — `u64::MAX` for the all-tail shape, small thresholds for the
+//! chunk + tail merge path — and asserts chunk + tail serving equals
+//! whole-file indexing. `file-lifecycle` (`chunk.rs`): its `ChunkCache`
+//! keying rests on the append-only rule; it cites this module rather
+//! than calling it.
 
 use crate::FrameBoundary;
 
@@ -22,11 +52,22 @@ use crate::FrameBoundary;
 /// log records (the last frame can push it over).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ChunkBoundary {
-    /// 0-based index within the WAL, dense and stable across queries.
+    /// 0-based ordinal in the fold from `start`, dense. Production
+    /// callers always fold from `crate::HEADER_SIZE`, making this the
+    /// WAL-wide chunk index, stable as the prefix grows (boundaries are
+    /// append-only) — the `chunk_index` half of the
+    /// `(wal_seq, chunk_index)` memoization key. A sub-window fold from
+    /// a later offset restarts numbering.
     pub index: u32,
-    /// The chunk's frame-aligned byte range, `[first frame, last frame end)`.
+    /// The chunk's frame-aligned byte range, `[first frame, last frame
+    /// end)`: both offsets are frame ends recorded by the scan, i.e. a
+    /// valid [`Reader::open_range`](crate::Reader::open_range) window —
+    /// the ledger passes it straight to `ng_index::build_sfst_range`.
     pub range: crate::FrameRange,
-    /// Log records in the chunk (>= `min_entries`).
+    /// Log records in the chunk — the sum of the frames' entry counts,
+    /// at least `min_entries`. The ledger passes this as the expected
+    /// count its chunk builds cross-check the built SFST against (the
+    /// shortfall check `reader.rs` defers to its callers).
     pub entry_count: u64,
 }
 
@@ -37,12 +78,18 @@ pub struct ChunkBoundary {
 /// [`scan_frame_boundaries`](crate::scan_frame_boundaries) over
 /// `[start, valid_up_to)`, in file order; `start` is the offset of the
 /// first frame (`crate::HEADER_SIZE` for a whole-prefix scan, or a prior
-/// chunk's `end`). Each chunk extends to the first frame boundary at or
-/// past the running `min_entries`, then a new chunk begins. Frames after
-/// the last complete chunk (cumulative `< min_entries`) are **not**
-/// returned — they are the *tail*, beginning at
-/// `chunks.last().map_or(start, |c| c.range.end())`, and are evaluated per query
-/// by the row scan rather than indexed.
+/// chunk's `end`). They must be contiguous whole-frame ends — exactly
+/// what one scan over one window produces; the fold does no I/O and no
+/// validation (it cannot fail) and would silently mis-split anything
+/// else.
+///
+/// Each chunk extends to the first frame boundary at or past the
+/// running `min_entries`, then a new chunk begins. A threshold above
+/// the scan's total entry count completes no chunk — the whole prefix
+/// stays tail. Frames after the last complete chunk (cumulative
+/// `< min_entries`) are **not** returned — they are the *tail*,
+/// beginning at [`tail_start`], and are evaluated per query by the row
+/// scan rather than indexed.
 ///
 /// Boundaries are a deterministic function of the entry counts, so a
 /// longer prefix yields the same chunks plus possibly more — never a
@@ -53,9 +100,10 @@ pub fn chunk_boundaries(
     min_entries: u64,
 ) -> Vec<ChunkBoundary> {
     // `min_entries == 0` would make every frame its own chunk —
-    // degenerate, and contrary to the >=16K design intent. The caller's
-    // threshold is a config knob, so guard it in debug rather than at
-    // runtime cost.
+    // degenerate, and contrary to the >=16K design intent (the ledger
+    // wires `CHUNK_MIN_ENTRIES` = 16_384). The threshold is
+    // caller-supplied, so guard it in debug rather than at runtime
+    // cost.
     debug_assert!(min_entries > 0, "min_entries must be positive");
 
     let mut chunks = Vec::new();
@@ -79,6 +127,11 @@ pub fn chunk_boundaries(
 /// The byte offset where the tail begins for a chunk list produced by
 /// [`chunk_boundaries`] over the same `start`: the end of the last
 /// complete chunk, or `start` when there are none.
+///
+/// Consumers form the query's tail range as `[tail_start, end)` — the
+/// ledger's `[tail_start, valid_up_to)` — and skip it when the offsets
+/// meet: the prefix divided evenly into chunks, nothing left to
+/// row-scan.
 pub fn tail_start(chunks: &[ChunkBoundary], start: u64) -> u64 {
     chunks.last().map_or(start, |c| c.range.end())
 }

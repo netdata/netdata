@@ -133,17 +133,19 @@ Use a discriminator plus `dependencies` for mutually exclusive configurations (m
 ```
 
 - The discriminator is a radio; its `ui:help` compares the modes (when to choose which).
-- Branch section keys SHOULD be `<discriminator>_<value>`. When multiple discriminator values share one shape,
-  semantic keys MAY be used (for example `version` with `credentials` and `credentials3`). Each branch MUST carry
-  its own `required`; the renderer constraints below still apply.
+- Branch section keys SHOULD be `<discriminator>_<value>`. Values that share one shape SHOULD share one branch whose
+  discriminator is an `enum` of those values; its keys MAY be semantic (vnodes `version`: `credentials` for `1`/`2c`)
+  or existing top-level options (redfish `auth_method`: `username`/`password` for `auto`/`session`/`basic`). Each
+  branch MUST carry its own `required`; the renderer constraints below still apply.
 - A branch key MUST NOT also be a plain sibling property (it would render for every mode).
+- An object with `dependencies` MUST NOT set `additionalProperties: false`: standard validators then reject every key
+  a branch reveals.
 - With tabs, branch keys MUST be listed on a tab (they render only while their mode is selected); an unlisted branch
   key is dropped like any other property.
 - Prefer top-level dependencies: the UI drops inactive-branch data only for top-level discriminators.
-- Do not use `oneOf`/`anyOf` outside `dependencies`, on a property or an object (including inside `allOf`); the UI
-  renders a branch selector, and on a tabbed object a second tab strip. Express a cross-field rule as `if`/`then`,
-  several rules in `allOf` (redfish: `tls_cert` and `tls_key` set together; ceph: `bearer_token_file` or both
-  `username` and `password`).
+- `oneOf`/`anyOf` MUST NOT appear outside `dependencies` (why, and the `if`/`then` alternative:
+  `src/plugins.d/DYNCFG.md#json-schema-for-configuration-ui`). Put several `if`/`then` rules in `allOf`; worked
+  examples: redfish `tls_cert`/`tls_key` set together, ceph `bearer_token_file` or both `username` and `password`.
 
 ## 6. Secrets
 
@@ -252,6 +254,7 @@ a wrong schema; they never restate a file, and a failure is fixed in the schema,
 | `TestConfigSchemasDoNotMaterializeOptionalArrays` | no `minItems` on optional arrays |
 | `TestConfigSchemasDoNotDeclareBranchKeysAsProperties` | branch keys are not sibling properties |
 | `TestConfigSchemasOfferAlternativesOnlyThroughDependencies` | no `oneOf`/`anyOf` outside `dependencies` |
+| `TestConfigSchemasKeepDependentObjectsOpen` | no `additionalProperties: false` next to `dependencies` |
 
 The file also asserts that its glob list covers every `config_schema*.json` under `src/go/plugin` except the ibm.d
 generated schemas and `framework/charttpl`, so a new schema outside the list fails the build.

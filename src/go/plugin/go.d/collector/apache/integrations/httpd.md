@@ -239,7 +239,7 @@ All metrics available only if [ExtendedStatus](https://httpd.apache.org/docs/2.4
 
 
 
-### Per Apache instance
+### Per HTTPD instance
 
 These metrics refer to the entire monitored application.
 
