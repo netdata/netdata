@@ -28,7 +28,7 @@ type collectorMetrics struct {
 	firstPartyResources, thirdPartyResources        metrix.SnapshotCounter
 }
 
-func newCollectorMetrics(m metrix.SnapshotMeter) collectorMetrics {
+func newCollectorMetrics(m metrix.SnapshotMeter, logs, traces bool) collectorMetrics {
 	metrics := collectorMetrics{
 		meter: m,
 		ingress: m.StateSet(
@@ -46,7 +46,24 @@ func newCollectorMetrics(m metrix.SnapshotMeter) collectorMetrics {
 		firstPartyResources: m.Counter("resources_first_party"),
 		thirdPartyResources: m.Counter("resources_third_party"),
 	}
-	for _, name := range []string{aggregate.CounterOTLPSent, aggregate.CounterOTLPDropped, aggregate.CounterOTLPErrors, aggregate.CounterHistoryWritten, aggregate.CounterHistoryDropped, aggregate.CounterSpansSent, aggregate.CounterSpansDropped, aggregate.CounterSpansErrors} {
+	diagnostics := []string{aggregate.CounterHistoryWritten, aggregate.CounterHistoryDropped}
+	if logs {
+		diagnostics = append(
+			diagnostics,
+			aggregate.CounterOTLPSent,
+			aggregate.CounterOTLPDropped,
+			aggregate.CounterOTLPErrors,
+		)
+	}
+	if traces {
+		diagnostics = append(
+			diagnostics,
+			aggregate.CounterSpansSent,
+			aggregate.CounterSpansDropped,
+			aggregate.CounterSpansErrors,
+		)
+	}
+	for _, name := range diagnostics {
 		metrics.diagnostics = append(metrics.diagnostics, counterMetric{
 			name:       name,
 			instrument: m.Counter(name),

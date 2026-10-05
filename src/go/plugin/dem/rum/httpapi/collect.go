@@ -129,7 +129,7 @@ func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
 		Lat:         lat,
 		Lon:         lon,
 		HasGeo:      hasGeo,
-		ConsoleLogs: route.config.CollectConsoleLogs,
+		ConsoleLogs: route.config.ConsoleLogsOn(),
 		Tracing:     st.tracing,
 		PathRules:   st.pathRules,
 	})

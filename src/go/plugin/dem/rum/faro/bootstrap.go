@@ -21,6 +21,7 @@ const SDKOrigin = "https://cdn.jsdelivr.net"
 type BootstrapOptions struct {
 	MeasureRate float64
 	IncludeBots bool
+	ConsoleLogs bool
 	Tracing     bool
 	Propagate   []string
 }
@@ -37,6 +38,7 @@ func Bootstrap(key, base string, opts BootstrapOptions) string {
 		"sampling":    opts.MeasureRate,
 		"bots":        beacon.BotPatternJS(),
 		"includeBots": opts.IncludeBots,
+		"consoleLogs": opts.ConsoleLogs,
 		"tracing":     nil,
 	}
 	if opts.Tracing {

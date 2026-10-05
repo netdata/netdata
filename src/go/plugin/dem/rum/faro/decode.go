@@ -5,11 +5,13 @@ package faro
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
@@ -88,6 +90,7 @@ type faroPayload struct {
 		ResourceSpans []otlpResourceSpans `json:"resourceSpans"`
 	} `json:"traces"`
 	Logs []struct {
+		Context   json.RawMessage `json:"context"`
 		Message   string          `json:"message"`
 		Level     string          `json:"level"`
 		Timestamp json.RawMessage `json:"timestamp"`
@@ -255,7 +258,7 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 		b.Errors = append(b.Errors, beacon.Error{
 			Type:        typ,
 			Message:     msg,
-			Stack:       truncate(stack, maxStackLen),
+			Stack:       beacon.Truncate(stack, maxStackLen),
 			Time:        flexTime(e.Timestamp, now),
 			Fingerprint: beacon.Fingerprint(typ, msg, firstFrame),
 		})
@@ -312,14 +315,17 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 			if i >= maxItems {
 				break
 			}
-			msg := beacon.Clean(l.Message, maxMessageLen)
+			msg := beacon.Clean(logRedactor.Apply(l.Message), maxMessageLen)
 			if msg == "" {
 				continue
 			}
+			errorType, stack := consoleErrorContext(l.Context, opt)
 			b.Logs = append(b.Logs, beacon.Log{
-				Level:   beacon.Clean(strings.ToLower(l.Level), 16),
-				Message: msg,
-				Time:    flexTime(l.Timestamp, now),
+				ErrorType: errorType,
+				Stack:     stack,
+				Level:     beacon.Clean(strings.ToLower(l.Level), 16),
+				Message:   msg,
+				Time:      flexTime(l.Timestamp, now),
 			})
 		}
 	}
@@ -333,13 +339,6 @@ func attributedElement(vital string, ctx map[string]any) string {
 		return ""
 	}
 	return beacon.RedactSelector(beacon.Clean(v, maxSelector))
-}
-
-func truncate(s string, n int) string {
-	if len(s) > n {
-		return s[:n]
-	}
-	return s
 }
 
 // pageHost is the page URL's host (first-party resource
@@ -451,4 +450,58 @@ func eventKind(name string) beacon.EventKind {
 	default:
 		return beacon.EventCustom
 	}
+}
+
+var logRedactor = redact.NewRedactor()
+
+// consoleErrorContext reads the space-separated JSON frames Faro 2.11 emits.
+// Only the known Error subset is retained; malformed context cannot reject vitals.
+func consoleErrorContext(raw json.RawMessage, opt Options) (string, string) {
+	var ctx struct {
+		Type        json.RawMessage `json:"type"`
+		StackFrames json.RawMessage `json:"stackFrames"`
+	}
+	if json.Unmarshal(raw, &ctx) != nil {
+		return "", ""
+	}
+	var typ, encoded string
+	_ = json.Unmarshal(ctx.Type, &typ)
+	_ = json.Unmarshal(ctx.StackFrames, &encoded)
+	type frame struct {
+		Filename string `json:"filename"`
+		Function string `json:"function"`
+		Lineno   int    `json:"lineno"`
+		Colno    int    `json:"colno"`
+	}
+	typ = beacon.Clean(logRedactor.Apply(typ), maxNameLen)
+	var stack strings.Builder
+	decoder := json.NewDecoder(strings.NewReader(encoded))
+	for {
+		var f *frame
+		if err := decoder.Decode(&f); err == io.EOF {
+			break
+		} else if err != nil {
+			return typ, ""
+		}
+		if f == nil {
+			return typ, ""
+		}
+		filename := f.Filename
+		if i := strings.IndexAny(filename, "?#"); i >= 0 {
+			filename = filename[:i]
+		}
+		filename = beacon.RedactURL(filename, opt.PathRules)
+		fmt.Fprintf(
+			&stack,
+			"%s (%s:%d:%d)\n",
+			beacon.Clean(logRedactor.Apply(f.Function), maxStackLen),
+			beacon.Clean(logRedactor.Apply(filename), maxStackLen),
+			f.Lineno,
+			f.Colno,
+		)
+		if stack.Len() >= maxStackLen {
+			break
+		}
+	}
+	return typ, beacon.Truncate(stack.String(), maxStackLen)
 }

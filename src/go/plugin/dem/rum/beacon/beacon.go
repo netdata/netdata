@@ -167,9 +167,12 @@ type SpanAttr struct {
 }
 
 type Log struct {
-	Level   string
-	Message string
-	Time    time.Time
+	// ErrorType and Stack contain only the SDK console Error context.
+	ErrorType string
+	Stack     string
+	Level     string
+	Message   string
+	Time      time.Time
 }
 
 // Reject reasons.

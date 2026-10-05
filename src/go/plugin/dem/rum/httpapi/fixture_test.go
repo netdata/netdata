@@ -11,8 +11,7 @@ import (
 
 type fixtureConfig struct {
 	config.Receiver
-	Sites              []config.Site
-	CollectConsoleLogs bool
+	Sites []config.Site
 }
 type fixtureRoutes struct {
 	mu    sync.Mutex
@@ -47,7 +46,6 @@ func (s *fixtureServer) Update(cfg *fixtureConfig) {
 	defer s.fixture.mu.Unlock()
 	s.fixture.sites = map[string]*Route{}
 	for _, sc := range cfg.Sites {
-		sc.CollectConsoleLogs = cfg.CollectConsoleLogs
 		s.fixture.sites[sc.Name] = NewRoute(sc, s.sink, diagnostics.New(sc))
 	}
 }
