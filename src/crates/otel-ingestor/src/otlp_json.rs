@@ -15,7 +15,8 @@
 //! - Omitted fields: proto3 JSON lets any field be absent (or `null`), but the
 //!   derives require the top-level `resource*` array and most fields of
 //!   exponential-histogram points, buckets, summary points, quantiles,
-//!   exemplars, `ArrayValue`/`KeyValueList` and `KeyValue.key`; an empty
+//!   exemplars, `ArrayValue`/`KeyValueList`, `KeyValue.key` and every field
+//!   of a resource's `EntityRef`; an empty
 //!   `AnyValue` (`{}`, meaning unset, or only unknown fields) is rejected.
 //! - Exemplar values: the contract puts `asInt`/`asDouble` on the exemplar
 //!   itself; the derives expect them nested under `value`.
@@ -161,12 +162,13 @@ fn from_value<T: DeserializeOwned>(root: Value) -> Result<T, String> {
 
 /// Signal-independent rewrites, applied to the whole tree: drop `null`
 /// entries (proto3 JSON's "default value"), fill the `values` of an
-/// `ArrayValue`/`KeyValueList` and the `key` of a `KeyValue` when omitted, and
-/// drop an empty `AnyValue` (`{}`, unset) where a `KeyValue` or log body holds
-/// it. An `AnyValue` naming no known kind counts as empty: receivers ignore
-/// unknown fields, so a value kind newer than this decoder is unset rather
-/// than a derive error. The `arrayValue`/`kvlistValue`/`body` keys and the attribute-list keys
-/// occur only in those messages, so matching on names is unambiguous; a
+/// `ArrayValue`/`KeyValueList`, the `key` of a `KeyValue` and the fields of
+/// an `EntityRef` when omitted, and drop an empty `AnyValue` (`{}`, unset)
+/// where a `KeyValue` or log body holds it. An `AnyValue` naming no known kind
+/// counts as empty: receivers ignore unknown fields, so a value kind newer
+/// than this decoder is unset rather than a derive error. The
+/// `arrayValue`/`kvlistValue`/`body`/`entityRefs` keys and the attribute-list
+/// keys occur only in those messages, so matching on names is unambiguous; a
 /// `value` key also names a quantile's double, so an empty `value` is dropped
 /// only inside the `KeyValue`s those lists hold.
 fn prune(value: &mut Value) {
@@ -191,6 +193,21 @@ fn prune(value: &mut Value) {
             for key in ["attributes", "filteredAttributes", "metadata"] {
                 if let Some(Value::Array(pairs)) = map.get_mut(key) {
                     pairs.iter_mut().for_each(fill_key_value);
+                }
+            }
+            // A Resource's EntityRefs: the derive requires all four fields.
+            if let Some(Value::Array(refs)) = map.get_mut("entityRefs") {
+                for entity in refs.iter_mut().filter_map(Value::as_object_mut) {
+                    for key in ["schemaUrl", "type"] {
+                        entity
+                            .entry(key)
+                            .or_insert_with(|| Value::String(String::new()));
+                    }
+                    for key in ["idKeys", "descriptionKeys"] {
+                        entity
+                            .entry(key)
+                            .or_insert_with(|| Value::Array(Vec::new()));
+                    }
                 }
             }
             if map.get("body").is_some_and(is_unset_any_value) {
@@ -659,7 +676,7 @@ fn integer(value: &Value, sign: Sign) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use opentelemetry_proto::tonic::common::v1::{
-        AnyValue, ArrayValue, KeyValue, KeyValueList, any_value,
+        AnyValue, ArrayValue, EntityRef, KeyValue, KeyValueList, any_value,
     };
     use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
     use opentelemetry_proto::tonic::metrics::v1::{
@@ -669,6 +686,7 @@ mod tests {
         exponential_histogram_data_point::Buckets, metric::Data, number_data_point,
         summary_data_point::ValueAtQuantile,
     };
+    use opentelemetry_proto::tonic::resource::v1::Resource;
     use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, span::Event};
 
     use super::*;
@@ -938,6 +956,34 @@ mod tests {
             ExportLogsServiceRequest::decode_json(br#"{"resourceLogs":null}"#).unwrap(),
             ExportLogsServiceRequest::default()
         );
+    }
+
+    #[test]
+    fn entity_refs_with_omitted_fields_decode() {
+        // proto3 JSON omits empty fields; the collector writes an EntityRef
+        // only with its non-empty fields, an all-empty one as `{}`.
+        let json = r#"{"resourceLogs":[{"resource":{"entityRefs":[
+            {"type":"host","idKeys":["host.name"]},
+            {}
+        ]},"scopeLogs":[]}]}"#;
+        let decoded = ExportLogsServiceRequest::decode_json(json.as_bytes()).unwrap();
+        let expected = ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                resource: Some(Resource {
+                    entity_refs: vec![
+                        EntityRef {
+                            r#type: "host".into(),
+                            id_keys: vec!["host.name".into()],
+                            ..Default::default()
+                        },
+                        EntityRef::default(),
+                    ],
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }],
+        };
+        assert_eq!(decoded, expected);
     }
 
     #[test]
