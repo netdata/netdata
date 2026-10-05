@@ -366,8 +366,8 @@ fn validate_tls_pairing(
 /// binds (`otel-ingestor/src/lib.rs` `run_ingestor`); each listener's TLS
 /// cert and key must come as a pair, with the CA requiring both
 /// ([`validate_tls_pairing`]); the optional `endpoint.http_path` (OTLP/HTTP
-/// listener), when enabled, carries the same host:port shape and must differ
-/// from `endpoint.grpc_path` (two listeners cannot bind one address); and each
+/// listener), when enabled, carries the same host:port shape and must not
+/// overlap `endpoint.grpc_path` (two listeners cannot bind one socket); and each
 /// signal's retention must satisfy the catalog-horizon invariant
 /// (`netdata-plugin/bridge/src/config.rs` `RetentionPolicy::validate`).
 fn validate(config: &PluginConfig) -> Result<()> {
@@ -418,8 +418,9 @@ fn validate(config: &PluginConfig) -> Result<()> {
         }
         if listeners_overlap(http_path, &config.endpoint.grpc_path) {
             anyhow::bail!(
-                "endpoint.http_path ({http_path}) must differ from endpoint.grpc_path ({}): \
-                 the OTLP/HTTP and OTLP/gRPC listeners cannot share an address and port",
+                "endpoint.http_path ({http_path}) and endpoint.grpc_path ({}) \
+                 claim the same socket: give the listeners different ports, or addresses \
+                 that do not overlap (0.0.0.0 and [::] cover every local address)",
                 config.endpoint.grpc_path
             );
         }
@@ -1340,7 +1341,7 @@ logs:
         // config load names both fields instead of surfacing a raw bind error.
         let err = resolve_with_user("endpoint:\n  http_path: '127.0.0.1:4317'\n").unwrap_err();
         let msg = format!("{err:#}");
-        assert!(msg.contains("must differ from endpoint.grpc_path"), "{msg}");
+        assert!(msg.contains("claim the same socket"), "{msg}");
         assert!(msg.contains("127.0.0.1:4317"), "{msg}");
     }
 
@@ -1350,7 +1351,7 @@ logs:
         // listener's 127.0.0.1:4318 too, though the strings differ.
         let err = resolve_with_user("endpoint:\n  grpc_path: '0.0.0.0:4318'\n").unwrap_err();
         let msg = format!("{err:#}");
-        assert!(msg.contains("must differ from endpoint.grpc_path"), "{msg}");
+        assert!(msg.contains("claim the same socket"), "{msg}");
         assert!(msg.contains("0.0.0.0:4318"), "{msg}");
     }
 
