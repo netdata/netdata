@@ -114,6 +114,10 @@ def test_generate_runtime_applies_overrides(tmp_path, monkeypatch):
     assert "[plugins]" in text and "go.d = no" in text  # new section added
 
 
+def _protocols(doc):
+    return doc["receivers"]["otlp"]["protocols"]
+
+
 def test_generate_runtime_writes_otel_yaml_with_isolated_base_dir_and_endpoint(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     rd, _conf, otlp, _http = runtime.generate_runtime("agent-o")
@@ -122,13 +126,15 @@ def test_generate_runtime_writes_otel_yaml_with_isolated_base_dir_and_endpoint(t
     # dir from it (per-agent isolation for both logs and traces).
     assert doc["base_dir"] == str(rd / "lib" / "otel")
     # endpoint auto-assigned on loopback and reported back
-    assert doc["endpoint"]["grpc_path"] == otlp
+    assert _protocols(doc)["grpc"] == {"endpoint": otlp}
     assert otlp.startswith("127.0.0.1:")
     # the OTLP/HTTP listener gets its OWN auto-assigned loopback port — never
     # the stock 4318 (a collide-and-fail-fast across parallel agents), never
     # the gRPC one
-    assert doc["endpoint"]["http_path"].startswith("127.0.0.1:")
-    assert doc["endpoint"]["http_path"] != otlp
+    http = _protocols(doc)["http"]
+    assert http["enabled"] is True
+    assert http["endpoint"].startswith("127.0.0.1:")
+    assert http["endpoint"] != otlp
     # no per-signal dirs are emitted (derived), and no tuning knobs were set
     assert "logs" not in doc
     # global storage omitted (disabled) unless configured
@@ -142,21 +148,21 @@ def test_generate_runtime_otel_http_endpoint_states(tmp_path, monkeypatch):
         "agent-h1", otel=runtime.OtelConfig(otlp_http_endpoint="127.0.0.1:4318")
     )
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
-    assert doc["endpoint"]["http_path"] == "127.0.0.1:4318"
+    assert _protocols(doc)["http"] == {"enabled": True, "endpoint": "127.0.0.1:4318"}
     assert http == "127.0.0.1:4318"
-    # "" (the tool-layer disable sentinel) serializes as http_path: null —
-    # the plugin's disable — not as an empty string or an omission — and is
+    # "" (the tool-layer disable sentinel) serializes as enabled: false — the
+    # plugin's disable — not as an empty address or an omission — and is
     # reported as None
     rd, _conf, _otlp, http = runtime.generate_runtime(
         "agent-h2", otel=runtime.OtelConfig(otlp_http_endpoint="")
     )
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
-    assert doc["endpoint"]["http_path"] is None
+    assert _protocols(doc)["http"] == {"enabled": False}
     assert http is None
     # auto-assigned: the reported endpoint is the one written
     rd, _conf, _otlp, http = runtime.generate_runtime("agent-h3")
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
-    assert http is not None and doc["endpoint"]["http_path"] == http
+    assert http is not None and _protocols(doc)["http"]["endpoint"] == http
 
 
 def test_generate_runtime_auto_ports_never_collide(tmp_path, monkeypatch):
@@ -169,7 +175,7 @@ def test_generate_runtime_auto_ports_never_collide(tmp_path, monkeypatch):
     rd, _conf, otlp, http = runtime.generate_runtime("agent-ports", reserved_ports=(5000,))
     assert (otlp, http) == ("127.0.0.1:6000", "127.0.0.1:7000")
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
-    assert (doc["endpoint"]["grpc_path"], doc["endpoint"]["http_path"]) == (otlp, http)
+    assert (_protocols(doc)["grpc"]["endpoint"], _protocols(doc)["http"]["endpoint"]) == (otlp, http)
     # a pinned gRPC endpoint is avoided too
     picks = iter([4317, 8000])
     rd, _conf, otlp, http = runtime.generate_runtime(
@@ -285,7 +291,7 @@ def test_generate_runtime_otel_emits_only_set_knobs(tmp_path, monkeypatch):
     rd, _conf, otlp, _http = runtime.generate_runtime("agent-k", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert otlp == "127.0.0.1:4317"  # caller endpoint wins over auto-assign
-    assert doc["endpoint"]["grpc_path"] == "127.0.0.1:4317"
+    assert _protocols(doc)["grpc"]["endpoint"] == "127.0.0.1:4317"
     # tuning lands flat under logs.* — the plugin's public schema (no dirs,
     # no wal/index nesting)
     assert doc["logs"]["rotation"]["default"] == {"max_entries": 10}
@@ -397,46 +403,67 @@ def test_generate_runtime_otel_extra_yaml_deep_merges_and_wins(tmp_path, monkeyp
 
 def test_generate_runtime_otel_extra_yaml_cannot_override_pins(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    # base_dir and both endpoint addresses are harness isolation invariants:
-    # the passthrough must not escape the per-agent run dir, lie about the
-    # reported OTLP endpoint, or smuggle in an undeclared HTTP bind.
+    # base_dir, both endpoint addresses and the HTTP enabled flag are harness
+    # isolation invariants: the passthrough must not escape the per-agent run
+    # dir, lie about the reported OTLP endpoints, or smuggle in an undeclared
+    # HTTP bind.
     cfg = runtime.OtelConfig(
         extra_yaml=(
             "base_dir: /tmp/escape\n"
             "endpoint:\n"
             '  path: "1.2.3.4:0"\n'
-            '  grpc_path: "1.2.3.4:1"\n'
-            '  http_path: "1.2.3.4:2"\n'
-            "  grpc_tls_cert_path: /x.pem\n"
-            "  http_tls_cert_path: /y.pem\n"
+            "receivers:\n"
+            "  otlp:\n"
+            "    protocols:\n"
+            "      grpc:\n"
+            '        endpoint: "1.2.3.4:1"\n'
+            "        enabled: false\n"
+            "        tls: {cert_file: /x.pem}\n"
+            "      http:\n"
+            '        endpoint: "1.2.3.4:2"\n'
+            "        enabled: false\n"
+            "        tls: {cert_file: /y.pem}\n"
         )
     )
-    rd, _conf, otlp, _http = runtime.generate_runtime("agent-pin", otel=cfg)
+    rd, _conf, otlp, http = runtime.generate_runtime("agent-pin", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert doc["base_dir"] == str(rd / "lib" / "otel")
-    assert doc["endpoint"]["grpc_path"] == otlp
-    # The deprecated name is dropped too: the plugin refuses both names.
-    assert "path" not in doc["endpoint"]
-    # http_path re-pinned to the auto-assigned address, not the override
-    assert doc["endpoint"]["http_path"].startswith("127.0.0.1:")
-    assert doc["endpoint"]["http_path"] != otlp
-    # Non-pinned endpoint siblings (either listener's TLS) still pass through.
-    assert doc["endpoint"]["grpc_tls_cert_path"] == "/x.pem"
-    assert doc["endpoint"]["http_tls_cert_path"] == "/y.pem"
+    protocols = _protocols(doc)
+    # Endpoints and the HTTP enabled flag are re-pinned to the harness values.
+    assert protocols["grpc"]["endpoint"] == otlp
+    assert protocols["http"]["endpoint"] == http
+    assert protocols["http"]["enabled"] is True
+    assert http.startswith("127.0.0.1:") and http != otlp
+    # Everything else passes through: gRPC's enabled flag (HTTP-only tests),
+    # either listener's TLS, and the deprecated endpoint block (the plugin
+    # warns and uses the pinned receivers value).
+    assert protocols["grpc"]["enabled"] is False
+    assert protocols["grpc"]["tls"] == {"cert_file": "/x.pem"}
+    assert protocols["http"]["tls"] == {"cert_file": "/y.pem"}
+    assert doc["endpoint"] == {"path": "1.2.3.4:0"}
 
 
-def test_generate_runtime_otel_extra_yaml_pins_survive_non_mapping_endpoint(tmp_path, monkeypatch):
+def test_generate_runtime_otel_extra_yaml_pins_survive_non_mapping_receivers(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    # The re-pin must hold even when the passthrough replaces `endpoint` with
-    # something that is not a mapping (the isinstance fallback branch). The
-    # HTTP listener is disabled here so the expected endpoint is exactly the
-    # two pins (a disable must also survive the passthrough).
-    for evil in ("endpoint: null\n", "endpoint: 42\n", "endpoint: [1, 2]\n", "base_dir: null\nendpoint: null\n"):
+    # The re-pin must hold even when the passthrough replaces a level of
+    # receivers.otlp.protocols with something that is not a mapping. The HTTP
+    # listener is disabled here so the expected section is exactly the pins
+    # (a disable must also survive the passthrough).
+    for evil in (
+        "receivers: null\n",
+        "receivers: 42\n",
+        "receivers: {otlp: [1, 2]}\n",
+        "receivers: {otlp: {protocols: x}}\n",
+        "receivers: {otlp: {protocols: {grpc: 1, http: null}}}\n",
+        "base_dir: null\nreceivers: null\n",
+    ):
         cfg = runtime.OtelConfig(otlp_http_endpoint="", extra_yaml=evil)
         rd, _conf, otlp, _http = runtime.generate_runtime("agent-nd", otel=cfg)
         doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
         assert doc["base_dir"] == str(rd / "lib" / "otel"), evil
-        assert doc["endpoint"] == {"grpc_path": otlp, "http_path": None}, evil
+        assert doc["receivers"] == {
+            "otlp": {"protocols": {"grpc": {"endpoint": otlp}, "http": {"enabled": False}}}
+        }, evil
 
 
 def test_generate_runtime_otel_extra_yaml_rejects_invalid_yaml(tmp_path, monkeypatch):

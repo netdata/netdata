@@ -67,7 +67,7 @@ _HttpEndpoint = Annotated[
         description=(
             "OTLP/HTTP listen address 'ip:port' (e.g. '127.0.0.1:4318'). Omit to "
             "auto-assign a free loopback port; pass the EMPTY STRING '' to disable "
-            "the HTTP listener (writes http_path: null); any other value must be "
+            "the HTTP listener (writes its enabled: false); any other value must be "
             "'ip:port', and is refused on the agent's declared web port (127.0.0.1 "
             "or a wildcard address)."
         )
@@ -110,7 +110,7 @@ _ExtraYaml = Annotated[
             "per-tenant rotation/retention override blocks, remote_storage.startup_op_timeout, "
             "remote_storage.read_cache_max_size (the download cache both signals share) — "
             "and deliberately-unknown keys for strict-config refuse-to-start tests. "
-            "base_dir, endpoint.grpc_path, and endpoint.http_path stay pinned for "
+            "base_dir, both listener endpoints, and the HTTP listener's enabled flag stay pinned for "
             "per-agent isolation and cannot be overridden. SHARP TOOL: a semantically invalid config keeps "
             "the otel plugin down until reconfigured (check netdata_agent_logs "
             "component='supervisor'/'ledger' for the refusal) — that failure mode is "
@@ -155,12 +155,12 @@ def register(mcp: FastMCP) -> None:
             "rotation/retention knobs to force multi-file / eviction edge cases over a "
             "known corpus — set traces_* (e.g. traces_rotation_max_entries=10) so a "
             "small trace corpus seals without a restart. otlp_http_endpoint sets the "
-            "OTLP/HTTP listener (endpoint.http_path): omit to auto-assign a free "
+            "OTLP/HTTP listener (receivers.otlp.protocols.http): omit to auto-assign a free "
             "loopback port, '' to disable it, 'ip:port' to pin it. For knobs without a "
             "first-class param (auth, ingest windows, retention max_age/horizon, "
             "per-tenant overrides) or for strict-config refusal tests, pass a raw "
             "YAML mapping via extra_yaml — it deep-merges over the generated file "
-            "and wins on conflicts (base_dir/endpoint.grpc_path/http_path stay pinned)."
+            "and wins on conflicts (base_dir and the listener endpoints stay pinned)."
         ),
     )
     async def netdata_agent_otel_config(
@@ -195,7 +195,7 @@ def register(mcp: FastMCP) -> None:
             err = _endpoint_error(agent_id, otlp_endpoint)
             if err is not None:
                 return err
-        # "" is the disable sentinel (http_path: null), not a malformed address —
+        # "" is the disable sentinel (enabled: false), not a malformed address —
         # everything else must be a valid ip:port.
         if otlp_http_endpoint not in (None, ""):
             err = _endpoint_error(agent_id, otlp_http_endpoint, name="otlp_http_endpoint")

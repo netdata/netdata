@@ -185,8 +185,8 @@ class OtelConfig:
     so parallel agents never collide on the stock 4317/4318 — the plugin fails
     fast on an occupied port. The local storage layout is derived from a
     single ``base_dir`` that is always pinned under the run dir for per-agent
-    isolation (re-pinned after the ``extra_yaml`` merge, alongside
-    ``endpoint.grpc_path`` and ``endpoint.http_path``). Caller-supplied paths do
+    isolation (re-pinned after the ``extra_yaml`` merge, alongside both
+    listener endpoints and the HTTP listener's ``enabled``). Caller-supplied paths do
     exist beyond the pin: ``remote_storage_uri``, ``journal_dir``, and whatever
     ``extra_yaml`` reaches — the server is a localhost-only developer tool, so
     the caller is trusted. The rotation/retention knobs are the edge-case
@@ -195,8 +195,8 @@ class OtelConfig:
     viewer's fixture).
     """
 
-    otlp_endpoint: str | None = None          # endpoint.grpc_path; None → auto free loopback port
-    otlp_http_endpoint: str | None = None     # endpoint.http_path; None → auto free loopback port, "" → null (disable)
+    otlp_endpoint: str | None = None          # receivers.otlp.protocols.grpc.endpoint; None → auto free loopback port
+    otlp_http_endpoint: str | None = None     # receivers.otlp.protocols.http.endpoint; None → auto free loopback port, "" → enabled: false
     # Per-signal tuning (dirs are derived from base_dir, not set here). Each
     # signal has an independent set; an omitted knob keeps the plugin's stock
     # default for that signal. logs.* and traces.* are symmetric.
@@ -224,8 +224,9 @@ class OtelConfig:
     # value replaces). Reaches knobs without first-class fields (auth, ingest
     # windows, retention max_age/horizon, catalog rotation_period, per-tenant
     # override blocks, startup_op_timeout) and deliberately-invalid keys for
-    # strict-config refusal tests. base_dir, endpoint.grpc_path, and endpoint.http_path
-    # stay pinned (the harness' per-agent isolation invariants) — see _otel_doc.
+    # strict-config refusal tests. base_dir, both listener endpoints, and the HTTP
+    # listener's enabled flag stay pinned (the harness' per-agent isolation
+    # invariants) — see _otel_doc.
     # Validated as parseable YAML at the tool boundary; a semantically bad config
     # surfaces as the plugin's own refuse-to-start (that IS the test).
     extra_yaml: str | None = None
@@ -302,7 +303,7 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint:
     download cache ``{base_dir}/remote-read``, ``{base_dir}/shared/seq_highwater``)
     lands in isolation — one pin isolates both signals. ``otlp_http_endpoint``
     arrives already resolved (a host:port string, or ``None``/``""`` which both
-    serialize to ``http_path: null`` — the plugin's disable).
+    serialize to the HTTP listener's ``enabled: false``).
     """
     base_dir = str(rd / "lib" / "otel")
 
@@ -350,10 +351,8 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint:
     if cfg.journal_dir:
         logs["journal_dir"] = cfg.journal_dir
 
-    doc: dict = {
-        "endpoint": {"grpc_path": otlp_endpoint, "http_path": otlp_http_endpoint or None},
-        "base_dir": base_dir,
-    }
+    # receivers is filled by the pin below (it must also survive extra_yaml).
+    doc: dict = {"receivers": {}, "base_dir": base_dir}
     if remote_storage:
         doc["remote_storage"] = remote_storage
     if logs:
@@ -362,11 +361,14 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint:
         doc["traces"] = traces
 
     # Raw-YAML escape hatch (see OtelConfig.extra_yaml): deep-merge the caller's
-    # mapping over the generated doc — passthrough wins — then RE-PIN base_dir
-    # and both endpoint addresses. Those are harness invariants (per-agent
-    # isolation; the reported OTLP endpoint; no undeclared 4318 bind), not
-    # plugin knobs to reach; everything else, including keys the plugin will
-    # refuse, passes through untouched.
+    # mapping over the generated doc — passthrough wins — then RE-PIN base_dir,
+    # both listener endpoints and the HTTP listener's enabled flag. Those are
+    # harness invariants (per-agent isolation; the reported OTLP endpoints; no
+    # undeclared 4318 bind), not plugin knobs to reach; everything else,
+    # including keys the plugin will refuse, passes through untouched. That
+    # covers grpc.enabled (an HTTP-only plugin), every tls key, and a
+    # deprecated `endpoint:` block (the plugin warns and the pinned
+    # receivers.* value wins).
     if cfg.extra_yaml:
         try:
             extra = yaml.safe_load(cfg.extra_yaml)
@@ -379,18 +381,21 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint:
                 )
             doc = _deep_merge(doc, extra)
             doc["base_dir"] = base_dir
-            doc.setdefault("endpoint", {})
-            if isinstance(doc["endpoint"], dict):
-                # `path` is the deprecated name of grpc_path; the plugin
-                # refuses a file setting both, and the pin must win anyway.
-                doc["endpoint"].pop("path", None)
-                doc["endpoint"]["grpc_path"] = otlp_endpoint
-                doc["endpoint"]["http_path"] = otlp_http_endpoint or None
-            else:
-                doc["endpoint"] = {
-                    "grpc_path": otlp_endpoint,
-                    "http_path": otlp_http_endpoint or None,
-                }
+
+    protocols = doc
+    for key in ("receivers", "otlp", "protocols"):
+        if not isinstance(protocols.get(key), dict):
+            protocols[key] = {}
+        protocols = protocols[key]
+    for key in ("grpc", "http"):
+        if not isinstance(protocols.get(key), dict):
+            protocols[key] = {}
+    protocols["grpc"]["endpoint"] = otlp_endpoint
+    if otlp_http_endpoint:
+        protocols["http"]["enabled"] = True
+        protocols["http"]["endpoint"] = otlp_http_endpoint
+    else:
+        protocols["http"]["enabled"] = False
     return doc
 
 
