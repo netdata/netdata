@@ -90,3 +90,12 @@ func TestCaptureRedactsBeforeBounds(t *testing.T) {
 	require.Len(t, b.Events, 1)
 	assert.Equal(t, strings.Repeat("x", maxNameLen-3)+"[RE", b.Events[0].Name)
 }
+
+func TestCaptureSpanAttributeSemanticsPrecedeKeyRedaction(t *testing.T) {
+	raw := []byte(`{"traces":{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"1234567890abcdef1234567890abcdef","spanId":"1234567890abcdef","startTimeUnixNano":"1","endTimeUnixNano":"2","attributes":[{"key":"url.full","value":{"stringValue":"https://user:password@example.org/api?private=value#fragment"}}]}]}]}]}}`)
+	b, err := Decode(raw, Options{Now: now, Tracing: true, Redactor: redact.NewRedactor("url.full")})
+	require.NoError(t, err)
+	require.Len(t, b.Spans, 1)
+	require.Len(t, b.Spans[0].Attrs, 1)
+	assert.Equal(t, "https://example.org/api", b.Spans[0].Attrs[0].Str)
+}

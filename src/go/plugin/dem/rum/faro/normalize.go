@@ -4,6 +4,7 @@ package faro
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
@@ -85,4 +86,27 @@ func keepEventAttr(kind beacon.EventKind, name, key string) bool {
 	default:
 		return beacon.IsFrustration(name) && key == "target"
 	}
+}
+
+// Numeric protocol values are measurements, not free text. Interpret each field
+// by its original key, before custom-key redaction can change that meaning.
+func (o Options) eventAttr(kind beacon.EventKind, key, value string) string {
+	if kind == beacon.EventResource && key == "name" {
+		return o.url(value, maxAttrLen)
+	}
+	numeric := false
+	switch kind {
+	case beacon.EventNavigation:
+		numeric = key == "pageLoadTime" || key == "domContentLoadHandlerTime"
+	case beacon.EventResource:
+		numeric = key == "duration" || key == "transferSize"
+	case beacon.EventRequest:
+		numeric = key == "http.response.status_code" || key == "duration_ns"
+	}
+	if numeric {
+		if _, err := strconv.ParseFloat(value, 64); err == nil {
+			return beacon.Clean(value, maxAttrLen)
+		}
+	}
+	return o.cleanAttr(key, value)
 }

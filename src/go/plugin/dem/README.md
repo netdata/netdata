@@ -71,7 +71,7 @@ or entered form values. Unsupported SDK metadata is removed before transmission 
 | Evidence | Browser/native capture | Live and measurements | Retained native history | Optional export |
 |---|---|---|---|---|
 | Core activity, vitals, timings and errors | Enabled for collected sessions | Relevant measurements and live entries | Selected investigation entries | Supported event logs; request spans only with tracing |
-| Application user ID | Explicit `setUser` ID only | Original ID on attributed activity | Original per-event ID and every observed ID for session lookup | Original ID on supported records |
+| Application user ID | Explicit `setUser` ID only | No live-feed field or measurement dimension | Per-event ID in pending/retained timelines; observed retained IDs for session lookup | No automatic ID export |
 | Country | Receiver IP lookup; default `capture.geolocation: country` | Country comparisons | Country on retained entries | Country on supported records |
 | Approximate city and coordinates | Only `capture.geolocation: city` | City and map markers | No city or coordinates | No city or coordinates |
 | Rage, dead and error clicks | Only `capture.frustration_signals: true` | Heuristic counts and activity; absent when disabled | Selected heuristic entries | Selected events when event logs are enabled |
@@ -94,7 +94,7 @@ normalization as other diagnostic strings; numeric and UUID IDs are not generali
 logout and user changes; session lookup matches every observed retained ID within the selected saved-time range.
 User names, email fields and arbitrary user attributes are not part of this identity contract.
 
-URLs lose query strings, fragments and credentials; path grouping and configured `redact_paths` rules normalize
+Recognized structured URL fields lose query strings, fragments and credentials; path grouping and configured `redact_paths` rules normalize
 supported URL paths. Targeted text transformations apply to diagnostic strings before grouping, history and export.
 These limited transformations are not a general anonymization, data-loss-prevention or consent system: application IDs,
 error text, selectors and explicitly exported attributes can still be identifying. Choose application instrumentation

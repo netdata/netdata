@@ -58,3 +58,37 @@ func TestCaptureGeolocationAtReceiver(t *testing.T) {
 		})
 	}
 }
+
+func TestCaptureCredentialRedactionPreservesProtocolSemantics(t *testing.T) {
+	body := `{"meta":{"session":{"id":"session"},"page":{"url":"https://shop.example.com/"}},"events":[
+	 {"name":"faro.performance.navigation","attributes":{"pageLoadTime":"1000","domContentLoadHandlerTime":"10"}},
+	 {"name":"faro.performance.resource","attributes":{"name":"app.js?private=value#fragment","httpHost":"cdn.example.com","duration":"1000","transferSize":"1000","initiatorType":"fetch"}},
+	 {"name":"faro.tracing.fetch","attributes":{"url.full":"https://user:password@api.example.com/api?private=value#fragment","http.request.method":"POST","http.response.status_code":"200","duration_ns":"1000"}},
+	 {"name":"rage_click","attributes":{"target":"button#pay"}}
+	]}`
+	for _, token := range []string{"unrelated-token", "resource", "duration", "1000", "rage_click", "url.full"} {
+		t.Run(token, func(t *testing.T) {
+			cfg := testCfg()
+			cfg.Sites[0].EventLogs = &config.EventLogs{Destination: config.Destination{AuthToken: token}}
+			sink := newRecSink()
+			handler := newFixture(cfg, sink, nil).Handler()
+			req := httptest.NewRequest(http.MethodPost, "/rum/shop/collect", strings.NewReader(body))
+			req.Header.Set("Origin", "https://shop.example.com")
+			req.Header.Set("User-Agent", browserUA)
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, req)
+			require.Equal(t, http.StatusAccepted, response.Code)
+			require.Len(t, sink.ingested, 1)
+			b := sink.ingested[0]
+			require.NotNil(t, b.Navigation)
+			assert.Equal(t, float64(1000), b.Navigation.LoadMS)
+			require.Len(t, b.Resources, 1)
+			assert.Equal(t, float64(1000), b.Resources[0].DurationMS)
+			assert.Equal(t, float64(1000), b.Resources[0].TransferB)
+			require.Len(t, b.Events, 3, "disabled frustration must not become a generic event")
+			assert.Equal(t, "app.js", b.Events[1].Attrs["name"])
+			assert.Equal(t, "https://api.example.com/api", b.Events[2].Attrs["url.full"])
+			assert.Equal(t, "1000", b.Events[2].Attrs["duration_ns"])
+		})
+	}
+}

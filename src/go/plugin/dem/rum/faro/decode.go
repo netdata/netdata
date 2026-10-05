@@ -231,25 +231,35 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 		if i >= maxItems {
 			break
 		}
-		name := opt.text(ev.Name, maxNameLen)
+		// Classification uses protocol names, before free-text transformation.
+		name := beacon.Clean(ev.Name, len(ev.Name))
 		if name == "" || name == "securitypolicyviolation" || name == "faro.user.action" || (beacon.IsFrustration(name) && !opt.FrustrationSignals) {
 			continue
 		}
 		kind := eventKind(name)
+		if kind == beacon.EventCustom && !beacon.IsFrustration(name) {
+			name = opt.text(ev.Name, maxNameLen)
+		}
 		var attrs map[string]string
 		if len(ev.Attributes) > 0 {
 			for k, v := range ev.Attributes {
 				if len(attrs) >= maxEventAttrs {
 					break
 				}
-				if !opt.EventLogs && !keepEventAttr(kind, name, k) {
+				nativeAttr := keepEventAttr(kind, name, k)
+				if !opt.EventLogs && !nativeAttr {
 					continue
 				}
-				if k = opt.text(k, maxNameLen); k != "" {
+				value := opt.eventAttr(kind, k, v)
+				// Known keys carry protocol semantics; custom keys are diagnostic text.
+				if !nativeAttr {
+					k = opt.text(k, maxNameLen)
+				}
+				if k != "" {
 					if attrs == nil {
 						attrs = make(map[string]string, min(len(ev.Attributes), maxEventAttrs))
 					}
-					attrs[k] = opt.cleanAttr(k, v)
+					attrs[k] = value
 				}
 			}
 		}
