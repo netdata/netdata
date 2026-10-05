@@ -1,14 +1,18 @@
 # Logs Management
 
-Netdata manages logs in a mix of distributed and centralized ways. It uses the indexed log databases each operating
-system already maintains — on every node, and on the OS-native log centralization points you already run — and adds
-its own indexed log store, with transparent offloading to object storage, for the logs you choose to
-centralize. Every event stays queryable from the same interface, and you control what logs cost by deciding where each
-source is stored and for how long, instead of filtering or discarding logs to fit a budget. See
-[Log Storage and Retention](/docs/logs/log-storage-and-retention.md).
+Netdata manages logs in a mix of distributed and centralized ways. It uses the
+indexed log databases each operating system already maintains — on every node,
+and on the OS-native log centralization points you already run — and adds its
+own indexed log store, with transparent offloading to object storage, for the
+logs you choose to centralize. Every event stays queryable from the same
+interface, and you control what logs cost by deciding where each source is
+stored and for how long, instead of filtering or discarding logs to fit a
+budget. See [Log Storage and
+Retention](/docs/logs/log-storage-and-retention.md).
 
-A node with Netdata installed is a complete setup: its logs are searchable and streaming live in the Logs tab, with
-nothing to configure and no additional storage. Centralization is a per-source decision you take for the sources that
+A node with Netdata installed is a complete setup: its logs are searchable and
+streaming live in the Logs tab, with nothing to configure and no additional
+storage. Centralization is a per-source decision you take for the sources that
 need it.
 
 ## Where logs live
@@ -20,12 +24,14 @@ need it.
 | **Journals written by Netdata** | Journal-compatible files that Netdata itself writes for SNMP traps and network flows, on the node that receives them; no `systemd-journald` involved | The same indexing and querying as any journal; readable with `journalctl` and by SIEM agents on Linux | Configure the SNMP trap or network flow collector |
 | **Centralized with OpenTelemetry** | Netdata's own indexed log store on the receiving node: size and age retention, optional offloading to S3-compatible object storage with transparent read-back | Storage that outlives the sending nodes, retention beyond a node's disk, and the same interface | Point an OpenTelemetry Collector at Netdata's OTLP endpoint |
 
-The OS-native tiers add no storage and no pipeline: Netdata reads the logs where the operating system writes them, and
-the operating system's own tools keep working on the same data. The journals Netdata writes for SNMP traps and network
-flows use the systemd journal file format without requiring systemd: Netdata reads them on every platform it writes
-them on, and on Linux `journalctl` (systemd 252 or later) and SIEM agents read the same files. The OpenTelemetry tier
-is for the logs that must survive their source, need retention beyond the node's disk, or come from platforms without
-an OS log store, such as Kubernetes.
+The OS-native tiers add no storage and no pipeline: Netdata reads the logs where
+the operating system writes them, and the operating system's own tools keep
+working on the same data. The journals Netdata writes for SNMP traps and network
+flows use the systemd journal file format without requiring systemd: Netdata
+reads them on every platform it writes them on, and on Linux `journalctl`
+(systemd 252 or later) and SIEM agents read the same files. The OpenTelemetry
+tier is for the logs that must survive their source, need retention beyond the
+node's disk, or come from platforms without an OS log store, such as Kubernetes.
 
 ## Decide per source
 
@@ -40,8 +46,9 @@ an OS log store, such as Kubernetes.
 | Network devices sending SNMP traps, NetFlow, sFlow, or IPFIX | Netdata receives them directly and writes journal-compatible files on the receiving node; see [SNMP Trap Logs](/docs/logs/snmp-trap-logs.md) and [Network Flows](/docs/logs/network-flows.md). |
 | macOS | In place. macOS has no OS-native log forwarding; to centralize, use the [OpenTelemetry Collector's macOS receiver](/docs/opentelemetry/logs-collection.md#macos-unified-log). |
 
-Any mix works. Centralization points do not need to be infrastructure-wide: run one per team, environment, or
-datacenter, sized for its own volume, and keep critical systems' logs local. Netdata Cloud presents every node and every
+Any mix works. Centralization points do not need to be infrastructure-wide: run
+one per team, environment, or datacenter, sized for its own volume, and keep
+critical systems' logs local. Netdata Cloud presents every node and every
 centralization point in one dashboard with one role-based access model.
 
 ## Log sources
@@ -59,48 +66,63 @@ centralization point in one dashboard with one role-based access model.
 
 ## One interface for every source
 
-All log sources share the Logs tab (network flows have their own view): field filters with live counters, full-text search, per-field histograms, live tail,
-and the node's per-second metrics on the same dashboard, so you read an event next to the exact moment a metric
-changed. Netdata Cloud brings every node and centralization point into one dashboard with role-based access, so
-reading production logs does not require shell access to production systems. See
+All log sources share the Logs tab (network flows have their own view): field
+filters with live counters, full-text search, per-field histograms, live tail,
+and the node's per-second metrics on the same dashboard, so you read an event
+next to the exact moment a metric changed. Netdata Cloud brings every node and
+centralization point into one dashboard with role-based access, so reading
+production logs does not require shell access to production systems. See
 [Managing Logs](/docs/dashboards-and-charts/logs-tab.md).
 
-Log content stays in your infrastructure. Viewing logs requires signing in with Netdata Cloud, which is free for
-community use; the content is transmitted encrypted to your browser and is not stored in Netdata Cloud. For full data
-sovereignty, [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md)
+Log content stays in your infrastructure. Viewing logs requires signing in with
+Netdata Cloud, which is free for community use; the content is transmitted
+encrypted to your browser and is not stored in Netdata Cloud. For full data
+sovereignty, [Netdata Cloud
+On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md)
 runs the same service inside your own infrastructure.
 
 ## Current limitations
 
-- **A query runs against one node or centralization point at a time.** Netdata Cloud presents all of them; you select
-  which one to query.
-- **Alerts are evaluated on metrics, not on log content.** To alert on a log pattern, derive a metric from it, for
-  example with [logs-to-metrics](/docs/opentelemetry/logs-to-metrics.md), and alert on that metric.
-- **macOS has no OS-native log forwarding.** Centralize macOS logs through the OpenTelemetry Collector.
+- **A query runs against one node or centralization point at a time.** Netdata
+  Cloud presents all of them; you select which one to query.
+- **Alerts are evaluated on metrics, not on log content.** To alert on a log
+  pattern, derive a metric from it, for example with
+  [logs-to-metrics](/docs/opentelemetry/logs-to-metrics.md), and alert on that
+  metric.
+- **macOS has no OS-native log forwarding.** Centralize macOS logs through the
+  OpenTelemetry Collector.
 
 ## In this section
 
-- [Managing Logs](/docs/dashboards-and-charts/logs-tab.md) — how logs are organized, queried, and explored: sources,
-  filters, full-text search, histograms, live tail, and query behavior at scale.
-- [Systemd Journal Logs](/src/collectors/systemd-journal.plugin/README.md) — the journal reference,
-  [Forward Secure Sealing](/src/collectors/systemd-journal.plugin/forward_secure_sealing.md), and
-  [Logs Centralization Points](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md)
+- [Managing Logs](/docs/dashboards-and-charts/logs-tab.md) — how logs are
+  organized, queried, and explored: sources, filters, full-text search,
+  histograms, live tail, and query behavior at scale.
+- [Systemd Journal Logs](/src/collectors/systemd-journal.plugin/README.md) — the
+  journal reference, [Forward Secure
+  Sealing](/src/collectors/systemd-journal.plugin/forward_secure_sealing.md),
+  and [Logs Centralization
+  Points](/docs/observability-centralization-points/logs-centralization-points-with-systemd-journald/README.md)
   for environments that already aggregate journals.
-- [Windows Event Logs](/src/collectors/windows-events.plugin/README.md) — event channels on nodes and on Windows
-  Event Collectors.
-- [macOS Unified Logs](/src/collectors/macos-logs.plugin/README.md) — the unified log store on macOS nodes.
-- [Text Files to Journals](/docs/logs/text-files-to-journals.md) — application log files, with
-  [log2journal](/src/collectors/log2journal/README.md) and
+- [Windows Event Logs](/src/collectors/windows-events.plugin/README.md) — event
+  channels on nodes and on Windows Event Collectors.
+- [macOS Unified Logs](/src/collectors/macos-logs.plugin/README.md) — the
+  unified log store on macOS nodes.
+- [Text Files to Journals](/docs/logs/text-files-to-journals.md) — application
+  log files, with [log2journal](/src/collectors/log2journal/README.md) and
   [systemd-cat-native](/src/libnetdata/log/systemd-cat-native.md).
-- [Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md) — which sources to
-  centralize and what to set up; the Collector recipes live in the OpenTelemetry pages.
-- [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) — retention settings per tier, offloading to
-  object storage, and sizing.
-- [SNMP Trap Logs](/docs/logs/snmp-trap-logs.md) and [Network Flows](/docs/logs/network-flows.md) — the journals
-  Netdata writes for network devices.
+- [Centralizing Logs with
+  OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md) — which
+  sources to centralize and what to set up; the Collector recipes live in the
+  OpenTelemetry pages.
+- [Log Storage and Retention](/docs/logs/log-storage-and-retention.md) —
+  retention settings per tier, offloading to object storage, and sizing.
+- [SNMP Trap Logs](/docs/logs/snmp-trap-logs.md) and [Network
+  Flows](/docs/logs/network-flows.md) — the journals Netdata writes for network
+  devices.
 - Integrations — the per-source integration cards.
-- Related: the OpenTelemetry section — [OTLP ingestion](/docs/opentelemetry/otlp-ingestion.md),
-  [logs collection](/docs/opentelemetry/logs-collection.md),
+- Related: the OpenTelemetry section — [OTLP
+  ingestion](/docs/opentelemetry/otlp-ingestion.md), [logs
+  collection](/docs/opentelemetry/logs-collection.md),
   [transformations](/docs/opentelemetry/transformations.md),
   [logs-to-metrics](/docs/opentelemetry/logs-to-metrics.md), and the
   [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md).
