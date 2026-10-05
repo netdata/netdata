@@ -402,6 +402,7 @@ prepare_cmake_options() {
   enable_feature PLUGIN_APPS "${ENABLE_APPS:-1}"
   enable_feature PLUGIN_NETFLOW "${ENABLE_NETFLOW:-0}"
   enable_feature PLUGIN_OTEL "${ENABLE_OTEL:-0}"
+  enable_feature PLUGIN_OTELCOLPOC "${ENABLE_OTELCOLPOC:-0}"
   enable_feature PLUGIN_IBM "${ENABLE_IBM:-0}"
   enable_feature PLUGIN_SCRIPTS "${ENABLE_SCRIPTS:-0}"
   enable_feature PLUGIN_STATSD "${ENABLE_STATSD:-0}"

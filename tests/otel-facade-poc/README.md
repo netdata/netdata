@@ -5,7 +5,7 @@ templates and generates ordinary OpenTelemetry pipelines behind them. It uses
 real plugins.d DynCfg commands and exports metrics and logs to Netdata's existing
 OTLP/gRPC plugin. It requires neither CollectorV2 nor a custom chart converter.
 
-The implementation is experimental and deliberately outside production packaging.
+The implementation is experimental and disabled in default builds.
 It uses released OTel 0.157.0 components, with stable API modules at 1.63.0.
 
 ```mermaid
@@ -32,6 +32,7 @@ make test          # controller/provider race tests and go vet
 make integration   # build with OCB, then test the actual executable
 make agent-smoke   # Linux build plus an isolated real Netdata Docker Agent
 make linux-amd64   # Linux x86-64 binary and plugins.d launcher for a VM
+make installer-test # source-installer flag tests (Python 3, CMake, Make)
 ```
 
 `agent-smoke` also needs Python 3 and Docker. Its Linux binary uses the build
@@ -46,7 +47,40 @@ receivers, file storage, resource processing, and the standard OTLP exporter.
 The environment provider is included because the Collector CLI uses `env` as its
 default scheme even when `--config=netdata:local` is explicit.
 
-## Install the POC on a Linux x86-64 VM
+## Build and install the branch on Linux
+
+From the root of this branch's checkout, use the normal source installer:
+
+```sh
+sudo ./netdata-installer.sh --enable-plugin-otelcolpoc --enable-plugin-otel
+```
+
+Use the usual Netdata source-build prerequisites, plus Go 1.27+ and the Rust
+toolchain required by `src/crates/Cargo.toml` for the OTLP plugin. The installer
+checks/provisions Go; on Linux install Rust before running it and ensure `cargo`
+is visible to the installer. Network access is needed for Go modules and Rust
+crates. On an x86-64 Linux VM this builds native Linux x86-64 binaries.
+
+`--enable-plugin-otelcolpoc` builds the OCB distribution and installs
+`otel-facade` plus `otel-facade.plugin` into `usr/libexec/netdata/plugins.d`
+under the installation prefix. `--enable-plugin-otel` builds Netdata's OTLP
+receiver, which the facade exports to. The flags are independent: omit the
+second if the receiver is already available or an external endpoint is used.
+No manual file copying or Collector YAML is needed. The installer starts or
+restarts Netdata unless `--dont-start-it` is passed.
+
+The corresponding CMake option is `-DENABLE_PLUGIN_OTELCOLPOC=ON`; generated
+Collector sources and binaries stay under the CMake build directory's
+`otelcolpoc/collector/`. `--disable-plugin-otelcolpoc` (the default) skips building
+and installing it; it does not uninstall a previous copy. Disable an installed
+facade with `otel-facade = no` in `[plugins]` if needed.
+
+If a previous test installed the launcher into `custom-plugins.d`, keep only
+one copy in the plugin search path when switching to the source installer.
+Existing explicit `otel-facade = no` or `otel = no` settings in `[plugins]`
+must be changed to `yes` to run the plugins.
+
+## Copy a prebuilt POC to a Linux x86-64 VM
 
 Build and copy **both** files:
 

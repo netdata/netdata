@@ -1,4 +1,4 @@
-.PHONY: build test integration linux linux-amd64 agent-smoke
+.PHONY: build test integration linux linux-amd64 agent-smoke installer-test
 
 IMAGE ?= netdata/netdata:edge
 
@@ -9,6 +9,9 @@ build:
 test:
 	go test -race ./...
 	go vet ./...
+
+installer-test:
+	python3 installer_test.py -v
 
 integration: build
 	OTEL_POC_BINARY="$(CURDIR)/.build/collector/otel-facade" go test -race -count=1 -run TestDistribution ./...
