@@ -25,9 +25,9 @@ modules:
         method_description: |
           It connects to the Docker instance via a TCP or UNIX socket and executes the following commands:
           
-          - [System info](https://docs.docker.com/engine/api/v1.43/#tag/System/operation/SystemInfo).
-          - [List images](https://docs.docker.com/engine/api/v1.43/#tag/Image/operation/ImageList).
-          - [List containers](https://docs.docker.com/engine/api/v1.43/#tag/Container/operation/ContainerList).
+          - [System info](https://docs.docker.com/engine/api/v1.43/#tag/System/operation/SystemInfo), on every collection.
+          - [List images](https://docs.docker.com/engine/api/v1.43/#tag/Image/operation/ImageList), at most once every 5 minutes.
+          - [List containers](https://docs.docker.com/engine/api/v1.43/#tag/Container/operation/ContainerList), on every collection, once per container health status.
       supported_platforms:
         include: []
         exclude: []
@@ -39,10 +39,13 @@ modules:
           description: |
             It discovers instances running on localhost by attempting to connect to a known Docker UNIX socket: `/var/run/docker.sock`.
         limits:
-          description: ""
+          description: |
+            Image metrics are refreshed about every 5 minutes, or on every collection when `update_every` is longer, so image pulls, removals, and changes in image use can take that long to show.
         performance_impact:
           description: |
-            Enabling `collect_container_size` may result in high CPU usage depending on the version of Docker Engine.
+            The collector itself uses little CPU; the cost falls on the Docker daemon, which does the work for each API request. On Docker Engine 29 and later with the containerd image store, listing images and containers costs `dockerd` and `containerd` CPU time that grows with the number of images and containers ([moby/moby#53077](https://github.com/moby/moby/issues/53077)).
+
+            The defaults keep this low: data is collected every 10 seconds, and the image list is requested at most once every 5 minutes. Lowering `update_every` increases daemon CPU usage. Enabling `collect_container_size` may result in high CPU usage, depending on the Docker Engine version.
     setup:
       prerequisites:
         list: []
@@ -58,7 +61,7 @@ modules:
           list:
             - name: update_every
               description: Data collection interval (seconds).
-              default_value: 1
+              default_value: 10
               required: false
               group: Collection
             - name: autodetection_retry

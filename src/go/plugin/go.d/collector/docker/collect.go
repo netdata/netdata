@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	typesContainer "github.com/moby/moby/api/types/container"
 	docker "github.com/moby/moby/client"
@@ -52,30 +53,53 @@ func (c *Collector) collectInfo(mx map[string]int64) error {
 	return nil
 }
 
+// On Docker Engine 29+ with the containerd image store, listing images can cost the daemon over a second of CPU time
+// per call (moby/moby#53077). Image metrics change rarely, so the list is refreshed at most this often.
+const imagesRefreshEvery = 5 * time.Minute
+
+type imagesStats struct {
+	size     int64
+	dangling int64
+	active   int64
+}
+
 func (c *Collector) collectImages(mx map[string]int64) error {
+	if now := c.now(); !now.Before(c.imagesNextRefresh) {
+		stats, err := c.listImages()
+		if err != nil {
+			return err
+		}
+		c.images = stats
+		c.imagesNextRefresh = now.Add(imagesRefreshEvery)
+	}
+
+	mx["images_size"] = c.images.size
+	mx["images_dangling"] = c.images.dangling
+	mx["images_active"] = c.images.active
+
+	return nil
+}
+
+func (c *Collector) listImages() (imagesStats, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
 	result, err := c.client.ImageList(ctx, docker.ImageListOptions{})
 	if err != nil {
-		return err
+		return imagesStats{}, err
 	}
-	images := result.Items
 
-	mx["images_size"] = 0
-	mx["images_dangling"] = 0
-	mx["images_active"] = 0
-
-	for _, v := range images {
-		mx["images_size"] += v.Size
+	var stats imagesStats
+	for _, v := range result.Items {
+		stats.size += v.Size
 		if v.Containers == 0 {
-			mx["images_dangling"]++
+			stats.dangling++
 		} else {
-			mx["images_active"]++
+			stats.active++
 		}
 	}
 
-	return nil
+	return stats, nil
 }
 
 var (
