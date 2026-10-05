@@ -479,9 +479,10 @@ SYSLOG_SETUP = setup_block(
     '[Syslog via the OpenTelemetry Collector](/docs/npm/syslog/otel-collector.md). '
     'The endpoint listens on loopback by default, which accepts '
     'only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP '
-    'endpoint reachable off-host must be protected with TLS or mutual TLS (`receivers.otlp.protocols.grpc.tls.cert_file`, '
-    '`receivers.otlp.protocols.grpc.tls.key_file`, and `receivers.otlp.protocols.grpc.tls.client_ca_file` for mTLS) plus network access controls — '
-    'otherwise anyone who can reach it can inject telemetry. Prefer keeping the Collector on the same host as the Agent.',
+    'endpoint reachable off-host must be protected with TLS or mutual TLS '
+    '(`receivers.otlp.protocols.grpc.tls.cert_file`, `receivers.otlp.protocols.grpc.tls.key_file`, and '
+    '`receivers.otlp.protocols.grpc.tls.client_ca_file` for mTLS) plus network access controls — otherwise '
+    'anyone who can reach it can inject telemetry. Prefer keeping the Collector on the same host as the Agent.',
     [('The OpenTelemetry plugin',
       'The Netdata Agent must include the `otel` plugin, which is available on Linux and macOS. See the '
       'OpenTelemetry collector documentation for how it is enabled in each installation method.'),

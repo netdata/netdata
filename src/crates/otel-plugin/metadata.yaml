@@ -73,7 +73,7 @@ modules:
         # is hit first.
         limits:
           description: |
-            Each export request is limited to 4 MiB, measured after decompression. The plugin rejects a larger request as a whole. Each export request can create at most 100 new charts by default. This is a per-request throttle, not a total cardinality limit. By default, log timestamps are accepted from up to 24 hours in the past through 10 minutes in the future; records without a timestamp use their arrival time. A span is accepted when it started no more than 24 hours ago and ends no more than 10 minutes in the future. Log and trace retention are each bounded by whichever limit is reached first: retained file count, retained indexed-data size, or age.
+            Each export request is limited to 4 MiB, both as received and after decompression. The plugin rejects a larger request as a whole. Each export request can create at most 100 new charts by default. This is a per-request throttle, not a total cardinality limit. By default, log timestamps are accepted from up to 24 hours in the past through 10 minutes in the future; records without a timestamp use their arrival time. A span is accepted when it started no more than 24 hours ago and ends no more than 10 minutes in the future. Log and trace retention are each bounded by whichever limit is reached first: retained file count, retained indexed-data size, or age.
         performance_impact:
           description: |
             Resource use depends on the number and cardinality of received metrics, log and span volume, retention, and query activity. Keep unbounded attributes out of metric identities and dimension names.
