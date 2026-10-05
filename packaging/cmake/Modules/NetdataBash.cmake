@@ -47,9 +47,15 @@ function(netdata_bundle_bash)
         # Not EXCLUDE_FROM_ALL: nothing links Bash, so it must be reachable
         # from the default target for the install rule below to have a file
         # to install.
+        # Keep the archive's timestamps. Extraction-time stamps (CMP0135) make
+        # aclocal.m4 and config.h.in, which follow configure in the tarball,
+        # newer than configure whenever extraction crosses a second boundary;
+        # make then regenerates configure with autoconf, which macOS runners
+        # do not ship.
         ExternalProject_Add(bundled-bash
                 URL https://ftp.gnu.org/gnu/bash/bash-${version}.tar.gz
                 URL_HASH SHA256=${sha256}
+                DOWNLOAD_EXTRACT_TIMESTAMP TRUE
                 CONFIGURE_COMMAND <SOURCE_DIR>/configure ${configure_args}
                 BUILD_COMMAND make -j${ncpu}
                 INSTALL_COMMAND make install
