@@ -32,6 +32,10 @@ func BenchmarkCollectTimingEvents(b *testing.B) {
  ]}`)
 }
 
+func BenchmarkCollectViews(b *testing.B) {
+	benchmarkCollectBody(b, `{"meta":{"session":{"id":"session"},"page":{"url":"https://shop.example.com/"},"view":{"name":"checkout"}},"events":[{"name":"view_changed","attributes":{"fromView":"catalog","toView":"checkout"}}]}`)
+}
+
 func BenchmarkCollectErrors(b *testing.B) {
 	benchmarkCollectBody(b, `{"meta":{"session":{"id":"session"},"page":{"url":"https://shop.example.com/"}},"exceptions":[{"type":"TypeError","value":"failed","stacktrace":{"frames":[{"filename":"https://cdn.example.com/static/framework-2c79e2a64abdb08b.js?private=value#fragment","function":"render","lineno":12,"colno":3}]}}]}`)
 }

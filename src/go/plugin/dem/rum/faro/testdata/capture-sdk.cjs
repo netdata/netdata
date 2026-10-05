@@ -220,10 +220,7 @@ async function run() {
     assert.deepEqual(Object.keys(delivered.at(-1).payload).sort(), ['context', 'level', 'message', 'timestamp']);
     assert.deepEqual(delivered.at(-1).payload.context, { type: 'Error', stackFrames: '' });
   }
-  for (const url of ['data:,private', 'data:text/plain,private', 'blob:https://account:password@shop.example.org/private?secret=opaque', 'javascript:private']) {
-    api.setView({ name: url });
-    assert.equal(delivered.at(-1).meta.view.name, '');
-    assert.equal(delivered.at(-1).payload.attributes.toView, '');
+  for (const url of ['data:,private', 'da\tta:,private', 'java\nscript:private', 'data:text/plain,private', 'blob:https://account:password@shop.example.org/private?secret=opaque', 'javascript:private']) {
     api.setPage({ id: 'opaque-page', url });
     api.pushEvent('opaque_url', { 'url.full': url }, 'browser', { skipDedupe: true });
     assert.equal(delivered.at(-1).meta.page.url, '');
@@ -234,6 +231,9 @@ async function run() {
       api.pushLog(['opaque stack'], { skipDedupe: true, context: { stackFrames: JSON.stringify({ filename: url, function: 'render } {', lineno: 1, colno: 2 }) } });
       assert.deepEqual(JSON.parse(delivered.at(-1).payload.context.stackFrames), { filename: '', function: 'render } {', lineno: 1, colno: 2 });
     }
+    api.setView({ name: url });
+    assert.equal(delivered.at(-1).meta.view.name, '');
+    assert.equal(delivered.at(-1).payload.attributes.toView, '');
   }
   process.stdout.write(JSON.stringify(bodies));
 }

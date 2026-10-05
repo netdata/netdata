@@ -173,6 +173,7 @@ func TestCaptureURLPercentAndOpaqueViewHandling(t *testing.T) {
 	for _, tc := range []struct{ view, want string }{
 		{"/sale/50%-off?private=x#fragment", "/sale/50%25-off"},
 		{"data:,private", ""}, {"javascript:private", ""}, {" data:text/plain,private ", ""},
+		{"da\tta:,private", ""}, {"java\nscript:private", ""},
 		{"checkout-view", "checkout-view"}, {"Checkout?logical#label", "Checkout?logical#label"},
 	} {
 		t.Run(tc.view, func(t *testing.T) {

@@ -45,6 +45,7 @@ func (o Options) url(value string, limit int) string {
 }
 
 func (o Options) view(value string) string {
+	value = beacon.Clean(value, len(value))
 	if strings.Contains(value, "/") || viewURLScheme.MatchString(strings.TrimSpace(value)) {
 		value = o.url(value, maxPathLen)
 		if value != "" {

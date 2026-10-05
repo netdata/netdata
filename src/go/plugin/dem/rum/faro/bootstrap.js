@@ -74,14 +74,18 @@
     try {
       // Opaque URLs can embed content or another URL with credentials.
       // The receiver also rejects them; hierarchical script schemes remain useful.
-      if (/^[a-z][a-z0-9+.-]*:(?!\/)/i.test(value.trim())) { return ''; }
+      var opaqueURL = /^[a-z][a-z0-9+.-]*:(?!\/)/i;
+      if (opaqueURL.test(value.trim())) { return ''; }
       var url = new URL(value, location.href);
+      // URL parsing removes embedded tabs/newlines from scheme names.
+      if (opaqueURL.test(url.href)) { return ''; }
       url.username = ''; url.password = ''; url.search = ''; url.hash = '';
       return url.href;
     } catch (e) { return ''; }
   }
   function cleanView(value) {
     if (typeof value !== 'string') { return value; }
+    value = value.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').trim();
     // Keep relative route labels relative; resolving them against the current
     // page would add an unrelated path prefix. Full URLs retain only their path.
     if (/^[a-z][a-z0-9+.-]*:/i.test(value.trim()) || value.indexOf('//') === 0) {
