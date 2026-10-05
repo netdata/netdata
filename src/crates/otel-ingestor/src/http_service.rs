@@ -13,9 +13,11 @@
 //!   `application/json` are accepted, anything else → `415 text/plain`
 //!   (local: parameters are ignored, not validated — upstream's
 //!   `mime.ParseMediaType` 415s a malformed one);
-//! - `Content-Encoding`: `gzip` (flate2), `identity`/absent → raw, anything
-//!   else → `415 text/plain` (local: upstream answers `400` with a
-//!   `google.rpc.Status`);
+//! - `Content-Encoding` (local): absent, `identity` and `gzip` (flate2) are
+//!   accepted, anything else → `415 text/plain`. Upstream also decompresses
+//!   `zstd`, `zlib`, `deflate`, `snappy`, `lz4` and `x-snappy-framed`, and
+//!   answers `400` with a `google.rpc.Status` for any other coding —
+//!   including an explicit `identity`, which its own tests flag as a bug;
 //! - bodies are capped (see [`MAX_BODY_BYTES`], applied to the wire body AND
 //!   the gzip-expanded body — the second cap is the decompression-bomb guard)
 //!   → over-limit `413 text/plain` (local: upstream caps at 20 MiB and
@@ -36,8 +38,8 @@
 //! [`crate::otlp_json`], which repairs the `opentelemetry-proto` derives'
 //! narrower JSON forms first. Deviations from the collector's decoder: enum
 //! names and the `NaN`/`Infinity` doubles are rejected with a `400`, never
-//! dropped silently. Only metric losses name a field path; other decode
-//! errors carry serde's message alone.
+//! dropped silently. Metric losses and the rewrite's own rejections name the
+//! offending JSON field path; errors from the derives carry serde's message.
 //!
 //! The listener binds during startup with the same strict fail-fast rule as
 //! the gRPC endpoint (user decision D4): a bind or TLS failure aborts the
@@ -597,10 +599,9 @@ enum BodyCoding {
     Gzip,
 }
 
-/// The request's `Content-Encoding` (case-insensitive). Absent means
-/// identity (the collector's decompression middleware treats a missing
-/// header the same as `identity`); anything but `gzip`/`identity` is
-/// unsupported.
+/// The request's `Content-Encoding` (case-insensitive). Absent or
+/// `identity` means a raw body; anything but `gzip` is unsupported (see the
+/// module doc for how this differs from the collector).
 fn content_encoding(value: Option<&axum::http::HeaderValue>) -> Option<BodyCoding> {
     let Some(value) = value else {
         return Some(BodyCoding::Identity);
