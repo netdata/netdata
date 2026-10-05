@@ -31,6 +31,9 @@ func TestExportFormAndRuntimeAddressValidation(t *testing.T) {
 		{"https://[1:2:3:4:5:6:7:8:9]:4317", false},
 		{"https://[::ffff:192.0.2.999]:4317", false},
 		{"https://[::ffff:192.0.2.01]:4317", false},
+		{"https://[::ffff:0192.0.2.1]:4317", false},
+		{"https://[::ffff:192.00.2.1]:4317", false},
+		{"https://[::ffff:192.0.02.1]:4317", false},
 		{"https://[::1%25eth0]:4317", false},
 		{"https://[::1]:0", false},
 		{"https://[::1]:65536", false},
@@ -38,6 +41,8 @@ func TestExportFormAndRuntimeAddressValidation(t *testing.T) {
 		{"http://[2001:db8::1]:4317", true},
 		{"https://[1:2:3:4:5:6:7:8]:4317", true},
 		{"https://[::ffff:192.0.2.1]:4317", true},
+		{"https://[0:00:000:0000::0001]:4317", true},
+		{"https://[::0000:192.0.2.1]:4317", true},
 		{"https://collector.example.:4317", true},
 	} {
 		for _, field := range []string{"event_logs", "tracing", "propagate_to"} {
@@ -71,4 +76,14 @@ func TestExportFormAndRuntimeAddressValidation(t *testing.T) {
 			}
 		}
 	}
+	for _, signal := range []string{"event_logs", "tracing"} {
+		for name, destination := range map[string]any{"null": nil, "empty": map[string]any{}, "null endpoint": map[string]any{"endpoint": nil}} {
+			t.Run(signal+"/"+name, func(t *testing.T) {
+				input := map[string]any{"name": "shop", "allowed_origins": []any{"https://shop.example.org"},
+					signal: map[string]any{"enabled": true, "destination": destination}}
+				require.NoError(t, schema.Validate(input), "nullable destination fields use the local default")
+			})
+		}
+	}
+
 }
