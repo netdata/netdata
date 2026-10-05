@@ -26,13 +26,15 @@ func (c *Collector) collect() (map[string]int64, error) {
 	if err := c.collectInfo(mx); err != nil {
 		return nil, err
 	}
+	// collectContainers adds and removes charts, so every call that can fail the collection runs before it.
+	if err := c.refreshImages(); err != nil {
+		return nil, err
+	}
 	usedImages, err := c.collectContainers(mx)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.collectImages(mx, usedImages); err != nil {
-		return nil, err
-	}
+	c.collectImages(mx, usedImages)
 
 	return mx, nil
 }
@@ -63,18 +65,34 @@ type imagesSnapshot struct {
 	size int64
 }
 
-// collectImages counts an image as active when a container in usedImages (keyed by image ID) was created from it.
-// The daemon's own per-image container count is not used: it is -1 when the negotiated API is older than 1.51.
-func (c *Collector) collectImages(mx map[string]int64, usedImages map[string]bool) error {
-	if now := c.now(); !now.Before(c.imagesNextRefresh) {
-		images, err := c.listImages()
-		if err != nil {
-			return err
-		}
-		c.images = images
-		c.imagesNextRefresh = now.Add(imagesRefreshEvery)
+func (c *Collector) refreshImages() error {
+	now := c.now()
+	if now.Before(c.imagesNextRefresh) {
+		return nil
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+	defer cancel()
+
+	result, err := c.client.ImageList(ctx, docker.ImageListOptions{})
+	if err != nil {
+		return err
+	}
+
+	var images imagesSnapshot
+	for _, v := range result.Items {
+		images.ids = append(images.ids, v.ID)
+		images.size += v.Size
+	}
+	c.images = images
+	c.imagesNextRefresh = now.Add(imagesRefreshEvery)
+
+	return nil
+}
+
+// collectImages counts an image as active when a container in usedImages (keyed by image ID) was created from it.
+// The daemon's own per-image container count is not used: it is -1 when the negotiated API is older than 1.51.
+func (c *Collector) collectImages(mx map[string]int64, usedImages map[string]bool) {
 	mx["images_size"] = c.images.size
 	mx["images_dangling"] = 0
 	mx["images_active"] = 0
@@ -86,26 +104,6 @@ func (c *Collector) collectImages(mx map[string]int64, usedImages map[string]boo
 			mx["images_dangling"]++
 		}
 	}
-
-	return nil
-}
-
-func (c *Collector) listImages() (imagesSnapshot, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
-	defer cancel()
-
-	result, err := c.client.ImageList(ctx, docker.ImageListOptions{})
-	if err != nil {
-		return imagesSnapshot{}, err
-	}
-
-	var images imagesSnapshot
-	for _, v := range result.Items {
-		images.ids = append(images.ids, v.ID)
-		images.size += v.Size
-	}
-
-	return images, nil
 }
 
 var (

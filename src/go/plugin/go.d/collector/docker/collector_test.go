@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	typesContainer "github.com/moby/moby/api/types/container"
@@ -768,6 +769,24 @@ func TestCollector_Collect_ImagesRefresh(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCollector_Collect_FailedCollectionLeavesChartsUnchanged(t *testing.T) {
+	collr := New()
+	collr.newClient = prepareNewClientFunc(&mockClient{errOnImageList: true})
+	require.NoError(t, collr.Init(context.Background()))
+
+	require.Nil(t, collr.Collect(context.Background()))
+
+	assert.Equal(t, chartIDs(summaryCharts.Copy()), chartIDs(collr.Charts()))
+}
+
+func chartIDs(charts *collectorapi.Charts) []string {
+	var ids []string
+	for _, chart := range *charts {
+		ids = append(ids, chart.ID)
+	}
+	return ids
 }
 
 func imageMetrics(mx map[string]int64) map[string]int64 {
