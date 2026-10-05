@@ -19,9 +19,10 @@ field means.
 - One idea per paragraph, a few sentences. A paragraph that enumerates becomes a list. Three or more items that share
   attributes (modes, permissions per endpoint, services per area, prerequisites per mode) become a table.
 - Admonitions carry what the reader must not miss and nothing else: `:::caution` for cost, data loss, destructive or
-  irreversible behavior; `:::tip` for a recommended shortcut ("need X, do Y"); `:::note` for a non-obvious fact that is
-  not a warning. `:::info` is the fleet's catch-all and is discouraged. At most one admonition per field. Prefer an
-  admonition over a blockquote. An admonition never replaces the field's own first paragraph.
+  irreversible behavior; `:::info` (blue) or `:::tip` (green, "need X, do Y") for a fact the operator must notice, such
+  as persisted state and how to reset it. `:::note` renders white and blends into the page; use it only for an aside
+  that may blend in. At most one admonition per field. Prefer an admonition over a blockquote. An admonition never
+  replaces the field's own first paragraph.
 - Define unfamiliar operator terms inline on first use; omit irrelevant implementation mechanics (see the reading
   model in `SKILL.md`). A glossary table is allowed only when
   four or more terms recur across the page and the options table, and then it closes `method_description`, after the
@@ -59,6 +60,25 @@ most visitors read.
 - Do NOT describe internal stages, caching, ownership resolution, or state handling. Those are `ARCHITECTURE.md`
   content (developer documentation, never linked from the page). "Plan, discover, query" is how the code is organized,
   not how the operator experiences it.
+
+**Worked example: routing an over-scoped field.** `redfish` shipped this field as four paragraphs, 206 words, longest
+paragraph 104 words — inside every length bound in `SKILL.md`, and still unreadable. Its first paragraph answered the
+question and the rest did not; each stray piece had a different owner:
+
+| What it said | Where it belonged |
+|---|---|
+| Reconnects once on HTTP 401 inside the cycle | Off the page: state handling |
+| Partial scans retain prior membership evidence | Off the page: ownership resolution |
+| How derived sensor health evaluates thresholds | `functions`, the `sensors` entry that displays it |
+| Session and auto config tests skip credentials | `troubleshooting.errors` |
+| Missing values produce gaps, not zeroes | `default_behavior.limits` |
+
+What remained answers the field's own question in three paragraphs and one table: what it connects to, over what
+protocol, how often, how it authenticates (four `auth_method` modes, so a table), and that its only writes are its own
+sessions.
+
+The test that catches this is not length. For each sentence, ask what the operator does differently for having read
+it; when the answer is nothing, that sentence has an owner elsewhere or no owner at all.
 
 ## 4. `supported_platforms` And `multi_instance`
 

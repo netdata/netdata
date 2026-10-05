@@ -75,7 +75,7 @@ Stand up an HTTP endpoint that returns either a top-level array (`[ "https://a/h
 
 #### Options
 
-The configuration file has two top-level blocks: `discoverer:` (the options below) and `services:` (rules that turn fetched items into collector jobs — see [Service Rules](#service-rules)).
+The configuration file has two top-level blocks: `discoverer:` (the discoverer-specific options below) and `services:` (rules that turn fetched items into collector jobs — see [Service Rules](#service-rules)).
 
 After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
 
@@ -83,11 +83,30 @@ After editing the file, restart the Netdata Agent to load the updated discovery 
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
+| [trust_discovered_targets](#option-trust-discovered-targets) | Allow secret references in generated collector jobs, including target-controlled values that can make Netdata read files, run commands, or fetch stored secrets. Off by default; enable only if you control and trust every discoverable target and accept the risk of exposing resolved values to it. | no | no |
 | [url](#option-url) | HTTP/HTTPS endpoint that returns the items. |  | yes |
 | [interval](#option-interval) | How often to refetch the endpoint. | 1m | no |
 | [format](#option-format) | Response format. One of `auto`, `json`, `yaml`. | auto | no |
 | timeout | Per-request HTTP timeout. | 2s | no |
 | [headers / username / password / bearer_token_file / proxy_url / tls_skip_verify / etc.](#option-headers-username-password-bearer-token-file-proxy-url-tls-skip-verify-etc) | All standard go.d HTTP options are accepted (basic auth, bearer tokens, custom headers, HTTP proxy, TLS options). |  | no |
+
+<a id="option-trust-discovered-targets"></a>
+##### trust_discovered_targets
+
+Set this option at the top level, alongside `discoverer:` and `services:`, not inside the discoverer block.
+It enables `${env:...}`, `${file:...}`, `${cmd:...}` and `${store:...}` in generated collector jobs.
+
+If a service rule copies a target-controlled value into a job field, the target can insert a reference that
+makes Netdata read a local file, run a command, or fetch a stored secret with the secret provider's
+permissions. The collector may send the result to that target as a credential or other request field.
+Enable only if you control and trust every target this pipeline can discover; enabling it accepts
+this risk for the whole pipeline. One untrusted target is enough to abuse it.
+
+The discovery endpoint controls the items returned to service rules; trust both that endpoint and its data sources.
+
+The default keeps reference syntax literal. This option does not resolve the discoverer's own connection
+credentials. See [Service Discovery](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md#configuration-file-structure).
+
 
 <a id="option-url"></a>
 ##### url
@@ -127,7 +146,7 @@ See any go.d HTTP-based collector (`httpcheck`, `prometheus`, `nginx`, …) for 
 
 Define the discovery pipeline in `/etc/netdata/go.d/sd/http.conf`.
 
-The file has two top-level blocks: `discoverer:` (the options above) and `services:` (rules that turn discovered targets into collector jobs — see [Service Rules](#service-rules)).
+The file has two top-level blocks: `discoverer:` (discoverer-specific settings) and `services:` (rules that turn discovered targets into collector jobs — see [Service Rules](#service-rules)). Set pipeline options such as `trust_discovered_targets` alongside these blocks, not inside `discoverer:`.
 
 After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
 

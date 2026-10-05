@@ -35,6 +35,12 @@
           "docker"
         ]
       },
+      "trust_discovered_targets": {
+        "title": "Trust discovered targets",
+        "description": "Allow secret references in generated collector jobs, including target-controlled values that can make Netdata read files, run commands, or fetch stored secrets. Off by default; enable only if you control and trust every discoverable target and accept the risk of exposing resolved values to it.",
+        "type": "boolean",
+        "default": false
+      },
       "services": {
         "title": "Service rules",
         "description": "Rules that turn discovered Docker containers into data collection jobs.",
@@ -78,7 +84,8 @@
         {
           "title": "Base",
           "fields": [
-            "discoverer"
+            "discoverer",
+            "trust_discovered_targets"
           ]
         },
         {
@@ -118,6 +125,9 @@
         }
       },
       "ui:help": "- Match discovered Docker containers and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a container matches, a data collection job is created."
+    },
+    "trust_discovered_targets": {
+      "ui:help": "Service rules can copy `${env:...}`, `${file:...}`, `${cmd:...}` or `${store:...}` from target-controlled inputs into job fields. Netdata resolves those references with the secret providers' permissions, and a collector may send the resulting value to the target as a credential or other request field. One untrusted target can abuse this; enabling the option accepts that risk for the whole pipeline.\n\nContainer owners can control command arguments, labels and other values used by service rules.\n\nDisabled by default: references remain literal. This option does not resolve the discoverer's own connection credentials."
     }
   }
 }

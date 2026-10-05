@@ -195,9 +195,10 @@ func TestAutogenWarmPlanAllocationEnvelope(t *testing.T) {
 				10,
 				func() { plan, err := buildPlan(e, reader); require.NoError(t, err); require.Len(t, plan.Actions, n) },
 			)
-			// Plans still allocate O(output charts/dimensions) staged state. This generous
-			// ceiling excludes rebuilding O(series) autogen strings/routes on every hit.
-			assert.LessOrEqual(t, allocs, float64(15*n+128))
+			// Planning stages lifecycle state in place, so an unchanged chart allocates only
+			// its boxed update action; the constant covers per-plan setup. It also excludes
+			// rebuilding O(series) autogen strings/routes on every hit.
+			assert.LessOrEqual(t, allocs, float64(n+18))
 		})
 	}
 }
@@ -286,7 +287,7 @@ func TestCollectExpiryNoRemovalAllocationEnvelope(t *testing.T) {
 			// Stable expiry still scans retained state, but allocates only for removals.
 			removed := 0
 			allocs := testing.AllocsPerRun(10, func() {
-				dims, charts := collectExpiryRemovals(1, &e.state.materialized)
+				dims, charts := collectExpiryRemovals(1, &e.state.materialized, nil)
 				removed += len(dims) + len(charts)
 			})
 			require.Zero(t, removed)

@@ -1,18 +1,25 @@
-//! Query time range with automatic alignment for histogram bucketing
+//! The shared time grid for journal-engine queries.
+//!
+//! [`QueryTimeRange`] snaps a requested `[start, end)` window onto a
+//! bucket width and outward-aligned boundaries, so histogram buckets,
+//! file-index granularity and log-query bounds all land on one grid:
+//! [`crate::histogram::HistogramEngine::compute_from_indexes`],
+//! [`crate::indexing::batch_compute_file_indexes`],
+//! `otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::on_call`.
 
 use crate::EngineError;
 use crate::histogram::calculate_bucket_duration;
 use journal_index::Seconds;
 
-/// A time range for querying journal entries with automatic alignment.
+/// A query window snapped onto the shared bucket grid.
 ///
-/// This type encapsulates:
-/// - The original requested time boundaries
-/// - The computed bucket duration based on the range
-/// - The aligned boundaries for consistent indexing and querying
-///
-/// All alignment logic is handled internally, ensuring consistency between
-/// histogram computation, file indexing, and log queries.
+/// [`QueryTimeRange::new`] keeps the requested boundaries as given, picks
+/// the bucket width with [`calculate_bucket_duration`] and
+/// rounds both boundaries outward onto width multiples, so every query
+/// shares one grid no matter what timestamps callers send. The
+/// `requested_*` accessors and `aligned_duration()` have no tree callers
+/// outside tests and doctests (grep-verified); production code reads
+/// `bucket_duration*`, `aligned_start`/`aligned_end` and `buckets()`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct QueryTimeRange {
     /// Original requested start time (seconds)
@@ -28,20 +35,16 @@ pub struct QueryTimeRange {
 }
 
 impl QueryTimeRange {
-    /// Create a new query time range with automatic alignment.
+    /// Create a range over `[start, end)` seconds (`start` inclusive,
+    /// `end` exclusive).
     ///
-    /// The bucket duration is computed based on the range duration, and
-    /// the boundaries are aligned to bucket boundaries:
-    /// - `aligned_start` rounds down to the nearest bucket boundary
-    /// - `aligned_end` rounds up to the nearest bucket boundary
-    ///
-    /// # Arguments
-    /// * `start` - Start time in seconds (inclusive)
-    /// * `end` - End time in seconds (exclusive)
-    ///
-    /// # Returns
-    /// * `Ok(QueryTimeRange)` if the range is valid
-    /// * `Err(EngineError::InvalidTimeRange)` if start >= end
+    /// Errors with [`EngineError::InvalidTimeRange`] when `start >= end`;
+    /// this is the only construction site of that variant in the tree, so
+    /// callers that may receive a degenerate window substitute one first
+    /// (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::on_call`). Otherwise the bucket width
+    /// is picked for the range duration and both boundaries are rounded
+    /// outward (see the field docs). There is no default window; callers
+    /// choose one, e.g. the last 24h (see `examples/index.rs` `main`).
     ///
     /// # Example
     /// ```
@@ -72,59 +75,62 @@ impl QueryTimeRange {
         })
     }
 
-    /// Get the original requested start time (seconds).
+    /// Original requested start time (seconds).
     pub fn requested_start(&self) -> u32 {
         self.requested_start
     }
 
-    /// Get the original requested end time (seconds).
+    /// Original requested end time (seconds).
     pub fn requested_end(&self) -> u32 {
         self.requested_end
     }
 
-    /// Get the computed bucket duration (seconds).
+    /// Bucket width in seconds.
     ///
-    /// This is used for file indexing to ensure all files are indexed
-    /// with the same bucket size.
+    /// Also the granularity file indexes are built and cached at:
+    /// `batch_compute_file_indexes` reuses a cached index only when its
+    /// own width divides this one.
     pub fn bucket_duration(&self) -> u32 {
         self.bucket_duration
     }
 
-    /// Get the bucket duration as `Seconds`.
+    /// Bucket width as [`Seconds`].
     pub fn bucket_duration_seconds(&self) -> Seconds {
         Seconds(self.bucket_duration)
     }
 
-    /// Get the aligned start time (seconds).
-    ///
-    /// This is the start time rounded down to the nearest bucket boundary.
+    /// Aligned start (seconds), floored to a bucket boundary.
     pub fn aligned_start(&self) -> u32 {
         self.aligned_start
     }
 
-    /// Get the aligned end time (seconds).
-    ///
-    /// This is the end time rounded up to the nearest bucket boundary.
+    /// Aligned end (seconds), ceiled to a bucket boundary.
     pub fn aligned_end(&self) -> u32 {
         self.aligned_end
     }
 
-    /// Get the duration of the aligned range (seconds).
+    /// Length of the aligned range (seconds).
     pub fn aligned_duration(&self) -> u32 {
         self.aligned_end - self.aligned_start
     }
 
-    /// Get the duration of the requested range (seconds).
+    /// Length of the requested range (seconds).
     pub fn requested_duration(&self) -> u32 {
         self.requested_end - self.requested_start
     }
 
-    /// Returns an iterator over the bucket time ranges.
+    /// The buckets of the aligned range, left to right.
     ///
-    /// Each bucket is a `(start, end)` tuple in seconds, where:
-    /// - `start` is inclusive
-    /// - `end` is exclusive
-    /// - `end - start == bucket_duration`
+    /// Each bucket is a `(start, end)` pair in seconds: `[start, end)`
+    /// half-open, exactly `bucket_duration` wide, contiguous from
+    /// `aligned_start` through `aligned_end`. At least one bucket always
+    /// results: a qualifying width splits the requested duration into
+    /// >= 50 buckets ([`calculate_bucket_duration`]'s threshold), and the 1s fallback is <= any
+    /// valid duration, so the aligned span (>= the requested duration)
+    /// always contains whole widths.
+    ///
+    /// `HistogramEngine::compute_from_indexes` turns each pair into a
+    /// [`crate::histogram::BucketRequest`].
     ///
     /// # Example
     /// ```

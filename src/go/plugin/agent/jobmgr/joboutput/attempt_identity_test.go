@@ -111,6 +111,7 @@ func TestCandidateAndRuntimeAttemptsAcceptLongPublicJobName(t *testing.T) {
 	resource, err := prepared.AcceptStart(t.Context(), identity.Generation)
 	require.NoError(t, err)
 	generation := resource.(*JobGeneration)
+	require.NoError(t, generation.AwaitReady(t.Context()))
 	require.NoError(t, generation.Publish())
 	require.NoError(t, generation.reserveInstallation())
 	require.NoError(t, generation.acknowledgeInstallation())

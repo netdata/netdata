@@ -31,6 +31,8 @@
 #   --timeout SECONDS    per-command timeout (default: 10)
 #   --no-obfuscate       disable PII pseudonymization (secrets STILL redacted)
 #   --include-snmp-diagnostics  include original, UNSANITIZED SNMP evidence
+#   --include-plugin-debug      RUN systemd-journal.plugin in debug mode and capture
+#                               its output (the only option that executes a collector)
 #   --keep-staging       keep staging dir for inspection
 #   --selftest           run the sanitizer regression vectors and exit
 #   -v, --version        print version
@@ -59,6 +61,7 @@ init_defaults() {
   KEEP_STAGING=0
   SELFTEST=0
   INCLUDE_SNMP=0
+  INCLUDE_PLUGIN_DEBUG=0
   SNMP_FILES=0
   SNMP_STATUS=not_requested
   # Admission deadline checked before collectors; filesystem operations,
@@ -81,6 +84,7 @@ parse_options() {
       --timeout) need_val "$@"; CMD_TIMEOUT="$2"; shift 2 ;;
       --no-obfuscate) OBFUSCATE=0; shift ;;
       --include-snmp-diagnostics) INCLUDE_SNMP=1; shift ;;
+      --include-plugin-debug) INCLUDE_PLUGIN_DEBUG=1; shift ;;
       --keep-staging) KEEP_STAGING=1; shift ;;
       --selftest) SELFTEST=1; shift ;;
       -v|--version) echo "netdata-support-bundle $VERSION"; exit 0 ;;
@@ -723,6 +727,20 @@ json_str() { # JSON-escape every control byte, including in source filenames.
         else printf "%c", n;
     } }'
 }
+# Correct a manifest row's size after its body was replaced. collect_body records
+# the row when it writes the file, so any later rewrite leaves a stale size and
+# breaks the manifest/on-disk parity CI asserts.
+manifest_fix_bytes() {
+  _mf_rel="$1"; _mf_new=0
+  [ -f "$WORK/$_mf_rel" ] && _mf_new=$(wc -c < "$WORK/$_mf_rel" | tr -d ' ')
+  awk -v rel="\"path\":\"$_mf_rel\"" -v n="$_mf_new" '
+    index($0, rel) > 0 && !done { done = 1; sub(/"bytes":[0-9]+/, "\"bytes\":" n) }
+    { print }
+  ' "$MANIFEST_ROWS" > "$MANIFEST_ROWS.fix" && mv "$MANIFEST_ROWS.fix" "$MANIFEST_ROWS" && return 0
+  rm -f "$MANIFEST_ROWS.fix"
+  return 1
+}
+
 manifest_add() {
   _ma_rel="$1"; _ma_kind="$2"; _ma_origin="$3"; _ma_title="$4"; _ma_raw="${5:-0}"
   _ma_bytes=0; [ -f "$WORK/$_ma_rel" ] && _ma_bytes=$(wc -c < "$WORK/$_ma_rel" | tr -d ' ')
@@ -1476,9 +1494,9 @@ collect_state() {
       cat '"$LIBDIR"'/cloud.d/claimed_id 2>/dev/null || echo "(no claimed_id file - agent not claimed)"; echo;
       echo "(token and private.pem intentionally NOT collected)"; true'
     collect_file 06-state/health-silencers.json "Persisted alert silencers" "$LIBDIR/health.silencers.json"
-    for gjs in "$LIBDIR"/god-jobs-statuses.json "$LIBDIR"/*jobs-statuses*.json; do
-      [ -f "$gjs" ] && { collect_file 06-state/go.d-job-statuses.json "go.d collector job states (which jobs run/fail)" "$gjs"; break; }
-    done
+    # python.d is the only plugin still dumping job state to disk; go.d moved its
+    # job state into dyncfg, captured live in 07-runtime/dyncfg-tree.json
+    collect_file 06-state/pythond-job-statuses.json "python.d collector job states (go.d job state is in 07-runtime/dyncfg-tree.json)" "$LIBDIR/pythond-jobs-statuses.json"
     if [ -d "$LIBDIR/config" ]; then
       for dc in "$LIBDIR/config"/*.dyncfg; do
         [ -f "$dc" ] || continue
@@ -1510,6 +1528,38 @@ collect_runtime() {
     collect_api 07-runtime/alerts-active.json "Currently raised alerts" "/api/v3/alerts?options=active"
     collect_api 07-runtime/alerts-all.json "All alert instances (summary)" "/api/v1/alarms?all"
     collect_api 07-runtime/functions.json "Registered functions (which plugins expose what)" /api/v1/functions
+    collect_api 07-runtime/dyncfg-tree.json "Dynamic configuration tree: go.d/scripts.d job states (accepted/running/failed/disabled/orphan/incomplete/none), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state" "/api/v3/config?action=tree"
+    # /api/v3/info answers without any access check, so api_ok can be 1 while
+    # this endpoint - which sits behind the dyncfg ACL - refuses us. The bundle
+    # cannot authenticate: bearer token FILENAMES are themselves live tokens and
+    # are never collected. Say so, rather than leaving a bare exit code, so the
+    # reader does not read the absence as "no collector jobs exist".
+    if [ -f "$WORK/07-runtime/dyncfg-tree.json" ] && \
+       grep -q '"error":"capture failed' "$WORK/07-runtime/dyncfg-tree.json" 2>/dev/null; then
+      # Keep the observed failure rather than asserting a cause: a refusal, a
+      # timeout, a transport error and a 5xx all land here identically, and
+      # naming one of them would be the exact over-reading this marker exists
+      # to prevent. Every step below can fail, and a half-written marker with a
+      # stale manifest row is worse than the plain capture error it replaces,
+      # so anything short of full success keeps the original body.
+      _dt_new="$WORK/07-runtime/dyncfg-tree.json.new"
+      _dt_ok=0
+      if _dt_detail=$(tr -d "\n" < "$WORK/07-runtime/dyncfg-tree.json" 2>/dev/null) && [ -n "$_dt_detail" ]; then
+        if printf '%s\n' "{\"error\":\"dyncfg tree was not collected\",\"observed\":${_dt_detail},\"hint\":\"/api/v3/info answers with no access check, but /api/v3/config sits behind the dyncfg ACL, so a bearer-protected API is a common cause - a timeout, transport error or HTTP failure is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Ask for the collector job state separately.\",\"means\":\"NOT evidence that no collector jobs exist\"}" > "$_dt_new"; then
+          if mv -f "$_dt_new" "$WORK/07-runtime/dyncfg-tree.json"; then
+            _dt_ok=1
+          fi
+        fi
+      fi
+      rm -f "$_dt_new"
+      if [ "$_dt_ok" = "1" ]; then
+        if ! manifest_fix_bytes 07-runtime/dyncfg-tree.json; then
+          printf '[netdata-support-bundle] dyncfg marker written but its manifest size could not be corrected\n' >&2
+        fi
+      else
+        printf '[netdata-support-bundle] could not write the dyncfg marker; the original capture error is kept\n' >&2
+      fi
+    fi
     collect_api 07-runtime/ml-info.json "Machine learning status" /api/v1/ml_info
     # netdata's own resource usage, bounded windows (perf triage without screenshots)
     collect_api 07-runtime/self-cpu.csv "Netdata CPU last 10min (csv)" "/api/v1/data?chart=netdata.server_cpu&after=-600&points=60&format=csv"
@@ -1671,8 +1721,12 @@ collect_permissions() {
   # every netdata-owned path worth reporting permissions for; the cache dir stays
   # TOP-LEVEL only (recursing it would enumerate thousands of dbengine files)
   _PERM_PATHS=""
+  # the journal directories are NOT netdata's, but they decide whether
+  # systemd-journal.plugin can read anything: on a default host they are
+  # root:systemd-journal with an ACL, and an ACL is invisible to ls
   for _p in "$CONFDIR" "$CONFDIR/netdata.conf" "$CONFDIR/stream.conf" "$CONFDIR/ssl" \
             "$LOGDIR" "$LIBDIR" "$LIBDIR/cloud.d" "$LIBDIR/registry" "$CACHEDIR" \
+            /var/log/journal /run/log/journal \
             $PLUGINSD_DIRS "${NETDATA_BIN:-}"; do
     [ -n "$_p" ] || continue
     [ -e "$_p" ] || continue
@@ -1680,6 +1734,139 @@ collect_permissions() {
     _PERM_PATHS="$_PERM_PATHS $_p"
   done
   _PERM_PATHS="${_PERM_PATHS# }"
+
+  # Which user the agent runs as, and what groups it is in. Journal access is
+  # granted by a file capability, by journal-group membership, or by an ACL; the
+  # capability sweep above covers the first, this covers the second, and the
+  # journal directories in the path list cover the third. Without all three a
+  # host that relies on group membership looks identical to a broken one.
+  collect_cmd 09-permissions/netdata-user.txt "Which user the agent runs as and its group membership (journal and device access depend on it)" sh -c '
+    raw=""
+    [ -n "${1:-}" ] && raw=$(ps -o user= -p "$1" 2>/dev/null | tr -d " ")
+    echo "agent process user (as ps reports it): ${raw:-(unknown: no running netdata process)}"
+
+    # ps prints a NUMERIC uid when the name will not fit or the account does not
+    # exist here - which is exactly what a containerised agent looks like from
+    # the host. Resolve it rather than reporting a bare number.
+    resolved=""
+    case "$raw" in
+      "" ) : ;;
+      *[!0-9]* ) resolved="$raw" ;;
+      * ) if getent passwd "$raw" >/dev/null 2>&1; then
+            resolved=$(getent passwd "$raw" | cut -d: -f1)
+            echo "resolved uid $raw to account: $resolved"
+          else
+            echo "uid $raw has NO account on this host - the agent is probably containerised,"
+            echo "so its groups live in the container, not here. Collect a bundle inside the container."
+          fi ;;
+    esac
+
+    echo
+    if [ -n "$resolved" ]; then
+      echo "--- id $resolved ---"
+      id "$resolved" 2>/dev/null || echo "(id failed for $resolved)"
+    fi
+    if getent passwd netdata >/dev/null 2>&1; then
+      echo "--- id netdata (the local account, for comparison) ---"
+      id netdata 2>/dev/null || true
+    else
+      echo "(no local netdata account on this host)"
+    fi
+
+    echo
+    echo "--- groups that grant journal access ---"
+    for g in systemd-journal adm; do
+      if getent group "$g" >/dev/null 2>&1; then getent group "$g"; else echo "$g: (group does not exist on this host)"; fi
+    done
+    true' sh "${NETDATA_PID:-}"
+
+  # OPT-IN ONLY. Every other capture is read-only; this one executes a collector,
+  # so it runs solely when the operator asked for it. Bounded by the usual
+  # per-command timeout and cap, sanitized like any other capture. It answers the
+  # question the permission artifacts cannot: what the plugin itself reports when
+  # it tries to open the journal.
+  if [ "$INCLUDE_PLUGIN_DEBUG" = "1" ]; then
+    # Everything - identity lookup included - happens inside collect_cmd, so it
+    # is bounded by the per-command timeout. A getent out here would be
+    # unbounded, and a slow or wedged NSS would stall the whole bundle before
+    # the capped capture even started.
+    # shellcheck disable=SC2086  # deliberate word-split of the discovered dir list
+    collect_cmd 09-permissions/plugin-debug-systemd-journal.txt \
+      "REQUESTED: systemd-journal.plugin debug STDERR (its stdout is journal content and is discarded); states directly why the journal could not be opened" \
+      sh -c '
+        pid="$1"; t="$2"; shift 2
+
+        # --- locate the plugin -------------------------------------------------
+        bin=""; seen=""
+        for d in "$@"; do
+          [ -n "$d" ] || continue
+          [ -f "$d/systemd-journal.plugin" ] || continue
+          seen="$d/systemd-journal.plugin"
+          if [ -x "$seen" ]; then bin="$seen"; break; fi
+        done
+        if [ -z "$bin" ] && [ -n "$seen" ]; then
+          echo "systemd-journal.plugin IS installed at: $seen"
+          echo "but it is not executable by the current user ($(id -un 2>/dev/null))."
+          ls -l "$seen" 2>/dev/null
+          echo "Re-run the bundle with sudo to capture the debug output."
+          exit 0
+        fi
+        if [ -z "$bin" ]; then
+          echo "systemd-journal.plugin is not installed in any discovered plugins.d directory."
+          exit 0
+        fi
+
+        # --- resolve the agent user to a local NAME ----------------------------
+        raw=""; u=""
+        [ -n "$pid" ] && raw=$(ps -o user= -p "$pid" 2>/dev/null | tr -d " ")
+        case "$raw" in
+          "") if getent passwd netdata >/dev/null 2>&1; then u=netdata
+                echo "# note: no running netdata process; using the local netdata account"
+              else
+                echo "# note: no running netdata process and no local netdata account"
+              fi ;;
+          *[!0-9]*) u="$raw" ;;
+          *) if getent passwd "$raw" >/dev/null 2>&1; then
+               u=$(getent passwd "$raw" | cut -d: -f1)
+             else
+               echo "# note: the agent runs as uid $raw, which has no local account (containerised)."
+               echo "# NOT substituting the host netdata account - that would test a different identity."
+             fi ;;
+        esac
+        [ -n "$u" ] || exit 0
+
+        # --- refuse a path we cannot pass safely -------------------------------
+        # runuser takes argv, so any path is safe there; the su fallback has to
+        # build a command string, and a path with shell metacharacters would be
+        # executed as code under the agent account.
+        case "$bin" in
+          *[!A-Za-z0-9/._-]*) bin_safe=0 ;;
+          *) bin_safe=1 ;;
+        esac
+
+        run() { if command -v timeout >/dev/null 2>&1; then timeout "$t" "$@"; else echo "# note: no timeout(1) here; only the bundle watchdog bounds this"; "$@"; fi; }
+
+        if [ "$(id -u)" = "0" ] && command -v runuser >/dev/null 2>&1; then
+          echo "# running as: $u (via runuser)"
+          run runuser -u "$u" -- "$bin" debug 2>&1 >/dev/null
+          echo "# exit: $?"
+        elif [ "$(id -u)" = "0" ] && command -v su >/dev/null 2>&1 && [ "$bin_safe" = "1" ]; then
+          echo "# running as: $u (via su)"
+          run su -s /bin/sh -c "$bin debug 2>&1 >/dev/null" "$u"
+          echo "# exit: $?"
+        elif [ "$(id -u)" = "0" ] && [ "$bin_safe" = "0" ]; then
+          echo "# NOT running the plugin: its path contains characters that cannot be passed"
+          echo "# safely to su, and runuser is unavailable. Path: $bin"
+        elif [ "$(id -un 2>/dev/null)" = "$u" ]; then
+          echo "# running as: $u (already this user)"
+          run "$bin" debug 2>&1 >/dev/null
+          echo "# exit: $?"
+        else
+          echo "# NOT running the plugin: cannot become $u (not root, or no runuser/su)."
+          echo "# An access error from any other user would not reflect the agent."
+        fi
+        true' sh "${NETDATA_PID:-}" "${CMD_TIMEOUT:-10}" $PLUGINSD_DIRS
+  fi
 
   # paths reach the child as positional ARGUMENTS - see the note above
   # shellcheck disable=SC2086  # deliberate word-split of the discovered path list
@@ -1791,7 +1978,7 @@ write_summary() {
     echo "READ ORDER FOR TRIAGE:"
     echo "  SNMP issues         -> 06-state/snmp-diagnostics-status.txt, 06-state/snmp-diagnostics/"
     echo "  crashes/won't start -> 06-state/status-file.json, 05-logs/, 01-system/kernel-messages.txt"
-    echo "  collector issues    -> 04-config/go.d*, 05-logs/collector.log, 09-permissions/plugins-d.txt"
+    echo "  collector issues    -> 07-runtime/dyncfg-tree.json (job states), 05-logs/collector.log, 04-config/go.d*, 09-permissions/plugins-d.txt"
     echo "  streaming issues    -> 04-config/stream.conf, 07-runtime/node-instances.json, 01-system/clock-timesync.txt"
     echo "  cloud/claiming      -> 06-state/cloud-state.txt, 07-runtime/aclk-state.json, 08-network/"
     echo "  performance         -> 03-process/threads-cpu.txt, 06-state/db-disk-usage.txt, 07-runtime/node-instances.json"

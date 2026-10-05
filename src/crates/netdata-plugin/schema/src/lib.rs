@@ -1,51 +1,67 @@
-//! # Netdata Schema Generation Library
+//! Turns a schemars-generated JSON Schema for a Rust type into Netdata's
+//! config-form schema payload: [`NetdataSchema::netdata_schema`] generates a
+//! draft-07 schema for the type and reworks it into the
+//! `{jsonSchema, uiSchema, configDeclaration}` object — the shape the go.d
+//! side ships as `config_schema.json` (Go readers take exactly the
+//! `jsonSchema` and `uiSchema` members:
+//! src/go/plugin/framework/vnodes/schema.go and
+//! src/go/plugin/scripts.d/collector/native/internal/configform/form.go;
+//! `configDeclaration` has no Go reader — it is this crate's dyncfg add-on).
+//! The trait is blanket-implemented for every `JsonSchema` type, so no derive
+//! is needed; examples/simple_usage.rs is the working end-to-end example.
 //!
-//! This library provides functionality to generate Netdata-compatible JSON schemas
-//! with UI annotations and configuration declarations from Rust types annotated with schemars attributes.
+//! `netdata_schema()` runs two private schemars `Transform`s in sequence over
+//! the generated root schema: `CollectUISchema` over the whole tree, then
+//! `CollectConfigDeclaration` over the root object only (no recursion).
+//! Extensions are stripped from the returned `jsonSchema` as they are
+//! collected:
 //!
-//! ## Basic Usage
+//! - `x-ui-*` (any JSON value) → the matching `ui:*` key in `uiSchema`,
+//!   stored under the dotted property/definition path of the node carrying
+//!   the extension; extensions on the root merge their keys directly into
+//!   `uiSchema`. A non-root path holds one object that is replaced — not
+//!   merged — by a later collection at the same path, so extensions found
+//!   both on a node and inside its subschema positions (`items`, `oneOf`,
+//!   …) do not accumulate; positions walked only through
+//!   `transform_subschemas` have no path pushed, so their extensions land on
+//!   the enclosing node's path.
+//! - `x-sensitive`, exactly `Bool(true)` → `ui:widget: "password"` at the
+//!   same node; any other value stays in the schema.
+//! - `x-config-*` (root object only) → one dyncfg `ConfigDeclaration`,
+//!   serialized into `configDeclaration`; see netdata-plugin-types (the
+//!   `config` module), whose `TryFrom<&serde_json::Value> for
+//!   ConfigDeclaration` is the inverse of the serializer here.
 //!
-//! ```rust
-//! use schemars::JsonSchema;
-//! use netdata_plugin_schema::NetdataSchema;
+//! Boolean schema values convert in the walks but have no object, so they
+//! are no-ops; other non-object values fail `try_into` and are skipped.
 //!
-//! #[derive(Clone, Debug, JsonSchema)]
-//! #[schemars(
-//!     extend("x-ui-flavour" = "tabs"),
-//!     extend("x-config-id" = "my_plugin:my_config"),
-//!     extend("x-config-path" = "/collectors")
-//! )]
-//! struct MyConfig {
-//!     #[schemars(
-//!         title = "Server URL",
-//!         extend("x-ui-help" = "Enter the server URL"),
-//!         extend("x-ui-placeholder" = "https://example.com")
-//!     )]
-//!     url: String,
-//! }
+//! Failures are panics, not `Result`s: an unknown `x-config-*` attribute
+//! name panics in `CollectConfigDeclaration`, and
+//! `ConfigDeclarationBuilder::build` unwraps every declaration field, so an
+//! absent attribute, an unsupported value type, or a `type`/`status`/
+//! `source-type` word outside its vocabulary panics there too — a
+//! declaration is only ever produced complete. Only `x-config-cmds` is
+//! lenient: an unparsable command list becomes the empty `DynCfgCmds` set.
 //!
-//! // NetdataSchema is automatically implemented for all JsonSchema types
-//!
-//! let netdata_schema = MyConfig::netdata_schema();
-//! println!("{}", serde_json::to_string_pretty(&netdata_schema).unwrap());
-//!
-//! // Config declaration is included in the schema if x-config-* metadata is present
-//! if let Some(config_decl) = netdata_schema.get("configDeclaration") {
-//!     println!("Config ID: {}", config_decl["id"]);
-//! }
-//! ```
+//! Direct consumers (grep-verified): otel-legacy-logs takes the `HttpAccess`
+//! re-export (src/crates/otel-legacy-logs/src/handler.rs); bridge and rt
+//! declare the workspace dependency but reference nothing from this crate in
+//! their current sources; nothing outside the crate calls `netdata_schema()`
+//! except examples/simple_usage.rs.
 
 use schemars::transform::{Transform, transform_subschemas};
 use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings};
 use serde_json::{Map, Value};
 
-// Re-export types for convenience
+// Re-exports of the netdata-plugin-types vocabulary consumed through this
+// crate (otel-legacy-logs reads HttpAccess from here).
 pub use netdata_plugin_types::{
     ConfigDeclaration, DynCfgCmds, DynCfgSourceType, DynCfgStatus, DynCfgType, HttpAccess,
 };
 
-/// Transform that collects UI schema information from x-ui-* extensions
-/// and removes them from the JSON schema, collecting them separately
+/// Collects `x-ui-*` extensions (plus `x-sensitive: true`) into a `uiSchema`
+/// map keyed by dotted property path, stripping them from the schema as it
+/// walks the whole tree.
 #[derive(Default)]
 struct CollectUISchema {
     ui_schema: Map<String, Value>,
@@ -58,7 +74,7 @@ impl Transform for CollectUISchema {
             return;
         };
 
-        // Collect UI extensions from current schema
+        // x-ui-* keys become ui:<suffix>; x-sensitive counts only when exactly Bool(true).
         let mut ui_props = Map::new();
         let mut keys_to_remove = Vec::new();
 
@@ -75,12 +91,12 @@ impl Transform for CollectUISchema {
             }
         }
 
-        // Remove the x-ui-* extensions from the JSON schema
+        // Consumed keys are stripped; a non-true x-sensitive stays in the schema.
         for key in keys_to_remove {
             obj.remove(&key);
         }
 
-        // If we have UI properties, add them to the UI schema at the current path
+        // Store collected keys under the node's dotted path; the root merges into uiSchema itself.
         if !ui_props.is_empty() {
             let ui_path = if self.current_path.is_empty() {
                 ".".to_string()
@@ -89,7 +105,7 @@ impl Transform for CollectUISchema {
             };
 
             if ui_path == "." {
-                // Root level - merge into root UI schema
+                // Root: merge the keys directly into uiSchema rather than nesting under ".".
                 for (key, value) in ui_props {
                     self.ui_schema.insert(key, value);
                 }
@@ -98,7 +114,7 @@ impl Transform for CollectUISchema {
             }
         }
 
-        // Handle properties recursively
+        // Property names extend the dotted uiSchema path.
         if let Some(properties) = obj.get_mut("properties").and_then(|v| v.as_object_mut()) {
             for (prop_name, prop_schema) in properties.iter_mut() {
                 if let Ok(schema_ref) = prop_schema.try_into() {
@@ -109,7 +125,7 @@ impl Transform for CollectUISchema {
             }
         }
 
-        // Handle definitions recursively
+        // Same walk for named definitions.
         if let Some(definitions) = obj.get_mut("definitions").and_then(|v| v.as_object_mut()) {
             for (def_name, def_schema) in definitions.iter_mut() {
                 if let Ok(schema_ref) = def_schema.try_into() {
@@ -120,12 +136,19 @@ impl Transform for CollectUISchema {
             }
         }
 
-        // Handle other subschemas
+        // Remaining positions (items, oneOf, additionalProperties, ...) get no path push:
+        // extensions found there land on the enclosing node's path.
         transform_subschemas(self, schema);
     }
 }
 
-/// Transform that collects config declaration information from x-config-* extensions
+/// Reads the root schema's `x-config-*` attributes into one `ConfigDeclaration`
+/// (netdata-plugin-types) and strips them from the schema. Runs once over the
+/// root — no recursion — so `x-config-*` left on nested subschemas is neither
+/// read nor removed. The attribute vocabulary and the serialized
+/// `configDeclaration` member are the netdata-plugin-types `config` module's
+/// contract; its `TryFrom<&serde_json::Value> for ConfigDeclaration` is the
+/// inverse of the serializer in `netdata_schema`.
 #[derive(Default)]
 struct CollectConfigDeclaration {
     config_declaration: Option<ConfigDeclaration>,
@@ -137,12 +160,16 @@ impl Transform for CollectConfigDeclaration {
             return;
         };
 
-        // Only process root-level schema (where config declarations should be)
+        // Only the keys of the schema object passed in are read; nothing recurses.
         let mut config_props = ConfigDeclarationBuilder::default();
         let mut keys_to_remove = Vec::new();
 
         for (key, value) in obj.iter() {
             if let Some(config_key) = key.strip_prefix("x-config-") {
+                // Known names with the wrong value type reach the `unknown`
+                // arm of the other type's match and panic; values of neither
+                // type are dropped here and surface later as missing fields
+                // in `build`.
                 if let Some(str_value) = value.as_str() {
                     match config_key {
                         "id" => config_props.id = Some(str_value.to_string()),
@@ -175,16 +202,17 @@ impl Transform for CollectConfigDeclaration {
             }
         }
 
-        // Remove the x-config-* extensions from the JSON schema
         for key in keys_to_remove {
             obj.remove(&key);
         }
 
-        // Build config declaration
+        // Unconditional: built even when no x-config-* attribute was present.
         self.config_declaration = Some(config_props.build());
     }
 }
 
+/// x-config-* attribute accumulator; all nine fields are required, and
+/// `build` unwraps each one.
 #[derive(Debug, Default)]
 struct ConfigDeclarationBuilder {
     id: Option<String>,
@@ -214,18 +242,24 @@ impl ConfigDeclarationBuilder {
     }
 }
 
-/// Parse command string like "schema|get|update" into DynCfgCmds flags
+/// Parses an `x-config-cmds` value with `DynCfgCmds::from_str_multi`; a list
+/// containing an unknown command name falls back to the empty set rather
+/// than failing.
 fn parse_cmds_string(cmds_str: &str) -> DynCfgCmds {
-    // Use the existing parsing functionality from DynCfgCmds
     DynCfgCmds::from_str_multi(cmds_str).unwrap_or_else(DynCfgCmds::empty)
 }
 
-/// Configuration for Netdata schema generation
+/// Private knobs for `netdata_schema`; only `Default` is ever constructed,
+/// so `fullPage` is always emitted and draft-07 always used.
 #[derive(Debug, Clone)]
 struct NetdataSchemaConfig {
-    /// Whether to include the full page UI option
+    /// Adds `uiSchema.uiOptions.fullPage: true` when set; ibm.d docgen emits
+    /// the same key (src/go/plugin/ibm.d/docgen/main.go), while the go.d
+    /// renderer treats top-level `uiOptions` as dead
+    /// (src/go/plugin/go.d/collector/config_schema_test.go).
     full_page: bool,
-    /// JSON Schema settings to use
+    /// Draft-07 settings; the returned `jsonSchema` carries the matching
+    /// `$schema` keyword.
     schema_settings: SchemaSettings,
 }
 
@@ -238,9 +272,13 @@ impl Default for NetdataSchemaConfig {
     }
 }
 
-/// Trait for types that can generate Netdata-compatible schemas with UI and config declarations
+/// One-call artifact generation for a `JsonSchema` type: [`Self::netdata_schema`]
+/// returns the `{jsonSchema, uiSchema, configDeclaration}` payload described
+/// in the module docs. Blanket-implemented below, so no derive is needed.
 pub trait NetdataSchema: JsonSchema {
-    /// Generate a comprehensive Netdata-compatible schema with jsonSchema, uiSchema, and configDeclaration
+    /// Generates a draft-07 schema for `Self`, strips the consumed extensions
+    /// out of the returned `jsonSchema`, and assembles the payload. Panics on
+    /// an unknown or incomplete `x-config-*` set.
     fn netdata_schema() -> serde_json::Value
     where
         Self: Sized,
@@ -249,18 +287,14 @@ pub trait NetdataSchema: JsonSchema {
         let generator = SchemaGenerator::new(config.schema_settings.clone());
         let mut json_schema = generator.into_root_schema_for::<Self>();
 
-        // Apply our UI schema collector transform
         let mut ui_collector = CollectUISchema::default();
         ui_collector.transform(&mut json_schema);
 
-        // Apply our config declaration collector
         let mut config_collector = CollectConfigDeclaration::default();
         config_collector.transform(&mut json_schema);
 
-        // Create the UI schema from collected information
         let mut ui_schema = ui_collector.ui_schema;
 
-        // Add default UI options
         if config.full_page {
             ui_schema.insert(
                 "uiOptions".to_string(),
@@ -270,13 +304,13 @@ pub trait NetdataSchema: JsonSchema {
             );
         }
 
-        // Build the result object
         let mut result = serde_json::json!({
             "jsonSchema": json_schema,
             "uiSchema": ui_schema
         });
 
-        // Add config declaration if present
+        // Always present after a successful transform (build() panics otherwise); member
+        // keys per netdata-plugin-types' `config` module (the TryFrom inverse).
         if let Some(config_decl) = config_collector.config_declaration {
             result["configDeclaration"] = serde_json::json!({
                 "id": config_decl.id,
@@ -295,5 +329,6 @@ pub trait NetdataSchema: JsonSchema {
     }
 }
 
-/// Blanket implementation for all JsonSchema types
+/// Blanket impl: every `JsonSchema` type gets [`NetdataSchema`], so
+/// `T::netdata_schema()` needs no derive.
 impl<T> NetdataSchema for T where T: JsonSchema {}

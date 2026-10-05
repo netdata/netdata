@@ -2,9 +2,12 @@
 
 package powerstore
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
-func (c *Collector) collectFcPorts() {
+func (c *Collector) collectFcPorts(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	for id, port := range c.discovered.fcPorts {
@@ -20,7 +23,7 @@ func (c *Collector) collectFcPorts() {
 			}
 			c.mx.fcPort.linkUp.WithLabelValues(name).Observe(linkVal)
 
-			pm, err := c.client.PerformanceMetricsByFcPort(id)
+			pm, err := c.client.PerformanceMetricsByFcPort(ctx, id)
 			if err != nil {
 				c.Warningf("error collecting FC port %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {
@@ -39,7 +42,7 @@ func (c *Collector) collectFcPorts() {
 	wg.Wait()
 }
 
-func (c *Collector) collectEthPorts() {
+func (c *Collector) collectEthPorts(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	for id, port := range c.discovered.ethPorts {
@@ -55,7 +58,7 @@ func (c *Collector) collectEthPorts() {
 			}
 			c.mx.ethPort.linkUp.WithLabelValues(name).Observe(linkVal)
 
-			pm, err := c.client.EthPortPerformanceMetrics(id)
+			pm, err := c.client.EthPortPerformanceMetrics(ctx, id)
 			if err != nil {
 				c.Warningf("error collecting ETH port %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {

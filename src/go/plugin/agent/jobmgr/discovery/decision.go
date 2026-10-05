@@ -49,8 +49,9 @@ type decisionCandidateKey struct {
 }
 
 type decisionCandidateRevision struct {
-	key decisionCandidateKey
-	uid string
+	key        decisionCandidateKey
+	uid        string
+	pipelineID string
 }
 
 type decisionSelection struct {
@@ -142,6 +143,12 @@ func (di *DecisionIndex) reconcileRound(
 			if reconciliation.submit {
 				di.acknowledge(reconciliation)
 			}
+			continue
+		}
+		// Process retirement cuts attempts before cancelling discovery. Leave
+		// these selections unacknowledged and keep the pipeline alive to drain.
+		if jobmgr.ContainsOnlyErrorLeaves(reconciliation.err,
+			jobmgr.ErrProcessAttemptRetired, jobmgr.ErrProcessAttemptStopped) {
 			continue
 		}
 		if ctx.Err() != nil {
@@ -435,8 +442,13 @@ func (di *DecisionIndex) candidateRejected(
 }
 
 func candidateRevision(key decisionCandidateKey, candidate confgroup.Config) decisionCandidateRevision {
-	return decisionCandidateRevision{
+	revision := decisionCandidateRevision{
 		key: key,
 		uid: candidate.UID(),
 	}
+	if candidate.SourceType() == confgroup.TypeDiscovered {
+		// Untrusted hashes omit the owner, but its rejection must not block another pipeline's opt-out.
+		revision.pipelineID = candidate.DiscoveryPipelineID()
+	}
+	return revision
 }

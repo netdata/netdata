@@ -109,6 +109,10 @@ func (s *jobV2HostState) commitSuccessfulEmission(plan chartengine.Plan, decisio
 	s.ownerGUID = decision.targetHost.guid
 	s.engineHost = decision.targetHost
 	s.cleanupDefinition = decision.definition
+	// An empty switch can advance engineHost while cleanup still belongs to the old host.
+	if s.cleanupOwner != decision.targetHost {
+		clear(s.cleanupCharts)
+	}
 	if s.cleanupCharts == nil {
 		s.cleanupCharts = make(map[string]chartengine.ChartMeta)
 	}

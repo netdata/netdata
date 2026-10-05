@@ -98,7 +98,9 @@ Voice, for every channel:
   `["object", "null"]` / `["array", "null"]` (a YAML key with no value decodes to nil). Scalars stay single-typed.
 - Enums: 2 to 5 values render as `"ui:widget": "radio"` with `"ui:options": {"inline": true}`; longer lists stay a
   select. Display labels come from `ui:options.enumNames` (the JSON Schema `enumNames` keyword is ignored). Avoid `0`,
-  `false`, and `""` as enum values.
+  `false`, and `""` as enum values. An enum with a default SHOULD be a `confopt.Enum`, so an empty or omitted value
+  means the default (the form can submit a list item without it); the schema then carries that `default` and leaves the
+  field out of `required`.
 - Multi-line text (queries, request bodies, templates) uses `"ui:widget": "textarea"`, with `"ui:options": {"rows": N}`
   when 2 rows are too few.
 - Durations are strings in Netdata duration syntax (`30s`, `5m`); give a placeholder. Numbers carry `minimum`
@@ -131,15 +133,19 @@ Use a discriminator plus `dependencies` for mutually exclusive configurations (m
 ```
 
 - The discriminator is a radio; its `ui:help` compares the modes (when to choose which).
-- Branch section keys SHOULD be `<discriminator>_<value>`. When multiple discriminator values share one shape,
-  semantic keys MAY be used (for example `version` with `credentials` and `credentials3`). Each branch MUST carry
-  its own `required`; the renderer constraints below still apply.
+- Branch section keys SHOULD be `<discriminator>_<value>`. Values that share one shape SHOULD share one branch whose
+  discriminator is an `enum` of those values; its keys MAY be semantic (vnodes `version`: `credentials` for `1`/`2c`)
+  or existing top-level options (redfish `auth_method`: `username`/`password` for `auto`/`session`/`basic`). Each
+  branch MUST carry its own `required`; the renderer constraints below still apply.
 - A branch key MUST NOT also be a plain sibling property (it would render for every mode).
+- An object with `dependencies` MUST NOT set `additionalProperties: false`: standard validators then reject every key
+  a branch reveals.
 - With tabs, branch keys MUST be listed on a tab (they render only while their mode is selected); an unlisted branch
   key is dropped like any other property.
 - Prefer top-level dependencies: the UI drops inactive-branch data only for top-level discriminators.
-- Do not use property-level `oneOf`/`anyOf` for alternatives; the UI renders a branch selector whose first option
-  cannot be selected reliably.
+- `oneOf`/`anyOf` MUST NOT appear outside `dependencies` (why, and the `if`/`then` alternative:
+  `src/plugins.d/DYNCFG.md#json-schema-for-configuration-ui`). Put several `if`/`then` rules in `allOf`; worked
+  examples: redfish `tls_cert`/`tls_key` set together, ceph `bearer_token_file` or both `username` and `password`.
 
 ## 6. Secrets
 
@@ -224,7 +230,9 @@ seconds.`.
   the schema `required` list.
 - `collecttest.AssertConfigSchemaMatchesMetadata(t, "config_schema.json", "metadata.yaml")` checks tabs and
   descriptions in both directions: every documented option exists in the schema with the same description, and every
-  visible top-level property is documented. Nested option names resolve through `properties`, `dependencies`
+  visible top-level property is documented. A form without tabs skips the tab checks and requires no `group` on any
+  option. `AssertConfigSchemaMatchesMetadataWith(..., collecttest.ConfigSchemaCheck{Defaults: true})` also compares
+  `default_value` with the schema `default` (booleans as `yes`/`no`); opt in once the collector's defaults agree. Nested option names resolve through `properties`, `dependencies`
   branches, `allOf`, `$ref`, and array items written as `rules[].query.period`; keys of a free map
   (`additionalProperties`) are not documented as options. The call is opt-in because most collectors predate the
   alignment rule and would fail it today; `cloudwatch`, `ceph`, `s3check`, and `azure_monitor` are the worked examples.
@@ -245,6 +253,8 @@ a wrong schema; they never restate a file, and a failure is fixed in the schema,
 | `TestConfigSchemasMaskOnlySecrets` | password widget on credentials only; no `sensitive` flag |
 | `TestConfigSchemasDoNotMaterializeOptionalArrays` | no `minItems` on optional arrays |
 | `TestConfigSchemasDoNotDeclareBranchKeysAsProperties` | branch keys are not sibling properties |
+| `TestConfigSchemasOfferAlternativesOnlyThroughDependencies` | no `oneOf`/`anyOf` outside `dependencies` |
+| `TestConfigSchemasKeepDependentObjectsOpen` | no `additionalProperties: false` next to `dependencies` |
 
 The file also asserts that its glob list covers every `config_schema*.json` under `src/go/plugin` except the ibm.d
 generated schemas and `framework/charttpl`, so a new schema outside the list fails the build.

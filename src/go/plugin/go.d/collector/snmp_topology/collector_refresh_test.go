@@ -23,6 +23,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/snmptopologyfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 	"github.com/stretchr/testify/require"
 )
@@ -88,7 +89,7 @@ func TestCollectorRunRefreshesImmediatelyBeforeUpdateEvery(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		require.NoError(t, coll.Run(ctx))
+		require.NoError(t, coll.Run(ctx, func() {}))
 	}()
 
 	seen := false
@@ -121,7 +122,7 @@ func TestCollectorRunStopsOnContextCancel(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		require.NoError(t, coll.Run(ctx))
+		require.NoError(t, coll.Run(ctx, func() {}))
 	}()
 
 	cancel()
@@ -146,7 +147,7 @@ func TestCollectorRunDoesNotPollWhenContextAlreadyCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	require.NoError(t, coll.Run(ctx))
+	require.NoError(t, coll.Run(ctx, func() {}))
 }
 
 func TestCollectorRefreshPrunesUnregisteredDeviceStateFromPublishedGeneration(t *testing.T) {
@@ -943,7 +944,7 @@ func TestCollectorRunCancelsInFlightRefresh(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- coll.Run(ctx)
+		errCh <- coll.Run(ctx, func() {})
 	}()
 
 	select {
@@ -2056,4 +2057,25 @@ func BenchmarkCollectorRefreshDueDeviceWithAcquisition(b *testing.B) {
 			}
 		})
 	}
+}
+
+func TestCollectorRuntimeReadyPrecedesFirstObservation(t *testing.T) {
+	coll, store := newTestSNMPTopologyCollectorWithStore()
+	registerTestDeviceState(store, ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.10", Port: 161})
+	sweepEntered, releaseSweep, ready := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	coll.newSnmpClient = func() gosnmp.Handler { close(sweepEntered); <-releaseSweep; panic("end test sweep") }
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() { done <- coll.Run(ctx, func() { close(ready) }) }()
+	select {
+	case <-ready:
+	case <-time.After(time.Second):
+		t.Fatal("local readiness waited for first observation")
+	}
+	<-sweepEntered
+	require.False(t, coll.FunctionAvailable(snmptopologyfunc.MethodID), "runtime readiness does not imply a renderable topology")
+	cancel()
+	close(releaseSweep)
+	require.NoError(t, <-done)
+	coll.Cleanup(context.Background())
 }

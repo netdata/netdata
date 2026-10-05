@@ -13,12 +13,12 @@ import (
 
 // CollectorV1 is an interface that represents a module.
 type CollectorV1 interface {
-	// Init does initialization.
-	// If it returns error, the job will be disabled.
+	// Init does initialization. An error fails the job; retries follow the
+	// CollectorV2 rules.
 	Init(context.Context) error
 
-	// Check is called after Init.
-	// If it returns error, the job will be disabled.
+	// Check is called after Init. An error fails the job; retries follow the
+	// CollectorV2 rules.
 	Check(context.Context) error
 
 	// Charts returns the chart definition.
@@ -41,7 +41,15 @@ type CollectorV1 interface {
 //
 // Collectors implementing this interface:
 //   - write metrics into CollectorStore during Collect(),
-//   - provide chart template YAML consumed by chartengine.
+//   - provide exactly one chart capability for metric jobs: static YAML or a native set.
+//
+// An Init or Check error fails the job. By default, a Check error is retried
+// every autodetection_retry seconds (never when it is 0, the framework
+// default) and an Init error is never retried. PermanentError (never retried)
+// and TemporaryError (retried per autodetection_retry) classify either. DynCfg
+// update rejects failed preflight regardless of retry policy; enable accepts
+// intent before probing and reports a later failure through job status.
+// A classified failure keeps a failed stock job listed instead of removed.
 type CollectorV2 interface {
 	Init(context.Context) error
 	Check(context.Context) error
@@ -53,18 +61,35 @@ type CollectorV2 interface {
 	VirtualNode() *vnodes.VirtualNode
 
 	MetricStore() metrix.CollectorStore
+}
+
+// StaticChartTemplateProvider supplies one document, captured once after Check.
+// Existing collectors may continue composing or embedding YAML through this API.
+type StaticChartTemplateProvider interface {
 	ChartTemplateYAML() string
 }
 
-// CollectorV2Runner is an optional long-running V2 collector hook.
-//
-// Run is called only after the runtime job starts. It is not called during
-// config validation or autodetection. Implementations should block until ctx is
-// canceled, and must return promptly after ctx.Done(). Returning before
-// cancellation is treated as an unexpected runner stop and is logged by the job
-// runtime.
+// ChartTemplateSetProvider supplies the complete desired native set. The getter
+// is captured after Check and once after each successful Collect, before metric
+// commit. It must be cheap and return the same immutable pointer until content
+// changes. Nil and the zero value are invalid. For no authored entries, construct
+// an empty set with chartengine.NewTemplateSet(chartengine.TemplateSetSpec{}).
+// Calls run on the job goroutine, serialized with Collect. If other goroutines
+// share the stored pointer across replacements, synchronize its reads and writes.
+type ChartTemplateSetProvider interface {
+	ChartTemplateSet() *chartengine.TemplateSet
+}
+
+// CollectorV2Runner optionally owns operational acquisition and serving.
+// Init/Check prepare configuration without acquiring exclusive runtime resources.
+// Run starts after predecessor release. Call ready after all fallible startup
+// prerequisites succeed and Collect can safely run; no packet or poll is required.
+// Duplicate/late ready calls are ignored. Run must return promptly on cancellation.
+// Unexpected return (including nil) fails the job. Before readiness, ordinary
+// failures use configured startup retries and a PermanentError none; after
+// readiness recovery needs restart.
 type CollectorV2Runner interface {
-	Run(context.Context) error
+	Run(ctx context.Context, ready func()) error
 }
 
 // ConfiguredVnodeConsumer is an optional CollectorV1 or CollectorV2 capability. It receives an
@@ -86,7 +111,8 @@ type FunctionAvailability interface {
 }
 
 // CollectorV2EnginePolicy allows a V2 collector to provide chartengine policy
-// (series selector + autogen behavior).
+// (series selector + autogen behavior), captured once after Check. Overrides
+// apply to global policy; native entry restrictions remain in force.
 type CollectorV2EnginePolicy interface {
 	EnginePolicy() chartengine.EnginePolicy
 }

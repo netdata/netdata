@@ -152,6 +152,10 @@ Metrics:
 | cgroup.dc_reference | Count file access | reference | files |
 | cgroup.dc_not_cache | Files not present inside directory cache | slow | files |
 | cgroup.dc_not_found | Files not found | miss | files |
+| cgroup.fd_open | Number of open files | calls | calls/s |
+| cgroup.fd_open_error | Fails to open files | calls | calls/s |
+| cgroup.fd_close | Files closed | calls | calls/s |
+| cgroup.fd_close_error | Fails to close files | calls | calls/s |
 | cgroup.net_conn_ipv4 | TCP v4 outbound connections | connections | connections/s |
 | cgroup.net_conn_ipv6 | TCP v6 outbound connections | connections | connections/s |
 | cgroup.net_total_bandwidth | Bandwidth | received, sent | kilobits/s |

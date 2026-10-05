@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"strings"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	s, err := c.serverStats()
+	s, err := c.serverStats(ctx)
 	if err != nil {
 		return nil, err
 	}

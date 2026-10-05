@@ -64,6 +64,7 @@ func TestDiscovererTestUnsupportedMethodsDoNoOperationalWork(t *testing.T) {
 }
 
 func TestDiscovererTestUsesConfiguredGETRequest(t *testing.T) {
+	useCredentialHelper(t)
 	tests := map[string]struct {
 		method string
 	}{
@@ -73,8 +74,8 @@ func TestDiscovererTestUsesConfiguredGETRequest(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			tokenFile := t.TempDir() + "/token"
-			require.NoError(t, os.WriteFile(tokenFile, []byte("test-token"), 0o600))
+			tokenFile := credentialTestDir(t) + "/token"
+			require.NoError(t, os.WriteFile(tokenFile, []byte("test-token"), 0o644))
 
 			var requests atomic.Int64
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -113,8 +114,9 @@ func TestDiscovererTestPublicErrors(t *testing.T) {
 	}{
 		"request creation": {
 			run: func(t *testing.T) (error, []string) {
-				tokenFile := t.TempDir() + "/empty-token"
-				require.NoError(t, os.WriteFile(tokenFile, nil, 0o600))
+				useCredentialHelper(t)
+				tokenFile := credentialTestDir(t) + "/empty-token"
+				require.NoError(t, os.WriteFile(tokenFile, nil, 0o644))
 				d := newTestDiscoverer(t, web.HTTPConfig{
 					RequestConfig: web.RequestConfig{
 						URL:             "http://127.0.0.1/discovery",
@@ -240,15 +242,16 @@ func TestDiscovererTestUsesConfiguredTLSAndProxyPaths(t *testing.T) {
 	}{
 		"TLS CA": {
 			run: func(t *testing.T) error {
+				useCredentialHelper(t)
 				srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
 					_, _ = fmt.Fprint(w, `[]`)
 				}))
 				defer srv.Close()
 
-				caFile := t.TempDir() + "/ca.pem"
+				caFile := credentialTestDir(t) + "/ca.pem"
 				caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: srv.Certificate().Raw})
-				require.NoError(t, os.WriteFile(caFile, caPEM, 0o600))
+				require.NoError(t, os.WriteFile(caFile, caPEM, 0o644))
 
 				d := newTestDiscoverer(t, web.HTTPConfig{
 					RequestConfig: web.RequestConfig{URL: srv.URL},

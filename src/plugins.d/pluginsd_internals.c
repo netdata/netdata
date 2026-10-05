@@ -43,9 +43,9 @@ ssize_t send_to_plugin(const char *txt, PARSER *parser, STREAM_TRAFFIC_TYPE type
     return -4;
 }
 
-PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyword, const char *msg) {
-    parser->user.enabled = 0;
-
+// Stops the parser; for a plugin, the plugins.d worker then applies its failure
+// policy (restart with backoff, or disable) - see pluginsd_worker_thread().
+PARSER_RC PLUGINSD_PROTOCOL_ERROR(const char *keyword, const char *msg) {
     if(keyword && msg) {
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_INFO,

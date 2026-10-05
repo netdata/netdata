@@ -910,8 +910,11 @@ function Save-Api([string]$rel, [string]$title, [string]$urlPath) {
     try {
         $resp = Invoke-LocalApi "http://127.0.0.1:$NdPort$urlPath" $TimeoutSeconds
         $content = $resp.Content
-        # a JSON body cut at any point is malformed, so overflow is withheld whole
-        if ($content.Length -gt 2MB) { $content = '{"error":"response exceeded the cap and was withheld"}' }
+        # a JSON body cut at any point is malformed, so overflow is withheld whole.
+        # Measure the UTF-8 bytes actually written, not the string's UTF-16 code
+        # units: a non-ASCII body can be several times longer on disk than in
+        # characters and would otherwise sail past the cap.
+        if ([System.Text.Encoding]::UTF8.GetByteCount($content) -gt 2MB) { $content = '{"error":"response exceeded the cap and was withheld"}' }
         Write-Utf8 $full $content
         Invoke-SanitizeFile $full
         Add-Manifest $rel 'api' $urlPath $title
@@ -1147,6 +1150,23 @@ if ($ApiOk) {
     Save-Api '07-runtime\alerts-active.json' 'Currently raised alerts' '/api/v3/alerts?options=active'
     Save-Api '07-runtime\alerts-all.json' 'All alert instances (summary)' '/api/v1/alarms?all'
     Save-Api '07-runtime\functions.json' 'Registered functions' '/api/v1/functions'
+    Save-Api '07-runtime\dyncfg-tree.json' 'Dynamic configuration tree: go.d/scripts.d job states (accepted/running/failed/disabled/orphan/incomplete/none), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state' '/api/v3/config?action=tree'
+    # /api/v3/info answers without any access check, so $ApiOk can be true while
+    # this endpoint - behind the dyncfg ACL - refuses us, and Save-Api deletes the
+    # file on failure leaving no trace at all. The bundle cannot authenticate:
+    # bearer token FILENAMES are themselves live tokens and are never collected.
+    $dyncfgPath = Join-Path $Work '07-runtime\dyncfg-tree.json'
+    if (-not (Test-Path $dyncfgPath)) {
+        # Every Save-Api in this block returns early once the deadline is past,
+        # so 07-runtime may not exist yet and WriteAllText would throw.
+        $dyncfgDir = Split-Path $dyncfgPath -Parent
+        if (-not (Test-Path $dyncfgDir)) { New-Item -ItemType Directory -Path $dyncfgDir -Force | Out-Null }
+        # State what was observed, not a cause: a refusal, a timeout, a transport
+        # error and a deadline all reach this point identically.
+        $marker = '{"error":"dyncfg tree was not collected","hint":"/api/v3/info answers with no access check, but /api/v3/config sits behind the dyncfg ACL, so a bearer-protected API is a common cause - a timeout, transport error, HTTP failure or an exceeded collection deadline is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Ask for the collector job state separately.","means":"NOT evidence that no collector jobs exist"}'
+        Write-Utf8 $dyncfgPath $marker
+        Add-Manifest '07-runtime\dyncfg-tree.json' 'file' 'generated' 'Collector job state was unavailable (see hint in the file)'
+    }
     Save-Api '07-runtime\ml-info.json' 'Machine learning status' '/api/v1/ml_info'
     Save-Api '07-runtime\self-cpu.csv' 'Netdata CPU last 10min (csv)' '/api/v1/data?chart=netdata.server_cpu&after=-600&points=60&format=csv'
     Save-Api '07-runtime\self-memory.csv' 'Netdata memory last 10min (csv)' '/api/v1/data?chart=netdata.memory&after=-600&points=60&format=csv'
@@ -1356,7 +1376,7 @@ SNMP diagnostics: $script:SnmpStatus ($script:SnmpFiles raw files; UNSANITIZED w
 READ ORDER FOR TRIAGE:
   SNMP issues         -> 06-state\snmp-diagnostics-status.txt, 06-state\snmp-diagnostics\
   crashes/won't start -> 06-state\status-file.json, 05-logs\eventlog-netdata.txt
-  collector issues    -> 04-config\go.d*, 05-logs\, 09-permissions\plugins-d.txt
+  collector issues    -> 07-runtime\dyncfg-tree.json (job states), 04-config\go.d*, 05-logs\, 09-permissions\plugins-d.txt
   streaming issues    -> 04-config\stream.conf, 07-runtime\node-instances.json, 01-system\clock-timesync.txt
   cloud/claiming      -> 06-state\claimed-id.txt, 07-runtime\aclk.json, 08-network\
   performance         -> 03-process\netdata-processes.txt, 06-state\db-disk-usage.txt

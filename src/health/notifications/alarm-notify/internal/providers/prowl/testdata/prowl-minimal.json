@@ -1,0 +1,20 @@
+{
+  "apikey": [
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+  ],
+  "application": [
+    "Netdata"
+  ],
+  "priority": [
+    "1"
+  ],
+  "event": [
+    "node WARNING: summary"
+  ],
+  "description": [
+    "summary\nNode: node\nAlert: alert\nStatus: WARNING\nTime: 2026-09-14T12:00:00Z"
+  ],
+  "url": [
+    ""
+  ]
+}

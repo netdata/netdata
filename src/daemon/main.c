@@ -146,6 +146,9 @@ int help(int exitcode) {
             "  -W sqlite-compact        Reclaim metadata database unused space and exit.\n\n"
             "  -W sqlite-analyze        Run update statistics and exit.\n\n"
             "  -W sqlite-alert-cleanup  Perform maintenance on the alerts table.\n\n"
+            "  -W sqlite-lease-test     Test that a slow SQLite connection does not block unrelated\n"
+            "                           SQLite users and that teardown waits for running SQLite\n"
+            "                           operations, and exit.\n\n"
 #ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
             "  -W stresstest=A,B,C,D,E,F,G\n"
@@ -225,6 +228,7 @@ int mrg_unittest(void);
 int pluginsd_parser_unittest(void);
 int websocket_compression_unittest(void);
 int web_client_request_size_unittest(void);
+int rrdhost_machine_guid_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
 int unittest_stream_compressions(void);
@@ -498,6 +502,7 @@ int netdata_main(int argc, char **argv) {
                             if (pluginsd_parser_unittest()) return 1;
                             if (websocket_compression_unittest()) return 1;
                             if (web_client_request_size_unittest()) return 1;
+                            if (rrdhost_machine_guid_unittest()) return 1;
                             if (stream_conf_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
                             if (unit_test_buffer()) return 1;
@@ -510,6 +515,7 @@ int netdata_main(int argc, char **argv) {
                             if (exporting_opentsdb_telnet_unittest()) return 1;
                             if (ringbuffer_unittest()) return 1;
                             if (onewayalloc_unittest()) return 1;
+                            if (timezone_windows_mapping_unittest()) return 1;
                             if (log_stack_unittest()) return 1;
                             if (clocks_unittest()) return 1;
                             if (ws_client_unittest()) return 1;
@@ -576,14 +582,19 @@ int netdata_main(int argc, char **argv) {
 #ifdef OS_WINDOWS
                             if (perflibnamestest_main()) return 1;
 #endif
-                            sqlite_close_databases();
-                            sqlite_library_shutdown();
+                            // MUST stay last: it runs the real sqlite_close_databases() and
+                            // sqlite_library_shutdown(), after which no SQLite work is admitted
+                            if (sqlite_lease_teardown_unittest()) return 1;
                             rrdlabels_aral_destroy(false);
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
                         else if(strcmp(optarg, "escapetest") == 0) {
                             return command_argument_sanitization_tests();
+                        }
+                        else if(strcmp(optarg, "alertqueuetest") == 0) {
+                            unittest_running = true;
+                            return alert_queue_unittest();
                         }
                         else if(strcmp(optarg, "dicttest") == 0) {
                             unittest_running = true;
@@ -660,6 +671,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return onewayalloc_unittest();
                         }
+                        else if(strcmp(optarg, "timezonemaptest") == 0) {
+                            unittest_running = true;
+                            return timezone_windows_mapping_unittest();
+                        }
                         else if(strcmp(optarg, "wsclienttest") == 0) {
                             unittest_running = true;
                             return ws_client_unittest();
@@ -684,6 +699,16 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "uuidtest") == 0) {
                             unittest_running = true;
                             return uuid_unittest();
+                        }
+                        else if(strcmp(optarg, "sqlite-lease-test") == 0) {
+                            unittest_running = true;
+                            // the same SQLite setup as -W unittest; the teardown test runs the real teardown,
+                            // so it goes last, in this process only
+                            if (sqlite_library_init())
+                                return 1;
+                            int errors = sqlite_lease_unittest();
+                            errors += sqlite_lease_teardown_unittest();
+                            return errors ? 1 : 0;
                         }
 #ifdef HAVE_LIBBACKTRACE
                         else if(strcmp(optarg, "stacktracetest") == 0) {

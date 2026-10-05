@@ -54,15 +54,22 @@ static bool rrdhost_update_is_parent_label(RRDLABELS *labels, uint32_t (*count_r
     return changed;
 }
 
+// The complete reaction to a change of a host's label set: persist it, re-match alerts, refresh the
+// Cloud node info and forward the set to our parent. Call it when the set changed, or may have (a reload).
+// The node info request is immediate: label changes are rare, and a debounced request would postpone
+// an immediate one already pending (e.g. the one queued when a child connects).
+void rrdhost_labels_changed(RRDHOST *host) {
+    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE | RRDHOST_FLAG_PENDING_LABEL_RECHECK);
+    aclk_queue_node_info(host, true);
+    stream_send_host_labels(host);
+}
+
 void rrdhost_set_is_parent_label(void) {
     if (!localhost || !localhost->rrdlabels)
         return;
 
-    if (rrdhost_update_is_parent_label(localhost->rrdlabels, stream_receivers_currently_connected, false)) {
-        rrdhost_flag_set(localhost, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
-
-        aclk_queue_node_info(localhost, false);
-    }
+    if (rrdhost_update_is_parent_label(localhost->rrdlabels, stream_receivers_currently_connected, false))
+        rrdhost_labels_changed(localhost);
 }
 
 // expand ${VAR} and ${VAR:-default} patterns in src, writing result to dst
@@ -261,10 +268,7 @@ void reload_host_labels(void) {
     // RRDLABEL_FLAG_DONT_DELETE entries are preserved.
     rrdlabels_remove_all_unmarked(localhost->rrdlabels);
 
-    rrdhost_flag_set(localhost,
-                     RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE | RRDHOST_FLAG_PENDING_LABEL_RECHECK);
-
-    stream_send_host_labels(localhost);
+    rrdhost_labels_changed(localhost);
 }
 
 // ----------------------------------------------------------------------------

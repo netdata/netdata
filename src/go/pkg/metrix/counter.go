@@ -107,7 +107,7 @@ func (c *storeCore) recordCounterObserveTotal(desc *instrumentDescriptor, scope 
 			labelsKey:    labelsKey,
 			desc:         desc,
 		}
-		c.active.counters[key] = entry
+		stageEntry(&c.active.counters, key, entry)
 	}
 	entry.current = value // last-write-wins in-cycle
 }
@@ -160,7 +160,7 @@ func (c *storeCore) recordCounterAdd(desc *instrumentDescriptor, scope HostScope
 			desc:         desc,
 			current:      baseline,
 		}
-		c.active.counters[key] = entry
+		stageEntry(&c.active.counters, key, entry)
 	}
 	entry.current += delta
 }

@@ -150,7 +150,7 @@ func (c *storeCore) recordStateSetObserve(desc *instrumentDescriptor, scope Host
 			labelsKey:    labelsKey,
 			desc:         desc,
 		}
-		c.active.stateSet[key] = entry
+		stageEntry(&c.active.stateSet, key, entry)
 	}
 	entry.states = states
 }

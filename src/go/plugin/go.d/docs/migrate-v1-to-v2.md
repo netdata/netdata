@@ -76,7 +76,9 @@ A V2 migration MUST replace the V1 collection path:
 - `Configuration()` preserves existing config return behavior;
 - `VirtualNode()` preserves existing vnode behavior when the V1 collector has one;
 - `MetricStore()` returns the store;
-- `ChartTemplateYAML()` returns embedded `charts.yaml`;
+- `ChartTemplateYAML()` returns embedded `charts.yaml`; the static provider workflow below remains recommended
+  for compatibility migrations. Runtime membership changes may instead use the native provider under
+  `src/go/plugin/framework/chartengine/README.md#named-active-template-sets`;
 - if the compatibility manifest contains V1 chart `Vars`, the migration stops until the `Chart Variables` decision path
   is resolved;
 - `Collect(ctx)` returns `error` and writes observations to `metrix`;

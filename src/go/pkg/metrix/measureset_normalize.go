@@ -2,7 +2,11 @@
 
 package metrix
 
-func normalizeMeasureSetPoint(point MeasureSetPoint, schema *measureSetSchema) []SampleValue {
+import "math"
+
+// Validation borrows the input; each backend copies or consumes it before returning.
+// Only snapshot gauges may represent unavailable fields with NaN.
+func validateMeasureSetPoint(point MeasureSetPoint, schema *measureSetSchema, allowUnavailable bool) {
 	if schema == nil {
 		panic(errMeasureSetSchema)
 	}
@@ -10,19 +14,15 @@ func normalizeMeasureSetPoint(point MeasureSetPoint, schema *measureSetSchema) [
 		panic(errMeasureSetPoint)
 	}
 
-	values := make([]SampleValue, len(point.Values))
-	for i, v := range point.Values {
-		mustFiniteSample(v)
-		values[i] = v
+	for _, v := range point.Values {
+		if math.IsInf(v, 0) || (!allowUnavailable && math.IsNaN(v)) {
+			panic(errInvalidSampleValue)
+		}
 	}
-	return values
 }
 
+// Map the complete named shape; the backend validates values for its write mode.
 func measureSetPointFromFields(fields map[string]SampleValue, schema *measureSetSchema) MeasureSetPoint {
-	return MeasureSetPoint{Values: normalizeMeasureSetFields(fields, schema)}
-}
-
-func normalizeMeasureSetFields(fields map[string]SampleValue, schema *measureSetSchema) []SampleValue {
 	if schema == nil {
 		panic(errMeasureSetSchema)
 	}
@@ -36,10 +36,9 @@ func normalizeMeasureSetFields(fields map[string]SampleValue, schema *measureSet
 		if !ok {
 			panic(errMeasureSetField)
 		}
-		mustFiniteSample(value)
 		values[idx] = value
 	}
-	return values
+	return MeasureSetPoint{Values: values}
 }
 
 func singleMeasureSetPoint(field string, value SampleValue, schema *measureSetSchema) MeasureSetPoint {
@@ -61,12 +60,11 @@ func mustMeasureSetFieldIndex(field string, schema *measureSetSchema) int {
 	return idx
 }
 
-func normalizeMeasureSetCounterDelta(delta MeasureSetPoint, schema *measureSetSchema) []SampleValue {
-	values := normalizeMeasureSetPoint(delta, schema)
-	for _, v := range values {
+func validateMeasureSetCounterDelta(delta MeasureSetPoint, schema *measureSetSchema) {
+	validateMeasureSetPoint(delta, schema, false)
+	for _, v := range delta.Values {
 		if v < 0 {
 			panic(errCounterNegativeDelta)
 		}
 	}
-	return values
 }

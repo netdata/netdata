@@ -92,7 +92,7 @@ env:
 
 #### Options
 
-The configuration file has two top-level blocks: `discoverer:` (the options below) and `services:` (rules that turn discovered pods/services into collector jobs — see [Service Rules](#service-rules)).
+The configuration file has two top-level blocks: `discoverer:` (the discoverer-specific options below) and `services:` (rules that turn discovered pods/services into collector jobs — see [Service Rules](#service-rules)).
 
 After editing the file, restart the Netdata Agent to load the updated discovery pipeline. The default and recommended deployment path on Kubernetes is the [Netdata Helm chart](https://github.com/netdata/helmchart) — the chart renders this file and the rules for you.
 
@@ -100,11 +100,30 @@ After editing the file, restart the Netdata Agent to load the updated discovery 
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
+| [trust_discovered_targets](#option-trust-discovered-targets) | Allow secret references in generated collector jobs, including target-controlled values that can make Netdata read files, run commands, or fetch stored secrets. Off by default; enable only if you control and trust every discoverable target and accept the risk of exposing resolved values to it. | no | no |
 | [role](#option-role) | What to discover. One of `pod` or `service`. |  | yes |
 | namespaces | Namespaces to watch. Empty means all namespaces. | [] (all namespaces) | no |
 | [selector.label](#option-selector-label) | Label selector applied at watch time (server-side filtering). |  | no |
 | [selector.field](#option-selector-field) | Field selector applied at watch time. |  | no |
 | [pod.local_mode](#option-pod-local-mode) | Restrict pod discovery to pods on the same node as the Netdata Agent. | false | no |
+
+<a id="option-trust-discovered-targets"></a>
+##### trust_discovered_targets
+
+Set this option at the top level, alongside `discoverer:` and `services:`, not inside the discoverer block.
+It enables `${env:...}`, `${file:...}`, `${cmd:...}` and `${store:...}` in generated collector jobs.
+
+If a service rule copies a target-controlled value into a job field, the target can insert a reference that
+makes Netdata read a local file, run a command, or fetch a stored secret with the secret provider's
+permissions. The collector may send the result to that target as a credential or other request field.
+Enable only if you control and trust every target this pipeline can discover; enabling it accepts
+this risk for the whole pipeline. One untrusted target is enough to abuse it.
+
+Workload authors can control labels, annotations, environment values and other fields used by service rules.
+
+The default keeps reference syntax literal. This option does not resolve the discoverer's own connection
+credentials. See [Service Discovery](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md#configuration-file-structure).
+
 
 <a id="option-role"></a>
 ##### role
@@ -147,7 +166,7 @@ Only applies when `role: pod`. Requires `MY_NODE_NAME` to be set on the Netdata 
 
 Define the discovery pipeline in `/etc/netdata/go.d/sd/k8s.conf`.
 
-The file has two top-level blocks: `discoverer:` (the options above) and `services:` (rules that turn discovered targets into collector jobs — see [Service Rules](#service-rules)).
+The file has two top-level blocks: `discoverer:` (discoverer-specific settings) and `services:` (rules that turn discovered targets into collector jobs — see [Service Rules](#service-rules)). Set pipeline options such as `trust_discovered_targets` alongside these blocks, not inside `discoverer:`.
 
 After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
 

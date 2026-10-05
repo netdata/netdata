@@ -1,30 +1,54 @@
 //! The date-partitioned per-tenant directory layout:
 //! `{base}/{YYYY-MM-DD}/{tenant}/<files>`.
 //!
-//! Scattered copies of this layout's walk and path-build are how
-//! layout bugs happen (a scanner that doesn't know a layout exists
-//! can't bound a counter seeded from it), so the structure lives here;
-//! per-file policy (which files to read, how to react to read errors)
-//! stays with the callers. The flat per-tenant layout
-//! (`{base}/{tenant}/<files>`) is owned by [`FileDir`](crate::FileDir)
-//! and [`scan_max_sequence_recursive`](crate::scan_max_sequence_recursive).
+//! Path build and partition enumeration live together here so the two
+//! cannot drift apart; per-file policy (which files to read, how to react
+//! to read errors) stays with the callers. The flat per-tenant layout
+//! (`{base}/{tenant}/<files>`) is a separate contract, owned by
+//! [`FileDir`](crate::FileDir) and
+//! [`scan_max_sequence_recursive`](crate::scan_max_sequence_recursive).
+//!
+//! The two walks below share one structural contract (what counts as a
+//! partition, what is skipped, no ordering guarantee) and differ only in
+//! error policy — [`date_tenant_dirs`] propagates a failed directory
+//! open, [`date_tenant_dirs_lossy`] warns and skips it; the precise
+//! semantics are on the functions. The crate-root docs (`lib.rs`) name
+//! this strict-vs-lossy pairing under failure conventions.
+//!
+//! Consumers (grep-verified): path build — `otel-catalog::Registry`,
+//! `file-lifecycle::catalog_builder` and `file-lifecycle::recovery`;
+//! strict walk — `otel_catalog::scan_max_sequence` (the seq-counter
+//! seed must not be under-read); lossy walk —
+//! `otel-catalog::Registry::recover`. [`date_dir_name`] and
+//! [`parse_date_dir`] currently have no callers outside this module and
+//! its tests.
 
 use std::io;
 use std::path::{Path, PathBuf};
 
 use chrono::NaiveDate;
 
-/// The directory name for `date` (`YYYY-MM-DD`).
+/// The partition directory name for `date`: zero-padded `YYYY-MM-DD`
+/// (chrono `%Y-%m-%d`). Inverse of [`parse_date_dir`].
 pub fn date_dir_name(date: NaiveDate) -> String {
     date.format("%Y-%m-%d").to_string()
 }
 
-/// Parse a directory name as a layout date partition.
+/// Parse a directory name as a partition date in `YYYY-MM-DD` shape;
+/// `None` for anything with trailing characters or an impossible date
+/// (e.g. February 30th). Chrono's numeric parsing is padding-lenient
+/// (1-2 digit month/day, leading whitespace skipped, optional year
+/// sign), so `2026-6-11` also parses — [`date_dir_name`] only ever
+/// writes the padded canonical form.
 pub fn parse_date_dir(name: &str) -> Option<NaiveDate> {
     NaiveDate::parse_from_str(name, "%Y-%m-%d").ok()
 }
 
-/// The directory holding `tenant`'s files for `date`.
+/// The directory holding `tenant`'s files for `date`, built as
+/// `{base}/{date}/{tenant}`; the file name is the caller's to join.
+/// `tenant` is used verbatim — this module does not validate it, so the
+/// caller must hand in a path-safe segment (the `TenantId` validators
+/// reject `.`/`..` because this join would otherwise escape `base`).
 pub fn date_tenant_dir(base: &Path, date: NaiveDate, tenant: &str) -> PathBuf {
     base.join(date_dir_name(date)).join(tenant)
 }
@@ -32,41 +56,59 @@ pub fn date_tenant_dir(base: &Path, date: NaiveDate, tenant: &str) -> PathBuf {
 /// One `{date}/{tenant}` partition found on disk.
 #[derive(Debug, Clone)]
 pub struct DateTenantDir {
+    /// The parsed partition date.
     pub date: NaiveDate,
+    /// The tenant directory name as found (already UTF-8, otherwise
+    /// unvalidated).
     pub tenant: String,
+    /// The partition directory itself, `{base}/{date}/{tenant}`: what a
+    /// caller lists or joins file names onto.
     pub path: PathBuf,
 }
 
-/// Enumerate every `{date}/{tenant}` partition under `base`.
+/// Enumerate every `{date}/{tenant}` partition under `base` (strict).
 ///
-/// Structural policy only: a missing `base` yields an empty list,
-/// non-directory entries and non-date directory names are skipped
-/// (other artifact types may share the base), tenant names that aren't
-/// valid UTF-8 are skipped, and symlinks are not followed. Hard I/O
-/// errors propagate, so a caller whose correctness depends on seeing
-/// every partition — like a seq high-water scan, where a silently
-/// short list could under-seed the counter — gets completeness or an
-/// error, never a partial list. Callers that prefer a partial result
-/// use [`date_tenant_dirs_lossy`].
+/// Structural policy, shared with [`date_tenant_dirs_lossy`]: a missing
+/// `base` is an empty list; a partition is only a directory pair whose
+/// top level parses as a date, so plain files, non-date directory
+/// names, stray files inside a date directory, and non-UTF-8 tenant
+/// names are skipped; symlinks are not followed (the entry's own type,
+/// not the target's, must be a directory); results come in `read_dir`
+/// order — sort when order matters.
+///
+/// Error policy (strict): the only failures that surface are `read_dir`
+/// calls failing to open `base` or a date directory; they propagate, so
+/// a caller whose correctness depends on seeing every openable
+/// partition — like the seq high-water scan, where a silently short
+/// list could under-seed the counter — gets the full list or an error.
+/// Entry-level misbehavior (an iteration error, a failed type lookup)
+/// is skipped silently in both modes. Callers that prefer a partial
+/// result use [`date_tenant_dirs_lossy`].
 pub fn date_tenant_dirs(base: &Path) -> io::Result<Vec<DateTenantDir>> {
     collect(base, OnErr::Propagate)
 }
 
-/// Like [`date_tenant_dirs`], but for recovery-style walks where a
-/// partial result beats none: a directory whose listing fails is
-/// warned about and skipped, and the readable partitions are still
-/// returned.
+/// Like [`date_tenant_dirs`], same structural policy, different error
+/// policy: for recovery-style walks where a partial result beats none,
+/// a `read_dir` that fails to open a directory — `base` or a date dir —
+/// is warned about and skipped, and the readable partitions are still
+/// returned. The lossy consumer is `otel-catalog::Registry::recover`.
 pub fn date_tenant_dirs_lossy(base: &Path) -> Vec<DateTenantDir> {
     // Infallible: `WarnSkip` converts every error into a skip.
     collect(base, OnErr::WarnSkip).unwrap_or_default()
 }
 
+/// Error policy for [`collect`]: strict walks propagate a failed
+/// directory open, lossy walks warn about it and skip.
 #[derive(Clone, Copy)]
 enum OnErr {
     Propagate,
     WarnSkip,
 }
 
+/// Shared walker for [`date_tenant_dirs`] (`Propagate`) and
+/// [`date_tenant_dirs_lossy`] (`WarnSkip`): identical structural
+/// filters, error policy selected by `on_err`.
 fn collect(base: &Path, on_err: OnErr) -> io::Result<Vec<DateTenantDir>> {
     let mut out = Vec::new();
     let date_entries = match std::fs::read_dir(base) {

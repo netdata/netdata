@@ -414,6 +414,7 @@ set(RRD_PLUGIN_FILES
         src/database/contexts/rrdcontext-worker.c
         src/database/rrddim.c
         src/database/rrdhost.c
+        src/database/rrdhost-unittest.c
         src/database/rrdlabels.c
         src/database/rrdlabels-aggregated.c
         src/database/rrdlabels-aggregated.h

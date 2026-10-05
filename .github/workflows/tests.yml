@@ -11,6 +11,8 @@ on:
       - '**.cmake'
       - '**.c'
       - '**.h'
+      - 'tests/acls/**'
+      - 'tests/run-unit-tests.sh'
   pull_request:
     paths:
       - 'CMakeLists.txt'
@@ -18,6 +20,8 @@ on:
       - '**.cmake'
       - '**.c'
       - '**.h'
+      - 'tests/acls/**'
+      - 'tests/run-unit-tests.sh'
 env:
   DISABLE_TELEMETRY: 1
 concurrency:

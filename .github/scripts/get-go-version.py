@@ -43,15 +43,15 @@ for modfile in GO_SRC.glob('**/go.mod'):
 # Linux-only, but it still belongs in the native Linux test matrix below.
 build_modules = list(modules)
 
-# Standalone Linux-only Go modules outside src/go (their own go.mod and module
-# path). Each entry's build_target is the module's own import path read from
-# go.mod.
-EXTRA_LINUX_MODULES = [
+# Standalone Go modules outside src/go included in native Linux tests.
+# Each build_target is the module's own import path read from go.mod.
+EXTRA_TEST_MODULES = [
     REPO_ROOT / 'src' / 'collectors' / 'cgroups.plugin' / 'cgroup-name',
     REPO_ROOT / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin',
+    REPO_ROOT / 'src' / 'health' / 'notifications' / 'alarm-notify',
 ]
 
-for moddir in EXTRA_LINUX_MODULES:
+for moddir in EXTRA_TEST_MODULES:
     modfile = moddir / 'go.mod'
     if not modfile.exists():
         continue

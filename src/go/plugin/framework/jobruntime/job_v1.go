@@ -23,37 +23,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
-func newCollectStatusChart(pluginName string) *collectorapi.Chart {
-	chart := &collectorapi.Chart{
-		Title:    "Data Collection Status",
-		Units:    "status",
-		Fam:      pluginName,
-		Ctx:      "netdata.plugin_data_collection_status",
-		Priority: 144000,
-		Dims: collectorapi.Dims{
-			{ID: "success"},
-			{ID: "failed"},
-		},
-	}
-	chart.SetCachedType("netdata")
-	return chart
-}
-
-func newCollectDurationChart(pluginName string) *collectorapi.Chart {
-	chart := &collectorapi.Chart{
-		Title:    "Data Collection Duration",
-		Units:    "ms",
-		Fam:      pluginName,
-		Ctx:      "netdata.plugin_data_collection_duration",
-		Priority: 145000,
-		Dims: collectorapi.Dims{
-			{ID: "duration"},
-		},
-	}
-	chart.SetCachedType("netdata")
-	return chart
-}
-
 type JobConfig struct {
 	PluginName              string
 	Name                    string
@@ -94,24 +63,29 @@ func NewJob(cfg JobConfig) *Job {
 	j := &Job{
 		publication:     cfg.Publication,
 		hostCharts:      make(jobV1ChartInventory),
-		selfCharts:      make(jobV1ChartInventory),
 		autoDetectEvery: cfg.AutoDetectEvery,
 		autoDetectTries: infTries,
 
-		pluginName:              cfg.PluginName,
-		name:                    cfg.Name,
-		moduleName:              cfg.ModuleName,
-		fullName:                cfg.FullName,
-		updateEvery:             cfg.UpdateEvery,
-		priority:                cfg.Priority,
-		isStock:                 cfg.IsStock,
-		functionOnly:            cfg.FunctionOnly,
-		module:                  cfg.Module,
-		labels:                  cfg.Labels,
-		out:                     cfg.Out,
-		cleanupOut:              cfg.CleanupOut,
-		collectStatusChart:      newCollectStatusChart(cfg.PluginName),
-		collectDurationChart:    newCollectDurationChart(cfg.PluginName),
+		pluginName:   cfg.PluginName,
+		name:         cfg.Name,
+		moduleName:   cfg.ModuleName,
+		fullName:     cfg.FullName,
+		updateEvery:  cfg.UpdateEvery,
+		priority:     cfg.Priority,
+		isStock:      cfg.IsStock,
+		functionOnly: cfg.FunctionOnly,
+		module:       cfg.Module,
+		labels:       cfg.Labels,
+		out:          cfg.Out,
+		cleanupOut:   cfg.CleanupOut,
+		selfMetrics: newJobSelfMetrics(
+			cfg.PluginName,
+			cfg.ModuleName,
+			cfg.Name,
+			cfg.FullName,
+			cfg.UpdateEvery,
+			cfg.Labels,
+		),
 		stopCtrl:                newStopController(),
 		tick:                    make(chan int),
 		buf:                     &buf,
@@ -124,12 +98,6 @@ func NewJob(cfg JobConfig) *Job {
 		lifecycleErrorSanitizer: cfg.LifecycleErrorSanitizer,
 	}
 
-	j.collectStatusChart.ID = fmt.Sprintf("%s_%s_data_collection_status", cleanPluginName(j.pluginName), j.FullName())
-	j.collectDurationChart.ID = fmt.Sprintf(
-		"%s_%s_data_collection_duration",
-		cleanPluginName(j.pluginName),
-		j.FullName(),
-	)
 	log := logger.New().With(jobLoggerAttrs(j.ModuleName(), j.Name(), cfg.Source)...)
 
 	j.Logger = log
@@ -172,21 +140,19 @@ type Job struct {
 	initialized bool
 	panicked    atomic.Bool
 
-	collectStatusChart   *collectorapi.Chart
-	collectDurationChart *collectorapi.Chart
-	charts               *collectorapi.Charts
-	tick                 chan int
-	out                  io.Writer
-	cleanupOut           io.Writer
-	buf                  *bytes.Buffer
-	api                  *netdataapi.API
+	selfMetrics jobSelfMetrics
+	charts      *collectorapi.Charts
+	tick        chan int
+	out         io.Writer
+	cleanupOut  io.Writer
+	buf         *bytes.Buffer
+	api         *netdataapi.API
 
 	publication    *hostoutput.Publisher
 	hostOwner      *hostoutput.Owner
 	hostGUID       string
 	hostDefinition *hostoutput.Definition
 	hostCharts     jobV1ChartInventory
-	selfCharts     jobV1ChartInventory
 	emission       jobV1Emission
 	// vnodeMu covers current vnode state while collection refreshes it.
 	vnodeMu               sync.RWMutex
@@ -273,7 +239,7 @@ func (j *Job) autoDetection(ctx context.Context) (err error) {
 	}
 
 	if rawErr := j.init(ctx); rawErr != nil {
-		if !isRetryableError(rawErr) {
+		if !keepsInitRetry(rawErr) {
 			j.disableAutoDetection()
 		}
 		err = sanitizeLifecycleError(j.lifecycleErrorSanitizer, rawErr)
@@ -372,22 +338,17 @@ func (j *Job) Collector() any {
 // StartManaged starts the collector loop while leaving Cleanup ownership with
 // the caller. It acknowledges readiness only after the loop has published its
 // running state.
-func (j *Job) StartManaged(ready chan<- struct{}) {
-	j.run(ready)
-}
-
-func (j *Job) run(ready chan<- struct{}) {
+func (j *Job) StartManaged(run *ManagedRun) {
 	j.stopCtrl.markStarted()
 	j.running.Store(true)
-	if ready != nil {
-		close(ready)
-	}
+	run.Ready()
 	if j.functionOnly {
 		j.Info("started in function-only mode")
 	} else {
 		j.Infof("started, data collection interval %ds", j.updateEvery)
 	}
 	defer func() {
+		run.Stop(nil)
 		j.running.Store(false)
 		j.stopCtrl.markStopped()
 		j.Info("stopped")
@@ -397,6 +358,8 @@ LOOP:
 	for {
 		select {
 		case <-j.stopCtrl.stopCh:
+			break LOOP
+		case <-run.Context().Done():
 			break LOOP
 		case t := <-j.tick:
 			if !j.functionOnly && j.shouldCollect(t) {
@@ -439,10 +402,7 @@ func (j *Job) Cleanup() {
 		j.hostCharts.cleanup(j.api)
 	}
 	hostBytes := j.buf.Len()
-	if len(j.selfCharts) > 0 {
-		j.api.HOST("")
-		j.selfCharts.cleanup(j.api)
-	}
+	j.selfMetrics.cleanup(j.api)
 	if j.buf.Len() > 0 {
 		if _, err := commitHostOutput(j.cleanupOut, hostoutput.Request{
 			Owner:      j.hostOwner,

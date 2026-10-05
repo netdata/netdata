@@ -767,95 +767,81 @@ void rrdhost_system_info_to_node_info(struct rrdhost_system_info *system_info, s
     node_info->data.ml_info.ml_enabled = system_info->ml_enabled;
 }
 
-// emit system info as named key-value pairs into an open JSON object
-void rrdhost_system_info_to_json_object_fields(BUFFER *wb, struct rrdhost_system_info *si) {
-    buffer_json_member_add_string(wb, "os_name",                si && si->host_os_name ? si->host_os_name : "");
-    buffer_json_member_add_string(wb, "os_id",                  si && si->host_os_id ? si->host_os_id : "");
-    buffer_json_member_add_string(wb, "os_id_like",             si && si->host_os_id_like ? si->host_os_id_like : "");
-    buffer_json_member_add_string(wb, "os_version",             si && si->host_os_version ? si->host_os_version : "");
-    buffer_json_member_add_string(wb, "os_version_id",          si && si->host_os_version_id ? si->host_os_version_id : "");
-    buffer_json_member_add_string(wb, "os_detection",           si && si->host_os_detection ? si->host_os_detection : "");
-    buffer_json_member_add_uint64(wb, "cpu_cores",              si && si->host_cores ? str2uint64_t(si->host_cores, NULL) : 0);
-    buffer_json_member_add_uint64(wb, "disk_space",             si && si->host_disk_space ? str2uint64_t(si->host_disk_space, NULL) : 0);
-    buffer_json_member_add_uint64(wb, "cpu_freq",               si && si->host_cpu_freq ? str2uint64_t(si->host_cpu_freq, NULL) : 0);
-    buffer_json_member_add_uint64(wb, "ram_total",              si && si->host_ram_total ? str2uint64_t(si->host_ram_total, NULL) : 0);
-    buffer_json_member_add_string(wb, "container_os_name",      si && si->container_os_name ? si->container_os_name : "");
-    buffer_json_member_add_string(wb, "container_os_id",        si && si->container_os_id ? si->container_os_id : "");
-    buffer_json_member_add_string(wb, "container_os_id_like",   si && si->container_os_id_like ? si->container_os_id_like : "");
-    buffer_json_member_add_string(wb, "container_os_version",   si && si->container_os_version ? si->container_os_version : "");
-    buffer_json_member_add_string(wb, "container_os_version_id",si && si->container_os_version_id ? si->container_os_version_id : "");
-    buffer_json_member_add_string(wb, "container_os_detection", si && si->container_os_detection ? si->container_os_detection : "");
-    buffer_json_member_add_string(wb, "is_k8s_node",            si && si->is_k8s_node ? si->is_k8s_node : "");
-    buffer_json_member_add_string(wb, "kernel_name",            si && si->kernel_name ? si->kernel_name : "");
-    buffer_json_member_add_string(wb, "kernel_version",         si && si->kernel_version ? si->kernel_version : "");
-    buffer_json_member_add_string(wb, "architecture",           si && si->architecture ? si->architecture : "");
-    buffer_json_member_add_string(wb, "virtualization",         si && si->virtualization ? si->virtualization : "");
-    buffer_json_member_add_string(wb, "virt_detection",         si && si->virt_detection ? si->virt_detection : "");
-    buffer_json_member_add_string(wb, "container_type",         si && si->container ? si->container : "");
-    buffer_json_member_add_string(wb, "container_detection",    si && si->container_detection ? si->container_detection : "");
-    buffer_json_member_add_string(wb, "cloud_provider_type",    si && si->cloud_provider_type ? si->cloud_provider_type : "");
-    buffer_json_member_add_string(wb, "cloud_instance_type",    si && si->cloud_instance_type ? si->cloud_instance_type : "");
-    buffer_json_member_add_string(wb, "cloud_instance_region",  si && si->cloud_instance_region ? si->cloud_instance_region : "");
+// the system-info columns of the netdata-streaming function, in column order;
+// drives the column definitions, the row values and the group-by entries
+static const struct {
+    const char *key;
+    const char *name;
+    const char *group_by;           // NULL = no group-by entry
+    RRDF_FIELD_FILTER filter;
+    size_t offset;
+} streaming_function_fields[] = {
+    { "OSName",               "The name of the host's operating system",           "O/S Name",                  RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, host_os_name) },
+    { "OSId",                 "The identifier of the host's operating system",     "O/S ID",                    RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, host_os_id) },
+    { "OSIdLike",             "The ID-like string for the host's OS",              "O/S ID Like",               RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, host_os_id_like) },
+    { "OSVersion",            "The version of the host's operating system",        "O/S Version",               RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, host_os_version) },
+    { "OSVersionId",          "The version identifier of the host's OS",           "O/S Version ID",            RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, host_os_version_id) },
+    { "OSDetection",          "Details about host OS detection",                   "O/S Detection",             RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, host_os_detection) },
+    { "CPUCores",             "The number of CPU cores in the host",               "CPU Cores",                 RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, host_cores) },
+    { "DiskSpace",            "The total disk space available on the host",        NULL,                        RRDF_FIELD_FILTER_NONE,        offsetof(struct rrdhost_system_info, host_disk_space) },
+    { "CPUFreq",              "The CPU frequency of the host",                     NULL,                        RRDF_FIELD_FILTER_NONE,        offsetof(struct rrdhost_system_info, host_cpu_freq) },
+    { "RAMTotal",             "The total RAM available on the host",               NULL,                        RRDF_FIELD_FILTER_NONE,        offsetof(struct rrdhost_system_info, host_ram_total) },
+    { "ContainerOSName",      "The name of the container's operating system",      "Container O/S Name",        RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, container_os_name) },
+    { "ContainerOSId",        "The identifier of the container's operating system", "Container O/S ID",         RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, container_os_id) },
+    { "ContainerOSIdLike",    "The ID-like string for the container's OS",         "Container O/S ID Like",     RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, container_os_id_like) },
+    { "ContainerOSVersion",   "The version of the container's OS",                 "Container O/S Version",     RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, container_os_version) },
+    { "ContainerOSVersionId", "The version identifier of the container's OS",      "Container O/S Version ID",  RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, container_os_version_id) },
+    { "ContainerOSDetection", "Details about container OS detection",              "Container O/S Detection",   RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, container_os_detection) },
+    { "IsK8sNode",            "Whether this node is part of a Kubernetes cluster", "Kubernetes Nodes",          RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, is_k8s_node) },
+    { "KernelName",           "The kernel name",                                   "Kernel Name",               RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, kernel_name) },
+    { "KernelVersion",        "The kernel version",                                "Kernel Version",            RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, kernel_version) },
+    { "Architecture",         "The system architecture",                           "Architecture",              RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, architecture) },
+    { "Virtualization",       "The virtualization technology in use",              "Virtualization Technology", RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, virtualization) },
+    { "VirtDetection",        "Details about virtualization detection",            "Virtualization Detection",  RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, virt_detection) },
+    { "Container",            "Container type information",                        "Container",                 RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, container) },
+    { "ContainerDetection",   "Details about container detection",                 "Container Detection",       RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, container_detection) },
+    { "CloudProviderType",    "The type of cloud provider",                        "Cloud Provider Type",       RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, cloud_provider_type) },
+    { "CloudInstanceType",    "The type of cloud instance",                        "Cloud Instance Type",       RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, cloud_instance_type) },
+    { "CloudInstanceRegion",  "The region of the cloud instance",                  "Cloud Instance Region",     RRDF_FIELD_FILTER_MULTISELECT, offsetof(struct rrdhost_system_info, cloud_instance_region) },
+};
+
+size_t rrdhost_system_info_streaming_function_columns(BUFFER *wb, size_t field_id) {
+    for(size_t i = 0; i < _countof(streaming_function_fields); i++)
+        buffer_rrdf_table_add_field(wb, field_id++, streaming_function_fields[i].key, streaming_function_fields[i].name,
+                                    RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                                    0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                                    RRDF_FIELD_SUMMARY_COUNT, streaming_function_fields[i].filter,
+                                    RRDF_FIELD_OPTS_NONE,
+                                    NULL);
+
+    return field_id;
 }
 
 void rrdhost_system_info_to_streaming_function_array(BUFFER *wb, struct rrdhost_system_info *system_info) {
-    if(system_info) {
-        buffer_json_add_array_item_string(wb, system_info->host_os_name ? system_info->host_os_name : "");
-        buffer_json_add_array_item_string(wb, system_info->host_os_id ? system_info->host_os_id : "");
-        buffer_json_add_array_item_string(wb, system_info->host_os_id_like ? system_info->host_os_id_like : "");
-        buffer_json_add_array_item_string(wb, system_info->host_os_version ? system_info->host_os_version : "");
-        buffer_json_add_array_item_string(wb, system_info->host_os_version_id ? system_info->host_os_version_id : "");
-        buffer_json_add_array_item_string(wb, system_info->host_os_detection ? system_info->host_os_detection : "");
-        buffer_json_add_array_item_string(wb, system_info->host_cores ? system_info->host_cores : "");
-        buffer_json_add_array_item_string(wb, system_info->host_disk_space ? system_info->host_disk_space : "");
-        buffer_json_add_array_item_string(wb, system_info->host_cpu_freq ? system_info->host_cpu_freq : "");
-        buffer_json_add_array_item_string(wb, system_info->host_ram_total ? system_info->host_ram_total : "");
-        buffer_json_add_array_item_string(wb, system_info->container_os_name ? system_info->container_os_name : "");
-        buffer_json_add_array_item_string(wb, system_info->container_os_id ? system_info->container_os_id : "");
-        buffer_json_add_array_item_string(wb, system_info->container_os_id_like ? system_info->container_os_id_like : "");
-        buffer_json_add_array_item_string(wb, system_info->container_os_version ? system_info->container_os_version : "");
-        buffer_json_add_array_item_string(wb, system_info->container_os_version_id ? system_info->container_os_version_id : "");
-        buffer_json_add_array_item_string(wb, system_info->container_os_detection ? system_info->container_os_detection : "");
-        buffer_json_add_array_item_string(wb, system_info->is_k8s_node ? system_info->is_k8s_node : "");
-        buffer_json_add_array_item_string(wb, system_info->kernel_name ? system_info->kernel_name : "");
-        buffer_json_add_array_item_string(wb, system_info->kernel_version ? system_info->kernel_version : "");
-        buffer_json_add_array_item_string(wb, system_info->architecture ? system_info->architecture : "");
-        buffer_json_add_array_item_string(wb, system_info->virtualization ? system_info->virtualization : "");
-        buffer_json_add_array_item_string(wb, system_info->virt_detection ? system_info->virt_detection : "");
-        buffer_json_add_array_item_string(wb, system_info->container ? system_info->container : "");
-        buffer_json_add_array_item_string(wb, system_info->container_detection ? system_info->container_detection : "");
-        buffer_json_add_array_item_string(wb, system_info->cloud_provider_type ? system_info->cloud_provider_type : "");
-        buffer_json_add_array_item_string(wb, system_info->cloud_instance_type ? system_info->cloud_instance_type : "");
-        buffer_json_add_array_item_string(wb, system_info->cloud_instance_region ? system_info->cloud_instance_region : "");
+    for(size_t i = 0; i < _countof(streaming_function_fields); i++) {
+        const char *value = NULL;
+        if(system_info)
+            value = *(char *const *)((const char *)system_info + streaming_function_fields[i].offset);
+
+        buffer_json_add_array_item_string(wb, value ? value : "");
     }
-    else {
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
-        buffer_json_add_array_item_string(wb, "");
+}
+
+void rrdhost_system_info_streaming_function_group_by(BUFFER *wb) {
+    for(size_t i = 0; i < _countof(streaming_function_fields); i++) {
+        if(!streaming_function_fields[i].group_by)
+            continue;
+
+        buffer_json_member_add_object(wb, streaming_function_fields[i].key);
+        {
+            buffer_json_member_add_string(wb, "name", streaming_function_fields[i].group_by);
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, streaming_function_fields[i].key);
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
     }
 }
 

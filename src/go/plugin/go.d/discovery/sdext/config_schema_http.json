@@ -133,6 +133,12 @@
           "http"
         ]
       },
+      "trust_discovered_targets": {
+        "title": "Trust discovered targets",
+        "description": "Allow secret references in generated collector jobs, including target-controlled values that can make Netdata read files, run commands, or fetch stored secrets. Off by default; enable only if you control and trust every discoverable target and accept the risk of exposing resolved values to it.",
+        "type": "boolean",
+        "default": false
+      },
       "services": {
         "title": "Service rules",
         "description": "Rules that turn fetched HTTP discovery items into data collection jobs.",
@@ -176,7 +182,8 @@
         {
           "title": "Discovery",
           "fields": [
-            "discoverer"
+            "discoverer",
+            "trust_discovered_targets"
           ]
         },
         {
@@ -282,6 +289,9 @@
         }
       },
       "ui:help": "- Match fetched HTTP discovery items and generate collector configurations.\n- Generated job configs must include `name` and `module`; `module` is the collector name, for example `httpcheck` or `ping`.\n- If a generated config omits `module`, the rule ID is used as `module`; rely on this only for curated rules where the rule ID is the intended collector.\n- `.Item` contains the fetched item. String items expose the string as `.Item`; object items expose fields under `.Item`."
+    },
+    "trust_discovered_targets": {
+      "ui:help": "Service rules can copy `${env:...}`, `${file:...}`, `${cmd:...}` or `${store:...}` from target-controlled inputs into job fields. Netdata resolves those references with the secret providers' permissions, and a collector may send the resulting value to the target as a credential or other request field. One untrusted target can abuse this; enabling the option accepts that risk for the whole pipeline.\n\nThe discovery endpoint controls the items returned to service rules; trust both that endpoint and its data sources.\n\nDisabled by default: references remain literal. This option does not resolve the discoverer's own connection credentials."
     }
   }
 }

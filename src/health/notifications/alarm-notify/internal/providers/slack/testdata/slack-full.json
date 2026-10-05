@@ -1,0 +1,42 @@
+{
+  "text": "WARNING: Temperature is high\n\nNode\ntest-node\n\nAlert\ntest_alert\n\nStatus\nCLEAR → WARNING\n\nChart\ntest.chart\n\nContext\ntest.context\n\nValue\n42.5 C\n\nPrevious value\n0 C\n\nTime\n2026-09-14T12:00:00Z\n\nA quote: \"hot\"\nUnicode: θερμοκρασία\n\nView alert\nhttps://example.com/alert?id=1&amp;view=chart#details",
+  "mrkdwn": false,
+  "parse": "none",
+  "unfurl_links": false,
+  "unfurl_media": false,
+  "blocks": [
+    {"type": "section", "text": {"type": "plain_text", "text": "WARNING: Temperature is high"}}
+  ],
+  "attachments": [
+    {
+      "color": "warning",
+      "blocks": [
+        {
+          "type": "section",
+          "fields": [
+            {"type": "plain_text", "text": "Node\ntest-node"},
+            {"type": "plain_text", "text": "Alert\ntest_alert"},
+            {"type": "plain_text", "text": "Status\nCLEAR → WARNING"},
+            {"type": "plain_text", "text": "Chart\ntest.chart"},
+            {"type": "plain_text", "text": "Context\ntest.context"},
+            {"type": "plain_text", "text": "Value\n42.5 C"},
+            {"type": "plain_text", "text": "Previous value\n0 C"},
+            {"type": "plain_text", "text": "Time\n2026-09-14T12:00:00Z"}
+          ]
+        },
+        {
+          "type": "section",
+          "text": {"type": "plain_text", "text": "A quote: \"hot\"\nUnicode: θερμοκρασία"}
+        },
+        {
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": "<https://example.com/alert?id=1&amp;view=chart#details|View alert>",
+            "verbatim": true
+          }
+        }
+      ]
+    }
+  ]
+}

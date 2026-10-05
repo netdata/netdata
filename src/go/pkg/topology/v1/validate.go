@@ -23,6 +23,7 @@ type topologyShape struct {
 	actorTypes         map[string]struct{}
 	linkTypes          map[string]struct{}
 	portTypes          map[string]struct{}
+	aggregationScopes  map[string]struct{}
 	evidenceTypes      map[string]map[string]string
 	tableTypes         map[string]map[string]string
 	tableTypeOwners    map[string]string
@@ -579,6 +580,7 @@ func decodeColumn(path string, columnIndex int, rows int, raw any) ([]any, error
 
 func validateColumnValues(path string, column map[string]any, columnType string, values []any, ctx validationContext) error {
 	nullable, _ := column["nullable"].(bool)
+	aggregation, _ := column["aggregation"].(string)
 	for i, value := range values {
 		if value == nil {
 			if nullable {
@@ -624,26 +626,12 @@ func validateColumnValues(path string, column map[string]any, columnType string,
 			if _, ok := value.([]any); !ok {
 				return fmt.Errorf("%s[%d] is not an array", path, i)
 			}
-		case "bool":
-			if _, ok := value.(bool); !ok {
-				return fmt.Errorf("%s[%d] is not a bool", path, i)
-			}
-		case "int":
-			if _, ok := integerValue(value); !ok {
-				return fmt.Errorf("%s[%d] is not an integer", path, i)
-			}
-		case "uint":
-			n, ok := integerValue(value)
-			if !ok || n < 0 {
-				return fmt.Errorf("%s[%d] is not a non-negative integer", path, i)
-			}
-		case "float", "duration":
-			if _, ok := numberValue(value); !ok {
-				return fmt.Errorf("%s[%d] is not a number", path, i)
-			}
-		case "string", "ip", "mac", "timestamp":
-			if _, ok := value.(string); !ok {
-				return fmt.Errorf("%s[%d] is not a string", path, i)
+		case "bool", "int", "uint", "float", "duration", "string", "ip", "mac", "timestamp":
+			if member, reason := scalarColumnValueError(columnType, aggregation, nullable, value); reason != "" {
+				if member >= 0 {
+					return fmt.Errorf("%s[%d][%d] %s", path, i, member, reason)
+				}
+				return fmt.Errorf("%s[%d] %s", path, i, reason)
 			}
 		case "json":
 			// Any decoded JSON value is valid for a json column.
@@ -679,6 +667,10 @@ func collectTopologyShape(data map[string]any) (topologyShape, error) {
 	if err != nil {
 		return topologyShape{}, err
 	}
+	aggregationScopes, err := optionalObjectKeySet(types["aggregation_scopes"], "data.types.aggregation_scopes")
+	if err != nil {
+		return topologyShape{}, err
+	}
 
 	evidenceTypes, err := columnTypesByRegistryObject(types["evidence_types"], "data.types.evidence_types")
 	if err != nil {
@@ -711,6 +703,7 @@ func collectTopologyShape(data map[string]any) (topologyShape, error) {
 		actorTypes:         actorTypes,
 		linkTypes:          linkTypes,
 		portTypes:          portTypes,
+		aggregationScopes:  aggregationScopes,
 		evidenceTypes:      evidenceTypes,
 		tableTypes:         tableTypes,
 		tableTypeOwners:    tableTypeOwners,
@@ -884,6 +877,21 @@ func validateActorTypePresentation(raw any, shape topologyShape) error {
 		if !ok {
 			return fmt.Errorf("data.types.actor_types.%s is not an object", typeID)
 		}
+		if rawScopes, exists := actorType["aggregation_scopes"]; exists {
+			path := "data.types.actor_types." + typeID + ".aggregation_scopes"
+			scopes, err := collectStringList(path, rawScopes, false)
+			if err != nil {
+				return err
+			}
+			for i, scope := range scopes {
+				if _, ok := shape.aggregationScopes[scope]; !ok {
+					return fmt.Errorf("%s[%d] references unknown aggregation scope %q", path, i, scope)
+				}
+			}
+		}
+		if err := validateActorSearchPolicy("data.types.actor_types."+typeID+".search", actorType["search"], shape.actorColumns); err != nil {
+			return err
+		}
 		presentation, ok := actorType["presentation"].(map[string]any)
 		if !ok {
 			continue
@@ -928,9 +936,6 @@ func validateActorTypePresentation(raw any, shape topologyShape) error {
 			return err
 		}
 		if err := validateModalPresentation(path+".modal", presentation["modal"], shape); err != nil {
-			return err
-		}
-		if err := validateActorSearchPolicy("data.types.actor_types."+typeID+".search", actorType["search"], shape.actorColumns); err != nil {
 			return err
 		}
 	}
@@ -2572,27 +2577,6 @@ func integerValue(raw any) (int, bool) {
 			return 0, false
 		}
 		return int(n), true
-	default:
-		return 0, false
-	}
-}
-
-func numberValue(raw any) (float64, bool) {
-	switch value := raw.(type) {
-	case int:
-		return float64(value), true
-	case int64:
-		return float64(value), true
-	case uint64:
-		return float64(value), true
-	case float64:
-		return value, true
-	case json.Number:
-		n, err := value.Float64()
-		if err != nil {
-			return 0, false
-		}
-		return n, true
 	default:
 		return 0, false
 	}

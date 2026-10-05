@@ -4120,7 +4120,6 @@ static void topology_v1_emit_type_registry(
     static const char *const self_scopes[] = { "node" };
     static const char *const process_scopes[] = { "process_name", "pid" };
     static const char *const container_scopes[] = { "container" };
-    static const char *const endpoint_scopes[] = { "endpoint" };
     const char *process_merge_a = "process";
     const char *process_merge_b = NULL;
 
@@ -4149,7 +4148,7 @@ static void topology_v1_emit_type_registry(
                 topology_v1_emit_runtime_actor_type(
                     wb, payload, &topology_runtime_actor_types[i], container_scopes, _countof(container_scopes), group_by, detailed);
             topology_v1_emit_actor_type(
-                wb, payload, "endpoint", "ip", "address_space", endpoint_scopes, _countof(endpoint_scopes),
+                wb, payload, "endpoint", "ip", "address_space", NULL, 0,
                 "Correlation endpoint", "derived", "remote-endpoint", "endpoint", true, "fixed", NULL, "compact", "weaker", false, NULL,
                 group_by,
                 detailed,

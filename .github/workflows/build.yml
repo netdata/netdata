@@ -152,8 +152,6 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - file-check
-    outputs:
-      distfile: ${{ steps.build.outputs.distfile }}
     steps:
       - name: Skip Check
         id: skip
@@ -179,21 +177,14 @@ jobs:
       - name: Build
         id: build
         if: needs.file-check.outputs.run == 'true'
-        run: |
-          mkdir -p artifacts/
-          tar --create --file "artifacts/netdata-$(git describe).tar.gz" \
-              --sort=name --posix --auto-compress --exclude=artifacts --exclude=.git \
-              --exclude=.gitignore --exclude=.gitattributes --exclude=.gitmodules \
-              --transform "s/^\\.\\//netdata-$(git describe)\\//" --verbose .
-          cd artifacts/
-          echo "distfile=$(find . -name 'netdata-*.tar.gz')" >> "${GITHUB_OUTPUT}"
+        run: packaging/create-source-archives.sh
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: dist-tarball
-          path: artifacts/*.tar.gz
+          path: artifacts/*.tar.*
           compression-level: 0
           retention-days: 30
       - name: Failure Notification
@@ -310,7 +301,7 @@ jobs:
       - name: Upload topology-ip-intel stock payload
         id: upload-stock
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@v7
         with:
           name: static-topology-ip-intel-stock
           path: ${{ github.workspace }}/.topology-ip-intel-stock/
@@ -450,7 +441,7 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: dist-static-${{ matrix.arch }}
           path: artifacts/*.gz.run
@@ -558,7 +549,7 @@ jobs:
           timestamp-digest: SHA256
       - name: Upload Installer
         id: upload
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: windows-x86_64-installer
           path: packaging\windows\netdata*.msi
@@ -612,7 +603,7 @@ jobs:
       - name: Retrieve Windows Artifacts
         id: fetch-windows
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: windows-*-installer
           path: dist-artifacts
@@ -680,7 +671,7 @@ jobs:
       - name: Retrieve Build Artifacts
         id: fetch-dist
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: dist-*
           path: dist-artifacts
@@ -688,28 +679,37 @@ jobs:
       - name: Retrieve Windows Artifacts
         id: fetch-windows
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: windows-*-installer
           path: dist-artifacts
           merge-multiple: true
+      - name: Import GPG Keys
+        id: import-keys
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
       - name: Prepare Artifacts
         id: consolidate
         if: needs.file-check.outputs.run == 'true'
-        working-directory: ./artifacts/
-        run: |
-          mv ../dist-artifacts/* . || exit 1
-          ln -s ${{ needs.build-dist.outputs.distfile }} netdata-latest.tar.gz || exit 1
-          cp ../packaging/version ./latest-version.txt || exit 1
-          sha256sum -b ./* > sha256sums.txt || exit 1
-          cat sha256sums.txt
-      - name: Store Artifacts
-        id: store
+        run: .github/scripts/prepare-artifacts.sh dist-artifacts ${{ steps.import-keys.outputs.fingerprint }}
+      - name: Store GitHub Artifacts
+        id: store-github
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         with:
-          name: final-artifacts
-          path: artifacts/*
+          name: github-artifacts
+          path: artifacts/github/*
+          compression-level: 0
+          retention-days: 30
+      - name: Store R2 Artifacts
+        id: store-r2
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: r2-artifacts
+          path: artifacts/r2/*
           compression-level: 0
           retention-days: 30
       - name: Failure Notification
@@ -727,7 +727,8 @@ jobs:
               Fetch dist artifacts: ${{ steps.fetch-dist.outcome }}
               Fetch Windows installers: ${{ steps.fetch-windows.outcome }}
               Consolidate artifacts: ${{ steps.consolidate.outcome }}
-              Store: ${{ steps.store.outcome }}
+              Store Github: ${{ steps.store-github.outcome }}
+              Store R2: ${{ steps.store-r2.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
@@ -763,9 +764,9 @@ jobs:
       - name: Fetch artifacts
         id: fetch
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
-          name: final-artifacts
+          name: github-artifacts
           path: artifacts
       - name: Prepare artifacts directory
         id: prepare
@@ -830,9 +831,9 @@ jobs:
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
-          name: final-artifacts
+          name: github-artifacts
           path: artifacts
       - name: Prepare artifacts directory
         id: prepare
@@ -897,9 +898,9 @@ jobs:
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
-          name: final-artifacts
+          name: github-artifacts
           path: artifacts
       - name: Prepare artifacts directory
         id: prepare
@@ -965,9 +966,9 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
-          name: final-artifacts
+          name: github-artifacts
           path: final-artifacts
       - name: Prepare version info
         id: version
@@ -982,7 +983,7 @@ jobs:
         with:
           allowUpdates: false
           artifactErrorsFailBuild: true
-          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run,final-artifacts/netdata-*.msi'
+          artifacts: 'final-artifacts/*'
           owner: netdata
           repo: netdata-nightlies
           body: Netdata nightly build for ${{ steps.version.outputs.date }}.
@@ -1056,6 +1057,60 @@ jobs:
             && github.event_name == 'workflow_dispatch'
           }}
 
+  publish-nightly-artifacts:
+    name: Publish Nightly Release Artifacts
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly' && github.repository == 'netdata/netdata'
+    needs:
+      - prepare-upload
+      - windows-test
+      - artifact-verification-dist
+      - artifact-verification-static
+    steps:
+      - name: Install Rclone
+        id: install-rclone
+        run: |
+          sudo apt-get update || exit 1
+          sudo apt-get install -y rclone || exit 1
+      - name: Retrieve Artifacts
+        id: fetch
+        uses: actions/download-artifact@v8
+        with:
+          name: r2-artifacts
+          path: artifacts
+      - name: Upload Artifacts
+        id: upload
+        env:
+          RCLONE_CONFIG_S3_TYPE: "s3"
+          RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
+          RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}"
+          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "${{ secrets.CLOUDFLARE_R2_SECRET_KEY }}"
+          RCLONE_CONFIG_S3_ENDPOINT: "${{ secrets.CLOUDFLARE_R2_RELEASE_ENDPOINT }}"
+          RCLONE_CONFIG_S3_REGION: "auto"
+        working-directory: artifacts
+        run: |
+          rclone copy --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/nightly/ || exit 1
+          rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/nightly/latest/ || exit 1
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to upload nightly artifacts:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to upload nightly build artifacts.
+              Install Rclone: ${{ steps.install-rclone.outcome }}
+              Fetch artifacts: ${{ steps.fetch.outcome }}
+              Upload artifacts: ${{ steps.upload.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name == 'workflow_dispatch'
+          }}
+
   normalize-tag: # Fix the release tag if needed
     name: Normalize Release Tag
     runs-on: ubuntu-latest
@@ -1087,9 +1142,9 @@ jobs:
         uses: actions/checkout@v7
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
-          name: final-artifacts
+          name: github-artifacts
           path: final-artifacts
       - name: Create Release
         id: create-release
@@ -1097,7 +1152,7 @@ jobs:
         with:
           allowUpdates: false
           artifactErrorsFailBuild: true
-          artifacts: 'final-artifacts/sha256sums.txt,final-artifacts/netdata-*.tar.gz,final-artifacts/netdata-*.gz.run,final-artifacts/netdata-*.msi'
+          artifacts: 'final-artifacts/*'
           draft: true
           tag: ${{ needs.normalize-tag.outputs.tag }}
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
@@ -1133,6 +1188,60 @@ jobs:
         if: >-
           ${{
             success()
+            && github.event_name == 'workflow_dispatch'
+          }}
+
+  publish-stable-artifacts:
+    name: Publish Stable Release Artifacts
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'release' && github.repository == 'netdata/netdata'
+    needs:
+      - prepare-upload
+      - windows-test
+      - artifact-verification-dist
+      - artifact-verification-static
+    steps:
+      - name: Install Rclone
+        id: install-rclone
+        run: |
+          sudo apt-get update || exit 1
+          sudo apt-get install -y rclone || exit 1
+      - name: Retrieve Artifacts
+        id: fetch
+        uses: actions/download-artifact@v8
+        with:
+          name: r2-artifacts
+          path: artifacts
+      - name: Upload Artifacts
+        id: upload
+        env:
+          RCLONE_CONFIG_S3_TYPE: "s3"
+          RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
+          RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}"
+          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: "${{ secrets.CLOUDFLARE_R2_SECRET_KEY }}"
+          RCLONE_CONFIG_S3_ENDPOINT: "${{ secrets.CLOUDFLARE_R2_RELEASE_ENDPOINT }}"
+          RCLONE_CONFIG_S3_REGION: "auto"
+        working-directory: artifacts
+        run: |
+          rclone copy --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/stable/ || exit 1
+          rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/stable/latest/ || exit 1
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to upload stable build artifacts:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to upload stable build artifacts.
+              Install Rclone: ${{ steps.install-rclone.outcome }}
+              Fetch artifacts: ${{ steps.fetch.outcome }}
+              Upload artifacts: ${{ steps.upload.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
             && github.event_name == 'workflow_dispatch'
           }}
 

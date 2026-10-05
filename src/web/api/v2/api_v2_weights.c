@@ -146,7 +146,7 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
 
     QUERY_WEIGHTS_REQUEST qwr = {
         .version = api_version,
-        .host = (api_version == 1) ? NULL : host,
+        .host = (api_version == 1) ? host : NULL,
         .scope_nodes = scope_nodes,
         .scope_contexts = scope_contexts,
         .scope_instances = scope_instances,

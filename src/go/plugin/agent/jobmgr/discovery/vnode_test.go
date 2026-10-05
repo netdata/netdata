@@ -102,6 +102,8 @@ func TestVNodeConfigCopiesMutableValues(t *testing.T) {
 	current.Vnode.Labels["site"] = "mutated-lookup"
 	again, _ := configuration.Lookup("node")
 	require.EqualValues(t, "original", again.Vnode.Labels["site"])
+	require.NotZero(t, snapshot.Incarnation)
+	require.Equal(t, snapshot.Incarnation, again.Incarnation)
 }
 
 func TestVNodeConfigInitialSnapshotIsDeterministicAndIndependent(t *testing.T) {
@@ -249,4 +251,22 @@ func TestVNodeDefinitionIndex(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestVNodeIncarnationTracksLifetime(t *testing.T) {
+	configuration := newTestVNodeConfiguration(t)
+	first := commitVNode(t, configuration, "node", 0, testVNode("host", "source"))
+	require.NotZero(t, first.Incarnation)
+	changed := testVNode("updated", "source")
+	changed.GUID = "replacement-guid"
+	updated := commitVNode(t, configuration, "node", first.Revision, changed)
+	require.Equal(t, first.Incarnation, updated.Incarnation, "static identity edits retain the record")
+	removal, err := configuration.PrepareRemove("node", updated.Revision)
+	require.NoError(t, err)
+	_, err = removal.Commit()
+	require.NoError(t, err)
+	recreated := commitVNode(t, configuration, "node", 0, testVNode("host", "source"))
+	require.Equal(t, first.Vnode, recreated.Vnode)
+	require.Equal(t, first.Revision, recreated.Revision)
+	require.NotEqual(t, first.Incarnation, recreated.Incarnation)
 }

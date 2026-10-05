@@ -26,34 +26,30 @@ var errServiceDiscoveryNoTerminalResult = errors.New(
 )
 
 type serviceDiscoveryBinding struct {
-	mu sync.Mutex // guards handler/registered/active/dirty
+	mu sync.Mutex // guards registration, read invocations and dirty state
 
 	pluginName  string // owning plugin name
 	epoch       uint64 // run generation
-	attemptKey  string // one physical invocation owner per binding
 	attempts    jobmgr.ProcessAttemptAuthority
-	frames      *lifecycle.FrameOwner       // the one wire frame writer
-	diagnostics jobmgr.DiagnosticObserver   // operational log sink
-	handler     frameworkfunctions.Handler  // the registered service-discovery handler
-	active      *serviceDiscoveryInvocation // current synchronous invocation
-	registered  bool                        // the SD Function is registered
-	dirty       error                       // sticky error (unexpected registration)
+	frames      *lifecycle.FrameOwner                  // the one wire frame writer
+	diagnostics jobmgr.DiagnosticObserver              // operational log sink
+	handler     frameworkfunctions.Handler             // the registered service-discovery handler
+	preparer    dyncfg.CommandPreparer                 // mutation preparation, without adoption
+	invocations map[string]*serviceDiscoveryInvocation // physical handlers, keyed by UID
+	registered  bool                                   // the SD Function is registered
+	dirty       error                                  // sticky error (unexpected registration)
 }
 
 type serviceDiscoveryInvocation struct {
-	uid                  string
-	result               *dyncfg.Result
-	captureNotifications bool
-	notificationOverflow bool
-	notifications        []byte
-	err                  error
+	result *dyncfg.Result
+	err    error
 }
 
 type preparedServiceDiscoveryTransaction struct {
 	mu sync.Mutex
 
 	binding  *serviceDiscoveryBinding
-	handler  frameworkfunctions.Handler
+	command  dyncfg.PreparedCommand
 	function frameworkfunctions.Function
 	scope    lifecycle.ResourceTransactionScope
 	consumed bool
@@ -70,13 +66,9 @@ func newServiceDiscoveryBinding(
 		return nil, errors.New("jobmgr composition: invalid service discovery binding")
 	}
 	return &serviceDiscoveryBinding{
-		pluginName: pluginName,
-		epoch:      epoch,
-		attemptKey: jobmgr.ProcessAttemptIdentityKey(
-			"service-discovery-binding",
-			fmt.Sprintf("%d", epoch),
-			pluginName,
-		),
+		pluginName:  pluginName,
+		epoch:       epoch,
+		invocations: make(map[string]*serviceDiscoveryInvocation),
 		attempts:    attempts,
 		frames:      frames,
 		diagnostics: diagnostics,
@@ -123,8 +115,23 @@ func (sdb *serviceDiscoveryBinding) UnregisterPrefix(name string, prefix string)
 		return
 	}
 	sdb.handler = nil
+	sdb.preparer = nil
 	sdb.registered = false
 	sdb.mu.Unlock()
+}
+
+func (sdb *serviceDiscoveryBinding) RegisterCommandPreparer(name, prefix string, prepare dyncfg.CommandPreparer) {
+	sdb.mu.Lock()
+	defer sdb.mu.Unlock()
+	if sdb.dirty != nil {
+		return
+	}
+	if name != joboutput.DynCfgFunctionName || prefix != sdb.prefix() || prepare == nil ||
+		!sdb.registered || sdb.preparer != nil {
+		sdb.setDirtyLocked(errors.New("jobmgr composition: invalid service discovery command registration"))
+		return
+	}
+	sdb.preparer = prepare
 }
 
 func (sdb *serviceDiscoveryBinding) recordRegistrationError(err error) {
@@ -140,6 +147,30 @@ func (sdb *serviceDiscoveryBinding) prepare(
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
+	var prepared lifecycle.PreparedResourceTransaction
+	workErr, claimErr := jobmgr.RunWithoutClaims(ctx, func(ctx context.Context) (err error) {
+		prepared, err = sdb.prepareUnclaimed(ctx, input, current, scope, permit)
+		return err
+	})
+	if claimErr != nil {
+		if prepared != nil {
+			_, disposeErr := prepared.Dispose(context.Background())
+			claimErr = errors.Join(claimErr, disposeErr)
+		}
+		return nil, errors.Join(workErr, claimErr)
+	}
+	return prepared, workErr
+}
+
+// Preparation owns its candidate and result without the global SD claim. The
+// kernel reacquires that claim before Apply checks the exact predecessor.
+func (sdb *serviceDiscoveryBinding) prepareUnclaimed(
+	ctx context.Context,
+	input functionadapter.HandlerInput,
+	current lifecycle.ReadyResource,
+	scope lifecycle.ResourceTransactionScope,
+	permit lifecycle.LongLivedPermit,
+) (lifecycle.PreparedResourceTransaction, error) {
 	if sdb == nil || ctx == nil || current != nil ||
 		scope.Current.Valid() ||
 		scope.Successor.Valid() ||
@@ -148,7 +179,7 @@ func (sdb *serviceDiscoveryBinding) prepare(
 		return nil, errors.New("jobmgr composition: invalid service discovery transaction scope")
 	}
 	sdb.mu.Lock()
-	handler, dirty := sdb.handler, sdb.dirty
+	handler, preparer, dirty := sdb.handler, sdb.preparer, sdb.dirty
 	sdb.mu.Unlock()
 	if dirty != nil {
 		return nil, dirty
@@ -173,9 +204,39 @@ func (sdb *serviceDiscoveryBinding) prepare(
 		Source:      input.CallerSource,
 		ContentType: input.ContentType,
 	}
+	if !serviceDiscoveryMutationCommand(serviceDiscoveryCommand(function.Args)) {
+		result, cleanup, err := sdb.invokeContained(ctx, scope.ID, function, func(callCtx context.Context) {
+			handler(callCtx, function)
+		})
+		if err != nil {
+			return nil, err
+		}
+		return joboutput.PrepareNoopResourceTransaction(scope, nil, lifecycle.LongLivedPermit{}, result, cleanup, nil)
+	}
+	if preparer == nil {
+		return joboutput.PrepareNoopResourceTransaction(
+			scope,
+			nil,
+			lifecycle.LongLivedPermit{},
+			mustDynCfgMessage(
+				503,
+				"Service discovery configuration is not available.",
+			),
+			func() error { return nil },
+			nil,
+		)
+	}
+	command, err := sdb.prepareCommandContained(ctx, function, preparer)
+	if err != nil {
+		result, cleanup, containmentErr := sdb.serviceDiscoveryContainmentResult(err)
+		if containmentErr != nil {
+			return nil, containmentErr
+		}
+		return joboutput.PrepareNoopResourceTransaction(scope, nil, lifecycle.LongLivedPermit{}, result, cleanup, nil)
+	}
 	return &preparedServiceDiscoveryTransaction{
 		binding:  sdb,
-		handler:  handler,
+		command:  command,
 		function: function,
 		scope:    scope,
 	}, nil
@@ -196,25 +257,23 @@ func (psdt *preparedServiceDiscoveryTransaction) Scope() lifecycle.ResourceTrans
 func (psdt *preparedServiceDiscoveryTransaction) Apply(
 	ctx context.Context,
 ) (lifecycle.AppliedResourceTransaction, error) {
-	binding, handler, function, scope, err := psdt.take()
+	binding, prepared, function, scope, err := psdt.take()
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
 	if ctx == nil {
-		return lifecycle.AppliedResourceTransaction{}, errors.New(
-			"jobmgr composition: nil service discovery apply context",
+		return lifecycle.AppliedResourceTransaction{}, errors.Join(
+			errors.New("jobmgr composition: nil service discovery apply context"),
+			prepared.Dispose(context.Background()),
 		)
 	}
 	command := serviceDiscoveryCommand(function.Args)
-	result, cleanup, err := binding.invokeContained(
-		ctx,
-		scope.ID,
-		function,
-		serviceDiscoveryMutationCommand(command),
-		func(callCtx context.Context) {
-			handler(callCtx, function)
-		},
-	)
+	outcome, err := prepared.Apply(ctx)
+	if err != nil {
+		binding.observeCommand(command, scope.ID, 0, err)
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	result, cleanup, err := binding.prepareCommandOutput(function.UID, outcome)
 	if err != nil {
 		binding.observeCommand(command, scope.ID, 0, err)
 		return lifecycle.AppliedResourceTransaction{}, err
@@ -230,14 +289,17 @@ func (psdt *preparedServiceDiscoveryTransaction) Apply(
 	return applied, err
 }
 
-func (psdt *preparedServiceDiscoveryTransaction) Dispose(context.Context) (lifecycle.ReadyResource, error) {
-	_, _, _, _, err := psdt.take()
-	return nil, err
+func (psdt *preparedServiceDiscoveryTransaction) Dispose(ctx context.Context) (lifecycle.ReadyResource, error) {
+	_, command, _, _, err := psdt.take()
+	if err != nil {
+		return nil, err
+	}
+	return nil, command.Dispose(ctx)
 }
 
 func (psdt *preparedServiceDiscoveryTransaction) take() (
 	*serviceDiscoveryBinding,
-	frameworkfunctions.Handler,
+	dyncfg.PreparedCommand,
 	frameworkfunctions.Function,
 	lifecycle.ResourceTransactionScope,
 	error,
@@ -253,12 +315,147 @@ func (psdt *preparedServiceDiscoveryTransaction) take() (
 			errors.New("jobmgr composition: service discovery transaction consumed")
 	}
 	psdt.consumed = true
-	binding, handler, function, scope := psdt.binding, psdt.handler, psdt.function, psdt.scope
+	binding, command, function, scope := psdt.binding, psdt.command, psdt.function, psdt.scope
 	psdt.binding = nil
-	psdt.handler = nil
+	psdt.command = nil
 	psdt.function = frameworkfunctions.Function{}
 	psdt.scope = lifecycle.ResourceTransactionScope{}
-	return binding, handler, function, scope, nil
+	return binding, command, function, scope, nil
+}
+
+func (sdb *serviceDiscoveryBinding) prepareCommandOutput(
+	uid string,
+	outcome dyncfg.AppliedCommand,
+) (lifecycle.SealedResult, lifecycle.TaskCleanup, error) {
+	if outcome.Result.UID != uid {
+		return lifecycle.SealedResult{}, nil, errors.New(
+			"jobmgr composition: service discovery command result UID differs",
+		)
+	}
+	result, err := lifecycle.NewSealedResult(
+		outcome.Result.Code,
+		outcome.Result.ContentType,
+		[]byte(outcome.Result.Payload),
+	)
+	if err != nil {
+		return lifecycle.SealedResult{}, nil, err
+	}
+	var encoded bytes.Buffer
+	for _, notification := range outcome.Notifications {
+		if err := notification.Validate(); err != nil {
+			return lifecycle.SealedResult{}, nil, err
+		}
+		notification.Emit(dyncfg.NewProtocolOutput(&encoded))
+	}
+	cleanup := lifecycle.TaskCleanup(func() error {
+		if outcome.Published != nil {
+			outcome.Published()
+		}
+		return nil
+	})
+	if encoded.Len() == 0 {
+		return result, cleanup, nil
+	}
+	frame, err := lifecycle.PrepareProtocolFrame(encoded.Bytes())
+	if err != nil {
+		return lifecycle.SealedResult{}, nil, err
+	}
+	return result, func() error {
+		if err := sdb.frames.CommitPreparedProtocolFrame(frame); err != nil {
+			return err
+		}
+		return cleanup()
+	}, nil
+}
+
+// commandHandoff keeps ownership even when cancellation races a completed
+// preflight. A late prepared object is disposed and can never be adopted.
+type commandHandoff struct {
+	mu        sync.Mutex
+	command   dyncfg.PreparedCommand
+	abandoned bool
+}
+
+func (h *commandHandoff) offer(command dyncfg.PreparedCommand) error {
+	h.mu.Lock()
+	if !h.abandoned {
+		h.command = command
+		h.mu.Unlock()
+		return nil
+	}
+	h.mu.Unlock()
+	return command.Dispose(context.Background())
+}
+
+func (h *commandHandoff) take() dyncfg.PreparedCommand {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	command := h.command
+	h.command = nil
+	h.abandoned = true
+	return command
+}
+
+func (sdb *serviceDiscoveryBinding) prepareCommandContained(
+	ctx context.Context,
+	function frameworkfunctions.Function,
+	prepare dyncfg.CommandPreparer,
+) (dyncfg.PreparedCommand, error) {
+	if cause := context.Cause(ctx); cause != nil {
+		return nil, cause
+	}
+	handoff := &commandHandoff{}
+	attempt, err := sdb.attempts.StartProcessAttempt(ctx, jobmgr.ProcessAttemptPlan{
+		Identity: sdb.commandIdentity(function),
+		Target:   sdb.epoch,
+		Work: func(attemptCtx context.Context, admission jobmgr.ProcessAttemptAdmission) error {
+			command, err := prepare(dyncfg.NewFunction(attemptCtx, function))
+			if err != nil {
+				if command != nil {
+					err = errors.Join(err, command.Dispose(context.Background()))
+				}
+				return err
+			}
+			if command == nil {
+				return errors.New("jobmgr composition: nil prepared service discovery command")
+			}
+			if err := admission.Admit(); err != nil {
+				return errors.Join(err, command.Dispose(context.Background()))
+			}
+			return handoff.offer(command)
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	err = attempt.Await(ctx)
+	command := handoff.take()
+	if err != nil {
+		if command != nil {
+			err = errors.Join(err, command.Dispose(context.Background()))
+		}
+		return nil, err
+	}
+	if command == nil {
+		return nil, errors.New("jobmgr composition: service discovery preparation settled without ownership")
+	}
+	return command, nil
+}
+
+func (sdb *serviceDiscoveryBinding) commandIdentity(
+	function frameworkfunctions.Function,
+) jobmgr.ProcessAttemptIdentity {
+	fn := dyncfg.NewFunction(context.Background(), function)
+	name := ""
+	if fn.Command() == dyncfg.CommandAdd {
+		name = fn.JobName()
+	}
+	return jobmgr.ProcessAttemptIdentity{
+		Namespace: jobmgr.ProcessAttemptServiceDiscovery,
+		Key: jobmgr.ProcessAttemptIdentityKey("service-discovery-command", sdb.pluginName,
+			fn.ID(), string(fn.Command()), name),
+		Resource: serviceDiscoveryDiagnosticResource(fn.ID()),
+	}
 }
 
 type serviceDiscoveryInvocationResult struct {
@@ -271,7 +468,6 @@ func (sdb *serviceDiscoveryBinding) invokeContained(
 	ctx context.Context,
 	resource string,
 	function frameworkfunctions.Function,
-	captureNotifications bool,
 	call func(context.Context),
 ) (lifecycle.SealedResult, lifecycle.TaskCleanup, error) {
 	if sdb == nil || ctx == nil || sdb.attempts == nil ||
@@ -286,7 +482,7 @@ func (sdb *serviceDiscoveryBinding) invokeContained(
 	attempt, err := sdb.attempts.StartProcessAttempt(ctx, jobmgr.ProcessAttemptPlan{
 		Identity: jobmgr.ProcessAttemptIdentity{
 			Namespace: jobmgr.ProcessAttemptServiceDiscovery,
-			Key:       sdb.attemptKey,
+			Key:       jobmgr.ProcessAttemptIdentityKey("service-discovery-read", sdb.pluginName, resource),
 			Resource:  serviceDiscoveryDiagnosticResource(resource),
 		},
 		Target: sdb.epoch,
@@ -296,7 +492,6 @@ func (sdb *serviceDiscoveryBinding) invokeContained(
 		) error {
 			result, cleanup, invokeErr := sdb.invoke(
 				function.UID,
-				captureNotifications,
 				func() { call(attemptCtx) },
 			)
 			// The opaque handler stays fuse-bounded. Its terminal result is
@@ -377,44 +572,39 @@ func serviceDiscoveryDiagnosticResource(resource string) string {
 
 func (sdb *serviceDiscoveryBinding) invoke(
 	uid string,
-	captureNotifications bool,
 	call func(),
 ) (lifecycle.SealedResult, lifecycle.TaskCleanup, error) {
 	if sdb == nil || lifecycle.ValidateUID(uid) != nil || call == nil {
 		return lifecycle.SealedResult{}, nil, errors.New("jobmgr composition: invalid service discovery invocation")
 	}
 
-	invocation := &serviceDiscoveryInvocation{
-		uid:                  uid,
-		captureNotifications: captureNotifications,
-	}
+	invocation := &serviceDiscoveryInvocation{}
 	sdb.mu.Lock()
 	if sdb.dirty != nil {
 		err := sdb.dirty
 		sdb.mu.Unlock()
 		return lifecycle.SealedResult{}, nil, err
 	}
-	if sdb.active != nil {
+	if sdb.invocations[uid] != nil {
 		sdb.mu.Unlock()
 		return lifecycle.SealedResult{}, nil, errors.New(
-			"jobmgr composition: concurrent service discovery invocation escaped containment",
+			"jobmgr composition: duplicate service discovery invocation UID",
 		)
 	}
-	sdb.active = invocation
+	sdb.invocations[uid] = invocation
 	sdb.mu.Unlock()
 
 	callErr := callServiceDiscoveryHandler(call)
 
 	sdb.mu.Lock()
-	if sdb.active != invocation {
+	if sdb.invocations[uid] != invocation {
 		sdb.mu.Unlock()
 		return lifecycle.SealedResult{}, nil,
 			errors.Join(callErr, errors.New("jobmgr composition: service discovery invocation changed"))
 	}
-	sdb.active = nil
+	delete(sdb.invocations, uid)
 	result := invocation.result
-	notifications := invocation.notifications
-	invocationErr := invocation.err
+	invocationErr := errors.Join(invocation.err, sdb.dirty)
 	sdb.mu.Unlock()
 
 	if err := errors.Join(callErr, invocationErr); err != nil {
@@ -427,17 +617,7 @@ func (sdb *serviceDiscoveryBinding) invoke(
 	if err != nil {
 		return lifecycle.SealedResult{}, nil, err
 	}
-	cleanup := lifecycle.TaskCleanup(func() error { return nil })
-	if len(notifications) != 0 {
-		prepared, err := lifecycle.PrepareProtocolFrame(notifications)
-		if err != nil {
-			return lifecycle.SealedResult{}, nil, err
-		}
-		cleanup = func() error {
-			return sdb.frames.CommitPreparedProtocolFrame(prepared)
-		}
-	}
-	return sealed, cleanup, nil
+	return sealed, func() error { return nil }, nil
 }
 
 func callServiceDiscoveryHandler(call func()) (err error) {
@@ -454,25 +634,19 @@ func (sdb *serviceDiscoveryBinding) FunctionResult(result dyncfg.Result) {
 	sdb.mu.Lock()
 	defer sdb.mu.Unlock()
 
-	if sdb.active == nil {
+	invocation := sdb.invocations[result.UID]
+	if invocation == nil {
 		sdb.setDirtyLocked(errors.New("jobmgr composition: service discovery result outside invocation"))
 		return
 	}
-	if sdb.active.result != nil {
-		sdb.active.err = errors.Join(
-			sdb.active.err,
+	if invocation.result != nil {
+		invocation.err = errors.Join(
+			invocation.err,
 			errors.New("jobmgr composition: service discovery handler produced multiple results"),
 		)
 		return
 	}
-	if result.UID != sdb.active.uid {
-		sdb.active.err = errors.Join(
-			sdb.active.err,
-			errors.New("jobmgr composition: service discovery result UID differs from invocation"),
-		)
-		return
-	}
-	sdb.active.result = &result
+	invocation.result = &result
 }
 
 func (sdb *serviceDiscoveryBinding) ConfigCreate(opts netdataapi.ConfigOpts) {
@@ -499,32 +673,13 @@ func (sdb *serviceDiscoveryBinding) emitNotification(emit func(dyncfg.Output)) {
 	payload := encoded.Bytes()
 
 	sdb.mu.Lock()
-	// Keep the lock through a direct commit to linearize it with invocation-captured notifications.
-	// Supported output failures return as errors; this binding is not a panic-recovery boundary.
-	if sdb.active == nil || !sdb.active.captureNotifications {
-		commitErr := sdb.frames.CommitBorrowedProtocolFrame(payload)
-		if commitErr != nil {
-			sdb.setDirtyLocked(commitErr)
-		}
-		sdb.mu.Unlock()
+	defer sdb.mu.Unlock()
+	if sdb.dirty != nil {
 		return
 	}
-	if sdb.active.notificationOverflow {
-		sdb.mu.Unlock()
-		return
+	if err := sdb.frames.CommitBorrowedProtocolFrame(payload); err != nil {
+		sdb.setDirtyLocked(err)
 	}
-	if len(payload) > lifecycle.MaximumOtherFrameBytes-len(sdb.active.notifications) {
-		boundErr := errors.New("jobmgr composition: service discovery notifications exceed frame bounds")
-		sdb.active.notificationOverflow = true
-		sdb.active.err = errors.Join(
-			sdb.active.err,
-			boundErr,
-		)
-		sdb.mu.Unlock()
-		return
-	}
-	sdb.active.notifications = append(sdb.active.notifications, payload...)
-	sdb.mu.Unlock()
 }
 
 func (sdb *serviceDiscoveryBinding) setDirtyLocked(err error) {
@@ -604,10 +759,11 @@ func newServiceDiscoveryInitialRoute(
 				},
 			},
 			Transaction: &functionadapter.ResourceTransactionDeclaration{
-				Prepare:         binding.prepare,
-				CommandArgument: 1,
-				GlobalClaim:     dynCfgServiceDiscoveryClaim,
-				Commands:        commands,
+				Prepare:                   binding.prepare,
+				CommandArgument:           1,
+				GlobalClaim:               dynCfgServiceDiscoveryClaim,
+				YieldGlobalClaimOnPrepare: true,
+				Commands:                  commands,
 			},
 			PublicName:          joboutput.DynCfgFunctionName,
 			Prefix:              binding.prefix(),
@@ -620,4 +776,5 @@ func newServiceDiscoveryInitialRoute(
 }
 
 var _ frameworkfunctions.Registry = (*serviceDiscoveryBinding)(nil)
+var _ dyncfg.PreparedRegistry = (*serviceDiscoveryBinding)(nil)
 var _ dyncfg.Output = (*serviceDiscoveryBinding)(nil)

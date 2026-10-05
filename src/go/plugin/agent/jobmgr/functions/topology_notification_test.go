@@ -134,10 +134,10 @@ func TestMethodGenerationTopologyNotifications(t *testing.T) {
 			}, nil, &funcapi.FunctionResponse{
 				Status: 200,
 				Data:   data,
-			})
+			}, false)
 			require.NoError(t, err)
 
-			payload := topologyNotificationResultPayload(t, result, 200)
+			payload := functionResultPayload(t, result, 200)
 			var decoded map[string]any
 			require.NoError(t, json.Unmarshal(payload, &decoded))
 			require.NoError(t, topologyv1.ValidateDecodedResponse(decoded))
@@ -180,28 +180,33 @@ func TestMethodGenerationTopologyFatalResponse(t *testing.T) {
 						Message:  "The test source is unavailable.",
 					}},
 				},
-			})
+			}, false)
 			require.NoError(t, err)
 
-			payload := topologyNotificationResultPayload(t, result, status)
+			payload := functionResultPayload(t, result, status)
 			assert.JSONEq(t, fmt.Sprintf(`{"status":%d,"errorMessage":"The topology request failed."}`, status),
 				string(payload))
 		})
 	}
 }
 
-func topologyNotificationResultPayload(t *testing.T, result lifecycle.SealedResult, status int) []byte {
+func functionResultPayload(t *testing.T, result lifecycle.SealedResult, status int) []byte {
 	t.Helper()
 
 	var output bytes.Buffer
 	owner, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
-	frame, err := lifecycle.PrepareFrame("topology-test", result, 1)
+	frame, err := lifecycle.PrepareFrame("function-test", result, 1)
 	require.NoError(t, err)
 	require.NoError(t, owner.Commit(frame))
-	header, body, ok := strings.Cut(output.String(), "\n")
+	return functionFramePayload(t, output.String(), status)
+}
+
+func functionFramePayload(t *testing.T, output string, status int) []byte {
+	t.Helper()
+	header, body, ok := strings.Cut(output, "\n")
 	require.True(t, ok)
-	assert.Equal(t, fmt.Sprintf("FUNCTION_RESULT_BEGIN topology-test %d application/json 1", status), header)
+	assert.Equal(t, fmt.Sprintf("FUNCTION_RESULT_BEGIN function-test %d application/json 1", status), header)
 	payload, ok := strings.CutSuffix(body, "\nFUNCTION_RESULT_END\n\n")
 	require.True(t, ok)
 	return []byte(payload)

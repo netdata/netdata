@@ -1,7 +1,7 @@
 # Centralizing Logs with OpenTelemetry
 
 You centralize a log source by running an OpenTelemetry Collector where the logs are produced and pointing it at the
-OTLP endpoint of a Netdata Agent. That Agent stores the logs in Netdata's log store, with retention per tenant and
+OTLP endpoint of a Netdata Agent. That Agent stores the logs in Netdata's log store, with its own retention and
 optional offloading to object storage, and shows them in its Logs tab under the `otel-logs` source. Centralize the
 sources that must outlive their node, need retention beyond the node's disk, or have no OS log store, such as
 Kubernetes; leave the rest managed in place, where they cost nothing extra. See
@@ -9,11 +9,10 @@ Kubernetes; leave the rest managed in place, where they cost nothing extra. See
 
 Two things to set up:
 
-1. **The receiving Agent.** Any Netdata Agent with the OpenTelemetry plugin (see the availability note in
-   [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md)). Bind its OTLP endpoint beyond loopback with TLS or mutual TLS, and enable tenant selection when different
-   sender groups need their own retention. See
-   [Securing the OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md) and, for
-   retention and offloading to object storage, [Log Storage and Retention](/docs/logs/log-storage-and-retention.md).
+1. **The receiving Agent.** Any Netdata Agent with the OpenTelemetry plugin (see the availability note in [OTLP
+   Ingestion](/docs/opentelemetry/otlp-ingestion.md)). Bind its OTLP endpoint beyond loopback with TLS or mutual TLS.
+   See [Securing the OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md) and, for retention and offloading
+   to object storage, [Log Storage and Retention](/docs/logs/log-storage-and-retention.md).
 2. **The senders.** One OpenTelemetry Collector per node or cluster, with a persistent queue and the receiver for the
    source. The recipes are in [Collect Logs with OpenTelemetry Collector](/docs/opentelemetry/logs-collection.md):
    [systemd journal](/docs/opentelemetry/logs-collection.md#systemd-journal),

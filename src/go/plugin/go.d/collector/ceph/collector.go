@@ -101,7 +101,7 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("invalid config: %v", err)
 	}
@@ -117,7 +117,7 @@ func (c *Collector) Init(context.Context) error {
 	c.osdMatcher = osdMatcher
 	c.poolMatcher = poolMatcher
 
-	httpClient, err := web.NewHTTPClient(c.ClientConfig)
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("create http client: %v", err)
 	}

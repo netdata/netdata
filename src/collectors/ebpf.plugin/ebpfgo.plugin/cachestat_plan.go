@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
@@ -72,7 +73,23 @@ func defaultPluginsDir() string {
 		return dir
 	}
 
-	return filepath.Join(netdataRuntimePrefix, "usr/libexec/netdata/plugins.d")
+	executable, err := os.Executable()
+	if err != nil || executable == "" {
+		executable = os.Args[0]
+		if resolved, err := exec.LookPath(executable); err == nil {
+			executable = resolved
+		}
+	}
+	if !filepath.IsAbs(executable) {
+		if resolved, err := filepath.Abs(executable); err == nil {
+			executable = resolved
+		}
+	}
+	if resolved, err := filepath.EvalSymlinks(executable); err == nil {
+		executable = resolved
+	}
+
+	return filepath.Dir(executable)
 }
 
 func defaultCachestatLegacyConfig() CachestatLegacyConfig {

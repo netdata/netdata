@@ -1,0 +1,7 @@
+{
+  "chat_id": "@example_alerts",
+  "text": "⚠️ <b>WARNING: summary</b>\n<b>Node:</b> node\n<b>Alert:</b> alert\n<b>Status:</b> WARNING\n<b>Time:</b> 2026-09-14T12:00:00Z",
+  "parse_mode": "HTML",
+  "disable_notification": false,
+  "link_preview_options": {"is_disabled": true}
+}

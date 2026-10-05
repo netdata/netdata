@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile/testutil"
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
@@ -647,6 +648,7 @@ func newOperationalStore(t *testing.T, config Config) *store {
 	t.Helper()
 	s := &store{Config: config}
 	require.NoError(t, s.Init(t.Context()))
+	s.runtime.readFile = testutil.New().Read
 	return s
 }
 

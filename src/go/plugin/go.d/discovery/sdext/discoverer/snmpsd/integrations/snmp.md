@@ -47,7 +47,14 @@ The discoverer never queries device-specific OIDs — those are queried later by
 - **Outbound interface**: probes use the host's default routing. There is no per-pipeline bind-address or VRF option — on multi-homed hosts, configure the OS routing table so the Netdata host reaches each target subnet via the correct interface.
 - The discoverer reads only the standard `system` MIB. Vendor-specific identification (`.SysInfo.Vendor`, `.Category`, `.Model`) is derived from `sysObjectID` and an enterprise-numbers table; values may be empty or `Unknown` for devices that are not in that table.
 - **SNMPv3 engine ID**: gosnmp negotiates the engine ID at the start of each probe (one extra round-trip per probe — usually irrelevant unless `parallel_scans_per_network` is high and the device is rate-limited). Engine IDs are not cached across probes, so devices that rotate engine IDs (rare; some HA pairs do this on failover) are handled transparently.
-- **Credential storage**: community strings and SNMPv3 passphrases are stored in plaintext both in `/etc/netdata/go.d/sd/snmp.conf` (file-based pipelines) and in the agent's dynamic-configuration store under `/var/lib/netdata/dyncfg/` (UI-managed pipelines). To avoid plaintext credentials on disk in either path, reference them via `${env:VAR}` or `${file:/path}` (see [Secrets Management](https://github.com/netdata/netdata/blob/master/src/collectors/SECRETS.md)).
+- **Credential storage**: discovery requires literal community strings and SNMPv3 passphrases. They are stored in plaintext in `/etc/netdata/go.d/sd/snmp.conf` (file-based pipelines) or the agent's dynamic-configuration store under `/var/lib/netdata/dyncfg/` (UI-managed pipelines). Secret references are not resolved in discovery credentials. Generated collector jobs keep them literal by default.
+- **Collector job secrets**: to use [secret references](https://github.com/netdata/netdata/blob/master/src/collectors/SECRETS.md), explicitly enable `trust_discovered_targets` for a trusted pipeline, or adopt an individual collector job through Dynamic Configuration and review the complete configuration before saving. For reference-based fields, Netdata saves the reference text and resolves values only in memory; it does not persist the resolved values in the job configuration. `${env:...}` and `${file:...}` read operator-managed environment variables or files, whose credentials may already be stored on disk. Adoption does not remove literal credentials from the discovery configuration.
+
+:::warning Discovery credentials reach every host that answers
+
+To identify a device, discovery presents the configured credential to whatever responds on a scanned IP, so any host on a scanned subnet — including a rogue or spoofed device — receives it. This is inherent to credentialed network scanning, not specific to Netdata. SNMPv1/v2c sends the community string in cleartext; SNMPv3 discloses the USM username and an authentication MAC (offline-crackable if the passphrase is weak), not the passphrase itself. Scan only networks you trust, prefer SNMPv3 `authPriv` with strong passphrases, and avoid reusing sensitive community strings on segments where untrusted hosts can appear.
+
+:::
 
 
 ## Setup
@@ -75,7 +82,7 @@ The Netdata Agent host must be able to reach UDP port 161 on every scanned IP. S
 
 #### Options
 
-The configuration file has two top-level blocks: `discoverer:` (the options below) and `services:` (rules that turn discovered devices into `snmp` collector jobs — see [Service Rules](#service-rules)).
+The configuration file has two top-level blocks: `discoverer:` (the discoverer-specific options below) and `services:` (rules that turn discovered devices into `snmp` collector jobs — see [Service Rules](#service-rules)).
 
 After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
 
@@ -83,12 +90,35 @@ After editing the file, restart the Netdata Agent to load the updated discovery 
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
+| [trust_discovered_targets](#option-trust-discovered-targets) | Allow secret references in generated collector jobs, including target-controlled values that can make Netdata read files, run commands, or fetch stored secrets. Off by default; enable only if you control and trust every discoverable target and accept the risk of exposing resolved values to it. | no | no |
 | [rescan_interval](#option-rescan-interval) | How often to rescan configured networks for devices. | 30m | no |
 | timeout | Maximum time to wait for an SNMP device response. | 1s | no |
 | [device_cache_ttl](#option-device-cache-ttl) | How long to trust cached discovery results before re-probing a device. | 12h | no |
 | parallel_scans_per_network | How many IPs to probe concurrently within each subnet. | 32 | no |
 | [credentials](#option-credentials) | List of SNMP credentials referenced by entries in `networks`. At least one credential is required. |  | yes |
 | [networks](#option-networks) | List of subnets to scan, each tagged with the credential name to use. At least one network is required. |  | yes |
+
+<a id="option-trust-discovered-targets"></a>
+##### trust_discovered_targets
+
+Set this option at the top level, alongside `discoverer:` and `services:`, not inside the discoverer block.
+It enables `${env:...}`, `${file:...}`, `${cmd:...}` and `${store:...}` in generated collector jobs.
+
+If a service rule copies a target-controlled value into a job field, the target can insert a reference that
+makes Netdata read a local file, run a command, or fetch a stored secret with the secret provider's
+permissions. The collector may send the result to that target as a credential or other request field.
+Enable only if you control and trust every target this pipeline can discover; enabling it accepts
+this risk for the whole pipeline. One untrusted target is enough to abuse it.
+
+Stock SNMP rules use device-reported system information only in the job name, not in credential fields.
+To use references in generated-job credentials, write them explicitly in your service rules. Enabling
+this option alone does not replace the literal credentials copied by stock rules.
+
+Devices control system information exposed to service rules. Review custom rules as well as the devices you scan. Discovery still requires literal SNMP credentials.
+
+The default keeps reference syntax literal. This option does not resolve the discoverer's own connection
+credentials. See [Service Discovery](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md#configuration-file-structure).
+
 
 <a id="option-rescan-interval"></a>
 ##### rescan_interval
@@ -123,7 +153,7 @@ For SNMPv3, set:
 
 **Naming note:** the YAML keys are `auth_password` and `priv_password`. The same fields are exposed inside service rule templates as `.Credential.AuthPassphrase` and `.Credential.PrivacyPassphrase` (the Go struct names). Both refer to the same value.
 
-**Avoid plaintext on disk:** any of these fields can be sourced from environment variables or files using `${env:VAR_NAME}` or `${file:/absolute/path}` — see [Secrets Management](https://github.com/netdata/netdata/blob/master/src/collectors/SECRETS.md).
+**Literal values required:** use the credentials configured on your devices. Discovery does not resolve `${env:...}`, `${file:...}`, `${cmd:...}`, or `${store:...}`; those strings would be sent as credentials. To use secret references in a collector job, adopt it through Dynamic Configuration as described under [Limitations](#limitations).
 
 
 <a id="option-networks"></a>
@@ -157,7 +187,7 @@ For CIDR notation, network and broadcast addresses are excluded (except `/31`, `
 
 Define the discovery pipeline in `/etc/netdata/go.d/sd/snmp.conf`.
 
-The file has two top-level blocks: `discoverer:` (the options above) and `services:` (rules that turn discovered targets into collector jobs — see [Service Rules](#service-rules)).
+The file has two top-level blocks: `discoverer:` (discoverer-specific settings) and `services:` (rules that turn discovered targets into collector jobs — see [Service Rules](#service-rules)). Set pipeline options such as `trust_discovered_targets` alongside these blocks, not inside `discoverer:`.
 
 After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
 
@@ -185,7 +215,7 @@ services:
 ```
 ###### Multiple subnets, mixed SNMPv2c and SNMPv3
 
-Mix SNMPv2c on one subnet with SNMPv3 (authPriv) on another. Credentials are referenced from environment variables to keep them out of plaintext on disk.
+Mix SNMPv2c on one subnet with SNMPv3 (authPriv) on another. Replace the placeholder strings with the literal credentials configured on your devices; secret references are not supported here.
 
 ```yaml
 disabled: no
@@ -195,15 +225,15 @@ discoverer:
     credentials:
       - name: public-v2c
         version: 2c
-        community: ${env:SNMP_V2C_COMMUNITY}
+        community: "PLACEHOLDER"
       - name: secure-v3
         version: 3
         security_level: authPriv
         username: netdata-monitor
         auth_protocol: sha256
-        auth_password: ${env:SNMP_V3_AUTH}
+        auth_password: "PLACEHOLDER_AUTH_PASSPHRASE"
         priv_protocol: aes256
-        priv_password: ${env:SNMP_V3_PRIV}
+        priv_password: "PLACEHOLDER_PRIV_PASSPHRASE"
     networks:
       - subnet: 192.168.10.0/24
         credential: public-v2c

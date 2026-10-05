@@ -12,13 +12,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
-	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
@@ -58,14 +59,14 @@ type RuntimeService interface {
 }
 
 // Config is the process-fixed production composition input. NewProcess freezes
-// the mutable registries and constructs the provider, secret-creator, resolver,
-// vnode-metadata, UID, and frame authorities exactly once.
+// mutable inputs, retains explicitly supplied secret providers, and constructs
+// discovery, vnode-metadata, UID and frame authorities exactly once.
 type Config struct {
 	SNMPVnodeAcquirer vnodes.SNMPAcquirer
 	Input             io.Reader // plugin stdin
 	Output            io.Writer // plugin stdout
 
-	PluginName string                // plugin name (go.d / ibm.d / scripts.d)
+	PluginName string                // plugin name (go.d / ibm.d / scripts.d / statsd)
 	Modules    collectorapi.Registry // enabled collector module registry
 	Defaults   confgroup.Registry    // per-module config defaults
 
@@ -74,15 +75,29 @@ type Config struct {
 	RunJob                []string                         // allow-list filter of job names (empty = allow all)
 	AutoEnable            bool                             // publish discovered jobs as Running vs Accepted
 
-	InitialSecrets []secretstore.Config      // initial secret store configs
-	InitialVnodes  map[string]*vnodes.Config // file-configured vnodes
+	Secrets       *SecretsConfig            // nil disables all secret services
+	InitialVnodes map[string]*vnodes.Config // file-configured vnodes
 
-	Services []ProcessService // optional process-owned background services
+	Services         []ProcessService                  // optional process-owned background services
+	ProcessFunctions []funcapi.ProcessFunctionProvider // independent of collector selection
 
 	Runtime RuntimeService // runtime service (charts/host-scope; nil disables runtime charts)
 
 	ShutdownTimeout time.Duration // per-run shutdown budget
 	KeepAlive       bool          // emit keepalive frames (long-lived agent mode)
+}
+
+// SecretsConfig groups enabled providers with their initial Store configurations.
+type SecretsConfig struct {
+	Providers secrets.Config
+	Initial   []secretstore.Config
+}
+
+func (c *SecretsConfig) validate() error {
+	if c == nil {
+		return nil
+	}
+	return c.Providers.Validate()
 }
 
 // Process owns the one process-lifetime ingress and rotates only complete run
@@ -107,23 +122,26 @@ func NewProcess(config Config) (*Process, error) {
 	if config.Input == nil ||
 		config.Output == nil ||
 		config.PluginName == "" ||
-		len(config.Modules) == 0 ||
-		len(config.Defaults) == 0 ||
-		len(config.DiscoveryProviders) == 0 {
+		(len(config.Modules) == 0 && len(config.ProcessFunctions) == 0) ||
+		(len(config.Modules) != 0 && (len(config.Defaults) == 0 || len(config.DiscoveryProviders) == 0)) {
 		return nil, errors.New("jobmgr composition: incomplete production configuration")
 	}
-	modules := maps.Clone(config.Modules)
-	defaults := maps.Clone(config.Defaults)
-	providers, err := agentdiscovery.NewProviderCatalog(slices.Clone(config.DiscoveryProviders))
-	if err != nil {
+	modules := make(collectorapi.Registry, len(config.Modules))
+	maps.Copy(modules, config.Modules)
+	defaults := make(confgroup.Registry, len(config.Defaults))
+	maps.Copy(defaults, config.Defaults)
+	var providers *agentdiscovery.ProviderCatalog
+	if len(modules) != 0 {
+		var err error
+		providers, err = agentdiscovery.NewProviderCatalog(slices.Clone(config.DiscoveryProviders))
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := functionadapter.ValidateProcessProviders(config.ProcessFunctions); err != nil {
 		return nil, err
 	}
-	creatorCatalog, err := secretstore.NewCreatorCatalog(backends.Creators())
-	if err != nil {
-		return nil, err
-	}
-	resolver, err := secretresolver.NewDefaultAtomicResolver()
-	if err != nil {
+	if err := config.Secrets.validate(); err != nil {
 		return nil, err
 	}
 	initialVnodes := make(map[string]*vnodes.Config, len(config.InitialVnodes))
@@ -146,6 +164,9 @@ func NewProcess(config Config) (*Process, error) {
 	if build.Identity.Name != config.PluginName {
 		return nil, errors.New("jobmgr composition: discovery identity differs from plugin")
 	}
+	if len(modules) == 0 {
+		build = agentdiscovery.BuildContext{Identity: build.Identity}
+	}
 	build.Registry = defaults
 	build.DyncfgOutput = nil
 	build.FnReg = nil
@@ -153,34 +174,39 @@ func NewProcess(config Config) (*Process, error) {
 	if shutdownTimeout == 0 {
 		shutdownTimeout = lifecycle.DefaultShutdownTimeout
 	}
-	initialSecrets, err := cloneSecretConfigs(config.InitialSecrets)
-	if err != nil {
-		return nil, err
+	var secretConfig *SecretsConfig
+	if config.Secrets != nil {
+		initial, err := cloneSecretConfigs(config.Secrets.Initial)
+		if err != nil {
+			return nil, err
+		}
+		secretConfig = &SecretsConfig{
+			Providers: config.Secrets.Providers,
+			Initial:   initial,
+		}
 	}
 	var finalizeOutput func()
 	if config.Runtime != nil {
 		finalizeOutput = config.Runtime.Stop
 	}
 	core, err := newProcessCore(processCoreConfig{
-		Input:           config.Input,
-		Output:          config.Output,
-		ShutdownTimeout: shutdownTimeout,
-		KeepAlive:       config.KeepAlive,
-		Modules:         modules,
+		Input:            config.Input,
+		Output:           config.Output,
+		ShutdownTimeout:  shutdownTimeout,
+		KeepAlive:        config.KeepAlive,
+		Modules:          modules,
+		ProcessFunctions: slices.Clone(config.ProcessFunctions),
 		Jobs: runJobServices{
 			PluginName:        config.PluginName,
 			Defaults:          defaults,
-			Resolver:          resolver,
-			StoreCreators:     creatorCatalog,
 			Runtime:           config.Runtime,
 			InitialVnodes:     initialVnodes,
 			SNMPVnodeAcquirer: config.SNMPVnodeAcquirer,
 		},
-		Secrets: runSecretServices{
-			Initial: initialSecrets,
-		},
+		Secrets: secretConfig,
 		Discovery: runDiscoveryServices{
 			BuildContext: build,
+			Disabled:     len(modules) == 0,
 			Providers:    providers,
 			RunJob:       slices.Clone(config.RunJob),
 			AutoEnable:   config.AutoEnable,

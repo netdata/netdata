@@ -1,29 +1,62 @@
-//! Durable atomic file writes and stale-temp sweeping.
-//!
-//! The one implementation of the crash-safe replace-file sequence:
+//! Durable atomic file writes and stale-temp sweeping: the one
+//! implementation of the crash-safe replace-file sequence
 //!
 //! ```text
 //! create <final>.tmp → write → fsync(file) → rename → fsync(parent dir)
 //! ```
 //!
-//! `rename` makes the swap atomic (a reader sees the complete old or
-//! new file, never a torn one); the parent-dir fsync makes the rename
-//! itself durable — without it a power loss can drop the new directory
-//! entry even though the data the file replaces was already durably
-//! deleted. Producers that skip any step here have historically
-//! re-introduced exactly that loss window, so every tmp+rename write
-//! in the otel subsystem (WAL, SFST, catalogs, the seq high-water
-//! file) goes through this module. (Other subsystems' writers are
-//! tracked separately — notably netflow-plugin still hand-rolls
-//! tmp+rename without fsync.)
+//! `rename` makes the swap atomic — a reader sees the complete old or the
+//! complete new file, never a torn one. The parent-dir fsync makes the
+//! rename itself durable: without it a power loss can drop the new
+//! directory entry, and the rename has already unlinked the old content,
+//! so the file is lost outright. Every replace-in-place write in the otel
+//! stack goes through this sequence — SFST (streaming), remote catalogs,
+//! the seq high-water file, file-cache entries — and the WAL, whose own
+//! files are created with `create_new` rather than tmp+rename, still uses
+//! [`fsync_dir`] to make each new file's directory entry durable.
+//! netflow-plugin hand-rolls tmp+rename without fsync (facet_runtime,
+//! sidecar and ingest persistence) and is outside this contract.
 //!
-//! Temp naming is uniform: [`TMP_SUFFIX`] appended to the final file
-//! name (`a.catalog` → `a.catalog.tmp`), so [`is_tmp`] /
-//! [`sweep_tmp`] recognize every producer's leftovers with one rule
-//! and no data-file scanner ever matches a temp (temps never end in a
-//! data extension). The suffix is therefore **reserved**: a producer
-//! must never write a non-temp artifact ending in `.tmp` into a swept
-//! directory — recovery would silently reap it.
+//! The sequence leaves two crash windows, both covered by reaping: a
+//! crash before [`AtomicFile::commit`] leaves the final path untouched
+//! and a partial temp behind, removed by the guard's `Drop` or by a
+//! startup sweep; a crash after the rename but before the dir fsync
+//! leaves the swap done but its durability unconfirmed — after power loss
+//! the file comes back as the old or the new version, never torn.
+//!
+//! Temp naming is uniform: [`TMP_SUFFIX`] appended to the final name
+//! (`a.catalog` → `a.catalog.tmp`), so [`is_tmp`] / [`sweep_tmp`]
+//! recognize every producer's leftovers with one rule and no data-file
+//! scanner ever matches a temp (scanners match names ending in the data
+//! extension; temps end in `.tmp`). The suffix is therefore **reserved**:
+//! a producer must never write a non-temp artifact ending in `.tmp` into
+//! a swept directory — recovery silently reaps it, and file-cache rejects
+//! such cache-entry names outright.
+//!
+//! This module owns the crate's I/O-error convention: every failing step
+//! is annotated with the operation and the path while its `ErrorKind` is
+//! preserved ([`annotate`]).
+//!
+//! Everything here is synchronous blocking `std::fs` I/O with no locking
+//! of its own; the temp path is a pure function of the final path, so
+//! concurrent writers to the same final path would interleave on one temp
+//! file and serialization is the producer's job. Async consumers run the
+//! calls under `spawn_blocking` (file-lifecycle's catalog builder,
+//! recovery startup sync and file-cache all do).
+//!
+//! # Users (grep-verified)
+//!
+//! - Streaming atomic write: `sfst::build` — the only direct [`AtomicFile`]
+//!   user (`create` + [`annotate`] + `commit`).
+//! - [`write_atomic`]: file-lifecycle catalog rotation and startup install
+//!   (both under `spawn_blocking`), the WAL seq high-water file, file-cache
+//!   entries.
+//! - Sweeps: file-cache `open`, file-lifecycle `Registry::recover`
+//!   (SFST dir).
+//! - Temp checks: file-lifecycle `remote_read` cache migration
+//!   ([`is_tmp`]); otel-catalog's recovery walk ([`is_tmp`] +
+//!   `remove_stale_tmp`).
+//! - [`fsync_dir`]: the WAL writer, after each new WAL file.
 
 use std::fs::File;
 use std::io::{self, Write};
@@ -57,7 +90,8 @@ pub fn annotate(e: io::Error, op: &str, path: &Path) -> io::Error {
     io::Error::new(e.kind(), format!("{op} {}: {e}", path.display()))
 }
 
-/// fsync a directory so a rename inside it survives power loss.
+/// fsync a directory so a directory-entry change inside it — a rename or
+/// a newly created file — survives power loss.
 pub fn fsync_dir(dir: &Path) -> io::Result<()> {
     File::open(dir)
         .and_then(|f| f.sync_all())
@@ -73,7 +107,7 @@ pub fn fsync_dir(dir: &Path) -> io::Result<()> {
 /// performs fsync → rename → parent-dir fsync. If the guard drops
 /// uncommitted — any error path between create and commit — the temp
 /// file is reaped best-effort, so a failed build never leaves a
-/// partial temp behind for a crash investigation to trip over.
+/// partial temp behind.
 #[must_use = "dropping the guard without commit() discards the write"]
 pub struct AtomicFile {
     tmp: PathBuf,
@@ -83,7 +117,9 @@ pub struct AtomicFile {
 
 impl AtomicFile {
     /// Open `<final_path>.tmp` for writing, creating parent
-    /// directories as needed. Returns the guard and the open file.
+    /// directories as needed. A leftover temp at that path (from an
+    /// earlier interrupted run) is truncated, never appended to.
+    /// Returns the guard and the open file.
     /// A bare relative filename writes into the working directory —
     /// callers pass absolute (or directory-joined) paths.
     pub fn create(final_path: impl Into<PathBuf>) -> io::Result<(Self, File)> {
@@ -115,6 +151,13 @@ impl AtomicFile {
     /// returned by [`create`](AtomicFile::create), unwrapped from any
     /// buffering layers), rename the temp over the final path, and
     /// fsync the parent directory.
+    ///
+    /// Failure classes: an error from the temp fsync or the rename
+    /// leaves the final path untouched and reaps the temp on drop; an
+    /// error from the final dir fsync arrives after the swap is
+    /// complete, so the final path already holds the new content and
+    /// only the entry's durability is unconfirmed — the guard is
+    /// already disarmed and reaps nothing.
     pub fn commit(mut self, file: File) -> io::Result<()> {
         file.sync_all()
             .map_err(|e| annotate(e, "fsync temp file", &self.tmp))?;
@@ -134,6 +177,9 @@ impl Drop for AtomicFile {
         if self.committed {
             return;
         }
+        // Best-effort reaping: a destructor cannot propagate errors, so
+        // a missing temp is tolerated and only a real removal failure
+        // is logged.
         if let Err(e) = std::fs::remove_file(&self.tmp) {
             if e.kind() != io::ErrorKind::NotFound {
                 tracing::warn!(
@@ -146,7 +192,10 @@ impl Drop for AtomicFile {
 }
 
 /// Atomically and durably replace `final_path` with `bytes` — the
-/// whole-buffer convenience over [`AtomicFile`].
+/// whole-buffer convenience over [`AtomicFile`]. Failure semantics are
+/// [`commit`](AtomicFile::commit)'s: on error the final path is either
+/// untouched (pre-rename failure) or fully installed with unconfirmed
+/// directory durability (dir-fsync failure); the temp never survives.
 pub fn write_atomic(final_path: &Path, bytes: &[u8]) -> io::Result<()> {
     let (guard, mut file) = AtomicFile::create(final_path)?;
     file.write_all(bytes)
@@ -159,8 +208,10 @@ pub fn is_tmp(path: &Path) -> bool {
     path.extension().is_some_and(|ext| ext == "tmp")
 }
 
-/// Remove one stale temp file, logging the outcome. Used by recovery
-/// walks that already iterate the directory entries themselves.
+/// Remove one stale temp file, logging the outcome; a missing file is
+/// ignored. For recovery walks that already iterate the directory
+/// entries themselves (otel-catalog's); callers without a walk use
+/// [`sweep_tmp`].
 pub fn remove_stale_tmp(path: &Path) {
     match std::fs::remove_file(path) {
         Ok(()) => tracing::info!("removed stale tmp file path={}", path.display()),
@@ -175,8 +226,12 @@ pub fn remove_stale_tmp(path: &Path) {
 }
 
 /// Remove every stale `*.tmp` directly inside `dir` (non-recursive).
-/// Missing or unreadable directories are ignored — recovery sweeps run
-/// before the producer has necessarily created anything.
+/// Best-effort by construction: any `read_dir` failure (missing
+/// directory, permissions, anything) ends the sweep silently, and
+/// per-entry read errors are dropped mid-walk, so a sweep can come up
+/// short without a trace. Used by startup/recovery paths (file-cache
+/// `open`, file-lifecycle `Registry::recover`) where a missing
+/// directory is the normal first-boot case.
 pub fn sweep_tmp(dir: &Path) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,

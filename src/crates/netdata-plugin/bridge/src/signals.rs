@@ -2,26 +2,28 @@
 //!
 //! A signal's identity is two values that must always agree: a numeric
 //! `pipeline_id` (stamped into every `FileId`, serialized into filenames and WAL
-//! frames, and used by the ledger to route events to the owning pipeline) and a
-//! remote-key segment (`v2/{segment}/...`). [`Signal`] is the one place that maps
+//! frames, used by the ledger to route events to the owning pipeline, and keying
+//! each signal's own `frame_seq` stream) and a remote-key segment
+//! (`v2/{segment}/...`). [`Signal`] is the one place that maps
 //! a signal to that pair, so the two cannot drift apart; downstream layers carry
 //! `Signal` (or its opaque [`SignalSpec`]) instead of loose `(u16, &str)` pairs.
 //!
 //! The numeric axis is the wire/disk format: it is encoded as `u16` and MUST stay
-//! byte-compatible. A `pipeline_id` read back from a filename or WAL frame is
-//! decoded to a `Signal` via [`Signal::try_from`] at the boundary — an id with no
-//! known signal is a runtime error (it can come from a persisted file or another
-//! process), never a panic.
+//! byte-compatible. `Signal` itself is never serialized — filenames, WAL frames,
+//! and substrate IPC carry the raw `u16`, and signal-aware code re-derives the
+//! enum with [`Signal::try_from`] at that boundary (the handlers live in
+//! `otel-ledger`). An id with no known signal is a runtime error (it can come
+//! from a persisted file or another process), never a panic.
 
 use std::fmt;
 
-/// An OTel signal handled by the storage substrate. The single source of truth
-/// for the (signal ↔ pipeline_id ↔ remote-key segment) mapping.
+/// An OTel signal handled by the storage substrate: the single mapping from a
+/// signal to its `pipeline_id` and remote-key segment (contract in the module
+/// docs). The axis is a closed set, so consumers match over it exhaustively;
+/// out-of-set ids fail at the [`Signal::try_from`] boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Signal {
-    /// Logs.
     Logs,
-    /// Traces.
     Traces,
 }
 
@@ -36,7 +38,9 @@ impl Signal {
         }
     }
 
-    /// The remote-key segment for this signal (`v2/{segment}/...`).
+    /// The remote-key segment for this signal (`v2/{segment}/...`), also the
+    /// name of its local `{base_dir}/{segment}/` subtree (derived in
+    /// [`PluginConfig::lifecycle_for`](crate::config::PluginConfig)).
     pub const fn segment(self) -> &'static str {
         match self {
             Signal::Logs => "logs",
@@ -44,9 +48,7 @@ impl Signal {
         }
     }
 
-    /// The opaque (pipeline_id, segment) pair handed DOWN to the content-agnostic
-    /// substrate, bundled so the two values cannot be supplied separately and
-    /// mismatched.
+    /// The opaque [`SignalSpec`] handed down to the content-agnostic substrate.
     pub const fn spec(self) -> SignalSpec {
         SignalSpec {
             pipeline_id: self.pipeline_id(),
@@ -82,8 +84,9 @@ impl TryFrom<u16> for Signal {
 
 /// The opaque identity of a signal as seen by the content-agnostic substrate: the
 /// numeric routing axis plus the remote-key segment, bundled so they cannot be
-/// mismatched. Constructible only via [`Signal::spec`]; the substrate stores and
-/// echoes it without knowing the signal set (it never names "logs"/"traces").
+/// mismatched. Constructible only via [`Signal::spec`]; the substrate
+/// (`file-lifecycle`'s `Pipeline`) stores and echoes it without knowing the
+/// signal set (it never names "logs"/"traces").
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SignalSpec {
     pipeline_id: u16,

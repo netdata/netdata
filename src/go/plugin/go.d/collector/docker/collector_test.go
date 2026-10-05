@@ -6,8 +6,11 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	typesContainer "github.com/moby/moby/api/types/container"
@@ -184,8 +187,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container10_health_status_not_running_unhealthy": 1,
 				"container_container10_health_status_starting":              0,
 				"container_container10_health_status_unhealthy":             0,
-				"container_container10_size_root_fs":                        0,
-				"container_container10_size_rw":                             0,
+				"container_container10_size_root_fs":                        321,
+				"container_container10_size_rw":                             123,
 				"container_container10_state_created":                       0,
 				"container_container10_state_dead":                          1,
 				"container_container10_state_exited":                        0,
@@ -198,8 +201,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container11_health_status_not_running_unhealthy": 0,
 				"container_container11_health_status_starting":              1,
 				"container_container11_health_status_unhealthy":             0,
-				"container_container11_size_root_fs":                        0,
-				"container_container11_size_rw":                             0,
+				"container_container11_size_root_fs":                        321,
+				"container_container11_size_rw":                             123,
 				"container_container11_state_created":                       0,
 				"container_container11_state_dead":                          0,
 				"container_container11_state_exited":                        0,
@@ -212,8 +215,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container12_health_status_not_running_unhealthy": 0,
 				"container_container12_health_status_starting":              1,
 				"container_container12_health_status_unhealthy":             0,
-				"container_container12_size_root_fs":                        0,
-				"container_container12_size_rw":                             0,
+				"container_container12_size_root_fs":                        321,
+				"container_container12_size_rw":                             123,
 				"container_container12_state_created":                       0,
 				"container_container12_state_dead":                          0,
 				"container_container12_state_exited":                        1,
@@ -226,8 +229,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container13_health_status_not_running_unhealthy": 0,
 				"container_container13_health_status_starting":              1,
 				"container_container13_health_status_unhealthy":             0,
-				"container_container13_size_root_fs":                        0,
-				"container_container13_size_rw":                             0,
+				"container_container13_size_root_fs":                        321,
+				"container_container13_size_rw":                             123,
 				"container_container13_state_created":                       0,
 				"container_container13_state_dead":                          0,
 				"container_container13_state_exited":                        1,
@@ -240,8 +243,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container14_health_status_not_running_unhealthy": 0,
 				"container_container14_health_status_starting":              0,
 				"container_container14_health_status_unhealthy":             0,
-				"container_container14_size_root_fs":                        0,
-				"container_container14_size_rw":                             0,
+				"container_container14_size_root_fs":                        321,
+				"container_container14_size_rw":                             123,
 				"container_container14_state_created":                       0,
 				"container_container14_state_dead":                          1,
 				"container_container14_state_exited":                        0,
@@ -254,8 +257,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container15_health_status_not_running_unhealthy": 0,
 				"container_container15_health_status_starting":              0,
 				"container_container15_health_status_unhealthy":             0,
-				"container_container15_size_root_fs":                        0,
-				"container_container15_size_rw":                             0,
+				"container_container15_size_root_fs":                        321,
+				"container_container15_size_rw":                             123,
 				"container_container15_state_created":                       0,
 				"container_container15_state_dead":                          1,
 				"container_container15_state_exited":                        0,
@@ -268,8 +271,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container16_health_status_not_running_unhealthy": 0,
 				"container_container16_health_status_starting":              0,
 				"container_container16_health_status_unhealthy":             0,
-				"container_container16_size_root_fs":                        0,
-				"container_container16_size_rw":                             0,
+				"container_container16_size_root_fs":                        321,
+				"container_container16_size_rw":                             123,
 				"container_container16_state_created":                       0,
 				"container_container16_state_dead":                          1,
 				"container_container16_state_exited":                        0,
@@ -282,8 +285,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container1_health_status_not_running_unhealthy":  0,
 				"container_container1_health_status_starting":               0,
 				"container_container1_health_status_unhealthy":              0,
-				"container_container1_size_root_fs":                         0,
-				"container_container1_size_rw":                              0,
+				"container_container1_size_root_fs":                         321,
+				"container_container1_size_rw":                              123,
 				"container_container1_state_created":                        1,
 				"container_container1_state_dead":                           0,
 				"container_container1_state_exited":                         0,
@@ -296,8 +299,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container2_health_status_not_running_unhealthy":  0,
 				"container_container2_health_status_starting":               0,
 				"container_container2_health_status_unhealthy":              0,
-				"container_container2_size_root_fs":                         0,
-				"container_container2_size_rw":                              0,
+				"container_container2_size_root_fs":                         321,
+				"container_container2_size_rw":                              123,
 				"container_container2_state_created":                        0,
 				"container_container2_state_dead":                           0,
 				"container_container2_state_exited":                         0,
@@ -310,8 +313,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container3_health_status_not_running_unhealthy":  0,
 				"container_container3_health_status_starting":               0,
 				"container_container3_health_status_unhealthy":              0,
-				"container_container3_size_root_fs":                         0,
-				"container_container3_size_rw":                              0,
+				"container_container3_size_root_fs":                         321,
+				"container_container3_size_rw":                              123,
 				"container_container3_state_created":                        0,
 				"container_container3_state_dead":                           0,
 				"container_container3_state_exited":                         0,
@@ -324,8 +327,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container4_health_status_not_running_unhealthy":  1,
 				"container_container4_health_status_starting":               0,
 				"container_container4_health_status_unhealthy":              0,
-				"container_container4_size_root_fs":                         0,
-				"container_container4_size_rw":                              0,
+				"container_container4_size_root_fs":                         321,
+				"container_container4_size_rw":                              123,
 				"container_container4_state_created":                        1,
 				"container_container4_state_dead":                           0,
 				"container_container4_state_exited":                         0,
@@ -338,8 +341,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container5_health_status_not_running_unhealthy":  0,
 				"container_container5_health_status_starting":               0,
 				"container_container5_health_status_unhealthy":              1,
-				"container_container5_size_root_fs":                         0,
-				"container_container5_size_rw":                              0,
+				"container_container5_size_root_fs":                         321,
+				"container_container5_size_rw":                              123,
 				"container_container5_state_created":                        0,
 				"container_container5_state_dead":                           0,
 				"container_container5_state_exited":                         0,
@@ -352,8 +355,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container6_health_status_not_running_unhealthy":  1,
 				"container_container6_health_status_starting":               0,
 				"container_container6_health_status_unhealthy":              0,
-				"container_container6_size_root_fs":                         0,
-				"container_container6_size_rw":                              0,
+				"container_container6_size_root_fs":                         321,
+				"container_container6_size_rw":                              123,
 				"container_container6_state_created":                        0,
 				"container_container6_state_dead":                           0,
 				"container_container6_state_exited":                         0,
@@ -366,8 +369,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container7_health_status_not_running_unhealthy":  1,
 				"container_container7_health_status_starting":               0,
 				"container_container7_health_status_unhealthy":              0,
-				"container_container7_size_root_fs":                         0,
-				"container_container7_size_rw":                              0,
+				"container_container7_size_root_fs":                         321,
+				"container_container7_size_rw":                              123,
 				"container_container7_state_created":                        0,
 				"container_container7_state_dead":                           0,
 				"container_container7_state_exited":                         0,
@@ -380,8 +383,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container8_health_status_not_running_unhealthy":  1,
 				"container_container8_health_status_starting":               0,
 				"container_container8_health_status_unhealthy":              0,
-				"container_container8_size_root_fs":                         0,
-				"container_container8_size_rw":                              0,
+				"container_container8_size_root_fs":                         321,
+				"container_container8_size_rw":                              123,
 				"container_container8_state_created":                        0,
 				"container_container8_state_dead":                           0,
 				"container_container8_state_exited":                         0,
@@ -394,8 +397,8 @@ func TestCollector_Collect(t *testing.T) {
 				"container_container9_health_status_not_running_unhealthy":  1,
 				"container_container9_health_status_starting":               0,
 				"container_container9_health_status_unhealthy":              0,
-				"container_container9_size_root_fs":                         0,
-				"container_container9_size_rw":                              0,
+				"container_container9_size_root_fs":                         321,
+				"container_container9_size_rw":                              123,
 				"container_container9_state_created":                        0,
 				"container_container9_state_dead":                           0,
 				"container_container9_state_exited":                         1,
@@ -411,7 +414,7 @@ func TestCollector_Collect(t *testing.T) {
 				"containers_state_exited":                                   6,
 				"containers_state_paused":                                   5,
 				"containers_state_running":                                  4,
-				"images_active":                                             1,
+				"images_active":                                             2,
 				"images_dangling":                                           1,
 				"images_size":                                               300,
 			},
@@ -651,7 +654,7 @@ func TestCollector_Collect(t *testing.T) {
 				"containers_state_exited":                                   6,
 				"containers_state_paused":                                   5,
 				"containers_state_running":                                  4,
-				"images_active":                                             1,
+				"images_active":                                             2,
 				"images_dangling":                                           1,
 				"images_size":                                               300,
 			},
@@ -686,6 +689,117 @@ func TestCollector_Collect(t *testing.T) {
 
 		})
 	}
+}
+
+func TestCollector_Collect_ImagesRefresh(t *testing.T) {
+	imagesV1 := []typesImage.Summary{
+		{ID: "sha256:v1", Containers: -1, Size: 100},
+		{ID: "sha256:unused", Containers: -1, Size: 200},
+	}
+	imagesV2 := []typesImage.Summary{{ID: "sha256:v2", Containers: -1, Size: 1000}}
+	mxV1 := map[string]int64{"images_active": 1, "images_dangling": 1, "images_size": 300}
+	mxV2 := map[string]int64{"images_active": 1, "images_dangling": 0, "images_size": 1000}
+
+	type step struct {
+		advance          time.Duration
+		images           []typesImage.Summary
+		errOnImageList   bool
+		containerImageID string
+		wantCalls        int
+		wantImages       map[string]int64
+	}
+	tests := map[string]struct {
+		steps []step
+	}{
+		"cached values reported until the refresh interval elapses": {
+			steps: []step{
+				{images: imagesV1, wantCalls: 1, wantImages: mxV1},
+				{advance: imagesRefreshEvery - time.Second, images: imagesV2, wantCalls: 1, wantImages: mxV1},
+				{advance: time.Second, images: imagesV2, wantCalls: 2, wantImages: mxV2},
+			},
+		},
+		"image usage follows the container list between refreshes": {
+			steps: []step{
+				{images: imagesV1, wantCalls: 1, wantImages: mxV1},
+				{
+					advance:          10 * time.Second,
+					containerImageID: "sha256:removed",
+					wantCalls:        1,
+					wantImages:       map[string]int64{"images_active": 0, "images_dangling": 2, "images_size": 300},
+				},
+				{advance: 10 * time.Second, wantCalls: 1, wantImages: mxV1},
+			},
+		},
+		"collection interval longer than the refresh interval refreshes on every collection": {
+			steps: []step{
+				{images: imagesV1, wantCalls: 1, wantImages: mxV1},
+				{advance: 2 * imagesRefreshEvery, images: imagesV2, wantCalls: 2, wantImages: mxV2},
+				{advance: 2 * imagesRefreshEvery, images: imagesV1, wantCalls: 3, wantImages: mxV1},
+			},
+		},
+		"failed refresh fails the collection and is retried on the next one": {
+			steps: []step{
+				{images: imagesV1, wantCalls: 1, wantImages: mxV1},
+				{advance: imagesRefreshEvery, errOnImageList: true, wantCalls: 2, wantImages: nil},
+				{advance: 10 * time.Second, images: imagesV2, wantCalls: 3, wantImages: mxV2},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			m := &mockClient{}
+			collr := New()
+			collr.newClient = prepareNewClientFunc(m)
+			now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+			collr.now = func() time.Time { return now }
+
+			require.NoError(t, collr.Init(context.Background()))
+
+			for i, s := range test.steps {
+				now = now.Add(s.advance)
+				m.images = s.images
+				m.errOnImageList = s.errOnImageList
+				m.containerImageID = s.containerImageID
+
+				mx := collr.Collect(context.Background())
+
+				assert.Equalf(t, s.wantCalls, m.imageListCalls, "step %d: ImageList calls", i)
+				assert.Equalf(t, s.wantImages, imageMetrics(mx), "step %d: image metrics", i)
+			}
+		})
+	}
+}
+
+func TestCollector_Collect_FailedCollectionLeavesChartsUnchanged(t *testing.T) {
+	collr := New()
+	collr.newClient = prepareNewClientFunc(&mockClient{errOnImageList: true})
+	require.NoError(t, collr.Init(context.Background()))
+
+	require.Nil(t, collr.Collect(context.Background()))
+
+	assert.Equal(t, chartIDs(summaryCharts.Copy()), chartIDs(collr.Charts()))
+}
+
+func chartIDs(charts *collectorapi.Charts) []string {
+	var ids []string
+	for _, chart := range *charts {
+		ids = append(ids, chart.ID)
+	}
+	return ids
+}
+
+func imageMetrics(mx map[string]int64) map[string]int64 {
+	if mx == nil {
+		return nil
+	}
+	images := make(map[string]int64)
+	for k, v := range mx {
+		if strings.HasPrefix(k, "images_") {
+			images[k] = v
+		}
+	}
+	return images
 }
 
 func prepareCaseSuccess() *Collector {
@@ -738,6 +852,9 @@ type mockClient struct {
 	errOnImageList     bool
 	errOnContainerList bool
 	closeCalled        bool
+	images             []typesImage.Summary
+	imageListCalls     int
+	containerImageID   string
 }
 
 func (m *mockClient) Info(_ context.Context, _ docker.InfoOptions) (docker.SystemInfoResult, error) {
@@ -774,41 +891,47 @@ func (m *mockClient) ContainerList(_ context.Context, opts docker.ContainerListO
 	switch typesContainer.HealthStatus(status) {
 	case typesContainer.Healthy:
 		containers = []typesContainer.Summary{
-			{Names: []string{"container1"}, State: "created", Image: "example/example:v1"},
-			{Names: []string{"container2"}, State: "running", Image: "example/example:v1"},
-			{Names: []string{"container3"}, State: "running", Image: "example/example:v1"},
+			{Names: []string{"container1"}, State: "created", Image: "example/example:v1", ImageID: "sha256:v1"},
+			{Names: []string{"container2"}, State: "running", Image: "example/example:v1", ImageID: "sha256:v1"},
+			{Names: []string{"container3"}, State: "running", Image: "example/example:v1", ImageID: "sha256:v1"},
 		}
 	case typesContainer.Unhealthy:
 		containers = []typesContainer.Summary{
-			{Names: []string{"container4"}, State: "created", Image: "example/example:v2"},
-			{Names: []string{"container5"}, State: "running", Image: "example/example:v2"},
-			{Names: []string{"container6"}, State: "paused", Image: "example/example:v2"},
-			{Names: []string{"container7"}, State: "restarting", Image: "example/example:v2"},
-			{Names: []string{"container8"}, State: "removing", Image: "example/example:v2"},
-			{Names: []string{"container9"}, State: "exited", Image: "example/example:v2"},
-			{Names: []string{"container10"}, State: "dead", Image: "example/example:v2"},
+			{Names: []string{"container4"}, State: "created", Image: "example/example:v2", ImageID: "sha256:v2"},
+			{Names: []string{"container5"}, State: "running", Image: "example/example:v2", ImageID: "sha256:v2"},
+			{Names: []string{"container6"}, State: "paused", Image: "example/example:v2", ImageID: "sha256:v2"},
+			{Names: []string{"container7"}, State: "restarting", Image: "example/example:v2", ImageID: "sha256:v2"},
+			{Names: []string{"container8"}, State: "removing", Image: "example/example:v2", ImageID: "sha256:v2"},
+			{Names: []string{"container9"}, State: "exited", Image: "example/example:v2", ImageID: "sha256:v2"},
+			{Names: []string{"container10"}, State: "dead", Image: "example/example:v2", ImageID: "sha256:v2"},
 		}
 	case typesContainer.Starting:
 		containers = []typesContainer.Summary{
-			{Names: []string{"container11"}, State: "removing", Image: "example/example:v3"},
-			{Names: []string{"container12"}, State: "exited", Image: "example/example:v3"},
-			{Names: []string{"container13"}, State: "exited", Image: "example/example:v3"},
+			{Names: []string{"container11"}, State: "removing", Image: "example/example:v3", ImageID: "sha256:v3"},
+			{Names: []string{"container12"}, State: "exited", Image: "example/example:v3", ImageID: "sha256:v3"},
+			{Names: []string{"container13"}, State: "exited", Image: "example/example:v3", ImageID: "sha256:v3"},
 		}
 	case typesContainer.NoHealthcheck:
 		containers = []typesContainer.Summary{
-			{Names: []string{"container14"}, State: "dead", Image: "example/example:v4"},
-			{Names: []string{"container15"}, State: "dead", Image: "example/example:v4"},
-			{Names: []string{"container16"}, State: "dead", Image: "example/example:v4"},
-			{Names: []string{"container17"}, State: "dead", Image: "example/example:v4",
+			{Names: []string{"container14"}, State: "dead", Image: "example/example:v4", ImageID: "sha256:v4"},
+			{Names: []string{"container15"}, State: "dead", Image: "example/example:v4", ImageID: "sha256:v4"},
+			{Names: []string{"container16"}, State: "dead", Image: "example/example:v4", ImageID: "sha256:v4"},
+			{Names: []string{"container17"}, State: "dead", Image: "example/example:v5", ImageID: "sha256:v5",
 				Labels: map[string]string{"netdata.cloud/ignore": "true"},
 			},
 		}
 	}
 
+	if m.containerImageID != "" {
+		for i := range containers {
+			containers[i].ImageID = m.containerImageID
+		}
+	}
+
 	if opts.Size {
-		for _, c := range containers {
-			c.SizeRw = 123
-			c.SizeRootFs = 321
+		for i := range containers {
+			containers[i].SizeRw = 123
+			containers[i].SizeRootFs = 321
 		}
 	}
 
@@ -816,13 +939,20 @@ func (m *mockClient) ContainerList(_ context.Context, opts docker.ContainerListO
 }
 
 func (m *mockClient) ImageList(_ context.Context, _ docker.ImageListOptions) (docker.ImageListResult, error) {
+	m.imageListCalls++
+
 	if m.errOnImageList {
 		return docker.ImageListResult{}, errors.New("mockClient.ImageList() error")
 	}
+	if m.images != nil {
+		return docker.ImageListResult{Items: m.images}, nil
+	}
 
+	// Containers is -1 when the negotiated API is older than 1.51.
 	return docker.ImageListResult{Items: []typesImage.Summary{
-		{Containers: 0, Size: 100},
-		{Containers: 1, Size: 200},
+		{ID: "sha256:v1", Containers: -1, Size: 100},
+		{ID: "sha256:v5", Containers: -1, Size: 100},
+		{ID: "sha256:unused", Containers: -1, Size: 100},
 	}}, nil
 }
 

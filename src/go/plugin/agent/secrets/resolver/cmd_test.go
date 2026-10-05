@@ -14,6 +14,7 @@ import (
 )
 
 func TestDefaultAtomicResolverCommand(t *testing.T) {
+	useTestLocalHelper(t)
 	tests := map[string]struct {
 		onWindowsSkip   bool
 		buildCfg        func(t *testing.T) map[string]any

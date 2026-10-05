@@ -17,6 +17,10 @@ Shape rules for every field (structure, admonitions, terms, Markdown safety, dep
   `python.d/<module>.conf`, `netdata.conf`). It MUST be the file the collector actually reads; the template prints
   the `edit-config` command with it.
 - `section_name` only for collectors configured inside `netdata.conf` (plugin sections); otherwise omit it.
+- A go.d collector using `InstancePolicySingle` MUST set `setup.single_job: true`. The existing
+  `integrations/templates/setup-generic.md` and `integrations/templates/setup/sample-go-config-single-job.md` then
+  show its fixed job name and omit the add-job UI instructions. `overview.multi_instance: false` alone does not
+  select that setup flow; it describes target scope.
 
 ## 2. `prerequisites`: One Action Each
 
@@ -65,7 +69,9 @@ Renders as a table with columns Option, Description, Default, Required, preceded
 - `required: true` only when the collector does not work without the option. Not "recommended", not "usually set".
 - `group` names the schema tab the option lives in, same spelling (or `Tab / Subgroup` when a nested concern needs
   its own doc group; the first segment is the tab). Rows of one group are contiguous so the table renders the group
-  once, and groups appear in the tab order of the form. A collector without tabs omits `group` everywhere.
+  once, and groups appear in the tab order of the form. A collector without tabs omits `group` everywhere, except a
+  `netdata.conf` plugin whose options span several sections: there `group` is each option's section name
+  (`plugin:macos:sysctl`).
 
 ## 5. `detailed_description`: Depth Per Option
 

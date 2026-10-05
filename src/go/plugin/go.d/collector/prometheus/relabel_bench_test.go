@@ -12,7 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
+	"github.com/netdata/netdata/go/plugins/pkg/relabel"
 )
 
 // BenchmarkRelabelExecutor isolates the collector-side cost relabeling adds on top

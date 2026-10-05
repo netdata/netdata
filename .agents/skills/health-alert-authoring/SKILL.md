@@ -67,6 +67,10 @@ Write down the following in the active SOW before changing a non-trivial alert:
   a lookup window an implementation of another engine's `for:` state machine.
 - **Validation:** List the boundary, transition, missing-data, recovery, and duplicate-ownership tests that prove the
   contract.
+- **Policy change disclosure:** for a change to a shipped alert's lookup, window, threshold or recovery, you MUST show
+  the old and the new outcome on one short source trace that includes an active event followed by quiet samples, and
+  state what clears the alert and whether it can clear while the underlying cumulative value stays nonzero. A lookup
+  name and window do not disclose that trade-off; the user-owned decision is not informed without it.
 
 Pause for a user decision when the change creates a public alert contract, changes default notification policy, changes
 the owner of an incident, needs shared health/query framework work, or cannot preserve the approved operator-visible
@@ -354,8 +358,11 @@ Run the smallest relevant tests first, then the full affected suite. A complete 
 items below:
 
 1. Run `/usr/sbin/netdata -W healthconfigtest` for the built-in health parser and lookup suite.
-2. Add or update a focused test that reads the shipped alert template and asserts its context, labels, lookup, units,
-   cadence, expressions, routing, source ownership, and declared fidelity—not merely a copied expected string.
+2. Verify the shipped alert against an independent oracle: exercise the signal's behavior, or compare independently
+   owned artifacts with the `collecttest` health checks named in
+   `.agents/skills/collectors-go-framework-v2/chart-template.md#tests`. A test MUST NOT copy the definition's lookup,
+   cadence, thresholds, expressions or recipients into expected literals; that restates the file and pins whatever it
+   said, right or wrong.
 3. Test the signal's lifecycle through the real query/health runtime where practical. If a lower-level deterministic model
    is necessary, derive it directly from runtime timestamps and numeric-point selection; do not pass an arbitrary
    `windowComplete` flag or label skipped NULLs as continuous evaluation. Cover startup, active transition, normal zero

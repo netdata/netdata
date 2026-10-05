@@ -12,24 +12,68 @@ import (
 // descriptors against the committed registry.
 type descriptorResolution struct {
 	failErr   error
-	supersede []string                         // committed names whose (unobserved) kind is replaced by the observed one
-	drop      []string                         // names with ambiguous multi-kind writes and no established authority
-	canonical map[string]*instrumentDescriptor // accepted name => the single descriptor to publish for all its series
+	supersede []string // committed names whose (unobserved) kind is replaced by the observed one
+	drop      []string // names with ambiguous multi-kind writes and no established authority
+	// names holds every observed name; an accepted name carries the single descriptor
+	// to publish for all its series.
+	names map[string]nameAuthorities
 }
 
-// observedAuthority accumulates one series authority observed for a name this cycle,
-// canonicalizing the declared metadata of every compatible write into a single
-// descriptor so the name publishes one descriptor rather than a raw per-write one.
-type observedAuthority struct {
-	canonical *instrumentDescriptor
+// canonicalFor returns the descriptor an accepted name publishes.
+func (r descriptorResolution) canonicalFor(name string) (*instrumentDescriptor, bool) {
+	na, ok := r.names[name]
+	if !ok || !na.accepted {
+		return nil, false
+	}
+	return na.canonical, true
 }
 
-// nameAuthorities holds every distinct series authority observed for one name this cycle. `all` is
-// the flat list the resolution loop walks; `byFP` indexes it by authority fingerprint so grouping a
-// new write is O(1) with no cap (a bucket per fingerprint, length 1 except on a hash collision).
+// nameAuthorities holds every distinct series authority observed for one name this cycle,
+// each as its canonical descriptor: the declared metadata of every compatible write merged
+// into one, so the name publishes one descriptor rather than a raw per-write one. Almost
+// every name has one authority, stored inline with no allocation; further authorities
+// (incompatible writes) go to more.
 type nameAuthorities struct {
-	all  []*observedAuthority
-	byFP map[authorityFingerprint][]*observedAuthority
+	first   *instrumentDescriptor
+	firstFP authorityFingerprint
+	more    *extraAuthorities
+	// committedObserved marks a name whose live committed authority is observed this cycle.
+	committedObserved bool
+	// canonical and accepted are the resolution outcome.
+	canonical *instrumentDescriptor
+	accepted  bool
+}
+
+// extraAuthorities holds a name's authorities after the first, indexed by fingerprint so
+// grouping stays O(1) with no cap (a bucket per fingerprint, length 1 except on a hash
+// collision).
+type extraAuthorities struct {
+	all  []*instrumentDescriptor
+	byFP map[authorityFingerprint][]int
+}
+
+func (na *nameAuthorities) count() int {
+	switch {
+	case na.first == nil:
+		return 0
+	case na.more == nil:
+		return 1
+	default:
+		return 1 + len(na.more.all)
+	}
+}
+
+// each visits every distinct observed authority in observation order.
+func (na *nameAuthorities) each(fn func(*instrumentDescriptor)) {
+	if na.first == nil {
+		return
+	}
+	fn(na.first)
+	if na.more != nil {
+		for _, desc := range na.more.all {
+			fn(desc)
+		}
+	}
 }
 
 // reconcileStagedDesc reconciles a same-key write against the staged entry's running-canonical
@@ -160,51 +204,65 @@ func (c *storeCore) resolveObservedDescriptors() descriptorResolution {
 	// conflict on ANY of them is merged and detected (fixing the class of bug where a capped-out
 	// authority silently hid a conflict), and the fail-vs-drop decision sees the true count. For a
 	// pathological many-schema name this is O(distinct authorities) memory - transient, bounded by
-	// the cycle's write count, and the name fails/drops anyway.
-	authorities := make(map[string]*nameAuthorities)
+	// the cycle's write count, and the name fails/drops anyway. Entries are values, so the common
+	// one-authority name allocates nothing; the map is sized for the names this cycle can observe,
+	// bounded by its writes so a sparse commit stays O(touched).
+	authorities := make(map[string]nameAuthorities, c.active.observedNamesHint(len(c.instruments)))
 	// declErrs collects declaration (metadata) conflicts between series-authority-
 	// compatible descriptors observed this cycle; they fail the cycle at the end.
 	var declErrs []error
-	// committedObservedNames marks names whose live committed authority is actively observed this
-	// cycle. It drives the multi-authority fail-vs-drop decision below and is computed over EVERY
-	// observed authority. Because each distinct same-key authority is recorded as a conflict
-	// (deduped by full descriptor identity), a committed-matching write observed only as a same-key
-	// conflict still reaches this loop.
-	committedObservedNames := make(map[string]bool)
 	// Descriptors reach record already reduced to their effective authority (histograms carry their
 	// observed bounds), so no wildcard remains and series-authority compatibility is a symmetric
 	// equivalence. Compatible authorities are canonicalized by merging their declared metadata; a
 	// metadata conflict fails the cycle.
+	merge := func(canonical **instrumentDescriptor, desc *instrumentDescriptor) {
+		merged, err := mergeDeclarations(*canonical, desc)
+		if err != nil {
+			declErrs = append(declErrs, err)
+			return
+		}
+		*canonical = merged
+	}
 	record := func(name string, desc *instrumentDescriptor) {
-		if !committedObservedNames[name] {
+		na := authorities[name]
+		// committedObserved marks a name whose live committed authority is actively observed this
+		// cycle. It drives the multi-authority fail-vs-drop decision below and is computed over
+		// EVERY observed authority. Because each distinct same-key authority is recorded as a
+		// conflict (deduped by full descriptor identity), a committed-matching write observed only
+		// as a same-key conflict still reaches this loop.
+		if !na.committedObserved {
 			if committed := realCommittedAuthority(c.instruments[name]); committed != nil &&
 				seriesAuthoritiesCompatible(committed, desc) {
-				committedObservedNames[name] = true
+				na.committedObserved = true
 			}
-		}
-		na := authorities[name]
-		if na == nil {
-			na = &nameAuthorities{byFP: make(map[authorityFingerprint][]*observedAuthority)}
-			authorities[name] = na
 		}
 		fp := authorityFingerprintOf(desc)
-		// The bucket is normally length 1 (distinct authorities have distinct fingerprints); a
-		// length > 1 bucket only arises on a hash collision, which descriptorSeriesAuthoritiesEqual
-		// separates so distinct authorities are never merged.
-		for _, auth := range na.byFP[fp] {
-			if descriptorSeriesAuthoritiesEqual(auth.canonical, desc) {
-				merged, err := mergeDeclarations(auth.canonical, desc)
-				if err != nil {
-					declErrs = append(declErrs, err)
+		// A fingerprint bucket is normally length 1 (distinct authorities have distinct
+		// fingerprints); a longer bucket only arises on a hash collision, which
+		// descriptorSeriesAuthoritiesEqual separates so distinct authorities are never merged.
+		switch {
+		case na.first == nil:
+			na.first, na.firstFP = desc, fp
+		case na.firstFP == fp && descriptorSeriesAuthoritiesEqual(na.first, desc):
+			merge(&na.first, desc)
+		default:
+			if na.more == nil {
+				na.more = &extraAuthorities{
+					byFP: make(map[authorityFingerprint][]int),
+				}
+			}
+			more := na.more
+			for _, i := range more.byFP[fp] {
+				if descriptorSeriesAuthoritiesEqual(more.all[i], desc) {
+					merge(&more.all[i], desc)
+					authorities[name] = na
 					return
 				}
-				auth.canonical = merged
-				return // same authority already recorded
 			}
+			more.byFP[fp] = append(more.byFP[fp], len(more.all))
+			more.all = append(more.all, desc)
 		}
-		auth := &observedAuthority{canonical: desc}
-		na.byFP[fp] = append(na.byFP[fp], auth)
-		na.all = append(na.all, auth)
+		authorities[name] = na
 	}
 	for _, s := range c.active.gauges {
 		record(s.name, s.desc)
@@ -233,23 +291,24 @@ func (c *storeCore) resolveObservedDescriptors() descriptorResolution {
 		record(cc.name, cc.desc)
 	}
 
-	res := descriptorResolution{canonical: make(map[string]*instrumentDescriptor)}
+	res := descriptorResolution{
+		names: authorities,
+	}
 	var failNames []string
 	for name, na := range authorities {
-		auths := na.all
 		// The raw committed descriptor supplies the canonical DECLARATION base (its declared
 		// metadata is preserved) even when it is a never-observed nil-bounds histogram
 		// wildcard. realCommittedAuthority is the live AUTHORITY (nil for such a wildcard)
 		// and drives only the supersede/fail decision.
 		rawCommitted := c.instruments[name]
 		committed := realCommittedAuthority(rawCommitted)
-		if len(auths) < 2 {
-			observed := auths[0].canonical
+		if na.count() < 2 {
+			observed := na.first
 			switch {
 			case committed != nil && !seriesAuthoritiesCompatible(committed, observed):
 				// A live committed authority of a different kind was not observed: supersede it.
 				res.supersede = append(res.supersede, name)
-				res.canonical[name] = observed
+				na.canonical, na.accepted = observed, true
 			case rawCommitted != nil && seriesAuthoritiesCompatible(rawCommitted, observed):
 				// Committed authority (live, or a wildcard registration) is compatible: its
 				// declared metadata is the canonical base, merged with the observed one.
@@ -258,11 +317,12 @@ func (c *storeCore) resolveObservedDescriptors() descriptorResolution {
 					declErrs = append(declErrs, err)
 					continue
 				}
-				res.canonical[name] = merged
+				na.canonical, na.accepted = merged, true
 			default:
 				// New name (no committed registration), or an incompatible wildcard.
-				res.canonical[name] = observed
+				na.canonical, na.accepted = observed, true
 			}
+			authorities[name] = na
 			continue
 		}
 		// Multiple incompatible authorities observed for one name this cycle. A committed
@@ -273,17 +333,17 @@ func (c *storeCore) resolveObservedDescriptors() descriptorResolution {
 		// e.g. a committed nil-bounds histogram unit=bytes vs an observed unit=seconds would silently
 		// drop instead of failing. The single-authority branch already merges against rawCommitted.
 		if rawCommitted != nil {
-			for _, auth := range auths {
-				if seriesAuthoritiesCompatible(rawCommitted, auth.canonical) {
-					if _, err := mergeDeclarations(rawCommitted, auth.canonical); err != nil {
+			na.each(func(auth *instrumentDescriptor) {
+				if seriesAuthoritiesCompatible(rawCommitted, auth) {
+					if _, err := mergeDeclarations(rawCommitted, auth); err != nil {
 						declErrs = append(declErrs, err)
 					}
 				}
-			}
+			})
 		}
 		// committedObserved was computed over every observed authority, so the fail-vs-drop decision
 		// is complete.
-		if committedObservedNames[name] {
+		if na.committedObserved {
 			// An established authority is actively written alongside an incompatible one:
 			// unresolvable, fail loud (never silent data loss).
 			failNames = append(failNames, name)

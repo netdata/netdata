@@ -132,7 +132,7 @@ func (c *storeCore) recordHistogramObservePoint(desc *instrumentDescriptor, scop
 			labelsKey:    labelsKey,
 			desc:         desc,
 		}
-		c.active.histograms[key] = entry
+		stageEntry(&c.active.histograms, key, entry)
 	}
 	entry.bounds = append(entry.bounds[:0], bounds...)
 	entry.count = count
@@ -202,7 +202,7 @@ func (c *storeCore) recordHistogramObserve(desc *instrumentDescriptor, scope Hos
 				}
 			}
 		}
-		c.active.histograms[key] = entry
+		stageEntry(&c.active.histograms, key, entry)
 	}
 
 	idx := findHistogramBucket(schema.bounds, value)

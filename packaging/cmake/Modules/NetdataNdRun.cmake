@@ -10,7 +10,13 @@
 
 include_guard()
 
-set(NDRUN_FILES src/collectors/utils/nd-run.c src/collectors/utils/exec-signals.h)
+set(NDRUN_FILES
+    src/collectors/utils/nd-run.c
+    src/collectors/utils/nd-process-tree.c
+    src/collectors/utils/nd-process-tree.h
+    src/collectors/utils/nd-file-reader.c
+    src/collectors/utils/nd-file-reader.h
+    src/collectors/utils/exec-signals.h)
 
 #
 # nd-run helper program
@@ -23,9 +29,6 @@ if(CAP_FOUND AND OS_LINUX)
 endif()
 
 add_executable(nd-run ${NDRUN_FILES})
-if(HAVE_CAPABILITY)
-  target_link_libraries(nd-run PRIVATE PkgConfig::CAP)
-endif()
 target_include_directories(nd-run PRIVATE ${CMAKE_BINARY_DIR})
 install(TARGETS nd-run
         COMPONENT netdata

@@ -47,6 +47,7 @@ type JobV2Config struct {
 	VnodeLookup             VnodeLookup
 	Publication             *hostoutput.Publisher
 	FunctionOnly            bool
+	StoreFirst              bool
 	RuntimeService          runtimecomp.Service
 	LifecycleErrorSanitizer func(error) error
 }
@@ -71,6 +72,7 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 		autoDetectTries:         infTries,
 		isStock:                 cfg.IsStock,
 		functionOnly:            cfg.FunctionOnly,
+		storeFirst:              cfg.StoreFirst,
 		module:                  cfg.Module,
 		labels:                  cloneLabels(cfg.Labels),
 		out:                     cfg.Out,
@@ -94,6 +96,7 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 	if j.cleanupOut == nil {
 		j.cleanupOut = j.out
 	}
+	j.selfMetrics = newJobSelfMetrics(j.pluginName, j.moduleName, j.name, j.fullName, j.updateEvery, j.labels)
 
 	log := logger.New().With(jobLoggerAttrs(j.ModuleName(), j.Name(), cfg.Source)...)
 	j.Logger = log
@@ -118,6 +121,7 @@ type JobV2 struct {
 	autoDetectTries int
 	isStock         bool
 	functionOnly    bool
+	storeFirst      bool
 	labels          map[string]string
 
 	*logger.Logger
@@ -125,7 +129,7 @@ type JobV2 struct {
 	module                  collectorapi.CollectorV2
 	lifecycleErrorSanitizer func(error) error
 
-	running atomic.Bool
+	managed atomic.Pointer[ManagedRun]
 
 	initialized bool
 	panicked    atomic.Bool
@@ -133,15 +137,15 @@ type JobV2 struct {
 	store metrix.CollectorStore
 	cycle metrix.CycleController
 
-	scopeStates           map[string]*jobV2ScopeState
-	chartTemplateYAML     []byte
-	chartTemplateRevision uint64
-	engineOptions         []chartengine.Option
-	runtimeStore          metrix.RuntimeStore
-	runtimeAggregator     *chartengine.RuntimeAggregator
+	scopeStates       map[string]*jobV2ScopeState
+	chartTemplates    *collectorapi.ChartTemplateSource
+	engineOptions     []chartengine.Option
+	runtimeStore      metrix.RuntimeStore
+	runtimeAggregator *chartengine.RuntimeAggregator
 
-	prevRun time.Time
-	retries atomic.Int64
+	prevRun     time.Time
+	retries     atomic.Int64
+	selfMetrics jobSelfMetrics
 
 	vnodeMu               sync.RWMutex
 	vnode                 vnodes.VirtualNode
@@ -161,6 +165,9 @@ type JobV2 struct {
 	cleanupOut io.Writer
 	buf        *bytes.Buffer
 	api        *netdataapi.API
+
+	// lastOutputBytes sizes the next cycle's scope output block.
+	lastOutputBytes int
 
 	stopCtrl stopController
 
@@ -207,8 +214,11 @@ type jobV2ScopeState struct {
 func (j *JobV2) FullName() string   { return j.fullName }
 func (j *JobV2) ModuleName() string { return j.moduleName }
 func (j *JobV2) Name() string       { return j.name }
-func (j *JobV2) IsRunning() bool    { return j.running.Load() }
-func (j *JobV2) Collector() any     { return j.module }
+func (j *JobV2) IsRunning() bool {
+	run := j.managed.Load()
+	return run != nil && run.Running()
+}
+func (j *JobV2) Collector() any { return j.module }
 func (j *JobV2) AutoDetectionEvery() int {
 	return j.autoDetectEvery
 }
@@ -268,6 +278,7 @@ func (j *JobV2) CleanupRejected() {
 
 func (j *JobV2) cleanup(emit bool) {
 	defer func() { j.releaseAllScopeOwners(); j.clearAllScopeStateAfterCleanup() }()
+	defer j.selfMetrics.clear()
 	j.buf.Reset()
 	snapshots := j.captureScopeCleanupSnapshots()
 	j.unregisterRuntimeComponent()
@@ -283,14 +294,7 @@ func (j *JobV2) cleanup(emit bool) {
 			continue
 		}
 
-		env := chartemit.EmitEnv{
-			TypeID:      j.fullName,
-			UpdateEvery: j.updateEvery,
-			Plugin:      j.pluginName,
-			Module:      j.moduleName,
-			JobName:     j.name,
-			JobLabels:   j.labels,
-		}
+		env := j.emitEnv(0, jobV2EmissionDecision{})
 		if snapshot.host.isVnode() {
 			env.HostScope = &chartemit.HostScope{
 				GUID: snapshot.host.guid,
@@ -309,6 +313,16 @@ func (j *JobV2) cleanup(emit bool) {
 			Cleanup:    true,
 		}, nil); err != nil {
 			j.Warningf("cleanup output failed for host scope %q: %v", snapshot.scopeKey, err)
+		}
+		j.buf.Reset()
+	}
+	j.selfMetrics.cleanup(j.api)
+	if j.buf.Len() > 0 {
+		if _, err := commitHostOutput(j.cleanupOut, hostoutput.Request{
+			Payload: j.buf.Bytes(),
+			Cleanup: true,
+		}, nil); err != nil {
+			j.Warningf("self-metrics cleanup output failed: %v", err)
 		}
 		j.buf.Reset()
 	}
@@ -336,7 +350,7 @@ func (j *JobV2) autoDetection(ctx context.Context) (err error) {
 	}
 
 	if rawErr := j.init(ctx); rawErr != nil {
-		if !isRetryableError(rawErr) {
+		if !keepsInitRetry(rawErr) {
 			j.disableAutoDetection()
 		}
 		err = sanitizeLifecycleError(j.lifecycleErrorSanitizer, rawErr)
@@ -361,106 +375,92 @@ func (j *JobV2) autoDetection(ctx context.Context) (err error) {
 	return nil
 }
 
-// StartManaged starts the collector loop while leaving Cleanup ownership with
-// the caller. It acknowledges readiness only after the loop and optional
-// runner have published their active state.
-func (j *JobV2) StartManaged(ready chan<- struct{}) {
-	j.run(ready)
-}
-
-func (j *JobV2) run(ready chan<- struct{}) {
+// StartManaged owns the loop and joins Run before returning. Cleanup remains
+// with the process owner. Run failures settle independently of a blocked Collect.
+func (j *JobV2) StartManaged(run *ManagedRun) {
 	j.stopCtrl.markStarted()
-	j.running.Store(true)
-	runCtx, cancel := context.WithCancel(context.Background())
-	j.setRunContext(runCtx, cancel)
-	var runnerDone <-chan error
-	if !j.stopCtrl.stopRequested() {
-		runnerDone = j.startCollectorRunner(runCtx)
+	j.managed.Store(run)
+	runCtx := run.Context()
+	j.setRunContext(runCtx, func() { run.Stop(nil) })
+	defer func() {
+		run.Stop(nil)
+		j.setRunContext(nil, nil)
+		j.stopCtrl.markStopped()
+		j.Info("stopped")
+	}()
+	if j.stopCtrl.stopRequested() {
+		run.Stop(nil)
+		return
 	}
-	if ready != nil {
-		close(ready)
+	var runnerDone chan struct{}
+	if runner, ok := j.module.(collectorapi.CollectorV2Runner); ok {
+		runnerDone = make(chan struct{})
+		go func() {
+			defer close(runnerDone)
+			j.runCollectorRunner(j.moduleContextFrom(runCtx), runner, run)
+		}()
+		defer func() { run.Stop(nil); <-runnerDone }()
+	} else {
+		run.Ready()
+	}
+	select {
+	case <-run.StartupDone():
+	case <-runCtx.Done():
+		run.Stop(context.Cause(runCtx))
+	case <-j.stopCtrl.stopCh:
+		run.Stop(nil)
+	}
+	if !run.Running() {
+		return
 	}
 	if j.functionOnly {
 		j.Info("started in function-only mode")
 	} else {
 		j.Infof("started (v2), data collection interval %ds", j.updateEvery)
 	}
-	defer func() {
-		cancel()
-		j.setRunContext(nil, nil)
-		j.stopCtrl.markStopped()
-		j.Info("stopped")
-	}()
-
-LOOP:
 	for {
 		select {
 		case <-j.stopCtrl.stopCh:
-			break LOOP
-		case err := <-runnerDone:
-			runnerDone = nil
-			j.handleCollectorRunnerExit(runCtx, err)
+			run.Stop(nil)
+			return
+		case <-runCtx.Done():
+			return
 		case t := <-j.tick:
-			if !j.functionOnly && j.shouldCollect(t) {
+			if run.Running() && !j.functionOnly && j.shouldCollect(t) {
 				markRunStartWithResumeLog(&j.skipTracker, j.Logger)
 				j.runOnce()
 				j.skipTracker.MarkRunStop(time.Now())
 			}
 		}
 	}
-	cancel()
-	j.waitCollectorRunner(runCtx, runnerDone)
-	// Mark not-running before returning so external function dispatch rejects
-	// requests before the lifecycle owner tears module resources down.
-	j.running.Store(false)
 }
 
-func (j *JobV2) startCollectorRunner(ctx context.Context) <-chan error {
-	runner, ok := j.module.(collectorapi.CollectorV2Runner)
-	if !ok {
-		return nil
-	}
-	done := make(chan error, 1)
-	go func() {
-		done <- j.runCollectorRunner(ctx, runner)
-	}()
-	return done
-}
-
-func (j *JobV2) runCollectorRunner(ctx context.Context, runner collectorapi.CollectorV2Runner) (err error) {
+func (j *JobV2) runCollectorRunner(ctx context.Context, runner collectorapi.CollectorV2Runner, run *ManagedRun) (err error) {
 	defer func() {
-		if r := recover(); r != nil {
-			j.panicked.Store(true)
-			err = sanitizeLifecycleError(j.lifecycleErrorSanitizer, fmt.Errorf("panic %v", r))
-			j.Errorf("PANIC: %v", err)
+		var stack []byte
+		if recovered := recover(); recovered != nil {
+			err = newRunFailure(fmt.Errorf("panic %v", recovered), "panic", j.lifecycleErrorSanitizer)
 			if logger.Level.Enabled(slog.LevelDebug) {
-				j.Errorf("STACK: %s", debug.Stack())
+				stack = debug.Stack()
 			}
 		}
+		// Revoke output before logging, which can itself block on I/O.
+		run.Complete(err)
+		if failure := run.Failure(); err == nil && failure != nil {
+			err = failure
+		}
+		if err != nil {
+			j.Errorf("collector runner failed: %v", err)
+		}
+		if len(stack) != 0 {
+			j.Errorf("STACK: %s", stack)
+		}
 	}()
-
-	err = runner.Run(ctx)
-	if err != nil && ctx.Err() != nil && errors.Is(err, ctx.Err()) {
+	err = runner.Run(ctx, run.Ready)
+	if err == nil || (ctx.Err() != nil && cancellationOnly(err, ctx.Err(), context.Cause(ctx))) {
 		return nil
 	}
-	return sanitizeLifecycleError(j.lifecycleErrorSanitizer, err)
-}
-
-func (j *JobV2) waitCollectorRunner(ctx context.Context, done <-chan error) {
-	if done == nil {
-		return
-	}
-	j.handleCollectorRunnerExit(ctx, <-done)
-}
-
-func (j *JobV2) handleCollectorRunnerExit(ctx context.Context, err error) {
-	if err != nil {
-		j.Errorf("collector runner failed: %v", err)
-		return
-	}
-	if ctx.Err() == nil {
-		j.Warningf("collector runner stopped before job stop")
-	}
+	return newRunFailure(err, "error", j.lifecycleErrorSanitizer)
 }
 
 func (j *JobV2) Stop() {
@@ -525,20 +525,18 @@ func (j *JobV2) postCheck() error {
 		chartengine.WithLogger(j.Logger.With(slog.String("component", "chartengine"))),
 		chartengine.WithEmitTypeIDBudgetPrefix(j.fullName),
 	}
-	if v, ok := j.module.(collectorapi.CollectorV2EnginePolicy); ok {
-		opts = append(opts, chartengine.WithEnginePolicy(v.EnginePolicy()))
+	templates, err := collectorapi.NewChartTemplateSource(j.module, opts...)
+	if err != nil {
+		return err
 	}
-
-	templateYAML := []byte(j.module.ChartTemplateYAML())
-	if err := validateJobV2ChartTemplate(templateYAML, opts); err != nil {
+	if _, err := templates.Capture(); err != nil {
 		return err
 	}
 
 	j.store = store
 	j.cycle = managed.CycleController()
 	j.scopeStates = make(map[string]*jobV2ScopeState)
-	j.chartTemplateYAML = templateYAML
-	j.chartTemplateRevision = 1
+	j.chartTemplates = templates
 	j.engineOptions = opts
 	j.runtimeStore = metrix.NewRuntimeStore()
 	j.runtimeAggregator = chartengine.NewRuntimeAggregator(j.runtimeStore)
@@ -546,16 +544,6 @@ func (j *JobV2) postCheck() error {
 		j.Warningf("runtime metrics registration failed: %v", err)
 	}
 	return nil
-}
-
-func validateJobV2ChartTemplate(templateYAML []byte, opts []chartengine.Option) error {
-	engineOpts := append([]chartengine.Option{}, opts...)
-	engineOpts = append(engineOpts, chartengine.WithRuntimeStore(nil))
-	engine, err := chartengine.New(engineOpts...)
-	if err != nil {
-		return err
-	}
-	return engine.LoadYAML(templateYAML, 1)
 }
 
 func (j *JobV2) runOnce() {
@@ -569,6 +557,7 @@ func (j *JobV2) runOnce() {
 	j.prevRun = curTime
 
 	prepared, ok := j.collectAndEmit(sinceLastRun)
+	elapsed := int64(durationTo(time.Since(curTime), time.Millisecond))
 	if ok && !j.panicked.Load() {
 		if err := j.finishPreparedEmission(prepared); err != nil {
 			j.Warningf("finalize emission failed: %v", err)
@@ -581,6 +570,15 @@ func (j *JobV2) runOnce() {
 		j.retries.Add(1)
 	}
 	j.buf.Reset()
+	if !j.panicked.Load() {
+		self := j.selfMetrics.prepare(j.api, sinceLastRun, elapsed, ok, false)
+		if _, err := commitHostOutput(j.out, hostoutput.Request{
+			Payload: j.buf.Bytes(),
+		}, self); err != nil {
+			j.Warningf("self-metrics output failed: %v", err)
+		}
+		j.buf.Reset()
+	}
 }
 
 func (j *JobV2) flushRuntimeAggregator() {
@@ -625,6 +623,13 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 		j.Warningf("collect failed: %v", err)
 		return jobV2PreparedEmission{}, false
 	}
+	candidate, err := j.chartTemplates.Capture()
+	if err != nil {
+		j.cycle.AbortCycle()
+		cycleOpen = false
+		j.Warningf("chart template capture failed: %v", sanitizeLifecycleError(j.lifecycleErrorSanitizer, err))
+		return jobV2PreparedEmission{}, false
+	}
 	if err := j.cycle.CommitCycleSuccess(); err != nil {
 		cycleOpen = false
 		j.Warningf("commit cycle failed: %v", err)
@@ -632,23 +637,19 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 	}
 	cycleOpen = false
 
-	liveSet := j.liveScopeSet()
-	workSet := j.scopeWorkSet(liveSet)
-	for _, scopeKey := range sortedScopeKeys(workSet) {
-		scope := workSet[scopeKey]
-		_, live := liveSet[scopeKey]
-		if !live {
-			if state := j.scopeStates[scopeKey]; state != nil {
-				scope = state.scope
-			}
-		}
-		scopePrepared, scopeOK := j.prepareScopeEmission(scope, live, sinceLastRun)
+	work := j.scopeWork()
+	prepared.scopes = make([]jobV2PreparedScopeEmission, 0, len(work))
+	// Scope outputs share one block per cycle; each scope's output is capped at its own end.
+	outputs := make([]byte, 0, j.lastOutputBytes)
+	for _, item := range work {
+		scopePrepared, scopeOK := j.prepareScopeEmission(item.scope, item.live, sinceLastRun, candidate, &outputs)
 		if !scopeOK {
 			prepared.scopeFailure = true
 			continue
 		}
 		prepared.scopes = append(prepared.scopes, scopePrepared)
 	}
+	j.lastOutputBytes = len(outputs)
 	j.Debugf("v2 scope count: %d", len(j.scopeStates))
 	if len(prepared.scopes) == 0 && prepared.scopeFailure {
 		return prepared, false
@@ -699,6 +700,8 @@ func (j *JobV2) prepareScopeEmission(
 	scope metrix.HostScope,
 	live bool,
 	sinceLastRun int,
+	candidate *chartengine.TemplateSet,
+	outputs *[]byte,
 ) (prepared jobV2PreparedScopeEmission, ok bool) {
 	var attempt chartengine.PlanAttempt
 	var decision jobV2EmissionDecision
@@ -728,26 +731,21 @@ func (j *JobV2) prepareScopeEmission(
 	if state.scopeKey == defaultHostScopeKey {
 		vnode := j.currentVnode()
 		decision, err = state.host.prepareEmission(vnode)
-		if err == nil && decision.needEngineReload {
-			state.engine.ResetMaterialized()
-		}
 		if err != nil {
 			j.Warningf("prepare default host scope failed: %v", err)
 			return jobV2PreparedScopeEmission{}, false
 		}
 	} else {
 		decision, err = state.host.prepareScopedEmission(state.scope)
-		if err == nil && decision.needEngineReload {
-			state.engine.ResetMaterialized()
-		}
 		if err != nil {
 			j.Warningf("prepare host scope %q failed: %v", state.scopeKey, err)
 			return jobV2PreparedScopeEmission{}, false
 		}
 	}
 
-	attempt, err = state.engine.PreparePlan(
+	attempt, err = state.engine.PreparePlanWithOptions(
 		j.store.Read(metrix.ReadRaw(), metrix.ReadFlatten(), metrix.ReadHostScope(state.scopeKey)),
+		chartengine.PlanOptions{TemplateSet: candidate, ResetMaterialized: decision.needEngineReload},
 	)
 	if err != nil {
 		j.Warningf("build plan for host scope %q failed: %v", state.scopeKey, err)
@@ -765,7 +763,9 @@ func (j *JobV2) prepareScopeEmission(
 		j.Warningf("apply plan for host scope %q failed: %v", state.scopeKey, err)
 		return jobV2PreparedScopeEmission{}, false
 	}
-	output := append([]byte(nil), j.buf.Bytes()...)
+	start := len(*outputs)
+	*outputs = append(*outputs, j.buf.Bytes()...)
+	output := (*outputs)[start:len(*outputs):len(*outputs)]
 	j.buf.Reset()
 
 	prepared = jobV2PreparedScopeEmission{
@@ -808,6 +808,7 @@ func (j *JobV2) emitEnv(sinceLastRun int, decision jobV2EmissionDecision) charte
 		JobName:     j.name,
 		JobLabels:   j.labels,
 		MSSinceLast: sinceLastRun,
+		StoreFirst:  j.storeFirst,
 	}
 	env.HostScope = decision.hostScope
 	return env

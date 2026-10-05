@@ -253,6 +253,42 @@ For string-heavy columns, prefer `string_ref` with `dictionary: "strings"` and
 integer values. This is how production socket evidence reached about 22 raw
 bytes per socket evidence row in the measured corpus.
 
+For direct scalar columns with `aggregation: "set"`, `type` describes each
+member: `bool`, `int`, `uint`, `float`, `string`, `timestamp`, `duration`, `ip`,
+or `mac`. A cell may contain a scalar or a one-dimensional array of that type,
+including an empty array. The same column can contain scalar identity cells
+and set-valued attributes for different actor types; aggregators preserve key
+values rather than wrapping them into sets. Keep the column type, role, unit,
+and presentation metadata when emitting an aggregate.
+
+Every set member follows the ordinary scalar type and `nullable` checks. Null
+cells and null members require `nullable: true`; nested arrays, objects, and
+wrong-typed members are rejected without coercion. In Go builders, use `[]any`
+for sets. A nil slice serializes as null and follows nullability; a non-nil
+empty slice represents an empty set. These rules apply after decoding any of
+the three column codecs.
+
+Numeric cells and set members must be finite. Types `int` and `uint` require
+integral values, and `uint` also requires a nonnegative value. Go validation
+accepts `int`, `int64`, `uint64`, `float64`, and `json.Number`, including the
+full native `uint64` range; numeric cells are not narrowed to machine-sized
+row or dictionary indexes. Validation preserves the supplied value.
+
+`json.Number` must contain a valid JSON numeric literal. For `int` and `uint`,
+it must use integer-form syntax (no fraction or exponent), fitting `int64`
+when negative or `uint64` when nonnegative. For `float` and `duration`, it must
+parse as a finite `float64`. Callers using the default JSON decoder retain its
+`float64` precision limits; validation does not recover digits already rounded
+during decoding.
+
+Set aggregation does not turn reference cells into arrays of references:
+`string_ref`, `ip_ref`, and `mac_ref` still carry one global dictionary index,
+and row-reference columns still carry one row index. A global dictionary entry
+may contain a set where its existing dictionary contract permits arrays.
+Non-set scalar columns and explicit `array`/`json` columns retain their existing
+validation rules. JSON Schema checks the generic wire shape; the topology Go
+builder and semantic validator also check the typed-set member contract.
+
 Use column type `json` only for actor/custom detail cells that must preserve
 nested producer-owned data, such as SNMP port `neighbors` or `vlans`. Do not
 use `json` for high-cardinality relationship evidence when a typed scalar,
@@ -292,7 +328,10 @@ Common actor identity columns:
 - `vsphere_moid`
 - `vsphere_inventory_path`
 
-Actor types define source-local identity and cross-source merge identity:
+Actor types define source-local identity and cross-source merge identity. The
+following actor-type excerpt is not a complete payload. The enclosing payload
+must declare the listed scope IDs in `types.aggregation_scopes`, provide the
+referenced actor columns, and define the referenced label and port tables:
 
 ```json
 {
@@ -355,7 +394,10 @@ fallback.
 Actor type `search` declares exactly what the graph search bar may index for
 that actor type. `search.columns[]` references actor-table scalar columns.
 `search.label_keys[]` references values in the actor label table, normally
-`actor_labels.key`. Set `search.enabled: false` for helper actors that should
+`actor_labels.key`. These keys are unique non-empty strings, not registry IDs;
+built-in keys such as `_hostname` and `_os` are valid. Search validation does not
+depend on the presence of optional actor presentation settings.
+Set `search.enabled: false` for helper actors that should
 not appear in graph search, such as synthetic segment or grouping actors. The
 UI must not traverse producer-specific `details`, `match`, `attributes`, or
 labels paths when rendering a v1 payload.
@@ -365,6 +407,10 @@ generic `segment` type. Each such type must declare its own identity, merge
 identity, presentation, modal sections, legend entry, and aggregation behavior.
 Consumers must use the declared type metadata and must not infer semantics from
 a type id that happens to contain `segment`, `subnet`, or `network`.
+
+Every actor-type `aggregation_scopes[]` entry must name a scope declared in
+`types.aggregation_scopes`. Omit the list or emit an empty list when the actor
+does not participate in a grouping scope; this does not remove it from the graph.
 
 ## Required Link Semantics
 

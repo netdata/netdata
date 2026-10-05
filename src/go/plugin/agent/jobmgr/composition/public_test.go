@@ -13,6 +13,10 @@ import (
 	"time"
 
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -271,7 +275,16 @@ func testProductionProcessConfig(input io.Reader, output io.Writer) Config {
 			return runTestDiscoverer{}, true, nil
 		},
 	)
+	resolver, err := secretresolver.NewDefaultAtomicResolver()
+	if err != nil {
+		panic(err)
+	}
+	creators, err := secretstore.NewCreatorCatalog(backends.Creators())
+	if err != nil {
+		panic(err)
+	}
 	return Config{
+		Secrets:    &SecretsConfig{Providers: secretconfig.Config{Resolver: resolver, Creators: creators}},
 		Input:      input,
 		Output:     output,
 		PluginName: "go.d",

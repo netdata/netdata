@@ -1,5 +1,9 @@
 [
   {
+    "name": "W/anomaly-gaps",
+    "proves": "anomaly-rate weights count missing samples as zero without changing ordinary value weights"
+  },
+  {
     "name": "L0/live-burst",
     "proves": "a live BEGIN2/SET2 burst sent without historical spike-3 pre-burst pacing preserves exactly the fixture dimensions, timestamps, storage-number-quantized values, gaps, anomaly rates and annotations after the retention barrier (pins #23096 green)",
     "fixed_by": "#23096"
@@ -647,6 +651,10 @@
     "proves": "valid MCP condition queries preserve the exact RESET point-annotation bitmap independently of the grouped value"
   },
   {
+    "name": "CASE-023/mcp-hidden-dimension-selection",
+    "proves": "MCP query_metrics returns an explicitly requested hidden dimension series while leaving a visible peer query scoped to the requested dimension"
+  },
+  {
     "name": "CASE-023/mcp-invalid-options",
     "proves": "non-string, malformed and non-finite MCP condition expressions return structured -32602 INVALID_PARAMS errors"
   },
@@ -1232,6 +1240,10 @@
   {
     "name": "W/limit-node-ties",
     "proves": "equal weights select physical metrics by stable node and metric identity while retaining metadata for nodes without selected metrics"
+  },
+  {
+    "name": "W/v1-host-scope",
+    "proves": "v1 weights respect the URL-selected host while v2/v3 retain explicit multi-node scope"
   },
   {
     "name": "W/limit-mcp",

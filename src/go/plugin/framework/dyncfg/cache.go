@@ -15,8 +15,9 @@ type Config interface {
 
 // Entry pairs a config with its current dyncfg status.
 type Entry[C Config] struct {
-	Cfg    C
-	Status Status
+	Cfg     C
+	Status  Status
+	Enabled bool // committed enabled intent; Accepted alone may be passive
 }
 
 // SeenCache stores all discovered configs keyed by UID().
@@ -27,7 +28,9 @@ type SeenCache[C Config] struct {
 }
 
 func NewSeenCache[C Config]() *SeenCache[C] {
-	return &SeenCache[C]{items: make(map[string]C)}
+	return &SeenCache[C]{
+		items: make(map[string]C),
+	}
 }
 
 func (c *SeenCache[C]) Add(cfg C) {
@@ -61,19 +64,17 @@ func (c *SeenCache[C]) ForEach(fn func(uid string, cfg C) bool) {
 }
 
 // ExposedCache stores active config+status per logical name, keyed by ExposedKey().
-// LookupByKey returns a pointer to the stored Entry — mutations to Status
-// are visible through the pointer. The mutex protects map access only.
-// Entry.Status is written exclusively by the serialized command goroutine
-// (via Handler.Cmd*) and is not read by any concurrent code path in production.
-// Concurrent read-only commands (schema/get/test/userconfig) access only
-// Entry.Cfg, which is immutable after creation.
+// Entries are immutable after insertion. Writers replace snapshots; concurrent
+// preparation and read-only commands may retain their pointers.
 type ExposedCache[C Config] struct {
 	mux   sync.RWMutex
 	items map[string]*Entry[C]
 }
 
 func NewExposedCache[C Config]() *ExposedCache[C] {
-	return &ExposedCache[C]{items: make(map[string]*Entry[C])}
+	return &ExposedCache[C]{
+		items: make(map[string]*Entry[C]),
+	}
 }
 
 // Add inserts or overwrites an entry by cfg.ExposedKey().

@@ -46,13 +46,32 @@ setup:
       name: 'go.d/sd/docker.conf'
     options:
       description: |
-        The configuration file has two top-level blocks: `discoverer:` (the options below) and `services:` (rules that turn discovered containers into collector jobs — see [Service Rules](#service-rules)).
+        The configuration file has two top-level blocks: `discoverer:` (the discoverer-specific options below) and `services:` (rules that turn discovered containers into collector jobs — see [Service Rules](#service-rules)).
 
         After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
       folding:
         title: 'Discoverer options'
         enabled: false
       list:
+        - name: 'trust_discovered_targets'
+          description: 'Allow secret references in generated collector jobs, including target-controlled values that can make Netdata read files, run commands, or fetch stored secrets. Off by default; enable only if you control and trust every discoverable target and accept the risk of exposing resolved values to it.'
+          default_value: 'no'
+          required: false
+          group: 'Base'
+          detailed_description: |
+            Set this option at the top level, alongside `discoverer:` and `services:`, not inside the discoverer block.
+            It enables `${env:...}`, `${file:...}`, `${cmd:...}` and `${store:...}` in generated collector jobs.
+
+            If a service rule copies a target-controlled value into a job field, the target can insert a reference that
+            makes Netdata read a local file, run a command, or fetch a stored secret with the secret provider's
+            permissions. The collector may send the result to that target as a credential or other request field.
+            Enable only if you control and trust every target this pipeline can discover; enabling it accepts
+            this risk for the whole pipeline. One untrusted target is enough to abuse it.
+
+            Container owners can control command arguments, labels and other values used by service rules.
+
+            The default keeps reference syntax literal. This option does not resolve the discoverer's own connection
+            credentials. See [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md#configuration-file-structure).
         - name: 'address'
           description: 'Docker daemon address.'
           default_value: 'unix:///var/run/docker.sock'

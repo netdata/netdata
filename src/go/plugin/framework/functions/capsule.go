@@ -262,7 +262,16 @@ func parseCapsuleCall(fields []string) (Call, bool, error) {
 	if maxSeconds := int64(maximumFunctionTimeout / time.Second); timeoutSeconds == 0 || timeoutSeconds > maxSeconds {
 		timeoutSeconds = maxSeconds
 	}
-	callFields := strings.Fields(fields[3])
+	// Match the daemon's ASCII word separators; Unicode whitespace is part of
+	// the argument and must reach the owner's validation unchanged.
+	callFields := strings.FieldsFunc(fields[3], func(r rune) bool {
+		switch r {
+		case ' ', '\t', '\r', '\n', '\f', '\v':
+			return true
+		default:
+			return false
+		}
+	})
 	if len(callFields) == 0 {
 		return Call{}, false, errors.New("function ingress: empty call")
 	}
@@ -430,29 +439,14 @@ func tokenize(line string) ([]string, error) {
 			offset += end
 			continue
 		}
-		end := offset + 1
-		escaped := false
-		for ; end < len(line); end++ {
-			if escaped {
-				escaped = false
-				continue
-			}
-			if line[end] == '\\' {
-				escaped = true
-				continue
-			}
-			if line[end] == '"' {
-				break
-			}
-		}
-		if end == len(line) {
+		// pluginsd_functions.c quotes sanitized fields literally. Backslashes
+		// are data, including immediately before the closing quote.
+		end := strings.IndexByte(line[offset+1:], '"')
+		if end < 0 {
 			return nil, errors.New("function ingress: unterminated quote")
 		}
-		value, err := strconv.Unquote(line[offset : end+1])
-		if err != nil {
-			return nil, errors.New("function ingress: invalid quoted field")
-		}
-		fields = append(fields, value)
+		end += offset + 1
+		fields = append(fields, line[offset+1:end])
 		offset = end + 1
 		if offset < len(line) && line[offset] != ' ' {
 			return nil, errors.New("function ingress: missing field separator")

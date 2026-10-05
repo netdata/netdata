@@ -13,13 +13,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/internal/promprofile/proof"
-	"github.com/netdata/netdata/go/plugins/internal/promprofile/semantics"
-	"github.com/netdata/netdata/go/plugins/internal/promprofile/testutil"
+	promproof "github.com/netdata/netdata/go/plugins/internal/promprofile/proof"
+	promsemantics "github.com/netdata/netdata/go/plugins/internal/promprofile/semantics"
+	promtestutil "github.com/netdata/netdata/go/plugins/internal/promprofile/testutil"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/relabel"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 var exactPrometheusMetricNamePattern = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`)
@@ -161,7 +160,7 @@ func profileRelabelDroppedNames(t *testing.T, profile Profile, names []string) [
 	require.NoErrorf(t, err, "profile %q", profile.Name)
 	var dropped []string
 	for _, name := range names {
-		_, drop := pipeline.Apply(prompkg.Sample{Name: name})
+		_, drop := pipeline.Apply(relabel.Record{Name: name})
 		if drop.Dropped() {
 			dropped = append(dropped, name)
 		}

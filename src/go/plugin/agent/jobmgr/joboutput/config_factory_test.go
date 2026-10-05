@@ -14,9 +14,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/stretchr/testify/require"
 )
 
@@ -58,8 +59,7 @@ func TestConfigModuleFactoryCleansEveryAttemptAndPrefersV2(t *testing.T) {
 							},
 						},
 					},
-					Resolver:   resolver,
-					StoreScope: unavailableStoreScope,
+					Configs: testConfigResolver(t, resolver, unavailableStoreScope),
 				},
 			)
 			require.NoError(t, err)
@@ -104,17 +104,117 @@ func TestConfigModuleFactoryRedactsResolvedValuesFromDecodeErrors(t *testing.T) 
 				},
 			},
 		},
-		Resolver:   resolver,
-		StoreScope: unavailableStoreScope,
+		Configs: testConfigResolver(t, resolver, unavailableStoreScope),
 	})
 	require.NoError(t, err)
 	config := factoryTestConfig(false)
 	config["option_int"] = "${fixture:value}"
 
-	err = factory.Validate(context.Background(), config)
+	err = factory.Test(context.Background(), config)
 	require.Error(t, err)
 	require.NotContains(t, err.Error(), resolvedFixture)
 	require.True(t, strings.Contains(err.Error(), "resolved") && strings.Contains(err.Error(), "redacted"))
+}
+
+func TestConfigModuleFactorySecretReferenceSourcePolicy(t *testing.T) {
+	const references = "${env:value}|${file:/synthetic/value}|${cmd:/synthetic/command}|${store:vault:main:value}"
+	tests := map[string]struct {
+		sourceType string
+		trust      bool
+		value      string
+		resolve    bool
+	}{
+		"stock":                {sourceType: confgroup.TypeStock, value: references, resolve: true},
+		"user":                 {sourceType: confgroup.TypeUser, value: references, resolve: true},
+		"dyncfg":               {sourceType: confgroup.TypeDyncfg, value: references, resolve: true},
+		"trusted discovered":   {sourceType: confgroup.TypeDiscovered, trust: true, value: references, resolve: true},
+		"discovered":           {sourceType: confgroup.TypeDiscovered, value: references},
+		"discovered malformed": {sourceType: confgroup.TypeDiscovered, value: "${store:invalid}|${env:}"},
+		"empty":                {value: references},
+		"unknown":              {sourceType: "future-source", value: references},
+	}
+	variants := map[string]func() (collectorapi.Creator, func() string){
+		"V1": func() (collectorapi.Creator, func() string) {
+			var module *collectorapi.MockCollectorV1
+			return collectorapi.Creator{
+				Create: func() collectorapi.CollectorV1 {
+					module = &collectorapi.MockCollectorV1{}
+					return module
+				},
+			}, func() string { return module.Config.OptionStr }
+		},
+		"V2": func() (collectorapi.Creator, func() string) {
+			var module *factoryTestV2
+			return collectorapi.Creator{
+				CreateV2: func() collectorapi.CollectorV2 {
+					module = &factoryTestV2{state: &factoryTestState{}}
+					return module
+				},
+			}, func() string { return module.OptionStr }
+		},
+	}
+	for name, test := range tests {
+		for variantName, newVariant := range variants {
+			for _, operation := range []string{"validate", "test", "snapshot"} {
+				t.Run(name+"/"+variantName+"/"+operation, func(t *testing.T) {
+					providerCalls := map[string]int{}
+					scopeCalls := 0
+					providers := map[string]secretresolver.AtomicProvider{}
+					for _, scheme := range []string{"env", "file", "cmd"} {
+						providers[scheme] = secretresolver.AtomicProviderFunc(func(context.Context, string) ([]byte, error) {
+							providerCalls[scheme]++
+							return []byte(scheme + "-resolved"), nil
+						})
+					}
+					resolver, err := secretresolver.NewAtomicResolver(providers)
+					require.NoError(t, err)
+					creator, option := newVariant()
+					factory, err := NewConfigModuleFactory(ConfigModuleFactoryConfig{
+						Modules: collectorapi.Registry{"module": creator},
+						Configs: testConfigResolver(t, resolver, func([]string) (secretresolver.AtomicScope, error) {
+							scopeCalls++
+							return &factoryTestAtomicScope{value: "store-resolved"}, nil
+						}),
+					})
+					require.NoError(t, err)
+					config := factoryTestConfig(false)
+					config.SetSourceType(test.sourceType).SetTrustDiscoveredTargets(test.trust)
+					config["option_str"] = test.value
+					config["option_int"] = 1
+
+					if operation == "validate" {
+						err = factory.Validate(context.Background(), config)
+					} else if operation == "test" {
+						err = factory.Test(context.Background(), config)
+					} else {
+						probe, constructErr := factory.construct(config.Module())
+						require.NoError(t, constructErr)
+						defer probe.cleanup(context.Background())
+						var snapshot secretresolver.AtomicScopeSnapshot
+						var redact bool
+						redact, snapshot, err = factory.applyResolvedWithSnapshot(context.Background(), config, probe.module)
+						require.Equal(t, test.resolve, redact)
+						require.Equal(t, test.resolve, snapshot != nil)
+					}
+					require.NoError(t, err)
+					require.Equal(t, test.value, config.Get("option_str"))
+					if operation == "validate" && test.resolve {
+						require.Empty(t, option())
+						require.Empty(t, providerCalls)
+						require.Zero(t, scopeCalls)
+					} else if test.resolve {
+						require.Equal(t, "env-resolved|file-resolved|cmd-resolved|store-resolved", option())
+						require.Equal(t, map[string]int{"env": 1, "file": 1, "cmd": 1}, providerCalls)
+						require.Equal(t, 1, scopeCalls)
+					} else {
+						require.Equal(t, test.value, option())
+						require.Empty(t, providerCalls)
+						require.Zero(t, scopeCalls)
+					}
+				})
+			}
+		}
+	}
 }
 
 func TestConfigModuleFactoryRedactsReferenceResolutionFailures(t *testing.T) {
@@ -201,15 +301,14 @@ func TestConfigModuleFactoryRedactsReferenceResolutionFailures(t *testing.T) {
 						},
 					},
 				},
-				Resolver:   test.resolver(t),
-				StoreScope: test.storeScope,
+				Configs: testConfigResolver(t, test.resolver(t), test.storeScope),
 			})
 			require.NoError(t, err)
 			config := factoryTestConfig(false)
 			config["option_str"] = test.reference
 			config["option_int"] = 1
 
-			err = factory.Validate(context.Background(), config)
+			err = factory.Test(context.Background(), config)
 			require.Error(t, err)
 			require.NotContains(t, err.Error(), resolverSensitive)
 			require.NotContains(t, err.Error(), cleanupSensitive)
@@ -255,8 +354,7 @@ func TestConfigModuleFactoryRedactsResolvedValuesFromCollectorLifecycle(t *testi
 						},
 					},
 				},
-				Resolver:   resolver,
-				StoreScope: unavailableStoreScope,
+				Configs: testConfigResolver(t, resolver, unavailableStoreScope),
 			})
 			require.NoError(t, err)
 			config := factoryTestConfig(false)
@@ -296,8 +394,7 @@ func TestConfigModuleFactoryRedactsCollectorInternalLogsAfterResolution(t *testi
 				},
 			},
 		},
-		Resolver:   resolver,
-		StoreScope: unavailableStoreScope,
+		Configs: testConfigResolver(t, resolver, unavailableStoreScope),
 	})
 	require.NoError(t, err)
 	var logs bytes.Buffer
@@ -311,39 +408,32 @@ func TestConfigModuleFactoryRedactsCollectorInternalLogsAfterResolution(t *testi
 	require.Contains(t, logs.String(), "redacted")
 }
 
-type sensitiveCodedRetryableError struct{}
-
-func (sensitiveCodedRetryableError) Error() string         { return "resolved-sensitive-fixture" }
-func (sensitiveCodedRetryableError) DyncfgCode() int       { return 429 }
-func (sensitiveCodedRetryableError) DyncfgRetryable() bool { return true }
-
-type sensitiveCodedProcessControlError struct {
-	cause error
-}
-
-func (err *sensitiveCodedProcessControlError) Error() string         { return "resolved-sensitive-control" }
-func (err *sensitiveCodedProcessControlError) Unwrap() error         { return err.cause }
-func (err *sensitiveCodedProcessControlError) DyncfgCode() int       { return 429 }
-func (err *sensitiveCodedProcessControlError) DyncfgRetryable() bool { return true }
-
 func TestResolvedLifecycleRedactionPreservesControlClassifications(t *testing.T) {
-	err := lifecycle.RetainOwnership(errors.Join(
-		lifecycle.ErrTaskPanic,
-		context.Canceled,
-		sensitiveCodedRetryableError{},
-	))
+	tests := map[string]struct {
+		classify func(error) error
+		want     collectorapi.LifecycleErrorClass
+	}{
+		"permanent": {classify: collectorapi.PermanentError, want: collectorapi.LifecycleErrorPermanent},
+		"temporary": {classify: collectorapi.TemporaryError, want: collectorapi.LifecycleErrorTemporary},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := lifecycle.RetainOwnership(errors.Join(
+				lifecycle.ErrTaskPanic,
+				context.Canceled,
+				test.classify(errors.New("resolved-sensitive-fixture")),
+			))
 
-	redacted := redactResolvedLifecycleError(err)
+			redacted := redactResolvedLifecycleError(err)
 
-	require.NotContains(t, redacted.Error(), "resolved-sensitive-fixture")
-	require.Contains(t, redacted.Error(), "redacted")
-	require.ErrorIs(t, redacted, lifecycle.ErrTaskPanic)
-	require.ErrorIs(t, redacted, context.Canceled)
-	require.True(t, lifecycle.OwnershipRetained(redacted))
-	require.True(t, dyncfg.IsRetryableError(redacted))
-	coded, ok := errors.AsType[dyncfg.CodedError](redacted)
-	require.True(t, ok)
-	require.Equal(t, 429, coded.DyncfgCode())
+			require.NotContains(t, redacted.Error(), "resolved-sensitive-fixture")
+			require.Contains(t, redacted.Error(), "redacted")
+			require.ErrorIs(t, redacted, lifecycle.ErrTaskPanic)
+			require.ErrorIs(t, redacted, context.Canceled)
+			require.True(t, lifecycle.OwnershipRetained(redacted))
+			require.Equal(t, test.want, collectorapi.ClassifyLifecycleError(redacted))
+		})
+	}
 }
 
 func TestResolvedLifecycleRedactionPreservesPureProcessControlTrees(t *testing.T) {
@@ -404,9 +494,9 @@ func TestResolvedLifecycleRedactionRejectsMixedProcessControlTree(t *testing.T) 
 }
 
 func TestResolvedLifecycleRedactionComposesProcessControlMetadata(t *testing.T) {
-	err := lifecycle.RetainOwnership(&sensitiveCodedProcessControlError{
-		cause: jobmgr.ErrProcessAttemptStopped,
-	})
+	err := lifecycle.RetainOwnership(collectorapi.TemporaryError(
+		fmt.Errorf("resolved-sensitive-control: %w", jobmgr.ErrProcessAttemptStopped),
+	))
 
 	redacted := redactResolvedLifecycleError(err)
 
@@ -419,10 +509,7 @@ func TestResolvedLifecycleRedactionComposesProcessControlMetadata(t *testing.T) 
 		jobmgr.ErrProcessAttemptStopped,
 	))
 	require.True(t, lifecycle.OwnershipRetained(redacted))
-	require.True(t, dyncfg.IsRetryableError(redacted))
-	coded, ok := errors.AsType[dyncfg.CodedError](redacted)
-	require.True(t, ok)
-	require.Equal(t, 429, coded.DyncfgCode())
+	require.Equal(t, collectorapi.LifecycleErrorTemporary, collectorapi.ClassifyLifecycleError(redacted))
 }
 
 type sensitiveConfigFactoryScope struct {
@@ -439,4 +526,18 @@ func (scfs *sensitiveConfigFactoryScope) Resolve(context.Context, string, string
 
 func (scfs *sensitiveConfigFactoryScope) Release(context.Context) error {
 	return scfs.releaseErr
+}
+
+func testConfigResolver(t testing.TB, resolver *secretresolver.AtomicResolver, scope secretresolver.AtomicScopeAcquirer) *secretconfig.ConfigResolver {
+	t.Helper()
+	configs, err := secretconfig.NewConfigResolver(resolver, scope)
+	require.NoError(t, err)
+	return configs
+}
+
+func testAtomicResolver(t testing.TB) *secretresolver.AtomicResolver {
+	t.Helper()
+	resolver, err := secretresolver.NewAtomicResolver(nil)
+	require.NoError(t, err)
+	return resolver
 }

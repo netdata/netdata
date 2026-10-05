@@ -2,7 +2,7 @@
 
 package funcapi
 
-// FunctionConfig describes a Function provided by a module.
+// FunctionConfig describes a Function provided by a module or process provider.
 type FunctionConfig struct {
 	ID string // Function ID (e.g., "top-queries")
 	// FunctionName overrides the public Function name.
@@ -18,12 +18,24 @@ type FunctionConfig struct {
 	Tags         string   // Function tags for registration; empty defaults to "top"
 	ResponseType string   // Response schema type; empty defaults to "table" when dispatched
 	// Available gates publication of agent/process-backed Functions. Nil means available.
-	// Availability may be rechecked while jobs are running.
-	// Once a Function is published, later false results do not withdraw it.
+	// Process providers are rechecked on the process tick even without jobs;
+	// collector AgentFunctions are rechecked while their module has scheduled jobs.
+	// Once published, later false results do not withdraw it or prevent dispatch.
 	Available func() bool
 	// RawRequest routes the complete Function request to a RawMethodHandler.
 	// Use this for Function APIs that need raw payloads, args, or full response envelopes.
-	RawRequest     bool
+	RawRequest bool
+	// ManagedInfo uses framework metadata for raw-input methods. For selectable
+	// jobs, info without __job returns declarations without invoking a handler;
+	// scoped info calls HandleRaw, which supplies domain RequiredParams.
+	// Requires RawRequest. RawResponse still bypasses managed serialization.
+	ManagedInfo bool
+	// HasHistory advertises time-range support in managed info and data responses.
+	HasHistory bool
+	// AcceptedParams advertises inputs in addition to required selector IDs.
+	// Requires RawRequest; structured handlers receive only resolved selectors.
+	// The raw handler owns parsing and validation of these extra inputs.
+	AcceptedParams []string
 	RequiredParams []ParamConfig // Required parameters for this method (including __sort if used)
 	// FIXME: Presentation is intentionally untyped here, while the shared UI schema
 	// currently defines only topology-specific presentation payloads.

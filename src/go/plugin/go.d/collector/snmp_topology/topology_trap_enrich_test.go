@@ -239,7 +239,7 @@ func TestCollectorRunPublishesAndClearsTrapTopologyRegistry(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- coll.Run(ctx)
+		errCh <- coll.Run(ctx, func() {})
 	}()
 
 	stopped := false

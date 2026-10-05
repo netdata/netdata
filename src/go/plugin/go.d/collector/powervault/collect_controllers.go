@@ -2,8 +2,10 @@
 
 package powervault
 
-func (c *Collector) collectControllerStats() {
-	stats, err := c.client.ControllerStatistics()
+import "context"
+
+func (c *Collector) collectControllerStats(ctx context.Context) {
+	stats, err := c.client.ControllerStatistics(ctx)
 	if err != nil {
 		c.Warningf("error collecting controller statistics: %v", err)
 		return

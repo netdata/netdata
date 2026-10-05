@@ -1,5 +1,32 @@
+//! `#[cfg(test)]` tests for [`RawBitmap`] (wired up in lib.rs) — the
+//! descriptor-level contract `bitmap.rs` builds on. The tree bytes live
+//! in plain `Vec<u8>` blobs here, so most tests pin byte-level behavior
+//! directly. By area:
+//!
+//! - `ceil_log8` at power-of-8 boundaries and the descriptor `empty()`
+//!   returns.
+//! - The canonical blob layout: exact pre-order node bytes for
+//!   hand-checked builds, and `from_sorted_iter`/`from_range` round
+//!   trips (ascending input required, duplicates tolerated, an empty
+//!   iterator appends nothing).
+//! - Queries over the raw blob: `contains`, ascending `iter`, `len`,
+//!   `min`/`max`, `range_cardinality`.
+//! - The four set ops as pure blob-to-blob functions, with
+//!   set-theoretic identities across 1-4 level trees.
+//! - In-place `insert`/`remove` — the crate's only tree-byte splice and
+//!   drain (the `splice` in `insert`, the `drain` in `remove`) —
+//!   `remove_range`'s rebuild, the panic guards, and the serialize wire format.
+//! - `estimate_data_size`'s exactness against real builds (the fuzz
+//!   target re-asserts the tie after arbitrary op sequences,
+//!   `fuzz/fuzz_targets/against_roaring.rs`).
+//!
+//! Not pinned here: descending or out-of-range values fed to
+//! `from_sorted_iter` (both undefined; no test feeds them), and roaring
+//! equivalence over long mutation sequences (fuzz-target territory).
 use crate::*;
 
+// The level curve at its boundaries: 0 maps to 0 levels (no tree at
+// all), and exact powers of 8 stay on the lower level.
 #[test]
 fn test_ceil_log8() {
     assert_eq!(ceil_log8(0), 0);
@@ -12,6 +39,8 @@ fn test_ceil_log8() {
     assert_eq!(ceil_log8(513), 4);
 }
 
+// `empty()` builds a descriptor only: levels come from ceil_log8 and
+// the tree blob stays whatever the caller supplies (initially empty).
 #[test]
 fn test_empty_bitmap() {
     let bm = RawBitmap::empty(0);
@@ -31,6 +60,8 @@ fn test_empty_bitmap() {
     assert_eq!(bm.levels(), 3);
 }
 
+// Exact-byte pins for the canonical layout: one node byte per level
+// along each root-to-leaf path, root first, subtrees in child order.
 #[test]
 fn test_build_universe8_bit0() {
     let mut data = Vec::new();
@@ -75,6 +106,9 @@ fn test_build_universe9_insert_8() {
     assert_eq!(&data, &[0x02, 0x01]);
 }
 
+// contains() over the raw blob, probed exhaustively for each universe;
+// out-of-universe values and the empty blob reject in the dedicated
+// tests below.
 #[test]
 fn test_contains_universe8() {
     let (bm, data) = make_bitmap(8, &[0, 3, 7]);
@@ -144,6 +178,8 @@ fn test_contains_universe512() {
     }
 }
 
+// The depth-first walk emits set bits in ascending order and covers
+// the empty, single-value and full-leaf cases.
 #[test]
 fn test_iter_ascending_order() {
     let (bm, data) = make_bitmap(512, &[511, 0, 255, 1, 63, 64, 8, 7, 256]);
@@ -211,6 +247,9 @@ fn test_min_max_universe8() {
     assert_eq!(bm.max(&data), Some(5));
 }
 
+/// Build a `(descriptor, blob)` pair from `values`, sorting and
+/// deduplicating first — call sites may list values in any order
+/// without that exercising `from_sorted_iter`'s input contract.
 fn make_bitmap(universe_size: u32, values: &[u32]) -> (RawBitmap, Vec<u8>) {
     let mut sorted = values.to_vec();
     sorted.sort_unstable();
@@ -220,11 +259,17 @@ fn make_bitmap(universe_size: u32, values: &[u32]) -> (RawBitmap, Vec<u8>) {
     (bm, data)
 }
 
-/// Helper to compare two bitmaps by iterating their values.
+/// Compare two bitmaps by their iterated values: logical set equality,
+/// not byte-for-byte blob equality.
 fn bitmaps_equal(a: &RawBitmap, ad: &[u8], b: &RawBitmap, bd: &[u8]) -> bool {
     a.iter(ad).collect::<Vec<_>>() == b.iter(bd).collect::<Vec<_>>()
 }
 
+// The set ops are pure functions of the two input blobs: the result
+// lands in the caller's `out`, paired with the returned descriptor.
+// The tests pin set-theoretic identities — disjoint, overlapping and
+// partial-overlap operands, empty operands in both argument positions,
+// self-ops and commutativity — across 1-4 level trees.
 #[test]
 fn test_union_disjoint() {
     let (a, da) = make_bitmap(64, &[0, 1, 2]);
@@ -753,9 +798,12 @@ fn test_union_full() {
     assert_eq!(c.len(&out), 8);
 }
 
+// The ops never read back from `out`; the result pair is valid
+// wherever the caller puts it — including assigned over an operand's
+// blob.
 #[test]
 fn test_assign_variants() {
-    // Union assign
+    // Union: result assigned over an operand's blob.
     let (a, mut da) = make_bitmap(64, &[0, 1, 2]);
     let (b, db) = make_bitmap(64, &[2, 3, 4]);
     let mut out = Vec::new();
@@ -763,19 +811,19 @@ fn test_assign_variants() {
     da = out;
     assert_eq!(c.iter(&da).collect::<Vec<_>>(), vec![0, 1, 2, 3, 4]);
 
-    // Intersect assign
+    // Intersect: recomputed into a fresh buffer.
     let (a, da2) = make_bitmap(64, &[0, 1, 2, 3]);
     let mut out = Vec::new();
     let c = a.intersect(&da2, &b, &db, &mut out);
     assert_eq!(c.iter(&out).collect::<Vec<_>>(), vec![2, 3]);
 
-    // Difference assign
+    // Difference: recomputed into a fresh buffer.
     let (a, da3) = make_bitmap(64, &[0, 1, 2, 3]);
     let mut out = Vec::new();
     let c = a.difference(&da3, &b, &db, &mut out);
     assert_eq!(c.iter(&out).collect::<Vec<_>>(), vec![0, 1]);
 
-    // Symmetric difference assign
+    // Symmetric difference: recomputed into a fresh buffer.
     let (a, da4) = make_bitmap(64, &[0, 1, 2, 3]);
     let mut out = Vec::new();
     let c = a.symmetric_difference(&da4, &b, &db, &mut out);
@@ -791,6 +839,8 @@ fn test_set_op_mismatched_universe() {
     let _ = a.union(&da, &b, &db, &mut out);
 }
 
+// Wire format: [universe: u32 LE][len: u32 LE][tree bytes]. The level
+// count is not stored — deserialize_from rederives it via ceil_log8.
 #[test]
 fn test_serialize_deserialize_roundtrip() {
     let (bm, data) = make_bitmap(512, &[0, 1, 7, 8, 63, 64, 255, 256, 511]);
@@ -810,6 +860,8 @@ fn test_serialize_deserialize_empty() {
     assert!(bitmaps_equal(&bm, &data, &bm2, &data2));
 }
 
+// serialized_size() must equal the bytes serialize_into actually
+// writes: the 8-byte header plus the blob.
 #[test]
 fn test_serialized_size_matches() {
     let (bm, data) = make_bitmap(512, &[0, 100, 200, 300, 511]);
@@ -818,6 +870,8 @@ fn test_serialized_size_matches() {
     assert_eq!(buf.len(), bm.serialized_size(&data));
 }
 
+// Four bytes carry only the universe field; the missing length must
+// error out, not read as a zero-length blob.
 #[test]
 fn test_deserialize_truncated() {
     let buf = [1u8, 0, 0, 0];
@@ -825,6 +879,9 @@ fn test_deserialize_truncated() {
     assert!(result.is_err());
 }
 
+// Despite the name, only blob sizes are pinned — RawBitmap has no
+// heap_bytes to exercise (the descriptor is a Copy pair). `empty()`
+// owns no bytes; one built value yields a non-empty blob.
 #[test]
 fn test_heap_bytes() {
     let data: Vec<u8> = Vec::new();
@@ -834,6 +891,11 @@ fn test_heap_bytes() {
     assert!(data.len() > 0);
 }
 
+// In-place patchers: insert/remove are the crate's only tree-byte
+// splice/drain — they edit the existing blob rather
+// than rebuild it, and panic on values at or past the universe. The
+// first insert into an empty blob lays down a whole root-to-leaf
+// chain; removing the last value prunes it back to nothing.
 #[test]
 fn test_insert_into_empty() {
     let bm = RawBitmap::empty(64);
@@ -873,6 +935,8 @@ fn test_remove_absent_noop() {
     assert_eq!(before, after);
 }
 
+// No clear() API: the caller empties the blob. Pins that a zero-byte
+// blob reads back as an empty set under the same descriptor.
 #[test]
 fn test_clear() {
     let (bm, mut data) = make_bitmap(64, &[10, 20, 30]);
@@ -929,6 +993,9 @@ fn test_remove_out_of_bounds() {
     bm.remove(&mut data, 8);
 }
 
+// from_sorted_iter round trips: ascending input (required by the
+// single-pass pre-order writer; duplicates are tolerated) checked
+// through iter/contains/len, from 1- to 7-level trees.
 #[test]
 fn test_from_sorted_iter_correctness() {
     let cases: Vec<(u32, Vec<u32>)> = vec![
@@ -961,6 +1028,8 @@ fn test_from_sorted_iter_correctness() {
     }
 }
 
+// An empty iterator appends no bytes; the descriptor still carries
+// the requested universe (0 stays 0 levels).
 #[test]
 fn test_from_sorted_iter_empty() {
     let mut data = Vec::new();
@@ -978,7 +1047,7 @@ fn test_from_sorted_iter_empty() {
 fn test_from_sorted_iter_single_level() {
     let mut data = Vec::new();
     let bm = RawBitmap::from_sorted_iter([3, 5].into_iter(), 8, &mut data);
-    assert_eq!(&data, &[0x28]); // bits 3 and 5
+    assert_eq!(&data, &[0x28]); // 0x28 = bits 3 | 5
     assert_eq!(bm.iter(&data).collect::<Vec<_>>(), vec![3, 5]);
 }
 
@@ -1011,6 +1080,10 @@ fn test_from_sorted_iter_large_universe() {
     assert!(!bm.contains(&data, 1));
 }
 
+// from_range normalizes any RangeBounds<u32> into start..end —
+// inclusive bounds widen by one, the end is clamped to the universe —
+// and delegates to from_sorted_iter. An inverted or empty range yields
+// an empty set, never a panic.
 #[test]
 fn test_from_range_full() {
     let mut data = Vec::new();
@@ -1089,6 +1162,8 @@ fn test_from_range_clamped_to_universe() {
     assert_eq!(bm.iter(&data).collect::<Vec<_>>(), vec![60, 61, 62, 63]);
 }
 
+// The delegate must agree with the direct builder: same membership
+// for full and middle ranges at every depth tested.
 #[test]
 fn test_from_range_matches_from_sorted_iter() {
     for &universe in &[8, 64, 512, 4096] {
@@ -1114,6 +1189,8 @@ fn test_from_range_matches_from_sorted_iter() {
     }
 }
 
+// Counting without iterating: full, partial, empty-range and
+// multi-level cases; an unbounded range equals len().
 #[test]
 fn test_range_cardinality_full() {
     let (bm, data) = make_bitmap(64, &(0..64).collect::<Vec<_>>());
@@ -1176,6 +1253,10 @@ fn test_range_cardinality_single_level() {
     assert_eq!(bm.range_cardinality(&data, 1..=5), 3);
 }
 
+// remove_range rebuilds the blob through ops.rs's subtree walker — a
+// fresh Vec, not an in-place patch — pruning every node whose subtree
+// empties. Pins full/prefix/suffix/middle cuts, inclusive bounds, and
+// the no-op ranges.
 #[test]
 fn test_remove_range_all() {
     let (bm, mut data) = make_bitmap(64, &(0..64).collect::<Vec<_>>());
@@ -1260,6 +1341,10 @@ fn test_remove_range_empty_bitmap() {
     assert!(bm.is_empty(&data));
 }
 
+// estimate_data_size (lib.rs) predicts the exact byte count
+// from_sorted_iter appends — one byte per distinct (level, node) pair,
+// the root always among them. Single-element inputs therefore cost
+// exactly `levels` bytes.
 #[test]
 fn test_estimate_data_size_matches_actual() {
     let cases: Vec<(u32, Vec<u32>)> = vec![

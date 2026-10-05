@@ -1,44 +1,57 @@
-//! A key=value interner keyed by pre-computed xxhash64 values.
+//! The build-side `key=value` interner: assigns every distinct attribute
+//! string a unique [`KvSlot`] ID, so rows reference attributes by cheap
+//! `u32`s, duplicates share one stored string, and the indexer keeps one
+//! bitmap per distinct pair instead of one per row.
 //!
-//! # Role in the pre-computed hash optimization
-//!
-//! The indexer interns every `"key=value"` attribute string into a unique
-//! `u32` ID. The same `key=value` pair appears on thousands of log records,
-//! so interning avoids storing redundant copies and enables cheap ID-based
-//! bitmap operations.
+//! # Pre-computed hash fast path
 //!
 //! The producer (`ng-flatten`) pre-computes `xxhash64("key=value")` for
-//! every attribute and ships the hashes alongside the data (see
-//! `ng_flatten`'s emit-time hashing). This interner is designed to
-//! exploit those pre-computed hashes:
+//! every attribute and carries the hash alongside the data (`hash_kv` in
+//! `src/crates/ng-flatten/src/common.rs`). The builder feed
+//! (`src/crates/ng-index/src/sfst_build.rs`) hands it to this interner:
 //!
-//! - **[`lookup_hash`](KeyValueInterner::lookup_hash)**: Hash-only lookup.
-//!   Returns the intern ID if this hash was already seen and has no
-//!   collisions. This is the fast path — no string needed at all.
-//!
-//! - **[`intern_with_hash`](KeyValueInterner::intern_with_hash)**: Intern a
-//!   string with a pre-computed hash. Used on the first encounter of a
-//!   `key=value` pair (cache miss). The hash is stored so future
-//!   `lookup_hash` calls will hit.
-//!
-//! - **[`intern`](KeyValueInterner::intern)**: Compute the hash from the
-//!   string and intern it. Fallback for attributes without pre-computed
-//!   hashes.
+//! - [`lookup_hash`](KeyValueInterner::lookup_hash): resolve a hash to a
+//!   slot with no string at all — the fast path.
+//! - [`intern_with_hash`](KeyValueInterner::intern_with_hash): first
+//!   encounter of a pair; stores the hash so later lookups hit.
+//! - [`intern`](KeyValueInterner::intern): hashes the string itself —
+//!   fallback when no pre-computed hash is available.
 //!
 //! # Identity hasher
 //!
-//! The internal `HashbrownMap<u64, u32>` uses an identity hasher — it passes
-//! the `u64` key through as-is instead of re-hashing it. This is safe
-//! because xxhash64 already provides excellent distribution, and avoids
-//! the overhead of hashing a hash.
+//! The maps hash their `u64` keys with a pass-through identity hasher —
+//! xxhash64 already spread the keys, so re-hashing a hash is pure
+//! overhead. With it, the standard `entry(hash)` matches the removed
+//! hashbrown raw-entry API (`from_hash(hash, |&k| k == hash)`).
 //!
-//! # Hash collision handling
+//! # Collision handling
 //!
-//! The primary map stores one intern ID per hash (the common case). A
-//! separate overflow map handles the astronomically rare case of genuine
-//! xxhash64 collisions (different strings producing the same hash). When
-//! collisions exist for a hash, `lookup_hash` returns `None` to force the
-//! caller through the string-based slow path for disambiguation.
+//! The primary map stores one slot per hash (the common case). A separate
+//! overflow map handles genuine xxhash64 collisions — different strings
+//! with the same hash, astronomically rare. For an ambiguous hash,
+//! `lookup_hash` returns `None` to force the caller through the
+//! string-comparing slow path.
+//!
+//! # Cardinality tiers and canonical order
+//!
+//! Besides interning, the interner groups slots by field (the part before
+//! the first `=`) and classifies each field by slot count against
+//! `cardinality_threshold` (`T`; default 100 — `schema.rs`):
+//! low `< T`, mid `[T, 10·T)`, high `≥ 10·T` — the same taxonomy as
+//! [`FieldTier`](crate::FieldTier). [`tier_assignment`](KeyValueInterner::tier_assignment)
+//! orders all slots canonically — low → mid → high, fields by name,
+//! values sorted — and that ordering is the contract the on-disk ID
+//! translation depends on: `build_id_translation` in
+//! `src/crates/sfst/src/build.rs` numbers the concatenated tiers 0.. and
+//! assigns `table[slot.idx()] = KvId(i)`, recording the cumulative tier
+//! boundaries as `IdRanges`. The tier also routes the on-disk home: low
+//! fields into the primary FST (`PRIM`), mid fields into per-field FST
+//! chunks (`MF{hi}{lo}`), high fields into columnar chunks (`HF{hi}{lo}`).
+//!
+//! [`KeyValueInterner`] is crate-internal, owned by `RowIndex`
+//! (`src/crates/sfst/src/row_index.rs`); [`KvSlot`] is the module's only
+//! public export. Interned strings are arena-allocated and live as long
+//! as the build.
 
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hasher};
@@ -49,12 +62,14 @@ use bumpalo::Bump;
 use hashbrown::hash_map::Entry;
 use twox_hash::XxHash64;
 
-/// A unique ID assigned by the build-side interner to each distinct
-/// `key=value` string. Used as the index into the per-value bitmap array and
-/// as the elements in the per-log entries.
+/// A unique ID the build-side interner assigns to each distinct
+/// `key=value` string. Indexes the per-pair bitmap array, appears in the
+/// per-row slot lists, and is held by the span event/link rows and trace
+/// rollup; the build translates every slot to its file `KvId` before
+/// writing.
 ///
 /// Not to be confused with raw log positions (array indices into the
-/// log list), which are also `u32`.
+/// row list), which are also `u32`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct KvSlot(pub u32);
 
@@ -103,10 +118,11 @@ impl BuildHasher for BuildIdentityHasher {
     }
 }
 
-/// Maps `key=value` strings to unique `u32` IDs, keyed by pre-computed xxhash64.
+/// Maps `key=value` strings to unique [`KvSlot`] IDs, keyed by
+/// pre-computed xxhash64.
 ///
-/// See the [module-level documentation](self) for how this fits into the
-/// pre-computed hash optimization pipeline.
+/// Crate-internal; owned by `RowIndex`. The module docs cover the hash
+/// fast path, collision handling, and the tier/canonical-order contract.
 pub struct KeyValueInterner<'a> {
     arena: &'a Bump,
     /// xxhash64 → first intern ID with this hash
@@ -115,10 +131,12 @@ pub struct KeyValueInterner<'a> {
     collisions: HashbrownMap<u64, Vec<u32>, BuildIdentityHasher>,
     /// intern ID → canonical string
     strings: Vec<&'a str>,
-    /// field name → list of key=value IDs with that field.
-    /// Built incrementally on each new interning (miss only).
+    /// Field name → the key=value slots carrying it. The field is the
+    /// part before the first `=`. Slots are appended only when a new one
+    /// is created (string-match hits skip [`track_field`](Self::track_field)).
     field_slots: HashMap<&'a str, Vec<KvSlot>>,
-    /// Fields with fewer unique values than this go into the primary FST.
+    /// Tier boundary `T`: a field with `< T` slots is low (primary FST),
+    /// `[T, 10·T)` mid, `≥ 10·T` high.
     cardinality_threshold: u32,
 }
 
@@ -134,7 +152,8 @@ impl<'a> KeyValueInterner<'a> {
         }
     }
 
-    /// Compute xxhash64 of `s` and intern it.
+    /// Compute xxhash64 of `s` and intern it — the fallback when the
+    /// caller has no pre-computed hash.
     pub fn intern(&mut self, s: &str) -> KvSlot {
         let hash = xxhash64(s.as_bytes());
         self.intern_with_hash(hash, s)
@@ -146,9 +165,8 @@ impl<'a> KeyValueInterner<'a> {
     /// a slot is registered in `field_slots` exactly once, when first interned.
     /// Re-tracking a returned slot would double-count it under its field.
     pub fn intern_with_hash(&mut self, hash: u64, s: &str) -> KvSlot {
-        // The map keys on the precomputed hash with an identity hasher, so the
-        // standard `entry(hash)` lands in the same slot the removed raw-entry
-        // API did (`from_hash(hash, |&k| k == hash)`).
+        // Identity hasher: `entry(hash)` matches the removed raw-entry
+        // API (`from_hash(hash, |&k| k == hash)`).
         let kv_slot = match self.map.entry(hash) {
             Entry::Occupied(entry) => {
                 let &existing_id = entry.get();
@@ -201,7 +219,8 @@ impl<'a> KeyValueInterner<'a> {
         }
     }
 
-    /// Register a newly interned string in the field_slots map.
+    /// Register a newly created slot under its field — the part before
+    /// the first `=`, or the whole string when there is no `=`.
     fn track_field(&mut self, slot: KvSlot) {
         let s = self.strings[slot.idx()];
         let field = match s.find('=') {
@@ -211,6 +230,7 @@ impl<'a> KeyValueInterner<'a> {
         self.field_slots.entry(field).or_default().push(slot);
     }
 
+    /// Return the canonical string for a slot.
     pub fn resolve(&self, slot: KvSlot) -> &str {
         self.strings[slot.idx()]
     }
@@ -232,21 +252,27 @@ impl<'a> KeyValueInterner<'a> {
         self.fields_in_range(t * 10, usize::MAX)
     }
 
-    /// Assign tier-aligned positions to all key=value IDs.
+    /// Assign every key=value slot its canonical position.
     ///
     /// Walks low → mid → high tiers. Within each tier, fields are sorted by
     /// name; within each field, values are sorted by their resolved string.
     /// Returns three vectors of [`KvSlot`]s, one per tier.
+    ///
+    /// This ordering is the contract the build's ID translation depends
+    /// on: concatenating the three tiers and numbering the result 0..
+    /// gives each slot its on-disk `KvId` — `build_id_translation` in
+    /// `src/crates/sfst/src/build.rs`.
     pub fn tier_assignment(&self) -> [Vec<KvSlot>; 3] {
-        // Reusable decorate buffer of (value suffix, slot). Three things make this
-        // cheaper than sorting the slots directly by `self.strings[idx]`:
-        //   - sorting the value *suffix* (`&s[field.len()..]`) skips the `field=`
-        //     prefix every value in the field shares; the prefix is constant within
-        //     a field, so suffix order == full-string order (same result);
-        //   - the `&str` is inline in the tuple, dropping the per-compare index into
-        //     `self.strings` for both operands;
-        //   - `sort_unstable_by` avoids the stable sort's scratch allocation, and is
-        //     safe here because every value in a field is a distinct string (no ties).
+        // Reusable decorate buffer of (value suffix, slot). Cheaper than
+        // sorting the slots directly by `self.strings[idx]`:
+        //   - sorting the value *suffix* (past the `field=` prefix every
+        //     value in the field shares) gives the same order as sorting
+        //     full strings;
+        //   - the `&str` sits inline in the tuple, so comparisons don't
+        //     re-index `self.strings`;
+        //   - `sort_unstable_by` skips the stable sort's scratch allocation
+        //     and is safe here: every value in a field is a distinct string
+        //     (no ties).
         let mut scratch: Vec<(&str, KvSlot)> = Vec::new();
 
         let mut collect_tier = |tier: &[(&str, &[KvSlot])]| -> Vec<KvSlot> {
@@ -284,7 +310,9 @@ impl<'a> KeyValueInterner<'a> {
     }
 }
 
-/// Compute xxhash64 (seed 0) of a byte slice.
+/// Compute xxhash64 (seed 0) of a byte slice — the same hash `ng-flatten`'s
+/// `hash_kv` pre-computes for a pair. A mismatch here silently disables the
+/// `lookup_hash` fast path and lets one pair intern twice (once per hash).
 #[inline]
 fn xxhash64(bytes: &[u8]) -> u64 {
     let mut h = XxHash64::default();

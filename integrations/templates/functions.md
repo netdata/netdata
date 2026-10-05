@@ -10,7 +10,7 @@
 
 | Aspect | Description |
 |:-------|:------------|
-| Name | `[[ strfy(entry.meta.module_name)|capitalize ]]:[[ strfy(func.id) ]]` |
+| Name | `[% if func.function_name %][[ strfy(func.function_name)|capitalize ]][% else %][[ strfy(entry.meta.module_name)|capitalize ]]:[[ strfy(func.id) ]][% endif %]` |
 | Require Cloud | [[ 'yes' if func.require_cloud else 'no' ]] |
 | Performance | [[ strfy(func.performance) ]] |
 | Security | [[ strfy(func.security) ]] |

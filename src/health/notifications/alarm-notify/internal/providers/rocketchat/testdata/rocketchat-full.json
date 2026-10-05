@@ -1,0 +1,22 @@
+{
+  "channel": "#alerts",
+  "alias": "netdata on test-node",
+  "text": "test-node WARNING: Temperature is high",
+  "parseUrls": false,
+  "attachments": [{
+    "color": "#f0ad4e",
+    "title": "test_alert",
+    "title_link": "https://example.com/alert?id=1&view=chart#details",
+    "text": "A quote: \"hot\"\nUnicode: θερμοκρασία",
+    "ts": "2026-09-14T12:00:00Z",
+    "fields": [
+      {"title": "Node", "value": "test-node", "short": true},
+      {"title": "Alert", "value": "test_alert", "short": true},
+      {"title": "Status", "value": "CLEAR → WARNING", "short": true},
+      {"title": "Chart", "value": "test.chart", "short": true},
+      {"title": "Context", "value": "test.context", "short": true},
+      {"title": "Value", "value": "42.5 C", "short": true},
+      {"title": "Previous value", "value": "0 C", "short": true}
+    ]
+  }]
+}

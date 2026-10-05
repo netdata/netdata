@@ -1,0 +1,26 @@
+{
+  "text": "WARNING: Something happened\n\nNode\nnode\n\nAlert\nalert\n\nStatus\nWARNING\n\nTime\n2026-09-14T12:00:00Z",
+  "mrkdwn": false,
+  "parse": "none",
+  "unfurl_links": false,
+  "unfurl_media": false,
+  "blocks": [
+    {"type": "section", "text": {"type": "plain_text", "text": "WARNING: Something happened"}}
+  ],
+  "attachments": [
+    {
+      "color": "warning",
+      "blocks": [
+        {
+          "type": "section",
+          "fields": [
+            {"type": "plain_text", "text": "Node\nnode"},
+            {"type": "plain_text", "text": "Alert\nalert"},
+            {"type": "plain_text", "text": "Status\nWARNING"},
+            {"type": "plain_text", "text": "Time\n2026-09-14T12:00:00Z"}
+          ]
+        }
+      ]
+    }
+  ]
+}

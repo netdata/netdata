@@ -3,9 +3,11 @@
 package chartengine
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"math"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -116,6 +118,7 @@ type dimBuildEntry struct {
 	observations uint64
 	value        metrix.SampleValue
 	dimensionState
+	journalToken uint64
 }
 
 func (e *dimBuildEntry) aggregate(value metrix.SampleValue) {
@@ -166,12 +169,15 @@ func runningAverage(current, value metrix.SampleValue, observations uint64) metr
 }
 
 type chartState struct {
-	templateID      string
-	chartID         string
-	meta            program.ChartMeta
-	lifecycle       program.LifecyclePolicy
-	labelTracker    chartLabelTracker
-	entries         map[string]*dimBuildEntry
+	templateID   string
+	chartID      string
+	meta         program.ChartMeta
+	lifecycle    program.LifecyclePolicy
+	labelTracker chartLabelTracker
+	entries      map[string]*dimBuildEntry
+	// entriesOwner is the materialized chart whose scratch map entries is, if any.
+	entriesOwner    *materializedChartState
+	unownedDeletes  int // cap deletions from entries while it has no owner
 	observedCount   int
 	currentBuildSeq uint64
 }
@@ -188,12 +194,21 @@ type planBuildContext struct {
 	index             matchIndex
 	flat              metrix.Reader
 
-	seenInfer        map[string]struct{}
-	chartsByID       map[string]*chartState
-	chartOwners      map[string]string
-	dimCapHints      map[string]int
+	seenInfer  map[inferredDimensionKey]struct{}
+	chartsByID map[string]*chartState
+	// chartOwnerOverrides holds ownership decided in this build; other charts are
+	// owned by their materialized template.
+	chartOwnerOverrides map[string]string
+	// chartStates and values back per-build chart state and update values; both
+	// are sized from the previous build and fall back to ordinary allocation.
+	chartStates      []chartState
+	values           []UpdateDimensionValue
 	materialized     *materializedState
 	materializedByID map[string]*materializedChartState
+	retired          map[string]*materializedChartState
+	journal          *planJournal
+	scan             planSeriesScan
+	collisions       chartIDCollisions
 
 	planRouteStats
 }
@@ -207,24 +222,22 @@ func isHistogramBucketSeries(meta metrix.SeriesMeta) bool {
 		meta.FlattenRole == metrix.FlattenRoleHistogramBucket
 }
 
-func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uint64, uint64, uint64, bool, error) {
-	if e == nil {
-		return Plan{}, materializedState{}, 0, 0, 0, false, fmt.Errorf("chartengine: nil engine")
-	}
-	if reader == nil {
-		return Plan{}, materializedState{}, 0, 0, 0, false, fmt.Errorf("chartengine: nil metrics reader")
-	}
+// buildPlan runs with the owning engine locked, possibly against a private
+// candidate view. It stages lifecycle changes in the materialized state in place,
+// recording committed values in journal. Until an attempt is reserved for the
+// result, PreparePlanWithOptions rolls the journal back on any exit, so a build that
+// fails or panics leaves committed state unchanged.
+func (e *Engine) buildPlan(
+	reader metrix.Reader,
+	retired map[string]*materializedChartState,
+	journal *planJournal,
+) (Plan, materializedState, bool, error) {
 	out := Plan{
-		Actions:            make([]EngineAction, 0),
-		InferredDimensions: make([]InferredDimension, 0),
+		Actions:            make([]EngineAction, 0, e.state.hints.actions),
+		InferredDimensions: make([]InferredDimension, 0, e.state.hints.seenInfer),
 	}
 	collectMeta := reader.CollectMeta()
 
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if e.state.outstanding != 0 {
-		return Plan{}, materializedState{}, 0, 0, 0, false, ErrOutstandingPlanAttempt
-	}
 	sample := PlanRuntimeSample{
 		startedAt: time.Now(),
 	}
@@ -233,7 +246,7 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 	if collectMeta.LastAttemptStatus != metrix.CollectStatusSuccess {
 		sample.skippedFailed = true
 		e.logDebugf("chartengine build skipped: collect status=%d", collectMeta.LastAttemptStatus)
-		return out, materializedState{}, 0, 0, 0, false, nil
+		return out, materializedState{}, false, nil
 	}
 
 	obs := e.observeBuildSuccessSeq(collectMeta.LastSuccessSeq)
@@ -258,20 +271,22 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 	}
 
 	phaseStartedAt := time.Now()
-	staged := e.state.materialized.clone()
+	staged := e.state.materialized
 	ctx, err := e.preparePlanBuildContext(reader, &out, collectMeta, buildCycle, &staged)
 	sample.phasePrepareSeconds = time.Since(phaseStartedAt).Seconds()
 	if err != nil {
 		sample.buildErr = true
 		e.logWarningf("chartengine build prepare failed: %v", err)
-		return Plan{}, materializedState{}, 0, 0, 0, false, err
+		return Plan{}, materializedState{}, false, err
 	}
+	ctx.retired = retired
+	ctx.journal = journal
 	phaseStartedAt = time.Now()
 	if err := validateBuildReaderForInferredDimensions(ctx.index, reader); err != nil {
 		sample.phaseValidateSeconds = time.Since(phaseStartedAt).Seconds()
 		sample.buildErr = true
 		e.logWarningf("chartengine build reader validation failed: %v", err)
-		return Plan{}, materializedState{}, 0, 0, 0, false, err
+		return Plan{}, materializedState{}, false, err
 	}
 	sample.phaseValidateSeconds = time.Since(phaseStartedAt).Seconds()
 	phaseStartedAt = time.Now()
@@ -279,7 +294,7 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 		sample.phaseScanSeconds = time.Since(phaseStartedAt).Seconds()
 		sample.buildErr = true
 		e.logWarningf("chartengine build scan failed: %v", err)
-		return Plan{}, materializedState{}, 0, 0, 0, false, err
+		return Plan{}, materializedState{}, false, err
 	}
 	sample.phaseScanSeconds = time.Since(phaseStartedAt).Seconds()
 
@@ -301,6 +316,7 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 		ctx.chartsByID,
 		ctx.materialized,
 		ctx.routeObserver,
+		journal,
 	)
 	sample.phaseLifecycleCapsSec = time.Since(phaseStartedAt).Seconds()
 	sample.lifecycleRemovedDimensionByCap = len(removeByCapDims)
@@ -316,11 +332,11 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 		sample.phaseMaterializeSeconds = time.Since(phaseStartedAt).Seconds()
 		sample.buildErr = true
 		e.logWarningf("chartengine build materialization failed: %v", err)
-		return Plan{}, materializedState{}, 0, 0, 0, false, err
+		return Plan{}, materializedState{}, false, err
 	}
 	sample.phaseMaterializeSeconds = time.Since(phaseStartedAt).Seconds()
 	phaseStartedAt = time.Now()
-	removeDims, removeCharts := collectExpiryRemovals(ctx.collectMeta.LastSuccessSeq, ctx.materialized)
+	removeDims, removeCharts := collectExpiryRemovals(ctx.collectMeta.LastSuccessSeq, ctx.materialized, journal)
 	sample.phaseExpirySeconds = time.Since(phaseStartedAt).Seconds()
 	sample.lifecycleRemovedDimensionByExpiry = len(removeDims)
 	sample.lifecycleRemovedChartByExpiry = len(removeCharts)
@@ -331,6 +347,8 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 		out.Actions = append(out.Actions, action)
 	}
 	phaseStartedAt = time.Now()
+	ctx.reconcileRetirements()
+	staged.recordEmittedChartDefinitions(journal, out.Actions)
 	sortInferredDimensions(out.InferredDimensions)
 	sample.phaseSortSeconds = time.Since(phaseStartedAt).Seconds()
 
@@ -346,17 +364,18 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 	sample.actionRemoveDimension = actionCounts.actionRemoveDimension
 	sample.actionRemoveChart = actionCounts.actionRemoveChart
 	sample.buildSuccess = true
+	e.warnChartIDCollisions(ctx)
 	e.state.hints.chartsByID = len(ctx.chartsByID)
 	e.state.hints.seenInfer = len(ctx.seenInfer)
+	e.state.hints.actions = len(out.Actions)
+	e.state.hints.values = len(ctx.values)
 
-	attemptID := e.nextAttemptIDLocked()
-	e.state.outstanding = attemptID
-	return out, staged, e.state.engineEpoch, e.state.commitSeq, attemptID, true, nil
+	return out, staged, true, nil
 }
 
 func validateBuildReaderForInferredDimensions(index matchIndex, reader metrix.Reader) error {
-	templateID, dimIndex, requiresFlatten := firstInferDimension(index)
-	if !requiresFlatten {
+	infer := index.firstInfer
+	if !infer.ok {
 		return nil
 	}
 	aware, ok := reader.(flattenedReadChecker)
@@ -365,29 +384,9 @@ func validateBuildReaderForInferredDimensions(index matchIndex, reader metrix.Re
 	}
 	return fmt.Errorf(
 		"chartengine: inferred dimension requires flattened reader metadata (template_id=%q dim_index=%d); use store.Read(metrix.ReadFlatten())",
-		templateID,
-		dimIndex,
+		infer.templateID,
+		infer.dimIndex,
 	)
-}
-
-func firstInferDimension(index matchIndex) (string, int, bool) {
-	if len(index.chartsByID) == 0 {
-		return "", 0, false
-	}
-	templateIDs := make([]string, 0, len(index.chartsByID))
-	for templateID := range index.chartsByID {
-		templateIDs = append(templateIDs, templateID)
-	}
-	sort.Strings(templateIDs)
-	for _, templateID := range templateIDs {
-		chart := index.chartsByID[templateID]
-		for i := range chart.Dimensions {
-			if chart.Dimensions[i].InferNameFromSeriesMeta {
-				return templateID, i, true
-			}
-		}
-	}
-	return "", 0, false
 }
 
 func (e *Engine) preparePlanBuildContext(
@@ -417,16 +416,11 @@ func (e *Engine) preparePlanBuildContext(
 		index = buildMatchIndex(prog.Charts())
 		e.state.matchIndex = index
 	}
-	chartOwners := make(map[string]string, len(materialized.charts))
-	dimCapHints := make(map[string]int, len(materialized.charts))
-	for chartID, matChart := range materialized.charts {
-		chartOwners[chartID] = matChart.templateID
-		if n := len(matChart.dimensions); n > 0 {
-			dimCapHints[chartID] = n
-		}
-	}
 	chartsCap := max(e.state.hints.chartsByID, len(materialized.charts))
-	seenInferCap := e.state.hints.seenInfer
+	var seenInfer map[inferredDimensionKey]struct{}
+	if hint := e.state.hints.seenInfer; hint > 0 {
+		seenInfer = make(map[inferredDimensionKey]struct{}, hint)
+	}
 	return &planBuildContext{
 		out:               out,
 		reader:            reader,
@@ -435,13 +429,13 @@ func (e *Engine) preparePlanBuildContext(
 		prog:              prog,
 		cache:             cache,
 		routeCacheEnabled: e.state.cfg.routeObserver == nil,
-		routeObserver:     e.state.cfg.routeObserver,
+		routeObserver:     e.state.templateSet.diagnosticObserver(e.state.cfg.routeObserver),
 		index:             index,
 		flat:              reader,
-		seenInfer:         make(map[string]struct{}, seenInferCap),
+		seenInfer:         seenInfer,
 		chartsByID:        make(map[string]*chartState, chartsCap),
-		chartOwners:       chartOwners,
-		dimCapHints:       dimCapHints,
+		chartStates:       make([]chartState, 0, e.state.hints.chartsByID),
+		values:            make([]UpdateDimensionValue, 0, e.state.hints.values),
 		materialized:      materialized,
 		materializedByID:  materialized.charts,
 	}, nil
@@ -451,168 +445,229 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 	return e.forEachPlanSeriesRoute(ctx, false)
 }
 
+// planSeriesScan is the state of one pass over the reader's series. It lives in the
+// build context, so a pass allocates only its callback.
+type planSeriesScan struct {
+	engine       *Engine
+	replayLabels bool
+	buildSeq     uint64
+	err          error
+	view         labelSliceView
+}
+
 func (e *Engine) forEachPlanSeriesRoute(ctx *planBuildContext, replayLabels bool) error {
-	var firstErr error
-	buildSeq := ctx.collectMeta.LastSuccessSeq
-	trackStats := !replayLabels
-	process := func(
-		identity metrix.SeriesIdentity,
-		meta metrix.SeriesMeta,
-		name string,
-		labels metrix.LabelView,
-		v metrix.SampleValue,
-	) {
-		if trackStats {
-			ctx.seriesScanned++
-		}
-		if firstErr != nil {
-			return
-		}
-		if e.state.cfg.seriesSelection == seriesSelectionLastSuccessOnly &&
-			meta.LastSeenSuccessSeq != ctx.collectMeta.LastSuccessSeq {
-			if trackStats {
-				ctx.seriesFilteredBySeq++
-				if ctx.routeCacheEnabled {
-					ctx.cache.MarkSeenIfPresent(identity, buildSeq)
-				}
-				if ctx.routeObserver != nil {
-					ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
-						Decision:       PlanRouteSeriesFilteredBySequence,
-						SeriesIdentity: identity,
-						MetricName:     name,
-					})
-				}
-			}
-			return
-		}
-		if selector := e.state.cfg.selector; selector != nil && !selector.Matches(name, labels) {
-			if trackStats {
-				ctx.seriesFilteredBySel++
-				if ctx.routeCacheEnabled {
-					ctx.cache.MarkSeenIfPresent(identity, buildSeq)
-				}
-				if ctx.routeObserver != nil {
-					ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
-						Decision:       PlanRouteSeriesFilteredBySelector,
-						SeriesIdentity: identity,
-						MetricName:     name,
-					})
-				}
-			}
-			return
-		}
+	ctx.scan = planSeriesScan{
+		engine:       e,
+		replayLabels: replayLabels,
+		buildSeq:     ctx.collectMeta.LastSuccessSeq,
+	}
+	if rawIter, ok := ctx.flat.(metrix.SeriesIdentityRawIterator); ok {
+		rawIter.ForEachSeriesIdentityRaw(ctx.visitRawPlanSeries)
+	} else {
+		ctx.flat.ForEachSeriesIdentity(ctx.visitPlanSeries)
+	}
+	err := ctx.scan.err
+	ctx.scan = planSeriesScan{}
+	return err
+}
 
-		observer := ctx.routeObserver
-		if !trackStats {
-			observer = nil
-		}
-		routes, hit, err := e.resolveSeriesRoutes(
-			ctx.cache,
-			ctx.routeCacheEnabled,
-			observer,
-			identity,
-			name,
-			labels,
-			meta,
-			ctx.reader,
-			ctx.index,
-			ctx.prog.Revision(),
-			buildSeq,
-		)
-		if err != nil {
-			firstErr = err
-			return
-		}
-		if trackStats && ctx.routeCacheEnabled {
-			if hit {
-				ctx.routeCacheHits++
-			} else {
-				ctx.routeCacheMisses++
-			}
-		}
-		if len(routes) > 0 && routes[0].Autogen && !routes[0].autogenGuard.valid(ctx.reader, meta) {
-			routes = nil
-			// Release obsolete discovery even if autogen rebuilding is rejected.
+func (ctx *planBuildContext) visitRawPlanSeries(
+	identity metrix.SeriesIdentity,
+	meta metrix.SeriesMeta,
+	name string,
+	labels []metrix.Label,
+	v metrix.SampleValue,
+) {
+	ctx.scan.view.items = labels
+	ctx.visitPlanSeries(identity, meta, name, &ctx.scan.view, v)
+}
+
+func (ctx *planBuildContext) visitPlanSeries(
+	identity metrix.SeriesIdentity,
+	meta metrix.SeriesMeta,
+	name string,
+	labels metrix.LabelView,
+	v metrix.SampleValue,
+) {
+	e := ctx.scan.engine
+	if !ctx.scan.replayLabels {
+		ctx.seriesScanned++
+	}
+	if ctx.scan.err != nil {
+		return
+	}
+	if e.state.cfg.seriesSelection == seriesSelectionLastSuccessOnly &&
+		meta.LastSeenSuccessSeq != ctx.collectMeta.LastSuccessSeq {
+		if !ctx.scan.replayLabels {
+			ctx.seriesFilteredBySeq++
 			if ctx.routeCacheEnabled {
-				ctx.cache.Store(identity, ctx.prog.Revision(), buildSeq, nil)
+				ctx.cache.MarkSeenIfPresent(identity, ctx.scan.buildSeq)
+			}
+			if ctx.routeObserver != nil {
+				ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+					Decision:       PlanRouteSeriesFilteredBySequence,
+					SeriesIdentity: identity,
+					MetricName:     name,
+				})
 			}
 		}
-		if len(routes) == 0 {
-			autoRoutes, ok, reason, ruleIndex, err := e.resolveAutogenRouteWithReason(ctx.reader, name, labels, meta)
-			if err != nil {
-				firstErr = err
-				return
+		return
+	}
+	if selector := e.state.cfg.selector; selector != nil && !selector.Matches(name, labels) {
+		if !ctx.scan.replayLabels {
+			ctx.seriesFilteredBySel++
+			if ctx.routeCacheEnabled {
+				ctx.cache.MarkSeenIfPresent(identity, ctx.scan.buildSeq)
 			}
-			if ok {
-				routes = autoRoutes
-				if ctx.routeCacheEnabled {
-					ctx.cache.Store(identity, ctx.prog.Revision(), buildSeq, routes)
-				}
-				if trackStats {
-					ctx.seriesAutogenMatched++
-					ctx.seriesMatched++
-				}
-			} else {
-				if trackStats {
-					ctx.seriesUnmatched++
-					if ctx.routeObserver != nil {
-						ruleScope := ""
-						if ruleIndex >= 0 && ruleIndex < len(e.state.cfg.autogen.Rules) {
-							ruleScope = e.state.cfg.autogen.Rules[ruleIndex].Scope
-						}
-						ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
-							Decision:         PlanRouteUnmatched,
-							Reason:           reason,
-							SeriesIdentity:   identity,
-							MetricName:       name,
-							MetricFamilyName: diagnosticMetricFamilyName(name, labels, meta),
-							AutogenRuleIndex: ruleIndex,
-							AutogenRuleScope: ruleScope,
-						})
-					}
-				}
-				return
+			if ctx.routeObserver != nil {
+				ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+					Decision:       PlanRouteSeriesFilteredBySelector,
+					SeriesIdentity: identity,
+					MetricName:     name,
+				})
 			}
-		} else if trackStats {
-			if routes[0].Autogen {
-				ctx.seriesAutogenMatched++
-			}
-			ctx.seriesMatched++
 		}
+		return
+	}
 
-		for _, route := range routes {
-			if replayLabels {
-				chart := ctx.chartsByID[route.ChartID]
-				if chart == nil || chart.templateID != route.ChartTemplateID || !chart.labelTracker.needsReplay() {
-					continue
+	observer := ctx.routeObserver
+	if ctx.scan.replayLabels {
+		observer = nil
+	}
+	routes, hit, err := e.resolveSeriesRoutes(
+		ctx.cache,
+		ctx.routeCacheEnabled,
+		observer,
+		identity,
+		name,
+		labels,
+		meta,
+		ctx.reader,
+		ctx.index,
+		ctx.prog.Revision(),
+		ctx.scan.buildSeq,
+	)
+	if err != nil {
+		ctx.scan.err = err
+		return
+	}
+	if !ctx.scan.replayLabels && ctx.routeCacheEnabled {
+		if hit {
+			ctx.routeCacheHits++
+		} else {
+			ctx.routeCacheMisses++
+		}
+	}
+	if len(routes) > 0 && routes[0].Autogen && !routes[0].autogenGuard.valid(ctx.reader, meta) {
+		routes = nil
+		// Release obsolete discovery even if autogen rebuilding is rejected.
+		if ctx.routeCacheEnabled {
+			ctx.cache.Store(identity, ctx.prog.Revision(), ctx.scan.buildSeq, nil)
+		}
+	}
+	if len(routes) == 0 {
+		autoRoutes, ok, reason, ruleIndex, err := e.resolveAutogenRouteWithReason(ctx.reader, name, labels, meta)
+		if err != nil {
+			ctx.scan.err = err
+			return
+		}
+		if ok {
+			routes = autoRoutes
+			if ctx.routeCacheEnabled {
+				ctx.cache.Store(identity, ctx.prog.Revision(), ctx.scan.buildSeq, routes)
+			}
+			if !ctx.scan.replayLabels {
+				ctx.seriesAutogenMatched++
+				ctx.seriesMatched++
+			}
+		} else {
+			if !ctx.scan.replayLabels {
+				ctx.seriesUnmatched++
+				if ctx.routeObserver != nil {
+					ruleScope := ""
+					if ruleIndex >= 0 && ruleIndex < len(e.state.cfg.autogen.Rules) {
+						ruleScope = e.state.cfg.autogen.Rules[ruleIndex].Scope
+					}
+					ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
+						Decision:         PlanRouteUnmatched,
+						Reason:           reason,
+						SeriesIdentity:   identity,
+						MetricName:       name,
+						MetricFamilyName: diagnosticMetricFamilyName(name, labels, meta),
+						AutogenRuleIndex: ruleIndex,
+						AutogenRuleScope: ruleScope,
+					})
 				}
-				if err := chart.labelTracker.observeReplay(labels, route.DimensionKeyLabel); err != nil {
-					firstErr = err
-					return
-				}
+			}
+			return
+		}
+	} else if !ctx.scan.replayLabels {
+		if routes[0].Autogen {
+			ctx.seriesAutogenMatched++
+		}
+		ctx.seriesMatched++
+	}
+
+	for _, route := range routes {
+		if ctx.scan.replayLabels {
+			chart := ctx.chartsByID[route.ChartID]
+			if chart == nil || chart.templateID != route.ChartTemplateID || !chart.labelTracker.needsReplay() {
 				continue
 			}
-			route = finalizeRouteAlgorithm(route, meta.Kind)
-			if err := ctx.accumulateRoute(ctx.index, route, identity, name, meta, labels, v); err != nil {
-				firstErr = err
+			if err := chart.labelTracker.observeReplay(labels, route.DimensionKeyLabel); err != nil {
+				ctx.scan.err = err
 				return
 			}
+			continue
+		}
+		route = finalizeRouteAlgorithm(route, meta.Kind)
+		if err := ctx.accumulateRoute(ctx.index, route, identity, name, meta, labels, v); err != nil {
+			ctx.scan.err = err
+			return
 		}
 	}
+}
 
-	if rawIter, ok := ctx.flat.(metrix.SeriesIdentityRawIterator); ok {
-		view := &labelSliceView{}
-		rawIter.ForEachSeriesIdentityRaw(func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels []metrix.Label, v metrix.SampleValue) {
-			view.items = labels
-			process(identity, meta, name, view, v)
-		})
-		return firstErr
+// newChartState returns zeroed chart state from the build block while it has room.
+func (ctx *planBuildContext) newChartState() *chartState {
+	if len(ctx.chartStates) < cap(ctx.chartStates) {
+		ctx.chartStates = ctx.chartStates[:len(ctx.chartStates)+1]
+		return &ctx.chartStates[len(ctx.chartStates)-1]
 	}
+	return new(chartState)
+}
 
-	ctx.flat.ForEachSeriesIdentity(func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels metrix.LabelView, v metrix.SampleValue) {
-		process(identity, meta, name, labels, v)
-	})
-	return firstErr
+// adoptedScratchEntries returns the scratch map the chart takes from this build: a map
+// the build created and a cap then trimmed heavily is rebuilt at its live size.
+func (cs *chartState) adoptedScratchEntries() map[string]*dimBuildEntry {
+	if cs.entriesOwner == nil && needsCompaction(len(cs.entries), cs.unownedDeletes) {
+		cs.entries = rebuildMap(cs.entries)
+		cs.unownedDeletes = 0
+	}
+	return cs.entries
+}
+
+func (ctx *planBuildContext) chartOwner(chartID string) (string, bool) {
+	if owner, ok := ctx.chartOwnerOverrides[chartID]; ok {
+		return owner, true
+	}
+	if chart := ctx.materializedByID[chartID]; chart != nil {
+		return chart.templateID, true
+	}
+	return "", false
+}
+
+func (ctx *planBuildContext) setChartOwner(chartID, templateID string) {
+	if ctx.chartOwnerOverrides == nil {
+		ctx.chartOwnerOverrides = make(map[string]string)
+	}
+	ctx.chartOwnerOverrides[chartID] = templateID
+}
+
+type inferredDimensionKey struct {
+	chartTemplateID string
+	dimensionIndex  int
+	name            string
 }
 
 func (ctx *planBuildContext) accumulateRoute(
@@ -629,13 +684,16 @@ func (ctx *planBuildContext) accumulateRoute(
 		if !route.Autogen && isAutogenTemplateID(cs.templateID) {
 			// Template wins over autogen on chart-id collision.
 			ctx.observeAutogenDisplacement(route, identity, metricName, cs.templateID)
-			ctx.chartOwners[route.ChartID] = route.ChartTemplateID
+			ctx.setChartOwner(route.ChartID, route.ChartTemplateID)
 			delete(ctx.chartsByID, route.ChartID)
 			cs = nil
 			exists = false
 		} else {
 			// Cross-template rendered-id collision.
 			// Existing owner keeps chart-id ownership.
+			if !route.Autogen {
+				ctx.collisions.add(route.ChartID, cs.templateID, route.ChartTemplateID)
+			}
 			if ctx.routeObserver != nil {
 				ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
 					Decision:                PlanRouteCollisionRejected,
@@ -654,16 +712,19 @@ func (ctx *planBuildContext) accumulateRoute(
 		}
 	}
 	if !exists {
-		ownerTemplateID, ownerExists := ctx.chartOwners[route.ChartID]
+		ownerTemplateID, ownerExists := ctx.chartOwner(route.ChartID)
 		if ownerExists && ownerTemplateID != route.ChartTemplateID {
 			if !route.Autogen && isAutogenTemplateID(ownerTemplateID) {
 				// Template wins over autogen on chart-id collision.
 				ctx.observeAutogenDisplacement(route, identity, metricName, ownerTemplateID)
-				ctx.chartOwners[route.ChartID] = route.ChartTemplateID
+				ctx.setChartOwner(route.ChartID, route.ChartTemplateID)
 				delete(ctx.chartsByID, route.ChartID)
 			} else {
 				// Cross-template rendered-id collision.
 				// Existing owner keeps chart-id ownership.
+				if !route.Autogen {
+					ctx.collisions.add(route.ChartID, ownerTemplateID, route.ChartTemplateID)
+				}
 				if ctx.routeObserver != nil {
 					ctx.observeRouteDiagnostic(PlanRouteDiagnostic{
 						Decision:                PlanRouteCollisionRejected,
@@ -682,15 +743,21 @@ func (ctx *planBuildContext) accumulateRoute(
 			}
 		}
 		if !ownerExists {
-			ctx.chartOwners[route.ChartID] = route.ChartTemplateID
+			ctx.setChartOwner(route.ChartID, route.ChartTemplateID)
 		}
 
-		dimCap := ctx.dimCapHints[route.ChartID]
 		var entries map[string]*dimBuildEntry
+		var entriesOwner *materializedChartState
 		matChart := ctx.materializedByID[route.ChartID]
+		dimCap := 0
+		if matChart != nil {
+			dimCap = len(matChart.dimensions)
+		}
 		matchingMaterializedChart := matChart != nil && matChart.templateID == route.ChartTemplateID
+
 		if matchingMaterializedChart {
-			entries = matChart.checkoutScratchEntries(dimCap)
+			entries = matChart.checkoutScratchEntries(ctx.journal, dimCap)
+			entriesOwner = matChart
 		} else {
 			entries = make(map[string]*dimBuildEntry, dimCap)
 		}
@@ -699,13 +766,15 @@ func (ctx *planBuildContext) accumulateRoute(
 		if matchingMaterializedChart && matChart.presentation != nil {
 			previousPresentation = matChart.presentation
 		}
-		cs = &chartState{
+		cs = ctx.newChartState()
+		*cs = chartState{
 			templateID:      route.ChartTemplateID,
 			chartID:         route.ChartID,
 			meta:            route.Meta,
 			lifecycle:       route.Lifecycle,
 			labelTracker:    newChartLabelTracker(previousPresentation),
 			entries:         entries,
+			entriesOwner:    entriesOwner,
 			currentBuildSeq: ctx.buildCycle,
 		}
 		ctx.chartsByID[route.ChartID] = cs
@@ -718,7 +787,9 @@ func (ctx *planBuildContext) accumulateRoute(
 	entry, exists := cs.entries[route.DimensionName]
 	if !exists {
 		entry = &dimBuildEntry{}
-		cs.entries[route.DimensionName] = entry
+		ctx.journal.putEntry(cs.entries, route.DimensionName, entry)
+	} else {
+		ctx.journal.touchEntry(entry)
 	}
 	if entry.seenSeq != cs.currentBuildSeq {
 		entry.seenSeq = cs.currentBuildSeq
@@ -757,8 +828,15 @@ func (ctx *planBuildContext) accumulateRoute(
 	}
 
 	if route.Inferred {
-		key := fmt.Sprintf("%s\xff%d\xff%s", route.ChartTemplateID, route.DimensionIndex, route.DimensionName)
+		key := inferredDimensionKey{
+			chartTemplateID: route.ChartTemplateID,
+			dimensionIndex:  route.DimensionIndex,
+			name:            route.DimensionName,
+		}
 		if _, exists := ctx.seenInfer[key]; !exists {
+			if ctx.seenInfer == nil {
+				ctx.seenInfer = make(map[inferredDimensionKey]struct{})
+			}
 			ctx.seenInfer[key] = struct{}{}
 			ctx.out.InferredDimensions = append(ctx.out.InferredDimensions, InferredDimension{
 				ChartTemplateID: route.ChartTemplateID,
@@ -828,7 +906,25 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 
 	for _, chartID := range chartIDs {
 		cs := ctx.chartsByID[chartID]
-		matChart, chartCreated := ctx.materialized.ensureChart(cs.chartID, cs.templateID, cs.meta, cs.lifecycle)
+		previous := ctx.materialized.charts[chartID]
+		dimensionExpiry := cs.lifecycle.Dimensions.ExpireAfterCycles
+		if previous != nil {
+			dimensionExpiry = previous.lifecycle.Dimensions.ExpireAfterCycles
+		}
+		if previous != nil &&
+			(previous.templateID != cs.templateID || needsChartRevival(previous, cs, ctx.collectMeta.LastSuccessSeq)) {
+			// Caps may already have pruned staged dimensions and queued their removal.
+			// Reconciliation needs the complete committed definition to retain those removals.
+			ctx.rememberRetired(chartID, ctx.journal.committedChart(previous))
+			ctx.journal.deleteChart(ctx.materialized.charts, chartID)
+		}
+		matChart, chartCreated := ctx.materialized.ensureChart(
+			ctx.journal,
+			cs.chartID,
+			cs.templateID,
+			cs.meta,
+			cs.lifecycle,
+		)
 		previousPresentation := matChart.presentation
 		membershipChanged := cs.labelTracker.changed()
 		if membershipChanged {
@@ -838,7 +934,7 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 				!accumulator.materializedEquals(previousPresentation.labelValues)
 			if labelsChanged {
 				chartLabels := accumulator.materialize()
-				matChart.replaceLabels(maps.Clone(chartLabels), membership)
+				matChart.replaceLabels(ctx.journal, maps.Clone(chartLabels), membership)
 				if chartCreated {
 					ctx.out.Actions = append(ctx.out.Actions, CreateChartAction{
 						ChartTemplateID: cs.templateID,
@@ -854,20 +950,35 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 					})
 				}
 			} else {
-				matChart.replaceLabelMembership(membership)
+				matChart.replaceLabelMembership(ctx.journal, membership)
 			}
 		} else if chartCreated {
-			return fmt.Errorf("chartengine: new chart %q unexpectedly matched prior label membership", cs.chartID)
+			if previous == nil || previous.presentation == nil {
+				return fmt.Errorf("chartengine: new chart %q unexpectedly matched prior label membership", cs.chartID)
+			}
+			// Revival can recreate a definition without changing its exact series membership.
+			matChart.replaceLabels(ctx.journal, previous.presentation.labelValues, previous.presentation.labelMembership)
+			ctx.out.Actions = append(ctx.out.Actions, CreateChartAction{
+				ChartTemplateID: cs.templateID,
+				ChartID:         cs.chartID,
+				Meta:            cs.meta,
+				Labels:          maps.Clone(previous.presentation.labelValues),
+			})
 		}
-		matChart.lastSeenSuccessSeq = ctx.collectMeta.LastSuccessSeq
+		ctx.journal.setChartSeen(matChart, ctx.collectMeta.LastSuccessSeq)
 
-		observedNames := observedDimensionNames(cs, matChart)
+		observedNames := observedDimensionNames(ctx.journal, cs, matChart)
 		for _, name := range observedNames {
 			entry := cs.entries[name]
 			if entry == nil || entry.seenSeq != cs.currentBuildSeq {
 				continue
 			}
-			matDim, dimCreated := matChart.ensureDimension(name, entry.dimensionState)
+			if dim := matChart.dimensions[name]; dim != nil &&
+				expiredBeforeCycle(dim.lastSeenSuccessSeq, ctx.collectMeta.LastSuccessSeq, dimensionExpiry) &&
+				dimensionDefinitionChanged(dim, entry.dimensionState) {
+				matChart.removeDimension(ctx.journal, name)
+			}
+			matDim, dimCreated := matChart.ensureDimension(ctx.journal, name, entry.dimensionState)
 			if dimCreated {
 				ctx.out.Actions = append(ctx.out.Actions, CreateDimensionAction{
 					ChartID:    cs.chartID,
@@ -880,11 +991,12 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 					Divisor:    entry.divisor,
 				})
 			}
-			matDim.lastSeenSuccessSeq = ctx.collectMeta.LastSuccessSeq
+			ctx.journal.setDimSeen(matDim, ctx.collectMeta.LastSuccessSeq)
 		}
 
-		updateNames := matChart.orderedDimensionNames()
-		values := make([]UpdateDimensionValue, 0, len(updateNames))
+		updateNames := matChart.orderedDimensionNames(ctx.journal)
+		start := len(ctx.values)
+		values := ctx.values
 		for _, name := range updateNames {
 			entry, ok := cs.entries[name]
 			if ok && entry != nil && entry.seenSeq == cs.currentBuildSeq {
@@ -910,12 +1022,14 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 				IsEmpty: true,
 			})
 		}
+		// Each chart owns a capacity-limited window of the build's value block.
+		ctx.values = values
 		ctx.out.Actions = append(ctx.out.Actions, UpdateChartAction{
 			ChartID: cs.chartID,
-			Values:  values,
+			Values:  values[start:len(values):len(values)],
 		})
-		matChart.storeScratchEntries(cs.entries)
-		matChart.pruneScratchEntries(cs.currentBuildSeq)
+		matChart.storeScratchEntries(ctx.journal, cs.adoptedScratchEntries(), cs.entriesOwner)
+		matChart.pruneScratchEntries(ctx.journal, cs.currentBuildSeq)
 	}
 	return nil
 }
@@ -945,7 +1059,7 @@ func (e *Engine) reconcileChangedChartLabels(ctx *planBuildContext) error {
 	return e.forEachPlanSeriesRoute(ctx, true)
 }
 
-func observedDimensionNames(cs *chartState, matChart *materializedChartState) []string {
+func observedDimensionNames(j *planJournal, cs *chartState, matChart *materializedChartState) []string {
 	if cs == nil {
 		return nil
 	}
@@ -955,7 +1069,7 @@ func observedDimensionNames(cs *chartState, matChart *materializedChartState) []
 	if matChart == nil || len(matChart.dimensions) == 0 {
 		return orderedObservedDimensionNames(cs.entries, cs.currentBuildSeq)
 	}
-	prev := matChart.orderedDimensionNames()
+	prev := matChart.orderedDimensionNames(j)
 	if len(prev) != cs.observedCount {
 		return orderedObservedDimensionNames(cs.entries, cs.currentBuildSeq)
 	}
@@ -1007,15 +1121,17 @@ func parseHistogramBucketUpperBound(upperBound string) (float64, bool) {
 }
 
 func sortInferredDimensions(in []InferredDimension) {
+	if len(in) < 2 {
+		return
+	}
 	histogramGroups := inferredHistogramBucketGroups(in)
-	sort.Slice(in, func(i, j int) bool {
-		lhs := in[i]
-		rhs := in[j]
-		if lhs.ChartTemplateID != rhs.ChartTemplateID {
-			return lhs.ChartTemplateID < rhs.ChartTemplateID
+	// Keys are unique per build, so the order is total and sort stability is irrelevant.
+	slices.SortFunc(in, func(lhs, rhs InferredDimension) int {
+		if c := cmp.Compare(lhs.ChartTemplateID, rhs.ChartTemplateID); c != 0 {
+			return c
 		}
-		if lhs.DimensionIndex != rhs.DimensionIndex {
-			return lhs.DimensionIndex < rhs.DimensionIndex
+		if c := cmp.Compare(lhs.DimensionIndex, rhs.DimensionIndex); c != 0 {
+			return c
 		}
 		if histogramGroups[inferredDimensionGroup{
 			chartTemplateID: lhs.ChartTemplateID,
@@ -1024,10 +1140,10 @@ func sortInferredDimensions(in []InferredDimension) {
 			lhsBound, lhsOK := parseHistogramBucketUpperBound(lhs.Name)
 			rhsBound, rhsOK := parseHistogramBucketUpperBound(rhs.Name)
 			if lhsOK && rhsOK && lhsBound != rhsBound {
-				return lhsBound < rhsBound
+				return cmp.Compare(lhsBound, rhsBound)
 			}
 		}
-		return lhs.Name < rhs.Name
+		return cmp.Compare(lhs.Name, rhs.Name)
 	})
 }
 

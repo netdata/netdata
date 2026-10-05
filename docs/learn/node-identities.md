@@ -196,7 +196,7 @@ In the Netdata UI, open the node's dynamic configuration view and look for the *
 
 :::
 
-The go.d GUI form selects `static` or `snmp` mode. The resource name entered when creating a vnode is its stable reference name. Static mode uses these fields:
+The go.d GUI form selects `static` or `snmp` mode. The resource name entered when creating a vnode is its stable reference name. For names that are easy to reuse in configuration, prefer ASCII letters, digits, dots, underscores, and hyphens. Spaces and colons are invalid. Static mode uses these fields:
 
 | Field      | Required in the GUI | Description                                                                                                                         |
 |------------|---------------------|-------------------------------------------------------------------------------------------------------------------------------------|
@@ -241,7 +241,11 @@ jobs:
     url: http://203.0.113.10:9182/metrics
 ```
 
-The `vnode` value must exactly match the vnode reference name. For static YAML definitions, use `hostname`; for SNMP YAML definitions, use the required `name`. For GUI definitions, use the resource name assigned when creating the vnode. An unknown name or an SNMP vnode awaiting its first usable identity prevents the job from starting; configured detection retries can start it once the identity is available.
+The `vnode` value must exactly match the vnode reference name. For static YAML definitions, use `hostname`; for SNMP YAML definitions, use the required `name`. For GUI definitions, use the resource name assigned when creating the vnode.
+
+When an enabled job starts with an unknown vnode name or an SNMP vnode awaiting its first usable identity, it waits for that dependency. Creating the vnode or acquiring its first usable identity wakes the job even when `autodetection_retry` is zero. Passive registrations and disabled jobs stay inactive until enabled.
+
+Editing an enabled job through dynamic configuration is different: an edit that references an unknown or not-yet-identified vnode is rejected, leaving the previous configuration and any running job unchanged. Create the vnode and, for SNMP, wait for identity acquisition before applying the edit. A disabled job can save such a reference and wait for it when enabled.
 
 Several jobs can reference the same vnode. Its configured hostname and host labels govern output to its GUID within that plugin process, including collector-generated scopes using the same GUID. Job labels remain chart labels. Removing an unreferenced configured vnode lets generated contributors resume using their own host metadata.
 

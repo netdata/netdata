@@ -38,7 +38,7 @@ func (s *store) Test(ctx context.Context) error {
 	if err != nil {
 		return dyncfg.NewPublicError(publicErrEndpoint, err)
 	}
-	token, err := s.published.token()
+	token, err := s.published.token(ctx)
 	if err != nil {
 		return dyncfg.NewPublicError(publicErrToken, err)
 	}

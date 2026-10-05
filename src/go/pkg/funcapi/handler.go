@@ -9,7 +9,7 @@ import (
 )
 
 // MethodHandler defines the interface for handling Function method requests.
-// Functions are declared by collector creators; this interface handles requests.
+// Functions are declared by collector creators or process providers; this interface handles requests.
 //
 // Example implementation:
 //
@@ -27,6 +27,9 @@ import (
 type MethodHandler interface {
 	// MethodParams returns dynamic params for a method.
 	// Return nil to use static params from FunctionConfig.RequiredParams.
+	// It is also called for structured info with an explicit job on shared selectable Functions,
+	// without calling Handle or validating secondary selector values.
+	// RawRequest methods use HandleRaw instead.
 	// The context should be used for timeout/cancellation of database queries.
 	MethodParams(ctx context.Context, method string) ([]ParamConfig, error)
 
@@ -35,7 +38,8 @@ type MethodHandler interface {
 	Handle(ctx context.Context, method string, params ResolvedParams) *FunctionResponse
 
 	// Cleanup releases any resources held by the handler.
-	// Called when the collector is being stopped.
+	// Called when the owning job or run generation is stopped.
+	// Injected process stores remain caller-owned.
 	Cleanup(ctx context.Context)
 }
 

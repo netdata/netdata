@@ -3,6 +3,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -70,7 +71,7 @@ type Client struct {
 
 // Login creates a session with the API. This operation exchanges user credentials supplied in the security context
 // for a session identifier that is to be used for authenticating subsequent calls.
-func (c *Client) Login() error {
+func (c *Client) Login(ctx context.Context) error {
 	req := web.RequestConfig{
 		URL:      fmt.Sprintf("%s%s", c.url, pathCISSession),
 		Username: c.username,
@@ -79,7 +80,7 @@ func (c *Client) Login() error {
 	}
 	s := struct{ Value string }{}
 
-	err := c.doOKWithDecode(req, &s)
+	err := c.doOKWithDecode(ctx, req, &s)
 	if err == nil {
 		c.token.set(s.Value)
 	}
@@ -87,14 +88,14 @@ func (c *Client) Login() error {
 }
 
 // Logout terminates the validity of a session token.
-func (c *Client) Logout() error {
+func (c *Client) Logout(ctx context.Context) error {
 	req := web.RequestConfig{
 		URL:     fmt.Sprintf("%s%s", c.url, pathCISSession),
 		Method:  http.MethodDelete,
 		Headers: map[string]string{apiSessIDKey: c.token.get()},
 	}
 
-	resp, err := c.doOK(req)
+	resp, err := c.doOK(ctx, req)
 	web.CloseBody(resp)
 	c.token.set("")
 	return err
@@ -102,48 +103,48 @@ func (c *Client) Logout() error {
 
 // Ping sent a request to VCSA server to ensure the link is operating.
 // In case of 401 error Ping tries to re authenticate.
-func (c *Client) Ping() error {
+func (c *Client) Ping(ctx context.Context) error {
 	req := web.RequestConfig{
 		URL:     fmt.Sprintf("%s%s?~action=get", c.url, pathCISSession),
 		Method:  http.MethodPost,
 		Headers: map[string]string{apiSessIDKey: c.token.get()},
 	}
-	resp, err := c.doOK(req)
+	resp, err := c.doOK(ctx, req)
 	defer web.CloseBody(resp)
 	if resp != nil && resp.StatusCode == http.StatusUnauthorized {
-		return c.Login()
+		return c.Login(ctx)
 	}
 	return err
 }
 
-func (c *Client) health(urlPath string) (string, error) {
+func (c *Client) health(ctx context.Context, urlPath string) (string, error) {
 	req := web.RequestConfig{
 		URL:     fmt.Sprintf("%s%s", c.url, urlPath),
 		Headers: map[string]string{apiSessIDKey: c.token.get()},
 	}
 	s := struct{ Value string }{}
-	err := c.doOKWithDecode(req, &s)
+	err := c.doOKWithDecode(ctx, req, &s)
 	return s.Value, err
 }
 
 // ApplMgmt provides health status of applmgmt services.
-func (c *Client) ApplMgmt() (string, error) {
-	return c.health(pathHealthApplMgmt)
+func (c *Client) ApplMgmt(ctx context.Context) (string, error) {
+	return c.health(ctx, pathHealthApplMgmt)
 }
 
 // DatabaseStorage provides health status of database storage health.
-func (c *Client) DatabaseStorage() (string, error) {
-	return c.health(pathHealthDatabaseStorage)
+func (c *Client) DatabaseStorage(ctx context.Context) (string, error) {
+	return c.health(ctx, pathHealthDatabaseStorage)
 }
 
 // Load provides health status of load health.
-func (c *Client) Load() (string, error) {
-	return c.health(pathHealthLoad)
+func (c *Client) Load(ctx context.Context) (string, error) {
+	return c.health(ctx, pathHealthLoad)
 }
 
 // Mem provides health status of memory health.
-func (c *Client) Mem() (string, error) {
-	return c.health(pathHealthMem)
+func (c *Client) Mem(ctx context.Context) (string, error) {
+	return c.health(ctx, pathHealthMem)
 }
 
 // SoftwarePackages provides information on available software updates available in remote VUM repository.
@@ -151,35 +152,35 @@ func (c *Client) Mem() (string, error) {
 // Orange indicates that non-security updates are available.
 // Green indicates that there are no updates available.
 // Gray indicates that there was an error retrieving information on software updates.
-func (c *Client) SoftwarePackages() (string, error) {
-	return c.health(pathHealthSoftwarePackager)
+func (c *Client) SoftwarePackages(ctx context.Context) (string, error) {
+	return c.health(ctx, pathHealthSoftwarePackager)
 }
 
 // Storage provides health status of storage health.
-func (c *Client) Storage() (string, error) {
-	return c.health(pathHealthStorage)
+func (c *Client) Storage(ctx context.Context) (string, error) {
+	return c.health(ctx, pathHealthStorage)
 }
 
 // Swap provides health status of swap health.
-func (c *Client) Swap() (string, error) {
-	return c.health(pathHealthSwap)
+func (c *Client) Swap(ctx context.Context) (string, error) {
+	return c.health(ctx, pathHealthSwap)
 }
 
 // System provides overall health of system.
-func (c *Client) System() (string, error) {
-	return c.health(pathHealthSystem)
+func (c *Client) System(ctx context.Context) (string, error) {
+	return c.health(ctx, pathHealthSystem)
 }
 
-func (c *Client) do(req web.RequestConfig) (*http.Response, error) {
-	httpReq, err := web.NewHTTPRequest(req)
+func (c *Client) do(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
+	httpReq, err := web.NewHTTPRequest(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating http request to %s : %v", req.URL, err)
 	}
 	return c.httpClient.Do(httpReq)
 }
 
-func (c *Client) doOK(req web.RequestConfig) (*http.Response, error) {
-	resp, err := c.do(req)
+func (c *Client) doOK(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
+	resp, err := c.do(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -190,8 +191,8 @@ func (c *Client) doOK(req web.RequestConfig) (*http.Response, error) {
 	return resp, nil
 }
 
-func (c *Client) doOKWithDecode(req web.RequestConfig, dst any) error {
-	resp, err := c.doOK(req)
+func (c *Client) doOKWithDecode(ctx context.Context, req web.RequestConfig, dst any) error {
+	resp, err := c.doOK(ctx, req)
 	defer web.CloseBody(resp)
 	if err != nil {
 		return err

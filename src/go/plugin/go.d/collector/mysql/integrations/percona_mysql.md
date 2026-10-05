@@ -316,7 +316,7 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 
 
-### Per MariaDB instance
+### Per Percona MySQL instance
 
 These metrics refer to the entire monitored application.
 

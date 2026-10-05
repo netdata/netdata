@@ -456,7 +456,7 @@ static void stream_receiver_log_poll_error(
             stream_receiver_automatic_keepalive_idle(rpt) :
             rpt->config.tcp_keepalive.idle_s;
         snprintfz(keepalive, sizeof(keepalive),
-                  "enabled policy=%s idle=%us interval=%us probes=%u",
+                  "enabled policy=%s idle=%us interval=%ds probes=%d",
                   rpt->config.tcp_keepalive.automatic ? "automatic" : "configured",
                   idle_s, CONNECTION_PROBE_INTERVAL_SECONDS, CONNECTION_PROBE_COUNT);
 #else
@@ -823,7 +823,7 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
                         // loop through all the complete lines found in the uncompressed buffer
 
                         while (buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
-                            if (unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
+                            if (unlikely(parser_action(parser, rpt->thread.line_buffer->buffer) != PARSER_RC_OK)) {
                                 stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
                                 *removed = true;
                                 return -1;
@@ -864,7 +864,7 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
             return rc;
 
         while(buffered_reader_next_line(&rpt->thread.uncompressed, rpt->thread.line_buffer)) {
-            if(unlikely(parser_action(parser, rpt->thread.line_buffer->buffer))) {
+            if(unlikely(parser_action(parser, rpt->thread.line_buffer->buffer) != PARSER_RC_OK)) {
                 stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
                 *removed = true;
                 return -1;

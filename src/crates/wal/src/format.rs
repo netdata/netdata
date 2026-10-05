@@ -1,3 +1,35 @@
+//! The WAL disk/wire format: the 4 KiB file header, the frame layout of the
+//! file body, and the serde lifecycle-event envelope (`FileEvent` / `Message`)
+//! that carries writer events from the ingestor to the ledger.
+//!
+//! All multi-byte header and frame fields are little-endian; checksums are
+//! CRC32 (`crc32fast`). The header CRC covers its whole page prefix up to the
+//! CRC field. A frame's CRC covers its 20 header bytes plus the compressed
+//! payload, and is stored/verified only when the header sets
+//! [`FLAG_CRC_ENABLED`] (otherwise the field is `0` and unverified).
+//!
+//! Compat policy: [`FileHeader::from_bytes`] accepts exactly [`FORMAT_VERSION`]
+//! and rejects in a fixed order — magic, version, header CRC, unknown flag
+//! bits, compression id, `content_meta` cap — so a corrupt or foreign file
+//! fails before any field is interpreted. The header carries no partition key
+//! and no footer: `part_key` lives only in the filename `FileId` stem (the
+//! `file-registry` stem contract), and a file recovered from disk has no
+//! durable prefix or log-time range (`wal::registry` re-reads the header for
+//! identity only).
+//!
+//! Consumers: `FileHeader` and the frame constants are used only inside this
+//! crate (writer builds, reader and registry parse). `HEADER_SIZE` is
+//! re-exported as the first-frame offset shared with the query/index side
+//! (sfsq, sfsq-cli, otel-ledger, ng-index); `MAX_CONTENT_META_BYTES` is
+//! pre-write-enforced by the ingestor's log service. `FileEvent` is produced
+//! by `wal::Writer` in the ingestor and, wrapped in [`Message`], applied by
+//! the ledger's per-tenant registries (`file-lifecycle` forwards to
+//! `wal::Registry::apply_event`); `Message` is that link's envelope,
+//! produced by the ingestor's `LedgerSender` and gap-checked + routed in
+//! `otel-ledger`'s ingestor.
+//! `Message` rides the ingestor→ledger ferryboat IPC link (length-delimited
+//! bincode, 8 MiB default) — that framing is the transport's, independent of
+//! the WAL frame layout below.
 use serde::{Deserialize, Serialize};
 
 use file_registry::{ByteSize, FileId, TenantId, TimestampNs};
@@ -18,14 +50,13 @@ pub const HEADER_SIZE: usize = 4096;
 
 /// Max stored length (bytes) of the header's `content_meta` blob — the content
 /// plane's opaque per-file identity. It fits easily in the 4 KiB header; the
-/// writer rejects a larger blob rather than truncate it (truncating would
-/// corrupt the identity, unlike the old display-only field).
+/// writer rejects a larger blob rather than truncate it (truncation would
+/// corrupt the identity).
 pub const MAX_CONTENT_META_BYTES: usize = 1024;
 
 /// Byte offset where the header's `content_meta` blob begins:
 /// `MAGIC(4) + version(2) + flags(2) + created_at(8) + payload_format(2) +
 /// content_meta_len(2)`.
-/// (No `part_key` in the header — it lives only in the filename `FileId`.)
 pub const CONTENT_META_OFFSET: usize = 20;
 
 /// Byte offset of the header CRC32: the last 4 bytes of the page. Covers
@@ -39,12 +70,18 @@ pub const HEADER_CRC_OFFSET: usize = HEADER_SIZE - 4;
 /// one of the constants.
 const _: () = assert!(CONTENT_META_OFFSET + MAX_CONTENT_META_BYTES <= HEADER_CRC_OFFSET);
 
-/// Bit 0: CRC32 checksums are present in batch frames.
+/// Bit 0: frames carry a CRC32 over their header + compressed payload, and the
+/// reader verifies it. When clear, the writer stores `0` in the frame's CRC
+/// field and the reader skips verification.
 pub const FLAG_CRC_ENABLED: u16 = 1 << 0;
 
-// Bits 1-2: compression algorithm for batch payloads.
+/// Bits 1-2 of the header flags: the compression algorithm applied to each
+/// frame's payload. Only the two values below are defined; `from_bytes`
+/// rejects any other pattern as `Error::UnsupportedCompression`.
 pub const COMPRESSION_MASK: u16 = 0b110;
+/// LZ4 block compression — the writer's default, so the bits are usually clear.
 pub const COMPRESSION_LZ4: u16 = 0b000;
+/// Payloads stored as written, uncompressed.
 pub const COMPRESSION_NONE: u16 = 0b010;
 
 /// Every flag bit this version defines. `from_bytes` rejects any other bit:
@@ -52,10 +89,17 @@ pub const COMPRESSION_NONE: u16 = 0b010;
 /// understand, and proceeding would misread the file.
 pub const KNOWN_FLAGS_MASK: u16 = FLAG_CRC_ENABLED | COMPRESSION_MASK;
 
-/// Frame header size: `[u32 payload_len] [u32 uncompressed_len] [u32 entry_count] [u64 timestamp_ns] [u32 crc32]`.
+/// Frame header size: `[u32 payload_len] [u32 uncompressed_len] [u32 entry_count] [u64 timestamp_ns] [u32 crc32]`,
+/// all little-endian. `timestamp_ns` is the caller's ingestion timestamp
+/// ([`FrameMeta::ingestion_ns`](crate::FrameMeta)); `crc32` is `0` unless the
+/// header sets [`FLAG_CRC_ENABLED`], in which case it covers these 20 bytes
+/// followed by the compressed payload.
 pub const FRAME_HEADER_SIZE: usize = 24;
 
-/// Alignment boundary for frames within the file.
+/// Every frame is zero-padded so its total size (header + payload + padding)
+/// is a multiple of this. The header page is a multiple of it too, so every
+/// frame starts and ends on this boundary — the property that makes a frame
+/// end offset a valid `Reader::open_range` start.
 pub const FRAME_ALIGNMENT: usize = 8;
 
 // -- File header --------------------------------------------------------
@@ -74,10 +118,14 @@ pub const FRAME_ALIGNMENT: usize = 8;
 pub struct FileHeader {
     pub version: u16,
     pub flags: u16,
+    /// Wall-clock creation time (nanoseconds since the Unix epoch), stamped
+    /// once at file creation. A diagnostic: ordering uses the frames'
+    /// ingestion timestamps, not this.
     pub created_at: u64,
     /// Opaque per-file frame-codec tag. The content plane assigns the ids and
     /// checks them before decoding frames; the WAL stamps and exposes the
-    /// value, never interprets it. `0` is reserved and never written.
+    /// value, never interprets it. `0` is reserved ("unspecified") and refused
+    /// at `Writer::new`; the reader does not re-check it.
     pub payload_format: u16,
     /// Opaque content-plane metadata, recorded so the file's identity is
     /// available cheaply (recovery, the stream selector) without decoding any
@@ -131,6 +179,9 @@ impl FileHeader {
             )));
         }
         let version = u16::from_le_bytes([buf[4], buf[5]]);
+        // Version precedes the CRC and every layout-dependent read: a
+        // different version may place other fields where this layout reads
+        // them, so reject on the version alone.
         if version != FORMAT_VERSION {
             return Err(crate::Error::UnsupportedVersion(version));
         }
@@ -188,6 +239,11 @@ impl FileHeader {
 
 /// Events produced by the WAL writer during file lifecycle operations.
 ///
+/// Applied by the ledger's per-tenant registries — `file-lifecycle`'s
+/// `apply_wal_event` forwards each event to
+/// [`Registry::apply_event`](crate::Registry); a `Closed` event schedules the
+/// file's SFST indexing job in `otel-ledger`'s ingestor.
+///
 /// `min_timestamp_ns` / `max_timestamp_ns` carry the **log-data** time
 /// range accumulated so far for the file — derived from each frame's
 /// per-row OTel timestamps as supplied by the caller of
@@ -207,8 +263,13 @@ pub enum FileEvent {
     },
     Synced {
         file_id: FileId,
+        /// Durable byte prefix at sync time: the end of the last frame fsynced
+        /// to disk (frame-aligned). A concurrent reader may read up to here.
         valid_up_to: ByteSize,
+        /// Frames written to the file so far. Informational: the registry
+        /// ignores it.
         frame_count: u64,
+        /// Log records in that durable prefix.
         entry_count: u64,
         /// Earliest log-data timestamp accumulated for this file so far.
         min_timestamp_ns: TimestampNs,
@@ -217,6 +278,8 @@ pub enum FileEvent {
     },
     Closed {
         file_id: FileId,
+        /// Frames written to the file (final). Informational: the registry
+        /// ignores it.
         frame_count: u64,
         /// Earliest log-data timestamp in this file (final value).
         min_timestamp_ns: TimestampNs,
@@ -234,9 +297,10 @@ pub enum FileEvent {
 
 impl FileEvent {
     /// The signal axis (`pipeline_id`) of the file this event concerns. Every
-    /// variant carries a [`FileId`], which carries the pipeline. The writer
-    /// assigns a per-signal frame sequence by this value, and the ledger routes
-    /// the event to the owning pipeline by it.
+    /// variant carries a [`FileId`], which carries the pipeline. The ingestor
+    /// keys its per-signal `Message::frame_seq` stream by this value, and the
+    /// ledger routes the event to the owning pipeline by it (decoding the raw
+    /// id via `bridge::signals::Signal::try_from`).
     pub fn pipeline_id(&self) -> u16 {
         match self {
             FileEvent::Created { file_id, .. }
@@ -246,10 +310,21 @@ impl FileEvent {
     }
 }
 
-/// A sequenced file event sent over IPC.
+/// One lifecycle event sent from the ingestor to the ledger over the
+/// WAL-event IPC link: every [`FileEvent`] the ingestor drains from its
+/// writers is wrapped in one of these (the ledger is the only consumer).
+/// Cross-process wire contract: the two ends are separate processes
+/// exchanging bincode over the ferryboat link (8 MiB default), so enum
+/// variant order and field shapes must not change silently.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
+    /// The link's per-signal message sequence, not a WAL frame index: the
+    /// ingestor numbers each signal's messages from 1 (keyed by
+    /// [`FileEvent::pipeline_id`]) and the ledger gap-checks per signal — a
+    /// gap is a genuinely lost event for that signal.
     pub frame_seq: u64,
+    /// Tenant the event's file belongs to; routes the event to that tenant's
+    /// registry (the event itself carries no tenant).
     pub tenant_id: TenantId,
     pub event: FileEvent,
 }

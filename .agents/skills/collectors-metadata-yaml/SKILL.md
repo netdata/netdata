@@ -59,10 +59,19 @@ Facts every rule below relies on (`integrations/templates/overview/collector.md`
   field for the question it sits under.
 - Readers stop when they have enough. The first paragraph of every field MUST stand alone; detail follows in
   decreasing importance.
+- `metrics_description` and `method_description` carry the page. They sit above the fold, most visitors read no
+  further, and the first sentence of `metrics_description` becomes the catalog row that decides whether anyone opens
+  the page at all. When writing or reviewing time is short, spend it on those two.
 - Readers skip walls of text ("I ain't reading all that"). Long content is fine when it is structured: one idea per
   paragraph, lists for enumerations, tables for items that share attributes, an admonition for what must not be
   missed. Length is a symptom to check, not the rule; an unstructured 120-word paragraph fails, a 400-word field made
   of a table and three short paragraphs may pass.
+- Paragraph breaks are not structure, and no shape test decides this. A field can sit under every length bound, break
+  cleanly into four paragraphs, and still be a wall, because the reader must read all of it to find the part that
+  concerns them; `redfish` shipped exactly that (`overview.md` section 3). Conversely `s3check`'s `method_description`
+  is three plain paragraphs, the longest 114 words, and passes, because every sentence in it is a consequence the
+  operator can act on. Judge the field by the question it answers and by what the reader can do with each sentence,
+  never by its silhouette.
 - Operator voice. The page describes what the collector does as the operator sees it: connections, requests,
   commands, files, permissions, what it creates and deletes, what it never touches. Unexplained implementation
   mechanics that do not affect operation MUST NOT appear. Preserve operator-visible terms and exact public names
@@ -89,6 +98,21 @@ Content that does not answer its field's question does not stay in the field. Ro
 - It is developer content (internal stages, caches, bounds nobody configures, ownership resolution). It belongs in the
   collector's `ARCHITECTURE.md` or in code, is never linked from the page, and leaves the page.
 - Nothing owns it: cut it.
+
+Noticing is the hard part, because the content feels relevant while you are writing it — you are describing the
+collector you just built. Hold the draft against these four shapes. They are developer notes nearly every time they
+appear in a field, at any length:
+
+- **Failure narration.** What happens on an error, how many times it retries, when it gives up.
+- **State between runs.** What is kept, discarded, replayed, or invalidated from one collection to the next.
+- **Algorithm.** Preference order, evaluation rules, dwell and hysteresis, bounds the code applies to itself.
+- **Internal vocabulary.** A term that appears nowhere the operator can see: not an option name, not a chart, not a
+  log message, not a label in the UI. Public protocol and API names (`ServiceRoot`, a vendor operation) are the
+  exception and stay.
+
+An operator-visible *consequence* of any of these can belong on the page; the mechanism behind it does not. "Some
+charts skip a cycle when the walk overruns" is a consequence and lives in `limits`. How the walk resumes afterwards is
+the mechanism, and leaves.
 
 ## Safety Of The Markdown
 
@@ -121,7 +145,10 @@ complete the validation and preview before committing:
 4. Empty `auto_detection`, `limits`, or `performance_impact` only where the placeholder sentence is true. A collector
    covered by a service-discovery rule, or with a cardinality cap or a metered API, fills them.
 5. No irrelevant implementation mechanics; unfamiliar operator terms defined at first use; no developer links
-   (`ARCHITECTURE.md`, source files).
+   (`ARCHITECTURE.md`, source files). The test is per sentence, not per field: ask what the operator does differently
+   for having read it. "Nothing" means it belongs to another field, to `ARCHITECTURE.md`, or nowhere — see the worked
+   routing example in `overview.md` section 3. A field can pass every length and structure check and still fail this
+   one, which is the failure mode that reaches production.
 6. Statements verified against the code, not against the previous prose: permissions, defaults, what is created or
    deleted, limits, addresses probed.
 7. Markdown safety items above; for authorized changes run

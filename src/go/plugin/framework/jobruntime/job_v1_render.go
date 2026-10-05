@@ -7,7 +7,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func (tx *jobV1Emission) processMetrics(mx collectedMetrics, sinceLastRun int) bool {
@@ -51,30 +50,7 @@ func (tx *jobV1Emission) processMetrics(mx collectedMetrics, sinceLastRun int) b
 		j.buf.Reset()
 	}
 	tx.hostBytes = j.buf.Len()
-	j.api.HOST("")
-	var status jobV1ChartChange
-	status.prepare(j.collectStatusChart, j)
-	status.global = true
-	var duration jobV1ChartChange
-	duration.prepare(j.collectDurationChart, j)
-	duration.global = true
-	if !status.created || createCharts {
-		tx.createChart(&status)
-	}
-	if !duration.created || createCharts {
-		tx.createChart(&duration)
-	}
-	intMx := collectedMetrics{
-		intMetrics: map[string]int64{"success": oldmetrix.Bool(updated > 0), "failed": oldmetrix.Bool(updated == 0)},
-	}
-	tx.updateChart(&status, intMx, sinceLastRun)
-	tx.record(&status)
-	if updated > 0 {
-		tx.updateChart(&duration, collectedMetrics{
-			intMetrics: map[string]int64{"duration": elapsed},
-		}, sinceLastRun)
-	}
-	tx.record(&duration)
+	tx.self = j.selfMetrics.prepare(j.api, sinceLastRun, elapsed, updated > 0, createCharts)
 	return updated > 0
 }
 

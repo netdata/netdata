@@ -35,6 +35,7 @@ func TestCollector_Init(t *testing.T) {
 	c.DSN = "sqlserver://localhost:1433"
 
 	assert.NoError(t, c.Init(context.Background()))
+	defer c.Cleanup(context.Background())
 }
 
 func TestCollector_Init_EmptyDSN(t *testing.T) {
@@ -149,7 +150,7 @@ func TestEnsureEngineEditionAlsoCachesVersion(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"version", "engine_edition"}).AddRow("16.0.4265.3", 3))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 
 	edition, err := c.ensureEngineEdition(context.Background())
 	require.NoError(t, err)
@@ -173,7 +174,7 @@ func TestEnsureEngineEditionCachesUnparsableVersion(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"version", "engine_edition"}).AddRow("invalid", 3))
 
 	c := New()
-	c.db = db
+	c.functionDB = db
 
 	edition, err := c.ensureEngineEdition(context.Background())
 	require.NoError(t, err)

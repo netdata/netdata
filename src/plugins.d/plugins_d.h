@@ -45,7 +45,7 @@ struct plugind {
 
 extern struct plugind *pluginsd_root;
 
-size_t pluginsd_process(struct rrdhost *host, struct plugind *cd, int fd_input, int fd_output, int trust_durations, bool *retry);
+size_t pluginsd_process(struct rrdhost *host, struct plugind *cd, int fd_input, int fd_output, int trust_durations, bool *retry, bool *protocol_error);
 
 struct parser;
 void pluginsd_process_cleanup(struct parser *parser);

@@ -3,12 +3,14 @@
 package prometheus
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
 func (c *Collector) validateConfig() error {
@@ -18,14 +20,17 @@ func (c *Collector) validateConfig() error {
 	if err := c.FallbackType.Validate(); err != nil {
 		return err
 	}
+	if _, err := charttpl.CompileCounterRawCharts(c.CounterRawCharts); err != nil {
+		return fmt.Errorf("invalid 'counter_raw_charts': %w", err)
+	}
 	if err := c.Profiles.validate(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Collector) initPrometheusClient() (prometheus.Prometheus, error) {
-	httpClient, err := web.NewHTTPClient(c.ClientConfig)
+func (c *Collector) initPrometheusClient(ctx context.Context) (prometheus.Prometheus, error) {
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("init HTTP client: %v", err)
 	}

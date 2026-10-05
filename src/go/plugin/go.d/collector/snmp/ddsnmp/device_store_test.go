@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/stretchr/testify/require"
 )
 
@@ -341,6 +342,89 @@ func TestDeviceStoreLifecycleChangeNotifications(t *testing.T) {
 			<-store.LifecycleChanges()
 			revision := store.LifecycleRevision()
 			tc.change(store, writer, status)
+			require.Equal(t, tc.wantChange, store.LifecycleRevision() > revision)
+			select {
+			case <-store.LifecycleChanges():
+				require.True(t, tc.wantChange)
+			default:
+				require.False(t, tc.wantChange)
+			}
+		})
+	}
+}
+
+func TestDeviceStoreReplaceJobChangeNotifications(t *testing.T) {
+	type replacement struct {
+		previous string
+		owner    string
+		info     DeviceLifecycleInfo
+		status   DeviceLifecycleStatus
+		device   *DeviceConnectionInfo
+	}
+	info := DeviceLifecycleInfo{Hostname: "192.0.2.10", Port: 161, SNMPVersion: "2c"}
+	device := &DeviceConnectionInfo{Hostname: "192.0.2.10"}
+	failed := DeviceLifecycleStatus{PreparationFailure: collectorapi.JobConfigFailure{
+		Stage:       "vnode",
+		Reason:      "missing_vnode",
+		CompletedAt: time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC),
+	}}
+	retried := failed
+	retried.PreparationFailure.CompletedAt = retried.PreparationFailure.CompletedAt.Add(time.Second)
+	pending := failed
+	pending.PreparationFailure.Reason = "pending_vnode"
+	collected := DeviceLifecycleStatus{
+		Phase:       DeviceLifecyclePhaseCollect,
+		Outcome:     DeviceLifecycleOutcomeSuccess,
+		CompletedAt: time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC),
+	}
+	recollected := collected
+	recollected.CompletedAt = recollected.CompletedAt.Add(time.Second)
+
+	for name, tc := range map[string]struct {
+		initial    replacement
+		next       replacement
+		wantChange bool
+	}{
+		"repeated preparation failure": {
+			initial: replacement{owner: "job", info: info, status: failed},
+			next:    replacement{previous: "job", owner: "job", info: info, status: retried},
+		},
+		"repeated ready projection": {
+			initial: replacement{owner: "job", info: info, status: collected, device: device},
+			next:    replacement{previous: "job", owner: "job", info: info, status: recollected, device: device},
+		},
+		"preparation failure reason": {
+			initial:    replacement{owner: "job", info: info, status: failed},
+			next:       replacement{previous: "job", owner: "job", info: info, status: pending},
+			wantChange: true,
+		},
+		"identity": {
+			initial:    replacement{owner: "job", info: info, status: failed},
+			next:       replacement{previous: "job", owner: "job", info: DeviceLifecycleInfo{Hostname: "192.0.2.20"}, status: failed},
+			wantChange: true,
+		},
+		"readiness gained": {
+			initial:    replacement{owner: "job", info: info, status: collected},
+			next:       replacement{previous: "job", owner: "job", info: info, status: collected, device: device},
+			wantChange: true,
+		},
+		"readiness lost": {
+			initial:    replacement{owner: "job", info: info, status: collected, device: device},
+			next:       replacement{previous: "job", owner: "job", info: info, status: collected},
+			wantChange: true,
+		},
+		"new incarnation": {
+			initial:    replacement{owner: "job", info: info, status: failed},
+			next:       replacement{previous: "job", owner: "successor", info: info, status: failed},
+			wantChange: true,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			store := NewDeviceStore()
+			store.ReplaceJob(tc.initial.previous, tc.initial.owner, tc.initial.info, tc.initial.status, tc.initial.device)
+			<-store.LifecycleChanges()
+			revision := store.LifecycleRevision()
+			store.ReplaceJob(tc.next.previous, tc.next.owner, tc.next.info, tc.next.status, tc.next.device)
 			require.Equal(t, tc.wantChange, store.LifecycleRevision() > revision)
 			select {
 			case <-store.LifecycleChanges():

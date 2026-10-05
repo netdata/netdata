@@ -1,13 +1,25 @@
-//! Query-time span scan over a **traces** WAL range — the tail evaluator.
+//! Query-time span scan over a **traces** WAL range — the tail arm of
+//! the traces source model.
 //!
 //! [`TraceWalScan`] decodes a WAL's trace frames
-//! (`ng_flatten::FlattenedTraceRequest`, payload format 3) into spans once
-//! and serves them to the shared combiner as a
-//! [`SpanSource`](sfst::SpanSource). It exists for data the indexer hasn't
+//! (`ng_flatten::FlattenedTraceRequest`, payload format 3) into spans
+//! once and serves them from memory — to the shared combiner as a
+//! [`SpanSource`](sfst::SpanSource) (trace-by-id) and directly to the
+//! other operations: the cross-source aggregates fold, search, and the
+//! attribute enumerations. It exists for data the indexer hasn't
 //! reached yet — the bounded, un-indexed *tail* of an active WAL — so a
-//! whole-range decode per query is affordable (the same rationale as the
-//! logs [`WalScan`](crate::logs::WalScan); dictionaries don't exist here,
-//! frame decoding IS the access path).
+//! whole-range decode per query is affordable (the same rationale as
+//! the logs [`WalScan`](crate::logs::WalScan)). The WAL itself carries
+//! no index or dictionaries — frame decoding IS the access path — and
+//! this scan rebuilds the tail's in-memory counterparts of the sealed
+//! file's schema tree and value dictionaries (`field_kinds`,
+//! `pair_table`) alongside the spans.
+//!
+//! Two plumbing facts: reads go through the buffered [`wal::Reader`]
+//! (never an mmap — that is the sealed-SFST candidate path,
+//! `crate::source`), and the scan takes no cancellation token —
+//! operations poll cancellation BETWEEN sources, so a started scan
+//! succeeds or fails its source as a whole.
 //!
 //! # Semantic equality with the sealed path
 //!
@@ -26,15 +38,20 @@
 //! - `kind` parses from the same `_kind` entry; ids convert by the same
 //!   byte copy the seal uses; `ts`/`duration` are the same frame scalars.
 //!
-//! Scanning is all-or-nothing at the DECODE boundary — a torn frame, a
-//! CRC mismatch, or a bincode-invalid payload fails the scan (the engine
-//! reports the source failed; never a silent truncation). Structural
-//! validation of successfully DECODED frames follows the platform-wide
-//! trust model shared with the logs scanner and both seal paths: WAL
-//! frames are CRC-protected and written by this same binary's ingest, so
-//! decoded trees/node-ids are trusted; hardening against CRC-valid
-//! crafted frames is part of the deferred DoS-hardening follow-up
-//! (user ruling, phase 3 — tracked in the plan repo).
+//! # Failure and trust model
+//!
+//! Corruption is all-or-nothing at the decode boundary: a CRC mismatch
+//! or an undecodable payload fails the WHOLE scan (the engine reports
+//! the source failed; never a silent truncation). A torn frame is
+//! different: [`wal::Reader::open_range`] never reads past the range's
+//! durable bound, so a torn tail just ends the stream (the expected
+//! active-WAL case, not a failure). Structural validation of
+//! successfully DECODED frames follows the platform-wide trust model
+//! shared with the logs scanner and both seal paths: WAL frames are
+//! CRC-protected and written by this same binary's ingest, so decoded
+//! trees/node-ids are trusted; hardening against CRC-valid crafted
+//! frames is the deferred DoS-hardening follow-up (tracked in the
+//! traces plan repo).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -44,6 +61,7 @@ use sfst::{SpanRef, SpanSource, TraceEvent, TraceLink, TraceSpan};
 /// A failure decoding a traces WAL range.
 #[derive(Debug, thiserror::Error)]
 pub enum TraceScanError {
+    /// The WAL container could not be read (open or frame iteration).
     #[error("wal read: {0}")]
     Wal(#[from] wal::Error),
     /// The WAL header names a frame codec other than the flattened-traces
@@ -53,6 +71,7 @@ pub enum TraceScanError {
          refusing to decode frames written by a different codec"
     )]
     PayloadFormat { found: u16, expected: u16 },
+    /// A frame's bincode `FlattenedTraceRequest` payload failed to decode.
     #[error("frame {frame}: trace-frame decode failed: {msg}")]
     Decode { frame: u64, msg: String },
     /// The range holds more spans than `SpanRef.position: u32` can index
@@ -62,15 +81,16 @@ pub enum TraceScanError {
     TooManySpans(usize),
 }
 
-/// One decoded span, ready to serve: the sealed-equivalent [`TraceSpan`]
-/// plus the lookup/merge keys.
+/// One decoded span plus its trace id — the key [`SpanSource::span_refs`]
+/// matches on; the span materializes by scan index.
 struct DecodedSpan {
     trace_id: sfst::TraceId,
     span: TraceSpan,
 }
 
 /// The decoded spans of one WAL range. Build once with
-/// [`scan_range`](Self::scan_range); serve any number of trace lookups.
+/// [`scan_range`](Self::scan_range); serve any number of trace lookups
+/// (the [`SpanSource`] impl, plus the accessors below).
 pub struct TraceWalScan {
     spans: Vec<DecodedSpan>,
     /// Field → coalesced scalar kind over the scanned frames, derived
@@ -80,8 +100,8 @@ pub struct TraceWalScan {
     field_kinds: Vec<(String, sfst::ValueKind)>,
     /// Storage field → distinct rendered values over the scanned frames —
     /// the tail's counterpart of a sealed file's value dictionaries, for
-    /// key enumeration. Built from EXACTLY the entry set the seal interns
-    /// (phase-4b pin C5): resource ∪ scope ∪ span entries (including
+    /// key/value enumeration. Built from EXACTLY the entry set the seal
+    /// interns: resource ∪ scope ∪ span entries (including
     /// `_kind`/`_status_code`/`trace_state`; the mapping layer filters,
     /// same as for sealed field tables) PLUS the structured
     /// `events.name`, `events.attributes.*`, `links.attributes.*` under
@@ -93,13 +113,16 @@ pub struct TraceWalScan {
 
 impl TraceWalScan {
     /// Decode every trace frame in `range` (frame boundaries; half-open —
-    /// see [`wal::FrameRange`]). An empty range yields a zero-span scan.
+    /// see [`wal::FrameRange`]). Production callers pass the tail's
+    /// validated coverage range (`WalCoverage`, `super::sources`) — the
+    /// durable, not-yet-indexed part of an active WAL. An empty range
+    /// yields a zero-span scan.
     pub fn scan_range(path: &Path, range: wal::FrameRange) -> Result<TraceWalScan, TraceScanError> {
         Self::drain(wal::Reader::open_range(path, range)?)
     }
 
-    /// Whole-file counterpart of [`scan_range`](Self::scan_range) (tests,
-    /// tooling).
+    /// Whole-file counterpart of [`scan_range`](Self::scan_range) (the
+    /// tail/seal parity tests use it: `tests/traces_rollup_tail.rs`).
     pub fn scan(path: &Path) -> Result<TraceWalScan, TraceScanError> {
         Self::drain(wal::Reader::open(path)?)
     }
@@ -126,7 +149,8 @@ impl TraceWalScan {
             }
         }
         // Accumulates the frames' typed schema trees — the source of the
-        // field-kind map, exactly as the seal accumulates its on-disk tree.
+        // field-kind map, exactly as the seal accumulates its on-disk
+        // tree (`src/crates/ng-index/src/sfst_build.rs`).
         let mut flattener = ng_flatten::Flattener::new();
         while let Some(frame) = reader.next_frame()? {
             frame_no += 1;
@@ -143,7 +167,7 @@ impl TraceWalScan {
                 .map(|id| tree.path(id))
                 .collect();
             // Every renderer records the FULL storage pair into the key
-            // pair table (pin C5) before any prefix stripping.
+            // pair table before any prefix stripping.
             type PairTable = BTreeMap<String, BTreeSet<String>>;
             let render = |entries: &[ng_flatten::Entry],
                           kv: &mut String,
@@ -275,14 +299,16 @@ impl TraceWalScan {
         })
     }
 
-    /// Number of decoded spans in the range.
+    /// Number of decoded spans in the range (the aggregate fold charges
+    /// this to its visited budget).
     pub fn num_spans(&self) -> usize {
         self.spans.len()
     }
 
-    /// Every decoded span with its trace id, in decode order — the
-    /// search phase-1 tail path (the caller filters UNSET ids and
-    /// counts each visited span into its work ceiling).
+    /// Every decoded span with its trace id, in decode order — the tail
+    /// loop input for search's phase-1 evaluation, the fold's span
+    /// filter, and the tail rollup (evaluating callers skip UNSET ids
+    /// and charge each visited span to their work ceiling).
     pub fn spans_with_ids(&self) -> impl Iterator<Item = (sfst::TraceId, &TraceSpan)> {
         self.spans.iter().map(|d| (d.trace_id, &d.span))
     }
@@ -294,13 +320,15 @@ impl TraceWalScan {
     }
 
     /// Storage field → distinct rendered values over the scanned frames
-    /// (see the struct field's doc) — the tail's key dictionaries.
+    /// (see the struct field's doc) — the tail's value dictionaries.
     pub fn pair_table(&self) -> &BTreeMap<String, BTreeSet<String>> {
         &self.pair_table
     }
 }
 
 impl SpanSource for TraceWalScan {
+    /// Candidates for `trace_id`, in decode order; `position` is the
+    /// span's scan index — [`Self::materialize`]'s key.
     fn span_refs(&mut self, trace_id: sfst::TraceId) -> Result<Vec<SpanRef>, sfst::Error> {
         Ok(self
             .spans
@@ -316,6 +344,9 @@ impl SpanSource for TraceWalScan {
             .collect())
     }
 
+    /// Materialize by scan index. An out-of-range position surfaces as a
+    /// corrupt-index error — unreachable when positions come from
+    /// [`Self::span_refs`], and never a wrong span either way.
     fn materialize(&mut self, position: u32) -> Result<TraceSpan, sfst::Error> {
         self.spans
             .get(position as usize)

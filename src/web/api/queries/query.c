@@ -30,39 +30,39 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
 
     internal_error(
     true,
-    "rrd2rrdr() on %s update every %ld with %s grouping %s (group: %zu, resampling_time: %ld, resampling_group: %zu), "
-         "after (got: %ld, want: %ld, req: %ld, db: %ld), "
-         "before (got: %ld, want: %ld, req: %ld, db: %ld), "
-         "duration (got: %ld, want: %ld, req: %ld, db: %ld), "
+    "rrd2rrdr() on %s update every %" PRId64 " with %s grouping %s (group: %zu, resampling_time: %" PRId64 ", resampling_group: %zu), "
+         "after (got: %" PRId64 ", want: %" PRId64 ", req: %" PRId64 ", db: %" PRId64 "), "
+         "before (got: %" PRId64 ", want: %" PRId64 ", req: %" PRId64 ", db: %" PRId64 "), "
+         "duration (got: %" PRId64 ", want: %" PRId64 ", req: %" PRId64 ", db: %" PRId64 "), "
          "points (got: %zu, want: %zu, req: %zu), "
          "%s"
          , qt->id
-         , qt->window.query_granularity
+         , (int64_t)qt->window.query_granularity
 
          // grouping
          , (aligned) ? "aligned" : "unaligned"
          , time_grouping_id2txt(group_method)
          , group
-         , resampling_time
+         , (int64_t)resampling_time
          , resampling_group
 
          // after
-         , r->view.after
-         , after_wanted
-         , after_requested
-         , first_entry_s
+         , (int64_t)r->view.after
+         , (int64_t)after_wanted
+         , (int64_t)after_requested
+         , (int64_t)first_entry_s
 
          // before
-         , r->view.before
-         , before_wanted
-         , before_requested
-         , last_entry_s
+         , (int64_t)r->view.before
+         , (int64_t)before_wanted
+         , (int64_t)before_requested
+         , (int64_t)last_entry_s
 
          // duration
-         , (long)(r->view.before - r->view.after + qt->window.query_granularity)
-         , (long)(before_wanted - after_wanted + qt->window.query_granularity)
-         , (long)before_requested - after_requested
-         , (long)((last_entry_s - first_entry_s) + qt->window.query_granularity)
+         , (int64_t)(r->view.before - r->view.after + qt->window.query_granularity)
+         , (int64_t)(before_wanted - after_wanted + qt->window.query_granularity)
+         , (int64_t)(before_requested - after_requested)
+         , (int64_t)((last_entry_s - first_entry_s) + qt->window.query_granularity)
 
          // points
          , r->rows

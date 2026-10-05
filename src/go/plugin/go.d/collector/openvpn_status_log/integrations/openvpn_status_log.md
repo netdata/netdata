@@ -85,7 +85,27 @@ The following options can be defined globally: update_every, autodetection_retry
 | update_every | Data collection frequency. | 1 | no |
 | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
 | log_path | Path to status log. | /var/log/openvpn/status.log | yes |
-| per_user_stats | User selector. Determines which user metrics will be collected. |  | no |
+| [per_user_stats](#option-per-user-stats) | User selector. Determines which user metrics will be collected. |  | no |
+
+<a id="option-per-user-stats"></a>
+##### per_user_stats
+
+Metrics of users matching the selector will be collected. When unset, no per-user metrics are collected.
+
+- Logic: (pattern1 OR pattern2) AND !(pattern3 OR pattern4)
+- Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format).
+- Syntax:
+
+  ```yaml
+  per_user_stats:
+    includes:
+      - pattern1
+      - pattern2
+    excludes:
+      - pattern3
+      - pattern4
+  ```
+
 
 
 </details>

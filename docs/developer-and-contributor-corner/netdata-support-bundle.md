@@ -62,6 +62,7 @@ Both scripts accept the same set of options. The POSIX flags and their PowerShel
 | `--timeout SECONDS` | `-TimeoutSeconds N` | `10` | Per-command timeout, so a slow command cannot stall the run. |
 | `--no-obfuscate` | `-NoObfuscate` | off | Turn off IP and hostname pseudonymization. Secrets are still redacted. |
 | `--include-snmp-diagnostics` | `-IncludeSnmpDiagnostics` | off | Include existing raw SNMP diagnostic files; no sanitization. Share privately. |
+| `--include-plugin-debug` | _(POSIX only)_ | off | Run `systemd-journal.plugin` in debug mode and collect its error output. The only option that executes a collector. |
 | `--keep-staging` | `-KeepStaging` | off | Keep the temporary working directory for inspection. |
 | `--selftest` | `-SelfTest` | off | Run the built-in sanitizer tests and exit without collecting anything. |
 | `-v`, `--version` | `-Version` | | Print the tool version and exit. |
@@ -88,6 +89,26 @@ The archive is organized into numbered directories so a person or an automated r
   `netdata-sockets.txt`: visible, platform-supported sockets owned by the
   Netdata process tree and their native states.
 - `09-permissions/`, file modes, ownership, plugin capabilities, extended attributes, security contexts, and ACLs for the agent's directories and plugins.
+
+## Include plugin debug
+
+Support may ask you to add:
+
+```sh
+sudo netdata-support-bundle --include-plugin-debug
+```
+
+This runs `systemd-journal.plugin` in debug mode as the Agent's own user and captures what it
+reports. It can only do that when the Agent's user has a local account and the bundle runs with
+enough privilege to become it — for a containerised Agent, or without `sudo`, it says so and runs
+nothing, because an error from any other user would not reflect the Agent's access. The artifact
+always records which user it ran as, so check that line first. It is the only option that runs a collector, so it is off by default. Use it when systemd
+journal logs are missing from Netdata — that failure is almost always a permissions problem, and the
+plugin states the reason directly.
+
+Only the plugin's error output is collected — its normal output is journal content and is
+discarded, so the bundle does not pick up logs from your other services. What is collected is
+sanitized and size-capped like everything else in the bundle.
 
 ## Include SNMP diagnostics
 

@@ -15,9 +15,21 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
+// Result distinguishes a joined Agent run from an early process-exit disposition.
+// Shared resources may be closed only when Err is nil and ExitRequired is false.
+type Result struct {
+	// Err reports a host, control or Agent failure. A failed run may retain work.
+	Err error
+	// ExitRequired means the host returned without observing RunContext complete.
+	// The command must exit immediately, without deferred resource cleanup. Use
+	// status 1 for Err != nil and status 0 otherwise so the daemon can recover.
+	ExitRequired bool
+}
+
 // Run hosts one process-lifetime Agent and forwards acknowledged lifecycle
-// controls from operating-system signals.
-func Run(a *agent.Agent) error {
+// controls from operating-system signals. The command owns process exit and
+// must inspect both result fields before releasing shared resources.
+func Run(a *agent.Agent) Result {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(ch)
@@ -40,7 +52,7 @@ type hostedAgent interface {
 	Errorf(string, ...any)
 }
 
-func runSignals(a hostedAgent, signals <-chan os.Signal) error {
+func runSignals(a hostedAgent, signals <-chan os.Signal) Result {
 	return runSignalsWithTimeout(a, signals, hostedRestartTimeout, hostedTerminationTimeout)
 }
 
@@ -49,9 +61,11 @@ func runSignalsWithTimeout(
 	signals <-chan os.Signal,
 	restartTimeout time.Duration,
 	terminationTimeout time.Duration,
-) error {
+) Result {
 	if a == nil || signals == nil || restartTimeout <= 0 || terminationTimeout <= 0 {
-		return errors.New("agent host: invalid signal loop")
+		return Result{
+			Err: errors.New("agent host: invalid signal loop"),
+		}
 	}
 	collectorapi.ObsoleteCharts(true)
 	runDone := make(chan error, 1)
@@ -73,7 +87,7 @@ func runSignalsWithTimeout(
 			done <- a.Restart(ctx)
 		}()
 	}
-	terminate := func(restartErr error) error {
+	terminate := func(restartErr error) Result {
 		if restartCancel != nil {
 			restartCancel()
 			restartCancel = nil
@@ -98,11 +112,12 @@ func runSignalsWithTimeout(
 		if agent.ContainsOnlyProcessControlErrors(err, agent.ErrNotRunning) {
 			err = nil
 		}
-		runErr := waitForRun(runDone, ctx)
-		if runErr != nil {
-			a.Errorf("agent shutdown failed: %v", runErr)
+		result := waitForRun(runDone, ctx)
+		if result.Err != nil {
+			a.Errorf("agent shutdown failed: %v", result.Err)
 		}
-		return errors.Join(restartErr, err, runErr)
+		result.Err = errors.Join(restartErr, err, result.Err)
+		return result
 	}
 	for {
 		select {
@@ -130,11 +145,7 @@ func runSignalsWithTimeout(
 				continue
 			}
 			if restartRecoveryRequired(err) {
-				collectorapi.ObsoleteCharts(false)
-				if runErr, ready := completedRunResult(runDone); ready && runErr != nil {
-					return runErr
-				}
-				return nil
+				return recoveryResult(runDone)
 			}
 			restartErr := restartControlError(err)
 			if restartErr != nil {
@@ -162,19 +173,26 @@ func runSignalsWithTimeout(
 					return terminate(restartErr)
 				}
 			}
-			collectorapi.ObsoleteCharts(false)
-			if runErr, ready := completedRunResult(runDone); ready && runErr != nil {
-				return runErr
-			}
-			return nil
+			return recoveryResult(runDone)
 		case err := <-runDone:
 			a.Info("agent run loop stopped. Terminating...")
 			collectorapi.ObsoleteCharts(false)
 			if err != nil {
 				a.Errorf("agent run loop failed: %v", err)
 			}
-			return err
+			return Result{
+				Err: err,
+			}
 		}
+	}
+}
+
+func recoveryResult(done <-chan error) Result {
+	collectorapi.ObsoleteCharts(false)
+	err, completed := completedRunResult(done)
+	return Result{
+		Err:          err,
+		ExitRequired: !completed,
 	}
 }
 
@@ -205,20 +223,29 @@ func completedRunResult(done <-chan error) (error, bool) {
 	}
 }
 
-func waitForRun(done <-chan error, ctx context.Context) error {
+func waitForRun(done <-chan error, ctx context.Context) Result {
 	if err, ready := completedRunResult(done); ready {
-		return err
+		return Result{
+			Err: err,
+		}
 	}
 	select {
 	case err := <-done:
-		return err
+		return Result{
+			Err: err,
+		}
 	case <-ctx.Done():
 		if err, ready := completedRunResult(done); ready {
-			return err
+			return Result{
+				Err: err,
+			}
 		}
-		return errors.Join(
-			context.Cause(ctx),
-			errors.New("agent shutdown timed out; process exit will contain remaining work"),
-		)
+		return Result{
+			Err: errors.Join(
+				context.Cause(ctx),
+				errors.New("agent shutdown timed out; process exit will contain remaining work"),
+			),
+			ExitRequired: true,
+		}
 	}
 }

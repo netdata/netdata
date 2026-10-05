@@ -124,7 +124,8 @@ Where:
 - `transaction_id` is the same ID received in the original command
 - `http_status_code` is the standard HTTP response code:
     - `200`: Success (DYNCFG_RESP_RUNNING) - Configuration accepted and running
-    - `202`: Accepted (DYNCFG_RESP_ACCEPTED) - Configuration accepted but not running yet
+    - `202`: Accepted (DYNCFG_RESP_ACCEPTED) - Configuration accepted but not running: still starting, or adopted
+      and failed (the status frame says which)
     - `298`: Accepted but disabled (DYNCFG_RESP_ACCEPTED_DISABLED)
     - `299`: Accepted but restart required (DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
     - `400`: Bad request - Invalid configuration
@@ -132,6 +133,29 @@ Where:
     - `500`: Internal server error
 - `content_type` is typically "application/json"
 - `expiration` is the absolute timestamp (unix epoch) for result expiration
+
+For `add`, `update`, `enable`, `disable` and `remove`, the response code is the plugin's adoption decision.
+For user commands, Netdata changes the saved configuration or enabledness only after a 2xx response; successful
+`remove` deletes the saved configuration. Netdata replays saved configurations when the plugin starts. Echo replies
+update status or record plugin rejection; they do not replace the already saved payload:
+
+- A plugin MUST answer 2xx only when it now holds the requested configuration and state.
+- A completed plugin rejection MUST preserve the previous configuration and enabled intent. Validate before
+  adoption; after adoption, runtime failure is a status outcome rather than a rejection.
+- Report the health of an adopted configuration, such as a job that failed to start, with `CONFIG <id> STATUS`, not
+  with the response code.
+- `test` and `restart` are not saved; their codes only report the outcome.
+
+A timeout, lost reply, plugin crash, or structural failure after a transition can leave the outcome indeterminate.
+An error from that path is not proof that the plugin rejected the change. Netdata persists a user mutation only after
+observing a successful reply; reading the plugin's current configuration does not prove that Netdata saved it.
+Clients MUST NOT turn an uncertain update result into an `add` attempt.
+
+For Go collector and service-discovery jobs, `update` that accepts a replacement for activation and non-running
+`enable` return `202`, without waiting for runtime readiness or physical cleanup. Disabled `update` and an identical running DynCfg-source
+`update` return `200`. `CONFIG <id> STATUS` reports later health. `add` is passive until Netdata echoes enabledness;
+`add` and disabled `update` validate structure without acquiring external
+dependencies. Interactive `update` still rejects any failed preflight, irrespective of retry policy.
 
 The result data depends on the command:
 
@@ -346,11 +370,14 @@ Behavior an author must design around:
 - Validation: the UI validates live with ajv (types, `required`, `enum`, `minimum`/`maximum`, `pattern`, `format`
   including `uri`, `ipv4`, `hostname`) and blocks the save while the form is invalid. A schema stricter than the
   plugin blocks legitimate configs; a looser one offers configs the plugin rejects.
-- `dependencies` with `oneOf` on a `const` discriminator reveals the matching branch's properties inline (no selector
-  widget); the UI drops the form data of inactive branches for TOP-LEVEL dependencies only. A key that is both a
-  branch property and a plain sibling property renders unconditionally. Avoid property-level `oneOf`/`anyOf` (rendered
-  as a branch selector whose first option cannot be selected reliably) and avoid `0`, `false`, and `""` as `enum`
-  values in select-rendered fields.
+- `dependencies` with `oneOf` reveals the matching branch's properties inline (no selector widget). A branch matches
+  when its discriminator is a `const` equal to the value or an `enum` listing it, so one branch can serve several
+  values. For TOP-LEVEL dependencies only, the UI drops the form data of properties that no matching branch declares;
+  a property several branches declare survives a switch between them. A key that is both a branch property and a plain
+  sibling property renders unconditionally. Avoid `oneOf`/`anyOf` outside `dependencies`, on a property or on an object
+  (including inside `allOf`): it renders as a branch selector whose first option cannot be selected reliably, and on a
+  tabbed object it repeats the tab strip. Express cross-field rules with `if`/`then` instead. Avoid `0`, `false`, and
+  `""` as `enum` values in select-rendered fields.
 - Nullable fields: a two-member union such as `["string", "null"]` renders as the non-null type; any other union
   (three or more members, or two members without `null`) collapses to its first member.
 - Maps: `additionalProperties: {type: ...}` renders a key/value list with an add button; `patternProperties` alone

@@ -1,21 +1,24 @@
 //! Cross-source TRACE-density overview — the traces UI's default paint
-//! (trace-level numbers, `unit:"traces"`).
+//! (trace-level numbers, `unit:"traces"`). Consumers: the otel-traces
+//! Function's `overview` mode and the `overview` section embedded in
+//! its `search` view — the ledger's adapter shapes both from one
+//! [`OverviewData`].
 //!
 //! Folds per-trace aggregates from BOTH source shapes — sealed files'
 //! `TRSU` rollup rows and WAL tails' decoded-span folds (parity
-//! test-pinned) — into one map keyed by trace id (traces
-//! STRADDLE sealed files: WAL rotation is content-agnostic), then
-//! bins each merged trace into the (time bucket × log-scale duration
-//! bin) grid by its ENVELOPE (min start; saturating max end − min
-//! start).
+//! test-pinned) — into one map keyed by trace id (sealed-file rotation
+//! is content-agnostic: a trace's spans straddle files and tails),
+//! then bins each merged trace into the (time bucket × log-scale
+//! duration bin) grid by its ENVELOPE (min start; saturating max end
+//! − min start).
 //!
 //! Pinned semantics:
 //!
-//! - **Stored-row statistics**: span/error totals sum the stored
-//!   rows; a resent span counts every time it is stored. Canonical
-//!   dedup remains assembly's property (`search`/`trace_by_id`). The
-//!   error cells are that same ERROR-SPAN statistic sliced per cell —
-//!   NOT "cells holding a failed trace".
+//! - **Stored-row statistics**: span/error totals sum the stored rows;
+//!   a resent span counts every time it is stored. Canonical dedup
+//!   remains assembly's property (`search`/`trace_by_id`). The error
+//!   cells are that same ERROR-SPAN statistic sliced per cell — NOT
+//!   "cells holding a failed trace".
 //! - **No mixed units**: a sealed source WITHOUT the rollup chunk
 //!   (legacy) is EXCLUDED and marked
 //!   [`RollupAbsent`](PartialReason::RollupAbsent) — its spans never
@@ -28,29 +31,41 @@
 //!   to an order-of-magnitude error.
 //! - **Bin-by-envelope-start**: a trace whose MERGED envelope starts
 //!   outside the grid is clipped — excluded from the cells AND the
-//!   totals (the same start-clipping rule spans followed in v1). A
-//!   long trace straddling the window's left edge is therefore
-//!   invisible here even though search returns its in-window spans.
+//!   totals. The same start-in-window rule the search list applies to
+//!   spans, here applied to the merged envelope, so a long trace
+//!   straddling the window's left edge is invisible here even though
+//!   search returns its in-window spans.
+//! - **Filtered population is a stored-row match**: with an
+//!   [`OverviewQuery::predicate`], a trace is binned when ANY of its
+//!   stored rows that starts inside the grid matches the span-local
+//!   predicate — evaluated by the search engine's per-file plan
+//!   (sealed) and span-side evaluator (tails), never by canonical
+//!   assembly. The filter SELECTS traces, it does not trim them: a
+//!   binned trace still contributes its WHOLE merged envelope and ALL
+//!   its stored spans, matching or not. Trace-level conditions
+//!   (`root_name`, `root_service_name`, `trace_duration`) and
+//!   `trace_id` pins need assembly or the candidate machinery and are
+//!   REJECTED at the request boundary — never silently ignored.
 //! - **Roots are resolved only for the facet lists**: the grid needs
 //!   only envelopes and counts, so the shared fold (one merge, in
-//!   [`super::fold`]) runs roots-free by default — no file string
-//!   table built. Requesting [`OverviewQuery::root_facets`] flips the
-//!   flag and accumulates the top-root lists over the binned
-//!   population; the facet count maps are bounded by that population
-//!   (distinct values ≤ binned traces), the same order the visited
-//!   budget already governs through the merge map.
+//!   [`super::fold`]) runs roots-free by default — no root-field
+//!   dictionary decodes. Requesting [`OverviewQuery::root_facets`]
+//!   flips the flag and accumulates the top-root lists over the binned
+//!   population, whose size the visited budget already bounds through
+//!   the merge map.
 //!
-//! Engine contracts mirrored from the siblings: sources process in
-//! `SourceId` order; a failed source is a
-//! [`SourceFailure`](PartialReason::SourceFailure) (the rest still
-//! count); cancellation is polled up front and between sources
+//! Engine contracts mirrored from the siblings (all owned by the shared
+//! fold): sources process in `SourceId` order; a failed source is a
+//! [`SourceFailure`](PartialReason::SourceFailure) and an unavailable
+//! one a [`RemoteUnavailable`](PartialReason::RemoteUnavailable) (the
+//! rest still count); cancellation is polled up front and between sources
 //! (all-or-empty); an OWN visited budget terminates with the
 //! deterministic prefix and
 //! [`OverviewCeiling`](PartialReason::OverviewCeiling). The budget
 //! charges each source shape its actual fold cost — rollup rows
 //! (sealed) or decoded spans (tails) — and is checked BETWEEN sources,
-//! so one source may overshoot it by that source's whole cost: work
-//! stays per-source-whole (and the result deterministic) at the price
+//! so one source may overshoot it by that source's whole cost:
+//! per-source work stays whole (the result deterministic) at the price
 //! of a bounded overshoot. It bounds WORK, not memory — the merge map
 //! peaks at the processed prefix's distinct traces.
 
@@ -59,9 +74,11 @@ use std::sync::atomic::AtomicUsize;
 
 use tokio_util::sync::CancellationToken;
 
-use super::fold::{SourceFoldSpec, merge_trace_sources};
+use super::fold::{SourceFoldSpec, SpanFilter, merge_trace_sources};
+use super::predicate::{Predicate, PredicateError};
 use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
+use super::window::{TimeWindow, WindowError};
 
 /// Number of log-scale duration bins (fixed).
 pub const DURATION_BIN_COUNT: usize = 6;
@@ -129,6 +146,7 @@ pub struct OverviewQuery {
     grid: sfst::Grid,
     visited_ceiling: u64,
     root_facets: bool,
+    predicate: Option<Predicate>,
 }
 
 impl OverviewQuery {
@@ -137,7 +155,17 @@ impl OverviewQuery {
             grid,
             visited_ceiling: VISITED_ROWS_CEILING,
             root_facets: false,
+            predicate: None,
         }
+    }
+
+    /// Bin only the traces owning a stored row that matches `predicate`
+    /// (module docs, "Filtered population"). Span-local conditions
+    /// only; the match-all predicate is the unfiltered grid. The
+    /// filter's scans share the visited budget.
+    pub fn predicate(mut self, predicate: Predicate) -> Self {
+        self.predicate = (!predicate.is_all()).then_some(predicate);
+        self
     }
 
     /// Also compute the top-root-service/operation facet lists. OFF by
@@ -167,6 +195,18 @@ pub enum OverviewRequestError {
     GridOverflow,
     #[error(transparent)]
     SourceSet(#[from] SourceSetError),
+    #[error(transparent)]
+    Predicate(#[from] PredicateError),
+    /// The grid itself is a valid window by construction; kept for the
+    /// `?` conversion of the filter window (the sibling modes' wrapper
+    /// contract).
+    #[error(transparent)]
+    Window(#[from] WindowError),
+    /// A trace-level or trace-id condition: the filtered grid evaluates
+    /// stored rows, never an assembled trace, so it cannot honour one —
+    /// the caller decides (fall back to the unfiltered grid, or refuse).
+    #[error("the overview filter evaluates span-level conditions only; {target} is trace-level")]
+    TraceLevelCondition { target: String },
 }
 
 /// One root-facet dimension's bounded list. The three parts partition
@@ -245,7 +285,8 @@ impl OverviewData {
     }
 }
 
-/// Run a cross-source trace-level overview. `progress` ticks once per
+/// Run a cross-source trace-level overview. See the module docs for the
+/// pinned semantics and the engine contracts. `progress` ticks once per
 /// source; callers that don't report pass a fresh counter. Pure sync —
 /// invoke off any async runtime thread (the engine contract).
 pub fn overview(
@@ -272,14 +313,34 @@ pub fn overview(
     let grid = query.grid;
     let grid_start = grid.bucket_start_ns;
 
+    // The filter: validated like a search predicate, then confined to
+    // the span-local subset — the only one stored rows can answer.
+    let filter = match &query.predicate {
+        None => None,
+        Some(predicate) => {
+            predicate.validate()?;
+            predicate.ensure_evaluable()?;
+            if let Some(target) = predicate.trace_level_target() {
+                return Err(OverviewRequestError::TraceLevelCondition {
+                    target: target.to_string(),
+                });
+            }
+            Some(SpanFilter::new(
+                predicate,
+                TimeWindow::new(grid_start, grid_end)?,
+            ))
+        }
+    };
+
     let mut status = StatusBuilder::new();
     let spec = SourceFoldSpec {
         op: "overview",
         visited_ceiling: query.visited_ceiling,
         ceiling_reason: PartialReason::OverviewCeiling,
-        // The grid itself discards roots — the sealed path decodes the
-        // root-field dictionaries ONLY when the facet lists need them.
+        // Roots only for the facets: resolve_roots=false skips the
+        // sealed root-field dictionary decodes and drops tail roots.
         resolve_roots: query.root_facets,
+        filter,
     };
     let Some(merged) = merge_trace_sources(sources, &spec, &cancel, &progress, &mut status)
     else {
@@ -290,9 +351,10 @@ pub fn overview(
         ));
     };
 
-    // Bin the merged traces by envelope; totals fold alongside. Traces
-    // whose envelope START lies outside the grid are clipped (the same
-    // rule spans followed in v1).
+    // Bin the merged traces by envelope; totals fold alongside. A
+    // trace whose envelope START lies outside the grid is clipped —
+    // the search engine's start-in-window rule, applied to the
+    // envelope.
     let mut cells = vec![[0u64; DURATION_BIN_COUNT]; grid.num_buckets];
     let mut error_cells = vec![[0u64; DURATION_BIN_COUNT]; grid.num_buckets];
     let mut total_traces = 0u64;
@@ -304,7 +366,9 @@ pub fn overview(
     let mut bucket_durations: Vec<Vec<i64>> = vec![Vec::new(); grid.num_buckets];
     let mut facets = query.root_facets.then(FacetCounts::default);
     for m in merged.values() {
-        if m.min_start_ns < grid_start || m.min_start_ns >= grid_end {
+        // Unflagged under a filter (no stored row matched), or clipped
+        // by the bin-by-envelope-start rule.
+        if !m.matched || m.min_start_ns < grid_start || m.min_start_ns >= grid_end {
             continue;
         }
         let bucket = ((m.min_start_ns - grid_start) / grid.bucket_width_ns) as usize;
@@ -378,23 +442,37 @@ impl FacetCounts {
 /// Reduce a full count map to the bounded list: count DESC, value ASC,
 /// the tail folded into `other`.
 fn reduce(counts: std::collections::HashMap<String, u64>, unattributed: u64) -> FacetList {
-    let mut entries: Vec<(String, u64)> = counts.into_iter().collect();
-    let rank = |a: &(String, u64), b: &(String, u64)| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0));
-    // Select-then-sort, like the slowest top-K: O(n + K log K).
-    let mut other = 0u64;
-    if entries.len() > FACET_TOP_K {
-        entries.select_nth_unstable_by(FACET_TOP_K - 1, rank);
-        other = entries
-            .iter()
-            .skip(FACET_TOP_K)
-            .map(|(_, n)| n)
-            .sum::<u64>();
-        entries.truncate(FACET_TOP_K);
-    }
-    entries.sort_unstable_by(rank);
+    let (top, other) = top_k(counts.into_iter().collect(), FACET_TOP_K);
     FacetList {
-        top: entries,
-        other,
+        top,
+        other: other.count,
         unattributed,
     }
+}
+
+/// The entries [`top_k`] folded away.
+#[derive(Debug, Default)]
+pub(crate) struct FoldedTail {
+    /// Their summed counts.
+    pub count: u64,
+    /// How many entries they were.
+    pub entries: usize,
+}
+
+/// Keep the `k` (≥ 1) highest-count entries — count DESC, value ASC —
+/// and fold the rest into a [`FoldedTail`]. Shared by the root facets
+/// and the search rows' service breakdown so both rank identically.
+pub(crate) fn top_k<V: Ord>(mut entries: Vec<(V, u64)>, k: usize) -> (Vec<(V, u64)>, FoldedTail) {
+    let rank = |a: &(V, u64), b: &(V, u64)| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0));
+    // Select-then-sort, like the slowest top-K: O(n + K log K).
+    let mut tail = FoldedTail::default();
+    if entries.len() > k {
+        entries.select_nth_unstable_by(k - 1, rank);
+        for (_, n) in entries.drain(k..) {
+            tail.count += n;
+            tail.entries += 1;
+        }
+    }
+    entries.sort_unstable_by(rank);
+    (entries, tail)
 }

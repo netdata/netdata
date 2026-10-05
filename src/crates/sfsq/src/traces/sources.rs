@@ -1,22 +1,37 @@
-//! Trace query sources and their validated identity.
+//! Trace query sources: the source model every traces operation
+//! consumes, plus the set validation they all run first.
+//!
+//! Three kinds ([`TraceSource`]): an SFST — a sealed file or an
+//! in-memory chunk image of an active WAL — evaluated through the
+//! indexed reader, an active WAL's un-indexed tail evaluated by a
+//! trace-frame row scan, and a source whose bytes could not be
+//! obtained (reported to the query status, never silently skipped).
+//! This is the ENGINE side: it takes whatever source set the caller
+//! assembled; the production assembler is the ledger's
+//! `TracesSourceSupplier` (`otel-ledger/src/ledger/rpc/traces/sources.rs`).
 //!
 //! The library never inspects `part_key` or any other content of a
-//! source's identity (part_key is opaque — the caller enumerates
-//! ALL of a tenant's trace files, whatever their stream). What it DOES
-//! validate, on every operation, is set hygiene:
+//! source's identity — [`SourceId`] is opaque, and the caller decides
+//! what the set covers. What it validates, on every operation, is set
+//! hygiene ([`validate_sources`]):
 //!
 //! - exact [`SourceId`] duplicates are rejected — a duplicated source
 //!   would double UNSET-span-id spans, which deliberately never
-//!   deduplicate;
-//! - WAL-derived sources (in-memory chunk SFSTs and tails) carry
-//!   [`WalCoverage`], and byte ranges of the same WAL must not intersect
-//!   (half-open; adjacent is fine) — overlapping coverage double-counts
-//!   frames.
+//!   deduplicate (`sfst/src/trace_combine.rs` `combine` skips unset
+//!   span ids in its dedup check);
+//! - WAL-derived sources (in-memory chunks and tails) carry
+//!   [`WalCoverage`], and byte ranges of the same WAL must not
+//!   intersect (half-open; adjacent is fine) — overlapping coverage
+//!   double-counts frames;
+//! - an in-memory chunk must carry its [`WalCoverage`]
+//!   ([`SourceSetError::MemoryChunkWithoutCoverage`]), or the overlap
+//!   check could not see it at all.
 //!
-//! What it CANNOT validate — documented, caller-owned: a sealed file and
-//! an active WAL holding the same data (the seal-vs-rotation window) must
-//! not both be offered; the caller's registry snapshot owns that
-//! invariant, exactly as it does for the logs engine.
+//! What it CANNOT validate, caller-owned: a sealed file and an active
+//! WAL holding the same data (the seal-vs-rotation window) must not
+//! both be offered — a sealed file carries no coverage to collide
+//! with. The caller's registry snapshot owns that invariant, as it
+//! does for the logs engine.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -27,10 +42,14 @@ use crate::source::Source;
 /// Caller-supplied opaque source identity: equality and diagnostics only.
 ///
 /// Uniqueness is the caller's contract; the documented production
-/// derivation is the full `FileId` (machine, instance, pipeline,
-/// part_key, seq) plus the chunk index for in-memory chunks and the byte
+/// derivation is the full `FileId` (machine, instance, pipeline, seq,
+/// part_key) plus the chunk index for in-memory chunks and the byte
 /// range for tails — a bare `seq` is unique only within one process
 /// instance and is NOT sufficient.
+///
+/// Also the ops' iteration key: sources are visited in `SourceId` order
+/// (`fold.rs` `merge_trace_sources` sorts them), so the caller's vector
+/// order can never change a result.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SourceId(Arc<str>);
 
@@ -63,31 +82,39 @@ pub struct WalCoverage {
     pub range: wal::FrameRange,
 }
 
-/// A sealed or in-memory SFST source for trace queries.
+/// A sealed or in-memory SFST source for trace queries, evaluated
+/// through the indexed reader when visited.
 #[derive(Clone)]
 pub struct TraceSfstCandidate {
     pub source_id: SourceId,
-    /// Cheap time/stream/size facts ([`sfst::Summary`]). Trace-by-id does
-    /// not consume it (TBLM prunes better than time ranges for a by-id
-    /// probe); it is part of the candidate shape for the search phase's
-    /// window pruning (4c) and for parity with the logs candidates.
+    /// Cheap time/stream/size facts ([`sfst::Summary`]). Consumed only by
+    /// the operations that summary-prune: search's phase-1 file-granular
+    /// window prune ([`search`](super::search::search)) and attribute
+    /// enumeration's window prune
+    /// ([`attribute_names`](super::attribute_names) /
+    /// [`attribute_values`](super::attribute_values)). Trace-by-id never
+    /// reads it — the TBLM bloom prunes a by-id probe better than time
+    /// ranges — and no completion-role source is pruned by it at all.
     pub summary: sfst::Summary,
     /// Where the bytes come from ([`Source::File`] sealed on disk,
     /// [`Source::Memory`] an in-memory chunk image).
     pub source: Source,
     /// Present exactly when the SFST is an in-memory chunk of an active
-    /// WAL (`build_sfst_traces_range`); a sealed file has no WAL
-    /// coverage. ENFORCED by [`validate_sources`]: a
+    /// WAL (`ng_index::build_sfst_traces_range`); a sealed file has no
+    /// WAL coverage. ENFORCED by [`validate_sources`]: a
     /// [`Source::Memory`]-backed candidate without coverage is rejected —
     /// omitting it would silently bypass the overlap protection.
     pub coverage: Option<WalCoverage>,
 }
 
-/// An active WAL's un-indexed tail, evaluated by a trace-frame row scan.
+/// An active WAL's un-indexed tail, evaluated by a trace-frame row scan
+/// (`super::wal_scan::TraceWalScan`).
 ///
 /// The scanned byte range IS `coverage.range` — one field, one truth: a
 /// separate scan range could silently diverge from the validated
-/// coverage and bypass the overlap protection.
+/// coverage and bypass the overlap protection. Every consumer scans
+/// exactly this field (e.g. [`search`](super::search::search)'s
+/// completion assembly).
 #[derive(Clone)]
 pub struct TraceWalTail {
     pub source_id: SourceId,
@@ -98,14 +125,33 @@ pub struct TraceWalTail {
     pub coverage: WalCoverage,
 }
 
+/// A source whose bytes could not be obtained — a remote file whose
+/// download failed, or the span of a remote catalog that could not be
+/// read. It holds no bytes, only what the caller knew about the missing
+/// data; every operation that visits it reports
+/// [`RemoteUnavailable`](super::PartialReason::RemoteUnavailable).
+#[derive(Clone)]
+pub struct TraceUnavailable {
+    pub source_id: SourceId,
+    /// The known time range and counts of the missing data (for a
+    /// remote file, its catalog entry). One summary-pruning consumer:
+    /// attribute enumeration applies its sealed-candidate window prune
+    /// to an unavailable source too
+    /// ([`attribute_names`](super::attribute_names)), so one
+    /// outside the window is irrelevant rather than reported;
+    /// operations without a summary prune always report it.
+    pub summary: sfst::Summary,
+}
+
 /// A source of trace data: an SFST (sealed file or in-memory chunk)
-/// evaluated through the indexed reader, or a WAL tail row scan.
-/// Cloning is cheap — sources are descriptors (paths, ids, coverage),
-/// never data.
+/// evaluated through the indexed reader, a WAL tail row scan, or a
+/// source whose bytes could not be obtained. Cloning is cheap — sources
+/// are descriptors (paths, ids, coverage), never data.
 #[derive(Clone)]
 pub enum TraceSource {
     Sfst(TraceSfstCandidate),
     Tail(TraceWalTail),
+    Unavailable(TraceUnavailable),
 }
 
 impl TraceSource {
@@ -113,13 +159,18 @@ impl TraceSource {
         match self {
             TraceSource::Sfst(c) => &c.source_id,
             TraceSource::Tail(t) => &t.source_id,
+            TraceSource::Unavailable(u) => &u.source_id,
         }
     }
 
+    /// The coverage the overlap check sees: a tail always has one, an
+    /// SFST candidate only when it carries one (chunks must —
+    /// [`validate_sources`] enforces that), an unavailable source never.
     fn coverage(&self) -> Option<&WalCoverage> {
         match self {
             TraceSource::Sfst(c) => c.coverage.as_ref(),
             TraceSource::Tail(t) => Some(&t.coverage),
+            TraceSource::Unavailable(_) => None,
         }
     }
 }
@@ -128,13 +179,20 @@ impl TraceSource {
 /// bad set), not a per-source degrade.
 #[derive(Debug, thiserror::Error)]
 pub enum SourceSetError {
+    /// The same id appeared twice: the duplicated source's frames would
+    /// be folded twice.
     #[error("duplicate source id {0}")]
     DuplicateSource(SourceId),
+    /// An in-memory chunk arrived without its [`WalCoverage`]: the
+    /// overlap check has nothing to see it by against the WAL's other
+    /// sources.
     #[error(
         "in-memory chunk {0} carries no WAL coverage — the overlap \
          protection cannot see it; supply the chunk's WalCoverage"
     )]
     MemoryChunkWithoutCoverage(SourceId),
+    /// Two ranges of one WAL intersect: both sources would serve the
+    /// same frames. Both ranges are carried for diagnosis.
     #[error(
         "overlapping coverage of WAL {wal_id}: [{a_start}, {a_end}) and [{b_start}, {b_end}) \
          intersect — two sources would serve the same frames"
@@ -150,7 +208,11 @@ pub enum SourceSetError {
 
 /// Validate a source set's hygiene: no duplicate [`SourceId`]s, no
 /// intersecting [`WalCoverage`] ranges within one WAL (half-open;
-/// adjacent ranges are fine). Run by every operation before any I/O.
+/// adjacent ranges are fine), and no in-memory chunk without its
+/// coverage. The one gate every operation runs before any I/O —
+/// `trace_by_id`, `search` (for both of its sets), `overview`,
+/// `slowest`, `attribute_names`/`attribute_values` — so a bad set is a
+/// request error, never a mid-query surprise.
 pub fn validate_sources(sources: &[TraceSource]) -> Result<(), SourceSetError> {
     let mut seen: HashSet<&SourceId> = HashSet::with_capacity(sources.len());
     for source in sources {

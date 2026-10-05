@@ -1,27 +1,58 @@
-//! Tracked chart with change detection and emission.
+//! Emission state for one registered chart.
+//!
+//! [`TrackedChart`] holds what a sample tick needs to emit a chart: the latest
+//! and previous sampled values (change detection), the resolved
+//! [`ChartMetadata`], the sample interval, and whether the CHART/DIMENSION
+//! definition has been emitted yet. The registry (`super::registry`) owns one
+//! tracker per chart inside its `SingletonChartSampler` and drives it once per
+//! tick: it clones the newest value out of the chart's `ChartHandle`
+//! (`super::handle`), calls `update`, emits the definition on the first tick,
+//! then BEGIN/SET/END on every tick. Emission is unconditional — change
+//! detection is informational only — so each sample interval carries a
+//! datapoint. Commands go into a per-sampler [`ChartWriter`] whose buffer the
+//! sampler appends to the shared batch buffer; the tracker never touches the
+//! outbound stream. Plugins normally reach this through chart registration
+//! (`PluginRuntime::register_chart` / `register_instanced_chart`).
 
 use super::chart_trait::{InstancedChart, NetdataChart};
 use super::metadata::ChartMetadata;
 use super::writer::ChartWriter;
 use std::time::{Duration, SystemTime};
 
-/// A tracked chart that detects changes and emits Netdata protocol commands.
+/// One chart's emission state, owned by the registry's `SingletonChartSampler`.
+///
+/// Both stored values start at the constructor's `initial`, so `has_changed()`
+/// is false until the first `update()`.
 pub struct TrackedChart<T> {
+    /// Newest sampled value, written into every update's SET commands.
     current: T,
+    /// The value before the last `update()`; compared against `current` by
+    /// `has_changed()`.
     previous: T,
+    /// Resolved chart definition. For instanced charts this is an
+    /// instantiated copy: `new_instanced` substitutes the instance id for
+    /// `{instance}` (id, name, title, family, context) at construction, and
+    /// later `update()` calls never change it.
     pub(crate) metadata: ChartMetadata,
+    /// Sample interval; also emitted as the update-every field (in
+    /// microseconds) of every BEGIN command.
     pub(crate) interval: Duration,
+    /// Set by the first `emit_definition` call; the registry's sampler reads
+    /// it directly to gate its per-tick definition emission.
     pub(crate) defined: bool,
 }
 
 impl<T: NetdataChart + Default + PartialEq + Clone> TrackedChart<T> {
-    /// Create a new tracked chart with the given initial value and interval
+    /// Create a tracker whose metadata comes from `T::chart_metadata()` (the
+    /// type's schemars `x-chart-*` annotations). Used by
+    /// `ChartRegistry::register_chart` for singleton charts.
     pub fn new(initial: T, interval: Duration) -> Self {
         let metadata = T::chart_metadata();
         Self::new_with_metadata(initial, interval, metadata)
     }
 
-    /// Create a new tracked chart with explicit metadata (used for instantiated templates)
+    /// Like `new`, but with caller-supplied metadata instead of the type's
+    /// schema annotations. Only `new` calls it.
     pub(crate) fn new_with_metadata(
         initial: T,
         interval: Duration,
@@ -36,22 +67,29 @@ impl<T: NetdataChart + Default + PartialEq + Clone> TrackedChart<T> {
         }
     }
 
-    /// Update the current values
+    /// Advance the sample: the current value moves to `previous` and
+    /// `new_values` becomes `current`. The registry's sampler calls this once
+    /// per tick with the value cloned from the chart's `ChartHandle`.
     pub fn update(&mut self, new_values: T) {
         self.previous = std::mem::replace(&mut self.current, new_values);
     }
 
-    /// Check if values changed since last update
+    /// Whether the latest sample differs from the previous one.
     ///
-    /// Note: This is provided for informational purposes (e.g., logging, debugging).
-    /// The registry always emits updates regardless of changes, as required by Netdata's protocol.
+    /// Informational only: the registry's sampler ignores this and emits an
+    /// update on every tick (see `SingletonChartSampler::sample_to_buffer`),
+    /// so each sample interval carries a datapoint.
     pub fn has_changed(&self) -> bool {
         self.current != self.previous
     }
 
-    /// Emit the chart definition (CHART + DIMENSION commands) to the writer
+    /// Write the CHART and DIMENSION definition lines to the writer, once per
+    /// tracker lifetime; later calls are no-ops.
     ///
-    /// This should be called once before emitting any updates.
+    /// Must precede the first [`Self::emit_update`]: an update carries only
+    /// BEGIN/SET/END, and the agent disables the plugin when a BEGIN names a
+    /// chart it has never seen declared (`pluginsd_begin` in
+    /// src/plugins.d/pluginsd_parser.c).
     pub fn emit_definition(&mut self, writer: &mut ChartWriter) {
         if self.defined {
             return;
@@ -60,13 +98,12 @@ impl<T: NetdataChart + Default + PartialEq + Clone> TrackedChart<T> {
         writer.write_chart_definition(&self.metadata);
     }
 
-    /// Emit a chart update (BEGIN + SET + END commands) to the writer
-    ///
-    /// This uses the ChartDimensions trait for efficient zero-allocation dimension writing.
-    ///
-    /// # Parameters
-    /// - `writer`: The writer to emit the update to
-    /// - `collection_time`: When the data was collected
+    /// Write one update: BEGIN (carrying the tracker's interval as the
+    /// update-every field, in microseconds), the current value's SET lines via
+    /// `super::chart_trait::ChartDimensions::write_dimensions`, and END
+    /// timestamped with `collection_time` (Unix seconds). The definition is
+    /// not emitted here — call [`Self::emit_definition`] first. The registry's
+    /// sampler calls this on every tick with the batch's collection time.
     pub fn emit_update(&self, writer: &mut ChartWriter, collection_time: SystemTime)
     where
         T: super::chart_trait::ChartDimensions,
@@ -77,9 +114,13 @@ impl<T: NetdataChart + Default + PartialEq + Clone> TrackedChart<T> {
     }
 }
 
-// For instanced charts, we need special handling
 impl<T: InstancedChart + Default + PartialEq> TrackedChart<T> {
-    /// Create a tracked chart for an instanced chart
+    /// Create a tracker for one instance of an instanced chart: the template
+    /// metadata's `{instance}` placeholders are replaced with the initial
+    /// value's `instance_id()` (`ChartMetadata::instantiate`), so the tracker
+    /// declares a concrete chart. Used by
+    /// `ChartRegistry::register_instanced_chart`; the instance is fixed at
+    /// construction — later `update()` calls never re-instantiate.
     pub fn new_instanced(initial: T, interval: Duration) -> Self {
         let template_metadata = T::chart_metadata();
         let instance_id = initial.instance_id();
