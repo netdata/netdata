@@ -36,7 +36,9 @@ func samplingExportBeacon(t *testing.T, session, page string, hasError bool) []b
 		event["timestamp"] = now.Format(time.RFC3339Nano)
 		event["attributes"].(map[string]any)["session.id"] = session
 	}
-	body["events"] = append(events, map[string]any{"name": page + "-action", "timestamp": now.Format(time.RFC3339Nano)})
+	body["events"] = append(events,
+		map[string]any{"name": "document_activated", "timestamp": now.Format(time.RFC3339Nano), "attributes": map[string]string{"observation_id": page, "observation_sequence": "1"}},
+		map[string]any{"name": page + "-action", "timestamp": now.Format(time.RFC3339Nano)})
 	for _, rawResource := range body["traces"].(map[string]any)["resourceSpans"].([]any) {
 		for _, rawScope := range rawResource.(map[string]any)["scopeSpans"].([]any) {
 			for _, rawSpan := range rawScope.(map[string]any)["spans"].([]any) {
@@ -116,11 +118,22 @@ func TestSamplingDetailThroughNativeJobs(t *testing.T) {
 			assert.EqualValues(t, 1, counters[aggregate.CounterJSErrors])
 			assert.EqualValues(t, tc.wantLogs, counters[aggregate.CounterOTLPSent])
 			assert.EqualValues(t, tc.wantSpans, counters[aggregate.CounterSpansSent])
-			for _, counter := range []string{aggregate.CounterOTLPDropped, aggregate.CounterOTLPErrors, aggregate.CounterSpansDropped, aggregate.CounterSpansErrors, aggregate.CounterHistoryDropped, aggregate.CounterSamplesDropped} {
+			for _, counter := range []string{aggregate.CounterOTLPDropped, aggregate.CounterOTLPErrors, aggregate.CounterSpansDropped, aggregate.CounterSpansErrors, aggregate.CounterHistoryDropped, aggregate.CounterSamplesDropped, aggregate.CounterInvalidMeasurements} {
 				assert.Zero(t, counters[counter], counter)
 			}
 			live, _ := a.Live(0, 10)
-			assert.Len(t, live, observations, "live measurements remain independent of detail sampling")
+			assert.Len(t, live, observations+1, "document activations and the error have separate live rows, independent of detail sampling")
+			documents, errorsLive := 0, 0
+			for _, row := range live {
+				switch row.Kind {
+				case "document":
+					documents++
+				case "error":
+					errorsLive++
+				}
+			}
+			assert.Equal(t, observations, documents)
+			assert.Equal(t, 1, errorsLive)
 			rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10)
 			require.NoError(t, err)
 			timeline, err := store.QuerySessionEvents(context.Background(), "shop", session)
@@ -159,8 +172,8 @@ func TestSamplingDetailThroughNativeJobs(t *testing.T) {
 	}
 }
 
-// Collection disabled is missing browser measurement input, not a stream of
-// zero views that could attach the stock missing-beacon alert.
+// Disabled collection retains receiver diagnostics. Enabled quiet collection
+// reports an empty measurement population without inventing percentile samples.
 func TestDisabledCollectionKeepsDiagnosticsWithoutTrafficCharts(t *testing.T) {
 	for _, rate := range []float64{0, 0.25, 1} {
 		t.Run(fmt.Sprint(rate), func(t *testing.T) {
@@ -173,10 +186,13 @@ func TestDisabledCollectionKeepsDiagnosticsWithoutTrafficCharts(t *testing.T) {
 			tickUntil(t, job, out, "SET 'available' = 1")
 			stop()
 			if rate == 0 {
-				assert.NotContains(t, out.String(), "rum.pageviews")
-				assert.NotContains(t, out.String(), "rum.sessions")
+				assert.NotContains(t, out.String(), "rum.document_views")
+				assert.NotContains(t, out.String(), "rum.observed_sessions")
 			} else {
-				assert.Contains(t, out.String(), "rum.pageviews")
+				assert.Contains(t, out.String(), "rum.document_views")
+				assert.Contains(t, out.String(), "rum.lcp_population")
+				assert.Contains(t, out.String(), "SET 'observed' = 0")
+				assert.NotContains(t, out.String(), "'rum.lcp'")
 			}
 		})
 	}

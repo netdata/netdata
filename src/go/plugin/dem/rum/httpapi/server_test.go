@@ -86,7 +86,7 @@ func testCfg() *fixtureConfig {
 // browserUA is a real browser's; Go's default client UA is a bot.
 const browserUA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
-const faroBody = `{"meta":{"page":{"url":"https://shop.example.com/users/42?x=1"},"session":{"id":"s1"},"browser":{"name":"Chrome","version":"120","os":"Linux","mobile":false}},"measurements":[{"type":"web-vitals","values":{"lcp":1234.5},"timestamp":"2030-01-01T00:00:00Z"}]}`
+const faroBody = `{"meta":{"page":{"id":"document-1","url":"https://shop.example.com/users/42?x=1"},"session":{"id":"s1"},"browser":{"name":"Chrome","version":"120","os":"Linux","mobile":false}},"measurements":[{"type":"web-vitals","values":{"lcp":1234.5},"context":{"id":"vital-1","observation_sequence":"2"},"timestamp":"2030-01-01T00:00:00Z"}],"events":[{"name":"document_activated","attributes":{"observation_id":"document-1","observation_sequence":"1"}}]}`
 
 func newTestServer(
 	t *testing.T,
@@ -557,20 +557,24 @@ func TestIngestedBeaconShape(t *testing.T) {
 		Site:           "shop",
 		Received:       now,
 		SessionID:      "s1",
+		ExperienceID:   "document-1",
 		Path:           "/users/42",
 		PageGroup:      "/users/:id",
 		Browser:        "Chrome",
 		BrowserVersion: "120",
 		OS:             "Linux",
 		Device:         "desktop",
-		Vitals:         []beacon.Vital{{Name: "LCP", Value: 1234.5, Time: time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)}},
+		Vitals:         []beacon.Vital{{ID: "vital-1", Revision: 2, Name: "LCP", Value: 1234.5, Time: time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)}},
 	}
 	if got.Site != want.Site || !got.Received.Equal(want.Received) || got.SessionID != want.SessionID ||
-		got.Path != want.Path || got.PageGroup != want.PageGroup || got.Browser != want.Browser ||
+		got.ExperienceID != want.ExperienceID || got.Path != want.Path || got.PageGroup != want.PageGroup || got.Browser != want.Browser ||
 		got.BrowserVersion != want.BrowserVersion || got.OS != want.OS || got.Device != want.Device ||
 		got.Country != "" || len(got.Vitals) != 1 || got.Vitals[0].Name != "LCP" || got.Vitals[0].Value != 1234.5 ||
-		!got.Vitals[0].Time.Equal(want.Vitals[0].Time) || got.Errors != nil || got.Events != nil || got.Logs != nil {
+		!got.Vitals[0].Time.Equal(want.Vitals[0].Time) || got.Errors != nil || len(got.Events) != 1 || got.Logs != nil {
 		t.Fatalf("beacon mismatch:\ngot  %+v\nwant %+v", got, want)
+	}
+	if got.Vitals[0].ID != "vital-1" || got.Vitals[0].Revision != 2 || got.Events[0].Kind != beacon.EventDocument || got.Events[0].ID != "document-1" || got.Events[0].Revision != 1 {
+		t.Fatalf("measurement identity mismatch: %+v", got)
 	}
 }
 

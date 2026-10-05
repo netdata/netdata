@@ -40,7 +40,7 @@ func (h *Handler) sessionsRows(ctx context.Context, site, userID string, after, 
 				s.LastPage,
 				s.UserIDs,
 				s.Frustrations,
-				rowID(s.Site, s.SessionID),
+				rowID(s.Site, s.SessionID), s.ApplicationViews,
 			},
 		)
 	}
@@ -89,7 +89,7 @@ var rumSessionsColumns = map[string]any{
 	}).BuildColumn(),
 	"pageviews": (funcapi.Column{
 		Index:         4,
-		Name:          "Retained Page Views",
+		Name:          "Retained Document Views",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
@@ -161,6 +161,14 @@ var rumSessionsColumns = map[string]any{
 	"frustrations": (funcapi.Column{
 		Index:         13,
 		Name:          "Retained Frustration Signals",
+		Type:          funcapi.FieldTypeInteger,
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+		Sortable:      true,
+	}).BuildColumn(),
+	"application_views": (funcapi.Column{
+		Index:         15,
+		Name:          "Retained Application Views",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,

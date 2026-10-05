@@ -27,6 +27,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
 	"github.com/stretchr/testify/require"
@@ -39,9 +40,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func accepted() aggregate.Result {
+func accepted(b *beacon.Beacon) aggregate.Result {
 	return aggregate.Result{
 		Accepted:     true,
+		Observation:  b,
 		Investigated: true,
 		PageView:     true,
 	}
@@ -57,17 +59,17 @@ func TestIngestDispositionAndOverflow(t *testing.T) {
 	}
 	wrong := tracedBeacon()
 	wrong.Site = "other"
-	l.Ingest(wrong, accepted())
-	tr.Ingest(wrong, accepted())
+	l.Ingest(wrong, accepted(wrong))
+	tr.Ingest(wrong, accepted(wrong))
 	require.Empty(t, l.ch)
 	require.Empty(t, tr.spanCh)
 	require.Empty(t, c.snapshot())
 	// Exercise the actual bounded queues, without replacing their capacities.
 	for range queueCap + 1 {
-		l.Ingest(tracedBeacon(), accepted())
+		l.Ingest(tracedBeacon(), accepted(tracedBeacon()))
 	}
 	for range spanQueueCap + 1 {
-		tr.Ingest(tracedBeacon(), accepted())
+		tr.Ingest(tracedBeacon(), accepted(tracedBeacon()))
 	}
 	require.Len(t, l.ch, queueCap)
 	require.Len(t, tr.spanCh, spanQueueCap)
@@ -83,8 +85,8 @@ func TestSharedShutdownDrainsOrDropsUnattempted(t *testing.T) {
 			l := newExporter(t, startServer(t, ls), c, nil)
 			tr := newTraceExporter(t, startTraceServer(t, ts), "s1", c, nil)
 			for range 300 {
-				l.Ingest(tracedBeacon(), accepted())
-				tr.Ingest(tracedBeacon(), accepted())
+				l.Ingest(tracedBeacon(), accepted(tracedBeacon()))
+				tr.Ingest(tracedBeacon(), accepted(tracedBeacon()))
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
@@ -139,8 +141,8 @@ func TestPartialCountsAndSafeDiagnostics(t *testing.T) {
 			l := newExporter(t, startServer(t, ls), c, nil)
 			tr := newTraceExporter(t, startTraceServer(t, ts), "s1", c, nil)
 			for range 5 {
-				l.Ingest(tracedBeacon(), accepted())
-				tr.Ingest(tracedBeacon(), accepted())
+				l.Ingest(tracedBeacon(), accepted(tracedBeacon()))
+				tr.Ingest(tracedBeacon(), accepted(tracedBeacon()))
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
@@ -204,8 +206,8 @@ func TestRepeatedReceiverFailuresHaveBoundedDiagnostics(t *testing.T) {
 				b := tracedBeacon()
 				b.Site = site
 				for range attempts {
-					l.Ingest(b, accepted())
-					tr.Ingest(b, accepted())
+					l.Ingest(b, accepted(b))
+					tr.Ingest(b, accepted(b))
 					l.export(context.Background(), []queued{<-l.ch}, exportTimeout)
 					tr.exportSpans(context.Background(), []spanItem{<-tr.spanCh}, exportTimeout)
 				}

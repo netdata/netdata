@@ -88,7 +88,8 @@ async function run() {
   assert.deepEqual(delivered.find(item => item.payload.name === 'second_user').meta.user, { id: 'user-2' });
   assert.deepEqual(identified.payload.attributes, enabled ? { custom: 'retained only in event logs', 'url.full': 'https://shop.example.org/api' } : {});
   assert.equal(identified.meta.page.url, 'https://shop.example.org/products/123456');
-  assert.equal(identified.meta.page.id, 'page-1');
+  assert.equal(identified.meta.page.id, sourceMeta.page.id);
+  assert.notEqual(identified.meta.page.id, 'page-1', 'application page metadata cannot replace document identity');
   assert.deepEqual(Object.keys(identified.meta).sort(), ['app', 'browser', 'page', 'session', 'user', 'view']);
   assert.deepEqual(Object.keys(identified.meta.browser).sort(), ['mobile', 'name', 'os', 'version', 'viewportWidth']);
   assert.deepEqual(identified.meta.app, { version: 'release-1', environment: 'test' });
@@ -223,7 +224,7 @@ async function run() {
   for (const url of ['data:,private', 'da\tta:,private', 'java\nscript:private', 'data:text/plain,private', 'blob:https://account:password@shop.example.org/private?secret=opaque', 'javascript:private']) {
     api.setPage({ id: 'opaque-page', url });
     api.pushEvent('opaque_url', { 'url.full': url }, 'browser', { skipDedupe: true });
-    assert.equal(delivered.at(-1).meta.page.url, '');
+    assert.equal(delivered.at(-1).meta.page.url, 'https://shop.example.org/products/123456', 'document entry stays frozen');
     assert.deepEqual(delivered.at(-1).payload.attributes, enabled ? { 'url.full': '' } : {});
     api.pushError(error, { skipDedupe: true, stackFrames: [{ filename: url, function: 'render', lineno: 1, colno: 2 }] });
     assert.equal(delivered.at(-1).payload.stacktrace.frames[0].filename, '');

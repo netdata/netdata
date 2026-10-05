@@ -3,13 +3,14 @@
 package aggregate
 
 import (
+	"container/list"
+	"math"
+	"strconv"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
-// Reject counts a collector rejection (beacon.Reject* reasons) and, for
-// origin/rate/size, feeds the 60s ring behind rejected_per_min — an invalid body never reached a rate worth surfacing.
 func (a *Aggregator) Reject(site, reason string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -25,25 +26,21 @@ func (a *Aggregator) Reject(site, reason string) {
 		st.bots = append(st.bots, a.now())
 	}
 }
-
-// Add bumps a site-level monotonic counter (used by the OTLP exporter for
-// otlp_sent/dropped/errors).
 func (a *Aggregator) Add(counter string, n uint64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.site.counters[counter] += n
 }
 
-// Result describes the decisions made while processing a normalized observation.
-// Its zero value indicates the observation did not belong to this aggregator.
+// Result carries the newly admitted observations for investigation/export.
+// Observation is non-nil for an accepted batch, including a replay with no new measurements.
 type Result struct {
-	Accepted     bool
-	PageView     bool
-	Investigated bool
+	Accepted, PageView, Investigated bool
+	Observation                      *beacon.Beacon
 }
 
-// Ingest records measurements and investigation events without modifying b.
-// History is enqueued under the state lock before the result reaches export.
+// Ingest never changes its input. Measurement work is O(items in the batch),
+// with O(1) identity checks and capacity eviction; retained-state scans run on reads.
 func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -60,225 +57,388 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 	if now.After(st.lastAccepted) {
 		st.lastAccepted = now
 	}
+	obs := *b
+	obs.Vitals, obs.Events, obs.Resources, obs.Navigation = nil, nil, nil, nil
+	attrs := measurementAttributes(b)
+	var documents, views, frustrations uint64
+	var resourceEvents []beacon.Event
+	var navigationEvent *beacon.Event
+	for _, ev := range b.Events {
+		switch ev.Kind {
+		case beacon.EventDocument, beacon.EventView:
+			if b.ExperienceID == "" || ev.ID == "" || ev.Revision == 0 ||
+				(ev.Kind == beacon.EventView && b.ViewID == "") {
+				st.counters[CounterInvalidMeasurements]++
+				continue
+			}
+			// Activations are occurrences, not revision-counted events.
+			key := identityKey{
+				kind:       "document",
+				experience: b.ExperienceID,
+			}
+			if ev.Kind == beacon.EventView {
+				key = identityKey{
+					kind:       "view",
+					experience: b.ExperienceID,
+					item:       b.ViewID,
+				}
+			}
+			if !st.admitIdentity(key, 1, now) {
+				continue
+			}
+			if ev.Kind == beacon.EventDocument {
+				documents++
+			} else {
+				views++
+			}
+		case beacon.EventNavigation:
+			if b.Navigation != nil && ev.Revision == b.Navigation.Revision && navigationEvent == nil {
+				event := ev
+				navigationEvent = &event
+			}
+			continue
+		case beacon.EventResource:
+			resourceEvents = append(resourceEvents, ev)
+			continue // Typed resources preserve decoder event order.
 
-	var pageView bool
-	// Page view: one per (session, page) within pageviewDedup. Beacons
-	// without a session id cannot be de-duplicated and count as views.
-	page := b.PageID
-	if page == "" {
-		page = b.Path
-	}
-	if b.SessionID == "" {
-		pageView = true
-	} else {
-		key := pageviewKey{
-			session: b.SessionID,
-			page:    page,
 		}
-		last, seen := st.dedup[key]
-		if !seen || now.Sub(last) > pageviewDedup {
-			pageView = true
-		}
-		if !seen || now.After(last) {
-			st.dedup[key] = now
-		}
-	}
-
-	var frustrations uint64
-	for _, e := range b.Events {
-		if c, ok := frustrationCounters[e.Name]; ok {
+		if c, ok := frustrationCounters[ev.Name]; ok {
 			st.counters[c]++
 			frustrations++
 		}
+		obs.Events = append(obs.Events, ev)
 	}
-	bd := breakdowns(b)
-	if pageView {
-		st.counters[CounterPageviews]++
-		st.pvWindow = append(st.pvWindow, now)
+	st.counters[CounterPageviews] += documents
+	st.counters[CounterApplicationViews] += views
+	if documents+views+frustrations > 0 {
+		st.appendActivity(activityObservation{
+			received:     now,
+			attrs:        attrs,
+			documents:    documents,
+			views:        views,
+			frustrations: frustrations,
+		})
 	}
-	if n := uint64(len(b.Errors)); n > 0 {
-		st.counters[CounterJSErrors] += n
-		st.jsErrWindow = append(st.jsErrWindow, tsCount{now, n})
-		for _, e := range b.Errors {
-			st.recordError(e, now)
+	for _, v := range b.Vitals {
+		if _, supported := thresholds[v.Name]; !supported || b.ExperienceID == "" || v.ID == "" || v.Revision == 0 ||
+			!validMeasurement(v.Value) {
+			st.counters[CounterInvalidMeasurements]++
+			continue
+		}
+		if st.observeVital(b.ExperienceID, v, attrs, now) {
+			origin := st.observations[observationKey{b.ExperienceID, v.Name}].Value.(*vitalObservation).attrs
+			v.Origin = &beacon.VitalOrigin{
+				PageGroup:  origin.page,
+				Browser:    origin.browser,
+				Device:     origin.device,
+				Country:    origin.country,
+				AppVersion: origin.version,
+			}
+			obs.Vitals = append(obs.Vitals, v)
 		}
 	}
-	for _, kv := range bd {
-		real := st.group(kv.kind, kv.value, now) // the actual tracked instance, nil if the per-kind cap is full
-		target := real                           // where monotonic counters land (routed to other pre-promotion)
-		if real == nil {
-			target = st.otherGroup(kv.kind)
-		} else if !st.top[kv.kind][kv.value] {
-			// tracked but not an emitted instance: counters go to other,
-			// ranking still sees the views so it can enter the top set
-			if pageView {
-				real.pvTimes = append(real.pvTimes, now)
+	if nav := b.Navigation; nav != nil {
+		if b.ExperienceID == "" || nav.Revision == 0 {
+			st.counters[CounterInvalidMeasurements]++
+		} else if st.admitIdentity(identityKey{
+			kind:       "navigation",
+			experience: b.ExperienceID,
+		}, nav.Revision, now) {
+			n := *nav
+			if n.HasLoad && !validMeasurement(n.LoadMS) {
+				n.HasLoad = false
+				st.counters[CounterInvalidMeasurements]++
 			}
-			if now.After(real.lastSeen) {
-				real.lastSeen = now
+			if n.HasDCL && !validMeasurement(n.DCLMS) {
+				n.HasDCL = false
+				st.counters[CounterInvalidMeasurements]++
 			}
-			st.recordVitals(b, kv.kind, kv.value, now)
-			target = st.otherGroup(kv.kind)
-		} else {
-			if pageView {
-				real.pvTimes = append(real.pvTimes, now)
-			}
-			if now.After(real.lastSeen) {
-				real.lastSeen = now
-			}
-			st.recordVitals(b, kv.kind, kv.value, now)
-		}
-		if pageView {
-			target.pageviews++
-		}
-		target.jsErrors += uint64(len(b.Errors))
-
-		// rum-pages reads the real page group directly, not
-		// routed through other: it always describes that page's own
-		// activity, top-N ranked or not.
-		if kv.kind == KindPage && real != nil {
-			if n := len(b.Errors); n > 0 {
-				real.errWindow = append(real.errWindow, tsCount{now, uint64(n)})
-			}
-			if frustrations > 0 {
-				real.frWindow = append(real.frWindow, tsCount{now, frustrations})
-			}
-			for _, v := range b.Vitals {
-				if v.Element == "" {
-					continue
-				}
-				if len(real.elements) >= maxPageElements {
-					real.elements = real.elements[1:]
-				}
-				real.elements = append(
-					real.elements,
-					elemSample{
-						ts:    now,
-						vital: v.Name,
-						sel:   v.Element,
-						poor:  v.Poor(),
-					},
-				)
-			}
-			if b.SessionID != "" {
-				if real.sessions == nil {
-					real.sessions = map[string]struct{}{}
-				}
-				if len(real.sessions) < maxPageGroupSessions {
-					real.sessions[b.SessionID] = struct{}{}
+			// Revision replacement also removes a field absent from the newer report.
+			for _, metric := range []struct {
+				name    string
+				value   float64
+				present bool
+			}{{navLoadName, n.LoadMS, n.HasLoad}, {navDCLName, n.DCLMS, n.HasDCL}} {
+				key := observationKey{b.ExperienceID, metric.name}
+				if metric.present {
+					st.putObservation(vitalObservation{
+						key:      key,
+						metricID: b.ExperienceID,
+						revision: n.Revision,
+						received: now,
+						value:    metric.value,
+						attrs:    attrs,
+					})
+				} else if el := st.observations[key]; el != nil {
+					st.observationOrder.Remove(el)
+					delete(st.observations, key)
 				}
 			}
+			obs.Navigation = &n
+			if navigationEvent != nil {
+				obs.Events = append(obs.Events, *navigationEvent)
+			}
 		}
 	}
-	st.recordVitals(b, "", "", now)
-	if b.Navigation != nil {
-		if b.Navigation.HasLoad {
-			st.addSample(seriesKey{navLoadName, "", ""}, b.Navigation.LoadMS, now)
+	for _, e := range b.Errors {
+		st.counters[CounterJSErrors]++
+		st.appendActivity(activityObservation{
+			received:    now,
+			attrs:       attrs,
+			errors:      1,
+			fingerprint: e.Fingerprint,
+			message:     e.Message,
+		})
+	}
+	for i, r := range b.Resources {
+		if r.Self {
+			continue
 		}
-		if b.Navigation.HasDCL {
-			st.addSample(seriesKey{navDCLName, "", ""}, b.Navigation.DCLMS, now)
+		if r.ID != "" && !st.admitIdentity(identityKey{
+			kind:       "resource",
+			experience: b.ExperienceID,
+			item:       r.ID,
+		}, 1, now) {
+			continue
+		}
+		if r.ID == "" {
+			st.counters[CounterInvalidMeasurements]++
+		}
+		if r.HasDuration && !validMeasurement(r.DurationMS) {
+			r.HasDuration = false
+			st.counters[CounterInvalidMeasurements]++
+		}
+		st.resourcesSeen = true
+		switch {
+		case b.PageHost == "" || r.Host == "":
+			st.unknownResources++
+		case isFirstParty(b.PageHost, r.Host):
+			st.firstPartyResources++
+		default:
+			st.thirdPartyResources++
+		}
+		st.appendActivity(activityObservation{
+			received: now,
+			attrs:    attrs,
+			resource: &r,
+			pageHost: b.PageHost,
+		})
+		obs.Resources = append(obs.Resources, r)
+		if i < len(resourceEvents) && resourceEvents[i].ID == r.ID {
+			obs.Events = append(obs.Events, resourceEvents[i])
 		}
 	}
-	for _, r := range b.Resources {
-		st.recordResource(b.PageHost, r, now)
+	// Transport receipt alone is not a fresh measured observation. In particular,
+	// a replay must not extend observed-session or page-session windows.
+	if len(obs.Vitals) > 0 || len(obs.Events) > 0 || len(obs.Errors) > 0 || len(obs.Logs) > 0 || len(obs.Spans) > 0 ||
+		obs.Navigation != nil ||
+		len(obs.Resources) > 0 {
+		st.observeSession(b.SessionID, attrs.page, now)
 	}
-
-	// Investigate sampling: measure (everything above) always runs;
-	// history and events follow the session's decision.
+	pageView := documents > 0
 	var investigated bool
 	if b.SessionID != "" {
-		investigated = st.touchSession(b, pageView, now, a.history)
+		investigated = st.touchSession(&obs, pageView, now, a.history)
 	} else {
-		inv := st.cfg.Investigate
-		investigated = inv.Rate >= 1 || inv.alwaysKeep(b)
+		investigated = st.cfg.Investigate.Rate >= 1 || st.cfg.Investigate.alwaysKeep(&obs)
 	}
-	// Sessions already emitted self-contained error events with their timeline.
-	// Sessionless errors remain investigable without creating a parent session.
 	if investigated && b.SessionID == "" && a.history != nil {
-		for _, e := range b.Errors {
-			if e.Fingerprint == "" {
-				continue
-			}
+		for _, e := range obs.Errors {
 			a.history.Event(HistoryEvent{
-				Site:        st.cfg.Name,
-				TSUnixUS:    now.UnixMicro(),
-				Type:        "error",
-				Page:        b.PageGroup,
-				Browser:     b.Browser,
-				Device:      b.Device,
-				Country:     b.Country,
-				Version:     b.AppVersion,
-				UserID:      b.UserID,
-				Fingerprint: e.Fingerprint,
-				ErrorType:   e.Type,
-				Message:     e.Message,
-				Text:        truncateRunes(e.Type+": "+e.Message, sessionEventTextMax),
-				SampleStack: truncateStack(e.Stack),
+				Site:         st.cfg.Name,
+				TSUnixUS:     now.UnixMicro(),
+				Type:         "error",
+				Page:         b.PageGroup,
+				ExperienceID: b.ExperienceID,
+				View:         b.View,
+				ViewID:       b.ViewID,
+				Browser:      b.Browser,
+				Device:       b.Device,
+				Country:      b.Country,
+				Version:      b.AppVersion,
+				UserID:       b.UserID,
+				Fingerprint:  e.Fingerprint,
+				ErrorType:    e.Type,
+				Message:      e.Message,
+				Text:         truncateRunes(e.Type+": "+e.Message, sessionEventTextMax),
+				SampleStack:  truncateStack(e.Stack),
 			})
 		}
 	}
-
-	a.appendLive(b, pageView, now)
+	a.appendLive(&obs, pageView, now)
 	return Result{
 		Accepted:     true,
 		PageView:     pageView,
 		Investigated: investigated,
+		Observation:  &obs,
 	}
 }
-
-type kv struct{ kind, value string }
-
-// breakdowns lists the (kind, value) pairs a beacon contributes to. An
-// unknown country is excluded from the country breakdown.
-func breakdowns(b *beacon.Beacon) []kv {
-	out := make([]kv, 0, 4)
-	browser := b.Browser
-	if browser == "" {
-		browser = unknownValue
+func validMeasurement(v float64) bool { return v >= 0 && !math.IsNaN(v) && !math.IsInf(v, 0) }
+func measurementAttributes(b *beacon.Beacon) attributes {
+	return attributes{
+		browser: b.Browser,
+		device:  b.Device,
+		country: b.Country,
+		page:    b.PageGroup,
+		version: b.AppVersion,
+		view:    b.View,
 	}
-	out = append(out, kv{KindBrowser, browser})
-	device := b.Device
-	if device == "" {
-		device = beacon.DeviceDesktop
+}
+func (st *siteState) admitIdentity(key identityKey, revision uint64, now time.Time) bool {
+	if el := st.identities[key]; el != nil {
+		old := el.Value.(*identity)
+		if now.Sub(old.received) <= identityRetention {
+			if revision <= old.revision {
+				return false
+			}
+			old.revision = revision
+			if now.After(old.received) {
+				old.received = now
+			}
+			st.identityOrder.MoveToBack(el)
+			return true
+		}
+		st.identityOrder.Remove(el)
+		delete(st.identities, key)
 	}
-	out = append(out, kv{KindDevice, device})
-	if b.Country != "" {
-		out = append(out, kv{KindCountry, b.Country})
+	if st.identityOrder.Len() >= maxWindowObservations {
+		el := st.identityOrder.Front()
+		old := el.Value.(*identity)
+		if now.Sub(old.received) <= identityRetention {
+			st.identityLoss.add(now, st.window)
+			st.counters[CounterSamplesDropped]++
+		}
+		delete(st.identities, old.key)
+		st.identityOrder.Remove(el)
 	}
-	page := b.PageGroup
-	if page == "" {
-		page = "/"
+	st.identities[key] = st.identityOrder.PushBack(&identity{
+		key:      key,
+		revision: revision,
+		received: now,
+	})
+	return true
+}
+func (st *siteState) observeVital(experience string, v beacon.Vital, attrs attributes, now time.Time) bool {
+	key := observationKey{experience, v.Name}
+	if el := st.observations[key]; el != nil {
+		attrs = el.Value.(*vitalObservation).attrs
 	}
-	out = append(out, kv{KindPage, page})
-	if b.AppVersion != "" {
-		out = append(out, kv{KindVersion, b.AppVersion})
+	ledgerKey := identityKey{
+		kind:       "vital",
+		experience: experience,
+		item:       v.Name,
 	}
-	return out
+	if el := st.identities[ledgerKey]; el != nil {
+		old := el.Value.(*identity)
+		if now.Sub(old.received) <= identityRetention {
+			if old.metricID != v.ID {
+				st.counters[CounterInvalidMeasurements]++
+				return false
+			}
+			attrs = old.attrs
+		}
+	}
+	if !st.admitIdentity(ledgerKey, v.Revision, now) {
+		return false
+	}
+	evidence := st.identities[ledgerKey].Value.(*identity)
+	evidence.metricID = v.ID
+	evidence.attrs = attrs
+	st.putObservation(vitalObservation{
+		key:      key,
+		metricID: v.ID,
+		revision: v.Revision,
+		received: now,
+		value:    v.Value,
+		element:  v.Element,
+		attrs:    attrs,
+	})
+	return true
+}
+func (st *siteState) putObservation(v vitalObservation) {
+	if el := st.observations[v.key]; el != nil {
+		old := el.Value.(*vitalObservation)
+		if old.received.After(v.received) {
+			v.received = old.received
+		}
+		*old = v
+		st.observationOrder.MoveToBack(el)
+		return
+	}
+	if st.observationOrder.Len() >= maxWindowObservations {
+		el := st.observationOrder.Front()
+		old := el.Value.(*vitalObservation)
+		if !old.received.Before(v.received.Add(-st.window)) {
+			loss := st.vitalLoss[old.key.name]
+			if loss == nil {
+				loss = &lossInterval{}
+				st.vitalLoss[old.key.name] = loss
+			}
+			loss.add(old.received, st.window)
+			st.counters[CounterSamplesDropped]++
+		}
+		delete(st.observations, old.key)
+		st.observationOrder.Remove(el)
+	}
+	entry := new(vitalObservation)
+	*entry = v
+	st.observations[v.key] = st.observationOrder.PushBack(entry)
+}
+func (st *siteState) appendActivity(v activityObservation) {
+	if st.activity.Len() >= maxWindowObservations {
+		el := st.activity.Front()
+		old := el.Value.(*activityObservation)
+		if !old.received.Before(v.received.Add(-st.window)) {
+			st.activityLoss.add(old.received, st.window)
+			st.counters[CounterSamplesDropped]++
+		}
+		st.activity.Remove(el)
+	}
+	st.activity.PushBack(&v)
+}
+func (st *siteState) observeSession(id, page string, now time.Time) {
+	if id == "" {
+		return
+	}
+	st.touchObservedSession(st.sessions, st.sessionOrder, id, "", now, &st.sessionLoss)
+	st.touchObservedSession(
+		st.pageSessions,
+		st.pageSessionOrder,
+		strconv.Itoa(len(id))+":"+id+page,
+		page,
+		now,
+		&st.pageSessionLoss,
+	)
 }
 
-// group returns the tracked group for (kind, value), creating it unless
-// the per-kind tracking cap is reached (nil then).
-func (st *siteState) group(kind, value string, now time.Time) *group {
-	k := groupKey{kind, value}
-	if g, ok := st.groups[k]; ok {
-		return g
+func (st *siteState) touchObservedSession(
+	index map[string]*list.Element,
+	order *list.List,
+	key, page string,
+	now time.Time,
+	loss *lossInterval,
+) {
+	if el := index[key]; el != nil {
+		v := el.Value.(*sessionObservation)
+		if now.After(v.received) {
+			v.received = now
+		}
+		order.MoveToBack(el)
+		return
 	}
-	if st.groupN[kind] >= maxTrackedGroups {
-		return nil
+	if order.Len() >= maxWindowObservations {
+		el := order.Front()
+		v := el.Value.(*sessionObservation)
+		if !v.received.Before(now.Add(-st.window)) {
+			loss.add(v.received, st.window)
+			st.counters[CounterSamplesDropped]++
+		}
+		delete(index, v.key)
+		order.Remove(el)
 	}
-	g := &group{
-		lastSeen: now,
-	}
-	st.groups[k] = g
-	st.groupN[kind]++
-	return g
-}
-
-func (st *siteState) otherGroup(kind string) *group {
-	g, ok := st.other[kind]
-	if !ok {
-		g = &group{}
-		st.other[kind] = g
-	}
-	return g
+	index[key] = order.PushBack(&sessionObservation{
+		key:      key,
+		page:     page,
+		received: now,
+	})
 }

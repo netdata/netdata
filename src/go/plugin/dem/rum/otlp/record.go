@@ -3,6 +3,7 @@
 package otlp
 
 import (
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,9 +15,8 @@ import (
 // queued is one record waiting on the owning site's export queue.
 type queued struct{ rec *logspb.LogRecord }
 
-// build turns one accepted beacon into zero or more queued records:
-// pageview, one per JS
-// error, one per custom event, one per console log line (already
+// build turns admitted observations into document activations, vital updates,
+// JS errors, custom events and console log lines (already
 // filtered upstream by ConsoleLogsOn). Receiver normalization owns all text
 // cleaning and bounds; export preserves the accepted observation.
 func (e *Logs) build(b *beacon.Beacon, pageView bool) []queued {
@@ -24,7 +24,33 @@ func (e *Logs) build(b *beacon.Beacon, pageView bool) []queued {
 	var out []queued
 
 	if pageView {
-		out = append(out, e.record(base, "pageview", b.Received, sevInfo, "pageview "+b.Path))
+		attrs, ts := base, b.Received
+		for _, event := range b.Events {
+			if event.Kind == beacon.EventDocument {
+				attrs = append(append([]*commonpb.KeyValue{}, base...), strAttr("event.id", event.ID), strAttr("event.revision", strconv.FormatUint(event.Revision, 10)))
+				if !event.Time.IsZero() {
+					ts = event.Time
+				}
+				break
+			}
+		}
+		out = append(out, e.record(attrs, "pageview", ts, sevInfo, "pageview "+b.PageGroup))
+	}
+	for _, vital := range b.Vitals {
+		vitalBase := base
+		page := b.PageGroup
+		if origin := vital.Origin; origin != nil {
+			observed := *b
+			observed.PageGroup, observed.Browser, observed.Device = origin.PageGroup, origin.Browser, origin.Device
+			observed.Country, observed.AppVersion = origin.Country, origin.AppVersion
+			vitalBase, page = baseAttrs(&observed), origin.PageGroup
+		}
+		attrs := append(append([]*commonpb.KeyValue{}, vitalBase...),
+			strAttr("metric.name", vital.Name), strAttr("metric.id", vital.ID),
+			strAttr("metric.revision", strconv.FormatUint(vital.Revision, 10)),
+			strAttr("metric.value", strconv.FormatFloat(vital.Value, 'g', -1, 64)),
+			strAttr("metric.element", vital.Element))
+		out = append(out, e.record(attrs, "vital", vital.Time, sevInfo, "vital "+vital.Name+" @ "+page))
 	}
 	for _, err := range b.Errors {
 		msg := err.Message
@@ -38,10 +64,13 @@ func (e *Logs) build(b *beacon.Beacon, pageView bool) []queued {
 		out = append(out, e.record(attrs, "error", err.Time, sevError, body))
 	}
 	for _, ev := range b.Events {
-		if ev.Kind == beacon.EventSession {
+		if ev.Kind == beacon.EventSession || ev.Kind == beacon.EventDocument {
 			continue
 		}
 		attrs := append(append([]*commonpb.KeyValue{}, base...), strAttr("event.name", ev.Name))
+		if ev.ID != "" {
+			attrs = append(attrs, strAttr("event.id", ev.ID), strAttr("event.revision", strconv.FormatUint(ev.Revision, 10)))
+		}
 		for k, v := range ev.Attrs {
 			attrs = append(attrs, strAttr("event.attr."+k, v))
 		}
@@ -78,6 +107,8 @@ func baseAttrs(b *beacon.Beacon) []*commonpb.KeyValue {
 		}
 	}
 	add("session.id", b.SessionID)
+	add("document.experience.id", b.ExperienceID)
+	add("application.view.id", b.ViewID)
 	add("page.path", b.Path)
 	add("page.group", b.PageGroup)
 	add("page.view", b.View)

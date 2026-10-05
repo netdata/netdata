@@ -96,6 +96,7 @@ func BenchmarkConsoleIngest(b *testing.B) {
 			event := mkBeacon()
 			event.Logs = []beacon.Log{log}
 			result := aggregate.Result{
+				Observation:  event,
 				Accepted:     true,
 				Investigated: true,
 			}

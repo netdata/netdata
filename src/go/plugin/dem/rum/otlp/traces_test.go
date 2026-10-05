@@ -109,15 +109,18 @@ func TestTraceBatchPreservesPerBeaconResourcesAndScopes(t *testing.T) {
 	second.Browser = "Firefox"
 	second.Device = "mobile"
 	second.Country = "US"
+	second.ExperienceID, second.View, second.ViewID = "document-two", "checkout", "view-two"
 	extra := first.Spans[0]
 	extra.Scope = "other-scope"
 	extra.ScopeVersion = "2"
 	first.Spans = append(first.Spans, extra, first.Spans[0])
 	e.Ingest(first, aggregate.Result{
+		Observation:  first,
 		Accepted:     true,
 		Investigated: true,
 	})
 	e.Ingest(second, aggregate.Result{
+		Observation:  second,
 		Accepted:     true,
 		Investigated: true,
 	})
@@ -145,6 +148,10 @@ func TestTraceBatchPreservesPerBeaconResourcesAndScopes(t *testing.T) {
 			"rum.browser_version": "120",
 			"rum.device":          "mobile",
 			"rum.country":         "US",
+			"rum.document_entry":  "/pricing",
+			"rum.experience_id":   "document-two",
+			"rum.view":            "checkout",
+			"rum.view_id":         "view-two",
 		},
 		attrs,
 	)

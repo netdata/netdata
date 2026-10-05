@@ -60,6 +60,8 @@ func (s *Store) QuerySessions(
 		switch r.Type {
 		case "pageview":
 			g.record.Pageviews++
+		case "view":
+			g.record.ApplicationViews++
 		case "error":
 			g.record.Errors++
 		case "frustration":
@@ -110,6 +112,12 @@ func (s *Store) QuerySessionEvents(ctx context.Context, site, sessionID string) 
 		out = append(
 			out,
 			SessionEventRecord{
+				ExperienceID: r.ExperienceID,
+				View:         r.View,
+				ViewID:       r.ViewID,
+				MetricID:     r.MetricID,
+				Revision:     r.Revision,
+
 				Site:      r.Site,
 				SessionID: r.SessionID,
 				TSUnixUS:  r.TSUnixUS,

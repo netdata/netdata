@@ -48,6 +48,7 @@ const (
 	EventRequest
 	EventView
 	EventSession
+	EventDocument
 )
 
 // Frustration signals the snippet detects; each event carries a
@@ -66,14 +67,15 @@ func IsFrustration(name string) bool {
 // Beacon is one accepted Faro payload after origin/limit checks, URL
 // stripping and GeoIP. Client IPs never appear here.
 type Beacon struct {
-	Site      string
-	Received  time.Time
-	SessionID string
-	PageID    string // Faro meta.page.id when the SDK sets one
-	Path      string // URL path only (query and fragment stripped)
-	PageHost  string // page URL host (first-party resource classification); "" when unknown
-	PageGroup string // View name when set (SPA), else Path with volatile segments replaced by :id
-	View      string // Faro meta.view.name, "" outside SPAs
+	Site         string
+	Received     time.Time
+	SessionID    string
+	ExperienceID string // Explicit document activation, independent of session and application view
+	Path         string // Document entry URL path (query and fragment stripped)
+	PageHost     string // page URL host (first-party resource classification); "" when unknown
+	PageGroup    string // Document entry path with volatile segments replaced by :id
+	View         string // Current application view name, empty until explicitly assigned
+	ViewID       string // Current application view occurrence
 
 	Browser        string
 	BrowserVersion string
@@ -104,27 +106,43 @@ type Beacon struct {
 // event. Has* distinguishes an absent attribute (SDK sent
 // no value) from a genuine zero.
 type Navigation struct {
-	LoadMS  float64
-	HasLoad bool
-	DCLMS   float64
-	HasDCL  bool
+	Revision uint64
+	LoadMS   float64
+	HasLoad  bool
+	DCLMS    float64
+	HasDCL   bool
 }
 
 // Resource is one entry from a faro.performance.resource event: a single sub-resource fetch (script, image, XHR,...).
 type Resource struct {
-	Host       string
-	DurationMS float64
-	TransferB  float64
-	Initiator  string
+	ID          string
+	HasDuration bool
+	Host        string
+	DurationMS  float64
+	TransferB   float64
+	Initiator   string
 	// Self marks the snippet's own request to the collector (a Faro
-	// beacon), kept out of rum.api so it never reads as the site's API.
+	// beacon), excluded from resource measurements.
 	Self bool
 }
 
+// VitalOrigin contains document measurement dimensions frozen by aggregation.
+// Normalization leaves it unset; accepted output updates carry the retained origin.
+type VitalOrigin struct {
+	PageGroup  string
+	Browser    string
+	Device     string
+	Country    string
+	AppVersion string
+}
+
 type Vital struct {
-	Name  string
-	Value float64
-	Time  time.Time
+	ID       string       // SDK metric identity, preserved across updates
+	Revision uint64       // Creation sequence, assigned before batching; zero means unavailable
+	Origin   *VitalOrigin // Output-only frozen dimensions for an accepted update
+	Name     string
+	Value    float64
+	Time     time.Time
 	// Element is the redacted CSS selector Faro's attribution names: the
 	// LCP element, the INP interaction target, the CLS largest shift.
 	Element string
@@ -139,12 +157,14 @@ type Error struct {
 }
 
 type Event struct {
-	Kind    EventKind
-	Name    string
-	Domain  string
-	Attrs   map[string]string
-	Time    time.Time
-	TraceID string // hex, set on traced fetch/XHR events
+	ID       string
+	Revision uint64
+	Kind     EventKind
+	Name     string
+	Domain   string
+	Attrs    map[string]string
+	Time     time.Time
+	TraceID  string // hex, set on traced fetch/XHR events
 }
 
 // Span is one browser span, with URL attributes already stripped of
