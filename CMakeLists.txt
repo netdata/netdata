@@ -2667,7 +2667,6 @@ if(OS_WINDOWS)
         # wevt_netdata_compile.sh validates the required Windows SDK (mc.exe, rc.exe)
         # and MSVC (link.exe) tools and reports an actionable error when they are absent.
         set(HAVE_ETW True)
-        set(HAVE_WEL False)
 
         # Output the results for debugging purposes
         message(STATUS "Have Event Tracing for Windows (ETW): ${HAVE_ETW}")

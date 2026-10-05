@@ -109,14 +109,11 @@ static BOOL WINAPI windows_console_control_handler(DWORD control_type) {
         case CTRL_BREAK_EVENT:
             signo = SIGQUIT;
             break;
-        case CTRL_CLOSE_EVENT:
-            signo = SIGTERM;
-            wait_for_shutdown = true;
-            break;
         case CTRL_LOGOFF_EVENT:
             // Services must remain running when an interactive user logs off.
             // Let Windows' service-aware default handler process this event.
             return FALSE;
+        case CTRL_CLOSE_EVENT:
         case CTRL_SHUTDOWN_EVENT:
             signo = SIGTERM;
             wait_for_shutdown = true;
@@ -450,39 +447,12 @@ static void process_triggered_signals(void) {
     } while(found);
 }
 
-static inline bool threshold_trigger_smaller(bool *last, double threshold, double hysteresis, double free_mem) {
-    bool triggered = *last;
-
-    if (free_mem < threshold)
-        *last = true;
-
-    if (free_mem >= (threshold + hysteresis))
-        *last = false;
-
-    return !triggered && *last;
-}
-
 NEVER_INLINE
 void nd_process_signals(void) {
     posix_unmask_my_signals();
-    const usec_t save_every_ut = 15 * 60 * USEC_PER_SEC;
-    usec_t last_update_mt = now_monotonic_usec();
-    bool triggered1 = false, triggered5 = false, triggered10 = false;
 
     while (true) {
-        bool save_again = false;
-        double free_mem = os_system_memory_available_percent(os_system_memory(false));
-
-        save_again =
-            threshold_trigger_smaller(&triggered1, 1.0, 1.0, free_mem) ||
-            threshold_trigger_smaller(&triggered5, 5.0, 1.0, free_mem) ||
-            threshold_trigger_smaller(&triggered10, 10.0, 1.0, free_mem);
-
-        usec_t mt = now_monotonic_usec();
-        if ((mt - last_update_mt) >= save_every_ut || save_again) {
-            daemon_status_file_update_status(DAEMON_STATUS_NONE);
-            last_update_mt += save_every_ut;
-        }
+        daemon_status_file_periodic_update();
 
 #if defined(OS_WINDOWS)
         if (windows_console_signal_event)

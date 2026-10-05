@@ -50,9 +50,6 @@ static struct {
 #if defined(HAVE_ETW)
     { .method = NDLM_ETW, .name = ETW_NAME },
 #endif
-#if defined(HAVE_WEL)
-        { .method = NDLM_WEL, .name = WEL_NAME },
-#endif
 #endif
 };
 
@@ -248,9 +245,6 @@ static struct {
 #if defined(OS_WINDOWS)
 #if defined(HAVE_ETW)
         { .format = NDLF_ETW, .name = ETW_NAME },
-#endif
-#if defined(HAVE_WEL)
-    { .format = NDLF_WEL, .name = WEL_NAME },
 #endif
 #endif
 };

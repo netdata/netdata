@@ -13,6 +13,64 @@ static unsigned command_string_size;
 
 static int exit_status;
 
+#if defined(OS_WINDOWS)
+static bool command_pipe_server_is_trusted(HANDLE pipe)
+{
+    ULONG server_pid = 0;
+    HANDLE process = NULL, token = NULL;
+    PSID system_sid = NULL, administrators_sid = NULL;
+    bool trusted = false;
+    TOKEN_USER *user = NULL;
+    TOKEN_ELEVATION elevation = {0};
+    DWORD size = 0;
+    SID_IDENTIFIER_AUTHORITY nt_authority = SECURITY_NT_AUTHORITY;
+
+    if (!GetNamedPipeServerProcessId(pipe, &server_pid) || !server_pid)
+        goto cleanup;
+    process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, server_pid);
+    if (!process || GetProcessId(process) != server_pid ||
+        !OpenProcessToken(process, TOKEN_QUERY, &token))
+        goto cleanup;
+
+    if (!GetTokenInformation(token, TokenUser, NULL, 0, &size) && GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+        goto cleanup;
+    user = mallocz(size);
+    if (!user || !GetTokenInformation(token, TokenUser, user, size, &size))
+        goto cleanup;
+
+    if (!AllocateAndInitializeSid(&nt_authority, 1, SECURITY_LOCAL_SYSTEM_RID,
+                                  0, 0, 0, 0, 0, 0, 0, &system_sid))
+        goto cleanup;
+    if (EqualSid(user->User.Sid, system_sid)) {
+        trusted = true;
+        goto cleanup;
+    }
+
+    if (!GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size) ||
+        !elevation.TokenIsElevated ||
+        !AllocateAndInitializeSid(&nt_authority, 2, SECURITY_BUILTIN_DOMAIN_RID,
+                                  DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &administrators_sid))
+        goto cleanup;
+
+    BOOL is_admin = FALSE;
+    if (CheckTokenMembership(token, administrators_sid, &is_admin) && is_admin)
+        trusted = true;
+
+cleanup:
+    if (trusted) {
+        ULONG verified_pid = 0;
+        if (!GetNamedPipeServerProcessId(pipe, &verified_pid) || verified_pid != server_pid)
+            trusted = false;
+    }
+    if (administrators_sid) FreeSid(administrators_sid);
+    if (system_sid) FreeSid(system_sid);
+    freez(user);
+    if (token) CloseHandle(token);
+    if (process) CloseHandle(process);
+    return trusted;
+}
+#endif
+
 static void close_client_pipe(void)
 {
     if (!client_pipe_close_requested) {
@@ -254,6 +312,14 @@ int main(int argc, char **argv)
         connect_cb(&req, uv_translate_sys_error((int)pipe_error));
     }
     else {
+        if (!command_pipe_server_is_trusted(pipe_handle)) {
+            fprintf(stderr, "The command-pipe server is not a trusted Netdata service process.\n");
+            CloseHandle(pipe_handle);
+            close_client_pipe();
+            uv_run(loop, UV_RUN_DEFAULT);
+            buffer_free(req.data);
+            return 1;
+        }
         uv_file pipe_fd = uv_open_osfhandle((uv_os_fd_t)pipe_handle);
         if (pipe_fd < 0) {
             int saved_errno = errno;
@@ -291,6 +357,7 @@ int main(int argc, char **argv)
     uv_run(loop, UV_RUN_DEFAULT);
 
     close_client_pipe();
+    uv_run(loop, UV_RUN_DEFAULT); // Complete the asynchronous close before returning.
     buffer_free(client_pipe.data);
 
     return exit_status;

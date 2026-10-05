@@ -39,9 +39,6 @@ typedef enum  __attribute__((__packed__)) {
 #if defined(HAVE_ETW)
     NDLM_ETW,
 #endif
-#if defined(HAVE_WEL)
-    NDLM_WEL,
-#endif
 #endif
 } ND_LOG_METHOD;
 
@@ -52,14 +49,8 @@ typedef enum  __attribute__((__packed__)) {
 #define ETW_CONDITION(ndlo) (false)
 #endif
 
-#if defined(HAVE_WEL)
-#define WEL_CONDITION(ndlo) ((ndlo) == NDLM_WEL)
-#else
-#define WEL_CONDITION(ndlo) (false)
-#endif
-
-#define IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(ndlo) ((ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG || (ndlo) == NDLM_STDERR || ETW_CONDITION(ndlo) || WEL_CONDITION(ndlo))
-#define IS_FINAL_LOG_METHOD(ndlo) ((ndlo) == NDLM_FILE || (ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG || ETW_CONDITION(ndlo) || WEL_CONDITION(ndlo))
+#define IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(ndlo) ((ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG || (ndlo) == NDLM_STDERR || ETW_CONDITION(ndlo))
+#define IS_FINAL_LOG_METHOD(ndlo) ((ndlo) == NDLM_FILE || (ndlo) == NDLM_JOURNAL || (ndlo) == NDLM_SYSLOG || ETW_CONDITION(ndlo))
 
 ND_LOG_METHOD nd_log_method2id(const char *method);
 const char *nd_log_id2method(ND_LOG_METHOD method);
@@ -74,9 +65,6 @@ typedef enum __attribute__((__packed__)) {
 #if defined(OS_WINDOWS)
 #if defined(HAVE_ETW)
     NDLF_ETW, // Event Tracing for Windows
-#endif
-#if defined(HAVE_WEL)
-    NDLF_WEL, // Windows Event Log
 #endif
 #endif
 } ND_LOG_FORMAT;
@@ -250,10 +238,6 @@ bool nd_logger_file(int fd, FILE *fp, netdata_mutex_t *mutex, ND_LOG_FORMAT form
 #if defined(HAVE_ETW)
 bool nd_log_init_etw(void);
 bool nd_logger_etw(struct nd_log_source *source, struct log_field *fields, size_t fields_max);
-#endif
-#if defined(HAVE_WEL)
-bool nd_log_init_wel(void);
-bool nd_logger_wel(struct nd_log_source *source, struct log_field *fields, size_t fields_max);
 #endif
 #endif
 

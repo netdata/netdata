@@ -49,13 +49,8 @@ static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, 
             }
             break;
 
-#if defined(OS_WINDOWS) && (defined(HAVE_ETW) || defined(HAVE_WEL))
-#if defined(HAVE_ETW)
+#if defined(OS_WINDOWS) && defined(HAVE_ETW)
         case NDLM_ETW:
-#endif
-#if defined(HAVE_WEL)
-        case NDLM_WEL:
-#endif
             if(unlikely(!nd_log.eventlog.initialized)) {
                 output = NDLM_FILE;
                 *fpp = stderr;
@@ -205,17 +200,6 @@ static void nd_logger_log_fields(FILE *fp, int fd, netdata_mutex_t *mutex, bool 
 #if defined(HAVE_ETW)
     if(output == NDLM_ETW) {
         if(!nd_logger_etw(source, fields, fields_max)) {
-            // we can't log to windows events, let's log to stderr
-            output = NDLM_FILE;
-            fp = stderr;
-            fd = STDERR_FILENO;
-            mutex = nd_logger_stderr_mutex();
-        }
-    }
-#endif
-#if defined(HAVE_WEL)
-    if(output == NDLM_WEL) {
-        if(!nd_logger_wel(source, fields, fields_max)) {
             // we can't log to windows events, let's log to stderr
             output = NDLM_FILE;
             fp = stderr;

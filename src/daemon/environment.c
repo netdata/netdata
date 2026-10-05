@@ -30,7 +30,8 @@ static char *nd_env_native_path_list(const char *src) {
             }
         }
 
-        size_t entry_len = separator ? (size_t)(separator - entry_start) : strlen(entry_start);
+        // entry_start always points into the NUL-terminated config/environment string.
+        size_t entry_len = separator ? (size_t)(separator - entry_start) : strlen(entry_start); // NOSONAR (c:S5813)
         CLEAN_CHAR_P *entry = strndupz(entry_start, entry_len);
         char native[FILENAME_MAX + 1];
         os_translate_path(native, entry, sizeof(native));

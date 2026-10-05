@@ -28,11 +28,6 @@ if [ -f /opt/netdata/usr/bin/bashbug ]; then
     rm -rf /opt/netdata/usr/bin/bashbug
 fi
 
-${GITHUB_ACTIONS+echo "::group::Staging Windows runtime DLLs"}
-# Runtime DLL dependencies for all installed executables are resolved and
-# staged by CMake's Windows install code.
-${GITHUB_ACTIONS+echo "::endgroup::"}
-
 ${GITHUB_ACTIONS+echo "::group::Installing"}
 # shellcheck disable=SC2154  # build is assigned by win-build-dir.sh
 cmake --install "${build}"

@@ -109,6 +109,9 @@ _Static_assert(sizeof(struct pipe_header) == 8, "websocket command header layout
 
 static void websocket_thread_close_command_pipe(WEBSOCKET_THREAD *wth) {
     if(wth->cmd.pipe[PIPE_READ] != -1) {
+        if(wth->ndpl && !nd_poll_del(wth->ndpl, wth->cmd.pipe[PIPE_READ]))
+            netdata_log_error("WEBSOCKET[%zu]: Failed to remove command socket from poll", wth->id);
+
 #if defined(OS_WINDOWS)
         sock_close(wth->cmd.pipe[PIPE_READ]);
 #else
@@ -494,7 +497,8 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                 uint32_t message_len = header.len - sizeof(WEBSOCKET_OPCODE);
                 if(message_len > WS_MAX_OUTGOING_FRAME_SIZE) {
                     netdata_log_error("WEBSOCKET[%zu]: Broadcast message too large: %u bytes", wth->id, message_len);
-                    websocket_thread_drain_command_payload(wth, header.len);
+                    if(!websocket_thread_drain_command_payload(wth, header.len))
+                        return;
                     continue;
                 }
                 if(header.len + 1 > wth->cmd.buffer_size) {

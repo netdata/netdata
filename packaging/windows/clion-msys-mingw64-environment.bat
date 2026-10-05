@@ -1,4 +1,5 @@
 @echo off
+:: Legacy filename retained; this profile configures the UCRT64 toolchain.
 :: In Clion Toolchains
 :: 1. Add an MSYS2 UCRT64 profile
 :: 2. Set Toolset to C:\msys64\ucrt64

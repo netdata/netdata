@@ -56,9 +56,6 @@ void nd_log_initialize_for_external_plugins(const char *name) {
 #if defined(HAVE_ETW)
     nd_setenv("NETDATA_LOG_METHOD", ETW_NAME, 0);
     nd_setenv("NETDATA_LOG_FORMAT", ETW_NAME, 0);
-#elif defined(HAVE_WEL)
-    nd_setenv("NETDATA_LOG_METHOD", WEL_NAME, 0);
-    nd_setenv("NETDATA_LOG_FORMAT", WEL_NAME, 0);
 #else
     nd_setenv("NETDATA_LOG_METHOD", "stderr", 0);
     nd_setenv("NETDATA_LOG_FORMAT", "logfmt", 0);
@@ -134,14 +131,6 @@ void nd_log_initialize_for_external_plugins(const char *name) {
             }
         break;
 #endif
-#if defined(HAVE_WEL)
-            case NDLM_WEL:
-            if(!nd_log_init_wel()) {
-                nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Failed to initialize Windows Event Log (WEL). Using stderr.");
-                method = NDLM_STDERR;
-            }
-        break;
-#endif
 #endif
 
         case NDLM_SYSLOG:
@@ -193,13 +182,6 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
         case NDLM_ETW:
             nd_log_init_etw();
             break;
-#endif
-#if defined(HAVE_WEL)
-            case NDLM_WEL: {
-            bool wel_ok = nd_log_init_wel();
-            (void)wel_ok;
-            break;
-            }
 #endif
 #endif
 
@@ -294,6 +276,9 @@ void nd_log_open(struct nd_log_source *e, ND_LOG_SOURCES source) {
 // --------------------------------------------------------------------------------------------------------------------
 
 void nd_log_stdin_init(int fd, const char *filename) {
+    if(!filename)
+        return;
+
 #if defined(OS_WINDOWS)
     if (filename && strcmp(filename, "/dev/null") == 0)
         filename = "NUL";

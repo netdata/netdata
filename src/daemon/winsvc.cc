@@ -4,6 +4,7 @@ extern "C" {
 #include "libnetdata/libnetdata.h"
 #include "daemon/daemon-shutdown.h"
 #include "daemon/daemon-shutdown-watcher.h"
+#include "daemon/status-file.h"
 
 int netdata_main(int argc, char *argv[]);
 void nd_process_signals(void);
@@ -305,7 +306,14 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     // and ExitProcess to silently kill every background thread before any
     // useful work is done.  Block on the stop event until the SCM sends
     // SERVICE_CONTROL_STOP or SERVICE_CONTROL_SHUTDOWN.
-    WaitForSingleObject(svc_stop_event_handle, INFINITE);
+    while (true) {
+        DWORD wait_result = WaitForSingleObject(svc_stop_event_handle, 13 * 1000 + 379);
+        if (wait_result == WAIT_OBJECT_0)
+            break;
+        if (wait_result != WAIT_TIMEOUT)
+            break;
+        daemon_status_file_periodic_update();
+    }
 
     // ServiceControlHandler already created the cleanup thread and signalled
     // the stop event.  The cleanup thread runs netdata_exit_gracefully() and
@@ -328,7 +336,12 @@ static bool update_path() {
         return true;
     }
 
-    size_t new_path_length = strlen(old_path) + strlen(native_system_bin) + 2;
+    size_t old_path_length = strlen(old_path); // NOSONAR (cpp:S5813) - getenv returns a NUL-terminated environment string.
+    size_t native_system_bin_length = strlen(native_system_bin); // NOSONAR (cpp:S5813) - os_translate_path writes into this bounded buffer.
+    if (old_path_length > SIZE_MAX - native_system_bin_length - 2)
+        return false;
+
+    size_t new_path_length = old_path_length + native_system_bin_length + 2;
     char *new_path = (char *) callocz(new_path_length, sizeof(char));
     snprintfz(new_path, new_path_length, "%s;%s", native_system_bin, old_path);
 

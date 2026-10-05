@@ -24,7 +24,7 @@ static void debug_flags_initialize(void) {
     }
 }
 
-#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+#if defined(OS_WINDOWS) && defined(HAVE_ETW)
 // Upgrade only the exact legacy path generated from the configured log
 // directory. A filename suffix alone cannot distinguish a default from an
 // explicit user-selected path such as C:/custom/debug.log.
@@ -78,8 +78,6 @@ void netdata_conf_section_logs(void) {
 #elif defined(OS_WINDOWS)
 #if defined(HAVE_ETW)
     os_default_method = "etw";
-#elif defined(HAVE_WEL)
-    os_default_method = "wel";
 #endif
 #endif
 
@@ -90,7 +88,7 @@ void netdata_conf_section_logs(void) {
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
 #endif
     s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "debug", filename);
-#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+#if defined(OS_WINDOWS) && defined(HAVE_ETW)
     if (nd_log_is_default_file_path(s, "debug")) {
         inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "debug", os_default_method);
         s = os_default_method;
@@ -103,7 +101,7 @@ void netdata_conf_section_logs(void) {
     else
         snprintfz(filename, FILENAME_MAX, "%s/daemon.log", netdata_configured_log_dir);
     s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "daemon", filename);
-#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+#if defined(OS_WINDOWS) && defined(HAVE_ETW)
     if (nd_log_is_default_file_path(s, "daemon")) {
         inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "daemon", os_default_method);
         s = os_default_method;
@@ -116,7 +114,7 @@ void netdata_conf_section_logs(void) {
     else
         snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
     s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "collector", filename);
-#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+#if defined(OS_WINDOWS) && defined(HAVE_ETW)
     if (nd_log_is_default_file_path(s, "collector")) {
         inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "collector", os_default_method);
         s = os_default_method;
@@ -131,7 +129,7 @@ void netdata_conf_section_logs(void) {
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
 #endif
     s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "access", filename);
-#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+#if defined(OS_WINDOWS) && defined(HAVE_ETW)
     if (nd_log_is_default_file_path(s, "access")) {
         inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "access", os_default_method);
         s = os_default_method;
@@ -144,7 +142,7 @@ void netdata_conf_section_logs(void) {
     else
         snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
     s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_LOGS, "health", filename);
-#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+#if defined(OS_WINDOWS) && defined(HAVE_ETW)
     if (nd_log_is_default_file_path(s, "health")) {
         inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "health", os_default_method);
         s = os_default_method;
@@ -156,7 +154,7 @@ void netdata_conf_section_logs(void) {
     // NDLM_DEFAULT), so it bypasses the normal nd_log_open config path even when aclk
     // conversation logging is disabled.  On Windows, always redirect it to the Windows event
     // log first so that the broken compile-time LOG_DIR path is never used.
-#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+#if defined(OS_WINDOWS) && defined(HAVE_ETW)
     nd_log_set_user_settings(NDLS_ACLK, os_default_method);
 #endif
 
@@ -169,7 +167,7 @@ void netdata_conf_section_logs(void) {
         snprintfz(filename, FILENAME_MAX, "%s/aclk.log", netdata_configured_log_dir);
 #endif
         s = inicfg_get_log_path_setting(&netdata_config, CONFIG_SECTION_CLOUD, "conversation log file", filename);
-#if defined(OS_WINDOWS) && (defined(HAVE_WEL) || defined(HAVE_ETW))
+#if defined(OS_WINDOWS) && defined(HAVE_ETW)
         if (nd_log_is_default_file_path(s, "aclk")) {
             inicfg_set(&netdata_config, CONFIG_SECTION_CLOUD, "conversation log file", os_default_method);
             s = os_default_method;

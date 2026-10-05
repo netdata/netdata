@@ -1357,10 +1357,10 @@ int command_pipe_security_unittest(void) {
                 }
                 ACCESS_ALLOWED_ACE *ace = ace_ptr;
                 PSID sid = (PSID)&ace->SidStart;
-                has_admins |= EqualSid(sid, admin_sid) != FALSE;
-                has_system |= EqualSid(sid, system_sid) != FALSE;
-                has_world |= EqualSid(sid, world_sid) != FALSE;
-                has_anonymous |= EqualSid(sid, anonymous_sid) != FALSE;
+                has_admins = has_admins || EqualSid(sid, admin_sid) != FALSE;
+                has_system = has_system || EqualSid(sid, system_sid) != FALSE;
+                has_world = has_world || EqualSid(sid, world_sid) != FALSE;
+                has_anonymous = has_anonymous || EqualSid(sid, anonymous_sid) != FALSE;
             }
         }
     }
@@ -1510,7 +1510,7 @@ static void command_thread(void *arg) {
     if (ret) {
         netdata_log_error("uv_pipe_bind(): %s", uv_strerror(ret));
         command_thread_error = ret;
-        goto error_after_pipe_bind;
+        goto error_after_uv_listen;
     }
 
     ret = uv_listen((uv_stream_t *)&server_pipe, SOMAXCONN, connection_cb);
@@ -1554,7 +1554,6 @@ static void command_thread(void *arg) {
     return;
 
 error_after_uv_listen:
-error_after_pipe_bind:
     uv_close((uv_handle_t*)&server_pipe, NULL);
 error_after_pipe_init:
     uv_close((uv_handle_t *)&async, NULL);

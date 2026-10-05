@@ -7,7 +7,7 @@ How can an operator distinguish a slow Windows Function from an ACLK/Cloud trans
 ## Inputs
 
 - A reachable agent address (`AGENT_URL`, or `AGENT_HOST` with an optional port).
-- The agent node UUID, machine GUID, and Cloud credentials loaded by the token-safe wrapper environment.
+- The agent node UUID (`NODE_UUID`) and machine GUID (`MACHINE_GUID`) must be set in the shell before running this guide. The token-safe wrapper loads Cloud credentials, but does not populate these host identifiers.
 
 ## Steps
 
@@ -57,7 +57,7 @@ How can an operator distinguish a slow Windows Function from an ACLK/Cloud trans
    fi
    ```
 
-2. Load the token-safe Cloud wrapper and run the same Function request. The wrapper emits only the response body:
+2. In the same shell session as Step 1, reuse the loaded token-safe wrapper, target, and credentials to run the same Function request. The wrapper emits only the response body. Keep `NODE_UUID` and `MACHINE_GUID` set in this shell:
 
    ```bash
    # Run this block in the same shell session as Step 1 to reuse the target and credentials.

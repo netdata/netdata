@@ -1012,11 +1012,12 @@ static inline int getrusage(int who __maybe_unused, struct rusage *r) {
 // <sys/statvfs.h> is guarded by HAVE_SYS_STATVFS_H which is not set on Windows.
 // Stub returns 0 (success) when the path exists, -1 otherwise, so callers that
 // use statvfs() only to validate a path still work correctly.
+// The Windows compatibility wrappers below need these declarations first.
+char *os_translate_msys_to_windows_path(const char *src);
+wchar_t *os_translate_msys_to_windows_pathW(const char *src);
+void freez(void *ptr);
 #ifndef _STATVFS_DEFINED
 #define _STATVFS_DEFINED
-// Declared here because the Windows statvfs compatibility wrapper uses it
-// before the platform path helpers are declared below.
-wchar_t *os_translate_msys_to_windows_pathW(const char *src);
 struct statvfs {
     unsigned long  f_bsize;   // filesystem block size
     unsigned long  f_frsize;  // fundamental block size
@@ -1228,11 +1229,6 @@ static inline int link(const char *oldpath, const char *newpath) {
 #endif // OS_WINDOWS
 
 // Return entry type portably; UCRT64 has no dirent::d_type member.
-#if defined(OS_WINDOWS)
-char *os_translate_msys_to_windows_path(const char *src);
-wchar_t *os_translate_msys_to_windows_pathW(const char *src);
-void freez(void *ptr);
-#endif
 static inline unsigned char nd_dirent_type(const char *directory, const struct dirent *entry) {
 #if !defined(OS_WINDOWS)
     (void)directory;
@@ -1243,8 +1239,9 @@ static inline unsigned char nd_dirent_type(const char *directory, const struct d
 
     char path[FILENAME_MAX + 1];
     int n = snprintf(path, sizeof(path), "%s/%s", directory, entry->d_name);
-    if (n < 0 || (size_t)n >= sizeof(path))
+    if (n < 0 || (size_t)n >= sizeof(path)) { // NOSONAR (cpp:S6004) - this shared header must compile as C too.
         return DT_UNKNOWN;
+    }
 
     // readdir() receives MSYS-style paths; Win32 APIs require native paths.
     wchar_t *native_path = os_translate_msys_to_windows_pathW(path);

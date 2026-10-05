@@ -58,6 +58,39 @@ static DAEMON_STATUS_FILE session_status = {
     },
 };
 
+static bool status_threshold_trigger_smaller(bool *last, double threshold, double hysteresis, double free_mem) {
+    bool triggered = *last;
+    if (free_mem < threshold)
+        *last = true;
+    if (free_mem >= threshold + hysteresis)
+        *last = false;
+    return !triggered && *last;
+}
+
+void daemon_status_file_periodic_update(void) {
+    static const usec_t save_every_ut = 15 * 60 * USEC_PER_SEC;
+    static usec_t last_update_mt;
+    static bool initialized;
+    static bool triggered1, triggered5, triggered10;
+
+    double free_mem = os_system_memory_available_percent(os_system_memory(false));
+    bool save_again =
+        status_threshold_trigger_smaller(&triggered1, 1.0, 1.0, free_mem) ||
+        status_threshold_trigger_smaller(&triggered5, 5.0, 1.0, free_mem) ||
+        status_threshold_trigger_smaller(&triggered10, 10.0, 1.0, free_mem);
+    usec_t mt = now_monotonic_usec();
+
+    if (!initialized) {
+        last_update_mt = mt;
+        initialized = true;
+    }
+
+    if ((mt - last_update_mt) >= save_every_ut || save_again) {
+        daemon_status_file_update_status(DAEMON_STATUS_NONE);
+        last_update_mt += save_every_ut;
+    }
+}
+
 // Normal writers publish into the inactive slot until a deadly signal freezes slot reuse.
 static DAEMON_STATUS_FILE session_status_for_signals[2] = {
     {

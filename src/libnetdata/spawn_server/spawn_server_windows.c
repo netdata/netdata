@@ -184,6 +184,12 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     }
 
     char *command = (char *)buffer_tostring(wb);
+    if (buffer_strlen(wb) > SPAWN_SERVER_WINDOWS_MAX_COMMAND_LENGTH) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: command line exceeds the Windows CreateProcess limit for request No %zu",
+               instance->request_id);
+        goto cleanup;
+    }
 
     if (pipe(pipe_stdin) == -1) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,

@@ -51,12 +51,10 @@ static bool log_setting_output_is_special(const char *output) {
            strcmp(output, "system") == 0 ||
            strcmp(output, "stderr") == 0 ||
            strcmp(output, "stdout") == 0 ||
-           strcmp(output, "/dev/null") == 0
+           strcmp(output, "/dev/null") == 0 ||
+           strcmp(output, "wel") == 0
 #if defined(HAVE_ETW)
            || strcmp(output, "etw") == 0
-#endif
-#if defined(HAVE_WEL)
-           || strcmp(output, "wel") == 0
 #endif
         ;
 }

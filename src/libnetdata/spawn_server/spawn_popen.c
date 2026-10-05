@@ -131,31 +131,39 @@ static bool windows_path_is_native_executable(const char *path) {
 }
 
 static POPEN_INSTANCE *windows_run_direct_command(const char *cmd) {
-    size_t len = strnlen(cmd, PATH_MAX);
-    if(len >= PATH_MAX) {
+    size_t len = strnlen(cmd, SPAWN_SERVER_WINDOWS_MAX_COMMAND_LENGTH + 1);
+    if(len > SPAWN_SERVER_WINDOWS_MAX_COMMAND_LENGTH) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN: command too long");
         return NULL;
     }
 
-    char cmd_copy[len + 1];
+    char *cmd_copy = callocz(len + 1, sizeof(char));
     memcpy(cmd_copy, cmd, len + 1);
 
-    char *words[100];
-    size_t num_words = quoted_strings_splitter_whitespace(cmd_copy, words, _countof(words));
+    char *words[102];
+    size_t num_words = quoted_strings_splitter_whitespace(cmd_copy, words, 101);
+    if (num_words > 100) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN: command has too many arguments");
+        freez(cmd_copy);
+        return NULL;
+    }
     char *program = get_word(words, num_words, 0);
     if(!program || !windows_path_is_explicit(program) || !windows_path_is_native_executable(program)) {
         nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                "SPAWN: skipping '%s' — Windows commands must name an explicit .exe or .com path",
                cmd);
+        freez(cmd_copy);
         return NULL;
     }
 
-    const char *argv[101];
+    const char *argv[102];
     for(size_t i = 0; i < num_words; i++)
         argv[i] = get_word(words, num_words, i);
     argv[num_words] = NULL;
 
-    return spawn_popen_run_argv(argv);
+    POPEN_INSTANCE *instance = spawn_popen_run_argv(argv);
+    freez(cmd_copy);
+    return instance;
 }
 #endif
 
@@ -168,17 +176,20 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
     // plugins are handled by finding their interpreter. Other commands are
     // accepted below only as explicit native executable paths.
     if(strncmp(cmd, "exec ", 5) == 0) {
-        // cmd is built by netdata internally (max ~16 KiB), but bound the
-        // scan so a malformed input cannot request an unbounded VLA.
-        size_t len = strnlen(cmd, PATH_MAX);
-        if (len >= PATH_MAX) {
+        size_t len = strnlen(cmd, SPAWN_SERVER_WINDOWS_MAX_COMMAND_LENGTH + 1);
+        if (len > SPAWN_SERVER_WINDOWS_MAX_COMMAND_LENGTH) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN: command too long");
             return NULL;
         }
-        char cmd_copy[len + 1];
+        char *cmd_copy = callocz(len + 1, sizeof(char));
         memcpy(cmd_copy, cmd, len + 1);
-        char *words[100];
-        size_t num_words = quoted_strings_splitter(cmd_copy, words, 100, isspace_map_pluginsd);
+        char *words[102];
+        size_t num_words = quoted_strings_splitter(cmd_copy, words, 101, isspace_map_pluginsd);
+        if (num_words > 100) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN: command has too many arguments");
+            freez(cmd_copy);
+            return NULL;
+        }
         char *exec = get_word(words, num_words, 0);
         char *prog = get_word(words, num_words, 1);
         if (strcmp(exec, "exec") == 0 && prog) {
@@ -191,7 +202,9 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
                     argv[dst++] = get_word(words, num_words, i);
 
                 argv[dst] = NULL;
-                return spawn_popen_run_argv(argv);
+                POPEN_INSTANCE *instance = spawn_popen_run_argv(argv);
+                freez(cmd_copy);
+                return instance;
             }
 
             if (strcasecmp(windows_path_basename(prog), NETDATA_WINDOWS_SUPPORTED_SCRIPT_PLUGIN) == 0) {
@@ -235,6 +248,7 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
                     if (!python_path[0]) {
                         nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                                "SPAWN: skipping '%s' — Python is not installed on this system", prog);
+                        freez(cmd_copy);
                         return NULL;
                     }
                     interp = python_path;
@@ -251,7 +265,9 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
                 for (size_t i = 0; i < filt_count; i++)
                     argv[2 + i] = filt_args[i];
                 argv[2 + filt_count] = NULL;
-                return spawn_popen_run_argv(argv);
+                POPEN_INSTANCE *instance = spawn_popen_run_argv(argv);
+                freez(cmd_copy);
+                return instance;
             }
 
             if (strendswith(prog, ".plugin")) {
@@ -261,9 +277,11 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
                 nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                        "SPAWN: skipping '%s' — only %s is supported as a script plugin on Windows",
                        prog, NETDATA_WINDOWS_SUPPORTED_SCRIPT_PLUGIN);
+                freez(cmd_copy);
                 return NULL;
             }
         }
+        freez(cmd_copy);
     }
 #endif
 

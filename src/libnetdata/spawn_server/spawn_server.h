@@ -7,6 +7,10 @@
 
 #define SPAWN_SERVER_TRANSFER_FDS 4
 
+#if defined(OS_WINDOWS)
+#define SPAWN_SERVER_WINDOWS_MAX_COMMAND_LENGTH 32766
+#endif
+
 typedef enum __attribute__((packed)) {
     SPAWN_INSTANCE_TYPE_EXEC = 0,
     SPAWN_INSTANCE_TYPE_CALLBACK = 1

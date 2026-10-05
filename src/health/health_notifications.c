@@ -38,7 +38,7 @@ static bool health_exec_is_legacy_alarm_notify_script(const char *exec) {
     return !strcasecmp(basename, "alarm-notify.sh");
 }
 
-static void health_log_legacy_notifier_disabled(const char *chart, const char *name) {
+static void health_log_windows_notifier_warning(const char *chart, const char *name, const char *reason) {
     const usec_t now = now_monotonic_usec();
     bool should_log = false;
 
@@ -52,8 +52,7 @@ static void health_log_legacy_notifier_disabled(const char *chart, const char *n
 
     if (should_log)
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "Health is not sending notification for alarm '%s.%s' because alarm-notify.sh is disabled on Windows",
-               chart, name);
+               "Health is not sending notification for alarm '%s.%s': %s", chart, name, reason);
 }
 #endif
 
@@ -486,8 +485,13 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
     const char *recipient = (ae->recipient) ? ae_recipient(ae) : string2str(host->health.default_recipient);
 
     if(!exec || !*exec) {
+#if defined(OS_WINDOWS)
+        health_log_windows_notifier_warning(ae_chart_id(ae), ae_name(ae),
+                                            "no notification command is configured on Windows");
+#else
         netdata_log_debug(D_HEALTH, "Health not sending notification for alarm '%s.%s' (no notification command configured)",
                           ae_chart_id(ae), ae_name(ae));
+#endif
         goto done;
     }
 
@@ -495,7 +499,8 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
     // The legacy notifier is a shell script and Windows installations do not provide
     // a supported shell runtime. Native executables remain available for explicit use.
     if(health_exec_is_legacy_alarm_notify_script(exec)) {
-        health_log_legacy_notifier_disabled(ae_chart_id(ae), ae_name(ae));
+        health_log_windows_notifier_warning(ae_chart_id(ae), ae_name(ae),
+                                            "alarm-notify.sh is disabled on Windows");
         goto done;
     }
 #endif
