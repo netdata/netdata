@@ -45,7 +45,7 @@ use crate::signals::Signal;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PluginConfig {
-    pub endpoint: EndpointConfig,
+    pub receivers: ReceiversConfig,
     pub metrics: MetricsConfig,
     /// Single mandatory root for all signal storage. The plugin derives each
     /// signal's subtree as `{base_dir}/{signal}/{wal,index,catalog}`; the
@@ -189,51 +189,55 @@ impl LegacyLogsConfig {
     }
 }
 
-/// Ingestion listener endpoints: the mandatory OTLP/gRPC listener
-/// (`grpc_path` plus its TLS trio) and the optional OTLP/HTTP listener (`http_path` plus
-/// its own TLS trio), which serves the same signals over HTTP
-/// `POST /v1/{logs,traces,metrics}` for senders that speak OTLP/HTTP.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// The `receivers:` section: the listeners that accept OTLP from senders.
+/// OTLP is the only receiver.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct EndpointConfig {
-    /// Bind address for the OTLP/gRPC listener (e.g., "127.0.0.1:4317").
-    /// The alias keeps a stock file written before the `grpc_` prefix
-    /// parsing; the user and env layers accept the old name too, with a
-    /// deprecation warning.
-    #[serde(alias = "path")]
-    pub grpc_path: String,
-    /// TLS certificate file path for the OTLP/gRPC listener (aliased like
-    /// `grpc_path`).
-    #[serde(default, alias = "tls_cert_path")]
-    pub grpc_tls_cert_path: Option<String>,
-    /// TLS private key file path for the OTLP/gRPC listener.
-    #[serde(default, alias = "tls_key_path")]
-    pub grpc_tls_key_path: Option<String>,
-    /// CA certificate for client authentication (mutual TLS) on the
-    /// OTLP/gRPC listener.
-    #[serde(default, alias = "tls_ca_cert_path")]
-    pub grpc_tls_ca_cert_path: Option<String>,
-    /// Bind address for the OTLP/HTTP listener (e.g., "127.0.0.1:4318");
-    /// `None` disables the listener (gRPC alone is served). Like `grpc_path`,
-    /// this is a network address, not a filesystem path. Optional so the
-    /// pre-HTTP schema (and stock files written before this field existed)
-    /// keeps parsing unchanged.
+pub struct ReceiversConfig {
+    pub otlp: OtlpReceiverConfig,
+}
+
+/// `receivers.otlp`: the OTLP receiver, one listener per transport.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OtlpReceiverConfig {
+    pub protocols: OtlpProtocols,
+}
+
+/// `receivers.otlp.protocols`: the OTLP/gRPC and OTLP/HTTP listeners. Both
+/// serve the same signals (HTTP as `POST /v1/{logs,traces,metrics}`); config
+/// validation requires at least one of them to be enabled.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OtlpProtocols {
+    pub grpc: ProtocolConfig,
+    pub http: ProtocolConfig,
+}
+
+/// One OTLP listener. A disabled listener keeps its `endpoint` and `tls`
+/// values (an override layer may enable it again) but is not bound.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProtocolConfig {
+    pub enabled: bool,
+    /// Bind address (`host:port`, e.g. "127.0.0.1:4317").
+    pub endpoint: String,
     #[serde(default)]
-    pub http_path: Option<String>,
-    /// TLS certificate file path for the OTLP/HTTP listener. Kept separate
-    /// from `grpc_tls_cert_path` so one transport can be protected while
-    /// the other is not.
+    pub tls: TlsServerConfig,
+}
+
+/// Server-side TLS for one listener. TLS is on when `cert_file` and
+/// `key_file` are both set; `client_ca_file` additionally requires senders to
+/// present a client certificate signed by that CA (mutual TLS).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TlsServerConfig {
     #[serde(default)]
-    pub http_tls_cert_path: Option<String>,
-    /// TLS private key file path for the OTLP/HTTP listener; paired with
-    /// `http_tls_cert_path` exactly like the gRPC trio above.
+    pub cert_file: Option<String>,
     #[serde(default)]
-    pub http_tls_key_path: Option<String>,
-    /// CA certificate for client authentication (mutual TLS) on the
-    /// OTLP/HTTP listener; requires both `http_tls_cert_path` and
-    /// `http_tls_key_path`.
+    pub key_file: Option<String>,
     #[serde(default)]
-    pub http_tls_ca_cert_path: Option<String>,
+    pub client_ca_file: Option<String>,
 }
 
 /// Metrics ingestion configuration.
@@ -945,8 +949,15 @@ mod tests {
     /// tuning for logs and traces (different rotation/retention so the
     /// derivation per signal is observable).
     const FULL_YAML: &str = r#"
-endpoint:
-  grpc_path: "127.0.0.1:4317"
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        enabled: true
+        endpoint: "127.0.0.1:4317"
+      http:
+        enabled: false
+        endpoint: "127.0.0.1:4318"
 metrics:
   max_new_charts_per_request: 100
 base_dir: /var/lib/netdata/otel
@@ -1029,40 +1040,35 @@ traces:
     }
 
     #[test]
-    fn endpoint_http_fields_default_absent_and_survive_bincode_ipc() {
-        // FULL_YAML predates the OTLP/HTTP keys: every http field absent →
-        // None (listener disabled), so a pre-change config keeps parsing
-        // unchanged at the schema level.
+    fn receivers_tls_defaults_absent_and_survive_bincode_ipc() {
+        // `tls` omitted → every TLS field unset.
         let c = full_config();
-        assert_eq!(c.endpoint.http_path, None);
-        assert_eq!(c.endpoint.http_tls_cert_path, None);
-        assert_eq!(c.endpoint.http_tls_key_path, None);
-        assert_eq!(c.endpoint.http_tls_ca_cert_path, None);
+        assert_eq!(
+            c.receivers.otlp.protocols.grpc.tls,
+            TlsServerConfig::default()
+        );
+        assert_eq!(
+            c.receivers.otlp.protocols.http.tls,
+            TlsServerConfig::default()
+        );
 
         // The whole PluginConfig travels supervisor→worker over bincode
-        // (ferryboat); the new endpoint fields must round-trip the compact
-        // wire form, not just human-readable YAML.
-        let mut with_http = full_config();
-        with_http.endpoint.http_path = Some("127.0.0.1:4318".to_string());
-        with_http.endpoint.http_tls_cert_path = Some("/http/cert.pem".to_string());
-        with_http.endpoint.http_tls_key_path = Some("/http/key.pem".to_string());
-        with_http.endpoint.http_tls_ca_cert_path = Some("/http/ca.pem".to_string());
-        let bytes = bincode::serde::encode_to_vec(&with_http, bincode::config::standard()).unwrap();
+        // (ferryboat); the receiver fields must round-trip the compact wire
+        // form, not just human-readable YAML.
+        let mut config = full_config();
+        config.receivers.otlp.protocols.http = ProtocolConfig {
+            enabled: true,
+            endpoint: "127.0.0.1:4318".to_string(),
+            tls: TlsServerConfig {
+                cert_file: Some("/http/cert.pem".to_string()),
+                key_file: Some("/http/key.pem".to_string()),
+                client_ca_file: Some("/http/ca.pem".to_string()),
+            },
+        };
+        let bytes = bincode::serde::encode_to_vec(&config, bincode::config::standard()).unwrap();
         let (back, _): (PluginConfig, usize) =
             bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
-        assert_eq!(back.endpoint.http_path.as_deref(), Some("127.0.0.1:4318"));
-        assert_eq!(
-            back.endpoint.http_tls_cert_path.as_deref(),
-            Some("/http/cert.pem")
-        );
-        assert_eq!(
-            back.endpoint.http_tls_key_path.as_deref(),
-            Some("/http/key.pem")
-        );
-        assert_eq!(
-            back.endpoint.http_tls_ca_cert_path.as_deref(),
-            Some("/http/ca.pem")
-        );
+        assert_eq!(back.receivers, config.receivers);
     }
 
     #[test]

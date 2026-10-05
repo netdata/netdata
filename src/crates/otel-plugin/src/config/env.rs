@@ -1,9 +1,9 @@
 //! The `NETDATA_OTEL_CFG_*` environment-variable layer of config resolution —
 //! the highest-precedence source in `mod.rs`' stock < user < env order.
 //!
-//! Names mirror the YAML keys: `NETDATA_OTEL_CFG_{SECTION}_{FIELD}` for the
-//! global sections (`ENDPOINT_`, `METRICS_`, `BASE_DIR`, `REMOTE_STORAGE_`,
-//! `AUTH_`) and `NETDATA_OTEL_CFG_{LOGS|TRACES}_{FIELD}` for per-signal
+//! Names mirror the YAML keys: the dotted path upper-cased with `.` → `_`
+//! under `NETDATA_OTEL_CFG_` for the global sections (`RECEIVERS_OTLP_PROTOCOLS_`,
+//! `METRICS_`, `BASE_DIR`, `REMOTE_STORAGE_`, `AUTH_`) and `NETDATA_OTEL_CFG_{LOGS|TRACES}_{FIELD}` for per-signal
 //! tuning. Values parse like the YAML layer's overrides: integers and byte
 //! sizes (`"2GiB"`) via `FromStr`, durations (`"2 hours"`) via `humantime`.
 //!
@@ -25,8 +25,10 @@ use std::time::Duration;
 use anyhow::Result;
 
 use super::ConfigOverride;
-use super::endpoint::{EndpointOverride, RENAMED_KEYS};
 use super::metrics::MetricsOverride;
+use super::receivers::{
+    DEPRECATED_ENDPOINT_KEYS, ProtocolOverride, ReceiversOverride, TlsOverride, resolve_deprecated,
+};
 use super::signal::{
     AuthOverride, CatalogOverride, IngestOverride, RemoteStorageOverride, SignalOverride,
 };
@@ -171,28 +173,26 @@ fn parse_env_bool(env: &EnvReader<'_>, name: &str) -> Result<Option<bool>> {
     }
 }
 
-/// Look up a renamed endpoint key under both env names, derived from the
-/// YAML keys in [`RENAMED_KEYS`] (`grpc_tls_cert_path` →
-/// `NETDATA_OTEL_CFG_ENDPOINT_GRPC_TLS_CERT_PATH`). The old name still works
-/// with a deprecation warning; both set is an error, mirroring the YAML layer
-/// (`EndpointOverride::migrate_renamed_keys`).
-fn get_renamed_endpoint_env<'a>(
-    env: &EnvReader<'a>,
-    old_key: &str,
-    new_key: &str,
-) -> Result<Option<&'a str>> {
-    let old = var("ENDPOINT", &old_key.to_uppercase());
-    let new = var("ENDPOINT", &new_key.to_uppercase());
-    match (get_env(env, &old)?, get_env(env, &new)?) {
-        (Some(_), Some(_)) => anyhow::bail!(
-            "{old} and {new} are both set; {old} is the deprecated name of {new}, remove it"
-        ),
-        (Some(value), None) => {
-            tracing::warn!("{old} is deprecated, use {new}");
-            Ok(Some(value))
-        }
-        (None, value) => Ok(value),
-    }
+/// The env var name of a dotted YAML key: `receivers.otlp.protocols.grpc.endpoint`
+/// → `NETDATA_OTEL_CFG_RECEIVERS_OTLP_PROTOCOLS_GRPC_ENDPOINT`.
+fn env_name(key: &str) -> String {
+    format!("NETDATA_OTEL_CFG_{}", key.replace('.', "_").to_uppercase())
+}
+
+/// Look up a receiver key under its env name and, for the gRPC keys that
+/// have one, its deprecated `NETDATA_OTEL_CFG_ENDPOINT_*` name
+/// ([`DEPRECATED_ENDPOINT_KEYS`]).
+/// Same rule as the user file: the old name works with a warning, and when
+/// both are set the new one wins.
+fn get_receiver_env<'a>(env: &EnvReader<'a>, key: &str) -> Result<Option<String>> {
+    let new_name = env_name(key);
+    let new = get_env(env, &new_name)?;
+    let Some((old_key, _)) = DEPRECATED_ENDPOINT_KEYS.iter().find(|(_, new)| *new == key) else {
+        return Ok(new.map(str::to_string));
+    };
+    let old_name = env_name(old_key);
+    let old = get_env(env, &old_name)?;
+    Ok(resolve_deprecated("environment", &old_name, old, &new_name, new).map(str::to_string))
 }
 
 impl ConfigOverride {
@@ -205,7 +205,7 @@ impl ConfigOverride {
     /// only where at least one variable was set.
     pub(super) fn from_map(env: &EnvMap) -> Result<Self> {
         let env = &EnvReader::new(env);
-        let endpoint = EndpointOverride::from_map(env)?;
+        let receivers = receivers_from_map(env)?;
         let metrics = MetricsOverride::from_map(env)?;
         let base_dir = get_env(env, "NETDATA_OTEL_CFG_BASE_DIR")?.map(PathBuf::from);
         let remote_storage = RemoteStorageOverride::from_map(env)?;
@@ -215,11 +215,9 @@ impl ConfigOverride {
         env.ensure_fully_consumed()?;
 
         Ok(Self {
-            endpoint: if endpoint.has_any() {
-                Some(endpoint)
-            } else {
-                None
-            },
+            receivers,
+            // The deprecated env names were resolved by `receivers_from_map`.
+            endpoint: None,
             metrics: if metrics.has_any() {
                 Some(metrics)
             } else {
@@ -238,39 +236,25 @@ impl ConfigOverride {
     }
 }
 
-impl EndpointOverride {
-    fn from_map(env: &EnvReader<'_>) -> Result<Self> {
-        let [path, cert, key, ca] =
-            RENAMED_KEYS.map(|(old, new)| get_renamed_endpoint_env(env, old, new));
-        Ok(Self {
-            grpc_path: path?.map(str::to_string),
-            grpc_tls_cert_path: cert?.map(str::to_string),
-            grpc_tls_key_path: key?.map(str::to_string),
-            grpc_tls_ca_cert_path: ca?.map(str::to_string),
-            // An EMPTY value maps to `Some(None)` — the explicit clear that
-            // `http_path: null` expresses in YAML. The env layer cannot
-            // convey "unset" any other way for a knob the stock file already
-            // sets: a set-but-empty variable is the deliberate "turn the
-            // OTLP/HTTP listener off", never a no-op, so it must not fall
-            // through to the stock value.
-            http_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_HTTP_PATH")?.map(|v| {
-                if v.is_empty() {
-                    None
-                } else {
-                    Some(v.to_string())
-                }
-            }),
-            http_tls_cert_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_HTTP_TLS_CERT_PATH")?
-                .map(str::to_string),
-            http_tls_key_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_HTTP_TLS_KEY_PATH")?
-                .map(str::to_string),
-            http_tls_ca_cert_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_HTTP_TLS_CA_CERT_PATH")?
-                .map(str::to_string),
-            // The deprecated YAML-only names; the env layer resolved its own
-            // old names above.
-            ..Self::default()
-        })
-    }
+/// Build the `receivers.otlp.protocols` override from its env vars; `None`
+/// when none is set.
+fn receivers_from_map(env: &EnvReader<'_>) -> Result<Option<ReceiversOverride>> {
+    let grpc = protocol_from_map(env, "grpc")?;
+    let http = protocol_from_map(env, "http")?;
+    Ok(ReceiversOverride::from_protocols(grpc, http))
+}
+
+fn protocol_from_map(env: &EnvReader<'_>, protocol: &str) -> Result<ProtocolOverride> {
+    let key = |field: &str| format!("receivers.otlp.protocols.{protocol}.{field}");
+    Ok(ProtocolOverride {
+        enabled: parse_env_bool(env, &env_name(&key("enabled")))?,
+        endpoint: get_receiver_env(env, &key("endpoint"))?,
+        tls: Some(TlsOverride {
+            cert_file: get_receiver_env(env, &key("tls.cert_file"))?,
+            key_file: get_receiver_env(env, &key("tls.key_file"))?,
+            client_ca_file: get_receiver_env(env, &key("tls.client_ca_file"))?,
+        }),
+    })
 }
 
 impl MetricsOverride {

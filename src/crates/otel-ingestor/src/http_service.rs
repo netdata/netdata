@@ -1,5 +1,5 @@
-//! The OTLP/HTTP receiver: a second listener (config `endpoint.http_path`,
-//! stock `127.0.0.1:4318`) that serves `POST /v1/{logs,traces,metrics}` with
+//! The OTLP/HTTP receiver: a second listener (config
+//! `receivers.otlp.protocols.http`, stock `127.0.0.1:4318`) that serves `POST /v1/{logs,traces,metrics}` with
 //! collector-parity semantics, so SDKs and exporters defaulting to
 //! `http/protobuf` or `http/json` reach the same ingestion cores as gRPC.
 //!
@@ -58,7 +58,7 @@ use axum::body::Body;
 use axum::extract::State;
 use axum::http::{HeaderMap, Response, StatusCode};
 use axum::routing::post;
-use bridge::config::{AuthConfig, EndpointConfig};
+use bridge::config::{AuthConfig, ProtocolConfig};
 use file_registry::TenantId;
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
@@ -180,7 +180,7 @@ pub(crate) fn router(state: HttpState) -> Router {
 }
 
 /// The OTLP/HTTP listener: a bound TCP listener, wrapped for TLS when the
-/// `http_tls_*` trio is configured.
+/// listener's `tls` cert and key are configured.
 pub(crate) enum HttpListener {
     Plain(tokio::net::TcpListener),
     Tls(TlsListener),
@@ -188,17 +188,19 @@ pub(crate) enum HttpListener {
 
 /// Bind the OTLP/HTTP listener (and build its TLS acceptor when configured).
 ///
-/// Returns `Ok(None)` when the receiver is disabled (`http_path: null`).
+/// Returns `Ok(None)` when the receiver is disabled (`enabled: false`).
 /// Every failure is fatal — strict fail-fast, symmetric with the gRPC
 /// bind — which is why this runs before the worker touches its WAL dirs and
 /// before `Ready` is sent.
-pub(crate) async fn bind_http(endpoint: &EndpointConfig) -> Result<Option<HttpListener>> {
-    let Some(path) = endpoint.http_path.as_ref() else {
+pub(crate) async fn bind_http(listener: &ProtocolConfig) -> Result<Option<HttpListener>> {
+    if !listener.enabled {
         tracing::info!(
-            "OTLP/HTTP receiver disabled (endpoint.http_path is null); serving gRPC only"
+            "OTLP/HTTP receiver disabled (receivers.otlp.protocols.http.enabled is false)"
         );
         return Ok(None);
-    };
+    }
+    let path = &listener.endpoint;
+    let tls = &listener.tls;
 
     let addr: SocketAddr = path
         .parse()
@@ -208,14 +210,10 @@ pub(crate) async fn bind_http(endpoint: &EndpointConfig) -> Result<Option<HttpLi
         .with_context(|| format!("failed to bind OTLP/HTTP endpoint {path}"))?;
     tracing::info!(endpoint = %path, "OTLP/HTTP endpoint bound");
 
-    match (
-        endpoint.http_tls_cert_path.as_ref(),
-        endpoint.http_tls_key_path.as_ref(),
-    ) {
+    match (tls.cert_file.as_ref(), tls.key_file.as_ref()) {
         (Some(cert_path), Some(key_path)) => {
-            let acceptor =
-                build_tls_acceptor(cert_path, key_path, endpoint.http_tls_ca_cert_path.as_ref())
-                    .context("failed to configure OTLP/HTTP TLS")?;
+            let acceptor = build_tls_acceptor(cert_path, key_path, tls.client_ca_file.as_ref())
+                .context("failed to configure OTLP/HTTP TLS")?;
             Ok(Some(HttpListener::Tls(TlsListener::new(
                 listener, acceptor,
             ))))
@@ -227,7 +225,7 @@ pub(crate) async fn bind_http(endpoint: &EndpointConfig) -> Result<Option<HttpLi
         // `validate()` rejects this pairing at config time; reaching here
         // means the supervisor handed us an unvalidated config.
         _ => bail!(
-            "OTLP/HTTP TLS requires both a certificate and a private key (http_tls_cert_path / http_tls_key_path)"
+            "OTLP/HTTP TLS requires both a certificate and a private key (tls.cert_file / tls.key_file)"
         ),
     }
 }
@@ -382,7 +380,7 @@ fn build_tls_acceptor(
         .with_context(|| format!("failed to parse TLS private key from: {key_path}"))?;
 
     // With a client CA the listener requires client certificates (mTLS),
-    // mirroring `grpc_tls_ca_cert_path` on the gRPC endpoint; without one it serves
+    // mirroring `tls.client_ca_file` on the gRPC endpoint; without one it serves
     // plain server-TLS.
     let builder = ServerConfig::builder();
     let config = match ca_path {
@@ -705,7 +703,7 @@ mod tests {
 
     use axum::body::Body;
     use axum::http::{Request, StatusCode, header};
-    use bridge::config::{AuthConfig, IngestConfig, RotationEntry, WalConfig};
+    use bridge::config::{AuthConfig, IngestConfig, RotationEntry, TlsServerConfig, WalConfig};
     use file_registry::{Identity, InstanceId, MachineId, MonotonicClock};
     use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
     use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
@@ -1527,16 +1525,15 @@ mod tests {
             self.dir.path().join(name).display().to_string()
         }
 
-        fn endpoint(&self, mtls: bool) -> EndpointConfig {
-            EndpointConfig {
-                grpc_path: "127.0.0.1:0".to_string(),
-                grpc_tls_cert_path: None,
-                grpc_tls_key_path: None,
-                grpc_tls_ca_cert_path: None,
-                http_path: Some("127.0.0.1:0".to_string()),
-                http_tls_cert_path: Some(self.path("server.pem")),
-                http_tls_key_path: Some(self.path("server.key")),
-                http_tls_ca_cert_path: mtls.then(|| self.path("ca.pem")),
+        fn endpoint(&self, mtls: bool) -> ProtocolConfig {
+            ProtocolConfig {
+                enabled: true,
+                endpoint: "127.0.0.1:0".to_string(),
+                tls: TlsServerConfig {
+                    cert_file: Some(self.path("server.pem")),
+                    key_file: Some(self.path("server.key")),
+                    client_ca_file: mtls.then(|| self.path("ca.pem")),
+                },
             }
         }
 
@@ -1563,7 +1560,7 @@ mod tests {
 
     /// Bind the TLS listener from `endpoint` and serve a test state on it.
     async fn spawn_tls_server(
-        endpoint: &EndpointConfig,
+        endpoint: &ProtocolConfig,
     ) -> (SocketAddr, tokio::task::JoinHandle<()>, tempfile::TempDir) {
         let Some(HttpListener::Tls(listener)) = bind_http(endpoint).await.unwrap() else {
             panic!("a configured cert/key pair must yield a TLS listener");
@@ -1671,7 +1668,7 @@ mod tests {
         install_crypto_provider();
         let pki = TestPki::new();
         let mut endpoint = pki.endpoint(false);
-        endpoint.http_tls_key_path = Some(pki.path("missing.key"));
+        endpoint.tls.key_file = Some(pki.path("missing.key"));
         let err = bind_http(&endpoint)
             .await
             .err()

@@ -6,7 +6,8 @@
 //! (`size_of_journal_file`, `number_of_journal_files`, ...); that is the only
 //! section whose keys were removed — the former endpoint/metrics keys still
 //! parse (`endpoint.path` and the TLS keys as deprecated names of their
-//! `grpc_` successors, see `endpoint.rs`). Values do not carry over: the storage engine changed, file sizes
+//! `receivers.otlp.protocols.grpc` successors, see `receivers.rs`). Values
+//! do not carry over: the storage engine changed, file sizes
 //! and counts mean different things, and the defaults changed too — so
 //! nothing is migrated automatically. The operator re-decides each value;
 //! this module hands them the key mapping. `logs.journal_dir` is the one

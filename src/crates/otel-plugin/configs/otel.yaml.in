@@ -10,35 +10,44 @@
 #
 # Settings resolve in this order: installed stock file < your otel.yaml copy
 # < NETDATA_OTEL_CFG_* environment variables. Variable names mirror the
-# option path (endpoint.grpc_path -> NETDATA_OTEL_CFG_ENDPOINT_GRPC_PATH);
-# see the plugin README for the exact naming rules. Restart the Netdata Agent
-# after changing this file or any of the variables.
+# option path (receivers.otlp.protocols.grpc.endpoint ->
+# NETDATA_OTEL_CFG_RECEIVERS_OTLP_PROTOCOLS_GRPC_ENDPOINT); see the plugin
+# README for the exact naming rules. Restart the Netdata Agent after
+# changing this file or any of the variables.
 
-endpoint:
-  # The two OTLP listeners. Each key ending in "path" is a network address
-  # (host:port), not a filesystem path. The loopback defaults accept only
-  # local senders. To receive from other hosts, bind a non-loopback address
-  # and protect the listener with TLS and network access controls.
-  #
-  # TLS: set the certificate and the key together (PEM files). The CA
-  # certificate enables mutual TLS: senders must present a client
-  # certificate signed by this CA. Each listener has its own TLS keys.
-  #
-  # The grpc_ keys were previously named without the prefix (path,
-  # tls_cert_path, ...). The former names still work and log a deprecation
-  # warning. If one key is set under both names, the plugin does not start.
+receivers:
+  otlp:
+    # The two OTLP listeners. Keep at least one of them enabled. The
+    # loopback defaults accept only local senders. To receive from other
+    # hosts, bind a non-loopback address and protect the listener with TLS
+    # and network access controls. Disable a listener that no sender uses.
+    #
+    # TLS: set cert_file and key_file together (PEM files).
+    # client_ca_file enables mutual TLS: senders must present a client
+    # certificate signed by this CA. Each listener has its own TLS settings.
+    #
+    # Older files configure the gRPC listener in an "endpoint:" section
+    # (path, tls_cert_path, tls_key_path, tls_ca_cert_path). These names
+    # still work and log a deprecation warning. If a file sets an option
+    # under both names, the plugin uses the value under "receivers:".
+    protocols:
+      # OTLP/gRPC listener.
+      grpc:
+        enabled: true
+        endpoint: "127.0.0.1:4317"
+        tls:
+          cert_file: null
+          key_file: null
+          client_ca_file: null
 
-  # OTLP/gRPC listener.
-  grpc_path: "127.0.0.1:4317"
-  grpc_tls_cert_path: null
-  grpc_tls_key_path: null
-  grpc_tls_ca_cert_path: null
-
-  # OTLP/HTTP listener. Set http_path to null to serve gRPC only.
-  http_path: "127.0.0.1:4318"
-  http_tls_cert_path: null
-  http_tls_key_path: null
-  http_tls_ca_cert_path: null
+      # OTLP/HTTP listener.
+      http:
+        enabled: true
+        endpoint: "127.0.0.1:4318"
+        tls:
+          cert_file: null
+          key_file: null
+          client_ca_file: null
 
 metrics:
   # Directory holding optional per-metric mapping files that shape how OTEL

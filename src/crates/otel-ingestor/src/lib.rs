@@ -22,9 +22,10 @@
 //!   the `X-Scope-OrgID` header). Each service exposes a transport-agnostic
 //!   core that the gRPC wrappers and the OTLP/HTTP front end both call.
 //! - Transports: `http_service` (OTLP/HTTP, `POST /v1/{logs,traces,metrics}`
-//!   with protobuf + JSON codecs on `endpoint.http_path`) and `otlp_json`
-//!   (its OTLP/JSON decoding over the `opentelemetry-proto` derives); gRPC
-//!   serving is wired inline in `run_ingestor` on `endpoint.grpc_path`.
+//!   with protobuf + JSON codecs on `receivers.otlp.protocols.http`) and
+//!   `otlp_json` (its OTLP/JSON decoding over the `opentelemetry-proto`
+//!   derives); gRPC serving (`receivers.otlp.protocols.grpc`) is `bind_grpc`
+//!   plus `grpc_server`, driven by `run_ingestor`.
 //! - Metrics support: `aggregation` (per-slot accumulation + cross-slot
 //!   contexts), `chart` (per-chart dimension state), `chart_config` (stock +
 //!   user chart config), `iter` (OTLP metric traversal), `otel` (proto
@@ -36,7 +37,7 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
-use bridge::config::{AuthConfig, LifecycleConfig, PluginConfig};
+use bridge::config::{AuthConfig, LifecycleConfig, PluginConfig, ProtocolConfig};
 use bridge::signals::Signal;
 use bridge::{IngestorRequest, IngestorResponse};
 use ferryboat::{Connection, Endpoint};
@@ -115,30 +116,16 @@ async fn run_ingestor(
     config: PluginConfig,
     mut conn: Connection<IngestorResponse, IngestorRequest>,
 ) -> Result<()> {
-    // Bind the gRPC endpoint FIRST, before this worker's disk setup: a port
+    // Bind the enabled listeners FIRST, before this worker's disk setup: a port
     // conflict is the most likely startup failure (another listener, or another
-    // agent in a shared network namespace), and binding here fails fast, before
-    // the ingestor touches its WAL directories or the seq high-water file.
-    // tonic's `serve(addr)` would bind lazily, only when the server future is
-    // polled.
-    let addr: std::net::SocketAddr = config.endpoint.grpc_path.parse().with_context(|| {
-        format!(
-            "failed to parse endpoint address: {}",
-            config.endpoint.grpc_path
-        )
-    })?;
-    // `serve_with_incoming` discards the builder's TCP options, so restore the
-    // TCP_NODELAY default that `serve(addr)` used to apply to accepted sockets.
-    let incoming = TcpIncoming::bind(addr)
-        .with_context(|| format!("failed to bind gRPC endpoint {}", config.endpoint.grpc_path))?
-        .with_nodelay(Some(true));
-    tracing::info!(endpoint = %config.endpoint.grpc_path, "gRPC endpoint bound");
-
-    // Bind the OTLP/HTTP listener under the same strict fail-fast rule: a
-    // bind or TLS failure here aborts the worker exactly like the gRPC bind
-    // above — before disk setup, before `Ready` — instead of advertising an
-    // endpoint that cannot receive.
-    let http_listener = http_service::bind_http(&config.endpoint).await?;
+    // agent in a shared network namespace), and binding here fails fast
+    // (strict, for both transports), before the ingestor touches its WAL
+    // directories or the seq high-water file and before `Ready`, instead of
+    // advertising an endpoint that cannot receive. Config validation
+    // guarantees at least one listener is enabled.
+    let grpc = &config.receivers.otlp.protocols.grpc;
+    let grpc_incoming = bind_grpc(grpc)?;
+    let http_listener = http_service::bind_http(&config.receivers.otlp.protocols.http).await?;
 
     // Set up metrics pipeline
     let mut ccm = ChartConfigManager::with_default_configs();
@@ -279,56 +266,20 @@ async fn run_ingestor(
         s.sweep_expired_rotations()
     });
 
-    // Build gRPC server (with TLS if configured)
-    let mut server_builder = Server::builder();
-
-    if let (Some(cert_path), Some(key_path)) = (
-        &config.endpoint.grpc_tls_cert_path,
-        &config.endpoint.grpc_tls_key_path,
-    ) {
-        let cert = std::fs::read(cert_path)
-            .with_context(|| format!("failed to read TLS certificate from: {}", cert_path))?;
-        let key = std::fs::read(key_path)
-            .with_context(|| format!("failed to read TLS private key from: {}", key_path))?;
-        let identity = Identity::from_pem(cert, key);
-
-        let mut tls_config = ServerTlsConfig::new().identity(identity);
-
-        if let Some(ref ca_cert_path) = config.endpoint.grpc_tls_ca_cert_path {
-            let ca_cert = std::fs::read(ca_cert_path)
-                .with_context(|| format!("failed to read CA certificate from: {}", ca_cert_path))?;
-            tls_config =
-                tls_config.client_ca_root(tonic::transport::Certificate::from_pem(ca_cert));
-        }
-
-        server_builder = server_builder
-            .tls_config(tls_config)
-            .context("failed to configure TLS")?;
-    } else {
-        tracing::warn!(
-            "TLS disabled, using insecure connection on endpoint: {}",
-            config.endpoint.grpc_path
-        );
-    }
-
-    // Build gRPC router with metrics + logs + traces
-    let metrics_svc = MetricsServiceServer::from_arc(Arc::clone(&metrics_service))
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
-    let logs_svc = LogsServiceServer::from_arc(Arc::clone(&logs_service))
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
-    let traces_svc = TraceServiceServer::from_arc(Arc::clone(&traces_service))
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
-
-    tracing::info!(endpoint = %config.endpoint.grpc_path, "gRPC server starting (metrics + logs + traces)");
-    let grpc_server = server_builder
-        .add_service(metrics_svc)
-        .add_service(logs_svc)
-        .add_service(traces_svc)
-        .serve_with_incoming(incoming);
+    let grpc_server = match grpc_incoming {
+        Some(incoming) => Some(grpc_server(
+            grpc,
+            incoming,
+            &metrics_service,
+            &logs_service,
+            &traces_service,
+        )?),
+        None => None,
+    };
 
     // The OTLP/HTTP front end over the SAME service cores. `None` means the
-    // receiver is disabled (`http_path: null`); the pending future keeps the
-    // select! arm shape uniform either way.
+    // receiver is disabled; the pending future keeps the select! arm shape
+    // uniform either way.
     let http_server = http_listener.map(|listener| {
         let router = http_service::router(http_service::HttpState {
             logs: Arc::clone(&logs_service),
@@ -351,8 +302,15 @@ async fn run_ingestor(
     // Main loop: forward chart data to supervisor, handle incoming requests,
     // run both transport servers
     tokio::select! {
-        result = grpc_server => {
-            result.with_context(|| format!("gRPC server error on {}", config.endpoint.grpc_path))?;
+        result = async {
+            match grpc_server {
+                Some(server) => server.await,
+                // Disabled receiver: this arm then never resolves, like the
+                // HTTP one below.
+                None => std::future::pending::<Result<()>>().await,
+            }
+        } => {
+            result?;
         }
         result = async {
             match http_server {
@@ -518,6 +476,84 @@ fn create_traces_service(
         auth.clone(),
         identity,
     )
+}
+
+/// Bind the OTLP/gRPC listener, or return `None` when it is disabled.
+/// tonic's `serve(addr)` would bind lazily, only when the server future is
+/// polled, so the socket is bound here to fail fast (see `run_ingestor`).
+fn bind_grpc(listener: &ProtocolConfig) -> Result<Option<TcpIncoming>> {
+    if !listener.enabled {
+        tracing::info!(
+            "OTLP/gRPC receiver disabled (receivers.otlp.protocols.grpc.enabled is false)"
+        );
+        return Ok(None);
+    }
+    let endpoint = &listener.endpoint;
+    let addr: std::net::SocketAddr = endpoint
+        .parse()
+        .with_context(|| format!("failed to parse endpoint address: {endpoint}"))?;
+    // `serve_with_incoming` discards the builder's TCP options, so restore the
+    // TCP_NODELAY default that `serve(addr)` used to apply to accepted sockets.
+    let incoming = TcpIncoming::bind(addr)
+        .with_context(|| format!("failed to bind gRPC endpoint {endpoint}"))?
+        .with_nodelay(Some(true));
+    tracing::info!(%endpoint, "gRPC endpoint bound");
+    Ok(Some(incoming))
+}
+
+/// Build the OTLP/gRPC server (with TLS if configured) for metrics, logs and
+/// traces over the bound `incoming` socket.
+fn grpc_server(
+    listener: &ProtocolConfig,
+    incoming: TcpIncoming,
+    metrics_service: &Arc<NetdataMetricsService>,
+    logs_service: &Arc<NetdataLogsService>,
+    traces_service: &Arc<NetdataTracesService>,
+) -> Result<impl std::future::Future<Output = Result<()>> + use<>> {
+    let endpoint = listener.endpoint.clone();
+    let mut server_builder = Server::builder();
+
+    if let (Some(cert_path), Some(key_path)) = (&listener.tls.cert_file, &listener.tls.key_file) {
+        let cert = std::fs::read(cert_path)
+            .with_context(|| format!("failed to read TLS certificate from: {}", cert_path))?;
+        let key = std::fs::read(key_path)
+            .with_context(|| format!("failed to read TLS private key from: {}", key_path))?;
+        let identity = Identity::from_pem(cert, key);
+
+        let mut tls_config = ServerTlsConfig::new().identity(identity);
+
+        if let Some(ca_cert_path) = &listener.tls.client_ca_file {
+            let ca_cert = std::fs::read(ca_cert_path)
+                .with_context(|| format!("failed to read CA certificate from: {}", ca_cert_path))?;
+            tls_config =
+                tls_config.client_ca_root(tonic::transport::Certificate::from_pem(ca_cert));
+        }
+
+        server_builder = server_builder
+            .tls_config(tls_config)
+            .context("failed to configure TLS")?;
+    } else {
+        tracing::warn!("TLS disabled, using insecure connection on endpoint: {endpoint}");
+    }
+
+    let metrics_svc = MetricsServiceServer::from_arc(Arc::clone(metrics_service))
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
+    let logs_svc = LogsServiceServer::from_arc(Arc::clone(logs_service))
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
+    let traces_svc = TraceServiceServer::from_arc(Arc::clone(traces_service))
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
+
+    tracing::info!(%endpoint, "gRPC server starting (metrics + logs + traces)");
+    let server = server_builder
+        .add_service(metrics_svc)
+        .add_service(logs_svc)
+        .add_service(traces_svc)
+        .serve_with_incoming(incoming);
+    Ok(async move {
+        server
+            .await
+            .with_context(|| format!("gRPC server error on {endpoint}"))
+    })
 }
 
 /// Spawn one signal's idle-rotation sweep loop: every [`WAL_SWEEP_INTERVAL`],
@@ -732,5 +768,45 @@ mod seed_tests {
         let highwater = wal::read_seq_highwater(&highwater_path);
         assert_eq!(highwater, None);
         assert_eq!(combined_seed(&scan, highwater), 7);
+    }
+}
+
+#[cfg(test)]
+mod grpc_listener_tests {
+    use bridge::config::TlsServerConfig;
+
+    use super::*;
+
+    fn grpc(enabled: bool, endpoint: &str) -> ProtocolConfig {
+        ProtocolConfig {
+            enabled,
+            endpoint: endpoint.to_string(),
+            tls: TlsServerConfig::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn disabled_grpc_listener_binds_nothing() {
+        // Even an address that cannot bind is never touched when disabled.
+        assert!(bind_grpc(&grpc(false, "not-an-address")).unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn enabled_grpc_listener_binds_or_fails_fast() {
+        assert!(bind_grpc(&grpc(true, "127.0.0.1:0")).unwrap().is_some());
+
+        let err = bind_grpc(&grpc(true, "not-an-address")).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("failed to parse endpoint address"),
+            "{err:#}"
+        );
+
+        let taken = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = taken.local_addr().unwrap().to_string();
+        let err = bind_grpc(&grpc(true, &addr)).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("failed to bind gRPC endpoint"),
+            "{err:#}"
+        );
     }
 }

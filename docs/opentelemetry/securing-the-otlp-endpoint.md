@@ -19,24 +19,30 @@ listeners as described below, or restrict which local users may connect to the p
 Bind beyond loopback only with TLS, and prefer mutual TLS:
 
 ```yaml
-endpoint:
-  grpc_path: "0.0.0.0:4317"
-  grpc_tls_cert_path: /etc/netdata/ssl/server-cert.pem
-  grpc_tls_key_path: /etc/netdata/ssl/server-key.pem
-  # Require client certificates (mutual TLS): senders must present a
-  # certificate signed by this CA.
-  grpc_tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
-  # The OTLP/HTTP listener has its own address and its own TLS settings,
-  # separate from the gRPC trio above. Set http_path to null instead to
-  # serve gRPC only.
-  http_path: "0.0.0.0:4318"
-  http_tls_cert_path: /etc/netdata/ssl/server-cert.pem
-  http_tls_key_path: /etc/netdata/ssl/server-key.pem
-  http_tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+        tls:
+          cert_file: /etc/netdata/ssl/server-cert.pem
+          key_file: /etc/netdata/ssl/server-key.pem
+          # Require client certificates (mutual TLS): senders must present a
+          # certificate signed by this CA.
+          client_ca_file: /etc/netdata/ssl/client-ca.pem
+      # The OTLP/HTTP listener has its own address and its own TLS settings.
+      http:
+        endpoint: "0.0.0.0:4318"
+        tls:
+          cert_file: /etc/netdata/ssl/server-cert.pem
+          key_file: /etc/netdata/ssl/server-key.pem
+          client_ca_file: /etc/netdata/ssl/client-ca.pem
 ```
 
 - Never expose a plaintext listener beyond loopback.
-- Restrict ports `4317` (OTLP/gRPC) and `4318` (OTLP/HTTP) with network access controls (firewall, security groups) to the senders' addresses. If no sender uses OTLP/HTTP, disable it (`http_path: null`) instead of leaving it exposed; the OTLP/gRPC listener cannot be disabled, so keep it on loopback when only HTTP senders exist.
+- Restrict ports `4317` (OTLP/gRPC) and `4318` (OTLP/HTTP) with network access controls (firewall, security groups) to
+  the senders' addresses. If no sender uses one of the listeners, turn it off (`enabled: false` under `grpc` or `http`)
+  instead of leaving it exposed. At least one listener must stay on.
 - Issue the server certificate from whatever your infrastructure already trusts — an internal CA or your certificate
   automation; the senders configure the matching `ca_file` (and, for mutual TLS, their client certificate and key) as
   shown in [Collect Logs with OpenTelemetry Collector](/docs/opentelemetry/logs-collection.md#shared-exporter).

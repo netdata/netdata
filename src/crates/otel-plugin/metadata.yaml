@@ -100,53 +100,63 @@ modules:
 
             The absolute paths shown below are the defaults for standard Linux packages. The installed stock configuration resolves its configuration and log directories for the installation layout, so macOS and custom-prefix installations use different paths. Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) with `otel.yaml` to inspect the installed values.
 
-            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Names are the uppercase option path with dots replaced by underscores. For example, `endpoint.grpc_tls_cert_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_GRPC_TLS_CERT_PATH`, and `endpoint.http_path` becomes `NETDATA_OTEL_CFG_ENDPOINT_HTTP_PATH` — set the latter to an empty value to disable the OTLP/HTTP listener. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
+            Environment overrides use the `NETDATA_OTEL_CFG_` prefix. Names are the uppercase option path with dots replaced by underscores. For example, `receivers.otlp.protocols.grpc.tls.cert_file` becomes `NETDATA_OTEL_CFG_RECEIVERS_OTLP_PROTOCOLS_GRPC_TLS_CERT_FILE`, and `receivers.otlp.protocols.http.enabled` becomes `NETDATA_OTEL_CFG_RECEIVERS_OTLP_PROTOCOLS_HTTP_ENABLED`. For the `default` rotation and retention entries, omit the `default` path segment: `logs.retention.default.max_age` becomes `NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE`, and `traces.retention.default.max_age` becomes `NETDATA_OTEL_CFG_TRACES_RETENTION_MAX_AGE`.
 
             Configuration is strict. Unknown YAML fields, unknown `NETDATA_OTEL_CFG_*` variables, malformed values, and the former experimental schema prevent the plugin from starting. The effective configuration is logged at startup; `remote_storage.uri` is redacted in that log.
 
-            The `endpoint.grpc_*` options were previously named without the `grpc_` prefix (`endpoint.path`, `endpoint.tls_cert_path`, and so on). The former names still work and log a deprecation warning. If one option is set under both names, the plugin does not start.
+            In a YAML file, an option set to `null` keeps its current value. To turn a listener off, set its `enabled` option to `false`. At least one of the two listeners must stay enabled.
+
+            Older files configure the OTLP/gRPC listener in an `endpoint:` section: `endpoint.path`, `endpoint.tls_cert_path`, `endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path`, and the matching `NETDATA_OTEL_CFG_ENDPOINT_*` variables. These names still work and log a deprecation warning. If a file or the environment sets an option under both names, the plugin logs a warning and uses the `receivers` name.
           folding:
             title: Config options
             enabled: true
           list:
-            - name: endpoint.grpc_path
-              description: OTLP/gRPC endpoint on which the Agent listens.
+            - name: receivers.otlp.protocols.grpc.enabled
+              description: Turns the OTLP/gRPC listener on or off.
+              default_value: true
+              required: false
+            - name: receivers.otlp.protocols.grpc.endpoint
+              description: Address (`host:port`) on which the OTLP/gRPC listener accepts connections.
               detailed_description: |
-                The default IPv4 loopback address accepts only local senders. To accept remote senders, bind a non-loopback address and protect the endpoint with TLS or mutual TLS and network access controls.
+                The default IPv4 loopback address accepts only local senders. To accept remote senders, bind a non-loopback address and protect the listener with TLS or mutual TLS and network access controls.
               default_value: "127.0.0.1:4317"
               required: false
-            - name: endpoint.grpc_tls_cert_path
-              description: Path to the server TLS certificate for the OTLP/gRPC listener. Set it together with `endpoint.grpc_tls_key_path`.
+            - name: receivers.otlp.protocols.grpc.tls.cert_file
+              description: Path to the server TLS certificate for the OTLP/gRPC listener. Set it together with `receivers.otlp.protocols.grpc.tls.key_file`.
               default_value: ""
               required: false
-            - name: endpoint.grpc_tls_key_path
-              description: Path to the server TLS private key for the OTLP/gRPC listener. Set it together with `endpoint.grpc_tls_cert_path`.
+            - name: receivers.otlp.protocols.grpc.tls.key_file
+              description: Path to the server TLS private key for the OTLP/gRPC listener. Set it together with `receivers.otlp.protocols.grpc.tls.cert_file`.
               default_value: ""
               required: false
-            - name: endpoint.grpc_tls_ca_cert_path
+            - name: receivers.otlp.protocols.grpc.tls.client_ca_file
               description: Path to a CA certificate used to verify client certificates on the OTLP/gRPC listener.
               detailed_description: |
                 Setting a CA certificate enables mutual TLS and therefore also requires the server certificate and key. Clients must present a certificate signed by this CA.
               default_value: ""
               required: false
-            - name: endpoint.http_path
-              description: OTLP/HTTP endpoint on which the Agent listens; `null` disables the HTTP listener.
+            - name: receivers.otlp.protocols.http.enabled
+              description: Turns the OTLP/HTTP listener on or off.
+              default_value: true
+              required: false
+            - name: receivers.otlp.protocols.http.endpoint
+              description: Address (`host:port`) on which the OTLP/HTTP listener accepts connections.
               detailed_description: |
-                Set it to `null` to disable the listener and serve gRPC only. The default IPv4 loopback address accepts only local senders. To accept remote senders, bind a non-loopback address and protect the listener with TLS or mutual TLS and network access controls.
+                The default IPv4 loopback address accepts only local senders. To accept remote senders, bind a non-loopback address and protect the listener with TLS or mutual TLS and network access controls.
               default_value: "127.0.0.1:4318"
               required: false
-            - name: endpoint.http_tls_cert_path
-              description: Path to the server TLS certificate for the OTLP/HTTP listener. Set it together with `endpoint.http_tls_key_path`.
+            - name: receivers.otlp.protocols.http.tls.cert_file
+              description: Path to the server TLS certificate for the OTLP/HTTP listener. Set it together with `receivers.otlp.protocols.http.tls.key_file`.
               default_value: ""
               required: false
-            - name: endpoint.http_tls_key_path
-              description: Path to the server TLS private key for the OTLP/HTTP listener. Set it together with `endpoint.http_tls_cert_path`.
+            - name: receivers.otlp.protocols.http.tls.key_file
+              description: Path to the server TLS private key for the OTLP/HTTP listener. Set it together with `receivers.otlp.protocols.http.tls.cert_file`.
               default_value: ""
               required: false
-            - name: endpoint.http_tls_ca_cert_path
+            - name: receivers.otlp.protocols.http.tls.client_ca_file
               description: Path to a CA certificate used to verify client certificates on the OTLP/HTTP listener.
               detailed_description: |
-                Setting a CA certificate enables mutual TLS and therefore also requires the HTTP server certificate and key. Clients must present a certificate signed by this CA.
+                Setting a CA certificate enables mutual TLS and therefore also requires the server certificate and key. Clients must present a certificate signed by this CA.
               default_value: ""
               required: false
             - name: metrics.chart_configs_dir
@@ -262,17 +272,23 @@ modules:
               folding:
                 enabled: false
               description: |
-                Bind beyond loopback only when the endpoint is protected. This example requires each sender to present a certificate signed by the configured CA. Each listener has its own TLS settings. If no sender uses OTLP/HTTP, set `http_path` to `null` instead.
+                Bind beyond loopback only when the endpoint is protected. This example requires each sender to present a certificate signed by the configured CA. Each listener has its own TLS settings. If no sender uses one of the listeners, set its `enabled` option to `false` instead.
               config: |
-                endpoint:
-                  grpc_path: "0.0.0.0:4317"
-                  grpc_tls_cert_path: /etc/netdata/ssl/server-cert.pem
-                  grpc_tls_key_path: /etc/netdata/ssl/server-key.pem
-                  grpc_tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
-                  http_path: "0.0.0.0:4318"
-                  http_tls_cert_path: /etc/netdata/ssl/server-cert.pem
-                  http_tls_key_path: /etc/netdata/ssl/server-key.pem
-                  http_tls_ca_cert_path: /etc/netdata/ssl/client-ca.pem
+                receivers:
+                  otlp:
+                    protocols:
+                      grpc:
+                        endpoint: "0.0.0.0:4317"
+                        tls:
+                          cert_file: /etc/netdata/ssl/server-cert.pem
+                          key_file: /etc/netdata/ssl/server-key.pem
+                          client_ca_file: /etc/netdata/ssl/client-ca.pem
+                      http:
+                        endpoint: "0.0.0.0:4318"
+                        tls:
+                          cert_file: /etc/netdata/ssl/server-cert.pem
+                          key_file: /etc/netdata/ssl/server-key.pem
+                          client_ca_file: /etc/netdata/ssl/client-ca.pem
             - name: Configure log and trace retention
               folding:
                 enabled: true
@@ -321,14 +337,18 @@ modules:
             cause: |
               Another process already listens on the configured address. Typical sources are a standalone OpenTelemetry Collector on the same host — its own OTLP receivers default to the same conventional ports, `4317` for gRPC and `4318` for HTTP — or several Netdata Agents running in containers that share the host network namespace (`--network host`), where only one of them can own a given port. The plugin binds both listeners before it advertises anything, so on a conflict it exits once and the Agent disables it until the next Agent restart.
             fix: |
-              Find the owner with `ss -ltnp 'sport = :4317'` (or `sport = :4318` for the OTLP/HTTP listener). Then stop that listener, or give this Agent its own addresses in `otel.yaml` and point every OTLP sender at the new ports. The OTLP/HTTP listener can also be disabled outright with `http_path: null`:
+              Find the owner with `ss -ltnp 'sport = :4317'` (or `sport = :4318` for the OTLP/HTTP listener). Then stop that listener, or give this Agent its own addresses in `otel.yaml` and point every OTLP sender at the new ports. You can also turn off a listener that no sender uses:
 
               ```yaml
-              endpoint:
-                grpc_path: 127.0.0.1:14317
-                http_path: 127.0.0.1:14318
-                # or serve gRPC only:
-                # http_path: null
+              receivers:
+                otlp:
+                  protocols:
+                    grpc:
+                      endpoint: 127.0.0.1:14317
+                    http:
+                      endpoint: 127.0.0.1:14318
+                      # or turn the OTLP/HTTP listener off:
+                      # enabled: false
               ```
 
               When several Agents share one network namespace and only one needs to receive OTLP, disable the plugin on the others in `netdata.conf`:

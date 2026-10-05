@@ -37,3 +37,5 @@ file-registry = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+# Captures the deprecation warnings config resolution logs.
+tracing-subscriber = { workspace = true }
