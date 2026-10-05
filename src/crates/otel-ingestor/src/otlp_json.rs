@@ -16,7 +16,7 @@
 //!   derives require the top-level `resource*` array and most fields of
 //!   exponential-histogram points, buckets, summary points, quantiles,
 //!   exemplars, `ArrayValue`/`KeyValueList` and `KeyValue.key`; an empty
-//!   `AnyValue` (`{}`, meaning unset) is rejected.
+//!   `AnyValue` (`{}`, meaning unset, or only unknown fields) is rejected.
 //! - Exemplar values: the contract puts `asInt`/`asDouble` on the exemplar
 //!   itself; the derives expect them nested under `value`.
 //!
@@ -25,7 +25,7 @@
 //! flattened `Option` into `None`: a histogram the derives cannot read
 //! vanishes from an otherwise successful decode.
 //!
-//! [`decode`] therefore parses the body into a `serde_json::Value`, rewrites
+//! [`OtlpJson::decode_json`] therefore parses the body into a `serde_json::Value`, rewrites
 //! every affected field into the form the derives read, decodes, and then
 //! checks that no metric or number-point value present in the JSON came back
 //! empty. Such a loss — input the derives cannot represent even after the
@@ -163,7 +163,9 @@ fn from_value<T: DeserializeOwned>(root: Value) -> Result<T, String> {
 /// entries (proto3 JSON's "default value"), fill the `values` of an
 /// `ArrayValue`/`KeyValueList` and the `key` of a `KeyValue` when omitted, and
 /// drop an empty `AnyValue` (`{}`, unset) where a `KeyValue` or log body holds
-/// it. The `arrayValue`/`kvlistValue`/`body` keys and the attribute-list keys
+/// it. An `AnyValue` naming no known kind counts as empty: receivers ignore
+/// unknown fields, so a value kind newer than this decoder is unset rather
+/// than a derive error. The `arrayValue`/`kvlistValue`/`body` keys and the attribute-list keys
 /// occur only in those messages, so matching on names is unambiguous; a
 /// `value` key also names a quantile's double, so an empty `value` is dropped
 /// only inside the `KeyValue`s those lists hold.
@@ -191,7 +193,7 @@ fn prune(value: &mut Value) {
                     pairs.iter_mut().for_each(fill_key_value);
                 }
             }
-            if map.get("body").is_some_and(is_empty_object) {
+            if map.get("body").is_some_and(is_unset_any_value) {
                 map.remove("body");
             }
         }
@@ -205,7 +207,7 @@ fn fill_key_value(pair: &mut Value) {
     if let Value::Object(pair) = pair {
         pair.entry("key")
             .or_insert_with(|| Value::String(String::new()));
-        if pair.get("value").is_some_and(is_empty_object) {
+        if pair.get("value").is_some_and(is_unset_any_value) {
             pair.remove("value");
         }
     }
@@ -219,8 +221,21 @@ fn single_value(object: &Object) -> Result<(), String> {
     Ok(())
 }
 
-fn is_empty_object(value: &Value) -> bool {
-    value.as_object().is_some_and(Map::is_empty)
+/// An `AnyValue` object with none of its oneof keys: `{}` or only unknown
+/// fields. The derives reject both ("no known keys found").
+fn is_unset_any_value(value: &Value) -> bool {
+    const KINDS: [&str; 7] = [
+        "stringValue",
+        "boolValue",
+        "intValue",
+        "doubleValue",
+        "arrayValue",
+        "kvlistValue",
+        "bytesValue",
+    ];
+    value
+        .as_object()
+        .is_some_and(|map| !KINDS.iter().any(|kind| map.contains_key(*kind)))
 }
 
 // ---------------------------------------------------------------------------
@@ -925,8 +940,10 @@ mod tests {
 
     #[test]
     fn omitted_and_null_any_values_decode_as_unset() {
-        let json = r#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{},"attributes":[
+        let json = r#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"futureValue":1},"attributes":[
             {"key":"empty","value":{}},
+            {"key":"future","value":{"futureValue":1}},
+            {"key":"mixed","value":{"stringValue":"s","futureValue":1}},
             {"key":"null","value":null},
             {"key":"list","value":{"kvlistValue":{}}},
             {"key":"array","value":{"arrayValue":{}}},
@@ -943,6 +960,8 @@ mod tests {
                     log_records: vec![LogRecord {
                         attributes: vec![
                             kv("empty", None),
+                            kv("future", None),
+                            kv("mixed", Some(any_value::Value::StringValue("s".into()))),
                             kv("null", None),
                             kv(
                                 "list",
