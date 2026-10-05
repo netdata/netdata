@@ -26,10 +26,11 @@ func (c *Collector) collect() (map[string]int64, error) {
 	if err := c.collectInfo(mx); err != nil {
 		return nil, err
 	}
-	if err := c.collectImages(mx); err != nil {
+	usedImages, err := c.collectContainers(mx)
+	if err != nil {
 		return nil, err
 	}
-	if err := c.collectContainers(mx); err != nil {
+	if err := c.collectImages(mx, usedImages); err != nil {
 		return nil, err
 	}
 
@@ -57,49 +58,54 @@ func (c *Collector) collectInfo(mx map[string]int64) error {
 // per call (moby/moby#53077). Image metrics change rarely, so the list is refreshed at most this often.
 const imagesRefreshEvery = 5 * time.Minute
 
-type imagesStats struct {
-	size     int64
-	dangling int64
-	active   int64
+type imagesSnapshot struct {
+	ids  []string
+	size int64
 }
 
-func (c *Collector) collectImages(mx map[string]int64) error {
+// collectImages counts an image as active when a container in usedImages (keyed by image ID) was created from it.
+// The daemon's own per-image container count is not used: it is -1 when the negotiated API is older than 1.51.
+func (c *Collector) collectImages(mx map[string]int64, usedImages map[string]bool) error {
 	if now := c.now(); !now.Before(c.imagesNextRefresh) {
-		stats, err := c.listImages()
+		images, err := c.listImages()
 		if err != nil {
 			return err
 		}
-		c.images = stats
+		c.images = images
 		c.imagesNextRefresh = now.Add(imagesRefreshEvery)
 	}
 
 	mx["images_size"] = c.images.size
-	mx["images_dangling"] = c.images.dangling
-	mx["images_active"] = c.images.active
+	mx["images_dangling"] = 0
+	mx["images_active"] = 0
+
+	for _, id := range c.images.ids {
+		if usedImages[id] {
+			mx["images_active"]++
+		} else {
+			mx["images_dangling"]++
+		}
+	}
 
 	return nil
 }
 
-func (c *Collector) listImages() (imagesStats, error) {
+func (c *Collector) listImages() (imagesSnapshot, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
 
 	result, err := c.client.ImageList(ctx, docker.ImageListOptions{})
 	if err != nil {
-		return imagesStats{}, err
+		return imagesSnapshot{}, err
 	}
 
-	var stats imagesStats
+	var images imagesSnapshot
 	for _, v := range result.Items {
-		stats.size += v.Size
-		if v.Containers == 0 {
-			stats.dangling++
-		} else {
-			stats.active++
-		}
+		images.ids = append(images.ids, v.ID)
+		images.size += v.Size
 	}
 
-	return stats, nil
+	return images, nil
 }
 
 var (
@@ -120,7 +126,7 @@ var (
 	}
 )
 
-func (c *Collector) collectContainers(mx map[string]int64) error {
+func (c *Collector) collectContainers(mx map[string]int64) (map[string]bool, error) {
 	containerSet := make(map[typesContainer.HealthStatus][]typesContainer.Summary)
 
 	for _, status := range containerHealthStatuses {
@@ -140,11 +146,12 @@ func (c *Collector) collectContainers(mx map[string]int64) error {
 			return nil
 
 		}(); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	seen := make(map[string]bool)
+	usedImages := make(map[string]bool)
 
 	for _, s := range containerHealthStatuses {
 		mx["containers_health_status_"+string(s)] = 0
@@ -158,6 +165,8 @@ func (c *Collector) collectContainers(mx map[string]int64) error {
 		}
 
 		for _, cntr := range containers {
+			usedImages[cntr.ImageID] = true
+
 			state := string(cntr.State)
 			if status == typesContainer.Unhealthy {
 				if cntr.State == "running" {
@@ -216,7 +225,7 @@ func (c *Collector) collectContainers(mx map[string]int64) error {
 		}
 	}
 
-	return nil
+	return usedImages, nil
 }
 
 func hasIgnoreLabel(cntr typesContainer.Summary) bool {

@@ -88,7 +88,7 @@ type (
 		cntrSr     matcher.Matcher
 
 		now               func() time.Time
-		images            imagesStats
+		images            imagesSnapshot
 		imagesNextRefresh time.Time
 	}
 	dockerClient interface {

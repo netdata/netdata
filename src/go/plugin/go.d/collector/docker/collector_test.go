@@ -413,7 +413,7 @@ func TestCollector_Collect(t *testing.T) {
 				"containers_state_exited":                                   6,
 				"containers_state_paused":                                   5,
 				"containers_state_running":                                  4,
-				"images_active":                                             1,
+				"images_active":                                             2,
 				"images_dangling":                                           1,
 				"images_size":                                               300,
 			},
@@ -653,7 +653,7 @@ func TestCollector_Collect(t *testing.T) {
 				"containers_state_exited":                                   6,
 				"containers_state_paused":                                   5,
 				"containers_state_running":                                  4,
-				"images_active":                                             1,
+				"images_active":                                             2,
 				"images_dangling":                                           1,
 				"images_size":                                               300,
 			},
@@ -691,17 +691,21 @@ func TestCollector_Collect(t *testing.T) {
 }
 
 func TestCollector_Collect_ImagesRefresh(t *testing.T) {
-	imagesV1 := []typesImage.Summary{{Containers: 0, Size: 100}, {Containers: 1, Size: 200}}
-	imagesV2 := []typesImage.Summary{{Containers: 2, Size: 1000}}
+	imagesV1 := []typesImage.Summary{
+		{ID: "sha256:v1", Containers: -1, Size: 100},
+		{ID: "sha256:unused", Containers: -1, Size: 200},
+	}
+	imagesV2 := []typesImage.Summary{{ID: "sha256:v2", Containers: -1, Size: 1000}}
 	mxV1 := map[string]int64{"images_active": 1, "images_dangling": 1, "images_size": 300}
 	mxV2 := map[string]int64{"images_active": 1, "images_dangling": 0, "images_size": 1000}
 
 	type step struct {
-		advance        time.Duration
-		images         []typesImage.Summary
-		errOnImageList bool
-		wantCalls      int
-		wantImages     map[string]int64
+		advance          time.Duration
+		images           []typesImage.Summary
+		errOnImageList   bool
+		containerImageID string
+		wantCalls        int
+		wantImages       map[string]int64
 	}
 	tests := map[string]struct {
 		steps []step
@@ -711,6 +715,18 @@ func TestCollector_Collect_ImagesRefresh(t *testing.T) {
 				{images: imagesV1, wantCalls: 1, wantImages: mxV1},
 				{advance: imagesRefreshEvery - time.Second, images: imagesV2, wantCalls: 1, wantImages: mxV1},
 				{advance: time.Second, images: imagesV2, wantCalls: 2, wantImages: mxV2},
+			},
+		},
+		"image usage follows the container list between refreshes": {
+			steps: []step{
+				{images: imagesV1, wantCalls: 1, wantImages: mxV1},
+				{
+					advance:          10 * time.Second,
+					containerImageID: "sha256:removed",
+					wantCalls:        1,
+					wantImages:       map[string]int64{"images_active": 0, "images_dangling": 2, "images_size": 300},
+				},
+				{advance: 10 * time.Second, wantCalls: 1, wantImages: mxV1},
 			},
 		},
 		"collection interval longer than the refresh interval refreshes on every collection": {
@@ -743,6 +759,7 @@ func TestCollector_Collect_ImagesRefresh(t *testing.T) {
 				now = now.Add(s.advance)
 				m.images = s.images
 				m.errOnImageList = s.errOnImageList
+				m.containerImageID = s.containerImageID
 
 				mx := collr.Collect(context.Background())
 
@@ -818,6 +835,7 @@ type mockClient struct {
 	closeCalled        bool
 	images             []typesImage.Summary
 	imageListCalls     int
+	containerImageID   string
 }
 
 func (m *mockClient) Info(_ context.Context, _ docker.InfoOptions) (docker.SystemInfoResult, error) {
@@ -854,34 +872,40 @@ func (m *mockClient) ContainerList(_ context.Context, opts docker.ContainerListO
 	switch typesContainer.HealthStatus(status) {
 	case typesContainer.Healthy:
 		containers = []typesContainer.Summary{
-			{Names: []string{"container1"}, State: "created", Image: "example/example:v1"},
-			{Names: []string{"container2"}, State: "running", Image: "example/example:v1"},
-			{Names: []string{"container3"}, State: "running", Image: "example/example:v1"},
+			{Names: []string{"container1"}, State: "created", Image: "example/example:v1", ImageID: "sha256:v1"},
+			{Names: []string{"container2"}, State: "running", Image: "example/example:v1", ImageID: "sha256:v1"},
+			{Names: []string{"container3"}, State: "running", Image: "example/example:v1", ImageID: "sha256:v1"},
 		}
 	case typesContainer.Unhealthy:
 		containers = []typesContainer.Summary{
-			{Names: []string{"container4"}, State: "created", Image: "example/example:v2"},
-			{Names: []string{"container5"}, State: "running", Image: "example/example:v2"},
-			{Names: []string{"container6"}, State: "paused", Image: "example/example:v2"},
-			{Names: []string{"container7"}, State: "restarting", Image: "example/example:v2"},
-			{Names: []string{"container8"}, State: "removing", Image: "example/example:v2"},
-			{Names: []string{"container9"}, State: "exited", Image: "example/example:v2"},
-			{Names: []string{"container10"}, State: "dead", Image: "example/example:v2"},
+			{Names: []string{"container4"}, State: "created", Image: "example/example:v2", ImageID: "sha256:v2"},
+			{Names: []string{"container5"}, State: "running", Image: "example/example:v2", ImageID: "sha256:v2"},
+			{Names: []string{"container6"}, State: "paused", Image: "example/example:v2", ImageID: "sha256:v2"},
+			{Names: []string{"container7"}, State: "restarting", Image: "example/example:v2", ImageID: "sha256:v2"},
+			{Names: []string{"container8"}, State: "removing", Image: "example/example:v2", ImageID: "sha256:v2"},
+			{Names: []string{"container9"}, State: "exited", Image: "example/example:v2", ImageID: "sha256:v2"},
+			{Names: []string{"container10"}, State: "dead", Image: "example/example:v2", ImageID: "sha256:v2"},
 		}
 	case typesContainer.Starting:
 		containers = []typesContainer.Summary{
-			{Names: []string{"container11"}, State: "removing", Image: "example/example:v3"},
-			{Names: []string{"container12"}, State: "exited", Image: "example/example:v3"},
-			{Names: []string{"container13"}, State: "exited", Image: "example/example:v3"},
+			{Names: []string{"container11"}, State: "removing", Image: "example/example:v3", ImageID: "sha256:v3"},
+			{Names: []string{"container12"}, State: "exited", Image: "example/example:v3", ImageID: "sha256:v3"},
+			{Names: []string{"container13"}, State: "exited", Image: "example/example:v3", ImageID: "sha256:v3"},
 		}
 	case typesContainer.NoHealthcheck:
 		containers = []typesContainer.Summary{
-			{Names: []string{"container14"}, State: "dead", Image: "example/example:v4"},
-			{Names: []string{"container15"}, State: "dead", Image: "example/example:v4"},
-			{Names: []string{"container16"}, State: "dead", Image: "example/example:v4"},
-			{Names: []string{"container17"}, State: "dead", Image: "example/example:v4",
+			{Names: []string{"container14"}, State: "dead", Image: "example/example:v4", ImageID: "sha256:v4"},
+			{Names: []string{"container15"}, State: "dead", Image: "example/example:v4", ImageID: "sha256:v4"},
+			{Names: []string{"container16"}, State: "dead", Image: "example/example:v4", ImageID: "sha256:v4"},
+			{Names: []string{"container17"}, State: "dead", Image: "example/example:v5", ImageID: "sha256:v5",
 				Labels: map[string]string{"netdata.cloud/ignore": "true"},
 			},
+		}
+	}
+
+	if m.containerImageID != "" {
+		for i := range containers {
+			containers[i].ImageID = m.containerImageID
 		}
 	}
 
@@ -905,9 +929,11 @@ func (m *mockClient) ImageList(_ context.Context, _ docker.ImageListOptions) (do
 		return docker.ImageListResult{Items: m.images}, nil
 	}
 
+	// Containers is -1 when the negotiated API is older than 1.51.
 	return docker.ImageListResult{Items: []typesImage.Summary{
-		{Containers: 0, Size: 100},
-		{Containers: 1, Size: 200},
+		{ID: "sha256:v1", Containers: -1, Size: 100},
+		{ID: "sha256:v5", Containers: -1, Size: 100},
+		{ID: "sha256:unused", Containers: -1, Size: 100},
 	}}, nil
 }
 

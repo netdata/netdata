@@ -40,7 +40,7 @@ modules:
             It discovers instances running on localhost by attempting to connect to a known Docker UNIX socket: `/var/run/docker.sock`.
         limits:
           description: |
-            Image metrics are refreshed about every 5 minutes, or on every collection when `update_every` is longer, so image pulls, removals, and changes in image use can take that long to show.
+            The image list is refreshed about every 5 minutes, or on every collection when `update_every` is longer, so pulled and removed images can take that long to show. Whether an image is used by a container is updated on every collection.
         performance_impact:
           description: |
             The collector itself uses little CPU; the cost falls on the Docker daemon, which does the work for each API request. On Docker Engine 29 and later with the containerd image store, listing images and containers costs `dockerd` and `containerd` CPU time that grows with the number of images and containers ([moby/moby#53077](https://github.com/moby/moby/issues/53077)).
