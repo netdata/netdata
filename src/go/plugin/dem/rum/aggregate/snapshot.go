@@ -126,6 +126,8 @@ func (st *siteState) readWindow(now time.Time) *windowRead {
 	// Identity loss can admit an old report again, so all derived measurements
 	// remain visibly incomplete for this bounded replay-loss interval.
 	identityLost := st.identityLoss.current(now)
+	r.sessionsLost += identityLost
+	r.pageSessionsLost += identityLost
 	for _, name := range append(append([]string{}, beacon.Vitals...), navLoadName, navDCLName) {
 		r.vitalLost[name] += identityLost
 	}

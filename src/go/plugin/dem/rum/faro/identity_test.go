@@ -35,6 +35,10 @@ func TestPinnedSDKDocumentIdentity(t *testing.T) {
 		assert.Equal(t, "/entry", b.PageGroup)
 		for _, event := range b.Events {
 			switch event.Kind {
+			case beacon.EventSession:
+				assert.NotEmpty(t, event.ID)
+				assert.Positive(t, event.Revision)
+				assert.Equal(t, event.ID, event.Attrs["observation_id"])
 			case beacon.EventDocument:
 				documents++
 				assert.Equal(t, b.ExperienceID, event.ID)

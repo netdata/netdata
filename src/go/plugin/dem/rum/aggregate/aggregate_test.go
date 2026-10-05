@@ -78,7 +78,8 @@ func TestPercentiles(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := [3]float64{percentile(tc.vals, 0.5), percentile(tc.vals, 0.75), percentile(tc.vals, 0.95)}
+			result := pctStats(tc.vals)
+			got := [3]float64{result.P50, result.P75, result.P95}
 			want := [3]float64{tc.p50, tc.p75, tc.p95}
 			if got != want {
 				t.Fatalf("got %v want %v", got, want)
@@ -425,4 +426,35 @@ func TestFilteredObservationPreservesOnlyAdmittedTimingEvents(t *testing.T) {
 	assert.Empty(t, result.Observation.Events)
 	assert.Nil(t, result.Observation.Navigation)
 	assert.Empty(t, result.Observation.Resources)
+}
+
+func TestIdentityCapacityLossInvalidatesObservedSessions(t *testing.T) {
+	a, now := newAgg(time.Minute)
+	old := mk(now.Add(-61*time.Second), "expired", "/old", v(beacon.LCP, 100))
+	old.Events = nil
+	a.Ingest(old)
+	require.Zero(t, a.Snapshot().ObservedSessions)
+	for i := range maxWindowObservations {
+		a.Ingest(&beacon.Beacon{
+			Site:         "s",
+			ExperienceID: fmt.Sprint(i),
+			Received:     *now,
+			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "activation", Revision: 1}},
+		})
+	}
+	old.Received = *now
+	a.Ingest(old)
+	snapshot := a.Snapshot()
+	require.Positive(t, snapshot.WindowLost)
+	require.Positive(t, snapshot.SessionsLost, "replay evidence loss also compromises session membership")
+	require.Positive(t, a.Activity().SessionsLost)
+	for _, page := range a.Pages() {
+		if page.Page == "/old" {
+			require.Positive(t, page.SessionsLost)
+		}
+	}
+	*now = now.Add(time.Minute + time.Second)
+	snapshot = a.Snapshot()
+	require.Zero(t, snapshot.SessionsLost)
+	require.Zero(t, snapshot.ObservedSessions)
 }

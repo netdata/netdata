@@ -75,6 +75,15 @@
           super.initialize();
         }
       }
+      class DocumentSessions extends sdk.SessionInstrumentation {
+        initialize() {
+          var push = this.api.pushEvent;
+          this.api = Object.assign({}, this.api, { pushEvent: function (name, attrs, domain, options) {
+            push(name, eventIdentity(attrs), domain, options);
+          } });
+          super.initialize();
+        }
+      }
       class ApplicationViews extends sdk.ViewInstrumentation {
         initialize() {
           var push = this.api.pushEvent;
@@ -96,7 +105,7 @@
         activate();
       });
       var inst = [new DocumentPerformance(), new sdk.ErrorsInstrumentation(),
-        new DocumentVitals(), new sdk.SessionInstrumentation(), new ApplicationViews()];
+        new DocumentVitals(), new DocumentSessions(), new ApplicationViews()];
       if (opt.consoleLogs) { inst.push(new sdk.ConsoleInstrumentation()); }
       if (opt.tracing && window.GrafanaFaroWebTracing) {
         // Same-origin requests always get traceparent; other origins only
@@ -184,6 +193,9 @@
     'faro.performance.resource': ['name', 'httpHost', 'duration', 'transferSize', 'initiatorType', 'observation_id', 'observation_sequence'],
     'faro.tracing.fetch': ['url.full', 'http.request.method', 'http.response.status_code', 'duration_ns'],
     'faro.tracing.xml-http-request': ['url.full', 'http.request.method', 'http.response.status_code', 'duration_ns'],
+    'session_start': ['observation_id', 'observation_sequence'],
+    'session_resume': ['observation_id', 'observation_sequence'],
+    'session_extend': ['observation_id', 'observation_sequence'],
     'document_activated': ['observation_id', 'observation_sequence'],
     'view_changed': ['fromView', 'toView', 'observation_id', 'observation_sequence'],
     'rage_click': ['target'], 'dead_click': ['target'], 'error_click': ['target']

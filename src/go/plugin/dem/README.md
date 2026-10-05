@@ -85,7 +85,8 @@ attributed to the original document.
 
 The configured `window` uses receiver arrival time, including for delayed reports. A genuinely newer revision extends
 that metric's presence in the window; a duplicate does not. Duplicate detection retains evidence for up to 30 minutes,
-subject to capacity and runtime restart. It is best effort, not exactly-once delivery. Reports arriving after retained
+subject to capacity and runtime restart. Identified SDK session lifecycle events follow the same rule, so replay does
+not renew observed-session windows. It is best effort, not exactly-once delivery. Reports arriving after retained
 evidence expires can be counted again. Late observations are not rejected merely to claim perfect deduplication.
 
 Population charts show retained observations, good/needs-improvement/poor counts and capacity-loss evidence. Percentiles

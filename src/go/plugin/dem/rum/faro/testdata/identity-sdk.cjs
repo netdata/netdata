@@ -108,15 +108,22 @@ async function run() {
   await tick();
   // Late first LCP report follows SPA navigation, while document origin stays entry.
   c.location.href = 'https://shop.example.org/checkout?private=route';
-  api.setView({ name: 'checkout' });
-  api.setView({ name: 'checkout' });
+  const callerView = Object.freeze({ name: 'checkout', id: 'caller-owned' });
+  api.setView(callerView);
+  const firstView = api.getView();
+  assert.equal(callerView.id, 'caller-owned', 'setView does not mutate the caller object');
+  assert.notEqual(firstView.id, callerView.id);
+  api.setView(callerView);
+  assert.equal(api.getView().id, firstView.id);
   c.document.visibilityState = 'hidden'; fire('visibilitychange'); await tick();
   c.document.visibilityState = 'visible'; fire('visibilitychange');
   now = 12000; clock += 11000;
   c.performance.interactionCount = 2;
   emit('event', { interactionId: 14, name: 'click', startTime: 11800, duration: 600, processingStart: 11810, processingEnd: 11900 });
   emit('layout-shift', { value: 0.3, startTime: 11800, hadRecentInput: false, sources: [] });
+  const firstViewID = firstView.id;
   api.setView({ name: 'receipt' });
+  assert.equal(firstView.id, firstViewID, 'later transitions do not mutate earlier view identity');
   await tick();
   c.document.visibilityState = 'hidden'; fire('visibilitychange'); await tick();
   // Restore before the 250ms queue drains. Old reports must retain old metadata.
@@ -164,11 +171,22 @@ async function run() {
   assert.equal(requests.filter(r => r.keepalive === false).length, 1);
   // Session replacement changes only session identity, never document identity.
   api.setSession({ id: 'replacement-session', attributes: { isSampled: 'true' } });
-  api.pushEvent('after_session_change');
+  const callerAttrs = Object.freeze({ key: 'value' });
+  api.pushEvent('after_session_change', callerAttrs);
+  assert.deepEqual(callerAttrs, { key: 'value' }, 'instrumentation identity wrappers do not mutate caller attributes');
   await settle();
   const last = records('events').find(r => r.value.name === 'after_session_change');
   assert.equal(last.meta.page.id, second);
   assert.equal(last.meta.session.id, 'replacement-session');
+  assert.equal(last.value.attributes?.observation_id, undefined, 'raw pushEvent is not identity-stamped');
+  assert.equal(last.value.attributes?.observation_sequence, undefined);
+  const sessions = records('events').filter(r => ['session_start', 'session_resume', 'session_extend'].includes(r.value.name));
+  assert.equal(sessions.length, 2);
+  assert.equal(new Set(sessions.map(r => r.value.attributes.observation_id)).size, sessions.length);
+  for (const event of sessions) {
+    assert.ok(event.value.attributes.observation_id);
+    assert.ok(Number(event.value.attributes.observation_sequence) > 0);
+  }
   assert.equal(records('events').filter(r => r.value.name === 'document_activated').length, 2);
   initialized.pause();
   process.stdout.write(JSON.stringify(bodies()));

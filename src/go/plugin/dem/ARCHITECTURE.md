@@ -142,7 +142,7 @@ raw setPage cannot replace the frozen document scope. The FetchTransport subclas
 matcher to an escaped, anchored collector URL; inherited delivery/batching/retry behavior stays intact. Raw URL
 strings become regular expressions in the pinned SDK and otherwise mis-handle bot query strings or prefix matches. The WebVitals instrumentation wrapper attaches increasing
 revisions in measurement context, never changing metadata for every measurement: Faro groups by metadata, so per-item
-metadata would destroy default batching. Explicit document/view events and performance entries receive identities
+metadata would destroy default batching. Explicit document/view/session lifecycle events and performance entries receive identities
 before transport; retries preserve identical IDs/revisions. Identity evidence lasts at most 30 minutes subject to
 capacity and restart. The SDK has no finite maximum delivery delay, so this is best-effort replay suppression.
 

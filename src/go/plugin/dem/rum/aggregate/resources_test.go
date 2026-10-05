@@ -75,7 +75,7 @@ func TestResourceCapacityWithholdsPercentiles(t *testing.T) {
 	b.PageHost = "example.com"
 	for i := range maxWindowObservations + 1 {
 		b.Resources = []beacon.Resource{
-			{Host: "example.com", HasDuration: true, DurationMS: float64(i), Initiator: "fetch"},
+			{ID: fmt.Sprint(i), Host: "example.com", HasDuration: true, DurationMS: float64(i), Initiator: "fetch"},
 		}
 		a.Ingest(b)
 	}
@@ -120,4 +120,29 @@ func TestLiteralUnknownHostIsNotMissingHost(t *testing.T) {
 		}
 	}
 	assert.NotEqual(t, s.ResourceHosts[0].Unknown, s.ResourceHosts[1].Unknown)
+}
+
+func TestResourceMissingIdentityIsExcluded(t *testing.T) {
+	for _, missing := range []string{"resource", "experience"} {
+		t.Run(missing, func(t *testing.T) {
+			a, now := newAgg(time.Minute)
+			b := mk(*now, "session", "/")
+			b.Events = nil
+			b.PageHost = "example.com"
+			b.Resources = []beacon.Resource{{ID: "resource", Host: "example.com", HasDuration: true, DurationMS: 100, Initiator: "fetch"}}
+			if missing == "resource" {
+				b.Resources[0].ID = ""
+			} else {
+				b.ExperienceID = ""
+			}
+			result := a.Ingest(b)
+			snapshot := a.Snapshot()
+			assert.Empty(t, result.Observation.Resources)
+			assert.False(t, snapshot.ResourcesSeen)
+			assert.Zero(t, snapshot.FirstPartyResources)
+			assert.Zero(t, snapshot.API.N)
+			assert.Empty(t, snapshot.ResourceHosts)
+			assert.EqualValues(t, 1, snapshot.Counters[CounterInvalidMeasurements])
+		})
+	}
 }

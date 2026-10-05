@@ -59,20 +59,12 @@ func stats(vital string, vals []float64) VitalStats {
 		}
 	}
 	n := len(sorted)
-	// Counts, not percentages: sum-aggregation across sites and nodes then
-	// yields traffic-weighted ratios, like httpcheck.status.
+	// Counts combine only for aligned, complete and disjoint populations;
+	// overlapping rolling windows must not be summed over time.
 	st.Good = good
 	st.Poor = poor
 	st.NeedsImpr = n - good - poor
 	return st
-}
-
-// percentile is nearest-rank on an unsorted copy.
-func percentile(vals []float64, p float64) float64 {
-	sorted := make([]float64, len(vals))
-	copy(sorted, vals)
-	sort.Float64s(sorted)
-	return pctSorted(sorted, p)
 }
 
 func pctSorted(sorted []float64, p float64) float64 {

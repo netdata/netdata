@@ -91,6 +91,18 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 			} else {
 				views++
 			}
+		case beacon.EventSession:
+			if b.ExperienceID == "" || b.SessionID == "" || ev.ID == "" || ev.Revision == 0 {
+				st.counters[CounterInvalidMeasurements]++
+				continue
+			}
+			if !st.admitIdentity(identityKey{
+				kind:       "session",
+				experience: b.ExperienceID,
+				item:       ev.ID,
+			}, 1, now) {
+				continue
+			}
 		case beacon.EventNavigation:
 			if b.Navigation != nil && ev.Revision == b.Navigation.Revision && navigationEvent == nil {
 				event := ev
@@ -194,15 +206,16 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 		if r.Self {
 			continue
 		}
-		if r.ID != "" && !st.admitIdentity(identityKey{
+		if b.ExperienceID == "" || r.ID == "" {
+			st.counters[CounterInvalidMeasurements]++
+			continue
+		}
+		if !st.admitIdentity(identityKey{
 			kind:       "resource",
 			experience: b.ExperienceID,
 			item:       r.ID,
 		}, 1, now) {
 			continue
-		}
-		if r.ID == "" {
-			st.counters[CounterInvalidMeasurements]++
 		}
 		if r.HasDuration && !validMeasurement(r.DurationMS) {
 			r.HasDuration = false

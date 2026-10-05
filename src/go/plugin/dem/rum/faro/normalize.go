@@ -85,7 +85,8 @@ func (o Options) appendFrame(stack *strings.Builder, frame stackFrame) string {
 // Typed event attributes serve native measurements even with optional logs off.
 func keepEventAttr(kind beacon.EventKind, name, key string) bool {
 	if key == "observation_id" || key == "observation_sequence" {
-		return kind == beacon.EventDocument || kind == beacon.EventView || kind == beacon.EventNavigation || kind == beacon.EventResource
+		return kind == beacon.EventDocument || kind == beacon.EventView || kind == beacon.EventNavigation ||
+			kind == beacon.EventResource || kind == beacon.EventSession
 	}
 	switch kind {
 	case beacon.EventNavigation:

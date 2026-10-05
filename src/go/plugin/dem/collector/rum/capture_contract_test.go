@@ -37,7 +37,8 @@ func TestCaptureNormalizationThroughNativeHistory(t *testing.T) {
 		viewID := fmt.Sprintf("view-%d", i+1)
 		events := []map[string]any{
 			{"name": "view_changed", "attributes": map[string]string{"fromView": previous, "toView": view, "observation_id": viewID, "observation_sequence": fmt.Sprint(i*10 + 2)}},
-			{"name": "session_start"}, {"name": "session_extend"},
+			{"name": "session_start", "attributes": map[string]string{"observation_id": fmt.Sprintf("start-%d", i), "observation_sequence": "1"}},
+			{"name": "session_extend", "attributes": map[string]string{"observation_id": fmt.Sprintf("extend-%d", i), "observation_sequence": "2"}},
 			{"name": stages[i], "attributes": map[string]string{"unused": "redact-me"}},
 		}
 		body := map[string]any{
