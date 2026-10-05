@@ -1850,11 +1850,9 @@ static int mrg_jv2_real_writer_unittest(void) {
     // two different extents, so the rejected page's extent must not be serialized
     xio_old.fileno = TEST_FILENO; xio_old.block = 4096;
     xio_old.bytes = 4096; xio_old.uuid_id = tp.shared_id;
-    xio_old.slots = END_SHORT - START_TIME + 1;
 
     xio_new.fileno = TEST_FILENO; xio_new.block = 8192;
     xio_new.bytes = 4096; xio_new.uuid_id = tp.shared_id;
-    xio_new.slots = END_LONG - START_TIME + 1;
     p_old = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
         .section = fx.section, .metric_id = (Word_t)tp.stale_ptr,
         .start_time_s = START_TIME, .end_time_s = END_SHORT, .size = 4096, .data = &fx.datafile,
@@ -2034,16 +2032,16 @@ static int jv2_expect_samples_section(struct rrdengine_journalfile *journalfile,
 }
 
 // Exact samples in journal v2 (stored slots):
-//  - the writer sums the slots of every metric's indexed pages into the samples
-//    section, in metric list order, and resets the datafile's charge to that total;
-//  - when a page does not know its slots, no section is written and the charge
-//    taken at flush time is kept;
+//  - the writer sums the slots of every metric's indexed pages (derived from
+//    their time ranges; a page with no update_every is a single slot) into the
+//    samples section, in metric list order, and resets the datafile's charge to
+//    that total;
 //  - the startup loader charges the section's total, or a per-entry estimate when
 //    the file has no valid section (absent, or damaged on disk).
 #define JV2_SAMPLES_METRICS 3
 #define JV2_SAMPLES_PAGES 2
 
-static int mrg_jv2_samples_section_check(bool all_slots_known) {
+static int mrg_jv2_samples_section_check(void) {
     int errors = 0;
     enum { TEST_FILENO = 12, FLUSH_CHARGE = 999 };
 
@@ -2074,19 +2072,26 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
         for(size_t p = 0; p < JV2_SAMPLES_PAGES; p++) {
             time_t start = 100 + (time_t)(p * 1000);
             time_t end = start + 50 + (time_t)(m * 10);
+            uint32_t update_every_s = 1;
+            // a single-point page replayed from a v1 journal for a metric not yet
+            // in MRG has no update_every; it is one slot. The first page, so the
+            // metric keeps its update_every (taken from its last page) and the
+            // estimate below does not change.
+            if(m == 1 && p == 0) {
+                end = start;
+                update_every_s = 0;
+            }
             uint32_t slots = (uint32_t)(end - start + 1);
-            if(!all_slots_known && m == 1 && p == 1)
-                slots = 0;
 
             struct extent_io_data xio = {
                 .fileno = TEST_FILENO, .block = (uint32_t)(4096 * (1 + m * JV2_SAMPLES_PAGES + p)),
-                .bytes = 4096, .uuid_id = mrg_metric_uuidmap_id(fx.mrg, metrics[m]), .slots = slots,
+                .bytes = 4096, .uuid_id = mrg_metric_uuidmap_id(fx.mrg, metrics[m]),
             };
             bool page_added;
             pages[m][p] = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
                 .section = fx.section, .metric_id = mrg_metric_id(fx.mrg, metrics[m]),
                 .start_time_s = start, .end_time_s = end, .size = 4096, .data = &fx.datafile,
-                .update_every_s = 1, .hot = true, .custom_data = (uint8_t *)&xio,
+                .update_every_s = update_every_s, .hot = true, .custom_data = (uint8_t *)&xio,
             }, &page_added);
             if(!pages[m][p] || !page_added) {
                 fprintf(stderr, "ERROR: cannot add hot page %zu of metric %zu\n", p, m);
@@ -2116,40 +2121,27 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
         }
 
         const uint32_t *samples = journalfile_v2_samples_section((const uint8_t *)j2, data_size);
-        if(all_slots_known) {
-            if(!samples) {
-                fprintf(stderr, "ERROR: the writer did not write a valid samples section\n");
-                errors++;
-            }
-            else {
-                const struct journal_metric_list *list = (const void *)((uint8_t *)j2 + j2->metric_offset);
-                for(size_t i = 0; i < j2->metric_count; i++) {
-                    for(size_t m = 0; m < JV2_SAMPLES_METRICS; m++) {
-                        if(nd_uuid_eq(list[i].uuid, uuids[m]) && samples[i] != expected[m]) {
-                            fprintf(stderr, "ERROR: metric %zu has %u samples in the section (expected %" PRIu64 ")\n",
-                                    m, samples[i], expected[m]);
-                            errors++;
-                        }
+        if(!samples) {
+            fprintf(stderr, "ERROR: the writer did not write a valid samples section\n");
+            errors++;
+        }
+        else {
+            const struct journal_metric_list *list = (const void *)((uint8_t *)j2 + j2->metric_offset);
+            for(size_t i = 0; i < j2->metric_count; i++) {
+                for(size_t m = 0; m < JV2_SAMPLES_METRICS; m++) {
+                    if(nd_uuid_eq(list[i].uuid, uuids[m]) && samples[i] != expected[m]) {
+                        fprintf(stderr, "ERROR: metric %zu has %u samples in the section (expected %" PRIu64 ")\n",
+                                m, samples[i], expected[m]);
+                        errors++;
                     }
                 }
             }
-
-            if(fx.datafile.samples.charged != expected_total || fx.ctx.atomic.samples != expected_total || fx.datafile.samples.estimated) {
-                fprintf(stderr, "ERROR: after the write the datafile is charged %" PRIu64 " (tier %" PRIu64 ", estimated %d), expected %" PRIu64 "\n",
-                        fx.datafile.samples.charged, (uint64_t)fx.ctx.atomic.samples, fx.datafile.samples.estimated, expected_total);
-                errors++;
-            }
         }
-        else {
-            if(samples) {
-                fprintf(stderr, "ERROR: a samples section was written although a page did not know its slots\n");
-                errors++;
-            }
-            if(fx.datafile.samples.charged != FLUSH_CHARGE) {
-                fprintf(stderr, "ERROR: without a section the flush-time charge must be kept (%" PRIu64 ", expected %d)\n",
-                        fx.datafile.samples.charged, FLUSH_CHARGE);
-                errors++;
-            }
+
+        if(fx.datafile.samples.charged != expected_total || fx.ctx.atomic.samples != expected_total || fx.datafile.samples.estimated) {
+            fprintf(stderr, "ERROR: after the write the datafile is charged %" PRIu64 " (tier %" PRIu64 ", estimated %d), expected %" PRIu64 "\n",
+                    fx.datafile.samples.charged, (uint64_t)fx.ctx.atomic.samples, fx.datafile.samples.estimated, expected_total);
+            errors++;
         }
 
         journalfile_v2_data_release(fx.journalfile);
@@ -2158,10 +2150,10 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
     // the startup loader
     journalfile_v2_populate_retention_to_mrg(&fx.ctx, fx.journalfile);
     {
-        uint64_t want = all_slots_known ? expected_total : expected_estimate;
-        if(fx.datafile.samples.charged != want || fx.ctx.atomic.samples != want || fx.datafile.samples.estimated == all_slots_known) {
+        uint64_t want = expected_total;
+        if(fx.datafile.samples.charged != want || fx.ctx.atomic.samples != want || fx.datafile.samples.estimated) {
             fprintf(stderr, "ERROR: the loader charged %" PRIu64 " (tier %" PRIu64 ", estimated %d), expected %" PRIu64 " (estimated %d)\n",
-                    fx.datafile.samples.charged, (uint64_t)fx.ctx.atomic.samples, fx.datafile.samples.estimated, want, !all_slots_known);
+                    fx.datafile.samples.charged, (uint64_t)fx.ctx.atomic.samples, fx.datafile.samples.estimated, want, 0);
             errors++;
         }
     }
@@ -2171,7 +2163,7 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
     // this datafile is deleted, then loading the remaining journal afresh gives
     // the same total as the running counter.
     {
-        uint64_t want = all_slots_known ? expected_total : expected_estimate;
+        uint64_t want = expected_total;
         struct rrdengine_datafile other = { .ctx = &fx.ctx };
         rrdeng_datafile_samples_set(&other, 12345, false);
         if(fx.ctx.atomic.samples != want + 12345) {
@@ -2200,7 +2192,7 @@ static int mrg_jv2_samples_section_check(bool all_slots_known) {
 
     // damage on disk: the loader trusts the descriptor alone (it never reads the
     // array), per-metric readers need both
-    if(all_slots_known) {
+    {
         char path[FILENAME_MAX + 1];
         journalfile_v2_generate_path(&fx.datafile, path, sizeof(path));
 
@@ -2321,8 +2313,7 @@ cleanup:
 
 static int mrg_jv2_samples_section_unittest(void) {
     fprintf(stderr, "\nTesting jv2 samples section (writer, loader, damaged section)...\n");
-    int errors = mrg_jv2_samples_section_check(true);
-    errors += mrg_jv2_samples_section_check(false);
+    int errors = mrg_jv2_samples_section_check();
     fprintf(stderr, "jv2 samples section test: %s\n", errors ? "FAILED" : "OK");
     return errors;
 }

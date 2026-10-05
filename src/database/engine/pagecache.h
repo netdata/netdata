@@ -54,7 +54,6 @@ void pgc_open_add_hot_page(
     time_t start_time_s,
     time_t end_time_s,
     uint32_t update_every_s,
-    uint32_t slots,
     struct rrdengine_datafile *datafile,
     uint64_t extent_offset,
     unsigned extent_size);

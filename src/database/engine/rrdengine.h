@@ -333,12 +333,6 @@ struct extent_io_data {
     // indexed lookup that cannot touch freed memory; a dead metric simply
     // misses. NOT a uuidmap reference - see mrg_metric_uuidmap_id().
     UUIDMAP_ID uuid_id;
-
-    // The number of stored slots of this page (points, including empty ones),
-    // known for hot open-cache pages (from a flushed extent or a replayed v1
-    // journal) and summed per metric into the journal v2 samples section.
-    // 0 = unknown (pages loaded from a journal v2 file are never migrated).
-    uint32_t slots;
 };
 
 struct extent_io_descriptor {

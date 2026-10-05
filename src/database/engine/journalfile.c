@@ -869,7 +869,6 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
             vd.start_time_s,
             vd.end_time_s,
             vd.update_every_s,
-            (uint32_t)vd.entries,
             journalfile->datafile,
             jf_metric_data->extent_offset,
             jf_metric_data->extent_size);
@@ -1751,10 +1750,14 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     usec_t start_loading = now_monotonic_usec();
 #endif
 
-    // The stored slots of every metric, for the samples section. The section is
-    // written only when every indexed page knows its slots (hot pages from flushed
-    // extents and replayed v1 journals do) and every metric fits in uint32_t;
-    // otherwise the file has no section and loaders estimate its samples.
+    // The slots of every metric, for the samples section, derived from the time
+    // ranges of its indexed pages: a page holds one slot per update_every from
+    // its start to its end (rrdeng_store_metric_next() fills in-page gaps with
+    // empty slots, validate_page() reconciles replayed v1 pages), and a page with
+    // no update_every (replayed from a v1 journal before its metric was known) is
+    // a single slot - what queries read from it. The section is written only when
+    // every metric fits in uint32_t; otherwise the file has no section and
+    // loaders estimate its samples.
     bool samples_exact = true;
     uint64_t file_samples = 0;
     {
@@ -1769,11 +1772,8 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
             bool page_first = true;
             while ((PValue2 = JudyLFirstThenNext(metric_info->JudyL_pages_by_start_time, &start_time, &page_first))) {
                 struct jv2_page_info *page_info = *PValue2;
-                struct extent_io_data *xio = page_info->custom_data;
-                uint32_t slots = xio ? xio->slots : 0;
-                if (!slots)
-                    samples_exact = false;
-                metric_info->samples += slots;
+                metric_info->samples += page_entries_by_time(
+                    page_info->start_time_s, page_info->end_time_s, page_info->update_every_s);
             }
 
             if (metric_info->samples > UINT32_MAX)

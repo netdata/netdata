@@ -728,7 +728,6 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
                 (time_t)(descr->start_time_ut / USEC_PER_SEC),
                 (time_t)(descr->end_time_ut / USEC_PER_SEC),
                 descr->update_every_s,
-                descr->slots,
                 datafile,
                 xt_io_descr->pos,
                 xt_io_descr->bytes);
