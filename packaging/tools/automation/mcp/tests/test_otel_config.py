@@ -3,13 +3,20 @@ from netdata_mcp.tools.otel_config import _endpoint_error
 
 def test_endpoint_error_accepts_valid_host_port():
     assert _endpoint_error("a", "127.0.0.1:4317") is None
-    assert _endpoint_error("a", "localhost:1") is None
     assert _endpoint_error("a", "0.0.0.0:65535") is None
+    assert _endpoint_error("a", "[::1]:4317") is None
+
+
+def test_endpoint_error_rejects_what_the_plugin_cannot_parse():
+    # The plugin parses a Rust SocketAddr: no hostnames, IPv6 only in brackets.
+    for value in ("localhost:4317", "::1:4317", "[127.0.0.1]:4317", "[::1:4317", "http://127.0.0.1:4317"):
+        err = _endpoint_error("a", value)
+        assert err is not None and err.state == "error", value
 
 
 def test_endpoint_error_rejects_missing_port():
     err = _endpoint_error("a", "127.0.0.1")
-    assert err is not None and err.state == "error" and "host:port" in err.message
+    assert err is not None and err.state == "error" and "ip:port" in err.message
 
 
 def test_endpoint_error_rejects_garbage():
@@ -25,7 +32,8 @@ def test_endpoint_error_rejects_port_out_of_range():
 
 def test_http_endpoint_error_accepts_valid_host_port():
     assert _endpoint_error("a", "127.0.0.1:4318", name="otlp_http_endpoint") is None
-    assert _endpoint_error("a", "localhost:1", name="otlp_http_endpoint") is None
+    err = _endpoint_error("a", "localhost:4318", name="otlp_http_endpoint")
+    assert err is not None and "not a hostname" in err.message and "otlp_http_endpoint" in err.message
 
 
 def test_http_endpoint_error_names_the_parameter():

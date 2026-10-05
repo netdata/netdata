@@ -9,6 +9,7 @@ deterministic corpora.
 
 from __future__ import annotations
 
+import ipaddress
 import re
 from typing import Annotated
 
@@ -22,32 +23,44 @@ from ._common import get_agents, get_runs
 from .models import RunInfo, agent_declared, agent_error, run_info, unknown_agent
 
 # Reject a malformed OTLP endpoint here so the caller gets a clean error now,
-# instead of an opaque agent-launch failure several tool calls later.
-_HOST_PORT_RE = re.compile(r"[^\s:]+:(\d{1,5})")
+# instead of an opaque agent-launch failure several tool calls later. The
+# plugin parses both listeners as a Rust SocketAddr: an IP literal (IPv6 in
+# brackets) and a port, never a hostname.
+_HOST_PORT_RE = re.compile(r"(\[[^\]\s]+\]|[^\s:\[\]]+):(\d{1,5})")
 
 
 def _endpoint_error(agent_id: str, value: str, name: str = "otlp_endpoint") -> RunInfo | None:
-    """Return an error RunInfo if ``value`` is not a valid host:port, else None."""
+    """Return an error RunInfo if ``value`` is not a valid ip:port, else None."""
     m = _HOST_PORT_RE.fullmatch(value)
     if m is None:
-        return agent_error(agent_id, f"{name} must be 'host:port', got {value!r}")
-    if not (1 <= int(m.group(1)) <= 65535):
+        return agent_error(agent_id, f"{name} must be 'ip:port', got {value!r}")
+    host = m.group(1)
+    try:
+        ip = ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        ip = None
+    if ip is None or (ip.version == 6) != host.startswith("["):
+        return agent_error(
+            agent_id,
+            f"{name} needs an IP address, not a hostname (e.g. '127.0.0.1:4317', '[::1]:4317'), got {value!r}",
+        )
+    if not (1 <= int(m.group(2)) <= 65535):
         return agent_error(agent_id, f"{name} port out of range (1-65535): {value!r}")
     return None
 
 _AgentId = Annotated[str, Field(description="The declared agent to configure.")]
 _Endpoint = Annotated[
     str | None,
-    Field(description="OTLP/gRPC listen address 'host:port' (e.g. '127.0.0.1:4317'). Omit to auto-assign a free loopback port."),
+    Field(description="OTLP/gRPC listen address 'ip:port' (e.g. '127.0.0.1:4317'). Omit to auto-assign a free loopback port."),
 ]
 _HttpEndpoint = Annotated[
     str | None,
     Field(
         description=(
-            "OTLP/HTTP listen address 'host:port' (e.g. '127.0.0.1:4318'). Omit to "
+            "OTLP/HTTP listen address 'ip:port' (e.g. '127.0.0.1:4318'). Omit to "
             "auto-assign a free loopback port; pass the EMPTY STRING '' to disable "
             "the HTTP listener (writes http_path: null); any other value must be "
-            "'host:port'."
+            "'ip:port'."
         )
     ),
 ]
@@ -134,7 +147,7 @@ def register(mcp: FastMCP) -> None:
             "known corpus — set traces_* (e.g. traces_rotation_max_entries=10) so a "
             "small trace corpus seals without a restart. otlp_http_endpoint sets the "
             "OTLP/HTTP listener (endpoint.http_path): omit to auto-assign a free "
-            "loopback port, '' to disable it, 'host:port' to pin it. For knobs without a "
+            "loopback port, '' to disable it, 'ip:port' to pin it. For knobs without a "
             "first-class param (auth, ingest windows, retention max_age/horizon, "
             "per-tenant overrides) or for strict-config refusal tests, pass a raw "
             "YAML mapping via extra_yaml — it deep-merges over the generated file "
@@ -174,7 +187,7 @@ def register(mcp: FastMCP) -> None:
             if err is not None:
                 return err
         # "" is the disable sentinel (http_path: null), not a malformed address —
-        # everything else must be a valid host:port.
+        # everything else must be a valid ip:port.
         if otlp_http_endpoint not in (None, ""):
             err = _endpoint_error(agent_id, otlp_http_endpoint, name="otlp_http_endpoint")
             if err is not None:
