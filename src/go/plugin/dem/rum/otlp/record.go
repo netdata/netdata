@@ -5,7 +5,6 @@ package otlp
 import (
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
@@ -34,7 +33,7 @@ func (e *Logs) build(b *beacon.Beacon, pageView bool) []queued {
 	}
 	for _, err := range b.Errors {
 		msg := e.redact(err.Message)
-		stack := truncate(e.redact(err.Stack), maxStackBytes)
+		stack := beacon.Truncate(e.redact(err.Stack), maxStackBytes)
 		attrs := append(append([]*commonpb.KeyValue{}, base...),
 			strAttr("error.type", err.Type), strAttr("error.message", msg), strAttr("error.stack", stack))
 		if err.Fingerprint != "" {
@@ -53,12 +52,15 @@ func (e *Logs) build(b *beacon.Beacon, pageView bool) []queued {
 	}
 	for _, l := range b.Logs {
 		// Preserve decoder bounds after configured-secret redaction.
-		msg := truncate(e.redact(l.Message), 1024)
+		msg := beacon.Truncate(e.redact(l.Message), 1024)
 		body := "console " + l.Level + ": " + msg
-		attrs := append(append([]*commonpb.KeyValue{}, base...),
-			strAttr("console.level", l.Level),
-			strAttr("error.type", truncate(e.redact(l.ErrorType), 64)),
-			strAttr("error.stack", truncate(e.redact(l.Stack), maxStackBytes)))
+		attrs := append(append([]*commonpb.KeyValue{}, base...), strAttr("console.level", l.Level))
+		if typ := beacon.Truncate(e.redact(l.ErrorType), 64); typ != "" {
+			attrs = append(attrs, strAttr("error.type", typ))
+		}
+		if stack := beacon.Truncate(e.redact(l.Stack), maxStackBytes); stack != "" {
+			attrs = append(attrs, strAttr("error.stack", stack))
+		}
 		out = append(out, e.record(attrs, "console", l.Time, consoleSeverity(l.Level), body))
 	}
 	return out
@@ -147,14 +149,4 @@ func strAttr(k, v string) *commonpb.KeyValue {
 			},
 		},
 	}
-}
-
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	for n > 0 && !utf8.RuneStart(s[n]) {
-		n-- // never cut inside a multi-byte rune
-	}
-	return s[:n]
 }

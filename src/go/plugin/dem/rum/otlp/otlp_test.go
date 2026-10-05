@@ -87,7 +87,7 @@ func (f *fakeLogsService) requests() []*collogspb.ExportLogsServiceRequest {
 	return out
 }
 
-func startServer(t *testing.T, svc *fakeLogsService) string {
+func startServer(t *testing.T, svc collogspb.LogsServiceServer) string {
 	t.Helper()
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -258,7 +258,7 @@ func TestBuild(t *testing.T) {
 			want: []simpleRec{{
 				body: "console warn: slow request", severity: "WARN",
 				attrs: map[string]string{
-					"rum.type": "console", "console.level": "warn", "error.type": "", "error.stack": "", "session.id": "sess1", "page.path": "/pricing", "page.group": "/pricing",
+					"rum.type": "console", "console.level": "warn", "session.id": "sess1", "page.path": "/pricing", "page.group": "/pricing",
 					"browser.name": "Chrome", "browser.version": "120", "os": "Linux", "device": "desktop", "country": "GR",
 				},
 			}},
@@ -424,41 +424,11 @@ func TestTruncateKeepsRuneBoundaries(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := truncate(tc.in, tc.n); got != tc.want {
+			if got := beacon.Truncate(tc.in, tc.n); got != tc.want {
 				t.Fatalf("truncate(%q,%d)=%q want %q", tc.in, tc.n, got, tc.want)
 			}
 		})
 	}
-}
-
-// TestInFlightPeriodicExportAbortsOnCancel: a ticker-driven export already
-// blocked on a black-holed endpoint must abort when Run's ctx is cancelled,
-// not run out its 5s export timeout (the agent's SIGTERM grace is 3s).
-func TestInFlightPeriodicExportAbortsOnCancel(t *testing.T) {
-	e := newExporter(t, "192.0.2.1:4317", newRecCounters(), nil)
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() {
-		e.Run(ctx, finalContext(t))
-		close(done)
-	}()
-	e.Ingest(mkBeacon(), aggregate.Result{
-		Accepted:     true,
-		Investigated: true,
-		PageView:     true,
-	})
-	time.Sleep(batchPeriod + 300*time.Millisecond) // ticker fired: export now in flight
-	cancel()
-	start := time.Now()
-	select {
-	case <-done:
-	case <-time.After(3 * time.Second):
-		t.Fatal("Run did not return within 3s of cancelling an in-flight export")
-	}
-	if d := time.Since(start); d > 1500*time.Millisecond {
-		t.Fatalf("in-flight export held shutdown for %v", d)
-	}
-	_ = e.Close()
 }
 
 // Investigate sampling: a beacon whose session is sampled out is

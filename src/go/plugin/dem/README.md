@@ -114,7 +114,8 @@ endpoint is `http://127.0.0.1:4317`; it does not enable or discover a receiver. 
 OTLP/gRPC, not OTLP/HTTP. Paths, URL credentials, queries, fragments and resolver targets are not supported.
 `auth_token` supplies Bearer authentication. With HTTPS, `tls_ca` selects a CA file (otherwise system roots apply),
 and paired `tls_cert` / `tls_key` files enable client certificate authentication. Files must be readable by the service.
-Outbound credentials stay on the collector and are never included in the browser snippet or investigation results.
+Destination credentials are used for collector-to-receiver authentication and are omitted from browser snippets and
+investigation results.
 
 Omitted or null feature blocks are disabled. An omitted or null destination or endpoint uses the local default;
 an explicitly empty endpoint is invalid for an enabled feature. Null booleans mean false, null auth/TLS strings mean

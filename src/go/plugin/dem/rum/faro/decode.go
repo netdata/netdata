@@ -258,7 +258,7 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 		b.Errors = append(b.Errors, beacon.Error{
 			Type:        typ,
 			Message:     msg,
-			Stack:       truncate(stack, maxStackLen),
+			Stack:       beacon.Truncate(stack, maxStackLen),
 			Time:        flexTime(e.Timestamp, now),
 			Fingerprint: beacon.Fingerprint(typ, msg, firstFrame),
 		})
@@ -339,13 +339,6 @@ func attributedElement(vital string, ctx map[string]any) string {
 		return ""
 	}
 	return beacon.RedactSelector(beacon.Clean(v, maxSelector))
-}
-
-func truncate(s string, n int) string {
-	if len(s) > n {
-		return s[:n]
-	}
-	return s
 }
 
 // pageHost is the page URL's host (first-party resource
@@ -510,5 +503,5 @@ func consoleErrorContext(raw json.RawMessage, opt Options) (string, string) {
 			break
 		}
 	}
-	return typ, truncate(stack.String(), maxStackLen)
+	return typ, beacon.Truncate(stack.String(), maxStackLen)
 }

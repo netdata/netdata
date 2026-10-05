@@ -47,7 +47,7 @@ func (f *fakeTraceService) count() int {
 	return len(f.reqs)
 }
 
-func startTraceServer(t *testing.T, svc *fakeTraceService) string {
+func startTraceServer(t *testing.T, svc coltracepb.TraceServiceServer) string {
 	t.Helper()
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

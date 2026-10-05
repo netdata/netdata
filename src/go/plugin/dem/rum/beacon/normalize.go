@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 const (
@@ -41,10 +42,7 @@ func Path(raw string) string {
 			p = "/"
 		}
 	}
-	if len(p) > maxPathLen {
-		p = p[:maxPathLen]
-	}
-	return p
+	return Truncate(p, maxPathLen)
 }
 
 // PageGroup replaces volatile path segments (decimal numbers, UUIDs,
@@ -64,10 +62,7 @@ func PageGroup(path string) string {
 		}
 	}
 	g := strings.Join(segs, "/")
-	if len(g) > maxGroupLen {
-		g = g[:maxGroupLen]
-	}
-	return g
+	return Truncate(g, maxGroupLen)
 }
 
 func isNumeric(s string) bool {
@@ -124,8 +119,16 @@ func Clean(s string, max int) string {
 		}
 		return r
 	}, s))
-	if len(s) > max {
-		s = s[:max]
+	return Truncate(s, max)
+}
+
+// Truncate limits valid UTF-8 text to n bytes without splitting a rune.
+func Truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
 	}
-	return s
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
 }

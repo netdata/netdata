@@ -46,7 +46,7 @@ func destinationCredentials(
 		TLSKey:  d.TLSKey,
 	})
 	if err != nil {
-		return "", nil, fmt.Errorf("invalid TLS material")
+		return "", nil, fmt.Errorf("invalid TLS material: %s", redact.NewRedactor(d.AuthToken).Apply(err.Error()))
 	}
 	if c == nil {
 		c = &tls.Config{}

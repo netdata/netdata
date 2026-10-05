@@ -169,40 +169,69 @@ func (e *Traces) Run(ctx context.Context, final func() context.Context) {
 	ticker := time.NewTicker(batchPeriod)
 	defer ticker.Stop()
 	batch := make([]spanItem, 0, maxSpanBatch)
-	flush := func(parent context.Context, timeout time.Duration) {
-		if len(batch) > 0 {
-			e.exportSpans(parent, batch, timeout)
+	// An unattempted normal batch belongs to the final drain. An attempted
+	// export is consumed even on failure, since retrying could duplicate data.
+	flush := func(parent context.Context) bool {
+		if len(batch) == 0 {
+			return true
+		}
+		if !e.exportSpans(parent, batch, exportTimeout) {
+			return false
+		}
+		batch = batch[:0]
+		return true
+	}
+normal:
+	for {
+		select {
+		case <-ctx.Done():
+			break normal
+		case it, ok := <-e.spanCh:
+			if !ok {
+				break normal
+			}
+			batch = append(batch, it)
+			if len(batch) >= maxSpanBatch && !flush(ctx) {
+				break normal
+			}
+		case <-ticker.C:
+			if !flush(ctx) {
+				break normal
+			}
+		}
+	}
+	// Producers have been joined by the owner. Use its shared budget once,
+	// including for a batch whose normal export never began.
+	parent := final()
+	flushFinal := func() {
+		if !flush(parent) {
+			var n uint64
+			for _, it := range batch {
+				n += it.n
+			}
+			e.counters.Add(aggregate.CounterSpansDropped, n)
 			batch = batch[:0]
 		}
 	}
 	for {
+		if len(batch) >= maxSpanBatch {
+			flushFinal()
+		}
 		select {
-		case <-ctx.Done():
-			parent := final()
-			for {
-				if len(batch) >= maxSpanBatch {
-					flush(parent, exportTimeout)
-				}
-				select {
-				case it := <-e.spanCh:
-					batch = append(batch, it)
-				default:
-					flush(parent, exportTimeout)
-					return
-				}
+		case it, ok := <-e.spanCh:
+			if !ok {
+				flushFinal()
+				return
 			}
-		case it := <-e.spanCh:
 			batch = append(batch, it)
-			if len(batch) >= maxSpanBatch {
-				flush(ctx, exportTimeout)
-			}
-		case <-ticker.C:
-			flush(ctx, exportTimeout)
+		default:
+			flushFinal()
+			return
 		}
 	}
 }
 
-func (e *Traces) exportSpans(parent context.Context, batch []spanItem, timeout time.Duration) {
+func (e *Traces) exportSpans(parent context.Context, batch []spanItem, timeout time.Duration) bool {
 	req := &coltracepb.ExportTraceServiceRequest{
 		ResourceSpans: make([]*tracepb.ResourceSpans, 0, len(batch)),
 	}
@@ -212,8 +241,7 @@ func (e *Traces) exportSpans(parent context.Context, batch []spanItem, timeout t
 		n += it.n
 	}
 	if parent.Err() != nil {
-		e.counters.Add(aggregate.CounterSpansDropped, n)
-		return
+		return false
 	}
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
@@ -224,7 +252,7 @@ func (e *Traces) exportSpans(parent context.Context, batch []spanItem, timeout t
 	if err != nil {
 		e.failed("traces", err)
 		e.counters.Add(aggregate.CounterSpansErrors, n)
-		return
+		return true
 	}
 	rejected := rejectedCount(resp.GetPartialSuccess().GetRejectedSpans(), n)
 	if rejected > 0 {
@@ -232,4 +260,5 @@ func (e *Traces) exportSpans(parent context.Context, batch []spanItem, timeout t
 	}
 	e.counters.Add(aggregate.CounterSpansErrors, rejected)
 	e.counters.Add(aggregate.CounterSpansSent, n-rejected)
+	return true
 }

@@ -289,7 +289,8 @@ func tlsFixture(t *testing.T) (tls.Certificate, string, string) {
 	return pair, cp, kp
 }
 
-func TestBothSignalsTLSAndBearer(t *testing.T) {
+func useCredentialReader(t *testing.T) {
+	t.Helper()
 	// Stand in for the credential reader process, preserving real TLS file parsing
 	// and gRPC handshakes. Privilege reduction belongs to credentialfile's tests.
 	if runtime.GOOS != "windows" {
@@ -301,6 +302,10 @@ func TestBothSignalsTLSAndBearer(t *testing.T) {
 		buildinfo.NetdataBinDir = dir
 		t.Cleanup(func() { buildinfo.NetdataBinDir = previous })
 	}
+}
+
+func TestBothSignalsTLSAndBearer(t *testing.T) {
+	useCredentialReader(t)
 
 	pair, certPath, keyPath := tlsFixture(t)
 	for _, tc := range []struct {
@@ -384,6 +389,46 @@ func TestBothSignalsTLSAndBearer(t *testing.T) {
 				require.EqualValues(t, 1, c.snapshot()[aggregate.CounterOTLPErrors])
 				require.EqualValues(t, 1, c.snapshot()[aggregate.CounterSpansErrors])
 			}
+		})
+	}
+}
+
+func TestActiveTLSFailuresExplainCauseWithoutSecrets(t *testing.T) {
+	useCredentialReader(t)
+	_, certPath, _ := tlsFixture(t)
+	dir := t.TempDir()
+	badCA := filepath.Join(dir, "bad-ca.pem")
+	badKey := filepath.Join(dir, "bad-key.pem")
+	require.NoError(t, os.WriteFile(badCA, []byte("private-material-marker"), 0600))
+	require.NoError(
+		t,
+		os.WriteFile(
+			badKey,
+			[]byte("-----BEGIN PRIVATE-MATERIAL-MARKER-----\ninvalid\n-----END PRIVATE-MATERIAL-MARKER-----"),
+			0600,
+		),
+	)
+	missing := filepath.Join(dir, "missing-diagnostic-secret.pem")
+	for name, tc := range map[string]struct {
+		ca, cert, key, want string
+	}{
+		"missing CA":    {ca: missing, want: "could not read certificate"},
+		"malformed CA":  {ca: badCA, want: "could not parse any PEM certificates"},
+		"missing cert":  {cert: missing, key: badKey, want: "could not read certificate"},
+		"missing key":   {cert: certPath, key: missing, want: "could not read key"},
+		"malformed key": {cert: certPath, key: badKey, want: "could not parse keypair"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := ValidateDestination(context.Background(), config.Destination{
+				Endpoint:  ptr("https://localhost:4317"),
+				AuthToken: "diagnostic-secret",
+				TLSCA:     tc.ca,
+				TLSCert:   tc.cert,
+				TLSKey:    tc.key,
+			})
+			require.ErrorContains(t, err, tc.want)
+			require.NotContains(t, err.Error(), "diagnostic-secret")
+			require.NotContains(t, strings.ToLower(err.Error()), "private-material-marker")
 		})
 	}
 }

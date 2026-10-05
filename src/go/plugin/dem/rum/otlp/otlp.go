@@ -83,43 +83,60 @@ func (e *Logs) Run(ctx context.Context, final func() context.Context) {
 	ticker := time.NewTicker(batchPeriod)
 	defer ticker.Stop()
 	batch := make([]queued, 0, maxBatch)
-	// Periodic exports run under ctx so cancellation aborts one already in
-	// flight; the final flush after cancellation gets its own short budget.
-	flush := func(parent context.Context, timeout time.Duration) {
+	// An unattempted normal batch belongs to the final drain. An attempted
+	// export is consumed even on failure, since retrying could duplicate data.
+	flush := func(parent context.Context) bool {
 		if len(batch) == 0 {
-			return
+			return true
 		}
-		e.export(parent, batch, timeout)
+		if !e.export(parent, batch, exportTimeout) {
+			return false
+		}
 		batch = batch[:0]
+		return true
 	}
+normal:
 	for {
 		select {
 		case <-ctx.Done():
-			parent := final()
-			// Producers have been joined by the owner before cancellation.
-			for {
-				if len(batch) >= maxBatch {
-					flush(parent, exportTimeout)
-				}
-				select {
-				case q := <-e.ch:
-					batch = append(batch, q)
-				default:
-					flush(parent, exportTimeout)
-					return
-				}
-			}
-		case q, ok := <-e.ch:
+			break normal
+		case it, ok := <-e.ch:
 			if !ok {
-				flush(final(), exportTimeout)
-				return
+				break normal
 			}
-			batch = append(batch, q)
-			if len(batch) >= maxBatch {
-				flush(ctx, exportTimeout)
+			batch = append(batch, it)
+			if len(batch) >= maxBatch && !flush(ctx) {
+				break normal
 			}
 		case <-ticker.C:
-			flush(ctx, exportTimeout)
+			if !flush(ctx) {
+				break normal
+			}
+		}
+	}
+	// Producers have been joined by the owner. Use its shared budget once,
+	// including for a batch whose normal export never began.
+	parent := final()
+	flushFinal := func() {
+		if !flush(parent) {
+			e.counters.Add(aggregate.CounterOTLPDropped, uint64(len(batch)))
+			batch = batch[:0]
+		}
+	}
+	for {
+		if len(batch) >= maxBatch {
+			flushFinal()
+		}
+		select {
+		case it, ok := <-e.ch:
+			if !ok {
+				flushFinal()
+				return
+			}
+			batch = append(batch, it)
+		default:
+			flushFinal()
+			return
 		}
 	}
 }
@@ -143,11 +160,10 @@ func (e *Logs) Ingest(b *beacon.Beacon, result aggregate.Result) {
 	}
 }
 
-// export sends one batch with the owning site's resource attributes.
-func (e *Logs) export(parent context.Context, batch []queued, timeout time.Duration) {
+// export reports whether a send was attempted, including failed attempts.
+func (e *Logs) export(parent context.Context, batch []queued, timeout time.Duration) bool {
 	if parent.Err() != nil {
-		e.counters.Add(aggregate.CounterOTLPDropped, uint64(len(batch)))
-		return
+		return false
 	}
 	recs := make([]*logspb.LogRecord, 0, len(batch))
 	for _, q := range batch {
@@ -176,7 +192,7 @@ func (e *Logs) export(parent context.Context, batch []queued, timeout time.Durat
 	if err != nil {
 		e.failed("logs", err)
 		e.counters.Add(aggregate.CounterOTLPErrors, uint64(len(batch)))
-		return
+		return true
 	}
 	rejected := rejectedCount(resp.GetPartialSuccess().GetRejectedLogRecords(), uint64(len(batch)))
 	if rejected > 0 {
@@ -184,4 +200,5 @@ func (e *Logs) export(parent context.Context, batch []queued, timeout time.Durat
 	}
 	e.counters.Add(aggregate.CounterOTLPErrors, rejected)
 	e.counters.Add(aggregate.CounterOTLPSent, uint64(len(batch))-rejected)
+	return true
 }
