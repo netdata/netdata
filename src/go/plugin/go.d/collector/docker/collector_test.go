@@ -713,6 +713,13 @@ func TestCollector_Collect_ImagesRefresh(t *testing.T) {
 				{advance: time.Second, images: imagesV2, wantCalls: 2, wantImages: mxV2},
 			},
 		},
+		"collection interval longer than the refresh interval refreshes on every collection": {
+			steps: []step{
+				{images: imagesV1, wantCalls: 1, wantImages: mxV1},
+				{advance: 2 * imagesRefreshEvery, images: imagesV2, wantCalls: 2, wantImages: mxV2},
+				{advance: 2 * imagesRefreshEvery, images: imagesV1, wantCalls: 3, wantImages: mxV1},
+			},
+		},
 		"failed refresh fails the collection and is retried on the next one": {
 			steps: []step{
 				{images: imagesV1, wantCalls: 1, wantImages: mxV1},

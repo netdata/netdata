@@ -54,7 +54,7 @@ func (c *Collector) collectInfo(mx map[string]int64) error {
 }
 
 // On Docker Engine 29+ with the containerd image store, listing images can cost the daemon over a second of CPU time
-// per call (moby/moby#53077). Image metrics change rarely, so the list is refreshed at this interval.
+// per call (moby/moby#53077). Image metrics change rarely, so the list is refreshed at most this often.
 const imagesRefreshEvery = 5 * time.Minute
 
 type imagesStats struct {
