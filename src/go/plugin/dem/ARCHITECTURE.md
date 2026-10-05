@@ -78,21 +78,25 @@ Each package in `collector/` is a registered native collector. Its lifecycle met
 collection and retirement; its metric definitions show the measurements it publishes. Fixed instruments are prepared
 once, with site labels bound during initialization. Dynamic breakdown handles are not retained in an unbounded cache.
 
-One RUM job constructs one aggregator, diagnostic state, route, history writer and OTLP exporter. These objects have
-no site inventory or reconfiguration API. The registry admits references to those exact owners; it does not construct
-them. The route records address/rejection observations in the separate diagnostic state. Aggregation and export reject
-an observation for another site before changing state.
+One RUM job constructs one aggregator, diagnostic state, route and history writer. It also constructs an event-log
+exporter when event_logs is enabled and a browser-trace exporter when tracing is enabled. Both default to disabled.
+Each enabled exporter owns its complete destination, gRPC connection, bounded queue and worker; disabled signals
+create none of these resources. The destinations have identical security options and do not inherit from each other.
+These objects have no site inventory or reconfiguration API. The registry admits references to those exact owners;
+it does not construct them. The route records address/rejection observations in the separate diagnostic state.
+Aggregation and each exporter reject an observation for another site before changing state.
 
-The collector's processor calls aggregation and then export directly. Aggregation leaves the normalized Beacon
+The collector's processor calls aggregation and then each enabled exporter directly. Aggregation leaves the normalized Beacon
 unchanged and returns Accepted, PageView and Investigated decisions. Every accepted observation contributes to
 measurements and the live stream; investigation sampling controls retained history and OTLP export. History promotion
 can replay retained session events, while OTLP exports only the current observation. Faro classifies protocol event
 names into domain kinds without changing their original names for presentation. HTTP rejection accounting reaches
 aggregation only. History enqueue remains nonblocking under the aggregate lock and does not call back into it.
 
-The history writer accounts for its own queue; the exporter binds its trace destination at construction,
-while preserving each beacon's trace resource attributes. Shared receiver/site policy belongs to `rum/config`, and OTLP
-connection options belong to `rum/otlp`. Native `Name` identifies the site; `DisplayName` is presentation metadata.
+The history writer and each enabled exporter account for their own queues. The trace exporter preserves each
+beacon's trace resource attributes. Shared receiver/site policy and destination declarations belong to `rum/config`;
+`rum/otlp` implements transport security, signal mapping and drainage. Native `Name` identifies the site;
+`DisplayName` is presentation metadata. Runtime export failure does not stop native aggregation or history.
 
 An HTTP request acquires one exact site registration containing both policy and its processor. Bootstrap, preflight, demo and
 beacon endpoints use this same admission. Retirement removes future admission, cancels admitted request contexts and

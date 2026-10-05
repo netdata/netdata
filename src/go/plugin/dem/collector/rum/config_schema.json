@@ -58,12 +58,6 @@
         "maximum": 100,
         "default": 20
       },
-      "collect_console_logs": {
-        "title": "Collect console logs",
-        "description": "Export browser console logs through OTLP for investigated sessions.",
-        "type": "boolean",
-        "default": false
-      },
       "measure_sample_rate": {
         "title": "Measure sample rate",
         "description": "Share of browser sessions measured, from 0 to 1. Zero preserves the default of measuring all sessions.",
@@ -116,20 +110,24 @@
       },
       "tracing": {
         "title": "Browser tracing",
-        "description": "Follow browser requests into backend services. Leave empty to disable tracing.",
+        "description": "Capture browser request spans and propagate trace context. Backend spans require separately instrumented services.",
         "type": [
           "object",
           "null"
         ],
         "properties": {
           "enabled": {
-            "title": "Enable tracing",
-            "description": "Capture browser request spans and propagate trace headers.",
-            "type": "boolean"
+            "title": "Enable browser tracing",
+            "description": "Capture and export browser spans independently of event logs. Disabled by default.",
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": false
           },
           "propagate_to": {
             "title": "Trace propagation origins",
-            "description": "Additional API origins receiving trace headers. Same-origin requests receive them automatically.",
+            "description": "Additional literal API origins receiving trace headers. Same-origin requests receive them automatically; cross-origin APIs must allow the trace headers in CORS.",
             "type": [
               "array",
               "null"
@@ -138,12 +136,42 @@
               "type": "string"
             }
           },
-          "export_to": {
-            "title": "Span export destination",
-            "description": "OTLP gRPC host:port or https://host:port. Leave empty to use this site OTLP endpoint.",
-            "type": "string"
+          "destination": {
+            "$ref": "#/definitions/destination"
           }
-        }
+        },
+        "allOf": [
+          {
+            "$ref": "#/definitions/enabled_destination"
+          },
+          {
+            "if": {
+              "properties": {
+                "enabled": {
+                  "const": true
+                }
+              },
+              "required": [
+                "enabled"
+              ]
+            },
+            "then": {
+              "properties": {
+                "propagate_to": {
+                  "items": {
+                    "format": "uri",
+                    "pattern": "^https?://(?:\\[[0-9A-Fa-f:.]+\\]|[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.?)(?::(?:0*[1-9][0-9]{0,3}|0*[1-5][0-9]{4}|0*6[0-4][0-9]{3}|0*65[0-4][0-9]{2}|0*655[0-2][0-9]|0*6553[0-5]))?$",
+                    "not": {
+                      "$comment": "IPv4 octets inside IPv6 must not have leading zeros; URI format validators differ on this.",
+                      "pattern": "\\[[^\\]]*(?:[.:]0[0-9]+\\.|\\.0[0-9]+\\])",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
       },
       "redact_paths": {
         "title": "Path redaction",
@@ -170,55 +198,256 @@
           }
         }
       },
-      "otlp": {
-        "title": "OTLP export",
-        "description": "Export browser logs and spans to an OTLP gRPC receiver.",
-        "type": "object",
+      "event_logs": {
+        "title": "Event logs",
+        "description": "Export sampled browser events for search, including custom-event attributes. Native RUM history works independently.",
+        "type": [
+          "object",
+          "null"
+        ],
         "properties": {
           "enabled": {
-            "title": "Log export",
-            "description": "Auto exports to an available receiver; yes enables export, and no disables log export. Export failures do not stop ingestion.",
-            "type": "string",
-            "enum": [
-              "auto",
-              "yes",
-              "no"
+            "title": "Enable event logs",
+            "description": "Send event logs to the configured destination. Disabled by default; native charts, sessions and errors remain available.",
+            "type": [
+              "boolean",
+              "null"
             ],
-            "default": "auto"
+            "default": false
           },
-          "endpoint": {
-            "title": "OTLP endpoint",
-            "description": "OTLP gRPC host and port for logs and default browser span export.",
-            "type": "string",
-            "default": "127.0.0.1:4317"
+          "include_console_logs": {
+            "title": "Include console logs",
+            "description": "Capture console info, warn and error messages for investigated sessions. Effective only when event logs are enabled.",
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": false
           },
-          "auth_token": {
-            "title": "Authentication token",
-            "description": "Bearer token sent to the OTLP receiver. Leave empty for no authentication.",
-            "type": "string"
-          },
-          "tls_cert": {
-            "title": "TLS certificate",
-            "description": "Client certificate file. Leave empty with TLS key to omit client authentication.",
-            "type": "string"
-          },
-          "tls_key": {
-            "title": "TLS key",
-            "description": "Client private key file. Set together with TLS certificate.",
-            "type": "string"
-          },
-          "tls_ca": {
-            "title": "TLS CA certificate",
-            "description": "CA certificate file for verifying the OTLP receiver. Leave empty to use system roots when TLS is enabled.",
-            "type": "string"
+          "destination": {
+            "$ref": "#/definitions/destination"
           }
-        }
+        },
+        "allOf": [
+          {
+            "$ref": "#/definitions/enabled_destination"
+          }
+        ]
       }
     },
     "required": [
       "name",
       "allowed_origins"
-    ]
+    ],
+    "definitions": {
+      "destination": {
+        "title": "Destination",
+        "description": "Receiver for this signal only. Leave unset to use the local OTLP/gRPC receiver.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "endpoint": {
+            "title": "Endpoint",
+            "description": "OTLP/gRPC receiver URL with an explicit port. Use http for plaintext or https for TLS; paths, credentials, query strings and fragments are not allowed.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "http://127.0.0.1:4317"
+          },
+          "auth_token": {
+            "title": "Authentication token",
+            "description": "Bearer token accepted by the receiver. Use a native secret reference; leave empty for no authentication.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tls_ca": {
+            "title": "TLS CA certificate",
+            "description": "CA certificate file for verifying an HTTPS receiver. Leave empty to use system roots.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tls_cert": {
+            "title": "TLS client certificate",
+            "description": "Client certificate file for an HTTPS receiver. Set together with TLS key; leave both empty to omit client authentication.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tls_key": {
+            "title": "TLS client key",
+            "description": "Client private key file for an HTTPS receiver. Set together with TLS client certificate.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "active_destination": {
+        "allOf": [
+          {
+            "properties": {
+              "endpoint": {
+                "format": "uri",
+                "pattern": "^https?://(?:\\[[0-9A-Fa-f:.]+\\]|[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.?):(?:0*[1-9][0-9]{0,3}|0*[1-5][0-9]{4}|0*6[0-4][0-9]{3}|0*65[0-4][0-9]{2}|0*655[0-2][0-9]|0*6553[0-5])$",
+                "not": {
+                  "$comment": "IPv4 octets inside IPv6 must not have leading zeros; URI format validators differ on this.",
+                  "pattern": "\\[[^\\]]*(?:[.:]0[0-9]+\\.|\\.0[0-9]+\\])",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "tls_cert": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "tls_cert"
+              ]
+            },
+            "then": {
+              "properties": {
+                "tls_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "tls_key"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "tls_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "tls_key"
+              ]
+            },
+            "then": {
+              "properties": {
+                "tls_cert": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "tls_cert"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "tls_ca": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "tls_ca"
+              ]
+            },
+            "then": {
+              "properties": {
+                "endpoint": {
+                  "type": "string",
+                  "pattern": "^https://"
+                }
+              },
+              "required": [
+                "endpoint"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "tls_cert": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "tls_cert"
+              ]
+            },
+            "then": {
+              "properties": {
+                "endpoint": {
+                  "type": "string",
+                  "pattern": "^https://"
+                }
+              },
+              "required": [
+                "endpoint"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "tls_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "tls_key"
+              ]
+            },
+            "then": {
+              "properties": {
+                "endpoint": {
+                  "type": "string",
+                  "pattern": "^https://"
+                }
+              },
+              "required": [
+                "endpoint"
+              ]
+            }
+          }
+        ]
+      },
+      "enabled_destination": {
+        "if": {
+          "properties": {
+            "enabled": {
+              "const": true
+            }
+          },
+          "required": [
+            "enabled"
+          ]
+        },
+        "then": {
+          "properties": {
+            "destination": {
+              "$ref": "#/definitions/active_destination"
+            }
+          }
+        }
+      }
+    }
   },
   "uiSchema": {
     "ui:flavour": "tabs",
@@ -240,7 +469,6 @@
             "window",
             "page_groups",
             "countries",
-            "collect_console_logs",
             "bots"
           ]
         },
@@ -252,10 +480,15 @@
           ]
         },
         {
-          "title": "Tracing",
+          "title": "Event logs",
           "fields": [
-            "tracing",
-            "otlp"
+            "event_logs"
+          ]
+        },
+        {
+          "title": "Browser tracing",
+          "fields": [
+            "tracing"
           ]
         },
         {
@@ -272,23 +505,35 @@
         "inline": true
       }
     },
-    "otlp": {
-      "enabled": {
-        "ui:widget": "radio",
-        "ui:options": {
-          "inline": true
-        }
-      },
-      "auth_token": {
-        "ui:widget": "password",
-        "ui:placeholder": "${env:OTLP_TOKEN}"
-      }
-    },
     "redact_paths": {
       "ui:listFlavour": "list"
     },
     "window": {
       "ui:placeholder": "5m"
+    },
+    "event_logs": {
+      "destination": {
+        "auth_token": {
+          "ui:widget": "password",
+          "ui:placeholder": "${env:EVENT_LOGS_TOKEN}"
+        }
+      },
+      "ui:help": "Saved destination settings are retained while disabled. Secret references must still resolve for the whole job to start.",
+      "include_console_logs": {
+        "ui:help": "Console errors remain optional logs, with bounded and redacted error detail when available. Uncaught exceptions and unhandled rejections remain core RUM errors."
+      }
+    },
+    "tracing": {
+      "destination": {
+        "auth_token": {
+          "ui:widget": "password",
+          "ui:placeholder": "${env:TRACE_EXPORT_TOKEN}"
+        }
+      },
+      "ui:help": "Saved destination settings are retained while disabled. Secret references must still resolve for the whole job to start.",
+      "propagate_to": {
+        "ui:help": "To join browser and backend spans, instrument the backend, accept propagated context, coordinate sampling, and send both sides to the same tracing system. Sending browser spans alone does not produce a complete backend trace."
+      }
     }
   }
 }

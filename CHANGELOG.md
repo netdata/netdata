@@ -30,6 +30,15 @@
 - Docs(go.d): render option details for mongodb, openvpn, pika and openvpn_status_log ([#24132](https://github.com/netdata/netdata/issues/24132))
 - Regenerate integrations docs ([#24133](https://github.com/netdata/netdata/issues/24133))
 - Feat(go): add native RUM plugin ([#24129](https://github.com/netdata/netdata/issues/24129))
+- Feat(go): support process-owned Functions independently of collectors ([#24136](https://github.com/netdata/netdata/issues/24136))
+- Feat(nd-run): add verified Linux process tree supervision ([#24135](https://github.com/netdata/netdata/issues/24135))
+- Build(deps): bump go.opentelemetry.io/proto/otlp from 1.11.0 to 1.11.1 in /src/go ([#24138](https://github.com/netdata/netdata/issues/24138))
+- Build(deps): bump github.com/cloudflare/cfssl from 1.6.5 to 1.7.0 in /src/go ([#24139](https://github.com/netdata/netdata/issues/24139))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/s3 from 1.113.4 to 1.114.0 in /src/go ([#24140](https://github.com/netdata/netdata/issues/24140))
+- Feat(dem): add native journey and Lighthouse monitoring ([#24137](https://github.com/netdata/netdata/issues/24137))
+- Refactor(dem): make browser collectors own their lifecycle and metrics ([#24141](https://github.com/netdata/netdata/issues/24141))
+- Refactor(dem): organize domain queries and persistence ([#24142](https://github.com/netdata/netdata/issues/24142))
+- Refactor(dem): make RUM processing boundaries explicit ([#24143](https://github.com/netdata/netdata/issues/24143))
 
 ## [2.12.0] - 2026-09-30
 

@@ -63,8 +63,8 @@ require (
 	github.com/microsoft/go-mssqldb v1.11.2
 	github.com/miekg/dns v1.1.73
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/moby/moby/api v1.56.0
-	github.com/moby/moby/client v0.6.0
+	github.com/moby/moby/api v1.56.1
+	github.com/moby/moby/client v0.6.1
 	github.com/netdata/systemd-journal-sdk/go v0.8.2
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/prometheus-community/pro-bing v0.9.1
@@ -128,7 +128,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgryski/go-metro v0.0.0-20250106013310-edb8663e5e33 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/go-connections v0.7.0 // indirect
+	github.com/docker/go-connections v0.8.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/fatih/color v1.19.0 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect

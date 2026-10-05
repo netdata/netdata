@@ -666,7 +666,7 @@ groups:
               selector: otlp_dropped
             - name: errors
               selector: otlp_errors
-          title: OTLP log records
+          title: Event log export outcomes
           type: stacked
           units: records/s
         - context: history
@@ -686,7 +686,7 @@ groups:
               selector: spans_dropped
             - name: errors
               selector: spans_errors
-          title: Browser spans exported
+          title: Browser span export outcomes
           type: stacked
           units: spans/s
         - context: samples_dropped

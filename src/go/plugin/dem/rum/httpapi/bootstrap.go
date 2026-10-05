@@ -45,6 +45,7 @@ func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
 	js := faro.Bootstrap(key, base, faro.BootstrapOptions{
 		MeasureRate: st.measureRate,
 		IncludeBots: st.includeBots,
+		ConsoleLogs: route.config.ConsoleLogsOn(),
 		Tracing:     st.tracing,
 		Propagate:   st.propagate,
 	})

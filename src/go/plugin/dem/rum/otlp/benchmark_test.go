@@ -16,15 +16,24 @@ func (benchmarkCounters) Add(string, uint64) {}
 // This exercises a continuing session with a pageview and browser trace while
 // draining its queues locally; allocations reflect per-beacon wire construction.
 func BenchmarkIngest(b *testing.B) {
-	e := &Exporter{
+	shared := &transport{
 		siteName: "s1",
 		counters: benchmarkCounters{},
-		sessions: newSessionTracker(),
-		now:      func() time.Time { return t0 },
-		ch:       make(chan queued, queueCap),
-		spanCh:   make(chan spanItem, spanQueueCap),
+	}
+	e := &Logs{
+		transport: shared,
+		now:       func() time.Time { return t0 },
+		ch:        make(chan queued, queueCap),
+	}
+	traces := &Traces{
+		transport: shared,
+		spanCh:    make(chan spanItem, spanQueueCap),
 	}
 	event := tracedBeacon()
+	traces.Ingest(event, aggregate.Result{
+		Accepted:     true,
+		Investigated: true,
+	})
 	e.Ingest(event, aggregate.Result{
 		Accepted:     true,
 		Investigated: true,
@@ -33,16 +42,20 @@ func BenchmarkIngest(b *testing.B) {
 	for len(e.ch) != 0 {
 		<-e.ch
 	}
-	<-e.spanCh
+	<-traces.spanCh
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
+		traces.Ingest(event, aggregate.Result{
+			Accepted:     true,
+			Investigated: true,
+		})
 		e.Ingest(event, aggregate.Result{
 			Accepted:     true,
 			Investigated: true,
 			PageView:     true,
 		})
 		<-e.ch
-		<-e.spanCh
+		<-traces.spanCh
 	}
 }

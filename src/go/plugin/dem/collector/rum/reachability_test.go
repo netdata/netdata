@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
 
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 
@@ -54,15 +53,10 @@ func TestProductionProbeConfirmsTrustedProxyPublicBase(t *testing.T) {
 	})
 	site.Name = "shop"
 	site.AllowedOrigins = []string{server.URL}
-	site.OTLP.Enabled = "no"
 	require.NoError(t, site.Init(context.Background()))
-	exporter, err := otlp.New(context.Background(), site.OTLP, site.Name, "", site.aggregator, site.redactor)
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, exporter.Close()) })
 	state := diagnostics.New(site.Site)
 	route := httpapi.NewRoute(site.Site, &processor{
 		aggregator: site.aggregator,
-		exporter:   exporter,
 	}, state)
 	retire, err := hub.Register(
 		site.Name,
