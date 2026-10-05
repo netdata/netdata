@@ -108,6 +108,8 @@ inside its temporary container; it does not install anything on the host.
 - `netdataprovider` returns a configuration snapshot and a one-shot watch callback.
   Rapid edits coalesce. Changes between closing a watch and retrieving another
   snapshot are retained. Callbacks never run under the command owner's lock.
+  Literal dollars are escaped at this boundary so file paths and service names
+  cannot become Collector `${provider:...}` expressions; GET preserves input.
 - `netdataextension` reports revision-specific pipeline readiness. Old service
   callbacks cannot mark a newer configuration running.
 - ADD adopts a passive job and returns 202 before registration. Enable or an
@@ -121,7 +123,7 @@ inside its temporary container; it does not install anything on the host.
 
 The executable tests capture real OTLP messages and cover both signals, passive
 ADD, rejected updates, rapid edits, stale readiness, cross-job reload with file
-offset retention, disable/remove, and EOF/QUIT shutdown.
+offset retention, literal dollar/expression strings, disable/remove, and EOF/QUIT shutdown.
 
 The Docker smoke test was validated with Netdata `v2.11.0-305-nightly` on Linux
 arm64. It checks daemon-issued enable commands, actual numeric chart samples,

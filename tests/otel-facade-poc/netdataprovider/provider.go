@@ -5,6 +5,7 @@ package netdataprovider
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 
 	"github.com/netdata/netdata/otel-facade-poc/internal/control"
@@ -39,6 +40,9 @@ func (p *provider) Retrieve(ctx context.Context, uri string, watcher confmap.Wat
 	if err != nil {
 		return nil, err
 	}
+	// The resolver expands provider expressions even in maps returned by custom
+	// providers. DynCfg and process settings are literal values, not OTel syntax.
+	escapeLiterals(config)
 	if err := p.controller.Start(); err != nil {
 		return nil, err
 	}
@@ -75,6 +79,23 @@ func (p *provider) Retrieve(ctx context.Context, uri string, watcher confmap.Wat
 			return ctx.Err()
 		}
 	}))
+}
+
+// Snapshot maps and slices are newly allocated; accepted job values stay intact.
+func escapeLiterals(value any) any {
+	switch v := value.(type) {
+	case string:
+		return strings.ReplaceAll(v, "$", "$$")
+	case map[string]any:
+		for key, item := range v {
+			v[key] = escapeLiterals(item)
+		}
+	case []any:
+		for i, item := range v {
+			v[i] = escapeLiterals(item)
+		}
+	}
+	return value
 }
 
 func (p *provider) Shutdown(context.Context) error {

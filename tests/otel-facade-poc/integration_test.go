@@ -119,6 +119,38 @@ func TestDistributionQuit(t *testing.T) {
 	p.stop(true)
 }
 
+func TestDistributionLiteralConfig(t *testing.T) {
+	p, sink := startDistribution(t)
+	const service = "literal$$name-${unsupported:value}"
+	const host = "otel-poc:hostmetrics:literal"
+	config, _ := json.Marshal(map[string]any{"interval": "1s", "service_name": service})
+	p.call("otel-poc:hostmetrics add literal", string(config), 202)
+	p.call(host+" enable", "", 202)
+	p.running(host, 0)
+	sink.wait(t, func(e telemetry) bool { return e.job == host && e.service == service })
+	p.requireConfig(host, service)
+
+	const logs = "otel-poc:filelogs:literal"
+	// Braces have their own glob meaning in file_log. Use plain dollar signs
+	// here to isolate Collector expansion from the receiver's glob semantics.
+	path := filepath.Join(t.TempDir(), "input$$.log")
+	appendLine(t, path, strings.Repeat("old-prefix-", 150))
+	config, _ = json.Marshal(map[string]any{"paths": []string{path}, "service_name": service})
+	p.call("otel-poc:filelogs add literal", string(config), 202)
+	p.call(logs+" enable", "", 202)
+	p.running(logs, 0)
+	for i := 0; i < 40; i++ {
+		appendLine(t, path, "literal-path-probe")
+		if sink.waitFor(300*time.Millisecond, func(e telemetry) bool {
+			return e.job == logs && e.service == service && e.body == "literal-path-probe"
+		}) {
+			p.stop(false)
+			return
+		}
+	}
+	t.Fatal("literal file path did not emit telemetry")
+}
+
 type telemetry struct {
 	job, service, metric, body string
 	ordinal                    int
@@ -230,7 +262,8 @@ func startDistribution(t *testing.T) (*distribution, *telemetrySink) {
 	t.Cleanup(server.Stop)
 	p := &distribution{t: t, done: make(chan struct{})}
 	p.cmd = exec.Command(binary, "--config=netdata:local", "--feature-gates=service.AllowNoPipelines")
-	p.cmd.Env = append(os.Environ(), "NETDATA_OTEL_POC_ENDPOINT="+listener.Addr().String(), "NETDATA_OTEL_POC_STATE_DIR="+t.TempDir())
+	stateDir := filepath.Join(t.TempDir(), "state$$-${unsupported:value}")
+	p.cmd.Env = append(os.Environ(), "NETDATA_OTEL_POC_ENDPOINT="+listener.Addr().String(), "NETDATA_OTEL_POC_STATE_DIR="+stateDir)
 	p.stdin, err = p.cmd.StdinPipe()
 	if err != nil {
 		t.Fatal(err)
