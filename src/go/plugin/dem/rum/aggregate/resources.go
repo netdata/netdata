@@ -1,85 +1,39 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-
-// Resource timing state: first/third-party counters
-// and a bounded top-10-by-count host ranking, feeding rum.resources /
-// rum.resource_host_p75 / rum.resource_host_count. Declared only once a
-// normalized resource observation has been seen for the site. A quiet or
-// simple page need not produce third-party resources in the beacon window.
 package aggregate
 
 import (
 	"net"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"golang.org/x/net/publicsuffix"
 )
 
-// resourceHostTopN is the fixed top-N for the resource-host charts ("top-10 hosts by count"); unlike page/country there is no
-// per-site config and no "other" fold — hosts beyond the top-10 (or the
-// maxTrackedGroups cap) simply are not charted, only counted toward the
-// site-level first_party/third_party totals.
 const resourceHostTopN = 10
-
-type resHostGroup struct {
-	count uint64
-	dur   series
-}
-
-// recordResource updates the first/third-party totals and the per-host
-// ranking state for one resource-timing sample. pageHost is the page's
-// own host (beacon.Beacon.PageHost); an empty pageHost or resource host
-// counts as third-party (conservative: cannot prove same-site).
-func (st *siteState) recordResource(pageHost string, r beacon.Resource, now time.Time) {
-	st.resourcesSeen = true
-	if isFirstParty(pageHost, r.Host) {
-		st.firstPartyResources++
-	} else {
-		st.thirdPartyResources++
-	}
-	if isAPICall(pageHost, r) {
-		st.addSample(seriesKey{apiName, "", ""}, r.DurationMS, now)
-	}
-	g, ok := st.resHosts[r.Host]
-	if !ok {
-		if st.resHostN >= maxTrackedGroups {
-			return // bounded, like every other breakdown cardinality
-		}
-		g = &resHostGroup{}
-		st.resHosts[r.Host] = g
-		st.resHostN++
-	}
-	g.count++
-	if r.DurationMS > 0 {
-		// Same per-series cap as addSample: a busy shared CDN host can see
-		// far more samples per window than the 10s eviction tick removes.
-		if len(g.dur.vals) >= maxSamplesPerSeries {
-			g.dur.ts = g.dur.ts[1:]
-			g.dur.vals = g.dur.vals[1:]
-			st.counters[CounterSamplesDropped]++
-		}
-		g.dur.ts = append(g.dur.ts, now)
-		g.dur.vals = append(g.dur.vals, r.DurationMS)
-	}
-}
-
-// apiName is the rum.api series key, distinct from any beacon.Vitals name.
 const apiName = "__api"
 
-// isAPICall reports whether a resource-timing entry is one of the site's
-// own API requests for rum.api: a first-party fetch/XHR with a duration,
-// not the snippet's beacon. Third-party calls (forms, analytics) stay
-// visible per host in rum.resource_host_p75 instead.
+type hostKey struct {
+	host    string
+	unknown bool
+}
+type resourcePopulation struct {
+	count  uint64
+	values []float64
+}
+type ResourceHostGroup struct {
+	Host     string
+	Other    bool
+	Unknown  bool // Missing host metadata; distinct from a literal host named "unknown".
+	Count    uint64
+	Duration VitalStats
+	Lost     uint64
+}
+
 func isAPICall(pageHost string, r beacon.Resource) bool {
-	if r.Self || r.DurationMS <= 0 {
-		return false
-	}
-	if r.Initiator != "fetch" && r.Initiator != "xmlhttprequest" {
-		return false
-	}
-	return isFirstParty(pageHost, r.Host)
+	return !r.Self && r.HasDuration && validMeasurement(r.DurationMS) &&
+		(r.Initiator == "fetch" || r.Initiator == "xmlhttprequest") &&
+		isFirstParty(pageHost, r.Host)
 }
 
 // isFirstParty reports whether resHost is the same registrable domain as
@@ -91,7 +45,7 @@ func isAPICall(pageHost string, r beacon.Resource) bool {
 // port ("www.example.com:8443") while pageHost never does, so ports are
 // ignored: the registrable domain decides, as for cookies.
 func isFirstParty(pageHost, resHost string) bool {
-	if pageHost == "" || resHost == "" || resHost == unknownValue {
+	if pageHost == "" || resHost == "" {
 		return false
 	}
 	pageHost, resHost = strings.ToLower(stripPort(pageHost)), strings.ToLower(stripPort(resHost))
@@ -115,47 +69,72 @@ func stripPort(host string) string {
 	return host
 }
 
-// ResourceHostGroup is one rum.resource_host_p75/count chart instance.
-type ResourceHostGroup struct {
-	Host        string
-	Count       uint64
-	HasDuration bool
-	P75Duration float64 // ms; 0 when no duration sample was ever recorded
+func (r *windowRead) addResource(v *activityObservation) {
+	resource := v.resource
+	host := resource.Host
+	if host == "" {
+		host = unknownValue
+	}
+	key := hostKey{
+		host:    host,
+		unknown: resource.Host == "",
+	}
+	g := r.resourceGroups[key]
+	if g == nil {
+		g = &resourcePopulation{}
+		r.resourceGroups[key] = g
+	}
+	g.count++
+	if resource.HasDuration {
+		g.values = append(g.values, resource.DurationMS)
+	}
+	if isAPICall(v.pageHost, *resource) {
+		r.global.values[apiName] = append(r.global.values[apiName], resource.DurationMS)
+	}
 }
-
-// rankResourceHosts ranks tracked hosts by all-time count, top-10. There
-// is no "other" fold; site-level resource counters still include every host.
-func (st *siteState) rankResourceHosts(cutoff time.Time) []ResourceHostGroup {
-	type cand struct {
-		host string
-		g    *resHostGroup
+func (r *windowRead) rankResourceHosts() []ResourceHostGroup {
+	var keys []hostKey
+	for key := range r.resourceGroups {
+		keys = append(keys, key)
 	}
-	cands := make([]cand, 0, len(st.resHosts))
-	for h, g := range st.resHosts {
-		g.dur.evict(cutoff)
-		cands = append(cands, cand{h, g})
-	}
-	sort.Slice(cands, func(i, j int) bool {
-		if cands[i].g.count != cands[j].g.count {
-			return cands[i].g.count > cands[j].g.count
+	sort.Slice(keys, func(i, j int) bool {
+		a, b := r.resourceGroups[keys[i]], r.resourceGroups[keys[j]]
+		if a.count != b.count {
+			return a.count > b.count
 		}
-		return cands[i].host < cands[j].host
+		if keys[i].host != keys[j].host {
+			return keys[i].host < keys[j].host
+		}
+		return !keys[i].unknown && keys[j].unknown
 	})
-	n := resourceHostTopN
-	if n > len(cands) {
-		n = len(cands)
+	n := min(resourceHostTopN, len(keys))
+	var out []ResourceHostGroup
+	for _, key := range keys[:n] {
+		g := r.resourceGroups[key]
+		out = append(out, ResourceHostGroup{
+			Host:     key.host,
+			Unknown:  key.unknown,
+			Count:    g.count,
+			Duration: measurementStats(apiName, g.values, r.resourcesLost),
+			Lost:     r.resourcesLost,
+		})
 	}
-	out := make([]ResourceHostGroup, 0, n)
-	for _, c := range cands[:n] {
-		out = append(
-			out,
-			ResourceHostGroup{
-				Host:        c.host,
-				Count:       c.g.count,
-				HasDuration: len(c.g.dur.vals) > 0,
-				P75Duration: percentile(c.g.dur.vals, 0.75),
-			},
-		)
+	other := resourcePopulation{}
+	present := false
+	for _, key := range keys[n:] {
+		g := r.resourceGroups[key]
+		other.count += g.count
+		other.values = append(other.values, g.values...)
+		present = true
+	}
+	if present {
+		out = append(out, ResourceHostGroup{
+			Host:     Other,
+			Other:    true,
+			Count:    other.count,
+			Duration: measurementStats(apiName, other.values, r.resourcesLost),
+			Lost:     r.resourcesLost,
+		})
 	}
 	return out
 }

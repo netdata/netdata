@@ -66,6 +66,7 @@ func (s *Service) Live(ctx context.Context, filter, after string, limit int) ([]
 		stream := make([]LiveEvent, 0, len(batch))
 		for _, row := range batch {
 			row.Page = redact.Apply(row.Page)
+			row.View = redact.Apply(row.View)
 			row.City = redact.Apply(row.City)
 			row.Country = redact.Apply(row.Country)
 			row.Browser = redact.Apply(row.Browser)

@@ -138,6 +138,12 @@ func (w *Writer) flush(ctx context.Context, batch []aggregate.HistoryEvent) int 
 			return i
 		}
 		r := EventRecord{
+			ExperienceID: rec.ExperienceID,
+			View:         rec.View,
+			ViewID:       rec.ViewID,
+			MetricID:     rec.MetricID,
+			Revision:     rec.Revision,
+
 			Site:        rec.Site,
 			SessionID:   rec.SessionID,
 			TSUnixUS:    rec.TSUnixUS,

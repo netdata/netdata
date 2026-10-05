@@ -107,7 +107,7 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 	site.AllowedOrigins = []string{"https://example.org"}
 	siteJob, siteOut, stopSite := startJob(t, "rum", "shop", site)
 	tickUntil(t, siteJob, siteOut, "SET 'unavailable' = 1")
-	assert.NotContains(t, siteOut.String(), "rum.lcp", "no browser measurement has been made")
+	assert.NotContains(t, siteOut.String(), "'rum.lcp'", "no browser percentile sample has been observed")
 	newReceiver := func() (*jobruntime.JobV2, *output, func()) {
 		c := receiver.New(hub)
 		c.Listen = "127.0.0.1:0"
@@ -116,7 +116,8 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 	recvJob, recvOut, stopReceiver := newReceiver()
 	tickUntil(t, recvJob, recvOut, "SET 'serving' = 1")
 	send := func(path string) {
-		body := `{"meta":{"page":{"url":"https://example.org` + path + `"},"session":{"id":"browser"},"browser":{"name":"Chrome"}},"measurements":[{"type":"web-vitals","values":{"lcp":3000,"cls":0.12}}]}`
+		id := "document-" + strings.TrimPrefix(path, "/")
+		body := `{"meta":{"page":{"id":"` + id + `","url":"https://example.org` + path + `"},"session":{"id":"browser"},"browser":{"name":"Chrome"}},"events":[{"name":"document_activated","attributes":{"observation_id":"` + id + `","observation_sequence":"1"}}],"measurements":[{"type":"web-vitals","values":{"lcp":3000},"context":{"id":"lcp-` + id + `","observation_sequence":"2"}},{"type":"web-vitals","values":{"cls":0.12},"context":{"id":"cls-` + id + `","observation_sequence":"3"}}]}`
 		req, err := http.NewRequest(
 			"POST",
 			"http://"+hub.Availability().Listen+"/rum/shop/collect",
@@ -205,7 +206,8 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 	}
 	stopReceiver := startReceiver()
 	send := func(site, page string, status int) {
-		body := `{"meta":{"page":{"url":"https://example.org` + page + `"},"session":{"id":"same-session"},"browser":{"name":"Chrome"}}}`
+		id := "document-" + strings.TrimPrefix(page, "/")
+		body := `{"meta":{"page":{"id":"` + id + `","url":"https://example.org` + page + `"},"session":{"id":"same-session"},"browser":{"name":"Chrome"}},"events":[{"name":"document_activated","attributes":{"observation_id":"` + id + `","observation_sequence":"1"}}]}`
 		req, err := http.NewRequestWithContext(
 			ctx,
 			http.MethodPost,
@@ -229,7 +231,7 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 		snapshot := data.Aggregator.Snapshot()
 		release()
 		require.EqualValues(t, 1, snapshot.Counters[aggregate.CounterPageviews])
-		require.Equal(t, 1, snapshot.ActiveSessions)
+		require.Equal(t, 1, snapshot.ObservedSessions)
 	}
 	stopReceiver()
 	stopNext := startReceiver()

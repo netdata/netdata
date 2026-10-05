@@ -53,16 +53,23 @@ func BenchmarkCollect(b *testing.B) {
 			defer c.Cleanup(ctx)
 			if measured {
 				c.aggregator.Ingest(&beacon.Beacon{
-					Site:      "shop",
-					SessionID: "browser",
-					PageGroup: "/products",
-					Path:      "/products",
-					Browser:   "Chrome",
-					Device:    "desktop",
-					Country:   "GR",
-					Received:  time.Now(),
-					Vitals:    []beacon.Vital{{Name: beacon.LCP, Value: 1200}, {Name: beacon.CLS, Value: 0}},
+					Site:         "shop",
+					SessionID:    "browser",
+					ExperienceID: "document",
+					Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}},
+					PageGroup:    "/products",
+					Path:         "/products",
+					Browser:      "Chrome",
+					Device:       "desktop",
+					Country:      "GR",
+					Received:     time.Now(),
+					Vitals:       []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 2, Value: 1200}, {Name: beacon.CLS, ID: "cls", Revision: 3, Value: 0}},
 				})
+			}
+			if measured {
+				snapshot := c.aggregator.Snapshot()
+				require.Equal(b, 1, snapshot.Vitals[beacon.LCP].N)
+				require.Equal(b, 1, snapshot.Vitals[beacon.CLS].N)
 			}
 			managed, ok := metrix.AsCycleManagedStore(c.MetricStore())
 			require.True(b, ok)

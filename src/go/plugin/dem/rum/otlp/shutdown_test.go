@@ -50,6 +50,7 @@ func TestCancellationBeforeExportPreservesFinalBatch(t *testing.T) {
 				var want uint64
 				var sent, dropped, errors string
 				result := aggregate.Result{
+					Observation:  tracedBeacon(),
 					Accepted:     true,
 					Investigated: true,
 					PageView:     true,
@@ -79,6 +80,7 @@ func TestCancellationBeforeExportPreservesFinalBatch(t *testing.T) {
 					e := newTraceExporter(t, startTraceServer(t, remote), "s1", counters, nil)
 					b := tracedBeacon()
 					b.Spans = append(b.Spans, b.Spans[0])
+					result.Observation = b
 					for i := 0; i < maxSpanBatch+3; i++ {
 						e.Ingest(b, result)
 					}
@@ -192,6 +194,7 @@ func TestInFlightPeriodicExportAbortsOnCancel(t *testing.T) {
 			var requests func() int
 			var sent, dropped, errors string
 			result := aggregate.Result{
+				Observation:  tracedBeacon(),
 				Accepted:     true,
 				Investigated: true,
 				PageView:     true,

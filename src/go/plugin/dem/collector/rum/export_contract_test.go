@@ -147,7 +147,8 @@ func TestOptionalExportsThroughNativeJobs(t *testing.T) {
 			require.NoError(t, json.Unmarshal(raw, &body))
 			meta := body["meta"].(map[string]any)
 			meta["session"] = map[string]any{"id": "export-contract"}
-			meta["page"] = map[string]any{"url": "https://example.org/checkout"}
+			meta["page"] = map[string]any{"id": "checkout-document", "url": "https://example.org/checkout"}
+			body["events"] = append(body["events"].([]any), map[string]any{"name": "document_activated", "attributes": map[string]string{"observation_id": "checkout-document", "observation_sequence": "1"}})
 			body["logs"] = []map[string]any{
 				{"message": "payment slow", "level": "warn", "timestamp": time.Now().UTC().Format(time.RFC3339Nano)},
 			}
@@ -168,6 +169,7 @@ func TestOptionalExportsThroughNativeJobs(t *testing.T) {
 			assert.Equal(t, tc.logs, logCount > 0)
 			assert.Equal(t, tc.traces, traceCount > 0)
 			counters := a.Snapshot().Counters
+			assert.Zero(t, counters[aggregate.CounterInvalidMeasurements])
 			if !tc.logs {
 				assert.Zero(t, counters[aggregate.CounterOTLPSent])
 				assert.Zero(t, counters[aggregate.CounterOTLPDropped])
@@ -209,7 +211,7 @@ func TestOTLPReceiverStorageSmoke(t *testing.T) {
 	_, _, stop := startJob(t, "rum", "shop", site)
 	timestamp := time.Now().UTC().Format(time.RFC3339Nano)
 	raw := fmt.Sprintf(
-		`{"meta":{"page":{"url":"https://example.org/checkout"},"session":{"id":"dem-otlp-storage-smoke"},"browser":{"name":"Chrome"}},"events":[{"name":"checkout_attempt","timestamp":%q,"attributes":{"cart_total":"42"}}],"logs":[{"message":"payment slow","level":"warn","timestamp":%q},{"message":"payment failed","level":"error","timestamp":%q,"context":{"type":"TypeError","stackFrames":"{\"filename\":\"https://example.org/app.js\",\"function\":\"checkout\",\"lineno\":12,\"colno\":3}"}}]}`,
+		`{"meta":{"page":{"id":"smoke-document","url":"https://example.org/checkout"},"session":{"id":"dem-otlp-storage-smoke"},"browser":{"name":"Chrome"}},"events":[{"name":"document_activated","attributes":{"observation_id":"smoke-document","observation_sequence":"1"}},{"name":"checkout_attempt","timestamp":%q,"attributes":{"cart_total":"42"}}],"logs":[{"message":"payment slow","level":"warn","timestamp":%q},{"message":"payment failed","level":"error","timestamp":%q,"context":{"type":"TypeError","stackFrames":"{\"filename\":\"https://example.org/app.js\",\"function\":\"checkout\",\"lineno\":12,\"colno\":3}"}}]}`,
 		timestamp,
 		timestamp,
 		timestamp,
@@ -221,6 +223,7 @@ func TestOTLPReceiverStorageSmoke(t *testing.T) {
 	release()
 	stop()
 	counters := a.Snapshot().Counters
+	assert.Zero(t, counters[aggregate.CounterInvalidMeasurements])
 	require.EqualValues(t, 4, counters[aggregate.CounterOTLPSent])
 	require.Zero(t, counters[aggregate.CounterOTLPErrors])
 	require.Zero(t, counters[aggregate.CounterJSErrors])
@@ -248,7 +251,7 @@ func TestEventExportRecoveryKeepsNativeHistory(t *testing.T) {
 			hub,
 			[]byte(
 				fmt.Sprintf(
-					`{"meta":{"page":{"url":"https://example.org/%s"},"session":{"id":"recovering-session"}}}`,
+					`{"meta":{"page":{"id":"%[1]s","url":"https://example.org/%[1]s"},"session":{"id":"recovering-session"}},"events":[{"name":"document_activated","attributes":{"observation_id":"%[1]s","observation_sequence":"1"}}]}`,
 					page,
 				),
 			),
@@ -273,6 +276,7 @@ func TestEventExportRecoveryKeepsNativeHistory(t *testing.T) {
 	)
 	stop()
 	counters := a.Snapshot().Counters
+	assert.Zero(t, counters[aggregate.CounterInvalidMeasurements])
 	assert.EqualValues(t, 1, counters[aggregate.CounterOTLPErrors])
 	assert.EqualValues(t, 1, counters[aggregate.CounterOTLPSent])
 	assert.Zero(t, counters[aggregate.CounterOTLPDropped])

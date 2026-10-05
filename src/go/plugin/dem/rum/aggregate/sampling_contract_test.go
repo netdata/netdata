@@ -76,10 +76,14 @@ func TestPromotionRetainsUnattributedPoorVital(t *testing.T) {
 			b := decodeSamplingBeacon(t, *now, map[string]any{
 				"meta": map[string]any{
 					"session": map[string]string{"id": "slow"},
-					"page":    map[string]string{"url": "https://shop.example.org/"},
+					"page":    map[string]string{"id": "activation", "url": "https://shop.example.org/"},
 				},
 				"measurements": []map[string]any{
-					{"type": "web-vitals", "values": map[string]float64{tc.name: tc.value}},
+					{
+						"type":    "web-vitals",
+						"values":  map[string]float64{tc.name: tc.value},
+						"context": map[string]string{"id": "metric", "observation_sequence": "1"},
+					},
 				},
 			})
 			require.True(t, a.Ingest(b).Investigated)
@@ -101,7 +105,9 @@ func TestPromotionPreservesOriginalContext(t *testing.T) {
 	before := mk(*now, "late-error", "/before")
 	before.UserID = "identity-before"
 	before.AppVersion = "before"
-	before.Events = []beacon.Event{{Name: "prior_action"}}
+	before.Events = append(before.Events, beacon.Event{
+		Name: "prior_action",
+	})
 	a.Ingest(before)
 	require.Empty(t, h.events)
 	*now = now.Add(time.Second)
@@ -164,7 +170,7 @@ func TestSessionlessSamplingKeepsMeasurementsWithoutInventingSessions(t *testing
 				assert.Equal(t, rate == 1 || keep, a.Ingest(b).Investigated)
 				assert.Equal(t, rate == 1 || keep, a.Ingest(mk(*now, "", "/slow", v(beacon.LCP, 5200))).Investigated)
 				assert.EqualValues(t, 3, a.Snapshot().Counters[CounterPageviews])
-				assert.Zero(t, a.Activity().ActiveSessions)
+				assert.Zero(t, a.Activity().ObservedSessions)
 				if rate == 1 || keep {
 					require.Len(t, h.events, 1, "only the standalone error has a native history surface")
 					assert.Empty(t, h.events[0].SessionID)

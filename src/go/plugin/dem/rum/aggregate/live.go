@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// live.go is the rum-live FUNCTION data source: a bounded ring of recently
-// accepted beacons carrying a page view, a vital, or a JS error. The ring
-// belongs to this aggregator runtime and is guarded by its mutex.
+// live.go is the rum-live FUNCTION data source: a bounded ring of recently admitted
+// document activations, application-view occurrences, vital reports and JS errors.
+// The ring belongs to this aggregator runtime and is guarded by its mutex.
 package aggregate
 
 import (
@@ -18,13 +18,15 @@ const liveRingCap = 5000
 // from a genuine zero, matching the FUNCTION's "null when absent" column
 // contract.
 type LiveRow struct {
-	Seq      uint64
-	TS       time.Time
-	Site     string
-	Country  string // ISO code, "" when unknown
-	City     string // "" when unknown
-	Lat, Lon float64
-	HasGeo   bool
+	ExperienceID, View, ViewID, MetricID, Kind, Vital string
+	Revision                                          uint64
+	Seq                                               uint64
+	TS                                                time.Time
+	Site                                              string
+	Country                                           string // ISO code, "" when unknown
+	City                                              string // "" when unknown
+	Lat, Lon                                          float64
+	HasGeo                                            bool
 
 	Page            string
 	Browser, Device string
@@ -38,30 +40,64 @@ type LiveRow struct {
 	Errors int
 }
 
-// appendLive records one ring entry when the beacon qualifies (page view,
-// any vital, or JS errors) and reclaims expired prefix rows.
-// Called from Ingest, which already holds a.mu.
+// appendLive gives each measurement its own unambiguous update identity.
 func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) {
-	if !pageView && len(b.Vitals) == 0 && len(b.Errors) == 0 {
-		return
+	base := LiveRow{
+		TS:           now,
+		Site:         b.Site,
+		Country:      b.Country,
+		City:         b.City,
+		Lat:          b.Lat,
+		Lon:          b.Lon,
+		HasGeo:       b.HasGeo,
+		Page:         b.PageGroup,
+		Browser:      b.Browser,
+		Device:       b.Device,
+		ExperienceID: b.ExperienceID,
+		View:         b.View,
+		ViewID:       b.ViewID,
 	}
-	a.liveSeq++
-	row := LiveRow{
-		Seq:      a.liveSeq,
-		TS:       now,
-		Site:     b.Site,
-		Country:  b.Country,
-		City:     b.City,
-		Lat:      b.Lat,
-		Lon:      b.Lon,
-		HasGeo:   b.HasGeo,
-		Page:     b.PageGroup,
-		Browser:  b.Browser,
-		Device:   b.Device,
-		PageView: pageView,
-		Errors:   len(b.Errors),
+	appendRow := func(row LiveRow) {
+		a.liveSeq++
+		row.Seq = a.liveSeq
+		a.live = append(a.live, row)
+		if len(a.live)-a.liveStart > liveRingCap {
+			a.liveStart = len(a.live) - liveRingCap
+		}
+	}
+	if pageView {
+		row := base
+		row.Kind = "document"
+		for _, ev := range b.Events {
+			if ev.Kind == beacon.EventDocument {
+				row.Revision = ev.Revision
+				break
+			}
+		}
+		row.PageView = true
+		appendRow(row)
+	}
+	for _, ev := range b.Events {
+		if ev.Kind == beacon.EventView {
+			row := base
+			row.Kind = "view"
+			row.Revision = ev.Revision
+			appendRow(row)
+		}
 	}
 	for _, v := range b.Vitals {
+		row := base
+		row.Kind = "vital"
+		row.Vital = v.Name
+		row.MetricID = v.ID
+		row.Revision = v.Revision
+		if origin := v.Origin; origin != nil {
+			if origin.Country != row.Country {
+				// Current location must not contradict the saved measurement country.
+				row.City, row.Lat, row.Lon, row.HasGeo = "", 0, 0, false
+			}
+			row.Page, row.Browser, row.Device, row.Country = origin.PageGroup, origin.Browser, origin.Device, origin.Country
+		}
 		switch v.Name {
 		case beacon.LCP:
 			row.LCPMS, row.HasLCP = v.Value, true
@@ -74,10 +110,13 @@ func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) 
 		case beacon.CLS:
 			row.CLS, row.HasCLS = v.Value, true
 		}
+		appendRow(row)
 	}
-	a.live = append(a.live, row)
-	if len(a.live)-a.liveStart > liveRingCap {
-		a.liveStart = len(a.live) - liveRingCap
+	if len(b.Errors) > 0 {
+		row := base
+		row.Kind = "error"
+		row.Errors = len(b.Errors)
+		appendRow(row)
 	}
 	a.evictLive(now)
 }

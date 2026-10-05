@@ -57,6 +57,12 @@ func (s *Service) SessionEvents(ctx context.Context, site, session string) ([]Se
 		events, _ := runtime.Aggregator.SessionEvents(session)
 		for _, event := range events {
 			row := history.SessionEventRecord{
+				ExperienceID: event.ExperienceID,
+				View:         event.View,
+				ViewID:       event.ViewID,
+				MetricID:     event.MetricID,
+				Revision:     event.Revision,
+
 				Site:      key,
 				SessionID: session,
 				TSUnixUS:  event.TS.UnixMicro(),
@@ -104,6 +110,7 @@ func redactSessionEvent(row *history.SessionEventRecord, redact *redact.Redactor
 	row.UserID = redact.Apply(row.UserID)
 	row.Type = redact.Apply(row.Type)
 	row.Page = redact.Apply(row.Page)
+	row.View = redact.Apply(row.View)
 	row.Text = redact.Apply(row.Text)
 }
 

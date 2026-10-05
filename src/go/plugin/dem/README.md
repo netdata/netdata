@@ -33,7 +33,7 @@ running with explicit ingress availability and gaps in browser product measureme
 
 Investigation history uses pure-Go journal files under `${NETDATA_LIB_DIR}/dem/journal`, through the existing
 `systemd-journal-sdk`. Events include their session and error metadata, so investigation does not depend on a separate
-parent record. `rum-sessions` reports sessions with activity saved in the selected range; page views, errors, frustration
+parent record. `rum-sessions` reports sessions with activity saved in the selected range; document views, application views, errors, frustration
 counts and activity spans describe retained events in that range, rather than lifetime totals. `rum-errors` groups
 retained occurrences by fingerprint; affected-session, top-page and browser statistics are `null` until a `fingerprint`
 filter selects the group to investigate. `rum-session-events` returns the full retained and pending timeline for a
@@ -49,10 +49,16 @@ not synced. Queue overflow and append failures count dropped records; sync failu
 close/reopen retries after five seconds so a transient filesystem error does not suspend history writes until the next
 hourly sweep. This is sampled investigation history, not a lossless event archive.
 
-Stock health templates provide LCP, INP and CLS alerts using the average p75 over 10 minutes, plus a no-beacons alert
-using page views over one hour. They apply independently to each native site chart. Customize thresholds or disable
-alerts through normal Netdata health configuration, using `_collect_plugin=dem` and `_collect_job=<site>` chart-label
-filters for site-specific policies. The plugin does not generate health files or reload Agent health configuration.
+Stock health templates evaluate the current LCP, INP and CLS populations once per minute. They require at least 30
+observations for that metric and complete local measurement state. More than 25% above the good threshold warns;
+more than 25% above the poor threshold is critical. Exactly 25% does not trigger. These alerts describe recent observed
+experiences: a brief poor burst can trigger, and a low-traffic metric can remain ineligible. They do not average p75
+values or establish that a problem persisted for ten minutes. Missing, stale or incomplete input is undefined, not
+recovery. Notification recovery delay does not change these evaluation semantics. Quiet traffic alone has no stock
+alarm because the Agent has no expected-traffic schedule.
+
+Customize alerts through normal Netdata health configuration, using `_collect_plugin=dem` and `_collect_job=<site>`
+chart-label filters for site-specific policies. The plugin does not generate health files or reload health configuration.
 Terminal/debug runs use private temporary journal and identity state, removed after readers and workers join; they leave
 live state untouched. An existing experimental `history.db` is not imported or deleted.
 
@@ -60,6 +66,54 @@ The browser normalization, bounded aggregation, OTLP and query behavior originat
 [Netdata digital-experience POC](https://github.com/netdata/digital-experience), commit
 `b3de4662f567dc63d33fee6201f8c2313568301b`. Its private configuration controller, scheduler, protocol emitter and root
 state reconciliation are replaced by the native Agent framework. Embedded third-party asset notices remain beside their source.
+
+## Browser measurement contract
+
+A document experience starts at the initial document activation or a back-forward cache restore. The bootstrap assigns
+an activation identity before the SDK queues reports. `rum.document_views` counts these explicit activations;
+`rum.application_views` counts explicit application-view occurrences separately. SPA navigation does not create a
+new document experience. Web Vitals remain associated with the document-entry page, even if first reported after a
+route change. The application-view dimension describes route activity and errors; it does not imply route-level Web
+Vitals.
+
+Each recent document experience contributes its latest reported value for each Web Vital. Repeated CLS or INP updates
+replace that experience's earlier value instead of adding visitors to the population. SDK metric identity and increasing
+report revisions survive normalization, live queries, retained history and enabled event-log exports. A `rum-live` row
+is an observation, not an independent pageview: use its kind, experience, metric and revision fields when updating a
+visualization. Later reports retain their own user and application-view context while measurement dimensions remain
+attributed to the original document.
+
+The configured `window` uses receiver arrival time, including for delayed reports. A genuinely newer revision extends
+that metric's presence in the window; a duplicate does not. Duplicate detection retains evidence for up to 30 minutes,
+subject to capacity and runtime restart. Identified SDK session lifecycle events follow the same rule, so replay does
+not renew observed-session windows. It is best effort, not exactly-once delivery. Reports arriving after retained
+evidence expires can be counted again. Late observations are not rejected merely to claim perfect deduplication.
+Errors, console logs, spans and ordinary custom events are not covered by this identity-based replay suppression;
+repeated delivery of these records can count again and refresh observed-session activity.
+
+Population charts show retained observations, good/needs-improvement/poor counts and capacity-loss evidence. Percentiles
+are unavailable when there are no observations or the local population is incomplete. A zero CLS or zero timing is a
+valid observation. Lost-report fields conservatively remain nonzero until the latest relevant loss leaves the window;
+they can include older loss from a continuous overload episode. They are neither exact missing-window counts nor part
+of the percentile denominator. The cumulative drop diagnostic counts actual discarded reports. Restart starts fresh
+in-memory windows; retained investigation history is independent.
+
+`rum.observed_sessions` counts distinct browser session identities seen in the receipt window. It does not estimate
+people, concurrency or time on site. Page session counts use the same window. JavaScript errors are events: several can
+occur in one document, so errors divided by document views is not a failure percentage. Missing identity excludes the
+corresponding measurement and increments an invalid-measurement diagnostic; no transport-gap fallback invents views.
+
+Breakdown traffic counts and vital populations use the same current window. Top groups and the pooled complement are
+computed from current observations. `bucket=value` distinguishes a literal label named `other` from `bucket=other`.
+The Pages Function exposes all retained document-entry groups, including groups outside the chart top list; loss
+fields reveal bounded-state truncation. Percentiles cannot be averaged across time windows, groups or sites to obtain a
+combined percentile.
+
+Navigation charts report document load time and **DOMContentLoaded handler duration**. Same-site fetch timing includes
+reported same-site fetch/XHR resource entries, not all backend API requests or server availability. Resource counts
+separate same-site, cross-site and unknown ownership; host buckets mark unavailable hosts as `bucket=unknown`,
+distinct from a real host named `unknown`; duration populations include only entries with a valid present
+duration. Performance entries for DEM delivery are excluded. Browser support, sampling and delivery can all leave gaps.
 
 ## Browser capture contract
 
@@ -132,8 +186,8 @@ With `sample_rate: 0` and `always_keep: []`, only measurements and live activity
 are enabled. With `measure_sample_rate: 0`, the generated bootstrap does not start the SDK, and the receiver returns
 204 for otherwise admissible collection attempts without decoding or recording them. Existing origin, size, bot and
 rate checks still apply. Intentional discard is neither accepted traffic nor a rejection/export-loss count. The
-Sites table reports `collection_disabled`. Browser measurement charts are absent, so the stock missing-beacon alert
-does not treat intentional disablement as a broken installation; receiver diagnostics remain available.
+Sites table reports `collection_disabled`. Browser measurement charts are absent; receiver diagnostics remain
+available. Quiet traffic does not raise a stock missing-beacon alarm.
 
 Already open pages can continue sending and propagating trace context until navigation. Positive collection-rate
 changes apply to new SDK sampling decisions; valid existing SDK sessions keep their earlier decision. Collection
@@ -183,7 +237,7 @@ jobs:
 For a Netdata receiver, follow [OTLP receiver setup and log verification](../../../../docs/opentelemetry/otlp-ingestion.md).
 Open that receiver node's Logs tab, select `otel-logs`, and choose `netdata-rum` in **Services**
 (`resource.attributes.service.name`). Narrow the time range and filter `resource.attributes.rum.site` by site key
-and `attributes.session.id` by session ID. Inspect `attributes.rum.type` (`console`, `event`, `error` or `pageview`),
+and `attributes.session.id` by session ID. Inspect `attributes.rum.type` (`console`, `event`, `error`, `pageview` or `vital`),
 the message body, `attributes.console.level`, `attributes.event.name` and `attributes.event.attr.<key>`.
 Error detail, when supplied, is in `attributes.error.type` and `attributes.error.stack`. Log access requires
 Netdata Cloud sign-in. The final frontend stage will verify this complete RUM-to-Logs workflow in the UI.

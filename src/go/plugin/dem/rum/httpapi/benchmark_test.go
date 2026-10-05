@@ -25,19 +25,19 @@ func (w benchmarkResponseWriter) Unwrap() http.ResponseWriter { return w.Respons
 func BenchmarkCollectWrapped(b *testing.B) { benchmarkCollectBody(b, faroBody) }
 
 func BenchmarkCollectTimingEvents(b *testing.B) {
-	benchmarkCollectBody(b, `{"meta":{"session":{"id":"session"},"page":{"url":"https://shop.example.com/"}},"events":[
- {"name":"faro.performance.navigation","attributes":{"pageLoadTime":"1000","domContentLoadHandlerTime":"10"}},
- {"name":"faro.performance.resource","attributes":{"name":"app.js?private=value#fragment","httpHost":"cdn.example.com","duration":"1000","transferSize":"1000","initiatorType":"fetch"}},
+	benchmarkCollectBody(b, `{"meta":{"session":{"id":"session"},"page":{"id":"document-1","url":"https://shop.example.com/"}},"events":[
+ {"name":"faro.performance.navigation","attributes":{"observation_id":"navigation-1","observation_sequence":"2","pageLoadTime":"1000","domContentLoadHandlerTime":"10"}},
+ {"name":"faro.performance.resource","attributes":{"observation_id":"resource-1","observation_sequence":"3","name":"app.js?private=value#fragment","httpHost":"cdn.example.com","duration":"1000","transferSize":"1000","initiatorType":"fetch"}},
  {"name":"faro.tracing.fetch","attributes":{"url.full":"https://api.example.com/api?private=value#fragment","http.request.method":"POST","http.response.status_code":"200","duration_ns":"1000"}}
  ]}`)
 }
 
 func BenchmarkCollectViews(b *testing.B) {
-	benchmarkCollectBody(b, `{"meta":{"session":{"id":"session"},"page":{"url":"https://shop.example.com/"},"view":{"name":"checkout"}},"events":[{"name":"view_changed","attributes":{"fromView":"catalog","toView":"checkout"}}]}`)
+	benchmarkCollectBody(b, `{"meta":{"session":{"id":"session"},"page":{"id":"document-1","url":"https://shop.example.com/"},"view":{"id":"view-2","name":"checkout"}},"events":[{"name":"view_changed","attributes":{"observation_id":"view-2","observation_sequence":"4","fromView":"catalog","toView":"checkout"}}]}`)
 }
 
 func BenchmarkCollectErrors(b *testing.B) {
-	benchmarkCollectBody(b, `{"meta":{"session":{"id":"session"},"page":{"url":"https://shop.example.com/"}},"exceptions":[{"type":"TypeError","value":"failed","stacktrace":{"frames":[{"filename":"https://cdn.example.com/static/framework-2c79e2a64abdb08b.js?private=value#fragment","function":"render","lineno":12,"colno":3}]}}]}`)
+	benchmarkCollectBody(b, `{"meta":{"session":{"id":"session"},"page":{"id":"document-1","url":"https://shop.example.com/"}},"exceptions":[{"type":"TypeError","value":"failed","stacktrace":{"frames":[{"filename":"https://cdn.example.com/static/framework-2c79e2a64abdb08b.js?private=value#fragment","function":"render","lineno":12,"colno":3}]}}]}`)
 }
 
 func benchmarkCollectBody(b *testing.B, body string) {

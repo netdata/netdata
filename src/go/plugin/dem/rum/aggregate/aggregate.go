@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package aggregate is the in-memory RUM aggregator: a sliding
-// window of web-vital samples per (vital, breakdown) for one site with
-// percentiles and CWV ratings computed at snapshot time, monotonic
-// counters, a session LRU and top-N breakdown folding into "other".
+// Package aggregate owns bounded, canonical receipt-window RUM measurements
+// for one site. It replaces identified metric revisions, derives consistent
+// facets at read time, and keeps investigation detail independent of measurement.
 package aggregate
 
 import (
@@ -20,30 +19,31 @@ const (
 	KindDevice  = "device"
 	KindCountry = "country"
 	KindPage    = "page"
-	KindVersion = "version" // declared only once a version is seen
+	KindView    = "view"
+	KindVersion = "version"
 )
 
-// Kinds lists the breakdowns in emission order. version is appended last
-// so existing browser/device/country/page chart priorities
-// are unaffected.
-var Kinds = []string{KindBrowser, KindDevice, KindCountry, KindPage, KindVersion}
+// Kinds lists the breakdowns in emission order. Application views carry
+// activity and error counts, without document-scoped vital distributions.
+var Kinds = []string{KindBrowser, KindDevice, KindCountry, KindPage, KindVersion, KindView}
 
 // versionTopN is the fixed top-N for the version breakdown ("top-10 by pageviews"); unlike page/country it has no per-site config.
 const versionTopN = 10
 
-// Other is the fold bucket for values outside the top-N.
+// Other is the display value of a synthetic fold; output also carries a typed flag.
 const Other = "other"
 
-// Site-level counter names (rum.pageviews / rum.js_errors / rum.beacons /
-// rum.otlp dimensions plus internal bookkeeping).
+// Site-level cumulative event and receiver/export diagnostic counters.
 const (
-	CounterPageviews      = "pageviews"
-	CounterJSErrors       = "js_errors"
-	CounterAccepted       = "accepted"
-	CounterOTLPSent       = "otlp_sent"
-	CounterOTLPDropped    = "otlp_dropped"
-	CounterOTLPErrors     = "otlp_errors"
-	CounterSamplesDropped = "samples_dropped"
+	CounterPageviews           = "document_views"
+	CounterApplicationViews    = "application_views"
+	CounterInvalidMeasurements = "invalid_measurements"
+	CounterJSErrors            = "js_errors"
+	CounterAccepted            = "accepted"
+	CounterOTLPSent            = "otlp_sent"
+	CounterOTLPDropped         = "otlp_dropped"
+	CounterOTLPErrors          = "otlp_errors"
+	CounterSamplesDropped      = "samples_dropped"
 
 	// History writer counters: the rum.history chart's
 	// written/dropped dims. Fed by the history writer's own goroutine via
@@ -65,13 +65,10 @@ var frustrationCounters = map[string]string{
 }
 
 const (
-	maxSamplesPerSeries  = 10000
-	pageviewDedup        = 10 * time.Second
-	maxTrackedGroups     = 1000 // per kind; beyond this new values fold straight into other
-	browserTopN          = 20   // browser names come from UA parsing and are client-controlled
-	unknownValue         = "unknown"
-	maxPageGroupSessions = 2000 // per page group, bounded distinct-session set (rum-pages "sessions")
-	maxPageElements      = 300  // per page group, attributed vital samples kept for rum-pages
+	maxWindowObservations = 10000
+	identityRetention     = 30 * time.Minute
+	browserTopN           = 20
+	unknownValue          = "unknown"
 )
 
 // SiteCfg is the immutable configuration for one site. Name is the stable
@@ -115,79 +112,87 @@ type Aggregator struct {
 	history HistorySink
 }
 
-type seriesKey struct{ vital, kind, value string }
-type groupKey struct{ kind, value string }
-
-type series struct {
-	ts   []time.Time
-	vals []float64
+// Measurement retention is independent of investigation sampling and detail LRU.
+// Bounds reuse the former sample/group budget, now once per canonical population.
+type attributes struct{ browser, device, country, page, version, view string }
+type observationKey struct{ experience, name string }
+type vitalObservation struct {
+	key      observationKey
+	metricID string
+	revision uint64
+	received time.Time
+	value    float64
+	element  string
+	attrs    attributes
+}
+type identityKey struct{ kind, experience, item string }
+type identity struct {
+	key      identityKey
+	metricID string
+	revision uint64
+	received time.Time
+	attrs    attributes
+}
+type sessionObservation struct {
+	key, page string
+	received  time.Time
+}
+type activityObservation struct {
+	received                               time.Time
+	attrs                                  attributes
+	documents, views, errors, frustrations uint64
+	fingerprint, message                   string
+	resource                               *beacon.Resource
+	pageHost                               string
 }
 
-type group struct {
-	pageviews uint64
-	jsErrors  uint64
-	pvTimes   []time.Time // windowed page views, for ranking
-	lastSeen  time.Time
-
-	// Page groups only (rum-pages): windowed error count and
-	// a bounded distinct-session set. Left nil/empty for every other kind.
-	errWindow []tsCount
-	sessions  map[string]struct{}
-	// elements are attributed vital samples and frWindow the
-	// frustration signals, both over the aggregation window.
-	elements []elemSample
-	frWindow []tsCount
+// A loss interval conservatively remains incomplete until its newest lost
+// observation leaves the window. It needs constant space during overload.
+type lossInterval struct {
+	until time.Time
+	count uint64
 }
 
-// elemSample is one vital sample with the element Faro attributed it to.
-type elemSample struct {
-	ts         time.Time
-	vital, sel string
-	poor       bool
+func (l *lossInterval) add(received time.Time, window time.Duration) {
+	until := received.Add(window)
+	if until.After(l.until) {
+		l.until = until
+	}
+	l.count++
 }
-
-type pageviewKey struct{ session, page string }
+func (l *lossInterval) current(now time.Time) uint64 {
+	if now.After(l.until) {
+		l.count = 0
+		l.until = time.Time{}
+	}
+	return l.count
+}
 
 type siteState struct {
-	cfg      SiteCfg
-	series   map[seriesKey]*series
-	groups   map[groupKey]*group
-	groupN   map[string]int             // kind → tracked group count
-	other    map[string]*group          // kind → fold counters
-	top      map[string]map[string]bool // kind → values emitted as own instances (last snapshot)
-	counters map[string]uint64
-	dedup    map[pageviewKey]time.Time
-	sess     *list.List // front = most recent
-	sessIdx  map[string]*list.Element
-
-	// rum-sites FUNCTION reads: kept separate from the
-	// breakdown series above so polling the function never disturbs chart
-	// ranking state.
-	accepted     []time.Time // accepted-beacon timestamps, 60s ring (beacons_per_min)
-	rejected     []time.Time // origin+rate+size reject timestamps, 60s ring (rejected_per_min)
-	bots         []time.Time // filtered bot beacons, 60s ring (bots_per_min)
-	pvWindow     []time.Time // page-view timestamps, aggregation-window ring (pageviews_window)
-	jsErrWindow  []tsCount   // js-error batches, aggregation-window ring (js_errors_window)
-	lastAccepted time.Time   // last accepted beacon time; zero = never (last_beacon_age_s)
-
-	// Error groups: fingerprint → bounded summary, LRU
-	// by last seen.
-	errGroups   *list.List // front = most recent
-	errGroupIdx map[string]*list.Element
-
-	// Resource timing: sticky once any resource event
-	// is seen (gates rum.resources/rum.resource_host_* declaration).
-	resourcesSeen                            bool
-	firstPartyResources, thirdPartyResources uint64
-	resHosts                                 map[string]*resHostGroup
-	resHostN                                 int
-}
-
-// tsCount is one timestamped batch count (a beacon can carry several JS
-// errors at once).
-type tsCount struct {
-	t time.Time
-	n uint64
+	cfg                                                        SiteCfg
+	window                                                     time.Duration
+	counters                                                   map[string]uint64
+	observations                                               map[observationKey]*receiptEntry
+	observationOrder                                           receiptHeap
+	identities                                                 map[identityKey]*receiptEntry
+	identityOrder                                              receiptHeap
+	activity, resources                                        receiptHeap
+	sessions                                                   map[string]*receiptEntry
+	sessionOrder                                               receiptHeap
+	pageSessions                                               map[string]*receiptEntry
+	pageSessionOrder                                           receiptHeap
+	vitalLoss                                                  map[string]*lossInterval
+	activityLoss, resourceLoss, sessionLoss, pageSessionLoss   lossInterval
+	identityLoss                                               map[string]*lossInterval
+	identitySessionLoss                                        lossInterval
+	resourceIdentities                                         map[identityKey]*receiptEntry
+	resourceIdentityOrder                                      receiptHeap
+	sess                                                       *list.List
+	sessIdx                                                    map[string]*list.Element
+	accepted, rejected, bots                                   []time.Time
+	lastAccepted                                               time.Time
+	resourcesSeen                                              bool
+	firstPartyResources, thirdPartyResources, unknownResources uint64
 }
 
 // New creates an aggregator for one site with immutable configuration.
@@ -196,19 +201,18 @@ func New(window time.Duration, cfg SiteCfg) *Aggregator {
 		window: window,
 		now:    time.Now,
 		site: siteState{
-			cfg:         cfg,
-			series:      map[seriesKey]*series{},
-			groups:      map[groupKey]*group{},
-			groupN:      map[string]int{},
-			other:       map[string]*group{},
-			top:         map[string]map[string]bool{},
-			counters:    map[string]uint64{},
-			dedup:       map[pageviewKey]time.Time{},
-			sess:        list.New(),
-			sessIdx:     map[string]*list.Element{},
-			errGroups:   list.New(),
-			errGroupIdx: map[string]*list.Element{},
-			resHosts:    map[string]*resHostGroup{},
+			cfg:                cfg,
+			window:             window,
+			counters:           map[string]uint64{},
+			observations:       map[observationKey]*receiptEntry{},
+			identities:         map[identityKey]*receiptEntry{},
+			sessions:           map[string]*receiptEntry{},
+			pageSessions:       map[string]*receiptEntry{},
+			vitalLoss:          map[string]*lossInterval{},
+			identityLoss:       map[string]*lossInterval{},
+			resourceIdentities: map[identityKey]*receiptEntry{},
+			sess:               list.New(),
+			sessIdx:            map[string]*list.Element{},
 		},
 	}
 }

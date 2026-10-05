@@ -5,6 +5,7 @@ package faro
 import (
 	"encoding/json"
 	"io"
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -37,6 +38,7 @@ type faroPayload struct {
 		} `json:"browser"`
 		View struct {
 			Name string `json:"name"`
+			ID   string `json:"id"`
 		} `json:"view"`
 		App struct {
 			Version     string `json:"version"`
@@ -142,8 +144,9 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 	b := &beacon.Beacon{
 		Site:           opt.Site,
 		Received:       now,
-		SessionID:      beacon.Clean(p.Meta.Session.ID, maxNameLen),
-		PageID:         beacon.Clean(p.Meta.Page.ID, maxNameLen),
+		SessionID:      observationID(p.Meta.Session.ID),
+		ExperienceID:   observationID(p.Meta.Page.ID),
+		ViewID:         observationID(p.Meta.View.ID),
 		Browser:        opt.text(p.Meta.Browser.Name, maxNameLen),
 		BrowserVersion: opt.text(p.Meta.Browser.Version, maxNameLen),
 		OS:             opt.text(p.Meta.Browser.OS, maxNameLen),
@@ -170,11 +173,7 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 	pageURL := opt.cleanURL(p.Meta.Page.URL)
 	b.Path = beacon.Path(pageURL)
 	b.PageHost = pageHost(pageURL)
-	if b.View != "" {
-		b.PageGroup = b.View
-	} else {
-		b.PageGroup = beacon.PageGroup(b.Path)
-	}
+	b.PageGroup = beacon.PageGroup(b.Path)
 
 	for i, m := range p.Measurements {
 		if i >= maxItems {
@@ -184,16 +183,18 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 		if len(m.Values) > 0 {
 			for k, v := range m.Values {
 				name, ok := vitalKeys[strings.ToLower(k)]
-				if !ok || v < 0 || v != v { // unknown key or NaN
+				if !ok || v < 0 || math.IsNaN(v) || math.IsInf(v, 0) {
 					continue
 				}
 				b.Vitals = append(
 					b.Vitals,
 					beacon.Vital{
-						Name:    name,
-						Value:   v,
-						Time:    ts,
-						Element: opt.attributedElement(name, m.Context),
+						ID:       observationContextID(m.Context),
+						Revision: observationContextRevision(m.Context),
+						Name:     name,
+						Value:    v,
+						Time:     ts,
+						Element:  opt.attributedElement(name, m.Context),
 					},
 				)
 			}
@@ -267,25 +268,35 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 				}
 			}
 		}
+		id := observationID(ev.Attributes["observation_id"])
+		revision := observationRevision(ev.Attributes["observation_sequence"])
 		b.Events = append(b.Events, beacon.Event{
-			Name:    name,
-			Kind:    kind,
-			Domain:  opt.text(ev.Domain, maxNameLen),
-			Attrs:   attrs,
-			Time:    flexTime(ev.Timestamp, now),
-			TraceID: hexID(ev.Trace.TraceID, 32),
+			ID:       id,
+			Revision: revision,
+			Name:     name,
+			Kind:     kind,
+			Domain:   opt.text(ev.Domain, maxNameLen),
+			Attrs:    attrs,
+			Time:     flexTime(ev.Timestamp, now),
+			TraceID:  hexID(ev.Trace.TraceID, 32),
 		})
 		// Navigation/resource timing ride the generic events array — also lift them into typed fields the aggregator uses
-		// for the rum.load/rum.dcl/rum.resource_* charts. Attribute names
+		// for document navigation and resource measurements. Attribute names
 		// verified against a captured Faro 2.11 beacon, see
 		// TestParseFaro timing-event cases in decode_test.go.
 		switch name {
 		case navigationEvent:
-			b.Navigation = parseNavigationAttrs(attrs)
-		case resourceEvent:
-			if r, ok := parseResourceAttrs(attrs); ok {
-				b.Resources = append(b.Resources, r)
+			n := parseNavigationAttrs(attrs)
+			if n != nil {
+				n.Revision = revision
+				if b.Navigation == nil || n.Revision > b.Navigation.Revision {
+					b.Navigation = n
+				}
 			}
+		case resourceEvent:
+			r := parseResourceAttrs(attrs)
+			r.ID = id
+			b.Resources = append(b.Resources, r)
 		}
 	}
 
@@ -336,7 +347,7 @@ func pageHost(raw string) string {
 }
 
 // parseNavigationAttrs reads the two navigation-timing attributes the
-// rum.load/rum.dcl charts need from a faro.performance.navigation
+// navigation measurements need from a faro.performance.navigation
 // event's attributes. Field names verified against a captured Faro 2.11
 // beacon and pinned by TestParseFaro in decode_test.go:
 // "pageLoadTime" (fetchStart..domComplete, the SDK's own "page load"
@@ -351,38 +362,33 @@ func parseNavigationAttrs(attrs map[string]string) *beacon.Navigation {
 		return nil
 	}
 	n := &beacon.Navigation{}
-	if v, err := strconv.ParseFloat(attrs["pageLoadTime"], 64); err == nil && v >= 0 {
+	if v, err := strconv.ParseFloat(attrs["pageLoadTime"], 64); err == nil && v >= 0 && !math.IsInf(v, 0) && !math.IsNaN(v) {
 		n.LoadMS, n.HasLoad = v, true
 	}
-	if v, err := strconv.ParseFloat(attrs["domContentLoadHandlerTime"], 64); err == nil && v >= 0 {
+	if v, err := strconv.ParseFloat(attrs["domContentLoadHandlerTime"], 64); err == nil && v >= 0 && !math.IsInf(v, 0) && !math.IsNaN(v) {
 		n.DCLMS, n.HasDCL = v, true
+	}
+	if !n.HasLoad && !n.HasDCL {
+		return nil
 	}
 	return n
 }
 
-// parseResourceAttrs reads host, duration, transfer size and initiator
-// type from a faro.performance.resource event. TestParseFaro pins the
-// captured field names: "httpHost", "duration",
-// "transferSize", and "initiatorType". ok is false when no numeric
-// attribute is present.
-func parseResourceAttrs(attrs map[string]string) (beacon.Resource, bool) {
-	dur, durErr := strconv.ParseFloat(attrs["duration"], 64)
-	if durErr != nil {
-		return beacon.Resource{}, false
-	}
+// parseResourceAttrs preserves entries whose duration is unavailable. Count and
+// duration populations differ; a present finite zero remains a duration sample.
+func parseResourceAttrs(attrs map[string]string) beacon.Resource {
 	r := beacon.Resource{
-		Host:       strings.ToLower(attrs["httpHost"]),
-		DurationMS: dur,
-		Initiator:  beacon.Clean(attrs["initiatorType"], maxNameLen),
+		Host:      strings.ToLower(attrs["httpHost"]),
+		Initiator: beacon.Clean(attrs["initiatorType"], maxNameLen),
+		Self:      isCollectorRequest(attrs["name"]),
 	}
-	if xfer, err := strconv.ParseFloat(attrs["transferSize"], 64); err == nil {
+	if dur, err := strconv.ParseFloat(attrs["duration"], 64); err == nil && dur >= 0 && !math.IsInf(dur, 0) && !math.IsNaN(dur) {
+		r.DurationMS, r.HasDuration = dur, true
+	}
+	if xfer, err := strconv.ParseFloat(attrs["transferSize"], 64); err == nil && xfer >= 0 && !math.IsInf(xfer, 0) && !math.IsNaN(xfer) {
 		r.TransferB = xfer
 	}
-	if r.Host == "" {
-		r.Host = "unknown"
-	}
-	r.Self = isCollectorRequest(attrs["name"])
-	return r, true
+	return r
 }
 
 // isCollectorRequest reports whether a resource URL is the snippet's own
@@ -430,6 +436,8 @@ func eventKind(name string) beacon.EventKind {
 		return beacon.EventResource
 	case fetchTraceEvent, xhrTraceEvent:
 		return beacon.EventRequest
+	case "document_activated":
+		return beacon.EventDocument
 	case "view_changed":
 		return beacon.EventView
 	case "session_start", "session_resume", "session_extend":

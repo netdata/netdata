@@ -357,6 +357,7 @@ func TestIngestDropsOnFullQueue(t *testing.T) {
 
 	b1 := mkBeacon() // One pageview fills the queue.
 	e.Ingest(b1, aggregate.Result{
+		Observation:  b1,
 		Accepted:     true,
 		Investigated: true,
 		PageView:     true,
@@ -364,6 +365,7 @@ func TestIngestDropsOnFullQueue(t *testing.T) {
 	b2 := mkBeacon()
 	b2.SessionID = "sess2"
 	e.Ingest(b2, aggregate.Result{
+		Observation:  b2,
 		Accepted:     true,
 		Investigated: true,
 		PageView:     true,
@@ -381,6 +383,7 @@ func TestIngestDropsOnFullQueue(t *testing.T) {
 func TestShutdownFlushIsBounded(t *testing.T) {
 	e := newExporter(t, "192.0.2.1:4317", newRecCounters(), nil)
 	e.Ingest(mkBeacon(), aggregate.Result{
+		Observation:  mkBeacon(),
 		Accepted:     true,
 		Investigated: true,
 		PageView:     true,
@@ -432,7 +435,8 @@ func TestIngestSkipsSampledOutBeacons(t *testing.T) {
 	e := newExporter(t, "127.0.0.1:1", counters, nil)
 	b := mkBeacon()
 	e.Ingest(b, aggregate.Result{
-		Accepted: true,
+		Observation: b,
+		Accepted:    true,
 	})
 	if n := len(e.ch); n != 0 {
 		t.Fatalf("queued %d records for a sampled-out beacon", n)

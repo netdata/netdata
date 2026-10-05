@@ -4,11 +4,13 @@ package rum_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,15 +34,17 @@ func TestCaptureNormalizationThroughNativeHistory(t *testing.T) {
 	stages := []string{"signed-in-action", "logged-out-action", "second-user-action"}
 	previous := "/home"
 	for i, view := range views {
+		viewID := fmt.Sprintf("view-%d", i+1)
 		events := []map[string]any{
-			{"name": "view_changed", "attributes": map[string]string{"fromView": previous, "toView": view}},
-			{"name": "session_start"}, {"name": "session_extend"},
+			{"name": "view_changed", "attributes": map[string]string{"fromView": previous, "toView": view, "observation_id": viewID, "observation_sequence": fmt.Sprint(i*10 + 2)}},
+			{"name": "session_start", "attributes": map[string]string{"observation_id": fmt.Sprintf("start-%d", i), "observation_sequence": "1"}},
+			{"name": "session_extend", "attributes": map[string]string{"observation_id": fmt.Sprintf("extend-%d", i), "observation_sequence": "2"}},
 			{"name": stages[i], "attributes": map[string]string{"unused": "redact-me"}},
 		}
 		body := map[string]any{
 			"meta": map[string]any{
-				"page":    map[string]any{"id": "same-document", "url": "https://example.org" + view + "?private=redact-me#fragment"},
-				"view":    map[string]any{"name": view},
+				"page":    map[string]any{"id": "same-document", "url": "https://example.org/users/123456?private=redact-me#fragment"},
+				"view":    map[string]any{"name": view, "id": viewID},
 				"session": map[string]any{"id": session},
 				"user":    map[string]any{"id": users[i]},
 				"browser": map[string]any{"name": "Chrome", "os": "Linux"},
@@ -56,11 +60,12 @@ func TestCaptureNormalizationThroughNativeHistory(t *testing.T) {
 			}}
 		}
 		if i == 0 {
-			body["measurements"] = []any{map[string]any{"type": "web-vitals", "values": map[string]any{"lcp": 4200}, "context": map[string]any{"element": "#account-123456"}}}
+			body["measurements"] = []any{map[string]any{"type": "web-vitals", "values": map[string]any{"lcp": 4200}, "context": map[string]any{"id": "lcp-metric", "observation_sequence": "3", "element": "#account-123456"}}}
 			events = append(events,
-				map[string]any{"name": "faro.performance.navigation", "attributes": map[string]string{"pageLoadTime": "900", "domContentLoadHandlerTime": "7"}},
-				map[string]any{"name": "faro.performance.resource", "attributes": map[string]string{"name": "https://example.org/api?token=redact-me", "httpHost": "example.org", "duration": "25", "transferSize": "100", "initiatorType": "fetch"}},
-				map[string]any{"name": "faro.performance.resource", "attributes": map[string]string{"name": "https://cdn.example.net/app.js?token=redact-me", "httpHost": "cdn.example.net", "duration": "50", "transferSize": "200", "initiatorType": "script"}},
+				map[string]any{"name": "document_activated", "attributes": map[string]string{"observation_id": "same-document", "observation_sequence": "1"}},
+				map[string]any{"name": "faro.performance.navigation", "attributes": map[string]string{"observation_id": "navigation", "observation_sequence": "4", "pageLoadTime": "900", "domContentLoadHandlerTime": "7"}},
+				map[string]any{"name": "faro.performance.resource", "attributes": map[string]string{"observation_id": "resource-1", "observation_sequence": "5", "name": "https://example.org/api?token=redact-me", "httpHost": "example.org", "duration": "25", "transferSize": "100", "initiatorType": "fetch"}},
+				map[string]any{"name": "faro.performance.resource", "attributes": map[string]string{"observation_id": "resource-2", "observation_sequence": "6", "name": "https://cdn.example.net/app.js?token=redact-me", "httpHost": "cdn.example.net", "duration": "50", "transferSize": "200", "initiatorType": "script"}},
 			)
 		}
 		body["events"] = events
@@ -76,8 +81,10 @@ func TestCaptureNormalizationThroughNativeHistory(t *testing.T) {
 	release()
 	assert.EqualValues(t, 3, snapshot.Counters[aggregate.CounterAccepted])
 	assert.EqualValues(t, 1, snapshot.Counters[aggregate.CounterPageviews], "one document/group, with explicit route events retained separately")
+	assert.EqualValues(t, 3, snapshot.Counters[aggregate.CounterApplicationViews])
+	assert.Zero(t, snapshot.Counters[aggregate.CounterInvalidMeasurements])
 	require.Len(t, snapshot.ErrorGroups, 1, "query and fragment changes must not split the error fingerprint")
-	assert.EqualValues(t, 2, snapshot.ErrorGroups[0].Total)
+	assert.EqualValues(t, 2, snapshot.ErrorGroups[0].Count)
 	assert.Equal(t, "checkout [REDACTED] failed", snapshot.ErrorGroups[0].Message)
 	assert.Equal(t, float64(900), snapshot.Load.P75)
 	assert.Equal(t, float64(7), snapshot.DCL.P75)
@@ -89,8 +96,9 @@ func TestCaptureNormalizationThroughNativeHistory(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, pages, 1)
 	assert.Equal(t, page, pages[0].Page)
-	assert.True(t, pages[0].HasLCP)
-	assert.Equal(t, float64(4200), pages[0].LCPP75MS)
+	assert.Equal(t, 1, pages[0].Vitals[beacon.LCP].N)
+	assert.Zero(t, pages[0].Vitals[beacon.LCP].Lost)
+	assert.Equal(t, float64(4200), pages[0].Vitals[beacon.LCP].P75)
 	assert.Equal(t, "#account-:id", pages[0].LCPElement)
 	assert.False(t, pages[0].FrustrationsKnown)
 	active, err := service.SessionEvents(ctx, "shop", session)

@@ -81,6 +81,7 @@ func TestHistoryRecordsActivityWithoutTimelineEvents(t *testing.T) {
 	a.Ingest(b)
 	*now = now.Add(time.Second)
 	b.Received = *now
+	b.Logs = []beacon.Log{{Message: "console observation"}}
 	a.Ingest(b)
 	require.Len(t, sink.events, 2)
 	assert.Equal(t, "activity", sink.events[1].Type)

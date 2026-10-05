@@ -149,3 +149,17 @@ assert.equal(rollover.delivered.length, beforeRollover);
 assert.equal(rollover.rollover(0.1), 'true');
 assert.ok(rollover.delivered.slice(beforeRollover).some(item => item.payload.name.startsWith('after_idle_')));
 assert.ok(rollover.delivered.slice(beforeRollover).some(item => ['session_start', 'session_extend'].includes(item.payload.name)));
+
+// Real start, resume and expiry-generated extension retain occurrence identity,
+// even when optional event attributes are disabled by bootstrap shaping.
+const lifecycleStart = run({ rate: 1, bootstrap: bootstraps.full });
+const lifecycleResume = run({ rate: 1, random: 0.6, savedStorage: lifecycleStart.savedStorage, bootstrap: bootstraps.full });
+assert.equal(lifecycleStart.rollover(0.5), 'true');
+const lifecycleItems = [...lifecycleStart.delivered, ...lifecycleResume.delivered]
+  .filter(item => ['session_start', 'session_resume', 'session_extend'].includes(item.payload.name));
+assert.deepEqual(new Set(lifecycleItems.map(item => item.payload.name)), new Set(['session_start', 'session_resume', 'session_extend']));
+assert.equal(new Set(lifecycleItems.map(item => item.payload.attributes.observation_id)).size, lifecycleItems.length);
+for (const item of lifecycleItems) {
+  assert.ok(item.payload.attributes.observation_id);
+  assert.ok(Number(item.payload.attributes.observation_sequence) > 0);
+}

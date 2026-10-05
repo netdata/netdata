@@ -144,7 +144,7 @@ func TestCaptureAttributeKeysNormalizeBeforeSemantics(t *testing.T) {
 }
 
 func TestCaptureRejectsNonfiniteTimingValues(t *testing.T) {
-	for _, value := range []string{"+Inf", "-Inf", "NaN", "Infinity", "1e1000", "I\tnf"} {
+	for _, value := range []string{"-1", "+Inf", "-Inf", "NaN", "Infinity", "1e1000", "I\tnf"} {
 		t.Run(value, func(t *testing.T) {
 			raw, err := json.Marshal(map[string]any{"events": []any{
 				map[string]any{"name": navigationEvent, "attributes": map[string]string{"pageLoadTime": value, "domContentLoadHandlerTime": "10"}},
@@ -159,7 +159,7 @@ func TestCaptureRejectsNonfiniteTimingValues(t *testing.T) {
 			assert.False(t, b.Navigation.HasLoad)
 			assert.True(t, b.Navigation.HasDCL)
 			assert.Equal(t, float64(10), b.Navigation.DCLMS)
-			assert.Equal(t, []beacon.Resource{{Host: "example.org", DurationMS: 25}}, b.Resources)
+			assert.Equal(t, []beacon.Resource{{Host: "example.org"}, {Host: "example.org", HasDuration: true, DurationMS: 25}}, b.Resources)
 			require.Len(t, b.Events, 4)
 			assert.NotContains(t, b.Events[0].Attrs, "pageLoadTime")
 			assert.NotContains(t, b.Events[1].Attrs, "duration")

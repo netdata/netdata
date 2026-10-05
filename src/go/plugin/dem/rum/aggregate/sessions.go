@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Session detail state holds per-session summaries and bounded event rings
-// for rum-sessions and rum-session-events. The same LRU supplies the
-// rum.sessions active-count gauge.
+// for rum-sessions and rum-session-events, independent of window session measurement.
 package aggregate
 
 import (
@@ -22,19 +21,22 @@ const (
 
 // sessionEvent is one ring entry (ts, type, page, text).
 type sessionEvent struct {
-	ts      time.Time
-	typ     string // pageview|error|event|view|request
-	page    string
-	text    string
-	traceID string // traced requests
-	error   *sessionError
-	context eventContext
+	metricID string
+	revision uint64
+	ts       time.Time
+	typ      string // pageview|error|event|view|request
+	page     string
+	text     string
+	traceID  string // traced requests
+	error    *sessionError
+	context  eventContext
 }
 
 // eventContext is captured when an observation arrives. Replayed context must
 // not acquire the identity, release or location of a later promoting event.
 type eventContext struct {
 	browser, device, country, version, userID string
+	experienceID, view, viewID                string
 }
 
 // Only error events retain error metadata; ordinary timeline entries keep the
@@ -42,13 +44,13 @@ type eventContext struct {
 type sessionError struct{ fingerprint, typ, message, stack string }
 
 type sessionDetail struct {
-	id                            string
-	started, lastSeen             time.Time
-	pageviews, errors             uint64
-	frustrations                  uint64 // rage, dead and error clicks
-	entryPage, lastPage, lastView string // lastView is bookkeeping only, not exposed
-	events                        []sessionEvent
-	investigated                  bool // currently selected for retained/exported detail
+	id                  string
+	started, lastSeen   time.Time
+	pageviews, errors   uint64
+	frustrations        uint64 // rage, dead and error clicks
+	entryPage, lastPage string
+	events              []sessionEvent
+	investigated        bool // currently selected for retained/exported detail
 }
 
 // touchSession updates (or creates) the session behind b.SessionID and
@@ -66,6 +68,9 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 		page = "/"
 	}
 	var sd *sessionDetail
+	if el := st.sessIdx[id]; el != nil && now.Sub(el.Value.(*sessionDetail).lastSeen) > beacon.SessionTTL {
+		st.dropSession(el)
+	}
 	if el, ok := st.sessIdx[id]; ok {
 		sd = el.Value.(*sessionDetail)
 		st.sess.MoveToFront(el)
@@ -97,15 +102,20 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 	}
 	sd.lastPage = page
 	context := eventContext{
-		browser: b.Browser,
-		device:  b.Device,
-		country: b.Country,
-		version: b.AppVersion,
-		userID:  b.UserID,
+		experienceID: b.ExperienceID,
+		view:         b.View,
+		viewID:       b.ViewID,
+		browser:      b.Browser,
+		device:       b.Device,
+		country:      b.Country,
+		version:      b.AppVersion,
+		userID:       b.UserID,
 	}
 	recorded := false
 	record := func(event sessionEvent) {
-		event.context = context
+		if event.typ != "vital" {
+			event.context = context
+		}
 		sd.pushEvent(event)
 		recorded = true
 		if hist != nil && sd.investigated {
@@ -113,37 +123,39 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 		}
 	}
 	if pageView {
+		var revision uint64
+		for _, ev := range b.Events {
+			if ev.Kind == beacon.EventDocument {
+				revision = ev.Revision
+				break
+			}
+		}
 		sd.pageviews++
 		record(sessionEvent{
-			ts:   now,
-			typ:  "pageview",
-			page: page,
+			ts:       now,
+			typ:      "pageview",
+			revision: revision,
+			page:     page,
 		})
-	}
-	// Explicit SDK view changes preserve navigation even when different raw
-	// routes normalize to the same label. Infer only when that evidence is absent.
-	explicitView := false
-	for _, event := range b.Events {
-		if event.Kind == beacon.EventView {
-			explicitView = true
-			break
-		}
-	}
-	if b.View != "" {
-		if !explicitView && sd.lastView != "" && sd.lastView != b.View {
-			record(sessionEvent{ts: now, typ: "view", page: page, text: b.View})
-		}
-		sd.lastView = b.View
 	}
 
 	for _, v := range b.Vitals {
 		if v.Poor() {
+			origin := context
+			originPage := page
+			if attrs := v.Origin; attrs != nil {
+				origin.browser, origin.device, origin.country, origin.version = attrs.Browser, attrs.Device, attrs.Country, attrs.AppVersion
+				originPage = attrs.PageGroup
+			}
 			record(
 				sessionEvent{
-					ts:   now,
-					typ:  "vital",
-					page: page,
-					text: truncateRunes(poorVitalText(v), sessionEventTextMax),
+					ts:       now,
+					typ:      "vital",
+					page:     originPage,
+					context:  origin,
+					metricID: v.ID,
+					revision: v.Revision,
+					text:     truncateRunes(poorVitalText(v), sessionEventTextMax),
 				},
 			)
 		}
@@ -164,7 +176,8 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 		})
 	}
 	for _, ev := range b.Events {
-		if ev.Kind == beacon.EventNavigation || ev.Kind == beacon.EventResource || ev.Kind == beacon.EventSession {
+		if ev.Kind == beacon.EventDocument || ev.Kind == beacon.EventNavigation || ev.Kind == beacon.EventResource ||
+			ev.Kind == beacon.EventSession {
 			continue
 		}
 		if ev.Kind == beacon.EventView {
@@ -172,7 +185,13 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 			if target == "" {
 				target = page
 			}
-			record(sessionEvent{ts: now, typ: "view", page: target, text: target})
+			record(sessionEvent{
+				ts:       now,
+				typ:      "view",
+				revision: ev.Revision,
+				page:     target,
+				text:     target,
+			})
 			continue
 		}
 		if beacon.IsFrustration(ev.Name) {
@@ -207,7 +226,8 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 			text: truncateRunes(ev.Name, sessionEventTextMax),
 		})
 	}
-	if hist != nil && sd.investigated && !recorded {
+	if hist != nil && sd.investigated && !recorded &&
+		(len(b.Vitals) > 0 || len(b.Logs) > 0 || len(b.Spans) > 0 || b.Navigation != nil || len(b.Resources) > 0) {
 		event := sessionEvent{
 			ts:      now,
 			typ:     "activity",
@@ -221,18 +241,23 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 
 func (e sessionEvent) history(site, sessionID string) HistoryEvent {
 	rec := HistoryEvent{
-		Site:      site,
-		SessionID: sessionID,
-		TSUnixUS:  e.ts.UnixMicro(),
-		Type:      e.typ,
-		Page:      e.page,
-		Text:      e.text,
-		TraceID:   e.traceID,
-		Browser:   e.context.browser,
-		Device:    e.context.device,
-		Country:   e.context.country,
-		Version:   e.context.version,
-		UserID:    e.context.userID,
+		ExperienceID: e.context.experienceID,
+		View:         e.context.view,
+		ViewID:       e.context.viewID,
+		MetricID:     e.metricID,
+		Revision:     e.revision,
+		Site:         site,
+		SessionID:    sessionID,
+		TSUnixUS:     e.ts.UnixMicro(),
+		Type:         e.typ,
+		Page:         e.page,
+		Text:         e.text,
+		TraceID:      e.traceID,
+		Browser:      e.context.browser,
+		Device:       e.context.device,
+		Country:      e.context.country,
+		Version:      e.context.version,
+		UserID:       e.context.userID,
 	}
 	if e.error != nil {
 		rec.Fingerprint, rec.ErrorType = e.error.fingerprint, e.error.typ
@@ -308,12 +333,14 @@ func (st *siteState) dropSession(el *list.Element) {
 
 // SessionEventInfo is one rum-session-events row.
 type SessionEventInfo struct {
-	TS      time.Time
-	Type    string
-	Page    string
-	Text    string
-	TraceID string
-	UserID  string
+	ExperienceID, View, ViewID, MetricID string
+	Revision                             uint64
+	TS                                   time.Time
+	Type                                 string
+	Page                                 string
+	Text                                 string
+	TraceID                              string
+	UserID                               string
 }
 
 // SessionEvents returns one session's event ring (oldest first).
@@ -321,6 +348,7 @@ type SessionEventInfo struct {
 func (a *Aggregator) SessionEvents(sessionID string) ([]SessionEventInfo, bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.site.evictSessions(a.now())
 	el, ok := a.site.sessIdx[sessionID]
 	if !ok {
 		return nil, false
@@ -329,12 +357,17 @@ func (a *Aggregator) SessionEvents(sessionID string) ([]SessionEventInfo, bool) 
 	out := make([]SessionEventInfo, len(sd.events))
 	for i, e := range sd.events {
 		out[i] = SessionEventInfo{
-			TS:      e.ts,
-			Type:    e.typ,
-			Page:    e.page,
-			Text:    e.text,
-			TraceID: e.traceID,
-			UserID:  e.context.userID,
+			ExperienceID: e.context.experienceID,
+			View:         e.context.view,
+			ViewID:       e.context.viewID,
+			MetricID:     e.metricID,
+			Revision:     e.revision,
+			TS:           e.ts,
+			Type:         e.typ,
+			Page:         e.page,
+			Text:         e.text,
+			TraceID:      e.traceID,
+			UserID:       e.context.userID,
 		}
 	}
 	return out, true

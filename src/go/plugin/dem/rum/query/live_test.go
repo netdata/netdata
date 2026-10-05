@@ -36,10 +36,12 @@ func TestLiveOutOfOrderReceivedTimesDoNotSkipOrReplay(t *testing.T) {
 				}
 				owner.Ingest(
 					&beacon.Beacon{
-						Site:      observation.site,
-						SessionID: observation.page,
-						PageGroup: observation.page,
-						Received:  observation.received,
+						Site:         observation.site,
+						ExperienceID: observation.page,
+						Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: observation.page, Revision: 1}},
+						SessionID:    observation.page,
+						PageGroup:    observation.page,
+						Received:     observation.received,
 					},
 				)
 			}

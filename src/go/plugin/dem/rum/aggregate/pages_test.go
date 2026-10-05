@@ -1,111 +1,142 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 package aggregate
 
 import (
-	"strconv"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestPagesReturnsRankedInstancesOnly(t *testing.T) {
-	a, now := newAgg(5 * time.Minute)
-	// Round 1: materialize the top set (see TestTopNFoldingIntoOther).
-	a.Ingest(mk(*now, "s1", "/a", v(beacon.LCP, 1000)))
-	a.Ingest(mk(*now, "s2", "/b", v(beacon.LCP, 2000)))
-	*now = now.Add(10 * time.Second)
-	a.Snapshot()
-
-	// Round 2: real activity lands on the now-promoted groups.
-	b1 := mk(*now, "t1", "/a", v(beacon.LCP, 1200), v(beacon.INP, 80))
-	a.Ingest(b1)
-	b2 := mk(*now, "t2", "/a", v(beacon.LCP, 1400))
-	b2.Errors = []beacon.Error{{Type: "E", Message: "m", Fingerprint: "fp1"}}
-	a.Ingest(b2)
-	*now = now.Add(10 * time.Second)
-
-	got := a.Pages()
-	byPage := map[string]PageInfo{}
-	for _, p := range got {
-		byPage[p.Page] = p
+func TestPagesIncludesLowTrafficOutsideChartTopN(t *testing.T) {
+	a, now := newAgg(time.Minute, SiteCfg{
+		Name:       "s",
+		PageGroups: 1,
+		Countries:  1,
+	})
+	for i := range 4 {
+		a.Ingest(mk(*now, fmt.Sprint(i), "/popular", v(beacon.LCP, 100)))
 	}
-	pa, ok := byPage["/a"]
-	if !ok {
-		t.Fatalf("expected /a in %+v", got)
-	}
-	// 3 total: round 1's "s1" plus round 2's "t1"/"t2" (the real group
-	// tracks its own activity regardless of top-set/routing status).
-	if pa.PageviewsWindow != 3 || pa.Sessions != 3 || pa.ErrorsWindow != 1 {
-		t.Fatalf("/a = %+v", pa)
-	}
-	if pa.LCPP75MS == 0 || pa.INPP75MS == 0 {
-		t.Fatalf("/a p75 missing: %+v", pa)
-	}
-	if _, ok := byPage["/b"]; !ok {
-		t.Fatalf("expected /b (top-N ranked but no new activity) in %+v", got)
-	}
+	a.Ingest(mk(*now, "slow", "/rare", v(beacon.LCP, 6000)))
+	require.Len(t, a.Pages(), 2)
+	groups := a.Snapshot().Breakdowns[KindPage]
+	require.Len(t, groups, 2)
+	assert.Equal(t, "/popular", groups[0].Value)
+	assert.True(t, groups[1].Other)
+	assert.EqualValues(t, 4, groups[0].Pageviews)
+	assert.EqualValues(t, 1, groups[1].Pageviews)
+	assert.Equal(t, 6000., groups[1].Vitals[beacon.LCP].P75)
 }
-
-func TestPagesEmptyBeforeAnyRank(t *testing.T) {
-	a, now := newAgg(5 * time.Minute)
-	a.Ingest(mk(*now, "s1", "/a"))
-	// No Snapshot()/rank() has run yet: top["page"] is nil.
-	if got := a.Pages(); len(got) != 0 {
-		t.Fatalf("expected no pages before the first rank, got %+v", got)
-	}
-}
-
-func TestPagesStayWithTheirOwner(t *testing.T) {
-	for _, site := range []string{"a", "b"} {
-		a, now := newAgg(5*time.Minute, SiteCfg{
-			Name:       site,
-			PageGroups: 20,
-			Countries:  20,
-		})
-		for _, incoming := range []string{"a", "b"} {
-			a.Ingest(&beacon.Beacon{
-				Site:      incoming,
-				Received:  *now,
-				SessionID: "shared",
-				PageGroup: "/" + incoming,
-			})
-		}
-		a.Snapshot()
-		got := a.Pages()
-		if len(got) != 1 || got[0].Site != site || got[0].Page != "/"+site {
-			t.Fatalf("site %s pages = %+v", site, got)
-		}
-	}
-}
-
-func TestPagesSessionsBounded(t *testing.T) {
-	a, now := newAgg(5 * time.Minute)
-	a.Ingest(mk(*now, "s0", "/a"))
-	*now = now.Add(10 * time.Second)
-	a.Snapshot() // materialize top set
-
-	for i := 0; i < maxPageGroupSessions+50; i++ {
-		b := mk(*now, "sess"+strconv.Itoa(i), "/a")
+func TestFacetPartitionTracksCurrentPopulationAndTypedOther(t *testing.T) {
+	a, now := newAgg(time.Minute, SiteCfg{
+		Name:       "s",
+		PageGroups: 1,
+		Countries:  1,
+	})
+	for i := range 3 {
+		b := mk(*now, fmt.Sprint(i), "/a", v(beacon.LCP, 100))
+		b.AppVersion = "other"
 		a.Ingest(b)
 	}
-	*now = now.Add(10 * time.Second)
-	got := a.Pages()
-	if len(got) != 1 || got[0].Sessions != maxPageGroupSessions {
-		t.Fatalf("sessions bound: %+v", got)
+	b := mk(*now, "rare", "/b", v(beacon.LCP, 6000))
+	b.AppVersion = "release"
+	a.Ingest(b)
+	snap := a.Snapshot()
+	for _, kind := range []string{KindPage, KindVersion, KindCountry} {
+		var views uint64
+		var n int
+		for _, g := range snap.Breakdowns[kind] {
+			views += g.Pageviews
+			n += g.Vitals[beacon.LCP].N
+		}
+		assert.Equal(t, snap.PageviewsWindow, views)
+		assert.Equal(t, snap.Vitals[beacon.LCP].N, n)
 	}
+	var realOther bool
+	for _, g := range snap.Breakdowns[KindVersion] {
+		if g.Value == Other && !g.Other {
+			realOther = true
+		}
+	}
+	assert.True(t, realOther)
+	*now = now.Add(time.Minute + time.Second)
+	a.Ingest(mk(*now, "new", "/b", v(beacon.LCP, 20)))
+	groups := a.Snapshot().Breakdowns[KindPage]
+	require.Len(t, groups, 1)
+	assert.Equal(t, "/b", groups[0].Value)
+	assert.EqualValues(t, 1, groups[0].Pageviews)
+}
+func TestSessionMeasurementIndependentOfDetailLRU(t *testing.T) {
+	a, now := newAgg(time.Minute)
+	for i := range maxTrackedSessions + 10 {
+		a.Ingest(mk(*now, fmt.Sprint(i), "/"))
+	}
+	assert.Equal(t, maxTrackedSessions+10, a.Snapshot().ObservedSessions)
+	assert.Equal(t, maxTrackedSessions+10, a.Pages()[0].Sessions)
+	*now = now.Add(time.Minute + time.Second)
+	assert.Zero(t, a.Activity().ObservedSessions)
+	assert.Empty(t, a.Pages())
+}
+func TestObservedSessionCapacityIsExplicit(t *testing.T) {
+	a, now := newAgg(time.Minute)
+	for i := range maxWindowObservations + 1 {
+		b := mk(*now, fmt.Sprint(i), "/")
+		b.Events = nil
+		b.Logs = []beacon.Log{{Message: "accepted activity"}}
+		a.Ingest(b)
+	}
+	s := a.Snapshot()
+	assert.Equal(t, maxWindowObservations, s.ObservedSessions)
+	assert.Positive(t, s.SessionsLost)
+	assert.Positive(t, a.Pages()[0].SessionsLost)
+	*now = now.Add(time.Minute + time.Second)
+	assert.Zero(t, a.Snapshot().SessionsLost)
+}
+func TestPageInventoryIncludesEveryRetainedGroup(t *testing.T) {
+	a, now := newAgg(time.Minute)
+	for i := range 1101 {
+		a.Ingest(mk(*now, "s", fmt.Sprintf("/page_%d", i)))
+	}
+	pages := a.Pages()
+	assert.Len(t, pages, 1101)
+	assert.Zero(t, pages[0].Lost)
+}
+func TestSelectorsUseReplacedVitalPopulation(t *testing.T) {
+	a, now := newAgg(time.Minute)
+	b := mk(*now, "s", "/", v(beacon.LCP, 6000))
+	b.Vitals[0].Element = "#old"
+	a.Ingest(b)
+	b.Vitals[0].Revision = 2
+	b.Vitals[0].Value = 100
+	b.Vitals[0].Element = "#new"
+	a.Ingest(b)
+	pages := a.Pages()
+	require.Len(t, pages, 1)
+	assert.Equal(t, "#new", pages[0].LCPElement)
+	assert.Equal(t, 1, pages[0].Vitals[beacon.LCP].N)
 }
 
-func TestPageVitalPresenceDistinguishesZeroFromMissing(t *testing.T) {
-	a, now := newAgg(5 * time.Minute)
-	a.Ingest(mk(*now, "browser", "/shop", v(beacon.CLS, 0)))
-	a.Snapshot()
+func TestDuplicateReportDoesNotRefreshObservedSessions(t *testing.T) {
+	a, now := newAgg(time.Minute)
+	b := mk(*now, "browser", "/entry", v(beacon.LCP, 100))
+	a.Ingest(b)
+	assert.Equal(t, 1, a.Snapshot().ObservedSessions)
+	*now = now.Add(time.Minute + time.Second)
+	assert.Zero(t, a.Snapshot().ObservedSessions)
+	assert.Empty(t, a.Pages())
+	b.Received = *now
+	result := a.Ingest(b)
+	assert.Empty(t, result.Observation.Vitals)
+	assert.Empty(t, result.Observation.Events)
+	assert.Zero(t, a.Snapshot().ObservedSessions)
+	assert.Empty(t, a.Pages())
+	b.Vitals[0].Revision = 2
+	a.Ingest(b)
+	assert.Equal(t, 1, a.Snapshot().ObservedSessions)
 	pages := a.Pages()
-	if len(pages) != 1 {
-		t.Fatalf("missing observed page: %+v", pages)
-	}
-	if !pages[0].HasCLS || pages[0].CLSP75 != 0 || pages[0].HasLCP || pages[0].HasINP {
-		t.Fatalf("zero CLS is a sample; missing latency is not: %+v", pages[0])
-	}
+	require.Len(t, pages, 1)
+	assert.Equal(t, 1, pages[0].Sessions)
 }

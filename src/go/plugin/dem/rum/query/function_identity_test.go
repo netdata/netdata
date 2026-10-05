@@ -91,12 +91,13 @@ func TestFunctionsExposeRetainedIdentityAfterLogoutAndRetirement(t *testing.T) {
 	now := time.Now()
 	for i, id := range ids {
 		owner.Ingest(&beacon.Beacon{
-			Site:      "shop",
-			SessionID: "shared",
-			UserID:    id,
-			PageGroup: "/checkout",
-			Received:  now.Add(time.Duration(i) * time.Second),
-			Events:    []beacon.Event{{Name: "milestone"}},
+			Site:         "shop",
+			ExperienceID: "document",
+			SessionID:    "shared",
+			UserID:       id,
+			PageGroup:    "/checkout",
+			Received:     now.Add(time.Duration(i) * time.Second),
+			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}, {Name: "milestone"}},
 		})
 	}
 	handler := functions.New(query.New(sites, retained))
@@ -109,7 +110,7 @@ func TestFunctionsExposeRetainedIdentityAfterLogoutAndRetirement(t *testing.T) {
 		return response.RawResponse["data"].([][]any)
 	}
 	pending := timeline()
-	// The first beacon also creates the initial page view.
+	// Only the explicit document activation creates a document view.
 	require.Len(t, pending, 4)
 	assert.Equal(t, ids[0], pending[0][5])
 	for i, id := range ids {

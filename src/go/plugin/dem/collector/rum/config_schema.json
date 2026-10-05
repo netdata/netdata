@@ -38,7 +38,7 @@
       },
       "window": {
         "title": "Measurement window",
-        "description": "Sliding window for browser measurements. Accepts durations between 1m and 30m.",
+        "description": "Receiver-arrival window for recent browser measurements and distinct observed sessions. Accepts durations between 1m and 30m.",
         "type": "string",
         "default": "5m"
       },

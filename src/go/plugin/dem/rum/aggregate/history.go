@@ -14,6 +14,8 @@ type HistorySink interface {
 // the history writer assigns saved time separately. Activity events record
 // sessions with no new timeline event and are omitted from timeline displays.
 type HistoryEvent struct {
+	ExperienceID, View, ViewID, MetricID         string
+	Revision                                     uint64
 	Site, SessionID                              string
 	TSUnixUS                                     int64
 	Type, Page, Text, TraceID                    string
