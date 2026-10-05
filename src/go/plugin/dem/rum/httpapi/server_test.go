@@ -687,7 +687,7 @@ func TestBootstrapRevalidates(t *testing.T) {
 		t.Fatalf("unchanged snippet: %d, want 304", resp.StatusCode)
 	}
 	cfg := testCfg()
-	cfg.Sites[0].MeasureSampleRate = 0.5
+	cfg.Sites[0].MeasureSampleRate = new(0.5)
 	s.Update(cfg)
 	if resp := get(etag); resp.StatusCode != 200 || resp.Header.Get("ETag") == etag {
 		t.Fatalf("changed settings must send a new snippet: %d", resp.StatusCode)

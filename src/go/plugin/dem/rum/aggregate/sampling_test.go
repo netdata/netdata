@@ -70,7 +70,7 @@ func TestInvestigateSamplingIsPerSession(t *testing.T) {
 }
 
 // A sampled-out session that hits an error is promoted and keeps its
-// timeline from the start, so the error is never missing its context.
+// available preceding timeline context as well as the current error.
 func TestErrorPromotesSessionWithItsEarlierEvents(t *testing.T) {
 	a, now, h := sampledAgg(0.000001, true, false)
 	a.Ingest(pageview(*now, "late-error"))
@@ -104,8 +104,8 @@ func TestErrorPromotesSessionWithItsEarlierEvents(t *testing.T) {
 func TestPoorVitalPromotesSession(t *testing.T) {
 	a, now, h := sampledAgg(0.000001, false, true)
 	a.Ingest(mk(*now, "slow", "/a", v(beacon.LCP, 5200)))
-	if len(h.events) != 1 {
-		t.Fatalf("a poor LCP must keep the session: %d kept", len(h.events))
+	if len(h.events) != 2 || h.events[1].Type != "vital" {
+		t.Fatalf("a poor LCP must preserve the pageview and triggering vital: %+v", h.events)
 	}
 }
 
@@ -124,12 +124,12 @@ func TestErrorsFollowTheSessionDecisionWhenNotAlwaysKept(t *testing.T) {
 	}
 }
 
-func TestUnsetRateKeepsEverything(t *testing.T) {
-	a, now, h := sampledAgg(0, false, false)
+func TestFullRateKeepsEverything(t *testing.T) {
+	a, now, h := sampledAgg(1, false, false)
 	b := pageview(*now, "s1")
 	result := a.Ingest(b)
 	if !result.Investigated || len(h.events) != 1 {
-		t.Fatal("an unset investigate rate keeps every session")
+		t.Fatal("a full investigate rate selects every session")
 	}
 }
 

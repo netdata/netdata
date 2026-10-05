@@ -14,11 +14,11 @@ type Site struct {
 	// proxy/TLS) used in the setup snippet; "" derives one
 	// from the receiver listener and diagnostic observations.
 	PublicURL string `yaml:"public_url,omitempty"          json:"public_url"`
-	// MeasureSampleRate is the share of sessions the snippet measures, set
-	// in the browser; unsampled browsers send nothing. 0 means 1.
-	MeasureSampleRate float64 `yaml:"measure_sample_rate,omitempty" json:"measure_sample_rate"`
-	// Investigate samples which measured sessions are kept in full
-	// (history, events); nil keeps every session.
+	// MeasureSampleRate is the browser collection share. Nil defaults to one;
+	// zero disables collection, including traffic from previously sampled browsers.
+	MeasureSampleRate *float64 `yaml:"measure_sample_rate,omitempty" json:"measure_sample_rate"`
+	// Investigate selects detail for native history and enabled event-log/trace
+	// exports. Nil selects all received sessions.
 	Investigate *Investigate `yaml:"investigate,omitempty"         json:"investigate"`
 	// Bots is BotsExclude (default: crawlers, headless browsers and other
 	// automation send nothing and are counted as filtered) or BotsInclude
@@ -91,6 +91,17 @@ func (s Site) ConsoleLogsOn() bool { return s.EventLogsOn() && s.EventLogs.Inclu
 
 // Effective returns defaults without changing the stored configuration.
 func (s Site) Effective() Site {
+	measure, detail := s.MeasureRate(), s.InvestigateRate()
+	s.MeasureSampleRate = &measure
+	investigate := Investigate{}
+	if s.Investigate != nil {
+		investigate = *s.Investigate
+	}
+	investigate.SampleRate = &detail
+	if investigate.AlwaysKeep == nil {
+		investigate.AlwaysKeep = []string{KeepErrors, KeepPoorVitals}
+	}
+	s.Investigate = &investigate
 	logs, traces := EventLogs{}, Tracing{}
 	if s.EventLogs != nil {
 		logs = *s.EventLogs

@@ -26,7 +26,7 @@ type snapshot struct {
 type site struct {
 	key         string
 	origins     []originRule
-	measureRate float64 // measure sampling in the snippet
+	measureRate float64 // collection sampling for the snippet and receiver zero gate
 	includeBots bool    // bots: include
 	// tracing enables browser spans. propagate lists cross-origin trace
 	// header patterns.

@@ -285,3 +285,58 @@ func TestNativeRUMIndependentDestinationsAndSecretResolution(t *testing.T) {
 	assert.NotContains(t, err.Error(), "synthetic-logs-secret-value")
 	assert.NotContains(t, err.Error(), malformed)
 }
+
+func TestNativeRUMSamplingConfigurationAndReload(t *testing.T) {
+	for _, tc := range []struct {
+		name, suffix string
+		rate         float64
+		keep         bool
+	}{
+		{"omitted", "", 1, true},
+		{"null", "measure_sample_rate: null\ninvestigate: null\n", 1, true},
+		{"empty", "investigate: {}\n", 1, true},
+		{"null fields", "measure_sample_rate: null\ninvestigate: {sample_rate: null, always_keep: null}\n", 1, true},
+		{"zero", "measure_sample_rate: 0\ninvestigate: {sample_rate: 0}\n", 0, true},
+		{"zero no overrides", "measure_sample_rate: 0\ninvestigate: {sample_rate: 0, always_keep: []}\n", 0, false},
+		{"fraction", "measure_sample_rate: 0.25\ninvestigate: {sample_rate: 0.25}\n", .25, true},
+		{"one", "measure_sample_rate: 1\ninvestigate: {sample_rate: 1}\n", 1, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			factory, last := nativeRUMConfigFactory(t)
+			var input confgroup.Config
+			require.NoError(
+				t,
+				yaml.Unmarshal([]byte("name: shop\nallowed_origins: [https://shop.example.org]\n"+tc.suffix), &input),
+			)
+			input.SetModule("rum").SetSourceType(confgroup.TypeUser)
+			payload, err := factory.Configuration(context.Background(), input)
+			require.NoError(t, err)
+			require.ErrorContains(t, last().Check(context.Background()), "not initialized")
+			var effective rum.Config
+			require.NoError(t, json.Unmarshal(payload, &effective))
+			require.NotNil(t, effective.MeasureSampleRate)
+			require.NotNil(t, effective.Investigate)
+			require.NotNil(t, effective.Investigate.SampleRate)
+			assert.Equal(t, tc.rate, *effective.MeasureSampleRate)
+			assert.Equal(t, tc.rate, *effective.Investigate.SampleRate)
+			assert.Equal(t, tc.keep, effective.KeepsErrors())
+			assert.Equal(t, tc.keep, effective.KeepsPoorVitals())
+			require.NoError(t, factory.Test(context.Background(), input))
+			assert.Equal(t, effective, last().Configuration())
+			for _, format := range []string{"json", "yaml"} {
+				var reload confgroup.Config
+				if format == "json" {
+					require.NoError(t, json.Unmarshal(payload, &reload))
+				} else {
+					reload = nativeRUMConfig(t, effective)
+				}
+				reload.SetModule("rum").SetSourceType(confgroup.TypeUser)
+				again, err := factory.Configuration(context.Background(), reload)
+				require.NoError(t, err)
+				assert.JSONEq(t, string(payload), string(again))
+				require.NoError(t, factory.Test(context.Background(), reload))
+				assert.Equal(t, effective, last().Configuration())
+			}
+		})
+	}
+}

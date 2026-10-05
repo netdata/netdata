@@ -25,7 +25,9 @@ func (h *Handler) sitesRows(ctx context.Context, now int64) (rows [][]any, recei
 	for _, s := range sites {
 		a := s.Activity
 		state := "enabled"
-		if !receiver.Serving {
+		if s.Sampling.MeasureRate == 0 {
+			state = "collection_disabled"
+		} else if !receiver.Serving {
 			state = "ingress_unavailable"
 		} else if a.LastBeaconAgeS < 0 || a.LastBeaconAgeS > 3600 {
 			state = "no_beacons"

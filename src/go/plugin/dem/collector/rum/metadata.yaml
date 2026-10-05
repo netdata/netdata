@@ -519,7 +519,7 @@ modules:
             default: ''
             options: []
           returns:
-            description: One retained or pending session event, with original observation time in Unix microseconds and an optional trace identifier. The full session timeline is returned without range filtering. Unknown
+            description: One retained or pending session event, with original observation time in Unix microseconds and an optional trace identifier. The available session timeline is returned without range filtering. Unknown
               sessions return an error.
             columns:
             - name: ts
@@ -1075,7 +1075,7 @@ modules:
             auto_detection:
                 description: Sites are explicitly configured; websites are not discovered automatically.
             limits:
-                description: Breakdown charts show bounded top groups. History uses one plugin-wide journal file-age and committed-byte retention target in dem.conf, including disabled sites. Whole archives expire; the active file is protected, so the size target is not a hard disk ceiling. Export/history queues count records dropped under backpressure. Export is best effort and receiver acceptance does not guarantee durable storage. Investigation sampling applies to event logs and traces; later session promotion cannot recover previously discarded logs or spans.
+                description: Breakdown charts show bounded top groups. History uses one plugin-wide journal file-age and committed-byte retention target in dem.conf, including disabled sites. Whole archives expire; the active file is protected, so the size target is not a hard disk ceiling. Export/history queues count records dropped under backpressure. Export is best effort and receiver acceptance does not guarantee durable storage. Detail sampling applies to native history and enabled event logs and traces. Problem overrides retain available recent native context with its original attribution, then current and future detail while the session remains tracked. Earlier logs and spans are not exported retrospectively; complete sessions or traces are not guaranteed.
             performance_impact:
                 description: Resource usage depends on accepted browser traffic and the configured measurement window. Optional OTLP export and investigation history add network and local disk work.
         multi_instance: true
@@ -1097,6 +1097,23 @@ modules:
                             allowed_origins: [https://shop.example.org]
                       description: Native charts, session timelines and errors, with no OTLP receiver required.
                       name: Website
+                    - config: |
+                        jobs:
+                          - name: shop
+                            allowed_origins: [https://shop.example.org]
+                            investigate:
+                              sample_rate: 0
+                      description: Keep measurements and live views for all received traffic, with detail selected only for errors or poor vitals by the default problem overrides.
+                      name: Problems-only detail
+                    - config: |
+                        jobs:
+                          - name: shop
+                            allowed_origins: [https://shop.example.org]
+                            investigate:
+                              sample_rate: 0
+                              always_keep: []
+                      description: Keep measurements and live views without retained native detail or event-log and trace exports, even when those exports are enabled.
+                      name: Measurements and live views only
                     - config: |
                         jobs:
                           - name: shop
@@ -1172,22 +1189,22 @@ modules:
                       name: bots
                       required: false
                     - default_value: 1
-                      description: Share of browser sessions measured, from 0 to 1. Zero preserves the default of measuring all sessions.
+                      description: Share of browser sessions collected, from 0 to 1. Omitted or null means all; zero disables collection. Browser measurement charts are absent while collection is disabled; receiver diagnostics remain available.
                       group: Sampling
                       name: measure_sample_rate
                       required: false
                     - default_value: ""
-                      description: Choose which measured sessions retain full history. Leave empty to retain all sessions.
+                      description: Select native investigation history and enabled event-log and trace exports from received sessions. Leave empty to select all received sessions.
                       group: Sampling
                       name: investigate
                       required: false
-                    - default_value: ""
-                      description: Share of measured sessions kept in full, from 0 to 1. Zero means all sessions.
+                    - default_value: 1
+                      description: Baseline share of received sessions selected for detail, from 0 to 1. Omitted or null means all; zero selects only the problem overrides below.
                       group: Sampling
                       name: investigate.sample_rate
                       required: false
-                    - default_value: ""
-                      description: Conditions that retain a session regardless of sampling. Leave unset to keep errors and poor vitals; an empty list keeps neither.
+                    - default_value: '["errors","poor_vitals"]'
+                      description: Conditions that select detail beyond the baseline sample. Omitted or null keeps errors and poor vitals; an empty list disables overrides.
                       group: Sampling
                       name: investigate.always_keep
                       required: false

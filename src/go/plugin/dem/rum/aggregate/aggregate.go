@@ -83,20 +83,12 @@ type SiteCfg struct {
 	Investigate       InvestigateCfg
 }
 
-// InvestigateCfg is investigate sampling: the share of measured
-// sessions kept in full (history, events), plus sessions always kept
-// because they had an error or a poor Web Vital. Rate 0 means unset: keep
-// every session.
+// InvestigateCfg contains effective detail-selection policy. Rate is the
+// baseline share of measured sessions; zero selects only configured overrides.
+// Config owns defaults before constructing the aggregator.
 type InvestigateCfg struct {
 	Rate                       float64
 	KeepErrors, KeepPoorVitals bool
-}
-
-func (c InvestigateCfg) rate() float64 {
-	if c.Rate <= 0 {
-		return 1
-	}
-	return c.Rate
 }
 
 // alwaysKeep reports whether b alone makes its session investigated.

@@ -16,6 +16,9 @@ var t0 = time.Date(2030, 1, 1, 12, 0, 0, 0, time.UTC)
 
 func newAgg(window time.Duration, cfgs ...SiteCfg) (*Aggregator, *time.Time) {
 	cfg := SiteCfg{
+		Investigate: InvestigateCfg{
+			Rate: 1,
+		},
 		Name:        "s",
 		DisplayName: "S",
 		PageGroups:  20,

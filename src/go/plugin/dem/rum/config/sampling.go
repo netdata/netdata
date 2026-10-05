@@ -4,8 +4,9 @@ package config
 
 // Investigate is investigate sampling.
 type Investigate struct {
-	// SampleRate is the share of measured sessions kept in full; 0 means 1.
-	SampleRate float64 `yaml:"sample_rate,omitempty" json:"sample_rate"`
+	// SampleRate is the baseline detail share of received sessions. Nil defaults
+	// to one; zero selects only the configured AlwaysKeep conditions.
+	SampleRate *float64 `yaml:"sample_rate,omitempty" json:"sample_rate"`
 	// AlwaysKeep lists conditions that keep a session regardless of
 	// SampleRate: "errors", "poor_vitals". Unset means both; an empty
 	// list means none.
@@ -20,7 +21,7 @@ func (i Investigate) MarshalYAML() (any, error) {
 		keep = &i.AlwaysKeep
 	}
 	return struct {
-		SampleRate float64   `yaml:"sample_rate,omitempty"`
+		SampleRate *float64  `yaml:"sample_rate,omitempty"`
 		AlwaysKeep *[]string `yaml:"always_keep,omitempty"`
 	}{SampleRate: i.SampleRate, AlwaysKeep: keep}, nil
 }
@@ -33,18 +34,18 @@ const (
 
 // MeasureRate is the effective measure sampling rate.
 func (s Site) MeasureRate() float64 {
-	if s.MeasureSampleRate <= 0 {
+	if s.MeasureSampleRate == nil {
 		return 1
 	}
-	return s.MeasureSampleRate
+	return *s.MeasureSampleRate
 }
 
 // InvestigateRate is the effective investigate sampling rate.
 func (s Site) InvestigateRate() float64 {
-	if s.Investigate == nil || s.Investigate.SampleRate <= 0 {
+	if s.Investigate == nil || s.Investigate.SampleRate == nil {
 		return 1
 	}
-	return s.Investigate.SampleRate
+	return *s.Investigate.SampleRate
 }
 
 // KeepsErrors reports whether sessions with errors are always kept.

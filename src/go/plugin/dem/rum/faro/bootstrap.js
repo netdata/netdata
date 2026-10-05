@@ -21,6 +21,9 @@
     if (!f) { return; }
     try { if (user) { f.setUser(user); } else { f.resetUser(); } } catch (e) {}
   }
+  // A stored Faro session can retain an earlier sampling decision. Zero must
+  // stop before loading the SDK or installing any instrumentation.
+  if (opt.sampling === 0) { return; }
   var bot = false;
   try { bot = navigator.webdriver === true || new RegExp(opt.bots, 'i').test(navigator.userAgent || ''); } catch (e) {}
   if (bot && !opt.includeBots) { return; }
@@ -51,7 +54,7 @@
       }
       var cfg = { url: base + '/rum/' + k + '/collect' + (bot ? '?bot=1' : ''), app: app, instrumentations: inst };
       if (opt.consoleLogs) { cfg.consoleInstrumentation = { consoleErrorAsLog: true }; }
-      if (opt.sampling > 0 && opt.sampling < 1) { cfg.sessionTracking = { samplingRate: opt.sampling }; }
+      cfg.sessionTracking = { samplingRate: opt.sampling };
       GrafanaFaroWebSdk.initializeFaro(cfg);
       if (user) { applyUser(); }
       watchFrustration();
