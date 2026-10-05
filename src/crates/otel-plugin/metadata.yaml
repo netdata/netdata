@@ -42,7 +42,7 @@ modules:
 
           For a maintained Collector configuration and end-to-end verification steps, see [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md). The separate [OpenTelemetry Logs integration](/integrations/logs/integrations/opentelemetry_logs.md) explains how received logs appear in Netdata, and [Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md) explains how received traces are stored and kept.
         method_description: |
-          The plugin starts automatically and listens on two OTLP endpoints: OTLP/gRPC on port `4317` and OTLP/HTTP on port `4318`. Point the Collector's `otlp_grpc` or `otlp_http` exporter at one of them. Keep the exporter's default protobuf encoding and gzip compression: the plugin rejects other compression algorithms, and with `encoding: json` it rejects any request that carries a NaN or infinite metric value.
+          The plugin starts automatically and listens for OTLP/gRPC on port `4317`. It can also listen for OTLP/HTTP on port `4318`, but this listener is off by default: set `receivers.otlp.protocols.http.enabled` to `true` to turn it on. Point the Collector's `otlp_grpc` exporter, or its `otlp_http` exporter when the OTLP/HTTP listener is on, at the matching port. Keep the exporter's default protobuf encoding and gzip compression: the plugin rejects other compression algorithms, and with `encoding: json` it rejects any request that carries a NaN or infinite metric value.
 
           Each metric name becomes a Netdata chart context prefixed with `otel.`. YAML mapping rules can match a metric name and instrumentation scope, select a data point attribute for dimension names, and override chart timing. User mapping files take priority over the stock hostmetrics mappings compiled into the plugin. Metrics without a matching mapping still create charts using default settings.
 
@@ -66,7 +66,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The plugin starts automatically and listens on `127.0.0.1:4317` for OTLP/gRPC connections and on `127.0.0.1:4318` for OTLP/HTTP connections.
+            The plugin starts automatically and listens on `127.0.0.1:4317` for OTLP/gRPC connections. When you turn on the OTLP/HTTP listener, it also listens on `127.0.0.1:4318` for OTLP/HTTP connections.
         # The ingest windows are the bridge crate's IngestConfig defaults
         # (24h max_age, 10m future_skew); the chart cap is the stock-file
         # value the ingestor enforces; retention evicts on whichever bound
@@ -85,7 +85,7 @@ modules:
               Official Linux packages, static builds, containers, and supported macOS packages include the plugin. Linux source installs using `netdata-installer.sh` require a compatible Rust toolchain and `--enable-plugin-otel`; on macOS, the installer enables the plugin automatically when it finds a compatible Rust toolchain.
           - title: An OTLP data source
             description: |
-              An OpenTelemetry Collector that exports metrics, logs, or traces to the Agent: the `otlp_grpc` exporter to port `4317`, or the `otlp_http` exporter to port `4318`. The default loopback endpoints accept only a Collector on the same host.
+              An OpenTelemetry Collector that exports metrics, logs, or traces to the Agent: the `otlp_grpc` exporter to port `4317`, or the `otlp_http` exporter to port `4318` after you turn on the OTLP/HTTP listener. The default loopback endpoints accept only a Collector on the same host.
       configuration:
         file:
           name: otel.yaml
@@ -104,7 +104,7 @@ modules:
 
             Configuration is strict. Unknown YAML fields, unknown `NETDATA_OTEL_CFG_*` variables, malformed values, and the former experimental schema prevent the plugin from starting. The effective configuration is logged at startup; `remote_storage.uri` is redacted in that log.
 
-            In a YAML file, an option set to `null` keeps its current value. To turn a listener off, set its `enabled` option to `false`. At least one of the two listeners must stay enabled.
+            In a YAML file, an option set to `null` keeps its current value. To turn a listener on or off, set its `enabled` option. The OTLP/gRPC listener is on and the OTLP/HTTP listener is off by default. At least one of the two listeners must stay enabled.
 
             Older files configure the OTLP/gRPC listener in an `endpoint:` section: `endpoint.path`, `endpoint.tls_cert_path`, `endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path`, and the matching `NETDATA_OTEL_CFG_ENDPOINT_*` variables. These names still work and log a deprecation warning. If a file or the environment sets an option under both names, the plugin logs a warning and uses the `receivers` name.
           folding:
@@ -136,8 +136,8 @@ modules:
               default_value: ""
               required: false
             - name: receivers.otlp.protocols.http.enabled
-              description: Turns the OTLP/HTTP listener on or off.
-              default_value: true
+              description: Turns the OTLP/HTTP listener on or off. The listener is off by default.
+              default_value: false
               required: false
             - name: receivers.otlp.protocols.http.endpoint
               description: Address (`host:port`) on which the OTLP/HTTP listener accepts connections.
@@ -284,6 +284,7 @@ modules:
                           key_file: /etc/netdata/ssl/server-key.pem
                           client_ca_file: /etc/netdata/ssl/client-ca.pem
                       http:
+                        enabled: true
                         endpoint: "0.0.0.0:4318"
                         tls:
                           cert_file: /etc/netdata/ssl/server-cert.pem
@@ -347,7 +348,7 @@ modules:
                       endpoint: 127.0.0.1:14317
                     http:
                       endpoint: 127.0.0.1:14318
-                      # or turn the OTLP/HTTP listener off:
+                      # or keep the OTLP/HTTP listener off:
                       # enabled: false
               ```
 
@@ -364,7 +365,7 @@ modules:
               Check the Agent journal for `otel-plugin` configuration errors. User YAML and `NETDATA_OTEL_CFG_*` variables are validated strictly, so a typo or an option from the former experimental schema stops startup. For a source install, confirm that a compatible Rust toolchain is available; Linux installs using `netdata-installer.sh` also require `--enable-plugin-otel`.
           - name: The endpoint is reachable but no data appears
             description: |
-              A successful TCP connection proves only that something is listening. Check that the Collector's exporter uses the right port: `4317` for `otlp_grpc`, `4318` for `otlp_http`. With the default endpoints, use `127.0.0.1`, not `localhost`, which can resolve to IPv6. Then look for rejected exports in the Collector log, and verify the resulting chart, log entry, or trace.
+              A successful TCP connection proves only that something is listening. Check that the Collector's exporter uses the right port: `4317` for `otlp_grpc`, `4318` for `otlp_http`. The `otlp_http` exporter needs the OTLP/HTTP listener, which is off by default. With the default endpoints, use `127.0.0.1`, not `localhost`, which can resolve to IPv6. Then look for rejected exports in the Collector log, and verify the resulting chart, log entry, or trace.
           - name: A metric does not create the expected chart
             description: |
               Exponential histograms are not currently ingested. For other supported metrics, inspect the Agent journal for rejected user mapping files and verify the metric name, instrumentation scope, and `dimension_attribute_key`. The resulting chart context is `otel.<metric-name>`.

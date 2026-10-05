@@ -40,9 +40,10 @@ receivers:
           key_file: null
           client_ca_file: null
 
-      # OTLP/HTTP listener.
+      # OTLP/HTTP listener. It is off by default. Set enabled to true to
+      # receive OTLP/HTTP.
       http:
-        enabled: true
+        enabled: false
         endpoint: "127.0.0.1:4318"
         tls:
           cert_file: null

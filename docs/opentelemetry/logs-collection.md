@@ -24,7 +24,7 @@ exporters:
       insecure: true
 ```
 
-Either transport works: `otlp_grpc` sends to port `4317`, while `otlp_http` sends OTLP/HTTP to port `4318` with a full-URL `endpoint`. Reference the exporter you chose in the `exporters` arrays of the recipes below.
+Either transport works: `otlp_grpc` sends to port `4317`, while `otlp_http` sends OTLP/HTTP to port `4318` with a full-URL `endpoint`. The `otlp_http` exporter needs the Agent's OTLP/HTTP listener, which is off by default; [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md) shows how to turn it on. Reference the exporter you chose in the `exporters` arrays of the recipes below.
 
 When the Collector sends to a remote Netdata Agent, use TLS and give the exporter a persistent queue so a Collector
 restart or a network outage does not lose records (shown for gRPC; `otlp_http` takes the same `tls` and `sending_queue`

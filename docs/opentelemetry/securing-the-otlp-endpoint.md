@@ -7,12 +7,12 @@ Agent — including certificate replacements.
 
 ## Keep the default when you can
 
-The plugin listens on `127.0.0.1:4317` (OTLP/gRPC) and `127.0.0.1:4318` (OTLP/HTTP) by default: only processes on the
-same host can reach them, and TLS is unnecessary for the network path. Loopback limits reach, not identity: any local
-process can send records. Keep the defaults on hosts where every local process is trusted, such as a node that runs one
-Collector forwarding to its local Agent. On a shared host, enable TLS with client certificates on the loopback
-listeners as described below, or restrict which local users may connect to the ports with the host firewall
-(netfilter's `owner` match).
+The plugin listens on `127.0.0.1:4317` (OTLP/gRPC) by default. The OTLP/HTTP listener, on `127.0.0.1:4318`, is off until
+you turn it on. Only processes on the same host can reach these loopback addresses, and TLS is unnecessary for the
+network path. Loopback limits reach, not identity: any local process can send records. Keep the defaults on hosts where
+every local process is trusted, such as a node that runs one Collector forwarding to its local Agent. On a shared host,
+enable TLS with client certificates on the loopback listeners as described below, or restrict which local users may
+connect to the ports with the host firewall (netfilter's `owner` match).
 
 ## Accepting remote senders
 
@@ -32,6 +32,7 @@ receivers:
           client_ca_file: /etc/netdata/ssl/client-ca.pem
       # The OTLP/HTTP listener has its own address and its own TLS settings.
       http:
+        enabled: true
         endpoint: "0.0.0.0:4318"
         tls:
           cert_file: /etc/netdata/ssl/server-cert.pem

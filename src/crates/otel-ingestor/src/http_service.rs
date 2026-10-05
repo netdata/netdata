@@ -1,5 +1,6 @@
 //! The OTLP/HTTP receiver: a second listener (config
-//! `receivers.otlp.protocols.http`, stock `127.0.0.1:4318`) that serves `POST /v1/{logs,traces,metrics}` with
+//! `receivers.otlp.protocols.http`, stock address `127.0.0.1:4318`, off by
+//! default) that serves `POST /v1/{logs,traces,metrics}` with
 //! collector-parity semantics, so SDKs and exporters defaulting to
 //! `http/protobuf` or `http/json` reach the same ingestion cores as gRPC.
 //!

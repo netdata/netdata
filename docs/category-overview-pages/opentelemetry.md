@@ -1,6 +1,7 @@
 # OpenTelemetry Overview
 
-The Netdata Agent receives OpenTelemetry telemetry over OTLP: gRPC on port 4317 and HTTP on port 4318. Metrics become
+The Netdata Agent receives OpenTelemetry telemetry over OTLP: gRPC on port 4317, and HTTP on port 4318 when you turn
+the HTTP listener on. Metrics become
 Netdata charts. Logs and traces are stored and indexed on the receiving Agent. Send the data through an OpenTelemetry
 Collector, with TLS or mutual TLS when the Collector runs on another host. Start with
 [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md) for the endpoints, the exporter blocks, and two smoke tests.

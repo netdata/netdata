@@ -34,7 +34,17 @@ The maintained examples are validated with OpenTelemetry Collector Contrib `0.15
 
 For production pipelines beyond these smoke tests, continue with [Metrics Collection](/docs/opentelemetry/metrics-collection.md), [Logs Collection](/docs/opentelemetry/logs-collection.md), and [Transformations](/docs/opentelemetry/transformations.md). Each page links its examples to the complete upstream Collector documentation.
 
-The plugin starts automatically and listens on two IPv4 loopback endpoints: `127.0.0.1:4317` for OTLP/gRPC and `127.0.0.1:4318` for OTLP/HTTP. The examples below put the Collector and Agent on the same host and intentionally disable TLS only for that loopback connection.
+The plugin starts automatically and listens for OTLP/gRPC on the IPv4 loopback endpoint `127.0.0.1:4317`. The OTLP/HTTP listener on `127.0.0.1:4318` is off by default. To use it, turn it on in `otel.yaml` and restart the Agent:
+
+```yaml
+receivers:
+  otlp:
+    protocols:
+      http:
+        enabled: true
+```
+
+The examples below put the Collector and Agent on the same host and intentionally disable TLS only for that loopback connection.
 
 ## Export to the local Agent
 
@@ -56,7 +66,7 @@ exporters:
       insecure: true
 ```
 
-Both exporters work. `otlp_grpc` sends to port `4317`. `otlp_http` sends to port `4318` and takes a full URL as its `endpoint`. Use `127.0.0.1`, not `localhost`: `localhost` can resolve to an IPv6 address, and the Agent listens on IPv4 by default.
+Both exporters work. `otlp_grpc` sends to port `4317`. `otlp_http` sends to port `4318` and takes a full URL as its `endpoint`; it needs the OTLP/HTTP listener turned on. Use `127.0.0.1`, not `localhost`: `localhost` can resolve to an IPv6 address, and the Agent listens on IPv4 by default.
 
 Keep the exporter's default encoding and compression:
 
@@ -171,7 +181,7 @@ the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) for ever
 
 - **The plugin is absent:** on Linux native packages, confirm the `netdata-plugin-otel` package is installed; on ARMv6 static builds, Windows, and FreeBSD the plugin is not available.
 - **The plugin does not start:** check the Agent journal for strict `otel.yaml` or `NETDATA_OTEL_CFG_*` validation errors.
-- **The Collector connects but data is absent:** check that the exporter uses the right port: `4317` for `otlp_grpc`, `4318` for `otlp_http`. Then look for rejected exports in the Collector log and in the Agent journal. On a systemd-based Agent host, query recent plugin messages with `journalctl SYSLOG_IDENTIFIER=otel-plugin SYSLOG_IDENTIFIER=otel-plugin/ingestor --since "-10 min"`.
+- **The Collector connects but data is absent:** check that the exporter uses the right port: `4317` for `otlp_grpc`, `4318` for `otlp_http`. The `otlp_http` exporter needs the OTLP/HTTP listener, which is off by default. Then look for rejected exports in the Collector log and in the Agent journal. On a systemd-based Agent host, query recent plugin messages with `journalctl SYSLOG_IDENTIFIER=otel-plugin SYSLOG_IDENTIFIER=otel-plugin/ingestor --since "-10 min"`.
 - **A metric is absent:** exponential histograms are not currently ingested. For other metrics, inspect mapping errors and search for the `otel.<metric-name>` context.
 - **Some logs are absent:** by default, Netdata accepts log timestamps from up to 24 hours in the past through 10 minutes in the future. Records outside this window are rejected, and the Collector logs a `Partial success response` warning for them.
 - **Some spans are absent:** by default, Netdata accepts a span only if it started no more than 24 hours ago and ends no more than 10 minutes in the future; a span without an end time is judged by its start. The Collector logs a `Partial success response` warning for rejected spans, and the Agent logs a warning in its journal.

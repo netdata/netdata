@@ -573,7 +573,7 @@ receivers:
           key_file: null
           client_ca_file: null
       http:
-        enabled: true
+        enabled: false
         endpoint: "127.0.0.1:4318"
         tls:
           cert_file: null
@@ -727,7 +727,7 @@ traces:
     }
 
     fn stock_http() -> ProtocolConfig {
-        listener(true, "127.0.0.1:4318", TlsServerConfig::default())
+        listener(false, "127.0.0.1:4318", TlsServerConfig::default())
     }
 
     #[test]
@@ -826,32 +826,34 @@ traces:
                 stock_http(),
             ),
             (
+                // At least one listener must stay on, so turning gRPC off
+                // needs HTTP on.
                 "grpc disabled",
-                "grpc:\n  enabled: false",
+                "grpc:\n  enabled: false\nhttp:\n  enabled: true",
                 listener(false, "127.0.0.1:4317", TlsServerConfig::default()),
-                stock_http(),
+                listener(true, "127.0.0.1:4318", TlsServerConfig::default()),
             ),
             (
                 "http endpoint",
                 "http:\n  endpoint: '0.0.0.0:4320'",
                 stock_grpc(),
-                listener(true, "0.0.0.0:4320", TlsServerConfig::default()),
+                listener(false, "0.0.0.0:4320", TlsServerConfig::default()),
             ),
             (
                 "http tls",
                 "http:\n  tls:\n    cert_file: /h.pem\n    key_file: /hk.pem",
                 stock_grpc(),
                 listener(
-                    true,
+                    false,
                     "127.0.0.1:4318",
                     tls(Some("/h.pem"), Some("/hk.pem"), None),
                 ),
             ),
             (
-                "http disabled",
-                "http:\n  enabled: false",
+                "http enabled",
+                "http:\n  enabled: true",
                 stock_grpc(),
-                listener(false, "127.0.0.1:4318", TlsServerConfig::default()),
+                listener(true, "127.0.0.1:4318", TlsServerConfig::default()),
             ),
         ];
         for (name, body, grpc, http) in cases {
@@ -1470,7 +1472,7 @@ logs:
         for protocol in ["grpc", "http"] {
             for endpoint in ["no-port", ""] {
                 let err = resolve_with_user(&protocols_yaml(&format!(
-                    "{protocol}:\n  endpoint: '{endpoint}'"
+                    "{protocol}:\n  enabled: true\n  endpoint: '{endpoint}'"
                 )))
                 .unwrap_err();
                 assert!(
@@ -1512,15 +1514,16 @@ logs:
                 ),
             ];
             for (tls, expected) in cases {
-                let err =
-                    resolve_with_user(&protocols_yaml(&format!("{protocol}:\n  tls:\n    {tls}")))
-                        .unwrap_err();
+                let err = resolve_with_user(&protocols_yaml(&format!(
+                    "{protocol}:\n  enabled: true\n  tls:\n    {tls}"
+                )))
+                .unwrap_err();
                 assert!(format!("{err:#}").contains(&expected), "{tls}: {err:#}");
             }
             // The full trio resolves.
             assert!(
                 resolve_with_user(&protocols_yaml(&format!(
-                    "{protocol}:\n  tls:\n    cert_file: /c.pem\n    key_file: /k.pem\n    client_ca_file: /ca.pem"
+                    "{protocol}:\n  enabled: true\n  tls:\n    cert_file: /c.pem\n    key_file: /k.pem\n    client_ca_file: /ca.pem"
                 )))
                 .is_ok()
             );
@@ -1545,7 +1548,7 @@ logs:
         // neither its shape and TLS checks nor the overlap check apply.
         for (disabled, other) in [("grpc", "http"), ("http", "grpc")] {
             let config = resolve_with_user(&protocols_yaml(&format!(
-                "{disabled}:\n  enabled: false\n  endpoint: no-port\n  tls:\n    cert_file: /c.pem\n{other}:\n  endpoint: '127.0.0.1:5000'"
+                "{disabled}:\n  enabled: false\n  endpoint: no-port\n  tls:\n    cert_file: /c.pem\n{other}:\n  enabled: true\n  endpoint: '127.0.0.1:5000'"
             )))
             .unwrap();
             let protocols = &config.receivers.otlp.protocols;
@@ -1555,7 +1558,7 @@ logs:
             );
             assert!(
                 resolve_with_user(&protocols_yaml(&format!(
-                    "{disabled}:\n  enabled: false\n  endpoint: '127.0.0.1:5000'\n{other}:\n  endpoint: '127.0.0.1:5000'"
+                    "{disabled}:\n  enabled: false\n  endpoint: '127.0.0.1:5000'\n{other}:\n  enabled: true\n  endpoint: '127.0.0.1:5000'"
                 )))
                 .is_ok(),
                 "no overlap check with {disabled} disabled"
@@ -1567,8 +1570,10 @@ logs:
     fn validation_rejects_http_endpoint_equal_to_grpc_endpoint() {
         // Two listeners cannot bind one address; rejecting the collision at
         // config load names both keys instead of surfacing a raw bind error.
-        let err =
-            resolve_with_user(&protocols_yaml("http:\n  endpoint: '127.0.0.1:4317'")).unwrap_err();
+        let err = resolve_with_user(&protocols_yaml(
+            "http:\n  enabled: true\n  endpoint: '127.0.0.1:4317'",
+        ))
+        .unwrap_err();
         let msg = format!("{err:#}");
         assert!(
             msg.contains(
@@ -1583,11 +1588,25 @@ logs:
     fn validation_rejects_a_wildcard_grpc_endpoint_over_the_http_port() {
         // A gRPC listener moved to 0.0.0.0:4318 claims the stock HTTP
         // listener's 127.0.0.1:4318 too, though the strings differ.
-        let err =
-            resolve_with_user(&protocols_yaml("grpc:\n  endpoint: '0.0.0.0:4318'")).unwrap_err();
+        let err = resolve_with_user(&protocols_yaml(
+            "grpc:\n  endpoint: '0.0.0.0:4318'\nhttp:\n  enabled: true",
+        ))
+        .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("claim the same socket"), "{msg}");
         assert!(msg.contains("0.0.0.0:4318"), "{msg}");
+    }
+
+    #[test]
+    fn grpc_on_the_http_port_is_accepted_while_http_is_off() {
+        // A first-release config could put gRPC on 4318; with the OTLP/HTTP
+        // listener off by default, that config still loads.
+        let config = resolve_with_user("endpoint:\n  path: '0.0.0.0:4318'\n").unwrap();
+        assert_eq!(
+            config.receivers.otlp.protocols.grpc.endpoint,
+            "0.0.0.0:4318"
+        );
+        assert!(!config.receivers.otlp.protocols.http.enabled);
     }
 
     #[test]
@@ -1775,7 +1794,9 @@ logs:
         for protocol in ["GRPC", "HTTP"] {
             let name =
                 format!("NETDATA_OTEL_CFG_RECEIVERS_OTLP_PROTOCOLS_{protocol}_TLS_CLIENT_CA_FILE");
-            let err = resolve_layers(None, &[(name.as_str(), "")]).unwrap_err();
+            let enabled = format!("NETDATA_OTEL_CFG_RECEIVERS_OTLP_PROTOCOLS_{protocol}_ENABLED");
+            let err = resolve_layers(None, &[(name.as_str(), ""), (enabled.as_str(), "true")])
+                .unwrap_err();
             assert!(
                 format!("{err:#}").contains("tls.client_ca_file cannot be empty"),
                 "{protocol}: {err:#}"
@@ -2112,9 +2133,9 @@ logs:
             config.receivers.otlp.protocols.http,
             listener(true, "192.168.1.1:4320", TlsServerConfig::default())
         );
-        // Env disables a listener the stock file enables.
-        let config = resolve_layers(None, &[(http_enabled_env, "false")]).unwrap();
-        assert!(!config.receivers.otlp.protocols.http.enabled);
+        // Env enables the listener the stock file ships off.
+        let config = resolve_layers(None, &[(http_enabled_env, "true")]).unwrap();
+        assert!(config.receivers.otlp.protocols.http.enabled);
         assert_eq!(config.receivers.otlp.protocols.grpc, stock_grpc());
     }
 
@@ -2281,7 +2302,7 @@ logs:
         let config = resolve_stock_yaml(&substituted).expect("shipped stock file must resolve");
 
         assert_eq!(config.receivers.otlp.protocols.grpc, stock_grpc());
-        // The OTLP/HTTP listener ships enabled on its standard port, TLS off.
+        // The OTLP/HTTP listener ships disabled, on its standard port, TLS off.
         assert_eq!(config.receivers.otlp.protocols.http, stock_http());
 
         assert_eq!(
