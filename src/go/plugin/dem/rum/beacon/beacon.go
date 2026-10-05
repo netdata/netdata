@@ -46,6 +46,8 @@ const (
 	EventNavigation
 	EventResource
 	EventRequest
+	EventView
+	EventSession
 )
 
 // Frustration signals the snippet detects; each event carries a
@@ -79,10 +81,10 @@ type Beacon struct {
 	Device         string  // mobile|tablet|desktop
 	Country        string  // ISO 3166-1 alpha-2, "" when unknown
 	City           string  // city name from the mmdb, "" when unknown
-	Lat, Lon       float64 // rounded to 1 decimal degree (~11km); valid only when HasGeo
+	Lat, Lon       float64 // rounded to 1 decimal degree; approximate, valid only when HasGeo
 	HasGeo         bool    // false when the mmdb had no location for this IP
 	AppVersion     string  // bootstrap data-version → Faro app.version
-	UserID         string  // netdataRum.setUser({id}) → Faro meta.user.id; never email or name
+	UserID         string  // application-supplied identifier; callers choose its contents
 	Environment    string  // bootstrap data-env → Faro app.environment
 
 	Vitals     []Vital

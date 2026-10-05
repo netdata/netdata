@@ -130,7 +130,7 @@ func (e *Traces) resourceSpans(b *beacon.Beacon) *tracepb.ResourceSpans {
 					},
 				)
 			} else {
-				attrs = append(attrs, strAttr(a.Key, e.redact(a.Str)))
+				attrs = append(attrs, strAttr(a.Key, a.Str))
 			}
 		}
 		ss.Spans = append(ss.Spans, &tracepb.Span{
@@ -144,7 +144,7 @@ func (e *Traces) resourceSpans(b *beacon.Beacon) *tracepb.ResourceSpans {
 			Attributes:        attrs,
 			Status: &tracepb.Status{
 				Code:    tracepb.Status_StatusCode(sp.StatusCode),
-				Message: e.redact(sp.StatusMessage),
+				Message: sp.StatusMessage,
 			},
 		})
 	}

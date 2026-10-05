@@ -155,7 +155,7 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 	send("/checkout")
 	stopNext()
 	stopSite()
-	rows, err := rumhistory.NewStore(db).QuerySessions(context.Background(), "shop", 0, time.Now().Unix()+10, 10)
+	rows, err := rumhistory.NewStore(db).QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.EqualValues(t, 2, rows[0].Pageviews)
@@ -246,7 +246,7 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 	stopBeta()
 	stopNext()
 	for name, want := range map[string]uint64{"alpha": 1, "beta": 2} {
-		rows, err := rumhistory.NewStore(db).QuerySessions(ctx, name, 0, time.Now().Unix()+10, 10)
+		rows, err := rumhistory.NewStore(db).QuerySessions(ctx, name, "", 0, time.Now().Unix()+10, 10)
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
 		require.Equal(t, "same-session", rows[0].SessionID)

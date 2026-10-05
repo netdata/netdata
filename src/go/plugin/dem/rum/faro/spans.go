@@ -67,7 +67,7 @@ func parseSpans(rs []otlpResourceSpans, opt Options) ([]beacon.Span, string) {
 	for _, r := range rs {
 		for _, kv := range r.Resource.Attributes {
 			if kv.Key == "service.name" && kv.Value.StringValue != nil && service == "" {
-				service = beacon.Clean(*kv.Value.StringValue, maxNameLen)
+				service = opt.text(*kv.Value.StringValue, maxNameLen)
 			}
 		}
 		for _, ss := range r.ScopeSpans {
@@ -84,18 +84,18 @@ func parseSpans(rs []otlpResourceSpans, opt Options) ([]beacon.Span, string) {
 					TraceID:       traceID,
 					SpanID:        spanID,
 					ParentSpanID:  hexID(sp.ParentSpanID, 16),
-					Name:          beacon.Clean(sp.Name, maxNameLen),
+					Name:          opt.text(sp.Name, maxNameLen),
 					Kind:          sp.Kind,
 					StartNS:       start,
 					EndNS:         end,
 					Attrs:         spanAttrs(sp.Attributes, opt),
 					StatusCode:    sp.Status.Code,
-					StatusMessage: beacon.Clean(sp.Status.Message, maxAttrLen),
-					Scope: beacon.Clean(
+					StatusMessage: opt.text(sp.Status.Message, maxAttrLen),
+					Scope: opt.text(
 						ss.Scope.Name,
 						maxNameLen,
 					),
-					ScopeVersion: beacon.Clean(ss.Scope.Version, maxNameLen),
+					ScopeVersion: opt.text(ss.Scope.Version, maxNameLen),
 				})
 			}
 		}
@@ -104,12 +104,13 @@ func parseSpans(rs []otlpResourceSpans, opt Options) ([]beacon.Span, string) {
 }
 
 func spanAttrs(kvs []otlpKV, opt Options) []beacon.SpanAttr {
-	out := make([]beacon.SpanAttr, 0, len(kvs))
+	out := make([]beacon.SpanAttr, 0, min(len(kvs), maxSpanAttrs))
 	for _, kv := range kvs {
 		if len(out) >= maxSpanAttrs {
 			break
 		}
-		key := beacon.Clean(kv.Key, maxNameLen)
+		semanticKey := beacon.Clean(kv.Key, len(kv.Key))
+		key := opt.text(semanticKey, maxNameLen)
 		if key == "" {
 			continue
 		}
@@ -118,7 +119,7 @@ func spanAttrs(kvs []otlpKV, opt Options) []beacon.SpanAttr {
 		case v.StringValue != nil:
 			out = append(out, beacon.SpanAttr{
 				Key: key,
-				Str: opt.cleanAttr(key, *v.StringValue),
+				Str: opt.cleanAttr(semanticKey, *v.StringValue),
 			})
 		case len(v.IntValue) > 0:
 			if n, err := strconv.ParseInt(strings.Trim(string(v.IntValue), `"`), 10, 64); err == nil {
@@ -143,21 +144,18 @@ func spanAttrs(kvs []otlpKV, opt Options) []beacon.SpanAttr {
 	return out
 }
 
-// cleanAttr bounds a client attribute; URL-valued ones lose query and
-// fragment and have personal data redacted from the path, and
-// frustration targets are redacted selectors.
-func (o Options) cleanAttr(key, v string) string {
-	v = beacon.Clean(v, maxAttrLen)
+// cleanAttr applies field semantics before text bounds and shared ingestion.
+func (o Options) cleanAttr(key, value string) string {
 	switch {
-	case urlAttrKeys[key] && strings.Contains(v, "://"):
-		if i := strings.IndexAny(v, "?#"); i >= 0 {
-			v = v[:i]
-		}
-		v = beacon.RedactURL(v, o.PathRules)
+	case urlAttrKeys[key] && (key != "name" || strings.Contains(value, "://") || strings.HasPrefix(value, "/")):
+		return o.url(value, maxAttrLen)
 	case key == "target":
-		v = beacon.RedactSelector(v)
+		return o.selector(value)
+	case key == "fromView" || key == "toView":
+		return o.view(value)
+	default:
+		return o.text(value, maxAttrLen)
 	}
-	return v
 }
 
 // hexID returns id lowercased when it is n hex digits and not all zero.

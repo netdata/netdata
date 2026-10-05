@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Faro 2.11.0 from the pinned jsDelivr URL used by bootstrap.go. We use the
 // actual SDK initialization, SessionInstrumentation and transport filtering.
-// Other instrumentations are omitted: this fixture tests session admission,
-// not browser APIs such as navigation timing or tracing.
+// Browser APIs are synthetic; configured instrumentations, metadata and
+// transport hooks are the unchanged SDK implementations.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -21,12 +21,18 @@ function storage() {
 }
 function run({ rate, random = 0.8, savedStorage = storage(), bootstrap, bot = false }) {
   const delivered = [];
+  let clock = Date.now(), sessionSequence = 0, timerSequence = 0;
+  const timers = new Map();
+  class BrowserDate extends Date { static now() { return clock; } }
   let loads = 0, initialized = 0, listeners = 0, storageReads = 0;
   const math = Object.create(Math);
   math.random = () => random;
   const context = {
-    console, URL, URLSearchParams, TextEncoder, Math: math,
-    setTimeout: (...args) => setTimeout(...args).unref(), clearTimeout,
+    console, URL, URLSearchParams, TextEncoder, Math: math, Date: BrowserDate,
+    performance: { now: () => 100, timeOrigin: Date.now(), getEntriesByType: () => [] },
+    innerWidth: 1024, innerHeight: 768,
+    setTimeout(callback, delay) { const id = ++timerSequence; timers.set(id, { callback, at: clock + delay }); return id; },
+    clearTimeout(id) { timers.delete(id); },
     navigator: { userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36', language: 'en', webdriver: bot },
     location: { href: 'https://shop.example.org/', hostname: 'shop.example.org', origin: 'https://shop.example.org' },
     addEventListener() { listeners++; }, removeEventListener() {},
@@ -36,6 +42,17 @@ function run({ rate, random = 0.8, savedStorage = storage(), bootstrap, bot = fa
     },
     localStorage: storage(),
   };
+  function advanceTime(delay) {
+    clock += delay;
+    for (const [id, timer] of Array.from(timers)) {
+      if (timer.at <= clock && timers.delete(id)) { timer.callback(); }
+    }
+  }
+  // A due callback may cancel another due timer before its turn.
+  let cancelledTimer;
+  context.setTimeout(() => context.clearTimeout(cancelledTimer), 0);
+  cancelledTimer = context.setTimeout(() => assert.fail('cancelled timer ran'), 0);
+  advanceTime(0);
   context.window = context;
   context.document = {
     location: context.location, currentScript: null, readyState: 'complete',
@@ -55,13 +72,12 @@ function run({ rate, random = 0.8, savedStorage = storage(), bootstrap, bot = fa
       isBatched() { return false; }
       send(item) { delivered.push(item); }
     }
-    sdk.getWebInstrumentations = () => [new sdk.SessionInstrumentation()];
     const initialize = sdk.initializeFaro;
     sdk.initializeFaro = cfg => {
       initialized++;
       assert.equal(cfg.sessionTracking.samplingRate, rate);
-      faro = initialize({ ...cfg, url: undefined, metas: [], transports: [new Capture()], batching: { enabled: false },
-        sessionTracking: { ...cfg.sessionTracking, generateSessionId: () => 'sampling-session' } });
+      faro = initialize({ ...cfg, url: undefined, transports: [new Capture()], batching: { enabled: false },
+        sessionTracking: { ...cfg.sessionTracking, generateSessionId: () => 'sampling-session-' + (++sessionSequence) } });
       return faro;
     };
   }
@@ -82,7 +98,15 @@ function run({ rate, random = 0.8, savedStorage = storage(), bootstrap, bot = fa
     faro.api.pushMeasurement({ type: 'web-vitals', values: { lcp: 1200 } });
   }
   return { sampled: faro?.api.getSession()?.attributes?.isSampled, delivered,
-    savedStorage, loads, initialized, listeners, storageReads };
+    savedStorage, loads, initialized, listeners, storageReads,
+    rollover(nextRandom) {
+      const previous = faro.api.getSession().id;
+      random = nextRandom;
+      advanceTime(16 * 60 * 1000);
+      faro.api.pushEvent('after_idle_' + clock);
+      assert.notEqual(faro.api.getSession().id, previous);
+      return faro.api.getSession().attributes.isSampled;
+    } };
 }
 function checkSelected(result, expected) {
   assert.equal(result.sampled, String(expected));
@@ -115,3 +139,13 @@ for (const [name, rate, random, selected] of [['fraction', 0.25, 0.1, true], ['f
 }
 // Existing bot exclusion is still applied before loading the SDK at rate 1.
 assert.equal(run({ rate: 1, bootstrap: bootstraps.full, bot: true }).loads, 0);
+
+// Expiry is driven by browser time and a public event. The SDK owns the new
+// session and rewrites/filtering of the event that triggered the rollover.
+const rollover = run({ rate: 0.25, random: 0.1, bootstrap: bootstraps.fraction });
+const beforeRollover = rollover.delivered.length;
+assert.equal(rollover.rollover(0.8), 'false');
+assert.equal(rollover.delivered.length, beforeRollover);
+assert.equal(rollover.rollover(0.1), 'true');
+assert.ok(rollover.delivered.slice(beforeRollover).some(item => item.payload.name.startsWith('after_idle_')));
+assert.ok(rollover.delivered.slice(beforeRollover).some(item => ['session_start', 'session_extend'].includes(item.payload.name)));

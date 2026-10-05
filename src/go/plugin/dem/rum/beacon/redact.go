@@ -3,6 +3,7 @@
 package beacon
 
 import (
+	"errors"
 	"net/url"
 	"regexp"
 	"strings"
@@ -19,6 +20,10 @@ type PathRule struct {
 // rules first, then per segment email addresses (email), UUIDs and
 // numbers of 6+ digits (id), and long token-like strings (token).
 func RedactPath(path string, rules []PathRule) string {
+	return redactPath(path, rules, false)
+}
+
+func redactPath(path string, rules []PathRule, source bool) string {
 	for _, r := range rules {
 		path = r.Re.ReplaceAllString(path, r.Replace)
 	}
@@ -36,26 +41,65 @@ func RedactPath(path string, rules []PathRule) string {
 			segs[i] = ":email"
 		case isUUID(plain) || (isNumeric(plain) && len(plain) >= 6):
 			segs[i] = ":id"
-		case isToken(plain):
+		case isToken(plain) && !(source && i == len(segs)-1 && isScriptFile(plain)):
 			segs[i] = ":token"
 		}
 	}
 	return strings.Join(segs, "/")
 }
 
-// RedactURL applies RedactPath to the path of an absolute URL, keeping
-// scheme and host; query and fragment must already be gone.
+// RedactURL strips credentials, query and fragment and applies the site's path
+// rules. Relative paths follow the same policy.
 func RedactURL(raw string, rules []PathRule) string {
-	i := strings.Index(raw, "://")
-	if i < 0 {
-		return RedactPath(raw, rules)
+	return redactURL(raw, rules, false)
+}
+
+// RedactSourceURL retains script basenames for source attribution and error
+// fingerprints. Site rules and identifier redaction still apply; only the token
+// heuristic is skipped for the final .js, .mjs or .cjs path segment.
+func RedactSourceURL(raw string, rules []PathRule) string {
+	return redactURL(raw, rules, true)
+}
+
+func isScriptFile(name string) bool {
+	return strings.HasSuffix(name, ".js") || strings.HasSuffix(name, ".mjs") || strings.HasSuffix(name, ".cjs")
+}
+
+func redactURL(raw string, rules []PathRule, source bool) string {
+	raw = strings.TrimSpace(raw)
+	u, err := url.Parse(raw)
+	if err != nil {
+		var escapeErr url.EscapeError
+		if errors.As(err, &escapeErr) {
+			// Browsers accept literal percent signs in paths. Encode only malformed
+			// escapes, then let the same URL parser remove credentials/query/fragment.
+			u, err = url.Parse(escapeInvalidPercent(raw))
+		}
 	}
-	rest := raw[i+3:]
-	j := strings.IndexByte(rest, '/')
-	if j < 0 {
-		return raw
+	if err != nil || u.Opaque != "" {
+		return ""
 	}
-	return raw[:i+3] + rest[:j] + RedactPath(rest[j:], rules)
+	u.User, u.RawQuery, u.Fragment, u.RawFragment = nil, "", "", ""
+	u.ForceQuery = false
+	path := redactPath(u.EscapedPath(), rules, source)
+	plain, err := url.PathUnescape(path)
+	if err != nil {
+		plain = path
+	}
+	u.Path, u.RawPath = plain, path
+	return u.String()
+}
+
+func escapeInvalidPercent(value string) string {
+	var result strings.Builder
+	for i := 0; i < len(value); i++ {
+		if value[i] == '%' && (i+2 >= len(value) || !isHexByte(value[i+1]) || !isHexByte(value[i+2])) {
+			result.WriteString("%25")
+		} else {
+			result.WriteByte(value[i])
+		}
+	}
+	return result.String()
 }
 
 func isEmail(s string) bool {

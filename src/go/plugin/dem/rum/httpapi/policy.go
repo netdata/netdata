@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 )
@@ -33,6 +34,7 @@ type site struct {
 	tracing   bool
 	propagate []string
 	pathRules []beacon.PathRule // redact_paths
+	redactor  *redact.Redactor
 }
 
 // originRule is one allowed_origins entry: scheme + host[:port], with
@@ -64,6 +66,14 @@ func compileSite(sc config.Site) *site {
 		measureRate: sc.MeasureRate(),
 		includeBots: sc.IncludesBots(),
 	}
+	var secrets []string
+	if sc.EventLogs != nil {
+		secrets = append(secrets, sc.EventLogs.Destination.AuthToken)
+	}
+	if sc.Tracing != nil {
+		secrets = append(secrets, sc.Tracing.Destination.AuthToken)
+	}
+	st.redactor = redact.NewRedactor(secrets...)
 	if sc.TracingOn() {
 		st.tracing = true
 		for _, o := range sc.Tracing.PropagateTo {

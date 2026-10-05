@@ -92,10 +92,11 @@ func (c *Collector) Init(ctx context.Context) error {
 	// Retained inactive credentials still need output redaction.
 	c.redactor = redact.NewRedactor(c.EventLogs.Destination.AuthToken, c.Tracing.Destination.AuthToken)
 	c.aggregator = aggregate.New(time.Duration(c.Window), aggregate.SiteCfg{
-		Name:        c.Name,
-		DisplayName: c.Label(),
-		PageGroups:  c.PageGroups,
-		Countries:   c.Countries,
+		Name:               c.Name,
+		DisplayName:        c.Label(),
+		PageGroups:         c.PageGroups,
+		Countries:          c.Countries,
+		FrustrationSignals: c.FrustrationSignalsOn(),
 		Investigate: aggregate.InvestigateCfg{
 			Rate:           c.InvestigateRate(),
 			KeepErrors:     c.KeepsErrors(),
@@ -109,6 +110,6 @@ func (c *Collector) Init(ctx context.Context) error {
 			Value: c.redactor.Apply(c.DisplayName),
 		})
 	}
-	c.metrics = newCollectorMetrics(m, c.EventLogsOn(), c.TracingOn())
+	c.metrics = newCollectorMetrics(m, c.EventLogsOn(), c.TracingOn(), c.FrustrationSignalsOn())
 	return nil
 }

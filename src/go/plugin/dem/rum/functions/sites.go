@@ -12,7 +12,7 @@ import (
 var sitesMethod = method{
 	id:      "rum-sites",
 	title:   "RUM Sites",
-	help:    "RUM site setup and observed activity",
+	help:    "RUM site setup and observed activity. Capture columns show current policy; retained history may reflect earlier policies. City locations are approximate live activity only; frustration signals are optional interaction heuristics",
 	sort:    "site",
 	every:   10,
 	columns: rumSitesColumns,
@@ -65,6 +65,8 @@ func (h *Handler) sitesRows(ctx context.Context, now int64) (rows [][]any, recei
 				h.redact.Apply(s.Snippet.Detail),
 				h.redact.Apply(s.Rejected.Origin),
 				rejectAge,
+				s.Capture.Geolocation,
+				boolean(s.Capture.FrustrationSignals),
 			},
 		)
 	}
@@ -73,6 +75,20 @@ func (h *Handler) sitesRows(ctx context.Context, now int64) (rows [][]any, recei
 }
 
 var rumSitesColumns = map[string]any{
+	"capture_geolocation": (funcapi.Column{
+		Index:         22,
+		Name:          "Current Geolocation Capture",
+		Type:          funcapi.FieldTypeString,
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+	}).BuildColumn(),
+	"capture_frustration_signals": (funcapi.Column{
+		Index:         23,
+		Name:          "Current Frustration Capture",
+		Type:          funcapi.FieldTypeBoolean,
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+	}).BuildColumn(),
 	"site": (funcapi.Column{
 		Index:         0,
 		UniqueKey:     true,

@@ -137,6 +137,7 @@ func TestSourceRedactsCopiesAndRejectsCancelledReads(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, sites, 1)
 	assert.Equal(t, "site [REDACTED]", sites[0].Label)
+	assert.Equal(t, query.Capture{Geolocation: "country"}, sites[0].Capture)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err = s.Pages(ctx, "")
@@ -171,14 +172,14 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 		cancel()
 		w.Run(runCtx)
 	}
-	first := history.NewWriter("site", st, a, redact.NewRedactor("opaque-secret"))
+	first := history.NewWriter("site", st, a)
 	a.SetHistorySink(first)
 	a.Ingest(
 		&beacon.Beacon{
 			Site:      "site",
 			SessionID: "session",
 			PageGroup: "/first",
-			Events:    []beacon.Event{{Name: "opaque-secret"}, {Name: "opaque-secret"}},
+			Events:    []beacon.Event{{Name: "[REDACTED]"}, {Name: "[REDACTED]"}},
 		},
 	)
 	pending := request()
@@ -187,7 +188,7 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 	assert.Equal(t, pending[1], pending[2], "identical repeated events are real occurrences")
 	flush(first)
 	assert.Equal(t, pending, request(), "flushing must not duplicate the live ring")
-	second := history.NewWriter("site", st, a, redact.NewRedactor("opaque-secret"))
+	second := history.NewWriter("site", st, a)
 	a.SetHistorySink(second)
 	a.Ingest(
 		&beacon.Beacon{
@@ -200,7 +201,7 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 	merged := request()
 	require.Len(t, merged, 4)
 	assert.Equal(t, pending, merged[:3])
-	assert.Equal(t, []any{"event", "/second", "purchase", ""}, merged[3][1:])
+	assert.Equal(t, []any{"event", "/second", "purchase", "", ""}, merged[3][1:])
 	flush(second)
 	assert.Equal(t, merged, request())
 	retire()
@@ -294,7 +295,7 @@ func TestFunctionPayloadsValidateAgainstNativeSchema(t *testing.T) {
 	st := history.NewStore(journalStore)
 	hub := rumregistry.New()
 	a, _ := addSite(t, hub, "site", "first")
-	writer := history.NewWriter("site", st, a, redact.NewRedactor("opaque-secret"))
+	writer := history.NewWriter("site", st, a)
 	a.SetHistorySink(writer)
 	a.Ingest(
 		&beacon.Beacon{

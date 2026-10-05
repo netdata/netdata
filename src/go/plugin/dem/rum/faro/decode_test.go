@@ -48,26 +48,10 @@ func TestParseFaro(t *testing.T) {
 				},
 			},
 		},
-		"legacy scalar shapes": {
-			body: `{"meta":{"page":{"url":"/"}},"measurements":[
-			  {"type":"web-vital","meta":{"name":"fcp"},"value":{"duration":900}},
-			  {"type":"ttfb","value":{"value":150}},
-			  {"type":"web-vital","meta":{"name":"bogus"},"value":{"value":1}},
-			  {"type":"lcp","value":{"value":0}}]}`,
-			want: beacon.Beacon{
-				Site:      "s",
-				Received:  now,
-				Path:      "/",
-				PageGroup: "/",
-				Device:    "desktop",
-				Country:   "GR",
-				Vitals:    []beacon.Vital{{Name: "FCP", Value: 900, Time: now}, {Name: "TTFB", Value: 150, Time: now}},
-			},
-		},
-		"exceptions with frames and legacy stack": {
+		"exceptions with and without frames": {
 			body: `{"meta":{"page":{"url":"https://x/pricing"}},"exceptions":[
 			  {"type":"TypeError","value":"x is undefined","stacktrace":{"frames":[{"filename":"https://x/app.js","function":"render","lineno":10,"colno":5}]},"timestamp":"` + tsStr + `"},
-			  {"type":"Error","value":"legacy","stackTrace":"at foo (bar.js:1:1)"}]}`,
+			  {"type":"Error","value":"no stack"}]}`,
 			want: beacon.Beacon{
 				Site:      "s",
 				Received:  now,
@@ -79,8 +63,8 @@ func TestParseFaro(t *testing.T) {
 				Errors: []beacon.Error{
 					{Type: "TypeError", Message: "x is undefined", Stack: "render (https://x/app.js:10:5)\n", Time: ts,
 						Fingerprint: beacon.Fingerprint("TypeError", "x is undefined", "render@https://x/app.js")},
-					{Type: "Error", Message: "legacy", Stack: "at foo (bar.js:1:1)", Time: now,
-						Fingerprint: beacon.Fingerprint("Error", "legacy", "")},
+					{Type: "Error", Message: "no stack", Time: now,
+						Fingerprint: beacon.Fingerprint("Error", "no stack", "")},
 				},
 			},
 		},
@@ -224,7 +208,7 @@ func TestParseFaro(t *testing.T) {
 				Device:    "desktop",
 				Country:   "GR",
 				Events: []beacon.Event{
-					{Name: "session_start", Domain: "browser", Attrs: map[string]string{"a": "1"}, Time: ts},
+					{Kind: beacon.EventSession, Name: "session_start", Domain: "browser", Attrs: map[string]string{"a": "1"}, Time: ts},
 				},
 			},
 		},
@@ -259,10 +243,12 @@ func TestParseFaro(t *testing.T) {
 			got, err := Decode(
 				[]byte(tc.body),
 				Options{
-					Site:        "s",
-					Now:         now,
-					Country:     "GR",
-					ConsoleLogs: tc.consoleLogs,
+					Site:               "s",
+					Now:                now,
+					Country:            "GR",
+					ConsoleLogs:        tc.consoleLogs,
+					EventLogs:          true,
+					FrustrationSignals: true,
 				},
 			)
 			if err != nil {
@@ -306,7 +292,7 @@ func TestParseFaroRejectsBadJSON(t *testing.T) {
 
 func TestParseFaroBounds(t *testing.T) {
 	long := strings.Repeat("z", 10000)
-	body := `{"meta":{"browser":{"name":"` + long + `"}},"exceptions":[{"type":"E","value":"` + long + `","stackTrace":"` + long + `"}]}`
+	body := `{"meta":{"browser":{"name":"` + long + `"}},"exceptions":[{"type":"E","value":"` + long + `","stacktrace":{"frames":[{"function":"` + long + `","filename":"app.js"}]}}]}`
 	got, err := Decode([]byte(body), Options{
 		Site: "s",
 		Now:  now,
@@ -450,9 +436,10 @@ func TestParseFaroPrivacyAttributionAndUser(t *testing.T) {
 	"measurements":[{"type":"web-vitals","values":{"lcp":5200},"context":{"element":"#hero img.user-1234567"}},{"type":"web-vitals","values":{"inp":620},"context":{"interaction_target":"button#buy"}}],
 	"events":[{"name":"rage_click","attributes":{"target":"div#row-jane@example.com > button"}},{"name":"faro.performance.resource","attributes":{"name":"https://cdn.example.com/avatars/jane@example.com.png?v=2"}}]}`
 	opt := Options{
-		Site:      "s",
-		Now:       time.Now(),
-		PathRules: []beacon.PathRule{{Re: regexp.MustCompile(`^/u/[^/]+`), Replace: "/u/:user"}},
+		FrustrationSignals: true,
+		Site:               "s",
+		Now:                time.Now(),
+		PathRules:          []beacon.PathRule{{Re: regexp.MustCompile(`^/u/[^/]+`), Replace: "/u/:user"}},
 	}
 	b, err := Decode([]byte(body), opt)
 	if err != nil {

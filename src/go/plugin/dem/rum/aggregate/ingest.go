@@ -207,7 +207,6 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 				Browser:     b.Browser,
 				Device:      b.Device,
 				Country:     b.Country,
-				City:        b.City,
 				Version:     b.AppVersion,
 				UserID:      b.UserID,
 				Fingerprint: e.Fingerprint,

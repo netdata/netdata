@@ -9,7 +9,8 @@ import (
 )
 
 // Redactor removes secret values and common credential shapes from text
-// before egress. It applies exact supplied values first, then pattern matches.
+// before egress. It replaces exact supplied values of at least four bytes, then
+// applies credential-pattern matches regardless of their value length.
 type Redactor struct {
 	values     []string
 	standalone *regexp.Regexp // whole match → [REDACTED]
@@ -47,8 +48,14 @@ func (r *Redactor) Apply(s string) string {
 			out = strings.ReplaceAll(out, v, redacted)
 		}
 	}
-	out = r.standalone.ReplaceAllString(out, redacted)
-	out = r.keyvalue.ReplaceAllString(out, "$1="+redacted)
+	// Most diagnostic strings contain no credentials. Avoid allocating copies
+	// when the replacement would leave them unchanged.
+	if r.standalone.MatchString(out) {
+		out = r.standalone.ReplaceAllString(out, redacted)
+	}
+	if r.keyvalue.MatchString(out) {
+		out = r.keyvalue.ReplaceAllString(out, "$1="+redacted)
+	}
 	return out
 }
 

@@ -11,17 +11,17 @@ import (
 var sessionsMethod = method{
 	id:      "rum-sessions",
 	title:   "RUM Sessions",
-	help:    "Sessions with retained activity saved in the selected range; counts and duration cover retained events, not lifetime totals",
+	help:    "Sessions with retained activity saved in the selected range; counts and duration cover retained events, not lifetime totals. user_id matches an exact stored, normalized ID observed in that range and returns the complete session summary. Credential-masked display values are not reliable lookup keys; redacted original IDs cannot be recovered",
 	sort:    "started_age_s",
 	every:   10,
 	history: true,
-	params:  []string{"site", "after", "before"},
+	params:  []string{"site", "after", "before", "user_id"},
 	columns: rumSessionsColumns,
 }
 
-func (h *Handler) sessionsRows(ctx context.Context, site string, after, before, now int64) (rows [][]any, err error) {
+func (h *Handler) sessionsRows(ctx context.Context, site, userID string, after, before, now int64) (rows [][]any, err error) {
 	var sessions []query.Session
-	sessions, err = h.deps.Sessions(ctx, site, after, before)
+	sessions, err = h.deps.Sessions(ctx, site, userID, after, before)
 	for _, s := range sessions {
 		rows = append(
 			rows,
@@ -38,7 +38,7 @@ func (h *Handler) sessionsRows(ctx context.Context, site string, after, before, 
 				s.Version,
 				s.EntryPage,
 				s.LastPage,
-				h.redact.Apply(s.UserID),
+				s.UserIDs,
 				s.Frustrations,
 				rowID(s.Site, s.SessionID),
 			},
@@ -149,10 +149,10 @@ var rumSessionsColumns = map[string]any{
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
 	}).BuildColumn(),
-	"user": (funcapi.Column{
+	"user_ids": (funcapi.Column{
 		Index:         12,
-		Name:          "User",
-		Type:          funcapi.FieldTypeString,
+		Name:          "Observed User IDs",
+		Type:          funcapi.FieldTypeArray,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
 		Sortable:      true,
@@ -160,7 +160,7 @@ var rumSessionsColumns = map[string]any{
 	}).BuildColumn(),
 	"frustrations": (funcapi.Column{
 		Index:         13,
-		Name:          "Frustration Signals",
+		Name:          "Retained Frustration Signals",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,

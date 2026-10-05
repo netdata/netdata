@@ -101,7 +101,6 @@ func TestPromotionPreservesOriginalContext(t *testing.T) {
 	before := mk(*now, "late-error", "/before")
 	before.UserID = "identity-before"
 	before.AppVersion = "before"
-	before.City = "before-city"
 	before.Events = []beacon.Event{{Name: "prior_action"}}
 	a.Ingest(before)
 	require.Empty(t, h.events)
@@ -109,7 +108,6 @@ func TestPromotionPreservesOriginalContext(t *testing.T) {
 	after := mk(*now, "late-error", "/after")
 	after.UserID = "identity-after"
 	after.AppVersion = "after"
-	after.City = "after-city"
 	after.Browser = "Firefox"
 	after.Device = "mobile"
 	after.Country = "DE"
@@ -119,7 +117,6 @@ func TestPromotionPreservesOriginalContext(t *testing.T) {
 	for _, e := range h.events[:2] {
 		assert.Equal(t, "identity-before", e.UserID)
 		assert.Equal(t, "before", e.Version)
-		assert.Equal(t, "before-city", e.City)
 		assert.Equal(t, "GR", e.Country)
 		assert.Equal(t, "Chrome", e.Browser)
 		assert.Equal(t, "desktop", e.Device)

@@ -86,7 +86,7 @@ func TestSyntheticHistoryReopenMixedKindsAndUnmatchedStart(t *testing.T) {
 	assert.Equal(t, run, detail)
 	_, err = history.NewStore(st).GetRun(ctx, "wrong", run.ID)
 	assert.ErrorIs(t, err, os.ErrNotExist)
-	rum, err := rumhistory.NewStore(st).QuerySessions(ctx, "", 0, time.Now().Unix()+1, 100)
+	rum, err := rumhistory.NewStore(st).QuerySessions(ctx, "", "", 0, time.Now().Unix()+1, 100)
 	require.NoError(t, err)
 	require.Len(t, rum, 1)
 	cancelled, cancel := context.WithCancel(ctx)

@@ -29,6 +29,7 @@ type PageInfo struct {
 	LCPElement, INPElement, CLSElement string
 	// FrustrationWindow counts rage, dead and error clicks.
 	FrustrationWindow int
+	FrustrationsKnown bool
 }
 
 // Pages returns this site's currently top-N-ranked page groups — the same set
@@ -73,6 +74,7 @@ func (a *Aggregator) Pages() []PageInfo {
 			INPElement:        topElement(g.elements, beacon.INP, cutoff),
 			CLSElement:        topElement(g.elements, beacon.CLS, cutoff),
 			FrustrationWindow: countTsCounts(g.frWindow, cutoff),
+			FrustrationsKnown: st.cfg.FrustrationSignals,
 		})
 	}
 	return out

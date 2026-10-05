@@ -6,12 +6,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
@@ -336,6 +338,64 @@ func TestNativeRUMSamplingConfigurationAndReload(t *testing.T) {
 				assert.JSONEq(t, string(payload), string(again))
 				require.NoError(t, factory.Test(context.Background(), reload))
 				assert.Equal(t, effective, last().Configuration())
+			}
+		})
+	}
+}
+
+func TestNativeRUMCaptureConfigurationAndReload(t *testing.T) {
+	for _, tc := range []struct {
+		suffix, mode string
+		frustration  bool
+	}{
+		{"", config.GeolocationCountry, false},
+		{"capture: null", config.GeolocationCountry, false},
+		{"capture: {}", config.GeolocationCountry, false},
+		{"capture: {geolocation: null, frustration_signals: null}", config.GeolocationCountry, false},
+		{"capture: {geolocation: 'off'}", config.GeolocationOff, false},
+		{"capture: {geolocation: city, frustration_signals: true}", config.GeolocationCity, true},
+	} {
+		t.Run(tc.suffix, func(t *testing.T) {
+			factory, last := nativeRUMConfigFactory(t)
+			var input confgroup.Config
+			require.NoError(t, yaml.Unmarshal([]byte("name: shop\nallowed_origins: [https://shop.example.org]\n"+tc.suffix), &input))
+			input.SetModule("rum").SetSourceType(confgroup.TypeUser)
+			payload, err := factory.Configuration(context.Background(), input)
+			require.NoError(t, err)
+			require.ErrorContains(t, last().Check(context.Background()), "not initialized")
+			var effective rum.Config
+			require.NoError(t, json.Unmarshal(payload, &effective))
+			require.NotNil(t, effective.Capture)
+			require.NotNil(t, effective.Capture.Geolocation)
+			assert.Equal(t, tc.mode, effective.GeolocationMode())
+			assert.Equal(t, tc.frustration, effective.FrustrationSignalsOn())
+			require.NoError(t, factory.Test(context.Background(), input))
+			assert.Equal(t, effective, last().Configuration())
+			again, err := factory.Configuration(context.Background(), nativeRUMConfig(t, effective))
+			require.NoError(t, err)
+			assert.JSONEq(t, string(payload), string(again))
+		})
+	}
+}
+
+func TestCaptureFrustrationChartsFollowPolicy(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprint(enabled), func(t *testing.T) {
+			site, hub, _ := contractSite(t)
+			site.Capture.FrustrationSignals = enabled
+			recv := receiver.New(hub)
+			recv.Listen = "127.0.0.1:0"
+			startJob(t, "receiver", "receiver", recv)
+			job, out, stop := startJob(t, "rum", "shop", site)
+			sendContractBeacon(t, hub, []byte(`{"meta":{"page":{"url":"https://example.org/cart"},"session":{"id":"capture-session"}},"events":[{"name":"rage_click"}]}`))
+			tickUntil(t, job, out, "SET 'pageviews' = 1")
+			stop()
+			if enabled {
+				assert.Contains(t, out.String(), "rum.frustration")
+				assert.Contains(t, out.String(), "SET 'rage_clicks' = 1")
+			} else {
+				assert.NotContains(t, out.String(), "rum.frustration")
+				assert.NotContains(t, out.String(), "SET 'rage_clicks'")
 			}
 		})
 	}

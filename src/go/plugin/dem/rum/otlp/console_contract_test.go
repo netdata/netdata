@@ -55,7 +55,7 @@ func TestDecodedConsoleUnicodeRemainsExportable(t *testing.T) {
 			assert.True(t, utf8.ValidString(l.Stack))
 			assert.LessOrEqual(t, len(l.ErrorType), 64)
 			assert.LessOrEqual(t, len(l.Message), 1024)
-			assert.LessOrEqual(t, len(l.Stack), maxStackBytes)
+			assert.LessOrEqual(t, len(l.Stack), 4096)
 			e := newExporter(t, "127.0.0.1:1", newRecCounters(), nil)
 			records := e.build(b, false)
 			require.Len(t, records, 1)

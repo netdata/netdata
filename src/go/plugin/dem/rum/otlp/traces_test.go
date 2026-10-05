@@ -67,14 +67,14 @@ func tracedBeacon() *beacon.Beacon {
 		TraceID: "360b7dd27710ac98272283e6f1f29102", SpanID: "17c20d0ec32b813e",
 		Name: "GET", Kind: 3, StartNS: 1, EndNS: 2, Scope: "@opentelemetry/instrumentation-fetch",
 		Attrs: []beacon.SpanAttr{
-			{Key: "url.full", Str: "https://api.example.com/orders/hunter2"},
+			{Key: "url.full", Str: "https://api.example.com/orders/[REDACTED]"},
 			{Key: "http.response.status_code", Int: 200, IsInt: true},
 		},
 	}}
 	return b
 }
 
-// Browser spans keep their ids, lose secrets, and carry the RUM resource.
+// Browser spans preserve normalized values and IDs and carry the RUM resource.
 func TestResourceSpans(t *testing.T) {
 	e := newTraceExporter(t, "127.0.0.1:1", "s1", newRecCounters(), newRedactor(t, "hunter2"))
 	rs := e.resourceSpans(tracedBeacon())
@@ -91,8 +91,8 @@ func TestResourceSpans(t *testing.T) {
 		t.Fatalf("ids = %x %x", sp.TraceId, sp.SpanId)
 	}
 	for _, kv := range sp.Attributes {
-		if kv.Key == "url.full" && kv.GetValue().GetStringValue() == "https://api.example.com/orders/hunter2" {
-			t.Fatal("secret not redacted from span attribute")
+		if kv.Key == "url.full" && kv.GetValue().GetStringValue() != "https://api.example.com/orders/[REDACTED]" {
+			t.Fatal("normalized span attribute changed")
 		}
 		if kv.Key == "http.response.status_code" && kv.GetValue().GetIntValue() != 200 {
 			t.Fatalf("int attr = %v", kv)

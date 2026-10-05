@@ -11,19 +11,14 @@ import (
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 )
 
-// maxStackBytes bounds error.stack (≤4 KiB). the Faro decoder already
-// truncates at this length before the beacon reaches here; this is a
-// defensive second cap so a future producer cannot regress it silently.
-const maxStackBytes = 4096
-
 // queued is one record waiting on the owning site's export queue.
 type queued struct{ rec *logspb.LogRecord }
 
 // build turns one accepted beacon into zero or more queued records:
 // pageview, one per JS
 // error, one per custom event, one per console log line (already
-// filtered upstream by ConsoleLogsOn). Free-form text is redacted
-// before it reaches the record.
+// filtered upstream by ConsoleLogsOn). Receiver normalization owns all text
+// cleaning and bounds; export preserves the accepted observation.
 func (e *Logs) build(b *beacon.Beacon, pageView bool) []queued {
 	base := baseAttrs(b)
 	var out []queued
@@ -32,8 +27,8 @@ func (e *Logs) build(b *beacon.Beacon, pageView bool) []queued {
 		out = append(out, e.record(base, "pageview", b.Received, sevInfo, "pageview "+b.Path))
 	}
 	for _, err := range b.Errors {
-		msg := e.redact(err.Message)
-		stack := beacon.Truncate(e.redact(err.Stack), maxStackBytes)
+		msg := err.Message
+		stack := err.Stack
 		attrs := append(append([]*commonpb.KeyValue{}, base...),
 			strAttr("error.type", err.Type), strAttr("error.message", msg), strAttr("error.stack", stack))
 		if err.Fingerprint != "" {
@@ -43,22 +38,24 @@ func (e *Logs) build(b *beacon.Beacon, pageView bool) []queued {
 		out = append(out, e.record(attrs, "error", err.Time, sevError, body))
 	}
 	for _, ev := range b.Events {
+		if ev.Kind == beacon.EventSession {
+			continue
+		}
 		attrs := append(append([]*commonpb.KeyValue{}, base...), strAttr("event.name", ev.Name))
 		for k, v := range ev.Attrs {
-			attrs = append(attrs, strAttr("event.attr."+k, e.redact(v)))
+			attrs = append(attrs, strAttr("event.attr."+k, v))
 		}
 		body := "event " + ev.Name + " @ " + b.Path
 		out = append(out, e.record(attrs, "event", ev.Time, sevInfo, body))
 	}
 	for _, l := range b.Logs {
-		// Preserve decoder bounds after configured-secret redaction.
-		msg := beacon.Truncate(e.redact(l.Message), 1024)
+		msg := l.Message
 		body := "console " + l.Level + ": " + msg
 		attrs := append(append([]*commonpb.KeyValue{}, base...), strAttr("console.level", l.Level))
-		if typ := beacon.Truncate(e.redact(l.ErrorType), 64); typ != "" {
+		if typ := l.ErrorType; typ != "" {
 			attrs = append(attrs, strAttr("error.type", typ))
 		}
-		if stack := beacon.Truncate(e.redact(l.Stack), maxStackBytes); stack != "" {
+		if stack := l.Stack; stack != "" {
 			attrs = append(attrs, strAttr("error.stack", stack))
 		}
 		out = append(out, e.record(attrs, "console", l.Time, consoleSeverity(l.Level), body))

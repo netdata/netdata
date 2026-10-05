@@ -20,7 +20,7 @@ type Deps interface {
 	Sites(context.Context) ([]query.Site, error)
 	Pages(context.Context, string) ([]query.Page, error)
 	Live(context.Context, string, string, int) ([]query.LiveEvent, string, error)
-	Sessions(context.Context, string, int64, int64) ([]query.Session, error)
+	Sessions(context.Context, string, string, int64, int64) ([]query.Session, error)
 	SessionEvents(context.Context, string, string) ([]query.SessionEvent, error)
 	Errors(context.Context, string, string, int64, int64) ([]query.ErrorGroup, error)
 }
@@ -166,7 +166,7 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 			return funcapi.ErrorResponse(400, "%v", err)
 		}
 		if req.Method == "rum-sessions" {
-			rows, err = h.sessionsRows(ctx, args["site"], after, before, now)
+			rows, err = h.sessionsRows(ctx, args["site"], args["user_id"], after, before, now)
 		} else {
 			rows, err = h.errorsRows(ctx, args["site"], args["fingerprint"], after, before, now)
 		}
