@@ -15,53 +15,29 @@
 # after changing this file or any of the variables.
 
 endpoint:
-  # The gRPC keys below were previously named without the grpc_ prefix
-  # (path, tls_cert_path, tls_key_path, tls_ca_cert_path). The former names
-  # still work but log a deprecation warning; setting one key under both
-  # names fails at startup.
+  # The two OTLP listeners. Each key ending in "path" is a network address
+  # (host:port), not a filesystem path. The loopback defaults accept only
+  # local senders. To receive from other hosts, bind a non-loopback address
+  # and protect the listener with TLS and network access controls.
+  #
+  # TLS: set the certificate and the key together (PEM files). The CA
+  # certificate enables mutual TLS: senders must present a client
+  # certificate signed by this CA. Each listener has its own TLS keys.
+  #
+  # The grpc_ keys were previously named without the prefix (path,
+  # tls_cert_path, ...). The former names still work and log a deprecation
+  # warning. If one key is set under both names, the plugin does not start.
 
-  # Bind address (host:port) for the OTLP/gRPC listener — the key ends in
-  # "path" but it is a network address, not a filesystem path. The loopback
-  # default accepts only local senders; to receive from other hosts, bind a
-  # non-loopback address and protect the endpoint with TLS and network
-  # access controls.
+  # OTLP/gRPC listener.
   grpc_path: "127.0.0.1:4317"
-
-  # Server TLS certificate (PEM) for the OTLP/gRPC listener. TLS is enabled
-  # only when both this and grpc_tls_key_path are set; providing either one
-  # alone fails at startup.
   grpc_tls_cert_path: null
-
-  # Server TLS private key (PEM) for the OTLP/gRPC listener. Required when
-  # grpc_tls_cert_path is set.
   grpc_tls_key_path: null
-
-  # CA certificate (PEM) for mutual TLS on the OTLP/gRPC listener: senders
-  # must present a client certificate signed by this CA. Requires both
-  # grpc_tls_cert_path and grpc_tls_key_path to be set.
   grpc_tls_ca_cert_path: null
 
-  # Bind address (host:port) for the OTLP/HTTP listener — the same OTLP
-  # receiver as the gRPC listener above, served over HTTP POST
-  # /v1/logs, /v1/traces, and /v1/metrics, accepting protobuf or JSON
-  # bodies. Set to null to disable it and serve gRPC only. Startup is
-  # strict: a bind failure stops the plugin, exactly like the gRPC
-  # listener.
+  # OTLP/HTTP listener. Set http_path to null to serve gRPC only.
   http_path: "127.0.0.1:4318"
-
-  # Server TLS certificate (PEM) for the OTLP/HTTP listener — separate from
-  # the gRPC keys above, so one transport can be protected while the other
-  # is not. TLS is enabled only when both this and http_tls_key_path are
-  # set; providing either one alone fails at startup.
   http_tls_cert_path: null
-
-  # Server TLS private key (PEM) for the OTLP/HTTP listener. Required when
-  # http_tls_cert_path is set.
   http_tls_key_path: null
-
-  # CA certificate (PEM) for mutual TLS on the OTLP/HTTP listener: senders
-  # must present a client certificate signed by this CA. Requires both
-  # http_tls_cert_path and http_tls_key_path to be set.
   http_tls_ca_cert_path: null
 
 metrics:
