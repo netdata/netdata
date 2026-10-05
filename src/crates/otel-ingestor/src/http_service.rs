@@ -44,9 +44,8 @@
 //! offending JSON field path; errors from the derives carry serde's message.
 //!
 //! The listener binds during startup with the same strict fail-fast rule as
-//! the gRPC endpoint (user decision D4): a bind or TLS failure aborts the
-//! worker before `Ready`, rather than advertising an endpoint that cannot
-//! receive. TLS terminates via `tokio-rustls`, configured independently of
+//! the gRPC endpoint: a bind or TLS failure aborts the worker before `Ready`,
+//! rather than advertising an endpoint that cannot receive. TLS terminates via `tokio-rustls`, configured independently of
 //! the gRPC endpoint's tonic TLS.
 
 use std::io::Read;
@@ -190,7 +189,7 @@ pub(crate) enum HttpListener {
 /// Bind the OTLP/HTTP listener (and build its TLS acceptor when configured).
 ///
 /// Returns `Ok(None)` when the receiver is disabled (`http_path: null`).
-/// Every failure is fatal per D4 — strict fail-fast, symmetric with the gRPC
+/// Every failure is fatal — strict fail-fast, symmetric with the gRPC
 /// bind — which is why this runs before the worker touches its WAL dirs and
 /// before `Ready` is sent.
 pub(crate) async fn bind_http(endpoint: &EndpointConfig) -> Result<Option<HttpListener>> {

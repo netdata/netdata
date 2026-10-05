@@ -757,7 +757,7 @@ traces:
         assert_eq!(config.endpoint.grpc_path, "127.0.0.1:4317");
     }
 
-    // -- Deprecated gRPC TLS key names (before the `grpc_` prefix) --
+    // -- Deprecated gRPC key names (before the `grpc_` prefix) --
 
     #[test]
     fn deprecated_grpc_keys_still_configure_the_grpc_listener() {

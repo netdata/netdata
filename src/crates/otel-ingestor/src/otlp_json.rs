@@ -655,7 +655,7 @@ fn as_numbers(object: &mut Object, key: &str) -> Result<(), String> {
 /// A 64-bit integer given as a JSON integer or a decimal string (the forms
 /// senders write), as a JSON number in the field's range. The fraction and
 /// exponent forms proto3 JSON also permits (`3.0`, `1e3`) are rejected with
-/// a 400: no surveyed sender writes them (user decision D15).
+/// a 400: no surveyed sender writes them.
 fn integer(value: &Value, sign: Sign) -> Result<Value, String> {
     let parsed = match (value, sign) {
         (Value::Number(n), Sign::Unsigned) => n.as_u64().map(Value::from),
@@ -956,6 +956,27 @@ mod tests {
             ExportLogsServiceRequest::decode_json(br#"{"resourceLogs":null}"#).unwrap(),
             ExportLogsServiceRequest::default()
         );
+    }
+
+    #[test]
+    fn entity_refs_with_omitted_fields_decode_for_metrics_and_traces() {
+        // `prune` runs over every signal's tree, not only logs.
+        let metrics = r#"{"resourceMetrics":[{"resource":{"entityRefs":[{}]},"scopeMetrics":[]}]}"#;
+        let decoded = ExportMetricsServiceRequest::decode_json(metrics.as_bytes()).unwrap();
+        let entity_refs = &decoded.resource_metrics[0]
+            .resource
+            .as_ref()
+            .unwrap()
+            .entity_refs;
+        assert_eq!(entity_refs, &vec![EntityRef::default()]);
+        let traces = r#"{"resourceSpans":[{"resource":{"entityRefs":[{}]},"scopeSpans":[]}]}"#;
+        let decoded = ExportTraceServiceRequest::decode_json(traces.as_bytes()).unwrap();
+        let entity_refs = &decoded.resource_spans[0]
+            .resource
+            .as_ref()
+            .unwrap()
+            .entity_refs;
+        assert_eq!(entity_refs, &vec![EntityRef::default()]);
     }
 
     #[test]

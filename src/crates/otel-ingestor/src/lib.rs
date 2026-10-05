@@ -134,10 +134,10 @@ async fn run_ingestor(
         .with_nodelay(Some(true));
     tracing::info!(endpoint = %config.endpoint.grpc_path, "gRPC endpoint bound");
 
-    // Bind the OTLP/HTTP listener under the same strict fail-fast rule (user
-    // decision D4): a bind or TLS failure here aborts the worker exactly like
-    // the gRPC bind above — before disk setup, before `Ready` — instead of
-    // advertising an endpoint that cannot receive.
+    // Bind the OTLP/HTTP listener under the same strict fail-fast rule: a
+    // bind or TLS failure here aborts the worker exactly like the gRPC bind
+    // above — before disk setup, before `Ready` — instead of advertising an
+    // endpoint that cannot receive.
     let http_listener = http_service::bind_http(&config.endpoint).await?;
 
     // Set up metrics pipeline
