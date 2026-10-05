@@ -576,6 +576,8 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                 generate_datafilepath(datafile, path, sizeof(path));
                 netdata_log_info("DBENGINE: deleted data file \"%s\".", path);
             }
+            // the v1 replay may have charged samples to this datafile already
+            rrdeng_datafile_samples_uncharge(datafile);
             freez(journalfile);
             freez(datafile);
             ++failed_to_load;

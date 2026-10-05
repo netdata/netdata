@@ -1277,7 +1277,7 @@ uint64_t journalfile_v2_metric_estimated_samples(const struct journal_metric_lis
     if (!metric->update_every_s || metric->delta_end_s < metric->delta_start_s)
         return metric->entries;
 
-    uint64_t samples = (uint64_t)(metric->delta_end_s - metric->delta_start_s) / metric->update_every_s + 1;
+    uint64_t samples = page_entries_by_time(metric->delta_start_s, metric->delta_end_s, metric->update_every_s);
     return samples > metric->entries ? samples : metric->entries;
 }
 
