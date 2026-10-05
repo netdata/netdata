@@ -91,9 +91,8 @@ func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) 
 		row.Vital = v.Name
 		row.MetricID = v.ID
 		row.Revision = v.Revision
-		if el := a.site.observations[observationKey{b.ExperienceID, v.Name}]; el != nil {
-			attrs := el.Value.(*vitalObservation).attrs
-			row.Page, row.Browser, row.Device, row.Country = attrs.page, attrs.browser, attrs.device, attrs.country
+		if origin := v.Origin; origin != nil {
+			row.Page, row.Browser, row.Device, row.Country = origin.PageGroup, origin.Browser, origin.Device, origin.Country
 		}
 		switch v.Name {
 		case beacon.LCP:

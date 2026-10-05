@@ -143,10 +143,9 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 		if v.Poor() {
 			origin := context
 			originPage := page
-			if el := st.observations[observationKey{b.ExperienceID, v.Name}]; el != nil {
-				attrs := el.Value.(*vitalObservation).attrs
-				origin.browser, origin.device, origin.country, origin.version = attrs.browser, attrs.device, attrs.country, attrs.version
-				originPage = attrs.page
+			if attrs := v.Origin; attrs != nil {
+				origin.browser, origin.device, origin.country, origin.version = attrs.Browser, attrs.Device, attrs.Country, attrs.AppVersion
+				originPage = attrs.PageGroup
 			}
 			record(
 				sessionEvent{

@@ -232,3 +232,57 @@ func TestFacetsRankAllRetainedGroupsBeforeFolding(t *testing.T) {
 		assert.Zero(t, page.Lost)
 	}
 }
+
+func TestCapacityDroppedVitalKeepsDocumentOriginInLiveAndHistory(t *testing.T) {
+	a, now := newAgg(time.Minute)
+	sink := &fakeHistorySink{}
+	a.SetHistorySink(sink)
+	b := mk(now.Add(-2*time.Second), "document", "/entry", v(beacon.LCP, 100))
+	b.Events = nil
+	b.Browser, b.Device, b.Country, b.AppVersion = "entry-browser", "desktop", "GR", "1"
+	a.Ingest(b)
+	// Navigation occupies two measurement slots but one identity slot, so the
+	// vital's frozen origin survives eviction of its measurement.
+	for i := range maxWindowObservations / 2 {
+		a.Ingest(&beacon.Beacon{
+			Site:         "s",
+			ExperienceID: fmt.Sprintf("navigation-%d", i),
+			Received:     *now,
+			Navigation: &beacon.Navigation{
+				Revision: 1,
+				LoadMS:   20,
+				HasLoad:  true,
+				DCLMS:    10,
+				HasDCL:   true,
+			},
+		})
+	}
+	b.Received = now.Add(-time.Second)
+	b.PageGroup = "/changed"
+	b.Browser, b.Device, b.Country, b.AppVersion = "new-browser", "mobile", "US", "2"
+	b.UserID, b.View, b.ViewID = "current-user", "checkout", "current-view"
+	b.Vitals[0].Revision = 2
+	b.Vitals[0].Value = 5001
+	result := a.Ingest(b)
+	require.Len(t, result.Observation.Vitals, 1)
+	assert.Equal(t, "/entry", result.Observation.Vitals[0].Origin.PageGroup)
+	rows, _ := a.Live(0, 100)
+	require.Len(t, rows, 2)
+	assert.Equal(t, uint64(2), rows[1].Revision)
+	assert.Equal(t, "/entry", rows[1].Page)
+	assert.Equal(t, "entry-browser", rows[1].Browser)
+	assert.Equal(t, "desktop", rows[1].Device)
+	assert.Equal(t, "GR", rows[1].Country)
+	assert.Equal(t, "checkout", rows[1].View)
+	require.Len(t, sink.events, 2)
+	retained := sink.events[1]
+	assert.Equal(t, "vital", retained.Type)
+	assert.Equal(t, "/entry", retained.Page)
+	assert.Equal(t, "entry-browser", retained.Browser)
+	assert.Equal(t, "desktop", retained.Device)
+	assert.Equal(t, "GR", retained.Country)
+	assert.Equal(t, "1", retained.Version)
+	assert.Equal(t, "current-user", retained.UserID)
+	assert.Equal(t, "checkout", retained.View)
+	assert.Equal(t, "current-view", retained.ViewID)
+}
