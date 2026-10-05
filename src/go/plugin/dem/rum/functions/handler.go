@@ -121,7 +121,9 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 			}
 		}
 		if len(notes) > 0 {
-			response["help"] = spec.help + ". Sampled: " + strings.Join(notes, "; ")
+			response["help"] = spec.help + ". Current sampling policy: " + strings.Join(notes, "; ") +
+				". Historical evidence may reflect earlier policies, bounded context, retention and delivery loss. " +
+				"Problem overrides bias retained detail toward failures; these rows do not estimate all visitors or errors."
 		}
 	}
 	if len(spec.params) > 0 {

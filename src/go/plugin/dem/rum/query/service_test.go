@@ -37,6 +37,9 @@ func (p measurementProcessor) Ingest(b *beacon.Beacon) { p.Aggregator.Ingest(b) 
 func addSite(t *testing.T, hub *rumregistry.Registry, key, generation string) (*aggregate.Aggregator, func()) {
 	t.Helper()
 	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+		Investigate: aggregate.InvestigateCfg{
+			Rate: 1,
+		},
 		Name:       key,
 		PageGroups: 20,
 		Countries:  20,
@@ -354,48 +357,71 @@ func TestFunctionPayloadsValidateAgainstNativeSchema(t *testing.T) {
 		})
 	}
 }
-func TestHistoryFunctionsExplainSampling(t *testing.T) {
-	ctx := context.Background()
-	journalStore, err := journal.Open(ctx, "")
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
-	st := history.NewStore(journalStore)
-	hub := rumregistry.New()
-	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
-		Name: "shop",
-	})
-	cfg := config.Site{
-		Name:              "shop",
-		DisplayName:       "Shop",
-		MeasureSampleRate: .25,
-		Investigate: &config.Investigate{
-			SampleRate: .1,
-			AlwaysKeep: []string{},
-		},
-	}
-	state := diagnostics.New(cfg)
-	retire, err := hub.Register(
-		"shop",
-		&rumregistry.Site{
-			Route:       httpapi.NewRoute(cfg, measurementProcessor{a}, state),
-			Diagnostics: state,
-			Aggregator:  a,
-			Generation:  "first",
-		},
-	)
-	require.NoError(t, err)
-	t.Cleanup(retire)
-	handler := rumfunctions.New(query.New(hub, st))
-	for _, method := range []string{"rum-sessions", "rum-errors"} {
-		response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
-			Method: method,
+func TestFunctionsDescribeCurrentSamplingPolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name                           string
+		measure, detail                float64
+		keep                           []string
+		measured, investigated, status string
+	}{
+		{"fraction", 0.25, 0.1, []string{}, "25% of new browser sessions", "10% baseline of measured sessions", "no_beacons"},
+		{"full", 1, 1, nil, "100% of new browser sessions", "100% baseline of measured sessions", "no_beacons"},
+		{"problems only", 1, 0, nil, "100% of new browser sessions", "0% baseline of measured sessions + errors, poor vitals", "no_beacons"},
+		{"no detail", 1, 0, []string{}, "100% of new browser sessions", "0% baseline of measured sessions", "no_beacons"},
+		{"collection disabled", 0, 1, nil, "off (0%)", "100% baseline of measured sessions", "collection_disabled"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			journalStore, err := journal.Open(ctx, "")
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
+			st := history.NewStore(journalStore)
+			hub := rumregistry.New()
+			t.Cleanup(hub.PublishReceiver(rumregistry.Availability{
+				Serving: true,
+			}))
+			a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+				Name: "shop",
+			})
+			cfg := config.Site{
+				Name:              "shop",
+				DisplayName:       "Shop",
+				MeasureSampleRate: new(tc.measure),
+				Investigate: &config.Investigate{
+					SampleRate: new(tc.detail),
+					AlwaysKeep: tc.keep,
+				},
+			}
+			state := diagnostics.New(cfg)
+			retire, err := hub.Register("shop", &rumregistry.Site{
+				Route:       httpapi.NewRoute(cfg, measurementProcessor{a}, state),
+				Diagnostics: state,
+				Aggregator:  a,
+				Generation:  "first",
+			})
+			require.NoError(t, err)
+			t.Cleanup(retire)
+			handler := rumfunctions.New(query.New(hub, st))
+			for _, method := range []string{"rum-sessions", "rum-errors"} {
+				response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
+					Method: method,
+				})
+				require.NotNil(t, response.RawResponse)
+				help := response.RawResponse["help"]
+				assert.Contains(t, help, "Current sampling policy:")
+				assert.Contains(t, help, "Shop: collection "+tc.measured+"; retained/exported detail "+tc.investigated)
+				assert.Contains(t, help, "earlier policies")
+			}
+			response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
+				Method: "rum-sites",
+			})
+			require.NotNil(t, response.RawResponse)
+			rows := response.RawResponse["data"].([][]any)
+			require.Len(t, rows, 1)
+			assert.Equal(t, tc.status, rows[0][2])
+			assert.Equal(t, tc.measured, rows[0][14])
+			assert.Equal(t, tc.investigated, rows[0][15])
 		})
-		require.NotNil(t, response.RawResponse)
-		assert.Contains(
-			t,
-			response.RawResponse["help"],
-			"Shop: measuring 25% of sessions, keeping 10% of measured in full",
-		)
 	}
 }
 

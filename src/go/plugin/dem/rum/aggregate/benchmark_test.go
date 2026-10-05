@@ -23,6 +23,9 @@ func BenchmarkIngest(b *testing.B) {
 		}
 		b.Run(name, func(b *testing.B) {
 			a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+				Investigate: aggregate.InvestigateCfg{
+					Rate: 1,
+				},
 				Name:       "shop",
 				PageGroups: 20,
 				Countries:  20,
@@ -51,6 +54,9 @@ func BenchmarkIngest(b *testing.B) {
 }
 func BenchmarkSnapshot(b *testing.B) {
 	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+		Investigate: aggregate.InvestigateCfg{
+			Rate: 1,
+		},
 		Name:       "shop",
 		PageGroups: 20,
 		Countries:  20,
@@ -82,6 +88,9 @@ func BenchmarkSnapshot(b *testing.B) {
 // it does not traverse persisted history. Timings are local trends, not CI gates.
 func BenchmarkIngestErrors(b *testing.B) {
 	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+		Investigate: aggregate.InvestigateCfg{
+			Rate: 1,
+		},
 		Name:       "shop",
 		PageGroups: 20,
 		Countries:  20,

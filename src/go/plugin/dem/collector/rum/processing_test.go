@@ -108,7 +108,9 @@ func newProcessingTest(
 }
 
 func TestProcessingDeduplicatesWithoutMutatingInput(t *testing.T) {
-	p, history, drain := newProcessingTest(t, aggregate.InvestigateCfg{})
+	p, history, drain := newProcessingTest(t, aggregate.InvestigateCfg{
+		Rate: 1,
+	})
 	event := &beacon.Beacon{
 		Site:      "site",
 		Received:  time.Now(),

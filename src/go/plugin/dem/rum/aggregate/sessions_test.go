@@ -32,9 +32,6 @@ func TestSessionDetailAccumulates(t *testing.T) {
 	if sd.entryPage != "/a" || sd.lastPage != "/b" {
 		t.Fatalf("entry/last page = %q/%q", sd.entryPage, sd.lastPage)
 	}
-	if sd.browser != "Chrome" || sd.device != "desktop" || sd.country != "GR" || sd.version != "1.0.0" {
-		t.Fatalf("attrs = %+v", sd)
-	}
 	if now.Sub(sd.started) != 10*time.Second || sd.lastSeen.Sub(sd.started) != 5*time.Second {
 		t.Fatalf("times: started=%v lastSeen=%v", sd.started, sd.lastSeen)
 	}

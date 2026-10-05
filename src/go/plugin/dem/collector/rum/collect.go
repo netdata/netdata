@@ -20,7 +20,9 @@ func (c *Collector) Collect(context.Context) error {
 	for _, counter := range c.metrics.diagnostics {
 		counter.instrument.ObserveTotal(float64(s.Counters[counter.name]))
 	}
-	if !available {
+	// Disabled collection has no browser observations. Publishing zero traffic
+	// would misleadingly attach the stock missing-beacon alert.
+	if !available || c.MeasureRate() == 0 {
 		return nil
 	}
 	for _, counter := range c.metrics.traffic {

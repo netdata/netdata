@@ -58,11 +58,11 @@ func (c *Collector) Init(ctx context.Context) error {
 	if errs := config.ValidateSiteExtras(c.Site); len(errs) > 0 {
 		return errors.New(strings.Join(errs, "; "))
 	}
-	if math.IsNaN(c.MeasureSampleRate) || c.MeasureSampleRate < 0 || c.MeasureSampleRate > 1 {
+	if math.IsNaN(c.MeasureRate()) || c.MeasureRate() < 0 || c.MeasureRate() > 1 {
 		return errors.New("measure_sample_rate must be between 0 and 1")
 	}
 	if c.Investigate != nil {
-		if math.IsNaN(c.Investigate.SampleRate) || c.Investigate.SampleRate < 0 || c.Investigate.SampleRate > 1 {
+		if math.IsNaN(c.InvestigateRate()) || c.InvestigateRate() < 0 || c.InvestigateRate() > 1 {
 			return errors.New("investigate sample_rate must be between 0 and 1")
 		}
 		for _, keep := range c.Investigate.AlwaysKeep {

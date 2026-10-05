@@ -59,31 +59,38 @@
         "default": 20
       },
       "measure_sample_rate": {
-        "title": "Measure sample rate",
-        "description": "Share of browser sessions measured, from 0 to 1. Zero preserves the default of measuring all sessions.",
-        "type": "number",
+        "title": "Browser collection rate",
+        "description": "Share of browser sessions collected, from 0 to 1. Omitted or null means all; zero disables collection. Browser measurement charts are absent while collection is disabled; receiver diagnostics remain available.",
+        "type": [
+          "number",
+          "null"
+        ],
         "minimum": 0,
         "maximum": 1,
         "default": 1
       },
       "investigate": {
-        "title": "Investigation sampling",
-        "description": "Choose which measured sessions retain full history. Leave empty to retain all sessions.",
+        "title": "Detail sampling",
+        "description": "Select native investigation history and enabled event-log and trace exports from received sessions. Leave empty to select all received sessions.",
         "type": [
           "object",
           "null"
         ],
         "properties": {
           "sample_rate": {
-            "title": "Investigation sample rate",
-            "description": "Share of measured sessions kept in full, from 0 to 1. Zero means all sessions.",
-            "type": "number",
+            "title": "Baseline detail sample rate",
+            "description": "Baseline share of received sessions selected for detail, from 0 to 1. Omitted or null means all; zero selects only the problem overrides below.",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1,
+            "default": 1
           },
           "always_keep": {
-            "title": "Always keep",
-            "description": "Conditions that retain a session regardless of sampling. Leave unset to keep errors and poor vitals; an empty list keeps neither.",
+            "title": "Problem overrides",
+            "description": "Conditions that select detail beyond the baseline sample. Omitted or null keeps errors and poor vitals; an empty list disables overrides.",
             "type": [
               "array",
               "null"
@@ -94,7 +101,11 @@
                 "errors",
                 "poor_vitals"
               ]
-            }
+            },
+            "default": [
+              "errors",
+              "poor_vitals"
+            ]
           }
         }
       },
@@ -534,6 +545,12 @@
       "propagate_to": {
         "ui:help": "To join browser and backend spans, instrument the backend, accept propagated context, coordinate sampling, and send both sides to the same tracing system. Sending browser spans alone does not produce a complete backend trace."
       }
+    },
+    "measure_sample_rate": {
+      "ui:help": "Lower positive rates reduce browser traffic. Existing browser sessions may keep their earlier sampling decision; zero also discards their traffic at the receiver. Excluded sessions cannot be recovered by detail sampling."
+    },
+    "investigate": {
+      "ui:help": "For problems-only detail, set the baseline rate to 0 and keep the default overrides. For measurements and live views without retained or exported detail, also set always_keep to an empty list. Problem overrides preserve available recent native context plus current and future detail while the session remains tracked. Earlier event logs and spans are not exported retrospectively; complete sessions and traces are not guaranteed."
     }
   }
 }

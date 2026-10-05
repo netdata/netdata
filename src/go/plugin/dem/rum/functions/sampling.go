@@ -9,11 +9,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 )
 
-// samplingLabels describes the site's sampling for the Sites table,
-// e.g. "25% of sessions" and "10% of measured + errors, poor vitals".
+// samplingLabels describes the site's sampling for the Sites table.
+// Rates describe the current policy, not observed or historical proportions.
 func samplingLabels(s query.Sampling) (measured, investigated string) {
-	measured = percent(s.MeasureRate) + " of sessions"
-	investigated = percent(s.InvestigateRate) + " of measured"
+	measured = percent(s.MeasureRate) + " of new browser sessions"
+	if s.MeasureRate == 0 {
+		measured = "off (0%)"
+	}
+	investigated = percent(s.InvestigateRate) + " baseline of measured sessions"
 	if s.InvestigateRate < 1 {
 		var keep []string
 		if s.KeepErrors {
@@ -29,15 +32,11 @@ func samplingLabels(s query.Sampling) (measured, investigated string) {
 	return measured, investigated
 }
 
-// samplingNote explains, for the Sessions and Errors tables, why they hold
-// fewer sessions than the charts count; "" when nothing is sampled.
+// samplingNote names current configuration separately from historical evidence.
 func samplingNote(site query.Site) string {
 	s := site.Sampling
-	if s.MeasureRate >= 1 && s.InvestigateRate >= 1 {
-		return ""
-	}
 	measured, investigated := samplingLabels(s)
-	return fmt.Sprintf("%s: measuring %s, keeping %s in full", site.Label, measured, investigated)
+	return fmt.Sprintf("%s: collection %s; retained/exported detail %s", site.Label, measured, investigated)
 }
 
 func percent(rate float64) string {

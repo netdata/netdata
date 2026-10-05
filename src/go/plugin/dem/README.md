@@ -61,6 +61,55 @@ The browser normalization, bounded aggregation, OTLP and query behavior originat
 `b3de4662f567dc63d33fee6201f8c2313568301b`. Its private configuration controller, scheduler, protocol emitter and root
 state reconciliation are replaced by the native Agent framework. Embedded third-party asset notices remain beside their source.
 
+## Collection and retained detail
+
+RUM has two sampling decisions, both defaulting to 100%. Omitted or `null` rates use that default; explicit zero
+means zero at that stage:
+
+- `measure_sample_rate` selects new browser sessions for collection. Received measurements and live activity describe
+  admitted traffic; counts are not scaled to estimate all visitors.
+- `investigate.sample_rate` selects a stable baseline of received sessions for native history and enabled event-log
+  and browser-trace exports. It does not reduce the received measurements or live activity further.
+- `investigate.always_keep` adds problem-triggered detail beyond that baseline. It defaults to `errors` and
+  `poor_vitals`; an explicit empty list disables these overrides. Overrides bias retained evidence toward problems,
+  so retained rows cannot establish the prevalence of failures or enforce a fixed export budget.
+
+For example, retain problem-triggered detail while measuring all received sessions:
+
+```yaml
+measure_sample_rate: 1
+investigate:
+  sample_rate: 0
+  always_keep: [errors, poor_vitals]
+```
+
+With `sample_rate: 0` and `always_keep: []`, only measurements and live activity remain, even when optional exports
+are enabled. With `measure_sample_rate: 0`, the generated bootstrap does not start the SDK, and the receiver returns
+204 for otherwise admissible collection attempts without decoding or recording them. Existing origin, size, bot and
+rate checks still apply. Intentional discard is neither accepted traffic nor a rejection/export-loss count. The
+Sites table reports `collection_disabled`. Browser measurement charts are absent, so the stock missing-beacon alert
+does not treat intentional disablement as a broken installation; receiver diagnostics remain available.
+
+Already open pages can continue sending and propagating trace context until navigation. Positive collection-rate
+changes apply to new SDK sampling decisions; valid existing SDK sessions keep their earlier decision. Collection
+zero also discards those sessions at the receiver. Sampling is a cost control, not a privacy opt-out or job disablement.
+
+A configured problem promotes an identified session while it remains tracked. Native history receives the available
+preceding timeline context (up to 100 entries), the triggering beacon's generated entries, and subsequent detail.
+Each entry keeps the user, release and location observed with it; later login or navigation does not relabel earlier
+context. Poor vitals retain their name and value even without element attribution. The current beacon's entries are
+not truncated by the context ring, but normal admission and delivery bounds still apply.
+
+This is bounded evidence, not a complete session archive: only 2,000 sessions are tracked per site, inactivity
+expiry and eviction lose context and promotion state, and reload/restart starts new in-memory state. Promotion does
+not reconstruct earlier discarded logs or spans. Browser spans can arrive separately from the error that promotes a
+session, so traces can remain fragmented; a trace ID alone does not establish stored span availability.
+
+Observations without a session ID still contribute measurements. At 100% detail they qualify for supported exports
+and standalone error history; below 100%, only configured problem-triggering observations qualify. They do not
+create a synthetic session or a standalone vital timeline. Function help describes the current policy; historical
+evidence can reflect earlier settings, bounded context, retention and delivery loss.
+
 ## Optional event logs and browser tracing
 
 Native RUM charts, session timelines and errors work without an OTLP receiver. Two optional features add evidence

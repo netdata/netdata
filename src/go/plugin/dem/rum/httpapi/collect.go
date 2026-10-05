@@ -115,6 +115,12 @@ func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	// Preserve admission and body-size checks for stale pages and custom
+	// producers, but intentional exclusion is neither acceptance nor loss.
+	if st.measureRate == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	var country, city string
 	var lat, lon float64
 	var hasGeo bool

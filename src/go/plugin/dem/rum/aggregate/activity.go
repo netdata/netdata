@@ -15,8 +15,8 @@ type SiteActivity struct {
 	BotsPerMin     int // bot beacons filtered out
 	LastBeaconAgeS int // -1 = never accepted a beacon
 	ActiveSessions int
-	// InvestigatedSessions is how many of ActiveSessions are kept in full
-	// under investigate sampling.
+	// InvestigatedSessions is how many tracked active sessions are currently
+	// selected for detail retention/export, including problem promotion.
 	InvestigatedSessions int
 	PageviewsWindow      int
 	JSErrorsWindow       uint64

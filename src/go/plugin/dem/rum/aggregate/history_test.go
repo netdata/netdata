@@ -30,8 +30,10 @@ func TestHistoryEventsAreSelfContained(t *testing.T) {
 	last := sink.events[1]
 	assert.Equal(t, "sess1", last.SessionID)
 	assert.Equal(t, "/b", last.Page)
-	assert.Equal(t, "Athens", last.City)
-	assert.Equal(t, "customer", last.UserID)
+	assert.Equal(t, "Athens", sink.events[0].City)
+	assert.Equal(t, "customer", sink.events[0].UserID)
+	assert.Empty(t, last.City)
+	assert.Empty(t, last.UserID)
 	assert.Equal(t, now.UnixMicro(), last.TSUnixUS)
 }
 func TestErrorHistoryNeedsNoParentRecord(t *testing.T) {

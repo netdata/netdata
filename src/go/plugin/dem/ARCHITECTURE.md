@@ -88,8 +88,12 @@ Aggregation and each exporter reject an observation for another site before chan
 
 The collector's processor calls aggregation and then each enabled exporter directly. Aggregation leaves the normalized Beacon
 unchanged and returns Accepted, PageView and Investigated decisions. Every accepted observation contributes to
-measurements and the live stream; investigation sampling controls retained history and OTLP export. History promotion
-can replay retained session events, while OTLP exports only the current observation. Faro classifies protocol event
+measurements and the live stream; investigation sampling controls retained history and OTLP export. Config owns
+omitted/null defaults; the aggregator receives literal effective rates, including zero. Receiver collection zero
+acknowledges otherwise admissible requests before decode, geo lookup or processing; bootstrap zero avoids SDK startup.
+History promotion replays preceding bounded context with each event's original attribution, then emits current
+entries independently of the live ring cap. Poor-vital entries do not require element attribution. OTLP exports only
+newly selected observations; prior exports and asynchronously arriving spans are not reconstructed. Faro classifies protocol event
 names into domain kinds without changing their original names for presentation. HTTP rejection accounting reaches
 aggregation only. History enqueue remains nonblocking under the aggregate lock and does not call back into it.
 
