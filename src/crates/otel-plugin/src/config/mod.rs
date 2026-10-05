@@ -322,7 +322,7 @@ fn listeners_overlap(a: &str, b: &str) -> bool {
 
 /// The TLS pairing rules both listeners share: certificate and key come as a
 /// pair (neither alone), both non-empty when set, and the client CA
-/// certificate (mutual TLS) requires the pair. `prefix` is the listener's
+/// certificate (mutual TLS) is non-empty when set and requires the pair. `prefix` is the listener's
 /// dotted path (`receivers.otlp.protocols.grpc`), so the error names the
 /// offending transport's keys, not an ambiguous "TLS".
 fn validate_tls_pairing(prefix: &str, tls: &TlsServerConfig) -> Result<()> {
@@ -1766,6 +1766,21 @@ logs:
                 tls(Some("/h.pem"), Some("/hk.pem"), Some("/hca.pem"))
             )
         );
+    }
+
+    #[test]
+    fn env_rejects_an_empty_client_ca_file() {
+        // An empty variable is a set value, not "unset": it must fail at
+        // config load like the YAML `''`, not later in the ingestor.
+        for protocol in ["GRPC", "HTTP"] {
+            let name =
+                format!("NETDATA_OTEL_CFG_RECEIVERS_OTLP_PROTOCOLS_{protocol}_TLS_CLIENT_CA_FILE");
+            let err = resolve_layers(None, &[(name.as_str(), "")]).unwrap_err();
+            assert!(
+                format!("{err:#}").contains("tls.client_ca_file cannot be empty"),
+                "{protocol}: {err:#}"
+            );
+        }
     }
 
     #[test]

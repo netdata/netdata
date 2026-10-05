@@ -1689,4 +1689,28 @@ mod tests {
         };
         assert!(bind_http(&listener).await.unwrap().is_none());
     }
+
+    #[tokio::test]
+    async fn enabled_http_listener_binds_or_fails_fast() {
+        let listener = |endpoint: &str| ProtocolConfig {
+            enabled: true,
+            endpoint: endpoint.to_string(),
+            tls: TlsServerConfig::default(),
+        };
+        assert!(bind_http(&listener("127.0.0.1:0")).await.unwrap().is_some());
+
+        let err = bind_http(&listener("not-an-address")).await.err().unwrap();
+        assert!(
+            format!("{err:#}").contains("failed to parse OTLP/HTTP endpoint address"),
+            "{err:#}"
+        );
+
+        let taken = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = taken.local_addr().unwrap().to_string();
+        let err = bind_http(&listener(&addr)).await.err().unwrap();
+        assert!(
+            format!("{err:#}").contains("failed to bind OTLP/HTTP endpoint"),
+            "{err:#}"
+        );
+    }
 }
