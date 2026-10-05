@@ -119,9 +119,9 @@ def main():
             assert config("schema", "otel-poc:hostmetrics")["jsonSchema"]["properties"]["interval"]
             host = "otel-poc:hostmetrics:host"
             logs = "otel-poc:filelogs:logs"
-            config("test", "otel-poc:hostmetrics", {"interval": "1s"}, name="host")
-            config("add", "otel-poc:hostmetrics", {"interval": "1s", "service_name": "agent-smoke"}, name="host")
-            config("add", "otel-poc:filelogs", {"paths": ["/poc/input.log"], "service_name": "agent-logs"}, name="logs")
+            config("test", "otel-poc:hostmetrics", {"name": "host", "interval": "1s"}, name="host")
+            config("add", "otel-poc:hostmetrics", {"name": "host", "interval": "1s", "service_name": "agent-smoke"}, name="host")
+            config("add", "otel-poc:filelogs", {"name": "logs", "paths": ["/poc/input.log"], "service_name": "agent-logs"}, name="logs")
 
             def jobs_ready():
                 tree = request(tree_path)["tree"]
@@ -148,7 +148,7 @@ def main():
             print("PASS: file log stored by Netdata OTLP plugin")
             config("update", host, {"interval": "0s"}, allowed=(400,))
             assert config("get", host)["interval"] == "1s"
-            config("update", host, {"interval": "2s", "service_name": "agent-updated"})
+            config("update", host, {"name": "host", "interval": "2s", "service_name": "agent-updated"})
             eventually(jobs_ready, "updated pipelines ready")
             assert config("get", host)["service_name"] == "agent-updated"
             run("docker", "restart", "--time", "10", name)

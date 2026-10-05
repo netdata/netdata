@@ -50,9 +50,16 @@ func parseConfig(kind string, payload []byte) (JobConfig, error) {
 	}
 	dec := json.NewDecoder(bytes.NewReader(payload))
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(&cfg); err != nil {
+	// The UI includes the job-header name in form data. Identity comes from
+	// the DynCfg command, so this metadata must not enter the receiver config.
+	form := struct {
+		JobConfig
+		Name string `json:"name"`
+	}{JobConfig: cfg}
+	if err := dec.Decode(&form); err != nil {
 		return cfg, errors.New("invalid JSON configuration or unknown field")
 	}
+	cfg = form.JobConfig
 	if err := dec.Decode(new(any)); err != io.EOF {
 		return cfg, errors.New("configuration must contain one JSON object")
 	}
@@ -61,7 +68,7 @@ func parseConfig(kind string, payload []byte) (JobConfig, error) {
 		return cfg, err
 	}
 	for key, value := range fields {
-		allowed := key == "service_name" || kind == "filelogs" && key == "paths" || kind == "hostmetrics" && key == "interval"
+		allowed := key == "name" || key == "service_name" || kind == "filelogs" && key == "paths" || kind == "hostmetrics" && key == "interval"
 		if !allowed || bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
 			return cfg, errors.New("field is not supported by this job type or is null")
 		}
@@ -169,6 +176,9 @@ func (c *Controller) jobIDsLocked() []string {
 
 func schema(kind string) map[string]any {
 	properties := map[string]any{
+		"name": map[string]any{
+			"type": "string", "title": "Job name", "description": "Job name entered in the configuration header.",
+		},
 		"service_name": map[string]any{
 			"type": "string", "title": "Service name", "description": "Service name attached to the collected telemetry.",
 			"default": "otel-facade-poc", "minLength": 1,
@@ -188,7 +198,7 @@ func schema(kind string) map[string]any {
 		required = append(required, "interval")
 	}
 	return map[string]any{
-		"jsonSchema": map[string]any{"type": "object", "title": "OpenTelemetry " + kind, "properties": properties, "required": required, "additionalProperties": false},
-		"uiSchema":   map[string]any{},
+		"jsonSchema": map[string]any{"$schema": "http://json-schema.org/draft-07/schema#", "type": "object", "title": "OpenTelemetry " + kind, "properties": properties, "required": required, "additionalProperties": false},
+		"uiSchema":   map[string]any{"name": map[string]any{"ui:widget": "hidden"}},
 	}
 }

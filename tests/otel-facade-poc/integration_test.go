@@ -39,7 +39,7 @@ func TestDistributionDynCfgAndTelemetry(t *testing.T) {
 			t.Fatalf("invalid schema: %s (%v)", body, err)
 		}
 	}
-	hostConfig := `{"interval":"1s","service_name":"host-initial"}`
+	hostConfig := `{"name":"host","interval":"1s","service_name":"host-initial"}`
 	p.call("otel-poc:hostmetrics test", hostConfig, 200)
 	p.call("otel-poc:hostmetrics add host", hostConfig, 202)
 	p.requireConfig(host, "host-initial")
@@ -53,7 +53,7 @@ func TestDistributionDynCfgAndTelemetry(t *testing.T) {
 	sink.wait(t, func(e telemetry) bool { return e.job == host && e.service == "host-initial" && e.metric != "" })
 	logPath := filepath.Join(t.TempDir(), "input.log")
 	appendLine(t, logPath, strings.Repeat("old-prefix-", 150)) // Stable fingerprint before discovery.
-	logConfig, _ := json.Marshal(map[string]any{"paths": []string{logPath}, "service_name": "logs"})
+	logConfig, _ := json.Marshal(map[string]any{"name": "logs", "paths": []string{logPath}, "service_name": "logs"})
 	p.call("otel-poc:filelogs add logs", string(logConfig), 202)
 	mark = p.mark()
 	p.call(logs+" enable", "", 202)

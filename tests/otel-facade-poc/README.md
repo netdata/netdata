@@ -145,6 +145,10 @@ The facade registers templates at `/collectors/otel-poc`:
 | `otel-poc:filelogs` | `{"paths":["/var/log/example.log"],"service_name":"app"}` | `file_log` with persistent offsets |
 
 Job IDs append `:<name>`. Names accept ASCII letters, digits, `_`, and `-`.
+The UI edits the job name in the configuration header and includes `name` in
+form data. The schema accepts this optional string without rendering a duplicate
+field. The facade discards this metadata; the DynCfg command's name/ID determines
+job identity. Unknown receiver settings are still rejected.
 File paths must be absolute; glob patterns are supported. New file jobs start at
 the end of discovered files. `service_name` defaults to `otel-facade-poc`, and
 the host collection interval defaults to `2s` with a minimum of `1s`.

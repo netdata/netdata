@@ -236,6 +236,16 @@ A response without the wrapper renders an EMPTY form: the UI reads `jsonSchema` 
 for a missing member. The agent serves the document verbatim and validates nothing against it; the plugin's own
 validation on `add`/`update` is the only server-side check.
 
+The UI keeps the job name from the configuration header in `formData.name` during
+form validation. A closed root schema (`additionalProperties: false`) must allow
+this metadata, for example with an optional string `name` property and
+`uiSchema.name: {"ui:widget": "hidden"}` to avoid a duplicate name field. Some UI
+request paths strip `name` before submission; others send it with `test`, `add`
+or `update`. Strict plugin decoders must handle both payload shapes according to
+their job-identity contract. Allowing it only in the schema can move the failure
+from browser validation to the plugin. For command-owned job identities, accepting
+this metadata must not let it override the command's name or ID.
+
 ### Static Schema Files (Optional)
 
 Before calling the plugin, Netdata will first attempt to find a static schema file. You can provide static schema files in:

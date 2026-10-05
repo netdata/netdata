@@ -6,6 +6,7 @@ require (
 	github.com/netdata/netdata/go/plugins v0.0.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.157.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.157.0
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	go.opentelemetry.io/collector/component v1.63.0
 	go.opentelemetry.io/collector/confmap v1.63.0
 	go.opentelemetry.io/collector/extension v1.63.0
