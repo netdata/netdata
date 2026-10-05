@@ -2,7 +2,7 @@
 
 package funcapi
 
-// FunctionConfig describes a Function provided by a module.
+// FunctionConfig describes a Function provided by a module or process provider.
 type FunctionConfig struct {
 	ID string // Function ID (e.g., "top-queries")
 	// FunctionName overrides the public Function name.
@@ -18,8 +18,9 @@ type FunctionConfig struct {
 	Tags         string   // Function tags for registration; empty defaults to "top"
 	ResponseType string   // Response schema type; empty defaults to "table" when dispatched
 	// Available gates publication of agent/process-backed Functions. Nil means available.
-	// Availability may be rechecked while jobs are running.
-	// Once a Function is published, later false results do not withdraw it.
+	// Process providers are rechecked on the process tick even without jobs;
+	// collector AgentFunctions are rechecked while their module has scheduled jobs.
+	// Once published, later false results do not withdraw it or prevent dispatch.
 	Available func() bool
 	// RawRequest routes the complete Function request to a RawMethodHandler.
 	// Use this for Function APIs that need raw payloads, args, or full response envelopes.

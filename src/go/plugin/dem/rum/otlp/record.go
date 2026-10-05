@@ -1,0 +1,152 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package otlp
+
+import (
+	"strings"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+)
+
+// maxStackBytes bounds error.stack (≤4 KiB). the Faro decoder already
+// truncates at this length before the beacon reaches here; this is a
+// defensive second cap so a future producer cannot regress it silently.
+const maxStackBytes = 4096
+
+// queued is one record waiting on the owning site's export queue.
+type queued struct{ rec *logspb.LogRecord }
+
+// build turns one accepted beacon into zero or more queued records:
+// pageview, one per JS
+// error, one per custom event, one per console log line (already
+// filtered upstream by ConsoleLogsOn). Free-form text is redacted
+// before it reaches the record.
+func (e *Logs) build(b *beacon.Beacon, pageView bool) []queued {
+	base := baseAttrs(b)
+	var out []queued
+
+	if pageView {
+		out = append(out, e.record(base, "pageview", b.Received, sevInfo, "pageview "+b.Path))
+	}
+	for _, err := range b.Errors {
+		msg := e.redact(err.Message)
+		stack := beacon.Truncate(e.redact(err.Stack), maxStackBytes)
+		attrs := append(append([]*commonpb.KeyValue{}, base...),
+			strAttr("error.type", err.Type), strAttr("error.message", msg), strAttr("error.stack", stack))
+		if err.Fingerprint != "" {
+			attrs = append(attrs, strAttr("error.fingerprint", err.Fingerprint))
+		}
+		body := err.Type + ": " + msg + " @ " + b.Path
+		out = append(out, e.record(attrs, "error", err.Time, sevError, body))
+	}
+	for _, ev := range b.Events {
+		attrs := append(append([]*commonpb.KeyValue{}, base...), strAttr("event.name", ev.Name))
+		for k, v := range ev.Attrs {
+			attrs = append(attrs, strAttr("event.attr."+k, e.redact(v)))
+		}
+		body := "event " + ev.Name + " @ " + b.Path
+		out = append(out, e.record(attrs, "event", ev.Time, sevInfo, body))
+	}
+	for _, l := range b.Logs {
+		// Preserve decoder bounds after configured-secret redaction.
+		msg := beacon.Truncate(e.redact(l.Message), 1024)
+		body := "console " + l.Level + ": " + msg
+		attrs := append(append([]*commonpb.KeyValue{}, base...), strAttr("console.level", l.Level))
+		if typ := beacon.Truncate(e.redact(l.ErrorType), 64); typ != "" {
+			attrs = append(attrs, strAttr("error.type", typ))
+		}
+		if stack := beacon.Truncate(e.redact(l.Stack), maxStackBytes); stack != "" {
+			attrs = append(attrs, strAttr("error.stack", stack))
+		}
+		out = append(out, e.record(attrs, "console", l.Time, consoleSeverity(l.Level), body))
+	}
+	return out
+}
+
+const (
+	sevInfo  = logspb.SeverityNumber_SEVERITY_NUMBER_INFO
+	sevError = logspb.SeverityNumber_SEVERITY_NUMBER_ERROR
+)
+
+// baseAttrs are the record attributes every RUM event type carries,
+// skipping empty values.
+func baseAttrs(b *beacon.Beacon) []*commonpb.KeyValue {
+	var out []*commonpb.KeyValue
+	add := func(k, v string) {
+		if v != "" {
+			out = append(out, strAttr(k, v))
+		}
+	}
+	add("session.id", b.SessionID)
+	add("page.path", b.Path)
+	add("page.group", b.PageGroup)
+	add("page.view", b.View)
+	add("browser.name", b.Browser)
+	add("browser.version", b.BrowserVersion)
+	add("os", b.OS)
+	add("device", b.Device)
+	add("country", b.Country)
+	add("app.version", b.AppVersion)
+	add("app.environment", b.Environment)
+	return out
+}
+
+func (e *Logs) record(
+	attrs []*commonpb.KeyValue,
+	typ string,
+	ts time.Time,
+	sev logspb.SeverityNumber,
+	body string,
+) queued {
+	if ts.IsZero() {
+		ts = e.now()
+	}
+	all := append([]*commonpb.KeyValue{strAttr("rum.type", typ)}, attrs...)
+	rec := &logspb.LogRecord{
+		TimeUnixNano:         uint64(ts.UnixNano()),
+		ObservedTimeUnixNano: uint64(e.now().UnixNano()),
+		SeverityNumber:       sev,
+		SeverityText:         sevText(sev),
+		Body: &commonpb.AnyValue{
+			Value: &commonpb.AnyValue_StringValue{
+				StringValue: body,
+			},
+		},
+		Attributes: all,
+	}
+	return queued{
+		rec: rec,
+	}
+}
+
+func consoleSeverity(level string) logspb.SeverityNumber {
+	switch strings.ToLower(level) {
+	case "error":
+		return sevError
+	case "warn", "warning":
+		return logspb.SeverityNumber_SEVERITY_NUMBER_WARN
+	case "debug":
+		return logspb.SeverityNumber_SEVERITY_NUMBER_DEBUG
+	case "trace":
+		return logspb.SeverityNumber_SEVERITY_NUMBER_TRACE
+	default:
+		return sevInfo
+	}
+}
+func sevText(sev logspb.SeverityNumber) string {
+	return strings.TrimPrefix(sev.String(), "SEVERITY_NUMBER_")
+}
+
+func strAttr(k, v string) *commonpb.KeyValue {
+	return &commonpb.KeyValue{
+		Key: k,
+		Value: &commonpb.AnyValue{
+			Value: &commonpb.AnyValue_StringValue{
+				StringValue: v,
+			},
+		},
+	}
+}

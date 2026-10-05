@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+package query_test
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestFunctionRowsHaveSiteScopedIdentities(t *testing.T) {
+	ctx := context.Background()
+	journalStore, err := journal.Open(ctx, "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
+	retained := history.NewStore(journalStore)
+	sites := registry.New()
+	fingerprint := beacon.Fingerprint("TypeError", "failed", "app.js")
+	for _, site := range []string{"a", "b"} {
+		owner, _ := addSite(t, sites, site, "first")
+		page(owner, site, "/shared")
+		owner.Snapshot()
+		attempted, err := retained.AppendEvent(
+			ctx,
+			history.EventRecord{
+				Site:        site,
+				SessionID:   "shared-session",
+				TSUnixUS:    time.Now().UnixMicro(),
+				Type:        "error",
+				Page:        "/shared",
+				Fingerprint: fingerprint,
+				ErrorType:   "TypeError",
+				Message:     "failed",
+			},
+		)
+		require.True(t, attempted)
+		require.NoError(t, err)
+	}
+	handler := functions.New(query.New(sites, retained))
+	for method, field := range map[string]string{"rum-errors": "fingerprint", "rum-pages": "page", "rum-sessions": "session_id"} {
+		t.Run(method, func(t *testing.T) {
+			response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
+				Method: method,
+			})
+			require.NotNil(t, response.RawResponse)
+			rows := response.RawResponse["data"].([][]any)
+			require.Len(t, rows, 2)
+			columns := response.RawResponse["columns"].(map[string]any)
+			keyIndex := -1
+			for _, value := range columns {
+				column := value.(map[string]any)
+				if unique, _ := column["unique_key"].(bool); unique {
+					require.Equal(t, -1, keyIndex, "one collision-safe row identity")
+					keyIndex = column["index"].(int)
+				}
+			}
+			require.NotEqual(t, -1, keyIndex)
+			assert.NotEqual(
+				t,
+				rows[0][keyIndex],
+				rows[1][keyIndex],
+				"identical site-local values must identify different rows",
+			)
+			valueIndex := columns[field].(map[string]any)["index"].(int)
+			assert.Equal(t, rows[0][valueIndex], rows[1][valueIndex], "the original filter value remains unchanged")
+		})
+	}
+}

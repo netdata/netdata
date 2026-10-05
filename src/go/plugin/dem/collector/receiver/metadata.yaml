@@ -1,0 +1,156 @@
+modules:
+    - alerts: []
+      meta:
+        id: collector-dem.plugin-receiver
+        info_provided_to_referring_integrations:
+            description: ""
+        keywords:
+            - rum
+            - browser
+            - web-vitals
+            - dem
+        module_name: receiver
+        monitored_instance:
+            categories:
+                - data-collection.applications
+            icon_filename: netdata.png
+            link: https://www.netdata.cloud/
+            name: RUM Receiver
+        plugin_name: dem.plugin
+        related_resources:
+            integrations:
+                list: []
+      metrics:
+        availability: []
+        description: The availability state distinguishes an unavailable receiver from measured request outcomes.
+        folding:
+            enabled: false
+            title: Metrics
+        scopes:
+            - description: One configured receiver; breakdowns appear when matching observations are available.
+              labels: []
+              metrics:
+                - chart_type: stacked
+                  description: RUM receiver availability
+                  dimensions:
+                    - name: serving
+                    - name: unavailable
+                  name: dem_receiver.state
+                  unit: state
+                - chart_type: stacked
+                  description: RUM HTTP requests
+                  dimensions:
+                    - name: success
+                    - name: client_errors
+                    - name: server_errors
+                  name: dem_receiver.requests
+                  unit: requests/s
+              name: receiver
+      overview:
+        additional_permissions:
+            description: The Netdata service needs write access to its DEM state directory. Configured TLS and GeoIP files must be readable by the Netdata service account.
+        data_collection:
+            method_description: Netdata accepts browser telemetry over HTTP or HTTPS and routes each request to its configured site. One receiver serves all sites; a receiver outage creates measurement gaps while site jobs remain available.
+            metrics_description: Monitor the availability and HTTP request outcomes of the browser telemetry receiver.
+        default_behavior:
+            auto_detection:
+                description: The stock receiver starts on loopback. Sites require explicit configuration.
+            limits:
+                description: Browser payloads and request rates are limited by receiver settings.
+            performance_impact:
+                description: Resource usage depends on accepted browser traffic and the configured measurement window. Optional OTLP export and investigation history add network and local disk work.
+        multi_instance: false
+        supported_platforms:
+            exclude: []
+            include:
+                - Linux
+                - macOS
+      setup:
+        configuration:
+            examples:
+                folding:
+                    enabled: true
+                    title: Examples
+                list:
+                    - config: |
+                        jobs:
+                          - name: receiver
+                            listen: 127.0.0.1:19938
+                      description: Minimal native configuration.
+                      name: Local receiver
+            file:
+                name: dem/receiver.conf
+            options:
+                description: Options apply to the canonical receiver.
+                folding:
+                    enabled: true
+                    title: Configuration options
+                list:
+                    - default_value: 127.0.0.1:19938
+                      description: Address and port that accept browser telemetry. The default accepts connections from this host only.
+                      group: Connection
+                      name: listen
+                      required: false
+                    - default_value: ""
+                      description: Externally reachable collector base URL. Leave empty to derive it from the listener or a trusted proxy.
+                      group: Connection
+                      name: public_url
+                      required: false
+                    - default_value: ""
+                      description: Server certificate file. Leave empty with TLS key to serve HTTP.
+                      group: Connection
+                      name: tls_cert
+                      required: false
+                    - default_value: ""
+                      description: Server private key file. Set together with TLS certificate to serve HTTPS.
+                      group: Connection
+                      name: tls_key
+                      required: false
+                    - default_value: ""
+                      description: Proxy IP addresses or CIDR ranges allowed to supply forwarded client addresses and public URLs. Leave empty to distrust forwarded headers.
+                      group: Connection
+                      name: trusted_proxies
+                      required: false
+                    - default_value: 262144
+                      description: Maximum accepted browser payload size, in bytes. Larger requests are rejected.
+                      group: Limits
+                      name: max_body_bytes
+                      required: false
+                    - default_value: ""
+                      description: Limits for browser telemetry requests.
+                      group: Limits
+                      name: rate_limit
+                      required: false
+                    - default_value: 120
+                      description: Maximum requests per client IP per minute.
+                      group: Limits
+                      name: rate_limit.per_ip_per_min
+                      required: false
+                    - default_value: 500
+                      description: Maximum requests per site per second.
+                      group: Limits
+                      name: rate_limit.per_site_per_sec
+                      required: false
+                    - default_value: 10
+                      description: Data collection interval, in seconds.
+                      group: Collection
+                      name: update_every
+                      required: false
+                    - default_value: ""
+                      description: MaxMind city database file. Leave empty to use the Agent IP intelligence database; unavailable data produces unknown locations.
+                      group: Collection
+                      name: geoip_db
+                      required: false
+        prerequisites:
+            list:
+                - description: DEM is experimental and opt-in. Build Netdata with `-DENABLE_PLUGIN_DEM=ON`, or use `--enable-plugin-dem` with the source installer. Install the resulting DEM plugin package.
+                  title: Install the DEM plugin
+                - description: Expose the listener through an HTTPS reverse proxy before sending traffic from remote websites. Set `public_url` and restrict `trusted_proxies` to that proxy. The default listener is local to this host.
+                  title: Expose the receiver
+        single_job: true
+      troubleshooting:
+        problems:
+            list:
+                - description: Check receiver availability, the installed snippet URL and the site allowed origins. Open the rum-sites Function for reachability and rejected-origin diagnostics. Missing vital samples produce gaps, including when the receiver is unavailable.
+                  name: No browser measurements
+plugin_name: dem.plugin

@@ -1,5 +1,6 @@
 import json
 import os
+from copy import deepcopy
 from pathlib import Path
 
 from jsonschema import Draft7Validator, FormatChecker, ValidationError
@@ -25,6 +26,7 @@ COLLECTOR_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'guides', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'collector', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'scripts.d' / 'collector', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'dem' / 'collector', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules' / 'websphere', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'otel-plugin' / 'metadata.yaml', False),
@@ -180,7 +182,12 @@ def load_collectors(sources=None):
         for module_id in sorted(set(profile_coverage) - module_ids):
             warn(f'Profile coverage references unknown module id {module_id!r}.', path)
 
-        for idx, item in enumerate(data['modules']):
+        # Modules may share merged sub-objects (YAML anchors/merge keys); later
+        # pipeline steps mutate items in place (e.g. scope names), so each item
+        # must own its data. Deepcopy per item: one deepcopy of the whole list
+        # would keep the shared references shared (memoization).
+        for idx, raw_item in enumerate(data['modules']):
+            item = deepcopy(raw_item)
             item['meta']['plugin_name'] = data['plugin_name']
             item['integration_type'] = 'collector'
             item['_src_path'] = path

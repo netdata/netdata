@@ -1,0 +1,539 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "RUM rum collector configuration.",
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Site key",
+        "description": "Stable site identifier used in beacon URLs and history. Renaming creates a new history identity.",
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+      },
+      "display_name": {
+        "title": "Display name",
+        "description": "Human-readable site name. Leave empty to use the site key.",
+        "type": "string"
+      },
+      "allowed_origins": {
+        "title": "Allowed origins",
+        "description": "Web origins allowed to send telemetry, such as https://example.org. A leading *. allows subdomains only.",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1
+      },
+      "public_url": {
+        "title": "Public URL",
+        "description": "Externally reachable collector base URL for this site. Leave empty to use the receiver public URL.",
+        "type": "string"
+      },
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "window": {
+        "title": "Measurement window",
+        "description": "Sliding window for browser measurements. Accepts durations between 1m and 30m.",
+        "type": "string",
+        "default": "5m"
+      },
+      "page_groups": {
+        "title": "Page groups",
+        "description": "Maximum individual page groups shown in breakdown charts. Remaining groups are combined as other.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 20
+      },
+      "countries": {
+        "title": "Countries",
+        "description": "Maximum individual countries shown in breakdown charts. Remaining countries are combined as other.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 20
+      },
+      "measure_sample_rate": {
+        "title": "Measure sample rate",
+        "description": "Share of browser sessions measured, from 0 to 1. Zero preserves the default of measuring all sessions.",
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1,
+        "default": 1
+      },
+      "investigate": {
+        "title": "Investigation sampling",
+        "description": "Choose which measured sessions retain full history. Leave empty to retain all sessions.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "sample_rate": {
+            "title": "Investigation sample rate",
+            "description": "Share of measured sessions kept in full, from 0 to 1. Zero means all sessions.",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "always_keep": {
+            "title": "Always keep",
+            "description": "Conditions that retain a session regardless of sampling. Leave unset to keep errors and poor vitals; an empty list keeps neither.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "errors",
+                "poor_vitals"
+              ]
+            }
+          }
+        }
+      },
+      "bots": {
+        "title": "Bot handling",
+        "description": "Exclude crawlers and browser automation by default, or include them as bot traffic.",
+        "type": "string",
+        "enum": [
+          "exclude",
+          "include"
+        ],
+        "default": "exclude"
+      },
+      "tracing": {
+        "title": "Browser tracing",
+        "description": "Capture browser request spans and propagate trace context. Backend spans require separately instrumented services.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "enabled": {
+            "title": "Enable browser tracing",
+            "description": "Capture and export browser spans independently of event logs. Disabled by default.",
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": false
+          },
+          "propagate_to": {
+            "title": "Trace propagation origins",
+            "description": "Additional literal API origins receiving trace headers. Same-origin requests receive them automatically; cross-origin APIs must allow the trace headers in CORS.",
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "destination": {
+            "$ref": "#/definitions/destination"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/definitions/enabled_destination"
+          },
+          {
+            "if": {
+              "properties": {
+                "enabled": {
+                  "const": true
+                }
+              },
+              "required": [
+                "enabled"
+              ]
+            },
+            "then": {
+              "properties": {
+                "propagate_to": {
+                  "items": {
+                    "format": "uri",
+                    "pattern": "^https?://(?:\\[[0-9A-Fa-f:.]+\\]|[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.?)(?::(?:0*[1-9][0-9]{0,3}|0*[1-5][0-9]{4}|0*6[0-4][0-9]{3}|0*65[0-4][0-9]{2}|0*655[0-2][0-9]|0*6553[0-5]))?$",
+                    "not": {
+                      "$comment": "IPv4 octets inside IPv6 must not have leading zeros; URI format validators differ on this.",
+                      "pattern": "\\[[^\\]]*(?:[.:]0[0-9]+\\.|\\.0[0-9]+\\])",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "redact_paths": {
+        "title": "Path redaction",
+        "description": "Replace private identifiers in URL paths before aggregation and export. Rules run before built-in path redaction.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Redaction rule",
+          "description": "One regular expression replacement.",
+          "type": "object",
+          "properties": {
+            "pattern": {
+              "title": "Pattern",
+              "description": "Go regular expression matching private path identifiers. Empty patterns are ignored.",
+              "type": "string"
+            },
+            "replace": {
+              "title": "Replacement",
+              "description": "Replacement text for matching path segments. Leave empty to remove them.",
+              "type": "string"
+            }
+          }
+        }
+      },
+      "event_logs": {
+        "title": "Event logs",
+        "description": "Export sampled browser events for search, including custom-event attributes. Native RUM history works independently.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "enabled": {
+            "title": "Enable event logs",
+            "description": "Send event logs to the configured destination. Disabled by default; native charts, sessions and errors remain available.",
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": false
+          },
+          "include_console_logs": {
+            "title": "Include console logs",
+            "description": "Capture console info, warn and error messages for investigated sessions. Effective only when event logs are enabled.",
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": false
+          },
+          "destination": {
+            "$ref": "#/definitions/destination"
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/definitions/enabled_destination"
+          }
+        ]
+      }
+    },
+    "required": [
+      "name",
+      "allowed_origins"
+    ],
+    "definitions": {
+      "destination": {
+        "title": "Destination",
+        "description": "Receiver for this signal only. Leave unset to use the local OTLP/gRPC receiver.",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "endpoint": {
+            "title": "Endpoint",
+            "description": "OTLP/gRPC receiver URL with an explicit port. Use http for plaintext or https for TLS; paths, credentials, query strings and fragments are not allowed.",
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": "http://127.0.0.1:4317"
+          },
+          "auth_token": {
+            "title": "Authentication token",
+            "description": "Bearer token accepted by the receiver. Use a native secret reference; leave empty for no authentication.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tls_ca": {
+            "title": "TLS CA certificate",
+            "description": "CA certificate file for verifying an HTTPS receiver. Leave empty to use system roots.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tls_cert": {
+            "title": "TLS client certificate",
+            "description": "Client certificate file for an HTTPS receiver. Set together with TLS key; leave both empty to omit client authentication.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tls_key": {
+            "title": "TLS client key",
+            "description": "Client private key file for an HTTPS receiver. Set together with TLS client certificate.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "active_destination": {
+        "allOf": [
+          {
+            "properties": {
+              "endpoint": {
+                "format": "uri",
+                "pattern": "^https?://(?:\\[[0-9A-Fa-f:.]+\\]|[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.?):(?:0*[1-9][0-9]{0,3}|0*[1-5][0-9]{4}|0*6[0-4][0-9]{3}|0*65[0-4][0-9]{2}|0*655[0-2][0-9]|0*6553[0-5])$",
+                "not": {
+                  "$comment": "IPv4 octets inside IPv6 must not have leading zeros; URI format validators differ on this.",
+                  "pattern": "\\[[^\\]]*(?:[.:]0[0-9]+\\.|\\.0[0-9]+\\])",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "tls_cert": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "tls_cert"
+              ]
+            },
+            "then": {
+              "properties": {
+                "tls_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "tls_key"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "tls_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "tls_key"
+              ]
+            },
+            "then": {
+              "properties": {
+                "tls_cert": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "tls_cert"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "tls_ca": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "tls_ca"
+              ]
+            },
+            "then": {
+              "properties": {
+                "endpoint": {
+                  "type": "string",
+                  "pattern": "^https://"
+                }
+              },
+              "required": [
+                "endpoint"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "tls_cert": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "tls_cert"
+              ]
+            },
+            "then": {
+              "properties": {
+                "endpoint": {
+                  "type": "string",
+                  "pattern": "^https://"
+                }
+              },
+              "required": [
+                "endpoint"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "tls_key": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "tls_key"
+              ]
+            },
+            "then": {
+              "properties": {
+                "endpoint": {
+                  "type": "string",
+                  "pattern": "^https://"
+                }
+              },
+              "required": [
+                "endpoint"
+              ]
+            }
+          }
+        ]
+      },
+      "enabled_destination": {
+        "if": {
+          "properties": {
+            "enabled": {
+              "const": true
+            }
+          },
+          "required": [
+            "enabled"
+          ]
+        },
+        "then": {
+          "properties": {
+            "destination": {
+              "$ref": "#/definitions/active_destination"
+            }
+          }
+        }
+      }
+    }
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Site",
+          "fields": [
+            "name",
+            "display_name",
+            "allowed_origins",
+            "public_url"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "window",
+            "page_groups",
+            "countries",
+            "bots"
+          ]
+        },
+        {
+          "title": "Sampling",
+          "fields": [
+            "measure_sample_rate",
+            "investigate"
+          ]
+        },
+        {
+          "title": "Event logs",
+          "fields": [
+            "event_logs"
+          ]
+        },
+        {
+          "title": "Browser tracing",
+          "fields": [
+            "tracing"
+          ]
+        },
+        {
+          "title": "Privacy",
+          "fields": [
+            "redact_paths"
+          ]
+        }
+      ]
+    },
+    "bots": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      }
+    },
+    "redact_paths": {
+      "ui:listFlavour": "list"
+    },
+    "window": {
+      "ui:placeholder": "5m"
+    },
+    "event_logs": {
+      "destination": {
+        "auth_token": {
+          "ui:widget": "password",
+          "ui:placeholder": "${env:EVENT_LOGS_TOKEN}"
+        }
+      },
+      "ui:help": "Saved destination settings are retained while disabled. Secret references must still resolve for the whole job to start.",
+      "include_console_logs": {
+        "ui:help": "Console errors remain optional logs, with bounded and redacted error detail when available. Uncaught exceptions and unhandled rejections remain core RUM errors."
+      }
+    },
+    "tracing": {
+      "destination": {
+        "auth_token": {
+          "ui:widget": "password",
+          "ui:placeholder": "${env:TRACE_EXPORT_TOKEN}"
+        }
+      },
+      "ui:help": "Saved destination settings are retained while disabled. Secret references must still resolve for the whole job to start.",
+      "propagate_to": {
+        "ui:help": "To join browser and backend spans, instrument the backend, accept propagated context, coordinate sampling, and send both sides to the same tracing system. Sending browser spans alone does not produce a complete backend trace."
+      }
+    }
+  }
+}

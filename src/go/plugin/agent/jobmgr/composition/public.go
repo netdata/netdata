@@ -12,8 +12,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
@@ -76,7 +78,8 @@ type Config struct {
 	Secrets       *SecretsConfig            // nil disables all secret services
 	InitialVnodes map[string]*vnodes.Config // file-configured vnodes
 
-	Services []ProcessService // optional process-owned background services
+	Services         []ProcessService                  // optional process-owned background services
+	ProcessFunctions []funcapi.ProcessFunctionProvider // independent of collector selection
 
 	Runtime RuntimeService // runtime service (charts/host-scope; nil disables runtime charts)
 
@@ -119,15 +122,23 @@ func NewProcess(config Config) (*Process, error) {
 	if config.Input == nil ||
 		config.Output == nil ||
 		config.PluginName == "" ||
-		len(config.Modules) == 0 ||
-		len(config.Defaults) == 0 ||
-		len(config.DiscoveryProviders) == 0 {
+		(len(config.Modules) == 0 && len(config.ProcessFunctions) == 0) ||
+		(len(config.Modules) != 0 && (len(config.Defaults) == 0 || len(config.DiscoveryProviders) == 0)) {
 		return nil, errors.New("jobmgr composition: incomplete production configuration")
 	}
-	modules := maps.Clone(config.Modules)
-	defaults := maps.Clone(config.Defaults)
-	providers, err := agentdiscovery.NewProviderCatalog(slices.Clone(config.DiscoveryProviders))
-	if err != nil {
+	modules := make(collectorapi.Registry, len(config.Modules))
+	maps.Copy(modules, config.Modules)
+	defaults := make(confgroup.Registry, len(config.Defaults))
+	maps.Copy(defaults, config.Defaults)
+	var providers *agentdiscovery.ProviderCatalog
+	if len(modules) != 0 {
+		var err error
+		providers, err = agentdiscovery.NewProviderCatalog(slices.Clone(config.DiscoveryProviders))
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := functionadapter.ValidateProcessProviders(config.ProcessFunctions); err != nil {
 		return nil, err
 	}
 	if err := config.Secrets.validate(); err != nil {
@@ -153,6 +164,9 @@ func NewProcess(config Config) (*Process, error) {
 	if build.Identity.Name != config.PluginName {
 		return nil, errors.New("jobmgr composition: discovery identity differs from plugin")
 	}
+	if len(modules) == 0 {
+		build = agentdiscovery.BuildContext{Identity: build.Identity}
+	}
 	build.Registry = defaults
 	build.DyncfgOutput = nil
 	build.FnReg = nil
@@ -176,11 +190,12 @@ func NewProcess(config Config) (*Process, error) {
 		finalizeOutput = config.Runtime.Stop
 	}
 	core, err := newProcessCore(processCoreConfig{
-		Input:           config.Input,
-		Output:          config.Output,
-		ShutdownTimeout: shutdownTimeout,
-		KeepAlive:       config.KeepAlive,
-		Modules:         modules,
+		Input:            config.Input,
+		Output:           config.Output,
+		ShutdownTimeout:  shutdownTimeout,
+		KeepAlive:        config.KeepAlive,
+		Modules:          modules,
+		ProcessFunctions: slices.Clone(config.ProcessFunctions),
 		Jobs: runJobServices{
 			PluginName:        config.PluginName,
 			Defaults:          defaults,
@@ -191,6 +206,7 @@ func NewProcess(config Config) (*Process, error) {
 		Secrets: secretConfig,
 		Discovery: runDiscoveryServices{
 			BuildContext: build,
+			Disabled:     len(modules) == 0,
 			Providers:    providers,
 			RunJob:       slices.Clone(config.RunJob),
 			AutoEnable:   config.AutoEnable,

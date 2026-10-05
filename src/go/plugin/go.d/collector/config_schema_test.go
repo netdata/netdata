@@ -33,6 +33,7 @@ var configSchemaGlobs = []string{
 	"../../scripts.d/collector/*/config_schema.json",
 	"../../scripts.d/development/*/config_schema.json",
 	"../../statsd/collector/*/config_schema.json",
+	"../../dem/collector/*/config_schema.json",
 	"../../agent/secrets/secretstore/backends/*/config_schema.json",
 	"../../framework/vnodes/config_schema.json",
 }
