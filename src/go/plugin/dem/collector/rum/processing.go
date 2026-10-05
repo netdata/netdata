@@ -12,12 +12,18 @@ import (
 // each admitted observation. The route lease covers the complete sequence.
 type processor struct {
 	aggregator *aggregate.Aggregator
-	exporter   *otlp.Exporter
+	logs       *otlp.Logs
+	traces     *otlp.Traces
 }
 
 func (p *processor) Ingest(b *beacon.Beacon) {
 	result := p.aggregator.Ingest(b)
-	p.exporter.Ingest(b, result)
+	if p.logs != nil {
+		p.logs.Ingest(b, result)
+	}
+	if p.traces != nil {
+		p.traces.Ingest(b, result)
+	}
 }
 
 func (p *processor) Reject(site, reason string) {

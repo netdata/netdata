@@ -54,6 +54,7 @@ func (c *Collector) Init(ctx context.Context) error {
 			return errors.New("origin wildcard is only allowed as a leading *.")
 		}
 	}
+	c.Site = c.Site.Effective()
 	if errs := config.ValidateSiteExtras(c.Site); len(errs) > 0 {
 		return errors.New(strings.Join(errs, "; "))
 	}
@@ -78,13 +79,18 @@ func (c *Collector) Init(ctx context.Context) error {
 			return errors.New("public_url must be an http(s) base URL")
 		}
 	}
-	if c.OTLP.Enabled != "auto" && c.OTLP.Enabled != "yes" && c.OTLP.Enabled != "no" {
-		return errors.New("otlp.enabled must be auto, yes or no")
+	if c.EventLogsOn() {
+		if err := otlp.ValidateDestination(ctx, c.EventLogs.Destination); err != nil {
+			return fmt.Errorf("event_logs.destination: %w", err)
+		}
 	}
-	if err := otlp.ValidateConfig(ctx, c.OTLP); err != nil {
-		return err
+	if c.TracingOn() {
+		if err := otlp.ValidateDestination(ctx, c.Tracing.Destination); err != nil {
+			return fmt.Errorf("tracing.destination: %w", err)
+		}
 	}
-	c.redactor = redact.NewRedactor(c.OTLP.AuthToken)
+	// Retained inactive credentials still need output redaction.
+	c.redactor = redact.NewRedactor(c.EventLogs.Destination.AuthToken, c.Tracing.Destination.AuthToken)
 	c.aggregator = aggregate.New(time.Duration(c.Window), aggregate.SiteCfg{
 		Name:        c.Name,
 		DisplayName: c.Label(),
@@ -103,6 +109,6 @@ func (c *Collector) Init(ctx context.Context) error {
 			Value: c.redactor.Apply(c.DisplayName),
 		})
 	}
-	c.metrics = newCollectorMetrics(m)
+	c.metrics = newCollectorMetrics(m, c.EventLogsOn(), c.TracingOn())
 	return nil
 }

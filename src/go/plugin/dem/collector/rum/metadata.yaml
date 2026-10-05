@@ -16,10 +16,14 @@ modules:
           link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
           metric: rum.pageviews
           name: rum_no_beacons
-        - info: RUM event records dropped before reaching the OTLP endpoint in the last 5 minutes
+        - info: RUM event log delivery failed or records were locally dropped in the last 5 minutes
           link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
           metric: rum.otlp
           name: rum_events_dropped
+        - info: RUM browser span delivery failed or spans were locally dropped in the last 5 minutes
+          link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
+          metric: rum.spans
+          name: rum_spans_dropped
       functions:
         description: Use these process-wide Functions through the Netdata Agent or Cloud to inspect RUM setup, live activity
           and retained investigation history. Invoke their public rum-* names; filter by site where supported.
@@ -567,7 +571,15 @@ modules:
                 list: []
       metrics:
         availability: []
-        description: All charts remain on this Agent. Native job identity scopes site charts; display_name is optional metadata. No vital samples means a gap, while an available but quiet receiver measures zero traffic.
+        description: |
+            All charts remain on this Agent. Native job identity scopes site charts; display_name is optional metadata.
+            No vital samples means a gap, while an available but quiet receiver measures zero traffic.
+
+            The event-log (`rum.otlp`) and browser-span (`rum.spans`) charts and their loss alerts exist only while
+            their respective feature is enabled. `sent` counts records accepted by the receiver; `errors` counts
+            records whose attempted delivery failed or was rejected; `dropped` counts local queue or shutdown loss.
+            Acceptance does not guarantee queryability or durable storage. A timeout can have an unknown delivery
+            outcome. Intentional disablement and sampling do not count as loss.
         folding:
             enabled: false
             title: Metrics
@@ -733,7 +745,7 @@ modules:
                   name: rum.beacons
                   unit: beacons/s
                 - chart_type: stacked
-                  description: OTLP log records
+                  description: Event log export outcomes
                   dimensions:
                     - name: sent
                     - name: dropped
@@ -748,7 +760,7 @@ modules:
                   name: rum.history
                   unit: records/s
                 - chart_type: stacked
-                  description: Browser spans exported
+                  description: Browser span export outcomes
                   dimensions:
                     - name: sent
                     - name: dropped
@@ -1057,13 +1069,13 @@ modules:
         additional_permissions:
             description: The Netdata service needs write access to its DEM state directory. Configured TLS and GeoIP files must be readable by the Netdata service account.
         data_collection:
-            method_description: The Faro browser SDK sends measurements to the configured RUM receiver. Netdata aggregates accepted observations over a sliding window, retains sampled investigation history locally, and optionally exports browser logs and traces through OTLP gRPC.
+            method_description: The Faro browser SDK sends measurements to the configured RUM receiver. Netdata aggregates accepted observations over a sliding window, retains sampled investigation history locally, and optionally exports event logs and browser traces through OTLP/gRPC. Native charts, session timelines and errors need no OTLP receiver. Event logs add searchable custom-event attributes and optional console messages; tracing adds full browser request spans. Both are disabled by default and have independent destinations.
             metrics_description: Monitor browser Web Vitals, page traffic, JavaScript errors, resource timing and user frustration.
         default_behavior:
             auto_detection:
                 description: Sites are explicitly configured; websites are not discovered automatically.
             limits:
-                description: Breakdown charts show bounded top groups. History uses one plugin-wide journal file-age and committed-byte retention target in dem.conf, including disabled sites. Whole archives expire; the active file is protected, so the size target is not a hard disk ceiling. Export/history queues count records dropped under backpressure.
+                description: Breakdown charts show bounded top groups. History uses one plugin-wide journal file-age and committed-byte retention target in dem.conf, including disabled sites. Whole archives expire; the active file is protected, so the size target is not a hard disk ceiling. Export/history queues count records dropped under backpressure. Export is best effort and receiver acceptance does not guarantee durable storage. Investigation sampling applies to event logs and traces; later session promotion cannot recover previously discarded logs or spans.
             performance_impact:
                 description: Resource usage depends on accepted browser traffic and the configured measurement window. Optional OTLP export and investigation history add network and local disk work.
         multi_instance: true
@@ -1083,12 +1095,33 @@ modules:
                         jobs:
                           - name: shop
                             allowed_origins: [https://shop.example.org]
-                      description: Minimal native configuration.
+                      description: Native charts, session timelines and errors, with no OTLP receiver required.
                       name: Website
+                    - config: |
+                        jobs:
+                          - name: shop
+                            allowed_origins: [https://shop.example.org]
+                            event_logs:
+                              enabled: true
+                              include_console_logs: true
+                      description: Search sampled events and optional console messages with a local OTLP/gRPC receiver at http://127.0.0.1:4317. Enable that receiver separately.
+                      name: Searchable event logs
+                    - config: |
+                        jobs:
+                          - name: shop
+                            allowed_origins: [https://shop.example.org]
+                            tracing:
+                              enabled: true
+                              propagate_to: [https://api.example.org]
+                              destination:
+                                endpoint: https://traces.example.org:4317
+                                auth_token: ${env:TRACE_EXPORT_TOKEN}
+                      description: Send browser spans to your backend tracing receiver without enabling event logs. Provide the secret and configure backend instrumentation, context propagation, CORS and compatible sampling separately.
+                      name: Browser tracing
             file:
                 name: dem/rum.conf
             options:
-                description: Options apply independently to each site job. Native job name is the beacon and history identity; display_name is human metadata.
+                description: Options apply independently to each site job. Native job name is the beacon and history identity; display_name is human metadata. Event logs and browser tracing each have a complete destination with no inheritance. Saved inactive settings are retained without endpoint or TLS validation, but all native secret references must resolve for the job to start.
                 folding:
                     enabled: true
                     title: Configuration options
@@ -1133,11 +1166,6 @@ modules:
                       group: Collection
                       name: countries
                       required: false
-                    - default_value: "no"
-                      description: Export browser console logs through OTLP for investigated sessions.
-                      group: Collection
-                      name: collect_console_logs
-                      required: false
                     - default_value: exclude
                       description: Exclude crawlers and browser automation by default, or include them as bot traffic.
                       group: Collection
@@ -1164,59 +1192,94 @@ modules:
                       name: investigate.always_keep
                       required: false
                     - default_value: ""
-                      description: Follow browser requests into backend services. Leave empty to disable tracing.
-                      group: Tracing
-                      name: tracing
+                      description: "Export sampled browser events for search, including custom-event attributes. Native RUM history works independently."
+                      group: Event logs
+                      name: event_logs
+                      required: false
+                    - default_value: "no"
+                      description: "Send event logs to the configured destination. Disabled by default; native charts, sessions and errors remain available."
+                      group: Event logs
+                      name: event_logs.enabled
+                      required: false
+                    - default_value: "no"
+                      description: "Capture console info, warn and error messages for investigated sessions. Effective only when event logs are enabled."
+                      group: Event logs
+                      name: event_logs.include_console_logs
                       required: false
                     - default_value: ""
-                      description: Capture browser request spans and propagate trace headers.
-                      group: Tracing
+                      description: "Receiver for this signal only. Leave unset to use the local OTLP/gRPC receiver."
+                      group: Event logs
+                      name: event_logs.destination
+                      required: false
+                    - default_value: "http://127.0.0.1:4317"
+                      description: "OTLP/gRPC receiver URL with an explicit port. Use http for plaintext or https for TLS; paths, credentials, query strings and fragments are not allowed."
+                      group: Event logs
+                      name: event_logs.destination.endpoint
+                      required: false
+                    - default_value: ""
+                      description: "Bearer token accepted by the receiver. Use a native secret reference; leave empty for no authentication."
+                      group: Event logs
+                      name: event_logs.destination.auth_token
+                      required: false
+                    - default_value: ""
+                      description: "CA certificate file for verifying an HTTPS receiver. Leave empty to use system roots."
+                      group: Event logs
+                      name: event_logs.destination.tls_ca
+                      required: false
+                    - default_value: ""
+                      description: "Client certificate file for an HTTPS receiver. Set together with TLS key; leave both empty to omit client authentication."
+                      group: Event logs
+                      name: event_logs.destination.tls_cert
+                      required: false
+                    - default_value: ""
+                      description: "Client private key file for an HTTPS receiver. Set together with TLS client certificate."
+                      group: Event logs
+                      name: event_logs.destination.tls_key
+                      required: false
+                    - default_value: ""
+                      description: "Capture browser request spans and propagate trace context. Backend spans require separately instrumented services."
+                      group: Browser tracing
+                      name: tracing
+                      required: false
+                    - default_value: "no"
+                      description: "Capture and export browser spans independently of event logs. Disabled by default."
+                      group: Browser tracing
                       name: tracing.enabled
                       required: false
                     - default_value: ""
-                      description: Additional API origins receiving trace headers. Same-origin requests receive them automatically.
-                      group: Tracing
+                      description: "Additional literal API origins receiving trace headers. Same-origin requests receive them automatically; cross-origin APIs must allow the trace headers in CORS."
+                      group: Browser tracing
                       name: tracing.propagate_to
                       required: false
                     - default_value: ""
-                      description: OTLP gRPC host:port or https://host:port. Leave empty to use this site OTLP endpoint.
-                      group: Tracing
-                      name: tracing.export_to
+                      description: "Receiver for this signal only. Leave unset to use the local OTLP/gRPC receiver."
+                      group: Browser tracing
+                      name: tracing.destination
+                      required: false
+                    - default_value: "http://127.0.0.1:4317"
+                      description: "OTLP/gRPC receiver URL with an explicit port. Use http for plaintext or https for TLS; paths, credentials, query strings and fragments are not allowed."
+                      group: Browser tracing
+                      name: tracing.destination.endpoint
                       required: false
                     - default_value: ""
-                      description: Export browser logs and spans to an OTLP gRPC receiver.
-                      group: Tracing
-                      name: otlp
-                      required: false
-                    - default_value: auto
-                      description: Auto exports to an available receiver; yes enables export, and no disables log export. Export failures do not stop ingestion.
-                      group: Tracing
-                      name: otlp.enabled
-                      required: false
-                    - default_value: 127.0.0.1:4317
-                      description: OTLP gRPC host and port for logs and default browser span export.
-                      group: Tracing
-                      name: otlp.endpoint
+                      description: "Bearer token accepted by the receiver. Use a native secret reference; leave empty for no authentication."
+                      group: Browser tracing
+                      name: tracing.destination.auth_token
                       required: false
                     - default_value: ""
-                      description: Bearer token sent to the OTLP receiver. Leave empty for no authentication.
-                      group: Tracing
-                      name: otlp.auth_token
+                      description: "CA certificate file for verifying an HTTPS receiver. Leave empty to use system roots."
+                      group: Browser tracing
+                      name: tracing.destination.tls_ca
                       required: false
                     - default_value: ""
-                      description: Client certificate file. Leave empty with TLS key to omit client authentication.
-                      group: Tracing
-                      name: otlp.tls_cert
+                      description: "Client certificate file for an HTTPS receiver. Set together with TLS key; leave both empty to omit client authentication."
+                      group: Browser tracing
+                      name: tracing.destination.tls_cert
                       required: false
                     - default_value: ""
-                      description: Client private key file. Set together with TLS certificate.
-                      group: Tracing
-                      name: otlp.tls_key
-                      required: false
-                    - default_value: ""
-                      description: CA certificate file for verifying the OTLP receiver. Leave empty to use system roots when TLS is enabled.
-                      group: Tracing
-                      name: otlp.tls_ca
+                      description: "Client private key file for an HTTPS receiver. Set together with TLS client certificate."
+                      group: Browser tracing
+                      name: tracing.destination.tls_key
                       required: false
                     - default_value: ""
                       description: Replace private identifiers in URL paths before aggregation and export. Rules run before built-in path redaction.
@@ -1241,6 +1304,10 @@ modules:
                   title: Configure the receiver and site
                 - description: Add `<script async src="https://rum.example.org/rum/shop.js"></script>` to the website, replacing the public receiver URL and site key. Allow this collector and the pinned Faro SDK CDN in the website Content Security Policy.
                   title: Install the browser snippet
+                - description: Event logs and tracing are optional and disabled by default. Enable an OTLP/gRPC receiver separately. In the receiving Netdata node's Logs tab, select `otel-logs` and the `netdata-rum` service. Filter the time range, `resource.attributes.rum.site` and `attributes.session.id`; inspect `attributes.event.attr.<key>` for custom-event attributes and `attributes.console.level` with the message body for console messages. Netdata log access requires Cloud sign-in. Console errors are logs; uncaught exceptions and unhandled rejections remain native RUM errors. Event data is sampled and independently retained by the destination.
+                  title: Optional searchable event logs
+                - description: To follow a request into backend services, instrument those services, accept browser trace context, allow trace headers in cross-origin CORS, coordinate sampling and send both sides to the same tracing system. Browser spans alone show browser requests, not a complete backend trace. For an external receiver, look up a copied trace ID in that system. Netdata receiver selection and direct UI navigation are part of the later frontend integration.
+                  title: Optional browser tracing
                 - description: Stock health templates provide Web Vital and no-beacon alerts independently for each site. Customize thresholds or disable alerts through normal Netdata health configuration; use the `_collect_plugin=dem` and `_collect_job` chart labels for site-specific policies.
                   title: Customize alerts
         single_job: false
@@ -1249,4 +1316,6 @@ modules:
             list:
                 - description: Check receiver availability, the installed snippet URL and the site allowed origins. Open the rum-sites Function for reachability and rejected-origin diagnostics. Missing vital samples produce gaps, including when the receiver is unavailable.
                   name: No browser measurements
+                - description: Check that the required signal is enabled and its receiver accepts OTLP/gRPC at the configured explicit http or https URL and port. Verify Bearer authentication, TLS trust and paired client certificate/key files. The event and span charts distinguish receiver-accepted records, failed or rejected delivery, and local queue/shutdown loss. A timeout may have an unknown delivery outcome; zero traffic proves neither failure nor success. Receiver failures do not stop native history.
+                  name: Missing exported events or spans
 plugin_name: dem.plugin

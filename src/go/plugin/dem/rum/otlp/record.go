@@ -3,6 +3,7 @@
 package otlp
 
 import (
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -20,18 +21,14 @@ const maxStackBytes = 4096
 type queued struct{ rec *logspb.LogRecord }
 
 // build turns one accepted beacon into zero or more queued records:
-// pageview, session_start (first sighting per session/TTL), one per JS
+// pageview, one per JS
 // error, one per custom event, one per console log line (already
-// filtered upstream by collect_console_logs). Free-form text is redacted
+// filtered upstream by ConsoleLogsOn). Free-form text is redacted
 // before it reaches the record.
-func (e *Exporter) build(b *beacon.Beacon, pageView bool) []queued {
+func (e *Logs) build(b *beacon.Beacon, pageView bool) []queued {
 	base := baseAttrs(b)
-	now := e.now()
 	var out []queued
 
-	if b.SessionID != "" && e.sessions.starts(b.SessionID, now) {
-		out = append(out, e.record(base, "session_start", b.Received, sevInfo, "session start"))
-	}
 	if pageView {
 		out = append(out, e.record(base, "pageview", b.Received, sevInfo, "pageview "+b.Path))
 	}
@@ -55,9 +52,14 @@ func (e *Exporter) build(b *beacon.Beacon, pageView bool) []queued {
 		out = append(out, e.record(attrs, "event", ev.Time, sevInfo, body))
 	}
 	for _, l := range b.Logs {
-		msg := e.redact(l.Message)
+		// Preserve decoder bounds after configured-secret redaction.
+		msg := truncate(e.redact(l.Message), 1024)
 		body := "console " + l.Level + ": " + msg
-		out = append(out, e.record(base, "console", l.Time, sevInfo, body))
+		attrs := append(append([]*commonpb.KeyValue{}, base...),
+			strAttr("console.level", l.Level),
+			strAttr("error.type", truncate(e.redact(l.ErrorType), 64)),
+			strAttr("error.stack", truncate(e.redact(l.Stack), maxStackBytes)))
+		out = append(out, e.record(attrs, "console", l.Time, consoleSeverity(l.Level), body))
 	}
 	return out
 }
@@ -90,7 +92,7 @@ func baseAttrs(b *beacon.Beacon) []*commonpb.KeyValue {
 	return out
 }
 
-func (e *Exporter) record(
+func (e *Logs) record(
 	attrs []*commonpb.KeyValue,
 	typ string,
 	ts time.Time,
@@ -118,11 +120,22 @@ func (e *Exporter) record(
 	}
 }
 
-func sevText(sev logspb.SeverityNumber) string {
-	if sev == sevError {
-		return "ERROR"
+func consoleSeverity(level string) logspb.SeverityNumber {
+	switch strings.ToLower(level) {
+	case "error":
+		return sevError
+	case "warn", "warning":
+		return logspb.SeverityNumber_SEVERITY_NUMBER_WARN
+	case "debug":
+		return logspb.SeverityNumber_SEVERITY_NUMBER_DEBUG
+	case "trace":
+		return logspb.SeverityNumber_SEVERITY_NUMBER_TRACE
+	default:
+		return sevInfo
 	}
-	return "INFO"
+}
+func sevText(sev logspb.SeverityNumber) string {
+	return strings.TrimPrefix(sev.String(), "SEVERITY_NUMBER_")
 }
 
 func strAttr(k, v string) *commonpb.KeyValue {

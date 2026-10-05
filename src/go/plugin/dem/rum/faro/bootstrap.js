@@ -39,7 +39,7 @@
       var app = { name: document.location.hostname };
       if (ver) { app.version = ver; }
       if (env) { app.environment = env; }
-      var inst = GrafanaFaroWebSdk.getWebInstrumentations();
+      var inst = GrafanaFaroWebSdk.getWebInstrumentations({ captureConsole: opt.consoleLogs });
       if (opt.tracing && window.GrafanaFaroWebTracing) {
         // Same-origin requests always get traceparent; other origins only
         // when listed, since their CORS must allow the header.
@@ -50,6 +50,7 @@
         }));
       }
       var cfg = { url: base + '/rum/' + k + '/collect' + (bot ? '?bot=1' : ''), app: app, instrumentations: inst };
+      if (opt.consoleLogs) { cfg.consoleInstrumentation = { consoleErrorAsLog: true }; }
       if (opt.sampling > 0 && opt.sampling < 1) { cfg.sessionTracking = { samplingRate: opt.sampling }; }
       GrafanaFaroWebSdk.initializeFaro(cfg);
       if (user) { applyUser(); }

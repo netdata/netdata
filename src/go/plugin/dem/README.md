@@ -61,6 +61,94 @@ The browser normalization, bounded aggregation, OTLP and query behavior originat
 `b3de4662f567dc63d33fee6201f8c2313568301b`. Its private configuration controller, scheduler, protocol emitter and root
 state reconciliation are replaced by the native Agent framework. Embedded third-party asset notices remain beside their source.
 
+## Optional event logs and browser tracing
+
+Native RUM charts, session timelines and errors work without an OTLP receiver. Two optional features add evidence
+for deeper investigation, each disabled by default and configured independently for each site:
+
+- **Event logs** preserve searchable browser events, custom-event attributes and, when explicitly included, console
+  info, warn and error messages. Search by site, session and time in the destination's logs to inspect that evidence.
+  Console errors remain logs with severity and bounded, redacted error type/stack when supplied; actual uncaught
+  exceptions and unhandled rejections remain core RUM errors.
+- **Browser tracing** exports full browser request spans and propagates trace context. To follow requests into a
+  backend, instrument its services, accept propagated context, coordinate sampling and send browser and backend
+  spans to the same tracing system. Cross-origin APIs must allow trace headers in CORS. Browser spans alone show
+  browser requests; they do not establish backend execution or trace completeness.
+
+Enable local searchable events after preparing a local OTLP/gRPC receiver:
+
+```yaml
+jobs:
+  - name: shop
+    allowed_origins: [https://shop.example.org]
+    event_logs:
+      enabled: true
+      include_console_logs: true
+```
+
+For a Netdata receiver, follow [OTLP receiver setup and log verification](../../../../docs/opentelemetry/otlp-ingestion.md).
+Open that receiver node's Logs tab, select `otel-logs`, and choose `netdata-rum` in **Services**
+(`resource.attributes.service.name`). Narrow the time range and filter `resource.attributes.rum.site` by site key
+and `attributes.session.id` by session ID. Inspect `attributes.rum.type` (`console`, `event`, `error` or `pageview`),
+the message body, `attributes.console.level`, `attributes.event.name` and `attributes.event.attr.<key>`.
+Error detail, when supplied, is in `attributes.error.type` and `attributes.error.stack`. Log access requires
+Netdata Cloud sign-in. The final frontend stage will verify this complete RUM-to-Logs workflow in the UI.
+
+Alternatively, enable browser tracing with an existing backend tracing receiver, leaving event logs disabled:
+
+```yaml
+jobs:
+  - name: shop
+    allowed_origins: [https://shop.example.org]
+    tracing:
+      enabled: true
+      propagate_to: [https://api.example.org]
+      destination:
+        endpoint: https://traces.example.org:4317
+        auth_token: ${env:TRACE_EXPORT_TOKEN}
+```
+
+Both features accept the same complete `destination` object. There is no inheritance between them. The default
+endpoint is `http://127.0.0.1:4317`; it does not enable or discover a receiver. Set `http://host:port` for plaintext or
+`https://host:port` for TLS, always with an explicit port from 1 to 65535 (bracket IPv6 addresses). The protocol is
+OTLP/gRPC, not OTLP/HTTP. Paths, URL credentials, queries, fragments and resolver targets are not supported.
+`auth_token` supplies Bearer authentication. With HTTPS, `tls_ca` selects a CA file (otherwise system roots apply),
+and paired `tls_cert` / `tls_key` files enable client certificate authentication. Files must be readable by the service.
+Outbound credentials stay on the collector and are never included in the browser snippet or investigation results.
+
+Omitted or null feature blocks are disabled. An omitted or null destination or endpoint uses the local default;
+an explicitly empty endpoint is invalid for an enabled feature. Null booleans mean false, null auth/TLS strings mean
+empty, and null `propagate_to` means no additional origins. Disabling a feature retains its well-typed saved settings
+without checking destination, TLS or propagation semantics. Native secret references throughout the job must still
+resolve before it can start, including references in disabled features.
+
+Investigation sampling applies to exported events and spans. Later promotion of a session does not reconstruct
+previously discarded logs or spans. SDK session lifecycle events are ordinary sampled events; the exporter does not
+invent a session-start event. Native history and the export destination retain data independently, so neither is a
+complete archive of every session. A session can contain multiple traces, and event logs do not guarantee automatic
+Logs-to-Traces correlation.
+
+For an external trace receiver, look up the copied trace ID in your existing tracing system. An export endpoint URL
+is not a Netdata node identity. Correct Netdata receiver selection and direct browser-to-backend trace navigation
+remain part of the final frontend integration; backend export alone does not establish those UI flows.
+
+Export is best effort and does not block native ingestion or history when a receiver is slow or unavailable. The
+`rum.otlp` event-log and `rum.spans` browser-span charts appear only for their enabled feature, including before first
+traffic. Their diagnostic dimensions mean:
+
+| Dimension | Meaning |
+|---|---|
+| `sent` | Records accepted by the receiver, without a guarantee of queryability or durable storage. |
+| `errors` | Records whose attempted export failed or was rejected; a timeout may have an unknown delivery outcome. |
+| `dropped` | Records lost locally because a queue was full or shutdown ended before export was attempted. |
+
+Intentional disablement and sampling are not export loss. Zero traffic proves neither receiver health nor failure.
+The event-log and browser-span warnings each report the average combined rate of failed delivery and local loss
+over the last five minutes;
+they have no instance when the corresponding feature is disabled. Check the destination, authentication and TLS
+settings when they fire. Failed batches are not a durable retry archive, though future batches can succeed after
+receiver recovery.
+
 ## Synthetic monitoring
 
 Each `journey` job runs one configured Playwright Test entry and its imports. Each `lighthouse` job runs one desktop
