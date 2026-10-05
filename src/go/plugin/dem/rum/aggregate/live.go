@@ -92,6 +92,10 @@ func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) 
 		row.MetricID = v.ID
 		row.Revision = v.Revision
 		if origin := v.Origin; origin != nil {
+			if origin.Country != row.Country {
+				// Current location must not contradict the saved measurement country.
+				row.City, row.Lat, row.Lon, row.HasGeo = "", 0, 0, false
+			}
 			row.Page, row.Browser, row.Device, row.Country = origin.PageGroup, origin.Browser, origin.Device, origin.Country
 		}
 		switch v.Name {

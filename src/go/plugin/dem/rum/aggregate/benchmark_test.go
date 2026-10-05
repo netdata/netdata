@@ -191,8 +191,14 @@ func BenchmarkActivity(b *testing.B) {
 						PageGroup:    "/" + strconv.Itoa(i),
 						Received:     time.Now(),
 						Vitals:       []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 100}},
+						Events: []beacon.Event{
+							{Kind: beacon.EventDocument, ID: "activation", Revision: 1},
+						},
 					},
 				)
+			}
+			if got := a.Activity().PageviewsWindow; got != size {
+				b.Fatalf("retained document activity: got %d, want %d", got, size)
 			}
 			b.ReportAllocs()
 			b.ResetTimer()
