@@ -297,20 +297,27 @@ fn redact_uri(uri: &str) -> String {
 
 /// Whether two listener addresses would claim the same socket: one port and
 /// an equal IP, or a wildcard covering the other (`0.0.0.0` covers IPv4;
-/// `[::]` covers IPv4 too, as Linux binds it dual-stack by default). Port 0
-/// never clashes (the kernel picks a free port); unparseable addresses fail
-/// at bind, so only identical text is a clash here.
+/// `[::]` covers IPv4 too, as Linux binds it dual-stack by default). An
+/// IPv4-mapped IPv6 literal (`[::ffff:127.0.0.1]`) claims its IPv4 address,
+/// so it is compared as that address. Port 0 never clashes (the kernel picks
+/// a free port); unparseable addresses fail at bind, so only identical text
+/// is a clash here.
 fn listeners_overlap(a: &str, b: &str) -> bool {
     let (Ok(a), Ok(b)) = (a.parse::<SocketAddr>(), b.parse::<SocketAddr>()) else {
         return a == b;
     };
+    let unmapped = |ip: IpAddr| match ip {
+        IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(ip, IpAddr::V4),
+        IpAddr::V4(_) => ip,
+    };
+    let (a_ip, b_ip) = (unmapped(a.ip()), unmapped(b.ip()));
     let covers = |wild: IpAddr, other: IpAddr| match wild {
         IpAddr::V6(w) => w.is_unspecified(),
         IpAddr::V4(w) => w.is_unspecified() && other.is_ipv4(),
     };
     a.port() != 0
         && a.port() == b.port()
-        && (a.ip() == b.ip() || covers(a.ip(), b.ip()) || covers(b.ip(), a.ip()))
+        && (a_ip == b_ip || covers(a_ip, b_ip) || covers(b_ip, a_ip))
 }
 
 /// The TLS pairing rules both listeners share: certificate and key come as a
@@ -1358,6 +1365,11 @@ logs:
             ("0.0.0.0:4318", "[::1]:4318", false),
             ("127.0.0.1:4317", "127.0.0.1:4318", false),
             ("127.0.0.1:4318", "127.0.0.2:4318", false),
+            // An IPv4-mapped literal binds its IPv4 address.
+            ("127.0.0.1:4318", "[::ffff:127.0.0.1]:4318", true),
+            ("0.0.0.0:4318", "[::ffff:127.0.0.1]:4318", true),
+            ("[::]:4318", "[::ffff:127.0.0.1]:4318", true),
+            ("[::ffff:127.0.0.1]:4318", "127.0.0.2:4318", false),
             // Port 0 asks the kernel for a free port, so two never clash.
             ("127.0.0.1:0", "127.0.0.1:0", false),
             // Unparseable addresses fail at bind; compare the text.
