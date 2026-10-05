@@ -1,22 +1,30 @@
-//! Shared time-grid derivation for the otel Functions' histogram/grid
-//! views. The frontends send a loose second-granular window and no
-//! bucket geometry; each wire adapter canonicalizes here — picking a
-//! "nice" bucket width and snapping the window outward — before handing
-//! the engine an exact [`sfst::Grid`]. Consumed by BOTH the logs
-//! histogram and the traces overview; a change here changes every otel
-//! Function's grid.
+//! The shared time-grid derivation for the otel ledger's Function
+//! views. Wire requests carry only a loose second-granular
+//! `[after, before)` window — no bucket geometry — so each signal's
+//! adapter canonicalizes the window, then derives everything else
+//! through here: a "nice" bucket width, the window snapped outward to
+//! wall-clock multiples, and the exact [`sfst::Grid`] the engine
+//! queries against.
+//!
+//! Consumers: the logs adapter's `into_query` (`rpc/logs/adapter.rs`),
+//! the traces `overview` and the aggregate section of the traces
+//! Functions view (`rpc/traces/handler.rs`).
+//! A change here re-grids every otel Function view at once.
 
-/// Aim for at least this many time buckets across the window when
-/// picking from [`VALID_BUCKET_WIDTHS_S`]. With the curated widths and
-/// a 15-minute window this yields 15-second buckets (60 of them).
+/// Aim for at least this many buckets across the window when picking
+/// from [`VALID_BUCKET_WIDTHS_S`]; with these widths a 15-minute window
+/// lands on 15s buckets (60 of them).
 const TARGET_BUCKETS: u32 = 60;
 
-/// "Nice" bucket widths in seconds. Ported from the legacy
-/// systemd-journal plugin's `calculate_bucket_duration` to keep
-/// histograms anchored to wall-clock-friendly intervals (1s, 2s, 5s,
-/// 10s, 15s, 30s, 1m, 5m, …). [`bucket_width_for_span_s`] picks the
-/// largest entry that produces at least [`TARGET_BUCKETS`] buckets
-/// across the span, so chart density is stable as the window scales.
+/// "Nice" bucket widths in seconds, mirroring journal-engine's
+/// `calculate_bucket_duration` (`journal-engine/src/histogram.rs`) so
+/// otel charts land on the same wall-clock-friendly intervals
+/// (1s, 2s, 5s, 10s, 15s, 30s,
+/// 1m, 5m, …) as the journal histograms. Only the density target
+/// differs: journal-engine settles for ≥ 50 buckets, this picks the
+/// largest entry that still meets [`TARGET_BUCKETS`] (see
+/// [`bucket_width_for_span_s`]), so chart density is stable as the
+/// window scales.
 const VALID_BUCKET_WIDTHS_S: &[u32] = &[
     1, 2, 5, 10, 15, 30, // seconds
     60, 120, 180, 300, 600, 900, 1800, // minutes
@@ -24,9 +32,9 @@ const VALID_BUCKET_WIDTHS_S: &[u32] = &[
     86400, 172800, 259200, 432000, 604800, 1209600, 2592000, // days
 ];
 
-/// Pick a "nice" bucket width (seconds) for a span: the largest entry in
-/// [`VALID_BUCKET_WIDTHS_S`] producing at least [`TARGET_BUCKETS`]
-/// buckets. Falls back to `1` for spans too short to satisfy it.
+/// Pick a "nice" bucket width (seconds) for a span: the largest entry
+/// in [`VALID_BUCKET_WIDTHS_S`] yielding at least [`TARGET_BUCKETS`]
+/// buckets; spans under [`TARGET_BUCKETS`] seconds fall back to `1`.
 pub(crate) fn bucket_width_for_span_s(span_s: u32) -> u32 {
     VALID_BUCKET_WIDTHS_S
         .iter()
@@ -55,11 +63,16 @@ pub(crate) fn align_window(after: u32, before: u32, width_s: u32) -> (u32, u32) 
 }
 
 /// Derive the whole grid for a canonicalized second-granular window:
-/// nice width, outward alignment, exact [`sfst::Grid`]. Returns the
-/// grid plus the aligned `(after, before)` seconds (the alignment can
-/// widen the window the caller prunes files by). The caller guarantees
-/// `after < before` (the canonicalizers do); the grid then always holds
-/// at least one bucket, horizon saturation included.
+/// nice width, outward alignment, exact [`sfst::Grid`]. Also returns
+/// the aligned `(after, before)` seconds — alignment moves both ends
+/// outward, so capture and file-pruning windows come from the pair (or
+/// the grid's own range), never the raw request.
+///
+/// `after < before` is the caller's job; the wire adapters' window
+/// canonicalizers guarantee it (`effective_window` in
+/// `rpc/logs/adapter.rs`, `validate_trace_bounds` in
+/// `rpc/traces/adapter.rs`). Given that, the result always holds at
+/// least one bucket, horizon saturation included.
 pub(crate) fn grid_for_window_s(after: u32, before: u32) -> (sfst::Grid, u32, u32) {
     const NS_PER_S: i64 = 1_000_000_000;
     let width_s = bucket_width_for_span_s(before.saturating_sub(after));

@@ -26,9 +26,9 @@ modules:
 
           This collector is a preview. Its package and response formats may change.
         method_description: |
-          Each job runs an executable per collection or keeps one persistent process, as selected by its package definition.
+          Each job runs an executable per collection or keeps one persistent process, as selected by its package definition or direct command job.
           Both modes read complete JSON snapshots; persistent requests and replies carry matching IDs.
-          A file-backed manifest supplies metadata without execution. An explicitly registered self-contained executable supplies declarations, templates and a configuration form through a bounded describe operation at plugin startup. Job creation, configuration tests and updates reuse that description.
+          A file-backed manifest supplies metadata without execution. An explicitly registered self-contained executable supplies capabilities, templates and a configuration form through a bounded describe operation at plugin startup. Job creation, configuration tests and updates reuse that description.
           Registered packages expose their own dynamic configuration forms and can provide interactive Functions, with or without periodic collection. Validated configuration and Function inputs reach scripts through stdin.
           Warning and critical service observations are successful collections; command or protocol failures discard the entire response.
       supported_platforms:
@@ -41,7 +41,7 @@ modules:
           passed as interpreter arguments. On Windows, use appropriate ACLs; Unix path checks do not apply.
       default_behavior:
         auto_detection:
-          description: No commands are discovered automatically. Administrators register package manifests explicitly or select a manifest per job. Registering a package does not create a job.
+          description: No commands are discovered automatically. Administrators register package manifests explicitly or select a manifest or direct command per job. Registering a package does not create a job.
         limits:
           description: Each JSON response, Function request and configuration envelope is limited to 64 MiB, including whitespace. Startup descriptions have a separate 64 MiB limit. These are encoded-byte cutoffs, not memory budgets. A persistent script handles collection and Function calls sequentially.
         performance_impact:
@@ -51,7 +51,7 @@ modules:
         list:
           - title: Install a native script package
             description: |
-              Install an executable and manifest in an administrator-controlled directory.
+              Install an executable in an administrator-controlled directory. A manifest is optional for direct command jobs.
               Follow the [native script package guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/scripts.d/NATIVE.md)
               for the protocol, optional chart template and Bash helper.
       configuration:
@@ -64,9 +64,21 @@ modules:
             enabled: true
           list:
             - name: manifest
-              description: Absolute path to the installed native script package manifest.
+              description: Absolute path to the installed native script package manifest. Set either manifest or command.
               default_value: ""
-              required: true
+              required: false
+            - name: command
+              description: Executable and fixed arguments for a script without a manifest. The executable must be an absolute path. Set either manifest or command.
+              default_value: ""
+              required: false
+            - name: mode
+              description: Auto uses the manifest's mode or runs a direct command once per collection. Choose oneshot or persistent only for a direct command.
+              default_value: auto
+              required: false
+            - name: snapshot_format
+              description: Auto uses the manifest's snapshot format or JSON for a direct command. Choose json or lines only for a direct command.
+              default_value: auto
+              required: false
             - name: config
               description: Values for the package configuration schema. Leave empty to use package defaults.
               default_value: ""
@@ -115,8 +127,8 @@ modules:
         title: Metrics
         enabled: false
       description: |
-        Metric charts and their labels come from each package's declarations and optional chart template.
-        Check charts use the package's check titles and identity labels. They share the context
+        Metric charts and their labels come from each response's metric families and optional package chart template.
+        Check charts use the response's check titles and identity labels. They share the context
         native_script.check_state, units state, and dimensions ok, warning, critical and unknown.
 
         Unknown observations leave health undefined. A check omitted from a successful response disappears;

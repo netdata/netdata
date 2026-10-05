@@ -1,17 +1,84 @@
+//! Stateful filter expressions for the journal file's filtered iteration
+//! path. [`FilterExpr`] resolves `FIELD=VALUE` matches to data objects and
+//! steps through each matched object's entry chain - the list of entries
+//! carrying that payload - returning entry-object offsets.
+//! [`JournalFilter`] accumulates caller-supplied matches into one
+//! expression.
+//!
+//! Data flow: `JournalReader::add_match` feeds a pending [`JournalFilter`]
+//! (field-name remapping happens there); the first
+//! `step` or `build_filter` resolves it against the file and installs the
+//! result on the cursor. From
+//! then on the cursor's filtered path drives the expression one entry at a
+//! time (`JournalCursor::resolve_filter_location`), rewinding with
+//! `head`/`tail` before
+//! resolving a location from scratch, because `next`/`previous` continue
+//! from the scan position instead of seeking
+//! (the resolver's fresh-resolution arms rewind first).
+//!
+//! A match is an exact, case-sensitive byte match of one full `FIELD=VALUE`
+//! payload: hash lookup in the data hash table plus raw-payload comparison
+//! ([`JournalFile::find_data_offset`]). A payload the file does not contain - or whose
+//! data object has no entry chain - resolves to [`FilterExpr::None`], which
+//! matches nothing: every step then ends the iteration (`Ok(None)` here,
+//! `Ok(false)` from
+//! [`JournalCursor::step`](crate::file::cursor::JournalCursor::step)).
+//!
+//! Entry chains list their entries in write order, and entry offsets share
+//! one file-global, write-ordered space (every object is appended at
+//! `JournalWriter`'s single growing `append_offset`), so offsets
+//! from different chains are comparable - what the disjunction min/max and
+//! the conjunction fixed-point gallop below rely on.
+//!
+//! The expression is bound to the file it was built against: data-object
+//! offsets and entry-array positions are followed as-is, with no
+//! re-resolution mid-scan, so it must be used with that file only.
+//!
+//! Consumers (grep-verified): `file/cursor.rs` and `file/reader.rs` only.
+//! Publicly reachable as `journal_core::file::{FilterExpr, JournalFilter,
+//! LogicalOp}` (the `pub use` in `file/mod.rs`) but absent from lib.rs's
+//! flat re-exports. Same-shape relatives: the near twin
+//! src/crates/jf/journal_file/src/filter.rs (stateless `lookup` instead of
+//! this file's stepping API) and this crate's index_filter.rs (bitmap-based
+//! `JournalFilter` analog).
 use super::mmap::MemoryMap;
 use crate::error::{JournalError, Result};
 use crate::file::{file::JournalFile, offset_array::InlinedCursor};
 use std::num::NonZeroU64;
 
+/// A stateful filter over one journal file's entries: `next`/`previous`
+/// return entry-object offsets of entries carrying the matched payloads.
+///
+/// Every arm except `None` carries scan state between calls.
+/// `next`/`previous` continue from it and clamp to the needle - the first
+/// chain position at/after (forward) or at/before (backward) the needle,
+/// which may be the position the scan already holds. A caller resolving a
+/// location from scratch must rewind with `head`/`tail` first, or the step
+/// re-reports the current entry; the filtered resolution path that lives by
+/// this contract is `JournalCursor::resolve_filter_location`.
 #[derive(Clone, Debug)]
 pub enum FilterExpr {
+    /// Matches nothing. Produced when a matched payload is absent from the
+    /// file or its data object has no entry chain; `next`/`previous` always
+    /// return `Ok(None)`, so a filter built to `None` ends every iteration.
     None,
+    /// One payload's data object plus the scan cursor over that object's
+    /// entry chain: the state carried between `next`/`previous` calls.
+    /// Built by `JournalFilter::convert_current_matches`.
     Match(NonZeroU64, InlinedCursor),
+    /// AND of sub-expressions: one per distinct matched field name.
     Conjunction(Vec<FilterExpr>),
+    /// OR of sub-expressions: the value set of one matched field name.
     Disjunction(Vec<FilterExpr>),
 }
 
 impl FilterExpr {
+    // Dead prototype, kept verbatim: the stateless seek variant of the
+    // stepping API below, active in the near twin
+    // src/crates/jf/journal_file/src/filter.rs. It does not compile as-is
+    // here: it names `Direction` (not imported by this file) and
+    // dereferences the old `Match(u64, _)` payload, not this enum's
+    // `Match(NonZeroU64, InlinedCursor)`.
     // pub fn lookup<M: MemoryMap>(
     //     &self,
     //     journal_file: &JournalFile<M>,
@@ -84,6 +151,9 @@ impl FilterExpr {
     //     }
     // }
 
+    /// Rewinds every scan cursor to its chain head: the first entry carrying
+    /// the payload. Infallible (no file access); returns `self` so a rewind
+    /// and the first `next` chain.
     pub fn head(&mut self) -> &mut Self {
         match self {
             FilterExpr::None => (),
@@ -105,6 +175,11 @@ impl FilterExpr {
         self
     }
 
+    /// Positions every scan cursor at the last entry of its chain, ready for
+    /// a backward scan. Unlike `head` this walks the entry arrays, so
+    /// object/array failures propagate as `Err`. Single-entry chains have no
+    /// array to park past; the cursor stays on the entry, which `previous`'s
+    /// clamp resolves identically.
     pub fn tail<M: MemoryMap>(&mut self, journal_file: &JournalFile<M>) -> Result<&mut Self> {
         match self {
             FilterExpr::None => {}
@@ -126,8 +201,30 @@ impl FilterExpr {
         Ok(self)
     }
 
-    // Returns the offset of the next matching entry, if any, with an offset
-    // greater or equal to the needle offset.
+    /// Returns the entry offset of the next matching entry at or after
+    /// `needle_offset`, advancing the scan state to it.
+    ///
+    /// Continuation, not seeking: the scan resumes from the state left by
+    /// the previous call and reports the first chain position >= the needle,
+    /// which may be the position already held - returned without moving.
+    /// Callers resolving a location from scratch must rewind with `head`
+    /// first, or `next` re-reports the current entry; see
+    /// `JournalCursor::resolve_filter_location` for the consumer side. Per arm:
+    /// - `Match`: walks the payload's entry chain forward
+    ///   ([`InlinedCursor::next_until`]).
+    /// - `Conjunction`: gallops to a fixed point - sub-expressions advance
+    ///   in order, ratcheting the needle upward, until a full pass leaves it
+    ///   unchanged; the first sub-expression without a later match ends the
+    ///   scan with `Ok(None)`. At convergence every cursor rests on the
+    ///   resolved entry.
+    /// - `Disjunction`: every branch advances to its own next match and the
+    ///   smallest offset wins. Unselected branches stay parked at their
+    ///   match, so their intermediate entries are consumed by the scan.
+    /// - `None`: always `Ok(None)`.
+    ///
+    /// On `Ok(None)` the exhausted cursors rest at their chains' ends;
+    /// `head` rewinds. `Err` propagates object/mmap failures raised while
+    /// walking the chains.
     pub fn next<M: MemoryMap>(
         &mut self,
         journal_file: &JournalFile<M>,
@@ -172,8 +269,14 @@ impl FilterExpr {
         }
     }
 
-    // Returns the offset of the previous matching entry, if any, with an offset
-    // less or equal to the needle offset.
+    /// `next` in reverse: the entry offset of the previous matching entry at
+    /// or before `needle_offset`, with the same continuation-and-clamp
+    /// contract - an already-satisfying position is returned without moving,
+    /// so fresh resolutions rewind with `tail` first. `Conjunction`
+    /// sub-expressions are walked in reverse order and gallop to a fixed
+    /// point; `Disjunction` advances every branch and takes the largest
+    /// offset; `None` always yields `Ok(None)`. On `Ok(None)` the exhausted
+    /// cursors rest at their chains' starts.
     pub fn previous<M: MemoryMap>(
         &mut self,
         journal_file: &JournalFile<M>,
@@ -219,16 +322,34 @@ impl FilterExpr {
     }
 }
 
+/// The operator recorded between match groups while `JournalFilter`
+/// accumulates; see `JournalFilter::set_operation`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogicalOp {
     Conjunction,
     Disjunction,
 }
 
+/// Accumulates `KEY=VALUE` matches into a [`FilterExpr`], the pending stage
+/// between `JournalReader::add_match`/`add_conjunction`/`add_disjunction`
+/// and filter installation (built per step by `JournalReader::step`, which
+/// installs it on the cursor).
+///
+/// Grouping mirrors systemd-journal's match semantics: matches accumulate
+/// in groups; within a group the values of a shared field name OR together
+/// and distinct field names AND together. Each group-splitting call also
+/// records the operator joining the next group, `Conjunction` initially - so
+/// `A=1; add_disjunction; B=2; build` yields `A=1 OR B=2`.
 #[derive(Debug)]
 pub struct JournalFilter {
+    /// The expression accumulated so far, or `None` before the first
+    /// group-closing call that had matches to flush.
     filter_expr: Option<FilterExpr>,
+    /// Pending `KEY=VALUE` payloads of the open group, sorted by field name
+    /// (see `add_match`).
     current_matches: Vec<Vec<u8>>,
+    /// The operator the next flushed group will be attached with; set by the
+    /// previous group-closing call, `Conjunction` until then.
     current_op: LogicalOp,
 }
 
@@ -243,6 +364,9 @@ impl Default for JournalFilter {
 }
 
 impl JournalFilter {
+    /// The bytes before the first `=` of a `KEY=VALUE` pair; `None` without
+    /// an `=`. Same rule as `field_map::extract_field_name`; `add_match`
+    /// sorts on this key.
     fn extract_key(kv_pair: &[u8]) -> Option<&[u8]> {
         if let Some(equal_pos) = kv_pair.iter().position(|&b| b == b'=') {
             Some(&kv_pair[..equal_pos])
@@ -251,6 +375,26 @@ impl JournalFilter {
         }
     }
 
+    /// Converts the pending matches of the open group into one expression
+    /// and clears them.
+    ///
+    /// The key-sorted list is walked in runs of equal field names: a
+    /// single-value run becomes a [`FilterExpr::Match`], a multi-value run a
+    /// [`FilterExpr::Disjunction`] over the value set, and the per-key
+    /// results combine in a [`FilterExpr::Conjunction`].
+    ///
+    /// Every payload is resolved against `journal_file` here: hash it
+    /// ([`JournalFile::hash`] reads the header's keyed-hash flag), look
+    /// it up in the data hash table ([`JournalFile::find_data_offset`]), and
+    /// take the matched data object's entry-chain cursor
+    /// ([`DataObject::inlined_cursor`](crate::file::DataObject::inlined_cursor)).
+    /// A payload the
+    /// file does not contain, or a data object without an entry chain
+    /// (missing first entry, count or entry-array offset), becomes
+    /// [`FilterExpr::None`] - it matches nothing instead of failing the
+    /// build. Resolution errors (missing hash table, object layer)
+    /// propagate. The 0-element panic below is unreachable: the empty
+    /// early-return covers it.
     fn convert_current_matches<M: MemoryMap>(
         &mut self,
         journal_file: &JournalFile<M>,
@@ -266,14 +410,15 @@ impl JournalFilter {
             let current_key = Self::extract_key(&self.current_matches[i]).unwrap_or(&[]);
             let start = i;
 
-            // Find all matches with the same key
+            // Extend the run of matches sharing this field name.
             while i < self.current_matches.len()
                 && Self::extract_key(&self.current_matches[i]).unwrap_or(&[]) == current_key
             {
                 i += 1;
             }
 
-            // If we have multiple values for this key, create a disjunction
+            // Multiple values for one field name OR together; a single
+            // value stays a plain Match.
             if i - start > 1 {
                 let mut matches = Vec::with_capacity(i - start);
                 for idx in start..i {
@@ -314,12 +459,21 @@ impl JournalFilter {
         }
     }
 
+    /// Adds one `KEY=VALUE` payload to the open match group. Pairs without
+    /// `=` are ignored silently.
+    ///
+    /// The pair is inserted key-sorted: the binary search compares key bytes
+    /// only, so equal-key values stay unordered but adjacent. Identical
+    /// payloads are accepted again, producing duplicate arms in the same
+    /// value set. The ordering is what lets `convert_current_matches` group
+    /// same-key values into one disjunction.
     pub fn add_match(&mut self, kv_pair: &[u8]) {
         if kv_pair.contains(&b'=') {
             let new_item = kv_pair.to_vec();
             let new_key = Self::extract_key(&new_item).unwrap_or(&[]);
 
-            // Find the insertion position using binary search
+            // Key-sorted insert position; the comparison never looks at the
+            // value bytes.
             let pos = self
                 .current_matches
                 .binary_search_by(|item| {
@@ -328,11 +482,23 @@ impl JournalFilter {
                 })
                 .unwrap_or_else(|e| e);
 
-            // Insert at the found position
             self.current_matches.insert(pos, new_item);
         }
     }
 
+    /// Flushes the open match group and records `op` for the next one.
+    ///
+    /// The pending matches are converted and attached to the accumulated
+    /// expression with the PREVIOUSLY recorded operator (`Conjunction` when
+    /// nothing is recorded yet); `op` then becomes the operator for the next
+    /// flush. A group joined by the same operator is pushed into the
+    /// existing vec; a different operator wraps the accumulated expression
+    /// in a fresh vec. Flattening is sound only because `filter_expr` is
+    /// built exclusively here, so every element of a vec was joined by that
+    /// vec's operator.
+    ///
+    /// With no pending matches the call only records `op`. `Err` propagates
+    /// from match resolution.
     pub fn set_operation<M: MemoryMap>(
         &mut self,
         journal_file: &JournalFile<M>,
@@ -374,6 +540,12 @@ impl JournalFilter {
         Ok(())
     }
 
+    /// Closes the final match group and returns the accumulated expression.
+    ///
+    /// The flush uses the recorded operator; afterwards the filter is reset
+    /// (matches cleared, operator back to `Conjunction`), so it can
+    /// accumulate a fresh run. `Err(MalformedFilter)` when nothing was ever
+    /// added: no pending matches and no accumulated expression.
     pub fn build<M: MemoryMap>(&mut self, journal_file: &JournalFile<M>) -> Result<FilterExpr> {
         self.set_operation(journal_file, self.current_op)?;
 

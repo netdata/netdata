@@ -1,3 +1,21 @@
+//! The `NETDATA_OTEL_CFG_*` environment-variable layer of config resolution —
+//! the highest-precedence source in `mod.rs`' stock < user < env order.
+//!
+//! Names mirror the YAML keys: `NETDATA_OTEL_CFG_{SECTION}_{FIELD}` for the
+//! global sections (`ENDPOINT_`, `METRICS_`, `BASE_DIR`, `REMOTE_STORAGE_`,
+//! `AUTH_`) and `NETDATA_OTEL_CFG_{LOGS|TRACES}_{FIELD}` for per-signal
+//! tuning. Values parse like the YAML layer's overrides: integers and byte
+//! sizes (`"2GiB"`) via `FromStr`, durations (`"2 hours"`) via `humantime`.
+//!
+//! Resolution is snapshot-based and strict: the environment is scanned once,
+//! [`ConfigOverride::from_map`] resolves the snapshot, and a
+//! `NETDATA_OTEL_CFG_*` name no consumer recognizes aborts startup — the same
+//! deny-unknown contract as the YAML parser, so a typo cannot silently leave
+//! a setting at its stock default. Only `load_config` (`mod.rs`) consumes
+//! this module; the workers receive the merged effective config over IPC.
+//!
+//! `bridge::config` here is the shared `netdata-plugin/bridge` crate, whose
+//! `RotationEntry`/`RetentionEntry` shapes the per-signal values fill.
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
@@ -13,15 +31,18 @@ use super::signal::{
     AuthOverride, CatalogOverride, IngestOverride, RemoteStorageOverride, SignalOverride,
 };
 
-/// A snapshot of `NETDATA_OTEL_CFG_*` (name → raw value), so config resolution reads
-/// from an injected map rather than `std::env` and stays unit-testable. Values
-/// stay `OsString`; a value's UTF-8 is checked only when read ([`get_env`]).
-/// Every name in the snapshot must be recognized ([`EnvReader`]) — an unknown
-/// name is fatal before its value matters.
+/// A snapshot of the `NETDATA_OTEL_CFG_*` environment (name → raw value).
+/// Injecting the map instead of reading `std::env` inline keeps config
+/// resolution unit-testable. Values stay `OsString`: UTF-8 is checked only
+/// when a value is read ([`get_env`]). Every name in the snapshot must be
+/// recognized ([`EnvReader`]) — an unknown name is fatal before its value
+/// matters.
 pub(super) type EnvMap = HashMap<String, OsString>;
 
-/// Collect the `NETDATA_OTEL_CFG_*` environment into an [`EnvMap`] — the only
-/// reader of the process environment.
+/// Collect the `NETDATA_OTEL_CFG_*` environment into an [`EnvMap`] — the one
+/// full-environment scan in the plugin. Every other env read elsewhere in the
+/// crate (config dirs in `mod.rs`, identity in `supervisor.rs`) targets a
+/// single named variable.
 pub(super) fn otel_env_from_process() -> EnvMap {
     otel_env_from_iter(std::env::vars_os())
 }
@@ -48,11 +69,11 @@ pub(super) fn otel_env_from_iter(
     env
 }
 
-/// An [`EnvMap`] that records every name looked up, so that after resolution
-/// the leftovers — `NETDATA_OTEL_CFG_*` names no consumer recognizes, i.e. typos —
-/// can be rejected. The consumers query their full fixed vocabulary
-/// unconditionally, so "read" equals "recognized" by construction; there is no
-/// hand-maintained list of accepted names to drift out of sync.
+/// An [`EnvMap`] wrapper that records every name looked up, so that after
+/// resolution the leftovers — `NETDATA_OTEL_CFG_*` names no consumer
+/// recognizes, i.e. typos — can be rejected. Consumers query their full fixed
+/// vocabulary unconditionally, so "read" equals "recognized" by construction:
+/// there is no second, hand-maintained list of accepted names to drift.
 struct EnvReader<'a> {
     map: &'a EnvMap,
     read: RefCell<HashSet<String>>,
@@ -106,6 +127,9 @@ fn get_env<'a>(env: &EnvReader<'a>, name: &str) -> Result<Option<&'a str>> {
     }
 }
 
+/// Parse a variable with `FromStr` — the integer and byte-size knobs
+/// (`u64`/`usize`/`ByteSize`, e.g. `"2GiB"`). Unset yields `Ok(None)`; a
+/// value that fails to parse is an error naming the variable and value.
 fn parse_env_var<T: std::str::FromStr>(env: &EnvReader<'_>, name: &str) -> Result<Option<T>>
 where
     T::Err: std::fmt::Display,
@@ -119,6 +143,9 @@ where
     }
 }
 
+/// Parse a variable as a `humantime` duration (`"2 hours"`, `"30 seconds"`) —
+/// the value form the YAML layer's `opt_humantime` accepts. Unset yields
+/// `Ok(None)`; an unparseable value is an error naming the variable.
 fn parse_env_duration(env: &EnvReader<'_>, name: &str) -> Result<Option<Duration>> {
     match get_env(env, name)? {
         Some(val) => humantime::parse_duration(val)
@@ -147,11 +174,13 @@ fn parse_env_bool(env: &EnvReader<'_>, name: &str) -> Result<Option<bool>> {
 }
 
 impl ConfigOverride {
-    /// Build the config overrides from an [`EnvMap`] snapshot of `NETDATA_OTEL_CFG_*`
-    /// variables. Pure: reads only the provided map, never the process env.
-    /// A name in the snapshot that no consumer recognizes is an error — the
-    /// consumers below query their full vocabulary unconditionally, so after
-    /// they run, an unread name can only be a typo or a removed variable.
+    /// Build the config overrides from an [`EnvMap`] snapshot of the
+    /// `NETDATA_OTEL_CFG_*` variables. Pure: reads only the provided map,
+    /// never the process env (tests build maps directly). Strictness — a name
+    /// no consumer recognizes is fatal — is [`EnvReader`]'s job, described
+    /// there. The `has_any` guards before returning collapse a section no
+    /// variable touched back to `None`, so the env layer counts as present
+    /// only where at least one variable was set.
     pub(super) fn from_map(env: &EnvMap) -> Result<Self> {
         let env = &EnvReader::new(env);
         let endpoint = EndpointOverride::from_map(env)?;
@@ -241,9 +270,11 @@ impl AuthOverride {
 }
 
 impl SignalOverride {
-    /// Build a per-signal tuning override from `NETDATA_OTEL_CFG_{PREFIX}_*` entries
-    /// in the map (`PREFIX` is `LOGS` or `TRACES`). Dirs and storage are not
-    /// per-signal and so have no per-signal env vars.
+    /// Build a per-signal tuning override from `NETDATA_OTEL_CFG_{PREFIX}_*`
+    /// entries in the map (`PREFIX` is `LOGS` or `TRACES`). Dirs and storage
+    /// are not per-signal and so have no per-signal env vars. Rotation and
+    /// retention are per-tenant maps in YAML; the env vars can only fill the
+    /// `default` tenant's entry.
     fn from_map(env: &EnvReader<'_>, prefix: &str) -> Result<Self> {
         let rotation_default = bridge::config::RotationEntry {
             max_file_size: parse_env_var(env, &var(prefix, "ROTATION_MAX_FILE_SIZE"))?,
@@ -298,7 +329,8 @@ impl SignalOverride {
             } else {
                 None
             },
-            // The legacy journal dir has no env var; it is a YAML-only key.
+            // The former plugin's journal dir stays YAML-only (`logs.journal_dir`,
+            // consumed by `resolve_legacy_journal_dir`); no env var exists for it.
             journal_dir: None,
         })
     }

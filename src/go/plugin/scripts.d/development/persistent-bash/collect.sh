@@ -15,7 +15,9 @@ while nd_next; do
     state=ok
     [[ $count != 1 ]] || state=critical
     nd_begin
-    nd_metric processed_total "$count" queue mail
-    nd_check backlog "$state" queue mail
+    nd_metric processed_total counter jobs
+    nd_sample "$ND_FAMILY" "$count" queue mail
+    nd_check backlog 'Queue Backlog' queue
+    nd_check_sample "$ND_FAMILY" "$state" queue mail
     nd_end
 done

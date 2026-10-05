@@ -81,6 +81,13 @@ requests follow the exceptions above. Remote mutation or durable local state sel
    fakes carry independent semantics, and what cannot be verified locally and is therefore stated as unverified. Test
    rules live in the V2 skill's Tests section.
 
+## Function Ownership
+
+When designing Functions over process-owned data, choose the owner independently from collector selection.
+Use `src/go/pkg/funcapi/README.md#process-function-providers` for provider, module-bound and job-backed lifetimes.
+A collector switch and a Function over retained history are distinct operator contracts; record their intended
+relationship in the design note before choosing registration.
+
 ## Architecture Gate
 
 For configured vnode acquisition and named attachment, use
@@ -158,6 +165,12 @@ measured unhealthy target from an inability to collect; make sure the framework 
 observations; check every early return against the table. Comparisons follow the wording ("exceeding" is strict).
 
 ## Lifecycle Entry Points
+
+When a migration changes the ownership unit, trace subordinate constructors, workers and read APIs as well as the
+native collector. When the approved ownership unit is one entity, the job SHOULD construct that state directly; remove
+obsolete reconciliation, entity selectors and per-entity bookkeeping from its private components. Retain inventories,
+routing and aggregation at owners that still serve multiple entities or jobs, and retain identity in transport/history records.
+Validate isolation using independently constructed jobs, including replacement and retirement of one while another runs.
 
 **When:** designing `Init`, `Check`, `Collect`, `Cleanup`, and any `Run`. **Do:** review every entry point, including
 partial initialization, DynCfg `test`, autodetection, reload, and stop, not only `Collect` followed by a clean

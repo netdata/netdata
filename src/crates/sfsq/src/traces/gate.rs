@@ -1,92 +1,100 @@
 //! The trace-level pre-assembly gate: the rollup-backed superset
-//! filter that spares [`search`](super::search::search) an assembly per
-//! provably non-matching candidate.
+//! filter that spares [`search`](super::search::search) an assembly
+//! per provably non-matching candidate.
 //!
 //! Trace-level predicates (`trace:root_service_name` / `trace:root_name`
-//! selections, `trace:duration` lower bounds) are decided post-assembly;
-//! without a gate every candidate in the window is assembled just to be
-//! discarded, and rare predicates burn the assembled ceiling on
-//! discards. The per-file `TRSU` rollup already stores each trace's
-//! envelope and recorded root per file, so the gate sits at the examine
-//! loop's `pool.pop()` and asks: could this candidate possibly match?
+//! selections, `trace:duration` lower bounds) are decided
+//! post-assembly; without a gate every candidate in the window is
+//! assembled just to be discarded, and rare predicates burn the
+//! assembled ceiling on discards. The per-file `TRSU` rollup already
+//! stores each trace's envelope and recorded root, so the gate sits at
+//! the examine loop's `pool.pop()` and asks: could this candidate
+//! possibly match?
 //!
 //! # The superset contract
 //!
-//! The gate only ever SKIPS an assembly when the rollup evidence PROVES
-//! a non-match; failing any precondition means UNPRUNABLE — the
-//! candidate assembles and the post-assembly evaluator stays the truth.
-//! The known exception is the documented recorded-vs-canonical root
-//! divergence mechanisms (see [`search`](super::search)'s module docs):
-//! accepted, recall-miss only, by explicit ruling.
+//! The gate only ever SKIPS an assembly when the rollup evidence
+//! PROVES a non-match; failing any precondition means UNPRUNABLE —
+//! the candidate assembles and the post-assembly evaluator stays the
+//! truth. The known exception is the recorded-vs-canonical root
+//! divergence (see [`search`](super::search)'s module docs), accepted
+//! by explicit ruling as recall-miss only.
 //!
-//! The caller engages the gate only when every completion source opened
-//! at setup: a source that failed or was unavailable holds spans the
-//! gate cannot see, so every assembly is already degraded and nothing
-//! may be pruned toward.
+//! The caller engages the gate only when every completion source
+//! opened at setup: a source that failed or was unavailable holds
+//! spans the gate cannot see, so every assembly is already degraded
+//! and nothing may be pruned toward.
 //!
-//! Prune preconditions, per candidate:
+//! # Prune rules
 //!
-//! - NOT in any tail's provenance (tails have no rollup; a tail span
-//!   could change the root or extend the envelope).
-//! - Coverage-complete: every surviving completion file is either
+//! The first two rules are preconditions; the last three each prove a
+//! non-match on their own:
+//!
+//! - **Tail presence**: the candidate is in any tail's provenance →
+//!   unprunable (tails have no rollup; a tail span could change the
+//!   root or extend the envelope).
+//! - **Coverage-complete**: every surviving completion file is either
 //!   bloom-proven absent for the candidate or has a decoded rollup
 //!   (a present row is evidence; a missing row in a validly decoded
 //!   rollup proves the trace absent from that file). A file with no
 //!   rollup chunk (pre-rollup retention) is Uncovered and blocks
 //!   pruning for every candidate it might contain.
-//! - No-root prune (any root condition, either polarity — decision
-//!   1D): when every covering row PROVES local root absence
-//!   (`ROOT_CLAIM_NONE`), the assembled trace has no unset-parent span
-//!   and no root condition can be satisfied (absent-never-satisfies).
-//!   A `ROOT_CLAIM_WITHHELD` row (ambiguous tie abstention) blocks
-//!   BOTH root rules — real roots exist there, values unknown.
-//! - All-claims-fail (positive conditions only): at least one row
+//! - **No root** (any root condition, either polarity — decision 1D):
+//!   every covering row proves LOCAL root absence
+//!   (`ROOT_CLAIM_NONE`), so the assembled trace has no unset-parent
+//!   span and no root condition can be satisfied
+//!   (absent-never-satisfies). A `ROOT_CLAIM_WITHHELD` row (ambiguous
+//!   tie abstention) blocks BOTH root rules — real roots exist there,
+//!   values unknown.
+//! - **All claims fail** (positive conditions only): at least one row
 //!   claims a true root AND every claiming row's resolved value fails
 //!   the condition. No cross-file root selection is ever attempted —
 //!   the rollup has no root start, so "the" root is not identifiable
 //!   across files; all-claims-fail needs no ordering.
-//! - Duration rule: the MERGED cross-file envelope
+//! - **Duration**: the MERGED cross-file envelope
 //!   (`max(max_end) - min(min_start)`, saturating) falls below the
 //!   compiled lower bound. The envelope over-estimates the canonical
 //!   duration, so only lower-bound violations are provable.
 //!
 //! # Corrupt files: skip and surface
 //!
-//! Per the project principle, a file that proves itself corrupt in ANY
-//! way — an undecodable TBLM or TRSU chunk, or a rollup ref the
-//! resolver cannot map to a proven value in its field (the closed rule;
-//! see [`sfst::RollupRootResolver`]) — becomes a FAILED SOURCE from the
-//! point of discovery: the gate stops consulting it, and the caller
-//! surfaces the skip (`SourceFailure` + degraded assembly), never a
-//! silent downgrade. The candidate that exposed the corruption is
-//! excluded either way: a resolver-corrupt ref returns `Assemble`
-//! directly, while a TBLM/TRSU decode failure only drops the file from
-//! the evidence set — the candidate MAY then prune on the remaining
-//! files, which is result-neutral ONLY because the caller's
-//! `degraded_assembly` flag makes the truth path exclude every
-//! post-discovery candidate as indeterminate. If that tri-state
-//! exclusion ever weakens, this prune becomes a false prune — the two
-//! contracts are coupled. An ABSENT chunk is a version fact, not
-//! corruption: absent TBLM = might-contain for every candidate; absent
-//! TRSU = Uncovered.
+//! A file that proves itself corrupt in ANY way — an undecodable TBLM
+//! or TRSU chunk, or a rollup ref the resolver cannot map to a proven
+//! value in its field (the closed rule; see
+//! [`sfst::RollupRootResolver`]) — becomes a FAILED SOURCE from the
+//! point of discovery:
 //!
-//! One consequence is RECORDED as a deliberate status delta: a pruned
-//! candidate's assembly never runs, so corruption living only in chunks
-//! that assembly alone reads (columns, stream batches) goes
-//! UNDISCOVERED on gate-engaged queries that prune the affected
-//! candidates — gate-off would have surfaced `SourceFailure`. Same
-//! class as the pinned SizeCap delta: the would-have-been partials of a
-//! pruned candidate are unobserved by design (and gate-off queries
-//! never read TRSU, so laziness of discovery cuts both ways).
+//! - the gate stops consulting it and queues the discovery for the
+//!   caller ([`TraceGate::take_new_failures`]), which surfaces the
+//!   skip (`SourceFailure` + degraded assembly) — never a silent
+//!   downgrade;
+//! - the candidate that exposed the corruption is excluded either
+//!   way: a resolver-corrupt ref returns `Assemble` directly, while a
+//!   TBLM/TRSU decode failure only drops the file from the evidence
+//!   set — the candidate MAY then prune on the remaining files,
+//!   result-neutral ONLY because the caller's `degraded_assembly`
+//!   flag makes the truth path exclude every post-discovery candidate
+//!   as indeterminate. If that tri-state exclusion ever weakens, this
+//!   prune becomes a false prune — the two contracts are coupled;
+//! - an ABSENT chunk is a version fact, not corruption: absent TBLM =
+//!   might-contain for every candidate; absent TRSU = Uncovered.
+//!
+//! Recorded status delta: a pruned candidate's assembly never runs,
+//! so corruption living only in chunks that assembly alone reads
+//! (columns, stream batches) goes UNDISCOVERED on gate-engaged
+//! queries that prune the affected candidates — gate-off would have
+//! surfaced `SourceFailure`. Same class as the pinned SizeCap delta
+//! (and gate-off queries never read TRSU, so laziness of discovery
+//! cuts both ways).
 //!
 //! # Cost accounting
 //!
 //! Pruned pops deliberately do NOT charge the assembled ceiling (that
 //! is the point) and the gate's probes are uncharged — the trade for
 //! the assemblies they replace. Termination is by pool drain; refills
-//! stay bounded by the visited-rows ceiling. Decodes and probes are
-//! counted in [`GateStats`] and surfaced via `tracing::debug!` by the
-//! caller.
+//! stay bounded by the visited-rows ceiling. Probes and decodes are
+//! counted in [`GateStats`] and logged once per query via
+//! `tracing::debug!` by the caller.
 
 use std::collections::HashSet;
 
@@ -143,6 +151,7 @@ enum RollupState {
     Ready(Box<sfst::TraceRollup>),
 }
 
+/// One completion file's gate state, indexed in reader order.
 struct GateFile<'r, 'a> {
     reader: &'r sfst::IndexReader<'a>,
     bloom: BloomState,
@@ -165,9 +174,14 @@ struct RowEvidence {
 enum RowVerdict {
     Matches,
     Fails,
+    /// Unresolvable ref (the closed corruption rule): the caller marks
+    /// the file failed; this candidate assembles.
     Corrupt,
 }
 
+/// The trace-level pre-assembly gate over one query's completion
+/// readers: per-file evidence caches plus the compiled prune rules,
+/// consulted per popped candidate.
 pub(crate) struct TraceGate<'r, 'a, 'e> {
     files: Vec<GateFile<'r, 'a>>,
     /// Trace ids with ANY tail presence — unprunable wholesale.
@@ -280,9 +294,8 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
             }
         }
         // No-root prune: every covering row proves LOCAL root absence,
-        // so the assembled trace (tails already excluded) has no
-        // unset-parent span — under true-root filter semantics no root
-        // condition, negated included, can be satisfied.
+        // so the assembled trace has no unset-parent span — no root
+        // condition, negated included, can be satisfied (decision 1D).
         if self.has_root_conditions && !rows.is_empty() && !any_claim && !any_withheld {
             self.stats.no_root_prunes += 1;
             self.stats.prunes += 1;
@@ -292,9 +305,9 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
         // ── Root rule: prune iff ≥1 true-root claim and ALL fail ─────
         // Index-iterated, copying each (Copy) pair out per round — the
         // matcher borrows the eval, not the gate, so per-row file state
-        // stays freely borrowable without cloning the list per pop. A
-        // withheld claim hides real unset-parent spans with unknown
-        // values, so all-claims-fail cannot be proven — rule skipped.
+        // stays freely borrowable without cloning the list per pop.
+        // Withheld claims hide real unset-parent spans of unknown
+        // value — all-claims-fail is unprovable, so the rule is skipped.
         let positive_conditions = if any_withheld { 0 } else { self.root_conditions.len() };
         'condition: for ci in 0..positive_conditions {
             let (field, matcher) = self.root_conditions[ci];
@@ -426,6 +439,9 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
         }
     }
 
+    /// Decode (once) and report the file's rollup state. A decode
+    /// failure marks the file corrupt and reports
+    /// [`RollupProbe::Failed`].
     fn decode_rollup(&mut self, idx: usize) -> RollupProbe {
         if matches!(self.files[idx].rollup, RollupState::Undecoded) {
             let reader = self.files[idx].reader;
@@ -452,6 +468,8 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
         }
     }
 
+    /// Record the file as proven corrupt: out of the evidence set from
+    /// now on, queued for the caller to surface.
     fn mark_failed(&mut self, idx: usize) {
         if !self.files[idx].failed {
             self.files[idx].failed = true;
@@ -461,8 +479,12 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
     }
 }
 
+/// One file's rollup readiness during evidence collection.
 enum RollupProbe {
+    /// No TRSU chunk: Uncovered — forces UNPRUNABLE for this candidate.
     Uncovered,
+    /// Decode failed: the file was marked corrupt; skip it.
     Failed,
+    /// Decoded; its rows join the evidence set.
     Ready,
 }

@@ -5,6 +5,7 @@ package native
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
@@ -17,8 +18,8 @@ const (
 	contextNamespace   = "native_script"
 )
 
-// chartTemplates compiles an optional authored template together with the
-// built-in check charts. Without a template, metrics get automatic charts.
+// chartTemplates compiles immutable package templates. Checks are selected by
+// each job's current snapshot. Without a template, metrics get automatic charts.
 func (d packageDefinition) chartTemplates(data []byte) (*chartengine.TemplateSet, error) {
 	if d.functionOnly() {
 		if data != nil {
@@ -41,7 +42,7 @@ func (d packageDefinition) chartTemplates(data []byte) (*chartengine.TemplateSet
 			return nil, errors.New("invalid chart template")
 		}
 		spec.Entries, spec.Policy, spec.FallbackContextNamespace = set.Entries(), set.GlobalPolicy(), set.FallbackContextNamespace()
-		if len(d.Checks) > 0 && spec.Policy.Selector != nil {
+		if spec.Policy.Selector != nil {
 			return nil, errors.New("global chart selector cannot filter built-in checks; use chart selectors instead")
 		}
 		for _, entry := range spec.Entries {
@@ -50,48 +51,71 @@ func (d packageDefinition) chartTemplates(data []byte) (*chartengine.TemplateSet
 			}
 		}
 	}
-	if groups := d.checkChartGroups(); len(groups) > 0 {
-		checks := chartengine.TemplateEntry{
-			ID:               "native_checks",
-			ContextNamespace: contextNamespace,
-			Groups:           groups,
-		}
-		spec.Entries = append([]chartengine.TemplateEntry{checks}, spec.Entries...)
-	}
 	return chartengine.NewTemplateSet(spec)
 }
 
-// checkChartGroups builds one state chart per check, instanced by its identity labels.
-func (d packageDefinition) checkChartGroups() []charttpl.Group {
-	var groups []charttpl.Group
-	for _, check := range d.Checks {
-		var instances *charttpl.Instances
-		if len(check.ByLabels) > 0 {
-			instances = &charttpl.Instances{
-				ByLabels: check.ByLabels,
-			}
-		}
-		metric := checkMetricName(check.ID)
-		groups = append(groups, charttpl.Group{
-			Family:  "Checks",
-			Metrics: []string{metric},
-			Charts: []charttpl.Chart{{
-				ID:        checkChartIDPrefix + check.ID,
-				Title:     check.Title,
-				Context:   "check_state",
-				Units:     "state",
-				Instances: instances,
-				Lifecycle: &charttpl.Lifecycle{
-					ExpireAfterCycles: 1,
-				},
-				Dimensions: []charttpl.Dimension{{
-					Selector:      metric,
-					NameFromLabel: metric,
-				}},
-			}},
+// One stable entry per check isolates replacements from unchanged siblings.
+func (c *Collector) updateCheckTemplates(families []checkFamily) error {
+	var definitions []checkDefinition
+	for _, family := range families {
+		definitions = append(definitions, family.checkDefinition)
+	}
+	if reflect.DeepEqual(c.checks, definitions) {
+		return nil
+	}
+	base := c.definition.templates
+	if base == nil {
+		return errors.New("collection requires chart templates")
+	}
+	entries := make([]chartengine.TemplateEntry, 0, len(definitions)+len(base.Entries()))
+	for _, check := range definitions {
+		entries = append(entries, chartengine.TemplateEntry{
+			ID:               checkChartIDPrefix + check.ID,
+			ContextNamespace: contextNamespace,
+			Groups:           checkChartGroups(check),
 		})
 	}
-	return groups
+	entries = append(entries, base.Entries()...)
+	set, err := chartengine.NewTemplateSet(chartengine.TemplateSetSpec{
+		FallbackContextNamespace: base.FallbackContextNamespace(),
+		Policy:                   base.GlobalPolicy(),
+		Entries:                  entries,
+	})
+	if err != nil {
+		return errors.New("invalid check chart templates")
+	}
+	c.templates, c.checks = set, definitions
+	return nil
+}
+
+// checkChartGroups builds one state chart, instanced by its identity labels.
+func checkChartGroups(check checkDefinition) []charttpl.Group {
+	var instances *charttpl.Instances
+	if len(check.ByLabels) > 0 {
+		instances = &charttpl.Instances{
+			ByLabels: check.ByLabels,
+		}
+	}
+	metric := checkMetricName(check.ID)
+	return []charttpl.Group{{
+		Family:  "Checks",
+		Metrics: []string{metric},
+		Charts: []charttpl.Chart{{
+			ID:            checkChartIDPrefix + check.ID,
+			Title:         check.Title,
+			Context:       "check_state",
+			Units:         "state",
+			Instances:     instances,
+			LabelPromoted: append([]string{}, check.ByLabels...),
+			Lifecycle: &charttpl.Lifecycle{
+				ExpireAfterCycles: 1,
+			},
+			Dimensions: []charttpl.Dimension{{
+				Selector:      metric,
+				NameFromLabel: metric,
+			}},
+		}},
+	}}
 }
 
 func validateChartIDs(groups []charttpl.Group) error {

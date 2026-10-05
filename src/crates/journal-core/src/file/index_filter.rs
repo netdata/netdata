@@ -1,16 +1,65 @@
+//! Bitmap-based filter over a prebuilt file index. [`IndexFilterExpr`]
+//! resolves `FIELD=VALUE` matches to roaring bitmaps of entry indices and
+//! combines them with set operations; [`IndexFilter`] accumulates
+//! caller-supplied matches into one such expression - the eager bitmap
+//! analog of file/filter.rs's cursor-based `JournalFilter`/`FilterExpr`
+//! (same builder shape and `LogicalOp`; pre-resolved bitmaps instead of
+//! lazily stepped entry chains; infallible instead of `Result`).
+//!
+//! Verified status: this file is an uncompiled orphan. No `mod
+//! index_filter` declaration exists anywhere (file/mod.rs declares
+//! cursor..writer without it), and the file could not compile even if
+//! declared: `super::index` and `crate::index` resolve to nothing in
+//! journal-core (lib.rs declares only error, collections, file,
+//! field_map, repository), `roaring` is not a dependency of this crate
+//! (Cargo.toml), and the tests' own imports fail too (`crate::index`
+//! unresolved, `FxHashMap` unimported). Grep across src/crates finds
+//! `IndexFilterExpr`/`IndexFilter` referenced only in this file.
+//!
+//! The index shape it targets matches nothing shipped: no crate defines
+//! a `FileIndex` with an `entries_index` field keyed by raw
+//! `"FIELD=VALUE"` strings plus a `file_histogram.get_entry_range()`.
+//! The live bitmap-filter line is src/crates/journal-index: its
+//! `FileIndex` (file_index.rs) keys bitmaps by typed `FieldValuePair`
+//! under a `Histogram`, and its `Filter` (filter.rs) is the consumed
+//! evaluator.
+//!
+//! Implied contract: bitmap bits are entry indices - positions in one
+//! index's entry list, not file offsets - so a bitmap is only meaningful
+//! against the index it was built from; only
+//! `matching_indices_in_bucket` couples an expression back to an index.
+//! A pair the index lacks resolves to [`IndexFilterExpr::None`], which
+//! matches nothing instead of failing the build.
 use super::index::FileIndex;
 use roaring::RoaringBitmap;
 
+/// A filter expression over a prebuilt index's entry-index bitmaps,
+/// evaluated by [`IndexFilterExpr::matching_indices`] to the set of
+/// matching indices.
 #[derive(Clone, Debug)]
 pub enum IndexFilterExpr {
+    /// Matches nothing. Produced for a matched pair the index does not
+    /// contain; evaluates to an empty bitmap.
     None,
+    /// One pair's entry-index bitmap, taken as-is at build time and
+    /// cloned on evaluation.
     Match(RoaringBitmap),
+    /// Intersection of sub-expressions: the AND across matched field
+    /// names. An empty vec yields an empty bitmap.
     Conjunction(Vec<IndexFilterExpr>),
+    /// Union of sub-expressions: the OR across a field's value set. An
+    /// empty vec yields an empty bitmap.
     Disjunction(Vec<IndexFilterExpr>),
 }
 
 impl IndexFilterExpr {
-    /// Get all entry indices that match this filter expression
+    /// The set of entry indices matching this expression: the `Match`
+    /// bitmap, the intersection across a conjunction, or the union across
+    /// a disjunction; `None` yields an empty set.
+    ///
+    /// Fully materialized on every call, with a conjunction early-exiting
+    /// once its intersection is empty. Independent of any `FileIndex`:
+    /// the bitmaps were resolved at build time.
     pub fn matching_indices(&self) -> RoaringBitmap {
         match self {
             IndexFilterExpr::None => RoaringBitmap::new(),
@@ -39,12 +88,18 @@ impl IndexFilterExpr {
         }
     }
 
-    /// Count the number of matching entries
+    /// Number of matching entry indices. Evaluates the full set; there
+    /// is no cheaper path than `matching_indices().len()`.
     pub fn count(&self) -> u64 {
         self.matching_indices().len()
     }
 
-    /// Check if there are any matching entries
+    /// Whether the expression has matches, without intersecting
+    /// anything. Exact for `None`/`Match`/`Disjunction`; for a
+    /// `Conjunction` only necessary, not sufficient - every arm must be
+    /// non-empty, but the arms may still intersect to nothing (a
+    /// conjunction of the two `_SYSTEMD_UNIT` values used in the tests
+    /// below would report true over an empty intersection).
     pub fn has_matches(&self) -> bool {
         match self {
             IndexFilterExpr::None => false,
@@ -58,7 +113,11 @@ impl IndexFilterExpr {
         }
     }
 
-    /// Get matching indices within a specific range
+    /// Matching entry indices restricted to the inclusive index range
+    /// `start..=end`: the full set materialized first, then indices
+    /// below `start` and above `end` removed. `end + 1` overflows at
+    /// `end == u32::MAX` (panics in debug; wraps and empties the result
+    /// in release).
     pub fn matching_indices_in_range(&self, start: u32, end: u32) -> RoaringBitmap {
         let mut result = self.matching_indices();
         result.remove_range(..start);
@@ -66,7 +125,10 @@ impl IndexFilterExpr {
         result
     }
 
-    /// Get matching indices within specific histogram bucket
+    /// Matching entry indices inside one histogram bucket: the bucket's
+    /// entry-index range from `file_index.file_histogram`, then
+    /// `matching_indices_in_range` on it. `None` when the bucket holds
+    /// no entries.
     pub fn matching_indices_in_bucket(
         &self,
         file_index: &FileIndex,
@@ -77,16 +139,35 @@ impl IndexFilterExpr {
     }
 }
 
+/// The operator recorded between match groups while `IndexFilter`
+/// accumulates; see `IndexFilter::set_operation`. Identical to the
+/// `LogicalOp` of file/filter.rs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogicalOp {
     Conjunction,
     Disjunction,
 }
 
+/// Accumulates `FIELD=VALUE` matches into an [`IndexFilterExpr`],
+/// resolving each pair against a prebuilt [`FileIndex`] when its group
+/// is closed.
+///
+/// Grouping mirrors systemd-journal match semantics, as in file/filter.rs's
+/// `JournalFilter`: matches accumulate in groups; within a group the
+/// values of a shared field name OR together and distinct field names AND
+/// together. Each group-closing call also records the operator joining
+/// the NEXT group, `Conjunction` until then - so `A=1; add_disjunction;
+/// B=2; build` yields `A=1 OR B=2`.
 #[derive(Debug)]
 pub struct IndexFilter {
+    /// The expression accumulated so far, or `None` before the first
+    /// group-closing call that had matches to flush.
     filter_expr: Option<IndexFilterExpr>,
+    /// Pending `FIELD=VALUE` strings of the open group, kept sorted by
+    /// field name (see `add_match`).
     current_matches: Vec<String>,
+    /// The operator the next flushed group will be attached with; set by
+    /// the previous group-closing call.
     current_op: LogicalOp,
 }
 
@@ -101,17 +182,36 @@ impl Default for IndexFilter {
 }
 
 impl IndexFilter {
-    /// Create a new empty filter
+    /// An empty filter: no accumulated expression, no pending matches.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Extract the field key from a field=value pair
+    /// The field name of a `FIELD=VALUE` pair: everything before the
+    /// first `=`. A string without `=` yields the whole string (`split`
+    /// always yields a first part, so this never returns `None`);
+    /// `add_match` filters those out anyway. The sort and grouping key
+    /// for the pending matches.
     fn extract_key(field_value: &str) -> Option<&str> {
         field_value.split('=').next()
     }
 
-    /// Convert current matches to a filter expression
+    /// Converts the pending matches of the open group into one expression
+    /// and clears them.
+    ///
+    /// The key-sorted list is walked in runs of equal field names: a
+    /// single-value run becomes one [`IndexFilterExpr::Match`], a
+    /// multi-value run a [`IndexFilterExpr::Disjunction`] over the value
+    /// set, and the per-key results combine in an
+    /// [`IndexFilterExpr::Conjunction`].
+    ///
+    /// Every pair is resolved here by lookup in the index's
+    /// `entries_index`; a pair the index does not contain becomes
+    /// [`IndexFilterExpr::None`] - it matches nothing instead of failing.
+    /// Infallible, unlike the file/filter.rs twin, which propagates
+    /// resolution errors. Returns `None` with no pending matches; the
+    /// 0-element arm below is unreachable, since each pending pair
+    /// contributes exactly one element.
     fn convert_current_matches(&mut self, file_index: &FileIndex) -> Option<IndexFilterExpr> {
         if self.current_matches.is_empty() {
             return None;
@@ -120,7 +220,8 @@ impl IndexFilter {
         let mut elements = Vec::new();
         let mut i = 0;
 
-        // Sort current matches by key for grouping
+        // Sort by field name for the grouping walk; add_match already
+        // inserts key-sorted, so this is normally a no-op.
         self.current_matches.sort_by(|a, b| {
             let key_a = Self::extract_key(a).unwrap_or("");
             let key_b = Self::extract_key(b).unwrap_or("");
@@ -131,14 +232,15 @@ impl IndexFilter {
             let current_key = Self::extract_key(&self.current_matches[i]).unwrap_or("");
             let start = i;
 
-            // Find all matches with the same key
+            // Extend the run of pending matches sharing this field name.
             while i < self.current_matches.len()
                 && Self::extract_key(&self.current_matches[i]).unwrap_or("") == current_key
             {
                 i += 1;
             }
 
-            // If we have multiple values for this key, create a disjunction
+            // Multiple values for one field name OR together; a single
+            // value stays a plain Match.
             if i - start > 1 {
                 let mut matches = Vec::with_capacity(i - start);
                 for idx in start..i {
@@ -169,7 +271,14 @@ impl IndexFilter {
         }
     }
 
-    /// Add a field=value match to the current filter being built
+    /// Adds one `FIELD=VALUE` pair to the open match group. Strings
+    /// without `=` are ignored silently.
+    ///
+    /// The pair is inserted key-sorted: the binary search compares field
+    /// names only, so equal-key values stay unordered but adjacent, and
+    /// duplicates are accepted as-is. The ordering is what lets
+    /// `convert_current_matches` group same-key values into one
+    /// disjunction.
     ///
     /// # Examples
     /// ```
@@ -192,7 +301,20 @@ impl IndexFilter {
         }
     }
 
-    /// Set the logical operation for combining the current matches with the existing filter
+    /// Flushes the open match group and records `op` for the next one.
+    ///
+    /// The pending matches are converted and attached to the accumulated
+    /// expression with the PREVIOUSLY recorded operator (`Conjunction`
+    /// when nothing is recorded yet); `op` then becomes the operator for
+    /// the next flush. A group joined by the same operator is pushed
+    /// into the existing vec; a different operator wraps the accumulated
+    /// expression in a fresh vec - sound only because `filter_expr` is
+    /// built exclusively here, so every vec element was joined by that
+    /// vec's operator.
+    ///
+    /// With no pending matches the call only records `op`. Infallible:
+    /// resolution failures degrade to `IndexFilterExpr::None` arms,
+    /// never errors (the file/filter.rs twin returns `Result`).
     pub fn set_operation(&mut self, file_index: &FileIndex, op: LogicalOp) {
         let new_expr = self.convert_current_matches(file_index);
         if new_expr.is_none() {
@@ -229,17 +351,26 @@ impl IndexFilter {
         self.current_op = op;
     }
 
-    /// Add conjunction (AND) operation
+    /// Shorthand for `set_operation(&file_index, LogicalOp::Conjunction)`:
+    /// closes the pending group, AND-ing it into the filter.
     pub fn add_conjunction(&mut self, file_index: &FileIndex) {
         self.set_operation(file_index, LogicalOp::Conjunction);
     }
 
-    /// Add disjunction (OR) operation
+    /// Shorthand for `set_operation(&file_index, LogicalOp::Disjunction)`:
+    /// closes the pending group, OR-ing it into the filter.
     pub fn add_disjunction(&mut self, file_index: &FileIndex) {
         self.set_operation(file_index, LogicalOp::Disjunction);
     }
 
-    /// Build the final filter expression
+    /// Closes the final match group and returns the accumulated
+    /// expression.
+    ///
+    /// The flush attaches pending matches with the recorded operator;
+    /// afterwards the filter is reset (matches cleared, operator back to
+    /// `Conjunction`), so it can accumulate a fresh run. Returns
+    /// [`IndexFilterExpr::None`] when nothing was ever added - unlike the
+    /// file/filter.rs twin, which fails with `MalformedFilter`.
     pub fn build(&mut self, file_index: &FileIndex) -> IndexFilterExpr {
         self.set_operation(file_index, self.current_op);
 
@@ -248,7 +379,9 @@ impl IndexFilter {
         self.filter_expr.take().unwrap_or(IndexFilterExpr::None)
     }
 
-    /// Convenience method to create a simple match filter
+    /// One pair's expression, resolved straight from the index: its
+    /// [`IndexFilterExpr::Match`] bitmap, or [`IndexFilterExpr::None`]
+    /// when the index does not contain the pair.
     pub fn simple_match(file_index: &FileIndex, field_value: &str) -> IndexFilterExpr {
         if let Some(bitmap) = file_index.entries_index.get(field_value) {
             IndexFilterExpr::Match(bitmap.clone())
@@ -257,7 +390,10 @@ impl IndexFilter {
         }
     }
 
-    /// Convenience method to create a conjunction of multiple field=value pairs
+    /// AND of several pairs, built through the same grouping as the
+    /// accumulator: distinct field names AND together, repeated values
+    /// of one field name OR together. Unknown pairs contribute
+    /// [`IndexFilterExpr::None`] arms.
     pub fn conjunction(file_index: &FileIndex, field_values: &[&str]) -> IndexFilterExpr {
         let mut filter = IndexFilter::new();
         for field_value in field_values {
@@ -266,7 +402,10 @@ impl IndexFilter {
         filter.build(file_index)
     }
 
-    /// Convenience method to create a disjunction of multiple field=value pairs
+    /// OR of several pair lookups. An empty list yields
+    /// [`IndexFilterExpr::None`]; a single pair collapses to its own
+    /// arm; unknown pairs become `None` arms, so a disjunction over only
+    /// unknown pairs matches nothing.
     pub fn disjunction(file_index: &FileIndex, field_values: &[&str]) -> IndexFilterExpr {
         let matches: Vec<_> = field_values
             .iter()
@@ -285,13 +424,15 @@ impl IndexFilter {
 
 #[cfg(test)]
 mod tests {
+    // Draft-shape fixture, built by struct literal: the fields below
+    // (`file_histogram`, `entries_index`) exist on no shipped `FileIndex`.
     use super::*;
     use crate::index::{FileHistogram, FileIndex};
 
     fn create_test_file_index() -> FileIndex {
         let mut entry_indices = FxHashMap::default();
 
-        // Add some test data
+        // Fixture pairs: raw "FIELD=VALUE" strings -> entry-index bitmaps.
         entry_indices.insert(
             "_SYSTEMD_UNIT=ssh.service".to_string(),
             RoaringBitmap::from_sorted_iter([1, 3, 5, 7]).unwrap(),
@@ -354,12 +495,12 @@ mod tests {
         let file_index = create_test_file_index();
         let mut filter = IndexFilter::new();
 
-        // Add matches for same key (will be OR'd)
+        // Two values of one field name: they OR together inside the group.
         filter.add_match("_SYSTEMD_UNIT=ssh.service");
         filter.add_match("_SYSTEMD_UNIT=nginx.service");
         filter.add_conjunction(&file_index);
 
-        // Add another condition (will be AND'd with above)
+        // Next group, attached with the recorded Conjunction.
         filter.add_match("PRIORITY=6");
 
         let result = filter.build(&file_index);

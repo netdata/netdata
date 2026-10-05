@@ -1,21 +1,29 @@
-//! Phase 2 (Writing) of the split-FST indexing pipeline.
+//! Phase 2 (Writing) of the split-FST indexing pipeline: consumes the
+//! in-memory [`RowIndex`] that Phase 1 produced (per-slot roaring bitmaps,
+//! per-row interned slots, timestamps, optional per-row columns) and
+//! streams out the on-disk format specified in `sfst/FORMAT.md`.
 //!
-//! Transforms the in-memory data structures built during Phase 1 into the
-//! on-disk split-FST format described in `sfst/FORMAT.md`.
+//! Pipeline, in the order `build_into` writes chunks:
 //!
-//! The pipeline steps are:
+//! 1. **Time order + ID translation** — the insertion→chronological
+//!    remap and the tier-aligned `key=value` → [`KvId`] table.
+//! 2. **Hot prefix** — `SUMR`, `META`, `TIMS`, then `PRIM` (all low-card
+//!    `key=value` entries with bitmaps, one FST chunk).
+//! 3. **Cold region** — the optional per-row column chunks, then the
+//!    optional trace index/bloom (`TIDX`/`TBLM`), span event/link
+//!    structures (`EVNB`/`LNKB`), and trace rollup (`TRSU`).
+//! 4. **Secondary chunks** — one FST chunk per mid-card field
+//!    (`MF{hi}{lo}`), one bincode + zstd chunk per high-card field
+//!    (`HF{hi}{lo}`), then the time-sorted stream batches (`SB...`).
 //!
-//! 1. **Cardinality classification** — group key=value pairs by field name,
-//!    classify each field as low / mid / high cardinality.
-//! 2. **Primary FST** — low-card `key=value` entries with bitmaps.
-//! 3. **Secondary chunks** — mid-card fields → per-field FST; high-card
-//!    fields → bincode + zstd blob.
-//! 4. **Tier-aligned ID assignment** — sequential file IDs in FST key order
-//!    across low → mid → high tiers.
-//! 5. **Stream batches** — translate each row's interner IDs to file IDs and
-//!    serialize the entries in time-sorted batches.
-//! 6. **Metadata + write** — assemble field table, histogram, and write all
-//!    sections to disk.
+//! The low/mid/high tiering is the interner's cardinality classification
+//! (`RowIndex::low_fields` and friends). Peak memory beyond the `RowIndex`
+//! itself is a single packed chunk.
+//!
+//! Both entry points are `pub(crate)`, called only from `index_writer.rs`:
+//! [`build_and_write`] is the body of `IndexWriter::write_file` (durable
+//! temp + fsync + rename), [`build_into`] the body of
+//! `IndexWriter::write_into` (any `Write + Seek` sink).
 
 use std::io::{Seek, Write};
 use std::path::Path;
@@ -34,10 +42,12 @@ use crate::{
     TraceIdIndex, TraceIds,
 };
 
-/// Build tier-aligned key=value ID translation table.
+/// Build the tier-aligned `key=value` → file-ID translation table.
 ///
-/// Uses [`RowIndex::tier_assignment`] to get the canonical ordering,
-/// then maps each [`KvSlot`] to its sequential [`KvId`].
+/// [`RowIndex::tier_assignment`] yields each tier's slots in canonical
+/// order (fields by name, values sorted); concatenated low → mid → high,
+/// position `i` is file ID `i`. `table[slot.idx()] = KvId(i)`, and the
+/// returned [`IdRanges`] carries the cumulative tier boundaries.
 fn build_id_translation(row_index: &RowIndex) -> (Vec<KvId>, IdRanges) {
     let [low_kv_slots, mid_kv_slots, high_kv_slots] = row_index.tier_assignment();
 
@@ -104,8 +114,6 @@ fn build_stream_batches<W: Write + Seek>(
         .collect();
 
     if entries.is_empty() {
-        // num_stream_batches(0) == 1: emit a single empty batch so the
-        // file's chunk layout is always valid.
         w.add_stream_batch(&crate::StreamBatch::for_write(&[]))?;
     } else {
         let batch_size = crate::stream_batch_size(total_rows) as usize;
@@ -120,8 +128,8 @@ fn build_stream_batches<W: Write + Seek>(
     Ok(())
 }
 
-/// Pack and stream the primary FST: low-card `key=value` entries with
-/// bitmaps.
+/// Pack and stream the primary FST: every low-card `key=value` entry with
+/// its remapped bitmap, into the single `PRIM` chunk.
 fn build_primary_fst<W: Write + Seek>(
     row_index: &RowIndex,
     time_order: &TimeOrder,
@@ -150,7 +158,9 @@ fn build_primary_fst<W: Write + Seek>(
     Ok(())
 }
 
-/// Pack and stream secondary FST chunks for mid-cardinality fields.
+/// Pack and stream the secondary FST chunks: one per mid-cardinality
+/// field (`MF{hi}{lo}` in `FORMAT.md`), with the entry buffer reused
+/// across fields.
 fn build_mid_card_chunks<W: Write + Seek>(
     row_index: &RowIndex,
     time_order: &TimeOrder,
@@ -261,10 +271,10 @@ pub(crate) fn build_and_write(
     // The guard owns the temp file's lifecycle: any failure before
     // commit reaps the partial temp (the boot-time sweep remains the
     // backstop for panic/power loss); commit performs fsync + rename +
-    // parent-dir fsync — the rename must be durable, or a power loss
-    // could drop the new directory entry even though the WAL that
-    // produced this index was already durably deleted, losing the
-    // seq's data with no recovery path.
+    // parent-dir fsync. The rename must be durable: by then the WAL
+    // that produced this index may already be durably deleted, and
+    // losing the new directory entry would lose the seq's data with no
+    // recovery path.
     let (guard, file) = file_registry::durable::AtomicFile::create(out_path)?;
     // The streaming writes happen through the file handle, outside the
     // guard's own annotated steps — annotate their failures (ENOSPC mid
@@ -303,13 +313,14 @@ pub(crate) fn build_and_write(
 ///
 /// Everything the `SUMR`/`META` chunks need (content identity, id
 /// ranges, field table, histogram) is available before any chunk is
-/// packed, and the chunk *count* is fixed by the field-tier
-/// classification and the stream-batch rule — so the writer reserves
-/// the TOC up front and each chunk is packed, written, and dropped in
-/// the canonical hot-prefix order (`SUMR`, `META`, `TIMS`, `PRIM`,
-/// mid-card, high-card, stream batches), which [`ChunkWriter`]
-/// enforces. Peak memory beyond the `RowIndex` itself is a single
-/// packed chunk, not the whole compressed file.
+/// packed, and the chunk *count* is fixed by the presence flags and the
+/// stream-batch rule — so the writer reserves the TOC up front and each
+/// chunk is packed, written, and dropped in the canonical stage order —
+/// `SUMR`, `META`, `TIMS`, `PRIM`, then the optional per-row columns,
+/// `TIDX`/`TBLM`, `EVNB`/`LNKB`, `TRSU`, then mid-card, high-card, and
+/// the stream batches — which [`ChunkWriter`] enforces. Peak memory
+/// beyond the `RowIndex` itself is a single packed chunk, not the whole
+/// compressed file.
 pub(crate) fn build_into<W: Write + Seek>(
     row_index: &RowIndex,
     sink: W,
@@ -317,7 +328,6 @@ pub(crate) fn build_into<W: Write + Seek>(
 ) -> Result<(W, crate::Summary, Metadata), Error> {
     let t = Instant::now();
 
-    // Build time order
     let time_order = row_index.time_order();
     tracing::debug!("time order built: {}ms", t.elapsed().as_millis());
 
@@ -369,23 +379,20 @@ pub(crate) fn build_into<W: Write + Seek>(
         content_meta,
     };
     // Per-row columns: each is independently present iff the caller supplied it.
-    // The presence set (for the TOC) and the manifest (for META) are derived from
-    // the same `Option`s in canonical order, so they always agree with the chunks
-    // written below.
+    // Presence (for the TOC) and the manifest (for META) both derive from these
+    // same `Option`s through `ColumnsPresent`, in canonical column order — one
+    // source, so they always agree with the chunks written below.
     let columns_present = ColumnsPresent {
         observed_ts: row_index.observed_timestamps.is_some(),
         trace_id: row_index.trace_ids.is_some(),
         span_id: row_index.span_ids.is_some(),
         flags: row_index.flags.is_some(),
         dropped_attributes_count: row_index.dropped_attribute_counts.is_some(),
-        // Span-only columns; the logs seal leaves these `None`, the traces seal
-        // fills them. Presence is driven straight off the `RowIndex` `Option`s.
+        // Span-only columns; the logs seal leaves these `None`, the
+        // traces seal fills them.
         parent_span_id: row_index.parent_span_ids.is_some(),
         duration: row_index.durations.is_some(),
     };
-    // The manifest is the same presence set rendered in canonical column order —
-    // one `ALL_COLUMNS`-driven source (`ColumnsPresent::present`), so it always
-    // agrees with the chunks written below and with the writer's manifest check.
     let col_entries: Vec<ColumnEntry> = columns_present
         .present()
         .map(|s| ColumnEntry {
@@ -415,8 +422,9 @@ pub(crate) fn build_into<W: Write + Seek>(
     };
 
     // The chunk counts are known before any payload exists — one chunk
-    // per present per-row column, per mid/high field, and per stream batch —
-    // which is what lets the writer reserve the TOC up front.
+    // per present per-row column and optional trace structure, per
+    // mid/high field, and per stream batch — which is what lets the
+    // writer reserve the TOC up front.
     let counts = ChunkCounts {
         columns: columns_present,
         // Built from the chronological `trace_id` column when the producer asks
@@ -468,7 +476,10 @@ pub(crate) fn build_into<W: Write + Seek>(
     // same chronological order as the timestamps and stream batches and written as
     // its own chunk. Each is independent: a present column is written, an absent
     // one skipped; a present column whose length != row count is a caller bug
-    // (checked, not panicked). The production path supplies none, so no chunks.
+    // (checked, not panicked). Which columns appear is whatever the producer
+    // filled — the logs seal supplies the five log columns
+    // (`ng-index/src/sfst_build.rs` `populate_row_index`), the traces seal the
+    // span set (`sfst_build.rs` `populate_trace_row_index`).
     let n = total_rows as usize;
     let by_time = || time_order.iter_by_time().map(|ins| ins as usize);
     if let Some(c) = &row_index.observed_timestamps {
@@ -587,9 +598,19 @@ fn check_column_len(column: &'static str, got: usize, expected: usize) -> Result
 /// Remap a single roaring bitmap from insertion order to time-sorted order,
 /// then encode as a treight bitmap.
 ///
-/// For dense bitmaps (cardinality > half the universe), stores the complement
-/// instead — fewer positions to encode. Uses a bitset for large bitmaps
-/// (avoids O(n log n) sort) and a sorted vec for sparse ones.
+/// Two independent decisions:
+///
+/// - Encoding path, by cardinality: at `max(universe/64, 256)` positions a
+///   [`Bitset`] wins (O(n) set + ascending scan) over the O(n log n) sort
+///   of a sparse vec.
+/// - Complement, by density: when cardinality is over half the universe,
+///   `Bitmap::from_sorted_iter_complemented` encodes the zeros instead —
+///   fewer positions to serialize. Applies in both encoding paths.
+///
+/// The remapped positions come out ascending either way (bitset scan or
+/// explicit sort), which treight's ascending-input contract requires, and
+/// are distinct row positions below `universe_size` by construction. An
+/// empty bitmap short-circuits to `Bitmap::empty` with empty data.
 fn remap_one_bitmap(rb: &RoaringBitmap, time_order: &TimeOrder) -> (Bitmap, Vec<u8>) {
     let universe_size = time_order.len();
     let half = universe_size as u64 / 2;
@@ -601,7 +622,7 @@ fn remap_one_bitmap(rb: &RoaringBitmap, time_order: &TimeOrder) -> (Bitmap, Vec<
         return (desc, data);
     }
 
-    // Use bitset for dense bitmaps, sort for sparse.
+    // Density threshold; the 256 floor keeps small bitmap work on the vec path.
     let bitset_threshold = (universe_size as usize / 64).max(256);
 
     if rb.len() as usize >= bitset_threshold {
@@ -623,7 +644,8 @@ fn remap_one_bitmap(rb: &RoaringBitmap, time_order: &TimeOrder) -> (Bitmap, Vec<
         let mut remapped: Vec<u32> = rb.iter().map(|v| time_order.to_sorted(v)).collect();
         remapped.sort_unstable();
         let desc = if card > half {
-            // Build complement from the sorted remapped values.
+            // The sparse path has no bitset to scan zeros from, so
+            // materialize one from the sorted values first.
             let mut bitset = Bitset::new(universe_size);
             for &v in &remapped {
                 bitset.set(v);

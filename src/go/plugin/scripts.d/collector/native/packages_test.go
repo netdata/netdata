@@ -164,6 +164,23 @@ func TestPackageCreator_JobForm(t *testing.T) {
 			}
 			require.NoError(t, json.Unmarshal([]byte(creator.JobConfigSchema), &form))
 			assert.ElementsMatch(t, tc.wantProperties, slices.Collect(maps.Keys(form.JSONSchema.Properties)))
+			var document map[string]any
+			require.NoError(t, json.Unmarshal([]byte(creator.JobConfigSchema), &document))
+			compiler := jsonschema.NewCompiler()
+			compiler.UseLoader(nil)
+			require.NoError(t, compiler.AddResource("urn:package-form", document["jsonSchema"]))
+			schema, err := compiler.Compile("urn:package-form")
+			require.NoError(t, err)
+			require.NoError(
+				t,
+				schema.Validate(map[string]any{}),
+				"registered form must not retain source-selection conditions",
+			)
+			ui := document["uiSchema"].(map[string]any)
+			for _, removed := range []string{"manifest", "command", "mode", "snapshot_format"} {
+				assert.NotContains(t, ui, removed)
+			}
+
 		})
 	}
 }
@@ -204,7 +221,7 @@ func TestPackageForm(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			// A real metrics package: its job form keeps the collection options.
-			description := `{"version":"v1","metrics":[{"name":"depth","type":"gauge","unit":"jobs"}],"config_schema":` +
+			description := `{"version":"v1","config_schema":` +
 				tc.form + `}`
 			definition, err := parseDescription([]byte(description), []string{"/configured/program"})
 			require.NoError(t, err)
@@ -300,7 +317,6 @@ func TestLoadPackages_SelfContainedPackage(t *testing.T) {
 	description, err := json.Marshal(map[string]any{
 		"version":       "v1",
 		"mode":          "persistent",
-		"metrics":       []any{map[string]any{"name": "depth", "type": "gauge", "unit": "jobs"}},
 		"functions":     []any{map[string]any{"id": "items", "name": "Items", "help": "Show items 😀."}},
 		"config_schema": form,
 	})

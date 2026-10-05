@@ -786,6 +786,34 @@ set(CPACK_RPM_PLUGIN-SCRIPTS_USER_FILELIST
     "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/scripts.d.plugin")
 
 #
+# dem.plugin
+#
+
+if(ENABLE_PLUGIN_DEM)
+  set(CPACK_COMPONENT_PLUGIN-DEM_DEPENDS "netdata")
+  set(CPACK_COMPONENT_PLUGIN-DEM_DESCRIPTION "Experimental digital experience monitoring for the Netdata Agent")
+  set(CPACK_DEBIAN_PLUGIN-DEM_PACKAGE_NAME "netdata-plugin-dem")
+  set(CPACK_DEBIAN_PLUGIN-DEM_PACKAGE_SECTION "net")
+  set(CPACK_DEBIAN_PLUGIN-DEM_PACKAGE_PREDEPENDS "netdata-user")
+  set(CPACK_DEBIAN_PLUGIN-DEM_DEBUGINFO_PACKAGE Off)
+  configure_file("${PKG_FILES_PATH}/deb/plugin-dem/postinst.in"
+                 "${CMAKE_BINARY_DIR}/packaging/plugin-dem/postinst" @ONLY)
+  set(CPACK_DEBIAN_PLUGIN-DEM_PACKAGE_CONTROL_EXTRA
+      "${CMAKE_BINARY_DIR}/packaging/plugin-dem/postinst")
+
+  set(CPACK_RPM_PLUGIN-DEM_PACKAGE_NAME "netdata-plugin-dem")
+  set(CPACK_RPM_PLUGIN-DEM_PACKAGE_SUMMARY "Experimental digital experience monitoring for the Netdata Agent")
+  set(CPACK_RPM_PLUGIN-DEM_PACKAGE_REQUIRES "netdata = ${CPACK_PACKAGE_VERSION}")
+  if(NETDATA_RPM_USER_PREDEP)
+    set(CPACK_RPM_PLUGIN-DEM_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+  endif()
+  set(CPACK_RPM_PLUGIN-DEM_DEFAULT_USER "root")
+  set(CPACK_RPM_PLUGIN-DEM_DEFAULT_GROUP "netdata")
+  set(CPACK_RPM_PLUGIN-DEM_USER_FILELIST
+      "%attr(0750,root,${netdata_group_POST}) ${PLUGINS_DIR}/dem.plugin")
+endif()
+
+#
 # ibm.plugin
 #
 
@@ -1275,6 +1303,9 @@ if(ENABLE_PLUGIN_IBM)
 endif()
 if(ENABLE_PLUGIN_SCRIPTS)
   list(APPEND CPACK_COMPONENTS_ALL "plugin-scripts")
+endif()
+if(ENABLE_PLUGIN_DEM)
+  list(APPEND CPACK_COMPONENTS_ALL "plugin-dem")
 endif()
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-network-viewer")

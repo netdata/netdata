@@ -8,6 +8,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
@@ -47,17 +48,18 @@ type processInputCompletion struct {
 var errRunDidNotQuiesce = errors.New("jobmgr composition: run did not quiesce")
 
 type processCoreConfig struct {
-	Input           io.Reader                   // plugin stdin
-	Output          io.Writer                   // plugin stdout
-	ShutdownTimeout time.Duration               // per-run shutdown budget
-	KeepAlive       bool                        // emit keepalive frames (long-lived agent mode)
-	Modules         collectorapi.Registry       // collector module registry
-	Jobs            runJobServices              // process-lifetime job services (resolver, catalogs, vnodes)
-	Secrets         *SecretsConfig              // process-lifetime secret services
-	Discovery       runDiscoveryServices        // discovery services (providers, build context)
-	StopServices    func(context.Context) error // cancels and joins within the shutdown budget
-	FinalizeOutput  func()                      // stops the runtime service at process teardown
-	Diagnostics     jobmgr.DiagnosticObserver   // process-wide operational log sink
+	Input            io.Reader     // plugin stdin
+	Output           io.Writer     // plugin stdout
+	ShutdownTimeout  time.Duration // per-run shutdown budget
+	KeepAlive        bool          // emit keepalive frames (long-lived agent mode)
+	ProcessFunctions []funcapi.ProcessFunctionProvider
+	Modules          collectorapi.Registry       // collector module registry
+	Jobs             runJobServices              // process-lifetime job services (resolver, catalogs, vnodes)
+	Secrets          *SecretsConfig              // process-lifetime secret services
+	Discovery        runDiscoveryServices        // discovery services (providers, build context)
+	StopServices     func(context.Context) error // cancels and joins within the shutdown budget
+	FinalizeOutput   func()                      // stops the runtime service at process teardown
+	Diagnostics      jobmgr.DiagnosticObserver   // process-wide operational log sink
 }
 
 type processCore struct {
@@ -333,7 +335,7 @@ func (pc *processCore) run(ctx context.Context, controls processControls) error 
 			if generation.run.IsStopping() {
 				continue
 			}
-			if err := generation.scheduler.Tick(ctx, clock); err != nil {
+			if err := generation.tick(ctx, clock); err != nil {
 				generation.run.Dirty(err)
 				generation.Stop()
 				continue
@@ -491,19 +493,20 @@ func (pc *processCore) newRun(
 		}
 	}
 	run, err := newRunGeneration(ctx, runGenerationConfig{
-		Generation:      generation,
-		ShutdownTimeout: pc.config.ShutdownTimeout,
-		Diagnostics:     pc.diagnostics,
-		UIDs:            pc.uids,
-		Frames:          pc.frames,
-		Publication:     pc.publication,
-		CleanupOutput:   pc.cleanupOut,
-		Modules:         pc.config.Modules,
-		Jobs:            pc.config.Jobs,
-		Secrets:         pc.config.Secrets,
-		Discovery:       pc.config.Discovery,
-		SecretEpoch:     epoch,
-		Attempts:        pc.attempts,
+		Generation:       generation,
+		ShutdownTimeout:  pc.config.ShutdownTimeout,
+		Diagnostics:      pc.diagnostics,
+		UIDs:             pc.uids,
+		Frames:           pc.frames,
+		Publication:      pc.publication,
+		CleanupOutput:    pc.cleanupOut,
+		Modules:          pc.config.Modules,
+		ProcessFunctions: pc.config.ProcessFunctions,
+		Jobs:             pc.config.Jobs,
+		Secrets:          pc.config.Secrets,
+		Discovery:        pc.config.Discovery,
+		SecretEpoch:      epoch,
+		Attempts:         pc.attempts,
 	})
 	if err != nil {
 		if epoch != nil {

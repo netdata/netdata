@@ -30,7 +30,7 @@ type methodGeneration struct {
 	id      string                            // generation identity
 	module  string                            // owning collector module
 	kind    methodGenerationKind              // method kind (agent / shared / instance)
-	creator collectorapi.Creator              // immutable routing policy
+	policy  collectorapi.InstancePolicy       // immutable job routing policy
 	methods map[string]funcapi.FunctionConfig // method configs by method ID
 	bundles map[string]*functionBundle        // stable handler bundles by job name; agent uses ""
 
@@ -41,7 +41,7 @@ func newMethodGeneration(
 	id string,
 	module string,
 	kind methodGenerationKind,
-	creator collectorapi.Creator,
+	policy collectorapi.InstancePolicy,
 	methods []funcapi.FunctionConfig,
 	bundles map[string]*functionBundle,
 ) (result *methodGeneration, err error) {
@@ -52,7 +52,7 @@ func newMethodGeneration(
 		id:      id,
 		module:  module,
 		kind:    kind,
-		creator: creator,
+		policy:  policy,
 		methods: make(map[string]funcapi.FunctionConfig, len(methods)),
 		bundles: make(map[string]*functionBundle, max(1, len(bundles))),
 	}
@@ -259,7 +259,7 @@ func (mg *methodGeneration) resolveTarget(
 			}
 		}
 		name := names[0]
-		if mg.creator.InstancePolicy != collectorapi.InstancePolicySingle {
+		if mg.policy != collectorapi.InstancePolicySingle {
 			values := functionJobValues(input)
 			if len(values) > 1 {
 				return "", nil, nil, functionStatusError{
@@ -297,7 +297,7 @@ func (mg *methodGeneration) availableJobNames(methodID string) []string {
 // sharedJobSelectable reports whether this shared-module generation exposes the
 // __job instance selector, including when only one job is currently running.
 func (mg *methodGeneration) sharedJobSelectable() bool {
-	return mg.kind == methodGenerationShared && mg.creator.InstancePolicy != collectorapi.InstancePolicySingle
+	return mg.kind == methodGenerationShared && mg.policy != collectorapi.InstancePolicySingle
 }
 
 // withJobParam prepends the __job instance selector to params when this

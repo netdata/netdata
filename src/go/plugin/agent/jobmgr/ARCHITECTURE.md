@@ -1239,6 +1239,18 @@ handles before finalization; the cancelable waits also cover retained job bundle
 
 ## Restart and Shutdown
 
+The command-root host returns `agenthost.Result{Err, ExitRequired}`. An unfinished restart recovery
+can require a successful process exit before `Agent.RunContext` returns. Command roots check `Err` first
+and exit with status 1 on failure, then use `os.Exit(0)` when `ExitRequired` is true. Explicit exit contains
+remaining work and skips deferred resource cleanup. Only `Err == nil && !ExitRequired` permits closing
+process-shared resources: the host has observed successful completion of the Agent run. A completed
+failed run may still retain work, so `ExitRequired == false` alone is insufficient.
+
+`ProcessServiceFinalizer` joins its own service and finalizes before jobs retire. It must not close a
+resource still used by jobs or Functions. Such resources belong to the command root and close after a
+clean host result. Collectors and services remain responsible for joining their own domain workers,
+including external processes; host completion does not cover detached work.
+
 Job Manager separates two lifetimes:
 
 - **The process is the building.** Built once by `composition.NewProcess`, it survives every reload: the stdin reader,

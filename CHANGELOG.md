@@ -3,6 +3,33 @@
 ### Merged Pull Requests:
 
 - Sync repos (netdata, ebpf-co-re, kernel-collector) ([#24008](https://github.com/netdata/netdata/issues/24008))
+- Net Framework (windows.plugin) ([#22219](https://github.com/netdata/netdata/issues/22219))
+- Feat(go.d/prometheus): add counter_raw_charts to chart a counter's raw value alongside its rate ([#24103](https://github.com/netdata/netdata/issues/24103))
+- Regenerate integrations docs ([#24085](https://github.com/netdata/netdata/issues/24085))
+- Test(go.d/sd/net_listeners): apply simulated listener steps atomically ([#24105](https://github.com/netdata/netdata/issues/24105))
+- Fix(scripts.d): scan persistent native frames in linear time ([#24104](https://github.com/netdata/netdata/issues/24104))
+- Refactor streaming system info columns into a shared table ([#24100](https://github.com/netdata/netdata/issues/24100))
+- Fix(go.d/ceph): remove the stray selector from the configuration form ([#24108](https://github.com/netdata/netdata/issues/24108))
+- Docs(cloud-authentication): correct SCIM/OIDC user keying, add Entra ID mapping ([#24110](https://github.com/netdata/netdata/issues/24110))
+- Fix Windows timezone detection buffer overread ([#24101](https://github.com/netdata/netdata/issues/24101))
+- Capture stack traces for SIGABRT outside `fatal()` ([#24094](https://github.com/netdata/netdata/issues/24094))
+- Fix global SQLite stalls with lifetime leases ([#24099](https://github.com/netdata/netdata/issues/24099))
+- Fix(plugins.d): restart external plugins after a protocol error ([#24051](https://github.com/netdata/netdata/issues/24051))
+- Regenerate integrations docs ([#24111](https://github.com/netdata/netdata/issues/24111))
+- Build(deps): bump github.com/klauspost/compress from 1.20.0 to 1.20.1 in /src/go ([#24120](https://github.com/netdata/netdata/issues/24120))
+- Build(deps): bump github.com/prometheus/common from 0.71.0 to 0.72.0 in /src/go ([#24118](https://github.com/netdata/netdata/issues/24118))
+- Build(deps): bump github.com/Azure/azure-sdk-for-go/sdk/azcore from 1.23.1 to 1.23.2 in /src/go ([#24119](https://github.com/netdata/netdata/issues/24119))
+- Build(deps): bump pyjwt from 2.14.0 to 2.15.0 in /packaging/tools/automation/mcp ([#24121](https://github.com/netdata/netdata/issues/24121))
+- Feat(scripts.d): add self-describing native metric snapshots ([#24096](https://github.com/netdata/netdata/issues/24096))
+- Feat(go.d/redfish): show credentials only for auth methods that use them ([#24106](https://github.com/netdata/netdata/issues/24106))
+- Docs(otel-plugin): comment-only documentation pass and citation sweep over the otel plugin crates ([#24123](https://github.com/netdata/netdata/issues/24123))
+- Feat(scripts.d): support scalar line snapshots in native scripts ([#24125](https://github.com/netdata/netdata/issues/24125))
+- Regenerate integrations docs ([#24124](https://github.com/netdata/netdata/issues/24124))
+- Go.d/redis: support Redis-compatible servers (Valkey, Dragonfly, KeyDB, Kvrocks, Garnet) ([#24130](https://github.com/netdata/netdata/issues/24130))
+- Regenerate integrations docs ([#24131](https://github.com/netdata/netdata/issues/24131))
+- Docs(go.d): render option details for mongodb, openvpn, pika and openvpn_status_log ([#24132](https://github.com/netdata/netdata/issues/24132))
+- Regenerate integrations docs ([#24133](https://github.com/netdata/netdata/issues/24133))
+- Feat(go): add native RUM plugin ([#24129](https://github.com/netdata/netdata/issues/24129))
 
 ## [2.12.0] - 2026-09-30
 

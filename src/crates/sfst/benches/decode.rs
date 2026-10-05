@@ -3,9 +3,18 @@
 //! Measures, per chunk kind, the **full typed decode** and the **zstd-only
 //! decompression** of the same chunk bytes — the split that prices the
 //! zero-copy candidates (borrowed views eliminate the materialization on top
-//! of zstd; uncompressed storage eliminates both). Plus `IndexReader::open`
-//! (the hot prefix: SUMR + META + field table + PRIM) and the query-level
-//! operations a real query pays.
+//! of zstd; uncompressed storage eliminates both). The legs diagnose
+//! differently: a zstd-only regression points at compression settings or
+//! the zstd crate, a widening delta at bincode / typed-struct
+//! materialization (allocator churn). Only some kinds carry both legs —
+//! TIMS, stream batches and high-card fields do; the always-present
+//! per-row columns are timed full-decode only, PRIM and mid-card fields
+//! zstd-only.
+//!
+//! Plus `IndexReader::open` (the hot prefix: SUMR + META + field table +
+//! PRIM) and the query-level operations a real query pays — filter
+//! compile + count, facets, timeline over native treight bitmaps, and
+//! page materialization through the stream batches.
 //!
 //! Needs a corpus file and the `test-util` feature (the raw-chunk legs go
 //! through [`ChunkReader`]):
@@ -23,6 +32,9 @@ use std::hint::black_box;
 use criterion::{Criterion, criterion_group, criterion_main};
 use sfst::{ChunkReader, Filter, Grid, IndexReader};
 
+/// Load the corpus named by `SFST_BENCH_FILE` (`~/` expands against
+/// `$HOME`). `None` (env unset) skips the benches; an unreadable path
+/// panics.
 fn corpus() -> Option<Vec<u8>> {
     let path = std::env::var("SFST_BENCH_FILE").ok()?;
     let path = path.strip_prefix("~/").map_or_else(
@@ -41,8 +53,10 @@ fn unpack<T: serde::de::DeserializeOwned>(raw: &[u8]) -> T {
         .0
 }
 
-/// A `field=value` pair that actually exists in the file's primary FST, for
-/// the filter benches — data-dependent, resolved at runtime.
+/// A `field=value` pair that actually exists in the file's primary FST,
+/// for the filter benches: the first key under the first Low-tier field's
+/// `name=` prefix. Data-dependent, resolved at runtime; `None` skips the
+/// query group.
 fn sample_low_card_pair(idx: &IndexReader) -> Option<(String, String)> {
     let low = idx
         .field_table()
@@ -65,12 +79,18 @@ fn bench_decode(c: &mut Criterion) {
     let num_batches = raw.num_stream_batches().expect("num batches");
     let num_high = raw.num_high().expect("num high");
     let num_mid = raw.num_mid().expect("num mid");
+    // The window the filter/facet/timeline benches share: the file's
+    // whole time range, widened from the summary's second bounds to a
+    // half-open ns span.
     let span_ns = {
         let s = idx.summary();
         (s.min_timestamp_s as i64 * 1_000_000_000)..((s.max_timestamp_s as i64 + 1) * 1_000_000_000)
     };
 
     // ── Hot prefix ──────────────────────────────────────────────────
+    // `open_index_reader` is everything a query needs before the first
+    // query (SUMR + META + field table + PRIM); `read_summary` touches
+    // header + TOC + SUMR only, so the delta prices the query-ready part.
     c.bench_function("open_index_reader", |b| {
         b.iter(|| IndexReader::open(black_box(&data)).unwrap())
     });
@@ -109,6 +129,10 @@ fn bench_decode(c: &mut Criterion) {
     });
     g.bench_function("flags_full", |b| b.iter(|| raw.flags().unwrap()));
 
+    // The typed high/mid accessors (`high_field`, `mid_field`) are
+    // crate-internal, so this group re-does the decode bench-side:
+    // `high_fields_full_all` is plain unpack — it omits the accessor's
+    // `rebuild_offsets` fix-up — and mid fields get no full leg.
     if num_high > 0 {
         g.bench_function("high_fields_full_all", |b| {
             b.iter(|| {
@@ -134,17 +158,24 @@ fn bench_decode(c: &mut Criterion) {
             })
         });
     }
+    // PRIM's full decode (bincode → PrefixMap) already runs inside
+    // open_index_reader, so this isolates its decompression alone.
     g.bench_function("primary_zstd_only", |b| {
         b.iter(|| zstd::decode_all(raw.primary_raw().unwrap()).unwrap())
     });
     g.finish();
 
     // ── Query-level ─────────────────────────────────────────────────
+    // One representative op per query primitive over the file's whole
+    // time span, all on native treight bitmaps (PosSet — no roaring
+    // round-trip). Skipped when the corpus yields no filterable pair.
     let mut q = c.benchmark_group("query");
     q.sample_size(20);
 
     if let Some((field, value)) = sample_low_card_pair(&idx) {
         let filter = Filter::new().select(&field, &value);
+        // Times compile + count: union the field's value bitmaps, AND
+        // across fields, clip to the window, take the cardinality.
         q.bench_function("filter_count", |b| {
             b.iter(|| {
                 let bf = idx.compile_filter(black_box(&filter), None).unwrap();
@@ -170,6 +201,8 @@ fn bench_decode(c: &mut Criterion) {
         });
 
         let page: Vec<u32> = (0..100.min(idx.total_logs())).collect();
+        // The page path: decode only the stream batches these positions
+        // fall in, then resolve their KvIds to strings.
         q.bench_function("materialize_100_rows", |b| {
             b.iter(|| idx.materialize_rows(black_box(&page)).unwrap())
         });

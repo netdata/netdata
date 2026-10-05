@@ -107,8 +107,8 @@ modules:
               default_value: ""
               required: false
               group: Filters
-              details: |
-                Metrics of databases matching the selector will be collected.
+              detailed_description: |
+                Metrics of databases matching the selector will be collected. When unset, no per-database metrics are collected.
 
                 - Logic: (pattern1 OR pattern2) AND !(pattern3 OR pattern4)
                 - Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format).

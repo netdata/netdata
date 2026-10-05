@@ -14,9 +14,8 @@
 //! sources, merge into ordered sets, then limit — `truncated` is exact
 //! for keys and values, and source order never changes a result.
 //! Consequently cancellation is ALL-OR-EMPTY (phase-4b pin C2): a merge
-//! prefix over "the sources processed so far" would depend on caller
-//! order, so cancellation observed before every source's contribution is
-//! collected returns an EMPTY result with
+//! prefix would depend on caller order, so a cancel observed before every
+//! source has contributed returns an EMPTY result with
 //! [`Cancelled`](PartialReason::Cancelled); once everything is collected
 //! there is nothing left to cancel.
 //!
@@ -71,7 +70,8 @@ impl AttributeNamesQuery {
         self
     }
 
-    /// Enumerate only one owner.
+    /// Enumerate only one owner. The predicate-only `Any` owner is
+    /// rejected ([`AttributeRequestError::AnyOwnerNotEnumerable`]).
     pub fn owner(mut self, owner: AttributeOwner) -> Self {
         self.owner = Some(owner);
         self
@@ -124,8 +124,15 @@ impl AttributeValuesQuery {
 /// from every source yields an empty `Complete` result.
 #[derive(Debug, thiserror::Error)]
 pub enum AttributeRequestError {
+    /// Zero would return nothing by construction, so it is refused
+    /// rather than honored. The ledger's handler repeats this exact
+    /// check before source capture — keep the message wording in step.
     #[error("a zero key/value limit would return nothing; omit the limit or raise it")]
     ZeroLimit,
+    /// No path here builds a [`WindowError`]: the query carries an
+    /// already-validated [`TimeWindow`] (the caller constructs it, so an
+    /// invalid window never reaches the engine). The variant completes
+    /// the per-operation error wrap (see `window.rs`).
     #[error(transparent)]
     Window(#[from] WindowError),
     /// The static virtual/dictionary split is known at the boundary
@@ -174,8 +181,11 @@ pub struct AttributeValuesData {
     pub status: QueryStatus,
 }
 
-/// Resolve a values-request `(owner, key)` pair to the storage
-/// dictionary field it reads, enforcing pin C4 and decision 18B.
+/// Resolve a values-request `(owner, key)` pair to the storage dictionary
+/// field it reads. The owner/key pairing is strict (pin C4): builtin keys
+/// only under the Builtin owner, attribute keys only under a concrete
+/// attribute owner, `Any` never. A virtual builtin — no value dictionary
+/// anywhere (decision 18B) — has no field to resolve and is rejected.
 fn storage_field_of(owner: AttributeOwner, key: &AttributeKey) -> Result<String, AttributeRequestError> {
     match (owner, key) {
         (AttributeOwner::Any, _) => Err(AttributeRequestError::AnyOwnerNotEnumerable),
@@ -254,6 +264,10 @@ pub fn attribute_names(
         if cancel.is_cancelled() {
             return Ok(cancelled_empty(status));
         }
+        // Names outside the key vocabulary — the `_kind`/`_status_code`
+        // shadow entries, `trace_state`, unrecognized fields — are
+        // dropped by storage_to_attribute. A deliberate whitelist, not a
+        // silent degrade: those names are never filterable keys.
         let mut add_storage_names = |names: &mut dyn Iterator<Item = &str>| {
             for name in names {
                 if let Some((owner, key)) = storage_to_attribute(name)
@@ -350,10 +364,10 @@ pub fn attribute_values(
     }
 
     let mut values: BTreeSet<String> = BTreeSet::new();
-    // Field-coalesced kind over exactly the sources whose dictionary
-    // contributed (the design-record coalescing domain), via the shared
-    // lattice; stays `None` when no contributor has a scalar occurrence
-    // (pin C1).
+    // ONE kind per field, folded across exactly the sources whose
+    // dictionary contributed, via sfst::join_value_kinds (the same
+    // lattice per-file coalescing uses); stays `None` when no
+    // contributor has a scalar occurrence of the field (pin C1).
     let mut kind: Option<sfst::ValueKind> = None;
     let fold_kind = |kind: &mut Option<sfst::ValueKind>, found: Option<sfst::ValueKind>| {
         if let Some(k) = found {

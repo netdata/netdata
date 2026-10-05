@@ -275,6 +275,35 @@ Job Object assigned during process creation, with no breakaway permission. Conta
 without an uncontained fallback. File stdio avoids copier goroutines waiting on a descendant's inherited stream.
 The existing `exec.Cmd` constructors retain their existing behavior; they do not provide this ownership guarantee.
 
+For Linux commands that may create detached groups, use `StartUnprivilegedProcessTree` instead. It uses an
+opt-in per-run `nd-run` subreaper which stays alive independently of the command, terminates remaining children
+when the command exits or cancellation is requested, and reaps adopted descendants. Before launch the supervisor
+sets and verifies inherited `no_new_privs`, so setuid/setgid exec and file capabilities cannot regain privileges
+that prevent it from signaling the payload. Failure refuses launch. `Wait` returns a `TreeResult`:
+`Err` includes command, cancellation, setup, supervisor and completion-protocol failures; it is not exclusively the
+payload result. `Drained` records verified descendant cleanup independently of `Err`. A failed
+command can still be drained. Command stdout/stderr never supplies completion evidence; a private descriptor carries
+the helper's terminal frame and the Go owner also joins the helper. The payload cannot inherit control/status descriptors.
+
+A caller MUST retain its resource/admission ownership when `Drained` is false and stop further execution, rather than
+retry or release files as though the tree finished. `ErrTreeNotDrained` identifies missing/invalid completion evidence.
+Unexpected supervisor loss is a fatal containment failure, not a guarantee that survivors have stopped. Fail-stop does
+not prevent a service manager restarting alongside those survivors; this is lifecycle ownership for trusted commands,
+not hostile-script isolation or restart-proof containment.
+
+Context cancellation and `Close` request drainage without killing the supervisor. Concurrent/repeated `Wait` and
+`Close` return the same result. Cleanup has no artificial success timeout: a live uninterruptible descendant can keep
+it unfinished. A host shutdown deadline must handle this as incomplete cleanup/fail-stop. Stdio follows `ProcessOptions`
+and remains caller-owned. Existing `Process` and command constructors retain their previous contracts.
+
+The stronger API is Linux-only and requires supported subreaper/wait behavior, readable procfs child enumeration
+(`CONFIG_PROC_CHILDREN`), readable self-descriptor enumeration, and a procfs PID namespace compatible with the caller. The helper validates those prerequisites
+before starting the payload. Child enumeration discovers signal candidates; only kernel wait exhaustion proves drain.
+A verified setup refusal before payload launch returns `ErrTreeSupervisionUnavailable` with `Drained=true`.
+Unverifiable setup or an incompatible/older helper returns `ErrTreeNotDrained`; no payload completion is assumed.
+Unsupported platforms return `ErrTreeSupervisionUnsupported`, and a missing helper fails at Start. There is no
+signal-only fallback. The target uses the existing minimal environment and privilege reduction policy.
+
 On Unix, `nd-run` uses a minimal environment by default. Passing `Env` to a Run API changes the helper's input
 but does not enable preservation. Use `UnprivilegedCommandContextWithPreservedEnv` when the target requires inherited
 application variables, such as authentication tokens or explicit tool configuration. It invokes

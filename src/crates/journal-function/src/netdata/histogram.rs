@@ -1,7 +1,7 @@
-//! Histogram and chart generation for Netdata UI.
-//!
-//! This module converts histogram responses into chart structures for the
-//! Netdata dashboard visualization.
+//! Histogram charts for the Netdata logs UI: the per-field `Histogram`
+//! chart and the `available_histograms` list, built from the query
+//! engine's bucket histogram (`Histogram` in `journal-engine/src/histogram.rs`,
+//! imported here as `QueryHistogram` - `Histogram` is the UI chart type).
 
 use super::transformations::TransformationRegistry;
 use super::ui_types::{
@@ -12,9 +12,9 @@ use journal_core::collections::HashSet;
 use journal_engine::Histogram as QueryHistogram;
 use journal_index::FieldName;
 
-/// Creates a list of available histograms from a query histogram.
+/// One [`AvailableHistogram`] per indexed field in the buckets.
 ///
-/// Returns one available histogram for each indexed field found in the buckets.
+/// Sorted by id, 0-based `order` - the FxHashSet union is unordered.
 pub fn available_histograms(histogram_response: &QueryHistogram) -> Vec<AvailableHistogram> {
     let mut indexed_fields = HashSet::default();
 
@@ -41,12 +41,12 @@ pub fn available_histograms(histogram_response: &QueryHistogram) -> Vec<Availabl
     available_histograms
 }
 
-/// Creates a Histogram for the given field from a query histogram.
+/// Builds the UI [`Histogram`] for one field; id/name = field.
 ///
 /// # Arguments
-/// * `histogram_response` - The query histogram to convert
-/// * `field` - The field to generate the histogram for
-/// * `transformations` - Transformation registry for field value display
+/// * `histogram_response` - The engine's bucket histogram (QueryHistogram)
+/// * `field` - The field to chart (the handler's `histogram` request param)
+/// * `transformations` - Registry turning raw values into display labels
 pub fn histogram(
     histogram_response: &QueryHistogram,
     field: &FieldName,
@@ -60,7 +60,7 @@ pub fn histogram(
     }
 }
 
-/// Creates a Chart for the given field from a query histogram.
+/// Builds the [`Chart`]: result data plus view metadata.
 fn chart_from_histogram(
     histogram_response: &QueryHistogram,
     field: &FieldName,
@@ -73,9 +73,9 @@ fn chart_from_histogram(
     Chart { view, result }
 }
 
-/// Creates chart result data for the given field from a query histogram.
+/// Builds the [`ChartResult`] for one field.
 ///
-/// Returns both the raw values (for dimension IDs) and the ChartResult (with transformed labels).
+/// Returns the raw values (dimension IDs) and transformed labels ("time" first).
 fn chart_result_from_histogram(
     histogram_response: &QueryHistogram,
     field: &FieldName,
@@ -83,7 +83,7 @@ fn chart_result_from_histogram(
 ) -> (Vec<String>, ChartResult) {
     let field_str = field.as_str();
 
-    // Collect all unique values for the field across all buckets
+    // Distinct values of this field, from every bucket's fv_counts keys.
     let mut values = HashSet::default();
 
     for (_, bucket_response) in &histogram_response.buckets {
@@ -94,17 +94,17 @@ fn chart_result_from_histogram(
         }
     }
 
-    // Sort raw values for consistent ordering
+    // FxHashSet iteration is unordered; sort for a deterministic layout.
     let mut raw_values: Vec<String> = values.into_iter().collect();
     raw_values.sort();
 
-    // Transform values for display
+    // Display labels: transform each value (identity if none registered).
     let mut labels: Vec<String> = raw_values
         .iter()
         .map(|v| transformations.transform_value(field_str, v))
         .collect();
 
-    // Build data array using raw values for lookups
+    // One point per bucket: filtered counts as [count, arp, pa] (arp/pa zeroed).
     let mut data = Vec::new();
 
     for (request, bucket_response) in &histogram_response.buckets {
@@ -113,7 +113,7 @@ fn chart_result_from_histogram(
         let mut field_sum = 0usize;
 
         for raw_value in &raw_values {
-            // Create FieldValuePair for lookup using raw (untransformed) value
+            // Look up the raw value: fv_counts is keyed by it, not by the label.
             let pair = field.with_value(raw_value);
 
             let count = bucket_response
@@ -126,7 +126,7 @@ fn chart_result_from_histogram(
             counts.push([count, 0, 0]);
         }
 
-        // Calculate entries without this field (unset)
+        // "(unset)": filtered entries with none of this field's values.
         let unset_count = bucket_response.total_entries.1.saturating_sub(field_sum);
         counts.push([unset_count, 0, 0]);
 
@@ -142,7 +142,7 @@ fn chart_result_from_histogram(
         pa: 2,
     };
 
-    // Add "(unset)" for entries without this field
+    // "(unset)" closes both arrays; labels[0] is "time" (the view skips it).
     raw_values.push(String::from("(unset)"));
     labels.push(String::from("(unset)"));
     labels.insert(0, String::from("time"));
@@ -157,13 +157,13 @@ fn chart_result_from_histogram(
     )
 }
 
-/// Creates chart view metadata for the given field from a query histogram.
+/// Builds the [`ChartView`]: a stacked "events" bar chart.
 ///
 /// # Arguments
-/// * `histogram_response` - The query histogram
-/// * `field` - The field name
-/// * `raw_values` - Raw (untransformed) values for dimension IDs
-/// * `labels` - Transformed values for dimension names (first element is "time", skip it)
+/// * `histogram_response` - The after/before (seconds) span and update_every
+/// * `field` - Names the chart title ("Events distribution by {field}")
+/// * `raw_values` - Dimension ids ("(unset)" last); units are all "events"
+/// * `labels` - Dimension names: labels[1..] (labels[0] "time" is skipped)
 fn chart_view_from_histogram(
     histogram_response: &QueryHistogram,
     field: &FieldName,

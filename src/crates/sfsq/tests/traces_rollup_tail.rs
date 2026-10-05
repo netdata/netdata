@@ -1,7 +1,19 @@
-//! The tail/seal parity contract: folding a WAL tail's decoded spans
-//! ([`tail_trace_aggregates`]) equals reading the `TRSU` rollup of
-//! sealing the SAME data ([`sealed_trace_aggregates`]) — value-for-value
-//! across envelopes, stored-row counts, and honest roots.
+//! The tail/seal rollup parity contract — the test pin behind the
+//! "Parity contract (test-pinned)" note in `src/traces/rollup.rs`:
+//! folding a WAL tail's decoded spans ([`tail_trace_aggregates`])
+//! equals reading the `TRSU` rollup of sealing the SAME data
+//! ([`sealed_trace_aggregates`]) — value-for-value across envelopes,
+//! stored-row counts, and honest roots.
+//!
+//! Coverage: the wholesale parity plus the roots-free envelope view,
+//! a semantic-by-semantic audit of the tail fold on one corpus, and
+//! the two sealed root-ref edges (corrupt-ref escalation, the
+//! `ROLLUP_NO_REF` sentinel). Not pinned here (the fixture cannot
+//! reach them): the u32::MAX count clamp and the saturating envelope
+//! end. Fixtures come from `tests/common/mod.rs`; the sibling
+//! `tests/traces_*.rs` suites pin the surrounding query ops — for the
+//! aggregate modes these per-source aggregates merge in
+//! `src/traces/fold.rs`.
 
 mod common;
 
@@ -10,7 +22,7 @@ use sfsq::traces::{
     TraceWalScan, sealed_trace_aggregates, sealed_trace_envelopes, tail_trace_aggregates,
 };
 
-/// A corpus covering every semantic the rollup pins:
+/// A corpus covering every rollup semantic (one trace per bullet):
 /// - trace A: a true root (unset parent, SERVER kind) + a child + a
 ///   RESENT copy of the child (stored-row counts) + an ERROR span;
 /// - trace B: NO unset-parent span (honest root absence);
@@ -76,7 +88,8 @@ fn tail_fold_matches_the_sealed_rollup_value_for_value() {
     let scan = TraceWalScan::scan(&wal).unwrap();
     let tail = tail_trace_aggregates(&scan);
 
-    // Sealed side: seal the same WAL, read TRSU, resolve refs.
+    // Sealed side: run the production sealer over the SAME WAL, then
+    // read its TRSU and resolve the root refs.
     let out = dir.path().join("parity.sfst");
     ng_index::build_sfst_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
     let bytes = std::fs::read(&out).unwrap();
@@ -85,8 +98,9 @@ fn tail_fold_matches_the_sealed_rollup_value_for_value() {
 
     assert_eq!(tail, sealed, "the parity contract");
 
-    // The roots-free grid view is the SAME rows minus root resolution —
-    // no dictionary decode involved, everything else value-for-value.
+    // The roots-free envelope view (the overview grid's path) must be
+    // the SAME rows minus root resolution: no dictionary decode, every
+    // other field value-for-value.
     let envelopes = sealed_trace_envelopes(&reader.trace_rollup().unwrap());
     let rootless: Vec<_> = sealed
         .into_iter()
@@ -95,6 +109,9 @@ fn tail_fold_matches_the_sealed_rollup_value_for_value() {
     assert_eq!(envelopes, rootless, "the envelope view drops only roots");
 }
 
+/// The tail fold's semantics, field by field, on the corpus above —
+/// the parity test already equates both sides wholesale, so this runs
+/// the tail side alone, asserting WHERE each number comes from.
 #[test]
 fn the_fold_pins_every_rollup_semantic() {
     let dir = tempfile::tempdir().unwrap();
@@ -159,8 +176,10 @@ fn corrupt_root_ref_escalates_instead_of_rendering_a_wrong_root() {
 
 #[test]
 fn sealed_root_without_service_resolves_the_sentinel_to_none() {
-    // The ROLLUP_NO_REF → None branch of the sealed resolver: a true
-    // root whose resource carries no service.name.
+    // The sealed fold's ROLLUP_NO_REF → None arm: a true root (unset
+    // parent) whose resource carries no service.name — `req_with`
+    // sends no resource attributes, so the seal stores the sentinel
+    // for the service ref.
     use common::req_with;
     let mut root = sp(1, 0, 1_000, "svcless-root");
     root.trace = [0xD4; 16];

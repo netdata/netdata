@@ -1,4 +1,15 @@
-//! OpenTelemetry protocol extensions for normalization, comparison, hashing, and data point iteration.
+//! Extensions over the generated OTLP metric types that the chart pipeline
+//! needs: a total order + normalization for OTLP values (canonical attribute
+//! ordering), the [`MetricIdentityHash`] trait behind chart identity hashing,
+//! and the per-metric [`DataPointRef`]/[`DataPointIter`] abstraction.
+//!
+//! Consumers: `metrics_service.rs::process_request` normalizes every export
+//! with [`normalize_request`] before chart matching, so attribute order does
+//! not affect the resulting hashes or chart names; `iter.rs` drives
+//! [`MetricIdentityHash`] through its `MetricIdentityHasher` and iterates each
+//! metric's points via [`DataPointIterExt`]. Note that `iter.rs` defines a
+//! same-named request-level `DataPointIter`; this file's is the per-metric
+//! iterator (`otel::DataPointIter` there).
 
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
@@ -18,6 +29,10 @@ use std::hash::{Hash, Hasher};
  * tag: compare
  */
 
+/// Total order over OTLP value types — the sort key [`Normalize`] uses to
+/// bring attribute lists into a canonical order. Values of different types
+/// order by type tag; vecs compare by length before element-wise; doubles use
+/// `total_cmp` so NaN does not break the order.
 trait Compare {
     fn compare(&self, other: &Self) -> Ordering;
 }
@@ -116,6 +131,12 @@ impl Compare for Option<AnyValue> {
  * tag: normalize
  */
 
+/// Bring OTLP structures into a canonical form: normalize nested values
+/// recursively, then sort every attribute list with [`Compare`] — kvlists,
+/// resource/scope attributes, metric metadata, and data-point attributes.
+/// Array order is preserved. Paired with [`MetricIdentityHash`] (which hashes
+/// vecs in slice order), this makes identity hashes independent of the order
+/// an SDK emitted attributes in.
 trait Normalize {
     fn normalize(&mut self);
 }
@@ -290,7 +311,9 @@ impl Normalize for Metric {
     }
 }
 
-/// Normalize an ExportMetricsServiceRequest by recursively sorting all attributes
+/// Normalize a whole export request: resource and scope attributes, metric
+/// metadata, and every data point's attributes (see [`Normalize`]). Called by
+/// `metrics_service.rs::process_request` before chart matching and hashing.
 pub fn normalize_request(request: &mut ExportMetricsServiceRequest) {
     for rm in &mut request.resource_metrics {
         rm.resource.normalize();
@@ -307,6 +330,12 @@ pub fn normalize_request(request: &mut ExportMetricsServiceRequest) {
  * tag: hash
  */
 
+/// Hash the *identity* of an OTLP object — the fields that distinguish one
+/// series from another (names, types, attribute keys and values, temporality)
+/// — while skipping measurements and timestamps. `iter.rs` feeds this into
+/// its `MetricIdentityHasher` to build chart identity hashes. Vecs hash in
+/// slice order, so hash only normalized (sorted) structures for
+/// order-independent results.
 pub trait MetricIdentityHash {
     fn identity_hash<H: Hasher>(&self, state: &mut H);
 }
@@ -387,7 +416,7 @@ impl MetricIdentityHash for Resource {
     fn identity_hash<H: Hasher>(&self, state: &mut H) {
         self.attributes.identity_hash(state);
         state.write_u32(self.dropped_attributes_count);
-        // ignore entity refs
+        // entity_refs are excluded from the identity
     }
 }
 
@@ -429,7 +458,9 @@ impl MetricIdentityHash for Metric {
  * tag: datapoint
  */
 
-/// A reference to a data point, abstracting over the different data point types.
+/// Borrowed view over one of the four OTLP data-point shapes. `Number` covers
+/// both Gauge and Sum, which share `NumberDataPoint`; `metrics_service.rs`
+/// pattern-matches the Histogram and Summary variants for decomposition.
 pub enum DataPointRef<'a> {
     Number(&'a NumberDataPoint),
     Histogram(&'a HistogramDataPoint),
@@ -438,7 +469,7 @@ pub enum DataPointRef<'a> {
 }
 
 impl<'a> DataPointRef<'a> {
-    /// Get the attributes of this data point.
+    /// The wrapped data point's attributes.
     pub fn attributes(&self) -> &[KeyValue] {
         match self {
             DataPointRef::Number(dp) => &dp.attributes,
@@ -448,14 +479,14 @@ impl<'a> DataPointRef<'a> {
         }
     }
 
-    /// Get the value of a specific attribute by key.
+    /// First attribute with this key, if any.
     pub fn get_attribute(&self, key: &str) -> Option<&KeyValue> {
         self.attributes().iter().find(|kv| kv.key == key)
     }
 
-    /// Get the dimension name based on the dimension attribute key.
-    /// If the key is provided and found, returns the string value of that attribute.
-    /// Otherwise returns "value".
+    /// Dimension name for this data point: the string value of the attribute
+    /// named `dimension_attr_key`, or the literal "value" when no key is
+    /// given, the attribute is missing, or its value is not a string.
     pub fn dimension_name(&self, dimension_attr_key: Option<&str>) -> &str {
         let Some(key) = dimension_attr_key else {
             return "value";
@@ -471,7 +502,9 @@ impl<'a> DataPointRef<'a> {
             .unwrap_or("value")
     }
 
-    /// Hash the attributes, excluding the dimension attribute key if provided.
+    /// Hash the attributes in slice order via [`MetricIdentityHash`], skipping
+    /// every attribute whose key is `exclude_key` — the dimension attribute,
+    /// which varies per dimension within one chart.
     pub fn hash_attributes<H: Hasher>(&self, state: &mut H, exclude_key: Option<&str>) {
         for kv in self.attributes() {
             if exclude_key.is_some_and(|k| k == kv.key) {
@@ -481,7 +514,8 @@ impl<'a> DataPointRef<'a> {
         }
     }
 
-    /// Get the underlying NumberDataPoint if this is a number type (Gauge or Sum).
+    /// The wrapped `NumberDataPoint` for Gauge/Sum points, `None` for the
+    /// other shapes.
     pub fn as_number(&self) -> Option<&NumberDataPoint> {
         match self {
             DataPointRef::Number(dp) => Some(dp),
@@ -489,8 +523,9 @@ impl<'a> DataPointRef<'a> {
         }
     }
 
-    /// Get the numeric value as f64.
-    /// Returns None if this is not a number data point or has no value.
+    /// Numeric value of a number data point, widening ints to f64. `None` for
+    /// histogram, exponential histogram, and summary points, or when the
+    /// value field is unset.
     pub fn value_as_f64(&self) -> Option<f64> {
         self.as_number().and_then(|dp| {
             dp.value.as_ref().map(|v| match v {
@@ -500,8 +535,8 @@ impl<'a> DataPointRef<'a> {
         })
     }
 
-    /// Get the time_unix_nano field.
-    /// Returns 0 if not a number data point.
+    /// Collection timestamp (`time_unix_nano`) of the wrapped data point,
+    /// whatever its shape.
     pub fn time_unix_nano(&self) -> u64 {
         match self {
             DataPointRef::Number(dp) => dp.time_unix_nano,
@@ -511,8 +546,8 @@ impl<'a> DataPointRef<'a> {
         }
     }
 
-    /// Get the start_time_unix_nano field.
-    /// Returns 0 if not a number data point.
+    /// Start timestamp (`start_time_unix_nano`) of the wrapped data point,
+    /// whatever its shape.
     pub fn start_time_unix_nano(&self) -> u64 {
         match self {
             DataPointRef::Number(dp) => dp.start_time_unix_nano,
@@ -523,7 +558,9 @@ impl<'a> DataPointRef<'a> {
     }
 }
 
-/// Iterator over data points in a metric.
+/// Lazy iterator over a single metric's data points, yielding [`DataPointRef`]s
+/// in stored order; yields nothing for a metric with no data set. (Not to be
+/// confused with `iter.rs`'s request-level iterator of the same name.)
 pub struct DataPointIter<'a> {
     inner: DataPointIterInner<'a>,
 }
@@ -552,7 +589,7 @@ impl<'a> Iterator for DataPointIter<'a> {
     }
 }
 
-/// Extension trait to iterate over data points in a metric.
+/// Extension trait: iterate a [`Metric`]'s data points as [`DataPointRef`]s.
 pub trait DataPointIterExt {
     fn data_points(&self) -> DataPointIter<'_>;
 }

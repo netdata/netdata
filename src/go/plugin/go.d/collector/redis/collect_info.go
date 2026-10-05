@@ -3,128 +3,124 @@
 package redis
 
 import (
-	"bufio"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
+// INFO section headers, lowercased: Redis-compatible servers may use different casing (e.g. Kvrocks emits
+// "# CommandStats").
 const (
-	infoSectionServer       = "# Server"
-	infoSectionData         = "# Data"
-	infoSectionClients      = "# Clients"
-	infoSectionStats        = "# Stats"
-	infoSectionCommandstats = "# Commandstats"
-	infoSectionCPU          = "# CPU"
-	infoSectionRepl         = "# Replication"
-	infoSectionKeyspace     = "# Keyspace"
+	infoSectionClients      = "# clients"
+	infoSectionStats        = "# stats"
+	infoSectionCommandstats = "# commandstats"
+	infoSectionKeyspace     = "# keyspace"
 )
 
-var infoSections = map[string]struct{}{
-	infoSectionServer:       {},
-	infoSectionData:         {},
-	infoSectionClients:      {},
-	infoSectionStats:        {},
-	infoSectionCommandstats: {},
-	infoSectionCPU:          {},
-	infoSectionRepl:         {},
-	infoSectionKeyspace:     {},
-}
+var (
+	reKeyspaceValue     = regexp.MustCompile(`^keys=(\d+),expires=(\d+)`)
+	reCommandstatsValue = regexp.MustCompile(`^calls=(\d+),usec=(\d+),usec_per_call=([\d.]+)`)
+)
 
-func isInfoSection(line string) bool { _, ok := infoSections[line]; return ok }
-
+// collectInfo parses an INFO response (https://redis.io/commands/info). Every line is either a section
+// header ("# Name") or a "field:value" property.
 func (c *Collector) collectInfo(mx map[string]int64, info string) {
-	// https://redis.io/commands/info
-	// Lines can contain a section name (starting with a # character) or a property.
-	// All the properties are in the form of field:value terminated by \r\n.
+	var section string
+	var garnetSamplingDisabled bool
 
-	var curSection string
-	sc := bufio.NewScanner(strings.NewReader(info))
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if len(line) == 0 {
-			curSection = ""
+	for line := range strings.Lines(info) {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			section = ""
 			continue
 		}
 		if strings.HasPrefix(line, "#") {
-			if isInfoSection(line) {
-				curSection = line
-			}
+			section = strings.ToLower(line)
 			continue
 		}
 
-		field, value, ok := parseProperty(line)
-		if !ok {
+		field, value, ok := strings.Cut(line, ":")
+		if !ok || field == "" || value == "" {
 			continue
 		}
 
 		switch {
-		case curSection == infoSectionCommandstats:
-			c.collectInfoCommandstatsProperty(mx, field, value)
-		case curSection == infoSectionKeyspace:
-			c.collectInfoKeyspaceProperty(mx, field, value)
+		case c.server == "garnet" && field == "monitor_task":
+			// Garnet's Server section precedes Stats/Clients. Without periodic sampling those
+			// sections contain placeholders, even with commandstats enabled.
+			garnetSamplingDisabled = value == "disabled"
+		case garnetSamplingDisabled && (section == infoSectionStats || section == infoSectionClients):
+			continue
+		case section == infoSectionCommandstats:
+			c.collectCommandstatsProperty(mx, field, value)
+		case section == infoSectionKeyspace:
+			c.collectKeyspaceProperty(mx, field, value)
+		case field == "rejected_connections" && value == "-1":
+			// Dragonfly uses -1 when this counter is unsupported.
+			continue
 		case field == "rdb_last_bgsave_status":
-			collectNumericValue(mx, field, convertBgSaveStatus(value))
+			mx[field] = oldmetrix.Bool(value != "ok")
 		case field == "rdb_current_bgsave_time_sec" && value == "-1":
-			// TODO: https://github.com/netdata/dashboard/issues/198
-			// "-1" means there is no on-going bgsave operation;
-			// netdata has 'Convert seconds to time' feature (enabled by default),
-			// looks like it doesn't respect negative values and does abs().
-			// "-1" => "00:00:01".
-			collectNumericValue(mx, field, "0")
+			// -1 means no bgsave is in progress.
+			mx[field] = 0
 		case field == "rdb_last_save_time":
-			v, _ := strconv.ParseInt(value, 10, 64)
-			mx[field] = int64(time.Since(time.Unix(v, 0)).Seconds())
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				mx[field] = int64(time.Since(time.Unix(v, 0)).Seconds())
+			}
 		case field == "aof_enabled" && value == "1":
 			c.addAOFChartsOnce.Do(c.addAOFCharts)
 		case field == "master_link_status":
 			mx["master_link_status_up"] = oldmetrix.Bool(value == "up")
 			mx["master_link_status_down"] = oldmetrix.Bool(value == "down")
 		default:
+			if c.server == "garnet" {
+				if mapped, ok := garnetFieldMap[field]; ok {
+					field = mapped
+				}
+			}
 			collectNumericValue(mx, field, value)
 		}
 	}
 
-	if has(mx, "keyspace_hits", "keyspace_misses") {
-		mx["keyspace_hit_rate"] = int64(calcKeyspaceHitRate(mx) * precision)
+	hits, okHits := mx["keyspace_hits"]
+	misses, okMisses := mx["keyspace_misses"]
+	if okHits && okMisses {
+		mx["keyspace_hit_rate"] = int64(keyspaceHitRate(hits, misses) * precision)
 	}
-	if has(mx, "master_last_io_seconds_ago") {
-		c.addReplSlaveChartsOnce.Do(c.addReplSlaveCharts)
-		if !has(mx, "master_link_down_since_seconds") {
+
+	if _, ok := mx["master_last_io_seconds_ago"]; ok {
+		c.addReplicaChartsOnce.Do(c.addReplicaCharts)
+		if _, ok := mx["master_link_down_since_seconds"]; !ok && mx["master_link_status_up"] == 1 {
+			// A missing duration is zero only for an explicitly healthy link.
 			mx["master_link_down_since_seconds"] = 0
 		}
 	}
 }
 
-var reKeyspaceValue = regexp.MustCompile(`^keys=(\d+),expires=(\d+)`)
-
-func (c *Collector) collectInfoKeyspaceProperty(ms map[string]int64, field, value string) {
+func (c *Collector) collectKeyspaceProperty(mx map[string]int64, db, value string) {
 	match := reKeyspaceValue.FindStringSubmatch(value)
 	if match == nil {
 		return
 	}
 
 	keys, expires := match[1], match[2]
-	collectNumericValue(ms, field+"_keys", keys)
-	collectNumericValue(ms, field+"_expires_keys", expires)
+	collectNumericValue(mx, db+"_keys", keys)
+	collectNumericValue(mx, db+"_expires_keys", expires)
 
-	if !c.collectedDbs[field] {
-		c.collectedDbs[field] = true
-		c.addDbToKeyspaceCharts(field)
+	if !c.collectedDBs[db] {
+		c.collectedDBs[db] = true
+		c.addDBToKeyspaceCharts(db)
 	}
 }
 
-var reCommandstatsValue = regexp.MustCompile(`^calls=(\d+),usec=(\d+),usec_per_call=([\d.]+)`)
-
-func (c *Collector) collectInfoCommandstatsProperty(ms map[string]int64, field, value string) {
-	if !strings.HasPrefix(field, "cmdstat_") {
+func (c *Collector) collectCommandstatsProperty(mx map[string]int64, field, value string) {
+	cmd, ok := strings.CutPrefix(field, "cmdstat_")
+	if !ok {
 		return
 	}
-	cmd := field[len("cmdstat_"):]
 
 	match := reCommandstatsValue.FindStringSubmatch(value)
 	if match == nil {
@@ -132,9 +128,12 @@ func (c *Collector) collectInfoCommandstatsProperty(ms map[string]int64, field, 
 	}
 
 	calls, usec, usecPerCall := match[1], match[2], match[3]
-	collectNumericValue(ms, "cmd_"+cmd+"_calls", calls)
-	collectNumericValue(ms, "cmd_"+cmd+"_usec", usec)
-	collectNumericValue(ms, "cmd_"+cmd+"_usec_per_call", usecPerCall)
+	collectNumericValue(mx, "cmd_"+cmd+"_calls", calls)
+	// Garnet reports literal zero timing fields, not measured execution times.
+	if c.server != "garnet" {
+		collectNumericValue(mx, "cmd_"+cmd+"_usec", usec)
+		collectNumericValue(mx, "cmd_"+cmd+"_usec_per_call", usecPerCall)
+	}
 
 	if !c.collectedCommands[cmd] {
 		c.collectedCommands[cmd] = true
@@ -142,111 +141,22 @@ func (c *Collector) collectInfoCommandstatsProperty(ms map[string]int64, field, 
 	}
 }
 
-func collectNumericValue(ms map[string]int64, field, value string) {
+// collectNumericValue stores a numeric INFO value, multiplied by precision when it is fractional.
+// Non-numeric values are skipped.
+func collectNumericValue(mx map[string]int64, key, value string) {
 	v, err := strconv.ParseFloat(value, 64)
 	if err != nil {
 		return
 	}
-	if strings.IndexByte(value, '.') == -1 {
-		ms[field] = int64(v)
-	} else {
-		ms[field] = int64(v * precision)
+	if strings.Contains(value, ".") {
+		v *= precision
 	}
+	mx[key] = int64(v)
 }
 
-func convertBgSaveStatus(status string) string {
-	// https://github.com/redis/redis/blob/unstable/src/server.c
-	// "ok" or "err"
-	if status == "ok" {
-		return "0"
-	}
-	return "1"
-}
-
-func parseProperty(prop string) (field, value string, ok bool) {
-	before, after, ok0 := strings.Cut(prop, ":")
-	if !ok0 {
-		return "", "", false
-	}
-	field, value = before, after
-	return field, value, field != "" && value != ""
-}
-
-func calcKeyspaceHitRate(ms map[string]int64) float64 {
-	hits := ms["keyspace_hits"]
-	misses := ms["keyspace_misses"]
+func keyspaceHitRate(hits, misses int64) float64 {
 	if hits+misses == 0 {
 		return 0
 	}
 	return float64(hits) * 100 / float64(hits+misses)
-}
-
-func (c *Collector) addCmdToCommandsCharts(cmd string) {
-	c.addDimToChart(chartCommandsCalls.ID, &collectorapi.Dim{
-		ID:   "cmd_" + cmd + "_calls",
-		Name: strings.ToUpper(cmd),
-		Algo: collectorapi.Incremental,
-	})
-	c.addDimToChart(chartCommandsUsec.ID, &collectorapi.Dim{
-		ID:   "cmd_" + cmd + "_usec",
-		Name: strings.ToUpper(cmd),
-		Algo: collectorapi.Incremental,
-	})
-	c.addDimToChart(chartCommandsUsecPerSec.ID, &collectorapi.Dim{
-		ID:   "cmd_" + cmd + "_usec_per_call",
-		Name: strings.ToUpper(cmd),
-		Div:  precision,
-	})
-}
-
-func (c *Collector) addDbToKeyspaceCharts(db string) {
-	c.addDimToChart(chartKeys.ID, &collectorapi.Dim{
-		ID:   db + "_keys",
-		Name: db,
-	})
-	c.addDimToChart(chartExpiresKeys.ID, &collectorapi.Dim{
-		ID:   db + "_expires_keys",
-		Name: db,
-	})
-}
-
-func (c *Collector) addDimToChart(chartID string, dim *collectorapi.Dim) {
-	chart := c.Charts().Get(chartID)
-	if chart == nil {
-		c.Warningf("error on adding '%s' dimension: can not find '%s' chart", dim.ID, chartID)
-		return
-	}
-	if err := chart.AddDim(dim); err != nil {
-		c.Warning(err)
-		return
-	}
-	chart.MarkNotCreated()
-}
-
-func (c *Collector) addAOFCharts() {
-	err := c.Charts().Add(chartPersistenceAOFSize.Copy())
-	if err != nil {
-		c.Warningf("error on adding '%s' chart", chartPersistenceAOFSize.ID)
-	}
-}
-
-func (c *Collector) addReplSlaveCharts() {
-	if err := c.Charts().Add(masterLinkStatusChart.Copy()); err != nil {
-		c.Warningf("error on adding '%s' chart", masterLinkStatusChart.ID)
-	}
-	if err := c.Charts().Add(masterLastIOSinceTimeChart.Copy()); err != nil {
-		c.Warningf("error on adding '%s' chart", masterLastIOSinceTimeChart.ID)
-	}
-	if err := c.Charts().Add(masterLinkDownSinceTimeChart.Copy()); err != nil {
-		c.Warningf("error on adding '%s' chart", masterLinkDownSinceTimeChart.ID)
-	}
-}
-
-func has(m map[string]int64, key string, keys ...string) bool {
-	switch _, ok := m[key]; len(keys) {
-	case 0:
-		return ok
-	default:
-		return ok && has(m, keys[0], keys[1:]...)
-	}
 }

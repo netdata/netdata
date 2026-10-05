@@ -1,41 +1,45 @@
-//! The shared trace combiner — ONE implementation of span dedup, canonical
-//! ordering, capping, and forest building, used by every path that
-//! assembles a trace: the single-file [`IndexReader::trace_by_id`]
-//! (`index_reader`), the cross-source engine (`sfsq::traces`), and any
-//! later consumer (compaction, cross-node fan-out).
+//! The shared trace combiner — the ONE implementation of span dedup,
+//! canonical ordering, capping, and forest building for every path that
+//! assembles a trace. Consumers (grep-verified): the single-file
+//! [`IndexReader::trace_by_id`] (`index_reader.rs`) and the
+//! cross-source engine `sfsq::traces` (by_id.rs, search.rs). Shared with
+//! `sfsq` deliberately — dedup, ordering, and root rules must not drift
+//! between consumers.
 //!
 //! Contracts (pinned in the phase-4 design record):
 //!
-//! - Dedup key: `(span_id, kind)` — kind included because Zipkin-style
-//!   shared client/server span ids are real. Valid within ONE trace: the
-//!   combiner assembles exactly one trace per call. UNSET span ids NEVER
-//!   collapse — those are distinct spans lacking a valid id, not resends.
-//! - Total order and canonical-copy rule:
+//! - Dedup key: `(span_id, kind)`, within ONE trace — the combiner
+//!   assembles exactly one trace per call. `kind` is in the key because
+//!   Zipkin-style shared client/server span ids are real. UNSET span ids
+//!   NEVER collapse: id-less spans are distinct spans, not resends.
+//! - Total order:
 //!   `(start_ns, span_id, kind, content-hash, canonical-bytes)`. The
 //!   canonical copy of unequal resends is the FIRST in that order —
 //!   chronological-first, content-tiebroken — among SUCCESSFULLY
-//!   materialized copies: if the true canonical copy's source fails, the
-//!   next copy in order substitutes and the failure is reported
-//!   (`failures`), so a consumer can treat `SourceFailure` as "the
-//!   canonical copy may have been substituted". NO physical provenance
-//!   participates, so results are independent of how spans scatter
+//!   materialized copies: if its source fails, the
+//!   next copy in order substitutes and the failure lands in
+//!   [`CombineOutcome::failures`] (sfsq reports those as its
+//!   `SourceFailure` partial reason, so a partial result may hide a
+//!   canonical-copy substitution). NO physical provenance (source index,
+//!   position) participates, so results are independent of how spans
+//!   scatter across sources.
+//! - Canonical identity: bincode standard encoding of the full
+//!   [`TraceSpan`] in declared field order, hashed with xxhash64 seed 0.
+//!   The encoding is not yet frozen (nothing is released); it freezes at
+//!   release.
+//! - The merge consumes lightweight [`SpanRef`]s. The cap bounds RETAINED
+//!   spans and HELD payloads. Every copy in an equal-cheap-key group
+//!   materializes once (the content comparison needs its bytes): a
+//!   set-id group streams the selection, holding one candidate at a time
+//!   — O(1) peak per group however many resends — while an UNSET group
+//!   is held whole, because content-deterministic ordering of its
+//!   distinct members needs them all: the one place peak memory is a
+//!   group. Groups beyond the cap never materialize (the pre-group cap
+//!   check). Examined *refs* are bounded by the trace's total row count
 //!   across sources.
-//! - Canonical encoding: bincode standard encoding of the full
-//!   [`TraceSpan`] in declared field order; hash = xxhash64, seed 0.
-//!   Pre-release the encoding may change freely (nothing is released);
-//!   it freezes at release.
-//! - The merge consumes lightweight [`SpanRef`]s. What the cap bounds,
-//!   precisely: RETAINED spans, and HELD span payloads. Every copy inside
-//!   an equal-cheap-key group must MATERIALIZE once (the content
-//!   comparison requires its bytes) — for a set id the selection streams,
-//!   holding one candidate at a time (O(1) peak memory per group however
-//!   many resends); an UNSET group is held whole, because ordering its
-//!   distinct members content-deterministically needs them all — the one
-//!   place peak memory is a group. Beyond-cap groups never materialize at
-//!   all (the pre-group cap check). Examined *refs* are bounded by the
-//!   trace's total row count across sources.
-//! - Capping stops at the first unique span BEYOND the cap, which
-//!   distinguishes an exactly-cap `Complete` trace from a truncated one.
+//! - Capping stops at the first unique span BEYOND the cap — an
+//!   exactly-cap trace is `Complete`, and resends of already-kept keys
+//!   (checked before the cap) cannot truncate.
 //!
 //! [`IndexReader::trace_by_id`]: crate::IndexReader::trace_by_id
 
@@ -45,22 +49,23 @@ use std::hash::Hasher;
 use crate::index_reader::{Trace, TraceSpan};
 use crate::{SpanId, TraceId};
 
-/// The raw OTLP `SpanKind::SPAN_KIND_SERVER` value — the preferred parent
-/// among a shared-id client/server pair (Zipkin shared-span semantics:
-/// in-process children hang off the receiving side).
+/// The raw OTLP `SpanKind::SPAN_KIND_SERVER` value (2) — the preferred
+/// parent among a shared-id client/server pair (Zipkin shared-span
+/// semantics: in-process children hang off the receiving side).
 const SPAN_KIND_SERVER_RAW: i32 = 2;
 
 /// A lightweight span candidate: everything the merge needs to order and
 /// deduplicate WITHOUT materializing the span payload. `position` is
-/// source-local (a file row position, or a tail scan's span index).
+/// source-local — a file row position in the SFST session
+/// (index_reader/session.rs), a span index in the WAL tail scan
+/// (sfsq/traces/wal_scan.rs).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SpanRef {
     pub position: u32,
     pub start_ns: i64,
     pub span_id: SpanId,
     /// Raw OTLP span kind int (0 = UNSPECIFIED, which older files leave
-    /// absent) — part of the
-    /// dedup key.
+    /// absent) — part of the dedup key.
     pub kind: i32,
 }
 
@@ -73,9 +78,10 @@ impl SpanRef {
 }
 
 /// A source of one trace's spans for the combiner: cheap refs up front,
-/// payloads on demand. Implemented by the SFST file session
-/// ([`TraceFileSession`](crate::TraceFileSession)) and by the traces WAL
-/// tail scan (in `sfsq`).
+/// payloads on demand. Implementors: the SFST file session
+/// ([`TraceFileSession`](crate::TraceFileSession),
+/// `index_reader/session.rs`) and the sfsq traces WAL tail scan
+/// (`sfsq/src/traces/wal_scan.rs` `TraceWalScan`).
 pub trait SpanSource {
     /// This source's candidates for `trace_id` (any order; the combiner
     /// sorts). An id absent from the source yields an empty vec.
@@ -95,14 +101,15 @@ pub struct CombineOutcome {
     /// merged prefix assembled so far.
     pub cancelled: bool,
     /// Sources that failed (`span_refs` or `materialize`), by input index,
-    /// with the error. A failed source's remaining candidates are dropped
-    /// — the caller reports the failure (partial result), it is never
-    /// silent.
+    /// with the error. A failed source's remaining candidates are dropped,
+    /// so the trace may be partial — the failure is always surfaced here,
+    /// never silent.
     pub failures: Vec<(usize, crate::Error)>,
     /// Input indices of the sources whose spans were RETAINED in the
-    /// trace (sorted, deduplicated) — the domain of any result metadata
-    /// derived per source (e.g. the schema-kind map: it describes the
-    /// returned data, not files that merely might contain the trace).
+    /// trace (sorted, deduplicated) — the domain of per-source result
+    /// metadata, e.g. sfsq's coalesced field→schema-kind map: it
+    /// describes the returned data, not files that merely might contain
+    /// the trace.
     pub contributing_sources: Vec<usize>,
 }
 
@@ -167,10 +174,11 @@ impl PartialOrd for HeapEntry {
 /// `cap = None` means unbounded; `cap = Some(0)` is a caller error the
 /// engine rejects at its request boundary (asserted here in debug builds).
 ///
-/// `cancel` is polled once per merge group; when it fires, the merge
-/// stops and the outcome carries the deterministic prefix assembled so
-/// far with [`cancelled`](CombineOutcome::cancelled) set (callers that
-/// don't cancel pass `&|| false`).
+/// `cancel` is polled during head resolution and once per merge group.
+/// Once the merge is running, a firing cancel keeps the deterministic
+/// prefix assembled so far ([`cancelled`](CombineOutcome::cancelled) is
+/// set); during head resolution nothing is assembled yet, so the outcome
+/// is empty. Callers that never cancel pass `&|| false`.
 pub fn combine(
     sources: &mut [&mut dyn SpanSource],
     trace_id: TraceId,
@@ -401,6 +409,9 @@ pub fn combine(
             }
         }
         members.sort_by(|a, b| content_order((a.0, &a.1), (b.0, &b.1)));
+        // The UNSET group was materialized whole (above), so the cap can
+        // trip mid-emission — this bounds the waste to one group, and
+        // nothing beyond it is touched.
         for (_, _, span, source) in members {
             if let Some(n) = cap
                 && spans.len() >= n
@@ -436,10 +447,12 @@ fn refs_get(refs: &[Vec<SpanRef>], source: usize, index: usize) -> Option<&SpanR
 
 /// Build the trace graph over combiner-ordered spans: node-index
 /// adjacency, the pinned shared-id parent rule, and the reachability
-/// guarantee.
+/// guarantee. These are GRAPH roots — `Trace::summary_root` applies its
+/// own policy on top (it prefers an unset-parent span over an earlier
+/// orphan).
 ///
 /// - A span whose `parent_span_id` is unset, self-referential, or absent
-///   from the set is a GRAPH root — a partial trace forms a forest, never
+///   from the set is a root — a partial trace forms a forest, never
 ///   dropped spans.
 /// - A parent id matching several spans (a shared client/server-id pair)
 ///   resolves to the SERVER-kind candidate, else the earliest (the spans

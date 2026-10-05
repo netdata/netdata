@@ -6,6 +6,7 @@ on:
       - '.github/workflows/nd-run-tests.yml'
       - 'src/collectors/utils/nd-run.c'
       - 'src/collectors/utils/nd-file-reader.*'
+      - 'src/collectors/utils/nd-process-tree.*'
       - 'CMakeLists.txt'
       - 'src/collectors/utils/exec-signals.h'
       - 'tests/nd-run/**'
@@ -16,6 +17,7 @@ on:
       - '.github/workflows/nd-run-tests.yml'
       - 'src/collectors/utils/nd-run.c'
       - 'src/collectors/utils/nd-file-reader.*'
+      - 'src/collectors/utils/nd-process-tree.*'
       - 'CMakeLists.txt'
       - 'src/collectors/utils/exec-signals.h'
       - 'tests/nd-run/**'
@@ -35,6 +37,9 @@ jobs:
       - uses: actions/checkout@v7
       - name: Unprivileged command and file-reader tests
         run: python3 tests/nd-run/test_nd_run.py -v
+      - name: Linux process-tree ownership tests
+        if: runner.os == 'Linux'
+        run: python3 tests/nd-run/test_process_tree.py
       - name: Address and undefined behavior sanitizers
         if: runner.os == 'Linux'
         run: python3 tests/nd-run/test_nd_run.py --cc clang --cflags='-fsanitize=address,undefined' -v
@@ -47,3 +52,4 @@ jobs:
           sudo useradd --system --user-group nd-run-test
           sudo python3 tests/nd-run/test_nd_run.py --user nd-run-test -v
           sudo python3 tests/nd-run/test_nd_run.py --user nd-run-test --no-setres -v
+          sudo python3 tests/nd-run/test_process_tree.py TreeTests.test_setuid_exec_cannot_escape_supervisor_identity

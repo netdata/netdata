@@ -1,9 +1,16 @@
-//! Mapping between the `otel-traces` wire types and the wire-neutral
-//! [`sfsq::traces`] engine — the traces analogue of the logs `adapter`.
-//! Wire shapes live in [`super::wire`]; this module owns the
-//! request-side parsing (hex ids, the selection-key grammar, the
-//! pagination cursor, window canonicalization) and the response-side
-//! conversion (engine data → wire, ids rendered as W3C lowercase hex).
+//! Mapping between the `otel-traces` wire types ([`super::wire`]) and
+//! the wire-neutral [`sfsq::traces`] engine — the traces analogue of
+//! the logs `adapter`: a pure translation layer, no I/O of its own.
+//!
+//! * wire → engine — request-side parsing: hex ids, the selection-key
+//!   grammar, the pagination cursor, window canonicalization
+//!   ([`resolve_window`]), the search predicate ([`build_predicate`]).
+//! * engine → wire — the response shapers (`to_*_result`), ids rendered
+//!   as W3C lowercase hex.
+//!
+//! The only consumer is the traces handler (`handler.rs`), which owns
+//! mode dispatch and the sealed-SFST + live-WAL source capture
+//! ([`super::sources`]) — the adapter never touches registry state.
 
 use std::collections::HashMap;
 
@@ -22,8 +29,9 @@ use super::wire::{
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
-/// case-insensitive. The all-zero (unset) id parses here — the engine
-/// rejects it with its own precise message.
+/// case-insensitive. Shape only: the all-zero (unset) sentinel parses
+/// here — rejecting it is the caller's semantic job (the handler
+/// pre-captures the engine's `UnsetTraceId` rejection).
 pub(crate) fn parse_trace_id(s: &str) -> Result<sfst::TraceId, String> {
     let s = s.trim();
     if s.len() != 32 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
@@ -40,11 +48,11 @@ pub(crate) fn parse_trace_id(s: &str) -> Result<sfst::TraceId, String> {
 }
 
 /// Validate the `trace` sub-object's optional assembly bounds into a
-/// capture range. Both-or-neither; `after < before` — violations are
-/// client errors (the structural-error precedent of the envelope
-/// window). Any width is accepted: the agent is relaxed on time ranges
-/// and the response's `coverage` declares the range used. `None` =
-/// full retention.
+/// capture range. Both-or-neither and `after < before` — violations
+/// are client errors, like the window fields of every other mode. Any
+/// width is accepted: the agent is relaxed on time ranges, and the
+/// response's `coverage` declares the range used. `None` = full
+/// retention (the handler passes `0..u32::MAX`).
 pub(crate) fn validate_trace_bounds(
     after: Option<u32>,
     before: Option<u32>,
@@ -68,11 +76,11 @@ pub(crate) fn validate_trace_bounds(
 }
 
 /// Search completion slack, per side, seconds: the completion capture
-/// is the match window widened by `clamp(window_width, 1h, 24h)` on
-/// each side, so a hit whose trace straddles the window edge still
-/// assembles its out-of-window spans. Saturating at the u32 second
-/// boundaries. The window width is the scale hint: a narrow view gets
-/// at least an hour of slack, a wide one at most a day per side.
+/// is the match window widened by `clamp(window_width, 1h, 24h)` per
+/// side — saturating at the u32 second boundaries — so a hit whose
+/// trace straddles the window edge still assembles its out-of-window
+/// spans. The window width is the scale hint: a narrow view gets at
+/// least an hour of slack, a wide one at most a day per side.
 pub(crate) const SEARCH_COMPLETION_SLACK_MIN_S: u32 = 3_600;
 pub(crate) const SEARCH_COMPLETION_SLACK_MAX_S: u32 = 86_400;
 
@@ -113,6 +121,7 @@ pub(crate) fn to_trace_result(
     }
 }
 
+/// One assembled span → the wire shape (events and links ride along).
 fn span_wire(s: sfst::TraceSpan) -> SpanWire {
     SpanWire {
         span_id: s.span_id.to_string(),
@@ -132,6 +141,7 @@ fn span_wire(s: sfst::TraceSpan) -> SpanWire {
     }
 }
 
+/// One span event → the wire shape.
 fn event_wire(e: sfst::TraceEvent) -> EventWire {
     EventWire {
         time_unix_nano: e.time_unix_nano,
@@ -141,6 +151,7 @@ fn event_wire(e: sfst::TraceEvent) -> EventWire {
     }
 }
 
+/// One span link → the wire shape (the linked trace id, W3C hex).
 fn link_wire(l: sfst::TraceLink) -> LinkWire {
     LinkWire {
         trace_id: l.trace_id.to_string(),
@@ -152,6 +163,8 @@ fn link_wire(l: sfst::TraceLink) -> LinkWire {
     }
 }
 
+/// Field-kind tables → the wire shape, each kind spelled as its wire
+/// word ([`kind_word`]).
 fn field_kinds_wire(k: FieldKinds) -> FieldKindsWire {
     let section = |v: Vec<(String, sfst::ValueKind)>| -> Vec<(String, &'static str)> {
         v.into_iter().map(|(n, k)| (n, kind_word(k))).collect()
@@ -165,10 +178,11 @@ fn field_kinds_wire(k: FieldKinds) -> FieldKindsWire {
 
 // ── Search: selection-key grammar ───────────────────────────────────
 
-/// The wire word for each builtin field (snake_case). Also the key
-/// grammar step 1.4's enumeration emits, so filters and facet keys stay
-/// one vocabulary. The lockstep test walks `BuiltinField::ALL`, so a new
-/// engine builtin breaks the suite until it gets a wire word.
+/// The wire word for each builtin field (snake_case). Also the words
+/// key enumeration emits ([`render_attribute_key`]), so filters and
+/// facet keys stay one vocabulary. The lockstep test walks
+/// `BuiltinField::ALL`, so a new engine builtin breaks the suite until
+/// it gets a wire word.
 const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
     ("name", BuiltinField::Name),
     ("kind", BuiltinField::Kind),
@@ -190,10 +204,12 @@ const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
 ];
 
 /// The attribute owners a selection key may name, as `<owner>.<key>`.
-/// `Any` is deliberately absent from the wire (enumeration — step 1.4 —
-/// emits owner-qualified keys, so selections are always qualified) and
-/// `Builtin` is spelled as the bare words above. The exhaustive match in
-/// `owner_word_for` keeps this table in lockstep with the engine enum.
+/// The engine enum has two further owners that stay un-named here:
+/// `Builtin` is spelled as the bare builtin words above, and the
+/// predicates-only `Any` is not wire-nameable at all. Enumeration emits
+/// owner-qualified keys ([`render_attribute_key`]), so selections are
+/// always qualified; its `.expect` keeps this table in lockstep with
+/// the engine enum.
 const OWNER_WORDS: [(&str, AttributeOwner); 5] = [
     ("resource", AttributeOwner::Resource),
     ("span", AttributeOwner::Span),
@@ -498,12 +514,10 @@ pub(crate) fn to_overview_result(
 }
 
 /// Shape the same aggregate as the SEARCH response's embedded section:
-/// the legacy body minus `mode`, plus `coverage` — the GRID's aligned
-/// window, which the caller derived together with `grid` — and `scope`.
-///
-/// `scope` is the section's honesty: the handler passes the value for
-/// the predicate the engine pass actually carried, never what a caller
-/// wanted.
+/// the body of [`to_overview_result`] minus `mode`, plus the caller's
+/// `coverage` (the grid's aligned window, derived together with
+/// `grid`) and `scope` — what the engine pass actually carried, which
+/// only the caller knows. The wire contract is `OverviewSection`.
 pub(crate) fn to_overview_section(
     data: OverviewData,
     grid: sfst::Grid,
@@ -566,8 +580,8 @@ pub(crate) fn to_slowest_result(data: SlowestData, limit: usize) -> SlowestResul
 /// rank — (newest matched-span start DESC, trace_id ASC) — is
 /// WINDOW-DEPENDENT: narrowing the window re-ranks any trace whose
 /// matched spans straddle the boundary through an older span,
-/// duplicating it on a later page (a review-caught flaw of the first
-/// design). So the cursor NEVER narrows the window. Instead it:
+/// duplicating it on a later page. So the cursor NEVER narrows the
+/// window. Instead it:
 ///
 /// - FREEZES the canonicalized window of page 1, so every page ranks
 ///   the same corpus the same way (and a default `now`-derived window
@@ -614,6 +628,10 @@ pub(crate) struct SearchCursor {
 /// served count); the cursor is rejected with advice to narrow.
 const CURSOR_SERVED_CAP: usize = 10_000;
 
+/// The cursor's wire form: the `t2:` version prefix plus the five
+/// frozen fields, colon-joined. The version prefix (with the exact
+/// field count [`parse_cursor`] demands) turns an older format into a
+/// clean "malformed anchor" instead of a misread.
 pub(crate) fn encode_cursor(c: &SearchCursor) -> String {
     format!(
         "t2:{}:{}:{}:{}:{}",
@@ -621,6 +639,12 @@ pub(crate) fn encode_cursor(c: &SearchCursor) -> String {
     )
 }
 
+/// Parse a cursor produced by [`encode_cursor`]: exact shape, all
+/// fields numeric, and the structural checks re-applied — `served` at
+/// least 1 (an anchor only exists after a served page) and the frozen
+/// window ordered. Anything off is one "malformed anchor" error (the
+/// wire calls the cursor an `anchor`); only an over-cap `served` gets
+/// its own message.
 pub(crate) fn parse_cursor(s: &str) -> Result<SearchCursor, String> {
     let malformed = || format!("malformed anchor {s:?}");
     let mut parts = s.split(':');
@@ -664,8 +688,11 @@ fn is_served(c: &SearchCursor, t: &sfsq::traces::TraceSummary) -> bool {
 
 // ── Search: window canonicalization ─────────────────────────────────
 
-/// The canonicalized search window: the engine bounds (ns) plus the
-/// registry capture range (seconds — a safe superset for file pruning).
+/// The canonicalized search window: the engine bounds in nanoseconds
+/// plus the same range as whole seconds — the capture range the
+/// supplier prunes candidate files with (file summaries are
+/// second-granular; the ns bounds do the exact filtering inside the
+/// engine).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ResolvedWindow {
     pub start_ns: i64,
@@ -771,6 +798,8 @@ pub(crate) fn to_search_result(
     }
 }
 
+/// One search-page summary → the wire shape (matched spans as full
+/// wire spans).
 fn summary_wire(t: sfsq::traces::TraceSummary) -> TraceSummaryWire {
     TraceSummaryWire {
         trace_id: t.trace_id.to_string(),
@@ -788,6 +817,7 @@ fn summary_wire(t: sfsq::traces::TraceSummary) -> TraceSummaryWire {
     }
 }
 
+/// The per-service span breakdown → the wire shape.
 fn service_breakdown_wire(b: sfsq::traces::ServiceBreakdown) -> ServiceBreakdownWire {
     ServiceBreakdownWire {
         top: b

@@ -1,0 +1,533 @@
+plugin_name: dem.plugin
+modules:
+  - meta:
+      id: collector-dem.plugin-lighthouse
+      plugin_name: dem.plugin
+      module_name: lighthouse
+      monitored_instance:
+        name: Lighthouse Desktop Audit
+        link: https://www.netdata.cloud/
+        icon_filename: netdata.png
+        categories:
+          - data-collection.synthetic-testing
+      keywords:
+        - dem
+        - synthetic
+        - browser
+        - lighthouse
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+    overview:
+      data_collection:
+        metrics_description: Monitor desktop lab performance for a web page with Lighthouse. Inspect the performance
+          category score, individual lab timings, layout shift and audit execution outcomes.
+        method_description: Audits the configured HTTP or HTTPS page using the Lighthouse desktop preset and
+          sandboxed Chromium at the native job interval. Configuration Test validates preparation without running
+          an audit. Lab measurements describe this browser attempt and are not field Core Web Vitals.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: '| Permission | Needed when |
+
+          |:--|:--|
+
+          | Execute the prepared Node runtime and sandboxed Chromium | Every browser attempt |
+
+          | Write to the DEM state directory | Retaining history and optional captures |
+
+          '
+      default_behavior:
+        auto_detection:
+          description: Jobs require explicit configuration; no websites or scripts are discovered automatically.
+        limits:
+          description: Missing scores or timings produce measurement gaps; a measured zero remains zero. Running
+            and waiting attempts do not refresh the prior observation, which becomes stale after two collection
+            intervals. HTML reports are disabled unless requested. No stock performance-score threshold alert
+            is configured.
+        performance_impact:
+          description: Each attempt starts a fresh browser and consumes CPU, memory and target website requests.
+            Increasing update_every reduces frequency. Jobs share one browser admission slot, so concurrent
+            due jobs can wait. Optional captures consume local disk space.
+    setup:
+      prerequisites:
+        list:
+          - title: Prepare the browser runtime
+            description: Configure the Node executable, pinned Playwright and Lighthouse dependencies, and
+              full Chromium binary in the runtime section of dem.conf. Chromium must run with its sandbox enabled
+              as the Netdata service account. Restart dem.plugin after changing runtime paths; the plugin does
+              not download dependencies. Follow the [DEM runtime preparation guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md)
+              for the pinned versions and setup commands.
+      configuration:
+        file:
+          name: dem/lighthouse.conf
+        options:
+          description: Options apply independently to each native job.
+          folding:
+            enabled: true
+            title: Configuration options
+          list:
+            - name: name
+              description: Native job name used to identify this monitor and its history. Renaming creates
+                a separate monitor.
+              default_value: ''
+              required: true
+              group: Target
+            - name: url
+              description: Absolute HTTP or HTTPS URL of the page to audit. Embedded credentials are not accepted.
+              default_value: ''
+              required: true
+              group: Target
+            - name: save_report
+              description: Save the full Lighthouse HTML report. Reports can contain sensitive URLs and page
+                content.
+              default_value: false
+              required: false
+              group: Diagnosis
+            - name: update_every
+              description: Data collection interval, in seconds.
+              default_value: 1800
+              required: false
+              group: Collection
+            - name: timeout
+              description: Browser attempt timeout, in seconds. Waiting for another browser attempt is excluded.
+              default_value: 180
+              required: false
+              group: Collection
+        examples:
+          folding:
+            enabled: true
+            title: Examples
+          list:
+            - name: Monitor a home page
+              description: Create one native browser monitor after preparing the runtime.
+              config: "jobs:\n  - name: home\n    url: https://example.org/\n"
+    troubleshooting:
+      problems:
+        list:
+          - name: No conclusive observations
+            description: Inspect native job status and synthetic inventory for runtime preparation errors,
+              waiting attempts or execution inability. Open the latest retained run for errors and actual failure
+              phases. Missing measurements are gaps; stale, inconclusive and cancelled observations are not
+              recovery.
+    alerts: []
+    metrics:
+      description: Each native job has its own chart identity. Attempt duration excludes waiting for admission.
+        Missing observations are omitted.
+      availability: []
+      folding:
+        enabled: false
+        title: Metrics
+      scopes:
+        - name: job
+          description: One configured native browser monitor.
+          labels: []
+          metrics:
+            - name: dem_synthetic.execution_state
+              description: Synthetic attempt outcome
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: unknown
+                - name: success
+                - name: failed
+                - name: timeout
+                - name: inconclusive
+                - name: error
+                - name: cancelled
+            - name: dem_synthetic.duration
+              description: Synthetic attempt duration
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: duration
+            - name: dem_synthetic.lighthouse.performance
+              description: Lighthouse performance score
+              unit: points
+              chart_type: line
+              dimensions:
+                - name: performance
+            - name: dem_synthetic.lighthouse.timings
+              description: Lighthouse lab timings
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: fcp
+                - name: lcp
+                - name: tbt
+                - name: speed_index
+            - name: dem_synthetic.lighthouse.cls
+              description: Lighthouse cumulative layout shift
+              unit: ratio
+              chart_type: line
+              dimensions:
+                - name: cls
+    functions:
+      description: Use these process-wide Functions through the Agent or Cloud for both journey and Lighthouse
+        jobs. Invoke their public synthetics-* names with the documented filters; no job selector or active
+        browser is required.
+      list:
+        - id: synthetics-checks
+          function_name: synthetics-checks
+          name: Synthetic monitors
+          description: Invoke `synthetics-checks`. Active native monitors and their latest observation. Disabled
+            and failed-startup configuration remains in native job status. Freshness belongs to the last observation,
+            independently of a waiting or running attempt.
+          parameters:
+            - id: job_id
+              name: Monitor (`job_id`)
+              description: Native module and job name, such as journey:checkout. Leave empty to include all
+                monitors when listing.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: kind
+              name: Kind (`kind`)
+              description: Filter by journey or lighthouse. Leave empty to include both kinds.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: limit
+              name: Maximum rows (`limit`)
+              description: Maximum returned rows, from 1 to 2000. Defaults to 2000; truncated indicates additional
+                matching rows.
+              type: string
+              required: false
+              default: '2000'
+              options: []
+          returns:
+            description: At most limit active jobs, with independent current-attempt state and last-observation
+              freshness. The response includes process artifact retained_bytes, protected_bytes and cleanup_errors
+              under artifacts. Disabled and failed-startup jobs are visible through native configuration status.
+            columns:
+              - name: job_id
+                type: string
+                unit: ''
+                description: Monitor.
+              - name: kind
+                type: string
+                unit: ''
+                description: Kind.
+              - name: name
+                type: string
+                unit: ''
+                description: Name.
+              - name: target
+                type: string
+                unit: ''
+                description: Target.
+              - name: state
+                type: string
+                unit: ''
+                description: Current state.
+              - name: fresh
+                type: boolean
+                unit: ''
+                description: Last observation fresh.
+              - name: run_id
+                type: string
+                unit: ''
+                description: Last run.
+              - name: outcome
+                type: string
+                unit: ''
+                description: Last outcome.
+              - name: completed_us
+                type: timestamp
+                unit: ''
+                description: Last completion. Unix microseconds; null when unavailable.
+              - name: duration_ms
+                type: float
+                unit: ms
+                description: Attempt duration.
+              - name: last_success_us
+                type: timestamp
+                unit: ''
+                description: Last success in this activation. Unix microseconds; null when unavailable.
+              - name: last_failure_us
+                type: timestamp
+                unit: ''
+                description: Last failure in this activation. Unix microseconds; null when unavailable.
+              - name: error
+                type: string
+                unit: ''
+                description: Last error.
+              - name: history_error
+                type: string
+                unit: ''
+                description: History error.
+          performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
+            browser admission. Artifact fetch reads at most 5 MiB.
+          security: Requires member-equivalent access for observations and retained text; artifact bytes require
+            administrator-equivalent access. Captures and reports may contain sensitive URLs, page content
+            and user input; they are not universally redacted.
+          availability: Available while dem.plugin is running, independently of active journey or Lighthouse
+            jobs. Individual retained evidence may be absent or expired.
+          require_cloud: false
+          prerequisites:
+            list: []
+        - id: synthetics-runs
+          function_name: synthetics-runs
+          name: Synthetic runs
+          description: Invoke `synthetics-runs`. Retained attempts filtered by journal saved time. after and
+            before accept Unix seconds or negative offsets from now; omitted bounds cover retained history
+            through now. Results are capped at 2000 and disclose truncation.
+          parameters:
+            - id: job_id
+              name: Monitor (`job_id`)
+              description: Native module and job name, such as journey:checkout. Leave empty to include all
+                monitors when listing.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: kind
+              name: Kind (`kind`)
+              description: Filter by journey or lighthouse. Leave empty to include both kinds.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: outcome
+              name: Outcome (`outcome`)
+              description: Filter by unknown, success, failed, timeout, inconclusive, error or cancelled. Leave
+                empty for all outcomes.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: after
+              name: Saved after (`after`)
+              description: Inclusive journal saved-time lower bound in Unix seconds or a negative offset from
+                now. Leave empty for all retained history.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: before
+              name: Saved before (`before`)
+              description: Inclusive journal saved-time upper bound in Unix seconds or a negative offset from
+                now. Leave empty for the current time.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: limit
+              name: Maximum rows (`limit`)
+              description: Maximum returned rows, from 1 to 2000. Defaults to 2000; truncated indicates additional
+                matching rows.
+              type: string
+              required: false
+              default: '2000'
+              options: []
+          returns:
+            description: At most limit retained attempts selected by saved time, with explicit truncated and
+              effective time bounds. Zero or missing execution timestamps and missing durations are null rather
+              than fabricated measurements.
+            columns:
+              - name: run_id
+                type: string
+                unit: ''
+                description: Run.
+              - name: job_id
+                type: string
+                unit: ''
+                description: Monitor.
+              - name: kind
+                type: string
+                unit: ''
+                description: Kind.
+              - name: name
+                type: string
+                unit: ''
+                description: Name.
+              - name: target
+                type: string
+                unit: ''
+                description: Target.
+              - name: started_us
+                type: timestamp
+                unit: ''
+                description: Started. Unix microseconds; null when unavailable.
+              - name: completed_us
+                type: timestamp
+                unit: ''
+                description: Completed. Unix microseconds; null when unavailable.
+              - name: outcome
+                type: string
+                unit: ''
+                description: Outcome.
+              - name: duration_ms
+                type: float
+                unit: ms
+                description: Attempt duration.
+              - name: capture_state
+                type: string
+                unit: ''
+                description: Capture state.
+              - name: error
+                type: string
+                unit: ''
+                description: Error.
+              - name: history_error
+                type: string
+                unit: ''
+                description: History error.
+          performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
+            browser admission. Artifact fetch reads at most 5 MiB.
+          security: Requires member-equivalent access for observations and retained text; artifact bytes require
+            administrator-equivalent access. Captures and reports may contain sensitive URLs, page content
+            and user input; they are not universally redacted.
+          availability: Available while dem.plugin is running, independently of active journey or Lighthouse
+            jobs. Individual retained evidence may be absent or expired.
+          require_cloud: false
+          prerequisites:
+            list: []
+        - id: synthetics-run
+          function_name: synthetics-run
+          name: Synthetic run detail
+          description: Invoke `synthetics-run`. One retained or latest active attempt with original test phases,
+            errors, counts, nullable lab measurements and bounded reporter events. Missing completion means
+            no verified terminal observation.
+          parameters:
+            - id: job_id
+              name: Monitor (`job_id`)
+              description: Exact native module and job name that owns the requested run, such as journey:checkout.
+              type: string
+              required: true
+              default: ''
+              options: []
+            - id: run_id
+              name: Run (`run_id`)
+              description: Exact run identifier returned by synthetic inventory or run history.
+              type: string
+              required: true
+              default: ''
+              options: []
+          returns:
+            description: One row per retained reporter event, preserving actual and expected status and failure
+              phase. The run object also contains test counts, nullable lab metrics, capture state, artifact
+              metadata and history errors; dropped_events discloses omitted event detail.
+            columns:
+              - name: at_ms
+                type: timestamp
+                unit: ''
+                description: Event time. Unix milliseconds.
+              - name: kind
+                type: string
+                unit: ''
+                description: Event.
+              - name: test_id
+                type: string
+                unit: ''
+                description: Test.
+              - name: title
+                type: string
+                unit: ''
+                description: Title.
+              - name: phase
+                type: string
+                unit: ''
+                description: Phase.
+              - name: status
+                type: string
+                unit: ''
+                description: Actual status.
+              - name: expected_status
+                type: string
+                unit: ''
+                description: Expected status.
+              - name: duration_ms
+                type: float
+                unit: ms
+                description: Duration.
+              - name: message
+                type: string
+                unit: ''
+                description: Message.
+          performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
+            browser admission. Artifact fetch reads at most 5 MiB.
+          security: Requires member-equivalent access for observations and retained text; artifact bytes require
+            administrator-equivalent access. Captures and reports may contain sensitive URLs, page content
+            and user input; they are not universally redacted.
+          availability: Available while dem.plugin is running, independently of active journey or Lighthouse
+            jobs. Individual retained evidence may be absent or expired.
+          require_cloud: false
+          prerequisites:
+            list: []
+        - id: synthetics-artifact
+          function_name: synthetics-artifact
+          name: Synthetic artifacts
+          description: Invoke `synthetics-artifact`. Retained capture metadata for one run; file bytes are
+            verified when fetched. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent
+            permissions. Screenshots and HTML reports may contain sensitive content. Missing retained files
+            are expired or unavailable; fetches are limited to 5 MiB.
+          parameters:
+            - id: job_id
+              name: Monitor (`job_id`)
+              description: Exact native module and job name that owns the requested run, such as journey:checkout.
+              type: string
+              required: true
+              default: ''
+              options: []
+            - id: run_id
+              name: Run (`run_id`)
+              description: Exact run identifier returned by synthetic inventory or run history.
+              type: string
+              required: true
+              default: ''
+              options: []
+            - id: artifact_id
+              name: Artifact (`artifact_id`)
+              description: Exact recorded artifact identifier to fetch its bytes. Leave empty to list capture
+                metadata.
+              type: string
+              required: false
+              default: ''
+              options: []
+          returns:
+            description: Recorded capture metadata with retained-manifest availability. Fetch verifies content
+              and returns encoding=base64 and data_base64 without rendering HTML. A missing recorded capture
+              returns expired_or_unavailable, which does not prove why the file is absent.
+            columns:
+              - name: artifact_id
+                type: string
+                unit: ''
+                description: Artifact.
+              - name: kind
+                type: string
+                unit: ''
+                description: Kind.
+              - name: mime
+                type: string
+                unit: ''
+                description: Content type.
+              - name: bytes
+                type: integer
+                unit: bytes
+                description: Size.
+              - name: sha256
+                type: string
+                unit: ''
+                description: SHA-256.
+              - name: availability
+                type: string
+                unit: ''
+                description: Availability.
+          performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
+            browser admission. Artifact fetch reads at most 5 MiB.
+          security: Requires member-equivalent access for observations and retained text; artifact bytes require
+            administrator-equivalent access. Captures and reports may contain sensitive URLs, page content
+            and user input; they are not universally redacted.
+          availability: Available while dem.plugin is running, independently of active journey or Lighthouse
+            jobs. Individual retained evidence may be absent or expired.
+          require_cloud: false
+          prerequisites:
+            list: []

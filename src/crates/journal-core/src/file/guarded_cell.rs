@@ -1,79 +1,58 @@
+//! Guarded interior mutability for one-at-a-time window access.
+//!
+//! [`GuardedCell`] pairs a value with a `RefCell<bool>` in-use flag. It hands
+//! out `&mut T` from `&self` only while the flag is clear; the caller raises
+//! the flag while the returned reference (or anything derived from it) is
+//! live and clears it when done - normally through the RAII `ValueGuard`
+//! (file/value_guard.rs), whose `Drop` clears it. A conflicting borrow fails
+//! with [`JournalError::ValueGuardInUse`] (produced by the borrow checks in
+//! [`GuardedCell::borrow_mut_checked`] and [`GuardedCell::with_guarded`])
+//! instead of racing or
+//! panicking.
+//!
+//! The only consumer is `JournalFile`'s `window_manager` field
+//! (`file/file.rs`): the
+//! window manager (file/mmap.rs) remaps its windows on demand and thereby
+//! invalidates slices handed out earlier, so at most one window-backed
+//! object view may be live at a time. The module is private (`file/mod.rs`
+//! declares it without `pub`)
+//! and neither `GuardedCell` nor `ValueGuard` is re-exported from lib.rs.
+//!
+//! Threading: `!Sync` for every `T` (`UnsafeCell` and `RefCell` are both
+//! `!Sync`); `Send` follows `T: Send`. Since `JournalFile` holds this cell,
+//! `&JournalFile` cannot cross threads, so `ValueGuardInUse` only ever
+//! reports same-thread conflicts (e.g. a nested object access).
 use crate::error::{JournalError, Result};
 use crate::file::value_guard::ValueGuard;
 use std::cell::{RefCell, UnsafeCell};
 use std::num::NonZeroU64;
 
-/// A cell type that provides interior mutability with integrated guard-based exclusion.
+/// Interior mutability with a built-in one-borrow gate: returns `&mut T` from
+/// `&self`, but at most one borrow at a time.
 ///
-/// # Purpose
+/// `RefCell` alone cannot express this: its `RefMut` must be dropped before
+/// the borrowing call returns, while here the reference - or data derived
+/// from it, such as a slice into an mmap window - must outlive the call.
+/// Instead the cell carries an in-use flag that the caller manages: check
+/// that it is clear, take the borrow, raise the flag while the reference is
+/// live, clear it when done. `ValueGuard` is the RAII wrapper that automates
+/// the last two steps.
 ///
-/// `GuardedCell` is designed for situations where:
-/// - You need interior mutability (get `&mut T` from `&self`)
-/// - References to the inner data must outlive the borrowing function scope
-/// - You need to ensure only one "logical borrow" is active at a time
-/// - `RefCell` cannot be used because `RefMut` guards must be dropped before returning
-///
-/// # Design
-///
-/// `GuardedCell` owns both the value and a `RefCell<bool>` guard flag. When borrowing,
-/// it checks that the guard is clear (no active borrow), then returns a mutable reference.
-/// The caller is responsible for managing the guard's lifecycle, typically via a separate
-/// RAII type (like `ValueGuard`) that sets the flag and clears it on drop.
-///
-/// # Example Use Case
-///
-/// This type is used for the `WindowManager` in journal files:
-/// - The window manager maps/unmaps memory windows dynamically
-/// - Methods return slices into these windows that must outlive the borrow scope
-/// - Only one object slice can be active at a time (enforced by the guard)
-/// - A `ValueGuard` RAII type manages the guard lifecycle
-///
-/// # Safety Model
-///
-/// The safety relies on two cooperating parts:
-/// 1. `GuardedCell` - Owns the guard and checks it before borrowing
-/// 2. External RAII guard (like `ValueGuard`) - Manages the guard flag lifecycle
-///
-/// The contract is:
-/// - Before calling `borrow_mut_checked()`, the guard must be `false`
-/// - After getting a reference, the caller must set the guard to `true`
-/// - The guard must stay `true` while any reference derived from the borrow is live
-/// - When all references are done, the guard must be set back to `false`
-///
-/// # Example
-///
-/// ```ignore
-/// struct Container {
-///     window_manager: GuardedCell<WindowManager>,
-/// }
-///
-/// impl Container {
-///     fn get_slice(&self, offset: u64, size: u64) -> Result<ValueGuard<&[u8]>> {
-///         // Check if guard is already held
-///         let mut is_in_use = self.window_manager.guard().borrow_mut();
-///         if *is_in_use {
-///             return Err(Error::AlreadyBorrowed);
-///         }
-///
-///         // Borrow the window manager
-///         let wm = self.window_manager.borrow_mut_checked()?;
-///         let slice = wm.get_slice(offset, size)?;
-///
-///         // Set guard and return RAII guard that clears it on drop
-///         *is_in_use = true;
-///         Ok(ValueGuard::new(slice, self.window_manager.guard()))
-///     }
-/// }
-/// ```
+/// The flag is a protocol, not type-level enforcement:
+/// [`GuardedCell::borrow_mut_checked`]
+/// only checks it and never raises it, so a caller that returns references
+/// without raising the flag (the object-header helpers
+/// [`JournalFile::object_header_ref`](crate::file::JournalFile::object_header_ref)
+/// and `object_header_mut` in `file/file.rs`) bypasses the gate. In-crate
+/// callers should prefer
+/// [`GuardedCell::with_guarded`], which runs the full protocol and returns a `ValueGuard`.
 pub struct GuardedCell<T> {
     value: UnsafeCell<T>,
     guard: RefCell<bool>,
 }
 
 impl<T> GuardedCell<T> {
-    /// Creates a new `GuardedCell` containing the given value.
-    ///
-    /// The guard is initialized to `false` (not in use).
+    /// Creates a cell holding `value`, with the flag clear (not in use).
     pub fn new(value: T) -> Self {
         Self {
             value: UnsafeCell::new(value),
@@ -81,159 +60,101 @@ impl<T> GuardedCell<T> {
         }
     }
 
-    /// Returns a reference to the guard flag.
-    ///
-    /// This allows external RAII types (like `ValueGuard`) to manage the guard's
-    /// lifecycle by setting it to `true` when borrowing and `false` when done.
+    /// The in-use flag, exposed so an external RAII guard can raise and clear
+    /// it: `ValueGuard` stores exactly such a `&RefCell<bool>` and clears it
+    /// on drop. `with_guarded` passes `&self.guard` directly, so today only
+    /// the tests use this accessor.
     #[allow(dead_code)]
     pub fn guard(&self) -> &RefCell<bool> {
         &self.guard
     }
 
-    /// Attempts to borrow the inner value mutably.
+    /// Returns `&mut T` from `&self` after verifying the flag is clear.
     ///
-    /// # Returns
+    /// The cell does not raise the flag. The caller must raise it before the
+    /// returned reference (or anything derived from it) is used, keep it
+    /// raised while that reference is live, and clear it afterwards - the
+    /// contract `ValueGuard`'s `Drop` implements. While the flag is clear,
+    /// no later borrow is blocked, so this escape hatch fits only immediate,
+    /// scope-bound uses like the header read in
+    /// [`JournalFile::object_header_ref`](crate::file::JournalFile::object_header_ref)
+    /// and header writes in `object_header_mut`.
     ///
-    /// - `Ok(&mut T)` if the guard is not currently held
-    /// - `Err(JournalError::ValueGuardInUse)` if the guard is held (another borrow is active)
-    ///
-    /// # Safety Contract
-    ///
-    /// After calling this method successfully, the caller MUST:
-    /// 1. Set the guard to `true` (via `guard().borrow_mut()`) before using the returned reference
-    /// 2. Keep the guard `true` for the entire lifetime of the returned reference
-    /// 3. Set the guard back to `false` when the reference is no longer needed
-    ///
-    /// This is typically enforced via a RAII guard type that manages the flag automatically.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// let cell = GuardedCell::new(WindowManager::new(...));
-    ///
-    /// // Check and borrow
-    /// let mut is_in_use = cell.guard().borrow_mut();
-    /// if *is_in_use {
-    ///     return Err(JournalError::ValueGuardInUse);
-    /// }
-    ///
-    /// let wm = cell.borrow_mut_checked()?;
-    /// let slice = wm.get_slice(offset, size)?;
-    ///
-    /// // Set guard before using the reference
-    /// *is_in_use = true;
-    ///
-    /// // Use slice...
-    /// // (guard will be cleared by RAII when done)
-    /// ```
+    /// Returns `Err(JournalError::ValueGuardInUse)` when the flag is raised.
     #[allow(clippy::mut_from_ref)]
     pub fn borrow_mut_checked(&self) -> Result<&mut T> {
-        // Check the guard to ensure no other borrow is active
         let is_in_use = self.guard.borrow();
         if *is_in_use {
             return Err(JournalError::ValueGuardInUse);
         }
         drop(is_in_use);
 
-        // SAFETY: We've verified via the guard that no other mutable reference exists.
-        // The caller is responsible for:
-        // 1. Setting the guard to true before using the returned reference
-        // 2. Keeping the guard true while the reference (or data derived from it) is live
-        // 3. Clearing the guard when done (typically via RAII Drop)
-        //
-        // This manual lifetime management is necessary because:
-        // - We need references that outlive this function's scope
-        // - RefCell's RefMut cannot express this pattern (it must drop before returning)
-        // - The guard flag provides the runtime safety check for exclusive access
+        // SAFETY: the flag was just verified clear, so no guarded borrow is
+        // live. The caller must raise the flag before the reference escapes
+        // and keep it raised while it (or anything derived from it) is used;
+        // `RefCell` guards cannot express a reference that outlives this
+        // call, hence the manual protocol.
         unsafe { Ok(&mut *self.value.get()) }
     }
 
-    /// Gets a mutable reference to the inner value.
-    ///
-    /// This is safe because it requires `&mut self`, guaranteeing unique access.
-    /// No guard checking is needed.
+    /// Mutable access through `&mut self`: the borrow checker already
+    /// guarantees uniqueness, so the flag is irrelevant here.
     pub fn get_mut(&mut self) -> &mut T {
         self.value.get_mut()
     }
 
-    /// Consumes the cell and returns the inner value.
+    /// Consumes the cell and returns the value; the flag dies with it.
     #[allow(dead_code)]
     pub fn into_inner(self) -> T {
         self.value.into_inner()
     }
 
-    /// Executes a closure with mutable access to the inner value and wraps the result in a `ValueGuard`.
+    /// Runs `f` with `&mut T` and wraps its result in a `ValueGuard` - the
+    /// intended entry point, automating the full protocol.
     ///
-    /// This is the primary method for working with `GuardedCell` in a safe, ergonomic way.
-    /// It handles all guard management automatically:
-    /// 1. Checks that the guard is not currently held
-    /// 2. Provides mutable access to the inner value via the closure
-    /// 3. Sets the guard flag
-    /// 4. Wraps the closure's result in a `ValueGuard` that will clear the flag on drop
+    /// Steps: verify the flag is clear, run `f` with `&mut T`, raise the
+    /// flag, return `ValueGuard::new(offset, result, &self.guard)` whose
+    /// `Drop` clears the flag. On any error the flag stays clear, so the
+    /// cell is immediately reusable. A conflicting call returns
+    /// `Err(JournalError::ValueGuardInUse)`; re-entering the cell from
+    /// inside `f` panics instead (the flag's `RefMut` is still held).
     ///
-    /// # Parameters
-    ///
-    /// - `offset`: Domain-specific metadata (e.g., file offset for journal objects) that will be
-    ///   stored in the `ValueGuard` for later retrieval
-    /// - `f`: A closure that takes mutable access to `T` and returns a `Result<R>` where `R` is
-    ///   the value to be wrapped in the guard
-    ///
-    /// # Returns
-    ///
-    /// - `Ok(ValueGuard<R>)` on success, which automatically manages the guard lifecycle
-    /// - `Err(JournalError::ValueGuardInUse)` if the guard is already held
-    /// - `Err(...)` if the closure returns an error
-    ///
-    /// # Example
+    /// `offset` is caller-defined metadata stored in the guard for later
+    /// retrieval via `ValueGuard::offset`; `JournalFile` passes the object
+    /// offset (from `journal_object_ref`/`journal_object_mut`) so readers
+    /// can identify the guarded object.
     ///
     /// ```ignore
-    /// let window_manager = GuardedCell::new(WindowManager::new(...));
-    ///
-    /// let object_guard = window_manager.with_guarded(object_offset, |wm| {
-    ///     // Access window manager mutably
-    ///     let slice = wm.get_slice(offset, size)?;
-    ///     let object = parse_object(slice)?;
-    ///     Ok(object)
+    /// let object = self.window_manager.with_guarded(offset, |wm| {
+    ///     let slice = wm.get_slice(offset.get(), size)?;
+    ///     DataObject::ref_from_bytes(slice).map_err(|_| JournalError::ZerocopyFailure)
     /// })?;
-    ///
-    /// // object_guard automatically clears the guard when dropped
+    /// // `object` derefs to the parsed value; dropping it clears the flag.
     /// ```
-    ///
-    /// # Safety
-    ///
-    /// This method encapsulates all the safety requirements:
-    /// - Guard checking is done automatically
-    /// - The guard is set before the `ValueGuard` is returned
-    /// - The guard is cleared automatically when `ValueGuard` is dropped
-    /// - No `unsafe` code is exposed to the caller
     pub fn with_guarded<'a, R, F>(&'a self, offset: NonZeroU64, f: F) -> Result<ValueGuard<'a, R>>
     where
         F: FnOnce(&'a mut T) -> Result<R>,
     {
-        // Check if the guard is already held
         let mut is_in_use = self.guard.borrow_mut();
         if *is_in_use {
             return Err(JournalError::ValueGuardInUse);
         }
 
-        // SAFETY: We've verified via the guard that no other mutable reference exists.
-        // The closure gets temporary mutable access, but we ensure the guard is set
-        // before returning the ValueGuard.
+        // SAFETY: the flag is clear, so no guarded borrow is live; `f` gets
+        // temporary `&mut T` and the flag is raised before the `ValueGuard`
+        // (which clears it on drop) escapes.
         let value_ref = unsafe { &mut *self.value.get() };
 
-        // Execute the user's closure to extract/create the result value
         let result = f(value_ref)?;
 
-        // Mark the guard as in use
         *is_in_use = true;
 
-        // Return a ValueGuard that will automatically clear the guard on drop
         Ok(ValueGuard::new(offset, result, &self.guard))
     }
 }
 
-// GuardedCell is NOT Send or Sync by default (inherited from UnsafeCell).
-// This is correct for single-threaded use in journal file reading.
+// !Sync for every T (UnsafeCell and RefCell); Send follows T: Send. This is
+// why JournalFile, which holds a GuardedCell, is itself !Sync.
 
 #[cfg(test)]
 mod tests {
@@ -255,40 +176,38 @@ mod tests {
             value: vec![1, 2, 3, 4, 5],
         });
 
-        // First borrow
+        // First cycle: check, borrow, use the slice, raise the flag - the
+        // caller side of borrow_mut_checked's contract.
         {
-            // Check guard is not in use
+            // Scoped so the flag borrow is released before borrow_mut_checked
+            // runs (a held flag borrow would panic there).
             {
                 let is_in_use = cell.guard().borrow();
                 assert!(!*is_in_use);
             }
 
-            // Borrow the data
             let data = cell.borrow_mut_checked().unwrap();
             let slice = data.get_slice(0, 3);
             assert_eq!(slice, &[1, 2, 3]);
 
-            // Mark as in use
             *cell.guard().borrow_mut() = true;
         }
 
-        // Clear guard
+        // Clear the flag (as ValueGuard's Drop would), making the cell
+        // reusable.
         *cell.guard().borrow_mut() = false;
 
-        // Second borrow after clearing
+        // Second cycle succeeds once the flag is clear.
         {
-            // Check guard is not in use
             {
                 let is_in_use = cell.guard().borrow();
                 assert!(!*is_in_use);
             }
 
-            // Borrow the data
             let data = cell.borrow_mut_checked().unwrap();
             let slice = data.get_slice(2, 3);
             assert_eq!(slice, &[3, 4, 5]);
 
-            // Mark as in use
             *cell.guard().borrow_mut() = true;
         }
     }
@@ -299,10 +218,10 @@ mod tests {
             value: vec![1, 2, 3],
         });
 
-        // Set guard to true (simulating active borrow)
+        // Simulate an active borrow by raising the flag directly.
         *cell.guard().borrow_mut() = true;
 
-        // Attempt to borrow while guard is held should fail
+        // The conflicting borrow fails with ValueGuardInUse.
         let result = cell.borrow_mut_checked();
         assert!(matches!(result, Err(JournalError::ValueGuardInUse)));
     }

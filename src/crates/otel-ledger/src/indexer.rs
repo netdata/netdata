@@ -1,14 +1,25 @@
-//! Indexer component that seals closed WAL files into SFST index files.
+//! The seal component: turns closed WAL files into SFST index files.
 //!
-//! One component serves every signal: the actual seal body is injected as the
-//! component's [`SealFn`] argument — the logs pipeline spawns it with
-//! [`ng_index::build_sfst_file`], the traces pipeline with
-//! [`ng_index::build_sfst_traces_file`]. Both signals therefore share the
-//! concurrency/queueing loop and the `Indexed`/`IndexFailed` response mapping;
-//! only the WAL-decoding seal differs.
+//! One component type serves both signals — each pipeline spawns its own
+//! [`Indexer`] and injects the seal as the [`SealFn`] argument: the logs
+//! pipeline passes [`ng_index::build_sfst_file`], the traces pipeline
+//! [`ng_index::build_sfst_traces_file`] (`ledger/pipeline.rs`,
+//! `ledger/traces_pipeline.rs`). Both share this queueing loop and the
+//! `Indexed`/`IndexFailed` response mapping; only the WAL-decoding seal
+//! differs.
 //!
-//! Manages its own concurrency: tracks in-flight indexing tasks and queues
-//! excess requests when the concurrency limit is reached.
+//! Requests arrive from the ingestor on a WAL `FileEvent::Closed`
+//! (`ledger/ingestor.rs`) and from startup recovery of unindexed WALs
+//! ([`file_lifecycle::recovery::recover_unindexed`]); responses go back to
+//! the ledger's `handle_indexer_resp` (`ledger/indexer.rs` — a different
+//! indexer.rs: the response handler, not this component) or to the recovery
+//! drains. Live-tail chunk range builds ([`ng_index::build_sfst_range`])
+//! bypass this component.
+//!
+//! Seals are serial (`max_concurrent` is 1) and excess requests queue.
+//! Cancelling or closing the request channel exits the loop, but
+//! already-spawned blocking seals are not aborted — their responses are
+//! dropped.
 
 use std::collections::{HashMap, VecDeque};
 use std::path::Path;
@@ -28,12 +39,15 @@ use file_lifecycle::ipc::{IndexerRequest, IndexerResponse};
 pub type SealFn =
     fn(&Path, &Path, &ng_index::Metrics) -> Result<(sfst::Summary, u64), ng_index::Error>;
 
-/// Tracks a single in-flight indexing operation.
+/// One in-flight indexing operation: the WAL's sequence number (the
+/// in-flight map's key) and the start time for the completion latency log.
 struct IndexerTask {
     seq: u64,
     started_at: Instant,
 }
 
+/// The seal-running component: a unit struct — all state lives in
+/// [`Component::run`]'s locals; one instance per signal pipeline.
 pub struct Indexer;
 
 impl Component for Indexer {
@@ -84,6 +98,9 @@ impl Component for Indexer {
     }
 }
 
+/// Register the request as in-flight and spawn the seal on a blocking
+/// thread; the `Indexed`/`IndexFailed` response is routed through `done_tx`
+/// so the run loop logs it and pulls the next queued request.
 fn start_indexing(
     seal: SealFn,
     req: IndexerRequest,
@@ -95,6 +112,8 @@ fn start_indexing(
         sfst_path,
     } = req;
 
+    // Parsed from the WAL file name; 0 when it doesn't parse. Keys the
+    // in-flight entry; the ledger routes the response to a tenant by it.
     let seq = file_registry::FileId::parse(&wal_path)
         .map(|id| id.seq)
         .unwrap_or(0);

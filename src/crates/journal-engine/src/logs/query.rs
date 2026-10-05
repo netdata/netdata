@@ -1,8 +1,23 @@
-//! Log querying from indexed journal files.
+//! Multi-file log queries over indexed journal files.
 //!
-//! This module provides the `LogQuery` builder for efficiently querying and
-//! merging log entries from multiple indexed journal files, as well as
-//! functions for extracting raw field data from journal entries.
+//! [`LogQuery`] fans a query out to each file's `find_log_entries`
+//! (`journal-index/src/file_index.rs` `FileIndex::find_log_entries`), merges the per-file results
+//! into one direction-ordered vector capped at the limit, and — for
+//! `execute_page` — threads a [`PaginationState`] so the next page
+//! resumes each file where this one stopped. `retrieve_log_entries`
+//! below is the shared engine behind both entry points;
+//! `extract_entry_data` then re-opens each journal file once and
+//! materializes the matched entry IDs into [`LogEntryData`] — raw
+//! `field=value` pairs with field names reverse-mapped to their OTEL
+//! forms. This is the crate's only producer of `LogEntryData`.
+//!
+//! Pagination and merge contracts are pinned by
+//! tests/multi_file_pagination.rs. Production callers: the legacy-logs
+//! handler builds a `LogQuery` per request and calls `execute()`
+//! (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::query_logs_from_indexes`); `LogQuery` and
+//! `LogEntryData` are re-exported at the crate root and by
+//! journal-function (`journal-function/src/lib.rs`) for its
+//! netdata table rendering. `PaginationState` is not re-exported.
 
 use crate::error::Result;
 use journal_core::field_map::REMAPPING_MARKER;
@@ -19,28 +34,35 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio_util::sync::CancellationToken;
 use tracing::warn;
 
-/// Pagination state for multi-file log queries.
+/// Resume positions for paged queries, keyed by journal file.
 ///
-/// This tracks the position in each file where we stopped reading,
-/// allowing queries to resume efficiently without re-scanning entries.
+/// Each value is a `LogEntryId.position`
+/// (`journal-index/src/file_index.rs` `LogEntryId::position`): the index into that
+/// file's filtered, time-ordered entry list where the previous page
+/// stopped. `execute_page` feeds it back as `resume_position`
+/// (`journal-index/src/file_index.rs` `LogQueryParamsBuilder::with_resume_position`), and `find_log_entries`
+/// restarts from there instead of the anchor binary search — forward
+/// at position + 1, backward at position - 1, with 0 meaning the file
+/// is exhausted (`journal-index/src/file_index.rs` `FileIndex::find_log_entries`).
 ///
-/// The state is tied to a specific query configuration (filter, anchor, direction, etc).
-/// Changing the query parameters while using the same pagination state will produce
-/// undefined results.
+/// Positions are list indexes: querying with a different filter
+/// re-selects the list they point into, so pages must replay the same
+/// query configuration. Changed parameters silently read the wrong
+/// entries rather than erroring (`journal-index/src/file_index.rs` `LogEntryId::position`).
 #[derive(Debug, Clone, Default)]
 pub struct PaginationState {
     /// Maps each file to the last position we read from it
     pub file_positions: HashMap<File, usize>,
 }
 
-/// Builder for configuring and executing log queries from indexed journal files.
+/// Builder for one query over several indexed journal files.
 ///
-/// This builder allows you to specify:
-/// - Direction (forward/backward in time)
-/// - Anchor timestamp (starting point)
-/// - Limit (maximum entries to retrieve)
-/// - Source timestamp field (which field to use for timestamps)
-/// - Filter (to match specific entries)
+/// [`LogQuery::new`] takes the required parameters (file indexes,
+/// anchor, direction); the `with_*` methods layer on limit, source
+/// timestamp field, filter, time boundaries, regex, cancellation,
+/// progress and field projection. [`Self::execute`] collects the whole
+/// result; [`Self::execute_page`] returns one page plus a
+/// [`PaginationState`] for the next.
 ///
 /// # Example
 ///
@@ -66,15 +88,12 @@ impl<'a> LogQuery<'a> {
     /// # Arguments
     ///
     /// * `file_indexes` - Journal file indexes to query
-    /// * `anchor` - Starting point for the query (Head, Tail, or specific timestamp)
+    /// * `anchor` - Starting point for the query (Head, Tail, or specific timestamp;
+    ///   Head/Tail resolve against all files — see `retrieve_log_entries`)
     /// * `direction` - Direction to iterate (Forward or Backward)
     ///
-    /// # Optional Configuration
-    ///
-    /// Use builder methods to set optional parameters:
-    /// - Limit: None (unlimited)
-    /// - Source timestamp field: _SOURCE_REALTIME_TIMESTAMP
-    /// - Filter: None
+    /// Defaults: no limit, no filter, and `_SOURCE_REALTIME_TIMESTAMP`
+    /// as the source timestamp field.
     pub fn new(file_indexes: &'a [FileIndex], anchor: Anchor, direction: Direction) -> Self {
         Self {
             file_indexes,
@@ -99,6 +118,8 @@ impl<'a> LogQuery<'a> {
     ///
     /// Pass `None` to use the entry's realtime timestamp from the journal header.
     /// Pass `Some(field_name)` to use a custom timestamp field from the entry data.
+    /// An entry missing that field falls back to its header realtime
+    /// timestamp (`journal-index/src/file_index.rs` `LogQueryParams`'s `source_timestamp_field`).
     pub fn with_source_timestamp_field(mut self, field: Option<FieldName>) -> Self {
         self.builder = self.builder.with_source_timestamp_field(field);
         self
@@ -135,8 +156,8 @@ impl<'a> LogQuery<'a> {
     /// Only entries where at least one data object (in "FIELD=value" format)
     /// matches the regex will be included in the results.
     ///
-    /// The pattern will be compiled when the query is executed. Invalid patterns
-    /// will cause execute() to return an error.
+    /// The pattern is compiled when the query runs; an invalid pattern
+    /// makes `execute`/`execute_page` return an error.
     pub fn with_regex(mut self, pattern: impl Into<String>) -> Self {
         self.builder = self.builder.with_regex(pattern);
         self
@@ -153,8 +174,12 @@ impl<'a> LogQuery<'a> {
 
     /// Set a progress counter for the query (optional).
     ///
-    /// When set, the counter is incremented (via `fetch_add`) after each file
-    /// is processed in `retrieve_log_entries`.
+    /// Counts files: one increment per relevant file as its processing
+    /// starts (after the cancellation check, so a file abandoned by
+    /// cancellation is not counted) plus one per file excluded by the
+    /// anchor pre-filter. The legacy-logs handler sets its progress
+    /// total to the file count and reads this counter against it
+    /// (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::on_call`).
     pub fn with_progress(mut self, counter: Arc<AtomicUsize>) -> Self {
         self.progress = Some(counter);
         self
@@ -163,7 +188,8 @@ impl<'a> LogQuery<'a> {
     /// Limit returned field-value pairs to the requested field names.
     ///
     /// Field names may be specified using either their OTEL names or the raw
-    /// systemd names present on disk.
+    /// systemd names present on disk. Unlisted fields are dropped from
+    /// every entry; without this setting all fields are returned.
     pub fn with_output_fields<I, S>(mut self, fields: I) -> Self
     where
         I: IntoIterator<Item = S>,
@@ -180,7 +206,9 @@ impl<'a> LogQuery<'a> {
     ///
     /// # Errors
     ///
-    /// Returns an error if anchor or direction were not set, or if time boundaries are invalid.
+    /// Returns an error if the time boundaries are invalid (`after >=
+    /// before`), if the regex pattern cannot be compiled, or if a
+    /// journal file cannot be read.
     pub fn execute(self) -> Result<Vec<LogEntryData>> {
         let params = self.builder.build()?;
         let output_fields = self.output_fields;
@@ -195,23 +223,19 @@ impl<'a> LogQuery<'a> {
         extract_entry_data(&log_entry_ids, output_fields.as_ref())
     }
 
-    /// Execute the query with pagination support.
+    /// Execute the query and return one page plus the state to resume from.
     ///
-    /// This consumes the builder and returns a page of log entries along with
-    /// pagination state that can be used to retrieve the next page.
-    ///
-    /// # Arguments
-    ///
-    /// * `state` - Optional pagination state from a previous query. Pass `None` for the first page.
-    ///
-    /// # Returns
-    ///
-    /// Returns a tuple of (log entry data, new pagination state). If the pagination state
-    /// is empty (no file positions tracked), there are no more results.
+    /// `state` is the state returned by the previous page (`None` for
+    /// the first). Entries come back ordered and capped as in
+    /// [`Self::execute`]; the returned state carries each contributing
+    /// file's resume position, merged over the input state. Loop until
+    /// the returned page comes back empty — exhausted files yield
+    /// nothing on the next call, so an empty page means every file is
+    /// done.
     ///
     /// # Errors
     ///
-    /// Returns an error if anchor or direction were not set, or if time boundaries are invalid.
+    /// Same conditions as [`Self::execute`].
     pub fn execute_page(
         self,
         state: Option<&PaginationState>,
@@ -233,19 +257,23 @@ impl<'a> LogQuery<'a> {
 
 /// Retrieve and merge log entries from multiple indexed journal files.
 ///
-/// This function efficiently retrieves log entries from multiple journal files,
-/// merging them in timestamp order while respecting the limit constraint.
+/// The engine behind [`LogQuery::execute`] and [`LogQuery::execute_page`]:
 ///
-/// # Arguments
+/// 1. Resolve one anchor timestamp across all files (Head: earliest
+///    start, Tail: latest end) and drop files that cannot hold entries
+///    on the query's side of it (forward: file end >= anchor;
+///    backward: file start <= anchor).
+/// 2. Sort the survivors into temporal order — forward by start time,
+///    backward by end time reversed — which decides which entries win
+///    the limit cap and is what `can_prune_file` relies on.
+/// 3. Walk each file with `find_log_entries`, seeding a per-file
+///    resume position from `state`, and merge into the running page.
 ///
-/// * `file_indexes` - Vector of indexed journal files to retrieve from
-/// * `params` - Query parameters (anchor, direction, limit, filter, boundaries)
-/// * `state` - Optional pagination state to resume from previous query
-///
-/// # Returns
-///
-/// A tuple of (log entries, new pagination state). The entries are sorted by timestamp
-/// and limited to `params.limit`. The new state can be used to resume the query.
+/// Per-file read failures are logged and skipped, not fatal.
+/// `cancellation` stops the walk between files, keeping partial
+/// results; `progress` counts files as described on
+/// [`LogQuery::with_progress`]. Returns the merged page (ordered per
+/// direction, at most `params.limit()`) and the state to resume from.
 fn retrieve_log_entries(
     file_indexes: Vec<FileIndex>,
     params: LogQueryParams,
@@ -253,12 +281,14 @@ fn retrieve_log_entries(
     cancellation: Option<&CancellationToken>,
     progress: Option<&Arc<AtomicUsize>>,
 ) -> (Vec<LogEntryId>, PaginationState) {
-    // Handle edge cases
+    // Nothing to do: a zero limit or no files yields an empty page and state.
     if params.limit() == Some(0) || file_indexes.is_empty() {
         return (Vec::new(), PaginationState::default());
     }
 
-    // Resolve anchor to concrete timestamp for multi-file queries
+    // One anchor timestamp across all files, used only to pre-filter
+    // files; each file's own walk re-resolves Head/Tail to its own
+    // bounds (see find_log_entries).
     let anchor_usec = match params.anchor() {
         Anchor::Timestamp(ts) => ts.get(),
         Anchor::Head => {
@@ -297,6 +327,8 @@ fn retrieve_log_entries(
         }
     };
 
+    // Files excluded by the anchor pre-filter still count as done for
+    // progress reporting.
     if let Some(counter) = progress {
         let filtered = file_indexes.len() - relevant_indexes.len();
         counter.fetch_add(filtered, Ordering::Relaxed);
@@ -306,7 +338,9 @@ fn retrieve_log_entries(
         return (Vec::new(), PaginationState::default());
     }
 
-    // Sort files to process them in temporal order
+    // Process files in temporal order: the order decides which entries
+    // survive the limit cap, and it is what the pruning check below
+    // relies on.
     match params.direction() {
         Direction::Forward => {
             // Sort by start timestamp ascending to process files in temporal order
@@ -318,13 +352,15 @@ fn retrieve_log_entries(
         }
     }
 
-    // Initialize result vector with capacity for efficiency
+    // No limit set is represented as usize::MAX; seed a modest
+    // capacity for that case.
     let (limit, mut collected_entries) = match params.limit() {
         Some(limit) => (limit, Vec::with_capacity(limit)),
         None => (usize::MAX, Vec::with_capacity(200)),
     };
 
-    // Track the new pagination state, starting from the previous state if available
+    // Resume positions carry over from the previous page; files that
+    // contribute entries to this page get their position updated below.
     let mut new_state = state.cloned().unwrap_or_default();
 
     for file_index in relevant_indexes {
@@ -361,7 +397,8 @@ fn retrieve_log_entries(
         // Check if we have a resume position for this file
         let resume_position = state.and_then(|s| s.file_positions.get(file).copied());
 
-        // Create params with resume position if available
+        // Rebuild the params so only this file gets the resume
+        // position; every other field is copied from the built params.
         let file_params = if let Some(pos) = resume_position {
             let mut builder = LogQueryParamsBuilder::new(params.anchor(), params.direction());
             if let Some(limit) = params.limit() {
@@ -383,7 +420,7 @@ fn retrieve_log_entries(
                 builder = builder.with_regex(regex.as_str());
             }
             builder = builder.with_resume_position(pos);
-            builder.build().unwrap() // Safe because we're copying from valid params
+            builder.build().unwrap() // build() cannot fail: same fields as the params the caller already built
         } else {
             params.clone()
         };
@@ -402,9 +439,11 @@ fn retrieve_log_entries(
         }
     }
 
-    // Update pagination state based on the last position for each file in collected_entries
-    // For forward direction: track the maximum position (we're progressing upward)
-    // For backward direction: track the minimum position (we're progressing downward)
+    // Update pagination state from the collected entries: the extreme
+    // position per file (max forward, min backward). A file whose
+    // entries all fell past the cap keeps whatever position it had
+    // (none on the first page) and is re-walked from there on the next
+    // page.
     for entry in &collected_entries {
         new_state
             .file_positions
@@ -421,10 +460,13 @@ fn retrieve_log_entries(
     (collected_entries, new_state)
 }
 
-/// Check if we can prune (skip) a file based on its time range and current results.
+/// Decide whether the file walk can stop early once the page is full.
 ///
-/// Returns Some(true) if we should break early, Some(false) if we should continue,
-/// or None if we can't determine (shouldn't happen with a full result set).
+/// Called with `result` — the page collected so far — only after it
+/// reaches the limit, so it is never empty. Returns `Some(true)` to
+/// break out of the walk, `Some(false)` to continue with the next
+/// file, and `None` when `result` is empty (not reachable from the
+/// caller).
 fn can_prune_file(
     file_index: &FileIndex,
     result: &[LogEntryId],
@@ -437,36 +479,32 @@ fn can_prune_file(
             Some(file_index.start_time().to_microseconds().get() > max_timestamp)
         }
         Direction::Backward => {
-            // For backward: if file ends before our earliest entry, skip all remaining files
+            // For backward: results are newest-first, so result[0] is
+            // the newest collected entry — not the oldest one the cap
+            // keeps. Break once this file ends before it; remaining
+            // files end even earlier. A later file lying wholly inside
+            // the collected time span is therefore skipped, even though
+            // it may hold entries newer than the page's oldest.
             let min_timestamp = result.first()?.timestamp.get();
             Some(file_index.end_time().to_microseconds().get() < min_timestamp)
         }
     }
 }
 
-/// Merges two sorted vectors into a single sorted vector with at most `limit` elements.
+/// Merge two direction-ordered vectors into one, capped at `limit`.
 ///
-/// This function performs a two-pointer merge, which is efficient for combining
-/// sorted sequences. It only retains the smallest/largest `limit` entries by timestamp
-/// depending on the direction.
-///
-/// # Arguments
-///
-/// * `a` - First sorted vector
-/// * `b` - Second sorted vector
-/// * `limit` - Maximum number of elements in the result
-/// * `direction` - Direction determines ascending (Forward) or descending (Backward) order
-///
-/// # Returns
-///
-/// A new vector containing the merged and limited results
+/// Both inputs are sorted by timestamp in `direction`'s order
+/// (ascending forward, descending backward); the two-pointer merge
+/// keeps that order, ties going to `a` — the already-collected side —
+/// in both directions. `limit` is `usize::MAX` when the query set no
+/// limit. Returns the merged prefix of at most `limit` entries.
 fn merge_log_entries(
     a: Vec<LogEntryId>,
     b: Vec<LogEntryId>,
     limit: usize,
     direction: Direction,
 ) -> Vec<LogEntryId> {
-    // Handle simple cases
+    // An empty side is already ordered — just cap it.
     if a.is_empty() {
         return b.into_iter().take(limit).collect();
     }
@@ -480,7 +518,7 @@ fn merge_log_entries(
     let mut i = 0;
     let mut j = 0;
 
-    // Two-pointer merge: always take the appropriate element based on direction
+    // Take whichever head sorts first for the direction; ties take from `a`.
     while result.len() < limit {
         let take_from_a = match (i < a.len(), j < b.len()) {
             (true, false) => true,
@@ -504,6 +542,11 @@ fn merge_log_entries(
     result
 }
 
+/// Whether a field passes the projection filter.
+///
+/// With no filter every field passes; otherwise the field is kept when
+/// either its raw on-disk name or its reverse-mapped OTEL name is in
+/// the requested set — see [`LogQuery::with_output_fields`].
 fn is_projected(
     raw_field_name: &str,
     output_field_name: &str,
@@ -514,14 +557,21 @@ fn is_projected(
     })
 }
 
-/// Raw field data extracted from a journal entry.
+/// Raw field data extracted from one journal entry.
 ///
-/// This is an intermediate representation between a `LogEntryId` (which only contains
-/// a file offset) and format-specific structures like `Table`, Arrow `RecordBatch`,
-/// or columnar data.
+/// The intermediate form between a `LogEntryId` (a file plus offset)
+/// and the render layer: [`crate::entry_data_to_table`] lays a
+/// slice of these into a `Table`, and journal-function's netdata
+/// builder wraps that for the Functions response
+/// (`journal-function/src/netdata/builder.rs` `build_ui_response`).
 ///
-/// The fields are stored as `FieldValuePair` objects, which efficiently store the
-/// field name and value with a cached split position for fast access.
+/// `fields` holds the entry's `field=value` pairs as `FieldValuePair`s
+/// (`journal-index/src/field_types.rs` `FieldValuePair`, which caches the split
+/// position for fast field/value access), names already reverse-mapped
+/// to their OTEL forms where the file records a mapping, values
+/// verbatim. `timestamp` is the query timestamp carried by the
+/// `LogEntryId` — the source timestamp field when configured, else the
+/// header realtime — not re-read during extraction.
 #[derive(Debug, Clone)]
 pub struct LogEntryData {
     /// Timestamp of the entry in microseconds since epoch
@@ -530,19 +580,17 @@ pub struct LogEntryData {
     pub fields: Vec<FieldValuePair>,
 }
 
-/// Extracts raw field data from multiple log entries efficiently.
+/// Materialize matched [`LogEntryId`]s into [`LogEntryData`].
 ///
-/// This function groups entries by file and processes them in batches,
-/// minimizing file open/close overhead. It reads the journal files and
-/// extracts all field=value pairs without applying any transformations.
-///
-/// # Arguments
-///
-/// * `log_entries` - Slice of log entry IDs to extract data from
-///
-/// # Returns
-///
-/// A vector of `LogEntryData` in the same order as the input entries
+/// Entries are grouped by file so each journal is opened once. Every
+/// data-object payload is parsed into `field=value` pairs — values
+/// verbatim, names reverse-mapped to their OTEL forms through the
+/// file's remapping record, kept only when the projection set (if any)
+/// includes them. Remapping bookkeeping entries are dropped instead of
+/// converted, so the result preserves the input order but can be
+/// shorter than it. The indexer already keeps those entries out of
+/// query results (`journal-index/src/file_indexer.rs` `FileIndexer::build_histogram`); this is the
+/// second line of defense.
 fn extract_entry_data(
     log_entries: &[LogEntryId],
     output_fields: Option<&HashSet<String>>,
@@ -556,18 +604,19 @@ fn extract_entry_data(
             .push((idx, entry));
     }
 
-    // Pre-allocate result vector with exact capacity
+    // One slot per input entry, keyed by original index; unfilled
+    // slots (skipped remapping entries) are dropped below.
     let mut result = vec![None; log_entries.len()];
 
     // Scratch buffer to keep any decompressed payload of data objects.
     let mut decompress_buf = Vec::new();
 
-    // Process each file's entries
+    // Process each file's entries; each journal is opened with an 8 MiB mmap window.
     for (file, file_entries) in entries_by_file {
         let journal_file = JournalFile::<Mmap>::open(file, 8 * 1024 * 1024)?;
 
-        // Load and reverse the field mapping (systemd -> OTEL)
-        // This allows us to reverse-map systemd field names back to their original OTEL names
+        // load_fields returns otel -> systemd (unmapped fields map to
+        // themselves); invert it for lookup by the on-disk name.
         let field_map = journal_file.load_fields()?;
         let reverse_map: HashMap<String, String> = field_map
             .into_iter()
@@ -588,10 +637,12 @@ fn extract_entry_data(
             drop(entry_guard);
 
             // Extract all field=value pairs, skipping field remapping entries.
-            // Remapping entries are internal bookkeeping (ND_REMAPPING=1) that map
-            // systemd field names back to OTEL names. Their data objects contain
-            // "SYSTEMD_NAME=otel.name", so if processed as log data the OTEL name
-            // would appear as the cell value — which is exactly the column name.
+            // A remapping entry holds the file's field-name mappings as
+            // "ND_<md5>=otel.name" pairs plus an ND_REMAPPING=1 marker
+            // (`journal-log-writer/src/log/mod.rs` `write_remapping_entry`). Converted as log
+            // data, each OTEL name would surface as a cell value — a
+            // column name masquerading as data — so the whole entry is
+            // dropped as soon as its marker pair is seen.
             let mut fields = Vec::new();
             let mut is_remapping_entry = false;
             for data_offset in data_offsets.iter().copied() {
@@ -624,8 +675,9 @@ fn extract_entry_data(
                         );
                     }
 
-                    // Accept projection filters expressed with either OTEL field names (preferred)
-                    // or the raw systemd names present on disk.
+                    // Kept only when the projection set (if any)
+                    // contains the raw or the OTEL name — see
+                    // `is_projected`.
                     if projected {
                         fields.push(pair);
                     }
@@ -643,7 +695,7 @@ fn extract_entry_data(
         }
     }
 
-    // Filter out None entries (remapping entries are skipped and left as None)
+    // Compact the result: skipped remapping entries leave None slots.
     Ok(result.into_iter().flatten().collect())
 }
 

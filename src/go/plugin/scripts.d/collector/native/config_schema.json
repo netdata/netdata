@@ -6,9 +6,42 @@
     "properties": {
       "manifest": {
         "title": "Manifest",
-        "description": "Absolute path to the installed native script package manifest.",
+        "description": "Absolute path to the installed native script package manifest. Set either manifest or command.",
         "type": "string",
         "minLength": 1
+      },
+      "command": {
+        "title": "Command",
+        "description": "Executable and fixed arguments for a script without a manifest. The executable must be an absolute path. Set either manifest or command.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "type": "string"
+        }
+      },
+      "mode": {
+        "title": "Execution mode",
+        "description": "Auto uses the manifest's mode or runs a direct command once per collection. Choose oneshot or persistent only for a direct command.",
+        "type": "string",
+        "enum": [
+          "auto",
+          "oneshot",
+          "persistent"
+        ],
+        "default": "auto"
+      },
+      "snapshot_format": {
+        "title": "Snapshot format",
+        "description": "Auto uses the manifest's snapshot format or JSON for a direct command. Choose json or lines only for a direct command.",
+        "type": "string",
+        "enum": [
+          "auto",
+          "json",
+          "lines"
+        ],
+        "default": "auto"
       },
       "update_every": {
         "title": "Update every",
@@ -40,13 +73,50 @@
         ]
       }
     },
-    "required": [
-      "manifest"
-    ]
+    "if": {
+      "required": [
+        "manifest"
+      ]
+    },
+    "then": {
+      "properties": {
+        "command": {
+          "type": "null"
+        },
+        "mode": {
+          "const": "auto"
+        },
+        "snapshot_format": {
+          "const": "auto"
+        }
+      }
+    },
+    "else": {
+      "required": [
+        "command"
+      ],
+      "properties": {
+        "command": {
+          "type": "array"
+        }
+      }
+    }
   },
   "uiSchema": {
     "manifest": {
       "ui:placeholder": "/usr/local/lib/netdata/custom/example/manifest.yaml"
+    },
+    "mode": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      }
+    },
+    "snapshot_format": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      }
     }
   }
 }

@@ -1,27 +1,104 @@
+//! The mmap abstraction of the journal layer: the [`MemoryMap`]/[`MemoryMapMut`]
+//! trait pair (implemented for memmap2's `Mmap`/`MmapMut`) and the
+//! [`WindowManager`] covering one file with a bounded set of windows. In a
+//! journal file only the header and the two hash tables keep persistent
+//! maps; every other object is read or written through these windows
+//! (file/file.rs).
+//!
+//! Mapping lifecycle: a map covers a fixed file range and is unmapped by
+//! being dropped - no open-vs-create split, no in-place resize; changing a
+//! window's coverage means unmapping it and mapping a new one (the remap
+//! path in `get_window`). Read-only `create` maps `[offset, offset+size)`
+//! as-is: nothing validates the range against the file length, so pages
+//! past the end are unbacked and touching them raises SIGBUS. Writable
+//! `create` extends the file to `offset + size` first (`File::set_len`,
+//! zero-filled hole), so its range is always backed - this is how journal
+//! appends grow a file. `MemoryMapMut::flush` msyncs a map (blocking);
+//! `WindowManager::sync` fdatasyncs the file through the fd the manager
+//! owns.
+//!
+//! Window model: windows start at chunk boundaries and cover whole chunks -
+//! at least one, more when a request spans a boundary. A request that does
+//! not fit any window remaps the window containing its position,
+//! re-centered on the request (sequential appends then slide one window
+//! forward instead of growing a single mapping from the file start), or
+//! opens a new window, evicting the oldest at `max_windows`. Sizing is
+//! caller policy: JournalFile passes 64 KiB chunks and 16 windows after
+//! `open` / 32 after `create`, 8 MiB chunks on rotation
+//! ([`JournalFile::open`](crate::file::JournalFile::open),
+//! [`JournalFile::create`](crate::file::JournalFile::create),
+//! [`JournalFile::create_successor`](crate::file::JournalFile::create_successor)).
+//!
+//! Load-bearing contract: any access can unmap or move windows, so a slice
+//! handed out earlier dangles once its window goes. Through `&mut self` the
+//! borrow checker forbids holding a slice across another access;
+//! `JournalFile` reaches its manager through interior mutability instead
+//! (file/guarded_cell.rs), where the one-window-view-at-a-time guard is the
+//! only protection and a second live view fails with
+//! `JournalError::ValueGuardInUse`.
+//!
+//! Errors: mmap, `set_len`, `metadata`, `flush` and `sync_data` all
+//! surface as [`JournalError::Io`](crate::error::JournalError::Io) - the
+//! only error this
+//! module raises. There is no runtime bounds validation beyond debug
+//! assertions: a bad position/size panics on slice indexing, never UB.
+//!
+//! Threading: no interior mutability - access is `&mut self` only and
+//! `Send`/`Sync` follow `M` (both memmap2 types are); the journal file type
+//! is `!Sync` because of its `GuardedCell` wrapper, not this module.
+//!
+//! Consumers (grep-verified): `JournalFile` (file/file.rs) is the only
+//! `WindowManager` user; cursor/reader/writer/offset-array only carry the
+//! trait bounds through `JournalFile<M>`, and journal-log-writer imports
+//! `MmapMut` from here directly (journal-log-writer/src/log/mod.rs).
+//! netflow-plugin instead queries the published sdk twin
+//! (systemd-journal-sdk-core); this module's near-twin is
+//! src/crates/jf/window_manager/src/lib.rs (keeps the old window start on
+//! remap, no `flush`/`sync`, no failure logging).
+//!
+//! For the SIGBUS hazard above, the crate ships a recovery handler
+//! (file/sigbus.rs, re-exported
+//! [`install_sigbus_handler`](crate::install_sigbus_handler)) but
+//! nothing in this repo installs it: netflow-plugin installs the published
+//! twin's copy (netflow-plugin/src/main.rs) and the FFI reader its own
+//! (jf/journal_reader_ffi/src/lib.rs).
 use crate::error::Result;
 use journal_common::compat::is_multiple_of;
 use std::fs::File;
 use std::ops::{Deref, DerefMut};
 use tracing::error;
 
-// Re-export memmap2 types for other crates and import for internal use
+// Re-exports memmap2 so dependents can name these types without a direct
+// memmap2 dependency: `Mmap`/`MmapMut` flow through file/mod.rs
+// (JournalFileMap) and journal-log-writer imports `MmapMut` from here;
+// `MmapOptions` is used unqualified below.
 pub use memmap2::{Mmap, MmapMut, MmapOptions};
 
+// Page size; used only to assert that window (chunk) sizes are page-aligned
 const PAGE_SIZE: u64 = 4096;
 
+/// A mapped byte range of a file, deref'ing to the mapped bytes. `create`
+/// maps `size` bytes at `offset`; what happens past the file's end is the
+/// implementor's choice (read-only maps leave it unbacked, writable ones
+/// extend the file).
 pub trait MemoryMap: Deref<Target = [u8]> {
     fn create(file: &File, offset: u64, size: u64) -> Result<Self>
     where
         Self: Sized;
 }
 
+/// A writable map: `create` extends the file to cover the requested range
+/// before mapping.
 pub trait MemoryMapMut: MemoryMap + DerefMut {
-    /// Flushes outstanding memory map modifications to disk
+    /// Flushes outstanding modifications to disk (msync, blocking until
+    /// persisted).
     fn flush(&self) -> Result<()>;
 }
 
 impl MemoryMap for Mmap {
     fn create(file: &File, offset: u64, size: u64) -> Result<Self> {
+        // Read-only: maps the range as-is - pages past the file end are
+        // unbacked (SIGBUS when touched); syscall failures are Io errors.
         let mmap = unsafe {
             MmapOptions::new()
                 .offset(offset)
@@ -35,6 +112,9 @@ impl MemoryMap for Mmap {
 
 impl MemoryMap for MmapMut {
     fn create(file: &File, offset: u64, size: u64) -> Result<Self> {
+        // Writable: extend the file to cover [offset, offset+size) with a
+        // zero-filled hole first, so the whole mapped range is backed -
+        // this is how journal appends grow a file.
         let required_size = offset + size;
 
         if required_size > file.metadata()?.len() {
@@ -59,12 +139,16 @@ impl MemoryMapMut for MmapMut {
     }
 }
 
+// One mapping over whole chunks: covers [offset, offset+size) of the
+// file. Dropping a window unmaps its range, so remaps and evictions
+// below invalidate slices taken from it.
 struct Window<M: MemoryMap> {
     offset: u64,
     size: u64,
     mmap: M,
 }
 
+// Debug output shows offset/size only, never the mapped bytes
 impl<M: MemoryMap> std::fmt::Debug for Window<M> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Window")
@@ -104,8 +188,18 @@ impl<M: MemoryMapMut> Window<M> {
     }
 }
 
+/// A bounded set of windows over one file, remapped on demand: at most
+/// `max_windows` mappings, each starting at a chunk boundary and sized to
+/// cover whatever range is requested (see `get_window`). Owns the file
+/// descriptor, so `sync` fdatasyncs through it.
+///
+/// No interior mutability and no guard of its own: any access can unmap or
+/// move windows, so a slice handed out earlier must not be held across the
+/// next access (module doc). `JournalFile` wraps this in a `GuardedCell`
+/// to enforce exactly that (file/guarded_cell.rs).
 pub struct WindowManager<M: MemoryMap> {
     file: File,
+    // File length at construction; currently unused
     _file_size: u64,
     chunk_size: u64,
     active_window_idx: Option<usize>,
@@ -114,6 +208,14 @@ pub struct WindowManager<M: MemoryMap> {
 }
 
 impl<M: MemoryMap> WindowManager<M> {
+    /// Takes ownership of `file` and starts with no windows. `chunk_size`
+    /// is the unit and minimum window size (debug-asserted non-zero and
+    /// page-aligned; `is_multiple_of` is the MSRV backport of
+    /// `u64::is_multiple_of`) and `max_windows` caps the window count
+    /// (debug-asserted non-zero). Callers set both: JournalFile passes
+    /// 64 KiB chunks with 16 (open) / 32 (create) windows
+    /// ([`JournalFile::open`](crate::file::JournalFile::open) /
+    /// [`JournalFile::create`](crate::file::JournalFile::create)).
     pub fn new(file: File, chunk_size: u64, max_windows: usize) -> Result<Self> {
         debug_assert!(chunk_size != 0 && is_multiple_of(chunk_size, PAGE_SIZE));
         debug_assert!(max_windows != 0);
@@ -138,6 +240,8 @@ impl<M: MemoryMap> WindowManager<M> {
         position.div_ceil(self.chunk_size) * self.chunk_size
     }
 
+    // Maps `chunk_count * chunk_size` bytes at `window_start`; failures
+    // are logged with the requested range and raised as JournalError::Io.
     fn create_window(&self, window_start: u64, chunk_count: u64) -> Result<Window<M>> {
         debug_assert_ne!(chunk_count, 0);
 
@@ -159,6 +263,10 @@ impl<M: MemoryMap> WindowManager<M> {
         })
     }
 
+    // Windows are appended in creation order and removals preserve the
+    // order of the rest, so index 0 is always the oldest surviving window.
+    // Evict it - unless it is the active window and another window exists,
+    // then evict index 1 instead.
     fn find_window_to_evict(&self) -> usize {
         if self.active_window_idx == Some(0) && self.windows.len() > 1 {
             1
@@ -167,6 +275,8 @@ impl<M: MemoryMap> WindowManager<M> {
         }
     }
 
+    // Active window first (hot path for repeated access), then all
+    // windows; the whole requested range must fit.
     fn lookup_window_by_range(&self, position: u64, size_needed: u64) -> Option<usize> {
         if let Some(idx) = self.active_window_idx {
             if self.windows[idx].contains_range(position, size_needed) {
@@ -183,6 +293,8 @@ impl<M: MemoryMap> WindowManager<M> {
         None
     }
 
+    // Same, but a position-only hit (range does not fit) still lets the
+    // caller remap that window - see `get_window`.
     fn lookup_window_by_position(&self, position: u64) -> Option<usize> {
         if let Some(idx) = self.active_window_idx {
             if self.windows[idx].contains(position) {
@@ -199,22 +311,25 @@ impl<M: MemoryMap> WindowManager<M> {
         None
     }
 
+    // Returns a window covering [position, position+size): reusing an
+    // existing window, remapping a partial hit, or creating a new one.
     fn get_window(&mut self, position: u64, size_needed: u64) -> Result<&mut Window<M>> {
         if let Some(idx) = self.lookup_window_by_range(position, size_needed) {
-            // Use the existing window
+            // Hit: an existing window covers the whole range.
             Ok(&mut self.windows[idx])
         } else if let Some(idx) = self.lookup_window_by_position(position) {
-            // Remap the window
+            // Partial hit: the position is inside a window but the range
+            // is not - remap it.
 
             let _window = self.windows.remove(idx);
-            // Invalidate active_window_idx before removal to maintain consistency.
-            // If create_window fails, the index won't point to a non-existent window.
+            // The removal above shifts (or drops) indices, so clear the
+            // active index: if create_window fails below, no stale index
+            // may point at a moved or non-existent window.
             self.active_window_idx = None;
 
-            // Keep the remapped window centered on the requested range instead of
-            // preserving the old window start. Preserving the old start lets
-            // sequential append access grow one mapping from the beginning of the
-            // file toward the tail, which defeats the intended bounded-window model.
+            // Re-center the new window on the requested range rather than
+            // keeping the old start, which would let sequential append
+            // access grow one mapping from the file start toward the tail.
             let window_start = self.get_chunk_aligned_start(position);
             let window_end = self.get_chunk_aligned_end(position + size_needed);
             let num_chunks = (window_end - window_start) / self.chunk_size;
@@ -225,17 +340,18 @@ impl<M: MemoryMap> WindowManager<M> {
             self.active_window_idx = Some(self.windows.len() - 1);
             Ok(self.windows.last_mut().unwrap())
         } else {
-            // Create a brand new window
+            // Miss: no window even contains the position - open a new one.
 
             if self.windows.len() >= self.max_windows {
                 self.windows.remove(self.find_window_to_evict());
-                // Invalidate active_window_idx after removal to maintain consistency.
-                // If create_window fails below, the index won't point to a non-existent window.
+                // The eviction above shifted indices; clear the active
+                // index so a failed create below leaves consistent state.
                 self.active_window_idx = None;
             }
 
             {
-                // Calculate window start for this position
+                // Window spans whole chunks: the chunk holding `position`
+                // through the chunk holding the range's end (>= 1 chunk).
                 let window_start = self.get_chunk_aligned_start(position);
                 let window_end = self.get_chunk_aligned_end(position + size_needed);
                 let num_chunks = (window_end - window_start) / self.chunk_size;
@@ -250,6 +366,11 @@ impl<M: MemoryMap> WindowManager<M> {
         }
     }
 
+    /// Returns the bytes at `[position, position+size)`, mapping a window
+    /// over them first. The returned slice borrows the manager, so the
+    /// borrow checker itself forbids holding it across another access; the
+    /// interior-mutability path (JournalFile/GuardedCell) serializes
+    /// instead (module doc).
     pub fn get_slice(&mut self, position: u64, size: u64) -> Result<&[u8]> {
         let window = self.get_window(position, size)?;
         Ok(window.get_slice(position, size))
@@ -257,12 +378,16 @@ impl<M: MemoryMap> WindowManager<M> {
 }
 
 impl<M: MemoryMapMut> WindowManager<M> {
+    /// Mutable variant of `get_slice`, for writable maps (`MmapMut`).
     pub fn get_slice_mut(&mut self, position: u64, size: u64) -> Result<&mut [u8]> {
         let window = self.get_window(position, size)?;
         Ok(window.get_mut_slice(position, size))
     }
 
-    /// Syncs all file data to disk
+    /// fdatasync of the file through the fd the manager owns. Windows and
+    /// hash-table maps reach disk only through this;
+    /// [`JournalFile::sync`](crate::file::JournalFile::sync)
+    /// additionally msyncs the header map first.
     pub fn sync(&self) -> Result<()> {
         self.file.sync_data()?;
         Ok(())
@@ -280,8 +405,8 @@ mod tests {
 
     const PAGE_SIZE_TEST: u64 = 4096;
 
-    /// A mock MemoryMap that can be configured to fail on specific calls.
-    /// This allows us to test error handling in WindowManager.
+    /// Mock map that fails on demand (see `MockController`), used to test
+    /// WindowManager state after a failed window creation.
     struct FailingMmap {
         data: Vec<u8>,
     }
@@ -340,19 +465,12 @@ mod tests {
         }
     }
 
-    /// This test verifies that WindowManager maintains consistent state
-    /// after a failed remap operation.
-    ///
-    /// The scenario:
-    /// 1. A window exists at some position
-    /// 2. A request comes in that requires remapping (position in window, but size extends beyond)
-    /// 3. The old window is removed
-    /// 4. Creating the new (larger) window fails (e.g., mmap error)
-    /// 5. The WindowManager should remain in a consistent state
-    /// 6. Subsequent operations should not panic
+    /// A failed remap must leave the manager consistent: the old window is
+    /// removed before create_window fails, so `windows` ends up empty, the
+    /// active index must be `None` (no stale index), and the next access
+    /// must recover by creating a fresh window.
     #[test]
     fn test_consistent_state_after_failed_remap() {
-        // Create a temporary file (content doesn't matter for mock)
         let mut temp_file = NamedTempFile::new().unwrap();
         temp_file.write_all(&[0u8; 8192]).unwrap();
         temp_file.flush().unwrap();
@@ -369,7 +487,7 @@ mod tests {
             ctrl.create_count.set(0);
         });
 
-        // First read: creates a window at offset 0, size 4KB (this should succeed)
+        // First read: creates window [0, 4096)
         {
             let slice = wm.get_slice(0, 100).unwrap();
             assert_eq!(slice.len(), 100);
@@ -380,25 +498,18 @@ mod tests {
         // Configure mock to fail on the next create call
         MOCK_CONTROLLER.with(|ctrl| ctrl.set_fail_next(true));
 
-        // Request a slice that requires remapping:
-        // - Position 100 is within the existing window [0, 4096)
-        // - But size 4000 means we need bytes [100, 4100), which extends beyond window
-        // - This triggers the "Remap the window" branch
-        // - The old window is removed
-        // - Then create_window is called and FAILS
+        // Position 100 is inside window [0, 4096) but [100, 4100) does not
+        // fit: remap branch - old window removed, then create_window fails.
         let remap_result = wm.get_slice(100, 4000);
         assert!(remap_result.is_err(), "Expected remap to fail");
 
-        // Verify state is consistent after the failure:
-        // - windows is empty (the old window was removed, new one failed to create)
-        // - active_window_idx should be None (not pointing to non-existent window)
         assert_eq!(wm.windows.len(), 0);
         assert_eq!(wm.active_window_idx, None);
 
         // Allow the next create to succeed
         MOCK_CONTROLLER.with(|ctrl| ctrl.set_fail_next(false));
 
-        // The next operation should NOT panic - it should succeed by creating a new window
+        // Recovery: the next access creates a fresh window
         let result = wm.get_slice(0, 100);
         assert!(
             result.is_ok(),
@@ -407,19 +518,11 @@ mod tests {
         assert_eq!(wm.windows.len(), 1);
     }
 
-    /// This test verifies that WindowManager maintains consistent state
-    /// after a failed window creation in the eviction path.
-    ///
-    /// The scenario:
-    /// 1. A window exists and we're at max_windows
-    /// 2. A request comes in for a different region requiring a new window
-    /// 3. The old window is evicted to make room
-    /// 4. Creating the new window fails (e.g., mmap error)
-    /// 5. The WindowManager should remain in a consistent state
-    /// 6. Subsequent operations should not panic
+    /// A failed window creation in the eviction path must leave the
+    /// manager consistent too: the evicted window is gone, `windows` ends
+    /// up empty and the active index `None`, and the next access recovers.
     #[test]
     fn test_consistent_state_after_failed_eviction() {
-        // Create a temporary file
         let mut temp_file = NamedTempFile::new().unwrap();
         temp_file.write_all(&[0u8; 8192]).unwrap();
         temp_file.flush().unwrap();
@@ -446,26 +549,19 @@ mod tests {
         // Configure mock to fail on the next create call
         MOCK_CONTROLLER.with(|ctrl| ctrl.set_fail_next(true));
 
-        // Request a slice at a completely different position (second page)
-        // This triggers:
-        // - lookup_window_by_range returns None (position 4096 not in window [0, 4096))
-        // - lookup_window_by_position returns None
-        // - "Create a brand new window" branch
-        // - Eviction: windows.remove(0) since we're at max_windows
-        // - create_window fails
+        // Position 4096 is outside window [0, 4096): brand-new-window
+        // branch - the old window is evicted (max_windows = 1), then
+        // create_window fails.
         let result = wm.get_slice(4096, 100);
         assert!(result.is_err(), "Expected mmap to fail");
 
-        // Verify state is consistent after the failure:
-        // - windows is empty (the old window was evicted, new one failed to create)
-        // - active_window_idx should be None (not pointing to non-existent window)
         assert_eq!(wm.windows.len(), 0);
         assert_eq!(wm.active_window_idx, None);
 
         // Allow the next create to succeed
         MOCK_CONTROLLER.with(|ctrl| ctrl.set_fail_next(false));
 
-        // The next operation should NOT panic - it should succeed by creating a new window
+        // Recovery: the next access creates a fresh window
         let result = wm.get_slice(0, 100);
         assert!(
             result.is_ok(),
@@ -474,6 +570,10 @@ mod tests {
         assert_eq!(wm.windows.len(), 1);
     }
 
+    /// Sequential access crossing chunk boundaries: the first crossing
+    /// re-centers the window and grows it to two chunks, later crossings
+    /// slide the two-chunk window forward - never growing past two chunks
+    /// or re-anchoring at the file start.
     #[test]
     fn sequential_boundary_crossing_slides_window_instead_of_growing_from_start() {
         let mut temp_file = NamedTempFile::new().unwrap();

@@ -11,8 +11,10 @@ def snapshot():
     state = "warning" if config["depth"] >= config["warning"] else "ok"
     return {
         "version": "v1",
-        "metrics": [{"name": "depth", "value": config["depth"], "labels": labels}],
-        "checks": [{"id": "backlog", "state": state, "labels": labels}],
+        "metrics": [{"name": "depth", "unit": "jobs",
+                     "samples": [{"value": config["depth"], "labels": labels}]}],
+        "checks": [{"id": "backlog", "title": "Queue Backlog", "by_labels": ["queue"],
+                    "samples": [{"state": state, "labels": labels}]}],
     }
 
 if sys.argv[-1] == "collect":
