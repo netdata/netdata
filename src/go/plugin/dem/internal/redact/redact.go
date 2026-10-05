@@ -9,7 +9,8 @@ import (
 )
 
 // Redactor removes secret values and common credential shapes from text
-// before egress. It applies exact supplied values first, then pattern matches.
+// before egress. It replaces exact supplied values of at least four bytes, then
+// applies credential-pattern matches regardless of their value length.
 type Redactor struct {
 	values     []string
 	standalone *regexp.Regexp // whole match → [REDACTED]

@@ -42,6 +42,17 @@ function run({ rate, random = 0.8, savedStorage = storage(), bootstrap, bot = fa
     },
     localStorage: storage(),
   };
+  function advanceTime(delay) {
+    clock += delay;
+    for (const [id, timer] of Array.from(timers)) {
+      if (timer.at <= clock && timers.delete(id)) { timer.callback(); }
+    }
+  }
+  // A due callback may cancel another due timer before its turn.
+  let cancelledTimer;
+  context.setTimeout(() => context.clearTimeout(cancelledTimer), 0);
+  cancelledTimer = context.setTimeout(() => assert.fail('cancelled timer ran'), 0);
+  advanceTime(0);
   context.window = context;
   context.document = {
     location: context.location, currentScript: null, readyState: 'complete',
@@ -91,10 +102,7 @@ function run({ rate, random = 0.8, savedStorage = storage(), bootstrap, bot = fa
     rollover(nextRandom) {
       const previous = faro.api.getSession().id;
       random = nextRandom;
-      clock += 16 * 60 * 1000;
-      for (const [id, timer] of Array.from(timers)) {
-        if (timer.at <= clock) { timers.delete(id); timer.callback(); }
-      }
+      advanceTime(16 * 60 * 1000);
       faro.api.pushEvent('after_idle_' + clock);
       assert.notEqual(faro.api.getSession().id, previous);
       return faro.api.getSession().attributes.isSampled;

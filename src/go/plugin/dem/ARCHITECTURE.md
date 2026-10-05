@@ -100,6 +100,8 @@ and `view_changed` envelopes carry metadata even on quiet pages, so they stay on
 generic session lifecycle rows and uses explicit view events to preserve transitions between identically normalized
 routes. The pinned-SDK capture and sampling fixtures exercise the real metadata providers and transport hooks,
 including selected/excluded session rollover; SDK upgrades MUST verify this ordering against the new bundle.
+The decoder targets the pinned SDK's measurement `values` map. Legacy experimental scalar `value.duration` and
+`value.value` payloads are unsupported; no compatibility adapter is retained.
 
 The collector's processor calls aggregation and then each enabled exporter directly. Aggregation leaves the normalized Beacon
 unchanged and returns Accepted, PageView and Investigated decisions. Every accepted observation contributes to

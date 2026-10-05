@@ -4,6 +4,8 @@ package faro
 
 import (
 	"fmt"
+	"math"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -12,6 +14,8 @@ import (
 )
 
 var defaultRedactor = redact.NewRedactor()
+
+var viewURLScheme = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*:`)
 
 // Text is normalized before it becomes an aggregation key or retained evidence.
 // Opaque protocol IDs use their own validation and are not generalized as paths.
@@ -32,6 +36,7 @@ func (o Options) cleanURL(value string) string {
 		return ""
 	}
 	value = o.apply(beacon.RedactURL(value, o.PathRules))
+	// Keep the full URL until callers separate host and path or bound an attribute.
 	return beacon.Clean(value, len(value))
 }
 
@@ -40,8 +45,11 @@ func (o Options) url(value string, limit int) string {
 }
 
 func (o Options) view(value string) string {
-	if strings.Contains(value, "/") {
-		value = beacon.Path(o.url(value, maxPathLen))
+	if strings.Contains(value, "/") || viewURLScheme.MatchString(strings.TrimSpace(value)) {
+		value = o.url(value, maxPathLen)
+		if value != "" {
+			value = beacon.Path(value)
+		}
 	} else {
 		for _, rule := range o.PathRules {
 			value = rule.Re.ReplaceAllString(value, rule.Replace)
@@ -67,7 +75,8 @@ type stackFrame struct {
 }
 
 func (o Options) appendFrame(stack *strings.Builder, frame stackFrame) string {
-	function, filename := o.text(frame.Function, maxStackLen), o.url(frame.Filename, maxStackLen)
+	function := o.text(frame.Function, maxStackLen)
+	filename := o.text(beacon.RedactSourceURL(frame.Filename, o.PathRules), maxStackLen)
 	fmt.Fprintf(stack, "%s (%s:%d:%d)\n", function, filename, frame.Lineno, frame.Colno)
 	return function + "@" + filename
 }
@@ -90,9 +99,9 @@ func keepEventAttr(kind beacon.EventKind, name, key string) bool {
 
 // Numeric protocol values are measurements, not free text. Interpret each field
 // by its original key, before custom-key redaction can change that meaning.
-func (o Options) eventAttr(kind beacon.EventKind, key, value string) string {
+func (o Options) eventAttr(kind beacon.EventKind, key, value string) (string, bool) {
 	if (kind == beacon.EventResource || kind == beacon.EventNavigation) && key == "name" {
-		return o.url(value, maxAttrLen)
+		return o.url(value, maxAttrLen), true
 	}
 	numeric := false
 	switch kind {
@@ -104,9 +113,12 @@ func (o Options) eventAttr(kind beacon.EventKind, key, value string) string {
 		numeric = key == "http.response.status_code" || key == "duration_ns"
 	}
 	if numeric {
-		if _, err := strconv.ParseFloat(value, 64); err == nil {
-			return beacon.Clean(value, maxAttrLen)
+		value = beacon.Clean(value, len(value))
+		n, err := strconv.ParseFloat(value, 64)
+		if err != nil || math.IsNaN(n) || math.IsInf(n, 0) {
+			return "", false
 		}
+		return beacon.Truncate(value, maxAttrLen), true
 	}
-	return o.cleanAttr(key, value)
+	return o.cleanAttr(key, value), true
 }

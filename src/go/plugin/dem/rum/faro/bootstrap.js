@@ -81,14 +81,14 @@
     } catch (e) { return ''; }
   }
   function cleanView(value) {
-    if (typeof value !== 'string' || value.indexOf('/') < 0) { return value; }
+    if (typeof value !== 'string') { return value; }
     // Keep relative route labels relative; resolving them against the current
     // page would add an unrelated path prefix. Full URLs retain only their path.
     if (/^[a-z][a-z0-9+.-]*:/i.test(value.trim()) || value.indexOf('//') === 0) {
       var cleaned = cleanURL(value);
       return cleaned ? new URL(cleaned).pathname : '';
     }
-    return value.split(/[?#]/, 1)[0];
+    return value.indexOf('/') < 0 ? value : value.split(/[?#]/, 1)[0];
   }
   function cleanURLAttrs(attrs) {
     ['url.full', 'http.url', 'url'].forEach(function (key) {

@@ -246,11 +246,15 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 				if len(attrs) >= maxEventAttrs {
 					break
 				}
+				k = beacon.Clean(k, len(k))
 				nativeAttr := keepEventAttr(kind, name, k)
 				if !opt.EventLogs && !nativeAttr {
 					continue
 				}
-				value := opt.eventAttr(kind, k, v)
+				value, valid := opt.eventAttr(kind, k, v)
+				if !valid {
+					continue
+				}
 				// Known keys carry protocol semantics; custom keys are diagnostic text.
 				if !nativeAttr {
 					k = opt.text(k, maxNameLen)

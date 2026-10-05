@@ -109,7 +109,8 @@ func spanAttrs(kvs []otlpKV, opt Options) []beacon.SpanAttr {
 		if len(out) >= maxSpanAttrs {
 			break
 		}
-		key := opt.text(kv.Key, maxNameLen)
+		semanticKey := beacon.Clean(kv.Key, len(kv.Key))
+		key := opt.text(semanticKey, maxNameLen)
 		if key == "" {
 			continue
 		}
@@ -118,7 +119,7 @@ func spanAttrs(kvs []otlpKV, opt Options) []beacon.SpanAttr {
 		case v.StringValue != nil:
 			out = append(out, beacon.SpanAttr{
 				Key: key,
-				Str: opt.cleanAttr(kv.Key, *v.StringValue),
+				Str: opt.cleanAttr(semanticKey, *v.StringValue),
 			})
 		case len(v.IntValue) > 0:
 			if n, err := strconv.ParseInt(strings.Trim(string(v.IntValue), `"`), 10, 64); err == nil {

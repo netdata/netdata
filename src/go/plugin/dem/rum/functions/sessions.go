@@ -11,7 +11,7 @@ import (
 var sessionsMethod = method{
 	id:      "rum-sessions",
 	title:   "RUM Sessions",
-	help:    "Sessions with retained activity saved in the selected range; counts and duration cover retained events, not lifetime totals. user_id matches an exact ID observed in that range and returns the complete session summary",
+	help:    "Sessions with retained activity saved in the selected range; counts and duration cover retained events, not lifetime totals. user_id matches an exact stored, normalized ID observed in that range and returns the complete session summary. Credential-masked display values are not reliable lookup keys; redacted original IDs cannot be recovered",
 	sort:    "started_age_s",
 	every:   10,
 	history: true,

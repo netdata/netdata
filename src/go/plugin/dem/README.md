@@ -91,11 +91,16 @@ intent, frustration or causality. A disabled signal is unavailable, not a measur
 An application-provided user ID is an explicit capture choice. IDs remain application-controlled values and are not
 hashed or anonymized by DEM. Use an internal, non-sensitive ID of at most 128 bytes and clear it on logout. IDs undergo the same bounded text
 normalization as other diagnostic strings; numeric and UUID IDs are not generalized as URL paths. Per-event attribution survives login,
-logout and user changes; session lookup matches every observed retained ID within the selected saved-time range.
+logout and user changes. The `user_id` filter matches exact stored, normalized IDs within the selected saved-time range.
+Original IDs changed by normalization cannot be recovered through lookup. Current configured credentials also mask
+query output, so a displayed `[REDACTED]` value is not a reliable lookup key or a unique identity.
 User names, email fields and arbitrary user attributes are not part of this identity contract.
 
 Recognized structured URL fields lose query strings, fragments and credentials; path grouping and configured `redact_paths` rules normalize
-supported URL paths. Targeted text transformations apply to diagnostic strings before grouping, history and export.
+supported URL paths. Stack source URLs retain hashed JavaScript basenames for source attribution; configured path rules
+still apply. Targeted text transformations apply to diagnostic strings before grouping, history and export. Exact
+configured-secret replacement applies to values of at least four bytes; shorter strings remain unchanged unless they
+match a credential pattern such as `token=...` or `Bearer ...`. Use strong destination credentials.
 These limited transformations are not a general anonymization, data-loss-prevention or consent system: application IDs,
 error text, selectors and explicitly exported attributes can still be identifying. Choose application instrumentation
 and optional capture settings accordingly. Sampling and the independent event-log/trace switches retain their existing

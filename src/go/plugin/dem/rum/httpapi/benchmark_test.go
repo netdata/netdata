@@ -32,6 +32,10 @@ func BenchmarkCollectTimingEvents(b *testing.B) {
  ]}`)
 }
 
+func BenchmarkCollectErrors(b *testing.B) {
+	benchmarkCollectBody(b, `{"meta":{"session":{"id":"session"},"page":{"url":"https://shop.example.com/"}},"exceptions":[{"type":"TypeError","value":"failed","stacktrace":{"frames":[{"filename":"https://cdn.example.com/static/framework-2c79e2a64abdb08b.js?private=value#fragment","function":"render","lineno":12,"colno":3}]}}]}`)
+}
+
 func benchmarkCollectBody(b *testing.B, body string) {
 	cfg := testCfg()
 	cfg.RateLimit.PerIPPerMin = math.MaxInt32

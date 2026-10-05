@@ -114,3 +114,115 @@ func TestCapturePerformanceEventNamesAreStructuredURLs(t *testing.T) {
 		})
 	}
 }
+
+func TestCaptureAttributeKeysNormalizeBeforeSemantics(t *testing.T) {
+	for _, tc := range []struct{ key, wantKey string }{
+		{" url.full ", "url.full"},
+		{"http.\turl", "http.url"},
+		{"\nurl\r", "url"},
+	} {
+		t.Run(tc.key, func(t *testing.T) {
+			encodedKey, err := json.Marshal(tc.key)
+			require.NoError(t, err)
+			key := string(encodedKey)
+			raw := []byte(`{
+ "events":[{"name":"custom","attributes":{` + key + `:"https://user:password@example.org/api?private=value#fragment"}}],
+ "traces":{"resourceSpans":[{"scopeSpans":[{"spans":[{
+  "traceId":"1234567890abcdef1234567890abcdef","spanId":"1234567890abcdef",
+  "startTimeUnixNano":"1","endTimeUnixNano":"2",
+  "attributes":[{"key":` + key + `,"value":{"stringValue":"https://user:password@example.org/api?private=value#fragment"}}]
+ }]}]}]}}`)
+			b, err := Decode(raw, Options{Now: now, Tracing: true, EventLogs: true})
+			require.NoError(t, err)
+			require.Len(t, b.Spans, 1)
+			require.Len(t, b.Spans[0].Attrs, 1)
+			assert.Equal(t, "https://example.org/api", b.Spans[0].Attrs[0].Str)
+			require.Len(t, b.Events, 1)
+			assert.Equal(t, map[string]string{tc.wantKey: "https://example.org/api"}, b.Events[0].Attrs)
+		})
+	}
+}
+
+func TestCaptureRejectsNonfiniteTimingValues(t *testing.T) {
+	for _, value := range []string{"+Inf", "-Inf", "NaN", "Infinity", "1e1000", "I\tnf"} {
+		t.Run(value, func(t *testing.T) {
+			raw, err := json.Marshal(map[string]any{"events": []any{
+				map[string]any{"name": navigationEvent, "attributes": map[string]string{"pageLoadTime": value, "domContentLoadHandlerTime": "10"}},
+				map[string]any{"name": resourceEvent, "attributes": map[string]string{"duration": value, "httpHost": "example.org"}},
+				map[string]any{"name": resourceEvent, "attributes": map[string]string{"duration": "25", "transferSize": value, "httpHost": "example.org"}},
+				map[string]any{"name": "faro.tracing.fetch", "attributes": map[string]string{"duration_ns": value, "http.response.status_code": value}},
+			}})
+			require.NoError(t, err)
+			b, err := Decode(raw, Options{Now: now, EventLogs: true})
+			require.NoError(t, err)
+			require.NotNil(t, b.Navigation)
+			assert.False(t, b.Navigation.HasLoad)
+			assert.True(t, b.Navigation.HasDCL)
+			assert.Equal(t, float64(10), b.Navigation.DCLMS)
+			assert.Equal(t, []beacon.Resource{{Host: "example.org", DurationMS: 25}}, b.Resources)
+			require.Len(t, b.Events, 4)
+			assert.NotContains(t, b.Events[0].Attrs, "pageLoadTime")
+			assert.NotContains(t, b.Events[1].Attrs, "duration")
+			assert.NotContains(t, b.Events[2].Attrs, "transferSize")
+			assert.Empty(t, b.Events[3].Attrs)
+		})
+	}
+}
+
+func TestCaptureURLPercentAndOpaqueViewHandling(t *testing.T) {
+	for _, tc := range []struct{ view, want string }{
+		{"/sale/50%-off?private=x#fragment", "/sale/50%25-off"},
+		{"data:,private", ""}, {"javascript:private", ""}, {" data:text/plain,private ", ""},
+		{"checkout-view", "checkout-view"}, {"Checkout?logical#label", "Checkout?logical#label"},
+	} {
+		t.Run(tc.view, func(t *testing.T) {
+			raw, err := json.Marshal(map[string]any{"meta": map[string]any{
+				"page": map[string]string{"url": "https://user:password@example.org/sale/50%-off?private=value#fragment"},
+				"view": map[string]string{"name": tc.view}},
+				"events": []any{map[string]any{"name": "view_changed", "attributes": map[string]string{"fromView": tc.view, "toView": tc.view}}},
+			})
+			require.NoError(t, err)
+			b, err := Decode(raw, Options{Now: now})
+			require.NoError(t, err)
+			assert.Equal(t, "/sale/50%25-off", b.Path)
+			assert.Equal(t, "example.org", b.PageHost)
+			assert.Equal(t, tc.want, b.View)
+			require.Len(t, b.Events, 1)
+			assert.Equal(t, tc.want, b.Events[0].Attrs["fromView"])
+			assert.Equal(t, tc.want, b.Events[0].Attrs["toView"])
+		})
+	}
+}
+
+func TestCapturePreservesHashedScriptIdentity(t *testing.T) {
+	opt := Options{
+		Now:         now,
+		ConsoleLogs: true,
+		PathRules:   []beacon.PathRule{{Re: regexp.MustCompile(`/members/[^/]+`), Replace: "/members/:member"}},
+	}
+	var fingerprints []string
+	for _, filename := range []string{"framework-2c79e2a64abdb08b.js", "framework-3c79e2a64abdb08b.mjs", "framework-4c79e2a64abdb08b.cjs"} {
+		frame := map[string]any{
+			"filename": "https://user:password@example.org/members/customer/123456/" + filename + "?private=value#fragment",
+			"function": "render",
+			"lineno":   12,
+			"colno":    3,
+		}
+		serialized, err := json.Marshal(frame)
+		require.NoError(t, err)
+		raw, err := json.Marshal(map[string]any{
+			"exceptions": []any{map[string]any{"type": "Error", "value": "failed", "stacktrace": map[string]any{"frames": []any{frame}}}},
+			"logs":       []any{map[string]any{"level": "error", "message": "failed", "context": map[string]string{"type": "Error", "stackFrames": string(serialized)}}},
+		})
+		require.NoError(t, err)
+		b, err := Decode(raw, opt)
+		require.NoError(t, err)
+		require.Len(t, b.Errors, 1)
+		require.Len(t, b.Logs, 1)
+		assert.Equal(t, "render (https://example.org/members/:member/:id/"+filename+":12:3)\n", b.Errors[0].Stack)
+		assert.Equal(t, b.Errors[0].Stack, b.Logs[0].Stack)
+		fingerprints = append(fingerprints, b.Errors[0].Fingerprint)
+	}
+	assert.NotEqual(t, fingerprints[0], fingerprints[1])
+	assert.NotEqual(t, fingerprints[1], fingerprints[2])
+}
