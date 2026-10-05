@@ -58,5 +58,6 @@ and is not stored in Netdata Cloud.
 
 - [ ] Endpoint bound only where senders need it; plaintext only on loopback.
 - [ ] TLS server certificate and key in place; mutual TLS where the network is not trusted.
-- [ ] Ports 4317 (OTLP/gRPC) and 4318 (OTLP/HTTP) restricted to known sender addresses, and OTLP/HTTP disabled if unused.
+- [ ] Ports 4317 (OTLP/gRPC) and 4318 (OTLP/HTTP) restricted to known sender addresses, and an unused listener
+      turned off (`enabled: false`).
 - [ ] A restart procedure for certificate rotation.

@@ -345,6 +345,9 @@ fn validate_tls_pairing(prefix: &str, tls: &TlsServerConfig) -> Result<()> {
         }
         (None, None) => {}
     }
+    if tls.client_ca_file.as_deref() == Some("") {
+        anyhow::bail!("{prefix}.tls.client_ca_file cannot be empty");
+    }
     if tls.client_ca_file.is_some() && (tls.cert_file.is_none() || tls.key_file.is_none()) {
         anyhow::bail!("{prefix}.tls.client_ca_file requires both {cert_field} and {key_field}");
     }
@@ -1502,6 +1505,10 @@ logs:
                 (
                     "cert_file: ''\n    key_file: /key.pem",
                     format!("{prefix}.cert_file cannot be empty"),
+                ),
+                (
+                    "cert_file: /c.pem\n    key_file: /k.pem\n    client_ca_file: ''",
+                    format!("{prefix}.client_ca_file cannot be empty"),
                 ),
             ];
             for (tls, expected) in cases {

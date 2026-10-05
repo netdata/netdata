@@ -1678,4 +1678,15 @@ mod tests {
             "{err:#}"
         );
     }
+
+    #[tokio::test]
+    async fn disabled_http_listener_binds_nothing() {
+        // Even an address that cannot bind is never touched when disabled.
+        let listener = ProtocolConfig {
+            enabled: false,
+            endpoint: "not-an-address".to_string(),
+            tls: TlsServerConfig::default(),
+        };
+        assert!(bind_http(&listener).await.unwrap().is_none());
+    }
 }

@@ -76,9 +76,10 @@ const WAL_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(3
 /// Ingestor worker entry point.
 ///
 /// Connects to the supervisor's IPC socket, receives Configure, then runs the
-/// OTLP listeners (gRPC, and HTTP unless disabled) and the chart emission
-/// loop. `Ready` is sent from inside `run_ingestor`, only after both
-/// listeners are bound and every startup step has
+/// enabled OTLP listeners (`receivers.otlp.protocols.{grpc,http}`; config
+/// validation requires at least one) and the chart emission loop. `Ready` is
+/// sent from inside `run_ingestor`, only after every enabled listener is
+/// bound and every startup step has
 /// succeeded: the supervisor forwards the ledger's Function declarations to the
 /// agent only once it sees this worker's Ready, so a startup failure here (a
 /// port already in use, an unreadable TLS key) leaves the plugin un-advertised
