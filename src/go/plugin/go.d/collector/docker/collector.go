@@ -24,6 +24,10 @@ var configSchema string
 func init() {
 	collectorapi.Register("docker", collectorapi.Creator{
 		JobConfigSchema: configSchema,
+		Defaults: collectorapi.Defaults{
+			// Docker Engine 29+ with the containerd image store makes the container list expensive for the daemon.
+			UpdateEvery: 10,
+		},
 		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
 		SharedFunctions: dockerfunc.Methods,
@@ -52,6 +56,7 @@ func New() *Collector {
 		},
 		cntrSr:     matcher.TRUE(),
 		containers: make(map[string]bool),
+		now:        time.Now,
 	}
 	c.funcRouter = dockerfunc.NewRouter(funcDepsAdapter{collector: c})
 	return c
@@ -81,6 +86,10 @@ type (
 
 		containers map[string]bool
 		cntrSr     matcher.Matcher
+
+		now               func() time.Time
+		images            imagesStats
+		imagesNextRefresh time.Time
 	}
 	dockerClient interface {
 		Info(context.Context, docker.InfoOptions) (docker.SystemInfoResult, error)
