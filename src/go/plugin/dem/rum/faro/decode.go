@@ -368,6 +368,9 @@ func parseNavigationAttrs(attrs map[string]string) *beacon.Navigation {
 	if v, err := strconv.ParseFloat(attrs["domContentLoadHandlerTime"], 64); err == nil && v >= 0 && !math.IsInf(v, 0) && !math.IsNaN(v) {
 		n.DCLMS, n.HasDCL = v, true
 	}
+	if !n.HasLoad && !n.HasDCL {
+		return nil
+	}
 	return n
 }
 

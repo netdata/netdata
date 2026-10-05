@@ -67,7 +67,6 @@ var frustrationCounters = map[string]string{
 const (
 	maxWindowObservations = 10000
 	identityRetention     = 30 * time.Minute
-	maxTrackedGroups      = 1000
 	browserTopN           = 20
 	unknownValue          = "unknown"
 )
@@ -173,18 +172,21 @@ type siteState struct {
 	cfg                                                        SiteCfg
 	window                                                     time.Duration
 	counters                                                   map[string]uint64
-	observations                                               map[observationKey]*list.Element
-	observationOrder                                           *list.List
-	identities                                                 map[identityKey]*list.Element
-	identityOrder                                              *list.List
-	activity                                                   *list.List
-	sessions                                                   map[string]*list.Element
-	sessionOrder                                               *list.List
-	pageSessions                                               map[string]*list.Element
-	pageSessionOrder                                           *list.List
+	observations                                               map[observationKey]*receiptEntry
+	observationOrder                                           receiptHeap
+	identities                                                 map[identityKey]*receiptEntry
+	identityOrder                                              receiptHeap
+	activity, resources                                        receiptHeap
+	sessions                                                   map[string]*receiptEntry
+	sessionOrder                                               receiptHeap
+	pageSessions                                               map[string]*receiptEntry
+	pageSessionOrder                                           receiptHeap
 	vitalLoss                                                  map[string]*lossInterval
-	activityLoss, sessionLoss, pageSessionLoss                 lossInterval
-	identityLoss                                               lossInterval
+	activityLoss, resourceLoss, sessionLoss, pageSessionLoss   lossInterval
+	identityLoss                                               map[string]*lossInterval
+	identitySessionLoss                                        lossInterval
+	resourceIdentities                                         map[identityKey]*receiptEntry
+	resourceIdentityOrder                                      receiptHeap
 	sess                                                       *list.List
 	sessIdx                                                    map[string]*list.Element
 	accepted, rejected, bots                                   []time.Time
@@ -199,21 +201,18 @@ func New(window time.Duration, cfg SiteCfg) *Aggregator {
 		window: window,
 		now:    time.Now,
 		site: siteState{
-			cfg:              cfg,
-			window:           window,
-			counters:         map[string]uint64{},
-			observations:     map[observationKey]*list.Element{},
-			observationOrder: list.New(),
-			identities:       map[identityKey]*list.Element{},
-			identityOrder:    list.New(),
-			activity:         list.New(),
-			sessions:         map[string]*list.Element{},
-			sessionOrder:     list.New(),
-			pageSessions:     map[string]*list.Element{},
-			pageSessionOrder: list.New(),
-			vitalLoss:        map[string]*lossInterval{},
-			sess:             list.New(),
-			sessIdx:          map[string]*list.Element{},
+			cfg:                cfg,
+			window:             window,
+			counters:           map[string]uint64{},
+			observations:       map[observationKey]*receiptEntry{},
+			identities:         map[identityKey]*receiptEntry{},
+			sessions:           map[string]*receiptEntry{},
+			pageSessions:       map[string]*receiptEntry{},
+			vitalLoss:          map[string]*lossInterval{},
+			identityLoss:       map[string]*lossInterval{},
+			resourceIdentities: map[identityKey]*receiptEntry{},
+			sess:               list.New(),
+			sessIdx:            map[string]*list.Element{},
 		},
 	}
 }

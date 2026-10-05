@@ -3,7 +3,6 @@
 package aggregate
 
 import (
-	"container/list"
 	"sort"
 	"time"
 
@@ -52,14 +51,13 @@ type population struct {
 	elements                               []elemSample
 }
 type windowRead struct {
-	global                                                     population
-	groups                                                     map[groupKey]*population
-	groupCounts                                                map[string]int
-	resourceGroups                                             map[hostKey]*resourcePopulation
-	errorGroups                                                map[errorKey]*errorPopulation
-	sessions                                                   int
-	windowLost, sessionsLost, pageSessionsLost, pageGroupsLost uint64
-	vitalLost                                                  map[string]uint64
+	global                                                    population
+	groups                                                    map[groupKey]*population
+	resourceGroups                                            map[hostKey]*resourcePopulation
+	errorGroups                                               map[errorKey]*errorPopulation
+	sessions                                                  int
+	windowLost, resourcesLost, sessionsLost, pageSessionsLost uint64
+	vitalLost                                                 map[string]uint64
 }
 
 func newPopulation() *population {
@@ -78,26 +76,14 @@ func (r *windowRead) group(kind, value string) *population {
 	if g := r.groups[key]; g != nil {
 		return g
 	}
-	if r.groupCounts[kind] >= maxTrackedGroups {
-		key = groupKey{
-			kind:  kind,
-			value: Other,
-			other: true,
-		}
-		if kind == KindPage {
-			r.pageGroupsLost++
-		}
-	} else {
-		r.groupCounts[kind]++
-	}
-	if g := r.groups[key]; g != nil {
-		return g
-	}
 	g := newPopulation()
 	r.groups[key] = g
 	return g
 }
-func attributePairs(v attributes) []groupKey {
+func attributePairs(v attributes, pageOnly bool) []groupKey {
+	if pageOnly {
+		return []groupKey{{kind: KindPage, value: v.page}}
+	}
 	return []groupKey{
 		{kind: KindBrowser, value: v.browser},
 		{kind: KindDevice, value: v.device},
@@ -106,41 +92,43 @@ func attributePairs(v attributes) []groupKey {
 		{kind: KindVersion, value: v.version},
 	}
 }
-func (st *siteState) readWindow(now time.Time) *windowRead {
+
+// Page reads derive only the page facet; other materialization belongs to Snapshot.
+func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 	cutoff := now.Add(-st.window)
 	st.expire(now)
 	r := &windowRead{
 		global:         *newPopulation(),
 		groups:         map[groupKey]*population{},
-		groupCounts:    map[string]int{},
 		resourceGroups: map[hostKey]*resourcePopulation{},
 		errorGroups:    map[errorKey]*errorPopulation{},
 		vitalLost:      map[string]uint64{},
 	}
-	r.windowLost = st.activityLoss.current(now) + st.identityLoss.current(now)
-	r.sessionsLost = st.sessionLoss.current(now)
-	r.pageSessionsLost = st.pageSessionLoss.current(now)
+	r.windowLost = st.activityLoss.current(now) + st.currentIdentityLoss("document", now) + st.currentIdentityLoss("view", now)
+	r.resourcesLost = st.resourceLoss.current(now) + st.currentIdentityLoss("resource", now)
+	r.sessionsLost = st.sessionLoss.current(now) + st.identitySessionLoss.current(now)
+	r.pageSessionsLost = st.pageSessionLoss.current(now) + st.identitySessionLoss.current(now)
 	for name, loss := range st.vitalLoss {
 		r.vitalLost[name] = loss.current(now)
 	}
-	// Identity loss can admit an old report again, so all derived measurements
-	// remain visibly incomplete for this bounded replay-loss interval.
-	identityLost := st.identityLoss.current(now)
-	r.sessionsLost += identityLost
-	r.pageSessionsLost += identityLost
-	for _, name := range append(append([]string{}, beacon.Vitals...), navLoadName, navDCLName) {
-		r.vitalLost[name] += identityLost
+	for _, name := range beacon.Vitals {
+		r.vitalLost[name] += st.currentIdentityLoss(name, now)
 	}
-	for el := st.observationOrder.Front(); el != nil; el = el.Next() {
+	navigationLost := st.currentIdentityLoss("navigation", now)
+	r.vitalLost[navLoadName] += navigationLost
+	r.vitalLost[navDCLName] += navigationLost
+	for _, el := range st.observationOrder.entries {
 		v := el.Value.(*vitalObservation)
 		if v.received.Before(cutoff) {
 			continue
 		}
-		r.global.values[v.key.name] = append(r.global.values[v.key.name], v.value)
+		if !pageOnly {
+			r.global.values[v.key.name] = append(r.global.values[v.key.name], v.value)
+		}
 		if _, ok := thresholds[v.key.name]; !ok {
 			continue
 		}
-		for _, kv := range attributePairs(v.attrs) {
+		for _, kv := range attributePairs(v.attrs, pageOnly) {
 			g := r.group(kv.kind, kv.value)
 			g.values[v.key.name] = append(g.values[v.key.name], v.value)
 			if kv.kind == KindPage && v.element != "" {
@@ -152,41 +140,38 @@ func (st *siteState) readWindow(now time.Time) *windowRead {
 			}
 		}
 	}
-	for el := st.activity.Front(); el != nil; el = el.Next() {
+	for _, el := range st.activity.entries {
 		v := el.Value.(*activityObservation)
 		if v.received.Before(cutoff) {
-			continue
-		}
-		if v.resource != nil {
-			r.addResource(v)
 			continue
 		}
 		r.global.documents += v.documents
 		r.global.views += v.views
 		r.global.errors += v.errors
 		r.global.frustrations += v.frustrations
-		for _, kv := range attributePairs(v.attrs) {
+		for _, kv := range attributePairs(v.attrs, pageOnly) {
 			g := r.group(kv.kind, kv.value)
 			g.documents += v.documents
 			g.views += v.views
 			g.errors += v.errors
 			g.frustrations += v.frustrations
 		}
-		if v.attrs.view != "" || v.views > 0 {
+		if !pageOnly && (v.attrs.view != "" || v.views > 0) {
 			g := r.group(KindView, v.attrs.view)
 			g.views += v.views
 			g.errors += v.errors
 		}
-		if v.errors > 0 {
+		if !pageOnly && v.errors > 0 {
 			r.addError(v)
 		}
 	}
-	for el := st.sessionOrder.Front(); el != nil; el = el.Next() {
-		if !el.Value.(*sessionObservation).received.Before(cutoff) {
-			r.sessions++
+	if !pageOnly {
+		for _, el := range st.resources.entries {
+			r.addResource(el.Value.(*activityObservation))
 		}
 	}
-	for el := st.pageSessionOrder.Front(); el != nil; el = el.Next() {
+	r.sessions = len(st.sessions)
+	for _, el := range st.pageSessionOrder.entries {
 		v := el.Value.(*sessionObservation)
 		if !v.received.Before(cutoff) {
 			r.group(KindPage, v.page).sessions++
@@ -195,55 +180,49 @@ func (st *siteState) readWindow(now time.Time) *windowRead {
 	return r
 }
 
-// Read-time expiry is linear in retained state. Hot ingestion never scans it.
+func (st *siteState) currentIdentityLoss(kind string, now time.Time) uint64 {
+	if loss := st.identityLoss[kind]; loss != nil {
+		return loss.current(now)
+	}
+	return 0
+}
+
+// Expiry removes only expired heap roots. Each removal costs O(log retained).
 func (st *siteState) expire(now time.Time) {
 	cutoff := now.Add(-st.window)
-	for el := st.observationOrder.Front(); el != nil; {
-		next := el.Next()
-		v := el.Value.(*vitalObservation)
-		if v.received.Before(cutoff) {
-			delete(st.observations, v.key)
-			st.observationOrder.Remove(el)
-		}
-		el = next
+	for el := st.observationOrder.oldest(); el != nil && el.Value.receivedAt().Before(cutoff); el = st.observationOrder.oldest() {
+		delete(st.observations, el.Value.(*vitalObservation).key)
+		st.observationOrder.pop()
 	}
-	for el := st.identityOrder.Front(); el != nil; {
-		next := el.Next()
-		v := el.Value.(*identity)
-		if v.received.Before(now.Add(-identityRetention)) {
-			delete(st.identities, v.key)
-			st.identityOrder.Remove(el)
+	expireIdentities(st.identities, &st.identityOrder, now.Add(-identityRetention))
+	expireIdentities(st.resourceIdentities, &st.resourceIdentityOrder, now.Add(-identityRetention))
+	for _, order := range []*receiptHeap{&st.activity, &st.resources} {
+		for el := order.oldest(); el != nil && el.Value.receivedAt().Before(cutoff); el = order.oldest() {
+			order.pop()
 		}
-		el = next
 	}
-	for el := st.activity.Front(); el != nil; {
-		next := el.Next()
-		if el.Value.(*activityObservation).received.Before(cutoff) {
-			st.activity.Remove(el)
-		}
-		el = next
-	}
-	expireObservedSessions(st.sessions, st.sessionOrder, cutoff)
-	expireObservedSessions(st.pageSessions, st.pageSessionOrder, cutoff)
+	expireObservedSessions(st.sessions, &st.sessionOrder, cutoff)
+	expireObservedSessions(st.pageSessions, &st.pageSessionOrder, cutoff)
 	st.evictActivity(now)
 	st.evictSessions(now)
 }
-func expireObservedSessions(index map[string]*list.Element, order *list.List, cutoff time.Time) {
-	for el := order.Front(); el != nil; {
-		next := el.Next()
-		v := el.Value.(*sessionObservation)
-		if v.received.Before(cutoff) {
-			delete(index, v.key)
-			order.Remove(el)
-		}
-		el = next
+func expireIdentities(index map[identityKey]*receiptEntry, order *receiptHeap, cutoff time.Time) {
+	for el := order.oldest(); el != nil && el.Value.receivedAt().Before(cutoff); el = order.oldest() {
+		delete(index, el.Value.(*identity).key)
+		order.pop()
+	}
+}
+func expireObservedSessions(index map[string]*receiptEntry, order *receiptHeap, cutoff time.Time) {
+	for el := order.oldest(); el != nil && el.Value.receivedAt().Before(cutoff); el = order.oldest() {
+		delete(index, el.Value.(*sessionObservation).key)
+		order.pop()
 	}
 }
 func (a *Aggregator) Snapshot() Snapshot {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	st := &a.site
-	r := st.readWindow(a.now())
+	r := st.readWindow(a.now(), false)
 	snap := Snapshot{
 		Name:                   st.cfg.Name,
 		DisplayName:            st.cfg.DisplayName,
@@ -255,7 +234,7 @@ func (a *Aggregator) Snapshot() Snapshot {
 		Breakdowns:             map[string][]Group{},
 		Load:                   measurementStats(navLoadName, r.global.values[navLoadName], r.vitalLost[navLoadName]),
 		DCL:                    measurementStats(navDCLName, r.global.values[navDCLName], r.vitalLost[navDCLName]),
-		API:                    measurementStats(apiName, r.global.values[apiName], r.windowLost),
+		API:                    measurementStats(apiName, r.global.values[apiName], r.resourcesLost),
 		ResourcesSeen:          st.resourcesSeen,
 		FirstPartyResources:    st.firstPartyResources,
 		ThirdPartyResources:    st.thirdPartyResources,
@@ -313,7 +292,7 @@ func (st *siteState) topN(kind string) int {
 func (r *windowRead) rank(kind string, n int) []Group {
 	var keys []groupKey
 	for key := range r.groups {
-		if key.kind == kind && !key.other {
+		if key.kind == kind {
 			keys = append(keys, key)
 		}
 	}
@@ -340,14 +319,6 @@ func (r *windowRead) rank(kind string, n int) []Group {
 	}
 	other := newPopulation()
 	present := false
-	if g := r.groups[groupKey{
-		kind:  kind,
-		value: Other,
-		other: true,
-	}]; g != nil {
-		mergePopulation(other, g)
-		present = true
-	}
 	for _, key := range keys[n:] {
 		mergePopulation(other, r.groups[key])
 		present = true

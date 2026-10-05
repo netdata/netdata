@@ -22,14 +22,14 @@ type elemSample struct {
 }
 
 // Pages returns all retained page groups, independent of the chart top-N.
-// Loss includes group overflow, making the bounded inventory explicit.
+// Its inventory is bounded by the canonical retained observations.
 func (a *Aggregator) Pages() []PageInfo {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	r := a.site.readWindow(a.now())
+	r := a.site.readWindow(a.now(), true)
 	var out []PageInfo
 	for key, p := range r.groups {
-		if key.kind != KindPage || key.other {
+		if key.kind != KindPage {
 			continue
 		}
 		out = append(out, PageInfo{
@@ -39,7 +39,7 @@ func (a *Aggregator) Pages() []PageInfo {
 			Sessions:          p.sessions,
 			ErrorsWindow:      int(p.errors),
 			Vitals:            r.vitals(p),
-			Lost:              r.windowLost + r.pageGroupsLost,
+			Lost:              r.windowLost,
 			SessionsLost:      r.pageSessionsLost,
 			LCPElement:        topElement(p.elements, beacon.LCP),
 			INPElement:        topElement(p.elements, beacon.INP),

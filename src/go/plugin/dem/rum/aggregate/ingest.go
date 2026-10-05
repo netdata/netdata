@@ -3,7 +3,6 @@
 package aggregate
 
 import (
-	"container/list"
 	"math"
 	"strconv"
 	"time"
@@ -39,8 +38,8 @@ type Result struct {
 	Observation                      *beacon.Beacon
 }
 
-// Ingest never changes its input. Measurement work is O(items in the batch),
-// with O(1) identity checks and capacity eviction; retained-state scans run on reads.
+// Ingest never changes its input. Duplicate checks are O(1); accepted receipt
+// inserts/updates are O(log retained) per item. No ingestion path scans retained state.
 func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -137,8 +136,7 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 			st.counters[CounterInvalidMeasurements]++
 			continue
 		}
-		if st.observeVital(b.ExperienceID, v, attrs, now) {
-			origin := st.observations[observationKey{b.ExperienceID, v.Name}].Value.(*vitalObservation).attrs
+		if origin, admitted := st.observeVital(b.ExperienceID, v, attrs, now); admitted {
 			v.Origin = &beacon.VitalOrigin{
 				PageGroup:  origin.page,
 				Browser:    origin.browser,
@@ -182,7 +180,7 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 						attrs:    attrs,
 					})
 				} else if el := st.observations[key]; el != nil {
-					st.observationOrder.Remove(el)
+					st.observationOrder.remove(el)
 					delete(st.observations, key)
 				}
 			}
@@ -241,8 +239,8 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 			obs.Events = append(obs.Events, resourceEvents[i])
 		}
 	}
-	// Transport receipt alone is not a fresh measured observation. In particular,
-	// a replay must not extend observed-session or page-session windows.
+	// Identified observations renew session membership only when newly admitted.
+	// Errors, logs, spans and custom events do not carry this replay guarantee.
 	if len(obs.Vitals) > 0 || len(obs.Events) > 0 || len(obs.Errors) > 0 || len(obs.Logs) > 0 || len(obs.Spans) > 0 ||
 		obs.Navigation != nil ||
 		len(obs.Resources) > 0 {
@@ -298,7 +296,11 @@ func measurementAttributes(b *beacon.Beacon) attributes {
 	}
 }
 func (st *siteState) admitIdentity(key identityKey, revision uint64, now time.Time) bool {
-	if el := st.identities[key]; el != nil {
+	index, order := st.identities, &st.identityOrder
+	if key.kind == "resource" {
+		index, order = st.resourceIdentities, &st.resourceIdentityOrder
+	}
+	if el := index[key]; el != nil {
 		old := el.Value.(*identity)
 		if now.Sub(old.received) <= identityRetention {
 			if revision <= old.revision {
@@ -307,31 +309,48 @@ func (st *siteState) admitIdentity(key identityKey, revision uint64, now time.Ti
 			old.revision = revision
 			if now.After(old.received) {
 				old.received = now
+				order.fix(el)
 			}
-			st.identityOrder.MoveToBack(el)
 			return true
 		}
-		st.identityOrder.Remove(el)
-		delete(st.identities, key)
+		order.remove(el)
+		delete(index, key)
 	}
-	if st.identityOrder.Len() >= maxWindowObservations {
-		el := st.identityOrder.Front()
-		old := el.Value.(*identity)
-		if now.Sub(old.received) <= identityRetention {
-			st.identityLoss.add(now, st.window)
-			st.counters[CounterSamplesDropped]++
-		}
-		delete(st.identities, old.key)
-		st.identityOrder.Remove(el)
-	}
-	st.identities[key] = st.identityOrder.PushBack(&identity{
+	entry := &identity{
 		key:      key,
 		revision: revision,
 		received: now,
-	})
+	}
+	if victim := order.capacityVictim(entry); victim != nil {
+		old := victim.(*identity)
+		if st.lastAccepted.Sub(old.received) <= identityRetention {
+			st.loseIdentity(old.key)
+		}
+		if old == entry {
+			return true
+		}
+		delete(index, old.key)
+	}
+	index[key] = order.add(entry)
 	return true
 }
-func (st *siteState) observeVital(experience string, v beacon.Vital, attrs attributes, now time.Time) bool {
+
+func (st *siteState) loseIdentity(key identityKey) {
+	kind := key.kind
+	if kind == "vital" {
+		kind = key.item
+	}
+	loss := st.identityLoss[kind]
+	if loss == nil {
+		loss = &lossInterval{}
+		st.identityLoss[kind] = loss
+	}
+	loss.add(st.lastAccepted, st.window)
+	// Every newly admitted identity can renew observed-session membership.
+	st.identitySessionLoss.add(st.lastAccepted, st.window)
+	st.counters[CounterSamplesDropped]++
+}
+func (st *siteState) observeVital(experience string, v beacon.Vital, attrs attributes, now time.Time) (attributes, bool) {
 	key := observationKey{experience, v.Name}
 	if el := st.observations[key]; el != nil {
 		attrs = el.Value.(*vitalObservation).attrs
@@ -346,17 +365,19 @@ func (st *siteState) observeVital(experience string, v beacon.Vital, attrs attri
 		if now.Sub(old.received) <= identityRetention {
 			if old.metricID != v.ID {
 				st.counters[CounterInvalidMeasurements]++
-				return false
+				return attrs, false
 			}
 			attrs = old.attrs
 		}
 	}
 	if !st.admitIdentity(ledgerKey, v.Revision, now) {
-		return false
+		return attrs, false
 	}
-	evidence := st.identities[ledgerKey].Value.(*identity)
-	evidence.metricID = v.ID
-	evidence.attrs = attrs
+	if el := st.identities[ledgerKey]; el != nil {
+		evidence := el.Value.(*identity)
+		evidence.metricID = v.ID
+		evidence.attrs = attrs
+	}
 	st.putObservation(vitalObservation{
 		key:      key,
 		metricID: v.ID,
@@ -366,22 +387,26 @@ func (st *siteState) observeVital(experience string, v beacon.Vital, attrs attri
 		element:  v.Element,
 		attrs:    attrs,
 	})
-	return true
+	return attrs, true
 }
 func (st *siteState) putObservation(v vitalObservation) {
 	if el := st.observations[v.key]; el != nil {
 		old := el.Value.(*vitalObservation)
+		changed := v.received.After(old.received)
 		if old.received.After(v.received) {
 			v.received = old.received
 		}
 		*old = v
-		st.observationOrder.MoveToBack(el)
+		if changed {
+			st.observationOrder.fix(el)
+		}
 		return
 	}
-	if st.observationOrder.Len() >= maxWindowObservations {
-		el := st.observationOrder.Front()
-		old := el.Value.(*vitalObservation)
-		if !old.received.Before(v.received.Add(-st.window)) {
+	entry := new(vitalObservation)
+	*entry = v
+	if victim := st.observationOrder.capacityVictim(entry); victim != nil {
+		old := victim.(*vitalObservation)
+		if !old.received.Before(st.lastAccepted.Add(-st.window)) {
 			loss := st.vitalLoss[old.key.name]
 			if loss == nil {
 				loss = &lossInterval{}
@@ -390,68 +415,61 @@ func (st *siteState) putObservation(v vitalObservation) {
 			loss.add(old.received, st.window)
 			st.counters[CounterSamplesDropped]++
 		}
+		if old == entry {
+			return
+		}
 		delete(st.observations, old.key)
-		st.observationOrder.Remove(el)
 	}
-	entry := new(vitalObservation)
-	*entry = v
-	st.observations[v.key] = st.observationOrder.PushBack(entry)
+	st.observations[v.key] = st.observationOrder.add(entry)
 }
 func (st *siteState) appendActivity(v activityObservation) {
-	if st.activity.Len() >= maxWindowObservations {
-		el := st.activity.Front()
-		old := el.Value.(*activityObservation)
-		if !old.received.Before(v.received.Add(-st.window)) {
-			st.activityLoss.add(old.received, st.window)
+	order, loss := &st.activity, &st.activityLoss
+	if v.resource != nil {
+		order, loss = &st.resources, &st.resourceLoss
+	}
+	if victim := order.capacityVictim(&v); victim != nil {
+		old := victim.(*activityObservation)
+		if !old.received.Before(st.lastAccepted.Add(-st.window)) {
+			loss.add(old.received, st.window)
 			st.counters[CounterSamplesDropped]++
 		}
-		st.activity.Remove(el)
+		if old == &v {
+			return
+		}
 	}
-	st.activity.PushBack(&v)
+	order.add(&v)
 }
 func (st *siteState) observeSession(id, page string, now time.Time) {
 	if id == "" {
 		return
 	}
-	st.touchObservedSession(st.sessions, st.sessionOrder, id, "", now, &st.sessionLoss)
-	st.touchObservedSession(
-		st.pageSessions,
-		st.pageSessionOrder,
-		strconv.Itoa(len(id))+":"+id+page,
-		page,
-		now,
-		&st.pageSessionLoss,
-	)
+	st.touchObservedSession(st.sessions, &st.sessionOrder, id, "", now, &st.sessionLoss)
+	st.touchObservedSession(st.pageSessions, &st.pageSessionOrder, strconv.Itoa(len(id))+":"+id+page, page, now, &st.pageSessionLoss)
 }
-
-func (st *siteState) touchObservedSession(
-	index map[string]*list.Element,
-	order *list.List,
-	key, page string,
-	now time.Time,
-	loss *lossInterval,
-) {
+func (st *siteState) touchObservedSession(index map[string]*receiptEntry, order *receiptHeap, key, page string, now time.Time, loss *lossInterval) {
 	if el := index[key]; el != nil {
 		v := el.Value.(*sessionObservation)
 		if now.After(v.received) {
 			v.received = now
+			order.fix(el)
 		}
-		order.MoveToBack(el)
 		return
 	}
-	if order.Len() >= maxWindowObservations {
-		el := order.Front()
-		v := el.Value.(*sessionObservation)
-		if !v.received.Before(now.Add(-st.window)) {
-			loss.add(v.received, st.window)
-			st.counters[CounterSamplesDropped]++
-		}
-		delete(index, v.key)
-		order.Remove(el)
-	}
-	index[key] = order.PushBack(&sessionObservation{
+	entry := &sessionObservation{
 		key:      key,
 		page:     page,
 		received: now,
-	})
+	}
+	if victim := order.capacityVictim(entry); victim != nil {
+		v := victim.(*sessionObservation)
+		if !v.received.Before(st.lastAccepted.Add(-st.window)) {
+			loss.add(v.received, st.window)
+			st.counters[CounterSamplesDropped]++
+		}
+		if v == entry {
+			return
+		}
+		delete(index, v.key)
+	}
+	index[key] = order.add(entry)
 }

@@ -35,6 +35,11 @@ func TestErrorsRankCurrentWindowAndFoldComplement(t *testing.T) {
 	}
 	assert.EqualValues(t, 15, count)
 	assert.True(t, groups[10].Other)
+	assert.EqualValues(t, 5, groups[10].Count)
+	for i, fp := range []string{"0", "1", "10", "11", "12", "13", "14", "2", "3", "4"} {
+		assert.Equal(t, fp, groups[i].Fingerprint)
+		assert.EqualValues(t, 1, groups[i].Count)
+	}
 	*now = now.Add(time.Minute + time.Second)
 	b := mk(*now, "s", "/")
 	b.Errors = []beacon.Error{{Fingerprint: "current"}}

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// live.go is the rum-live FUNCTION data source: a bounded ring of recently
-// accepted beacons carrying a page view, a vital, or a JS error. The ring
-// belongs to this aggregator runtime and is guarded by its mutex.
+// live.go is the rum-live FUNCTION data source: a bounded ring of recently admitted
+// document activations, application-view occurrences, vital reports and JS errors.
+// The ring belongs to this aggregator runtime and is guarded by its mutex.
 package aggregate
 
 import (

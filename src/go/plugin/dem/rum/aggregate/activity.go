@@ -17,7 +17,14 @@ func (a *Aggregator) Activity() SiteActivity {
 	defer a.mu.Unlock()
 	now := a.now()
 	st := &a.site
-	r := st.readWindow(now)
+	st.expire(now)
+	var documents, views, errors uint64
+	for _, el := range st.activity.entries {
+		v := el.Value.(*activityObservation)
+		documents += v.documents
+		views += v.views
+		errors += v.errors
+	}
 	age := -1
 	if !st.lastAccepted.IsZero() {
 		age = int(now.Sub(st.lastAccepted) / time.Second)
@@ -30,13 +37,13 @@ func (a *Aggregator) Activity() SiteActivity {
 		RejectedPerMin:         len(st.rejected),
 		BotsPerMin:             len(st.bots),
 		LastBeaconAgeS:         age,
-		ObservedSessions:       r.sessions,
+		ObservedSessions:       len(st.sessions),
 		InvestigatedSessions:   st.investigatedSessions(),
-		PageviewsWindow:        int(r.global.documents),
-		JSErrorsWindow:         r.global.errors,
-		ApplicationViewsWindow: r.global.views,
-		WindowLost:             r.windowLost,
-		SessionsLost:           r.sessionsLost,
+		PageviewsWindow:        int(documents),
+		JSErrorsWindow:         errors,
+		ApplicationViewsWindow: views,
+		WindowLost:             st.activityLoss.current(now) + st.currentIdentityLoss("document", now) + st.currentIdentityLoss("view", now),
+		SessionsLost:           st.sessionLoss.current(now) + st.identitySessionLoss.current(now),
 	}
 }
 func (st *siteState) evictActivity(now time.Time) {

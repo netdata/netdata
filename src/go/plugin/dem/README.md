@@ -88,6 +88,8 @@ that metric's presence in the window; a duplicate does not. Duplicate detection 
 subject to capacity and runtime restart. Identified SDK session lifecycle events follow the same rule, so replay does
 not renew observed-session windows. It is best effort, not exactly-once delivery. Reports arriving after retained
 evidence expires can be counted again. Late observations are not rejected merely to claim perfect deduplication.
+Errors, console logs, spans and ordinary custom events are not covered by this identity-based replay suppression;
+repeated delivery of these records can count again and refresh observed-session activity.
 
 Population charts show retained observations, good/needs-improvement/poor counts and capacity-loss evidence. Percentiles
 are unavailable when there are no observations or the local population is incomplete. A zero CLS or zero timing is a
@@ -184,8 +186,8 @@ With `sample_rate: 0` and `always_keep: []`, only measurements and live activity
 are enabled. With `measure_sample_rate: 0`, the generated bootstrap does not start the SDK, and the receiver returns
 204 for otherwise admissible collection attempts without decoding or recording them. Existing origin, size, bot and
 rate checks still apply. Intentional discard is neither accepted traffic nor a rejection/export-loss count. The
-Sites table reports `collection_disabled`. Browser measurement charts are absent, so the stock missing-beacon alert
-does not treat intentional disablement as a broken installation; receiver diagnostics remain available.
+Sites table reports `collection_disabled`. Browser measurement charts are absent; receiver diagnostics remain
+available. Quiet traffic does not raise a stock missing-beacon alarm.
 
 Already open pages can continue sending and propagating trace context until navigation. Positive collection-rate
 changes apply to new SDK sampling decisions; valid existing SDK sessions keep their earlier decision. Collection

@@ -228,7 +228,7 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 		})
 	}
 	if hist != nil && sd.investigated && !recorded &&
-		(len(b.Logs) > 0 || len(b.Spans) > 0 || b.Navigation != nil || len(b.Resources) > 0) {
+		(len(b.Vitals) > 0 || len(b.Logs) > 0 || len(b.Spans) > 0 || b.Navigation != nil || len(b.Resources) > 0) {
 		event := sessionEvent{
 			ts:      now,
 			typ:     "activity",

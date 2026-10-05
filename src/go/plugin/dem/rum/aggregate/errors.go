@@ -7,14 +7,12 @@ import (
 )
 
 const (
-	maxErrorGroups   = 200
 	errMaxStackBytes = 4096
 	errorGroupsTopN  = 10
 )
 
 type errorKey struct {
 	fingerprint string
-	other       bool
 }
 type errorPopulation struct {
 	count   uint64
@@ -47,28 +45,15 @@ func (r *windowRead) addError(v *activityObservation) {
 	}
 	g := r.errorGroups[key]
 	if g == nil {
-		if len(r.errorGroups) >= maxErrorGroups {
-			key = errorKey{
-				fingerprint: Other,
-				other:       true,
-			}
-		}
-		g = r.errorGroups[key]
-		if g == nil {
-			g = &errorPopulation{
-				message: v.message,
-			}
-			r.errorGroups[key] = g
-		}
+		g = &errorPopulation{message: v.message}
+		r.errorGroups[key] = g
 	}
 	g.count += v.errors
 }
 func (r *windowRead) rankErrorGroups() []ErrorChartGroup {
 	var keys []errorKey
 	for key := range r.errorGroups {
-		if !key.other {
-			keys = append(keys, key)
-		}
+		keys = append(keys, key)
 	}
 	sort.Slice(keys, func(i, j int) bool {
 		a, b := r.errorGroups[keys[i]], r.errorGroups[keys[j]]
@@ -89,12 +74,6 @@ func (r *windowRead) rankErrorGroups() []ErrorChartGroup {
 		})
 	}
 	var count uint64
-	if g := r.errorGroups[errorKey{
-		fingerprint: Other,
-		other:       true,
-	}]; g != nil {
-		count = g.count
-	}
 	for _, key := range keys[n:] {
 		count += r.errorGroups[key].count
 	}

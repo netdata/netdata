@@ -7,6 +7,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOutOfOrderReceiptsDoNotHideExpiredState(t *testing.T) {
@@ -18,6 +19,7 @@ func TestOutOfOrderReceiptsDoNotHideExpiredState(t *testing.T) {
 	assert.EqualValues(t, 1, snap.PageviewsWindow)
 	assert.Equal(t, 1, snap.ObservedSessions)
 	rows, _ := a.Live(0, 100)
+	require.NotEmpty(t, rows)
 	for _, row := range rows {
 		assert.Equal(t, "/new", row.Page)
 	}

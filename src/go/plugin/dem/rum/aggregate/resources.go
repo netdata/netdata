@@ -15,7 +15,6 @@ const apiName = "__api"
 
 type hostKey struct {
 	host    string
-	other   bool
 	unknown bool
 }
 type resourcePopulation struct {
@@ -82,17 +81,8 @@ func (r *windowRead) addResource(v *activityObservation) {
 	}
 	g := r.resourceGroups[key]
 	if g == nil {
-		if len(r.resourceGroups) >= maxTrackedGroups {
-			key = hostKey{
-				host:  Other,
-				other: true,
-			}
-		}
-		g = r.resourceGroups[key]
-		if g == nil {
-			g = &resourcePopulation{}
-			r.resourceGroups[key] = g
-		}
+		g = &resourcePopulation{}
+		r.resourceGroups[key] = g
 	}
 	g.count++
 	if resource.HasDuration {
@@ -105,9 +95,7 @@ func (r *windowRead) addResource(v *activityObservation) {
 func (r *windowRead) rankResourceHosts() []ResourceHostGroup {
 	var keys []hostKey
 	for key := range r.resourceGroups {
-		if !key.other {
-			keys = append(keys, key)
-		}
+		keys = append(keys, key)
 	}
 	sort.Slice(keys, func(i, j int) bool {
 		a, b := r.resourceGroups[keys[i]], r.resourceGroups[keys[j]]
@@ -127,20 +115,12 @@ func (r *windowRead) rankResourceHosts() []ResourceHostGroup {
 			Host:     key.host,
 			Unknown:  key.unknown,
 			Count:    g.count,
-			Duration: measurementStats(apiName, g.values, r.windowLost),
-			Lost:     r.windowLost,
+			Duration: measurementStats(apiName, g.values, r.resourcesLost),
+			Lost:     r.resourcesLost,
 		})
 	}
 	other := resourcePopulation{}
 	present := false
-	if g := r.resourceGroups[hostKey{
-		host:  Other,
-		other: true,
-	}]; g != nil {
-		other.count = g.count
-		other.values = append(other.values, g.values...)
-		present = true
-	}
 	for _, key := range keys[n:] {
 		g := r.resourceGroups[key]
 		other.count += g.count
@@ -152,8 +132,8 @@ func (r *windowRead) rankResourceHosts() []ResourceHostGroup {
 			Host:     Other,
 			Other:    true,
 			Count:    other.count,
-			Duration: measurementStats(apiName, other.values, r.windowLost),
-			Lost:     r.windowLost,
+			Duration: measurementStats(apiName, other.values, r.resourcesLost),
+			Lost:     r.resourcesLost,
 		})
 	}
 	return out

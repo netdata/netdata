@@ -95,14 +95,14 @@ func TestObservedSessionCapacityIsExplicit(t *testing.T) {
 	*now = now.Add(time.Minute + time.Second)
 	assert.Zero(t, a.Snapshot().SessionsLost)
 }
-func TestPageInventoryBoundIsExplicit(t *testing.T) {
+func TestPageInventoryIncludesEveryRetainedGroup(t *testing.T) {
 	a, now := newAgg(time.Minute)
-	for i := range maxTrackedGroups + 1 {
+	for i := range 1101 {
 		a.Ingest(mk(*now, "s", fmt.Sprintf("/page_%d", i)))
 	}
 	pages := a.Pages()
-	assert.Len(t, pages, maxTrackedGroups)
-	assert.Positive(t, pages[0].Lost)
+	assert.Len(t, pages, 1101)
+	assert.Zero(t, pages[0].Lost)
 }
 func TestSelectorsUseReplacedVitalPopulation(t *testing.T) {
 	a, now := newAgg(time.Minute)

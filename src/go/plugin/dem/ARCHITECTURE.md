@@ -128,13 +128,18 @@ Concurrent body reads can complete out of receipt-time order. Rolling-window rea
 session activity and deduplication keep the newest receipt time without rewriting event timestamps.
 
 `rum/aggregate` owns one canonical latest observation per `(experience, vital)` and separate bounded activation,
-view/resource identity, activity and observed-session records. Facet distributions and top-N complements derive from
-these canonical populations at read time. Ingestion is proportional to incoming reports, without scans of retained
-measurements; snapshots scan bounded retained state and sort the populations needed for percentiles and ranking.
+view/resource identity, activity and observed-session records. Resource observations and replay evidence have separate
+retention from document/vital activity, so resource pressure cannot invalidate unrelated measurements. Facet distributions
+and top-N complements derive from canonical populations at read time; host/error grouping is bounded by those retained
+observations and folded only after ranking. Receipt-ordered retention costs O(log retained) per changed entry without
+scanning retained measurements during ingestion. Snapshots scan bounded state and sort populations for percentiles and
+ranking; the Sites summary scans only its required activity and session populations.
 Measurement retention is independent of the investigation-session LRU and live ring. Pages reads expose all retained
 page groups rather than chart top-N only. Capacity loss conservatively invalidates affected results and remains visible
 until the newest relevant loss expires. This constant-space loss episode may include older loss during continuous
-overload; it is not an exact window-loss count. The drop counter remains cumulative actual loss.
+overload; it is not an exact window-loss count. The drop counter remains cumulative actual loss. Identity loss is scoped
+to affected measurements; resource identity loss still invalidates session completeness because resource-only reports
+can renew session activity. Unidentified errors, logs, spans and ordinary custom events have no replay suppression.
 
 Faro page metadata captures a frozen activation ID and document-entry URL before queueing. A persisted pageshow starts
 a new activation before SDK BFCache reports are generated. Custom metadata providers retain SDK browser/OS/sdk fields;
