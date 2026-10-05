@@ -294,8 +294,9 @@ def _signal_tuning(
 def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint: str | None) -> dict:
     """The otel.yaml override document: pinned per-agent base_dir + both endpoints, plus any set knobs.
 
-    Only fields the caller set are emitted; the plugin keeps its stock defaults
-    for the rest. ``base_dir`` is always pinned under the run dir, so every
+    Apart from ``base_dir`` and the two endpoint addresses, which are always
+    emitted, only fields the caller set are emitted; the plugin keeps its stock
+    defaults for the rest. ``base_dir`` is always pinned under the run dir, so every
     derived dir (``{base_dir}/{logs,traces}/{wal,index,catalog}``, the shared
     download cache ``{base_dir}/remote-read``, ``{base_dir}/shared/seq_highwater``)
     lands in isolation — one pin isolates both signals. ``otlp_http_endpoint``

@@ -1,7 +1,7 @@
 from netdata_mcp.tools.otel_config import _endpoint_error
 
 
-def test_endpoint_error_accepts_valid_host_port():
+def test_endpoint_error_accepts_ip_port():
     assert _endpoint_error("a", "127.0.0.1:4317") is None
     assert _endpoint_error("a", "0.0.0.0:65535") is None
     assert _endpoint_error("a", "[::1]:4317") is None
@@ -40,7 +40,7 @@ def test_endpoint_error_rejects_port_out_of_range():
     assert err is not None and "range" in err.message
 
 
-def test_http_endpoint_error_accepts_valid_host_port():
+def test_http_endpoint_error_accepts_an_ip_and_rejects_a_hostname():
     assert _endpoint_error("a", "127.0.0.1:4318", name="otlp_http_endpoint") is None
     err = _endpoint_error("a", "localhost:4318", name="otlp_http_endpoint")
     assert err is not None and "not a hostname" in err.message and "otlp_http_endpoint" in err.message
